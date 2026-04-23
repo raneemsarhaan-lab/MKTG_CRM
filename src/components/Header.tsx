@@ -24,21 +24,14 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
   const initials = currentUser.name.slice(0, 2).toUpperCase()
 
   return (
-    <header
-      style={{
-        height: 56,
-        backgroundColor: '#0d0f18',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        padding: '0 1.25rem',
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        zIndex: 30,
-      }}
-    >
+    <header style={{
+      height: 56, backgroundColor: '#fff',
+      borderBottom: '1px solid #e2e8f0',
+      display: 'flex', alignItems: 'center', gap: '0.75rem',
+      padding: '0 1.25rem', flexShrink: 0,
+      position: 'sticky', top: 0, zIndex: 30,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    }}>
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem', flexShrink: 0 }}>
         <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -46,7 +39,7 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
             <path d="M3 6h18M3 12h12M3 18h8" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.02em' }}>Fluxo</span>
+        <span style={{ color: '#0f172a', fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.02em' }}>Fluxo</span>
       </div>
 
       {/* Brand filter pills */}
@@ -54,15 +47,11 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
         <button
           onClick={() => setActiveBrand(null)}
           style={{
-            padding: '0.2rem 0.7rem',
-            borderRadius: 99,
-            border: '1px solid',
-            fontSize: '0.72rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backgroundColor: activeBrand === null ? 'rgba(255,255,255,0.12)' : 'transparent',
-            borderColor: activeBrand === null ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
-            color: activeBrand === null ? '#e2e8f0' : '#475569',
+            padding: '0.2rem 0.7rem', borderRadius: 99, border: '1px solid',
+            fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+            backgroundColor: activeBrand === null ? '#f1f5f9' : 'transparent',
+            borderColor: activeBrand === null ? '#cbd5e1' : '#e2e8f0',
+            color: activeBrand === null ? '#475569' : '#94a3b8',
           }}
         >
           All
@@ -76,22 +65,17 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
               key={b}
               onClick={() => setActiveBrand(active ? null : b)}
               style={{
-                padding: '0.2rem 0.7rem',
-                borderRadius: 99,
-                border: `1px solid ${active ? color + '66' : 'rgba(255,255,255,0.07)'}`,
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                backgroundColor: active ? color + '22' : 'transparent',
-                color: active ? color : '#475569',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
+                padding: '0.2rem 0.7rem', borderRadius: 99,
+                border: `1px solid ${active ? color + '55' : '#e2e8f0'}`,
+                fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+                backgroundColor: active ? color + '15' : 'transparent',
+                color: active ? color : '#94a3b8',
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
               }}
             >
               {BRAND_SHORT[b]}
               {count > 0 && (
-                <span style={{ fontSize: '0.6rem', backgroundColor: active ? color + '33' : 'rgba(255,255,255,0.06)', borderRadius: 99, padding: '0 0.3rem', color: active ? color : '#334155' }}>
+                <span style={{ fontSize: '0.6rem', backgroundColor: active ? color + '25' : '#f1f5f9', borderRadius: 99, padding: '0 0.3rem', color: active ? color : '#94a3b8' }}>
                   {count}
                 </span>
               )}
@@ -100,7 +84,6 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
         })}
       </div>
 
-      {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* Search */}
@@ -111,19 +94,14 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Search tasks..."
           style={{
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 8,
+            backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
             padding: '0.35rem 0.75rem 0.35rem 2rem',
-            color: '#e2e8f0',
-            fontSize: '0.8rem',
-            outline: 'none',
-            width: 180,
+            color: '#0f172a', fontSize: '0.8rem', outline: 'none', width: 180,
           }}
         />
         <svg style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.35 }} width="12" height="12" viewBox="0 0 24 24" fill="none">
-          <circle cx="11" cy="11" r="8" stroke="#fff" strokeWidth="2" />
-          <path d="m21 21-4.35-4.35" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="11" cy="11" r="8" stroke="#0f172a" strokeWidth="2" />
+          <path d="m21 21-4.35-4.35" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
 
@@ -131,15 +109,9 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
       <button
         onClick={onNewTask}
         style={{
-          padding: '0.35rem 0.85rem',
-          backgroundColor: '#6366f1',
-          border: 'none',
-          borderRadius: 8,
-          color: '#fff',
-          fontSize: '0.8rem',
-          fontWeight: 600,
-          cursor: 'pointer',
-          flexShrink: 0,
+          padding: '0.35rem 0.85rem', backgroundColor: '#6366f1', border: 'none',
+          borderRadius: 8, color: '#fff', fontSize: '0.8rem', fontWeight: 600,
+          cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
         }}
         onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#4f46e5' }}
         onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#6366f1' }}
@@ -158,9 +130,9 @@ export function Header({ onNewTask }: { onNewTask: () => void }) {
         <button
           onClick={logout}
           title="Switch user"
-          style={{ background: 'none', border: 'none', color: '#334155', cursor: 'pointer', fontSize: '0.72rem' }}
+          style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '0.72rem' }}
           onMouseEnter={e => { e.currentTarget.style.color = '#94a3b8' }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#334155' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#cbd5e1' }}
         >
           ↩
         </button>

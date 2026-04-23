@@ -6,38 +6,23 @@
 }
 
 @layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
 
   body {
     @apply font-sans antialiased;
-    background-color: #0a0c12;
-    color: #e2e8f0;
+    background-color: #f8fafc;
+    color: #0f172a;
     margin: 0;
     padding: 0;
     overflow: hidden;
   }
 
-  /* Dark scrollbar */
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.1);
-    border-radius: 99px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.18);
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
-  /* Dark native select option background */
-  select option {
-    background-color: #1a1d28;
-    color: #e2e8f0;
-  }
+  select option { background-color: #fff; color: #0f172a; }
+
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; cursor: pointer; }
 }
