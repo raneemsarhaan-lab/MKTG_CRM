@@ -1,152 +1,153 @@
-import React, { useState } from 'react';
-import { useStore } from '../store/useStore';
-import { X, Save, Calendar, User, Tag, FileText } from 'lucide-react';
-import { format } from 'date-fns';
-import { Task } from '../types';
+import React, { useState } from 'react'
+import { useStore } from '../store/useStore'
+import { Brand, ContentType, Priority } from '../types'
+import { playCreate } from '../lib/sounds'
 
-interface TaskFormProps {
-  onClose: () => void;
-  taskToEdit?: Task;
+const BRANDS: Brand[] = ['Islam Personal Branding', 'The Strategy Community', 'Omnisight', 'Forefront']
+const CTYPES: ContentType[] = ['Post', 'Video', 'Reel', 'Design', 'Email', 'Story', 'Deck', 'Other']
+const PRIORITIES: Priority[] = ['High', 'Medium', 'Low']
+
+const FIELD: React.CSSProperties = {
+  width: '100%',
+  padding: '0.6rem 0.75rem',
+  backgroundColor: '#1a1d28',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 10,
+  color: '#e2e8f0',
+  fontSize: '0.85rem',
+  outline: 'none',
+  boxSizing: 'border-box',
 }
 
-export const TaskForm: React.FC<TaskFormProps> = ({ onClose, taskToEdit }) => {
-  const { taskTypes, teamMembers, addTask, updateTask } = useStore();
-  
-  const [formData, setFormData] = useState({
-    name: taskToEdit?.name || '',
-    type: taskToEdit?.type || taskTypes[0]?.name || '',
-    owner: taskToEdit?.owner || teamMembers[0]?.name || '',
-    stakeholders: taskToEdit?.stakeholders || [] as string[],
-    start_date: taskToEdit?.start_date || format(new Date(), 'yyyy-MM-dd'),
-    publishing_date: taskToEdit?.publishing_date || '',
-    notes: taskToEdit?.notes || '',
-  });
+const LBL: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.72rem',
+  color: '#64748b',
+  marginBottom: '0.35rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  fontWeight: 600,
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.type || !formData.owner) return;
-    
-    if (taskToEdit) {
-      updateTask(taskToEdit.id, formData);
-    } else {
-      addTask({
-        ...formData,
-        created_date: format(new Date(), 'yyyy-MM-dd'),
-      });
-    }
-    onClose();
-  };
+interface Props { onClose: () => void }
+
+export function TaskForm({ onClose }: Props) {
+  const { addTask, members, currentUser } = useStore()
+  const today = new Date().toISOString().slice(0, 10)
+
+  const [form, setForm] = useState({
+    name: '',
+    account: BRANDS[0] as Brand,
+    priority: 'Medium' as Priority,
+    ctype: 'Post' as ContentType,
+    assignee: members[0]?.name ?? '',
+    due: today,
+    hours: 2,
+  })
+  const [error, setError] = useState('')
+
+  function patch<K extends keyof typeof form>(k: K, v: typeof form[K]) {
+    setForm(prev => ({ ...prev, [k]: v }))
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Task name is required'); return }
+    if (!form.assignee) { setError('Assignee is required'); return }
+    addTask({
+      name: form.name.trim(),
+      account: form.account,
+      initiator: currentUser?.role ?? 'Content Manager',
+      assignee: form.assignee,
+      priority: form.priority,
+      due: form.due,
+      hours: form.hours,
+      status: 'todo',
+      ctype: form.ctype,
+    })
+    playCreate()
+    onClose()
+  }
 
   return (
-    <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <h3 className="text-xl font-bold text-gray-900">
-            {taskToEdit ? 'Edit Task' : 'Create New Task'}
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ backgroundColor: '#141720', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ color: '#f1f5f9', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>New Task</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-              <FileText className="w-3.5 h-3.5" /> Task Name
-            </label>
-            <input 
-              autoFocus
-              required
-              type="text"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Q2 Strategy LinkedIn Post"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-            />
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={LBL}>Task Name *</label>
+            <input type="text" value={form.name} onChange={e => patch('name', e.target.value)}
+              placeholder="e.g. Ramadan Campaign Post" style={FIELD} autoFocus />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <Tag className="w-3.5 h-3.5" /> Category
-              </label>
-              <select 
-                value={formData.type}
-                onChange={e => setFormData({ ...formData, type: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-              >
-                {taskTypes.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={LBL}>Brand</label>
+              <select value={form.account} onChange={e => patch('account', e.target.value as Brand)} style={{ ...FIELD, cursor: 'pointer' }}>
+                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <User className="w-3.5 h-3.5" /> Owner
-              </label>
-              <select 
-                value={formData.owner}
-                onChange={e => setFormData({ ...formData, owner: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-              >
-                {teamMembers.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+            <div>
+              <label style={LBL}>Priority</label>
+              <select value={form.priority} onChange={e => patch('priority', e.target.value as Priority)} style={{ ...FIELD, cursor: 'pointer' }}>
+                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <Calendar className="w-3.5 h-3.5" /> Start Date
-              </label>
-              <input 
-                type="date"
-                value={formData.start_date}
-                onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-              />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={LBL}>Content Type</label>
+              <select value={form.ctype} onChange={e => patch('ctype', e.target.value as ContentType)} style={{ ...FIELD, cursor: 'pointer' }}>
+                {CTYPES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <Calendar className="w-3.5 h-3.5" /> Publish Date (Opt)
-              </label>
-              <input 
-                type="date"
-                value={formData.publishing_date}
-                onChange={e => setFormData({ ...formData, publishing_date: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-              />
+            <div>
+              <label style={LBL}>Assignee</label>
+              <select value={form.assignee} onChange={e => patch('assignee', e.target.value)} style={{ ...FIELD, cursor: 'pointer' }}>
+                {members.map(m => <option key={m.name} value={m.name}>{m.name} — {m.role}</option>)}
+              </select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Notes
-            </label>
-            <textarea 
-              value={formData.notes}
-              onChange={e => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-              placeholder="Any additional details..."
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all resize-none"
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={LBL}>Due Date</label>
+              <input type="date" value={form.due} onChange={e => patch('due', e.target.value)} style={{ ...FIELD, colorScheme: 'dark' }} />
+            </div>
+            <div>
+              <label style={LBL}>Est. Hours</label>
+              <input type="number" min={0.5} max={100} step={0.5} value={form.hours} onChange={e => patch('hours', parseFloat(e.target.value) || 1)} style={FIELD} />
+            </div>
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button 
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="flex-1 py-3 px-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-            >
-              <Save className="w-5 h-5" /> {taskToEdit ? 'Save Changes' : 'Create Task'}
-            </button>
-          </div>
+          {error && <p style={{ color: '#f87171', fontSize: '0.8rem', margin: 0 }}>{error}</p>}
+
+          <p style={{ fontSize: '0.72rem', color: '#334155', margin: 0 }}>
+            As <span style={{ color: '#64748b' }}>{currentUser?.role}</span>
+            {currentUser?.role === 'Content Creator' ? ' → 9-stage flow (incl. C-Check)' : ' → 8-stage flow (no C-Check)'}
+          </p>
+
+          <button
+            type="submit"
+            style={{ padding: '0.75rem', backgroundColor: '#6366f1', border: 'none', borderRadius: 10, color: '#fff', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', marginTop: '0.25rem' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#4f46e5' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#6366f1' }}
+          >
+            Create Task
+          </button>
         </form>
       </div>
     </div>
-  );
-};
+  )
+}

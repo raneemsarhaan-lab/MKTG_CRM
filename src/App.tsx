@@ -1,114 +1,106 @@
-import React, { useState } from 'react';
-import { StoreProvider } from './store/useStore';
-import { ChatPanel } from './components/ChatPanel';
-import { Dashboard } from './components/Dashboard';
-import { CalendarView } from './components/CalendarView';
-import { TaskListView } from './components/TaskListView';
-import { TeamView } from './components/TeamView';
-import { SettingsView } from './components/SettingsView';
-import { LayoutDashboard, Calendar, MessageSquare, Users, Settings, ClipboardList } from 'lucide-react';
-import { cn } from './lib/utils';
+import React, { useState } from 'react'
+import { useStore } from './store/useStore'
+import { LoginView } from './components/LoginView'
+import { KanbanBoard } from './components/KanbanBoard'
+import { TeamView } from './components/TeamView'
+import { CapacityView } from './components/CapacityView'
+import { TaskModal } from './components/TaskModal'
+import { TaskForm } from './components/TaskForm'
+import { CelebrationOverlay } from './components/CelebrationOverlay'
+import { Header } from './components/Header'
 
-type View = 'dashboard' | 'calendar' | 'tasks' | 'team' | 'settings';
+type View = 'kanban' | 'team' | 'capacity'
 
-export default function App() {
-  const [activeView, setActiveView] = useState<View>('dashboard');
-  const [isChatOpen, setIsChatOpen] = useState(true);
+const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
+  { id: 'kanban',   label: 'Pipeline', icon: '⚡' },
+  { id: 'team',     label: 'Team',     icon: '👥' },
+  { id: 'capacity', label: 'Capacity', icon: '📊' },
+]
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'tasks', label: 'Task List', icon: ClipboardList },
-    { id: 'team', label: 'Team', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) {
+  const { currentUser } = useStore()
+  const isAdmin = currentUser?.access === 'admin'
+
+  const items = NAV_ITEMS.filter(item => {
+    if (item.id === 'capacity') return isAdmin
+    return true
+  })
 
   return (
-    <StoreProvider>
-      <div className="flex h-screen bg-gray-50 text-gray-900 font-sans">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                <ClipboardList className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg leading-tight">Marketing Ops</h1>
-                <p className="text-xs text-gray-500 font-medium">Assistant v1.0</p>
-              </div>
-            </div>
+    <aside
+      style={{
+        width: 56,
+        backgroundColor: '#0d0f18',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingTop: '0.75rem',
+        gap: '0.25rem',
+        flexShrink: 0,
+      }}
+    >
+      {items.map(item => (
+        <button
+          key={item.id}
+          onClick={() => setView(item.id)}
+          title={item.label}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: view === item.id ? 'rgba(99,102,241,0.2)' : 'transparent',
+            outline: view === item.id ? '1px solid rgba(99,102,241,0.35)' : 'none',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => {
+            if (view !== item.id) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'
+          }}
+          onMouseLeave={e => {
+            if (view !== item.id) e.currentTarget.style.backgroundColor = 'transparent'
+          }}
+        >
+          {item.icon}
+        </button>
+      ))}
+    </aside>
+  )
+}
 
-            <nav className="space-y-1">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id as View)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
-                    activeView === item.id
-                      ? "bg-indigo-50 text-indigo-600"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+function AppShell() {
+  const { currentUser, selectedTaskId, showTaskForm, setShowTaskForm } = useStore()
+  const [view, setView] = useState<View>('kanban')
 
-          <div className="mt-auto p-6 border-t border-gray-100">
-            <button 
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              className={cn(
-                "w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all",
-                isChatOpen 
-                  ? "bg-gray-900 text-white shadow-lg shadow-gray-200" 
-                  : "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
-              )}
-            >
-              <MessageSquare className="w-4 h-4" />
-              {isChatOpen ? 'Close Assistant' : 'Open Assistant'}
-            </button>
-          </div>
-        </aside>
+  if (!currentUser) return <LoginView />
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0">
-            <h2 className="text-xl font-bold text-gray-800 capitalize">{activeView.replace('-', ' ')}</h2>
-            <div className="flex items-center gap-4">
-              <div className="flex -space-x-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 overflow-hidden">
-                    <img src={`https://picsum.photos/seed/user${i}/32/32`} alt="User" referrerPolicy="no-referrer" />
-                  </div>
-                ))}
-              </div>
-              <div className="h-8 w-px bg-gray-200 mx-2" />
-              <button className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign Out</button>
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-6xl mx-auto">
-              {activeView === 'dashboard' && <Dashboard />}
-              {activeView === 'calendar' && <CalendarView />}
-              {activeView === 'tasks' && <TaskListView />}
-              {activeView === 'team' && <TeamView />}
-              {activeView === 'settings' && <SettingsView />}
-            </div>
-          </div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#0a0c12', overflow: 'hidden' }}>
+      <Header onNewTask={() => setShowTaskForm(true)} />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Sidebar view={view} setView={setView} />
+        <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {view === 'kanban'   && <KanbanBoard />}
+          {view === 'team'     && <div style={{ overflowY: 'auto', flex: 1 }}><TeamView /></div>}
+          {view === 'capacity' && <div style={{ overflowY: 'auto', flex: 1 }}><CapacityView /></div>}
         </main>
-
-        {/* Chat Panel (Assistant) */}
-        {isChatOpen && (
-          <aside className="w-96 shrink-0">
-            <ChatPanel />
-          </aside>
-        )}
       </div>
-    </StoreProvider>
-  );
+
+      {/* Modals */}
+      {selectedTaskId !== null && <TaskModal />}
+      {showTaskForm && <TaskForm onClose={() => setShowTaskForm(false)} />}
+
+      {/* Celebration */}
+      <CelebrationOverlay />
+    </div>
+  )
+}
+
+export default function App() {
+  return <AppShell />
 }

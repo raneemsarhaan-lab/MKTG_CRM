@@ -1,50 +1,51 @@
-export type TaskStatus = "Not started" | "In progress" | "Overdue" | "Done";
+export type StageId =
+  | 'todo'
+  | 'c-prog'
+  | 'c-final'
+  | 'c-check'
+  | 'r-design'
+  | 'd-prog'
+  | 'd-check'
+  | 'final-check'
+  | 'publish'
 
-export interface TaskType {
-  name: string;
-  sla_days: number;
-  default_owner: string;
-  default_stakeholders: string[];
-  reminder_days_before: number;
-  description?: string;
-}
-
-export interface TeamMember {
-  name: string;
-  role: string;
-  email: string;
-  google_chat_id: string;
-  is_admin: boolean;
-}
+export type ContentType = 'Post' | 'Video' | 'Reel' | 'Design' | 'Email' | 'Story' | 'Deck' | 'Other'
+export type Brand = 'Islam Personal Branding' | 'The Strategy Community' | 'Omnisight' | 'Forefront'
+export type Priority = 'High' | 'Medium' | 'Low'
+export type AccessLevel = 'admin' | 'superuser' | 'user'
+export type Phase = 'content' | 'design'
 
 export interface Task {
-  id: number;
-  name: string;
-  type: string;
-  owner: string;
-  stakeholders: string[];
-  created_date: string;
-  start_date: string;
-  due_date: string;
-  publishing_date?: string;
-  status: TaskStatus;
-  notes?: string;
-  notifications_sent: string[];
+  id: number
+  name: string
+  account: Brand
+  initiator: string   // role name of creator
+  assignee: string    // member name of executor
+  priority: Priority
+  due: string         // YYYY-MM-DD
+  hours: number
+  status: StageId
+  ctype: ContentType
+  stageDate: string   // date task entered current stage, YYYY-MM-DD
 }
 
-export interface NotificationRules {
-  new_task_gchat: boolean;
-  new_task_email: boolean;
-  morning_briefing_gchat: boolean;
-  sla_reminder_gchat: boolean;
-  overdue_reminder_gchat: boolean;
-  overdue_email_escalation: boolean;
-  weekly_digest_email: boolean;
+export interface Member {
+  name: string
+  role: string
+  access: AccessLevel
+  color: string       // hex foreground / accent color
+  bg: string          // hex avatar background
+  tc: string          // tailwind text color class for badges
 }
 
-export interface AppState {
-  taskTypes: TaskType[];
-  teamMembers: TeamMember[];
-  tasks: Task[];
-  notificationRules: NotificationRules;
+export interface Stage {
+  id: StageId
+  label: string
+  phase: Phase
+  reviewer: string
+  skip8: boolean      // skip in 8-stage flow (non-content-creator initiator)
+}
+
+export interface SLAConfig {
+  [stageId: string]: number  // max days in stage before flagging
 }
