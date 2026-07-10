@@ -1,44 +1,45 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { STAGES } from '../data/stages'
 import { TaskCard } from './TaskCard'
 import { Task } from '../types'
 import { differenceInDays, parseISO } from 'date-fns'
 
-const PHASE_COLORS: Record<string, { line: string; label: string }> = {
-  content: { line: '#6366f1', label: '#6366f1' },
-  design:  { line: '#ec4899', label: '#ec4899' },
+const STAGE_META: Record<string, { en: string; color: string }> = {
+  'todo':        { en: 'To Do',             color: '#64748B' },
+  'c-prog':      { en: 'C-In Progress',     color: '#3B82F6' },
+  'c-final':     { en: 'C-Review',          color: '#2E6FB0' },
+  'c-check':     { en: 'C-Check',           color: '#1F5A94' },
+  'r-design':    { en: 'Ready For Design',  color: '#8B5CF6' },
+  'd-prog':      { en: 'D-In Progress',     color: '#7C3AED' },
+  'd-check':     { en: 'D-Check',           color: '#5B3FB5' },
+  'final-check': { en: 'F-Check',           color: '#F59E0B' },
+  'publish':     { en: 'Published',         color: '#22C55E' },
 }
 
-function SLAIndicator({ task, slaConfig }: { task: Task; slaConfig: Record<string, number> }) {
-  const maxDays = slaConfig[task.status] ?? 3
-  const daysIn = differenceInDays(new Date(), parseISO(task.stageDate))
-  const pct = Math.min(daysIn / maxDays, 1)
-  let color = '#22c55e'
-  if (pct >= 1)        color = '#ef4444'
-  else if (pct >= 0.7) color = '#f97316'
-  else if (pct >= 0.4) color = '#eab308'
+const UI = {
+  ink: '#1B1A13',
+  muted: '#9A9A94',
+  cardShadow: '0 1px 2px rgba(26,28,30,.04), 0 4px 12px rgba(26,28,30,.06)',
+}
 
-  return (
-    <div title={`${daysIn}/${maxDays}d in stage`} style={{ marginTop: '0.3rem' }}>
-      <div style={{ height: 2, backgroundColor: '#f1f5f9', borderRadius: 9, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct * 100}%`, backgroundColor: color, borderRadius: 9 }} />
-      </div>
-    </div>
-  )
+const BRAND_COLORS: Record<string, string> = {
+  'Forefront':               '#B4322F',
+  'Omnisight':               '#0E7C7B',
+  'The Strategy Community':  '#7A5A2E',
+  'Islam Personal Branding': '#1E293B',
 }
 
 export function KanbanBoard() {
-  const { tasks, activeBrand, searchQuery, currentUser, slaConfig } = useStore()
+  const { tasks, activeBrand, searchQuery, currentUser, slaConfig, setActiveBrand } = useStore()
+  const [search, setSearch] = useState('')
 
   const filteredTasks = useMemo(() => tasks.filter(task => {
     if (activeBrand && task.account !== activeBrand) return false
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase()
-      return task.name.toLowerCase().includes(q) || task.assignee.toLowerCase().includes(q)
-    }
+    const q = (search || searchQuery || '').toLowerCase()
+    if (q) return task.name.toLowerCase().includes(q) || task.assignee.toLowerCase().includes(q)
     return true
-  }), [tasks, activeBrand, searchQuery])
+  }), [tasks, activeBrand, searchQuery, search])
 
   const visibleTasks = useMemo(() => {
     if (!currentUser) return []
@@ -55,78 +56,123 @@ export function KanbanBoard() {
     return map
   }, [visibleTasks])
 
+  const brands = ['Forefront', 'Omnisight', 'The Strategy Community', 'Islam Personal Branding']
+
   return (
-    <div style={{
-      display: 'flex', gap: '0.75rem', overflowX: 'auto',
-      padding: '1rem 1.25rem 1.5rem', height: '100%', alignItems: 'flex-start',
-      backgroundColor: '#f8fafc',
-    }}>
-      {STAGES.map((stage, idx) => {
-        const isFirst = idx === 0
-        const prevPhase = idx > 0 ? STAGES[idx - 1].phase : null
-        const phaseChange = !isFirst && prevPhase !== stage.phase
-        const phaseColor = PHASE_COLORS[stage.phase]
-        const stageTasks = tasksByStage[stage.id] ?? []
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Brand filter + search bar */}
+      <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          {/* Brand chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setActiveBrand(null)}
+              style={{
+                padding: '5px 14px', borderRadius: 99, border: `1px solid ${!activeBrand ? '#C3F53D' : '#E1E1E0'}`,
+                background: !activeBrand ? '#C3F53D' : '#fff',
+                color: !activeBrand ? '#111' : UI.muted,
+                fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              All brands
+            </button>
+            {brands.map(b => {
+              const on = activeBrand === b
+              const bc = BRAND_COLORS[b] || '#94A3B8'
+              return (
+                <button
+                  key={b}
+                  onClick={() => setActiveBrand(on ? null : b)}
+                  title={b}
+                  style={{
+                    width: 34, height: 34, borderRadius: '50%', border: `2px solid ${on ? '#C3F53D' : 'transparent'}`,
+                    background: on ? '#C3F53D' : '#111',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0,
+                    boxShadow: on ? '0 4px 12px rgba(195,245,61,.5)' : 'none',
+                  }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: 99, background: on ? '#111' : bc }} />
+                </button>
+              )
+            })}
+          </div>
 
-        return (
-          <React.Fragment key={stage.id}>
-            {phaseChange && (
-              <div style={{ flexShrink: 0, width: 1, alignSelf: 'stretch', background: '#e2e8f0', margin: '0 0.25rem' }} />
-            )}
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              style={{
+                width: 200, padding: '6px 12px 6px 32px',
+                background: '#fff', border: '1px solid #E1E1E0', borderRadius: 10,
+                fontSize: '0.78rem', outline: 'none', color: UI.ink, fontFamily: 'inherit',
+              }}
+            />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={UI.muted} strokeWidth="2" strokeLinecap="round" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+        </div>
+      </div>
 
-            <div style={{ flexShrink: 0, width: 220, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {/* Board columns */}
+      <div style={{
+        display: 'flex', gap: 14, overflowX: 'auto',
+        padding: '14px 20px 20px', flex: 1, alignItems: 'flex-start',
+      }}>
+        {STAGES.map(stage => {
+          const meta = STAGE_META[stage.id] || { en: stage.id, color: '#94A3B8' }
+          const stageTasks = tasksByStage[stage.id] ?? []
+
+          return (
+            <div key={stage.id} style={{ flexShrink: 0, width: 248, display: 'flex', flexDirection: 'column' }}>
               {/* Column header */}
               <div style={{
-                backgroundColor: '#fff', borderRadius: 10, padding: '0.6rem 0.75rem',
-                borderTop: `2px solid ${phaseColor.line}`,
-                border: '1px solid #e2e8f0',
-                borderTopColor: phaseColor.line,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                background: '#FFFFFF',
+                border: '1px solid #EFEFEC',
+                borderTop: `3px solid ${meta.color}`,
+                borderRadius: '0 0 14px 14px',
+                padding: '0.75rem 0.875rem',
+                marginBottom: 0,
+                boxShadow: UI.cardShadow,
               }}>
-                {(isFirst || phaseChange) && (
-                  <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: phaseColor.label, marginBottom: '0.3rem', opacity: 0.7 }}>
-                    {stage.phase} phase
-                  </div>
-                )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="mont" style={{ fontSize: '0.85rem', fontWeight: 700, color: UI.ink }}>
+                    {meta.en}
+                  </div>
                   <span style={{
-                    color: '#0f172a', fontSize: '0.8rem', fontWeight: 600,
-                    direction: stage.id === 'todo' || stage.id === 'c-prog' || stage.id === 'publish' ? 'rtl' : 'ltr',
-                  }}>
-                    {stage.label}
-                  </span>
-                  <span style={{
-                    backgroundColor: stageTasks.length > 0 ? phaseColor.line + '18' : '#f1f5f9',
-                    color: stageTasks.length > 0 ? phaseColor.label : '#cbd5e1',
-                    borderRadius: 99, padding: '0.1rem 0.5rem',
-                    fontSize: '0.7rem', fontWeight: 700, minWidth: 22, textAlign: 'center',
+                    fontSize: '0.75rem', fontWeight: 600, color: meta.color,
+                    background: `${meta.color}18`, borderRadius: 99, padding: '1px 8px',
                   }}>
                     {stageTasks.length}
                   </span>
                 </div>
                 {stage.reviewer && (
-                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.2rem' }}>↳ {stage.reviewer}</div>
+                  <div style={{ fontSize: '0.62rem', color: UI.muted, marginTop: '0.2rem' }}>↳ {stage.reviewer}</div>
                 )}
               </div>
 
               {/* Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ paddingTop: 10 }}>
                 {stageTasks.map(task => (
-                  <div key={task.id}>
-                    <TaskCard task={task} />
-                    <SLAIndicator task={task} slaConfig={slaConfig} />
-                  </div>
+                  <TaskCard key={task.id} task={task} />
                 ))}
                 {stageTasks.length === 0 && (
-                  <div style={{ height: 56, border: '1px dashed #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0', fontSize: '0.7rem' }}>
-                    empty
+                  <div style={{
+                    height: 56, border: '1px dashed #E0E0DC', borderRadius: 12,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#C8C8C6', fontSize: '0.7rem',
+                  }}>
+                    Empty
                   </div>
                 )}
               </div>
             </div>
-          </React.Fragment>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }

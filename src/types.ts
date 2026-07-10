@@ -14,6 +14,13 @@ export type Brand = 'Islam Personal Branding' | 'The Strategy Community' | 'Omni
 export type Priority = 'High' | 'Medium' | 'Low'
 export type AccessLevel = 'admin' | 'superuser' | 'user'
 export type Phase = 'content' | 'design'
+export type Platform = 'LinkedIn' | 'Instagram' | 'TikTok' | 'Facebook'
+
+export interface TaskComment {
+  who: string
+  text: string
+  when: string
+}
 
 export interface Task {
   id: number
@@ -27,6 +34,10 @@ export interface Task {
   status: StageId
   ctype: ContentType
   stageDate: string   // date task entered current stage, YYYY-MM-DD
+  platform?: Platform
+  campaign?: string
+  comments?: TaskComment[]
+  attachments?: string[]
 }
 
 export interface Member {
@@ -36,6 +47,10 @@ export interface Member {
   color: string       // hex foreground / accent color
   bg: string          // hex avatar background
   tc: string          // tailwind text color class for badges
+  email?: string
+  capacity?: number
+  status?: 'Available' | 'Busy'
+  nickname?: string
 }
 
 export interface Stage {

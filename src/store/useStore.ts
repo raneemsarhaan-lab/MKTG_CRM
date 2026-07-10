@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { Task, Member, StageId, SLAConfig } from '../types'
+import { Task, Member, StageId, SLAConfig, TaskComment } from '../types'
 import { MEMBERS, SEED_TASKS } from '../data/seed'
 import { SLA_DEFAULTS } from '../data/stages'
 
@@ -17,8 +17,9 @@ interface FluxoStore {
   celebration: { taskName: string; stageLabel: string } | null
   selectedTaskId: number | null
   showTaskForm: boolean
-  activeBrand: string | null   // null = all brands
+  activeBrand: string | null
   searchQuery: string
+  profileOpen: boolean
 
   // Actions
   login: (member: Member) => void
@@ -40,6 +41,11 @@ interface FluxoStore {
   setActiveBrand: (brand: string | null) => void
   setSearchQuery: (q: string) => void
   clearCelebration: () => void
+  setProfileOpen: (open: boolean) => void
+
+  addComment: (taskId: number, comment: TaskComment) => void
+  addAttachment: (taskId: number, names: string[]) => void
+  removeAttachment: (taskId: number, idx: number) => void
 }
 
 export const useStore = create<FluxoStore>()(
@@ -54,6 +60,7 @@ export const useStore = create<FluxoStore>()(
       showTaskForm: false,
       activeBrand: null,
       searchQuery: '',
+      profileOpen: false,
 
       login: (member) => set({ currentUser: member }),
       logout: () => set({ currentUser: null }),
@@ -66,6 +73,8 @@ export const useStore = create<FluxoStore>()(
           ...taskData,
           id: newId,
           stageDate: today,
+          comments: [],
+          attachments: [],
         }
         set({ tasks: [...tasks, newTask] })
       },
@@ -118,6 +127,31 @@ export const useStore = create<FluxoStore>()(
       setActiveBrand: (brand) => set({ activeBrand: brand }),
       setSearchQuery: (q) => set({ searchQuery: q }),
       clearCelebration: () => set({ celebration: null }),
+      setProfileOpen: (open) => set({ profileOpen: open }),
+
+      addComment: (taskId, comment) => {
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            t.id === taskId ? { ...t, comments: [...(t.comments || []), comment] } : t
+          ),
+        }))
+      },
+
+      addAttachment: (taskId, names) => {
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            t.id === taskId ? { ...t, attachments: [...(t.attachments || []), ...names] } : t
+          ),
+        }))
+      },
+
+      removeAttachment: (taskId, idx) => {
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            t.id === taskId ? { ...t, attachments: (t.attachments || []).filter((_, i) => i !== idx) } : t
+          ),
+        }))
+      },
     }),
     {
       name: 'fluxo-storage',
