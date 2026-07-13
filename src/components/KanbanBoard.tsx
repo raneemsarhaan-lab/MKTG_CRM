@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { STAGES } from '../data/stages'
 import { TaskCard } from './TaskCard'
-import { Task } from '../types'
-import { differenceInDays, parseISO } from 'date-fns'
+import { Task, StageId } from '../types'
+import { playVictory, playMove } from '../lib/sounds'
+import { STAGE_MAP } from '../data/stages'
 
 const STAGE_META: Record<string, { en: string; color: string }> = {
   'todo':        { en: 'To Do',             color: '#64748B' },
@@ -31,8 +32,9 @@ const BRAND_COLORS: Record<string, string> = {
 }
 
 export function KanbanBoard() {
-  const { tasks, activeBrand, searchQuery, currentUser, slaConfig, setActiveBrand } = useStore()
+  const { tasks, activeBrand, searchQuery, currentUser, setActiveBrand, moveTask } = useStore()
   const [search, setSearch] = useState('')
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null)
 
   const filteredTasks = useMemo(() => tasks.filter(task => {
     if (activeBrand && task.account !== activeBrand) return false
@@ -57,6 +59,25 @@ export function KanbanBoard() {
   }, [visibleTasks])
 
   const brands = ['Forefront', 'Omnisight', 'The Strategy Community', 'Islam Personal Branding']
+
+  function handleDrop(e: React.DragEvent, stageId: string) {
+    e.preventDefault()
+    setDragOverStage(null)
+    const taskId = parseInt(e.dataTransfer.getData('taskId'))
+    if (isNaN(taskId)) return
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.status === stageId) return
+
+    if (stageId === 'publish') {
+      playVictory()
+      moveTask(taskId, stageId as StageId)
+      const stageLabel = STAGE_MAP[stageId]?.label ?? 'Published'
+      useStore.setState({ celebration: { taskName: task.name, stageLabel } })
+    } else {
+      playMove()
+      moveTask(taskId, stageId as StageId)
+    }
+  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -125,9 +146,27 @@ export function KanbanBoard() {
         {STAGES.map(stage => {
           const meta = STAGE_META[stage.id] || { en: stage.id, color: '#94A3B8' }
           const stageTasks = tasksByStage[stage.id] ?? []
+          const isOver = dragOverStage === stage.id
 
           return (
-            <div key={stage.id} style={{ flexShrink: 0, width: 248, display: 'flex', flexDirection: 'column' }}>
+            <div
+              key={stage.id}
+              onDragOver={e => { e.preventDefault(); setDragOverStage(stage.id) }}
+              onDragLeave={e => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverStage(null)
+                }
+              }}
+              onDrop={e => handleDrop(e, stage.id)}
+              style={{
+                flexShrink: 0, width: 248, display: 'flex', flexDirection: 'column',
+                borderRadius: 16,
+                outline: isOver ? `2px solid ${meta.color}` : '2px solid transparent',
+                outlineOffset: 2,
+                background: isOver ? `${meta.color}0A` : 'transparent',
+                transition: 'outline 0.1s, background 0.1s',
+              }}
+            >
               {/* Column header */}
               <div style={{
                 background: '#FFFFFF',
@@ -135,7 +174,6 @@ export function KanbanBoard() {
                 borderTop: `3px solid ${meta.color}`,
                 borderRadius: '0 0 14px 14px',
                 padding: '0.75rem 0.875rem',
-                marginBottom: 0,
                 boxShadow: UI.cardShadow,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -155,17 +193,18 @@ export function KanbanBoard() {
               </div>
 
               {/* Cards */}
-              <div style={{ paddingTop: 10 }}>
+              <div style={{ paddingTop: 10, paddingBottom: 4 }}>
                 {stageTasks.map(task => (
                   <TaskCard key={task.id} task={task} />
                 ))}
                 {stageTasks.length === 0 && (
                   <div style={{
-                    height: 56, border: '1px dashed #E0E0DC', borderRadius: 12,
+                    height: 56, border: `1px dashed ${isOver ? meta.color : '#E0E0DC'}`, borderRadius: 12,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#C8C8C6', fontSize: '0.7rem',
+                    color: isOver ? meta.color : '#C8C8C6', fontSize: '0.7rem',
+                    transition: 'border-color 0.1s, color 0.1s',
                   }}>
-                    Empty
+                    {isOver ? 'Drop here' : 'Empty'}
                   </div>
                 )}
               </div>

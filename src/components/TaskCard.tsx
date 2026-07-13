@@ -1,13 +1,15 @@
-import React from 'react'
-import { Task } from '../types'
+import React, { useState } from 'react'
+import { Task, StageId } from '../types'
 import { differenceInDays, parseISO } from 'date-fns'
 import { useStore } from '../store/useStore'
-import { playPop } from '../lib/sounds'
+import { playPop, playMove, playVictory, playCelebration } from '../lib/sounds'
+import { getNextStage, getStageOwner, STAGE_MAP } from '../data/stages'
 
 const UI = {
   ink: '#1B1A13',
   muted: '#8A8D91',
   line: '#EFEFEC',
+  lime: '#C3F53D',
   tightShadow: '0 1px 2px rgba(26,28,30,.06)',
 }
 
@@ -64,7 +66,6 @@ function PlatformBadge({ platform }: { platform?: string }) {
       </svg>
     </div>
   )
-  // LinkedIn default
   return (
     <div style={{ ...base, background: '#0A66C2' }}>
       <svg width={g} height={g} viewBox="0 0 24 24" fill="#fff">
@@ -88,7 +89,9 @@ function getAlertStatus(task: Task): string {
 interface Props { task: Task }
 
 export function TaskCard({ task }: Props) {
-  const { selectTask } = useStore()
+  const { selectTask, moveTask, currentUser } = useStore()
+  const [isDragging, setIsDragging] = useState(false)
+
   const alert = getAlertStatus(task)
   const aStyle = ALERT_STYLE[alert] || ALERT_STYLE['On Track']
   const brandColor = BRAND_COLORS[task.account] || '#94A3B8'
@@ -99,19 +102,51 @@ export function TaskCard({ task }: Props) {
   const overdue = dueDays < 0
   const dueLabel = overdue ? `${Math.abs(dueDays)}d over` : dueDays === 0 ? 'Due today' : `${dueDays}d left`
 
+  const nextStage = getNextStage(task)
+  const canMove = currentUser && (
+    currentUser.access === 'admin' ||
+    currentUser.access === 'superuser' ||
+    getStageOwner(task, task.status) === currentUser.name
+  )
+
+  function handleNext(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!nextStage || !canMove || !currentUser) return
+    const stageLabel = STAGE_MAP[nextStage]?.label ?? nextStage
+    if (nextStage === 'publish') {
+      playVictory()
+      moveTask(task.id, nextStage as StageId)
+      useStore.setState({ celebration: { taskName: task.name, stageLabel } })
+    } else {
+      const nextOwner = getStageOwner(task, nextStage)
+      if (nextOwner === currentUser.name) playCelebration()
+      else playMove()
+      moveTask(task.id, nextStage as StageId)
+    }
+  }
+
   return (
     <div
+      draggable
+      onDragStart={e => {
+        setIsDragging(true)
+        e.dataTransfer.setData('taskId', task.id.toString())
+        e.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragEnd={() => setIsDragging(false)}
       onClick={() => { playPop(); selectTask(task.id) }}
       style={{
         background: '#FAFAF9',
         border: `1px solid ${UI.line}`,
         borderRadius: 18, overflow: 'hidden',
         boxShadow: UI.tightShadow,
-        cursor: 'pointer',
-        transition: 'box-shadow 0.12s, transform 0.12s',
+        cursor: 'grab',
+        transition: 'box-shadow 0.12s, transform 0.12s, opacity 0.12s',
         marginBottom: 10,
+        opacity: isDragging ? 0.4 : 1,
       }}
       onMouseEnter={e => {
+        if (isDragging) return
         e.currentTarget.style.boxShadow = '0 4px 14px rgba(26,28,30,.1)'
         e.currentTarget.style.transform = 'translateY(-1px)'
       }}
@@ -128,7 +163,6 @@ export function TaskCard({ task }: Props) {
           </svg>
         </div>
         <PlatformBadge platform={task.platform} />
-        {/* Brand badge */}
         <div
           title={task.account}
           style={{
@@ -181,7 +215,7 @@ export function TaskCard({ task }: Props) {
           </span>
         </div>
 
-        {/* Footer: assignee + due */}
+        {/* Footer: assignee + due + next button */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #EDF0F6' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{
@@ -196,13 +230,39 @@ export function TaskCard({ task }: Props) {
               {task.assignee.split(' ')[0]}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={overdue ? '#C03A3A' : UI.muted} strokeWidth="2" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-            </svg>
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: overdue ? '#C03A3A' : UI.muted }}>
-              {dueLabel}
-            </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={overdue ? '#C03A3A' : UI.muted} strokeWidth="2" strokeLinecap="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+              </svg>
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: overdue ? '#C03A3A' : UI.muted }}>
+                {dueLabel}
+              </span>
+            </div>
+
+            {/* Next stage button */}
+            {nextStage && canMove && (
+              <button
+                onClick={handleNext}
+                title={`Move to ${STAGE_MAP[nextStage]?.label ?? nextStage}`}
+                style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: nextStage === 'publish' ? '#22C55E' : UI.lime,
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0,0,0,.12)',
+                  transition: 'transform 0.1s, box-shadow 0.1s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)'; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,.18)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,.12)' }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={nextStage === 'publish' ? '#fff' : '#111'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
