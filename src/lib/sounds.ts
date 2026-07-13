@@ -81,102 +81,20 @@ export function playError(): void {
   playTone(180, 0.15, 'sawtooth', 0.2, 0.12)
 }
 
-/** زغروطة — vibrato sine wave */
-export function playZaghrota(): void {
-  const audioCtx = getCtx()
-  const now = audioCtx.currentTime
-  const duration = 1.5
-  const osc = audioCtx.createOscillator()
-  const gain = audioCtx.createGain()
-  const lfo = audioCtx.createOscillator()
-  const lfoGain = audioCtx.createGain()
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(900, now)
-  lfo.type = 'square'
-  lfo.frequency.setValueAtTime(15, now)
-  lfoGain.gain.setValueAtTime(200, now)
-  lfo.connect(lfoGain)
-  lfoGain.connect(osc.frequency)
-  gain.gain.setValueAtTime(0, now)
-  gain.gain.linearRampToValueAtTime(0.3, now + 0.1)
-  gain.gain.linearRampToValueAtTime(0.3, now + duration - 0.2)
-  gain.gain.linearRampToValueAtTime(0, now + duration)
-  osc.connect(gain)
-  gain.connect(audioCtx.destination)
-  lfo.start(now); osc.start(now)
-  lfo.stop(now + duration); osc.stop(now + duration)
+function playFile(filename: string): void {
+  const base = import.meta.env.BASE_URL ?? '/'
+  const audio = new Audio(base + 'sounds/' + filename)
+  audio.play().catch(() => {})
 }
 
-/** تسقيف — rhythmic clapping noise */
-export function playTasqeef(): void {
-  const audioCtx = getCtx()
-  const now = audioCtx.currentTime
-  const hits = 8, duration = 0.08, gap = 0.12
-  for (let i = 0; i < hits; i++) {
-    const time = now + i * (duration + gap)
-    const bufferSize = Math.floor(audioCtx.sampleRate * duration)
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let j = 0; j < bufferSize; j++) data[j] = Math.random() * 2 - 1
-    const noise = audioCtx.createBufferSource()
-    noise.buffer = buffer
-    const filter = audioCtx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.setValueAtTime(1200, time)
-    filter.Q.setValueAtTime(0.5, time)
-    const g = audioCtx.createGain()
-    g.gain.setValueAtTime(0.5, time)
-    g.gain.exponentialRampToValueAtTime(0.01, time + duration)
-    noise.connect(filter); filter.connect(g); g.connect(audioCtx.destination)
-    noise.start(time)
-  }
-}
+/** زغروطة — real audio file */
+export function playZaghrota(): void { playFile('zaghrota.mp3') }
 
-/** انا مبهور بيا — rising sawtooth arpeggio */
-export function playMabhour(): void {
-  const audioCtx = getCtx()
-  const now = audioCtx.currentTime
-  const notes = [261.63, 329.63, 392.00, 523.25]
-  const stagger = 0.1
-  notes.forEach((freq, i) => {
-    playTone(freq, 0.15, 'sawtooth', 0.2, i * stagger)
-  })
-  playTone(523.25, 1.0, 'sawtooth', 0.3, notes.length * stagger)
-}
+/** تسقيف — real audio file */
+export function playTasqeef(): void { playFile('tasqeef.mp3') }
 
-/** طبلة — tabla drum pattern */
-export function playTabla(): void {
-  const audioCtx = getCtx()
-  const now = audioCtx.currentTime
-  const pattern = [
-    { type: 'dum', time: 0 }, { type: 'tak', time: 0.15 }, { type: 'tak', time: 0.3 },
-    { type: 'dum', time: 0.45 }, { type: 'tak', time: 0.6 }, { type: 'tak', time: 0.75 },
-    { type: 'dum', time: 0.9 },
-  ]
-  pattern.forEach(hit => {
-    if (hit.type === 'dum') {
-      const osc = audioCtx.createOscillator()
-      const g = audioCtx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(180, now + hit.time)
-      osc.frequency.exponentialRampToValueAtTime(40, now + hit.time + 0.2)
-      g.gain.setValueAtTime(0.6, now + hit.time)
-      g.gain.exponentialRampToValueAtTime(0.01, now + hit.time + 0.2)
-      osc.connect(g); g.connect(audioCtx.destination)
-      osc.start(now + hit.time); osc.stop(now + hit.time + 0.2)
-    } else {
-      const osc = audioCtx.createOscillator()
-      const g = audioCtx.createGain()
-      const f = audioCtx.createBiquadFilter()
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(900, now + hit.time)
-      f.type = 'bandpass'
-      f.frequency.setValueAtTime(900, now + hit.time)
-      f.Q.setValueAtTime(5, now + hit.time)
-      g.gain.setValueAtTime(0.4, now + hit.time)
-      g.gain.exponentialRampToValueAtTime(0.01, now + hit.time + 0.1)
-      osc.connect(f); f.connect(g); g.connect(audioCtx.destination)
-      osc.start(now + hit.time); osc.stop(now + hit.time + 0.1)
-    }
-  })
-}
+/** مبهور — real audio file */
+export function playMabhour(): void { playFile('mabhour.mov') }
+
+/** طبلة — real audio file */
+export function playTabla(): void { playFile('tabla.mp3') }
