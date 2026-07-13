@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useStore } from './store/useStore'
+import { supabase } from './lib/supabase'
+import { MEMBERS } from './data/seed'
 import { LoginView } from './components/LoginView'
 import { KanbanBoard } from './components/KanbanBoard'
 import { CapacityView } from './components/CapacityView'
@@ -241,5 +243,51 @@ function AppShell() {
 }
 
 export default function App() {
+  const { login, logout } = useStore()
+  const [authReady, setAuthReady] = useState(false)
+
+  useEffect(() => {
+    function resolveUser(email: string | undefined) {
+      if (!email) { logout(); return }
+      const member = MEMBERS.find(m => m.email?.toLowerCase() === email.toLowerCase())
+      if (member) login(member)
+      else {
+        supabase.auth.signOut()
+        logout()
+      }
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      resolveUser(data.session?.user?.email)
+      setAuthReady(true)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      resolveUser(session?.user?.email)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [login, logout])
+
+  if (!authReady) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#17181A', fontFamily: "'Montserrat','Inter',system-ui,sans-serif",
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, background: '#C3F53D',
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 9,
+            margin: '0 auto 16px', animation: 'bob 1.2s ease-in-out infinite',
+          }}>
+            {[0,1,2,3].map(i => <span key={i} style={{ background: '#111', borderRadius: 2 }} />)}
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>Loading…</span>
+        </div>
+      </div>
+    )
+  }
+
   return <AppShell />
 }

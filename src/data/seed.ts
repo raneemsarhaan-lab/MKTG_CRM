@@ -3,6 +3,7 @@ import { Member, Task } from '../types'
 export const MEMBERS: Member[] = [
   {
     name: 'Raneem',
+    email: 'raneem.sarhaan@forefront.consulting',
     role: 'Content Manager',
     access: 'admin',
     color: '#7c3aed',
@@ -11,6 +12,7 @@ export const MEMBERS: Member[] = [
   },
   {
     name: 'Islam',
+    email: 'islam@forefront.consulting',
     role: 'Managing Director',
     access: 'superuser',
     color: '#0f172a',
@@ -19,6 +21,7 @@ export const MEMBERS: Member[] = [
   },
   {
     name: 'Nour',
+    email: 'nour@forefront.consulting',
     role: 'Digital Marketing Specialist',
     access: 'superuser',
     color: '#1d4ed8',
@@ -27,6 +30,7 @@ export const MEMBERS: Member[] = [
   },
   {
     name: 'Omar',
+    email: 'omar@forefront.consulting',
     role: 'Brand Director',
     access: 'superuser',
     color: '#065f46',
@@ -35,6 +39,7 @@ export const MEMBERS: Member[] = [
   },
   {
     name: 'Sara',
+    email: 'sara@forefront.consulting',
     role: 'Content Creator',
     access: 'user',
     color: '#be185d',
@@ -43,6 +48,7 @@ export const MEMBERS: Member[] = [
   },
   {
     name: 'Youssef',
+    email: 'youssef@forefront.consulting',
     role: 'Designer',
     access: 'user',
     color: '#b45309',

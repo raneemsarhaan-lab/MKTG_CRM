@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { Task, Member, StageId, SLAConfig, TaskComment } from '../types'
 import { MEMBERS, SEED_TASKS } from '../data/seed'
 import { SLA_DEFAULTS } from '../data/stages'
+import { supabase } from '../lib/supabase'
 
 interface FluxoStore {
   // Data
@@ -63,7 +64,7 @@ export const useStore = create<FluxoStore>()(
       profileOpen: false,
 
       login: (member) => set({ currentUser: member }),
-      logout: () => set({ currentUser: null }),
+      logout: () => { supabase.auth.signOut(); set({ currentUser: null }) },
 
       addTask: (taskData) => {
         const tasks = get().tasks
@@ -159,7 +160,6 @@ export const useStore = create<FluxoStore>()(
         tasks: state.tasks,
         members: state.members,
         slaConfig: state.slaConfig,
-        currentUser: state.currentUser,
       }),
     }
   )
