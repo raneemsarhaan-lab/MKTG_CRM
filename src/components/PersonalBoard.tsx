@@ -1,26 +1,32 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { useStore } from '../store/useStore'
 import { Task, Member } from '../types'
 import { differenceInDays, parseISO, format, isToday } from 'date-fns'
 import { getStageOwner, STAGE_MAP } from '../data/stages'
 
-const UI = {
-  ink:         '#1B1A13',
-  muted:       '#8A8D91',
-  line:        '#E5E8F1',
-  lime:        '#C3F53D',
-  coral:       '#F5334F',
-  cyan:        '#5B93F5',
-  mint:        '#3FA34D',
-  violet:      '#B79CF5',
-  dark:        '#111111',
-  cardShadow:  '0 1px 2px rgba(26,28,30,.04), 0 10px 28px rgba(26,28,30,.06)',
+// ── Tokens ────────────────────────────────────────────────
+const INK    = '#1C1836'
+const MUTED  = '#6B6584'
+const DIM    = '#A8A3C4'
+const BORDER = '#ECEAF8'
+const DIVIDER= '#F1EFFA'
+const PURPLE = '#6E5BE6'
+const DEEP   = '#4A3BB0'
+const card: React.CSSProperties = {
+  background: '#fff', borderRadius: 16, border: `1px solid ${BORDER}`,
+  boxShadow: '0 1px 3px rgba(28,24,54,.04)',
 }
 
-const surface: React.CSSProperties = {
-  background: '#FFFFFF',
-  border: '1px solid #E5E8F1',
-  boxShadow: '0 1px 2px rgba(26,28,30,.04), 0 10px 28px rgba(26,28,30,.06)',
+const STAGE_COLOR: Record<string, string> = {
+  'todo':         '#64748B',
+  'c-prog':       '#3B82F6',
+  'c-final':      '#2E6FB0',
+  'c-check':      '#1F5A94',
+  'r-design':     '#8B5CF6',
+  'd-prog':       '#7C3AED',
+  'd-check':      '#5B3FB5',
+  'final-check':  '#F59E0B',
+  'publish':      '#22C55E',
 }
 
 const BRAND_COLORS: Record<string, string> = {
@@ -43,12 +49,6 @@ const CTYPE_EMOJI: Record<string, string> = {
   Email: '📧', Story: '📖', Deck: '📊', Other: '📌',
 }
 
-const ACCESS_BADGE: Record<string, { bg: string; color: string; label: string }> = {
-  admin:     { bg: '#C3F53D', color: '#111', label: 'Admin' },
-  superuser: { bg: '#B79CF5', color: '#111', label: 'Super User' },
-  user:      { bg: '#EDEDEA', color: '#6B6B6B', label: 'User' },
-}
-
 const AVATAR_PALETTE = ['#1B1D1F', '#6E5BE6', '#3FA34D', '#5B93F5', '#E0736A', '#5B6066', '#B4863F']
 function avatarBg(name: string) {
   let h = 0
@@ -63,251 +63,259 @@ function greeting() {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-// ── SVG Icons ──────────────────────────────────────────────
-const Sparkles = ({ size = 17, color = UI.lime }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/>
+// ── Decorative SVGs ───────────────────────────────────────
+const SparklinePurple = () => (
+  <svg width="108" height="28" viewBox="0 0 108 28" fill="none" style={{ position: 'absolute', bottom: 12, left: 12, opacity: 0.85 }}>
+    <polyline points="0,22 28,14 42,18 78,6 108,10" stroke="#4A3BB0" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="42" cy="18" r="3" fill="#4A3BB0"/>
+    <circle cx="78" cy="6" r="3" fill="#4A3BB0"/>
+    <circle cx="108" cy="10" r="3" fill="#4A3BB0"/>
   </svg>
 )
-const CalDays = ({ size = 17, color = UI.cyan }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-    <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>
+const BarsAmber = () => (
+  <svg width="92" height="28" viewBox="0 0 92 28" fill="none" style={{ position: 'absolute', bottom: 12, left: 12, opacity: 0.8 }}>
+    <rect x="0"  y="14" width="14" height="14" rx="3" fill="#F0B03A"/>
+    <rect x="18" y="8"  width="14" height="20" rx="3" fill="#EDA52B"/>
+    <rect x="36" y="18" width="14" height="10" rx="3" fill="#F0B03A"/>
+    <rect x="54" y="4"  width="14" height="24" rx="3" fill="#E8A422"/>
+    <rect x="72" y="10" width="14" height="18" rx="3" fill="#EDA52B"/>
   </svg>
 )
-const Users = ({ size = 17, color = UI.muted }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+const WaveRed = () => (
+  <svg width="108" height="28" viewBox="0 0 108 28" fill="none" style={{ position: 'absolute', bottom: 12, left: 12, opacity: 0.75 }}>
+    <path d="M0 20 Q18 8 36 16 Q54 24 72 10 Q90 0 108 14" stroke="#D6362C" strokeWidth="2.2" fill="none" strokeLinecap="round"/>
   </svg>
 )
-const AlertCircle = ({ size = 17, color = '#C03A3A' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-  </svg>
-)
-const Clock = ({ size = 17, color = '#B7791F' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-  </svg>
-)
-const CheckCircle = ({ size = 17, color = '#2A3E78' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
-  </svg>
-)
-const AlertTriangle = ({ size = 17, color = '#9A6B14' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/>
-    <path d="M12 9v4M12 17h.01"/>
+const SparklineGreen = () => (
+  <svg width="108" height="28" viewBox="0 0 108 28" fill="none" style={{ position: 'absolute', bottom: 12, left: 12, opacity: 0.85 }}>
+    <polyline points="0,20 40,10 80,16 108,6" stroke="#279247" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="40"  cy="10" r="3" fill="#279247"/>
+    <circle cx="108" cy="6"  r="3" fill="#279247"/>
   </svg>
 )
 
-// ── ProfileSection ─────────────────────────────────────────
-function ProfileSection({ user, myHours, members }: { user: Member; myHours: number; members: Member[] }) {
-  const CAP = user.capacity ?? 40
-  const capPct = Math.min(100, Math.round((myHours / CAP) * 100))
-  const capColor = capPct >= 90 ? UI.coral : capPct >= 70 ? '#E0A23F' : UI.mint
-  const badge = ACCESS_BADGE[user.access]
-
+// ── Stat Card ─────────────────────────────────────────────
+interface StatCardProps {
+  label: string
+  icon: string
+  value: number | string
+  sub: string
+  bg: string
+  labelColor: string
+  numColor: string
+  decoration: React.ReactNode
+}
+function StatCard({ label, icon, value, sub, bg, labelColor, numColor, decoration }: StatCardProps) {
   return (
-    <div style={{ ...surface, borderRadius: 24, marginBottom: 20, overflow: 'hidden' }}>
-      {/* Purple banner */}
-      <div style={{
-        height: 92,
-        background: 'linear-gradient(135deg, #9F7FE8 0%, #B79CF5 55%, #C3B2F5 100%)',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 28% 50%, rgba(255,255,255,.28) 0%, transparent 62%)' }} />
-      </div>
-
-      {/* Body — overlapping the banner by 46px */}
-      <div style={{ padding: '0 26px 24px', marginTop: -46, position: 'relative' }}>
-        {/* Avatar */}
-        <div style={{
-          width: 104, height: 104, borderRadius: 24,
-          background: avatarBg(user.name), border: '4px solid #fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 800, fontSize: 28,
-          fontFamily: "'Montserrat','Inter',sans-serif",
-          boxShadow: '0 4px 18px rgba(0,0,0,.16)',
-        }}>
-          {initials(user.name)}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginTop: 14 }}>
-          {/* Identity */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 3 }}>
-              <h2 className="mont" style={{ fontSize: 24, fontWeight: 800, color: UI.ink, margin: 0 }}>{user.name}</h2>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: badge.bg, color: badge.color }}>
-                {badge.label}
-              </span>
-            </div>
-            <p className="mont" style={{ fontSize: 14, fontWeight: 600, color: UI.muted, margin: '0 0 3px' }}>{user.role}</p>
-            {user.email && <p style={{ fontSize: 12.5, color: '#A6A6A0', margin: 0 }}>{user.email}</p>}
-            {user.nickname && (
-              <span style={{ display: 'inline-block', marginTop: 7, fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 99, background: '#EFE7FD', color: '#6D4FD0' }}>
-                {user.nickname}
-              </span>
-            )}
-          </div>
-
-          {/* Workload bar */}
-          <div style={{ minWidth: 210, flex: '0 0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: UI.ink }}>This week's workload</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: UI.violet }}>{capPct}%</span>
-            </div>
-            <div style={{ height: 9, borderRadius: 99, background: '#EFEFEB', overflow: 'hidden' }}>
-              <div style={{ width: `${capPct}%`, height: '100%', borderRadius: 99, background: capColor, transition: 'width .3s ease' }} />
-            </div>
-            <p style={{ fontSize: 11, color: UI.muted, margin: '4px 0 0' }}>{myHours}h of {CAP}h capacity</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Team roster */}
-      {members.length > 0 && (
-        <div style={{ padding: '0 26px 24px', borderTop: '1px solid #F1F1EF', paddingTop: 20 }}>
-          <p style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#B9B9B2', margin: '0 0 14px' }}>
-            Your team ({members.length})
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(176px, 1fr))', gap: 10 }}>
-            {members.map(m => {
-              const ab = ACCESS_BADGE[m.access]
-              return (
-                <div key={m.name} style={{ ...surface, borderRadius: 18, padding: 16, textAlign: 'center' }}>
-                  <div style={{
-                    width: 52, height: 52, borderRadius: '50%', margin: '0 auto 10px',
-                    background: avatarBg(m.name), color: '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, fontWeight: 700,
-                  }}>
-                    {initials(m.name)}
-                  </div>
-                  <div className="mont" style={{ fontSize: 13, fontWeight: 800, color: UI.ink, marginBottom: 2 }}>{m.name.split(' ')[0]}</div>
-                  <div style={{ fontSize: 11.5, color: UI.muted, marginBottom: 7 }}>{m.role}</div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: ab.bg, color: ab.color }}>
-                    {ab.label}
-                  </span>
-                  {m.nickname && (
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6D4FD0', marginTop: 5 }}>{m.nickname}</div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+    <div style={{ borderRadius: 16, padding: '18px 20px', background: bg, position: 'relative', overflow: 'hidden', minHeight: 148 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: labelColor }}>{icon} {label}</div>
+      <div className="mont" style={{ fontSize: 38, fontWeight: 800, color: numColor, margin: '14px 0 2px', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 13, color: labelColor }}>{sub}</div>
+      {decoration}
     </div>
   )
 }
 
-// ── BigStat ────────────────────────────────────────────────
-function BigStat({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: 'danger' | 'accent' | 'default' }) {
-  const color = tone === 'danger' ? '#C03A3A' : tone === 'accent' ? UI.violet : UI.ink
-  return (
-    <div style={{ ...surface, borderRadius: 18, padding: '1rem 1.25rem', minWidth: 0 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UI.muted, marginBottom: 8 }}>{label}</div>
-      <div className="mont" style={{ fontSize: 34, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: UI.muted, marginTop: 6 }}>{sub}</div>}
-    </div>
-  )
-}
-
-// ── MyTaskRow ──────────────────────────────────────────────
-function MyTaskRow({ task }: { task: Task }) {
+// ── Task Row (inside panel) ───────────────────────────────
+function TaskRow({ task, accent }: { task: Task; accent: { badgeBg: string; badgeColor: string } }) {
   const { selectTask } = useStore()
   const today = new Date()
   const d = parseISO(task.due)
   const diff = differenceInDays(d, today)
-  const info = d < today
-    ? { text: `${Math.abs(diff)}d late`, color: '#C03A3A' }
+  const status = d < today
+    ? { text: `${Math.abs(diff)}d late`, color: '#F5334F' }
     : diff === 0
-    ? { text: 'today', color: '#B96A00' }
-    : { text: `in ${diff}d`, color: UI.muted }
-  const bc = BRAND_COLORS[task.account] || '#94A3B8'
+    ? { text: 'Today', color: INK }
+    : { text: `in ${diff}d`, color: INK }
+  const dotColor = STAGE_COLOR[task.status] || '#94A3B8'
+  const stageLabel = STAGE_MAP[task.status]?.label ?? task.status
 
   return (
     <div
       onClick={() => selectTask(task.id)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        borderRadius: 14, padding: '0.65rem 0.9rem', marginBottom: 10,
-        ...surface, cursor: 'pointer', transition: 'box-shadow .12s, transform .12s',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(26,28,30,.1)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = UI.cardShadow; e.currentTarget.style.transform = 'translateY(0)' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', borderTop: `1px solid ${DIVIDER}`, cursor: 'pointer' }}
     >
-      <span style={{ width: 8, height: 8, borderRadius: 99, background: PRIORITY_COLOR[task.priority], flexShrink: 0 }} />
-      <span style={{ fontSize: 18, flexShrink: 0 }}>{CTYPE_EMOJI[task.ctype] || '📌'}</span>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+      <span style={{ fontSize: 17, flexShrink: 0 }}>{CTYPE_EMOJI[task.ctype] || '📌'}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: UI.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 4, background: `${bc}14`, color: bc }}>{shortBrand(task.account)}</span>
-          <span style={{ fontSize: 11.5, color: UI.muted }}>{STAGE_MAP[task.status]?.label ?? task.status}</span>
-        </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: info.color }}>{info.text}</div>
-        <div style={{ fontSize: 11, color: UI.muted, marginTop: 2 }}>{format(d, 'MMM d')}</div>
-      </div>
-    </div>
-  )
-}
-
-// ── DigestCard / DigestRow ─────────────────────────────────
-function DigestCard({ icon, theme, title, count, children }: {
-  icon: React.ReactNode; theme: string; title: string; count: number; children: React.ReactNode
-}) {
-  return (
-    <div style={{ ...surface, borderRadius: 18, padding: '1.1rem 1.2rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        {icon}
-        <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: theme }}>
-          {title} ({count})
+        <div style={{ fontWeight: 700, fontSize: 14, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.name}</div>
+        <span style={{ display: 'inline-block', marginTop: 4, fontSize: 11.5, fontWeight: 700, color: accent.badgeColor, background: accent.badgeBg, padding: '2px 9px', borderRadius: 6 }}>
+          {stageLabel}
         </span>
       </div>
-      {children}
-    </div>
-  )
-}
-
-function DigestRow({ tint, titleColor, name, sub, metric }: { tint: string; titleColor: string; name: string; sub: string; metric?: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 10, padding: '8px 12px', marginBottom: 6, background: tint }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: titleColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-        <div style={{ fontSize: 11.5, color: titleColor, opacity: 0.72, marginTop: 2 }}>{sub}</div>
+      <div style={{ textAlign: 'right', flexShrink: 0, width: 64 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: status.color }}>{status.text}</div>
+        <div style={{ fontSize: 12, color: DIM, marginTop: 2 }}>{format(d, 'MMM d')}</div>
       </div>
-      {metric && <div style={{ fontSize: 12.5, fontWeight: 700, color: titleColor, whiteSpace: 'nowrap' }}>{metric}</div>}
     </div>
   )
 }
 
-function EmptyDigest({ message }: { message: string }) {
-  return <div style={{ textAlign: 'center', padding: '1rem', color: '#C4C4BE', fontSize: 13 }}>{message}</div>
+// ── Task Panel ─────────────────────────────────────────────
+function TaskPanel({ title, icon, accentColor, tasks, badgeBg, badgeColor, linkColor }: {
+  title: string; icon: string; accentColor: string;
+  tasks: Task[]; badgeBg: string; badgeColor: string; linkColor: string;
+}) {
+  const { setShowTaskForm } = useStore()
+  return (
+    <div style={{ ...card, padding: '20px 22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span className="mont" style={{ fontWeight: 800, fontSize: 16, color: INK }}>{icon} {title}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: accentColor, cursor: 'pointer' }}>View all</span>
+      </div>
+      {tasks.length === 0
+        ? <div style={{ padding: '24px 0', textAlign: 'center', color: DIM, fontSize: 13, borderTop: `1px solid ${DIVIDER}`, marginTop: 8 }}>
+            Nothing here 🎉
+          </div>
+        : tasks.slice(0, 5).map(t => (
+            <TaskRow key={t.id} task={t} accent={{ badgeBg, badgeColor }} />
+          ))
+      }
+      <div
+        onClick={() => setShowTaskForm(true)}
+        style={{ fontSize: 13.5, fontWeight: 700, color: linkColor, marginTop: 14, cursor: 'pointer' }}
+      >
+        + Add task
+      </div>
+    </div>
+  )
 }
 
-// ── MemberStatCard ─────────────────────────────────────────
+// ── SLA Table ──────────────────────────────────────────────
+function SLATable({ rows, onSelect }: {
+  rows: { t: Task; biz: number; sla: number }[]
+  onSelect: (id: number) => void
+}) {
+  const COLS = '2fr 1fr 1fr 0.7fr 1fr'
+  const headerStyle: React.CSSProperties = {
+    fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase',
+    letterSpacing: '0.05em', color: DIM,
+  }
+  return (
+    <div style={{ ...card, padding: '22px 24px', marginBottom: 18 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <span className="mont" style={{ fontWeight: 800, fontSize: 16, color: '#C0392B' }}>⚠️ SLA Breached</span>
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <span style={{ fontFamily: "'Caveat', cursive", fontWeight: 700, fontSize: 15, color: INK, lineHeight: 1.2, display: 'block' }}>
+            Let's fix these!
+          </span>
+          <svg width="32" height="14" viewBox="0 0 32 14" fill="none" style={{ marginTop: 2, opacity: 0.6 }}>
+            <path d="M2 2 Q16 14 30 4" stroke={INK} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <path d="M30 4 L26 2 M30 4 L28 8" stroke={INK} strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#C0392B', cursor: 'pointer' }}>View all</span>
+      </div>
+
+      {/* Column headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: COLS, paddingBottom: 10 }}>
+        {['Task / Item', 'Owner', 'Due Date', 'SLA', 'Breached By'].map(h => (
+          <span key={h} style={headerStyle}>{h}</span>
+        ))}
+      </div>
+
+      {/* Rows */}
+      {rows.length === 0
+        ? <div style={{ textAlign: 'center', padding: '20px 0', color: DIM, fontSize: 13, borderTop: `1px solid ${DIVIDER}` }}>
+            All stages on time 🎉
+          </div>
+        : rows.slice(0, 6).map(({ t, biz, sla }) => (
+            <div
+              key={t.id}
+              onClick={() => onSelect(t.id)}
+              style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', padding: '12px 0', borderTop: `1px solid ${DIVIDER}`, cursor: 'pointer' }}
+            >
+              {/* Task */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#E24C4C', flexShrink: 0 }} />
+                <span style={{ fontSize: 14, flexShrink: 0 }}>{CTYPE_EMOJI[t.ctype] || '📌'}</span>
+                <span style={{ fontWeight: 600, fontSize: 13.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.name}
+                  <span style={{ color: DIM, fontWeight: 400, marginLeft: 4 }}>{shortBrand(t.account)}</span>
+                </span>
+              </div>
+              {/* Owner */}
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#5B4CBE', background: '#ECE9FA', padding: '3px 9px', borderRadius: 6, display: 'inline-block', width: 'fit-content' }}>
+                {t.assignee.split(' ')[0]}
+              </span>
+              {/* Due Date */}
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#E24C4C' }}>{format(parseISO(t.due), 'MMM d, yyyy')}</span>
+              {/* SLA */}
+              <span style={{ fontSize: 13, color: MUTED }}>{sla}d</span>
+              {/* Breached By */}
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#E24C4C' }}>{biz - sla} {biz - sla === 1 ? 'day' : 'days'}</span>
+            </div>
+          ))
+      }
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 700, color: '#E24C4C', cursor: 'pointer' }}>View all breached items →</span>
+        <span style={{ fontSize: 22 }}>😣</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Motivational Banner ────────────────────────────────────
+function MotivationalBanner() {
+  return (
+    <div style={{
+      background: 'linear-gradient(100deg, #4A3BB0, #8B7CF0)',
+      borderRadius: 18, padding: '26px 40px',
+      display: 'flex', alignItems: 'center', gap: 26,
+    }}>
+      <span style={{ fontFamily: 'Georgia, serif', fontSize: 46, color: '#fff', opacity: 0.85, lineHeight: 1, flexShrink: 0 }}>"</span>
+      <div style={{ flex: 1 }}>
+        <div className="mont" style={{ fontWeight: 800, fontSize: 21, color: '#fff', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+          Small progress
+        </div>
+        <div className="mont" style={{ fontWeight: 800, fontSize: 21, color: '#fff', lineHeight: 1.3 }}>
+          every{' '}
+          <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>day</span>{' '}
+          adds up
+        </div>
+      </div>
+      {/* Trophy */}
+      <div style={{ flexShrink: 0, position: 'relative', width: 56, height: 56, borderRadius: 14, background: '#241C5C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="mont" style={{ fontWeight: 900, fontSize: 20, color: '#fff', fontStyle: 'italic' }}>F</span>
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none" style={{ position: 'absolute', top: -12 }}>
+          <path d="M2 8 Q7 0 12 8" stroke="#E9E45E" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          <circle cx="2"  cy="8" r="1.5" fill="#E9E45E"/>
+          <circle cx="12" cy="8" r="1.5" fill="#E9E45E"/>
+        </svg>
+      </div>
+      {/* Arrow */}
+      <svg width="36" height="22" viewBox="0 0 36 22" fill="none" style={{ opacity: 0.8, flexShrink: 0 }}>
+        <path d="M2 11 Q14 3 30 11" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+        <path d="M30 11 L24 7 M30 11 L26 16" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+      {/* Sticky note */}
+      <div style={{
+        background: '#FFE45E', color: INK, padding: '10px 16px', borderRadius: 3,
+        fontFamily: "'Caveat', cursive", fontWeight: 700, fontSize: 15,
+        transform: 'rotate(-2deg)', flexShrink: 0, whiteSpace: 'nowrap',
+        boxShadow: '2px 3px 8px rgba(0,0,0,.12)',
+      }}>
+        one step<br/>at a time 🙂
+      </div>
+    </div>
+  )
+}
+
+// ── MemberStatCard (kept) ─────────────────────────────────
 function MemberStatCard({ member: m, onTurn, dueCount, overdueCount }: {
   member: Member; onTurn: number; dueCount: number; overdueCount: number
 }) {
   return (
     <div style={{ borderRadius: 14, padding: 14, background: '#F6F6F3', border: '1px solid rgba(23,19,33,.08)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <div style={{
-          width: 30, height: 30, borderRadius: '50%',
-          background: avatarBg(m.name), color: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 700, flexShrink: 0,
-        }}>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', background: avatarBg(m.name), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
           {initials(m.name)}
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: UI.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
-          <div style={{ fontSize: 11, color: UI.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.role}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1B1A13', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+          <div style={{ fontSize: 11, color: '#8A8D91', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.role}</div>
         </div>
       </div>
       <div style={{ display: 'flex', borderTop: '1px solid #EDF0F6', paddingTop: 10 }}>
@@ -317,8 +325,8 @@ function MemberStatCard({ member: m, onTurn, dueCount, overdueCount }: {
           { val: overdueCount, label: 'Overdue', danger: true },
         ].map((s, i) => (
           <div key={i} style={{ flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid #ECECE7' : 'none', paddingLeft: i > 0 ? 8 : 0 }}>
-            <div className="mont" style={{ fontSize: 19, fontWeight: 800, color: s.danger && s.val > 0 ? '#C03A3A' : UI.ink }}>{s.val}</div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: UI.muted }}>{s.label}</div>
+            <div className="mont" style={{ fontSize: 19, fontWeight: 800, color: s.danger && s.val > 0 ? '#C03A3A' : '#1B1A13' }}>{s.val}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8A8D91' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -326,12 +334,11 @@ function MemberStatCard({ member: m, onTurn, dueCount, overdueCount }: {
   )
 }
 
-// ── PersonalBoard ──────────────────────────────────────────
+// ── Main Export ───────────────────────────────────────────
 const REVIEW_STAGES = ['c-final', 'c-check', 'd-check', 'final-check']
 
 export function PersonalBoard() {
   const { currentUser, tasks, members, slaConfig, selectTask } = useStore()
-  const [digestWindow, setDigestWindow] = useState<'daily' | 'weekly'>('weekly')
 
   const myTasks = useMemo(() => tasks.filter(t => {
     if (t.status === 'publish') return false
@@ -341,20 +348,24 @@ export function PersonalBoard() {
 
   if (!currentUser) return null
 
-  const today = new Date()
-  const week7 = new Date(today); week7.setDate(today.getDate() + 7)
-  const digestEnd = digestWindow === 'daily' ? today : week7
-
+  const today   = new Date()
+  const week7   = new Date(today); week7.setDate(today.getDate() + 7)
   const allActive = tasks.filter(t => t.status !== 'publish')
+  const CAP       = currentUser.capacity ?? 40
 
-  const myHours    = myTasks.reduce((s, t) => s + t.hours, 0)
-  const highCount  = myTasks.filter(t => t.priority === 'High').length
-  const dueToday   = myTasks.filter(t => { const d = parseISO(t.due); return isToday(d) || d < today })
-  const dueWeek    = myTasks.filter(t => { const d = parseISO(t.due); return d > today && d <= week7 })
-  const CAP        = currentUser.capacity ?? 40
-  const capPct     = Math.min(100, Math.round((myHours / CAP) * 100))
+  const dueToday  = myTasks.filter(t => { const d = parseISO(t.due); return isToday(d) || d < today })
+  const dueWeek   = myTasks.filter(t => { const d = parseISO(t.due); return d > today && d <= week7 })
+  const completed = tasks.filter(t => t.status === 'publish').length
+  const myHours   = myTasks.reduce((s, t) => s + t.hours, 0)
+  const capPct    = Math.min(100, Math.round((myHours / CAP) * 100))
+  const capColor  = capPct >= 90 ? '#F5334F' : capPct >= 70 ? '#E0A23F' : '#3FA34D'
 
-  // Brand breakdown for capacity bar
+  const breached = allActive
+    .map(t => { const sla = slaConfig[t.status] ?? 3; const biz = differenceInDays(today, parseISO(t.stageDate)); return { t, sla, biz } })
+    .filter(x => x.biz > x.sla)
+    .sort((a, b) => (b.biz - b.sla) - (a.biz - a.sla))
+
+  // Brand breakdown for capacity
   const brandAgg: Record<string, { hours: number; count: number }> = {}
   myTasks.forEach(t => {
     if (!brandAgg[t.account]) brandAgg[t.account] = { hours: 0, count: 0 }
@@ -363,62 +374,73 @@ export function PersonalBoard() {
   })
   const brandRows = Object.entries(brandAgg).sort((a, b) => b[1].hours - a[1].hours)
 
-  // Digest data
-  const pastPublish = allActive
-    .filter(t => parseISO(t.due) < today)
-    .map(t => ({ t, days: differenceInDays(today, parseISO(t.due)) }))
-    .sort((a, b) => b.days - a.days)
-
-  const awaiting = allActive
-    .filter(t => REVIEW_STAGES.includes(t.status))
-    .map(t => ({ t, days: differenceInDays(today, parseISO(t.stageDate)) }))
-    .sort((a, b) => b.days - a.days)
-
-  const publishing = allActive
-    .filter(t => { const d = parseISO(t.due); return d >= today && d <= digestEnd })
-    .map(t => ({ t, days: differenceInDays(parseISO(t.due), today) }))
-    .sort((a, b) => a.days - b.days)
-
-  const breached = allActive
-    .map(t => { const sla = slaConfig[t.status] ?? 3; const biz = differenceInDays(today, parseISO(t.stageDate)); return { t, sla, biz } })
-    .filter(x => x.biz > x.sla)
-    .sort((a, b) => b.biz - a.biz)
-
   const firstName = currentUser.name.split(' ')[0]
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '1.5rem 1.5rem 3rem' }}>
+      <div style={{ maxWidth: 1060, margin: '0 auto', padding: '36px 44px 48px' }}>
 
-        {/* Greeting */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h2 className="mont" style={{ fontSize: 26, fontWeight: 800, color: UI.ink, margin: 0, letterSpacing: '-0.01em' }}>
-            {greeting()}, {firstName}
-          </h2>
-          <p style={{ color: UI.muted, fontSize: 14, margin: '0.3rem 0 0' }}>
-            {format(today, 'EEEE, MMMM d, yyyy')} — your live campaign room
-          </p>
+        {/* ── Greeting ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 26 }}>
+          <div>
+            <h1 className="mont" style={{ fontWeight: 800, fontSize: 27, color: '#1B1A13', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {greeting()}, {firstName} 👋
+            </h1>
+            <p style={{ fontSize: 14.5, color: MUTED, margin: '8px 0 0' }}>
+              Let's make{' '}
+              <span style={{ background: 'linear-gradient(0deg, #E9E45E 40%, transparent 40%)', fontWeight: 700, color: INK }}>
+                today
+              </span>{' '}
+              count.
+            </p>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 24 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid #E1E1E0`, borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 600, color: '#1B1A13' }}>
+              📅 {format(today, 'MMMM d, yyyy')}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 10 }}>
+              <svg width="38" height="15" viewBox="0 0 38 15" fill="none" style={{ opacity: 0.55 }}>
+                <path d="M2 13 Q10 2 20 8 Q30 14 36 4" stroke={INK} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+              </svg>
+              <span style={{ fontFamily: "'Caveat', cursive", fontWeight: 700, fontSize: 16, color: INK }}>
+                you got this! 💜
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Profile hero + team roster */}
-        <ProfileSection user={currentUser} myHours={myHours} members={members} />
-
-        {/* BigStat cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-          <BigStat label="Active tasks"    value={myTasks.length}  sub={`${highCount} high priority`} />
-          <BigStat label="Due today"       value={dueToday.length} sub="incl. overdue" tone={dueToday.length > 0 ? 'danger' : 'default'} />
-          <BigStat label="Due this week"   value={dueWeek.length}  sub="next 7 days" />
-          <BigStat label="Hours allocated" value={`${myHours}h`}   sub={`of ${CAP}h capacity`} tone="accent" />
+        {/* ── 4 Stat Cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 22 }}>
+          <StatCard
+            label="My Day" icon="☀️" value={dueToday.length} sub="Tasks"
+            bg="#E9E5FB" labelColor="#5B4CBE" numColor="#4A3BB0"
+            decoration={<SparklinePurple />}
+          />
+          <StatCard
+            label="This Week" icon="📅" value={dueWeek.length} sub="Tasks"
+            bg="#FCEFD9" labelColor="#B9821A" numColor="#D18A15"
+            decoration={<BarsAmber />}
+          />
+          <StatCard
+            label="SLA Breached" icon="⚠️" value={breached.length} sub="Items"
+            bg="#FCE4E1" labelColor="#C0392B" numColor="#D6362C"
+            decoration={<WaveRed />}
+          />
+          <StatCard
+            label="Completed" icon="✅" value={completed} sub="This Week"
+            bg="#E1F5E6" labelColor="#2E8B4F" numColor="#279247"
+            decoration={<SparklineGreen />}
+          />
         </div>
 
-        {/* Weekly capacity bar */}
-        <div style={{ ...surface, borderRadius: 18, padding: '1.1rem 1.4rem', marginBottom: 22 }}>
+        {/* ── Weekly Capacity (kept) ── */}
+        <div style={{ background: '#fff', border: '1px solid #E5E8F1', boxShadow: '0 1px 2px rgba(26,28,30,.04), 0 10px 28px rgba(26,28,30,.06)', borderRadius: 18, padding: '1.1rem 1.4rem', marginBottom: 22 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: UI.ink }}>Weekly capacity</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: UI.violet }}>{capPct}%</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#1B1A13' }}>Weekly capacity</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#B79CF5' }}>{capPct}%</span>
           </div>
           <div style={{ height: 10, borderRadius: 99, background: '#E7E7E3', overflow: 'hidden' }}>
-            <div style={{ width: `${capPct}%`, height: '100%', borderRadius: 99, background: UI.dark, transition: 'width .3s ease' }} />
+            <div style={{ width: `${capPct}%`, height: '100%', borderRadius: 99, background: capColor, transition: 'width .3s ease' }} />
           </div>
           {brandRows.length > 0 && (
             <div style={{ display: 'flex', gap: 18, marginTop: 12, flexWrap: 'wrap' }}>
@@ -427,8 +449,8 @@ export function PersonalBoard() {
                 return (
                   <div key={account} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 8, height: 8, borderRadius: 99, background: bc, display: 'inline-block' }} />
-                    <span style={{ fontSize: 11.5, color: UI.muted }}>
-                      <strong style={{ color: UI.ink }}>{shortBrand(account)}</strong> {hours}h · {count} tasks
+                    <span style={{ fontSize: 11.5, color: '#8A8D91' }}>
+                      <strong style={{ color: '#1B1A13' }}>{shortBrand(account)}</strong> {hours}h · {count} tasks
                     </span>
                   </div>
                 )
@@ -437,127 +459,31 @@ export function PersonalBoard() {
           )}
         </div>
 
-        {/* My Day + Up Next */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, marginBottom: 36 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Sparkles />
-              <span className="mont" style={{ fontWeight: 800, fontSize: 16, color: UI.ink }}>My Day</span>
-              {dueToday.length > 0 && (
-                <span style={{ background: '#F1F1EF', color: UI.violet, borderRadius: 99, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
-                  {dueToday.length}
-                </span>
-              )}
-            </div>
-            {dueToday.length > 0
-              ? dueToday.map(t => <MyTaskRow key={t.id} task={t} />)
-              : <div style={{ border: '1.5px dashed #C7CFE0', borderRadius: 14, padding: '1.5rem', textAlign: 'center', color: '#C4C4BE', fontSize: 13 }}>Nothing due today. Enjoy the calm.</div>
-            }
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <CalDays />
-              <span className="mont" style={{ fontWeight: 800, fontSize: 16, color: UI.ink }}>Up next this week</span>
-              {dueWeek.length > 0 && (
-                <span style={{ background: '#EDF6C6', color: '#4B7A12', borderRadius: 99, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
-                  {dueWeek.length}
-                </span>
-              )}
-            </div>
-            {dueWeek.length > 0
-              ? dueWeek.map(t => <MyTaskRow key={t.id} task={t} />)
-              : <div style={{ border: '1.5px dashed #C7CFE0', borderRadius: 14, padding: '1.5rem', textAlign: 'center', color: '#C4C4BE', fontSize: 13 }}>No upcoming deadlines this week</div>
-            }
-          </div>
+        {/* ── My Day + This Week panels ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <TaskPanel
+            title="My Day" icon="☀️" accentColor={PURPLE}
+            tasks={dueToday}
+            badgeBg="#ECE9FA" badgeColor="#5B4CBE" linkColor={PURPLE}
+          />
+          <TaskPanel
+            title="This Week" icon="📅" accentColor="#E8A422"
+            tasks={dueWeek}
+            badgeBg="#FBE9D0" badgeColor="#B9821A" linkColor="#E8A422"
+          />
         </div>
 
-        {/* Team digest ──────────────────────────── */}
-        <div style={{ borderTop: '1px solid #E6D9CB', paddingTop: 26, marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Users size={18} />
-              <span className="mont" style={{ fontSize: 16, fontWeight: 800, color: UI.ink }}>Team digest</span>
-            </div>
-            {/* Daily / weekly toggle */}
-            <div style={{ display: 'inline-flex', borderRadius: 10, padding: 3, background: '#E7E7E3', gap: 2 }}>
-              {(['daily', 'weekly'] as const).map(w => (
-                <button
-                  key={w}
-                  onClick={() => setDigestWindow(w)}
-                  style={{
-                    fontSize: 12, fontWeight: 600, padding: '5px 14px', borderRadius: 7,
-                    border: 'none', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
-                    background: digestWindow === w ? '#FFFCF7' : 'transparent',
-                    color: digestWindow === w ? UI.ink : UI.muted,
-                    boxShadow: digestWindow === w ? '0 1px 3px rgba(16,16,11,.1)' : 'none',
-                    transition: 'background .15s, box-shadow .15s',
-                  }}
-                >
-                  {w}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* ── SLA Breached Table ── */}
+        <SLATable rows={breached} onSelect={selectTask} />
 
-          {/* Row 1: Overdue + Awaiting Review */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-            <DigestCard icon={<AlertCircle />} theme="#C03A3A" title="Past publish date" count={pastPublish.length}>
-              {pastPublish.length > 0
-                ? pastPublish.slice(0, 4).map(({ t, days }) => (
-                    <div key={t.id} onClick={() => selectTask(t.id)} style={{ cursor: 'pointer' }}>
-                      <DigestRow tint="#F7E3E3" titleColor="#8F2C2C" name={t.name} sub={`${shortBrand(t.account)} · ${STAGE_MAP[t.status]?.label}`} metric={`${days}d over`} />
-                    </div>
-                  ))
-                : <EmptyDigest message="Nothing overdue 🎉" />
-              }
-            </DigestCard>
-            <DigestCard icon={<Clock />} theme="#B7791F" title="Awaiting review" count={awaiting.length}>
-              {awaiting.length > 0
-                ? awaiting.slice(0, 4).map(({ t, days }) => (
-                    <div key={t.id} onClick={() => selectTask(t.id)} style={{ cursor: 'pointer' }}>
-                      <DigestRow tint="#FBF0D6" titleColor="#7A5A1E" name={t.name} sub={`${shortBrand(t.account)} · ${STAGE_MAP[t.status]?.label}`} metric={`${days}d waiting`} />
-                    </div>
-                  ))
-                : <EmptyDigest message="No tasks in review" />
-              }
-            </DigestCard>
-          </div>
-
-          {/* Row 2: Publishing + SLA breached */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <DigestCard
-              icon={<CheckCircle />}
-              theme="#2A3E78"
-              title={`Publishing ${digestWindow === 'daily' ? 'today' : 'this week'}`}
-              count={publishing.length}
-            >
-              {publishing.length > 0
-                ? publishing.slice(0, 4).map(({ t, days }) => (
-                    <div key={t.id} onClick={() => selectTask(t.id)} style={{ cursor: 'pointer' }}>
-                      <DigestRow tint="#EEF1F8" titleColor="#1B2C5C" name={t.name} sub={`${shortBrand(t.account)} · ${t.ctype}`} metric={days === 0 ? 'today' : `in ${days}d`} />
-                    </div>
-                  ))
-                : <EmptyDigest message={`Nothing publishing ${digestWindow === 'daily' ? 'today' : 'this week'}`} />
-              }
-            </DigestCard>
-            <DigestCard icon={<AlertTriangle />} theme="#9A6B14" title="SLA breached" count={breached.length}>
-              {breached.length > 0
-                ? breached.slice(0, 4).map(({ t, biz, sla }) => (
-                    <div key={t.id} onClick={() => selectTask(t.id)} style={{ cursor: 'pointer' }}>
-                      <DigestRow tint="#F4EDDC" titleColor="#7A5A1E" name={t.name} sub={`${shortBrand(t.account)} · ${STAGE_MAP[t.status]?.label}`} metric={`${biz}d / ${sla}d`} />
-                    </div>
-                  ))
-                : <EmptyDigest message="All stages on time" />
-              }
-            </DigestCard>
-          </div>
-        </div>
-
-        {/* Team overview ────────────────────────── */}
-        <div style={{ ...surface, borderRadius: 18, padding: '1.25rem 1.4rem' }}>
+        {/* ── Team Overview (kept) ── */}
+        <div style={{ background: '#fff', border: '1px solid #E5E8F1', boxShadow: '0 1px 2px rgba(26,28,30,.04), 0 10px 28px rgba(26,28,30,.06)', borderRadius: 18, padding: '1.25rem 1.4rem', marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Users size={17} />
-            <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: UI.muted }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8A8D91" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span style={{ fontSize: 12.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#8A8D91' }}>
               Team overview ({members.length})
             </span>
           </div>
@@ -572,20 +498,15 @@ export function PersonalBoard() {
                 if (REVIEW_STAGES.includes(t.status)) return owner === m.name || owner === m.role
                 return t.assignee === m.name && !REVIEW_STAGES.includes(t.status)
               }).length
-              const dueTodayM  = memberTasks.filter(t => { const d = parseISO(t.due); return isToday(d) || d <= today }).length
-              const overdueM   = memberTasks.filter(t => parseISO(t.due) < today).length
-              return (
-                <MemberStatCard
-                  key={m.name}
-                  member={m}
-                  onTurn={onTurn}
-                  dueCount={dueTodayM}
-                  overdueCount={overdueM}
-                />
-              )
+              const dueTodayM = memberTasks.filter(t => { const d = parseISO(t.due); return isToday(d) || d <= today }).length
+              const overdueM  = memberTasks.filter(t => parseISO(t.due) < today).length
+              return <MemberStatCard key={m.name} member={m} onTurn={onTurn} dueCount={dueTodayM} overdueCount={overdueM} />
             })}
           </div>
         </div>
+
+        {/* ── Motivational Banner ── */}
+        <MotivationalBanner />
 
       </div>
     </div>
