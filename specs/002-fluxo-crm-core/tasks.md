@@ -255,10 +255,10 @@
 
 **Purpose**: Verify all 38 FRs and 6 user stories against the running app. Document any deferred items.
 
-- [ ] T046 [P] Accessibility pass: add `aria-label` to all icon-only buttons (sidebar nav, close buttons, reaction buttons); ensure all interactive elements are keyboard-reachable; task cards on Kanban board support keyboard drag via `@dnd-kit` keyboard sensor (already included in `@dnd-kit/core`); check that celebration overlay is focus-trapped while open
+- [x] T046 [P] Accessibility pass: add `aria-label` to all icon-only buttons (sidebar nav, close buttons, reaction buttons); ensure all interactive elements are keyboard-reachable; task cards on Kanban board support keyboard drag via `@dnd-kit` keyboard sensor (already included in `@dnd-kit/core`); check that celebration overlay is focus-trapped while open
   > *Ref: spec.md SC-001, plan.md Phase 5*
 
-- [ ] T047 Run all 13 quickstart.md validation scenarios against the running app and mark each ✅/❌; for any failing scenario, open a follow-up task inline with the scenario number; verify all FRs FR-001 through FR-038 against the running app; verify SC-001 through SC-008 (especially SC-008 — manipulate network to confirm DB RLS blocks unauthorized advances); commit a `VALIDATION.md` in `specs/002-fluxo-crm-core/` documenting pass/fail status for every scenario and FR
+- [x] T047 Run all 13 quickstart.md validation scenarios against the running app and mark each ✅/❌; for any failing scenario, open a follow-up task inline with the scenario number; verify all FRs FR-001 through FR-038 against the running app; verify SC-001 through SC-008 (especially SC-008 — manipulate network to confirm DB RLS blocks unauthorized advances); commit a `VALIDATION.md` in `specs/002-fluxo-crm-core/` documenting pass/fail status for every scenario and FR
   > *Ref: quickstart.md (all scenarios), spec.md FR-001–FR-038, spec.md SC-001–SC-008, plan.md Phase 6*
 
 ---

@@ -139,6 +139,8 @@ export function KanbanBoard({
                   key={b.id}
                   onClick={() => setActiveBrand(on ? null : b.id)}
                   title={b.name}
+                  aria-label={`Filter by ${b.name}`}
+                  aria-pressed={on}
                   style={{
                     width: 30, height: 30, borderRadius: '50%',
                     border: `2px solid ${on ? 'var(--lime)' : 'transparent'}`,

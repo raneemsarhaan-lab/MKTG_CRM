@@ -156,12 +156,43 @@ export function CelebrationOverlay() {
   const confettiShape = useRef<ParticleShape>('circle')
   const dismiss = useCallback(() => setCelebration(null), [setCelebration])
 
-  // Dismiss on Escape
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Dismiss on Escape + focus-trap inside overlay while open
   useEffect(() => {
     if (!celebration) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') dismiss() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+
+    const prevFocus = document.activeElement as HTMLElement | null
+    // Move focus into the panel on open
+    panelRef.current?.focus()
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { dismiss(); return }
+      if (e.key !== 'Tab') return
+
+      const panel = panelRef.current
+      if (!panel) return
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      )
+      if (focusable.length === 0) { e.preventDefault(); return }
+
+      const first = focusable[0]
+      const last  = focusable[focusable.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus() }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      prevFocus?.focus()
+    }
   }, [celebration, dismiss])
 
   if (!celebration) return null
@@ -183,7 +214,9 @@ export function CelebrationOverlay() {
 
       {/* Panel */}
       <div
+        ref={panelRef}
         onClick={e => e.stopPropagation()}
+        tabIndex={-1}
         style={{
           position: 'relative', zIndex: 2,
           width: '100%', maxWidth: 420,
@@ -191,6 +224,7 @@ export function CelebrationOverlay() {
           padding: '32px 28px 28px',
           boxShadow: '0 40px 100px rgba(0,0,0,.35)',
           textAlign: 'center',
+          outline: 'none',
         }}
       >
         {/* Dismiss */}

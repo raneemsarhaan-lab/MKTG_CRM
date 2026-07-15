@@ -57,6 +57,7 @@ export function AddBrandModal({ onClose }: AddBrandModalProps) {
           <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', margin: 0 }}>Add brand</h3>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             style={{
               width: 28, height: 28, borderRadius: '50%',
               background: '#F6F6F4', border: 'none', cursor: 'pointer',
