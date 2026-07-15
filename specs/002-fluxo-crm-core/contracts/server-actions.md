@@ -239,6 +239,29 @@ export async function removeMember(
 }
 ```
 
+### `updateMember`
+
+```ts
+export async function updateMember(
+  memberId: string,
+  patch: Partial<{ name: string; role: string; access: 'admin' | 'superuser' | 'user'; capacity_hrs_wk: number; status: string; avatar_url: string }>
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServerClient(cookies())
+
+  // RLS enforces: admin can update any member; user can update own status/avatar only.
+  // Server Action validation limits which fields are sent — never expose full patch to client.
+  const { error } = await supabase
+    .from('members')
+    .update(patch)
+    .eq('id', memberId)
+
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/settings')
+  revalidatePath('/capacity')
+  return { success: true }
+}
+```
+
 ---
 
 ## `src/actions/settings.ts`

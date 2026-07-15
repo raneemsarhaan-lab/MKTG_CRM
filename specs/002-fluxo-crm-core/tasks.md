@@ -42,7 +42,7 @@
 - [ ] T006 Create `src/app/auth/callback/route.ts` — exchange OAuth code for session, check email ends in `@forefront.consulting` (sign out + redirect to `/login?error=domain` if not), look up `members` table by email (redirect to `/login?error=not_member` if absent), redirect to `/overview` on success
   > *Ref: plan.md Auth Flow, contracts/server-actions.md Auth Flow, spec.md FR-037–FR-038, research.md Decision 10*
 
-- [ ] T007 Create `src/app/middleware.ts` — read Supabase session cookie on every request to `/(app)/**`; redirect unauthenticated requests to `/login`; allow `/login`, `/auth/**`, and static assets through without auth check
+- [ ] T007 Create `src/middleware.ts` (Next.js requires middleware at the `src/` root, not inside `app/`) — read Supabase session cookie on every request to `/(app)/**`; redirect unauthenticated requests to `/login`; allow `/login`, `/auth/**`, and static assets through without auth check
   > *Ref: plan.md Phase 0, spec.md FR-037*
 
 - [ ] T008 Create `src/app/layout.tsx` (root layout) with `<html lang="en">`, Montserrat + Inter + Caveat font variables, and `src/app/(app)/layout.tsx` (app shell layout) that resolves the current member server-side via Supabase and renders `AppShell` with member prop; create `src/components/shared/AppShell.tsx` with sidebar nav stubs (icons only) — Overview, Board, and placeholders for Capacity and Settings gated by `member.access === 'admin'`

@@ -152,10 +152,11 @@ CREATE POLICY "tasks_update"
     -- Admin/superuser can update any task field
     auth.user_access_level() IN ('admin', 'superuser')
     OR
-    -- Task owner can update their own tasks (for status advance and comment)
-    task_owner_id = auth.member_id()
-    OR
-    -- Stage owner can advance (handles review stage owners)
+    -- Stage owner can advance (handles both working stages and review stages).
+    -- can_advance_task() already checks task_owner_id for working stages,
+    -- so a separate task_owner_id clause is NOT needed and would be a
+    -- security hole (it would let task owners bypass review stage ownership
+    -- and un-publish published tasks).
     can_advance_task(id)
   );
 
@@ -165,11 +166,15 @@ CREATE POLICY "tasks_delete"
   USING (auth.user_access_level() = 'admin');
 ```
 
-> **Note on tasks_update**: The RLS policy is a broad gate. Granular field-level control (e.g., preventing a user from changing `nine_stage`) is handled by:
+> **Note on tasks_update**: `can_advance_task()` is the single gate for all task updates by non-admin users. It returns TRUE only when:
+> - The task is not in the terminal (`publish`) stage, AND
+> - The caller is admin/superuser, OR the caller owns the current stage (task owner for working stages, matching role for review stages).
+>
+> Granular field-level control (e.g., preventing a user from changing `nine_stage`) is handled by:
 > 1. The `prevent_nine_stage_change` trigger (blocks any change to `nine_stage`)
 > 2. Server Action validation (only sends the fields it intends to change)
 >
-> SC-008 requires that permissions are meaningful even if a user "manipulates the UI or network traffic." The `can_advance_task()` function and the `prevent_nine_stage_change` trigger provide the DB-level enforcement.
+> SC-008 requires that permissions are meaningful even if a user "manipulates the UI or network traffic." The `can_advance_task()` function and the `prevent_nine_stage_change` trigger provide the DB-level enforcement. The former `task_owner_id = auth.member_id()` clause has been deliberately removed — it was a security hole that allowed task owners to bypass review stage ownership and move tasks out of `publish`.
 
 ---
 

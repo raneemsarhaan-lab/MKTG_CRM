@@ -245,10 +245,10 @@ specs/002-fluxo-crm-core/
 
 ```text
 src/
+├── middleware.ts                    # Auth guard: redirect unauthenticated to /login (Next.js root-level)
 ├── app/
 │   ├── layout.tsx                   # Root layout: Montserrat+Inter+Caveat fonts, <html lang>
 │   ├── globals.css                  # CSS token variables, base reset, RTL rules
-│   ├── middleware.ts                # Auth guard: redirect unauthenticated to /login
 │   ├── (auth)/
 │   │   └── login/
 │   │       └── page.tsx             # Google OAuth sign-in (server component)

@@ -1,28 +1,39 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (template) → 1.0.0
-Type of bump: MINOR — initial concrete ratification from template
+Version change: 1.0.0 → 2.0.0
+Type of bump: MAJOR — framework migration from Vite/React to Next.js 15 App Router;
+  multiple principle updates to align with accepted plan.md decisions
 
-Modified principles: N/A (first fill)
-Added sections:
-  - I. Design System Fidelity
-  - II. Workflow Pipeline Integrity
-  - III. Role-Based Feature Access
-  - IV. Design-Driven Development
-  - V. Cultural UX & Celebration System
-  - VI. State Architecture & Persistence
-  - Tech Stack
-  - Governance
+Modified principles:
+  - §II: English stage labels corrected to canonical full names (To Do, Writing,
+    Content Review, Islam Check, Ready to Design, Designing, Design Review,
+    Final Check, Published) — previously used abbreviated internal codes
+  - §III: Admin-only mutation gate changed from Zustand store to Postgres RLS;
+    UI gating now correctly described as presentation-only
+  - §V: Celebration trigger scope corrected — fires on any personally-owned
+    stage advance (not only on publish transition); shouldCelebrate from moveTask
+    Server Action is authoritative
+  - §VI: Zustand persisted keys removed — all app data lives in Postgres;
+    slaConfig persistence moved from Zustand to sla_config table;
+    currentUser re-resolution updated from getSession()+MEMBERS seed to
+    server-side Supabase cookie session;
+    onAuthStateChange Zustand coupling removed
+  - Tech Stack: Framework updated React 19+Vite → Next.js 15 App Router;
+    Deployment updated GitHub Pages → Vercel; Auth/DB expanded to include
+    Postgres+Realtime+Storage; next-intl and @dnd-kit added;
+    Zustand persist middleware removed
+  - Source layout updated to reflect App Router structure
 
 Templates:
-  ✅ .specify/templates/plan-template.md — Constitution Check gate already present; no changes needed
-  ✅ .specify/templates/spec-template.md — generic; no Fluxo-specific conflicts
-  ✅ .specify/templates/tasks-template.md — generic; no Fluxo-specific conflicts
+  ✅ .specify/templates/plan-template.md — no changes needed
+  ✅ .specify/templates/spec-template.md — no changes needed
+  ✅ .specify/templates/tasks-template.md — no changes needed
 
 Follow-up TODOs:
-  - None; all fields resolved from design files and codebase context.
+  - None; all amendments resolve /speckit-analyze findings C2, H4, H2, H1, H3.
 -->
+
 
 # Fluxo Creative Ops Constitution
 
@@ -72,13 +83,13 @@ altered without a constitution amendment.
 | ID            | English Label    | Arabic Label                 | Phase   | Color     |
 |---------------|-----------------|------------------------------|---------|-----------|
 | `todo`        | To Do           | افكار للتنفيذ                | Intake  | `#64748B` |
-| `c-prog`      | C-In Progress   | كتابة المحتوى                | Content | `#3B82F6` |
-| `c-final`     | C-Review        | مراجعة المحتوى               | Content | `#2E6FB0` |
-| `c-check`     | C-Check         | موافقة نهائية على المحتوى   | Content | `#1F5A94` |
-| `r-design`    | Ready For Design| جاهز للتصميم                | Design  | `#8B5CF6` |
-| `d-prog`      | D-In Progress   | تصميم                        | Design  | `#7C3AED` |
-| `d-check`     | D-Check         | مراجعة التصميم              | Design  | `#5B3FB5` |
-| `final-check` | F-Check         | المراجعة النهائية           | Ship    | `#F59E0B` |
+| `c-prog`      | Writing         | كتابة المحتوى                | Content | `#3B82F6` |
+| `c-final`     | Content Review  | مراجعة المحتوى               | Content | `#2E6FB0` |
+| `c-check`     | Islam Check     | موافقة نهائية على المحتوى   | Content | `#1F5A94` |
+| `r-design`    | Ready to Design | جاهز للتصميم                | Design  | `#8B5CF6` |
+| `d-prog`      | Designing       | تصميم                        | Design  | `#7C3AED` |
+| `d-check`     | Design Review   | مراجعة التصميم              | Design  | `#5B3FB5` |
+| `final-check` | Final Check     | المراجعة النهائية           | Ship    | `#F59E0B` |
 | `publish`     | Published       | تم النشر                     | Ship    | `#22C55E` |
 
 **SLA enforcement:**
@@ -88,7 +99,8 @@ altered without a constitution amendment.
   A task is breached when `businessDaysBetween(stageDate, today) > sla[stage][ctype]`.
 - The SLA matrix defaults live in `src/data/stages.ts` as `SLA_DEFAULTS`.
 - Admins may override per-stage SLA via the Settings view; overrides persist
-  in Zustand under `slaConfig`.
+  in the `sla_config` Postgres table (not Zustand). SLA reads are always
+  server-side at render time via the `updateSLA` Server Action.
 
 **Review stage ownership (immutable unless amended):**
 
@@ -121,7 +133,9 @@ render.
 Rules:
 - Capacity view and Settings nav items MUST be hidden from non-admins.
 - Admin-only mutations (addMember, removeMember, updateSLA) MUST be
-  gated in the store: calling them as a non-admin MUST be a no-op or throw.
+  enforced at the database level via Postgres RLS. UI gating (hiding controls
+  from non-admins) is presentation only; DB-level enforcement via RLS is the
+  authoritative security gate.
 - `currentUser.access` is the single source of truth; derive it from the
   `MEMBERS` seed + Supabase auth email match.
 
@@ -167,7 +181,12 @@ easter egg. It MUST be preserved in every refactor.
 | `tabla`    | طبلة              | 🥁    | `#534AB7`    |
 
 **Rules:**
-- Celebrations MUST trigger on task transition to `publish` stage.
+- Celebrations MUST trigger when a user advances a stage they personally own:
+  working stages (`todo`, `c-prog`, `r-design`, `d-prog`) fire for the task
+  owner; review stages (`c-final`, `c-check`, `d-check`, `final-check`) fire
+  for the member whose role matches the stage's `owner_role`. Admin or superuser
+  advances that do not match stage ownership MUST NOT trigger a celebration.
+  The `moveTask` Server Action returns `shouldCelebrate: boolean` to signal this.
 - Audio synthesis MUST use the Web Audio API (no external audio CDN
   dependency). The four synthesis patterns (LFO sine / bandpass noise /
   sawtooth arpeggio / dum-tak tabla) are canonical and MUST not be replaced
@@ -184,13 +203,14 @@ identity and a key differentiator that makes task completion feel rewarding.
 
 App state MUST follow the Zustand + Supabase dual-layer pattern.
 
-**Zustand store (`src/store/useStore.ts`):**
-- Persisted keys (localStorage `fluxo-storage`): `tasks`, `members`,
-  `slaConfig`.
-- NOT persisted: `currentUser`, `selectedTaskId`, `showTaskForm`,
-  `celebration`, `activeBrand`, `searchQuery`, `profileOpen`.
-- `currentUser` MUST be re-resolved on every page load from
-  `supabase.auth.getSession()` → email lookup in `MEMBERS` seed.
+**Zustand store (`src/store/useUIStore.ts`):**
+- Persisted keys: NONE. All application data (tasks, members, brands,
+  slaConfig) lives in Postgres and is fetched server-side via Server Components
+  and Server Actions. No localStorage persistence.
+- Ephemeral UI state only: `celebration`, `selectedTaskId`, `showTaskForm`,
+  `profileOpen`.
+- `currentUser` is resolved server-side on every request from the Supabase
+  session cookie; it is NOT stored in Zustand.
 
 **Type system (`src/types.ts`):**
 - `StageId`, `ContentType`, `Brand`, `Priority`, `Platform`, `AccessLevel`
@@ -199,10 +219,12 @@ App state MUST follow the Zustand + Supabase dual-layer pattern.
   no string literals elsewhere.
 
 **Supabase auth:**
-- Only `@forefront.consulting` email domain is accepted.
-- Auth state changes (login / logout) MUST update Zustand `currentUser`
-  synchronously via `onAuthStateChange`.
-- `logout()` MUST call `supabase.auth.signOut()` before clearing store state.
+- Only `@forefront.consulting` email domain is accepted; enforced in
+  `/auth/callback/route.ts` — sign out and redirect to `/login?error=domain`
+  if the email domain does not match.
+- Session is managed via server-side cookies using `@supabase/ssr`.
+- `logout()` MUST call `supabase.auth.signOut()`. No Zustand state to clear
+  (currentUser lives only in the server session).
 
 **Rationale**: Separating ephemeral UI state from persisted data prevents
 stale state bugs across sessions and keeps the auth layer clean.
@@ -212,28 +234,32 @@ stale state bugs across sessions and keeps the auth layer clean.
 These are the canonical dependencies for Fluxo. Adding or swapping a major
 dependency requires a constitution amendment.
 
-| Layer        | Choice                                  |
-|--------------|-----------------------------------------|
-| Framework    | React 19 + TypeScript (strict)          |
-| Build tool   | Vite                                    |
-| Styling      | Tailwind CSS v4 (inline + `@theme`)     |
-| State        | Zustand v5 with `persist` middleware    |
-| Auth/DB      | Supabase (auth only; no DB queries yet) |
-| Icons        | Lucide React                            |
-| Fonts        | Google Fonts (Montserrat, Inter, Caveat)|
-| Deployment   | GitHub Pages via GitHub Actions         |
-| Testing      | (none mandated yet — see Governance)    |
+| Layer        | Choice                                                    |
+|--------------|-----------------------------------------------------------|
+| Framework    | Next.js 15 (App Router) + TypeScript (strict)             |
+| Build tool   | Next.js built-in (no separate Vite)                       |
+| Styling      | Tailwind CSS v4 (inline + `@theme`)                       |
+| State        | Zustand v5, no `persist` — UI ephemera only               |
+| Auth/DB      | Supabase (Auth + Postgres + Realtime + Storage)           |
+| i18n         | next-intl (cookie-based locale, no URL segment)           |
+| Drag-and-drop| @dnd-kit/core (within-column reorder only)                |
+| Icons        | Lucide React                                              |
+| Fonts        | Google Fonts (Montserrat, Inter, Caveat)                  |
+| Deployment   | Vercel                                                    |
+| Testing      | (none mandated yet — see Governance)                      |
 
 **Source layout:**
 
 ```
 src/
-├── components/   React components (one file per view/component)
-├── data/         seed.ts, stages.ts (static reference data)
-├── lib/          supabase.ts, sounds.ts (infrastructure)
-├── store/        useStore.ts (Zustand)
-├── types.ts      shared TypeScript types
-└── index.css     global styles + @theme tokens
+├── middleware.ts         Auth guard (cookie check, redirect to /login)
+├── app/                  Next.js App Router pages, layouts, route handlers
+├── actions/              Server Actions (tasks.ts, members.ts, settings.ts)
+├── components/           React components organized by view
+├── lib/                  Supabase helpers, stage-meta.ts, alert-status.ts
+├── store/                useUIStore.ts (Zustand, UI ephemera only)
+├── types/                index.ts — shared TypeScript union types
+└── app/globals.css       CSS token variables, base reset, RTL logical props
 ```
 
 ## Governance
@@ -252,4 +278,4 @@ src/
   Spec Kit skills (`/speckit-plan`, `/speckit-specify`, etc.) read this file
   to enforce compliance gates.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-07-15
+**Version**: 2.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-07-15
