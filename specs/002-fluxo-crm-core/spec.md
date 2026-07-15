@@ -187,10 +187,13 @@ technical knowledge required.
   they are the current stage owner for that task's current stage.
 - **FR-004**: Admin and Super User tier members MUST be able to advance any
   task at any stage, bypassing stage-ownership checks.
-- **FR-005**: [NEEDS CLARIFICATION: Does Islam Check (stage 4) apply to all
-  tasks regardless of who initiated them, or only to tasks initiated by a
-  Content Creator? This determines whether the tool supports a single 9-stage
-  flow for all tasks or a 9/8-stage variant.]
+- **FR-005**: Tasks created by a **Content Creator** role MUST follow the
+  full 9-stage path (including Islam Check). Tasks created by any other role
+  (Admin, Super User, other User roles) MUST follow the 8-stage path,
+  skipping Islam Check and advancing directly from Content Review to Ready
+  to Design. Each task MUST carry a `nineStage` boolean flag (set at creation
+  based on the initiator's role) that determines which path it takes; this
+  flag is immutable after creation.
 - **FR-006**: Stage ownership MUST be stored as roles, not person names.
   Removing or renaming a person MUST NOT break ownership assignments.
 - **FR-007**: Each task MUST carry a fixed task owner (set at creation) and a
@@ -337,9 +340,9 @@ technical knowledge required.
 
 - Task creation is Admin/Super User only by default; if User-tier creation is
   needed, a separate feature spec will cover it.
-- "Islam Check" (stage 4) applies to all tasks in the current build until the
-  open decision in FR-005 is resolved; if resolved as 8-stage, a flag on the
-  task (`nineStage: boolean`) will determine which path the task takes.
+- The 8/9-stage variant is determined by the initiator's role at task
+  creation. A `nineStage: boolean` flag is set once (true if the creator is a
+  Content Creator, false otherwise) and is immutable for the life of the task.
 - Cover images are uploaded externally and referenced by URL, or left blank
   for the gradient fallback; no in-app image upload is in scope for this spec.
 - Real-time multi-user collaboration (live cursor, instant board sync) is out

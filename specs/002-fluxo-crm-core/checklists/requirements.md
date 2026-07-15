@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **FR-005 pending user answer**
+- [x] No [NEEDS CLARIFICATION] markers remain — FR-005 resolved: 8/9-stage variant based on initiator role
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,6 @@
 
 ## Notes
 
-- FR-005 ([NEEDS CLARIFICATION]) blocks the checklist from fully passing.
-  Once the 9-stage vs 8-stage decision is resolved, replace FR-005 with the
-  concrete rule, mark this item ✅, and proceed to `/speckit-plan`.
+All items pass. FR-005 resolved 2026-07-15: 8/9-stage variant — `nineStage`
+boolean flag set at task creation based on initiator role (Content Creator →
+true, all others → false). Ready for `/speckit-plan`.
