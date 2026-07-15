@@ -9,6 +9,7 @@ import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { moveTask, addComment } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 
 type FullTask = Task & {
   brand: Brand
@@ -110,7 +111,20 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
       const result = await moveTask(task.id)
       if (result.success) {
         if (result.shouldCelebrate && nextMeta) {
-          setCelebration({ taskName: task.name, stageLabel: nextMeta.label_en })
+          const payload = { taskName: task.name, stageLabel: nextMeta.label_en }
+          // Direct call for immediate same-tab response
+          setCelebration(payload)
+          // Broadcast to user-scoped channel for cross-tab sync
+          const supabase = getSupabaseBrowserClient()
+          const ch = supabase.channel(`celebration-${currentUser.id}`, {
+            config: { broadcast: { selfBroadcast: false } },
+          })
+          ch.subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') {
+              ch.send({ type: 'broadcast', event: 'celebration', payload })
+              setTimeout(() => supabase.removeChannel(ch), 3000)
+            }
+          })
         }
         onClose()
       }
