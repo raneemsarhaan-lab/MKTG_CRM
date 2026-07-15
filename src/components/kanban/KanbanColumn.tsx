@@ -28,22 +28,25 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
       style={{
         display: 'flex',
         flexDirection: 'column',
-        minWidth: '240px',
-        width: '240px',
+        minWidth: '280px',
+        width: '280px',
         flexShrink: 0,
         background: isOver ? `${color}08` : 'transparent',
         borderRadius: '12px',
         transition: 'background 0.15s',
       }}
     >
-      {/* Column header — EN label + AR label, stage color left border + gradient bg */}
+      {/* Column header — colored top border, white bg, gray count badge */}
       <div
         style={{
-          borderLeft: `3px solid ${color}`,
-          background: `linear-gradient(135deg, ${color}33, ${color}11)`,
-          borderRadius: '0 8px 8px 0',
+          borderTop: `3px solid ${color}`,
+          borderLeft: '1px solid var(--line)',
+          borderRight: '1px solid var(--line)',
+          borderBottom: '1px solid var(--line)',
+          background: '#FFFFFF',
+          borderRadius: '10px 10px 0 0',
           padding: '10px 12px',
-          marginBottom: '10px',
+          marginBottom: '8px',
           flexShrink: 0,
         }}
       >
@@ -61,8 +64,8 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
           </span>
           <span
             style={{
-              background: color,
-              color: '#fff',
+              background: '#F1F1EF',
+              color: 'var(--muted)',
               borderRadius: '99px',
               fontSize: '10px',
               fontWeight: 700,
@@ -74,12 +77,11 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
             {tasks.length}
           </span>
         </div>
-        {/* Arabic label below — Caveat font, right-aligned for RTL */}
         <p
           style={{
             fontFamily: 'var(--font-accent)',
             fontSize: '11px',
-            color: color,
+            color: 'var(--muted)',
             marginTop: '2px',
             direction: 'rtl',
             textAlign: 'right',
@@ -95,7 +97,7 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '0 4px',
+          padding: '0 2px',
           minHeight: '48px',
         }}
       >

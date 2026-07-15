@@ -112,12 +112,88 @@ export function KanbanBoard({
 
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
 
-  const isAdmin = currentUser.access === 'admin'
+  // Compute active task count for workload bar
+  const myActiveTasks = tasks.filter(t => t.task_owner.id === currentUser.id && t.status !== 'publish').length
+  const workloadPct   = Math.min(100, Math.round((myActiveTasks / 10) * 100))
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Top bar: brand filter + search + new task button */}
-      <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+      {/* User identity header */}
+      <div
+        style={{
+          padding: '16px 24px 12px',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Square avatar */}
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '10px',
+              background: '#6E5BE6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px', color: '#fff' }}>
+              {currentUser.name.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '14px', color: 'var(--ink)' }}>
+              {currentUser.name}
+            </div>
+            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  width: '80px',
+                  height: '4px',
+                  borderRadius: '99px',
+                  background: 'var(--line)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${workloadPct}%`,
+                    borderRadius: '99px',
+                    background: workloadPct > 80 ? '#F5334F' : '#B79CF5',
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'var(--font-heading)' }}>
+                {myActiveTasks} active
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Pipeline heading */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 900,
+              fontSize: '18px',
+              color: 'var(--ink)',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Pipeline
+          </span>
+        </div>
+      </div>
+
+      {/* Brand filter + search */}
+      <div style={{ padding: '0 24px 8px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           {/* Brand filter chips */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -142,7 +218,7 @@ export function KanbanBoard({
                   aria-label={`Filter by ${b.name}`}
                   aria-pressed={on}
                   style={{
-                    width: 30, height: 30, borderRadius: '50%',
+                    width: 28, height: 28, borderRadius: '50%',
                     border: `2px solid ${on ? 'var(--lime)' : 'transparent'}`,
                     background: b.color, cursor: 'pointer', flexShrink: 0,
                     boxShadow: on ? `0 4px 12px ${b.color}66` : 'none',
@@ -152,39 +228,22 @@ export function KanbanBoard({
             })}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Search */}
-            <div style={{ position: 'relative' }}>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search tasks..."
-                style={{
-                  width: 180, padding: '5px 10px 5px 28px',
-                  background: '#fff', border: '1px solid var(--line)', borderRadius: 10,
-                  fontSize: '0.78rem', outline: 'none', color: 'var(--ink)', fontFamily: 'inherit',
-                }}
-              />
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"
-                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-
-            {/* New task button — admin/superuser only */}
-            {(isAdmin || currentUser.access === 'superuser') && (
-              <button
-                onClick={() => setShowTaskForm(true)}
-                aria-label="Create new task"
-                style={{
-                  padding: '5px 14px', borderRadius: 10, border: 'none',
-                  background: 'var(--ink)', color: 'var(--lime)',
-                  fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                + New Task
-              </button>
-            )}
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              style={{
+                width: 180, padding: '5px 10px 5px 28px',
+                background: '#fff', border: '1px solid var(--line)', borderRadius: 10,
+                fontSize: '0.78rem', outline: 'none', color: 'var(--ink)', fontFamily: 'inherit',
+              }}
+            />
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"
+              style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
           </div>
         </div>
       </div>

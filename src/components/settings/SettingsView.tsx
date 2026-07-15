@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Member, Brand, ContentType, SLAConfig } from '@/types/index'
+import type { Member, Brand, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { TeamSettings } from './TeamSettings'
 import { WorkflowSettings } from './WorkflowSettings'
 
@@ -13,9 +13,10 @@ interface SettingsViewProps {
   brands: Brand[]
   contentTypes: ContentType[]
   slaConfig: SLAConfig
+  workspaceSettings: WorkspaceSettings
 }
 
-export function SettingsView({ members, currentUserId, brands, contentTypes, slaConfig }: SettingsViewProps) {
+export function SettingsView({ members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings }: SettingsViewProps) {
   const [tab, setTab] = useState<Tab>('team')
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -69,6 +70,7 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
             brands={brands}
             contentTypes={contentTypes}
             slaConfig={slaConfig}
+            workspaceSettings={workspaceSettings}
           />
         )}
       </div>

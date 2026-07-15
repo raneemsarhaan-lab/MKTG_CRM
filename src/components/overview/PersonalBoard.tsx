@@ -107,23 +107,68 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto', padding: '36px 40px 48px' }}>
 
-        {/* Greeting header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-          <div>
-            <h1 style={{
-              fontFamily: 'var(--font-heading)', fontWeight: 800,
-              fontSize: '1.7rem', color: 'var(--ink)', margin: 0,
-            }}>
-              {t(greeting)}, {firstName} 👋
-            </h1>
-            <p style={{ fontSize: '0.9rem', color: 'var(--muted)', margin: '6px 0 0' }}>
-              {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
+        {/* Page identity badge */}
+        <div style={{ marginBottom: '12px' }}>
+          <span
+            style={{
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--muted)',
+              background: '#EDEDEA',
+              padding: '3px 10px',
+              borderRadius: '99px',
+            }}
+          >
+            Personal Command Center
+          </span>
         </div>
 
-        {/* Profile strip */}
-        <ProfileStrip member={currentUser} />
+        {/* Greeting header */}
+        <div style={{ marginBottom: '28px' }}>
+          <h1
+            style={{
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 800,
+              fontSize: '1.7rem',
+              color: 'var(--ink)',
+              margin: 0,
+            }}
+          >
+            {t(greeting)}, {firstName} 👋
+          </h1>
+          <p style={{ fontSize: '0.9rem', color: 'var(--muted)', margin: '6px 0 0' }}>
+            {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+
+        {/* Admin: Profile card + Team grid */}
+        {isAdmin && (
+          <>
+            <ProfileStrip member={currentUser} hoursUsed={hoursUsed} />
+
+            <div style={{
+              background: '#fff', border: '1px solid var(--line)',
+              borderRadius: '18px', padding: '20px 22px',
+              marginBottom: '20px',
+            }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted)', marginBottom: '14px' }}>
+                Team ({members.length})
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
+                {members.map(m => (
+                  <MemberCard
+                    key={m.id}
+                    member={m}
+                    activeTaskCount={memberTaskCount[m.id] ?? 0}
+                    isAdminViewer={isAdmin}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* 4 BigStat cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14, marginBottom: 18 }}>
@@ -131,7 +176,7 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
         </div>
 
         {/* Capacity bar */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: '18px' }}>
           <CapacityBar hoursUsed={hoursUsed} hoursTotal={currentUser.capacity_hrs_wk} />
         </div>
 
@@ -155,22 +200,14 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
           />
         </div>
 
-        {/* Team Digest */}
+        {/* Team Digest — non-admin also sees a lighter overview */}
         <div style={{
           background: '#fff', border: '1px solid var(--line)',
           boxShadow: '0 1px 3px rgba(28,24,54,.04)',
           borderRadius: 18, padding: '20px 22px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)' }}>
-              {tOv('teamOverview')} ({members.length})
-            </span>
+          <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--muted)', marginBottom: '14px' }}>
+            {tOv('teamOverview')} ({members.length})
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>
             {members.map(m => (
@@ -186,7 +223,7 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
 
       </div>
 
-      {/* Task modal — opens when a TaskRow is clicked */}
+      {/* Task modal */}
       {selectedTask && (
         <TaskModal
           task={selectedTask}

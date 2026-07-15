@@ -149,3 +149,10 @@ export interface MoveTaskResult {
   shouldCelebrate: boolean
   error?: string
 }
+
+export interface WorkspaceSettings {
+  id: number
+  capacity_hrs_per_wk: number
+  nine_stage_default: boolean
+  updated_at: string
+}

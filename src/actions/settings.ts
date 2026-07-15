@@ -97,3 +97,33 @@ export async function removeContentType(
   revalidatePath('/settings')
   return { success: true }
 }
+
+// ─── Workspace settings ───────────────────────────────────────────────────────
+
+export async function updateWeeklyCapacity(
+  hours: number,
+): Promise<{ success: boolean; error?: string }> {
+  if (hours < 1 || hours > 168) return { success: false, error: 'Invalid value' }
+  const supabase = await createServerClient()
+  const { error } = await supabase
+    .from('workspace_settings')
+    .update({ capacity_hrs_per_wk: hours, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/settings')
+  revalidatePath('/capacity')
+  return { success: true }
+}
+
+export async function updateNineStageDefault(
+  enabled: boolean,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerClient()
+  const { error } = await supabase
+    .from('workspace_settings')
+    .update({ nine_stage_default: enabled, updated_at: new Date().toISOString() })
+    .eq('id', 1)
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/settings')
+  return { success: true }
+}

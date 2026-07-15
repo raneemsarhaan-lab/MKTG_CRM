@@ -33,7 +33,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'c-prog': {
     id: 'c-prog',
-    label_en: 'Writing',
+    label_en: 'C-In Progress',
     label_ar: 'كتابة المحتوى',
     phase: 'Content',
     color: STAGE_COLORS['c-prog'],
@@ -42,7 +42,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'c-final': {
     id: 'c-final',
-    label_en: 'Content Review',
+    label_en: 'C-Review',
     label_ar: 'مراجعة المحتوى',
     phase: 'Content',
     color: STAGE_COLORS['c-final'],
@@ -51,7 +51,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'c-check': {
     id: 'c-check',
-    label_en: 'Islam Check',
+    label_en: 'C-Check',
     label_ar: 'موافقة نهائية على المحتوى',
     phase: 'Content',
     color: STAGE_COLORS['c-check'],
@@ -60,7 +60,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'r-design': {
     id: 'r-design',
-    label_en: 'Ready to Design',
+    label_en: 'Ready For Design',
     label_ar: 'جاهز للتصميم',
     phase: 'Design',
     color: STAGE_COLORS['r-design'],
@@ -69,7 +69,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'd-prog': {
     id: 'd-prog',
-    label_en: 'Designing',
+    label_en: 'D-In Progress',
     label_ar: 'تصميم',
     phase: 'Design',
     color: STAGE_COLORS['d-prog'],
@@ -78,7 +78,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'd-check': {
     id: 'd-check',
-    label_en: 'Design Review',
+    label_en: 'D-Check',
     label_ar: 'مراجعة التصميم',
     phase: 'Design',
     color: STAGE_COLORS['d-check'],
@@ -87,7 +87,7 @@ export const STAGE_META: Record<StageId, StageMeta> = {
   },
   'final-check': {
     id: 'final-check',
-    label_en: 'Final Check',
+    label_en: 'F-Check',
     label_ar: 'المراجعة النهائية',
     phase: 'Ship',
     color: STAGE_COLORS['final-check'],

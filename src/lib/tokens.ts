@@ -54,6 +54,14 @@ export const BIG_STAT_GRADIENTS: Record<'danger' | 'accent' | 'lime' | 'default'
   default: 'linear-gradient(135deg, #F59E0B22, #F59E0B44)',
 }
 
+// Flat tint backgrounds for My Board stat cards (reference: a646bb17-Fluxo_My_Board)
+export const STAT_CARD_TINTS: Record<'accent' | 'default' | 'danger' | 'lime', { bg: string; value: string; label: string }> = {
+  accent:  { bg: '#EBE6FD', value: '#6B49DB', label: '#7B5BDC' },
+  default: { bg: '#FDF3E3', value: '#C27A0A', label: '#C47C0A' },
+  danger:  { bg: '#FCE8EA', value: '#C0202F', label: '#C03030' },
+  lime:    { bg: '#E8F9EE', value: '#1F7A35', label: '#2E8B4F' },
+}
+
 // Celebration reaction colors — constitution.md §V
 export const REACTION_COLORS: Record<string, string> = {
   zaghrota: '#D4537E',

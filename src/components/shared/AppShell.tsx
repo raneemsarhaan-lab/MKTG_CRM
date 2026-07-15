@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
-import { LayoutDashboard, Kanban, Users, Settings } from 'lucide-react'
+import { LayoutDashboard, Kanban, Users, Settings, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/store/useUIStore'
@@ -28,11 +28,26 @@ function initials(name: string) {
   return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
 }
 
+const SECTION_LABELS: Record<string, string> = {
+  '/overview':  'Overview',
+  '/board':     'Creative Ops',
+  '/capacity':  'Capacity',
+  '/settings':  'Settings',
+}
+
+function getSectionLabel(pathname: string): string {
+  for (const [prefix, label] of Object.entries(SECTION_LABELS)) {
+    if (pathname.startsWith(prefix)) return label
+  }
+  return 'Fluxo'
+}
+
 export function AppShell({ member, children }: AppShellProps) {
   const pathname = usePathname()
   const isAdmin  = member.access === 'admin'
   const t        = useTranslations('nav')
-  const setCelebration = useUIStore(s => s.setCelebration)
+  const setCelebration   = useUIStore(s => s.setCelebration)
+  const setShowTaskForm  = useUIStore(s => s.setShowTaskForm)
 
   // Subscribe to user-scoped celebration broadcast channel (cross-tab sync)
   useEffect(() => {
@@ -108,8 +123,8 @@ export function AppShell({ member, children }: AppShellProps) {
                   width: '44px',
                   height: '44px',
                   borderRadius: '10px',
-                  background: active ? 'rgba(200,242,78,0.12)' : 'transparent',
-                  color: active ? COLORS.lime : COLORS.muted,
+                  background: active ? COLORS.lime : 'transparent',
+                  color: active ? COLORS.ink : COLORS.muted,
                   transition: 'background 0.15s, color 0.15s',
                   textDecoration: 'none',
                 }}
@@ -151,10 +166,79 @@ export function AppShell({ member, children }: AppShellProps) {
         </div>
       </nav>
 
-      {/* Main content */}
-      <main style={{ flex: 1, overflow: 'auto', padding: '0' }}>
-        {children}
-      </main>
+      {/* Right column: topbar + main content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Topbar */}
+        <div
+          style={{
+            height: '56px',
+            background: '#FFFFFF',
+            borderBottom: '1px solid var(--line)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontWeight: 900,
+                fontSize: '16px',
+                color: 'var(--ink)',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Fluxo
+            </span>
+            <span
+              style={{
+                background: COLORS.lime,
+                color: COLORS.ink,
+                fontFamily: 'var(--font-heading)',
+                fontWeight: 700,
+                fontSize: '11px',
+                letterSpacing: '0.02em',
+                padding: '2px 8px',
+                borderRadius: '99px',
+              }}
+            >
+              {getSectionLabel(pathname)}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowTaskForm(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: COLORS.lime,
+              color: COLORS.ink,
+              border: 'none',
+              borderRadius: '99px',
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 700,
+              fontSize: '13px',
+              padding: '7px 14px',
+              cursor: 'pointer',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            New task
+          </button>
+        </div>
+
+        {/* Page content */}
+        <main style={{ flex: 1, overflow: 'auto' }}>
+          {children}
+        </main>
+      </div>
 
       {/* Celebration overlay — global, mounts once in AppShell */}
       <CelebrationOverlay />

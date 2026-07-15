@@ -1,31 +1,46 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Brand, ContentType, SLAConfig } from '@/types/index'
+import type { Brand, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { COLORS, STAGE_COLORS } from '@/lib/tokens'
-import { updateSLA, createContentType, removeContentType, removeBrand } from '@/actions/settings'
+import { updateSLA, createContentType, removeContentType, removeBrand, updateWeeklyCapacity, updateNineStageDefault } from '@/actions/settings'
 import { AddBrandModal } from './AddBrandModal'
 
 const SLA_STAGES: { id: string; label: string }[] = [
-  { id: 'c-prog',      label: 'Writing' },
-  { id: 'c-final',     label: 'Content Review' },
-  { id: 'c-check',     label: 'Islam Check' },
-  { id: 'd-prog',      label: 'Designing' },
-  { id: 'd-check',     label: 'Design Review' },
-  { id: 'final-check', label: 'Final Check' },
+  { id: 'c-prog',      label: 'C-In Progress' },
+  { id: 'c-final',     label: 'C-Review' },
+  { id: 'c-check',     label: 'C-Check' },
+  { id: 'd-prog',      label: 'D-In Progress' },
+  { id: 'd-check',     label: 'D-Check' },
+  { id: 'final-check', label: 'F-Check' },
 ]
 
 interface WorkflowSettingsProps {
   brands: Brand[]
   contentTypes: ContentType[]
   slaConfig: SLAConfig
+  workspaceSettings: WorkspaceSettings
 }
 
-export function WorkflowSettings({ brands, contentTypes, slaConfig }: WorkflowSettingsProps) {
+export function WorkflowSettings({ brands, contentTypes, slaConfig, workspaceSettings }: WorkflowSettingsProps) {
   const [addBrandOpen, setAddBrandOpen] = useState(false)
   const [newType, setNewType] = useState('')
   const [typeError, setTypeError] = useState<string | null>(null)
+  const [capacityHrs, setCapacityHrs] = useState(workspaceSettings.capacity_hrs_per_wk)
+  const [nineStage, setNineStage] = useState(workspaceSettings.nine_stage_default)
   const [isPending, startTransition] = useTransition()
+
+  function handleCapacityBlur() {
+    if (capacityHrs !== workspaceSettings.capacity_hrs_per_wk && capacityHrs >= 1) {
+      startTransition(async () => { await updateWeeklyCapacity(capacityHrs) })
+    }
+  }
+
+  function handleNineStageToggle() {
+    const next = !nineStage
+    setNineStage(next)
+    startTransition(async () => { await updateNineStageDefault(next) })
+  }
 
   function handleAddType() {
     setTypeError(null)
@@ -162,6 +177,77 @@ export function WorkflowSettings({ brands, contentTypes, slaConfig }: WorkflowSe
         {typeError && (
           <div style={{ marginTop: 6, fontSize: '0.75rem', color: COLORS.coral }}>{typeError}</div>
         )}
+      </div>
+
+      {/* Weekly capacity */}
+      <div style={cardStyle}>
+        <div style={labelStyle}>Weekly Capacity</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <input
+            type="number"
+            min={1}
+            max={168}
+            value={capacityHrs}
+            onChange={e => setCapacityHrs(parseInt(e.target.value, 10) || 40)}
+            onBlur={handleCapacityBlur}
+            disabled={isPending}
+            style={{
+              ...inputStyle,
+              width: '72px',
+              textAlign: 'center',
+              fontWeight: 700,
+              fontSize: '1rem',
+            }}
+          />
+          <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>hours per person / week</span>
+        </div>
+      </div>
+
+      {/* Islam Check toggle */}
+      <div style={cardStyle}>
+        <div style={labelStyle}>Islam Check Stage (9-Stage Workflow)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--ink)', fontWeight: 600, margin: '0 0 2px' }}>
+              Enable C-Check stage for new tasks
+            </p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+              New tasks will include the C-Check (Islam approval) stage between C-Review and Ready For Design.
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={nineStage}
+            onClick={handleNineStageToggle}
+            disabled={isPending}
+            style={{
+              flexShrink: 0,
+              width: '44px',
+              height: '24px',
+              borderRadius: '99px',
+              border: 'none',
+              cursor: 'pointer',
+              background: nineStage ? COLORS.lime : 'var(--line)',
+              position: 'relative',
+              transition: 'background 0.2s',
+              marginLeft: '20px',
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                top: '3px',
+                left: nineStage ? '23px' : '3px',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                background: nineStage ? COLORS.ink : '#fff',
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+              }}
+            />
+          </button>
+        </div>
       </div>
 
       {/* SLA matrix */}
