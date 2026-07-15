@@ -58,16 +58,16 @@
 
 **⚠️ CRITICAL**: Complete T009–T016 before any Phase 3+ work. RLS violations discovered later are expensive to fix.
 
-- [ ] T009 Apply Supabase migration `001_extensions.sql` + `002_tables.sql` from `contracts/db-schema.md`: enable `uuid-ossp`, create tables `members`, `brands`, `content_types`, `stages`, `sla_config`, `tasks`, `task_comments`, `task_attachments` with all constraints; add `prevent_nine_stage_change` trigger on `tasks`; add `update_updated_at` trigger on `tasks`; create indexes listed in db-schema.md
+- [x] T009 Apply Supabase migration `001_extensions.sql` + `002_tables.sql` from `contracts/db-schema.md`: enable `uuid-ossp`, create tables `members`, `brands`, `content_types`, `stages`, `sla_config`, `tasks`, `task_comments`, `task_attachments` with all constraints; add `prevent_nine_stage_change` trigger on `tasks`; add `update_updated_at` trigger on `tasks`; create indexes listed in db-schema.md
   > *Ref: contracts/db-schema.md 002_tables.sql, data-model.md, spec.md FR-005 (nine_stage immutability)*
 
-- [ ] T010 Apply Supabase migration `003_functions.sql` from `contracts/db-schema.md`: create `auth.user_access_level()`, `auth.user_role()`, `auth.member_id()` (all SECURITY DEFINER STABLE), and `can_advance_task(p_task_id UUID)` function; verify each function returns the expected value when called as a known user in Supabase SQL Editor
+- [x] T010 Apply Supabase migration `003_functions.sql` from `contracts/db-schema.md`: create `auth.user_access_level()`, `auth.user_role()`, `auth.member_id()` (all SECURITY DEFINER STABLE), and `can_advance_task(p_task_id UUID)` function; verify each function returns the expected value when called as a known user in Supabase SQL Editor
   > *Ref: contracts/db-schema.md 003_functions.sql, contracts/rls-policies.md, spec.md FR-003–FR-004, research.md Decision 8*
 
-- [ ] T011 Enable RLS and apply all policies from `contracts/rls-policies.md`: `members` (select-all / admin-write / self-status-update), `brands` (select-all / admin-write), `content_types` (select-all / admin-write), `stages` (select-only), `sla_config` (select-all / admin-write), `tasks` (select-all / admin-superuser-insert / `can_advance_task`-update / admin-delete), `task_comments` (select-all / own-insert, no update/delete), `task_attachments` (select-all / admin-superuser-insert / admin-delete)
+- [x] T011 Enable RLS and apply all policies from `contracts/rls-policies.md`: `members` (select-all / admin-write / self-status-update), `brands` (select-all / admin-write), `content_types` (select-all / admin-write), `stages` (select-only), `sla_config` (select-all / admin-write), `tasks` (select-all / admin-superuser-insert / `can_advance_task`-update / admin-delete), `task_comments` (select-all / own-insert, no update/delete), `task_attachments` (select-all / admin-superuser-insert / admin-delete)
   > *Ref: contracts/rls-policies.md, spec.md FR-003, FR-004, FR-014, SC-008*
 
-- [ ] T012 Apply Supabase migration `005_seed.sql` from `contracts/db-schema.md`: insert all 9 stage rows (with EN/AR labels, ownerRole, terminalFlag), 4 brand rows, 8 content type rows, and full 9×8 SLA config matrix; insert seed member rows matching `@forefront.consulting` emails; enable Realtime on `tasks` table
+- [x] T012 Apply Supabase migration `005_seed.sql` from `contracts/db-schema.md`: insert all 9 stage rows (with EN/AR labels, ownerRole, terminalFlag), 4 brand rows, 8 content type rows, and full 9×8 SLA config matrix; insert seed member rows matching `@forefront.consulting` emails; enable Realtime on `tasks` table
   > *Ref: contracts/db-schema.md 005_seed.sql, data-model.md Seed Data, spec.md Key Entities*
 
 - [ ] T013 **RLS Verification — DB-Level Security Gate**: run all 5 SQL test cases from `contracts/rls-policies.md §Testing RLS` directly in Supabase SQL Editor using `SET request.jwt.claims`; confirm: (1) nobody can advance a Published task, (2) Content Creator cannot advance a review-stage task they don't own, (3) admin can advance any task, (4) `nine_stage` change throws the trigger exception, (5) User-tier INSERT on tasks is rejected; document results as comments in this task before marking complete
@@ -81,13 +81,13 @@
 
 **Purpose**: Foundational shared code that every subsequent component depends on. These tasks have no story label because they serve all user stories.
 
-- [ ] T014 [P] Create `src/lib/utils.ts` with `businessDaysBetween(from: Date, to: Date): number`, `calDaysBetween(from: Date, to: Date): number`, `todayISO(): string`, `initials(name: string): string`, `avatarColor(name: string): string`, `brandGradient(hex: string): string` — all pure, deterministic, no side effects
+- [x] T014 [P] Create `src/lib/utils.ts` with `businessDaysBetween(from: Date, to: Date): number`, `calDaysBetween(from: Date, to: Date): number`, `todayISO(): string`, `initials(name: string): string`, `avatarColor(name: string): string`, `brandGradient(hex: string): string` — all pure, deterministic, no side effects
   > *Ref: research.md Decision 1, data-model.md Avatar Color Function*
 
-- [ ] T015 Create `src/lib/stage-meta.ts` — the Islam Check config-flag module: define `NINE_STAGE` and `EIGHT_STAGE` ordered arrays, `STAGE_META` record (id, labelEN, labelAR, phase, color, ownerRole, terminalFlag), `nextStageId(current: StageId, nineStage: boolean): StageId | null` function, `isWorkingStage(stageId: StageId): boolean`; verify by unit-asserting that `nextStageId('c-final', false)` returns `'r-design'` and `nextStageId('c-final', true)` returns `'c-check'` in a quick script
+- [x] T015 Create `src/lib/stage-meta.ts` — the Islam Check config-flag module: define `NINE_STAGE` and `EIGHT_STAGE` ordered arrays, `STAGE_META` record (id, labelEN, labelAR, phase, color, ownerRole, terminalFlag), `nextStageId(current: StageId, nineStage: boolean): StageId | null` function, `isWorkingStage(stageId: StageId): boolean`; verify by unit-asserting that `nextStageId('c-final', false)` returns `'r-design'` and `nextStageId('c-final', true)` returns `'c-check'` in a quick script
   > *Ref: spec.md FR-005, research.md Decision 9, data-model.md Stage Traversal, plan.md §Stage Transition Logic — this is the Islam Check config-flag implementation*
 
-- [ ] T016 [P] Create `src/lib/alert-status.ts` with `getAlertStatus(task: Task, slaConfig: SLAConfig, today: Date): AlertStatus` — implements the priority-ordered algorithm from research.md Decision 1: Overdue → Stuck → Will Miss → At Risk → Idle → On Track; create `src/store/useUIStore.ts` with Zustand store for UI ephemera only: `celebration`, `selectedTaskId`, `showTaskForm`, `profileOpen` (no persist middleware)
+- [x] T016 [P] Create `src/lib/alert-status.ts` with `getAlertStatus(task: Task, slaConfig: SLAConfig, today: Date): AlertStatus` — implements the priority-ordered algorithm from research.md Decision 1: Overdue → Stuck → Will Miss → At Risk → Idle → On Track; create `src/store/useUIStore.ts` with Zustand store for UI ephemera only: `celebration`, `selectedTaskId`, `showTaskForm`, `profileOpen` (no persist middleware)
   > *Ref: research.md Decision 1, data-model.md UIStore, spec.md FR-023, FR-025, contracts/component-api.md §Rendering Guarantees*
 
 ---
