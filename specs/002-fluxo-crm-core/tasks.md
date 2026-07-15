@@ -100,38 +100,38 @@
 
 ### User Story 1 — Content executor completes their stage (P1) 🎯 MVP
 
-- [ ] T017 [US1] Create `src/components/kanban/KanbanColumn.tsx` — renders stage header with EN label, AR label below, left border + gradient bg using stage color from tokens; renders a list of task cards; install `@dnd-kit/core` and `@dnd-kit/sortable`; wrap cards in `SortableContext` for within-column reorder; column header shows task count badge
+- [x] T017 [US1] Create `src/components/kanban/KanbanColumn.tsx` — renders stage header with EN label, AR label below, left border + gradient bg using stage color from tokens; renders a list of task cards; install `@dnd-kit/core` and `@dnd-kit/sortable`; wrap cards in `SortableContext` for within-column reorder; column header shows task count badge
   > *Ref: spec.md FR-009, plan.md §KanbanBoard, contracts/component-api.md KanbanBoard, constitution.md §II*
 
-- [ ] T018 [US1] Create `src/components/kanban/TaskCard.tsx` with props `{ task: Task & { brand: Brand; task_owner: Member }; currentStageOwner: Member | null }` — renders brand monogram badge (color dot + 2-letter initials), content type chip, platform icon (Lucide), task name, task owner avatar + stage owner avatar (using `avatarColor`/`initials`), due-date countdown (`calDaysBetween`), AlertStatus badge using `getAlertStatus`; cover image or `brandGradient` fallback; apply `ALERT_BADGE_STYLES` from tokens.ts
+- [x] T018 [US1] Create `src/components/kanban/TaskCard.tsx` with props `{ task: Task & { brand: Brand; task_owner: Member }; currentStageOwner: Member | null }` — renders brand monogram badge (color dot + 2-letter initials), content type chip, platform icon (Lucide), task name, task owner avatar + stage owner avatar (using `avatarColor`/`initials`), due-date countdown (`calDaysBetween`), AlertStatus badge using `getAlertStatus`; cover image or `brandGradient` fallback; apply `ALERT_BADGE_STYLES` from tokens.ts
   > *Ref: spec.md FR-010, FR-011, FR-023, contracts/component-api.md TaskCard, plan.md §Design Token Layer*
 
-- [ ] T019 [US1] Create `src/components/kanban/StatStrip.tsx` — bar above the board showing: total task count, in-progress count (`status !== 'publish'`), tasks due today; styled with Fluxo tokens (ink text, line border, soft bg)
+- [x] T019 [US1] Create `src/components/kanban/StatStrip.tsx` — bar above the board showing: total task count, in-progress count (`status !== 'publish'`), tasks due today; styled with Fluxo tokens (ink text, line border, soft bg)
   > *Ref: spec.md FR-012, contracts/component-api.md §StatStrip*
 
-- [ ] T020 [US1] Create Server Action `src/actions/tasks.ts` — implement `moveTask(taskId: string): Promise<MoveTaskResult>` following `contracts/server-actions.md §moveTask`; compute `nextStageId` from stage-meta.ts; determine `shouldCelebrate` (true only when mover personally owns the stage: working stage = task owner, review stage = role match); update DB; call `revalidatePath('/board')` and `revalidatePath('/overview')`; return `{ success, shouldCelebrate, error? }`
+- [x] T020 [US1] Create Server Action `src/actions/tasks.ts` — implement `moveTask(taskId: string): Promise<MoveTaskResult>` following `contracts/server-actions.md §moveTask`; compute `nextStageId` from stage-meta.ts; determine `shouldCelebrate` (true only when mover personally owns the stage: working stage = task owner, review stage = role match); update DB; call `revalidatePath('/board')` and `revalidatePath('/overview')`; return `{ success, shouldCelebrate, error? }`
   > *Ref: contracts/server-actions.md §moveTask, spec.md FR-003, FR-004, FR-008, FR-017, research.md Decision 11*
 
-- [ ] T021 [US1] Create `src/components/kanban/TaskModal.tsx` (Client Component) with props `{ task: Task & { brand: Brand; task_owner: Member; comments: ...; attachments: ... }; currentUser: Member; stages: Stage[]; onClose: () => void }` — renders task attributes, current stage chip (EN+AR), advance button only when `nextStageId(task.status, task.nine_stage) !== null AND user has advance permission`; lime button for own-stage advance, ink button for admin override; clicking calls `moveTask(task.id)` then sets `useUIStore.celebration` if `shouldCelebrate`; renders comment list and comment input; no advance section when Published
+- [x] T021 [US1] Create `src/components/kanban/TaskModal.tsx` (Client Component) with props `{ task: Task & { brand: Brand; task_owner: Member; comments: ...; attachments: ... }; currentUser: Member; stages: Stage[]; onClose: () => void }` — renders task attributes, current stage chip (EN+AR), advance button only when `nextStageId(task.status, task.nine_stage) !== null AND user has advance permission`; lime button for own-stage advance, ink button for admin override; clicking calls `moveTask(task.id)` then sets `useUIStore.celebration` if `shouldCelebrate`; renders comment list and comment input; no advance section when Published
   > *Ref: contracts/component-api.md TaskModal, spec.md US1 Acceptance Scenarios 1–3, FR-013, FR-002*
 
-- [ ] T022 [P] [US1] Add `addComment(taskId, body)` Server Action to `src/actions/tasks.ts`; create comment input component inside TaskModal — submit on Enter or button click, calls Server Action, refreshes board path
+- [x] T022 [P] [US1] Add `addComment(taskId, body)` Server Action to `src/actions/tasks.ts`; create comment input component inside TaskModal — submit on Enter or button click, calls Server Action, refreshes board path
   > *Ref: contracts/server-actions.md §addComment, spec.md Key Entities Comment*
 
 ### User Story 2 — Reviewer approves and passes the task (P1)
 
-- [ ] T023 [US2] Create `src/components/kanban/KanbanBoard.tsx` (Client Component) — wraps all 9 `KanbanColumn` components in `DndContext` from `@dnd-kit/core`; fetches tasks and members from parent via props (server-side); derives `currentStageOwner` for each task from `STAGE_META[task.status].ownerRole` → member lookup; renders `StatStrip` above columns; shows `TaskModal` when `selectedTaskId` is set in `useUIStore`; handles DnD within-column reorder (no stage change on drag — advance via TaskModal only)
+- [x] T023 [US2] Create `src/components/kanban/KanbanBoard.tsx` (Client Component) — wraps all 9 `KanbanColumn` components in `DndContext` from `@dnd-kit/core`; fetches tasks and members from parent via props (server-side); derives `currentStageOwner` for each task from `STAGE_META[task.status].ownerRole` → member lookup; renders `StatStrip` above columns; shows `TaskModal` when `selectedTaskId` is set in `useUIStore`; handles DnD within-column reorder (no stage change on drag — advance via TaskModal only)
   > *Ref: spec.md US2, FR-009, contracts/component-api.md KanbanBoard, research.md Decision 5*
 
-- [ ] T024 [US2] Create `src/app/(app)/board/page.tsx` — server component; fetch tasks (with brand + task_owner joins), members, stages, slaConfig from Supabase; resolve current member from session email; pass all data as props to `KanbanBoard`; admin/superuser see all tasks; user sees all tasks (all users can view the full board per spec)
+- [x] T024 [US2] Create `src/app/(app)/board/page.tsx` — server component; fetch tasks (with brand + task_owner joins), members, stages, slaConfig from Supabase; resolve current member from session email; pass all data as props to `KanbanBoard`; admin/superuser see all tasks; user sees all tasks (all users can view the full board per spec)
   > *Ref: spec.md FR-008, FR-009, plan.md Phase 2, quickstart.md Scenario 3*
 
 ### User Story 3 — Admin creates and configures a task (P1)
 
-- [ ] T025 [US3] Add `createTask(input: CreateTaskInput)` Server Action to `src/actions/tasks.ts` following `contracts/server-actions.md §createTask` — reads creator's role from DB, sets `nine_stage = (creator.role === 'Content Creator')`, inserts task at `status: 'todo'` with today as `stage_date`; Server Action enforces admin/superuser-only via RLS (INSERT policy)
+- [x] T025 [US3] Add `createTask(input: CreateTaskInput)` Server Action to `src/actions/tasks.ts` following `contracts/server-actions.md §createTask` — reads creator's role from DB, sets `nine_stage = (creator.role === 'Content Creator')`, inserts task at `status: 'todo'` with today as `stage_date`; Server Action enforces admin/superuser-only via RLS (INSERT policy)
   > *Ref: spec.md FR-014, FR-015, FR-016, research.md Decision 9, spec.md US3*
 
-- [ ] T026 [US3] Create `src/components/shared/TaskForm.tsx` (Client Component) — form for new task: brand dropdown, content type dropdown, channel/platform dropdown, task owner dropdown (members list), due date picker, hours estimate, priority, cover image URL (optional); only renders when `currentUser.access` is `admin` or `superuser`; on submit calls `createTask` Server Action; close on success via `useUIStore.setShowTaskForm(false)`
+- [x] T026 [US3] Create `src/components/shared/TaskForm.tsx` (Client Component) — form for new task: brand dropdown, content type dropdown, channel/platform dropdown, task owner dropdown (members list), due date picker, hours estimate, priority, cover image URL (optional); only renders when `currentUser.access` is `admin` or `superuser`; on submit calls `createTask` Server Action; close on success via `useUIStore.setShowTaskForm(false)`
   > *Ref: spec.md US3 Acceptance Scenarios, FR-015, contracts/component-api.md TaskForm*
 
 **Checkpoint**: US1, US2, US3 acceptance scenarios pass (see quickstart.md Scenarios 3–7). Admin can create tasks. Content Creator can advance their own `c-prog` task. Cannot advance `c-final` as Content Creator. Cannot advance Published task as anyone.
