@@ -235,16 +235,16 @@
 
 **Independent Test**: Toggle to Arabic → stage column labels switch to Arabic, layout flips RTL, celebration copy is Arabic, no layout breaks.
 
-- [ ] T042 Install `next-intl` and configure: create `messages/en.json` and `messages/ar.json` with translations for all navigation labels, panel headings, button copy, empty states, and error messages; configure `next-intl` middleware (`intl.ts`) with locale cookie (no URL segment — same URL works in both languages); update `src/app/layout.tsx` to read locale cookie and set `<html lang>` and `dir` attribute
+- [x] T042 Install `next-intl` and configure: create `messages/en.json` and `messages/ar.json` with translations for all navigation labels, panel headings, button copy, empty states, and error messages; configure `next-intl` middleware (`intl.ts`) with locale cookie (no URL segment — same URL works in both languages); update `src/app/layout.tsx` to read locale cookie and set `<html lang>` and `dir` attribute
   > *Ref: plan.md §i18n / RTL, spec.md FR-034, FR-035, FR-036, research.md Decision 10*
 
-- [ ] T043 [P] Update all Kanban column headers to show both `stage.label_en` and `stage.label_ar` simultaneously (EN on top, AR below in smaller Caveat text); update task cards to show stage chip in current locale; update TaskModal stage chip with EN+AR; update AppShell nav items to use next-intl `t()` function; update PersonalBoard greeting and panel headings via next-intl
+- [x] T043 [P] Update all Kanban column headers to show both `stage.label_en` and `stage.label_ar` simultaneously (EN on top, AR below in smaller Caveat text); update task cards to show stage chip in current locale; update TaskModal stage chip with EN+AR; update AppShell nav items to use next-intl `t()` function; update PersonalBoard greeting and panel headings via next-intl
   > *Ref: spec.md FR-034, quickstart.md Scenario 12, constitution.md §II*
 
-- [ ] T044 [P] Create `src/components/shared/LangToggle.tsx` — button that reads current locale from cookie and toggles between `en` and `ar`; on toggle, sets locale cookie and calls `router.refresh()`; when `ar`, updates `document.documentElement.dir = 'rtl'`; update `globals.css` to use CSS logical properties (`margin-inline-start`, `padding-inline-end`) on sidebar, panels, and task cards so they flip correctly without per-component changes; ensure `next-intl` `dir` value is applied to `<html>` element
+- [x] T044 [P] Create `src/components/shared/LangToggle.tsx` — button that reads current locale from cookie and toggles between `en` and `ar`; on toggle, sets locale cookie and calls `router.refresh()`; when `ar`, updates `document.documentElement.dir = 'rtl'`; update `globals.css` to use CSS logical properties (`margin-inline-start`, `padding-inline-end`) on sidebar, panels, and task cards so they flip correctly without per-component changes; ensure `next-intl` `dir` value is applied to `<html>` element
   > *Ref: spec.md FR-036, plan.md §i18n / RTL, quickstart.md Scenario 12*
 
-- [ ] T045 [P] Apply cover image gradient fallback everywhere: in `TaskCard.tsx` and `TaskModal.tsx`, when `task.cover_image_url` is null/empty, render `brandGradient(brand.color)` as background with brand 2-letter monogram centered; apply `brandGradient` function from `src/lib/utils.ts`
+- [x] T045 [P] Apply cover image gradient fallback everywhere: in `TaskCard.tsx` and `TaskModal.tsx`, when `task.cover_image_url` is null/empty, render `brandGradient(brand.color)` as background with brand 2-letter monogram centered; apply `brandGradient` function from `src/lib/utils.ts`
   > *Ref: spec.md FR-011, data-model.md Cover Image Fallback, quickstart.md Design Fidelity Spot-Check*
 
 **Checkpoint**: quickstart.md Scenario 12 passes. All column headers bilingual. Toggle switches layout direction. No overflow or misalignment in RTL mode.

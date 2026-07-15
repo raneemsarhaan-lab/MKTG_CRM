@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "overview": "نظرة عامة",
+    "board": "اللوح",
+    "capacity": "الطاقة",
+    "settings": "الإعدادات",
+    "toggleLanguage": "التبديل إلى الإنجليزية"
+  },
+  "greeting": {
+    "morning": "صباح الخير",
+    "afternoon": "مساء الخير",
+    "evening": "مساء النور"
+  },
+  "board": {
+    "allBrands": "جميع البراندات",
+    "search": "بحث في المهام...",
+    "newTask": "+ مهمة جديدة",
+    "empty": "فارغ"
+  },
+  "overview": {
+    "myDay": "☀️ يومي",
+    "upNext": "📅 القادم",
+    "slaIssues": "⚠️ مشاكل SLA",
+    "published": "✅ تم النشر",
+    "dueToday": "يستحق اليوم",
+    "thisWeek": "هذا الأسبوع",
+    "atRiskPlus": "في خطر+",
+    "allTime": "كل الوقت",
+    "teamOverview": "نظرة على الفريق",
+    "nothingHere": "لا شيء هنا 🎉",
+    "active": "نشط",
+    "hrsWk": "ساعة/أسبوع",
+    "capacityOf": "من"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "subtitle": "إدارة الفريق وسير العمل.",
+    "teamTab": "الفريق والصلاحيات",
+    "workflowTab": "SLA وسير العمل"
+  },
+  "common": {
+    "close": "إغلاق",
+    "send": "إرسال",
+    "noComments": "لا تعليقات بعد",
+    "addComment": "أضف تعليقاً...",
+    "publishedDone": "✓ تم النشر — المهمة مكتملة",
+    "details": "التفاصيل",
+    "comments": "التعليقات",
+    "currentStage": "المرحلة الحالية",
+    "moveTo": "انتقال إلى",
+    "adminOverride": "تجاوز الإدارة — لن يتم الاحتفال",
+    "daysLeft": "يوم متبقٍ",
+    "daysOver": "يوم متأخر",
+    "dueToday": "يستحق اليوم"
+  }
+}

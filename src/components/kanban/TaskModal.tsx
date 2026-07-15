@@ -10,6 +10,7 @@ import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { moveTask, addComment } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { brandGradient } from '@/lib/utils'
 
 type FullTask = Task & {
   brand: Brand
@@ -165,8 +166,29 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
           boxShadow: '0 1px 2px rgba(26,28,30,.04), 0 20px 60px rgba(26,28,30,.18)',
         }}
       >
-        {/* Brand color bar */}
-        <div style={{ height: 5, background: task.brand.color, borderRadius: '22px 22px 0 0' }} />
+        {/* Cover area — uses cover image or brand gradient fallback (spec.md FR-011) */}
+        {(() => {
+          const coverBg = task.cover_image_url
+            ? `url(${task.cover_image_url}) center/cover no-repeat`
+            : brandGradient(task.brand.color)
+          const brandLabel = task.brand.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+          return (
+            <div style={{ position: 'relative', height: 72, background: coverBg, borderRadius: '22px 22px 0 0', overflow: 'hidden' }}>
+              {!task.cover_image_url && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 28, fontWeight: 800, color: `${task.brand.color}99`, letterSpacing: '-0.03em' }}>
+                    {brandLabel}
+                  </span>
+                </div>
+              )}
+              {/* Brand color accent bar at bottom */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, background: task.brand.color }} />
+            </div>
+          )
+        })()}
 
         <div style={{ padding: '1.5rem 1.5rem 0.75rem' }}>
           {/* Header */}

@@ -6,6 +6,7 @@ import { STAGE_META } from '@/lib/stage-meta'
 import { getAlertStatus } from '@/lib/alert-status'
 import { calDaysBetween, getGreeting } from '@/lib/utils'
 import { useUIStore } from '@/store/useUIStore'
+import { useTranslations } from 'next-intl'
 import { ProfileStrip } from './ProfileStrip'
 import { BigStat } from './BigStat'
 import { CapacityBar } from './CapacityBar'
@@ -32,6 +33,8 @@ interface PersonalBoardProps {
 export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConfig, today }: PersonalBoardProps) {
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
   const selectTask     = useUIStore(s => s.selectTask)
+  const t              = useTranslations('greeting')
+  const tOv            = useTranslations('overview')
 
   const hour      = today.getHours()
   const greeting  = getGreeting(hour)
@@ -68,10 +71,10 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
   [myTasks])
 
   const bigStats: BigStatMetric[] = [
-    { label: '☀️ My Day',      value: myDayCount,     sub: 'Due today',    theme: 'accent'  },
-    { label: '📅 Up Next',     value: upNextCount,    sub: 'This week',    theme: 'default' },
-    { label: '⚠️ SLA Issues',  value: slaIssueCount,  sub: 'At risk+',     theme: 'danger'  },
-    { label: '✅ Published',   value: publishedCount, sub: 'All time',     theme: 'lime'    },
+    { label: tOv('myDay'),      value: myDayCount,     sub: tOv('dueToday'),  theme: 'accent'  },
+    { label: tOv('upNext'),     value: upNextCount,    sub: tOv('thisWeek'),  theme: 'default' },
+    { label: tOv('slaIssues'),  value: slaIssueCount,  sub: tOv('atRiskPlus'), theme: 'danger'  },
+    { label: tOv('published'),  value: publishedCount, sub: tOv('allTime'),   theme: 'lime'    },
   ]
 
   // Active task count per member for the team digest
@@ -111,7 +114,7 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
               fontFamily: 'var(--font-heading)', fontWeight: 800,
               fontSize: '1.7rem', color: 'var(--ink)', margin: 0,
             }}>
-              Good {greeting}, {firstName} 👋
+              {t(greeting)}, {firstName} 👋
             </h1>
             <p style={{ fontSize: '0.9rem', color: 'var(--muted)', margin: '6px 0 0' }}>
               {today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -166,7 +169,7 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
             <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)' }}>
-              Team Overview ({members.length})
+              {tOv('teamOverview')} ({members.length})
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12 }}>

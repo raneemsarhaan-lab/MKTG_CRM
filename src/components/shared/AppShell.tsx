@@ -6,9 +6,11 @@ import { usePathname } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
 import { LayoutDashboard, Kanban, Users, Settings } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/store/useUIStore'
 import { CelebrationOverlay } from './CelebrationOverlay'
+import { LangToggle } from './LangToggle'
 
 interface AppShellProps {
   member: Member
@@ -16,11 +18,11 @@ interface AppShellProps {
 }
 
 const NAV_ITEMS = [
-  { href: '/overview', icon: LayoutDashboard, label: 'Overview', adminOnly: false },
-  { href: '/board',    icon: Kanban,          label: 'Board',    adminOnly: false },
-  { href: '/capacity', icon: Users,           label: 'Capacity', adminOnly: true  },
-  { href: '/settings', icon: Settings,        label: 'Settings', adminOnly: true  },
-]
+  { href: '/overview', icon: LayoutDashboard, key: 'overview', adminOnly: false },
+  { href: '/board',    icon: Kanban,          key: 'board',    adminOnly: false },
+  { href: '/capacity', icon: Users,           key: 'capacity', adminOnly: true  },
+  { href: '/settings', icon: Settings,        key: 'settings', adminOnly: true  },
+] as const
 
 function initials(name: string) {
   return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
@@ -28,7 +30,8 @@ function initials(name: string) {
 
 export function AppShell({ member, children }: AppShellProps) {
   const pathname = usePathname()
-  const isAdmin = member.access === 'admin'
+  const isAdmin  = member.access === 'admin'
+  const t        = useTranslations('nav')
   const setCelebration = useUIStore(s => s.setCelebration)
 
   // Subscribe to user-scoped celebration broadcast channel (cross-tab sync)
@@ -91,13 +94,13 @@ export function AppShell({ member, children }: AppShellProps) {
 
         {/* Nav icons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-          {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map(({ href, icon: Icon, label }) => {
+          {NAV_ITEMS.filter(item => !item.adminOnly || isAdmin).map(({ href, icon: Icon, key }) => {
             const active = pathname.startsWith(href)
             return (
               <Link
                 key={href}
                 href={href}
-                aria-label={label}
+                aria-label={t(key)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -116,6 +119,9 @@ export function AppShell({ member, children }: AppShellProps) {
             )
           })}
         </div>
+
+        {/* Language toggle */}
+        <LangToggle />
 
         {/* User avatar */}
         <div
