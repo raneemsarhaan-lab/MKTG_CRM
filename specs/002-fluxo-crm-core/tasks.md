@@ -173,10 +173,10 @@
 
 ### User Story 5 — Admin monitors team capacity (P2)
 
-- [ ] T032 [US5] Create `src/components/capacity/MemberCapacityCard.tsx` — props: `member: Member`, `activeTasks: Task[]`; shows avatar, name, role, active task count, total hours assigned (sum of `hours_estimate`), `capacity_hrs_wk`, fill bar: ≤100% → lime (`#C8F24E`), >100% → coral (`#F5334F`); card uses `panel` bg, `line` border, 14px radius
+- [x] T032 [US5] Create `src/components/capacity/MemberCapacityCard.tsx` — props: `member: Member`, `activeTasks: Task[]`; shows avatar, name, role, active task count, total hours assigned (sum of `hours_estimate`), `capacity_hrs_wk`, fill bar: ≤100% → lime (`#C8F24E`), >100% → coral (`#F5334F`); card uses `panel` bg, `line` border, 14px radius
   > *Ref: spec.md FR-027, FR-028, US5 Acceptance Scenarios 1–2, quickstart.md Scenario 8*
 
-- [ ] T033 [US5] Create `src/components/capacity/CapacityDashboard.tsx` with props `{ members: Member[]; tasks: Task[] }` — renders `MemberCapacityCard` grid; create `src/app/(app)/capacity/page.tsx` as server component — resolve current member from session; redirect to `/overview` if `member.access !== 'admin'`; fetch all members + active tasks; render `CapacityDashboard`; Capacity nav icon in AppShell only renders when `member.access === 'admin'`
+- [x] T033 [US5] Create `src/components/capacity/CapacityDashboard.tsx` with props `{ members: Member[]; tasks: Task[] }` — renders `MemberCapacityCard` grid; create `src/app/(app)/capacity/page.tsx` as server component — resolve current member from session; redirect to `/overview` if `member.access !== 'admin'`; fetch all members + active tasks; render `CapacityDashboard`; Capacity nav icon in AppShell only renders when `member.access === 'admin'`
   > *Ref: spec.md FR-026, US5 Acceptance Scenario 3, contracts/component-api.md CapacityDashboard, quickstart.md Scenario 8, spec.md SC-008*
 
 **Checkpoint**: US5 acceptance scenarios pass. Admin sees capacity cards. Content Creator visiting `/capacity` is redirected to `/overview`. Capacity nav icon absent from non-admin sidebar.
