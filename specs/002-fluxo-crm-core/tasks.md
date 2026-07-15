@@ -24,28 +24,28 @@
 
 **⚠️ CRITICAL**: No board, dashboard, or settings work can begin until login and AppShell are working end-to-end.
 
-- [ ] T001 Convert repo from Vite to Next.js 15 — update `package.json` scripts, install `next`, create `next.config.ts`, and replace `vite.config.ts`; keep existing `src/` files intact as reference; update `tsconfig.json` to `"moduleResolution": "bundler"` and add `paths` alias for `@/`
+- [x] T001 Convert repo from Vite to Next.js 15 — update `package.json` scripts, install `next`, create `next.config.ts`, and replace `vite.config.ts`; keep existing `src/` files intact as reference; update `tsconfig.json` to `"moduleResolution": "bundler"` and add `paths` alias for `@/`
   > *Ref: plan.md Phase 0, plan.md Technical Context*
 
-- [ ] T002 [P] Create `src/app/globals.css` with all Fluxo design tokens as CSS variables (ink, rail, lime, coral, violet, cyan, mint, muted, soft, panel, line) and Google Fonts `@import` for Montserrat (700, 800, 900), Inter (400, 500, 600, 700), and Caveat (600, 700); create `src/lib/tokens.ts` with the same values as typed TypeScript constants
+- [x] T002 [P] Create `src/app/globals.css` with all Fluxo design tokens as CSS variables (ink, rail, lime, coral, violet, cyan, mint, muted, soft, panel, line) and Google Fonts `@import` for Montserrat (700, 800, 900), Inter (400, 500, 600, 700), and Caveat (600, 700); create `src/lib/tokens.ts` with the same values as typed TypeScript constants
   > *Ref: plan.md Design Token Layer, constitution.md §I Design System Fidelity*
 
-- [ ] T003 [P] Create `src/types/index.ts` with complete TypeScript type surface: `StageId`, `AccessLevel`, `AlertStatus`, `Priority`, `Member`, `Brand`, `ContentType`, `Stage`, `SLAConfig`, `Task`, `TaskComment`, `TaskAttachment`, `PanelTask`, `BigStatMetric`, `CelebrationPayload`, `UIStore`
+- [x] T003 [P] Create `src/types/index.ts` with complete TypeScript type surface: `StageId`, `AccessLevel`, `AlertStatus`, `Priority`, `Member`, `Brand`, `ContentType`, `Stage`, `SLAConfig`, `Task`, `TaskComment`, `TaskAttachment`, `PanelTask`, `BigStatMetric`, `CelebrationPayload`, `UIStore`
   > *Ref: data-model.md TypeScript Types, plan.md §Types*
 
-- [ ] T004 Create `src/lib/supabase/server.ts` (createServerClient using `@supabase/ssr` cookie adapter) and `src/lib/supabase/client.ts` (createBrowserClient singleton); install `@supabase/ssr` and `@supabase/supabase-js`; add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local.example`
+- [x] T004 Create `src/lib/supabase/server.ts` (createServerClient using `@supabase/ssr` cookie adapter) and `src/lib/supabase/client.ts` (createBrowserClient singleton); install `@supabase/ssr` and `@supabase/supabase-js`; add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local.example`
   > *Ref: plan.md Phase 0, contracts/server-actions.md Auth Flow*
 
-- [ ] T005 Create `src/app/(auth)/login/page.tsx` — server component rendering a Google OAuth sign-in button that calls `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: '/auth/callback' } })`; style with Fluxo tokens (lime CTA, ink background); show error messages for `?error=domain`, `?error=not_member`, `?error=auth_failed`
+- [x] T005 Create `src/app/(auth)/login/page.tsx` — server component rendering a Google OAuth sign-in button that calls `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: '/auth/callback' } })`; style with Fluxo tokens (lime CTA, ink background); show error messages for `?error=domain`, `?error=not_member`, `?error=auth_failed`
   > *Ref: plan.md Phase 0, spec.md FR-037, quickstart.md Scenario 1*
 
-- [ ] T006 Create `src/app/auth/callback/route.ts` — exchange OAuth code for session, check email ends in `@forefront.consulting` (sign out + redirect to `/login?error=domain` if not), look up `members` table by email (redirect to `/login?error=not_member` if absent), redirect to `/overview` on success
+- [x] T006 Create `src/app/auth/callback/route.ts` — exchange OAuth code for session, check email ends in `@forefront.consulting` (sign out + redirect to `/login?error=domain` if not), look up `members` table by email (redirect to `/login?error=not_member` if absent), redirect to `/overview` on success
   > *Ref: plan.md Auth Flow, contracts/server-actions.md Auth Flow, spec.md FR-037–FR-038, research.md Decision 10*
 
-- [ ] T007 Create `src/middleware.ts` (Next.js requires middleware at the `src/` root, not inside `app/`) — read Supabase session cookie on every request to `/(app)/**`; redirect unauthenticated requests to `/login`; allow `/login`, `/auth/**`, and static assets through without auth check
+- [x] T007 Create `src/middleware.ts` (Next.js requires middleware at the `src/` root, not inside `app/`) — read Supabase session cookie on every request to `/(app)/**`; redirect unauthenticated requests to `/login`; allow `/login`, `/auth/**`, and static assets through without auth check
   > *Ref: plan.md Phase 0, spec.md FR-037*
 
-- [ ] T008 Create `src/app/layout.tsx` (root layout) with `<html lang="en">`, Montserrat + Inter + Caveat font variables, and `src/app/(app)/layout.tsx` (app shell layout) that resolves the current member server-side via Supabase and renders `AppShell` with member prop; create `src/components/shared/AppShell.tsx` with sidebar nav stubs (icons only) — Overview, Board, and placeholders for Capacity and Settings gated by `member.access === 'admin'`
+- [x] T008 Create `src/app/layout.tsx` (root layout) with `<html lang="en">`, Montserrat + Inter + Caveat font variables, and `src/app/(app)/layout.tsx` (app shell layout) that resolves the current member server-side via Supabase and renders `AppShell` with member prop; create `src/components/shared/AppShell.tsx` with sidebar nav stubs (icons only) — Overview, Board, and placeholders for Capacity and Settings gated by `member.access === 'admin'`
   > *Ref: plan.md Project Structure, contracts/component-api.md AppShell, spec.md FR-026, FR-029, FR-038*
 
 **Checkpoint**: `npm run dev` starts. Visiting `/` redirects to `/login`. Signing in with a non-`@forefront.consulting` account shows the domain error. Signing in with a valid account lands on `/overview` (empty page OK). Sidebar renders with nav icons.
