@@ -1,44 +1,32 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { mapMember, mapTask, mapSlaConfig } from '@/lib/mappers'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import type { SLAConfig } from '@/types/index'
 
 export default async function BoardPage() {
-  const supabase = await createServerClient()
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) redirect('/login')
+  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  if (!member) redirect('/login')
 
-  const { data: currentUser } = await supabase
-    .from('members')
-    .select('*')
-    .eq('email', user.email)
-    .single()
-  if (!currentUser) redirect('/login')
-
-  const [
-    { data: taskRows },
-    { data: memberRows },
-    { data: brandRows },
-    { data: contentTypeRows },
-    { data: slaRows },
-  ] = await Promise.all([
-    supabase
-      .from('tasks')
-      .select('*, brand:brands(*), task_owner:members!task_owner_id(*), comments:task_comments(*, author:members!author_id(*))')
-      .order('created_at', { ascending: false }),
-    supabase.from('members').select('*').order('name'),
-    supabase.from('brands').select('*').order('name'),
-    supabase.from('content_types').select('*').order('label'),
-    supabase.from('sla_config').select('*'),
+  const [tasks, members, brands, contentTypes, slaRows] = await Promise.all([
+    prisma.task.findMany({
+      include: {
+        brand:      true,
+        task_owner: true,
+        comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },
+        attachments: true,
+      },
+      orderBy: { created_at: 'desc' },
+    }),
+    prisma.member.findMany({ orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+    prisma.contentType.findMany({ orderBy: { label: 'asc' } }),
+    prisma.slaConfig.findMany(),
   ])
-
-  // Transform sla_config rows → SLAConfig shape
-  const slaConfig: SLAConfig = {}
-  ;(slaRows ?? []).forEach((row: { stage_id: string; content_type_label: string; days: number }) => {
-    if (!slaConfig[row.stage_id]) slaConfig[row.stage_id] = {}
-    slaConfig[row.stage_id][row.content_type_label] = row.days
-  })
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -47,12 +35,12 @@ export default async function BoardPage() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <KanbanBoard
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        initialTasks={(taskRows ?? []) as any}
-        currentUser={currentUser}
-        members={memberRows ?? []}
-        brands={brandRows ?? []}
-        contentTypes={contentTypeRows ?? []}
-        slaConfig={slaConfig}
+        initialTasks={tasks.map(mapTask) as any}
+        currentUser={mapMember(member)}
+        members={members.map(mapMember)}
+        brands={brands.map(b => ({ id: b.id, name: b.name, color: b.color, logo_url: b.logo_url ?? undefined, description: b.description ?? undefined }))}
+        contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
+        slaConfig={mapSlaConfig(slaRows)}
         today={today}
       />
     </div>

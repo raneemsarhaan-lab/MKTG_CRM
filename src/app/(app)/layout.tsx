@@ -1,25 +1,16 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { AppShell } from '@/components/shared/AppShell'
-import type { Member } from '@/types/index'
+import { mapMember } from '@/lib/mappers'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createServerClient()
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) {
-    redirect('/login')
-  }
+  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  if (!member) redirect('/login')
 
-  const { data: member } = await supabase
-    .from('members')
-    .select('*')
-    .eq('email', user.email)
-    .single()
-
-  if (!member) {
-    redirect('/login?error=not_member')
-  }
-
-  return <AppShell member={member as Member}>{children}</AppShell>
+  return <AppShell member={mapMember(member)}>{children}</AppShell>
 }

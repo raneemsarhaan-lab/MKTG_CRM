@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
 import { LayoutDashboard, Kanban, Users, Settings, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/store/useUIStore'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { LangToggle } from './LangToggle'
@@ -46,22 +44,8 @@ export function AppShell({ member, children }: AppShellProps) {
   const pathname = usePathname()
   const isAdmin  = member.access === 'admin'
   const t        = useTranslations('nav')
-  const setCelebration   = useUIStore(s => s.setCelebration)
   const setShowTaskForm  = useUIStore(s => s.setShowTaskForm)
 
-  // Subscribe to user-scoped celebration broadcast channel (cross-tab sync)
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-    const ch = supabase.channel(`celebration-${member.id}`)
-    ch.on('broadcast', { event: 'celebration' }, ({ payload }: { payload: { taskName: string; stageLabel: string } }) => {
-      // Only fire if not already celebrating (same-tab direct call takes precedence)
-      if (!useUIStore.getState().celebration) {
-        setCelebration(payload as { taskName: string; stageLabel: string })
-      }
-    })
-    ch.subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [member.id, setCelebration])
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--soft)' }}>

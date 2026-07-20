@@ -1,37 +1,32 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { mapMember, mapTask } from '@/lib/mappers'
 import { CapacityDashboard } from '@/components/capacity/CapacityDashboard'
 
 export default async function CapacityPage() {
-  const supabase = await createServerClient()
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user?.email) redirect('/login')
+  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  if (!member) redirect('/login')
+  if (member.access !== 'admin') redirect('/overview')
 
-  const { data: currentUser } = await supabase
-    .from('members')
-    .select('*')
-    .eq('email', user.email)
-    .single()
-  if (!currentUser) redirect('/login')
-
-  // Admin-only page
-  if (currentUser.access !== 'admin') redirect('/overview')
-
-  const [{ data: memberRows }, { data: taskRows }] = await Promise.all([
-    supabase.from('members').select('*').order('name'),
-    supabase
-      .from('tasks')
-      .select('*, brand:brands(id, name, color)')
-      .neq('status', 'publish'),
+  const [members, tasks] = await Promise.all([
+    prisma.member.findMany({ orderBy: { name: 'asc' } }),
+    prisma.task.findMany({
+      where: { NOT: { status: 'publish' } },
+      include: { brand: true },
+    }),
   ])
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CapacityDashboard
-        members={memberRows ?? []}
+        members={members.map(mapMember)}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tasks={(taskRows ?? []) as any}
+        tasks={tasks.map(mapTask) as any}
       />
     </div>
   )

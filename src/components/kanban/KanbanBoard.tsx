@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragOverEvent, DragStartEvent,
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter,
@@ -10,7 +9,6 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSo
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment } from '@/types/index'
 import { STAGE_META, ALL_STAGES } from '@/lib/stage-meta'
 import { useUIStore } from '@/store/useUIStore'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskModal } from './TaskModal'
 import { StatStrip } from './StatStrip'
@@ -46,19 +44,7 @@ export function KanbanBoard({
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [search, setSearch]       = useState('')
   const [activeBrand, setActiveBrand] = useState<string | null>(null)
-  const router = useRouter()
 
-  // Supabase Realtime — subscribe to task changes and refresh server data
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-    const ch = supabase
-      .channel('board-tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        router.refresh()
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [router])
 
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
   const selectTask     = useUIStore(s => s.selectTask)

@@ -1,22 +1,23 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 type MemberPatch = Partial<{
-  name: string
-  role: string
-  access: 'admin' | 'superuser' | 'user'
+  name:            string
+  role:            string
+  access:          'admin' | 'superuser' | 'user'
   capacity_hrs_wk: number
-  status: string
-  avatar_url: string
+  status:          string
 }>
 
 type AddMemberInput = {
-  name: string
-  email: string
-  role: string
-  access: 'admin' | 'superuser' | 'user'
+  name:            string
+  email:           string
+  role:            string
+  access:          'admin' | 'superuser' | 'user'
+  password:        string
   capacity_hrs_wk?: number
 }
 
@@ -31,50 +32,74 @@ export async function updateMember(
   memberId: string,
   patch: MemberPatch,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { error } = await supabase.from('members').update(patch).eq('id', memberId)
-  if (error) return { success: false, error: error.message }
-  revalidateAll()
-  return { success: true }
+  try {
+    await prisma.member.update({ where: { id: memberId }, data: patch })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 export async function addMember(
   input: AddMemberInput,
 ): Promise<{ success: boolean; error?: string }> {
-  if (!input.email.endsWith('@forefront.consulting')) {
-    return { success: false, error: 'Email must be a @forefront.consulting address' }
+  if (!input.password || input.password.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters' }
   }
 
-  const supabase = await createServerClient()
-  const { error } = await supabase.from('members').insert({
-    name: input.name.trim(),
-    email: input.email.trim().toLowerCase(),
-    role: input.role.trim() || 'Team Member',
-    access: input.access,
-    capacity_hrs_wk: input.capacity_hrs_wk ?? 40,
-    status: 'Available',
-  })
-  if (error) return { success: false, error: error.message }
-  revalidateAll()
-  return { success: true }
+  try {
+    const password_hash = await bcrypt.hash(input.password, 10)
+    await prisma.member.create({
+      data: {
+        name:            input.name.trim(),
+        email:           input.email.trim().toLowerCase(),
+        role:            input.role.trim() || 'Team Member',
+        access:          input.access,
+        capacity_hrs_wk: input.capacity_hrs_wk ?? 40,
+        status:          'Available',
+        password_hash,
+      },
+    })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    const msg = String(e)
+    if (msg.includes('Unique constraint')) return { success: false, error: 'Email already exists' }
+    return { success: false, error: msg }
+  }
+}
+
+export async function resetMemberPassword(
+  memberId: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, error: 'Password must be at least 6 characters' }
+  }
+  try {
+    const password_hash = await bcrypt.hash(newPassword, 10)
+    await prisma.member.update({ where: { id: memberId }, data: { password_hash } })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 export async function removeMember(
   memberId: string,
 ): Promise<{ success: boolean; activeTasks?: number; error?: string }> {
-  const supabase = await createServerClient()
+  try {
+    const count = await prisma.task.count({
+      where: { task_owner_id: memberId, NOT: { status: 'publish' } },
+    })
+    if (count > 0) return { success: false, activeTasks: count }
 
-  const { count, error: countError } = await supabase
-    .from('tasks')
-    .select('id', { count: 'exact', head: true })
-    .eq('task_owner_id', memberId)
-    .neq('status', 'publish')
-
-  if (countError) return { success: false, error: countError.message }
-  if (count && count > 0) return { success: false, activeTasks: count }
-
-  const { error } = await supabase.from('members').delete().eq('id', memberId)
-  if (error) return { success: false, error: error.message }
-  revalidateAll()
-  return { success: true }
+    await prisma.member.delete({ where: { id: memberId } })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Member } from '@/types/index'
 import { COLORS, ACCESS_BADGE } from '@/lib/tokens'
 import { initials, avatarColor } from '@/lib/utils'
-import { updateMember, addMember, removeMember } from '@/actions/members'
+import { updateMember, addMember, removeMember, resetMemberPassword } from '@/actions/members'
 import { STAGE_META } from '@/lib/stage-meta'
 
 const REVIEW_STAGES = ['c-final', 'c-check', 'd-check', 'final-check'] as const
@@ -27,7 +27,7 @@ interface RemoveWarning {
 }
 
 export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
-  const [draft, setDraft] = useState<{ name: string; email: string; role: string; access: 'admin' | 'superuser' | 'user' }>({ name: '', email: '', role: '', access: 'user' })
+  const [draft, setDraft] = useState<{ name: string; email: string; role: string; access: 'admin' | 'superuser' | 'user'; password: string }>({ name: '', email: '', role: '', access: 'user', password: '' })
   const [addError, setAddError] = useState<string | null>(null)
   const [removeWarning, setRemoveWarning] = useState<RemoveWarning | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -41,11 +41,12 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
         email: draft.email,
         role: draft.role,
         access: draft.access,
+        password: draft.password,
       })
       if (!result.success) {
         setAddError(result.error ?? 'Failed to add member')
       } else {
-        setDraft({ name: '', email: '', role: '', access: 'user' })
+        setDraft({ name: '', email: '', role: '', access: 'user', password: '' })
       }
     })
   }
@@ -135,9 +136,17 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
           >
             {ACCESS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          <input
+            type="password"
+            placeholder="Password (min 6 chars)"
+            value={draft.password}
+            onChange={e => setDraft(d => ({ ...d, password: e.target.value }))}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            style={{ ...inputStyle, flex: '2 1 160px' }}
+          />
           <button
             onClick={handleAdd}
-            disabled={isPending || !draft.name.trim() || !draft.email.trim()}
+            disabled={isPending || !draft.name.trim() || !draft.email.trim() || !draft.password.trim()}
             style={{
               ...inputStyle,
               background: 'var(--ink)', color: COLORS.lime, border: 'none',
@@ -258,7 +267,19 @@ interface MemberRowProps {
 
 function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   const [isPending, startTransition] = useTransition()
+  const [newPwd, setNewPwd] = useState('')
+  const [pwdMsg, setPwdMsg] = useState('')
   const ac = ACCESS_BADGE[m.access] as { bg: string; text: string }
+
+  function handleResetPassword() {
+    if (!newPwd || newPwd.length < 6) { setPwdMsg('Min 6 characters'); return }
+    startTransition(async () => {
+      const r = await resetMemberPassword(m.id, newPwd)
+      if (r.success) { setNewPwd(''); setPwdMsg('Password updated') }
+      else setPwdMsg(r.error ?? 'Failed')
+      setTimeout(() => setPwdMsg(''), 3000)
+    })
+  }
   const ownedStages = REVIEW_STAGES.filter(s => STAGE_META[s].owner_role === m.role)
 
   function handleField(patch: Parameters<typeof updateMember>[1]) {
@@ -356,6 +377,34 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         >
           ✕
         </button>
+      </div>
+
+      {/* Reset password */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
+        <input
+          type="password"
+          placeholder="New password"
+          value={newPwd}
+          onChange={e => setNewPwd(e.target.value)}
+          style={{
+            fontSize: '0.72rem', padding: '5px 8px', borderRadius: 6,
+            border: '1px solid var(--line)', background: '#F6F6F4',
+            color: 'var(--ink)', outline: 'none', fontFamily: 'inherit', width: 150,
+          }}
+        />
+        <button
+          onClick={handleResetPassword}
+          disabled={isPending || !newPwd}
+          style={{
+            fontSize: '0.7rem', padding: '5px 10px', borderRadius: 6,
+            background: 'var(--ink)', color: '#fff', border: 'none',
+            cursor: newPwd ? 'pointer' : 'default', opacity: newPwd ? 1 : 0.4,
+            fontFamily: 'inherit', fontWeight: 600,
+          }}
+        >
+          Reset
+        </button>
+        {pwdMsg && <span style={{ fontSize: '0.7rem', color: pwdMsg.includes('updated') ? '#4B7A12' : COLORS.coral }}>{pwdMsg}</span>}
       </div>
 
       {/* Stage ownership chips */}

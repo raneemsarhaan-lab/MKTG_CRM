@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 function revalidateAll() {
   revalidatePath('/settings')
@@ -16,51 +16,53 @@ export async function updateSLA(
   contentTypeLabel: string,
   days: number,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { error } = await supabase
-    .from('sla_configs')
-    .upsert(
-      { stage_id: stageId, content_type_label: contentTypeLabel, days },
-      { onConflict: 'stage_id,content_type_label' },
-    )
-  if (error) return { success: false, error: error.message }
-  revalidatePath('/settings')
-  revalidatePath('/board')
-  return { success: true }
+  try {
+    await prisma.slaConfig.upsert({
+      where:  { stage_id_content_type_label: { stage_id: stageId, content_type_label: contentTypeLabel } },
+      update: { max_business_days: days },
+      create: { stage_id: stageId, content_type_label: contentTypeLabel, max_business_days: days },
+    })
+    revalidatePath('/settings')
+    revalidatePath('/board')
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 // ─── Brands ───────────────────────────────────────────────────────────────────
 
-type BrandInput = {
-  name: string
-  color: string
-  logo_url?: string
-  description?: string
-}
+type BrandInput = { name: string; color: string; logo_url?: string; description?: string }
 
 export async function createBrand(
   input: BrandInput,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  const supabase = await createServerClient()
-  const { data, error } = await supabase
-    .from('brands')
-    .insert({ name: input.name.trim(), color: input.color, logo_url: input.logo_url, description: input.description })
-    .select('id')
-    .single()
-  if (error) return { success: false, error: error.message }
-  revalidateAll()
-  return { success: true, id: data.id }
+  try {
+    const brand = await prisma.brand.create({
+      data: {
+        name:        input.name.trim(),
+        color:       input.color,
+        logo_url:    input.logo_url    ?? null,
+        description: input.description ?? null,
+      },
+    })
+    revalidateAll()
+    return { success: true, id: brand.id }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 export async function removeBrand(
   brandId: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  // tasks.brand_id references brands with ON DELETE SET NULL per data-model.md
-  const { error } = await supabase.from('brands').delete().eq('id', brandId)
-  if (error) return { success: false, error: error.message }
-  revalidateAll()
-  return { success: true }
+  try {
+    await prisma.brand.delete({ where: { id: brandId } })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 // ─── Content types ────────────────────────────────────────────────────────────
@@ -70,32 +72,37 @@ const SLA_STAGES = ['c-prog', 'c-final', 'c-check', 'd-prog', 'd-check', 'final-
 export async function createContentType(
   label: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { error: insertError } = await supabase
-    .from('content_types')
-    .insert({ label: label.trim() })
-  if (insertError) return { success: false, error: insertError.message }
+  try {
+    await prisma.contentType.create({ data: { label: label.trim() } })
 
-  // Seed default SLA rows (2 days per stage) for the new content type
-  const slaRows = SLA_STAGES.map(stage_id => ({
-    stage_id,
-    content_type_label: label.trim(),
-    days: 2,
-  }))
-  await supabase.from('sla_configs').upsert(slaRows, { onConflict: 'stage_id,content_type_label' })
+    // Seed default SLA rows (2 days per stage) for the new content type
+    await Promise.all(
+      SLA_STAGES.map(stage_id =>
+        prisma.slaConfig.upsert({
+          where:  { stage_id_content_type_label: { stage_id, content_type_label: label.trim() } },
+          update: {},
+          create: { stage_id, content_type_label: label.trim(), max_business_days: 2 },
+        })
+      )
+    )
 
-  revalidateAll()
-  return { success: true }
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 export async function removeContentType(
   label: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { error } = await supabase.from('content_types').delete().eq('label', label)
-  if (error) return { success: false, error: error.message }
-  revalidatePath('/settings')
-  return { success: true }
+  try {
+    await prisma.contentType.delete({ where: { label } })
+    revalidatePath('/settings')
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 // ─── Workspace settings ───────────────────────────────────────────────────────
@@ -104,26 +111,32 @@ export async function updateWeeklyCapacity(
   hours: number,
 ): Promise<{ success: boolean; error?: string }> {
   if (hours < 1 || hours > 168) return { success: false, error: 'Invalid value' }
-  const supabase = await createServerClient()
-  const { error } = await supabase
-    .from('workspace_settings')
-    .update({ capacity_hrs_per_wk: hours, updated_at: new Date().toISOString() })
-    .eq('id', 1)
-  if (error) return { success: false, error: error.message }
-  revalidatePath('/settings')
-  revalidatePath('/capacity')
-  return { success: true }
+  try {
+    await prisma.workspaceSettings.upsert({
+      where:  { id: 1 },
+      update: { capacity_hrs_per_wk: hours, updated_at: new Date() },
+      create: { id: 1, capacity_hrs_per_wk: hours, nine_stage_default: false },
+    })
+    revalidatePath('/settings')
+    revalidatePath('/capacity')
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }
 
 export async function updateNineStageDefault(
   enabled: boolean,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { error } = await supabase
-    .from('workspace_settings')
-    .update({ nine_stage_default: enabled, updated_at: new Date().toISOString() })
-    .eq('id', 1)
-  if (error) return { success: false, error: error.message }
-  revalidatePath('/settings')
-  return { success: true }
+  try {
+    await prisma.workspaceSettings.upsert({
+      where:  { id: 1 },
+      update: { nine_stage_default: enabled, updated_at: new Date() },
+      create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: enabled },
+    })
+    revalidatePath('/settings')
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
 }

@@ -1,50 +1,46 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { nextStageId } from '@/lib/stage-meta'
+import { STAGE_META } from '@/lib/stage-meta'
 import type { StageId, MoveTaskResult } from '@/types/index'
+
+async function getSessionMember() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return null
+  return prisma.member.findUnique({ where: { id: session.user.id } })
+}
 
 // ─── moveTask ───────────────────────────────────────────────────────────────
 
 export async function moveTask(taskId: string): Promise<MoveTaskResult> {
-  const supabase = await createServerClient()
+  const member = await getSessionMember()
+  if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
 
-  const [{ data: task }, { data: { user } }] = await Promise.all([
-    supabase.from('tasks').select('*, stage:stages(*)').eq('id', taskId).single(),
-    supabase.auth.getUser(),
-  ])
-
-  if (!task || !user) return { success: false, shouldCelebrate: false, error: 'not_found' }
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
   const nextStage = nextStageId(task.status as StageId, task.nine_stage)
   if (!nextStage) return { success: false, shouldCelebrate: false, error: 'terminal' }
 
-  const { data: member } = await supabase
-    .from('members').select('role, id').eq('email', user.email).single()
-
+  const stageMeta = STAGE_META[task.status as StageId]
   let shouldCelebrate = false
-  if (member) {
-    const stage = task.stage as { owner_role: string | null } | null
-    if (!stage || stage.owner_role === null) {
-      // Working stage: celebration if mover IS the task owner
-      shouldCelebrate = task.task_owner_id === member.id
-    } else {
-      // Review stage: celebration if mover's role matches the stage owner role
-      shouldCelebrate = stage.owner_role === member.role
-    }
+  if (!stageMeta.owner_role) {
+    shouldCelebrate = task.task_owner_id === member.id
+  } else {
+    shouldCelebrate = stageMeta.owner_role === member.role
   }
 
-  const { error } = await supabase
-    .from('tasks')
-    .update({ status: nextStage, stage_date: new Date().toISOString().split('T')[0] })
-    .eq('id', taskId)
-
-  if (error) return { success: false, shouldCelebrate: false, error: error.message }
+  await prisma.task.update({
+    where: { id: taskId },
+    data:  { status: nextStage, stage_date: new Date(), updated_at: new Date() },
+  })
 
   revalidatePath('/board')
   revalidatePath('/overview')
-
   return { success: true, shouldCelebrate }
 }
 
@@ -54,19 +50,13 @@ export async function addComment(
   taskId: string,
   body: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'not_authenticated' }
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
 
-  const { data: member } = await supabase
-    .from('members').select('id').eq('email', user.email).single()
-  if (!member) return { success: false, error: 'member_not_found' }
+  await prisma.taskComment.create({
+    data: { task_id: taskId, author_id: member.id, body: body.trim() },
+  })
 
-  const { error } = await supabase
-    .from('task_comments')
-    .insert({ task_id: taskId, author_id: member.id, body: body.trim() })
-
-  if (error) return { success: false, error: error.message }
   revalidatePath('/board')
   return { success: true }
 }
@@ -74,46 +64,48 @@ export async function addComment(
 // ─── createTask ─────────────────────────────────────────────────────────────
 
 interface CreateTaskInput {
-  name: string
-  brand_id: string
+  name:               string
+  brand_id:           string
   content_type_label: string
-  task_owner_id: string
-  due_date: string
-  platform?: string
-  campaign?: string
-  hours_estimate?: number
-  priority?: 'Low' | 'Medium' | 'High'
-  cover_image_url?: string
+  task_owner_id:      string
+  due_date:           string
+  platform?:          string
+  campaign?:          string
+  hours_estimate?:    number
+  priority?:          'Low' | 'Medium' | 'High'
+  cover_image_url?:   string
 }
 
 export async function createTask(
   input: CreateTaskInput,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'not_authenticated' }
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
 
-  const { data: creator } = await supabase
-    .from('members').select('role').eq('email', user.email).single()
-  if (!creator) return { success: false, error: 'member_not_found' }
+  // Fetch workspace default for nine_stage
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+  const nineStage = ws?.nine_stage_default ?? false
 
-  // Islam Check config-flag: 9-stage for Content Creators, 8-stage otherwise
-  const nineStage = creator.role === 'Content Creator'
-
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      ...input,
-      initiator_role: creator.role,
-      nine_stage: nineStage,
-      status: 'todo',
-      stage_date: new Date().toISOString().split('T')[0],
-    })
-    .select('id')
-    .single()
-
-  if (error) return { success: false, error: error.message }
+  const task = await prisma.task.create({
+    data: {
+      name:               input.name,
+      brand_id:           input.brand_id || null,
+      content_type_label: input.content_type_label || null,
+      platform:           input.platform   ?? null,
+      campaign:           input.campaign   ?? null,
+      task_owner_id:      input.task_owner_id,
+      initiator_role:     member.role,
+      nine_stage:         nineStage,
+      status:             'todo',
+      stage_date:         new Date(),
+      due_date:           new Date(input.due_date),
+      hours_estimate:     input.hours_estimate ?? 0,
+      priority:           input.priority ?? 'Medium',
+      cover_image_url:    input.cover_image_url ?? null,
+      created_by:         member.id,
+    },
+  })
 
   revalidatePath('/board')
-  return { success: true, id: data.id }
+  return { success: true, id: task.id }
 }
