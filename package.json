@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "migrate": "bash scripts/migrate.sh",
+    "deploy": "next build && bash scripts/migrate.sh",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
