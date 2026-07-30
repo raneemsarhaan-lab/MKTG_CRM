@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "overview": "Overview",
+    "board": "Board",
+    "capacity": "Capacity",
+    "settings": "Settings",
+    "toggleLanguage": "Switch to Arabic"
+  },
+  "greeting": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening"
+  },
+  "board": {
+    "allBrands": "All brands",
+    "search": "Search tasks...",
+    "newTask": "+ New Task",
+    "empty": "Empty"
+  },
+  "overview": {
+    "myDay": "☀️ My Day",
+    "upNext": "📅 Up Next",
+    "slaIssues": "⚠️ SLA Issues",
+    "published": "✅ Published",
+    "dueToday": "Due today",
+    "thisWeek": "This week",
+    "atRiskPlus": "At risk+",
+    "allTime": "All time",
+    "teamOverview": "Team Overview",
+    "nothingHere": "Nothing here 🎉",
+    "active": "Active",
+    "hrsWk": "Hrs/wk",
+    "capacityOf": "of"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Controls for your team and workflow.",
+    "teamTab": "Team & Access",
+    "workflowTab": "SLA & Workflow"
+  },
+  "common": {
+    "close": "Close",
+    "send": "Send",
+    "noComments": "No comments yet",
+    "addComment": "Add a comment...",
+    "publishedDone": "✓ Published — this task is complete",
+    "details": "Details",
+    "comments": "Comments",
+    "currentStage": "Current Stage",
+    "moveTo": "Move to",
+    "adminOverride": "Admin override — celebration will not fire",
+    "daysLeft": "d left",
+    "daysOver": "d overdue",
+    "dueToday": "Due today"
+  }
+}

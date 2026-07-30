@@ -1,0 +1,158 @@
+// Fluxo CRM Core — complete type surface
+// data-model.md §TypeScript Types
+
+// ─── Primitive aliases ─────────────────────────────────────────────────────
+
+export type StageId =
+  | 'todo'          // To Do
+  | 'c-prog'        // Writing
+  | 'c-final'       // Content Review
+  | 'c-check'       // Islam Check (9-stage only)
+  | 'r-design'      // Ready to Design
+  | 'd-prog'        // Designing
+  | 'd-check'       // Design Review
+  | 'final-check'   // Final Check
+  | 'publish'       // Published (terminal)
+
+export type AccessLevel = 'admin' | 'superuser' | 'user'
+export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
+export type Priority = 'Low' | 'Medium' | 'High'
+
+// ─── Core entities ─────────────────────────────────────────────────────────
+
+export interface Member {
+  id: string
+  name: string
+  email: string
+  role: string
+  access: AccessLevel
+  capacity_hrs_wk: number
+  status: 'Available' | 'Busy'
+  color?: string
+  avatar_url?: string
+}
+
+export interface Brand {
+  id: string
+  name: string
+  color: string
+  logo_url?: string
+  description?: string
+}
+
+export interface ContentType {
+  id: string
+  label: string
+}
+
+export interface Stage {
+  id: StageId
+  label_en: string
+  label_ar: string
+  phase: 'Intake' | 'Content' | 'Design' | 'Ship'
+  owner_role: string | null
+  terminal_flag: boolean
+  sort_order: number
+}
+
+export interface SLAConfig {
+  [stageId: string]: {
+    [contentTypeLabel: string]: number
+  }
+}
+
+export interface Task {
+  id: string
+  name: string
+  brand_id: string
+  brand?: Brand
+  content_type_label: string
+  platform?: string
+  campaign?: string
+  task_owner_id: string
+  task_owner?: Member
+  initiator_role: string
+  nine_stage: boolean
+  status: StageId
+  stage_date: string
+  due_date: string
+  hours_estimate: number
+  cover_image_url?: string
+  priority: Priority
+  created_by?: string
+  created_at: string
+  updated_at: string
+  comments?: TaskComment[]
+  attachments?: TaskAttachment[]
+}
+
+export interface TaskComment {
+  id: string
+  task_id: string
+  author_id: string
+  author?: Member
+  body: string
+  created_at: string
+}
+
+export interface TaskAttachment {
+  id: string
+  task_id: string
+  filename: string
+  url?: string
+  uploaded_at: string
+}
+
+// ─── Derived / UI types ────────────────────────────────────────────────────
+
+export interface PanelTask {
+  task: Task
+  alertStatus: AlertStatus
+}
+
+export interface BigStatMetric {
+  label: string
+  value: number | string
+  sub?: string
+  theme: 'danger' | 'accent' | 'lime' | 'default'
+}
+
+export interface StageMeta {
+  id: StageId
+  label_en: string
+  label_ar: string
+  phase: string
+  color: string
+  owner_role: string | null
+  terminal_flag: boolean
+}
+
+export interface CelebrationPayload {
+  taskName: string
+  stageLabel: string
+}
+
+export interface UIStore {
+  celebration: CelebrationPayload | null
+  selectedTaskId: string | null
+  showTaskForm: boolean
+  profileOpen: boolean
+
+  setCelebration: (payload: CelebrationPayload | null) => void
+  selectTask: (id: string | null) => void
+  setShowTaskForm: (show: boolean) => void
+  setProfileOpen: (open: boolean) => void
+}
+
+export interface MoveTaskResult {
+  success: boolean
+  shouldCelebrate: boolean
+  error?: string
+}
+
+export interface WorkspaceSettings {
+  id: number
+  capacity_hrs_per_wk: number
+  nine_stage_default: boolean
+  updated_at: string
+}

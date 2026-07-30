@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  id              String   @id @default(uuid()) @db.Uuid
+  name            String
+  email           String   @unique
+  role            String
+  access          String   @default("user")
+  capacity_hrs_wk Int      @default(40)
+  status          String   @default("Available")
+  color           String?
+  avatar_url      String?
+  password_hash   String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  tasks_owned   Task[]        @relation("TaskOwner")
+  tasks_created Task[]        @relation("TaskCreator")
+  comments      TaskComment[]
+
+  @@map("members")
+}
+
+model Brand {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  color       String   @default("#64748B")
+  logo_url    String?
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  tasks Task[]
+
+  @@map("brands")
+}
+
+model ContentType {
+  id         String   @id @default(uuid()) @db.Uuid
+  label      String   @unique
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  tasks      Task[]      @relation("TaskContentType")
+  sla_config SlaConfig[]
+
+  @@map("content_types")
+}
+
+model Stage {
+  id            String  @id
+  label_en      String
+  label_ar      String
+  phase         String
+  owner_role    String?
+  terminal_flag Boolean @default(false)
+  sort_order    Int
+
+  tasks      Task[]
+  sla_config SlaConfig[]
+
+  @@map("stages")
+}
+
+model SlaConfig {
+  stage_id           String
+  content_type_label String
+  max_business_days  Int    @default(1)
+
+  stage        Stage       @relation(fields: [stage_id], references: [id], onDelete: Cascade)
+  content_type ContentType @relation(fields: [content_type_label], references: [label], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([stage_id, content_type_label])
+  @@map("sla_config")
+}
+
+model Task {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String
+  brand_id           String?  @db.Uuid
+  content_type_label String?
+  platform           String?
+  campaign           String?
+  task_owner_id      String   @db.Uuid
+  initiator_role     String
+  nine_stage         Boolean  @default(false)
+  status             String   @default("todo")
+  stage_date         DateTime @default(now()) @db.Date
+  due_date           DateTime @db.Date
+  hours_estimate     Decimal  @default(0) @db.Decimal(5, 1)
+  cover_image_url    String?
+  priority           String   @default("Medium")
+  created_by         String?  @db.Uuid
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  brand        Brand?       @relation(fields: [brand_id], references: [id])
+  task_owner   Member       @relation("TaskOwner", fields: [task_owner_id], references: [id])
+  creator      Member?      @relation("TaskCreator", fields: [created_by], references: [id])
+  stage        Stage        @relation(fields: [status], references: [id])
+  content_type ContentType? @relation("TaskContentType", fields: [content_type_label], references: [label])
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+
+  @@map("tasks")
+}
+
+model TaskComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  task_id    String   @db.Uuid
+  author_id  String   @db.Uuid
+  body       String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  task   Task   @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  author Member @relation(fields: [author_id], references: [id])
+
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid()) @db.Uuid
+  task_id     String   @db.Uuid
+  filename    String
+  url         String?
+  uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@map("task_attachments")
+}
+
+model WorkspaceSettings {
+  id                  Int      @id
+  capacity_hrs_per_wk Int      @default(40)
+  nine_stage_default  Boolean  @default(false)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("workspace_settings")
+}

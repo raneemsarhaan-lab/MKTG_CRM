@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* ─── Fluxo Design Tokens ────────────────────────────────────────────────── */
+:root {
+  /* Color tokens */
+  --ink:    #1B1A13;
+  --rail:   #17181A;
+  --lime:   #C8F24E;
+  --coral:  #F5334F;
+  --violet: #B79CF5;
+  --cyan:   #5B93F5;
+  --mint:   #3FA34D;
+  --muted:  #8A8D91;
+  --soft:   #F7F7F7;
+  --panel:  #FFFFFF;
+  --line:   #E1E1E0;
+
+  /* Stage colors */
+  --stage-todo:         #64748B;
+  --stage-c-prog:       #3B82F6;
+  --stage-c-final:      #2E6FB0;
+  --stage-c-check:      #1F5A94;
+  --stage-r-design:     #8B5CF6;
+  --stage-d-prog:       #7C3AED;
+  --stage-d-check:      #5B3FB5;
+  --stage-final-check:  #F59E0B;
+  --stage-publish:      #22C55E;
+
+  /* Typography scale */
+  --font-heading: 'Montserrat', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-accent:  'Caveat', cursive;
+}
+
+/* ─── Google Fonts ────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap');
+
+/* ─── Base Reset ──────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-body);
+  background-color: var(--soft);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── RTL / LTR logical properties ───────────────────────────────────────── */
+/* Use CSS logical properties throughout components so RTL flip is automatic */
+[dir="rtl"] {
+  direction: rtl;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+/* ─── Utility classes ─────────────────────────────────────────────────────── */
+.font-heading { font-family: var(--font-heading); }
+.font-body    { font-family: var(--font-body); }
+.font-accent  { font-family: var(--font-accent); }
