@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/authz'
 
 function revalidateAll() {
   revalidatePath('/settings')
@@ -16,6 +17,9 @@ export async function updateSLA(
   contentTypeLabel: string,
   days: number,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.slaConfig.upsert({
       where:  { stage_id_content_type_label: { stage_id: stageId, content_type_label: contentTypeLabel } },
@@ -37,6 +41,9 @@ type BrandInput = { name: string; color: string; logo_url?: string; description?
 export async function createBrand(
   input: BrandInput,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     const brand = await prisma.brand.create({
       data: {
@@ -56,6 +63,9 @@ export async function createBrand(
 export async function removeBrand(
   brandId: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.brand.delete({ where: { id: brandId } })
     revalidateAll()
@@ -72,6 +82,9 @@ const SLA_STAGES = ['c-prog', 'c-final', 'c-check', 'd-prog', 'd-check', 'final-
 export async function createContentType(
   label: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.contentType.create({ data: { label: label.trim() } })
 
@@ -96,6 +109,9 @@ export async function createContentType(
 export async function removeContentType(
   label: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.contentType.delete({ where: { label } })
     revalidatePath('/settings')
@@ -110,6 +126,9 @@ export async function removeContentType(
 export async function updateWeeklyCapacity(
   hours: number,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   if (hours < 1 || hours > 168) return { success: false, error: 'Invalid value' }
   try {
     await prisma.workspaceSettings.upsert({
@@ -128,6 +147,9 @@ export async function updateWeeklyCapacity(
 export async function updateNineStageDefault(
   enabled: boolean,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.workspaceSettings.upsert({
       where:  { id: 1 },

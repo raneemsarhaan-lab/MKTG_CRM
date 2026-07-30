@@ -1,18 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getSessionMember, requireTaskCreator } from '@/lib/authz'
 import { nextStageId } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import type { StageId, MoveTaskResult } from '@/types/index'
-
-async function getSessionMember() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return null
-  return prisma.member.findUnique({ where: { id: session.user.id } })
-}
 
 // ─── moveTask ───────────────────────────────────────────────────────────────
 
@@ -26,13 +19,19 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   const nextStage = nextStageId(task.status as StageId, task.nine_stage)
   if (!nextStage) return { success: false, shouldCelebrate: false, error: 'terminal' }
 
+  // Own-stage check: working stage → task owner; review stage → role match.
+  // Mirrors `canAdvance` in TaskModal — the client hides the button, this
+  // enforces it. Admin and superuser may advance any stage as an override.
   const stageMeta = STAGE_META[task.status as StageId]
-  let shouldCelebrate = false
-  if (!stageMeta.owner_role) {
-    shouldCelebrate = task.task_owner_id === member.id
-  } else {
-    shouldCelebrate = stageMeta.owner_role === member.role
-  }
+  const isOwnStage = !stageMeta.owner_role
+    ? task.task_owner_id === member.id
+    : stageMeta.owner_role === member.role
+
+  const canAdvance = isOwnStage || member.access === 'admin' || member.access === 'superuser'
+  if (!canAdvance) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+
+  // An override advance is not the overrider's win — no celebration.
+  const shouldCelebrate = isOwnStage
 
   await prisma.task.update({
     where: { id: taskId },
@@ -79,8 +78,9 @@ interface CreateTaskInput {
 export async function createTask(
   input: CreateTaskInput,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  const member = await getSessionMember()
-  if (!member) return { success: false, error: 'not_authenticated' }
+  const auth = await requireTaskCreator()
+  if (auth.error) return { success: false, error: auth.error }
+  const member = auth.member
 
   // Fetch workspace default for nine_stage
   const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })

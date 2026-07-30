@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/authz'
 import bcrypt from 'bcryptjs'
 
 type MemberPatch = Partial<{
@@ -32,6 +33,9 @@ export async function updateMember(
   memberId: string,
   patch: MemberPatch,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     await prisma.member.update({ where: { id: memberId }, data: patch })
     revalidateAll()
@@ -44,6 +48,9 @@ export async function updateMember(
 export async function addMember(
   input: AddMemberInput,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   if (!input.password || input.password.length < 6) {
     return { success: false, error: 'Password must be at least 6 characters' }
   }
@@ -74,6 +81,9 @@ export async function resetMemberPassword(
   memberId: string,
   newPassword: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   if (!newPassword || newPassword.length < 6) {
     return { success: false, error: 'Password must be at least 6 characters' }
   }
@@ -90,6 +100,9 @@ export async function resetMemberPassword(
 export async function removeMember(
   memberId: string,
 ): Promise<{ success: boolean; activeTasks?: number; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
   try {
     const count = await prisma.task.count({
       where: { task_owner_id: memberId, NOT: { status: 'publish' } },
