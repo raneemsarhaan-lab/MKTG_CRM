@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
@@ -117,6 +118,7 @@ export function TaskModal({
   const [editingName, setEditingName]   = useState(false)
   const [nameText, setNameText]         = useState('')
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const setCelebration = useUIStore(s => s.setCelebration)
 
   const stageMeta   = STAGE_META[task.status]
@@ -137,7 +139,7 @@ export function TaskModal({
     setBriefError('')
     startTransition(async () => {
       const res = await updateTask(task.id, patch)
-      if (res.success) after?.()
+      if (res.success) { router.refresh(); after?.() }
       else setBriefError(res.error ?? 'Could not save the change')
     })
   }
@@ -163,6 +165,7 @@ export function TaskModal({
     startTransition(async () => {
       const result = await moveTask(task.id)
       if (result.success) {
+        router.refresh()
         if (result.shouldCelebrate && nextMeta) {
           const payload = { taskName: task.name, stageLabel: nextMeta.label_en }
           // Direct call for immediate same-tab response
@@ -178,6 +181,7 @@ export function TaskModal({
     if (!text) return
     startTransition(async () => {
       await addComment(task.id, text)
+      router.refresh()
       setCmtText('')
     })
   }

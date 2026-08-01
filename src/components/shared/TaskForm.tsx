@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Member, Brand, ContentType } from '@/types/index'
 import { createTask } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
@@ -51,6 +52,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
 
 export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFormProps) {
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [showMore, setShowMore] = useState(false)
@@ -98,6 +100,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         cover_image_url:    form.cover_image_url || undefined,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create task'); return }
+
+      // The board keeps its own copy of the task list — pull the new one in.
+      router.refresh()
 
       if (andAnother) {
         // Keep the context fields, clear what is task-specific.
