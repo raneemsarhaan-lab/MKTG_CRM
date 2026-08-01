@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build",
+    "build": "next build && bash scripts/migrate.sh",
     "migrate": "bash scripts/migrate.sh",
-    "deploy": "next build && bash scripts/migrate.sh",
+    "deploy": "npm run build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
