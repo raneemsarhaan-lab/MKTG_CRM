@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "next build && bash scripts/migrate.sh",
+    "build": "next build",
     "migrate": "bash scripts/migrate.sh",
     "deploy": "npm run build",
-    "start": "next start",
+    "start": "bash scripts/migrate.sh && next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
