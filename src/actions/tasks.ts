@@ -64,6 +64,7 @@ export async function addComment(
 
 interface CreateTaskInput {
   name:               string
+  description?:       string
   brand_id:           string
   content_type_label: string
   task_owner_id:      string
@@ -89,6 +90,7 @@ export async function createTask(
   const task = await prisma.task.create({
     data: {
       name:               input.name,
+      description:        input.description?.trim() || null,
       brand_id:           input.brand_id || null,
       content_type_label: input.content_type_label || null,
       platform:           input.platform   ?? null,

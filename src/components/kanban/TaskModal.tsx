@@ -241,6 +241,23 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
           </div>
 
           {/* Details tab */}
+          {activeTab === 'details' && task.description && (
+            <div style={{ marginBottom: '1.1rem' }}>
+              <div style={{
+                fontSize: '0.6rem', color: COLORS.muted, marginBottom: 4,
+                textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+              }}>
+                Brief
+              </div>
+              <p style={{
+                color: COLORS.ink, fontSize: '0.85rem', lineHeight: 1.55,
+                margin: 0, whiteSpace: 'pre-wrap',
+              }}>
+                {task.description}
+              </p>
+            </div>
+          )}
+
           {activeTab === 'details' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: '1.1rem' }}>
               {[
