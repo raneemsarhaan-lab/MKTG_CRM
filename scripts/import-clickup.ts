@@ -103,6 +103,57 @@ export function parseAssignees(raw: string): string[] {
   return inner.split(',').map(s => s.trim()).filter(Boolean)
 }
 
+/**
+ * ClickUp writes newlines inside Task Content as the two characters `\` and
+ * `n`, not as real line breaks — 4,247 of them across this export, plus 6
+ * escaped quotes. Stored verbatim they render as visible "\n" through the
+ * middle of every brief, which is what "the description was corrupted" was.
+ *
+ * Only \n, \r, \t, \" and \\ appear in practice; anything else is left
+ * alone rather than silently swallowing a real backslash.
+ */
+export function unescapeClickUp(text: string): string {
+  return text.replace(/\\([nrt"\\])/g, (_, ch) => {
+    switch (ch) {
+      case 'n':  return '\n'
+      case 'r':  return '\r'
+      case 't':  return '\t'
+      default:   return ch      // \" → "   and   \\ → \
+    }
+  })
+}
+
+/**
+ * Task Content arrives in two shapes, and both rendered as garbage when stored
+ * verbatim — this is what "the description was corrupted" meant.
+ *
+ *  210 rows  plain text with escaped newlines  → unescape
+ *   20 rows  Quill Delta rich text as raw JSON → extract the insert strings
+ *
+ * The Delta rows must be JSON.parse'd from the RAW field, before unescaping:
+ * a `\n` inside a JSON string is legitimately escaped, so unescaping first
+ * turns valid JSON into a syntax error.
+ */
+export function decodeContent(raw: string): string {
+  const text = (raw ?? '').trim()
+  if (!text) return ''
+
+  if (text.startsWith('{') && text.includes('"ops"')) {
+    try {
+      const delta = JSON.parse(text) as { ops?: { insert?: unknown }[] }
+      // Return whatever the Delta yields, even nothing: two briefs in this
+      // export contain only a newline, and treating "empty" as a parse
+      // failure would fall through and store the raw JSON instead.
+      return (delta.ops ?? [])
+        .map(op => (typeof op.insert === 'string' ? op.insert : ''))
+        .join('')
+    } catch {
+      // Not the Delta shape after all — fall through and treat it as text.
+    }
+  }
+  return unescapeClickUp(text)
+}
+
 function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from)
   let left = days
@@ -201,7 +252,7 @@ async function main() {
 
     const data = {
       name,
-      description:    r['Task Content']?.trim() || null,
+      description:    decodeContent(r['Task Content']).trim() || null,
       brand_id:       brandId,
       task_owner_id:  ownerId,
       initiator_role: 'Marketing Manager',
