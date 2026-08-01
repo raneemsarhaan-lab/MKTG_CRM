@@ -7,7 +7,8 @@ import { STAGE_META, nextStageId, ALL_STAGES } from '@/lib/stage-meta'
 import { ALERT_BADGE_STYLES, COLORS } from '@/lib/tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { moveTask, addComment } from '@/actions/tasks'
+import { moveTask, addComment, updateTask, type TaskPatch } from '@/actions/tasks'
+import { EditableCell, ReadOnlyCell } from './EditableCell'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
 
@@ -17,6 +18,9 @@ type FullTask = Task & {
   comments: (TaskComment & { author: Member })[]
 }
 
+const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
+const PRIORITIES = ['High', 'Medium', 'Low']
+
 interface TaskModalProps {
   task: FullTask
   currentUser: Member
@@ -24,6 +28,10 @@ interface TaskModalProps {
   slaConfig: SLAConfig
   today: Date
   onClose: () => void
+  /** Option sources for the inline editors. */
+  brands?: Brand[]
+  members?: Member[]
+  contentTypes?: { id: string; label: string }[]
 }
 
 function Avatar({ name, size = 24 }: { name: string; size?: number }) {
@@ -79,9 +87,17 @@ function StageTimeline({ task }: { task: FullTask }) {
   )
 }
 
-export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today, onClose }: TaskModalProps) {
+export function TaskModal({
+  task, currentUser, stages: _stages, slaConfig, today, onClose,
+  brands = [], members = [], contentTypes = [],
+}: TaskModalProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details')
   const [cmtText, setCmtText]     = useState('')
+  const [editingBrief, setEditingBrief] = useState(false)
+  const [briefText, setBriefText]       = useState('')
+  const [briefError, setBriefError]     = useState('')
+  const [editingName, setEditingName]   = useState(false)
+  const [nameText, setNameText]         = useState('')
   const [isPending, startTransition] = useTransition()
   const setCelebration = useUIStore(s => s.setCelebration)
 
@@ -92,6 +108,25 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
   const daysLeft    = calDaysBetween(today, new Date(task.due_date))
   const overdue     = daysLeft < 0
+
+  // Mirrors updateTask's server-side check — the server one is authoritative.
+  const canEditBrief =
+    task.task_owner_id === currentUser.id ||
+    currentUser.access === 'admin' ||
+    currentUser.access === 'superuser'
+
+  function applyPatch(patch: TaskPatch, after?: () => void) {
+    setBriefError('')
+    startTransition(async () => {
+      const res = await updateTask(task.id, patch)
+      if (res.success) after?.()
+      else setBriefError(res.error ?? 'Could not save the change')
+    })
+  }
+
+  function saveBrief() {
+    applyPatch({ description: briefText }, () => setEditingBrief(false))
+  }
 
   const isAdmin    = currentUser.access === 'admin'
   const isSuperuser = currentUser.access === 'superuser'
@@ -193,9 +228,38 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
                   {task.priority}
                 </span>
               </div>
-              <h2 style={{ color: COLORS.ink, fontSize: '1.05rem', fontWeight: 800, margin: 0, lineHeight: 1.3 }}>
-                {task.name}
-              </h2>
+              {editingName ? (
+                <input
+                  value={nameText}
+                  autoFocus
+                  onChange={e => setNameText(e.target.value)}
+                  onBlur={() => {
+                    setEditingName(false)
+                    if (nameText.trim() && nameText !== task.name) applyPatch({ name: nameText })
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter')  { e.preventDefault(); e.currentTarget.blur() }
+                    if (e.key === 'Escape') { setNameText(task.name); setEditingName(false) }
+                  }}
+                  style={{
+                    color: COLORS.ink, fontSize: '1.05rem', fontWeight: 800,
+                    lineHeight: 1.3, width: '100%', fontFamily: 'inherit',
+                    background: '#fff', border: `1px solid ${COLORS.line}`,
+                    borderRadius: 6, padding: '2px 6px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              ) : (
+                <h2
+                  onClick={() => { if (canEditBrief) { setNameText(task.name); setEditingName(true) } }}
+                  title={canEditBrief ? 'Click to rename' : undefined}
+                  style={{
+                    color: COLORS.ink, fontSize: '1.05rem', fontWeight: 800, margin: 0,
+                    lineHeight: 1.3, cursor: canEditBrief ? 'pointer' : 'default',
+                  }}
+                >
+                  {task.name}
+                </h2>
+              )}
             </div>
             <button
               onClick={onClose}
@@ -240,41 +304,157 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
             </button>
           </div>
 
-          {/* Details tab */}
-          {activeTab === 'details' && task.description && (
+          {/* Brief — always present so the section is discoverable even when
+              empty, and editable in place (wireframe 1d). */}
+          {activeTab === 'details' && (
             <div style={{ marginBottom: '1.1rem' }}>
               <div style={{
-                fontSize: '0.6rem', color: COLORS.muted, marginBottom: 4,
-                textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 4,
               }}>
-                Brief
+                <span style={{
+                  fontSize: '0.6rem', color: COLORS.muted,
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                }}>
+                  Brief
+                </span>
+                {canEditBrief && !editingBrief && (
+                  <button
+                    onClick={() => { setBriefText(task.description ?? ''); setEditingBrief(true) }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      fontSize: '0.68rem', fontWeight: 700, color: COLORS.muted,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {task.description ? 'Edit' : '+ Add brief'}
+                  </button>
+                )}
               </div>
-              <p style={{
-                color: COLORS.ink, fontSize: '0.85rem', lineHeight: 1.55,
-                margin: 0, whiteSpace: 'pre-wrap',
-              }}>
-                {task.description}
-              </p>
+
+              {editingBrief ? (
+                <div>
+                  <textarea
+                    value={briefText}
+                    onChange={e => setBriefText(e.target.value)}
+                    autoFocus
+                    rows={4}
+                    placeholder="What needs making, for whom, and any constraints…"
+                    style={{
+                      width: '100%', padding: '0.6rem 0.7rem', borderRadius: 10,
+                      border: `1px solid ${COLORS.line}`, background: '#fff',
+                      color: COLORS.ink, fontSize: '0.85rem', lineHeight: 1.55,
+                      fontFamily: 'inherit', outline: 'none', resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={saveBrief}
+                      disabled={isPending}
+                      style={{
+                        padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none',
+                        background: COLORS.ink, color: COLORS.lime, fontWeight: 700,
+                        fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
+                        opacity: isPending ? 0.7 : 1,
+                      }}
+                    >
+                      {isPending ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingBrief(false)}
+                      style={{
+                        padding: '0.4rem 0.9rem', borderRadius: 8,
+                        border: `1px solid ${COLORS.line}`, background: '#fff',
+                        color: COLORS.muted, fontWeight: 700, fontSize: '0.75rem',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {briefError && (
+                    <p role="alert" style={{ color: '#ef4444', fontSize: '0.72rem', margin: '6px 0 0' }}>
+                      {briefError}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{
+                  color: task.description ? COLORS.ink : COLORS.muted,
+                  fontSize: '0.85rem', lineHeight: 1.55, margin: 0,
+                  whiteSpace: 'pre-wrap', fontStyle: task.description ? 'normal' : 'italic',
+                }}>
+                  {task.description || 'No brief yet.'}
+                </p>
+              )}
             </div>
           )}
 
           {activeTab === 'details' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: '1.1rem' }}>
-              {[
-                { label: 'Task Owner', value: task.task_owner.name },
-                { label: 'Content Type', value: task.content_type_label },
-                { label: 'Due Date', value: new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) },
-                { label: 'Est. Hours', value: `${task.hours_estimate}h` },
-                { label: 'Stage Since', value: new Date(task.stage_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) },
-                { label: 'Pipeline', value: task.nine_stage ? '9-stage' : '8-stage' },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ background: '#F7F7F7', border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '0.55rem 0.75rem' }}>
-                  <div style={{ fontSize: '0.6rem', color: COLORS.muted, marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {label}
-                  </div>
-                  <div style={{ color: COLORS.ink, fontSize: '0.82rem', fontWeight: 600 }}>{value}</div>
-                </div>
-              ))}
+              <EditableCell
+                label="Task Owner" canEdit={canEditBrief} type="select"
+                value={task.task_owner_id} display={task.task_owner.name}
+                options={members.map(m => ({ value: m.id, label: m.name }))}
+                onCommit={v => applyPatch({ task_owner_id: v })}
+              />
+              <EditableCell
+                label="Brand" canEdit={canEditBrief} type="select"
+                value={task.brand_id} display={task.brand?.name}
+                options={brands.map(b => ({ value: b.id, label: b.name }))}
+                onCommit={v => applyPatch({ brand_id: v })}
+              />
+              <EditableCell
+                label="Content Type" canEdit={canEditBrief} type="select"
+                value={task.content_type_label} display={task.content_type_label}
+                options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
+                onCommit={v => applyPatch({ content_type_label: v })}
+              />
+              <EditableCell
+                label="Priority" canEdit={canEditBrief} type="select"
+                value={task.priority} display={task.priority}
+                options={PRIORITIES.map(p => ({ value: p, label: p }))}
+                onCommit={v => applyPatch({ priority: v as 'Low' | 'Medium' | 'High' })}
+              />
+              <EditableCell
+                label="Due Date" canEdit={canEditBrief} type="date"
+                value={task.due_date} display={new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                onCommit={v => applyPatch({ due_date: v })}
+              />
+              <EditableCell
+                label="Est. Hours" canEdit={canEditBrief} type="number"
+                min={0} step={0.5}
+                value={task.hours_estimate} display={`${task.hours_estimate}h`}
+                onCommit={v => applyPatch({ hours_estimate: parseFloat(v) })}
+              />
+              <EditableCell
+                label="Platform" canEdit={canEditBrief} type="select"
+                value={task.platform ?? ''} display={task.platform}
+                options={PLATFORMS.map(p => ({ value: p, label: p }))}
+                onCommit={v => applyPatch({ platform: v })}
+              />
+              <EditableCell
+                label="Campaign" canEdit={canEditBrief} type="text"
+                placeholder="e.g. Brand Launch"
+                value={task.campaign ?? ''} display={task.campaign}
+                onCommit={v => applyPatch({ campaign: v })}
+              />
+              <EditableCell
+                label="Cover Image URL" canEdit={canEditBrief} type="text"
+                placeholder="https://…"
+                value={task.cover_image_url ?? ''} display={task.cover_image_url}
+                onCommit={v => applyPatch({ cover_image_url: v })}
+              />
+
+              {/* Read-only: the SLA clock and the pipeline shape are not
+                  user-editable. Stage moves go through Advance; nine_stage is
+                  frozen at creation (HANDOVER §8). */}
+              <ReadOnlyCell
+                label="Stage Since"
+                value={new Date(task.stage_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+              />
+              <ReadOnlyCell label="Pipeline" value={task.nine_stage ? '9-stage' : '8-stage'} />
             </div>
           )}
 

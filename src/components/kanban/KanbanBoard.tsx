@@ -307,6 +307,9 @@ export function KanbanBoard({
           stages={[]}
           slaConfig={slaConfig}
           today={today}
+          brands={brands}
+          members={members}
+          contentTypes={contentTypes}
           onClose={() => selectTask(null)}
         />
       )}
