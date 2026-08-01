@@ -1,0 +1,97 @@
+import type { StageId } from '@/types/index'
+
+/**
+ * My Board presentation mappings — developer handoff §6.
+ *
+ * The badge label and dot colour are *derived* from the stage enum, never
+ * stored separately (§9.1).
+ *
+ * The handoff names five stages explicitly; this product has nine. The five it
+ * names carry its exact hex values. The remaining four ('c-prog', 'r-design',
+ * 'd-prog', 'publish') are not in the handoff and reuse the existing stage
+ * palette from tokens.ts rather than inventing new colour.
+ */
+export const STAGE_BADGE: Record<StageId, { dot: string; label: string }> = {
+  'todo':        { dot: '#8A8D91', label: 'To Do'     }, // handoff: "Not started"
+  'c-prog':      { dot: '#3B82F6', label: 'Writing'   }, // not in handoff
+  'c-final':     { dot: '#2E6FB0', label: 'C-Review'  }, // handoff: "Client review"
+  'c-check':     { dot: '#1F5A94', label: 'C-Check'   }, // handoff: "Content check"
+  'r-design':    { dot: '#8B5CF6', label: 'Ready'     }, // not in handoff
+  'd-prog':      { dot: '#7C3AED', label: 'Designing' }, // not in handoff
+  'd-check':     { dot: '#5B3FB5', label: 'D-Check'   }, // handoff: "Design check"
+  'final-check': { dot: '#F59E0B', label: 'F-Check'   }, // handoff: "Final check"
+  'publish':     { dot: '#22C55E', label: 'Published' }, // not in handoff
+}
+
+/** Content type → row emoji. Decorative; the row's accessible name is its title. */
+const TYPE_EMOJI: Record<string, string> = {
+  Post:   '📝',
+  Video:  '🎬',
+  Reel:   '🎞️',
+  Design: '🎨',
+  Email:  '✉️',
+  Story:  '📖',
+  Deck:   '📊',
+  Other:  '📌',
+}
+
+export function typeEmoji(contentType?: string | null): string {
+  if (!contentType) return '📌'
+  return TYPE_EMOJI[contentType] ?? '📌'
+}
+
+/**
+ * Status label from a due date, per §6.
+ *
+ * negative → "Nd late" · zero → "Today" · positive → "in Nd".
+ * Computed at render time so the label stays correct across midnight without
+ * a refetch (§9.1). Never render both a late colour and a future label.
+ */
+export function dueStatus(dueISO: string, now: Date = new Date()): {
+  label: string
+  overdue: boolean
+} {
+  const due = new Date(dueISO + 'T00:00:00')
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+
+  const days = Math.round((due.getTime() - today.getTime()) / 86_400_000)
+
+  if (days < 0)  return { label: `${Math.abs(days)}d late`, overdue: true  }
+  if (days === 0) return { label: 'Today',                  overdue: false }
+  return { label: `in ${days}d`, overdue: false }
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "Jul 11" — task row meta date. */
+export function shortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return `${MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** "Jul 11, 2025" — breach table due date, format MMM DD, YYYY (§7). */
+export function longDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return `${MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`
+}
+
+/** "MMMM D, YYYY" — the header date pill (§4). */
+export function pillDate(d: Date): string {
+  const full = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December']
+  return `${full[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
+
+/** Time-derived greeting word: <12 morning, 12–17 afternoon, else evening (§4). */
+export function greetingWord(hour: number): 'morning' | 'afternoon' | 'evening' {
+  if (hour < 12) return 'morning'
+  if (hour < 18) return 'afternoon'
+  return 'evening'
+}
+
+/** "3 days" — humanised breach overrun (§7). */
+export function humanDays(n: number): string {
+  return n === 1 ? '1 day' : `${n} days`
+}
