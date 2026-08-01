@@ -24,8 +24,6 @@ export const STAGE_COLORS: Record<string, string> = {
   'd-prog':       '#7C3AED',
   'd-check':      '#5B3FB5',
   'final-check':  '#F59E0B',
-  'ready-publish':'#0EA5E9',
-  'scheduled':    '#14B8A6',
   'publish':      '#22C55E',
 }
 

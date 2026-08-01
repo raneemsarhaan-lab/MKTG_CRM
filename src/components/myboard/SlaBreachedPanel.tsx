@@ -21,7 +21,7 @@ export interface BreachRow {
   emoji:          string
   stage:          StageId
   ownerName:      string
-  dueDate:        string | null  // ISO; null for imported history
+  dueDate:        string  // ISO
   slaDays:        number
   breachedByDays: number
 }
@@ -131,7 +131,7 @@ export function SlaBreachedPanel({ rows }: { rows: BreachRow[] }) {
                 </span>
               </td>
               <td style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 600 }}>
-                {b.dueDate ? longDate(b.dueDate) : '—'}
+                {longDate(b.dueDate)}
               </td>
               {/* SLA is the contracted turnaround, not the overrun (§7) */}
               <td style={{ border: 0, color: 'var(--ink-500)' }}>{b.slaDays}d</td>

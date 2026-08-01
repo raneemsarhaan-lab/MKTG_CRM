@@ -10,11 +10,11 @@ import { STAGE_COLORS } from '@/lib/tokens'
 // ─── Ordered stage paths ──────────────────────────────────────────────────────
 
 export const NINE_STAGE: StageId[] = [
-  'todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish',
+  'todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'publish',
 ]
 
 export const EIGHT_STAGE: StageId[] = [
-  'todo', 'c-prog', 'c-final', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish',
+  'todo', 'c-prog', 'c-final', 'r-design', 'd-prog', 'd-check', 'final-check', 'publish',
 ]
 
 // ─── Stage metadata record ────────────────────────────────────────────────────
@@ -94,24 +94,6 @@ export const STAGE_META: Record<StageId, StageMeta> = {
     owner_role: 'Marketing Manager',
     terminal_flag: false,
   },
-  'ready-publish': {
-    id: 'ready-publish',
-    label_en: 'Ready to Publish',
-    label_ar: 'جاهز للنشر',
-    phase: 'Ship',
-    color: STAGE_COLORS['ready-publish'],
-    owner_role: null,
-    terminal_flag: false,
-  },
-  'scheduled': {
-    id: 'scheduled',
-    label_en: 'Scheduled',
-    label_ar: 'مجدول',
-    phase: 'Ship',
-    color: STAGE_COLORS['scheduled'],
-    owner_role: null,
-    terminal_flag: false,
-  },
   'publish': {
     id: 'publish',
     label_en: 'Published',
@@ -148,5 +130,5 @@ export function isWorkingStage(stageId: StageId): boolean {
 
 /** Ordered list of all stage IDs by sort_order. */
 export const ALL_STAGES: StageId[] = [
-  'todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish',
+  'todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'publish',
 ]

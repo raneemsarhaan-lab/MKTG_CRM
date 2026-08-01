@@ -12,7 +12,6 @@ export function StatStrip({ tasks, today }: StatStripProps) {
   const total      = tasks.length
   const inProgress = tasks.filter(t => t.status !== 'publish').length
   const dueToday   = tasks.filter(t => {
-    if (!t.due_date) return false
     const d = calDaysBetween(today, new Date(t.due_date))
     return d === 0 && t.status !== 'publish'
   }).length
