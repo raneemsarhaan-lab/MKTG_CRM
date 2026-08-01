@@ -83,6 +83,9 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
     : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
 
+  const attachmentCount = task.attachments?.length ?? 0
+  const commentCount    = task.comments?.length ?? 0
+
   const brandColor = task.brand?.color ?? '#8A8D91'
   const brandLabel = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
@@ -208,7 +211,39 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
             )}
           </div>
 
-          {/* Due date */}
+          {/* Attachment + comment counts, then the due date */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {attachmentCount > 0 && (
+              <span
+                title={`${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  fontSize: '0.68rem', fontWeight: 600, color: 'var(--muted)',
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+                {attachmentCount}
+              </span>
+            )}
+            {commentCount > 0 && (
+              <span
+                title={`${commentCount} comment${commentCount === 1 ? '' : 's'}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  fontSize: '0.68rem', fontWeight: 600, color: 'var(--muted)',
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                {commentCount}
+              </span>
+            )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
               stroke={overdue ? '#C03A3A' : 'var(--muted)'}
@@ -219,6 +254,7 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
             <span style={{ fontSize: '0.68rem', fontWeight: 600, color: overdue ? '#C03A3A' : 'var(--muted)' }}>
               {dueLabel}
             </span>
+          </div>
           </div>
         </div>
       </div>

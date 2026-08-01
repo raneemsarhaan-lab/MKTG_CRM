@@ -97,6 +97,20 @@ export const BRAND_PATTERNS: [RegExp, string][] = [
 /** ClickUp priority: 1 urgent, 2 high, 3 normal, 4 low. */
 const PRIORITY: Record<string, string> = { '1': 'High', '2': 'High', '3': 'Medium', '4': 'Low' }
 
+/** ClickUp's Attachments column is a JSON array of { title, url }. */
+export function parseAttachments(raw: string): { title: string; url: string }[] {
+  const text = (raw ?? '').trim()
+  if (!text || text === '[]') return []
+  try {
+    const list = JSON.parse(text) as { title?: string; url?: string }[]
+    return list
+      .filter(a => a && (a.title || a.url))
+      .map(a => ({ title: a.title ?? 'attachment', url: a.url ?? '' }))
+  } catch {
+    return []
+  }
+}
+
 export function parseAssignees(raw: string): string[] {
   const inner = raw.trim().replace(/^\[/, '').replace(/\]$/, '').trim()
   if (!inner) return []
@@ -127,31 +141,122 @@ export function unescapeClickUp(text: string): string {
  * Task Content arrives in two shapes, and both rendered as garbage when stored
  * verbatim — this is what "the description was corrupted" meant.
  *
- *  210 rows  plain text with escaped newlines  → unescape
- *   20 rows  Quill Delta rich text as raw JSON → extract the insert strings
+ *  210 rows  plain text whose newlines are the two characters \ and n
+ *   20 rows  Quill Delta rich text as raw JSON
  *
- * The Delta rows must be JSON.parse'd from the RAW field, before unescaping:
- * a `\n` inside a JSON string is legitimately escaped, so unescaping first
- * turns valid JSON into a syntax error.
+ * Both are converted to Markdown, which the task panel renders. The Delta rows
+ * carry real structure worth keeping: 26 H3s, 8 H2s, 54 bullets, 115 bold runs,
+ * blockquotes, links and images.
  */
+
+interface DeltaOp {
+  insert?: unknown
+  attributes?: Record<string, unknown>
+}
+
+
+/** Wrap a run of text in its inline marks. Whitespace stays outside the
+ *  markers, or Markdown will not close the emphasis. */
+function inlineMd(text: string, attrs: Record<string, unknown>): string {
+  if (!text) return ''
+  const lead  = text.match(/^\s*/)?.[0] ?? ''
+  const trail = text.match(/\s*$/)?.[0] ?? ''
+  let core = text.slice(lead.length, text.length - trail.length)
+  if (!core) return text
+
+  if (attrs.bold)   core = `**${core}**`
+  if (attrs.italic) core = `*${core}*`
+  if (typeof attrs.link === 'string') core = `[${core}](${attrs.link})`
+  return lead + core + trail
+}
+
+/**
+ * Quill Delta → Markdown.
+ *
+ * Delta is line-oriented in an unusual way: block formatting (heading level,
+ * list type, blockquote) is carried by the *newline* that ends a line, not by
+ * the line's own text. So text is buffered until a newline arrives, and that
+ * newline's attributes decide how the buffered line is emitted.
+ */
+export function deltaToMarkdown(ops: DeltaOp[]): string {
+  const out: string[] = []
+  let line = ''
+
+  const flush = (attrs: Record<string, unknown>) => {
+    const content = line.trim()
+    line = ''
+
+    const header = typeof attrs.header === 'number' ? attrs.header : 0
+    const list   = attrs.list as { list?: string } | string | undefined
+    const listKind =
+      typeof list === 'string' ? list :
+      list && typeof list === 'object' ? list.list : undefined
+
+    if (!content) { out.push(''); return }
+    if (header)            out.push(`${'#'.repeat(Math.min(header, 6))} ${content}`)
+    else if (listKind === 'ordered') out.push(`1. ${content}`)
+    else if (listKind)     out.push(`- ${content}`)
+    else if (attrs.blockquote) out.push(`> ${content}`)
+    // A plain line gets a Markdown hard break, or adjacent lines collapse
+    // into one paragraph — ClickUp treats each as its own line.
+    else                   out.push(`${content}  `)
+  }
+
+  for (const op of ops) {
+    const attrs = op.attributes ?? {}
+
+    if (typeof op.insert !== 'string') {
+      // Embeds. Images, dividers, links and attachment names carry meaning
+      // and become Markdown; table-embed is a reference to rows stored
+      // elsewhere in the export and has no content to recover, so it is
+      // dropped rather than rendered as an empty table.
+      const embed = op.insert as Record<string, unknown> | null
+      if (embed && typeof embed === 'object') {
+        if ('image' in embed && typeof embed.image === 'string') {
+          line += `![](${embed.image})`
+        } else if ('divider' in embed) {
+          flush({}); out.push('---')
+        } else if ('link_mention' in embed) {
+          const url = (embed.link_mention as { url?: string })?.url
+          if (url) line += `[${url}](${url})`
+        } else if ('attachment' in embed) {
+          const name = (embed.attachment as { name?: string })?.name
+          if (name) line += `📎 ${name}`
+        }
+      }
+      continue
+    }
+
+    const parts = op.insert.split('\n')
+    parts.forEach((part, i) => {
+      if (i > 0) flush(attrs)          // the newline that ended the previous line
+      line += inlineMd(part, attrs)
+    })
+  }
+  if (line.trim()) flush({})
+
+  // Collapse runs of blank lines, and keep list items adjacent.
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export function decodeContent(raw: string): string {
   const text = (raw ?? '').trim()
   if (!text) return ''
 
   if (text.startsWith('{') && text.includes('"ops"')) {
     try {
-      const delta = JSON.parse(text) as { ops?: { insert?: unknown }[] }
-      // Return whatever the Delta yields, even nothing: two briefs in this
-      // export contain only a newline, and treating "empty" as a parse
-      // failure would fall through and store the raw JSON instead.
-      return (delta.ops ?? [])
-        .map(op => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
+      const delta = JSON.parse(text) as { ops?: DeltaOp[] }
+      // Return whatever the Delta yields, even nothing: two briefs contain
+      // only a newline, and treating empty as a parse failure would fall
+      // through and store the raw JSON instead.
+      return deltaToMarkdown(delta.ops ?? [])
     } catch {
-      // Not the Delta shape after all — fall through and treat it as text.
+      // Not the Delta shape after all — treat it as text.
     }
   }
-  return unescapeClickUp(text)
+
+  // Plain text: a single newline is not a Markdown break, so make it one.
+  return unescapeClickUp(text).replace(/\n/g, '  \n')
 }
 
 function addBusinessDays(from: Date, days: number): Date {
@@ -212,7 +317,7 @@ async function main() {
     console.log(`  + member: ${name}`)
   }
 
-  let created = 0, updated = 0, skipped = 0
+  let created = 0, updated = 0, skipped = 0, attached = 0
   const unmapped = new Set<string>()
 
   for (const r of rows) {
@@ -266,16 +371,31 @@ async function main() {
     }
 
     const existing = await prisma.task.findUnique({ where: { external_id: externalId } })
+    let taskId: string
     if (existing) {
       await prisma.task.update({ where: { external_id: externalId }, data })
+      taskId = existing.id
       updated++
     } else {
-      await prisma.task.create({ data: { ...data, external_id: externalId } })
+      const t = await prisma.task.create({ data: { ...data, external_id: externalId } })
+      taskId = t.id
       created++
+    }
+
+    // Attachments are replaced wholesale rather than merged: the export is the
+    // source of truth for them, and TaskAttachment has no external key to
+    // upsert on, so merging would duplicate on every re-run.
+    const files = parseAttachments(r['Attachments'])
+    await prisma.taskAttachment.deleteMany({ where: { task_id: taskId } })
+    if (files.length) {
+      await prisma.taskAttachment.createMany({
+        data: files.map(f => ({ task_id: taskId, filename: f.title, url: f.url || null })),
+      })
+      attached += files.length
     }
   }
 
-  console.log(`✅ Import complete — ${created} created, ${updated} updated, ${skipped} skipped.`)
+  console.log(`✅ Import complete — ${created} created, ${updated} updated, ${skipped} skipped, ${attached} attachments.`)
   if (unmapped.size) console.log(`   Unmapped statuses: ${[...unmapped].join(', ')}`)
 }
 

@@ -210,6 +210,52 @@ html {
   border: 0;
 }
 
+/* ─── Task brief (Markdown) ───────────────────────────────────────────────────
+   Imported ClickUp briefs carry headings, bold, lists, quotes and images.
+   Sizes step down from the panel's own scale rather than the browser default,
+   which would render an h1 larger than the task title above it. */
+.fx-brief {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.fx-brief > :first-child { margin-top: 0; }
+.fx-brief > :last-child  { margin-bottom: 0; }
+.fx-brief h1 { font-size: 1.15rem; }
+.fx-brief h2 { font-size: 1.02rem; }
+.fx-brief h3 { font-size: 0.94rem; }
+.fx-brief h4,
+.fx-brief h5,
+.fx-brief h6 { font-size: 0.88rem; }
+.fx-brief h1,
+.fx-brief h2,
+.fx-brief h3,
+.fx-brief h4,
+.fx-brief h5,
+.fx-brief h6 {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 1.1em 0 0.4em;
+}
+.fx-brief p  { margin: 0 0 0.7em; }
+.fx-brief ul,
+.fx-brief ol { margin: 0 0 0.7em; padding-inline-start: 1.25rem; }
+.fx-brief li { margin: 0.15em 0; }
+.fx-brief blockquote {
+  margin: 0 0 0.7em;
+  padding-inline-start: 0.75rem;
+  border-inline-start: 3px solid var(--line);
+  color: var(--muted);
+}
+.fx-brief a { color: #6E5BE6; text-decoration: underline; }
+.fx-brief img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5em 0; }
+.fx-brief hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+.fx-brief code {
+  background: #F4F4F2; border-radius: 4px; padding: 0.1em 0.35em;
+  font-size: 0.92em;
+}
+
 /* ─── Utility classes ─────────────────────────────────────────────────────── */
 .font-heading { font-family: var(--font-heading); }
 .font-body    { font-family: var(--font-body); }

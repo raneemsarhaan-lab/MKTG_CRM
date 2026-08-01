@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
 import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
@@ -17,6 +18,7 @@ type FullTask = Task & {
   brand: Brand
   task_owner: Member
   comments: (TaskComment & { author: Member })[]
+  attachments?: { id: string; filename: string; url?: string | null }[]
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
@@ -499,14 +501,55 @@ export function TaskModal({
                   </button>
                 </div>
               </div>
+            ) : task.description ? (
+              /* Briefs are Markdown — imported ClickUp content keeps its
+                 headings, bold, lists and links, so it must be rendered
+                 rather than printed. */
+              <div className="fx-brief">
+                <ReactMarkdown>{task.description}</ReactMarkdown>
+              </div>
             ) : (
               <p style={{
-                color: task.description ? COLORS.ink : COLORS.muted,
-                fontSize: '0.85rem', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap',
-                fontStyle: task.description ? 'normal' : 'italic',
+                color: COLORS.muted, fontSize: '0.85rem',
+                lineHeight: 1.6, margin: 0, fontStyle: 'italic',
               }}>
-                {task.description || 'No brief yet.'}
+                No brief yet.
               </p>
+            )}
+
+            {(task.attachments?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{
+                  fontSize: '0.6rem', color: COLORS.muted, marginBottom: 6,
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                }}>
+                  Attachments ({task.attachments!.length})
+                </div>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+                  {task.attachments!.map(a => (
+                    <li key={a.id}>
+                      <a
+                        href={a.url ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          fontSize: '0.78rem', color: a.url ? '#6E5BE6' : COLORS.muted,
+                          textDecoration: 'none', padding: '4px 6px', borderRadius: 6,
+                          border: `1px solid ${COLORS.line}`, background: '#FCFCFB',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        {a.filename}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {isPublished && (
