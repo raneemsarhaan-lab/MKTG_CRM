@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
@@ -134,6 +134,19 @@ export function TaskModal({
     task.task_owner_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
+
+  // Escape closes the panel. Ignored while an inline editor is open so the
+  // first Escape reverts that field rather than discarding the whole view.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   function applyPatch(patch: TaskPatch, after?: () => void) {
     setBriefError('')
