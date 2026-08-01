@@ -1,8 +1,15 @@
-// Web Audio API synthesis for celebration reactions
-// constitution.md §V — 4 named reactions; audio plays on user interaction only
-// spec.md FR-018, FR-019
+// Celebration audio — constitution.md §V, spec.md FR-018, FR-019.
+//
+// Primary path plays the recorded assets in public/sounds/, named in
+// CRM_Labels_Reference.xlsx. The Web Audio synthesis below is retained as a
+// fallback for when a file cannot be decoded or fetched — losing the sound
+// entirely is worse than an approximation of it.
+//
+// Audio only ever plays off a user gesture (advancing a task).
 
-type Reaction = 'zaghrota' | 'tasqeef' | 'mabhour' | 'tabla'
+import { REACTION_BY_KEY, type ReactionKey } from '@/lib/celebrations'
+
+type Reaction = ReactionKey
 
 let audioCtx: AudioContext | null = null
 
@@ -117,14 +124,49 @@ const PLAYERS: Record<Reaction, (ctx: AudioContext) => void> = {
   tabla:    playTabla,
 }
 
-export function playCelebrationSound(reaction: Reaction): void {
+/** Last element created, so a new celebration can cut off the previous one. */
+let current: HTMLAudioElement | null = null
+
+function playSynthesized(reaction: Reaction): void {
   const ctx = getAudioCtx()
   if (!ctx) return
-  // Resume context if suspended (browser autoplay policy)
   const run = () => PLAYERS[reaction](ctx)
   if (ctx.state === 'running') {
     run()
   } else {
     ctx.resume().then(run).catch(() => undefined)
   }
+}
+
+/**
+ * Play the recorded asset for a reaction, trying each candidate source in
+ * order and falling back to synthesis if none can play.
+ *
+ * mabhour ships as QuickTime, which only Safari reliably decodes, so the
+ * sources list offers an MP4 of the same asset first.
+ */
+export function playCelebrationSound(reaction: Reaction): void {
+  if (typeof window === 'undefined') return
+
+  current?.pause()
+  current = null
+
+  const sources = REACTION_BY_KEY[reaction]?.sources ?? []
+  if (sources.length === 0) { playSynthesized(reaction); return }
+
+  let index = 0
+  const el = new Audio()
+  current = el
+  el.preload = 'auto'
+
+  const tryNext = () => {
+    if (index >= sources.length) { playSynthesized(reaction); return }
+    el.src = sources[index++]
+    el.play().catch(tryNext)
+  }
+
+  // A source that fetches but cannot decode fires 'error' rather than
+  // rejecting play(), so both routes advance to the next candidate.
+  el.addEventListener('error', tryNext)
+  tryNext()
 }

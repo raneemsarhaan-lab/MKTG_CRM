@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useUIStore } from '@/store/useUIStore'
-import { COLORS, REACTION_COLORS } from '@/lib/tokens'
+import { COLORS } from '@/lib/tokens'
 import { playCelebrationSound } from '@/lib/celebration-audio'
+import { randomCelebration, type Reaction, type ReactionMessage, type ConfettiShape } from '@/lib/celebrations'
 
 // ─── Canvas confetti ───────────────────────────────────────────────────────────
 
-type ParticleShape = 'streamer' | 'circle' | 'star' | 'drop'
+type ParticleShape = ConfettiShape
 
 interface Particle {
   x: number
@@ -138,23 +139,26 @@ function ConfettiCanvas({ shape }: { shape: ParticleShape }) {
   )
 }
 
-// ─── Reaction config ───────────────────────────────────────────────────────────
-
-const REACTIONS: { id: 'zaghrota' | 'tasqeef' | 'mabhour' | 'tabla'; ar: string; emoji: string; shape: ParticleShape }[] = [
-  { id: 'zaghrota', ar: 'زغروطة',          emoji: '🎉', shape: 'streamer' },
-  { id: 'tasqeef',  ar: 'تسقيف',           emoji: '👏', shape: 'circle'   },
-  { id: 'mabhour',  ar: 'انا مبهور بيا',   emoji: '🤩', shape: 'star'     },
-  { id: 'tabla',    ar: 'طبلة',            emoji: '🥁', shape: 'drop'     },
-]
-
 // ─── Overlay ───────────────────────────────────────────────────────────────────
 
 export function CelebrationOverlay() {
   const celebration    = useUIStore(s => s.celebration)
   const setCelebration = useUIStore(s => s.setCelebration)
 
-  const confettiShape = useRef<ParticleShape>('circle')
+  // The sheet's heading is "Random on Task Completion" — the reaction and the
+  // message line are chosen when the overlay opens, not picked by the user.
+  const [pickedReaction, setPickedReaction] = useState<Reaction | null>(null)
+  const [pickedLine, setPickedLine]         = useState<ReactionMessage | null>(null)
+
   const dismiss = useCallback(() => setCelebration(null), [setCelebration])
+
+  useEffect(() => {
+    if (!celebration) { setPickedReaction(null); setPickedLine(null); return }
+    const { reaction, line } = randomCelebration()
+    setPickedReaction(reaction)
+    setPickedLine(line)
+    playCelebrationSound(reaction.key)
+  }, [celebration])
 
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -195,7 +199,7 @@ export function CelebrationOverlay() {
     }
   }, [celebration, dismiss])
 
-  if (!celebration) return null
+  if (!celebration || !pickedReaction || !pickedLine) return null
 
   return (
     <div
@@ -210,7 +214,7 @@ export function CelebrationOverlay() {
         padding: 20,
       }}
     >
-      <ConfettiCanvas shape={confettiShape.current} />
+      <ConfettiCanvas shape={pickedReaction.shape} />
 
       {/* Panel */}
       <div
@@ -243,70 +247,57 @@ export function CelebrationOverlay() {
           ✕
         </button>
 
-        {/* Lime pulse circle */}
+        {/* Reaction emoji on its own tint */}
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
-          background: COLORS.lime, margin: '0 auto 18px',
+          background: `${pickedReaction.color}1F`,
+          border: `2px solid ${pickedReaction.color}55`,
+          margin: '0 auto 18px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.8rem',
+          fontSize: '1.9rem',
         }}>
-          🚀
+          <span aria-hidden="true">{pickedReaction.emoji}</span>
         </div>
 
-        <h2 style={{
-          fontFamily: 'var(--font-heading)', fontWeight: 800,
-          fontSize: '1.25rem', color: 'var(--ink)',
-          margin: '0 0 6px', lineHeight: 1.2,
-        }}>
-          {celebration.taskName}
-        </h2>
-
-        <div style={{ fontSize: '0.87rem', color: 'var(--muted)', marginBottom: 6 }}>
-          Moved to <strong style={{ color: 'var(--ink)' }}>{celebration.stageLabel}</strong>
+        {/* Message + sub-line, verbatim from the labels sheet */}
+        <div dir="rtl" style={{ marginBottom: 18 }}>
+          <h2 style={{
+            fontFamily: 'var(--font-heading)', fontWeight: 800,
+            fontSize: '1.3rem', color: pickedReaction.color,
+            margin: '0 0 6px', lineHeight: 1.35,
+          }}>
+            {pickedLine.message}
+          </h2>
+          <div style={{ fontSize: '0.95rem', color: 'var(--ink)', lineHeight: 1.5 }}>
+            {pickedLine.subline}
+          </div>
         </div>
 
-        {/* Arabic subheader */}
+        {/* Which task moved where */}
         <div style={{
-          fontFamily: 'var(--font-accent)',
-          fontSize: '1.2rem', color: COLORS.violet,
-          direction: 'rtl', textAlign: 'center',
-          marginBottom: 24, letterSpacing: '0.03em',
+          fontSize: '0.82rem', color: 'var(--muted)',
+          borderTop: '1px solid var(--line)', paddingTop: 14, marginBottom: 14,
         }}>
-          مبروك! أحسنت ✨
+          <strong style={{ color: 'var(--ink)' }}>{celebration.taskName}</strong>
+          {' → '}
+          {celebration.stageLabel}
         </div>
 
-        {/* Reaction buttons */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-          {REACTIONS.map(r => (
-            <button
-              key={r.id}
-              aria-label={r.ar}
-              onClick={() => {
-                confettiShape.current = r.shape
-                playCelebrationSound(r.id)
-              }}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                padding: '10px 12px', borderRadius: 14,
-                background: `${REACTION_COLORS[r.id]}18`,
-                border: `1.5px solid ${REACTION_COLORS[r.id]}44`,
-                cursor: 'pointer', transition: 'transform 0.1s, background 0.12s',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>{r.emoji}</span>
-              <span style={{
-                fontFamily: 'var(--font-accent)',
-                fontSize: '0.62rem', color: REACTION_COLORS[r.id],
-                fontWeight: 700, direction: 'rtl', whiteSpace: 'nowrap',
-              }}>
-                {r.ar}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* Replay — the reaction is random, so this repeats the same one */}
+        <button
+          onClick={() => playCelebrationSound(pickedReaction.key)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', borderRadius: 999,
+            background: `${pickedReaction.color}18`,
+            border: `1.5px solid ${pickedReaction.color}44`,
+            color: pickedReaction.color, fontWeight: 700, fontSize: '0.78rem',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <span aria-hidden="true">🔊</span>
+          <span dir="rtl">{pickedReaction.labelAr}</span>
+        </button>
       </div>
     </div>
   )
