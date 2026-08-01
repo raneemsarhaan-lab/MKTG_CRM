@@ -12,8 +12,6 @@ export type StageId =
   | 'd-prog'        // Designing
   | 'd-check'       // Design Review
   | 'final-check'   // Final Check
-  | 'ready-publish' // Ready to Publish
-  | 'scheduled'     // Scheduled
   | 'publish'       // Published (terminal)
 
 export type AccessLevel = 'admin' | 'superuser' | 'user'
@@ -78,7 +76,7 @@ export interface Task {
   nine_stage: boolean
   status: StageId
   stage_date: string
-  due_date: string | null
+  due_date: string
   hours_estimate: number
   cover_image_url?: string
   priority: Priority

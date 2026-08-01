@@ -54,17 +54,15 @@ export default async function OverviewPage() {
   const sla = new Map<string, number>()
   for (const r of slaRows) sla.set(`${r.stage_id}|${r.content_type_label}`, r.max_business_days)
 
-  // A task with no due date (imported history) is never "due" — it is
-  // excluded from My Day / This Week but still counts for SLA breach.
   const rows = openTasks.map(t => {
-    const due = t.due_date ? new Date(t.due_date) : null
-    due?.setHours(0, 0, 0, 0)
+    const due = new Date(t.due_date)
+    due.setHours(0, 0, 0, 0)
     return {
       id:      t.id,
       title:   t.name,
       emoji:   typeEmoji(t.content_type_label),
       stage:   t.status as StageId,
-      dueDate: due ? iso(due) : null,
+      dueDate: iso(due),
       due,
       stageDays: businessDaysBetween(new Date(t.stage_date), today),
       slaDays:   sla.get(`${t.status}|${t.content_type_label ?? ''}`) ?? 1,
@@ -77,8 +75,8 @@ export default async function OverviewPage() {
   })
 
   // My Day — due today or already overdue. This Week — the next seven days.
-  const myDay    = rows.filter(r => r.due && r.due <= today)
-  const thisWeek = rows.filter(r => r.due && r.due > today && r.due <= endOfWeek)
+  const myDay    = rows.filter(r => r.due <= today)
+  const thisWeek = rows.filter(r => r.due > today && r.due <= endOfWeek)
 
   // A breach is time-in-stage past the stage's SLA for that content type.
   const breaches: BreachRow[] = rows

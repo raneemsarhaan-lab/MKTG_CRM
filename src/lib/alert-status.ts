@@ -22,16 +22,13 @@ export function getAlertStatus(
   today: Date
 ): AlertStatus {
   const stageDate = new Date(task.stage_date)
+  const dueDate   = new Date(task.due_date)
 
-  const stageDays = businessDaysBetween(stageDate, today)
-  const slaLimit  = slaConfig[task.status]?.[task.content_type_label] ?? 1
+  const calDaysToDeadline = calDaysBetween(today, dueDate)
+  const stageDays         = businessDaysBetween(stageDate, today)
+  const slaLimit          = slaConfig[task.status]?.[task.content_type_label] ?? 1
 
-  // Imported tasks may have no deadline. Absent a due date nothing can be
-  // overdue, but time-in-stage still measures against the SLA.
-  if (task.due_date) {
-    const calDaysToDeadline = calDaysBetween(today, new Date(task.due_date))
-    if (calDaysToDeadline < 0) return 'Overdue'
-  }
+  if (calDaysToDeadline < 0) return 'Overdue'
   if (stageDays > slaLimit + 2) return 'Stuck'
   if (stageDays > slaLimit) return 'Will Miss'
   if (stageDays === slaLimit) return 'At Risk'

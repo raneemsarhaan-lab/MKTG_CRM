@@ -13,8 +13,7 @@
     "deploy": "npm run build",
     "start": "bash scripts/migrate.sh && next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "import:clickup": "tsx scripts/import-clickup.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

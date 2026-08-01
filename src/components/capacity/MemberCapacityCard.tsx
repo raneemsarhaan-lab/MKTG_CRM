@@ -28,8 +28,8 @@ export function MemberCapacityCard({ member, activeTasks }: MemberCapacityCardPr
     // brand name/color injected by CapacityDashboard via task.brand
     const taskWithBrand = t as Task & { brand?: { name: string; color: string } }
     if (taskWithBrand.brand) {
-      byBrandId[key].name  = taskWithBrand.brand?.name ?? 'No brand'
-      byBrandId[key].color = taskWithBrand.brand?.color ?? '#C4C4BE'
+      byBrandId[key].name  = taskWithBrand.brand.name
+      byBrandId[key].color = taskWithBrand.brand.color
     }
   })
   const brandRows = Object.entries(byBrandId)

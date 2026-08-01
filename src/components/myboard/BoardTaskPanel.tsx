@@ -17,7 +17,7 @@ export interface PanelTask {
   title:   string
   emoji:   string
   stage:   StageId
-  dueDate: string | null   // ISO yyyy-mm-dd; null for imported history
+  dueDate: string   // ISO yyyy-mm-dd
 }
 
 interface BoardTaskPanelProps {
@@ -76,7 +76,7 @@ export function BoardTaskPanel({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {tasks.map(t => {
             const badge  = STAGE_BADGE[t.stage]
-            const status = t.dueDate ? dueStatus(t.dueDate) : null
+            const status = dueStatus(t.dueDate)
             return (
               <li key={t.id}>
                 {/* border-top, not bottom: a divider sits under the header and
@@ -118,15 +118,15 @@ export function BoardTaskPanel({
                       display: 'block', fontSize: 13, fontWeight: 700,
                       /* Overdue is never carried by colour alone — the label
                          itself reads "Nd late" (§10). */
-                      color: status?.overdue ? 'var(--late-text)' : 'var(--ink-900)',
+                      color: status.overdue ? 'var(--late-text)' : 'var(--ink-900)',
                     }}>
-                      {status?.label ?? 'No date'}
+                      {status.label}
                     </span>
                     <span style={{
                       display: 'block', fontSize: 12,
                       color: 'var(--ink-400)', marginTop: 2,
                     }}>
-                      {t.dueDate ? shortDate(t.dueDate) : '—'}
+                      {shortDate(t.dueDate)}
                     </span>
                   </span>
                 </Link>

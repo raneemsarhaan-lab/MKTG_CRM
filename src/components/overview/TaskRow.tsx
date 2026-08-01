@@ -20,11 +20,10 @@ export function TaskRow({ task, slaConfig, today }: TaskRowProps) {
   const dotColor    = STAGE_COLORS[task.status] ?? '#94A3B8'
   const stageMeta   = STAGE_META[task.status]
 
-  const daysLeft = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
-  const overdue  = daysLeft !== null && daysLeft < 0
-  const dueLabel = daysLeft === null
-    ? 'No date'
-    : overdue ? `${Math.abs(daysLeft)}d late`
+  const daysLeft = calDaysBetween(today, new Date(task.due_date))
+  const overdue  = daysLeft < 0
+  const dueLabel = overdue
+    ? `${Math.abs(daysLeft)}d late`
     : daysLeft === 0 ? 'Today'
     : `in ${daysLeft}d`
 
@@ -71,7 +70,7 @@ export function TaskRow({ task, slaConfig, today }: TaskRowProps) {
           {dueLabel}
         </div>
         <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: 2 }}>
-          {task.due_date ? new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+          {new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
         </div>
       </div>
     </div>
