@@ -46,6 +46,12 @@ export function KanbanBoard({
   const [search, setSearch]       = useState('')
   const [activeBrand, setActiveBrand] = useState<string | null>(null)
 
+  // Server data is copied into local state so drag can reorder within a column
+  // without a round trip. That copy has to be re-synced when the server sends
+  // new data, or every mutation appears to do nothing until a full reload.
+  // Local drag order is intentionally discarded here — it is never persisted.
+  useEffect(() => { setTasks(initialTasks) }, [initialTasks])
+
 
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
   const selectTask     = useUIStore(s => s.selectTask)
