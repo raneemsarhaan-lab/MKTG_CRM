@@ -5,6 +5,7 @@ const prisma = new PrismaClient()
 
 async function main() {
   const defaultPassword = await bcrypt.hash('FluxoAdmin2026!', 10)
+  const adminPassword   = await bcrypt.hash('Fluxo-rSpNJNGb9c7prM', 10)
 
   // Stages
   const stages = [
@@ -64,7 +65,7 @@ async function main() {
 
   // Members (initial team with default password)
   const members = [
-    { name: 'Raneem',                       email: 'raneem@forefront.consulting',  role: 'Marketing Manager',           access: 'admin',     capacity_hrs_wk: 40, status: 'Available' },
+    { name: 'Raneem',                       email: 'raneem.sarhaan@forefront.consulting', role: 'Marketing Manager',    access: 'admin',     capacity_hrs_wk: 40, status: 'Available' },
     { name: 'Islam',                        email: 'islam@forefront.consulting',   role: 'Managing Director',           access: 'superuser', capacity_hrs_wk: 20, status: 'Busy' },
     { name: 'Brand Director',               email: 'brand@forefront.consulting',   role: 'Brand Director',              access: 'superuser', capacity_hrs_wk: 35, status: 'Busy' },
     { name: 'Digital Marketing Specialist', email: 'dms@forefront.consulting',     role: 'Digital Marketing Specialist',access: 'superuser', capacity_hrs_wk: 40, status: 'Available' },
@@ -73,10 +74,13 @@ async function main() {
     { name: 'Video Editor',                 email: 'video@forefront.consulting',   role: 'Video Editor',                access: 'user',      capacity_hrs_wk: 40, status: 'Available' },
   ]
   for (const m of members) {
+    // The admin account gets its own password; the rest still share the
+    // default until they are rotated (HANDOVER §14).
+    const password_hash = m.access === 'admin' ? adminPassword : defaultPassword
     await prisma.member.upsert({
       where:  { email: m.email },
       update: {},
-      create: { ...m, password_hash: defaultPassword },
+      create: { ...m, password_hash },
     })
   }
 
@@ -87,7 +91,7 @@ async function main() {
     create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: false },
   })
 
-  console.log('✅ Seed complete. Default password: FluxoAdmin2026!')
+  console.log('✅ Seed complete.')
 }
 
 main()
