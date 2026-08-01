@@ -44,11 +44,12 @@ export function PersonalBoard({ currentUser, myTasks, allTasks, members, slaConf
 
   // BigStat metrics
   const myDayCount = useMemo(() =>
-    myTasks.filter(t => calDaysBetween(today, new Date(t.due_date)) <= 0).length,
+    myTasks.filter(t => t.due_date && calDaysBetween(today, new Date(t.due_date)) <= 0).length,
   [myTasks, today])
 
   const upNextCount = useMemo(() => {
     return myTasks.filter(t => {
+      if (!t.due_date) return false
       const d = calDaysBetween(today, new Date(t.due_date))
       return d >= 1 && d <= 7
     }).length
