@@ -2,9 +2,23 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { mapMember, mapTask, mapSlaConfig } from '@/lib/mappers'
-import { PersonalBoard } from '@/components/overview/PersonalBoard'
+import { MyBoard } from '@/components/myboard/MyBoard'
+import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
+import type { BreachRow } from '@/components/myboard/SlaBreachedPanel'
+import { typeEmoji } from '@/lib/myboard'
+import { businessDaysBetween } from '@/lib/utils'
+import type { StageId } from '@/types/index'
 
+/**
+ * My Board — the personal dashboard.
+ *
+ * Handoff §9.1: all four stat numbers, both task lists and the breach list
+ * come from a single dashboard read. One request, one loading state.
+ *
+ * Note on routing: the handoff names this route /my-board. It is served at
+ * /overview here, which is the route the rest of the app already redirects to
+ * (page guards, middleware). The nav rail's Overview item points at it.
+ */
 export default async function OverviewPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
@@ -12,37 +26,86 @@ export default async function OverviewPage() {
   const member = await prisma.member.findUnique({ where: { id: session.user.id } })
   if (!member) redirect('/login')
 
-  const [myTasks, allTasks, members, slaRows] = await Promise.all([
+  const [openTasks, completed, slaRows] = await Promise.all([
     prisma.task.findMany({
-      where: { task_owner_id: member.id, NOT: { status: 'publish' } },
-      include: {
-        brand:      true,
-        task_owner: true,
-        comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },
-        attachments: true,
-      },
+      where:   { task_owner_id: member.id, NOT: { status: 'publish' } },
+      include: { task_owner: true },
       orderBy: { due_date: 'asc' },
     }),
-    prisma.task.findMany({ orderBy: { created_at: 'desc' } }),
-    prisma.member.findMany({ orderBy: { name: 'asc' } }),
+    prisma.task.findMany({
+      where:  { task_owner_id: member.id, status: 'publish' },
+      select: { id: true, updated_at: true },
+    }),
     prisma.slaConfig.findMany(),
   ])
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const endOfWeek = new Date(today)
+  endOfWeek.setDate(endOfWeek.getDate() + 7)
+
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(startOfWeek.getDate() - 7)
+
+  const iso = (d: Date) => d.toISOString().split('T')[0]
+
+  // SLA lookup: [stage][contentType] → max business days
+  const sla = new Map<string, number>()
+  for (const r of slaRows) sla.set(`${r.stage_id}|${r.content_type_label}`, r.max_business_days)
+
+  const rows = openTasks.map(t => {
+    const due = new Date(t.due_date)
+    due.setHours(0, 0, 0, 0)
+    return {
+      id:      t.id,
+      title:   t.name,
+      emoji:   typeEmoji(t.content_type_label),
+      stage:   t.status as StageId,
+      dueDate: iso(due),
+      due,
+      stageDays: businessDaysBetween(new Date(t.stage_date), today),
+      slaDays:   sla.get(`${t.status}|${t.content_type_label ?? ''}`) ?? 1,
+      ownerName: t.task_owner?.name ?? '—',
+    }
+  })
+
+  const toPanelTask = (r: (typeof rows)[number]): PanelTask => ({
+    id: r.id, title: r.title, emoji: r.emoji, stage: r.stage, dueDate: r.dueDate,
+  })
+
+  // My Day — due today or already overdue. This Week — the next seven days.
+  const myDay    = rows.filter(r => r.due <= today)
+  const thisWeek = rows.filter(r => r.due > today && r.due <= endOfWeek)
+
+  // A breach is time-in-stage past the stage's SLA for that content type.
+  const breaches: BreachRow[] = rows
+    .filter(r => r.stageDays > r.slaDays)
+    .map(r => ({
+      id:             r.id,
+      title:          r.title,
+      emoji:          r.emoji,
+      stage:          r.stage,
+      ownerName:      r.ownerName,
+      dueDate:        r.dueDate,
+      slaDays:        r.slaDays,
+      breachedByDays: r.stageDays - r.slaDays,
+    }))
+
+  const completedThisWeek = completed.filter(c => c.updated_at >= startOfWeek).length
+
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <PersonalBoard
-        currentUser={mapMember(member)}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        myTasks={myTasks.map(mapTask) as any}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        allTasks={allTasks as any}
-        members={members.map(mapMember)}
-        slaConfig={mapSlaConfig(slaRows)}
-        today={today}
-      />
-    </div>
+    <MyBoard
+      firstName={member.name.split(' ')[0]}
+      stats={{
+        today:    myDay.length,
+        week:     thisWeek.length,
+        breached: breaches.length,
+        completedThisWeek,
+      }}
+      myDay={myDay.map(toPanelTask)}
+      thisWeek={thisWeek.map(toPanelTask)}
+      breaches={breaches}
+    />
   )
 }

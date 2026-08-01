@@ -26,14 +26,61 @@
   --stage-final-check:  #F59E0B;
   --stage-publish:      #22C55E;
 
-  /* Typography scale */
-  --font-heading: 'Montserrat', sans-serif;
-  --font-body:    'Inter', sans-serif;
-  --font-accent:  'Caveat', cursive;
+  /* Typography scale — families are self-hosted via next/font (see layout.tsx) */
+  --font-heading: var(--font-montserrat), 'Montserrat', sans-serif;
+  --font-body:    var(--font-inter), 'Inter', sans-serif;
+  --font-accent:  var(--font-caveat), 'Caveat', cursive;
 }
 
-/* ─── Google Fonts ────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap');
+/* ─── My Board handoff tokens (v1.0) ──────────────────────────────────────────
+   Normative values from the developer handoff §1. Exact hex only — these must
+   not be approximated against the older palette above. */
+:root {
+  /* 1.1 Core surfaces */
+  --bg-app:       #F6F6F4;
+  --bg-card:      #FFFFFF;
+  --rail-bg:      #36332B;
+  --brand-lime:   #C3F53D;
+  --ink-900:      #1B1A13;
+  --ink-800:      #1C1836;
+  --ink-500:      #6B6584;
+  --ink-400:      #A8A3C4;
+  --rail-icon:    #9BA0A5;
+  --border-card:  #ECEAF8;
+  --border-row:   #F1EFFA;
+  --border-input: #E1E1E0;
+
+  /* 1.2 Semantic status families — surface / label / accent */
+  --violet-surface: #E9E5FB;
+  --violet-label:   #5B4CBE;
+  --violet-accent:  #4A3BB0;
+  --violet-badge:   #ECE9FA;
+  --violet-link:    #6E5BE6;
+
+  --amber-surface:  #FCEFD9;
+  --amber-label:    #B9821A;
+  --amber-accent:   #D18A15;
+  --amber-accent-2: #E8A422;
+  --amber-badge:    #FBE9D0;
+
+  --red-surface:    #FCE4E1;
+  --red-label:      #C0392B;
+  --red-accent:     #D6362C;
+  --red-accent-2:   #E24C4C;
+
+  --green-surface:  #E1F5E6;
+  --green-label:    #2E8B4F;
+  --green-accent:   #279247;
+
+  /* One-off values */
+  --bolt-violet:    #8B7CF0;
+  --highlighter:    #E9E45E;
+  --sticky-note:    #FFE45E;
+  --mug-navy:       #241C5C;
+  --outline-star:   #D9CB3B;
+  --late-text:      #F5334F;
+  --date-chevron:   #C7CFE0;
+}
 
 /* ─── Base Reset ──────────────────────────────────────────────────────────── */
 *,
@@ -59,15 +106,108 @@ html {
 
 /* ─── Scrollbar ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: 3px;
+  background: var(--border-input);
+  border-radius: 10px;
+}
+
+/* ─── Motion budget ───────────────────────────────────────────────────────────
+   Handoff §9.2: hover 140–160ms ease-out, card lift 2px, count-up 400ms on
+   first load. Nothing else animates, and reduced-motion disables the lift and
+   the count-up entirely. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Nav rail button states — handoff §3.2 ──────────────────────────────── */
+.fx-rail-btn {
+  transition: background 140ms ease-out, color 140ms ease-out;
+}
+.fx-rail-btn:hover:not([data-active]) {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #FFFFFF !important;
+}
+.fx-rail-btn:focus-visible {
+  outline: 2px solid var(--brand-lime);
+  outline-offset: 2px;
+}
+
+/* ─── Stat card interaction — handoff §5 ─────────────────────────────────── */
+.fx-stat-card {
+  transition: transform 160ms ease-out;
+}
+.fx-stat-card:hover {
+  transform: translateY(-2px);
+}
+.fx-stat-card:focus-visible,
+.fx-row-link:focus-visible,
+.fx-panel-link:focus-visible {
+  outline: 2px solid var(--violet-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-stat-card:hover { transform: none; }
+}
+
+/* ─── My Board line-height reset ─────────────────────────────────────────────
+   The handoff's type scale (§1.3) is specified against the prototype, which
+   runs at the browser default `line-height: normal`. Tailwind's preflight sets
+   a global 1.5, which inflates every text block — measured at +8px on the h1,
+   +18px on a stat card and +7px per task row, well past the 2px tolerance in
+   the definition of done.
+
+   Scoped to the board and rail so other screens keep Tailwind's default.
+   Inline line-heights (the Caveat annotation at 1.15, the banner quote glyph
+   at 1) still win, as they should. */
+.fx-myboard,
+.fx-myboard *:not([style*="line-height"]) {
+  line-height: normal;
+}
+
+/* ─── My Board responsive — handoff §9.3 ─────────────────────────────────────
+   ≥1280px is the reference layout. Below 768px is explicitly out of scope for
+   this release and needs a mobile design pass. */
+@media (max-width: 1279px) {
+  .fx-myboard { padding: 28px 28px 32px !important; }
+}
+@media (max-width: 1023px) {
+  .fx-myboard .fx-panel-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  /* Stat grid drops to 2×2 */
+  .fx-myboard > div[style*="repeat(4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* SLA table hides the SLA column */
+  .fx-myboard th:nth-child(4),
+  .fx-myboard td:nth-child(4) { display: none; }
+  .fx-myboard thead tr,
+  .fx-myboard tbody tr { grid-template-columns: 2fr 1fr 1fr 1fr !important; }
+}
+
+/* Visually-hidden text that stays available to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */
