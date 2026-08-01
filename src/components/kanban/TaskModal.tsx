@@ -7,7 +7,7 @@ import { STAGE_META, nextStageId, ALL_STAGES } from '@/lib/stage-meta'
 import { ALERT_BADGE_STYLES, COLORS } from '@/lib/tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { moveTask, addComment } from '@/actions/tasks'
+import { moveTask, addComment, updateTaskDescription } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
 
@@ -82,6 +82,9 @@ function StageTimeline({ task }: { task: FullTask }) {
 export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today, onClose }: TaskModalProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details')
   const [cmtText, setCmtText]     = useState('')
+  const [editingBrief, setEditingBrief] = useState(false)
+  const [briefText, setBriefText]       = useState('')
+  const [briefError, setBriefError]     = useState('')
   const [isPending, startTransition] = useTransition()
   const setCelebration = useUIStore(s => s.setCelebration)
 
@@ -92,6 +95,21 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
   const daysLeft    = calDaysBetween(today, new Date(task.due_date))
   const overdue     = daysLeft < 0
+
+  // Mirrors updateTaskDescription's server-side check.
+  const canEditBrief =
+    task.task_owner_id === currentUser.id ||
+    currentUser.access === 'admin' ||
+    currentUser.access === 'superuser'
+
+  function saveBrief() {
+    setBriefError('')
+    startTransition(async () => {
+      const res = await updateTaskDescription(task.id, briefText)
+      if (res.success) setEditingBrief(false)
+      else setBriefError(res.error ?? 'Could not save the brief')
+    })
+  }
 
   const isAdmin    = currentUser.access === 'admin'
   const isSuperuser = currentUser.access === 'superuser'
@@ -240,21 +258,90 @@ export function TaskModal({ task, currentUser, stages: _stages, slaConfig, today
             </button>
           </div>
 
-          {/* Details tab */}
-          {activeTab === 'details' && task.description && (
+          {/* Brief — always present so the section is discoverable even when
+              empty, and editable in place (wireframe 1d). */}
+          {activeTab === 'details' && (
             <div style={{ marginBottom: '1.1rem' }}>
               <div style={{
-                fontSize: '0.6rem', color: COLORS.muted, marginBottom: 4,
-                textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 4,
               }}>
-                Brief
+                <span style={{
+                  fontSize: '0.6rem', color: COLORS.muted,
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                }}>
+                  Brief
+                </span>
+                {canEditBrief && !editingBrief && (
+                  <button
+                    onClick={() => { setBriefText(task.description ?? ''); setEditingBrief(true) }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      fontSize: '0.68rem', fontWeight: 700, color: COLORS.muted,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {task.description ? 'Edit' : '+ Add brief'}
+                  </button>
+                )}
               </div>
-              <p style={{
-                color: COLORS.ink, fontSize: '0.85rem', lineHeight: 1.55,
-                margin: 0, whiteSpace: 'pre-wrap',
-              }}>
-                {task.description}
-              </p>
+
+              {editingBrief ? (
+                <div>
+                  <textarea
+                    value={briefText}
+                    onChange={e => setBriefText(e.target.value)}
+                    autoFocus
+                    rows={4}
+                    placeholder="What needs making, for whom, and any constraints…"
+                    style={{
+                      width: '100%', padding: '0.6rem 0.7rem', borderRadius: 10,
+                      border: `1px solid ${COLORS.line}`, background: '#fff',
+                      color: COLORS.ink, fontSize: '0.85rem', lineHeight: 1.55,
+                      fontFamily: 'inherit', outline: 'none', resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={saveBrief}
+                      disabled={isPending}
+                      style={{
+                        padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none',
+                        background: COLORS.ink, color: COLORS.lime, fontWeight: 700,
+                        fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
+                        opacity: isPending ? 0.7 : 1,
+                      }}
+                    >
+                      {isPending ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingBrief(false)}
+                      style={{
+                        padding: '0.4rem 0.9rem', borderRadius: 8,
+                        border: `1px solid ${COLORS.line}`, background: '#fff',
+                        color: COLORS.muted, fontWeight: 700, fontSize: '0.75rem',
+                        cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {briefError && (
+                    <p role="alert" style={{ color: '#ef4444', fontSize: '0.72rem', margin: '6px 0 0' }}>
+                      {briefError}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p style={{
+                  color: task.description ? COLORS.ink : COLORS.muted,
+                  fontSize: '0.85rem', lineHeight: 1.55, margin: 0,
+                  whiteSpace: 'pre-wrap', fontStyle: task.description ? 'normal' : 'italic',
+                }}>
+                  {task.description || 'No brief yet.'}
+                </p>
+              )}
             </div>
           )}
 

@@ -60,6 +60,41 @@ export async function addComment(
   return { success: true }
 }
 
+// ─── updateTaskDescription ──────────────────────────────────────────────────
+
+/**
+ * Edit a task's brief in place (wireframe 1d: attribute rows are inline
+ * editors, no separate edit mode).
+ *
+ * Anyone who could advance the task can also brief it: its owner, or an
+ * admin/superuser. A plain user editing someone else's brief is refused.
+ */
+export async function updateTaskDescription(
+  taskId: string,
+  description: string,
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, error: 'not_found' }
+
+  const allowed =
+    task.task_owner_id === member.id ||
+    member.access === 'admin' ||
+    member.access === 'superuser'
+  if (!allowed) return { success: false, error: 'not_authorized' }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data:  { description: description.trim() || null, updated_at: new Date() },
+  })
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  return { success: true }
+}
+
 // ─── createTask ─────────────────────────────────────────────────────────────
 
 interface CreateTaskInput {
