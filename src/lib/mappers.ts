@@ -71,6 +71,7 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
   return {
     id:                 t.id,
     name:               t.name,
+    description:        t.description ?? undefined,
     brand_id:           t.brand_id ?? '',
     brand:              t.brand    ? mapBrand(t.brand)     : undefined,
     content_type_label: t.content_type_label ?? '',

@@ -81,6 +81,7 @@ model SlaConfig {
 model Task {
   id                 String   @id @default(uuid()) @db.Uuid
   name               String
+  description        String?  @db.Text
   brand_id           String?  @db.Uuid
   content_type_label String?
   platform           String?

@@ -64,6 +64,7 @@ export interface SLAConfig {
 export interface Task {
   id: string
   name: string
+  description?: string
   brand_id: string
   brand?: Brand
   content_type_label: string
