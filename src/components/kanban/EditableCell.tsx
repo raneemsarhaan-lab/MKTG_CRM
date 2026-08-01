@@ -47,6 +47,91 @@ const CONTROL: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
+/**
+ * Borderless inline value for the two-pane attribute list (wireframe 1d).
+ *
+ * Same commit rules as EditableCell, but no card shell — it sits in a
+ * label/value row and only reveals a control while being edited, so a
+ * populated task reads as text rather than as a form.
+ */
+export function InlineValue({
+  canEdit, type, value, display, options, min, step, placeholder, onCommit,
+}: {
+  canEdit:  boolean
+  type:     'text' | 'number' | 'date' | 'select'
+  value:    string | number
+  display:  React.ReactNode
+  options?: { value: string; label: string }[]
+  min?:     string | number
+  step?:    number
+  placeholder?: string
+  onCommit: (next: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState(String(value ?? ''))
+  const ref = useRef<HTMLInputElement | HTMLSelectElement>(null)
+
+  useEffect(() => { if (!editing) setDraft(String(value ?? '')) }, [value, editing])
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+
+  const EMPTY = <span style={{ color: COLORS.muted, fontWeight: 400 }}>Empty</span>
+
+  if (!canEdit) {
+    return <div style={{ ...VALUE, padding: '3px 6px' }}>{display || EMPTY}</div>
+  }
+
+  function commit() {
+    setEditing(false)
+    if (draft !== String(value ?? '')) onCommit(draft)
+  }
+
+  if (editing) {
+    return type === 'select' ? (
+      <select
+        ref={ref as React.RefObject<HTMLSelectElement>}
+        value={draft}
+        onChange={e => { setDraft(e.target.value); onCommit(e.target.value); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+        onKeyDown={e => { if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) } }}
+        style={{ ...CONTROL, cursor: 'pointer' }}
+      >
+        {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    ) : (
+      <input
+        ref={ref as React.RefObject<HTMLInputElement>}
+        type={type}
+        value={draft}
+        min={min}
+        step={step}
+        placeholder={placeholder}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter')  { e.preventDefault(); commit() }
+          if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) }
+        }}
+        style={CONTROL}
+      />
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      style={{
+        ...VALUE, background: 'none', border: '1px solid transparent',
+        borderRadius: 6, padding: '3px 6px', cursor: 'pointer',
+        fontFamily: 'inherit', textAlign: 'start', width: '100%',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+    >
+      {display || EMPTY}
+    </button>
+  )
+}
+
 /** Non-editable cell — same shell, no affordance. */
 export function ReadOnlyCell({ label, value }: { label: string; value: React.ReactNode }) {
   return (
