@@ -83,7 +83,7 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     nine_stage:         t.nine_stage,
     status:             t.status,
     stage_date:         toDateStr(t.stage_date),
-    due_date:           toDateStr(t.due_date),
+    due_date:           t.due_date ? toDateStr(t.due_date) : null,
     hours_estimate:     Number(t.hours_estimate),
     cover_image_url:    t.cover_image_url ?? undefined,
     priority:           t.priority,

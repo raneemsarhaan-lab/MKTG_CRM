@@ -20,6 +20,8 @@ export const STAGE_BADGE: Record<StageId, { dot: string; label: string }> = {
   'd-prog':      { dot: '#7C3AED', label: 'Designing' }, // not in handoff
   'd-check':     { dot: '#5B3FB5', label: 'D-Check'   }, // handoff: "Design check"
   'final-check': { dot: '#F59E0B', label: 'F-Check'   }, // handoff: "Final check"
+  'ready-publish': { dot: '#0EA5E9', label: 'Ready' },   // not in handoff
+  'scheduled':   { dot: '#14B8A6', label: 'Scheduled' }, // not in handoff
   'publish':     { dot: '#22C55E', label: 'Published' }, // not in handoff
 }
 
