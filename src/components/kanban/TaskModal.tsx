@@ -126,8 +126,8 @@ export function TaskModal({
   const nextMeta    = nextStage ? STAGE_META[nextStage] : null
   const alertStatus = getAlertStatus(task, slaConfig, today)
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
-  const daysLeft    = calDaysBetween(today, new Date(task.due_date))
-  const overdue     = daysLeft < 0
+  const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue     = daysLeft !== null && daysLeft < 0
 
   // Mirrors updateTask's server-side check — the server one is authoritative.
   const canEditBrief =
@@ -212,10 +212,10 @@ export function TaskModal({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: '0.72rem' }}>
               <span style={{
-                width: 9, height: 9, borderRadius: 3, background: task.brand.color, flexShrink: 0,
+                width: 9, height: 9, borderRadius: 3, background: task.brand?.color ?? '#C4C4BE', flexShrink: 0,
               }} />
               <span style={{ color: COLORS.ink, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {task.brand.name}
+                {task.brand?.name ?? 'No brand'}
               </span>
               <span style={{ color: COLORS.muted }}>/</span>
               <span style={{ color: COLORS.muted, whiteSpace: 'nowrap' }}>{task.content_type_label}</span>
@@ -239,11 +239,11 @@ export function TaskModal({
               height: 64, flexShrink: 0, position: 'relative',
               background: task.cover_image_url
                 ? `url(${task.cover_image_url}) center/cover no-repeat`
-                : brandGradient(task.brand.color),
+                : brandGradient(task.brand?.color ?? '#C4C4BE'),
             }}>
               <div style={{
                 position: 'absolute', bottom: 0, insetInline: 0, height: 3,
-                background: task.brand.color,
+                background: task.brand?.color ?? '#C4C4BE',
               }} />
             </div>
 
@@ -313,9 +313,11 @@ export function TaskModal({
                     {isOverride ? '⚡ ' : ''}→ {nextMeta.label_en}
                   </button>
                 )}
-                <span style={{ fontSize: '0.68rem', color: overdue ? '#ef4444' : COLORS.muted }}>
-                  {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
-                </span>
+                {daysLeft !== null && (
+                  <span style={{ fontSize: '0.68rem', color: overdue ? '#ef4444' : COLORS.muted }}>
+                    {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
+                  </span>
+                )}
               </div>
             </Row>
 
@@ -336,8 +338,10 @@ export function TaskModal({
 
             <Row icon="▦" label="Due date">
               <InlineValue
-                canEdit={canEditBrief} type="date" value={task.due_date}
-                display={new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                canEdit={canEditBrief} type="date" value={task.due_date ?? ''}
+                display={task.due_date
+                  ? new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : ''}
                 onCommit={v => applyPatch({ due_date: v })}
               />
             </Row>
@@ -360,7 +364,7 @@ export function TaskModal({
 
             <Row icon="◆" label="Brand">
               <InlineValue
-                canEdit={canEditBrief} type="select" value={task.brand_id} display={task.brand?.name}
+                canEdit={canEditBrief} type="select" value={task.brand_id ?? ''} display={task.brand?.name}
                 options={brands.map(b => ({ value: b.id, label: b.name }))}
                 onCommit={v => applyPatch({ brand_id: v })}
               />

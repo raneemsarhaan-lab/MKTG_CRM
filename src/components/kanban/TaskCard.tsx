@@ -76,14 +76,15 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
 
   const alertStatus = getAlertStatus(task, slaConfig, today)
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
-  const daysLeft    = calDaysBetween(today, new Date(task.due_date))
-  const overdue     = daysLeft < 0
-  const dueLabel    = overdue
-    ? `${Math.abs(daysLeft)}d over`
+  const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue     = daysLeft !== null && daysLeft < 0
+  const dueLabel    = daysLeft === null
+    ? 'No date'
+    : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
 
-  const brandColor = task.brand.color
-  const brandLabel = task.brand.name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const brandColor = task.brand?.color ?? '#8A8D91'
+  const brandLabel = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
   const coverBg = task.cover_image_url
     ? `url(${task.cover_image_url}) center/cover no-repeat`
@@ -144,7 +145,7 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
         )}
         <PlatformBadge platform={task.platform} />
         <div
-          title={task.brand.name}
+          title={task.brand?.name ?? 'No brand'}
           style={{
             position: 'absolute', right: 8, top: 8,
             width: 28, height: 28, borderRadius: '50%',
