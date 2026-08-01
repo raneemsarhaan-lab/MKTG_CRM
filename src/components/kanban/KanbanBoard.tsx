@@ -60,6 +60,13 @@ export function KanbanBoard({
     if (wantsNewTask) setShowTaskForm(true)
   }, [wantsNewTask, setShowTaskForm])
 
+  // ...and its task rows link with ?task=<id>. Without this the link lands on
+  // the board with nothing open.
+  const deepLinkTaskId = searchParams.get('task')
+  useEffect(() => {
+    if (deepLinkTaskId) selectTask(deepLinkTaskId)
+  }, [deepLinkTaskId, selectTask])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
