@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import type { Member } from '@/types/index'
 import { initials, avatarColor } from '@/lib/utils'
 import { LangToggle } from './LangToggle'
+import { UserMenu } from './UserMenu'
 
 /**
  * Navigation rail — developer handoff §3.
@@ -213,57 +214,22 @@ export function NavRail({ member, onExpand }: NavRailProps) {
             the rail still reads as icon-only. */}
         <LangToggle />
 
-        {/* Avatar — 40px circle, 2px #34383B ring, 10px lime presence dot */}
-        <div style={{ position: 'relative', flexShrink: 0, marginTop: 12 }}>
-          {member.avatar_url ? (
-            <Image
-              src={member.avatar_url}
-              alt={member.name}
-              width={40}
-              height={40}
-              style={{
-                width:        40,
-                height:       40,
-                borderRadius: '50%',
-                objectFit:    'cover',
-                display:      'block',
-                border:       '2px solid #34383B',
-                boxSizing:    'border-box',
-              }}
-            />
-          ) : (
-            <div
-              title={member.name}
-              style={{
-                width:          40,
-                height:         40,
-                borderRadius:   '50%',
-                background:     avatarColor(member.name) || '#4A4740',
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                border:         '2px solid #34383B',
-                boxSizing:      'border-box',
-                fontFamily:     'var(--font-heading)',
-                fontWeight:     700,
-                fontSize:       13,
-                color:          '#FFFFFF',
-              }}
-            >
-              {initials(member.name)}
-            </div>
-          )}
+        {/* Avatar — also the account menu, so logging out does not require
+            expanding the sidebar first. */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <UserMenu member={member} variant="rail" />
           <span
             aria-hidden="true"
             style={{
               position:     'absolute',
-              bottom:       -1,
+              bottom:       11,
               right:        -1,
               width:        10,
               height:       10,
               borderRadius: '50%',
               background:   'var(--brand-lime)',
               border:       '2px solid var(--rail-bg)',
+              pointerEvents: 'none',
             }}
           />
         </div>

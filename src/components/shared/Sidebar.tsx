@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import type { Member } from '@/types/index'
-import { initials, avatarColor } from '@/lib/utils'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { NavRail } from './NavRail'
+import { UserMenu } from './UserMenu'
 
 /**
  * Expanded sidebar — Pipeline handoff §3.
@@ -168,27 +168,10 @@ export function Sidebar({ member }: { member: Member }) {
         </svg>
       </div>
 
-      {/* User row + the collapse control */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-          border: '2px solid #E9D5FF', boxSizing: 'border-box',
-          background: avatarColor(member.name), color: '#FFFFFF',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 13,
-        }}>
-          {initials(member.name)}
-        </div>
-        <div style={{ minWidth: 0, lineHeight: 1.25 }}>
-          <div style={{
-            fontWeight: 700, fontSize: 13.5, color: PIPE.ink,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {member.name}
-          </div>
-          <div style={{ fontWeight: 500, fontSize: 11.5, color: PIPE.textFaint }}>
-            {member.access === 'admin' ? 'Admin' : member.role}
-          </div>
+      {/* User row — the account menu, plus the collapse control */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <UserMenu member={member} />
         </div>
         <button
           type="button"
@@ -196,8 +179,8 @@ export function Sidebar({ member }: { member: Member }) {
           title="Collapse sidebar"
           aria-label="Collapse sidebar"
           style={{
-            marginInlineStart: 'auto', background: 'none', border: 'none',
-            cursor: 'pointer', padding: 4, color: PIPE.textFaint, lineHeight: 0,
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 4, color: PIPE.textFaint, lineHeight: 0, flexShrink: 0,
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
