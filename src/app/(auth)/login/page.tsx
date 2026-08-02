@@ -186,6 +186,16 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {/* Which build is answering. Readable without signing in, so it can
+            still be checked by the person who cannot get in — and it is the
+            difference between "the fix is broken" and "the fix isn't live". */}
+        <p style={{
+          textAlign: 'center', margin: '20px 0 0', fontSize: '11px',
+          color: 'var(--muted)', opacity: 0.7, letterSpacing: '.02em',
+        }}>
+          Build {process.env.NEXT_PUBLIC_BUILD_STAMP ?? 'unknown'}
+        </p>
       </div>
     </div>
   )

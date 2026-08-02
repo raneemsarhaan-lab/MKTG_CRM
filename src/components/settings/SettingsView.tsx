@@ -5,8 +5,9 @@ import type { Member, ContentType, SLAConfig, WorkspaceSettings } from '@/types/
 import { TeamSettings } from './TeamSettings'
 import { WorkflowSettings } from './WorkflowSettings'
 import { BrandSettings, type BrandWithAssets } from './BrandSettings'
+import { Diagnostics } from './Diagnostics'
 
-type Tab = 'team' | 'brands' | 'workflow'
+type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics'
 
 interface SettingsViewProps {
   members: Member[]
@@ -61,6 +62,9 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
           <button style={tabBtn(tab === 'workflow')} onClick={() => setTab('workflow')}>
             SLA &amp; Workflow
           </button>
+          <button style={tabBtn(tab === 'diagnostics')} onClick={() => setTab('diagnostics')}>
+            Diagnostics
+          </button>
         </div>
 
         {/* Tab content */}
@@ -68,6 +72,7 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
           <TeamSettings members={members} currentUserId={currentUserId} />
         )}
         {tab === 'brands' && <BrandSettings brands={brands} />}
+        {tab === 'diagnostics' && <Diagnostics />}
         {tab === 'workflow' && (
           <WorkflowSettings
             contentTypes={contentTypes}

@@ -352,6 +352,7 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   const [isPending, startTransition] = useTransition()
   const [newPwd, setNewPwd] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
+  const [issued, setIssued] = useState('')
   const pwdRef = useRef<HTMLInputElement>(null)
   const ac = ACCESS_BADGE[m.access] as { bg: string; text: string }
 
@@ -379,6 +380,35 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
       setTimeout(() => setPwdMsg(''), 6000)
     })
   }
+
+  /**
+   * Set a generated password and show it once.
+   *
+   * Typing a temporary password into the box and then re-typing it into a
+   * message is where the other half of "it still doesn't work" lives: a
+   * trailing space picked up on the way, an l/1 or O/0 read wrong, and the
+   * two no longer match. Generated from an alphabet with those characters
+   * removed, set, then displayed for the admin to copy verbatim.
+   */
+  function handleGenerate() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    const bytes = new Uint32Array(14)
+    crypto.getRandomValues(bytes)
+    const value = Array.from(bytes, n => alphabet[n % alphabet.length]).join('')
+
+    setPwdMsg('')
+    startTransition(async () => {
+      const r = await resetMemberPassword(m.id, value)
+      if (r.success) {
+        setIssued(value)
+        setPwdMsg(`Password set for ${m.name}`)
+      } else {
+        setPwdMsg(r.error ?? 'Failed')
+        setTimeout(() => setPwdMsg(''), 6000)
+      }
+    })
+  }
+
   const ownedStages = REVIEW_STAGES.filter(s => STAGE_META[s].owner_role === m.role)
 
   function handleField(patch: Parameters<typeof updateMember>[1]) {
@@ -544,6 +574,19 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         >
           {m.has_password === false ? 'Set' : 'Reset'}
         </button>
+        <button
+          onClick={handleGenerate}
+          disabled={isPending}
+          title={`Generate a password for ${m.name} and show it once`}
+          style={{
+            fontSize: '0.7rem', padding: '5px 10px', borderRadius: 6,
+            background: '#fff', color: 'var(--ink)', border: '1px solid var(--line)',
+            cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+            opacity: isPending ? 0.5 : 1, whiteSpace: 'nowrap',
+          }}
+        >
+          Generate
+        </button>
         {pwdMsg && (
           <span style={{
             fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
@@ -571,6 +614,47 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           }}
         />
       </div>
+
+      {/* The generated password, shown once. It is not stored anywhere in
+          readable form — closing this is the only chance to copy it. */}
+      {issued && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
+          marginLeft: 46, padding: '8px 10px', borderRadius: 9,
+          background: '#FCEFD9', border: '1px solid #F0DCB4', flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8A6414' }}>
+            Send this to {m.name} — it is not shown again:
+          </span>
+          <code style={{
+            fontSize: '0.82rem', fontWeight: 700, letterSpacing: '.03em',
+            background: '#fff', border: '1px solid #F0DCB4', borderRadius: 6,
+            padding: '4px 8px', color: 'var(--ink)', userSelect: 'all',
+          }}>
+            {issued}
+          </code>
+          <button
+            onClick={() => { void navigator.clipboard?.writeText(issued) }}
+            style={{
+              fontSize: '0.7rem', padding: '4px 10px', borderRadius: 6,
+              background: 'var(--ink)', color: '#fff', border: 'none',
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            Copy
+          </button>
+          <button
+            onClick={() => { setIssued(''); setPwdMsg('') }}
+            style={{
+              fontSize: '0.7rem', padding: '4px 8px', borderRadius: 6,
+              background: 'transparent', color: '#8A6414', border: 'none',
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            Done
+          </button>
+        </div>
+      )}
 
       {/* Stage ownership chips */}
       {ownedStages.length > 0 && (
