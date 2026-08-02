@@ -21,6 +21,8 @@ import { LangToggle } from './LangToggle'
 
 interface NavRailProps {
   member: Member
+  /** Shown as an expand control when the sidebar is in its collapsed form. */
+  onExpand?: () => void
 }
 
 const ICON = {
@@ -74,7 +76,7 @@ const NAV_ITEMS = [
   { href: '/settings', key: 'settings', icon: ICON.settings, adminOnly: true  },
 ] as const
 
-export function NavRail({ member }: NavRailProps) {
+export function NavRail({ member, onExpand }: NavRailProps) {
   const pathname = usePathname()
   const isAdmin  = member.access === 'admin'
   const t        = useTranslations('nav')
@@ -181,6 +183,27 @@ export function NavRail({ member }: NavRailProps) {
             )
           })}
         </nav>
+
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+            className="fx-rail-btn"
+            style={{
+              width: 46, height: 46, borderRadius: 15, border: 'none',
+              background: 'transparent', color: 'var(--rail-icon)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0, marginBottom: 4,
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        )}
 
         {/* Language toggle.
             DEVIATION from handoff §3, which specifies only nav items plus a

@@ -1,17 +1,23 @@
 'use client'
 
-import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Linkedin, Instagram, Facebook, Twitter, Music2, Globe } from 'lucide-react'
-import type { Task, Member, SLAConfig } from '@/types/index'
+import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
-import { ALERT_BADGE_STYLES } from '@/lib/tokens'
-import { initials, avatarColor, calDaysBetween, brandGradient } from '@/lib/utils'
+import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { PIPE } from '@/lib/pipeline-tokens'
+
+/**
+ * Board task card — Pipeline handoff §7 "Task card".
+ *
+ * Cover, brand badge, title, status + type chips, then a footer of assignee
+ * avatars against the due date. Every value below is literal from the spec.
+ */
 
 interface TaskCardProps {
-  task: Task & { brand: { id: string; name: string; color: string }; task_owner: Member }
+  task: Task & { brand: { id: string; name: string; color: string; logo_url?: string }; task_owner: Member }
   currentStageOwner: Member | null
   currentUser: Member
   slaConfig: SLAConfig
@@ -19,269 +25,221 @@ interface TaskCardProps {
   onSelect: (id: string) => void
 }
 
-function PlatformIcon({ platform }: { platform?: string }) {
-  const size = 14
-  switch (platform?.toLowerCase()) {
-    case 'linkedin':  return <Linkedin size={size} />
-    case 'instagram': return <Instagram size={size} />
-    case 'facebook':  return <Facebook size={size} />
-    case 'twitter':
-    case 'x':        return <Twitter size={size} />
-    case 'tiktok':   return <Music2 size={size} />
-    default:         return <Globe size={size} />
-  }
+/**
+ * The handoff draws three status chips; the pipeline computes six.
+ *
+ * Stuck is a worse Overdue and Will Miss a worse At Risk, so they take those
+ * treatments rather than inventing colour the design never specified. Idle is
+ * neither good nor bad and uses the neutral chip.
+ */
+const CHIP: Record<AlertStatus, { bg: string; color: string; weight: number; upper?: boolean }> = {
+  'On Track':  { bg: '#E9F8EE', color: '#16A34A', weight: 700 },
+  'At Risk':   { bg: '#FFF1E3', color: '#E07C0B', weight: 700 },
+  'Will Miss': { bg: '#FFF1E3', color: '#E07C0B', weight: 700 },
+  'Idle':      { bg: PIPE.surface, color: PIPE.textMuted, weight: 600 },
+  'Stuck':     { bg: '#FDE7EA', color: '#D22040', weight: 800, upper: true },
+  'Overdue':   { bg: '#FDE7EA', color: '#D22040', weight: 800, upper: true },
 }
 
-function PlatformBadge({ platform }: { platform?: string }) {
-  return (
-    <div
-      style={{
-        position: 'absolute', left: 8, top: 8,
-        width: 28, height: 28, borderRadius: 8,
-        background: 'rgba(17,17,17,0.72)',
-        backdropFilter: 'blur(4px)',
-        color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 2px 7px rgba(15,26,61,.22)',
-      }}
-    >
-      <PlatformIcon platform={platform} />
-    </div>
-  )
-}
+/** The placeholder cover: three bars on a grey gradient (§7.1). */
+const BAR_SETS = [[14, 30, 20], [24, 14, 32], [16, 32, 22], [22, 30, 16], [20, 32, 16]]
 
-function Avatar({
-  name, size = 22, style = {},
-}: {
-  name: string; size?: number; style?: React.CSSProperties
+function Chip({ bg, color, weight, upper, children }: {
+  bg: string; color: string; weight: number; upper?: boolean; children: React.ReactNode
 }) {
   return (
-    <div
-      title={name}
-      style={{
-        width: size, height: size, borderRadius: '50%',
-        background: avatarColor(name),
-        color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size * 0.36, fontWeight: 700,
-        flexShrink: 0,
-        ...style,
-      }}
-    >
-      {initials(name)}
-    </div>
+    <span style={{
+      background: bg, color, fontSize: 10.5, fontWeight: weight,
+      padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+      letterSpacing: upper ? '0.02em' : undefined,
+    }}>
+      {children}
+    </span>
   )
 }
 
-/**
- * The card's visual body, with no drag wiring.
- *
- * Split out so the same markup can be rendered inside dnd-kit's DragOverlay.
- * A sortable item across columns doesn't follow the pointer on its own — the
- * overlay is what does — and the overlay must not call useSortable with an id
- * that is already registered.
- */
+function AssigneeDot({ name, stacked }: { name: string; stacked?: boolean }) {
+  const label = initials(name)
+  return (
+    <span
+      title={name}
+      style={{
+        width: 22, height: 22, borderRadius: '50%', background: avatarColor(name),
+        color: '#FFFFFF', fontSize: label.length > 1 ? 9 : 10, fontWeight: 800,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        border: stacked ? '1.5px solid #FFFFFF' : undefined,
+        marginLeft: stacked ? -7 : undefined,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** Card body with no drag wiring, so DragOverlay can reuse it. */
 function CardBody({ task, currentStageOwner, slaConfig, today }: {
   task: TaskCardProps['task']
   currentStageOwner: Member | null
   slaConfig: SLAConfig
   today: Date
 }) {
-  const [coverFailed, setCoverFailed] = useState(false)
-
-  const alertStatus = getAlertStatus(task, slaConfig, today)
-  const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
-  const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
-  const overdue     = daysLeft !== null && daysLeft < 0
-  const dueLabel    = daysLeft === null
-    ? 'No date'
+  const alert    = getAlertStatus(task, slaConfig, today)
+  const chip     = CHIP[alert]
+  const daysLeft = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue  = daysLeft !== null && daysLeft < 0
+  const dueLabel = daysLeft === null
+    ? ''
     : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
 
   const attachmentCount = task.attachments?.length ?? 0
   const commentCount    = task.comments?.length ?? 0
 
-  const brandColor = task.brand?.color ?? '#8A8D91'
-  const brandLabel = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const brandColor = task.brand?.color ?? PIPE.textFaint
+  const brandMark  = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const cover      = coverImageFor(task)
 
-  // Set cover first, else the newest image attachment (see coverImageFor).
-  const cover = coverImageFor(task)
+  // Stable per task, so a card does not reshuffle its bars on every render.
+  const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
 
   return (
     <>
-      <style>{`
-        .task-card {
-          background: #FAFAF9;
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          overflow: hidden;
-          box-shadow: 0 1px 2px rgba(26,28,30,.06);
-          cursor: grab;
-          margin-bottom: 10px;
-          transition: box-shadow 0.12s, transform 0.12s;
-          user-select: none;
-          outline: none;
-        }
-        .task-card:focus-visible {
-          box-shadow: 0 0 0 2px var(--lime);
-        }
-        .task-card:hover {
-          box-shadow: 0 4px 14px rgba(26,28,30,.10);
-          transform: translateY(-1px);
-        }
-      `}</style>
-
-      {/* Cover area — brand gradient underneath, image on top when there is
-          one. An <img> rather than a CSS background so a URL that fails to
-          load reveals the gradient instead of an empty box. */}
-      <div style={{ position: 'relative', height: 68, background: brandGradient(brandColor), overflow: 'hidden' }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontSize: 22, fontWeight: 800, color: `${brandColor}99`, letterSpacing: '-0.03em' }}>
-            {brandLabel}
-          </span>
-        </div>
-        {cover && !coverFailed && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cover}
-            alt=""
-            loading="lazy"
-            onError={() => setCoverFailed(true)}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        )}
-        <PlatformBadge platform={task.platform} />
-        <div
-          title={task.brand?.name ?? 'No brand'}
+      {/* Cover */}
+      <div style={{ position: 'relative', marginBottom: 9 }}>
+        <ImageWithFallback
+          src={cover}
+          alt=""
+          loading="lazy"
           style={{
-            position: 'absolute', right: 8, top: 8,
-            width: 28, height: 28, borderRadius: '50%',
-            background: brandColor, color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 800,
-            border: '2px solid #fff',
-            boxShadow: '0 2px 7px rgba(15,26,61,.20)',
+            width: '100%', height: 126, objectFit: 'cover', display: 'block',
+            borderRadius: 8, border: `1px solid ${PIPE.borderFaint}`,
           }}
-        >
-          {brandLabel}
-        </div>
-      </div>
+          fallback={
+            <div style={{
+              width: '100%', height: 126, borderRadius: 8,
+              background: 'linear-gradient(140deg, #F1F1F5 0%, #E7E7EE 100%)',
+              border: `1px solid ${PIPE.borderFaint}`, display: 'flex',
+              alignItems: 'flex-end', justifyContent: 'center', gap: 5,
+              padding: '12px 16px', boxSizing: 'border-box', overflow: 'hidden',
+            }}>
+              {bars.map((h, i) => (
+                <div key={i} style={{
+                  flex: 1, height: h, borderRadius: 2,
+                  background: h >= 30 ? '#B3B8C6' : '#C9CDD8',
+                }} />
+              ))}
+            </div>
+          }
+        />
 
-      {/* Body */}
-      <div style={{ padding: '10px 12px 10px' }}>
-        {/* A subtask says whose it is — otherwise it is indistinguishable from
-            a top-level task once it is sitting in a column. */}
-        {task.parent && (
-          <p
-            title={`Subtask of ${task.parent.name}`}
+        {task.brand && (
+          <span
+            title={task.brand.name}
             style={{
-              color: 'var(--muted)', fontSize: '0.64rem', fontWeight: 600,
-              margin: '0 0 3px', overflow: 'hidden',
-              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              position: 'absolute', top: 7, right: 7, width: 24, height: 24,
+              borderRadius: '50%', border: '2px solid #FFFFFF', overflow: 'hidden',
+              background: brandColor, color: '#FFFFFF',
+              fontSize: brandMark.length > 1 ? 9 : 11, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            ↳ {task.parent.name}
-          </p>
+            <ImageWithFallback
+              src={task.brand.logo_url}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              fallback={<>{brandMark}</>}
+            />
+          </span>
         )}
+      </div>
 
-        {/* Task name */}
-        <p style={{
-          color: 'var(--ink)',
-          fontSize: '0.82rem',
-          fontWeight: 700,
-          margin: '0 0 8px',
-          lineHeight: 1.35,
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-        }}>
-          {task.name}
-        </p>
+      {/* Title */}
+      <div style={{
+        fontSize: 12.5, fontWeight: 600, lineHeight: 1.35,
+        color: PIPE.textPrimary, textWrap: 'pretty',
+      }}>
+        {task.name}
+      </div>
 
-        {/* Badges row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 700,
-            padding: '2px 6px', borderRadius: 5,
-            background: badgeStyle.bg, color: badgeStyle.text,
-          }}>
-            {alertStatus}
-          </span>
-          <span style={{
-            fontSize: '0.62rem', fontWeight: 600,
-            padding: '2px 6px', borderRadius: 5,
-            background: '#F1F1EF', color: 'var(--ink)',
-          }}>
+      {/* Chips */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+        <Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip>
+        {task.content_type_label && (
+          <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
             {task.content_type_label}
-          </span>
+          </Chip>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginTop: 10, gap: 8,
+      }}>
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          <AssigneeDot name={task.task_owner.name} />
+          {currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
+            <AssigneeDot name={currentStageOwner.name} stacked />
+          )}
         </div>
 
-        {/* Footer: avatars + due date */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          paddingTop: 8, borderTop: '1px solid #EDF0F6',
-        }}>
-          {/* Avatars */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Avatar name={task.task_owner.name} size={22} />
-            {currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
-              <Avatar name={currentStageOwner.name} size={22} style={{ marginLeft: -6, border: '1.5px solid #fff' }} />
-            )}
-          </div>
-
-          {/* Attachment + comment counts, then the due date */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {attachmentCount > 0 && (
-              <span
-                title={`${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3,
-                  fontSize: '0.68rem', fontWeight: 600, color: 'var(--muted)',
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                </svg>
-                {attachmentCount}
-              </span>
-            )}
-            {commentCount > 0 && (
-              <span
-                title={`${commentCount} comment${commentCount === 1 ? '' : 's'}`}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3,
-                  fontSize: '0.68rem', fontWeight: 600, color: 'var(--muted)',
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                {commentCount}
-              </span>
-            )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-              stroke={overdue ? '#C03A3A' : 'var(--muted)'}
-              strokeWidth="2" strokeLinecap="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M16 2v4M8 2v4M3 10h18" />
-            </svg>
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: overdue ? '#C03A3A' : 'var(--muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+          {/* Not in the handoff, but asked for earlier — kept at the footer's
+              own muted weight so it reads as metadata, not a third chip. */}
+          {attachmentCount > 0 && (
+            <span title={`${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 600, color: PIPE.textFaintest }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              {attachmentCount}
+            </span>
+          )}
+          {commentCount > 0 && (
+            <span title={`${commentCount} comment${commentCount === 1 ? '' : 's'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 600, color: PIPE.textFaintest }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              {commentCount}
+            </span>
+          )}
+          {dueLabel && (
+            <span style={{
+              fontSize: 10.5, fontWeight: overdue ? 800 : 600,
+              color: overdue ? '#D22040' : PIPE.textFaintest, whiteSpace: 'nowrap',
+            }}>
               {dueLabel}
             </span>
-          </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* A subtask says whose it is — otherwise it is indistinguishable from a
+          top-level task once it is sitting in a column. */}
+      {task.parent && (
+        <div
+          title={`Subtask of ${task.parent.name}`}
+          style={{
+            marginTop: 8, paddingTop: 7, borderTop: `1px solid ${PIPE.border}`,
+            fontSize: 10.5, fontWeight: 600, color: PIPE.textFaint,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          ↳ {task.parent.name}
+        </div>
+      )}
     </>
   )
+}
+
+const SHELL: React.CSSProperties = {
+  background: '#FFFFFF',
+  border: `1px solid ${PIPE.border}`,
+  borderRadius: 12,
+  padding: 8,
 }
 
 export function TaskCard({
@@ -290,20 +248,21 @@ export function TaskCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    // The overlay carries the card while it moves, so the original just dims.
-    opacity: isDragging ? 0.35 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
-    // Pointer drags on touch devices are swallowed by scrolling without this.
-    touchAction: 'none',
-  }
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        ...SHELL,
+        transform: CSS.Transform.toString(transform),
+        transition,
+        // The overlay carries the card while it moves, so the original dims.
+        opacity: isDragging ? 0.35 : 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+        // Pointer drags on touch devices are swallowed by scrolling without this.
+        touchAction: 'none',
+        userSelect: 'none',
+        outline: 'none',
+      }}
       {...attributes}
       {...listeners}
       onClick={() => onSelect(task.id)}
@@ -311,14 +270,9 @@ export function TaskCard({
       role="button"
       tabIndex={0}
       aria-label={`Task: ${task.name}`}
-      className="task-card"
+      className="fx-task-card"
     >
-      <CardBody
-        task={task}
-        currentStageOwner={currentStageOwner}
-        slaConfig={slaConfig}
-        today={today}
-      />
+      <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
     </div>
   )
 }
@@ -328,20 +282,11 @@ export function TaskCardOverlay({
   task, currentStageOwner, slaConfig, today,
 }: Omit<TaskCardProps, 'onSelect' | 'currentUser'>) {
   return (
-    <div
-      className="task-card"
-      style={{
-        width: 276, cursor: 'grabbing',
-        transform: 'rotate(2deg)',
-        boxShadow: '0 12px 32px rgba(26,28,30,.22)',
-      }}
-    >
-      <CardBody
-        task={task}
-        currentStageOwner={currentStageOwner}
-        slaConfig={slaConfig}
-        today={today}
-      />
+    <div style={{
+      ...SHELL, width: 232, cursor: 'grabbing',
+      transform: 'rotate(2deg)', boxShadow: '0 12px 32px rgba(26,28,30,.22)',
+    }}>
+      <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
     </div>
   )
 }

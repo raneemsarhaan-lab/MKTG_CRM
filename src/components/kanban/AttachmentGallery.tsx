@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { COLORS } from '@/lib/tokens'
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import {
   attachmentKind, imageAttachments, isImageAttachment, kindIcon, shortName,
 } from '@/lib/attachments'
@@ -51,8 +52,22 @@ function FileRow({ a }: { a: TaskAttachment }) {
   )
 }
 
+/**
+ * Reports a thumbnail that will not load, so it moves to the file list.
+ *
+ * Rendering-phase setState is not allowed, hence the effect — and the parent
+ * guards on the id already being present so this settles after one pass.
+ */
+function FailedTile({ id, onFail }: { id: string; onFail: (id: string) => void }) {
+  useEffect(() => { onFail(id) }, [id, onFail])
+  return null
+}
+
 export function AttachmentGallery({ attachments }: Props) {
   const [failed, setFailed] = useState<Set<string>>(new Set())
+  const markFailed = useCallback((id: string) => {
+    setFailed(prev => (prev.has(id) ? prev : new Set(prev).add(id)))
+  }, [])
   const [openIdx, setOpenIdx] = useState<number | null>(null)
 
   const images = imageAttachments(attachments).filter(a => !failed.has(a.id))
@@ -107,13 +122,12 @@ export function AttachmentGallery({ attachments }: Props) {
                 background: '#F4F4F2', display: 'block',
               }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={a.url ?? ''}
+              <ImageWithFallback
+                src={a.url}
                 alt={a.filename}
                 loading="lazy"
-                onError={() => setFailed(prev => new Set(prev).add(a.id))}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                fallback={<FailedTile id={a.id} onFail={markFailed} />}
               />
             </button>
           ))}

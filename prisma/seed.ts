@@ -26,11 +26,15 @@ async function main() {
   }
 
   // Brands
+  // Emblems ship with the app (public/brands) — the Pipeline handoff §6 draws
+  // the brand chips with real marks, and three of the four have artwork. The
+  // Strategy Community has none in the handoff and falls back to its initial
+  // on its own colour, which is what the reference does too.
   const brands = [
-    { name: 'Forefront Consulting',    color: '#B4322F' },
-    { name: 'Omnisight',               color: '#0E7C7B' },
-    { name: 'The Strategy Community',  color: '#7A5A2E' },
-    { name: 'Islam Personal Branding', color: '#1E293B' },
+    { name: 'Forefront Consulting',    color: '#B4322F', logo_url: '/brands/forefront.png' },
+    { name: 'Omnisight',               color: '#0E7C7B', logo_url: '/brands/omnisight.png' },
+    { name: 'The Strategy Community',  color: '#7A5A2E', logo_url: null },
+    { name: 'Islam Personal Branding', color: '#1E293B', logo_url: '/brands/islam.png' },
   ]
   for (const b of brands) {
     await prisma.brand.upsert({ where: { name: b.name }, update: b, create: b })
