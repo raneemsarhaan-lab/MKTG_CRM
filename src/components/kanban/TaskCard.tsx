@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Linkedin, Instagram, Facebook, Twitter, Music2, Globe } from 'lucide-react'
@@ -7,6 +8,7 @@ import type { Task, Member, SLAConfig } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
 import { ALERT_BADGE_STYLES } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween, brandGradient } from '@/lib/utils'
+import { coverImageFor } from '@/lib/attachments'
 
 interface TaskCardProps {
   task: Task & { brand: { id: string; name: string; color: string }; task_owner: Member }
@@ -85,6 +87,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   slaConfig: SLAConfig
   today: Date
 }) {
+  const [coverFailed, setCoverFailed] = useState(false)
+
   const alertStatus = getAlertStatus(task, slaConfig, today)
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
   const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
@@ -100,9 +104,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const brandColor = task.brand?.color ?? '#8A8D91'
   const brandLabel = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
-  const coverBg = task.cover_image_url
-    ? `url(${task.cover_image_url}) center/cover no-repeat`
-    : brandGradient(brandColor)
+  // Set cover first, else the newest image attachment (see coverImageFor).
+  const cover = coverImageFor(task)
 
   return (
     <>
@@ -128,17 +131,27 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         }
       `}</style>
 
-      {/* Cover area */}
-      <div style={{ position: 'relative', height: 68, background: coverBg }}>
-        {!task.cover_image_url && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: `${brandColor}99`, letterSpacing: '-0.03em' }}>
-              {brandLabel}
-            </span>
-          </div>
+      {/* Cover area — brand gradient underneath, image on top when there is
+          one. An <img> rather than a CSS background so a URL that fails to
+          load reveals the gradient instead of an empty box. */}
+      <div style={{ position: 'relative', height: 68, background: brandGradient(brandColor), overflow: 'hidden' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 22, fontWeight: 800, color: `${brandColor}99`, letterSpacing: '-0.03em' }}>
+            {brandLabel}
+          </span>
+        </div>
+        {cover && !coverFailed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt=""
+            loading="lazy"
+            onError={() => setCoverFailed(true)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          />
         )}
         <PlatformBadge platform={task.platform} />
         <div
