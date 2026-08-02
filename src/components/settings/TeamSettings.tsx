@@ -459,6 +459,21 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           {ACCESS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
 
+        {/* An account with no password exists and can hold work, but cannot
+            sign in. The import creates people that way. */}
+        {m.has_password === false && (
+          <span
+            title="This account has no password yet and cannot sign in. Set one below."
+            style={{
+              fontSize: '0.65rem', fontWeight: 700, padding: '3px 9px',
+              borderRadius: 99, background: '#FCEFD9', color: '#B9821A',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            No sign-in
+          </span>
+        )}
+
         {/* Access badge */}
         <span style={{
           fontSize: '0.65rem', fontWeight: 700, padding: '3px 9px',
@@ -487,7 +502,7 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
         <input
           type="password"
-          placeholder="New password"
+          placeholder={m.has_password === false ? 'Set a password' : 'New password'}
           value={newPwd}
           onChange={e => setNewPwd(e.target.value)}
           style={{
@@ -506,7 +521,7 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
             fontFamily: 'inherit', fontWeight: 600,
           }}
         >
-          Reset
+          {m.has_password === false ? 'Set' : 'Reset'}
         </button>
         {pwdMsg && <span style={{ fontSize: '0.7rem', color: pwdMsg.includes('updated') ? '#4B7A12' : COLORS.coral }}>{pwdMsg}</span>}
 

@@ -32,6 +32,11 @@ export interface Member {
   status: 'Available' | 'Busy'
   color?: string
   avatar_url?: string
+  /**
+   * Whether this account can sign in at all. Never the hash itself — only
+   * whether one exists. Set on the Settings page, which is admin-only.
+   */
+  has_password?: boolean
 }
 
 export interface Brand {
