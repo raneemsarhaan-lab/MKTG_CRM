@@ -2,18 +2,17 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
 import { ALERT_BADGE_STYLES, COLORS } from '@/lib/tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { moveTask, addComment, updateTask, type TaskPatch } from '@/actions/tasks'
+import { moveTask, addComment, updateTask, createSubtask, type TaskPatch } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
 import { BriefEditor } from './BriefEditor'
 import { AttachmentGallery } from './AttachmentGallery'
+import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
@@ -88,6 +87,7 @@ export function TaskModal({
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const setCelebration = useUIStore(s => s.setCelebration)
+  const selectTask     = useUIStore(s => s.selectTask)
 
   const cover       = coverImageFor(task)
   const stageMeta   = STAGE_META[task.status]
@@ -128,6 +128,19 @@ export function TaskModal({
       if (res.success) { router.refresh(); after?.() }
       else setBriefError(res.error ?? 'Could not save the change')
     })
+  }
+
+  /** Insert ▸ New subtask — makes the child, hands back a link to it. */
+  async function handleCreateSubtask(name: string) {
+    const res = await createSubtask(task.id, name)
+    if (!res.success || !res.id) {
+      setBriefError(res.error === 'not_authorized'
+        ? 'You cannot add subtasks to this task'
+        : res.error ?? 'Could not create the subtask')
+      return null
+    }
+    router.refresh()
+    return { name: res.name ?? name, href: `/board?task=${res.id}` }
   }
 
   function startEditingBrief() {
@@ -294,6 +307,24 @@ export function TaskModal({
                 {task.brand?.name ?? 'No brand'}
               </span>
               <span style={{ color: COLORS.muted }}>/</span>
+              {task.parent && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => selectTask(task.parent!.id)}
+                    title={`Open parent: ${task.parent.name}`}
+                    style={{
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      color: '#6E5BE6', fontWeight: 700, fontSize: 'inherit',
+                      fontFamily: 'inherit', maxWidth: 160,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ↳ {task.parent.name}
+                  </button>
+                  <span style={{ color: COLORS.muted }}>/</span>
+                </>
+              )}
               <span style={{ color: COLORS.muted, whiteSpace: 'nowrap' }}>{task.content_type_label}</span>
             </div>
             <button
@@ -499,13 +530,22 @@ export function TaskModal({
                 saving={isPending}
                 onSave={saveBrief}
                 onCancel={() => setEditingBrief(false)}
+                attachments={task.attachments ?? []}
+                onCreateSubtask={canEditBrief ? handleCreateSubtask : undefined}
               />
             ) : (
               /* The brief itself is the edit affordance — click the text and
                  it becomes editable. Briefs are Markdown, so imported ClickUp
                  content keeps its headings, bold, lists and links. */
               <div
-                onClick={() => { if (canEditBrief) startEditingBrief() }}
+                onClick={e => {
+                  if (!canEditBrief) return
+                  // The brief has live parts now — checkboxes, links, toggle
+                  // headers, embeds. Clicking one of those means "use it", not
+                  // "edit the whole brief".
+                  if ((e.target as HTMLElement).closest('a, input, button, summary, iframe, label')) return
+                  startEditingBrief()
+                }}
                 role={canEditBrief ? 'button' : undefined}
                 tabIndex={canEditBrief ? 0 : undefined}
                 onKeyDown={e => {
@@ -529,9 +569,14 @@ export function TaskModal({
                 }}
               >
                 {task.description ? (
-                  <div className="fx-brief">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown>
-                  </div>
+                  <Brief
+                    markdown={task.description}
+                    // Ticking a box in the brief is an edit like any other, so
+                    // it goes through the same permission check and save path.
+                    onToggleTask={canEditBrief
+                      ? next => applyPatch({ description: next })
+                      : undefined}
+                  />
                 ) : (
                   <p style={{
                     color: COLORS.muted, fontSize: '0.85rem',
@@ -540,6 +585,48 @@ export function TaskModal({
                     {canEditBrief ? 'Click to add a brief…' : 'No brief yet.'}
                   </p>
                 )}
+              </div>
+            )}
+
+            {(task.subtasks?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{
+                  fontSize: '0.6rem', color: COLORS.muted, marginBottom: 6,
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                }}>
+                  Subtasks ({task.subtasks!.length})
+                </div>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+                  {task.subtasks!.map(s => {
+                    const meta = STAGE_META[s.status]
+                    return (
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectTask(s.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            padding: '5px 7px', borderRadius: 6, cursor: 'pointer',
+                            border: `1px solid ${COLORS.line}`, background: '#FCFCFB',
+                            fontFamily: 'inherit', fontSize: '0.78rem', color: COLORS.ink,
+                            textAlign: 'start',
+                          }}
+                        >
+                          <span aria-hidden="true" style={{
+                            width: 7, height: 7, borderRadius: '50%',
+                            background: meta.color, flexShrink: 0,
+                          }} />
+                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.name}
+                          </span>
+                          <span style={{ fontSize: '0.66rem', color: COLORS.muted, whiteSpace: 'nowrap' }}>
+                            {meta.label_en}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             )}
 

@@ -1,21 +1,22 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { COLORS } from '@/lib/tokens'
+import { Brief } from '@/components/shared/Brief'
+import { imageAttachments } from '@/lib/attachments'
+import type { TaskAttachment } from '@/types/index'
 
 /**
- * Brief editor with a formatting toolbar.
+ * Brief editor — formatting toolbar plus an Insert menu.
  *
- * Briefs are stored as Markdown — that is what the ClickUp import produces and
- * what the panel renders — so the toolbar edits Markdown source rather than
+ * Briefs are stored as Markdown, which is what the ClickUp import produces and
+ * what the panel renders, so the toolbar edits Markdown source rather than
  * running a contenteditable surface. Every button is a text transform on the
  * current selection, which keeps the stored value round-trippable: what the
  * import wrote, the editor can re-emit unchanged.
  *
- * Preview is a toggle rather than a second pane. The panel is 57% of a modal;
- * a side-by-side split at that width leaves neither half usable.
+ * Preview reuses the panel's own renderer, so what you see while writing is
+ * exactly what the task will show.
  */
 
 interface BriefEditorProps {
@@ -23,6 +24,10 @@ interface BriefEditorProps {
   saving:   boolean
   onSave:   (next: string) => void
   onCancel: () => void
+  /** Offered as one-click choices when inserting an image. */
+  attachments?: TaskAttachment[]
+  /** Creates a real child task and returns a link to it, or null if cancelled. */
+  onCreateSubtask?: (name: string) => Promise<{ name: string; href: string } | null>
 }
 
 type Cmd =
@@ -31,6 +36,7 @@ type Cmd =
   | { kind: 'prefix';  prefix: string }
   | { kind: 'ordered' }
   | { kind: 'link' }
+  | { kind: 'block';   text: string; caretBack?: number }
 
 interface ToolbarItem {
   id:     string
@@ -42,23 +48,29 @@ interface ToolbarItem {
 
 const TOOLS: ToolbarItem[][] = [
   [
-    { id: 'h1', label: 'H1', title: 'Heading 1',       cmd: { kind: 'heading', level: 1 }, style: { fontSize: '0.78rem', fontWeight: 800 } },
-    { id: 'h2', label: 'H2', title: 'Heading 2',       cmd: { kind: 'heading', level: 2 }, style: { fontSize: '0.72rem', fontWeight: 800 } },
-    { id: 'h3', label: 'H3', title: 'Heading 3',       cmd: { kind: 'heading', level: 3 }, style: { fontSize: '0.68rem', fontWeight: 800 } },
+    { id: 'h1', label: 'H1', title: 'Heading 1', cmd: { kind: 'heading', level: 1 }, style: { fontSize: '0.78rem', fontWeight: 800 } },
+    { id: 'h2', label: 'H2', title: 'Heading 2', cmd: { kind: 'heading', level: 2 }, style: { fontSize: '0.72rem', fontWeight: 800 } },
+    { id: 'h3', label: 'H3', title: 'Heading 3', cmd: { kind: 'heading', level: 3 }, style: { fontSize: '0.68rem', fontWeight: 800 } },
   ],
   [
-    { id: 'bold',   label: 'B', title: 'Bold (Ctrl+B)',        cmd: { kind: 'wrap', before: '**', after: '**' },  style: { fontWeight: 900 } },
-    { id: 'italic', label: 'I', title: 'Italic (Ctrl+I)',      cmd: { kind: 'wrap', before: '_',  after: '_'  },  style: { fontStyle: 'italic', fontFamily: 'serif' } },
-    { id: 'strike', label: 'S', title: 'Strikethrough',        cmd: { kind: 'wrap', before: '~~', after: '~~' },  style: { textDecoration: 'line-through' } },
-    { id: 'code',   label: '</>', title: 'Inline code',        cmd: { kind: 'wrap', before: '`',  after: '`'  },  style: { fontSize: '0.62rem' } },
+    { id: 'bold',   label: 'B',   title: 'Bold (Ctrl+B)',   cmd: { kind: 'wrap', before: '**', after: '**' }, style: { fontWeight: 900 } },
+    { id: 'italic', label: 'I',   title: 'Italic (Ctrl+I)', cmd: { kind: 'wrap', before: '_',  after: '_'  }, style: { fontStyle: 'italic', fontFamily: 'serif' } },
+    { id: 'strike', label: 'S',   title: 'Strikethrough',   cmd: { kind: 'wrap', before: '~~', after: '~~' }, style: { textDecoration: 'line-through' } },
+    { id: 'code',   label: '</>', title: 'Inline code',     cmd: { kind: 'wrap', before: '`',  after: '`'  }, style: { fontSize: '0.62rem' } },
   ],
   [
-    { id: 'ul',    label: '• —', title: 'Bulleted list',       cmd: { kind: 'prefix', prefix: '- ' } },
-    { id: 'ol',    label: '1.',  title: 'Numbered list',       cmd: { kind: 'ordered' } },
-    { id: 'quote', label: '❝',   title: 'Quote',               cmd: { kind: 'prefix', prefix: '> ' } },
-    { id: 'link',  label: '🔗',  title: 'Link (Ctrl+K)',       cmd: { kind: 'link' } },
+    { id: 'ul',    label: '• —', title: 'Bulleted list', cmd: { kind: 'prefix', prefix: '- ' } },
+    { id: 'ol',    label: '1.',  title: 'Numbered list', cmd: { kind: 'ordered' } },
+    { id: 'quote', label: '❝',   title: 'Quote',         cmd: { kind: 'prefix', prefix: '> ' } },
+    { id: 'link',  label: '🔗',  title: 'Link (Ctrl+K)', cmd: { kind: 'link' } },
   ],
 ]
+
+const TABLE_SKELETON =
+  '| Column | Column |\n| --- | --- |\n|  |  |\n|  |  |'
+
+const TOGGLE_SKELETON =
+  '<details>\n<summary>Toggle title</summary>\n\nHidden content.\n\n</details>'
 
 /** Split the value around the selection, expanded to whole lines when asked. */
 function lineRange(text: string, start: number, end: number) {
@@ -68,6 +80,32 @@ function lineRange(text: string, start: number, end: number) {
   return { from, to }
 }
 
+/**
+ * Strip Markdown back to its text — the "Clear format" action.
+ *
+ * Deliberately conservative: it removes markers, never words. Link and image
+ * syntax collapses to the label rather than vanishing with the URL.
+ */
+export function clearFormatting(text: string): string {
+  return text
+    .replace(/^\s{0,3}(#{1,6})\s+/gm, '')                 // headings
+    .replace(/^\s{0,3}>\s?/gm, '')                        // quotes
+    .replace(/^(\s*)(?:[-*+]|\d+[.)])\s+\[[ xX]\]\s+/gm, '$1') // task items
+    .replace(/^(\s*)(?:[-*+]|\d+[.)])\s+/gm, '$1')        // list markers
+    .replace(/^\s{0,3}([-*_])\s*(?:\1\s*){2,}$/gm, '')    // rules
+    .replace(/^\s*(```|~~~).*$/gm, '')                    // fences
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')             // images → alt
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')              // links → label
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')                   // bold
+    .replace(/(\*|_)(.*?)\1/g, '$2')                      // italic
+    .replace(/~~(.*?)~~/g, '$1')                          // strike
+    .replace(/`([^`]*)`/g, '$1')                          // code
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')                   // html tags
+    .replace(/\\([\\`*_{}[\]()#+\-.!<>|~])/g, '$1')       // escapes
+    .replace(/ {2}$/gm, '')                               // hard breaks
+    .replace(/\n{3,}/g, '\n\n')
+}
+
 export function apply(cmd: Cmd, text: string, start: number, end: number): {
   text: string; start: number; end: number
 } {
@@ -75,7 +113,6 @@ export function apply(cmd: Cmd, text: string, start: number, end: number): {
 
   if (cmd.kind === 'wrap') {
     const { before, after } = cmd
-    // Toggle: strip the markers when the selection already carries them.
     if (selected.startsWith(before) && selected.endsWith(after) &&
         selected.length >= before.length + after.length) {
       const inner = selected.slice(before.length, selected.length - after.length)
@@ -94,13 +131,23 @@ export function apply(cmd: Cmd, text: string, start: number, end: number): {
     const next  = `[${label}](https://)`
     return {
       text:  text.slice(0, start) + next + text.slice(end),
-      // Land the caret inside the URL — that is the part that still needs typing.
       start: start + next.length - 1,
       end:   start + next.length - 1,
     }
   }
 
-  // Line-oriented commands rewrite every line the selection touches.
+  if (cmd.kind === 'block') {
+    // Block content needs its own line and a blank line before it, or Markdown
+    // folds it into the paragraph the caret happened to be sitting in.
+    const beforeText = text.slice(0, start)
+    const afterText  = text.slice(end)
+    const lead  = beforeText === '' || beforeText.endsWith('\n\n') ? '' : beforeText.endsWith('\n') ? '\n' : '\n\n'
+    const trail = afterText.startsWith('\n') ? '\n' : '\n\n'
+    const next  = lead + cmd.text + trail
+    const caret = start + next.length - trail.length - (cmd.caretBack ?? 0)
+    return { text: beforeText + next + afterText, start: caret, end: caret }
+  }
+
   const { from, to } = lineRange(text, start, end)
   const lines = text.slice(from, to).split('\n')
 
@@ -123,13 +170,40 @@ export function apply(cmd: Cmd, text: string, start: number, end: number): {
   }
 
   const block = rewritten.join('\n')
-  return { text: text.slice(0, from) + block + text.slice(to), start: from, end: from + block.length }
+  const next  = text.slice(0, from) + block + text.slice(to)
+
+  // With nothing selected, land the caret after the marker instead of
+  // selecting the line — otherwise the first thing typed replaces the bullet
+  // or checkbox that was just inserted.
+  if (start === end) {
+    const caret = start + (rewritten[0].length - lines[0].length)
+    return { text: next, start: caret, end: caret }
+  }
+  return { text: next, start: from, end: from + block.length }
 }
 
-export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProps) {
+/** Insert items that need a value before they can be inserted. */
+type PromptKind = 'image' | 'youtube' | 'subtask'
+
+const PROMPTS: Record<PromptKind, { label: string; placeholder: string; cta: string }> = {
+  image:   { label: 'Image URL',   placeholder: 'https://…', cta: 'Insert image' },
+  youtube: { label: 'YouTube URL', placeholder: 'https://youtube.com/watch?v=…', cta: 'Embed video' },
+  subtask: { label: 'Subtask name', placeholder: 'What needs doing?', cta: 'Create subtask' },
+}
+
+export function BriefEditor({
+  value, saving, onSave, onCancel, attachments = [], onCreateSubtask,
+}: BriefEditorProps) {
   const [text, setText]       = useState(value)
   const [preview, setPreview] = useState(false)
+  const [menu, setMenu]       = useState<'insert' | 'more' | null>(null)
+  const [prompt, setPrompt]   = useState<PromptKind | null>(null)
+  const [draft, setDraft]     = useState('')
+  const [note, setNote]       = useState('')
+  const [busy, setBusy]       = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+
+  const images = imageAttachments(attachments)
 
   function run(cmd: Cmd) {
     const el = ref.current
@@ -142,6 +216,33 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
       el.focus()
       el.setSelectionRange(res.start, res.end)
     })
+  }
+
+  function insertBlock(body: string, caretBack = 0) {
+    setMenu(null)
+    run({ kind: 'block', text: body, caretBack })
+  }
+
+  function openPrompt(kind: PromptKind) {
+    setMenu(null)
+    setDraft('')
+    setPrompt(kind)
+  }
+
+  async function confirmPrompt() {
+    const v = draft.trim()
+    if (!v) return
+    if (prompt === 'image')   insertBlock(`![](${v})`, 0)
+    if (prompt === 'youtube') insertBlock(v, 0)
+    if (prompt === 'subtask' && onCreateSubtask) {
+      setBusy(true)
+      const made = await onCreateSubtask(v)
+      setBusy(false)
+      if (!made) { setNote('Could not create that subtask'); return }
+      insertBlock(`- [ ] [${made.name}](${made.href})`, 0)
+    }
+    setPrompt(null)
+    setDraft('')
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -160,12 +261,26 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
     fontSize: '0.7rem', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
   }
 
+  const INSERT_ITEMS: { icon: string; label: string; run: () => void; hint?: string }[] = [
+    { icon: '☑', label: 'Task',     run: () => { setMenu(null); run({ kind: 'prefix', prefix: '- [ ] ' }) } },
+    ...(onCreateSubtask
+      ? [{ icon: '⑂', label: 'New subtask', run: () => openPrompt('subtask'), hint: 'creates a real task' }]
+      : []),
+    { icon: '▤', label: 'Image',    run: () => openPrompt('image') },
+    { icon: '—', label: 'Divider',  run: () => insertBlock('---') },
+    { icon: '▸', label: 'Toggle list', run: () => insertBlock(TOGGLE_SKELETON, TOGGLE_SKELETON.length - TOGGLE_SKELETON.indexOf('Toggle title') - 'Toggle title'.length) },
+    { icon: '▦', label: 'Table',    run: () => insertBlock(TABLE_SKELETON) },
+    { icon: '☰', label: 'Table of contents', run: () => insertBlock('[[toc]]') },
+    { icon: '▶', label: 'YouTube',  run: () => openPrompt('youtube') },
+  ]
+
   return (
     <div>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         padding: '6px 8px', border: `1px solid ${COLORS.line}`,
         borderRadius: '10px 10px 0 0', borderBottom: 'none', background: '#FAFAF9',
+        position: 'relative',
       }}>
         {TOOLS.map((group, gi) => (
           <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -176,7 +291,6 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
                 title={t.title}
                 aria-label={t.title}
                 disabled={preview}
-                // Keep focus in the textarea so the selection survives the click.
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => run(t.cmd)}
                 style={{ ...btn, ...t.style, opacity: preview ? 0.4 : 1 }}
@@ -186,6 +300,83 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
             ))}
           </div>
         ))}
+
+        {/* Insert */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            disabled={preview}
+            aria-haspopup="menu"
+            aria-expanded={menu === 'insert'}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setMenu(m => (m === 'insert' ? null : 'insert'))}
+            style={{
+              ...btn, fontWeight: 700, opacity: preview ? 0.4 : 1,
+              background: menu === 'insert' ? '#EFEFED' : '#fff',
+            }}
+          >
+            + Insert ▾
+          </button>
+          {menu === 'insert' && (
+            <Menu onClose={() => setMenu(null)}>
+              {INSERT_ITEMS.map(it => (
+                <MenuItem key={it.label} icon={it.icon} onClick={it.run} hint={it.hint}>
+                  {it.label}
+                </MenuItem>
+              ))}
+            </Menu>
+          )}
+        </div>
+
+        {/* Overflow: clear format / copy markdown */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            title="More"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            aria-expanded={menu === 'more'}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}
+            style={{ ...btn, background: menu === 'more' ? '#EFEFED' : '#fff' }}
+          >
+            ⋯
+          </button>
+          {menu === 'more' && (
+            <Menu onClose={() => setMenu(null)}>
+              <MenuItem
+                icon="⃠"
+                onClick={() => {
+                  setMenu(null)
+                  const el = ref.current
+                  if (!el) return
+                  const { selectionStart: s, selectionEnd: e } = el
+                  if (s === e) { setText(clearFormatting(text)); return }
+                  const cleaned = clearFormatting(text.slice(s, e))
+                  setText(text.slice(0, s) + cleaned + text.slice(e))
+                }}
+                hint="selection, or all"
+              >
+                Clear format
+              </MenuItem>
+              <MenuItem
+                icon="M↓"
+                onClick={async () => {
+                  setMenu(null)
+                  try {
+                    await navigator.clipboard.writeText(text)
+                    setNote('Markdown copied')
+                  } catch {
+                    setNote('Clipboard blocked by the browser')
+                  }
+                  setTimeout(() => setNote(''), 2500)
+                }}
+              >
+                Copy Markdown
+              </MenuItem>
+            </Menu>
+          )}
+        </div>
 
         <button
           type="button"
@@ -200,17 +391,69 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
         </button>
       </div>
 
+      {/* Value prompt for the insert items that need one */}
+      {prompt && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          padding: '7px 8px', border: `1px solid ${COLORS.line}`, borderBottom: 'none',
+          background: '#FFFDF3',
+        }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: COLORS.muted }}>
+            {PROMPTS[prompt].label}
+          </span>
+          <input
+            value={draft}
+            autoFocus
+            placeholder={PROMPTS[prompt].placeholder}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => {
+              e.stopPropagation()
+              if (e.key === 'Enter')  { e.preventDefault(); void confirmPrompt() }
+              if (e.key === 'Escape') { setPrompt(null); setDraft('') }
+            }}
+            style={{
+              flex: 1, minWidth: 180, padding: '4px 7px', borderRadius: 6,
+              border: `1px solid ${COLORS.line}`, fontSize: '0.76rem',
+              fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          <button type="button" onClick={() => void confirmPrompt()} disabled={busy || !draft.trim()}
+                  style={{ ...btn, fontWeight: 700, opacity: busy || !draft.trim() ? 0.5 : 1 }}>
+            {busy ? 'Working…' : PROMPTS[prompt].cta}
+          </button>
+          <button type="button" onClick={() => { setPrompt(null); setDraft('') }} style={btn}>
+            Cancel
+          </button>
+
+          {prompt === 'image' && images.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.66rem', color: COLORS.muted }}>or use an attachment:</span>
+              {images.slice(0, 6).map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  title={a.filename}
+                  onClick={() => { insertBlock(`![${a.filename}](${a.url})`); setPrompt(null) }}
+                  style={{ ...btn, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  {a.filename}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {preview ? (
-        <div
-          className="fx-brief"
-          style={{
-            border: `1px solid ${COLORS.line}`, borderRadius: '0 0 10px 10px',
-            padding: '0.6rem 0.7rem', minHeight: 140, background: '#fff',
-          }}
-        >
+        <div style={{
+          border: `1px solid ${COLORS.line}`, borderRadius: '0 0 10px 10px',
+          padding: '0.6rem 0.7rem', minHeight: 140, background: '#fff',
+        }}>
           {text.trim()
-            ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
-            : <span style={{ color: COLORS.muted, fontStyle: 'italic' }}>Nothing to preview yet.</span>}
+            ? <Brief markdown={text} />
+            : <span style={{ color: COLORS.muted, fontStyle: 'italic', fontSize: '0.85rem' }}>
+                Nothing to preview yet.
+              </span>}
         </div>
       ) : (
         <textarea
@@ -219,7 +462,7 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
           onChange={e => setText(e.target.value)}
           onKeyDown={onKeyDown}
           autoFocus
-          rows={8}
+          rows={10}
           placeholder="What needs making, for whom, and any constraints…"
           style={{
             width: '100%', padding: '0.6rem 0.7rem', borderRadius: '0 0 10px 10px',
@@ -230,7 +473,7 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
         />
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={() => onSave(text)}
@@ -255,10 +498,55 @@ export function BriefEditor({ value, saving, onSave, onCancel }: BriefEditorProp
         >
           Cancel
         </button>
-        <span style={{ fontSize: '0.66rem', color: COLORS.muted }}>
-          Ctrl+Enter saves · Esc cancels
+        <span style={{ fontSize: '0.66rem', color: note ? COLORS.ink : COLORS.muted, fontWeight: note ? 700 : 400 }}>
+          {note || 'Ctrl+Enter saves · Esc cancels'}
         </span>
       </div>
     </div>
+  )
+}
+
+function Menu({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <>
+      {/* Click-away layer, so the menu closes without a document listener
+          fighting the toolbar's own mousedown suppression. */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 70 }} />
+      <div
+        role="menu"
+        style={{
+          position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 4, zIndex: 71,
+          minWidth: 210, background: '#fff', border: `1px solid ${COLORS.line}`,
+          borderRadius: 10, boxShadow: '0 12px 32px rgba(23,19,33,.18)', padding: 5,
+        }}
+      >
+        {children}
+      </div>
+    </>
+  )
+}
+
+function MenuItem({ icon, children, hint, onClick }: {
+  icon: string; children: React.ReactNode; hint?: string; onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onMouseDown={e => e.preventDefault()}
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+        padding: '7px 9px', borderRadius: 7, border: 'none', background: 'transparent',
+        color: COLORS.ink, fontSize: '0.8rem', fontFamily: 'inherit',
+        cursor: 'pointer', textAlign: 'start',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      <span aria-hidden="true" style={{ width: 16, textAlign: 'center', color: COLORS.muted }}>{icon}</span>
+      {children}
+      {hint && <span style={{ marginInlineStart: 'auto', fontSize: '0.62rem', color: COLORS.muted }}>{hint}</span>}
+    </button>
   )
 }

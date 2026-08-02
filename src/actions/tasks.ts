@@ -199,6 +199,64 @@ export async function updateTask(
   return { success: true }
 }
 
+// ─── createSubtask ──────────────────────────────────────────────────────────
+
+/**
+ * Create a child of an existing task — the Insert ▸ New subtask action.
+ *
+ * A subtask is an ordinary task. It gets its own stage, SLA clock and owner,
+ * and appears on the board like anything else; the only difference is that it
+ * knows its parent, which the card and the panel show. Nothing in the pipeline
+ * treats it specially, so no stage logic had to learn about it.
+ *
+ * It inherits the parent's brand, content type and owner, because a subtask
+ * raised from a brief is almost always the same work broken down.
+ */
+export async function createSubtask(
+  parentId: string,
+  name: string,
+): Promise<{ success: boolean; id?: string; name?: string; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const trimmed = name.trim()
+  if (!trimmed) return { success: false, error: 'Subtask name cannot be empty' }
+
+  const parent = await prisma.task.findUnique({ where: { id: parentId } })
+  if (!parent) return { success: false, error: 'not_found' }
+
+  // Same rule as editing the parent: its owner, or an admin/superuser.
+  const allowed =
+    parent.task_owner_id === member.id ||
+    member.access === 'admin' ||
+    member.access === 'superuser'
+  if (!allowed) return { success: false, error: 'not_authorized' }
+
+  const task = await prisma.task.create({
+    data: {
+      name:               trimmed,
+      parent_task_id:     parent.id,
+      brand_id:           parent.brand_id,
+      content_type_label: parent.content_type_label,
+      platform:           parent.platform,
+      campaign:           parent.campaign,
+      task_owner_id:      parent.task_owner_id,
+      initiator_role:     member.role,
+      nine_stage:         parent.nine_stage,
+      status:             'todo',
+      stage_date:         new Date(),
+      due_date:           parent.due_date,
+      hours_estimate:     0,
+      priority:           parent.priority,
+      created_by:         member.id,
+    },
+  })
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  return { success: true, id: task.id, name: task.name }
+}
+
 // ─── createTask ─────────────────────────────────────────────────────────────
 
 interface CreateTaskInput {
