@@ -17,12 +17,13 @@ export function TaskPanel({ title, variant, tasks, slaConfig, today, accentColor
   const filtered = tasks
     .filter(t => {
       if (t.status === 'publish') return false
+      if (!t.due_date) return false
       const d = calDaysBetween(today, new Date(t.due_date))
       if (variant === 'my-day')  return d <= 0
       if (variant === 'up-next') return d >= 1 && d <= 7
       return false
     })
-    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+    .sort((a, b) => new Date(a.due_date ?? 0).getTime() - new Date(b.due_date ?? 0).getTime())
 
   const ICON = variant === 'my-day' ? '☀️' : '📅'
 

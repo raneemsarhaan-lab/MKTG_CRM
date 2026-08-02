@@ -80,6 +80,9 @@ model SlaConfig {
 
 model Task {
   id                 String   @id @default(uuid()) @db.Uuid
+  /// Source key when a task came from an external system (ClickUp import).
+  /// Unique so a re-import updates rather than duplicates.
+  external_id        String?  @unique
   name               String
   description        String?  @db.Text
   brand_id           String?  @db.Uuid
@@ -91,7 +94,7 @@ model Task {
   nine_stage         Boolean  @default(false)
   status             String   @default("todo")
   stage_date         DateTime @default(now()) @db.Date
-  due_date           DateTime @db.Date
+  due_date           DateTime? @db.Date
   hours_estimate     Decimal  @default(0) @db.Decimal(5, 1)
   cover_image_url    String?
   priority           String   @default("Medium")

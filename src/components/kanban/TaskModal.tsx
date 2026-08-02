@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
 import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
@@ -17,6 +18,7 @@ type FullTask = Task & {
   brand: Brand
   task_owner: Member
   comments: (TaskComment & { author: Member })[]
+  attachments?: { id: string; filename: string; url?: string | null }[]
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
@@ -126,14 +128,27 @@ export function TaskModal({
   const nextMeta    = nextStage ? STAGE_META[nextStage] : null
   const alertStatus = getAlertStatus(task, slaConfig, today)
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
-  const daysLeft    = calDaysBetween(today, new Date(task.due_date))
-  const overdue     = daysLeft < 0
+  const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue     = daysLeft !== null && daysLeft < 0
 
   // Mirrors updateTask's server-side check — the server one is authoritative.
   const canEditBrief =
     task.task_owner_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
+
+  // Escape closes the panel. Ignored while an inline editor is open so the
+  // first Escape reverts that field rather than discarding the whole view.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   function applyPatch(patch: TaskPatch, after?: () => void) {
     setBriefError('')
@@ -212,10 +227,10 @@ export function TaskModal({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: '0.72rem' }}>
               <span style={{
-                width: 9, height: 9, borderRadius: 3, background: task.brand.color, flexShrink: 0,
+                width: 9, height: 9, borderRadius: 3, background: task.brand?.color ?? '#C4C4BE', flexShrink: 0,
               }} />
               <span style={{ color: COLORS.ink, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {task.brand.name}
+                {task.brand?.name ?? 'No brand'}
               </span>
               <span style={{ color: COLORS.muted }}>/</span>
               <span style={{ color: COLORS.muted, whiteSpace: 'nowrap' }}>{task.content_type_label}</span>
@@ -239,11 +254,11 @@ export function TaskModal({
               height: 64, flexShrink: 0, position: 'relative',
               background: task.cover_image_url
                 ? `url(${task.cover_image_url}) center/cover no-repeat`
-                : brandGradient(task.brand.color),
+                : brandGradient(task.brand?.color ?? '#C4C4BE'),
             }}>
               <div style={{
                 position: 'absolute', bottom: 0, insetInline: 0, height: 3,
-                background: task.brand.color,
+                background: task.brand?.color ?? '#C4C4BE',
               }} />
             </div>
 
@@ -313,9 +328,11 @@ export function TaskModal({
                     {isOverride ? '⚡ ' : ''}→ {nextMeta.label_en}
                   </button>
                 )}
-                <span style={{ fontSize: '0.68rem', color: overdue ? '#ef4444' : COLORS.muted }}>
-                  {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
-                </span>
+                {daysLeft !== null && (
+                  <span style={{ fontSize: '0.68rem', color: overdue ? '#ef4444' : COLORS.muted }}>
+                    {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
+                  </span>
+                )}
               </div>
             </Row>
 
@@ -336,8 +353,10 @@ export function TaskModal({
 
             <Row icon="▦" label="Due date">
               <InlineValue
-                canEdit={canEditBrief} type="date" value={task.due_date}
-                display={new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                canEdit={canEditBrief} type="date" value={task.due_date ?? ''}
+                display={task.due_date
+                  ? new Date(task.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : ''}
                 onCommit={v => applyPatch({ due_date: v })}
               />
             </Row>
@@ -360,7 +379,7 @@ export function TaskModal({
 
             <Row icon="◆" label="Brand">
               <InlineValue
-                canEdit={canEditBrief} type="select" value={task.brand_id} display={task.brand?.name}
+                canEdit={canEditBrief} type="select" value={task.brand_id ?? ''} display={task.brand?.name}
                 options={brands.map(b => ({ value: b.id, label: b.name }))}
                 onCommit={v => applyPatch({ brand_id: v })}
               />
@@ -482,14 +501,55 @@ export function TaskModal({
                   </button>
                 </div>
               </div>
+            ) : task.description ? (
+              /* Briefs are Markdown — imported ClickUp content keeps its
+                 headings, bold, lists and links, so it must be rendered
+                 rather than printed. */
+              <div className="fx-brief">
+                <ReactMarkdown>{task.description}</ReactMarkdown>
+              </div>
             ) : (
               <p style={{
-                color: task.description ? COLORS.ink : COLORS.muted,
-                fontSize: '0.85rem', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap',
-                fontStyle: task.description ? 'normal' : 'italic',
+                color: COLORS.muted, fontSize: '0.85rem',
+                lineHeight: 1.6, margin: 0, fontStyle: 'italic',
               }}>
-                {task.description || 'No brief yet.'}
+                No brief yet.
               </p>
+            )}
+
+            {(task.attachments?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{
+                  fontSize: '0.6rem', color: COLORS.muted, marginBottom: 6,
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
+                }}>
+                  Attachments ({task.attachments!.length})
+                </div>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
+                  {task.attachments!.map(a => (
+                    <li key={a.id}>
+                      <a
+                        href={a.url ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          fontSize: '0.78rem', color: a.url ? '#6E5BE6' : COLORS.muted,
+                          textDecoration: 'none', padding: '4px 6px', borderRadius: 6,
+                          border: `1px solid ${COLORS.line}`, background: '#FCFCFB',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        {a.filename}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {isPublished && (
