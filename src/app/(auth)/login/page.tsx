@@ -9,24 +9,51 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [hint,     setHint]     = useState(false)
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    })
+    try {
+      const result = await signIn('credentials', {
+        email: email.trim(),
+        password,
+        redirect: false,
+      })
 
-    if (result?.error) {
-      setError('Invalid email or password')
-      setLoading(false)
-    } else {
+      // A thrown request and a missing result both used to leave the button
+      // reading "Signing in…" for ever with nothing said — the reported
+      // symptom. Every path below ends in either a message or a redirect.
+      if (!result) {
+        setError('Could not reach the sign-in service. Check your connection and try again.')
+        return
+      }
+
+      if (result.error) {
+        // Deliberately the same message whether the address is unknown, the
+        // password is wrong, or the account has none yet: a specific answer
+        // would let anyone type addresses to find out who works here. The
+        // hint covers the third case without confirming any of them.
+        setError('Invalid email or password.')
+        setHint(true)
+        return
+      }
+
       router.push('/overview')
+      router.refresh()
+    } catch {
+      setError('Something went wrong signing in. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -77,6 +104,26 @@ export default function LoginPage() {
             role="alert"
           >
             {error}
+          </div>
+        )}
+
+        {/* Nine accounts came from the ClickUp import with no password set.
+            They can hold work but cannot sign in until an admin sets one, and
+            the failure looks identical to a typo from out here. */}
+        {hint && (
+          <div
+            style={{
+              background: '#FCEFD9',
+              color: '#8A6414',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '13px',
+              lineHeight: 1.5,
+              marginBottom: '20px',
+            }}
+          >
+            Never signed in before? Your account may not have a password yet —
+            ask an admin to set one for you in Settings.
           </div>
         )}
 
