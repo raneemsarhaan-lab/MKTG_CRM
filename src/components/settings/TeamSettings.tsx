@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import type { Member } from '@/types/index'
 import { COLORS, ACCESS_BADGE } from '@/lib/tokens'
 import { initials, avatarColor } from '@/lib/utils'
@@ -352,15 +352,31 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   const [isPending, startTransition] = useTransition()
   const [newPwd, setNewPwd] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
+  const pwdRef = useRef<HTMLInputElement>(null)
   const ac = ACCESS_BADGE[m.access] as { bg: string; text: string }
 
+  /**
+   * The value is read from the element, not from React state.
+   *
+   * These are `type=password` inputs on a page with sixteen of them, and a
+   * browser password manager will autofill them without firing React's
+   * onChange. State then stays empty while the box visibly holds a value, the
+   * button sits disabled, and clicking it does nothing at all — which looks
+   * exactly like "I reset the password and it didn't work".
+   */
   function handleResetPassword() {
-    if (!newPwd || newPwd.length < 6) { setPwdMsg('Min 6 characters'); return }
+    const value = pwdRef.current?.value ?? newPwd
+    if (!value || value.length < 6) { setPwdMsg('Min 6 characters'); return }
     startTransition(async () => {
-      const r = await resetMemberPassword(m.id, newPwd)
-      if (r.success) { setNewPwd(''); setPwdMsg('Password updated') }
-      else setPwdMsg(r.error ?? 'Failed')
-      setTimeout(() => setPwdMsg(''), 3000)
+      const r = await resetMemberPassword(m.id, value)
+      if (r.success) {
+        setNewPwd('')
+        if (pwdRef.current) pwdRef.current.value = ''
+        setPwdMsg(`Password set for ${m.name}`)
+      } else {
+        setPwdMsg(r.error ?? 'Failed')
+      }
+      setTimeout(() => setPwdMsg(''), 6000)
     })
   }
   const ownedStages = REVIEW_STAGES.filter(s => STAGE_META[s].owner_role === m.role)
@@ -501,9 +517,12 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
       {/* Reset password */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
         <input
+          ref={pwdRef}
           type="password"
+          name={`new-password-${m.id}`}
+          autoComplete="new-password"
           placeholder={m.has_password === false ? 'Set a password' : 'New password'}
-          value={newPwd}
+          defaultValue=""
           onChange={e => setNewPwd(e.target.value)}
           style={{
             fontSize: '0.72rem', padding: '5px 8px', borderRadius: 6,
@@ -511,19 +530,28 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
             color: 'var(--ink)', outline: 'none', fontFamily: 'inherit', width: 150,
           }}
         />
+        {/* Never disabled on state alone — see handleResetPassword. An empty
+            box is answered with a message, not with a dead button. */}
         <button
           onClick={handleResetPassword}
-          disabled={isPending || !newPwd}
+          disabled={isPending}
           style={{
             fontSize: '0.7rem', padding: '5px 10px', borderRadius: 6,
             background: 'var(--ink)', color: '#fff', border: 'none',
-            cursor: newPwd ? 'pointer' : 'default', opacity: newPwd ? 1 : 0.4,
+            cursor: 'pointer', opacity: isPending ? 0.5 : 1,
             fontFamily: 'inherit', fontWeight: 600,
           }}
         >
           {m.has_password === false ? 'Set' : 'Reset'}
         </button>
-        {pwdMsg && <span style={{ fontSize: '0.7rem', color: pwdMsg.includes('updated') ? '#4B7A12' : COLORS.coral }}>{pwdMsg}</span>}
+        {pwdMsg && (
+          <span style={{
+            fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
+            color: pwdMsg.startsWith('Password set') ? '#4B7A12' : COLORS.coral,
+          }}>
+            {pwdMsg.startsWith('Password set') ? `✓ ${pwdMsg}` : pwdMsg}
+          </span>
+        )}
 
         {/* Photo. A URL — there is no upload backend, so this points at an
             image hosted elsewhere. */}
