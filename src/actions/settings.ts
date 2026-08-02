@@ -60,14 +60,93 @@ export async function createBrand(
   }
 }
 
+/** Rename a brand, recolour it, or change its logo. */
+export async function updateBrand(
+  brandId: string,
+  patch: Partial<{ name: string; color: string; logo_url: string | null; description: string | null }>,
+): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
+  const data: Record<string, unknown> = {}
+  if (patch.name !== undefined) {
+    const name = patch.name.trim()
+    if (!name) return { success: false, error: 'Brand name cannot be empty' }
+    data.name = name
+  }
+  if (patch.color !== undefined)       data.color       = patch.color
+  if (patch.logo_url !== undefined)    data.logo_url    = patch.logo_url?.trim() || null
+  if (patch.description !== undefined) data.description = patch.description?.trim() || null
+
+  if (Object.keys(data).length === 0) return { success: true }
+
+  try {
+    await prisma.brand.update({ where: { id: brandId }, data })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    const msg = String(e)
+    if (msg.includes('Unique constraint')) return { success: false, error: 'A brand with that name already exists' }
+    return { success: false, error: msg }
+  }
+}
+
+// ─── Brand assets ─────────────────────────────────────────────────────────────
+
+/**
+ * Attach reference material to a brand.
+ *
+ * URL-based, exactly like task attachments — there is no file upload backend,
+ * so this points at artwork hosted elsewhere rather than storing bytes.
+ */
+export async function addBrandAsset(
+  brandId: string,
+  input: { filename: string; url: string },
+): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
+  const url = input.url.trim()
+  if (!url) return { success: false, error: 'A URL is required' }
+  const filename = input.filename.trim() || url.split('/').pop() || 'asset'
+
+  try {
+    await prisma.brandAsset.create({ data: { brand_id: brandId, filename, url } })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
+}
+
+export async function removeBrandAsset(
+  assetId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+
+  try {
+    await prisma.brandAsset.delete({ where: { id: assetId } })
+    revalidateAll()
+    return { success: true }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
+  }
+}
+
 export async function removeBrand(
   brandId: string,
 ): Promise<{ success: boolean; error?: string }> {
   const auth = await requireAdmin()
   if (auth.error) return { success: false, error: auth.error }
 
+  // Tasks reference the brand; deleting one out from under them would fail on
+  // the foreign key, so they are unlinked first and keep their history.
   try {
-    await prisma.brand.delete({ where: { id: brandId } })
+    await prisma.$transaction([
+      prisma.task.updateMany({ where: { brand_id: brandId }, data: { brand_id: null } }),
+      prisma.brand.delete({ where: { id: brandId } }),
+    ])
     revalidateAll()
     return { success: true }
   } catch (e: unknown) {

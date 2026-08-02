@@ -1,16 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import type { Member, Brand, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
+import type { Member, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { TeamSettings } from './TeamSettings'
 import { WorkflowSettings } from './WorkflowSettings'
+import { BrandSettings, type BrandWithAssets } from './BrandSettings'
 
-type Tab = 'team' | 'workflow'
+type Tab = 'team' | 'brands' | 'workflow'
 
 interface SettingsViewProps {
   members: Member[]
   currentUserId: string
-  brands: Brand[]
+  brands: BrandWithAssets[]
   contentTypes: ContentType[]
   slaConfig: SLAConfig
   workspaceSettings: WorkspaceSettings
@@ -54,20 +55,21 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
           <button style={tabBtn(tab === 'team')} onClick={() => setTab('team')}>
             Team &amp; Access
           </button>
+          <button style={tabBtn(tab === 'brands')} onClick={() => setTab('brands')}>
+            Brands
+          </button>
           <button style={tabBtn(tab === 'workflow')} onClick={() => setTab('workflow')}>
             SLA &amp; Workflow
           </button>
         </div>
 
         {/* Tab content */}
-        {tab === 'team' ? (
-          <TeamSettings
-            members={members}
-            currentUserId={currentUserId}
-          />
-        ) : (
+        {tab === 'team' && (
+          <TeamSettings members={members} currentUserId={currentUserId} />
+        )}
+        {tab === 'brands' && <BrandSettings brands={brands} />}
+        {tab === 'workflow' && (
           <WorkflowSettings
-            brands={brands}
             contentTypes={contentTypes}
             slaConfig={slaConfig}
             workspaceSettings={workspaceSettings}

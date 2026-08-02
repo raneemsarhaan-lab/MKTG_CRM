@@ -2,7 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, StageMeta } from '@/types/index'
+import type { Task, Member, SLAConfig, StageMeta, StageId } from '@/types/index'
 import { PIPE, PIPE_ACCENT } from '@/lib/pipeline-tokens'
 import { TaskCard } from './TaskCard'
 
@@ -25,14 +25,21 @@ interface KanbanColumnProps {
   highlight?: boolean
   onSelectTask: (id: string) => void
   onAddTask?: () => void
+  selectedIds?: Set<string>
+  selecting?: boolean
+  onToggleSelect?: (id: string, shiftKey: boolean) => void
+  onSelectAll?: (stageId: StageId, on: boolean) => void
 }
 
 export function KanbanColumn({
   stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask,
+  selectedIds, selecting, onToggleSelect, onSelectAll,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const active = isOver || Boolean(highlight)
   const accent = PIPE_ACCENT[stage.id] ?? PIPE.purpleStroke
+
+  const allSelected = tasks.length > 0 && tasks.every(t => selectedIds?.has(t.id))
 
   const stageOwner = stage.owner_role
     ? members.find(m => m.role === stage.owner_role) ?? null
@@ -65,13 +72,32 @@ export function KanbanColumn({
           }}>
             {stage.label_en}
           </div>
-          <div style={{
-            minWidth: 22, height: 22, borderRadius: 6, background: PIPE.surface,
-            fontSize: 11.5, fontWeight: 700, color: PIPE.textMuted,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            padding: '0 5px',
-          }}>
-            {tasks.length}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {onSelectAll && tasks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onSelectAll(stage.id as StageId, !allSelected)}
+                title={allSelected ? `Deselect all in ${stage.label_en}` : `Select all in ${stage.label_en}`}
+                aria-pressed={allSelected}
+                style={{
+                  width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
+                  border: `1.5px solid ${allSelected ? PIPE.purple : PIPE.borderInput}`,
+                  background: allSelected ? PIPE.purple : '#FFFFFF',
+                  color: '#FFFFFF', fontSize: 11, fontWeight: 900, lineHeight: '15px',
+                  padding: 0, fontFamily: 'inherit',
+                }}
+              >
+                {allSelected ? '✓' : ''}
+              </button>
+            )}
+            <div style={{
+              minWidth: 22, height: 22, borderRadius: 6, background: PIPE.surface,
+              fontSize: 11.5, fontWeight: 700, color: PIPE.textMuted,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 5px',
+            }}>
+              {tasks.length}
+            </div>
           </div>
         </div>
         <div style={{
@@ -96,6 +122,9 @@ export function KanbanColumn({
               slaConfig={slaConfig}
               today={today}
               onSelect={onSelectTask}
+              selected={selectedIds?.has(task.id)}
+              selecting={selecting}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </SortableContext>

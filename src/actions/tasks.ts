@@ -257,6 +257,113 @@ export async function createSubtask(
   return { success: true, id: task.id, name: task.name }
 }
 
+// ─── bulk operations ────────────────────────────────────────────────────────
+
+export interface BulkResult {
+  success: boolean
+  changed:  number
+  refused:  number
+  error?:   string
+}
+
+/**
+ * Apply one patch to many tasks — the bulk action bar.
+ *
+ * Every task is authorised individually against the same rule as updateTask,
+ * and the result reports how many were refused rather than failing the whole
+ * batch. Selecting forty tasks and finding one belongs to someone else should
+ * change thirty-nine, not zero.
+ *
+ * `status` moves are handled here too, unlike updateTask, because a bulk
+ * "move to stage" is a real need. It carries setTaskStage's rule — the stage
+ * being left decides — and resets the SLA clock exactly as a drag does.
+ */
+export async function bulkUpdateTasks(
+  taskIds: string[],
+  patch: TaskPatch & { status?: StageId },
+): Promise<BulkResult> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, changed: 0, refused: 0, error: 'not_authenticated' }
+  if (taskIds.length === 0) return { success: true, changed: 0, refused: 0 }
+
+  const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } } })
+  const isAdmin = member.access === 'admin' || member.access === 'superuser'
+
+  let changed = 0, refused = 0
+
+  for (const task of tasks) {
+    const data: Record<string, unknown> = { updated_at: new Date() }
+
+    if (patch.status !== undefined) {
+      const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
+      if (!path.includes(patch.status)) { refused++; continue }
+
+      const stageMeta = STAGE_META[task.status as StageId]
+      const ownsStage = !stageMeta.owner_role
+        ? task.task_owner_id === member.id
+        : stageMeta.owner_role === member.role
+      if (!ownsStage && !isAdmin) { refused++; continue }
+
+      if (patch.status !== task.status) {
+        data.status = patch.status
+        data.stage_date = new Date()
+      }
+    }
+
+    if (patch.status === undefined || Object.keys(patch).length > 1) {
+      if (task.task_owner_id !== member.id && !isAdmin) { refused++; continue }
+    }
+
+    if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
+    if (patch.brand_id !== undefined)           data.brand_id           = patch.brand_id || null
+    if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
+    if (patch.platform !== undefined)           data.platform           = patch.platform || null
+    if (patch.campaign !== undefined)           data.campaign           = patch.campaign.trim() || null
+    if (patch.priority !== undefined)           data.priority           = patch.priority
+    if (patch.due_date !== undefined) {
+      const d = new Date(patch.due_date)
+      if (Number.isNaN(d.getTime())) { refused++; continue }
+      data.due_date = d
+    }
+
+    if (Object.keys(data).length === 1) continue   // nothing but updated_at
+    await prisma.task.update({ where: { id: task.id }, data })
+    changed++
+  }
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  revalidatePath('/capacity')
+  return { success: true, changed, refused }
+}
+
+/**
+ * Delete tasks outright.
+ *
+ * Same authorisation as editing — owner, admin or superuser — because a task
+ * you may rewrite entirely you may also remove. Comments and attachments go
+ * with it by cascade; subtasks are kept and simply lose their parent, which is
+ * why the relation is onDelete: SetNull rather than Cascade.
+ */
+export async function bulkDeleteTasks(taskIds: string[]): Promise<BulkResult> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, changed: 0, refused: 0, error: 'not_authenticated' }
+  if (taskIds.length === 0) return { success: true, changed: 0, refused: 0 }
+
+  const isAdmin = member.access === 'admin' || member.access === 'superuser'
+  const tasks   = await prisma.task.findMany({ where: { id: { in: taskIds } } })
+
+  const allowed = tasks.filter(t => isAdmin || t.task_owner_id === member.id).map(t => t.id)
+  const refused = tasks.length - allowed.length
+
+  if (allowed.length) await prisma.task.deleteMany({ where: { id: { in: allowed } } })
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  revalidatePath('/capacity')
+  return { success: true, changed: allowed.length, refused }
+}
+
 // ─── createTask ─────────────────────────────────────────────────────────────
 
 interface CreateTaskInput {

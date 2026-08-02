@@ -12,7 +12,7 @@ import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-met
 import { PIPE } from '@/lib/pipeline-tokens'
 import { attentionItems } from '@/lib/home-metrics'
 import { initials, avatarColor } from '@/lib/utils'
-import { setTaskStage } from '@/actions/tasks'
+import { setTaskStage, bulkUpdateTasks, bulkDeleteTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardOverlay } from './TaskCard'
@@ -21,6 +21,7 @@ import {
 } from './BoardFilters'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
+import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
 
 type FullTask = Task & {
@@ -54,6 +55,9 @@ export function KanbanBoard({
   const [overStage, setOverStage] = useState<StageId | null>(null)
   const [filters, setFilters]     = useState<BoardFilterState>(EMPTY_FILTERS)
   const [dragError, setDragError] = useState('')
+  const [selected, setSelected]   = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy]   = useState(false)
+  const [bulkNote, setBulkNote]   = useState('')
   const [, startTransition]       = useTransition()
   const router = useRouter()
 
@@ -180,6 +184,81 @@ export function KanbanBoard({
 
   const attentionCount = attentionItems(tasks, currentUser.id, today).length
 
+  // ── Bulk selection ────────────────────────────────────────────────────────
+  // Shift-click extends from the last click through the *visible* order, which
+  // is what the eye expects — the filtered, column-grouped sequence, not the
+  // order the server happened to send.
+  const visibleOrder = useMemo(
+    () => ALL_STAGES.flatMap(id => (tasksByStage[id] ?? []).map(t => t.id)),
+    [tasksByStage],
+  )
+  const [lastClicked, setLastClicked] = useState<string | null>(null)
+
+  function toggleSelect(id: string, shiftKey: boolean) {
+    setBulkNote('')
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (shiftKey && lastClicked) {
+        const a = visibleOrder.indexOf(lastClicked)
+        const b = visibleOrder.indexOf(id)
+        if (a !== -1 && b !== -1) {
+          const [from, to] = a < b ? [a, b] : [b, a]
+          for (let i = from; i <= to; i++) next.add(visibleOrder[i])
+          return next
+        }
+      }
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+    setLastClicked(id)
+  }
+
+  function selectStage(stageId: StageId, on: boolean) {
+    const ids = (tasksByStage[stageId] ?? []).map(t => t.id)
+    setBulkNote('')
+    setSelected(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => (on ? next.add(id) : next.delete(id)))
+      return next
+    })
+  }
+
+  /**
+   * `clearAfter` is true only for delete. An edit keeps the selection so a
+   * second change can be chained onto the same set — and so the "N changed"
+   * note has a bar left to sit in, since the bar disappears at zero.
+   */
+  function runBulk(
+    fn: () => Promise<{ changed: number; refused: number; error?: string }>,
+    clearAfter = false,
+  ) {
+    setBulkBusy(true)
+    setBulkNote('')
+    startTransition(async () => {
+      const res = await fn()
+      setBulkBusy(false)
+      if (res.error) { setBulkNote(res.error); return }
+      setBulkNote(
+        res.refused > 0
+          ? `${res.changed} changed · ${res.refused} not yours`
+          : `${res.changed} changed`,
+      )
+      if (clearAfter) setSelected(new Set())
+      router.refresh()
+      setTimeout(() => setBulkNote(''), 5000)
+    })
+  }
+
+  // Escape drops the selection — the same key that closes everything else.
+  useEffect(() => {
+    if (selected.size === 0) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelected(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.size])
+
   // Time-derived, and computed on the client only — rendering it on the server
   // would freeze whatever hour the page was built at.
   const [greeting, setGreeting] = useState('Hello')
@@ -189,10 +268,13 @@ export function KanbanBoard({
   }, [])
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      gap: 22, paddingBottom: 30, background: '#FFFFFF',
-    }}>
+    <div
+      className={selected.size > 0 ? 'fx-board-selecting' : undefined}
+      style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        gap: 22, paddingBottom: selected.size > 0 ? 90 : 30, background: '#FFFFFF',
+      }}
+    >
       {/* Greeting header — Pipeline handoff §4. */}
       <div style={{
         padding: '24px 26px 0 38px', flexShrink: 0, display: 'flex',
@@ -392,6 +474,10 @@ export function KanbanBoard({
                 highlight={overStage === stageId && activeDragId !== null}
                 onSelectTask={id => selectTask(id)}
                 onAddTask={currentUser.access !== 'user' ? () => setShowTaskForm(true) : undefined}
+                selectedIds={selected}
+                selecting={selected.size > 0}
+                onToggleSelect={toggleSelect}
+                onSelectAll={selectStage}
               />
             )
           })}
@@ -414,6 +500,18 @@ export function KanbanBoard({
           )}
         </DragOverlay>
       </DndContext>
+
+      <BulkBar
+        count={selected.size}
+        members={members}
+        brands={brands}
+        types={contentTypes}
+        busy={bulkBusy}
+        note={bulkNote}
+        onApply={(patch: BulkPatch) => runBulk(() => bulkUpdateTasks([...selected], patch))}
+        onDelete={() => runBulk(() => bulkDeleteTasks([...selected]), true)}
+        onClear={() => { setSelected(new Set()); setBulkNote('') }}
+      />
 
       {/* Task modal */}
       {selectedTask && (
