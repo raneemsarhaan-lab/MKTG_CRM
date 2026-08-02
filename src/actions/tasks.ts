@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator } from '@/lib/authz'
-import { nextStageId } from '@/lib/stage-meta'
+import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
@@ -41,6 +41,57 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   revalidatePath('/board')
   revalidatePath('/overview')
   return { success: true, shouldCelebrate }
+}
+
+// ─── setTaskStage ───────────────────────────────────────────────────────────
+
+/**
+ * Move a task to a specific stage — what a board drag means.
+ *
+ * `moveTask` only knows "forward one"; a drag can land anywhere, including
+ * backwards, which is how a rejected review is expressed. Same authorisation
+ * as moveTask: whoever owns the stage the task is leaving, or an admin /
+ * superuser override. The check is on the *current* stage, not the target —
+ * the right to hand work on belongs to the person holding it.
+ *
+ * The target must exist in this task's own path. An 8-stage task cannot be
+ * dragged into c-check; that column simply rejects the drop.
+ */
+export async function setTaskStage(
+  taskId: string,
+  stageId: StageId,
+): Promise<MoveTaskResult> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
+
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
+
+  const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
+  const fromIdx = path.indexOf(task.status as StageId)
+  const toIdx   = path.indexOf(stageId)
+  if (toIdx === -1) return { success: false, shouldCelebrate: false, error: 'stage_not_in_pipeline' }
+  if (toIdx === fromIdx) return { success: true, shouldCelebrate: false }
+
+  const stageMeta = STAGE_META[task.status as StageId]
+  const isOwnStage = !stageMeta.owner_role
+    ? task.task_owner_id === member.id
+    : stageMeta.owner_role === member.role
+
+  const allowed = isOwnStage || member.access === 'admin' || member.access === 'superuser'
+  if (!allowed) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+
+  await prisma.task.update({
+    where: { id: taskId },
+    data:  { status: stageId, stage_date: new Date(), updated_at: new Date() },
+  })
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+
+  // Only progress is a win, and only for the person whose stage it was —
+  // pulling a task back or overriding someone else's stage celebrates nothing.
+  return { success: true, shouldCelebrate: isOwnStage && toIdx > fromIdx }
 }
 
 // ─── addComment ─────────────────────────────────────────────────────────────

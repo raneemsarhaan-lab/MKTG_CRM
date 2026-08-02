@@ -12,11 +12,14 @@ interface KanbanColumnProps {
   members: Member[]
   slaConfig: SLAConfig
   today: Date
+  /** Set by the board when the pointer is over this column mid-drag. */
+  highlight?: boolean
   onSelectTask: (id: string) => void
 }
 
-export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, today, onSelectTask }: KanbanColumnProps) {
+export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
+  const active = isOver || Boolean(highlight)
 
   const color = stage.color
   const stageOwner = stage.owner_role
@@ -24,16 +27,21 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
     : null
 
   return (
+    // The whole column is the drop target, not just the card list — a column
+    // holding one card would otherwise offer a 100px-tall place to aim at.
     <div
+      ref={setNodeRef}
       style={{
         display: 'flex',
         flexDirection: 'column',
         minWidth: '280px',
         width: '280px',
         flexShrink: 0,
-        background: isOver ? `${color}08` : 'transparent',
+        background: active ? `${color}12` : 'transparent',
+        outline: active ? `2px dashed ${color}66` : '2px dashed transparent',
+        outlineOffset: 2,
         borderRadius: '12px',
-        transition: 'background 0.15s',
+        transition: 'background 0.15s, outline-color 0.15s',
       }}
     >
       {/* Column header — colored top border, white bg, gray count badge */}
@@ -93,12 +101,11 @@ export function KanbanColumn({ stage, tasks, currentUser, members, slaConfig, to
 
       {/* Card list — droppable + sortable */}
       <div
-        ref={setNodeRef}
         style={{
           flex: 1,
           overflowY: 'auto',
           padding: '0 2px',
-          minHeight: '48px',
+          minHeight: '96px',
         }}
       >
         <SortableContext
