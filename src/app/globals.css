@@ -239,8 +239,18 @@ html {
   margin: 1.1em 0 0.4em;
 }
 .fx-brief p  { margin: 0 0 0.7em; }
+/* Tailwind preflight strips list markers globally; a brief's bullets are
+   content, so they come back here. */
 .fx-brief ul,
-.fx-brief ol { margin: 0 0 0.7em; padding-inline-start: 1.25rem; }
+.fx-brief ol { margin: 0 0 0.7em; padding-inline-start: 1.35rem; }
+.fx-brief ul { list-style: disc outside; }
+.fx-brief ol { list-style: decimal outside; }
+.fx-brief ul ul { list-style: circle outside; }
+.fx-brief li::marker { color: var(--muted); }
+.fx-brief li > ul,
+.fx-brief li > ol { margin-bottom: 0; }
+/* GFM task lists keep their checkbox instead of a bullet */
+.fx-brief li:has(> input[type="checkbox"]) { list-style: none; margin-inline-start: -0.35rem; }
 .fx-brief li { margin: 0.15em 0; }
 .fx-brief blockquote {
   margin: 0 0 0.7em;
@@ -255,6 +265,22 @@ html {
   background: #F4F4F2; border-radius: 4px; padding: 0.1em 0.35em;
   font-size: 0.92em;
 }
+.fx-brief pre {
+  background: #F4F4F2; border-radius: 8px; padding: 0.6em 0.7em;
+  overflow-x: auto; margin: 0 0 0.7em;
+}
+.fx-brief pre code { background: none; padding: 0; }
+.fx-brief strong { font-weight: 800; }
+.fx-brief del    { text-decoration: line-through; color: var(--muted); }
+/* GFM tables — scroll inside the panel rather than widening it */
+.fx-brief table {
+  border-collapse: collapse; width: 100%; display: block;
+  overflow-x: auto; margin: 0 0 0.7em; font-size: 0.95em;
+}
+.fx-brief th,
+.fx-brief td { border: 1px solid var(--line); padding: 0.3em 0.5em; text-align: start; }
+.fx-brief th { background: #F7F7F7; font-weight: 700; }
+.fx-brief input[type="checkbox"] { margin-inline-end: 0.4em; }
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */
 .font-heading { font-family: var(--font-heading); }

@@ -71,9 +71,20 @@ function Avatar({
   )
 }
 
-export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, slaConfig, today, onSelect }: TaskCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
-
+/**
+ * The card's visual body, with no drag wiring.
+ *
+ * Split out so the same markup can be rendered inside dnd-kit's DragOverlay.
+ * A sortable item across columns doesn't follow the pointer on its own — the
+ * overlay is what does — and the overlay must not call useSortable with an id
+ * that is already registered.
+ */
+function CardBody({ task, currentStageOwner, slaConfig, today }: {
+  task: TaskCardProps['task']
+  currentStageOwner: Member | null
+  slaConfig: SLAConfig
+  today: Date
+}) {
   const alertStatus = getAlertStatus(task, slaConfig, today)
   const badgeStyle  = ALERT_BADGE_STYLES[alertStatus]
   const daysLeft    = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
@@ -93,25 +104,8 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
     ? `url(${task.cover_image_url}) center/cover no-repeat`
     : brandGradient(brandColor)
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.35 : 1,
-  }
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onClick={() => onSelect(task.id)}
-      onKeyDown={e => { if (e.key === 'Enter') onSelect(task.id) }}
-      role="button"
-      tabIndex={0}
-      aria-label={`Task: ${task.name}`}
-      className="task-card"
-    >
+    <>
       <style>{`
         .task-card {
           background: #FAFAF9;
@@ -258,6 +252,68 @@ export function TaskCard({ task, currentStageOwner, currentUser: _currentUser, s
           </div>
         </div>
       </div>
+    </>
+  )
+}
+
+export function TaskCard({
+  task, currentStageOwner, currentUser: _currentUser, slaConfig, today, onSelect,
+}: TaskCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: task.id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // The overlay carries the card while it moves, so the original just dims.
+    opacity: isDragging ? 0.35 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    // Pointer drags on touch devices are swallowed by scrolling without this.
+    touchAction: 'none',
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => onSelect(task.id)}
+      onKeyDown={e => { if (e.key === 'Enter') onSelect(task.id) }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Task: ${task.name}`}
+      className="task-card"
+    >
+      <CardBody
+        task={task}
+        currentStageOwner={currentStageOwner}
+        slaConfig={slaConfig}
+        today={today}
+      />
+    </div>
+  )
+}
+
+/** What follows the cursor mid-drag. Same body, tilted and lifted. */
+export function TaskCardOverlay({
+  task, currentStageOwner, slaConfig, today,
+}: Omit<TaskCardProps, 'onSelect' | 'currentUser'>) {
+  return (
+    <div
+      className="task-card"
+      style={{
+        width: 276, cursor: 'grabbing',
+        transform: 'rotate(2deg)',
+        boxShadow: '0 12px 32px rgba(26,28,30,.22)',
+      }}
+    >
+      <CardBody
+        task={task}
+        currentStageOwner={currentStageOwner}
+        slaConfig={slaConfig}
+        today={today}
+      />
     </div>
   )
 }

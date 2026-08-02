@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
@@ -11,6 +12,7 @@ import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { moveTask, addComment, updateTask, type TaskPatch } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
+import { BriefEditor } from './BriefEditor'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
 
@@ -69,46 +71,6 @@ function Avatar({ name, size = 24 }: { name: string; size?: number }) {
   )
 }
 
-function StageTimeline({ task }: { task: FullTask }) {
-  const nineStage  = task.nine_stage
-  const path: string[] = nineStage
-    ? ['todo','c-prog','c-final','c-check','r-design','d-prog','d-check','final-check','publish']
-    : ['todo','c-prog','c-final','r-design','d-prog','d-check','final-check','publish']
-  const currentIdx = path.indexOf(task.status)
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: '1.25rem', overflowX: 'auto', paddingBottom: 4 }}>
-      {path.map((stageId, idx) => {
-        const meta  = STAGE_META[stageId as keyof typeof STAGE_META]
-        const done   = idx < currentIdx
-        const active = idx === currentIdx
-        const dotColor = done ? '#22c55e' : active ? COLORS.lime : COLORS.line
-        const textColor = done ? '#3FA34D' : active ? COLORS.ink : COLORS.muted
-        return (
-          <div key={stageId} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-              <div style={{
-                width: 10, height: 10, borderRadius: '50%', background: dotColor,
-                border: active ? `2px solid ${COLORS.ink}` : '2px solid transparent',
-                outline: active ? `2px solid ${COLORS.lime}44` : 'none',
-              }} />
-              <span style={{
-                fontSize: '0.52rem', color: textColor, textAlign: 'center',
-                maxWidth: 44, lineHeight: 1.2, fontWeight: active ? 700 : 400,
-              }}>
-                {meta.label_en}
-              </span>
-            </div>
-            {idx < path.length - 1 && (
-              <div style={{ width: 14, height: 1, background: idx < currentIdx ? '#BBF7D0' : COLORS.line, marginBottom: 12, flexShrink: 0 }} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [],
@@ -119,6 +81,7 @@ export function TaskModal({
   const [briefError, setBriefError]     = useState('')
   const [editingName, setEditingName]   = useState(false)
   const [nameText, setNameText]         = useState('')
+  const [showAllFields, setShowAllFields] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const setCelebration = useUIStore(s => s.setCelebration)
@@ -159,8 +122,13 @@ export function TaskModal({
     })
   }
 
-  function saveBrief() {
-    applyPatch({ description: briefText }, () => setEditingBrief(false))
+  function startEditingBrief() {
+    setBriefText(task.description ?? '')
+    setEditingBrief(true)
+  }
+
+  function saveBrief(next: string) {
+    applyPatch({ description: next }, () => setEditingBrief(false))
   }
 
   const isAdmin    = currentUser.access === 'admin'
@@ -190,6 +158,91 @@ export function TaskModal({
       }
     })
   }
+
+  /**
+   * Fields below the fold. `filled` decides whether a row shows up front or
+   * only after "Show empty fields" — an imported task with six blank
+   * attributes was reading as a form to complete rather than a brief to work
+   * from.
+   */
+  const secondaryRows: { key: string; filled: boolean; node: React.ReactNode }[] = [
+    {
+      key: 'hours', filled: (task.hours_estimate ?? 0) > 0,
+      node: (
+        <Row key="hours" icon="⏱" label="Time estimate">
+          <InlineValue
+            canEdit={canEditBrief} type="number" min={0} step={0.5}
+            value={task.hours_estimate}
+            display={(task.hours_estimate ?? 0) > 0 ? `${task.hours_estimate}h` : ''}
+            onCommit={v => applyPatch({ hours_estimate: parseFloat(v) })}
+          />
+        </Row>
+      ),
+    },
+    {
+      key: 'brand', filled: Boolean(task.brand?.name),
+      node: (
+        <Row key="brand" icon="◆" label="Brand">
+          <InlineValue
+            canEdit={canEditBrief} type="select" value={task.brand_id ?? ''} display={task.brand?.name}
+            options={brands.map(b => ({ value: b.id, label: b.name }))}
+            onCommit={v => applyPatch({ brand_id: v })}
+          />
+        </Row>
+      ),
+    },
+    {
+      key: 'type', filled: Boolean(task.content_type_label),
+      node: (
+        <Row key="type" icon="▣" label="Content type">
+          <InlineValue
+            canEdit={canEditBrief} type="select" value={task.content_type_label}
+            display={task.content_type_label}
+            options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
+            onCommit={v => applyPatch({ content_type_label: v })}
+          />
+        </Row>
+      ),
+    },
+    {
+      key: 'platform', filled: Boolean(task.platform),
+      node: (
+        <Row key="platform" icon="◈" label="Platform">
+          <InlineValue
+            canEdit={canEditBrief} type="select" value={task.platform ?? ''} display={task.platform}
+            options={PLATFORMS.map(p => ({ value: p, label: p }))}
+            onCommit={v => applyPatch({ platform: v })}
+          />
+        </Row>
+      ),
+    },
+    {
+      key: 'campaign', filled: Boolean(task.campaign),
+      node: (
+        <Row key="campaign" icon="≡" label="Campaign">
+          <InlineValue
+            canEdit={canEditBrief} type="text" value={task.campaign ?? ''} display={task.campaign}
+            placeholder="e.g. Brand Launch"
+            onCommit={v => applyPatch({ campaign: v })}
+          />
+        </Row>
+      ),
+    },
+    {
+      key: 'cover', filled: Boolean(task.cover_image_url),
+      node: (
+        <Row key="cover" icon="▤" label="Cover image">
+          <InlineValue
+            canEdit={canEditBrief} type="text" value={task.cover_image_url ?? ''}
+            display={task.cover_image_url} placeholder="https://…"
+            onCommit={v => applyPatch({ cover_image_url: v })}
+          />
+        </Row>
+      ),
+    },
+  ]
+
+  const hiddenCount = secondaryRows.filter(r => !r.filled).length
 
   function handleComment() {
     const text = cmtText.trim()
@@ -298,11 +351,8 @@ export function TaskModal({
               </h2>
             )}
 
-            {/* Pipeline progress — Fluxo-specific, kept because a staged
-                workflow is the point of this product; ClickUp has no analogue. */}
-            <StageTimeline task={task} />
-
-            {/* Attribute rows */}
+            {/* Attribute rows — the four that are always worth a line, then
+                everything else behind a toggle. */}
             <Row icon="◎" label="Status">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{
@@ -369,66 +419,41 @@ export function TaskModal({
               />
             </Row>
 
-            <Row icon="⏱" label="Time estimate">
-              <InlineValue
-                canEdit={canEditBrief} type="number" min={0} step={0.5}
-                value={task.hours_estimate} display={`${task.hours_estimate}h`}
-                onCommit={v => applyPatch({ hours_estimate: parseFloat(v) })}
-              />
-            </Row>
+            {/* A field with nothing in it earns no line. Everything stays
+                editable — the toggle reveals it, it does not lock it. */}
+            {secondaryRows.filter(r => r.filled).map(r => r.node)}
 
-            <Row icon="◆" label="Brand">
-              <InlineValue
-                canEdit={canEditBrief} type="select" value={task.brand_id ?? ''} display={task.brand?.name}
-                options={brands.map(b => ({ value: b.id, label: b.name }))}
-                onCommit={v => applyPatch({ brand_id: v })}
-              />
-            </Row>
+            {hiddenCount > 0 && (
+              <button
+                onClick={() => setShowAllFields(v => !v)}
+                style={{
+                  background: 'none', border: 'none', padding: '6px 0 0', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 700,
+                  color: COLORS.muted, display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <span style={{ fontSize: '0.6rem' }}>{showAllFields ? '▾' : '▸'}</span>
+                {showAllFields ? 'Hide empty fields' : `Show ${hiddenCount} empty field${hiddenCount === 1 ? '' : 's'}`}
+              </button>
+            )}
 
-            <Row icon="▣" label="Content type">
-              <InlineValue
-                canEdit={canEditBrief} type="select" value={task.content_type_label}
-                display={task.content_type_label}
-                options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
-                onCommit={v => applyPatch({ content_type_label: v })}
-              />
-            </Row>
+            {showAllFields && (
+              <>
+                {secondaryRows.filter(r => !r.filled).map(r => r.node)}
 
-            <Row icon="◈" label="Platform">
-              <InlineValue
-                canEdit={canEditBrief} type="select" value={task.platform ?? ''} display={task.platform}
-                options={PLATFORMS.map(p => ({ value: p, label: p }))}
-                onCommit={v => applyPatch({ platform: v })}
-              />
-            </Row>
-
-            <Row icon="≡" label="Campaign">
-              <InlineValue
-                canEdit={canEditBrief} type="text" value={task.campaign ?? ''} display={task.campaign}
-                placeholder="e.g. Brand Launch"
-                onCommit={v => applyPatch({ campaign: v })}
-              />
-            </Row>
-
-            <Row icon="▤" label="Cover image">
-              <InlineValue
-                canEdit={canEditBrief} type="text" value={task.cover_image_url ?? ''}
-                display={task.cover_image_url} placeholder="https://…"
-                onCommit={v => applyPatch({ cover_image_url: v })}
-              />
-            </Row>
-
-            {/* Read-only — the SLA clock and the pipeline shape */}
-            <Row icon="◔" label="Stage since">
-              <span style={{ fontSize: '0.82rem', color: COLORS.muted, padding: '3px 6px', display: 'inline-block' }}>
-                {new Date(task.stage_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </span>
-            </Row>
-            <Row icon="⋔" label="Pipeline">
-              <span style={{ fontSize: '0.82rem', color: COLORS.muted, padding: '3px 6px', display: 'inline-block' }}>
-                {task.nine_stage ? '9-stage' : '8-stage'}
-              </span>
-            </Row>
+                {/* Read-only — the SLA clock and the pipeline shape */}
+                <Row icon="◔" label="Stage since">
+                  <span style={{ fontSize: '0.82rem', color: COLORS.muted, padding: '3px 6px', display: 'inline-block' }}>
+                    {new Date(task.stage_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                </Row>
+                <Row icon="⋔" label="Pipeline">
+                  <span style={{ fontSize: '0.82rem', color: COLORS.muted, padding: '3px 6px', display: 'inline-block' }}>
+                    {task.nine_stage ? '9-stage' : '8-stage'}
+                  </span>
+                </Row>
+              </>
+            )}
 
             {briefError && (
               <p role="alert" style={{ color: '#ef4444', fontSize: '0.72rem', margin: '8px 0 0' }}>
@@ -448,73 +473,56 @@ export function TaskModal({
               }}>
                 Brief
               </span>
-              {canEditBrief && !editingBrief && (
-                <button
-                  onClick={() => { setBriefText(task.description ?? ''); setEditingBrief(true) }}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    fontSize: '0.68rem', fontWeight: 700, color: COLORS.muted, fontFamily: 'inherit',
-                  }}
-                >
-                  {task.description ? 'Edit' : '+ Add brief'}
-                </button>
-              )}
             </div>
 
             {editingBrief ? (
-              <div>
-                <textarea
-                  value={briefText}
-                  onChange={e => setBriefText(e.target.value)}
-                  autoFocus
-                  rows={5}
-                  placeholder="What needs making, for whom, and any constraints…"
-                  style={{
-                    width: '100%', padding: '0.6rem 0.7rem', borderRadius: 10,
-                    border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.ink,
-                    fontSize: '0.85rem', lineHeight: 1.55, fontFamily: 'inherit',
-                    outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button
-                    onClick={saveBrief}
-                    disabled={isPending}
-                    style={{
-                      padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none',
-                      background: COLORS.ink, color: COLORS.lime, fontWeight: 700,
-                      fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
-                      opacity: isPending ? 0.7 : 1,
-                    }}
-                  >
-                    {isPending ? 'Saving…' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => setEditingBrief(false)}
-                    style={{
-                      padding: '0.4rem 0.9rem', borderRadius: 8,
-                      border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.muted,
-                      fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : task.description ? (
-              /* Briefs are Markdown — imported ClickUp content keeps its
-                 headings, bold, lists and links, so it must be rendered
-                 rather than printed. */
-              <div className="fx-brief">
-                <ReactMarkdown>{task.description}</ReactMarkdown>
-              </div>
+              <BriefEditor
+                value={briefText}
+                saving={isPending}
+                onSave={saveBrief}
+                onCancel={() => setEditingBrief(false)}
+              />
             ) : (
-              <p style={{
-                color: COLORS.muted, fontSize: '0.85rem',
-                lineHeight: 1.6, margin: 0, fontStyle: 'italic',
-              }}>
-                No brief yet.
-              </p>
+              /* The brief itself is the edit affordance — click the text and
+                 it becomes editable. Briefs are Markdown, so imported ClickUp
+                 content keeps its headings, bold, lists and links. */
+              <div
+                onClick={() => { if (canEditBrief) startEditingBrief() }}
+                role={canEditBrief ? 'button' : undefined}
+                tabIndex={canEditBrief ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!canEditBrief) return
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startEditingBrief() }
+                }}
+                title={canEditBrief ? 'Click to edit' : undefined}
+                style={{
+                  cursor: canEditBrief ? 'text' : 'default',
+                  borderRadius: 8, padding: '6px 8px', margin: '0 -8px',
+                  border: '1px solid transparent', transition: 'background .12s, border-color .12s',
+                }}
+                onMouseEnter={e => {
+                  if (!canEditBrief) return
+                  e.currentTarget.style.background = '#FAFAF9'
+                  e.currentTarget.style.borderColor = COLORS.line
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.borderColor = 'transparent'
+                }}
+              >
+                {task.description ? (
+                  <div className="fx-brief">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.description}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p style={{
+                    color: COLORS.muted, fontSize: '0.85rem',
+                    lineHeight: 1.6, margin: 0, fontStyle: 'italic',
+                  }}>
+                    {canEditBrief ? 'Click to add a brief…' : 'No brief yet.'}
+                  </p>
+                )}
+              </div>
             )}
 
             {(task.attachments?.length ?? 0) > 0 && (
