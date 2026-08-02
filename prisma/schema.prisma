@@ -35,9 +35,24 @@ model Brand {
   description String?
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  tasks Task[]
+  tasks  Task[]
+  assets BrandAsset[]
 
   @@map("brands")
+}
+
+/// Reference material for a brand — logos, guidelines, templates.
+/// Stored as URLs, like task attachments: there is no upload backend.
+model BrandAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  brand_id    String   @db.Uuid
+  filename    String
+  url         String
+  uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+
+  brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+
+  @@map("brand_assets")
 }
 
 model ContentType {

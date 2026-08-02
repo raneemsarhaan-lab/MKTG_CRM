@@ -34,6 +34,9 @@ const prisma = new PrismaClient()
 
 const CSV_PATH = join(process.cwd(), 'data', 'clickup-export.csv')
 
+/** The only ClickUp list this tool tracks. */
+export const KEEP_LIST = 'ALL MEDIA'
+
 // ─── CSV parsing ─────────────────────────────────────────────────────────────
 // Hand-rolled because the export embeds commas, quotes and newlines in fields.
 
@@ -349,8 +352,22 @@ async function main() {
     return
   }
 
-  const rows = parseCsv(readFileSync(CSV_PATH, 'utf8'))
-  console.log(`▶ Importing ${rows.length} ClickUp tasks...`)
+  const allRows = parseCsv(readFileSync(CSV_PATH, 'utf8'))
+
+  // Only the ALL MEDIA list belongs in this tool. The export also carries a
+  // CONTENT list, which was imported originally and is not wanted.
+  const rows  = allRows.filter(r => r['List Name']?.trim() === KEEP_LIST)
+  const drop  = allRows.filter(r => r['List Name']?.trim() !== KEEP_LIST)
+  console.log(`▶ Importing ${rows.length} tasks from "${KEEP_LIST}" (${drop.length} rows in other lists ignored)...`)
+
+  // Anything this script imported from another list is removed. Keyed on the
+  // export's own ids, so it can only ever delete rows this import created —
+  // a task made in the app has no external_id and is never touched.
+  const dropIds = drop.map(r => r['Task ID']?.trim()).filter((v): v is string => Boolean(v))
+  if (dropIds.length) {
+    const removed = await prisma.task.deleteMany({ where: { external_id: { in: dropIds } } })
+    if (removed.count > 0) console.log(`  – removed ${removed.count} previously imported tasks from other lists`)
+  }
 
   const admin = await prisma.member.findFirst({ where: { access: 'admin' } })
   if (!admin) throw new Error('No admin member — run the seed first.')
@@ -404,9 +421,8 @@ async function main() {
     for (const [pattern, brandName] of BRAND_PATTERNS) {
       if (pattern.test(name)) { brandId = brandByName.get(brandName) ?? null; break }
     }
-    if (!brandId && r['List Name']?.trim() === 'CONTENT') {
-      brandId = brandByName.get('Forefront Consulting') ?? null
-    }
+    // The CONTENT list used to default to Forefront Consulting. It is no
+    // longer imported, so that rule has nothing left to match and is gone.
 
     const assignees = parseAssignees(r['Assignees'])
     const ownerId   = (assignees.length && memberByName.get(assignees[0].toLowerCase())) || admin.id

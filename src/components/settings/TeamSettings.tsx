@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Member } from '@/types/index'
 import { COLORS, ACCESS_BADGE } from '@/lib/tokens'
 import { initials, avatarColor } from '@/lib/utils'
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { updateMember, addMember, removeMember, resetMemberPassword } from '@/actions/members'
 import { STAGE_META } from '@/lib/stage-meta'
 
@@ -21,15 +22,19 @@ interface TeamSettingsProps {
 }
 
 interface RemoveWarning {
-  memberId: string
+  memberId:   string
   memberName: string
+  ownedTasks: number
   activeTasks: number
+  comments:   number
 }
 
 export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
   const [draft, setDraft] = useState<{ name: string; email: string; role: string; access: 'admin' | 'superuser' | 'user'; password: string }>({ name: '', email: '', role: '', access: 'user', password: '' })
   const [addError, setAddError] = useState<string | null>(null)
   const [removeWarning, setRemoveWarning] = useState<RemoveWarning | null>(null)
+  const [reassignTo, setReassignTo]       = useState('')
+  const [removeError, setRemoveError]     = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleAdd() {
@@ -52,11 +57,32 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
   }
 
   function handleRemove(member: Member) {
+    setRemoveError(null)
     startTransition(async () => {
       const result = await removeMember(member.id)
-      if (!result.success && result.activeTasks) {
-        setRemoveWarning({ memberId: member.id, memberName: member.name, activeTasks: result.activeTasks })
+      if (result.success) return
+      if (result.needsReassign) {
+        setReassignTo('')
+        setRemoveWarning({
+          memberId:    member.id,
+          memberName:  member.name,
+          ownedTasks:  result.ownedTasks ?? 0,
+          activeTasks: result.activeTasks ?? 0,
+          comments:    result.comments ?? 0,
+        })
+        return
       }
+      setRemoveError(result.error ?? 'Could not remove that member')
+    })
+  }
+
+  function confirmRemove() {
+    if (!removeWarning || !reassignTo) return
+    setRemoveError(null)
+    startTransition(async () => {
+      const res = await removeMember(removeWarning.memberId, reassignTo)
+      if (res.success) setRemoveWarning(null)
+      else setRemoveError(res.error ?? 'Could not remove that member')
     })
   }
 
@@ -216,7 +242,7 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
         </div>
       </div>
 
-      {/* Remove warning modal */}
+      {/* Reassign-then-remove dialog */}
       {removeWarning && (
         <div
           onClick={() => setRemoveWarning(null)}
@@ -228,32 +254,89 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
         >
           <div
             onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Remove ${removeWarning.memberName}`}
             style={{
-              width: '100%', maxWidth: 360, background: '#fff',
+              width: '100%', maxWidth: 420, background: '#fff',
               borderRadius: 18, padding: 24,
               boxShadow: '0 24px 60px rgba(0,0,0,.2)',
             }}
           >
             <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', margin: '0 0 12px' }}>
-              Can&apos;t remove {removeWarning.memberName}
+              Remove {removeWarning.memberName}
             </h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 18px', lineHeight: 1.55 }}>
-              This member owns <strong style={{ color: 'var(--ink)' }}>{removeWarning.activeTasks} active task{removeWarning.activeTasks !== 1 ? 's' : ''}</strong>.
-              Reassign or complete those tasks before removing them from the team.
+            <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.55 }}>
+              They hold{' '}
+              <strong style={{ color: 'var(--ink)' }}>
+                {removeWarning.ownedTasks} task{removeWarning.ownedTasks === 1 ? '' : 's'}
+              </strong>
+              {removeWarning.activeTasks > 0 && ` (${removeWarning.activeTasks} still unfinished)`}
+              {removeWarning.comments > 0 && ` and ${removeWarning.comments} comment${removeWarning.comments === 1 ? '' : 's'}`}
+              . Choose who takes them over — nothing is deleted, it all moves across.
             </p>
-            <button
-              onClick={() => setRemoveWarning(null)}
+
+            <label style={{
+              display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--muted)',
+              textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6,
+            }}>
+              Reassign to
+            </label>
+            <select
+              value={reassignTo}
+              onChange={e => setReassignTo(e.target.value)}
               style={{
-                width: '100%', padding: '0.65rem', borderRadius: 10,
-                background: 'var(--ink)', color: '#fff', border: 'none',
-                fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                width: '100%', fontSize: '0.82rem', padding: '9px 10px', borderRadius: 9,
+                border: '1px solid var(--line)', background: '#F6F6F4',
+                color: 'var(--ink)', fontFamily: 'inherit', cursor: 'pointer',
               }}
             >
-              Got it
-            </button>
+              <option value="">Select a member…</option>
+              {members.filter(m => m.id !== removeWarning.memberId).map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+
+            {removeError && (
+              <p role="alert" style={{ fontSize: '0.75rem', color: COLORS.coral, margin: '10px 0 0' }}>
+                {removeError}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+              <button
+                onClick={confirmRemove}
+                disabled={!reassignTo || isPending}
+                style={{
+                  flex: 1, padding: '0.65rem', borderRadius: 10,
+                  background: COLORS.coral, color: '#fff', border: 'none',
+                  fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit',
+                  cursor: reassignTo ? 'pointer' : 'default', opacity: reassignTo && !isPending ? 1 : 0.5,
+                }}
+              >
+                {isPending ? 'Working…' : 'Reassign and remove'}
+              </button>
+              <button
+                onClick={() => setRemoveWarning(null)}
+                style={{
+                  padding: '0.65rem 1rem', borderRadius: 10,
+                  background: '#fff', color: 'var(--muted)', border: '1px solid var(--line)',
+                  fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {removeError && !removeWarning && (
+        <p role="alert" style={{ fontSize: '0.78rem', color: COLORS.coral, marginTop: 12 }}>
+          {removeError}
+        </p>
+      )}
+
     </div>
   )
 }
@@ -293,21 +376,42 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
       opacity: isPending ? 0.6 : 1,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Avatar */}
+        {/* Avatar — the photo when one is set, initials otherwise */}
         <div style={{
-          width: 34, height: 34, borderRadius: '50%',
+          width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
           background: avatarColor(m.name), color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '0.7rem', fontWeight: 700, flexShrink: 0,
         }}>
-          {initials(m.name)}
+          <ImageWithFallback
+            src={m.avatar_url}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            fallback={<>{initials(m.name)}</>}
+          />
         </div>
 
         {/* Name + role */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: '0.87rem', color: 'var(--ink)' }}>
-            {m.name}
-            {isYou && <span style={{ fontWeight: 400, fontSize: '0.7rem', color: 'var(--muted)', marginLeft: 6 }}>(you)</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              defaultValue={m.name}
+              aria-label={`Name of ${m.name}`}
+              onBlur={e => {
+                const v = e.target.value.trim()
+                if (v && v !== m.name) handleField({ name: v })
+                else e.target.value = m.name
+              }}
+              style={{
+                fontWeight: 700, fontSize: '0.87rem', color: 'var(--ink)',
+                background: 'transparent', border: '1px solid transparent',
+                borderRadius: 6, padding: '1px 4px', margin: '-1px -4px',
+                outline: 'none', fontFamily: 'inherit', minWidth: 0, flex: 1,
+              }}
+              onFocus={e => (e.target.style.borderColor = 'var(--line)')}
+              onBlurCapture={e => (e.target.style.borderColor = 'transparent')}
+            />
+            {isYou && <span style={{ fontWeight: 400, fontSize: '0.7rem', color: 'var(--muted)' }}>(you)</span>}
           </div>
           <input
             defaultValue={m.role}
@@ -405,6 +509,24 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           Reset
         </button>
         {pwdMsg && <span style={{ fontSize: '0.7rem', color: pwdMsg.includes('updated') ? '#4B7A12' : COLORS.coral }}>{pwdMsg}</span>}
+
+        {/* Photo. A URL — there is no upload backend, so this points at an
+            image hosted elsewhere. */}
+        <input
+          defaultValue={m.avatar_url ?? ''}
+          placeholder="Photo URL"
+          aria-label={`Photo URL for ${m.name}`}
+          onBlur={e => {
+            const v = e.target.value.trim()
+            if (v !== (m.avatar_url ?? '')) handleField({ avatar_url: v || null })
+          }}
+          style={{
+            fontSize: '0.72rem', padding: '5px 8px', borderRadius: 6,
+            border: '1px solid var(--line)', background: '#F6F6F4',
+            color: 'var(--ink)', outline: 'none', fontFamily: 'inherit',
+            width: 200, minWidth: 0,
+          }}
+        />
       </div>
 
       {/* Stage ownership chips */}

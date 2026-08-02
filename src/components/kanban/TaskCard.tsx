@@ -23,6 +23,10 @@ interface TaskCardProps {
   slaConfig: SLAConfig
   today: Date
   onSelect: (id: string) => void
+  /** Selection state for bulk actions. Absent on the drag overlay. */
+  selected?: boolean
+  selecting?: boolean
+  onToggleSelect?: (id: string, shiftKey: boolean) => void
 }
 
 /**
@@ -244,6 +248,7 @@ const SHELL: React.CSSProperties = {
 
 export function TaskCard({
   task, currentStageOwner, currentUser: _currentUser, slaConfig, today, onSelect,
+  selected, selecting, onToggleSelect,
 }: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
@@ -253,6 +258,9 @@ export function TaskCard({
       ref={setNodeRef}
       style={{
         ...SHELL,
+        position: 'relative',
+        borderColor: selected ? PIPE.purple : PIPE.border,
+        boxShadow: selected ? `0 0 0 2px ${PIPE.purple}33` : undefined,
         transform: CSS.Transform.toString(transform),
         transition,
         // The overlay carries the card while it moves, so the original dims.
@@ -265,13 +273,47 @@ export function TaskCard({
       }}
       {...attributes}
       {...listeners}
-      onClick={() => onSelect(task.id)}
+      onClick={e => {
+        // While a selection is running, a plain click extends it rather than
+        // opening the task — the same bargain ClickUp makes.
+        if (selecting && onToggleSelect) { onToggleSelect(task.id, e.shiftKey); return }
+        onSelect(task.id)
+      }}
       onKeyDown={e => { if (e.key === 'Enter') onSelect(task.id) }}
       role="button"
       tabIndex={0}
       aria-label={`Task: ${task.name}`}
       className="fx-task-card"
     >
+      {onToggleSelect && (
+        <span
+          role="checkbox"
+          aria-checked={Boolean(selected)}
+          aria-label={`Select ${task.name}`}
+          tabIndex={0}
+          className="fx-card-check"
+          data-on={selected ? 'true' : undefined}
+          // Stops the click reaching the card and the drag sensor claiming it.
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e.shiftKey) }}
+          onKeyDown={e => {
+            if (e.key === ' ' || e.key === 'Enter') {
+              e.preventDefault(); e.stopPropagation(); onToggleSelect(task.id, e.shiftKey)
+            }
+          }}
+          style={{
+            position: 'absolute', top: 15, left: 15, zIndex: 2,
+            width: 20, height: 20, borderRadius: 6, cursor: 'pointer',
+            border: `1.5px solid ${selected ? PIPE.purple : 'rgba(255,255,255,.9)'}`,
+            background: selected ? PIPE.purple : 'rgba(255,255,255,.82)',
+            color: '#FFFFFF', fontSize: 12, fontWeight: 900, lineHeight: '17px',
+            textAlign: 'center', boxShadow: '0 1px 4px rgba(20,19,26,.25)',
+          }}
+        >
+          {selected ? '✓' : ''}
+        </span>
+      )}
+
       <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
     </div>
   )

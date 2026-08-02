@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 
   const [members, brands, contentTypes, slaRows, wsRow] = await Promise.all([
     prisma.member.findMany({ orderBy: { name: 'asc' } }),
-    prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ orderBy: { name: 'asc' }, include: { assets: { orderBy: { uploaded_at: 'asc' } } } }),
     prisma.contentType.findMany({ orderBy: { label: 'asc' } }),
     prisma.slaConfig.findMany(),
     prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
@@ -31,7 +31,12 @@ export default async function SettingsPage() {
       <SettingsView
         members={members.map(mapMember)}
         currentUserId={member.id}
-        brands={brands.map(b => ({ id: b.id, name: b.name, color: b.color, logo_url: b.logo_url ?? undefined, description: b.description ?? undefined }))}
+        brands={brands.map(b => ({
+          id: b.id, name: b.name, color: b.color,
+          logo_url: b.logo_url ?? undefined,
+          description: b.description ?? undefined,
+          assets: b.assets.map(a => ({ id: a.id, filename: a.filename, url: a.url })),
+        }))}
         contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
         slaConfig={mapSlaConfig(slaRows)}
         workspaceSettings={workspaceSettings}

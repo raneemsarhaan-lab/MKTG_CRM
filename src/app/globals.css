@@ -340,3 +340,12 @@ html {
 .font-heading { font-family: var(--font-heading); }
 .font-body    { font-family: var(--font-body); }
 .font-accent  { font-family: var(--font-accent); }
+
+/* ─── Bulk selection ──────────────────────────────────────────────────────────
+   The checkbox stays out of the way until the card is hovered or something is
+   already selected, so a board at rest still reads as cards rather than a form. */
+.fx-card-check { opacity: 0; transition: opacity 120ms ease-out; }
+.fx-task-card:hover .fx-card-check,
+.fx-task-card:focus-within .fx-card-check,
+.fx-card-check[data-on],
+.fx-board-selecting .fx-card-check { opacity: 1; }

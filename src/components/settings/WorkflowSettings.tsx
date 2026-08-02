@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import type { Brand, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
+import type { ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { COLORS, STAGE_COLORS } from '@/lib/tokens'
-import { updateSLA, createContentType, removeContentType, removeBrand, updateWeeklyCapacity, updateNineStageDefault } from '@/actions/settings'
-import { AddBrandModal } from './AddBrandModal'
+import { updateSLA, createContentType, removeContentType, updateWeeklyCapacity, updateNineStageDefault } from '@/actions/settings'
 
 const SLA_STAGES: { id: string; label: string }[] = [
   { id: 'c-prog',      label: 'C-In Progress' },
@@ -16,14 +15,12 @@ const SLA_STAGES: { id: string; label: string }[] = [
 ]
 
 interface WorkflowSettingsProps {
-  brands: Brand[]
   contentTypes: ContentType[]
   slaConfig: SLAConfig
   workspaceSettings: WorkspaceSettings
 }
 
-export function WorkflowSettings({ brands, contentTypes, slaConfig, workspaceSettings }: WorkflowSettingsProps) {
-  const [addBrandOpen, setAddBrandOpen] = useState(false)
+export function WorkflowSettings({ contentTypes, slaConfig, workspaceSettings }: WorkflowSettingsProps) {
   const [newType, setNewType] = useState('')
   const [typeError, setTypeError] = useState<string | null>(null)
   const [capacityHrs, setCapacityHrs] = useState(workspaceSettings.capacity_hrs_per_wk)
@@ -59,10 +56,6 @@ export function WorkflowSettings({ brands, contentTypes, slaConfig, workspaceSet
     startTransition(async () => { await removeContentType(label) })
   }
 
-  function handleRemoveBrand(brandId: string) {
-    startTransition(async () => { await removeBrand(brandId) })
-  }
-
   const inputStyle: React.CSSProperties = {
     fontSize: '0.8rem', padding: '7px 10px', borderRadius: 8,
     border: '1px solid var(--line)', background: '#F6F6F4',
@@ -82,50 +75,6 @@ export function WorkflowSettings({ brands, contentTypes, slaConfig, workspaceSet
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-      {/* Brands */}
-      <div style={cardStyle}>
-        <div style={labelStyle}>Brands</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          {brands.map(b => (
-            <span key={b.id} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '5px 8px 5px 8px', borderRadius: 10,
-              border: '1px solid var(--line)', background: '#F6F6F4',
-            }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: b.color, display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--ink)' }}>{b.name}</span>
-              <button
-                onClick={() => handleRemoveBrand(b.id)}
-                disabled={isPending}
-                title={`Remove ${b.name}`}
-                style={{
-                  border: 'none', background: 'transparent',
-                  cursor: 'pointer', color: 'var(--muted)',
-                  fontSize: '0.7rem', padding: '0 2px', lineHeight: 1,
-                }}
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-          {brands.length === 0 && (
-            <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>No brands yet.</span>
-          )}
-        </div>
-        <button
-          onClick={() => setAddBrandOpen(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: '0.82rem', fontWeight: 700, color: COLORS.lime,
-            padding: '8px 14px', borderRadius: 8, border: 'none',
-            cursor: 'pointer', background: 'var(--ink)', fontFamily: 'inherit',
-          }}
-        >
-          + Add brand
-        </button>
-      </div>
-
       {/* Content types */}
       <div style={cardStyle}>
         <div style={labelStyle}>Content types</div>
@@ -304,7 +253,6 @@ export function WorkflowSettings({ brands, contentTypes, slaConfig, workspaceSet
         )}
       </div>
 
-      {addBrandOpen && <AddBrandModal onClose={() => setAddBrandOpen(false)} />}
     </div>
   )
 }
