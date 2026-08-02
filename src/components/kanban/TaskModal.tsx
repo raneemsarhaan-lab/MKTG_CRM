@@ -14,6 +14,7 @@ import { BriefEditor } from './BriefEditor'
 import { AttachmentGallery } from './AttachmentGallery'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
 
@@ -83,7 +84,6 @@ export function TaskModal({
   const [editingName, setEditingName]   = useState(false)
   const [nameText, setNameText]         = useState('')
   const [showAllFields, setShowAllFields] = useState(false)
-  const [coverFailed, setCoverFailed]     = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const setCelebration = useUIStore(s => s.setCelebration)
@@ -103,10 +103,6 @@ export function TaskModal({
     task.task_owner_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
-
-  // The panel is reused when a different task is opened, so a failed cover on
-  // one task must not suppress the next one's.
-  useEffect(() => { setCoverFailed(false) }, [task.id])
 
   // Escape closes the panel. Ignored while an inline editor is open so the
   // first Escape reverts that field rather than discarding the whole view.
@@ -349,15 +345,12 @@ export function TaskModal({
               height: 64, flexShrink: 0, position: 'relative', overflow: 'hidden',
               background: brandGradient(task.brand?.color ?? '#C4C4BE'),
             }}>
-              {cover && !coverFailed && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={cover}
-                  alt=""
-                  onError={() => setCoverFailed(true)}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              )}
+              <ImageWithFallback
+                src={cover}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                fallback={null}
+              />
               <div style={{
                 position: 'absolute', bottom: 0, insetInline: 0, height: 3,
                 background: task.brand?.color ?? '#C4C4BE',

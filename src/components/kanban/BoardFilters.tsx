@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { FieldPill, PillOption, PillInput } from '@/components/shared/FieldPill'
 import { COLORS } from '@/lib/tokens'
+import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { calDaysBetween } from '@/lib/utils'
 import type { AlertStatus, Brand, Member, SLAConfig, Task } from '@/types/index'
@@ -143,6 +144,42 @@ function summary(selected: string[], label: (v: string) => string): string | nul
   return `${selected.length} selected`
 }
 
+
+/** Brand chip mark — the emblem when the brand has one, else its initial. */
+function BrandMark({ brand }: { brand: Brand }) {
+  const initial = brand.name.trim()[0]?.toUpperCase() ?? '?'
+  return (
+    <span style={{
+      width: 22, height: 22, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: brand.color, color: '#FFFFFF', fontSize: 11, fontWeight: 800,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {brand.logo_url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={brand.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : initial}
+    </span>
+  )
+}
+
+const GridIcon = ({ fill }: { fill: string }) => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill={fill} aria-hidden="true">
+    <rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" />
+    <rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" />
+  </svg>
+)
+
+/** §6 chip geometry — 44 tall, 999 radius, 13.5px. */
+const CHIP_BASE: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 9, height: 44,
+  padding: '0 20px', borderRadius: 999, fontSize: 13.5,
+  fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+  transition: 'background 140ms ease-out, border-color 140ms ease-out',
+}
+
+/** §6 view toggle — same height, 12 radius. */
+const VIEW_BASE: React.CSSProperties = { ...CHIP_BASE, borderRadius: 12 }
+
 export function BoardFilters({
   filters, onChange, tasks, brands, members, shown, total,
 }: BoardFiltersProps) {
@@ -166,240 +203,207 @@ export function BoardFilters({
   const usedPlatforms = useMemo(
     () => [...new Set(tasks.map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
     [tasks])
-  const usedOwnerIds = useMemo(
-    () => new Set(tasks.map(t => t.task_owner_id)),
-    [tasks])
+  const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.task_owner_id)), [tasks])
 
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
-  const brandName  = (id: string) => brands.find(b => b.id === id)?.name ?? 'Unknown'
 
-  const count   = activeFilterCount(filters)
+  const count = activeFilterCount(filters)
+  // The brand chips are their own control, so they do not count towards the
+  // number on the Filter button — that button owns everything behind it.
+  const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
+
   const dueText = filters.duePreset !== 'any'
     ? ({ overdue: 'Overdue', today: 'Due today', week: 'Next 7 days', none: 'No due date' } as const)[filters.duePreset]
     : filters.dueFrom || filters.dueTo
       ? `${filters.dueFrom || '…'} → ${filters.dueTo || '…'}`
       : null
 
+  const allBrands = filters.brandIds.length === 0
+
   return (
-    <div style={{ padding: '0 24px 8px', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {/* Search */}
-        <div style={{ position: 'relative' }}>
-          <input
-            value={filters.search}
-            onChange={e => set('search', e.target.value)}
-            placeholder="Search tasks…"
-            aria-label="Search tasks"
+    <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        {/* Brand chips — §6 left group */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
+          <button
+            type="button"
+            onClick={() => set('brandIds', [])}
+            aria-pressed={allBrands}
             style={{
-              width: 210, padding: '7px 10px 7px 28px',
-              background: '#fff', border: `1px solid ${COLORS.line}`, borderRadius: 8,
-              fontSize: 13, outline: 'none', color: COLORS.ink, fontFamily: 'inherit',
+              ...CHIP_BASE,
+              background: allBrands ? PIPE.limePrimary : '#FFFFFF',
+              border: allBrands ? '1px solid transparent' : `1px solid ${PIPE.borderInput}`,
+              fontWeight: allBrands ? 700 : 600,
+              color: allBrands ? PIPE.ink : PIPE.textPrimary,
             }}
-          />
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.muted}
-               strokeWidth="2" strokeLinecap="round" aria-hidden="true"
-               style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-          </svg>
+          >
+            <GridIcon fill={allBrands ? PIPE.ink : PIPE.textPrimary} />
+            All brands
+          </button>
+
+          {brands.map(b => {
+            const on = filters.brandIds.includes(b.id)
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => toggle('brandIds', b.id)}
+                aria-pressed={on}
+                style={{
+                  ...CHIP_BASE,
+                  background: on ? PIPE.limePrimary : '#FFFFFF',
+                  border: on ? '1px solid transparent' : `1px solid ${PIPE.borderInput}`,
+                  fontWeight: on ? 700 : 600,
+                  color: on ? PIPE.ink : PIPE.textPrimary,
+                }}
+              >
+                <BrandMark brand={b} />
+                {b.name}
+              </button>
+            )
+          })}
         </div>
 
-        {/* Brand — colour swatches, because that is how the board reads them */}
-        <FieldPill
-          label="Brand"
-          value={summary(filters.brandIds, brandName)}
-          active={filters.brandIds.length > 0}
-          width={230}
-        >
-          {() => (
-            <>
-              {brands.map(b => (
-                <PillOption key={b.id} selected={filters.brandIds.includes(b.id)}
-                            onClick={() => toggle('brandIds', b.id)}>
-                  <Check on={filters.brandIds.includes(b.id)} />
-                  <span aria-hidden="true" style={{
-                    width: 10, height: 10, borderRadius: 3, background: b.color, flexShrink: 0,
-                  }} />
-                  {b.name}
-                </PillOption>
-              ))}
-            </>
-          )}
-        </FieldPill>
+        {/* View + filter — §6 right group */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            ...VIEW_BASE, background: PIPE.navy, color: '#FFFFFF',
+            fontWeight: 700, cursor: 'default',
+          }}>
+            <GridIcon fill="#FFFFFF" />
+            Board
+          </div>
 
-        <FieldPill
-          label="Assignee"
-          value={summary(filters.ownerIds, memberName)}
-          active={filters.ownerIds.length > 0}
-          width={230}
-        >
-          {() => (
-            <>
-              {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
-                <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)}
-                            onClick={() => toggle('ownerIds', m.id)}>
-                  <Check on={filters.ownerIds.includes(m.id)} />
-                  {m.name}
-                </PillOption>
-              ))}
-            </>
-          )}
-        </FieldPill>
-
-        <FieldPill
-          label="Content type"
-          value={summary(filters.contentTypes, v => v)}
-          active={filters.contentTypes.length > 0}
-        >
-          {() => (
-            <>
-              {usedTypes.map(v => (
-                <PillOption key={v} selected={filters.contentTypes.includes(v)}
-                            onClick={() => toggle('contentTypes', v)}>
-                  <Check on={filters.contentTypes.includes(v)} /> {v}
-                </PillOption>
-              ))}
-            </>
-          )}
-        </FieldPill>
-
-        {usedPlatforms.length > 0 && (
           <FieldPill
-            label="Platform"
-            value={summary(filters.platforms, v => v)}
-            active={filters.platforms.length > 0}
+            label="Filter"
+            value={behindButton > 0 ? `Filter · ${behindButton}` : null}
+            active={behindButton > 0}
+            width={260}
+            variant="view"
           >
             {() => (
               <>
-                {usedPlatforms.map(v => (
-                  <PillOption key={v} selected={filters.platforms.includes(v)}
-                              onClick={() => toggle('platforms', v)}>
-                    <Check on={filters.platforms.includes(v)} /> {v}
+                <PillSection label="Search">
+                  <PillInput
+                    value={filters.search}
+                    placeholder="Name, owner, campaign…"
+                    onChange={e => set('search', e.target.value)}
+                  />
+                </PillSection>
+
+                <PillSection label="Assignee">
+                  {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
+                    <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)}
+                                onClick={() => toggle('ownerIds', m.id)}>
+                      <Check on={filters.ownerIds.includes(m.id)} /> {memberName(m.id)}
+                    </PillOption>
+                  ))}
+                </PillSection>
+
+                <PillSection label="Content type">
+                  {usedTypes.map(v => (
+                    <PillOption key={v} selected={filters.contentTypes.includes(v)}
+                                onClick={() => toggle('contentTypes', v)}>
+                      <Check on={filters.contentTypes.includes(v)} /> {v}
+                    </PillOption>
+                  ))}
+                </PillSection>
+
+                {usedPlatforms.length > 0 && (
+                  <PillSection label="Platform">
+                    {usedPlatforms.map(v => (
+                      <PillOption key={v} selected={filters.platforms.includes(v)}
+                                  onClick={() => toggle('platforms', v)}>
+                        <Check on={filters.platforms.includes(v)} /> {v}
+                      </PillOption>
+                    ))}
+                  </PillSection>
+                )}
+
+                <PillSection label="Priority">
+                  {PRIORITY_OPTIONS.map(v => (
+                    <PillOption key={v} selected={filters.priorities.includes(v)}
+                                onClick={() => toggle('priorities', v)}>
+                      <Check on={filters.priorities.includes(v)} /> {v}
+                    </PillOption>
+                  ))}
+                </PillSection>
+
+                <PillSection label="SLA status">
+                  {ALERT_OPTIONS.map(v => (
+                    <PillOption key={v} selected={filters.alerts.includes(v)}
+                                onClick={() => toggleAlert(v)}>
+                      <Check on={filters.alerts.includes(v)} /> {v}
+                    </PillOption>
+                  ))}
+                </PillSection>
+
+                <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
+                  {([
+                    ['any', 'Any date'], ['overdue', 'Overdue'], ['today', 'Due today'],
+                    ['week', 'Next 7 days'], ['none', 'No due date'],
+                  ] as [DuePreset, string][]).map(([v, label]) => (
+                    <PillOption key={v} selected={filters.duePreset === v}
+                                onClick={() => set('duePreset', v)}>
+                      <Check on={filters.duePreset === v} /> {label}
+                    </PillOption>
+                  ))}
+                  <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+                    <PillInput type="date" value={filters.dueFrom}
+                               onChange={e => set('dueFrom', e.target.value)} />
+                    <PillInput type="date" value={filters.dueTo}
+                               onChange={e => set('dueTo', e.target.value)} />
+                  </div>
+                </PillSection>
+
+                <PillSection label="Only">
+                  <PillOption selected={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
+                    <Check on={filters.onlyMine} /> My tasks
                   </PillOption>
-                ))}
+                  <PillOption selected={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
+                    <Check on={filters.withAttachments} /> Has files
+                  </PillOption>
+                </PillSection>
+
+                {count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onChange(EMPTY_FILTERS)}
+                    style={{
+                      width: '100%', marginTop: 8, padding: '8px 10px', borderRadius: 8,
+                      border: `1px solid ${PIPE.borderInput}`, background: '#fff',
+                      color: PIPE.textPrimary, fontSize: 12.5, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    Clear {count} filter{count === 1 ? '' : 's'}
+                  </button>
+                )}
               </>
             )}
           </FieldPill>
-        )}
-
-        <FieldPill
-          label="Priority"
-          value={summary(filters.priorities, v => v)}
-          active={filters.priorities.length > 0}
-          width={190}
-        >
-          {() => (
-            <>
-              {PRIORITY_OPTIONS.map(v => (
-                <PillOption key={v} selected={filters.priorities.includes(v)}
-                            onClick={() => toggle('priorities', v)}>
-                  <Check on={filters.priorities.includes(v)} /> {v}
-                </PillOption>
-              ))}
-            </>
-          )}
-        </FieldPill>
-
-        <FieldPill
-          label="SLA status"
-          value={summary(filters.alerts, v => v)}
-          active={filters.alerts.length > 0}
-          width={200}
-        >
-          {() => (
-            <>
-              {ALERT_OPTIONS.map(v => (
-                <PillOption key={v} selected={filters.alerts.includes(v)}
-                            onClick={() => toggleAlert(v)}>
-                  <Check on={filters.alerts.includes(v)} /> {v}
-                </PillOption>
-              ))}
-            </>
-          )}
-        </FieldPill>
-
-        <FieldPill
-          label="Due date"
-          value={dueText}
-          active={Boolean(dueText)}
-          width={250}
-        >
-          {() => (
-            <>
-              {([
-                ['any',     'Any date'],
-                ['overdue', 'Overdue'],
-                ['today',   'Due today'],
-                ['week',    'Next 7 days'],
-                ['none',    'No due date'],
-              ] as [DuePreset, string][]).map(([v, label]) => (
-                <PillOption key={v} selected={filters.duePreset === v}
-                            onClick={() => set('duePreset', v)}>
-                  <Check on={filters.duePreset === v} /> {label}
-                </PillOption>
-              ))}
-              <div style={{
-                borderTop: `1px solid ${COLORS.line}`, margin: '8px 0 6px', paddingTop: 8,
-                display: 'grid', gap: 6,
-              }}>
-                <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 700 }}>From</label>
-                <PillInput type="date" value={filters.dueFrom}
-                           onChange={e => set('dueFrom', e.target.value)} />
-                <label style={{ fontSize: 11, color: COLORS.muted, fontWeight: 700 }}>To</label>
-                <PillInput type="date" value={filters.dueTo}
-                           onChange={e => set('dueTo', e.target.value)} />
-              </div>
-            </>
-          )}
-        </FieldPill>
-
-        <Toggle on={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
-          My tasks
-        </Toggle>
-        <Toggle on={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
-          Has files
-        </Toggle>
-
-        <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: COLORS.muted, whiteSpace: 'nowrap' }}>
-            {count > 0 ? `${shown} of ${total} tasks` : `${total} tasks`}
-          </span>
-          {count > 0 && (
-            <button
-              type="button"
-              onClick={() => onChange(EMPTY_FILTERS)}
-              style={{
-                border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.ink,
-                borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-              }}
-            >
-              Clear {count} filter{count === 1 ? '' : 's'}
-            </button>
-          )}
         </div>
       </div>
+
+      {count > 0 && (
+        <div style={{ marginTop: 8, fontSize: 12, color: PIPE.textFaint }}>
+          Showing {shown} of {total} tasks
+        </div>
+      )}
     </div>
   )
 }
 
-function Toggle({ on, onClick, children }: {
-  on: boolean; onClick: () => void; children: React.ReactNode
-}) {
+function PillSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      style={{
-        padding: '7px 12px', borderRadius: 8,
-        border: `1px solid ${on ? COLORS.ink : COLORS.line}`,
-        background: on ? COLORS.ink : '#fff',
-        color: on ? COLORS.lime : COLORS.muted,
-        fontSize: 13, fontWeight: on ? 700 : 500,
-        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-      }}
-    >
+    <div style={{ marginBottom: 8 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+        color: PIPE.textFaint, padding: '6px 8px 4px',
+      }}>
+        {label}
+      </div>
       {children}
-    </button>
+    </div>
   )
 }

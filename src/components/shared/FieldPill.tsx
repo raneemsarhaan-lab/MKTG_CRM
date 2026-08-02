@@ -21,13 +21,18 @@ interface FieldPillProps {
   icon?:     React.ReactNode
   /** Emphasise the pill to show it carries a non-default value. */
   active?:   boolean
+  /**
+   * 'field' is the intake modal's compact chip; 'view' is the Pipeline
+   * handoff's 44px view toggle (§6). Same popover, different trigger.
+   */
+  variant?:  'field' | 'view'
   width?:    number
   children:  (close: () => void) => React.ReactNode
 }
 
 const PANEL_MAX = 300
 
-export function FieldPill({ label, value, icon, active, width = 240, children }: FieldPillProps) {
+export function FieldPill({ label, value, icon, active, variant = 'field', width = 240, children }: FieldPillProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number }>({ left: 0 })
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -84,7 +89,16 @@ export function FieldPill({ label, value, icon, active, width = 240, children }:
         onClick={() => setOpen(o => !o)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        style={{
+        style={variant === 'view' ? {
+          display: 'inline-flex', alignItems: 'center', gap: 9, height: 44,
+          padding: '0 20px', borderRadius: 12, fontSize: 13.5,
+          border: `1px solid ${active ? '#14133C' : '#E9E9EF'}`,
+          background: active ? '#14133C' : '#FFFFFF',
+          color: active ? '#FFFFFF' : '#1F2430',
+          fontWeight: active ? 700 : 600,
+          fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+          transition: 'border-color 140ms ease-out, background 140ms ease-out',
+        } : {
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '7px 12px', borderRadius: 8,
           border: `1px solid ${active ? COLORS.ink : COLORS.line}`,
@@ -95,6 +109,12 @@ export function FieldPill({ label, value, icon, active, width = 240, children }:
           transition: 'border-color 140ms ease-out, background 140ms ease-out',
         }}
       >
+        {variant === 'view' && (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+               stroke={active ? '#FFFFFF' : '#1F2430'} strokeWidth="2.2" aria-hidden="true">
+            <path d="M3 5h18l-7 8v6l-4-2v-4L3 5z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
         {icon}
         {value || label}
       </button>

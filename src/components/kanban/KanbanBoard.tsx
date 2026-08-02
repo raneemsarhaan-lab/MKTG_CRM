@@ -9,6 +9,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
+import { PIPE } from '@/lib/pipeline-tokens'
 import { setTaskStage } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -239,20 +240,9 @@ export function KanbanBoard({
           </div>
         </div>
 
-        {/* Pipeline heading + the board's own entry point to the composer.
-            The rail is icon-only (handoff §3), so this action lives here. */}
+        {/* The board's own entry point to the composer. The rail is icon-only
+            (handoff §3), so this action lives here. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 900,
-              fontSize: '18px',
-              color: 'var(--ink)',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Pipeline
-          </span>
           {currentUser.access !== 'user' && (
             <button
               onClick={() => setShowTaskForm(true)}
@@ -287,14 +277,37 @@ export function KanbanBoard({
           rather than reporting the whole board while a filter is applied. */}
       <StatStrip tasks={filteredTasks} today={today} />
 
-      {/* Board columns */}
+      {/* PIPELINE heading — handoff §7. Caveat, with the hand-drawn ticks and
+          underline that carry the rest of the design's voice. */}
+      <div style={{ padding: '14px 26px 0 38px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2l2.1 6.1L20 10l-5.9 2.1L12 18l-2.1-5.9L4 10l5.9-1.9L12 2z"
+                  fill={PIPE.limePrimary} stroke={PIPE.ink} strokeWidth="1.3" strokeLinejoin="round" />
+          </svg>
+          <h1 style={{
+            fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 30,
+            letterSpacing: '0.04em', color: PIPE.ink, lineHeight: 1, margin: 0,
+          }}>
+            PIPELINE
+          </h1>
+          <svg width="26" height="22" viewBox="0 0 26 22" fill="none" aria-hidden="true">
+            <path d="M3 18L8 4M14 17l5-12" stroke={PIPE.purpleStroke} strokeWidth="2.4" strokeLinecap="round" />
+          </svg>
+        </div>
+        <svg width="148" height="9" viewBox="0 0 148 9" fill="none" aria-hidden="true"
+             style={{ display: 'block', margin: '2px 0 0 32px' }}>
+          <path d="M3 6C34 2 100 1.6 145 4.2" stroke={PIPE.purpleStroke} strokeWidth="2.6" strokeLinecap="round" />
+        </svg>
+      </div>
+
       {dragError && (
         <div
           role="alert"
           onClick={() => setDragError('')}
           style={{
-            margin: '0 24px 8px', padding: '7px 12px', borderRadius: 10,
-            background: '#FCE4E1', color: '#C0392B', fontSize: '0.75rem',
+            margin: '10px 26px 0 38px', padding: '7px 12px', borderRadius: 10,
+            background: '#FDE7EA', color: '#D22040', fontSize: 12.5,
             fontWeight: 700, cursor: 'pointer', flexShrink: 0,
           }}
         >
@@ -317,9 +330,11 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={() => { setActiveDragId(null); setOverStage(null) }}
       >
+        {/* §7 board: fixed 244px columns on a single scrolling row. */}
         <div style={{
-          display: 'flex', gap: 12, overflowX: 'auto',
-          padding: '12px 20px 20px', flex: 1, alignItems: 'flex-start',
+          display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
+          gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
+          minWidth: 0, padding: '0 26px 16px 38px', flex: 1,
         }}>
           {ALL_STAGES.map(stageId => {
             const stage      = STAGE_META[stageId]
@@ -336,6 +351,7 @@ export function KanbanBoard({
                 today={today}
                 highlight={overStage === stageId && activeDragId !== null}
                 onSelectTask={id => selectTask(id)}
+                onAddTask={currentUser.access !== 'user' ? () => setShowTaskForm(true) : undefined}
               />
             )
           })}
