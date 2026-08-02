@@ -19,6 +19,8 @@ export default async function BoardPage() {
         task_owner: true,
         comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },
         attachments: true,
+        parent:     { select: { id: true, name: true } },
+        subtasks:   { select: { id: true, name: true, status: true }, orderBy: { created_at: 'asc' } },
       },
       orderBy: { created_at: 'desc' },
     }),

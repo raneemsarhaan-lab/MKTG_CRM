@@ -85,6 +85,9 @@ export interface Task {
   created_by?: string
   created_at: string
   updated_at: string
+  parent_task_id?: string | null
+  parent?: { id: string; name: string } | null
+  subtasks?: { id: string; name: string; status: StageId }[]
   comments?: TaskComment[]
   attachments?: TaskAttachment[]
 }

@@ -101,7 +101,13 @@ model Task {
   created_by         String?  @db.Uuid
   created_at         DateTime @default(now()) @db.Timestamptz(6)
   updated_at         DateTime @default(now()) @db.Timestamptz(6)
+  /// Set when this task was created as a subtask from another task's brief.
+  /// A subtask is an ordinary task — its own stage, SLA and owner — that
+  /// happens to know its parent, so nothing else in the pipeline changes.
+  parent_task_id     String?  @db.Uuid
 
+  parent       Task?        @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks     Task[]       @relation("Subtasks")
   brand        Brand?       @relation(fields: [brand_id], references: [id])
   task_owner   Member       @relation("TaskOwner", fields: [task_owner_id], references: [id])
   creator      Member?      @relation("TaskCreator", fields: [created_by], references: [id])

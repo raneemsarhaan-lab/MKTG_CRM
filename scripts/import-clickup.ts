@@ -138,6 +138,55 @@ export function unescapeClickUp(text: string): string {
 }
 
 /**
+ * Escape the Markdown syntax in text that was never Markdown.
+ *
+ * The plain-text briefs are literal prose, but they are stored in a Markdown
+ * column and rendered by a Markdown renderer, which quietly reinterprets them.
+ * Measured across the export:
+ *
+ *   13 separator lines of dashes are swallowed as horizontal rules — and every
+ *      one of them follows a line of text, so that line becomes a setext H2.
+ *      "Caption:" followed by ------- rendered as a page-wide heading.
+ *   83 lines that begin "1. " lose their own numbering to the renderer's,
+ *      which renumbers from 1 regardless of what the author wrote.
+ *    5 lines lose asterisks or underscores to emphasis.
+ *
+ * Escaping is deliberately narrow: only constructs that would actually change
+ * meaning. Over-escaping would fill the editor with backslashes for no gain,
+ * and these briefs are now editable by hand.
+ */
+export function escapeMarkdown(text: string): string {
+  return text.split('\n').map(line => {
+    // Block constructs, which only matter at the start of a line.
+    let out = line
+      .replace(/^(\s*)([-+*])(\s)/,        (_, s, c, t) => `${s}\\${c}${t}`)  // bullet
+      .replace(/^(\s*)(\d{1,9})([.)])(\s)/, (_, s, n, c, t) => `${s}${n}\\${c}${t}`) // ordered
+      .replace(/^(\s*)(#{1,6})(\s|$)/,     (_, s, h, t) => `${s}\\${h}${t}`)  // heading
+      .replace(/^(\s*)(>)/,                (_, s, c) => `${s}\\${c}`)         // quote
+      .replace(/^(\s*)(\|)/,               (_, s, c) => `${s}\\${c}`)         // table row
+
+    // A line that is nothing but rule characters — or a run of = or - directly
+    // under text, which promotes that text to a heading.
+    if (/^\s{0,3}([-_*=]\s*){3,}$/.test(out) || /^\s{0,3}[-=]+\s*$/.test(out)) {
+      out = out.replace(/([-_*=])/, '\\$1')
+    }
+
+    // Inline marks, escaped only where they could actually fire. A lone
+    // asterisk or backtick is inert, and "[SALMA]" is a bracket, not a link —
+    // escaping those would add backslashes to 36 briefs for nothing.
+    const pair = (ch: string) => (out.split(ch).length - 1) >= 2
+    if (pair('*')) out = out.replace(/\*/g, '\\*')
+    if (pair('_')) out = out.replace(/_/g, '\\_')
+    if (pair('`')) out = out.replace(/`/g, '\\`')
+    if (out.includes('~~')) out = out.replace(/~/g, '\\~')
+    if (/\]\(/.test(out)) out = out.replace(/\[/g, '\\[')
+    out = out.replace(/<(?=[a-zA-Z/!?])/g, '\\<')
+
+    return out
+  }).join('\n')
+}
+
+/**
  * Task Content arrives in two shapes, and both rendered as garbage when stored
  * verbatim — this is what "the description was corrupted" meant.
  *
@@ -255,7 +304,29 @@ export function decodeContent(raw: string): string {
     }
   }
 
-  // Plain text: a single newline is not a Markdown break, so make it one.
+  // Plain text: escape it so the renderer shows it verbatim, then give every
+  // newline a hard break — a single newline is not a break in Markdown, and
+  // without this a brief written as separate lines reads as a run-on.
+  return escapeMarkdown(unescapeClickUp(text)).replace(/\n/g, '  \n')
+}
+
+/**
+ * What `decodeContent` produced before the escaping fix.
+ *
+ * Kept solely so a re-import can recognise its own earlier output and repair
+ * it. A brief that still matches this byte for byte has not been touched by
+ * anyone, so it is safe to rewrite; anything else has been edited in the app
+ * and is left alone.
+ */
+export function decodeContentLegacy(raw: string): string {
+  const text = (raw ?? '').trim()
+  if (!text) return ''
+  if (text.startsWith('{') && text.includes('"ops"')) {
+    try {
+      const delta = JSON.parse(text) as { ops?: DeltaOp[] }
+      return deltaToMarkdown(delta.ops ?? [])
+    } catch { /* fall through */ }
+  }
   return unescapeClickUp(text).replace(/\n/g, '  \n')
 }
 
@@ -317,7 +388,7 @@ async function main() {
     console.log(`  + member: ${name}`)
   }
 
-  let created = 0, updated = 0, skipped = 0, attached = 0
+  let created = 0, updated = 0, skipped = 0, attached = 0, repaired = 0
   const unmapped = new Set<string>()
 
   for (const r of rows) {
@@ -373,9 +444,32 @@ async function main() {
     const existing = await prisma.task.findUnique({ where: { external_id: externalId } })
     let taskId: string
     if (existing) {
-      await prisma.task.update({ where: { external_id: externalId }, data })
+      // This script runs on every container start, so a blanket update would
+      // reset the board on each deploy: a task advanced through stages,
+      // reassigned, re-dated or whose brief was edited would silently snap back
+      // to whatever the ClickUp export said. Those fields belong to the app
+      // once a task exists.
+      //
+      // Two things still happen on a re-run. Genuinely absent data is filled
+      // in, and a description that is still byte-for-byte what a previous
+      // import wrote is repaired — that is how the escaping fix reaches the
+      // 210 briefs already in the database without touching an edited one.
+      const patch: Record<string, unknown> = {}
+
+      const pristine =
+        (existing.description ?? '') === decodeContentLegacy(r['Task Content']).trim() ||
+        (existing.description ?? '') === (data.description ?? '')
+      if (pristine && (existing.description ?? '') !== (data.description ?? '')) {
+        patch.description = data.description
+        repaired++
+      }
+      if (existing.brand_id === null && data.brand_id) patch.brand_id = data.brand_id
+
+      if (Object.keys(patch).length > 0) {
+        await prisma.task.update({ where: { external_id: externalId }, data: patch })
+        updated++
+      }
       taskId = existing.id
-      updated++
     } else {
       const t = await prisma.task.create({ data: { ...data, external_id: externalId } })
       taskId = t.id
@@ -384,18 +478,25 @@ async function main() {
 
     // Attachments are replaced wholesale rather than merged: the export is the
     // source of truth for them, and TaskAttachment has no external key to
-    // upsert on, so merging would duplicate on every re-run.
-    const files = parseAttachments(r['Attachments'])
-    await prisma.taskAttachment.deleteMany({ where: { task_id: taskId } })
-    if (files.length) {
-      await prisma.taskAttachment.createMany({
-        data: files.map(f => ({ task_id: taskId, filename: f.title, url: f.url || null })),
-      })
-      attached += files.length
+    // upsert on, so merging would duplicate on every re-run. The set is
+    // compared first so an unchanged task is not rewritten on every boot.
+    const files   = parseAttachments(r['Attachments'])
+    const current = await prisma.taskAttachment.findMany({ where: { task_id: taskId } })
+    const key = (l: { filename: string; url: string | null }[]) =>
+      l.map(f => `${f.filename} ${f.url ?? ''}`).sort().join('')
+
+    if (key(current) !== key(files.map(f => ({ filename: f.title, url: f.url || null })))) {
+      await prisma.taskAttachment.deleteMany({ where: { task_id: taskId } })
+      if (files.length) {
+        await prisma.taskAttachment.createMany({
+          data: files.map(f => ({ task_id: taskId, filename: f.title, url: f.url || null })),
+        })
+        attached += files.length
+      }
     }
   }
 
-  console.log(`✅ Import complete — ${created} created, ${updated} updated, ${skipped} skipped, ${attached} attachments.`)
+  console.log(`✅ Import complete — ${created} created, ${updated} updated (${repaired} briefs repaired), ${skipped} skipped, ${attached} attachments written.`)
   if (unmapped.size) console.log(`   Unmapped statuses: ${[...unmapped].join(', ')}`)
 }
 

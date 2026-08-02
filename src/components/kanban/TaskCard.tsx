@@ -172,6 +172,21 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
 
       {/* Body */}
       <div style={{ padding: '10px 12px 10px' }}>
+        {/* A subtask says whose it is — otherwise it is indistinguishable from
+            a top-level task once it is sitting in a column. */}
+        {task.parent && (
+          <p
+            title={`Subtask of ${task.parent.name}`}
+            style={{
+              color: 'var(--muted)', fontSize: '0.64rem', fontWeight: 600,
+              margin: '0 0 3px', overflow: 'hidden',
+              textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            ↳ {task.parent.name}
+          </p>
+        )}
+
         {/* Task name */}
         <p style={{
           color: 'var(--ink)',
