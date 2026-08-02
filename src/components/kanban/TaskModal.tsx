@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { Task, Member, Stage, TaskComment, SLAConfig } from '@/types/index'
+import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
 import { ALERT_BADGE_STYLES, COLORS } from '@/lib/tokens'
@@ -13,6 +13,8 @@ import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { moveTask, addComment, updateTask, type TaskPatch } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
 import { BriefEditor } from './BriefEditor'
+import { AttachmentGallery } from './AttachmentGallery'
+import { coverImageFor } from '@/lib/attachments'
 import { useUIStore } from '@/store/useUIStore'
 import { brandGradient } from '@/lib/utils'
 
@@ -20,7 +22,7 @@ type FullTask = Task & {
   brand: Brand
   task_owner: Member
   comments: (TaskComment & { author: Member })[]
-  attachments?: { id: string; filename: string; url?: string | null }[]
+  attachments?: TaskAttachment[]
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
@@ -82,10 +84,12 @@ export function TaskModal({
   const [editingName, setEditingName]   = useState(false)
   const [nameText, setNameText]         = useState('')
   const [showAllFields, setShowAllFields] = useState(false)
+  const [coverFailed, setCoverFailed]     = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const setCelebration = useUIStore(s => s.setCelebration)
 
+  const cover       = coverImageFor(task)
   const stageMeta   = STAGE_META[task.status]
   const nextStage   = nextStageId(task.status, task.nine_stage)
   const nextMeta    = nextStage ? STAGE_META[nextStage] : null
@@ -99,6 +103,10 @@ export function TaskModal({
     task.task_owner_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
+
+  // The panel is reused when a different task is opened, so a failed cover on
+  // one task must not suppress the next one's.
+  useEffect(() => { setCoverFailed(false) }, [task.id])
 
   // Escape closes the panel. Ignored while an inline editor is open so the
   // first Escape reverts that field rather than discarding the whole view.
@@ -302,13 +310,23 @@ export function TaskModal({
 
           {/* Scrolls independently */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {/* Cover — image when set, brand gradient otherwise (spec.md FR-011) */}
+            {/* Cover — the set image, else the newest image attachment, else the
+                brand gradient (spec.md FR-011). An <img> rather than a CSS
+                background so a URL that will not load can fall back instead of
+                leaving an empty band. */}
             <div style={{
-              height: 64, flexShrink: 0, position: 'relative',
-              background: task.cover_image_url
-                ? `url(${task.cover_image_url}) center/cover no-repeat`
-                : brandGradient(task.brand?.color ?? '#C4C4BE'),
+              height: 64, flexShrink: 0, position: 'relative', overflow: 'hidden',
+              background: brandGradient(task.brand?.color ?? '#C4C4BE'),
             }}>
+              {cover && !coverFailed && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cover}
+                  alt=""
+                  onError={() => setCoverFailed(true)}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              )}
               <div style={{
                 position: 'absolute', bottom: 0, insetInline: 0, height: 3,
                 background: task.brand?.color ?? '#C4C4BE',
@@ -525,40 +543,7 @@ export function TaskModal({
               </div>
             )}
 
-            {(task.attachments?.length ?? 0) > 0 && (
-              <div style={{ marginTop: 18 }}>
-                <div style={{
-                  fontSize: '0.6rem', color: COLORS.muted, marginBottom: 6,
-                  textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700,
-                }}>
-                  Attachments ({task.attachments!.length})
-                </div>
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 4 }}>
-                  {task.attachments!.map(a => (
-                    <li key={a.id}>
-                      <a
-                        href={a.url ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 7,
-                          fontSize: '0.78rem', color: a.url ? '#6E5BE6' : COLORS.muted,
-                          textDecoration: 'none', padding: '4px 6px', borderRadius: 6,
-                          border: `1px solid ${COLORS.line}`, background: '#FCFCFB',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                        </svg>
-                        {a.filename}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <AttachmentGallery attachments={task.attachments ?? []} />
 
             {isPublished && (
               <div style={{

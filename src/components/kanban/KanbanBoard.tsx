@@ -13,6 +13,9 @@ import { setTaskStage } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardOverlay } from './TaskCard'
+import {
+  BoardFilters, EMPTY_FILTERS, applyBoardFilters, type BoardFilterState,
+} from './BoardFilters'
 import { TaskModal } from './TaskModal'
 import { StatStrip } from './StatStrip'
 import { TaskForm } from '@/components/shared/TaskForm'
@@ -46,8 +49,7 @@ export function KanbanBoard({
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
-  const [search, setSearch]       = useState('')
-  const [activeBrand, setActiveBrand] = useState<string | null>(null)
+  const [filters, setFilters]     = useState<BoardFilterState>(EMPTY_FILTERS)
   const [dragError, setDragError] = useState('')
   const [, startTransition]       = useTransition()
   const router = useRouter()
@@ -85,16 +87,12 @@ export function KanbanBoard({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(t => {
-      if (activeBrand && t.brand_id !== activeBrand) return false
-      if (search) {
-        const q = search.toLowerCase()
-        return t.name.toLowerCase().includes(q) || t.task_owner.name.toLowerCase().includes(q)
-      }
-      return true
-    })
-  }, [tasks, activeBrand, search])
+  const filteredTasks = useMemo(
+    () => applyBoardFilters(tasks, filters, {
+      currentUserId: currentUser.id, slaConfig, today,
+    }),
+    [tasks, filters, currentUser.id, slaConfig, today],
+  )
 
   const tasksByStage = useMemo(() => {
     const map: Record<string, FullTask[]> = {}
@@ -241,8 +239,9 @@ export function KanbanBoard({
           </div>
         </div>
 
-        {/* Pipeline heading */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Pipeline heading + the board's own entry point to the composer.
+            The rail is icon-only (handoff §3), so this action lives here. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <span
             style={{
               fontFamily: 'var(--font-heading)',
@@ -254,65 +253,6 @@ export function KanbanBoard({
           >
             Pipeline
           </span>
-        </div>
-      </div>
-
-      {/* Brand filter + search */}
-      <div style={{ padding: '0 24px 8px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          {/* Brand filter chips */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setActiveBrand(null)}
-              style={{
-                padding: '4px 12px', borderRadius: 99, border: `1px solid ${!activeBrand ? 'var(--lime)' : 'var(--line)'}`,
-                background: !activeBrand ? 'var(--lime)' : '#fff',
-                color: !activeBrand ? 'var(--ink)' : 'var(--muted)',
-                fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              All brands
-            </button>
-            {brands.map(b => {
-              const on = activeBrand === b.id
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => setActiveBrand(on ? null : b.id)}
-                  title={b.name}
-                  aria-label={`Filter by ${b.name}`}
-                  aria-pressed={on}
-                  style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    border: `2px solid ${on ? 'var(--lime)' : 'transparent'}`,
-                    background: b.color, cursor: 'pointer', flexShrink: 0,
-                    boxShadow: on ? `0 4px 12px ${b.color}66` : 'none',
-                  }}
-                />
-              )
-            })}
-          </div>
-
-          {/* Search */}
-          <div style={{ position: 'relative' }}>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search tasks..."
-              style={{
-                width: 180, padding: '5px 10px 5px 28px',
-                background: '#fff', border: '1px solid var(--line)', borderRadius: 10,
-                fontSize: '0.78rem', outline: 'none', color: 'var(--ink)', fontFamily: 'inherit',
-              }}
-            />
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"
-              style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </div>
-
-          {/* New task — the board's own entry point to the composer. The rail
-              is icon-only (handoff §3), so this action lives on the screen. */}
           {currentUser.access !== 'user' && (
             <button
               onClick={() => setShowTaskForm(true)}
@@ -333,7 +273,19 @@ export function KanbanBoard({
         </div>
       </div>
 
-      <StatStrip tasks={tasks} today={today} />
+      <BoardFilters
+        filters={filters}
+        onChange={setFilters}
+        tasks={tasks}
+        brands={brands}
+        members={members}
+        shown={filteredTasks.length}
+        total={tasks.length}
+      />
+
+      {/* The strip counts what is on screen, so it agrees with the columns
+          rather than reporting the whole board while a filter is applied. */}
+      <StatStrip tasks={filteredTasks} today={today} />
 
       {/* Board columns */}
       {dragError && (
