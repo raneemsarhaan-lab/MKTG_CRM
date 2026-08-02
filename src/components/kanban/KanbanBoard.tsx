@@ -10,6 +10,8 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
+import { attentionItems } from '@/lib/home-metrics'
+import { initials, avatarColor } from '@/lib/utils'
 import { setTaskStage } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -18,7 +20,7 @@ import {
   BoardFilters, EMPTY_FILTERS, applyBoardFilters, type BoardFilterState,
 } from './BoardFilters'
 import { TaskModal } from './TaskModal'
-import { StatStrip } from './StatStrip'
+import { HeroCards } from './HeroCards'
 import { TaskForm } from '@/components/shared/TaskForm'
 
 type FullTask = Task & {
@@ -176,85 +178,119 @@ export function KanbanBoard({
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
-  // Compute active task count for workload bar
-  const myActiveTasks = tasks.filter(t => t.task_owner.id === currentUser.id && t.status !== 'publish').length
-  const workloadPct   = Math.min(100, Math.round((myActiveTasks / 10) * 100))
+  const attentionCount = attentionItems(tasks, currentUser.id, today).length
+
+  // Time-derived, and computed on the client only — rendering it on the server
+  // would freeze whatever hour the page was built at.
+  const [greeting, setGreeting] = useState('Hello')
+  useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening')
+  }, [])
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* User identity header */}
-      <div
-        style={{
-          padding: '16px 24px 12px',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Square avatar */}
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              background: '#6E5BE6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '15px', color: '#fff' }}>
-              {currentUser.name.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase()}
+    <div style={{
+      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      gap: 22, paddingBottom: 30, background: '#FFFFFF',
+    }}>
+      {/* Greeting header — Pipeline handoff §4. */}
+      <div style={{
+        padding: '24px 26px 0 38px', flexShrink: 0, display: 'flex',
+        alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 44,
+              lineHeight: 1, color: PIPE.ink,
+            }}>
+              {greeting}, {currentUser.name.split(' ')[0]}
             </span>
+            <span aria-hidden="true" style={{ fontSize: 26 }}>👋</span>
           </div>
-          <div>
-            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '14px', color: 'var(--ink)' }}>
-              {currentUser.name}
-            </div>
-            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '80px',
-                  height: '4px',
-                  borderRadius: '99px',
-                  background: 'var(--line)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${workloadPct}%`,
-                    borderRadius: '99px',
-                    background: workloadPct > 80 ? '#F5334F' : '#B79CF5',
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'var(--font-heading)' }}>
-                {myActiveTasks} active
-              </span>
-            </div>
+          <svg width="222" height="12" viewBox="0 0 222 12" fill="none" aria-hidden="true"
+               style={{ display: 'block', margin: '2px 0 0 2px' }}>
+            <path d="M4 8C50 3 160 2 218 6" stroke={PIPE.purpleStroke} strokeWidth="3.2" strokeLinecap="round" />
+          </svg>
+          <div style={{ marginTop: 6, fontWeight: 500, fontSize: 14.5, color: PIPE.textSecondary }}>
+            Let&apos;s create, ship and move the needle.
           </div>
         </div>
 
-        {/* The board's own entry point to the composer. The rail is icon-only
-            (handoff §3), so this action lives here. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 6, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              value={filters.search}
+              onChange={e => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search tasks, campaigns, assets..."
+              aria-label="Search tasks"
+              style={{
+                width: 362, height: 46, boxSizing: 'border-box',
+                border: `1px solid ${PIPE.borderInput}`, borderRadius: 999,
+                background: '#FFFFFF', padding: '0 12px 0 44px',
+                fontSize: 13.5, fontWeight: 500, color: PIPE.textPrimary,
+                fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={PIPE.textFaint}
+                 strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"
+                 style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+          </div>
+
+          {/* The bell counts the same work the attention card lists — it is
+              not a notification inbox, and pretending otherwise would put a
+              number on the screen with nothing behind it. */}
+          <div style={{ position: 'relative' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
+                 strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"
+                 aria-label={`${attentionCount} tasks need attention`} role="img">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
+            </svg>
+            {attentionCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -8, right: -8, minWidth: 20, height: 20,
+                borderRadius: 999, background: PIPE.purple, color: '#FFF',
+                fontWeight: 700, fontSize: 11, border: '2px solid #FFFFFF',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+              }}>
+                {attentionCount > 99 ? '99+' : attentionCount}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              width: 42, height: 42, borderRadius: '50%', boxSizing: 'border-box',
+              border: '2.5px solid #A855F7', background: avatarColor(currentUser.name),
+              color: '#FFF', fontWeight: 700, fontSize: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} aria-hidden="true">
+              {initials(currentUser.name)}
+            </span>
+            <span style={{ lineHeight: 1.25 }}>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: 14, color: PIPE.ink }}>
+                {currentUser.name}
+              </span>
+              <span style={{ display: 'block', fontWeight: 500, fontSize: 12, color: PIPE.textFaint }}>
+                {currentUser.access === 'admin' ? 'Admin' : currentUser.role}
+              </span>
+            </span>
+          </div>
+
           {currentUser.access !== 'user' && (
             <button
               onClick={() => setShowTaskForm(true)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'var(--brand-lime)', color: '#111111', border: 'none',
-                borderRadius: 10, fontFamily: 'var(--font-heading)', fontWeight: 700,
-                fontSize: 13, padding: '8px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                display: 'flex', alignItems: 'center', gap: 9, height: 46,
+                padding: '0 18px', borderRadius: 999, border: 'none',
+                background: PIPE.limeCta, color: PIPE.ink,
+                fontWeight: 700, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
                 <path d="M12 5v14M5 12h14" />
               </svg>
               New task
@@ -262,6 +298,13 @@ export function KanbanBoard({
           )}
         </div>
       </div>
+
+      <HeroCards
+        tasks={tasks}
+        currentUser={currentUser}
+        today={today}
+        onOpenTask={id => selectTask(id)}
+      />
 
       <BoardFilters
         filters={filters}
@@ -273,13 +316,10 @@ export function KanbanBoard({
         total={tasks.length}
       />
 
-      {/* The strip counts what is on screen, so it agrees with the columns
-          rather than reporting the whole board while a filter is applied. */}
-      <StatStrip tasks={filteredTasks} today={today} />
 
       {/* PIPELINE heading — handoff §7. Caveat, with the hand-drawn ticks and
           underline that carry the rest of the design's voice. */}
-      <div style={{ padding: '14px 26px 0 38px', flexShrink: 0 }}>
+      <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 2l2.1 6.1L20 10l-5.9 2.1L12 18l-2.1-5.9L4 10l5.9-1.9L12 2z"
@@ -334,7 +374,7 @@ export function KanbanBoard({
         <div style={{
           display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
-          minWidth: 0, padding: '0 26px 16px 38px', flex: 1,
+          minWidth: 0, padding: '0 26px 16px 38px',
         }}>
           {ALL_STAGES.map(stageId => {
             const stage      = STAGE_META[stageId]
