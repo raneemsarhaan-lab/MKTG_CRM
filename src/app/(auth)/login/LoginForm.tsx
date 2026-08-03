@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { signIn, getSession } from 'next-auth/react'
+import { signIn } from 'next-auth/react'
 
 /**
  * Sign-in tracing.
@@ -119,9 +119,31 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
       // console, indistinguishable from a wrong password.
       //
       // So: ask for the session before trusting it.
+      // Asked as a raw fetch rather than getSession(), because getSession()
+      // returns null both when the cookie did not stick *and* when the server
+      // failed to answer at all. Those need opposite fixes, and blaming
+      // NEXTAUTH_URL for a crashing server sends you looking in the wrong file.
       log('password accepted — checking the session actually stuck…')
-      const session = await getSession()
-      log('session after sign-in:', session ? `yes, ${session.user?.email}` : 'NONE')
+      let session: { user?: { email?: string | null } } | null = null
+      let sessionStatus = 0
+      try {
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
+        sessionStatus = res.status
+        const body = await res.json().catch(() => null)
+        session = body && Object.keys(body).length ? body : null
+        log('session check — HTTP', res.status, '·', session ? `signed in as ${session.user?.email}` : 'no session in the response')
+      } catch (err: unknown) {
+        log('session check failed outright:', err)
+      }
+
+      if (sessionStatus >= 500 || sessionStatus === 0) {
+        setError(
+          `The server is not responding properly (${sessionStatus || 'no response'}). ` +
+          'Your password was accepted — this is the app failing, not your account. ' +
+          'Check the deployment logs.',
+        )
+        return
+      }
 
       if (!session) {
         setError(
