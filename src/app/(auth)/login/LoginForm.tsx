@@ -1,8 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+
+/**
+ * Sign-in tracing.
+ *
+ * Every stage of the click prints a line, because the failure being chased is
+ * one where *nothing* happens — and "nothing" has half a dozen causes that
+ * look identical from a screenshot. Which line is the last one printed says
+ * which of them it is:
+ *
+ *   no lines at all      the bundle never ran
+ *   only "evaluated"     the bundle ran, React never hydrated
+ *   "click" but no       the button is not wired to the form
+ *     "submit"
+ *   "submit" then        the request never completed
+ *     nothing
+ *   "result"             the server answered; the line says what it said
+ *
+ * Passwords are never printed — only their length, which is enough to catch a
+ * field the browser filled without the app noticing, or a stray space.
+ */
+const log = (...args: unknown[]) => console.log('%c[fluxo]', 'color:#7A9E2F;font-weight:700', ...args)
+
+log('login bundle evaluated')
 
 /**
  * `jsFailed` is set by the server when the page was reached by the browser
@@ -17,10 +40,20 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
   const [hint,     setHint]     = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    log('login form hydrated — React is running, the button is live')
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    log('submit — email chars:', email.trim().length, '· password chars:', password.length)
 
     if (!email.trim() || !password) {
+      // The fields can look full while these are empty: a browser password
+      // manager fills the element without React hearing about it.
+      log('submit refused — the app sees one or both fields as empty.',
+          'DOM says:', document.querySelector<HTMLInputElement>('input[type=email]')?.value.length,
+          'and', document.querySelector<HTMLInputElement>('input[type=password]')?.value.length, 'chars')
       setError('Enter your email and password.')
       return
     }
@@ -29,21 +62,25 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
     setError('')
 
     try {
+      log('calling signIn…')
       const result = await signIn('credentials', {
         email: email.trim(),
         password,
         redirect: false,
       })
+      log('signIn returned:', result)
 
       // A thrown request and a missing result both used to leave the button
       // reading "Signing in…" for ever with nothing said — the reported
       // symptom. Every path below ends in either a message or a redirect.
       if (!result) {
+        log('signIn returned nothing — the request never completed')
         setError('Could not reach the sign-in service. Check your connection and try again.')
         return
       }
 
       if (result.error) {
+        log('rejected by the server:', result.error, '· status', result.status)
         // Deliberately the same message whether the address is unknown, the
         // password is wrong, or the account has none yet: a specific answer
         // would let anyone type addresses to find out who works here. The
@@ -53,12 +90,17 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
         return
       }
 
+      log('accepted — navigating to /overview.',
+          'If you end up back here, the session cookie is not sticking:',
+          'check NEXTAUTH_URL and the proxy, not the password.')
       router.push('/overview')
       router.refresh()
-    } catch {
+    } catch (e: unknown) {
+      log('threw while signing in:', e)
       setError('Something went wrong signing in. Please try again.')
     } finally {
       setLoading(false)
+      log('finished')
     }
   }
 
@@ -202,6 +244,9 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
           <button
             type="submit"
             disabled={loading}
+            // A click that never turns into a submit is its own answer: the
+            // button is live but the form is not, which no other line reveals.
+            onClick={() => log('button clicked')}
             style={{
               background: 'var(--lime)',
               color: 'var(--ink)',
