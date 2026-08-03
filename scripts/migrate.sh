@@ -28,6 +28,14 @@ echo "▶ Seeding reference data and default users..."
 # command and then narrates having done so.
 tsx prisma/seed.ts
 
+# Inert unless ADMIN_RESET_EMAIL and ADMIN_RESET_PASSWORD are both set. The
+# way back in when nobody can sign in — see scripts/reset-admin.ts.
+#
+# Before the import, not after: the import refuses to run without an admin
+# member, so if the admin account is the broken thing, putting the reset last
+# means it never runs at all. That is precisely the situation it exists for.
+tsx scripts/reset-admin.ts
+
 echo "▶ Importing ClickUp tasks (if an export is present)..."
 tsx scripts/import-clickup.ts
 
