@@ -1,15 +1,11 @@
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { mapMember, mapTask, mapSlaConfig } from '@/lib/mappers'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 
 export default async function BoardPage() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/login')
-
-  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  const member = await getSessionMember()
   if (!member) redirect('/login')
 
   const [tasks, members, brands, contentTypes, slaRows] = await Promise.all([

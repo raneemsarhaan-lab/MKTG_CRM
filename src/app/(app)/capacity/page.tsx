@@ -1,15 +1,11 @@
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { mapMember, mapTask } from '@/lib/mappers'
 import { CapacityDashboard } from '@/components/capacity/CapacityDashboard'
 
 export default async function CapacityPage() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/login')
-
-  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  const member = await getSessionMember()
   if (!member) redirect('/login')
   if (member.access !== 'admin') redirect('/overview')
 

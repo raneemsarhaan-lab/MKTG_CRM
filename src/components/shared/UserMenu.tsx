@@ -2,13 +2,28 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { initials, avatarColor } from '@/lib/utils'
 import { ImageWithFallback } from './ImageWithFallback'
 import { updateMyProfile, changeMyPassword } from '@/actions/profile'
+
+/**
+ * Sign out by deleting the cookie, then load /login as a real navigation.
+ *
+ * "I can't log out" was one of the original reports. signOut() went through
+ * the same machinery that was silently failing everywhere else; this asks the
+ * server to clear one cookie and does not depend on any of it. Even if the
+ * request fails, the navigation still happens — /login is the right place to
+ * end up either way.
+ */
+async function logout() {
+  try {
+    await fetch('/api/logout', { method: 'POST', cache: 'no-store', credentials: 'same-origin' })
+  } catch { /* navigate regardless */ }
+  window.location.assign('/login')
+}
 
 /**
  * The account menu behind the sidebar's user row.
@@ -233,7 +248,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
               <Row
                 icon="⏻"
                 tone="bad"
-                onClick={() => { close(); void signOut({ callbackUrl: '/login' }) }}
+                onClick={() => { close(); void logout() }}
               >
                 Log out
               </Row>
