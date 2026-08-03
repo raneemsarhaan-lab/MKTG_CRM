@@ -1,6 +1,6 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { SESSION_COOKIE, verifySession } from '@/lib/session'
 import type { Member } from '@prisma/client'
 
 /**
@@ -15,11 +15,18 @@ import type { Member } from '@prisma/client'
  * Every mutating action must open with one of these guards.
  */
 
-/** The signed-in member, or null when there is no valid session. */
+/**
+ * The signed-in member, or null when there is no valid session.
+ *
+ * The member is loaded fresh on every call rather than trusted from the
+ * cookie, so an account that is removed or demoted loses access immediately
+ * instead of at the end of a thirty-day session.
+ */
 export async function getSessionMember(): Promise<Member | null> {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return null
-  return prisma.member.findUnique({ where: { id: session.user.id } })
+  const jar     = await cookies()
+  const payload = await verifySession(jar.get(SESSION_COOKIE)?.value)
+  if (!payload) return null
+  return prisma.member.findUnique({ where: { id: payload.sub } })
 }
 
 type Guard =

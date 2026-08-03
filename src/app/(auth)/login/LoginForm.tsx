@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { signIn } from 'next-auth/react'
 
 /**
  * Sign-in tracing.
@@ -80,107 +79,34 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
     setError('')
 
     try {
-      // Re-sync the CSRF token before signing in.
+      // One request. It either sets the cookie or says why not.
       //
-      // NextAuth pairs a csrf cookie with a token posted in the body, and
-      // checks that sha256(token + NEXTAUTH_SECRET) matches. A cookie issued
-      // under a previous secret, or a cached /api/auth/csrf response, breaks
-      // the pair — and the failure is brutal: the credentials callback
-      // redirects to /signin?csrf=true *before authorize() is ever called*.
-      // No password check, no session cookie, no server log line, and signIn
-      // reports no error at all. Fetching it uncached first keeps the two in
-      // step; the check below catches it when they still are not.
-      try {
-        await fetch('/api/auth/csrf', { cache: 'no-store', credentials: 'same-origin' })
-      } catch { /* the signIn below will surface it */ }
-
-      log('calling signIn…')
-      const result = await signIn('credentials', {
-        email: email.trim(),
-        password,
-        redirect: false,
+      // What this replaces fetched a CSRF token first, posted it back, and —
+      // when the token and its cookie disagreed, which a rotated secret or a
+      // cached response is enough to cause — redirected away before checking
+      // the password at all, then reported success. There is no token to
+      // disagree with here, and no second round trip in which to lose it.
+      log('posting to /api/login…')
+      const res  = await fetch('/api/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: email.trim(), password }),
+        cache:   'no-store',
+        credentials: 'same-origin',
       })
-      log('signIn returned:', result)
+      const body = await res.json().catch(() => null)
+      log('/api/login →', res.status, body)
 
-      if (result?.url?.includes('csrf=true')) {
-        log('CSRF check failed — authorize() was never reached')
-        setError(
-          'Sign-in was rejected before your password was checked (CSRF token mismatch). ' +
-          'Clear this site’s cookies and try again — this usually follows a change to NEXTAUTH_SECRET.',
-        )
+      if (!res.ok) {
+        setError(body?.error ?? `Sign-in failed (${res.status}).`)
+        if (body?.hint === 'no_password') setHint(true)
         return
       }
 
-      // A thrown request and a missing result both used to leave the button
-      // reading "Signing in…" for ever with nothing said — the reported
-      // symptom. Every path below ends in either a message or a redirect.
-      if (!result) {
-        log('signIn returned nothing — the request never completed')
-        setError('Could not reach the sign-in service. Check your connection and try again.')
-        return
-      }
-
-      if (result.error) {
-        log('rejected by the server:', result.error, '· status', result.status)
-        // Deliberately the same message whether the address is unknown, the
-        // password is wrong, or the account has none yet: a specific answer
-        // would let anyone type addresses to find out who works here. The
-        // hint covers the third case without confirming any of them.
-        setError('Invalid email or password.')
-        setHint(true)
-        return
-      }
-
-      // The password was right. That is not the same as being signed in.
-      //
-      // Everything past this point depends on a cookie having been set and
-      // being readable again on the next request. When it is not — a wrong
-      // NEXTAUTH_URL, a proxy stripping it, a Secure cookie over a connection
-      // the browser does not consider secure — the old code navigated anyway,
-      // the three server-side guards on /overview each sent it back to /login,
-      // and the form reappeared looking untouched. No error, nothing in the
-      // console, indistinguishable from a wrong password.
-      //
-      // So: ask for the session before trusting it.
-      // Asked as a raw fetch rather than getSession(), because getSession()
-      // returns null both when the cookie did not stick *and* when the server
-      // failed to answer at all. Those need opposite fixes, and blaming
-      // NEXTAUTH_URL for a crashing server sends you looking in the wrong file.
-      log('password accepted — checking the session actually stuck…')
-      let session: { user?: { email?: string | null } } | null = null
-      let sessionStatus = 0
-      try {
-        const res = await fetch('/api/auth/session', { cache: 'no-store' })
-        sessionStatus = res.status
-        const body = await res.json().catch(() => null)
-        session = body && Object.keys(body).length ? body : null
-        log('session check — HTTP', res.status, '·', session ? `signed in as ${session.user?.email}` : 'no session in the response')
-      } catch (err: unknown) {
-        log('session check failed outright:', err)
-      }
-
-      if (sessionStatus >= 500 || sessionStatus === 0) {
-        setError(
-          `The server is not responding properly (${sessionStatus || 'no response'}). ` +
-          'Your password was accepted — this is the app failing, not your account. ' +
-          'Check the deployment logs.',
-        )
-        return
-      }
-
-      if (!session) {
-        setError(
-          'Your password was correct, but the session did not save. ' +
-          'This is a server configuration problem, not your account — ' +
-          'NEXTAUTH_URL must exactly match the address in the browser bar.',
-        )
-        return
-      }
-
-      // A full page load, not router.push. The client router would fetch
-      // /overview as an RSC payload; if middleware turned that away the router
-      // would follow the redirect back to /login in silence. A real navigation
-      // sends the new cookie and shows plainly where it ends up.
+      // The cookie is on this response, so it is already stored. A full page
+      // load carries it; router.push would fetch the next page as a payload
+      // and, if that were turned away, follow the redirect back here without
+      // a word — which is the silence this whole rebuild is about.
       const to = destination()
       log('signed in — navigating to', to)
       window.location.assign(to)

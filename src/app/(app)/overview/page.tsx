@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { MyBoard } from '@/components/myboard/MyBoard'
 import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
@@ -20,10 +19,7 @@ import type { StageId } from '@/types/index'
  * (page guards, middleware). The nav rail's Overview item points at it.
  */
 export default async function OverviewPage() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/login')
-
-  const member = await prisma.member.findUnique({ where: { id: session.user.id } })
+  const member = await getSessionMember()
   if (!member) redirect('/login')
 
   const [openTasks, completed, slaRows] = await Promise.all([
