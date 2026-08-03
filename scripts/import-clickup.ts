@@ -389,10 +389,20 @@ async function main() {
   for (const name of csvNames) {
     if (memberByName.has(name.toLowerCase())) continue
     const email = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@forefront.consulting`
-    const created = await prisma.member.upsert({
-      where:  { email },
-      update: {},
-      create: {
+
+    // The loop above matches on display name, but the account is keyed by
+    // email — "Raneem Sarhaan" in the export and "Raneem S." in the app derive
+    // the same address and are the same person. Look the address up before
+    // creating, so an existing account is reused and, just as importantly, the
+    // log stops announcing "+ member" for people who were already here.
+    const existing = await prisma.member.findUnique({ where: { email }, select: { id: true } })
+    if (existing) {
+      memberByName.set(name.toLowerCase(), existing.id)
+      continue
+    }
+
+    const made = await prisma.member.create({
+      data: {
         name, email,
         role: 'Team Member',
         access: 'user',
@@ -401,7 +411,7 @@ async function main() {
         password_hash: null,       // cannot sign in until a password is set
       },
     })
-    memberByName.set(name.toLowerCase(), created.id)
+    memberByName.set(name.toLowerCase(), made.id)
     console.log(`  + member: ${name}`)
   }
 

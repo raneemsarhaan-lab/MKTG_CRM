@@ -356,22 +356,46 @@ NEXTAUTH_URL=https://marketing-crm-ikdtpr.cranl.net
 npm run deploy
 ```
 
-Which expands to `next build && bash scripts/migrate.sh` — build, push schema, seed. The migration is wired into the build **specifically because** that is the only context with network access to the database.
+`npm run deploy` is just `next build`. The database work runs at **container start**, not at build: `npm start` is `bash scripts/migrate.sh && next start`, which pushes the schema, seeds, and imports. It lives there because the container is the only context with network access to the database.
 
 ### First login
 
 ```
-Email:    raneem@forefront.consulting
-Password: FluxoAdmin2026!
+Email:    raneem.sarhaan@forefront.consulting
+Password: Fluxo-rSpNJNGb9c7prM
 ```
 
-Change this immediately after first login. All seven seeded members share this password until reset.
+This is what `prisma/seed.ts` actually creates. Earlier revisions of this file
+documented `raneem@forefront.consulting` / `FluxoAdmin2026!` — that address
+does not exist and that password belongs to the other six seeded accounts,
+which is a fast way to conclude the login is broken when it isn't.
+
+The seed upserts with `update: {}`, so it only applies these on a **first**
+creation. If the account already exists, whatever password it currently holds
+is the live one and re-seeding will not change it.
+
+### Locked out
+
+Every way to set a password is behind a sign-in, and the database is reachable
+only from inside the deployment's network — so a broken admin account cannot be
+repaired from outside. `scripts/reset-admin.ts` runs at container start and is
+inert unless both of these are set:
+
+```
+ADMIN_RESET_EMAIL=you@forefront.consulting
+ADMIN_RESET_PASSWORD=something-long-enough
+```
+
+Set them, redeploy, sign in, then **delete both**. While they are set the
+password is reapplied on every restart, so a later change made in the app
+silently reverts. The script creates the account if the address is unknown, and
+forces `access: 'admin'` either way.
 
 ### Seeded team
 
 | Name | Email | Role | Access |
 |---|---|---|---|
-| Raneem | raneem@forefront.consulting | Marketing Manager | admin |
+| Raneem | raneem.sarhaan@forefront.consulting | Marketing Manager | admin |
 | Islam | islam@forefront.consulting | Managing Director | superuser |
 | Brand Director | brand@forefront.consulting | Brand Director | superuser |
 | Digital Marketing Specialist | dms@forefront.consulting | Digital Marketing Specialist | superuser |
@@ -426,7 +450,7 @@ Run through this after the first successful deploy.
 
 **Auth**
 - [ ] Visiting the app URL redirects to `/login`
-- [ ] `raneem@forefront.consulting` / `FluxoAdmin2026!` lands on `/overview`
+- [ ] `raneem.sarhaan@forefront.consulting` / `Fluxo-rSpNJNGb9c7prM` lands on `/overview`
 - [ ] A wrong password is rejected without hanging
 - [ ] Signing out returns to `/login`
 
