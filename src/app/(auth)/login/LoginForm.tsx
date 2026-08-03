@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { signIn, getSession } from 'next-auth/react'
 
 /**
  * Sign-in tracing.
@@ -38,11 +37,30 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const [hint,     setHint]     = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     log('login form hydrated — React is running, the button is live')
   }, [])
+
+  /**
+   * Where to go once signed in.
+   *
+   * Middleware appends ?callbackUrl= when it turns someone away from a page,
+   * so honouring it puts them back where they were headed. Only same-origin
+   * paths are accepted: a callbackUrl is attacker-supplied, and following an
+   * absolute one would make this form an open redirect.
+   */
+  function destination() {
+    const raw = new URLSearchParams(window.location.search).get('callbackUrl')
+    if (!raw) return '/overview'
+    try {
+      const url = new URL(raw, window.location.origin)
+      if (url.origin !== window.location.origin) return '/overview'
+      return url.pathname.startsWith('/login') ? '/overview' : url.pathname + url.search
+    } catch {
+      return '/overview'
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -90,11 +108,38 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
         return
       }
 
-      log('accepted — navigating to /overview.',
-          'If you end up back here, the session cookie is not sticking:',
-          'check NEXTAUTH_URL and the proxy, not the password.')
-      router.push('/overview')
-      router.refresh()
+      // The password was right. That is not the same as being signed in.
+      //
+      // Everything past this point depends on a cookie having been set and
+      // being readable again on the next request. When it is not — a wrong
+      // NEXTAUTH_URL, a proxy stripping it, a Secure cookie over a connection
+      // the browser does not consider secure — the old code navigated anyway,
+      // the three server-side guards on /overview each sent it back to /login,
+      // and the form reappeared looking untouched. No error, nothing in the
+      // console, indistinguishable from a wrong password.
+      //
+      // So: ask for the session before trusting it.
+      log('password accepted — checking the session actually stuck…')
+      const session = await getSession()
+      log('session after sign-in:', session ? `yes, ${session.user?.email}` : 'NONE')
+
+      if (!session) {
+        setError(
+          'Your password was correct, but the session did not save. ' +
+          'This is a server configuration problem, not your account — ' +
+          'NEXTAUTH_URL must exactly match the address in the browser bar.',
+        )
+        return
+      }
+
+      // A full page load, not router.push. The client router would fetch
+      // /overview as an RSC payload; if middleware turned that away the router
+      // would follow the redirect back to /login in silence. A real navigation
+      // sends the new cookie and shows plainly where it ends up.
+      const to = destination()
+      log('signed in — navigating to', to)
+      window.location.assign(to)
+      return
     } catch (e: unknown) {
       log('threw while signing in:', e)
       setError('Something went wrong signing in. Please try again.')
