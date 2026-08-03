@@ -80,6 +80,20 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
     setError('')
 
     try {
+      // Re-sync the CSRF token before signing in.
+      //
+      // NextAuth pairs a csrf cookie with a token posted in the body, and
+      // checks that sha256(token + NEXTAUTH_SECRET) matches. A cookie issued
+      // under a previous secret, or a cached /api/auth/csrf response, breaks
+      // the pair — and the failure is brutal: the credentials callback
+      // redirects to /signin?csrf=true *before authorize() is ever called*.
+      // No password check, no session cookie, no server log line, and signIn
+      // reports no error at all. Fetching it uncached first keeps the two in
+      // step; the check below catches it when they still are not.
+      try {
+        await fetch('/api/auth/csrf', { cache: 'no-store', credentials: 'same-origin' })
+      } catch { /* the signIn below will surface it */ }
+
       log('calling signIn…')
       const result = await signIn('credentials', {
         email: email.trim(),
@@ -87,6 +101,15 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
         redirect: false,
       })
       log('signIn returned:', result)
+
+      if (result?.url?.includes('csrf=true')) {
+        log('CSRF check failed — authorize() was never reached')
+        setError(
+          'Sign-in was rejected before your password was checked (CSRF token mismatch). ' +
+          'Clear this site’s cookies and try again — this usually follows a change to NEXTAUTH_SECRET.',
+        )
+        return
+      }
 
       // A thrown request and a missing result both used to leave the button
       // reading "Signing in…" for ever with nothing said — the reported

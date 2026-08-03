@@ -31,6 +31,26 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_STAMP: buildStamp,
   },
+
+  /**
+   * Authentication responses must never be cached.
+   *
+   * /api/auth/csrf issues a token that has to match a cookie set by the same
+   * response. If a proxy or the browser serves a stale copy, the two no longer
+   * agree and NextAuth rejects the sign-in *before* checking the password —
+   * silently, with no error and nothing in the server log. Behind a reverse
+   * proxy that is a very easy mistake for the infrastructure to make on our
+   * behalf, so say it explicitly.
+   */
+  async headers() {
+    return [{
+      source: '/api/auth/:path*',
+      headers: [
+        { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
+        { key: 'Pragma',        value: 'no-cache' },
+      ],
+    }]
+  },
   experimental: {
     serverActions: {
       allowedOrigins,
