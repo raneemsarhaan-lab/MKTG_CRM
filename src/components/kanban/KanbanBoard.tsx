@@ -9,6 +9,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
+import { MyTasksColumn } from './MyTasksColumn'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { attentionItems } from '@/lib/home-metrics'
 import { initials, avatarColor } from '@/lib/utils'
@@ -182,7 +183,23 @@ export function KanbanBoard({
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
-  const attentionCount = attentionItems(tasks, currentUser.id, today).length
+  const attentionCount = attentionItems(tasks, currentUser.id, today, currentUser.role).length
+
+  // "My tasks" is a preference, so it survives a reload. Read after mount, not
+  // during render — reading localStorage while rendering makes the server and
+  // client disagree and mismatches the tree.
+  const [showMine, setShowMine] = useState(true)
+  useEffect(() => {
+    const v = window.localStorage.getItem('fluxo.board.mine')
+    if (v !== null) setShowMine(v === '1')
+  }, [])
+  function toggleMine() {
+    setShowMine(v => {
+      window.localStorage.setItem('fluxo.board.mine', v ? '0' : '1')
+      return !v
+    })
+  }
+  const myOpenCount = tasks.filter(t => t.task_owner_id === currentUser.id && t.status !== 'publish').length
 
   // ── Bulk selection ────────────────────────────────────────────────────────
   // Shift-click extends from the last click through the *visible* order, which
@@ -343,6 +360,33 @@ export function KanbanBoard({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Bringing the column back, once it has been closed. Always
+                present rather than only when hidden, so the control does not
+                move around depending on state. */}
+            <button
+              type="button"
+              onClick={toggleMine}
+              aria-pressed={showMine}
+              title={showMine ? 'Hide my tasks' : 'Show my tasks'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px',
+                borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5,
+                fontWeight: 700, whiteSpace: 'nowrap',
+                border: `1.5px solid ${showMine ? PIPE.ink : PIPE.border}`,
+                background: showMine ? '#F4FBD6' : '#FFFFFF',
+                color: PIPE.ink,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              My tasks
+              {myOpenCount > 0 && (
+                <span style={{ fontWeight: 600, color: PIPE.textFaint }}>{myOpenCount}</span>
+              )}
+            </button>
+
             <span style={{
               width: 42, height: 42, borderRadius: '50%', boxSizing: 'border-box',
               border: '2.5px solid #A855F7', background: avatarColor(currentUser.name),
@@ -458,6 +502,15 @@ export function KanbanBoard({
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
         }}>
+          {showMine && (
+            <MyTasksColumn
+              tasks={tasks}
+              currentUser={currentUser}
+              today={today}
+              onOpenTask={id => selectTask(id)}
+              onHide={toggleMine}
+            />
+          )}
           {ALL_STAGES.map(stageId => {
             const stage      = STAGE_META[stageId]
             const stageTasks = tasksByStage[stageId] ?? []

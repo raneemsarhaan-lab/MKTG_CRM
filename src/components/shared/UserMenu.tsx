@@ -7,6 +7,7 @@ import type { Member } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { initials, avatarColor } from '@/lib/utils'
 import { ImageWithFallback } from './ImageWithFallback'
+import { ImageUpload } from './ImageUpload'
 import { updateMyProfile, changeMyPassword } from '@/actions/profile'
 
 /**
@@ -260,14 +261,14 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
               <Field label="Name">
                 <input value={name} onChange={e => setName(e.target.value)} style={INPUT} />
               </Field>
-              <Field label="Photo URL">
-                <input
-                  value={photo}
-                  onChange={e => setPhoto(e.target.value)}
-                  placeholder="https://…"
-                  style={INPUT}
-                />
-              </Field>
+              <ImageUpload
+                label="Photo"
+                value={photo || null}
+                max={192}
+                round
+                disabled={isPending}
+                onChange={v => setPhoto(v ?? '')}
+              />
               <Actions
                 busy={isPending}
                 onSave={saveProfile}

@@ -96,33 +96,68 @@ export function statCounts(tasks: Task[], today: Date): {
 export interface AttentionItem {
   id:      string
   title:   string
-  due:     'today' | 'tomorrow' | 'overdue'
+  due:     'today' | 'tomorrow' | 'overdue' | 'waiting'
   dueText: string
   stage:   StageId
+  /** True when it is here because the stage is yours, not the task. */
+  viaStage: boolean
 }
 
 /**
- * Needs Your Attention — the user's own work that is due now or has slipped.
+ * Needs Your Attention — two different claims on the same person.
+ *
+ * Work you own that is due now or has slipped, and work sitting in a stage you
+ * own waiting for you to look at it. The second was missing, which meant a
+ * reviewer's list was empty however long the queue in front of them was: the
+ * tasks belong to whoever is producing them, not to the person reviewing.
+ *
+ * A task waiting in your stage has no deadline of its own to breach — it is
+ * late the moment it arrives — so it is listed regardless of due date, and
+ * ordered ahead of everything except work already overdue.
  *
  * Published tasks are excluded: a finished task cannot need attention, however
  * old its date.
  */
-export function attentionItems(tasks: Task[], memberId: string, today: Date): AttentionItem[] {
-  return tasks
-    .filter(t => t.task_owner_id === memberId && t.status !== 'publish' && t.due_date)
-    .map(t => {
-      const days = calDaysBetween(today, new Date(t.due_date as string))
-      return { t, days }
-    })
-    .filter(({ days }) => days <= 1)
-    .sort((a, b) => a.days - b.days)
-    .map(({ t, days }) => ({
-      id:      t.id,
-      title:   t.name,
-      due:     days < 0 ? 'overdue' : days === 0 ? 'today' : 'tomorrow',
-      dueText: days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : 'Due tomorrow',
-      stage:   t.status,
-    }) as AttentionItem)
+export function attentionItems(
+  tasks: Task[],
+  memberId: string,
+  today: Date,
+  memberRole?: string,
+): AttentionItem[] {
+  const seen = new Set<string>()
+  const out: (AttentionItem & { sort: number })[] = []
+
+  for (const t of tasks) {
+    if (t.status === 'publish') continue
+
+    const mine = t.task_owner_id === memberId
+    const days = t.due_date ? calDaysBetween(today, new Date(t.due_date as string)) : null
+
+    if (mine && days !== null && days <= 1) {
+      seen.add(t.id)
+      out.push({
+        id: t.id, title: t.name, stage: t.status, viaStage: false,
+        due:     days < 0 ? 'overdue' : days === 0 ? 'today' : 'tomorrow',
+        dueText: days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : 'Due tomorrow',
+        sort:    days,
+      })
+    }
+  }
+
+  if (memberRole) {
+    for (const t of tasks) {
+      if (t.status === 'publish' || seen.has(t.id)) continue
+      if (STAGE_META[t.status]?.owner_role !== memberRole) continue
+      out.push({
+        id: t.id, title: t.name, stage: t.status, viaStage: true,
+        due: 'waiting',
+        dueText: `Waiting in ${STAGE_META[t.status].label_en}`,
+        sort: 0.5,          // after anything overdue, before tomorrow
+      })
+    }
+  }
+
+  return out.sort((a, b) => a.sort - b.sort).map(({ sort: _sort, ...item }) => item)
 }
 
 export interface ActivityItem {

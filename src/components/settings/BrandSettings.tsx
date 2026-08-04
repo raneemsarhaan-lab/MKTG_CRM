@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Brand } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { ImageUpload } from '@/components/shared/ImageUpload'
 import { AddBrandModal } from './AddBrandModal'
 import {
   updateBrand, removeBrand, addBrandAsset, removeBrandAsset,
@@ -215,17 +216,50 @@ function BrandRow({ brand: b, first, open, onToggle, onError }: {
 
       {open && (
         <div style={{ padding: '0 18px 18px 62px', display: 'grid', gap: 12 }}>
+          <ImageUpload
+            label="Logo"
+            value={b.logo_url ?? null}
+            max={256}
+            disabled={isPending}
+            onChange={v => patch({ logo_url: v })}
+          />
+
           <div style={{ display: 'grid', gap: 6 }}>
-            <label style={LABEL}>Logo URL</label>
-            <input
-              defaultValue={b.logo_url ?? ''}
-              placeholder="https://… or /brands/name.png"
-              onBlur={e => {
-                const v = e.target.value.trim()
-                if (v !== (b.logo_url ?? '')) patch({ logo_url: v || null })
-              }}
-              style={{ ...input, width: '100%' }}
-            />
+            <label style={LABEL}>Brand colour</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                type="color"
+                value={b.color}
+                aria-label={`Colour of ${b.name}`}
+                onChange={e => patch({ color: e.target.value })}
+                style={{ width: 46, height: 34, padding: 2, borderRadius: 8,
+                         border: '1px solid var(--line)', background: '#fff', cursor: 'pointer' }}
+              />
+              <input
+                defaultValue={b.color}
+                aria-label={`Colour hex of ${b.name}`}
+                onBlur={e => {
+                  const v = e.target.value.trim()
+                  if (/^#[0-9a-fA-F]{6}$/.test(v) && v !== b.color) patch({ color: v })
+                  else e.target.value = b.color
+                }}
+                style={{ ...input, width: 104, fontFamily: 'ui-monospace, monospace' }}
+              />
+              {/* The palette the boards already draw with, so a brand can be
+                  set to one of them without matching hex codes by eye. */}
+              {['#1B3A6B', '#D99A1F', '#1F7A4D', '#7C3AED', '#E2445C', '#2563A8', '#C2691E'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => patch({ color: c })}
+                  aria-label={`Set colour ${c}`}
+                  title={c}
+                  style={{
+                    width: 22, height: 22, borderRadius: '50%', background: c, cursor: 'pointer',
+                    border: b.color.toLowerCase() === c.toLowerCase() ? '2px solid var(--ink)' : '1px solid var(--line)',
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gap: 6 }}>
