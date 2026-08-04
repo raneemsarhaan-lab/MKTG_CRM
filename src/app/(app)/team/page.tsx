@@ -17,13 +17,18 @@ export default async function TeamPage() {
 
   const isAdmin = member.access === 'admin'
 
-  const [rows, brands] = await Promise.all([
+  const [rows, brands, allMembers, projects] = await Promise.all([
     prisma.projectStep.findMany({
       where: isAdmin ? { assignee_id: { not: null } } : { assignee_id: member.id },
       orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }],
       include: { assignee: true, project: { include: { brand: true } } },
     }),
     prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true } }),
+    prisma.member.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.project.findMany({
+      orderBy: [{ focus: 'desc' }, { name: 'asc' }],
+      select: { id: true, name: true, brand: { select: { name: true } } },
+    }),
   ])
 
   const steps: TeamStep[] = rows.map(s => ({
@@ -35,6 +40,7 @@ export default async function TeamPage() {
     assigneeId: s.assignee_id,
     assigneeName: s.assignee?.name ?? null,
     taskId: s.task_id,
+    projectId: s.project_id,
     projectName: s.project.name,
     brandName: s.project.brand?.name ?? null,
     brandColor: s.project.brand?.color ?? null,
@@ -52,6 +58,8 @@ export default async function TeamPage() {
       <TeamBoard
         steps={steps}
         people={people}
+        allMembers={allMembers}
+        projects={projects.map(p => ({ id: p.id, name: p.name, brandName: p.brand?.name ?? null }))}
         brands={brands}
         isAdmin={isAdmin}
         viewerId={member.id}
