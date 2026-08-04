@@ -4,17 +4,23 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { initials } from '@/lib/utils'
 import { setStepDone, convertStepToTask, updateStep, addStep } from '@/actions/projects'
 import { isLate, todayISO } from '@/lib/projects'
-import { UI, font, card, input, durationTone, personColor, segments } from '@/lib/board-ui'
+import {
+  UI, TILE, font, card, control, input,
+  durationTone, personColor, segmentWidth,
+} from '@/lib/board-ui'
 
 /**
  * Team tasks — the plan's steps, grouped by the person doing them.
  *
- * The same records the Projects board shows by project. A member sees only
- * their own; an admin gets a tab per person. The filtering that matters happens
- * on the server — this component is only ever handed what the viewer is allowed
- * to see, and every action re-checks before writing.
+ * Built to "Fluxo Team Tasks - Design Spec.md". Every measurement is from that
+ * file.
  *
- * Editing is inline rather than behind a modal. These rows are worked through
+ * The same records the Portfolio board shows by project. A member sees only
+ * their own; an admin gets a chip per person. The filtering that matters
+ * happens on the server — this component is only ever handed what the viewer
+ * is allowed to see, and every action re-checks before writing.
+ *
+ * Editing is inline rather than behind a modal. These rows get worked through
  * in sequence — a dozen dates nudged, a duration corrected — and a dialog per
  * change turns five seconds of work into a minute of clicking.
  */
@@ -27,22 +33,24 @@ export interface TeamStep {
   done: boolean
   assigneeId: string | null
   assigneeName: string | null
+  assigneeAvatar: string | null
   taskId: string | null
   projectId: string
   projectName: string
   brandName: string | null
   brandColor: string | null
+  brandLogo: string | null
 }
 
 interface Props {
-  steps:    TeamStep[]
-  people:   { id: string; name: string; role: string }[]
+  steps:      TeamStep[]
+  people:     { id: string; name: string; role: string; avatar: string | null }[]
   allMembers: { id: string; name: string }[]
-  projects: { id: string; name: string; brandName: string | null }[]
-  brands:   { id: string; name: string; color: string }[]
-  isAdmin:  boolean
-  viewerId: string
-  canPush:  boolean
+  projects:   { id: string; name: string; brandName: string | null }[]
+  brands:     { id: string; name: string; color: string }[]
+  isAdmin:    boolean
+  viewerId:   string
+  canPush:    boolean
 }
 
 type State = 'open' | 'all' | 'over' | 'done'
@@ -53,7 +61,7 @@ const fmt = (iso: string | null) => {
   const [, m, d] = iso.split('-')
   return `${+d} ${MONTHS[+m - 1]}`
 }
-const monthKey = (iso: string | null) => (iso ? iso.slice(0, 7) : 'zzzz')
+const monthKey   = (iso: string | null) => (iso ? iso.slice(0, 7) : 'zzzz')
 const monthLabel = (k: string) =>
   k === 'zzzz' ? 'NO DATE' : `${MONTHS[+k.slice(5, 7) - 1].toUpperCase()} ${k.slice(0, 4)}`
 
@@ -106,87 +114,110 @@ export function TeamBoard({
   const canEdit = isAdmin || who === viewerId
 
   return (
-    <div style={{ overflowY: 'auto', height: '100%', background: UI.bg }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 40px 90px' }}>
+    <div style={{ overflowY: 'auto', height: '100%', background: '#FFFFFF' }}>
+      <div style={{
+        maxWidth: 1336, padding: '24px 26px 34px 38px',
+        display: 'flex', flexDirection: 'column', gap: 20,
+      }}>
 
-        {/* Masthead */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
+        {/* ── §4 Header ───────────────────────────────────────────────── */}
+        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 26 }}>
           <div>
-            <p style={{ ...font.eyebrow, margin: 0 }}>Team</p>
-            <h1 style={{ ...font.h1, margin: '6px 0 0', position: 'relative', display: 'inline-block' }}>
-              {isAdmin ? 'Team tasks' : 'My tasks'}
-              <Sparkle />
-            </h1>
-            <p style={{ fontSize: 14, color: UI.muted, margin: '8px 0 0' }}>
+            <div style={font.eyebrow}>Team</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8 }}>
+              <h1 style={{ ...font.title, margin: 0 }}>{isAdmin ? 'Team tasks' : 'My tasks'}</h1>
+              <Ticks />
+            </div>
+            <p style={{ ...font.subtitle, margin: '7px 0 0' }}>
               {isAdmin ? 'Every planned step, by the person doing it.' : 'The planned steps assigned to you.'}
             </p>
+
+            {isAdmin && people.length > 0 && (
+              <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
+                {people.map(p => {
+                  const open = steps.filter(s => s.assigneeId === p.id && !s.done).length
+                  const active = p.id === who
+                  return (
+                    <button key={p.id} onClick={() => setWho(p.id)} aria-pressed={active}
+                            style={{
+                              height: 46, padding: '0 18px 0 6px', borderRadius: 999, gap: 10,
+                              display: 'flex', alignItems: 'center', cursor: 'pointer', fontFamily: 'inherit',
+                              border: active ? `1.5px solid ${UI.limeCta}` : `1px solid ${UI.borderInput}`,
+                              background: active ? UI.limeBg : '#FFFFFF',
+                            }}>
+                      <Avatar name={p.name} src={p.avatar} size={34} />
+                      <span style={{ fontWeight: active ? 700 : 600, fontSize: 13.5, color: active ? UI.ink : UI.textPrimary }}>
+                        {p.name}
+                      </span>
+                      <span style={{ fontWeight: active ? 700 : 600, fontSize: 12.5, color: active ? UI.muted : UI.faintest }}>
+                        {open}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
-          <ProgressCard percent={percent} done={stats.done} total={stats.total} />
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexShrink: 0 }}>
+            <Illustration />
+            <ProgressCard percent={percent} done={stats.done} total={stats.total} />
+          </div>
+        </header>
+
+        {/* ── §5 KPI row ──────────────────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+          <Kpi tile={TILE.purple} stroke={UI.purple} icon="user" label="Assigned"
+               value={String(stats.total)} unit="tasks"
+               fill={stats.total ? 42 : 0} fillColor={UI.purple} />
+          <Kpi tile={TILE.lime} stroke={UI.green} icon="check" label="Done"
+               value={`${stats.done}/${stats.total}`} unit="tasks"
+               fill={percent} fillColor={UI.limeDot} />
+          <Kpi tile={TILE.amber} stroke={UI.amber} icon="clock" label="Late"
+               value={String(stats.late)} unit="tasks"
+               fill={stats.total ? Math.round((stats.late / stats.total) * 100) : 0}
+               fillColor={UI.amber} track={UI.trackAmber} />
+          <Kpi tile={TILE.indigo} stroke={UI.indigo} icon="calendar" label="Days left"
+               value={String(Math.round(stats.days))} unit="days"
+               fill={27} fillColor={UI.purplePale} />
         </div>
 
-        {/* People */}
-        {isAdmin && people.length > 0 && (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '22px 0 0' }}>
-            {people.map(p => {
-              const open = steps.filter(s => s.assigneeId === p.id && !s.done).length
-              const active = p.id === who
-              return (
-                <button key={p.id} onClick={() => setWho(p.id)} aria-pressed={active}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 8px',
-                          borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                          border: `1.5px solid ${active ? UI.violet : UI.line}`,
-                          background: active ? UI.violetSoft : UI.card,
-                          boxShadow: active ? 'none' : UI.shadowSm,
-                        }}>
-                  <Avatar name={p.name} size={28} />
-                  <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 500, color: UI.ink }}>{p.name}</span>
-                  <span style={{ fontSize: 12, color: UI.faint }}>{open}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 14, margin: '18px 0 0' }}>
-          <StatCard icon="person" tone={UI.violet} soft={UI.violetSoft} label="Assigned"
-                    value={String(stats.total)} unit="tasks" fill={1} />
-          <StatCard icon="check" tone={UI.green} soft={UI.greenSoft} label="Done"
-                    value={`${stats.done}/${stats.total}`} unit="tasks" fill={stats.total ? stats.done / stats.total : 0} />
-          <StatCard icon="clock" tone={UI.amber} soft={UI.amberSoft} label="Late"
-                    value={String(stats.late)} unit="tasks" fill={stats.total ? stats.late / stats.total : 0} bad={stats.late > 0} />
-          <StatCard icon="cal" tone={UI.blue} soft={UI.blueSoft} label="Days left"
-                    value={String(Math.round(stats.days))} unit="days" fill={0.45} />
-        </div>
-
-        {/* Filters */}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '20px 0 0', alignItems: 'center' }}>
-          <Field icon="grid">
+        {/* ── §6 Filter row ───────────────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <label style={{ ...control, width: 232, padding: '0 16px', gap: 10 }}>
+            <Icon name="table" size={17} stroke={UI.muted} width={2} />
             <select value={brand} onChange={e => setBrand(e.target.value)} aria-label="Filter by brand" style={BARE}>
               <option value="">All brands</option>
               {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
-          </Field>
-          <Field icon="folder">
+            <Icon name="chevron" size={16} stroke={UI.muted} width={2.4} />
+          </label>
+
+          <label style={{ ...control, width: 232, padding: '0 16px', gap: 10 }}>
+            <Icon name="folder" size={17} stroke={UI.muted} width={2} />
             <select value={state} onChange={e => setState(e.target.value as State)} aria-label="Filter by state" style={BARE}>
               <option value="open">Open</option>
               <option value="all">All</option>
               <option value="over">Overdue only</option>
               <option value="done">Completed</option>
             </select>
-          </Field>
-          <Field icon="search" grow>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks…"
-                   aria-label="Search tasks" style={{ ...BARE, width: '100%' }} />
-          </Field>
+            <Icon name="chevron" size={16} stroke={UI.muted} width={2.4} />
+          </label>
+
+          <label style={{ ...control, flex: 1, padding: '0 18px', gap: 11 }}>
+            <Icon name="search" size={18} stroke={UI.faint} width={2.2} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks..."
+                   aria-label="Search tasks" style={{ ...BARE, cursor: 'text', width: '100%' }} />
+          </label>
+
           {canEdit && (
-            <button onClick={() => setAdding(v => !v)} style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 12,
-              border: 'none', background: UI.violet, color: '#fff', fontWeight: 700, fontSize: 13,
-              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-            }}>
-              <span style={{ fontSize: 15, lineHeight: 1 }}>+</span> New task
+            <button onClick={() => setAdding(v => !v)}
+                    style={{
+                      ...control, padding: '0 20px', gap: 10, cursor: 'pointer',
+                      fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: UI.textPrimary,
+                    }}>
+              <Icon name="sliders" size={17} stroke={UI.textPrimary} width={2.1} />
+              New task
             </button>
           )}
         </div>
@@ -201,93 +232,137 @@ export function TeamBoard({
           />
         )}
 
-        {error && (
-          <p role="alert" style={{ fontSize: 13, color: UI.rose, margin: '14px 0 0' }}>{error}</p>
-        )}
+        {error && <p role="alert" style={{ fontSize: 13, color: UI.redStrong, margin: 0 }}>{error}</p>}
 
         {!shown.length && (
-          <p style={{ fontSize: 14, color: UI.muted, padding: '34px 0' }}>
+          <p style={{ fontSize: 14, color: UI.soft, padding: '18px 0' }}>
             {mine.length ? 'Nothing matches those filters.'
               : person ? `Nothing is assigned to ${person.name} yet.`
               : 'Nothing is assigned to you yet.'}
           </p>
         )}
 
-        {/* Groups */}
-        <div style={{ display: 'grid', gap: 24, marginTop: 26 }}>
-          {[...grouped.entries()].map(([mk, byBrandMap]) => (
-            <section key={mk}>
-              <div style={{ ...font.eyebrow, marginBottom: 10 }}>{monthLabel(mk)}</div>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {[...byBrandMap.entries()].map(([bk, byProject]) => {
-                  const all = [...byProject.values()].flat()
-                  const key = mk + '|' + bk
-                  const collapsed = shut[key]
-                  const doneN = all.filter(s => s.done).length
-                  const colour = brands.find(b => b.name === bk)?.color ?? UI.faint
-                  return (
-                    <div key={bk} style={{ ...card, overflow: 'hidden' }}>
-                      <button
-                        onClick={() => setShut(s => ({ ...s, [key]: !collapsed }))}
-                        aria-expanded={!collapsed}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-                          padding: '15px 18px', background: 'none', border: 'none',
-                          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                        }}
-                      >
+        {/* ── §7–§9 Groups ────────────────────────────────────────────── */}
+        {[...grouped.entries()].map(([mk, byBrandMap]) => (
+          <div key={mk} style={{ display: 'contents' }}>
+            <div style={font.eyebrow}>{monthLabel(mk)}</div>
+            {[...byBrandMap.entries()].map(([bk, byProject]) => {
+              const all = [...byProject.values()].flat()
+              const key = mk + '|' + bk
+              const collapsed = shut[key]
+              const doneN = all.filter(s => s.done).length
+              const sample = all[0]
+              return (
+                <BrandGroup
+                  key={key}
+                  name={bk}
+                  color={sample?.brandColor ?? UI.faintest}
+                  logo={sample?.brandLogo ?? null}
+                  total={all.length}
+                  done={doneN}
+                  collapsed={!!collapsed}
+                  onToggle={() => setShut(s => ({ ...s, [key]: !collapsed }))}
+                >
+                  {[...byProject.entries()].map(([proj, list]) => (
+                    <div key={proj}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: UI.purpleSoft, flexShrink: 0 }} />
+                        <span style={{ fontWeight: 700, fontSize: 14, color: UI.textPrimary }}>{proj}</span>
                         <span style={{
-                          width: 30, height: 30, borderRadius: '50%', background: colour, color: '#fff',
-                          fontSize: 12, fontWeight: 800, flexShrink: 0,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>{bk[0]?.toUpperCase()}</span>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: UI.ink }}>{bk}</span>
-                        <Pill>{all.length} task{all.length === 1 ? '' : 's'}</Pill>
-                        <span style={{ flex: 1 }} />
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: doneN ? UI.green : UI.faint }}>
-                          {doneN}/{all.length} done
+                          height: 21, padding: '0 9px', borderRadius: 999, background: UI.track,
+                          fontWeight: 600, fontSize: 11, color: UI.muted,
+                          display: 'flex', alignItems: 'center',
+                        }}>
+                          {list.length} task{list.length === 1 ? '' : 's'}
                         </span>
-                        <span style={{ display: 'flex', gap: 3 }}>
-                          {segments(doneN, all.length).map((on, i) => (
-                            <span key={i} style={{ width: 15, height: 5, borderRadius: 3, background: on ? UI.green : UI.lineSoft }} />
-                          ))}
-                        </span>
-                        <Chevron open={!collapsed} />
-                      </button>
-
-                      {!collapsed && (
-                        <div style={{ padding: '0 18px 14px' }}>
-                          {[...byProject.entries()].map(([proj, list]) => (
-                            <div key={proj} style={{ borderLeft: `2px solid ${UI.lineSoft}`, paddingLeft: 14, marginBottom: 12 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 7px' }}>
-                                <span style={{ width: 5, height: 5, borderRadius: '50%', background: UI.violet, marginLeft: -17 }} />
-                                <span style={{ fontSize: 13.5, fontWeight: 600, color: UI.ink }}>{proj}</span>
-                                <Pill>{list.length} task{list.length === 1 ? '' : 's'}</Pill>
-                              </div>
-                              <div style={{ display: 'grid', gap: 4 }}>
-                                {list.map(s => (
-                                  <Row key={s.id} step={s} today={today} canPush={canPush}
-                                       canEdit={isAdmin || s.assigneeId === viewerId}
-                                       members={allMembers} isAdmin={isAdmin} onError={setError} />
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      </div>
+                      <div style={{
+                        margin: '10px 0 0 19px', paddingLeft: 18,
+                        borderLeft: `1.5px solid ${UI.purpleLine}`,
+                        display: 'flex', flexDirection: 'column', gap: 8,
+                      }}>
+                        {list.map(s => (
+                          <Row key={s.id} step={s} today={today} canPush={canPush}
+                               canEdit={isAdmin || s.assigneeId === viewerId}
+                               members={allMembers} isAdmin={isAdmin} onError={setError} />
+                        ))}
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+                  ))}
+                </BrandGroup>
+              )
+            })}
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-/* ── a task row ──────────────────────────────────────────────────────────── */
+/* ── §8/§9 brand group ───────────────────────────────────────────────── */
+
+function BrandGroup({ name, color, logo, total, done, collapsed, onToggle, children }: {
+  name: string; color: string; logo: string | null
+  total: number; done: number; collapsed: boolean
+  onToggle: () => void; children: React.ReactNode
+}) {
+  const segW = segmentWidth(total || 1)
+  return (
+    <section style={{ border: `1px solid ${UI.border}`, borderRadius: 18, overflow: 'hidden', background: '#FFFFFF' }}>
+      <button onClick={onToggle} aria-expanded={!collapsed}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 11, width: '100%',
+                padding: '16px 18px', background: 'none', border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+              }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+          background: color, color: '#FFFFFF', fontWeight: 800, fontSize: 13,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {logo ? <img src={logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : name[0]?.toUpperCase()}
+        </span>
+        <span style={font.cardTitle}>{name}</span>
+        <span style={{
+          height: 22, padding: '0 9px', borderRadius: 999, background: UI.purpleTint,
+          fontWeight: 700, fontSize: 11.5, color: UI.purple,
+          display: 'flex', alignItems: 'center',
+        }}>
+          {total} task{total === 1 ? '' : 's'}
+        </span>
+
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 12.5, color: done ? UI.green : UI.faintest }}>
+            {done}/{total} done
+          </span>
+          <span style={{ display: 'flex', gap: 4 }}>
+            {Array.from({ length: total || 1 }, (_, i) => (
+              <span key={i} style={{
+                width: segW, height: 7, borderRadius: 999,
+                background: i < done ? UI.green : UI.segEmpty,
+              }} />
+            ))}
+          </span>
+          <Icon name="chevron" size={18} stroke={UI.muted} width={2.3}
+                style={{ transform: collapsed ? 'none' : 'rotate(180deg)' }} />
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div style={{
+          background: UI.groupBg, borderTop: `1px solid ${UI.groupLine}`,
+          padding: '16px 18px 18px', display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {children}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/* ── §8 task row ─────────────────────────────────────────────────────── */
 
 function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
   step: TeamStep; today: string; canPush: boolean; canEdit: boolean
@@ -303,7 +378,6 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
   useEffect(() => { setDone(step.done) }, [step.done])
 
   const late = isLate({ ...step, done }, today)
-  const tone = durationTone(step.durationDays)
 
   function act(fn: () => Promise<{ success: boolean; error?: string }>) {
     onError('')
@@ -318,16 +392,15 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
 
   return (
     <div style={{
-      border: `1px solid ${late ? UI.roseSoft : UI.lineSoft}`, borderRadius: UI.radiusSm,
-      background: late ? UI.roseSoft : UI.card, opacity: isPending ? 0.72 : 1,
+      background: '#FFFFFF', border: `1px solid ${late ? '#F6D9DE' : UI.border}`,
+      borderRadius: 12, opacity: isPending ? 0.75 : 1,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 12px 11px 14px' }}>
         <input
           type="checkbox" checked={done} aria-label={`${step.name} done`}
           onChange={e => {
             const next = e.target.checked
-            setDone(next)
-            onError('')
+            setDone(next); onError('')
             start(async () => {
               const r = await setStepDone(step.id, next)
               if (!r.success) {
@@ -336,53 +409,54 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
               }
             })
           }}
-          style={{ width: 17, height: 17, cursor: 'pointer', accentColor: UI.violet, flexShrink: 0 }}
+          style={{ width: 18, height: 18, borderRadius: 5, accentColor: UI.purple, cursor: 'pointer', flexShrink: 0 }}
         />
 
         <span style={{
-          flex: 1, fontSize: 14, color: done ? UI.faint : UI.ink,
+          flex: 1, fontWeight: 600, fontSize: 13.5,
+          color: done ? UI.soft : UI.textPrimary,
           textDecoration: done ? 'line-through' : 'none',
         }}>
           {step.name}
         </span>
 
-        {step.assigneeName && <Avatar name={step.assigneeName} size={26} />}
+        {step.assigneeName && <Avatar name={step.assigneeName} src={step.assigneeAvatar} size={28} />}
 
-        <span title="Planned duration" style={{
-          fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 7,
-          background: tone.bg, color: tone.fg, whiteSpace: 'nowrap',
-        }}>
+        <span style={{ width: 34, textAlign: 'right', fontWeight: 700, fontSize: 12, color: durationTone(step.durationDays) }}>
           {step.durationDays}d
         </span>
 
-        <span style={{ fontSize: 12.5, fontWeight: late ? 700 : 500, color: late ? UI.rose : UI.muted, width: 52, textAlign: 'right' }}>
+        <span style={{
+          width: 62, textAlign: 'right', fontWeight: 500, fontSize: 12.5,
+          color: late ? UI.redStrong : UI.soft,
+        }}>
           {fmt(step.dueDate)}
         </span>
 
         {step.taskId ? (
-          <a href={`/board?task=${step.taskId}`} style={{
-            fontSize: 11.5, fontWeight: 700, color: UI.violet, textDecoration: 'none',
-            border: `1px solid ${UI.line}`, borderRadius: 8, padding: '5px 10px', whiteSpace: 'nowrap',
-          }}>on board ↗</a>
+          <a href={`/board?task=${step.taskId}`} style={{ ...PILL, textDecoration: 'none' }}>
+            <Icon name="arrow" size={14} stroke={UI.purple} width={2.4} /> board
+          </a>
         ) : canPush ? (
           <button onClick={() => act(() => convertStepToTask(step.id))}
-                  title="Create a task on the pipeline board from this step"
-                  style={GHOST}>→ board</button>
+                  title="Create a task on the pipeline board from this step" style={PILL}>
+            <Icon name="arrow" size={14} stroke={UI.purple} width={2.4} /> board
+          </button>
         ) : null}
 
         {canEdit && (
           <button onClick={() => setOpen(v => !v)} aria-expanded={open}
                   aria-label={`${open ? 'Close' : 'Edit'} ${step.name}`}
-                  style={{ ...GHOST, padding: '5px 8px' }}>
-            {open ? '✕' : 'Edit'}
+                  style={{ ...PILL, padding: '0 12px' }}>
+            {open ? 'Close' : 'Edit'}
           </button>
         )}
       </div>
 
       {open && canEdit && (
         <div style={{
-          borderTop: `1px solid ${UI.lineSoft}`, padding: '12px', display: 'flex',
-          gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
+          borderTop: `1px solid ${UI.groupLine}`, padding: 12,
+          display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end',
         }}>
           <Labelled label="Task name" grow>
             <input defaultValue={step.name}
@@ -392,22 +466,22 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
           <Labelled label="Duration (days)">
             <input type="number" min={0} step={0.5} defaultValue={step.durationDays}
                    onBlur={e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v !== step.durationDays) act(() => updateStep(step.id, { duration_days: v })) }}
-                   style={{ ...input, width: 96 }} />
+                   style={{ ...input, width: 100 }} />
           </Labelled>
           <Labelled label="Due date">
             <input type="date" defaultValue={step.dueDate ?? ''}
                    onChange={e => act(() => updateStep(step.id, { due_date: e.target.value || null }))}
-                   style={{ ...input, width: 156 }} />
+                   style={{ ...input, width: 158 }} />
           </Labelled>
           <Labelled label={isAdmin ? 'Assigned to' : 'Hand over to'}>
             <select defaultValue={step.assigneeId ?? ''}
                     onChange={e => act(() => updateStep(step.id, { assignee_id: e.target.value || null }))}
-                    style={{ ...input, width: 168 }}>
+                    style={{ ...input, width: 172 }}>
               <option value="">— unassigned —</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </Labelled>
-          <span style={{ fontSize: 11.5, color: UI.faint, paddingBottom: 9 }}>
+          <span style={{ fontSize: 11.5, color: UI.faintest, paddingBottom: 10 }}>
             Saved as you go · {step.projectName}
           </span>
         </div>
@@ -416,7 +490,7 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
   )
 }
 
-/* ── new task ────────────────────────────────────────────────────────────── */
+/* ── new task ────────────────────────────────────────────────────────── */
 
 function NewTaskForm({ projects, members, defaultAssignee, onDone, onError }: {
   projects: { id: string; name: string; brandName: string | null }[]
@@ -425,11 +499,11 @@ function NewTaskForm({ projects, members, defaultAssignee, onDone, onError }: {
   onDone: () => void
   onError: (s: string) => void
 }) {
-  const [name, setName]   = useState('')
-  const [proj, setProj]   = useState(projects[0]?.id ?? '')
-  const [who, setWho]     = useState(defaultAssignee)
-  const [due, setDue]     = useState('')
-  const [days, setDays]   = useState('1')
+  const [name, setName] = useState('')
+  const [proj, setProj] = useState(projects[0]?.id ?? '')
+  const [who, setWho]   = useState(defaultAssignee)
+  const [due, setDue]   = useState('')
+  const [days, setDays] = useState('1')
   const [isPending, start] = useTransition()
 
   function submit() {
@@ -447,177 +521,208 @@ function NewTaskForm({ projects, members, defaultAssignee, onDone, onError }: {
   }
 
   return (
-    <div style={{ ...card, padding: 16, marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    <div style={{ ...card, borderRadius: 18, padding: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <Labelled label="Task" grow>
         <input value={name} onChange={e => setName(e.target.value)} autoFocus
                onKeyDown={e => { if (e.key === 'Enter') submit() }}
                placeholder="What needs doing?" style={{ ...input, width: '100%' }} />
       </Labelled>
       <Labelled label="Project">
-        <select value={proj} onChange={e => setProj(e.target.value)} style={{ ...input, width: 210 }}>
+        <select value={proj} onChange={e => setProj(e.target.value)} style={{ ...input, width: 220 }}>
           {projects.map(p => (
             <option key={p.id} value={p.id}>{p.brandName ? `${p.brandName} — ` : ''}{p.name}</option>
           ))}
         </select>
       </Labelled>
       <Labelled label="Assigned to">
-        <select value={who} onChange={e => setWho(e.target.value)} style={{ ...input, width: 160 }}>
+        <select value={who} onChange={e => setWho(e.target.value)} style={{ ...input, width: 168 }}>
           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </Labelled>
       <Labelled label="Due">
-        <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ ...input, width: 152 }} />
+        <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ ...input, width: 158 }} />
       </Labelled>
       <Labelled label="Days">
-        <input type="number" min={0} step={0.5} value={days} onChange={e => setDays(e.target.value)} style={{ ...input, width: 78 }} />
+        <input type="number" min={0} step={0.5} value={days} onChange={e => setDays(e.target.value)} style={{ ...input, width: 84 }} />
       </Labelled>
       <button onClick={submit} disabled={!name.trim() || isPending}
               style={{
-                padding: '10px 20px', borderRadius: 11, border: 'none', background: UI.violet,
-                color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                height: 42, padding: '0 22px', borderRadius: 10, border: 'none',
+                background: UI.purple, color: '#FFFFFF', fontWeight: 700, fontSize: 13.5,
+                cursor: 'pointer', fontFamily: 'inherit',
                 opacity: name.trim() && !isPending ? 1 : 0.45,
               }}>
         Add task
       </button>
-      <button onClick={onDone} style={{ ...GHOST, padding: '9px 14px' }}>Cancel</button>
+      <button onClick={onDone} style={{ ...PILL, height: 42, padding: '0 16px' }}>Cancel</button>
     </div>
   )
 }
 
-/* ── small pieces ────────────────────────────────────────────────────────── */
+/* ── §4 right cluster ────────────────────────────────────────────────── */
 
 function ProgressCard({ percent, done, total }: { percent: number; done: number; total: number }) {
-  const pts = [8, 22, 18, 34, 30, 46, 58]
-  const d = pts.map((y, i) => `${i === 0 ? 'M' : 'L'}${8 + i * 16},${60 - y}`).join(' ')
+  // A seven-point line whose last point is today's figure, so the card moves
+  // with the number beside it instead of drawing a fixed decoration.
+  const pts = [18, 26, 22, 34, 30, 42, Math.max(6, Math.min(48, percent * 0.48 + 6))]
+  const d = pts.map((y, i) => `${i === 0 ? 'M' : 'L'}${6 + i * 23},${52 - y}`).join(' ')
+
   return (
-    <div style={{ ...card, padding: '16px 20px', minWidth: 260 }}>
-      <div style={{ fontSize: 13, color: UI.muted, marginBottom: 4 }}>Today&apos;s progress</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ ...font.stat, color: UI.violet, fontSize: 32 }}>{percent}%</div>
-        <svg width="120" height="46" viewBox="0 0 120 60" fill="none" aria-hidden="true">
-          <path d={d} stroke={UI.violet} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx={8 + 6 * 16} cy={60 - pts[6]} r="4" fill={UI.violet} />
+    <div style={{ width: 320, border: `1px solid ${UI.border}`, borderRadius: 18, padding: '16px 18px 18px' }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: UI.textPrimary }}>Today&apos;s progress</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 6 }}>
+        <span style={{ fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 50, lineHeight: 1, color: UI.purple }}>
+          {percent}%
+        </span>
+        <svg width="150" height="52" viewBox="0 0 150 52" fill="none" aria-hidden="true">
+          <path d={d} stroke={UI.purpleStroke} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={6 + 6 * 23} cy={52 - pts[6]} r="5" fill={UI.purple} />
         </svg>
       </div>
-      <div style={{ fontSize: 12, color: UI.muted, marginTop: 6 }}>
-        {done} of {total} planned steps complete
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12 }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={UI.green}
+             strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+        <span style={{ fontWeight: 700, fontSize: 12.5, color: UI.green }}>{done}</span>
+        <span style={{ fontWeight: 500, fontSize: 12.5, color: UI.soft }}>of {total} steps complete</span>
       </div>
     </div>
   )
 }
 
-function StatCard({ icon, tone, soft, label, value, unit, fill, bad }: {
-  icon: 'person' | 'check' | 'clock' | 'cal'
-  tone: string; soft: string; label: string; value: string; unit: string; fill: number; bad?: boolean
+function Illustration() {
+  return (
+    <div style={{ position: 'relative', width: 150, height: 130, flexShrink: 0 }} aria-hidden="true">
+      <div style={{
+        position: 'absolute', left: 10, top: 26, width: 104, height: 82,
+        borderRadius: 12, background: '#F1EDFE', transform: 'rotate(-8deg)',
+      }} />
+      <div style={{
+        position: 'absolute', left: 20, top: 18, width: 104, height: 86,
+        borderRadius: 12, background: '#FFFFFF', border: '1px solid #E7E1FB',
+        boxShadow: '0 8px 18px rgba(124,58,237,0.12)', padding: '14px 14px 0', boxSizing: 'border-box',
+      }}>
+        <div style={{ width: '62%', height: 6, borderRadius: 999, background: '#E4DCFB' }} />
+        <div style={{ width: '46%', height: 6, borderRadius: 999, background: '#EDE8FC', marginTop: 9 }} />
+        <div style={{ width: '54%', height: 6, borderRadius: 999, background: '#EDE8FC', marginTop: 9 }} />
+      </div>
+      <div style={{
+        position: 'absolute', right: 8, top: 6, width: 22, height: 22, borderRadius: '50%',
+        background: UI.purple, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <div style={{
+        position: 'absolute', right: 14, bottom: 14, width: 52, height: 52, borderRadius: '50%',
+        background: UI.purple, boxShadow: '0 10px 20px rgba(124,58,237,0.32)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      </div>
+      <svg width="26" height="20" viewBox="0 0 26 20" fill="none" style={{ position: 'absolute', left: 0, top: 4 }}>
+        <path d="M2 10h5M5 3l3 4M5 17l3-4" stroke="#C4B5FD" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    </div>
+  )
+}
+
+/* ── small pieces ────────────────────────────────────────────────────── */
+
+function Kpi({ tile, stroke, icon, label, value, unit, fill, fillColor, track }: {
+  tile: string; stroke: string; icon: string; label: string
+  value: string; unit: string; fill: number; fillColor: string; track?: string
 }) {
   return (
-    <div style={{ ...card, padding: '16px 18px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ ...card, padding: '16px 16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
         <span style={{
-          width: 38, height: 38, borderRadius: 12, background: soft, color: tone,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          width: 42, height: 42, borderRadius: 12, background: tile, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon name={icon} />
+          <Icon name={icon} size={20} stroke={stroke} width={2.1} />
         </span>
-        <div>
-          <div style={{ ...font.eyebrow, color: UI.faint }}>{label}</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
-            <span style={{ ...font.stat, color: bad ? UI.rose : UI.ink }}>{value}</span>
-            <span style={{ fontSize: 12.5, color: UI.faint }}>{unit}</span>
-          </div>
-        </div>
+        <span style={{ ...font.kpiLabel, textTransform: 'uppercase' }}>{label}</span>
       </div>
-      <div style={{ height: 6, background: UI.lineSoft, borderRadius: 4, marginTop: 13, overflow: 'hidden' }}>
-        <div style={{ width: `${Math.min(100, Math.max(3, fill * 100))}%`, height: '100%', background: tone, borderRadius: 4 }} />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginTop: 12 }}>
+        <span style={font.kpiValue}>{value}</span>
+        <span style={{ fontWeight: 600, fontSize: 13, color: UI.soft }}>{unit}</span>
+      </div>
+      <div style={{ marginTop: 14, height: 7, borderRadius: 999, background: track ?? UI.track, overflow: 'hidden' }}>
+        <div style={{ width: `${Math.min(100, fill)}%`, height: 7, borderRadius: 999, background: fillColor }} />
       </div>
     </div>
   )
 }
 
-function Avatar({ name, size }: { name: string; size: number }) {
+function Avatar({ name, src, size }: { name: string; src?: string | null; size: number }) {
   return (
     <span title={name} style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: personColor(name), color: '#fff',
-      fontSize: size * 0.36, fontWeight: 800,
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: personColor(name), color: '#FFFFFF',
+      fontWeight: 800, fontSize: size * 0.36,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>{initials(name)}</span>
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(name)}
+    </span>
   )
 }
 
 function Labelled({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
   return (
     <label style={{ display: 'grid', gap: 5, flex: grow ? '1 1 220px' : '0 0 auto' }}>
-      <span style={{ ...font.eyebrow, fontSize: 9.5 }}>{label}</span>
+      <span style={{ ...font.eyebrow, fontSize: 9.5, letterSpacing: '0.1em' }}>{label}</span>
       {children}
     </label>
   )
 }
 
-function Field({ icon, children, grow }: { icon: 'grid' | 'folder' | 'search'; children: React.ReactNode; grow?: boolean }) {
+function Ticks() {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 9, padding: '0 14px',
-      border: `1px solid ${UI.line}`, borderRadius: 12, background: UI.card,
-      height: 42, flex: grow ? '1 1 220px' : '0 0 auto', boxShadow: UI.shadowSm,
-    }}>
-      <span style={{ color: UI.faint, display: 'flex' }}><Icon name={icon} /></span>
-      {children}
-    </div>
-  )
-}
-
-const Pill = ({ children }: { children: React.ReactNode }) => (
-  <span style={{
-    fontSize: 11.5, fontWeight: 600, color: UI.muted,
-    background: UI.lineSoft, padding: '2px 9px', borderRadius: 7,
-  }}>{children}</span>
-)
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={UI.faint} strokeWidth="2.4"
-         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-         style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s', flexShrink: 0 }}>
-      <path d="M6 9l6 6 6-6" />
+    <svg width="34" height="26" viewBox="0 0 34 26" fill="none" aria-hidden="true" style={{ marginTop: 4 }}>
+      <path d="M3 16L8 3M14 18l5-13M25 16l5-13" stroke={UI.limeDot} strokeWidth="3" strokeLinecap="round" />
     </svg>
   )
 }
 
-function Sparkle() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"
-         style={{ position: 'absolute', top: -8, right: -26 }}>
-      <path d="M12 3v5M18 6l-3 3M21 13h-5" stroke="#C8F24E" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function Icon({ name }: { name: string }) {
-  const p: Record<string, React.ReactNode> = {
-    person: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
-    check:  <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></>,
-    clock:  <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
-    cal:    <><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
-    grid:   <><rect width="7" height="7" x="3" y="3" rx="1" /><rect width="7" height="7" x="14" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="14" rx="1" /><rect width="7" height="7" x="3" y="14" rx="1" /></>,
-    folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />,
-    search: <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,
+function Icon({ name, size, stroke, width, style }: {
+  name: string; size: number; stroke: string; width: number; style?: React.CSSProperties
+}) {
+  const paths: Record<string, React.ReactNode> = {
+    user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    check:    <><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5L16 9.5" /></>,
+    clock:    <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></>,
+    calendar: <><rect x="3" y="4.5" width="18" height="17" rx="2.5" /><path d="M16 2.5v4M8 2.5v4M3 10h18" /></>,
+    table:    <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 10v10" /></>,
+    folder:   <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+    search:   <><circle cx="11" cy="11" r="7.5" /><path d="m20 20-4.2-4.2" /></>,
+    sliders:  <><path d="M4 6h11M19 6h1M4 12h4M12 12h8M4 18h9M17 18h3" /><circle cx="17" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="15" cy="18" r="2" /></>,
+    chevron:  <path d="M6 9l6 6 6-6" />,
+    arrow:    <><path d="M5 12h13" /><path d="m12 5 7 7-7 7" /></>,
   }
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {p[name]}
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke}
+         strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+         style={{ flexShrink: 0, ...style }}>
+      {paths[name]}
     </svg>
   )
 }
 
 const BARE: React.CSSProperties = {
-  border: 'none', background: 'transparent', outline: 'none',
-  fontFamily: 'inherit', fontSize: 13.5, color: UI.ink, cursor: 'pointer',
+  border: 'none', background: 'transparent', outline: 'none', flex: 1, minWidth: 0,
+  fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: UI.textPrimary, cursor: 'pointer',
+  // The spec draws its own chevron; without this the browser adds a second one.
+  appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
 }
-const GHOST: React.CSSProperties = {
-  fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8,
-  border: `1px solid ${UI.line}`, background: UI.card, color: UI.ink,
-  cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+const PILL: React.CSSProperties = {
+  height: 32, padding: '0 14px', border: `1px solid ${UI.borderInput}`, borderRadius: 999,
+  display: 'inline-flex', alignItems: 'center', gap: 7, background: '#FFFFFF',
+  fontWeight: 600, fontSize: 12.5, color: UI.textPrimary, cursor: 'pointer',
+  fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
 }

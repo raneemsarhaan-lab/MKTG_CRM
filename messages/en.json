@@ -1,12 +1,12 @@
 {
   "nav": {
-    "overview": "Overview",
-    "board": "Board",
+    "overview": "Home",
+    "board": "Pipeline",
     "capacity": "Capacity",
     "settings": "Settings",
     "toggleLanguage": "Switch to Arabic",
-    "projects": "Projects",
-    "team": "Team"
+    "projects": "Portfolio",
+    "team": "Team tasks"
   },
   "greeting": {
     "morning": "Good morning",

@@ -89,9 +89,9 @@ const ICON = {
 }
 
 const NAV_ITEMS = [
-  { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
   { href: '/overview', key: 'overview', icon: ICON.overview, adminOnly: false },
   { href: '/projects', key: 'projects', icon: ICON.projects, adminOnly: false },
+  { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
   { href: '/team',     key: 'team',     icon: ICON.team,     adminOnly: false },
   { href: '/capacity', key: 'capacity', icon: ICON.capacity, adminOnly: true  },
   { href: '/settings', key: 'settings', icon: ICON.settings, adminOnly: true  },

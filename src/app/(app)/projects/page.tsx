@@ -23,7 +23,7 @@ export default async function ProjectsPage() {
         steps: { orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }], include: { assignee: true } },
       },
     }),
-    prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true } }),
+    prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, logo_url: true } }),
     prisma.member.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ])
 
