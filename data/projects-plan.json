@@ -1,0 +1,3046 @@
+{
+ "people": [
+  [
+   "samaa",
+   "Samaa",
+   "Content & Copy",
+   "#2563A8"
+  ],
+  [
+   "yosra",
+   "Yosra",
+   "Graphic Design",
+   "#6D3FA8"
+  ],
+  [
+   "salma",
+   "Salma",
+   "Video Editing",
+   "#C2691E"
+  ]
+ ],
+ "brand_colors": {
+  "Forefront": "#1B3A6B",
+  "Islam Personal Branding": "#D99A1F",
+  "The Strategy Community": "#1F7A4D",
+  "Omnisight": "#7C3AED"
+ },
+ "projects": [
+  {
+   "key": "p0",
+   "name": "Manifesto Launching",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-08-16",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Mani0",
+     "name": "Final manifesto copy sign-off",
+     "duration_days": 1.0,
+     "due_date": "2026-08-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Mani1",
+     "name": "Launch campaign art direction",
+     "duration_days": 2.0,
+     "due_date": "2026-08-05",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Mani2",
+     "name": "Design carousel & launch visuals",
+     "duration_days": 4.0,
+     "due_date": "2026-08-11",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Mani3",
+     "name": "D-Check — Alaa",
+     "duration_days": 1.0,
+     "due_date": "2026-08-12",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Mani4",
+     "name": "Announcement & co-creator emails",
+     "duration_days": 2.0,
+     "due_date": "2026-08-12",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Mani5",
+     "name": "WhatsApp broadcast copy & lists",
+     "duration_days": 1.0,
+     "due_date": "2026-08-13",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Mani6",
+     "name": "Final check & schedule launch week",
+     "duration_days": 1.0,
+     "due_date": "2026-08-13",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Mani7",
+     "name": "GO LIVE (15 Aug is a Saturday)",
+     "duration_days": 1.0,
+     "due_date": "2026-08-16",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Mani8",
+     "name": "Post-launch signals recap",
+     "duration_days": 2.0,
+     "due_date": "2026-08-19",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p1",
+   "name": "Bank Al Ahly Videos",
+   "brand": "Islam Personal Branding",
+   "standing": false,
+   "due_date": "2026-08-31",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Bank0",
+     "name": "⚠ Confirm script & footage status",
+     "duration_days": 1.0,
+     "due_date": "2026-08-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Bank1",
+     "name": "Edit hero video — D-In Progress",
+     "duration_days": 5.0,
+     "due_date": "2026-08-11",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Bank2",
+     "name": "D-Check — Alaa",
+     "duration_days": 2.0,
+     "due_date": "2026-08-13",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Bank3",
+     "name": "Final check",
+     "duration_days": 1.0,
+     "due_date": "2026-08-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Bank4",
+     "name": "Hero video live",
+     "duration_days": 1.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Bank5",
+     "name": "Edit video 2",
+     "duration_days": 3.0,
+     "due_date": "2026-08-23",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Bank6",
+     "name": "Edit video 3",
+     "duration_days": 3.0,
+     "due_date": "2026-08-26",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Bank7",
+     "name": "Edit video 4",
+     "duration_days": 3.0,
+     "due_date": "2026-08-30",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Bank8",
+     "name": "D-Check & final checks",
+     "duration_days": 2.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Bank9",
+     "name": "Campaign fully delivered",
+     "duration_days": 1.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p2",
+   "name": "Freelance Video Editor — Onboarding",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-08-19",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Free0",
+     "name": "Write scope & rate brief",
+     "duration_days": 1.0,
+     "due_date": "2026-08-04",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Free1",
+     "name": "Shortlist & showreel review",
+     "duration_days": 3.0,
+     "due_date": "2026-08-09",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Free2",
+     "name": "Trial edit on an Al Ahly cutdown",
+     "duration_days": 3.0,
+     "due_date": "2026-08-13",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Free3",
+     "name": "Contract & tool access",
+     "duration_days": 2.0,
+     "due_date": "2026-08-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Free4",
+     "name": "Handover: Islam campaign cutdowns",
+     "duration_days": 2.0,
+     "due_date": "2026-08-19",
+     "done": false,
+     "assignee": "salma"
+    }
+   ]
+  },
+  {
+   "key": "p3",
+   "name": "Strategic Thinking Campaign — Islam",
+   "brand": "Islam Personal Branding",
+   "standing": false,
+   "due_date": "2026-09-15",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Stra0",
+     "name": "Script & shot list",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra1",
+     "name": "Shoot day",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra2",
+     "name": "Footage ingest & selects",
+     "duration_days": 6.0,
+     "due_date": "2026-09-14",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra3",
+     "name": "Edit main cut — freelance editor (Salma on Al Ahly)",
+     "duration_days": 5.0,
+     "due_date": "2026-09-21",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra4",
+     "name": "Social cutdowns (3)",
+     "duration_days": 3.0,
+     "due_date": "2026-09-24",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Stra5",
+     "name": "D-Check — Alaa",
+     "duration_days": 10.0,
+     "due_date": "2026-10-05",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Stra6",
+     "name": "Final check",
+     "duration_days": 3.0,
+     "due_date": "2026-10-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Stra7",
+     "name": "VIDEOS DELIVERED",
+     "duration_days": 4.0,
+     "due_date": "2026-10-27",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p4",
+   "name": "Islam Course Launch",
+   "brand": "Islam Personal Branding",
+   "standing": false,
+   "due_date": "2026-11-29",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Isla0",
+     "name": "Course positioning, promise & audience",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla1",
+     "name": "Curriculum & module outline",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla2",
+     "name": "Pricing & enrolment model",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla3",
+     "name": "Landing & sales page copy",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla4",
+     "name": "Landing page design & build",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla5",
+     "name": "Platform setup & payment flow",
+     "duration_days": 3.0,
+     "due_date": "2026-11-16",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Isla6",
+     "name": "Launch campaign assets — social & email",
+     "duration_days": 4.0,
+     "due_date": "2026-11-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla7",
+     "name": "Islam review & sign-off",
+     "duration_days": 2.0,
+     "due_date": "2026-11-24",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Isla8",
+     "name": "Final check & schedule",
+     "duration_days": 1.0,
+     "due_date": "2026-11-25",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Isla9",
+     "name": "ENROLMENT OPENS",
+     "duration_days": 1.0,
+     "due_date": "2026-11-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Isla10",
+     "name": "Record modules — Islam",
+     "duration_days": 3.0,
+     "due_date": "2026-12-08",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Isla11",
+     "name": "Edit & produce modules",
+     "duration_days": 8.0,
+     "due_date": "2026-12-22",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Isla12",
+     "name": "Content delivery begins",
+     "duration_days": 1.0,
+     "due_date": "2027-01-10",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p5",
+   "name": "Consultants Campaign",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-09-15",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Cons0",
+     "name": "Collective video 1 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-07-29",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons1",
+     "name": "Collective video 2 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-08-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons2",
+     "name": "Collective video 3 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-08-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons3",
+     "name": "Collective video 4 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-08-11",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Cons4",
+     "name": "Collective video 5 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-08-16",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons5",
+     "name": "Collective video 6 of 6",
+     "duration_days": 3.0,
+     "due_date": "2026-08-19",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons6",
+     "name": "Intro & outro",
+     "duration_days": 2.0,
+     "due_date": "2026-08-24",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons7",
+     "name": "Adding subscription frames",
+     "duration_days": 2.0,
+     "due_date": "2026-08-26",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons8",
+     "name": "Reviewing & finalizing",
+     "duration_days": 2.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Cons9",
+     "name": "D-Check — Alaa",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Cons10",
+     "name": "Final check & schedule rollout",
+     "duration_days": 1.0,
+     "due_date": "2026-09-08",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Cons11",
+     "name": "GO LIVE",
+     "duration_days": 1.0,
+     "due_date": "2026-09-15",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p6",
+   "name": "Campaign 3 — Retreat Shoot",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-11-10",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Camp0",
+     "name": "Lock topic & format",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Camp1",
+     "name": "Script & shot list",
+     "duration_days": 2.0,
+     "due_date": "2026-09-08",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Camp2",
+     "name": "Crew brief & retreat integration",
+     "duration_days": 1.0,
+     "due_date": "2026-09-10",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Camp3",
+     "name": "Shoot at the Retreat",
+     "duration_days": 3.0,
+     "due_date": "2026-10-17",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Camp4",
+     "name": "Footage ingest & selects",
+     "duration_days": 2.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Camp5",
+     "name": "Edit main cut",
+     "duration_days": 5.0,
+     "due_date": "2026-11-02",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Camp6",
+     "name": "Social cutdowns (3)",
+     "duration_days": 3.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Camp7",
+     "name": "Review & publish",
+     "duration_days": 2.0,
+     "due_date": "2026-11-10",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p7",
+   "name": "Retreat Feedback Videos (6)",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-11-12",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Retr0",
+     "name": "Question set & consent flow",
+     "duration_days": 1.0,
+     "due_date": "2026-10-01",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Retr1",
+     "name": "Capture on site (6 executives)",
+     "duration_days": 3.0,
+     "due_date": "2026-10-17",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Retr2",
+     "name": "Ingest & transcribe",
+     "duration_days": 2.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Retr3",
+     "name": "Edit videos 1–3",
+     "duration_days": 5.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Retr4",
+     "name": "Edit videos 4–6",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Retr5",
+     "name": "D-Check & subtitles",
+     "duration_days": 2.0,
+     "due_date": "2026-11-09",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Retr6",
+     "name": "Publish rollout",
+     "duration_days": 2.0,
+     "due_date": "2026-11-12",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p8",
+   "name": "Strategy Retreat — Design & Comms",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-10-17",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Stra0",
+     "name": "Creative direction & moodboard",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra1",
+     "name": "Event identity & key visual",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra2",
+     "name": "Stage & spatial graphics",
+     "duration_days": 6.0,
+     "due_date": "2026-09-14",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra3",
+     "name": "Delegate materials & print pack",
+     "duration_days": 5.0,
+     "due_date": "2026-09-21",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Stra4",
+     "name": "Retreat communication plan",
+     "duration_days": 3.0,
+     "due_date": "2026-09-24",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Stra5",
+     "name": "Print production lead time",
+     "duration_days": 10.0,
+     "due_date": "2026-10-05",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Stra6",
+     "name": "On-site execution",
+     "duration_days": 3.0,
+     "due_date": "2026-10-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Stra7",
+     "name": "Post-retreat design support",
+     "duration_days": 4.0,
+     "due_date": "2026-10-27",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p9",
+   "name": "TSC — Retreat Videos",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-08-31",
+   "focus": true,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "Concept & script",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "Source footage from Summit & past events",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "⚠ Edit — no editor free in August, see note",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "D-Check & final check",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "DELIVERED — fuels September marketing",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    }
+   ]
+  },
+  {
+   "key": "p10",
+   "name": "TSC — Retreat Marketing",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-10-14",
+   "focus": true,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "Campaign architecture & audience segments",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "Speaker announcement assets",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "Invitation & application flow",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "Wave 1 — awareness: speakers & agenda",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "Wave 2 — conversion: applications & deadline",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 5",
+     "name": "Wave 3 — final call & logistics",
+     "duration_days": 5.0,
+     "due_date": "2026-11-11",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 6",
+     "name": "CAMPAIGN CLOSES",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p11",
+   "name": "TSC — Retreat Live Coverage",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-10-29",
+   "focus": true,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "Coverage plan & shot list",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "On-site capture — photo, video, quotes",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "Same-day social posts",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "Daily recap posts",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "Highlights reel",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 5",
+     "name": "Wrap post & thank-you comms",
+     "duration_days": 5.0,
+     "due_date": "2026-11-11",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 6",
+     "name": "COVERAGE CLOSES (30 Oct is a Friday)",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p12",
+   "name": "TSC — Retreat Educational Series",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-11-30",
+   "focus": true,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "Request speaker decks & pre-read material",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "Wave 1 outline & copy from speaker material",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "Wave 1 design — ready before 1 Nov",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "Session transcripts & content mining",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "Waves 2–3 copywriting",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 5",
+     "name": "Waves 2–3 design",
+     "duration_days": 5.0,
+     "due_date": "2026-11-11",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 6",
+     "name": "SERIES RUNS 1–30 NOV",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p13",
+   "name": "TSC — End of Year Meetup",
+   "brand": "The Strategy Community",
+   "standing": false,
+   "due_date": "2026-12-22",
+   "focus": false,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "⚠ Confirm meetup date & format",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "Coverage plan & event assets",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "Invitation campaign",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "On-site capture",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "Same-day social",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 5",
+     "name": "Recap video & year-in-review post",
+     "duration_days": 5.0,
+     "due_date": "2026-11-11",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p14",
+   "name": "E-book Ch.1 — Sep Flagship",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-09-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "E-bo0",
+     "name": "Chapter 1 final edit",
+     "duration_days": 3.0,
+     "due_date": "2026-08-13",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo1",
+     "name": "Islam review — C-Check",
+     "duration_days": 2.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo2",
+     "name": "Diagrams & visuals",
+     "duration_days": 2.0,
+     "due_date": "2026-08-20",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo3",
+     "name": "Design & layout",
+     "duration_days": 4.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo4",
+     "name": "D-Check — Alaa",
+     "duration_days": 2.0,
+     "due_date": "2026-09-01",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo5",
+     "name": "Final check",
+     "duration_days": 1.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "E-bo6",
+     "name": "Landing page & download setup",
+     "duration_days": 3.0,
+     "due_date": "2026-09-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo7",
+     "name": "GO LIVE",
+     "duration_days": 1.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p15",
+   "name": "E-book Ch.2 — Oct Flagship",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-10-29",
+   "focus": false,
+   "steps": [
+    {
+     "key": "E-bo0",
+     "name": "Chapter 2 draft",
+     "duration_days": 5.0,
+     "due_date": "2026-09-24",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo1",
+     "name": "Edit against writing guidelines",
+     "duration_days": 2.0,
+     "due_date": "2026-09-29",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo2",
+     "name": "Islam review — C-Check",
+     "duration_days": 2.0,
+     "due_date": "2026-10-01",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo3",
+     "name": "Diagrams & visuals",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo4",
+     "name": "Design & layout",
+     "duration_days": 4.0,
+     "due_date": "2026-10-13",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo5",
+     "name": "D-Check & final check",
+     "duration_days": 3.0,
+     "due_date": "2026-10-20",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "E-bo6",
+     "name": "Landing page & download setup",
+     "duration_days": 2.0,
+     "due_date": "2026-10-26",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo7",
+     "name": "GO LIVE (30 Oct is a Friday)",
+     "duration_days": 1.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p16",
+   "name": "E-book Ch.3 — Nov Flagship",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-11-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "E-bo0",
+     "name": "Chapter 3 draft",
+     "duration_days": 5.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo1",
+     "name": "Edit against writing guidelines",
+     "duration_days": 2.0,
+     "due_date": "2026-10-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "E-bo2",
+     "name": "Islam review — C-Check",
+     "duration_days": 2.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo3",
+     "name": "Diagrams & visuals",
+     "duration_days": 2.0,
+     "due_date": "2026-11-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo4",
+     "name": "Design & layout",
+     "duration_days": 4.0,
+     "due_date": "2026-11-10",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo5",
+     "name": "D-Check & final check",
+     "duration_days": 3.0,
+     "due_date": "2026-11-16",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "E-bo6",
+     "name": "Landing page & download setup",
+     "duration_days": 2.0,
+     "due_date": "2026-11-24",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "E-bo7",
+     "name": "GO LIVE",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p17",
+   "name": "ALABD Case Study — Dec Flagship",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "ALAB0",
+     "name": "Client approval & data gathering",
+     "duration_days": 5.0,
+     "due_date": "2026-11-19",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "ALAB1",
+     "name": "Case study draft",
+     "duration_days": 5.0,
+     "due_date": "2026-11-26",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "ALAB2",
+     "name": "Client sign-off",
+     "duration_days": 3.0,
+     "due_date": "2026-12-01",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "ALAB3",
+     "name": "Islam review — C-Check",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "ALAB4",
+     "name": "Design & layout",
+     "duration_days": 4.0,
+     "due_date": "2026-12-10",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "ALAB5",
+     "name": "D-Check & final check",
+     "duration_days": 3.0,
+     "due_date": "2026-12-15",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "ALAB6",
+     "name": "Landing page & download setup",
+     "duration_days": 2.0,
+     "due_date": "2026-12-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "ALAB7",
+     "name": "⚠ GO LIVE — dead week, consider 20 Dec or Jan",
+     "duration_days": 1.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p18",
+   "name": "Design System & Asset Library",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-08-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Desi0",
+     "name": "Audit existing assets & define v1 scope",
+     "duration_days": 2.0,
+     "due_date": "2026-08-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi1",
+     "name": "Brief & onboard freelance designer",
+     "duration_days": 3.0,
+     "due_date": "2026-08-11",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Desi2",
+     "name": "Design tokens — colour, type, spacing",
+     "duration_days": 3.0,
+     "due_date": "2026-08-16",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi3",
+     "name": "Core component library (v1)",
+     "duration_days": 5.0,
+     "due_date": "2026-08-23",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi4",
+     "name": "Master presentation templates",
+     "duration_days": 4.0,
+     "due_date": "2026-08-26",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi5",
+     "name": "Documentation & usage rules",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Desi6",
+     "name": "Team walkthrough",
+     "duration_days": 1.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Desi7",
+     "name": "v1 LAUNCH",
+     "duration_days": 1.0,
+     "due_date": "2026-08-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Desi8",
+     "name": "⚠ Re-skin v1 to the uplifted brand",
+     "duration_days": 5.0,
+     "due_date": "2026-10-08",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi9",
+     "name": "v2 — 3D illustrations & icon set",
+     "duration_days": 10.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi10",
+     "name": "v2 — proposal & report templates",
+     "duration_days": 8.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi11",
+     "name": "v2 rollout & documentation",
+     "duration_days": 2.0,
+     "due_date": "2026-11-12",
+     "done": false,
+     "assignee": "samaa"
+    }
+   ]
+  },
+  {
+   "key": "p19",
+   "name": "Brand Ecosystem — Omnisight & TSC",
+   "brand": "Omnisight",
+   "standing": false,
+   "due_date": "2026-12-03",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Bran0",
+     "name": "Omnisight offline design & print",
+     "duration_days": 8.0,
+     "due_date": "2026-09-17",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Bran1",
+     "name": "TSC identity refinement",
+     "duration_days": 8.0,
+     "due_date": "2026-10-01",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Bran2",
+     "name": "Standardized client material kit",
+     "duration_days": 8.0,
+     "due_date": "2026-11-19",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Bran3",
+     "name": "Proposal, report & deck standards",
+     "duration_days": 6.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p20",
+   "name": "Website Launching",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": null,
+   "focus": false,
+   "steps": [
+    {
+     "key": "Webs0",
+     "name": "Sitemap & page inventory",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Webs1",
+     "name": "Copy for core pages",
+     "duration_days": 6.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Webs2",
+     "name": "Design & build pages",
+     "duration_days": 10.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Webs3",
+     "name": "Migrate existing articles",
+     "duration_days": 3.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Webs4",
+     "name": "SEO basics & metadata",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Webs5",
+     "name": "QA across devices",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Webs6",
+     "name": "Go live & redirects",
+     "duration_days": 1.0,
+     "due_date": null,
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Webs7",
+     "name": "Post-launch fixes",
+     "duration_days": 3.0,
+     "due_date": null,
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p21",
+   "name": "Omnisight Launching",
+   "brand": "Omnisight",
+   "standing": false,
+   "due_date": "2026-08-19",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Omni0",
+     "name": "Positioning & key messages",
+     "duration_days": 3.0,
+     "due_date": null,
+     "done": true,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Omni1",
+     "name": "Design the 11 launch posts",
+     "duration_days": 8.0,
+     "due_date": null,
+     "done": true,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Omni2",
+     "name": "Product / landing page",
+     "duration_days": 4.0,
+     "due_date": null,
+     "done": true,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Omni3",
+     "name": "Announcement email",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": true,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Omni4",
+     "name": "⚠ WEBSITE PUBLISHING — the only blocker, needs an owner",
+     "duration_days": 1.0,
+     "due_date": "2026-08-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Omni5",
+     "name": "Final QA on the live site",
+     "duration_days": 1.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Omni6",
+     "name": "Sequence and schedule",
+     "duration_days": 1.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Omni7",
+     "name": "LAUNCH",
+     "duration_days": 1.0,
+     "due_date": "2026-08-19",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Omni8",
+     "name": "Launch week monitoring",
+     "duration_days": 2.0,
+     "due_date": "2026-08-25",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Omni9",
+     "name": "Performance review",
+     "duration_days": 1.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p22",
+   "name": "Conscious Leadership Campaign — Islam",
+   "brand": "Islam Personal Branding",
+   "standing": false,
+   "due_date": null,
+   "focus": false,
+   "steps": [
+    {
+     "key": "Cons0",
+     "name": "Campaign angle & content pillars",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons1",
+     "name": "Outline posts & formats",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons2",
+     "name": "Copywriting",
+     "duration_days": 5.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons3",
+     "name": "Design",
+     "duration_days": 5.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Cons4",
+     "name": "Islam review & approval",
+     "duration_days": 3.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons5",
+     "name": "Schedule",
+     "duration_days": 1.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons6",
+     "name": "Engagement & follow-up",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    }
+   ]
+  },
+  {
+   "key": "p23",
+   "name": "Consulting Campaign — Islam",
+   "brand": "Islam Personal Branding",
+   "standing": false,
+   "due_date": null,
+   "focus": false,
+   "steps": [
+    {
+     "key": "Cons0",
+     "name": "Offer definition & proof points",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons1",
+     "name": "Outline posts & formats",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons2",
+     "name": "Copywriting",
+     "duration_days": 5.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Cons3",
+     "name": "Design",
+     "duration_days": 5.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Cons4",
+     "name": "Islam review & approval",
+     "duration_days": 3.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons5",
+     "name": "Schedule",
+     "duration_days": 1.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Cons6",
+     "name": "Lead follow-up process",
+     "duration_days": 2.0,
+     "due_date": null,
+     "done": false,
+     "assignee": "salma"
+    }
+   ]
+  },
+  {
+   "key": "p24",
+   "name": "Design AI Workflow",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-09-15",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Desi0",
+     "name": "Map current design workflow & pain points",
+     "duration_days": 3.0,
+     "due_date": "2026-08-20",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi1",
+     "name": "Define AI-assisted stages (brief → generate → curate → version)",
+     "duration_days": 2.0,
+     "due_date": "2026-08-25",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Desi2",
+     "name": "Build shared design prompt library",
+     "duration_days": 4.0,
+     "due_date": "2026-09-02",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi3",
+     "name": "Build AI-ready templates on the new design system",
+     "duration_days": 4.0,
+     "due_date": "2026-09-08",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi4",
+     "name": "Pilot on one live brief",
+     "duration_days": 2.0,
+     "due_date": "2026-09-10",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Desi5",
+     "name": "Documentation & guardrails — judgement stays human",
+     "duration_days": 2.0,
+     "due_date": "2026-09-13",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Desi6",
+     "name": "Team training & rollout",
+     "duration_days": 1.0,
+     "due_date": "2026-09-14",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Desi7",
+     "name": "LAUNCH",
+     "duration_days": 1.0,
+     "due_date": "2026-09-15",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Desi8",
+     "name": "⚠ Refresh templates after the FFNT uplift",
+     "duration_days": 3.0,
+     "due_date": "2026-10-08",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p25",
+   "name": "FFNT Uplifting",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-09-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "FFNT0",
+     "name": "Audit current brand expression & gaps",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT1",
+     "name": "Uplift direction & moodboard",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT2",
+     "name": "Islam review & direction sign-off",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT3",
+     "name": "Refreshed visual system — lockups, type, colour, patterns",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT4",
+     "name": "Apply to core templates & social system",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT5",
+     "name": "Brand guidelines update",
+     "duration_days": 6.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT6",
+     "name": "Internal rollout & asset handover",
+     "duration_days": 2.0,
+     "due_date": "2026-11-22",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT7",
+     "name": "LAUNCH",
+     "duration_days": 6.0,
+     "due_date": "2026-11-24",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p26",
+   "name": "Guest Writing — external contributors",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2026-09-20",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Gues0",
+     "name": "Build guest list & selection criteria",
+     "duration_days": 3.0,
+     "due_date": "2026-08-11",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues1",
+     "name": "Outreach & invitations",
+     "duration_days": 4.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues2",
+     "name": "Confirm guests + brief pack (topic, length, guidelines)",
+     "duration_days": 2.0,
+     "due_date": "2026-08-20",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Gues3",
+     "name": "⚠ Guest drafting window — external, outside our SLA",
+     "duration_days": 10.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues4",
+     "name": "Chase window for late submissions",
+     "duration_days": 2.0,
+     "due_date": "2026-09-08",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues5",
+     "name": "Edit against writing guidelines",
+     "duration_days": 2.0,
+     "due_date": "2026-09-10",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Gues6",
+     "name": "Islam review — C-Check",
+     "duration_days": 1.0,
+     "due_date": "2026-09-13",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues7",
+     "name": "Design & visuals",
+     "duration_days": 3.0,
+     "due_date": "2026-09-16",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Gues8",
+     "name": "D-Check & final check",
+     "duration_days": 2.0,
+     "due_date": "2026-09-17",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues9",
+     "name": "GO LIVE (18 Sep is a Friday)",
+     "duration_days": 1.0,
+     "due_date": "2026-09-20",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p27",
+   "name": "Family Business Interview Series",
+   "brand": "Forefront",
+   "standing": false,
+   "due_date": "2027-01-19",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Fami0",
+     "name": "Define angle & family business shortlist",
+     "duration_days": 3.0,
+     "due_date": "2026-11-26",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Fami1",
+     "name": "Outreach & secure participants",
+     "duration_days": 5.0,
+     "due_date": "2026-12-08",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Fami2",
+     "name": "Question set & participant prep briefs",
+     "duration_days": 2.0,
+     "due_date": "2026-12-10",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Fami3",
+     "name": "Interview 1 — record",
+     "duration_days": 1.0,
+     "due_date": "2026-12-15",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Fami4",
+     "name": "Interview 2 — record",
+     "duration_days": 1.0,
+     "due_date": "2026-12-17",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Fami5",
+     "name": "Edit & transcripts",
+     "duration_days": 5.0,
+     "due_date": "2027-01-07",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Fami6",
+     "name": "D-Check & subtitles",
+     "duration_days": 2.0,
+     "due_date": "2027-01-12",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "Fami7",
+     "name": "Final check & schedule",
+     "duration_days": 1.0,
+     "due_date": "2027-01-14",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Fami8",
+     "name": "GO LIVE",
+     "duration_days": 1.0,
+     "due_date": "2027-01-19",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "p28",
+   "name": "FFNT Monthly Blogging",
+   "brand": "Forefront",
+   "standing": true,
+   "due_date": "2026-12-21",
+   "focus": true,
+   "steps": [
+    {
+     "key": "FFNT0",
+     "name": "Aug blogs live — 9 & 23 Aug (7th is a Friday)",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT1",
+     "name": "Sep topics, drafts & visuals",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT2",
+     "name": "Sep blogs live — 7 & 21 Sep",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT3",
+     "name": "Oct topics, drafts & visuals",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT4",
+     "name": "Oct blogs live — 7 & 21 Oct",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT5",
+     "name": "Nov topics, drafts & visuals",
+     "duration_days": 6.0,
+     "due_date": "2026-10-22",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT6",
+     "name": "Nov blogs live — 8 & 22 Nov (7th is a Saturday)",
+     "duration_days": 2.0,
+     "due_date": "2026-11-22",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT7",
+     "name": "Dec topics, drafts & visuals",
+     "duration_days": 6.0,
+     "due_date": "2026-11-24",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT8",
+     "name": "Dec blogs live — 7 & 21 Dec",
+     "duration_days": 2.0,
+     "due_date": "2026-12-21",
+     "done": false,
+     "assignee": "samaa"
+    }
+   ]
+  },
+  {
+   "key": "p29",
+   "name": "FFNT Monthly Calendar",
+   "brand": "Forefront",
+   "standing": true,
+   "due_date": "2026-12-03",
+   "focus": true,
+   "steps": [
+    {
+     "key": "FFNT0",
+     "name": "Sep calendar — one-off transition build",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT1",
+     "name": "W1 Sep — build October calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT2",
+     "name": "W1 Oct — build November calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT3",
+     "name": "W1 Nov — build December calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT4",
+     "name": "W1 Dec — build January calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT0s",
+     "name": "Sep calendar — one-off transition build — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT0y",
+     "name": "Sep calendar — one-off transition build — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT1s",
+     "name": "W1 Sep — build October calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT1y",
+     "name": "W1 Sep — build October calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT2s",
+     "name": "W1 Oct — build November calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT2y",
+     "name": "W1 Oct — build November calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT3s",
+     "name": "W1 Nov — build December calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT3y",
+     "name": "W1 Nov — build December calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "FFNT4s",
+     "name": "W1 Dec — build January calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "FFNT4y",
+     "name": "W1 Dec — build January calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p30",
+   "name": "TSC Monthly Calendar",
+   "brand": "The Strategy Community",
+   "standing": true,
+   "due_date": "2026-12-03",
+   "focus": true,
+   "steps": [
+    {
+     "key": "TSC 0",
+     "name": "Sep calendar — one-off transition build",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1",
+     "name": "W1 Sep — build October calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2",
+     "name": "W1 Oct — build November calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3",
+     "name": "W1 Nov — build December calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 4",
+     "name": "W1 Dec — build January calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "salma"
+    },
+    {
+     "key": "TSC 0s",
+     "name": "Sep calendar — one-off transition build — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 0y",
+     "name": "Sep calendar — one-off transition build — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 1s",
+     "name": "W1 Sep — build October calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 1y",
+     "name": "W1 Sep — build October calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 2s",
+     "name": "W1 Oct — build November calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 2y",
+     "name": "W1 Oct — build November calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 3s",
+     "name": "W1 Nov — build December calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 3y",
+     "name": "W1 Nov — build December calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "TSC 4s",
+     "name": "W1 Dec — build January calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "TSC 4y",
+     "name": "W1 Dec — build January calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p31",
+   "name": "Islam PB Monthly Calendar",
+   "brand": "Islam Personal Branding",
+   "standing": true,
+   "due_date": "2026-12-03",
+   "focus": true,
+   "steps": [
+    {
+     "key": "Isla0",
+     "name": "Sep calendar — one-off transition build",
+     "duration_days": 5.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla1",
+     "name": "W1 Sep — build October calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla2",
+     "name": "W1 Oct — build November calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla3",
+     "name": "W1 Nov — build December calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla4",
+     "name": "W1 Dec — build January calendar",
+     "duration_days": 5.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla0s",
+     "name": "Sep calendar — one-off transition build — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla0y",
+     "name": "Sep calendar — one-off transition build — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-08-27",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla1s",
+     "name": "W1 Sep — build October calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla1y",
+     "name": "W1 Sep — build October calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-09-03",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla2s",
+     "name": "W1 Oct — build November calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla2y",
+     "name": "W1 Oct — build November calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-10-06",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla3s",
+     "name": "W1 Nov — build December calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla3y",
+     "name": "W1 Nov — build December calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-11-05",
+     "done": false,
+     "assignee": "yosra"
+    },
+    {
+     "key": "Isla4s",
+     "name": "W1 Dec — build January calendar — copy & topics",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Isla4y",
+     "name": "W1 Dec — build January calendar — design & assets",
+     "duration_days": 2.0,
+     "due_date": "2026-12-03",
+     "done": false,
+     "assignee": "yosra"
+    }
+   ]
+  },
+  {
+   "key": "p32",
+   "name": "Newsletter — Bi-weekly (Tuesdays)",
+   "brand": "Forefront",
+   "standing": true,
+   "due_date": "2026-12-22",
+   "focus": false,
+   "steps": [
+    {
+     "key": "News0",
+     "name": "Issue 01 — Manifesto launch",
+     "duration_days": 2.0,
+     "due_date": "2026-08-18",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News1",
+     "name": "Issue 02",
+     "duration_days": 2.0,
+     "due_date": "2026-09-01",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News2",
+     "name": "Issue 03 — Consultants Campaign",
+     "duration_days": 2.0,
+     "due_date": "2026-09-15",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News3",
+     "name": "Issue 04 — Chapter 1",
+     "duration_days": 2.0,
+     "due_date": "2026-09-29",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News4",
+     "name": "Issue 05 — Retreat preview",
+     "duration_days": 2.0,
+     "due_date": "2026-10-13",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News5",
+     "name": "Issue 06 — Chapter 2",
+     "duration_days": 2.0,
+     "due_date": "2026-10-27",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News6",
+     "name": "Issue 07 — Retreat recap",
+     "duration_days": 2.0,
+     "due_date": "2026-11-10",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News7",
+     "name": "Issue 08",
+     "duration_days": 2.0,
+     "due_date": "2026-11-24",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News8",
+     "name": "Issue 09 — Chapter 3",
+     "duration_days": 2.0,
+     "due_date": "2026-12-08",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "News9",
+     "name": "Issue 10 — year in review",
+     "duration_days": 2.0,
+     "due_date": "2026-12-22",
+     "done": false,
+     "assignee": "samaa"
+    }
+   ]
+  },
+  {
+   "key": "p33",
+   "name": "Guest Posts — one per flagship",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-23",
+   "focus": false,
+   "steps": [
+    {
+     "key": "Gues0",
+     "name": "Build the target publication list",
+     "duration_days": 3.0,
+     "due_date": "2026-08-20",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues1",
+     "name": "Ch.1 placement",
+     "duration_days": 2.0,
+     "due_date": "2026-10-07",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues2",
+     "name": "Ch.2 placement",
+     "duration_days": 2.0,
+     "due_date": "2026-11-04",
+     "done": false,
+     "assignee": "samaa"
+    },
+    {
+     "key": "Gues3",
+     "name": "Ch.3 placement",
+     "duration_days": 2.0,
+     "due_date": "2026-12-07",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "Gues4",
+     "name": "ALABD placement",
+     "duration_days": 2.0,
+     "due_date": "2026-12-23",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm0",
+   "name": "Digital & Social — Community Engagement",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm0_0",
+     "name": "August — engagement, four brands",
+     "duration_days": 6.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm0_1",
+     "name": "September",
+     "duration_days": 6.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm0_2",
+     "name": "October",
+     "duration_days": 6.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm0_3",
+     "name": "November",
+     "duration_days": 6.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm0_4",
+     "name": "December",
+     "duration_days": 6.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm1",
+   "name": "Digital & Social — Paid Campaigns",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm1_0",
+     "name": "Account setup, audiences & tracking",
+     "duration_days": 3.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm1_1",
+     "name": "September optimisation",
+     "duration_days": 2.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm1_2",
+     "name": "October — retreat push",
+     "duration_days": 3.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm1_3",
+     "name": "November optimisation",
+     "duration_days": 2.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm1_4",
+     "name": "December optimisation",
+     "duration_days": 2.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm2",
+   "name": "Digital & Social — Analytics & Reporting",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm2_0",
+     "name": "August report, four brands",
+     "duration_days": 3.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm2_1",
+     "name": "September report",
+     "duration_days": 3.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm2_2",
+     "name": "October report",
+     "duration_days": 3.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm2_3",
+     "name": "November report",
+     "duration_days": 3.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm2_4",
+     "name": "H2 year-end report",
+     "duration_days": 3.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm3",
+   "name": "Digital & Social — Email Operations",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm3_0",
+     "name": "August — 1 issue",
+     "duration_days": 1.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm3_1",
+     "name": "September — 3 issues",
+     "duration_days": 2.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm3_2",
+     "name": "October — 2 issues",
+     "duration_days": 1.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm3_3",
+     "name": "November — 2 issues",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm3_4",
+     "name": "December — 2 issues",
+     "duration_days": 1.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm4",
+   "name": "Digital & Social — Course & Lead Funnel",
+   "brand": null,
+   "standing": false,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm4_0",
+     "name": "Nurture sequence build",
+     "duration_days": 3.0,
+     "due_date": "2026-09-14",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm4_1",
+     "name": "Conversion tracking & goals",
+     "duration_days": 2.0,
+     "due_date": "2026-09-21",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm4_2",
+     "name": "October optimisation",
+     "duration_days": 1.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm4_3",
+     "name": "November optimisation",
+     "duration_days": 1.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm4_4",
+     "name": "December optimisation",
+     "duration_days": 1.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  },
+  {
+   "key": "dm5",
+   "name": "TSC — Community Management",
+   "brand": null,
+   "standing": true,
+   "due_date": "2026-12-30",
+   "focus": false,
+   "steps": [
+    {
+     "key": "dm5_0",
+     "name": "August",
+     "duration_days": 2.0,
+     "due_date": "2026-08-31",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm5_1",
+     "name": "September",
+     "duration_days": 2.0,
+     "due_date": "2026-09-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm5_2",
+     "name": "October",
+     "duration_days": 2.0,
+     "due_date": "2026-10-29",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm5_3",
+     "name": "November",
+     "duration_days": 2.0,
+     "due_date": "2026-11-30",
+     "done": false,
+     "assignee": null
+    },
+    {
+     "key": "dm5_4",
+     "name": "December",
+     "duration_days": 2.0,
+     "due_date": "2026-12-30",
+     "done": false,
+     "assignee": null
+    }
+   ]
+  }
+ ]
+}
