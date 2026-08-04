@@ -39,4 +39,7 @@ tsx scripts/reset-admin.ts
 echo "▶ Importing ClickUp tasks (if an export is present)..."
 tsx scripts/import-clickup.ts
 
+echo "▶ Loading the Aspiring / Focus plan..."
+tsx scripts/import-plan.ts
+
 echo "✅ Database migration complete."

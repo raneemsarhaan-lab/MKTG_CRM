@@ -4,7 +4,9 @@
     "board": "اللوح",
     "capacity": "الطاقة",
     "settings": "الإعدادات",
-    "toggleLanguage": "التبديل إلى الإنجليزية"
+    "toggleLanguage": "التبديل إلى الإنجليزية",
+    "projects": "المشاريع",
+    "team": "المهام"
   },
   "greeting": {
     "morning": "صباح الخير",
