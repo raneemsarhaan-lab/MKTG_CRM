@@ -45,6 +45,24 @@ const ICON = {
       <rect width="7" height="5" x="3" y="16" rx="1" />
     </>
   ),
+  // Lucide target
+  projects: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </>
+  ),
+  // Lucide list-checks
+  team: (
+    <>
+      <path d="m3 17 2 2 4-4" />
+      <path d="m3 7 2 2 4-4" />
+      <line x1="13" x2="21" y1="6" y2="6" />
+      <line x1="13" x2="21" y1="12" y2="12" />
+      <line x1="13" x2="21" y1="18" y2="18" />
+    </>
+  ),
   // Lucide users
   capacity: (
     <>
@@ -73,6 +91,8 @@ const ICON = {
 const NAV_ITEMS = [
   { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
   { href: '/overview', key: 'overview', icon: ICON.overview, adminOnly: false },
+  { href: '/projects', key: 'projects', icon: ICON.projects, adminOnly: false },
+  { href: '/team',     key: 'team',     icon: ICON.team,     adminOnly: false },
   { href: '/capacity', key: 'capacity', icon: ICON.capacity, adminOnly: true  },
   { href: '/settings', key: 'settings', icon: ICON.settings, adminOnly: true  },
 ] as const

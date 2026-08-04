@@ -23,6 +23,7 @@ model Member {
   tasks_owned   Task[]        @relation("TaskOwner")
   tasks_created Task[]        @relation("TaskCreator")
   comments      TaskComment[]
+  project_steps ProjectStep[] @relation("StepAssignee")
 
   @@map("members")
 }
@@ -35,10 +36,61 @@ model Brand {
   description String?
   created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  tasks  Task[]
-  assets BrandAsset[]
+  tasks    Task[]
+  assets   BrandAsset[]
+  projects Project[]
 
   @@map("brands")
+}
+
+/// A planned piece of work, from the Aspiring / Focus plan.
+///
+/// Deliberately separate from Task. A Task is a deliverable moving through the
+/// nine review stages with an SLA; a Project is a plan made of steps measured
+/// in days. They meet at ProjectStep.task_id, when a step is turned into
+/// something the pipeline board tracks.
+model Project {
+  id         String    @id @default(uuid()) @db.Uuid
+  /// Stable key from the planning documents, so re-importing updates rather
+  /// than duplicates — and so a re-import never overwrites an edit made here.
+  key        String?   @unique
+  name       String
+  brand_id   String?   @db.Uuid
+  /// Standing work that recurs rather than finishing — monthly calendars,
+  /// community management. Shown apart from work that has an end.
+  standing   Boolean   @default(false)
+  due_date   DateTime? @db.Date
+  /// In the Focus list as well as Aspiring. Aspiring is everything.
+  focus      Boolean   @default(false)
+  sort_order Int       @default(0)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  brand Brand?        @relation(fields: [brand_id], references: [id], onDelete: SetNull)
+  steps ProjectStep[]
+
+  @@map("projects")
+}
+
+model ProjectStep {
+  id            String    @id @default(uuid()) @db.Uuid
+  key           String?   @unique
+  project_id    String    @db.Uuid
+  name          String
+  duration_days Decimal   @default(0) @db.Decimal(5, 1)
+  due_date      DateTime? @db.Date
+  done          Boolean   @default(false)
+  assignee_id   String?   @db.Uuid
+  /// Set once this step has been pushed onto the pipeline board. Kept so the
+  /// step can show that it is being produced, and so pushing it twice does
+  /// not create two tasks.
+  task_id       String?   @unique @db.Uuid
+  sort_order    Int       @default(0)
+
+  project  Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  assignee Member? @relation("StepAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  task     Task?   @relation(fields: [task_id], references: [id], onDelete: SetNull)
+
+  @@map("project_steps")
 }
 
 /// Reference material for a brand — logos, guidelines, templates.
@@ -130,6 +182,7 @@ model Task {
   content_type ContentType? @relation("TaskContentType", fields: [content_type_label], references: [label])
   comments     TaskComment[]
   attachments  TaskAttachment[]
+  project_step ProjectStep?
 
   @@map("tasks")
 }

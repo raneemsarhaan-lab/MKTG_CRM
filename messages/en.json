@@ -4,7 +4,9 @@
     "board": "Board",
     "capacity": "Capacity",
     "settings": "Settings",
-    "toggleLanguage": "Switch to Arabic"
+    "toggleLanguage": "Switch to Arabic",
+    "projects": "Projects",
+    "team": "Team"
   },
   "greeting": {
     "morning": "Good morning",

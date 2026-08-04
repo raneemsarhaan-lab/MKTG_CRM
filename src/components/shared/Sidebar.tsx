@@ -28,6 +28,8 @@ const STORAGE_KEY = 'fluxo.sidebar.expanded'
 const NAV = [
   { href: '/board',    key: 'board',    adminOnly: false },
   { href: '/overview', key: 'overview', adminOnly: false },
+  { href: '/projects', key: 'projects', adminOnly: false },
+  { href: '/team',     key: 'team',     adminOnly: false },
   { href: '/capacity', key: 'capacity', adminOnly: true  },
   { href: '/settings', key: 'settings', adminOnly: true  },
 ] as const
@@ -40,6 +42,14 @@ const NAV_ICON: Record<string, React.ReactNode> = {
   overview: (<>
     <rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" />
     <rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" />
+  </>),
+  projects: (<>
+    <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+  </>),
+  team: (<>
+    <path d="m3 17 2 2 4-4" /><path d="m3 7 2 2 4-4" />
+    <line x1="13" x2="21" y1="6" y2="6" /><line x1="13" x2="21" y1="12" y2="12" />
+    <line x1="13" x2="21" y1="18" y2="18" />
   </>),
   capacity: (<>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
