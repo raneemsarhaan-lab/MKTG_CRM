@@ -6,7 +6,8 @@ import {
   statsOf, portfolioStats, horizon, weeksOf, spanOf, byBrand,
   isLate, isDueWithin, todayISO, UNASSIGNED,
 } from '@/lib/projects'
-import { COLORS } from '@/lib/tokens'
+import { UI, font, card as CARD, input as INPUT_UI, durationTone, personColor, segments } from '@/lib/board-ui'
+import { initials } from '@/lib/utils'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
   convertStepToTask, addStep, removeStep, createProject,
@@ -51,17 +52,16 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
   const stats = useMemo(() => portfolioStats(shown, today), [shown, today])
 
   return (
-    <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 40px 80px' }}>
+    <div style={{ overflowY: 'auto', height: '100%', background: UI.bg }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 40px 90px' }}>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 22 }}>
           <div>
-            <p style={EYEBROW}>Portfolio</p>
-            <div style={{ height: 2, width: 32, background: '#C8F24E', borderRadius: 2, margin: '8px 0 12px' }} />
-            <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.5rem', color: 'var(--ink)', margin: 0 }}>
+            <p style={{ ...font.eyebrow, margin: 0 }}>Portfolio</p>
+            <h1 style={{ ...font.h1, margin: '6px 0 0' }}>
               {list === 'focus' ? 'Focus' : 'Aspiring'}
             </h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '6px 0 0' }}>
+            <p style={{ fontSize: 14, color: UI.muted, margin: '8px 0 0' }}>
               {list === 'focus'
                 ? 'What the team is working on now.'
                 : 'Everything planned — Focus is drawn from this list.'}
@@ -69,18 +69,18 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
           </div>
 
           {/* The switch between the two lists */}
-          <div style={{ display: 'inline-flex', borderRadius: 10, padding: 4, background: '#EBEBEB', gap: 2 }}>
+          <div style={{ display: 'inline-flex', borderRadius: 14, padding: 5, background: '#ECECF3', gap: 3 }}>
             {(['focus', 'aspiring'] as List[]).map(l => (
               <button
                 key={l}
                 onClick={() => setList(l)}
                 aria-pressed={list === l}
                 style={{
-                  fontSize: '0.82rem', fontWeight: 700, padding: '8px 20px', borderRadius: 7,
+                  fontSize: 14, fontWeight: 700, padding: '10px 24px', borderRadius: 11,
                   border: 'none', cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize',
-                  background: list === l ? '#fff' : 'transparent',
-                  color: list === l ? 'var(--ink)' : 'var(--muted)',
-                  boxShadow: list === l ? '0 1px 3px rgba(16,16,11,.12)' : 'none',
+                  background: list === l ? UI.card : 'transparent',
+                  color: list === l ? UI.ink : UI.muted,
+                  boxShadow: list === l ? UI.shadowSm : 'none',
                 }}
               >
                 {l} · {l === 'focus' ? projects.filter(p => p.focus).length : projects.length}
@@ -90,11 +90,11 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
         </div>
 
         {error && (
-          <p role="alert" style={{ fontSize: '0.8rem', color: COLORS.coral, margin: '0 0 14px' }}>{error}</p>
+          <p role="alert" style={{ fontSize: '0.8rem', color: UI.rose, margin: '0 0 14px' }}>{error}</p>
         )}
 
         {/* Portfolio at a glance */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 14, marginBottom: 16 }}>
           <Stat label="Projects"   value={String(stats.projects)} />
           <Stat label="Steps done" value={`${stats.done}/${stats.steps}`} note={`${stats.percent}%`} />
           <Stat label="Late"       value={String(stats.late)} bad={stats.late > 0} />
@@ -106,7 +106,7 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
 
         <Horizon projects={shown} today={today} />
 
-        <div style={{ display: 'inline-flex', borderRadius: 10, padding: 4, background: '#EBEBEB', gap: 2, margin: '18px 0 20px' }}>
+        <div style={{ display: 'inline-flex', borderRadius: 14, padding: 5, background: '#ECECF3', gap: 3, margin: '20px 0 22px' }}>
           {(['overview', 'projects', 'timeline', 'weeks'] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} style={TAB(tab === t)}>
               {t === 'weeks' ? 'Weeks' : t[0].toUpperCase() + t.slice(1)}
@@ -136,12 +136,10 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
 
 function Stat({ label, value, note, bad }: { label: string; value: string; note?: string; bad?: boolean }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px' }}>
-      <div style={EYEBROW}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.35rem', color: bad ? COLORS.coral : 'var(--ink)', marginTop: 4 }}>
-        {value}
-      </div>
-      {note && <div style={{ fontSize: '0.68rem', color: 'var(--muted)', marginTop: 2 }}>{note}</div>}
+    <div style={{ ...CARD, padding: '16px 18px' }}>
+      <div style={font.eyebrow}>{label}</div>
+      <div style={{ ...font.stat, color: bad ? UI.rose : UI.ink, marginTop: 4 }}>{value}</div>
+      {note && <div style={{ fontSize: 12, color: UI.faint, marginTop: 3 }}>{note}</div>}
     </div>
   )
 }
@@ -153,11 +151,11 @@ function Horizon({ projects, today }: { projects: ProjectView[]; today: string }
   const late = projects.flatMap(p => p.steps).filter(s => isLate(s, today)).length
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 14, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-        <span style={EYEBROW}>Horizon · next 21 days</span>
+    <div style={{ ...CARD, padding: '16px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <span style={font.eyebrow}>Horizon · next 21 days</span>
         {late > 0 && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: COLORS.coral }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: UI.rose }}>
             {late} step{late === 1 ? '' : 's'} already late
           </span>
         )}
@@ -171,10 +169,10 @@ function Horizon({ projects, today }: { projects: ProjectView[]; today: string }
                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div style={{
                 width: '100%', height: h, borderRadius: 4,
-                background: c.steps.length ? (c.date === today ? '#8FBF1F' : '#C8F24E') : '#EFEFEA',
+                background: c.steps.length ? (c.date === today ? UI.violet : '#C4B9F7') : UI.lineSoft,
                 opacity: weekend && !c.steps.length ? 0.5 : 1,
               }} />
-              <span style={{ fontSize: 8.5, color: c.date === today ? 'var(--ink)' : 'var(--muted)', fontWeight: c.date === today ? 700 : 400 }}>
+              <span style={{ fontSize: 9.5, color: c.date === today ? UI.ink : UI.faint, fontWeight: c.date === today ? 700 : 400 }}>
                 {c.date.slice(8)}
               </span>
             </div>
@@ -202,9 +200,9 @@ function Overview({ projects, today, brands, isAdmin, onError }: {
             {list.map(p => {
               const s = statsOf(p, today)
               return (
-                <div key={p.id} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, padding: '13px 15px' }}>
+                <div key={p.id} style={{ ...CARD, padding: '15px 17px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.87rem', color: 'var(--ink)', flex: 1, lineHeight: 1.35 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: UI.ink, flex: 1, lineHeight: 1.35 }}>
                       {p.name}
                     </span>
                     <FocusStar project={p} isAdmin={isAdmin} onError={onError} />
@@ -212,7 +210,7 @@ function Overview({ projects, today, brands, isAdmin, onError }: {
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
                     {p.standing && <Chip>standing</Chip>}
                     <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>due {fmt(p.dueDate)}</span>
-                    {s.late > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: COLORS.coral }}>{s.late} late</span>}
+                    {s.late > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: UI.rose }}>{s.late} late</span>}
                   </div>
                   <Progress percent={s.percent} />
                   <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: 5 }}>
@@ -278,7 +276,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
   }
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 12, opacity: isPending ? 0.65 : 1 }}>
+    <div style={{ ...CARD, opacity: isPending ? 0.7 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 15px' }}>
         {/* Icon-only, so it needs a name of its own — a chevron tells a screen
             reader nothing, and it made this button indistinguishable from every
@@ -302,7 +300,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
         )}
 
         {p.standing && <Chip>standing</Chip>}
-        {s.late > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: COLORS.coral }}>{s.late} late</span>}
+        {s.late > 0 && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: UI.rose }}>{s.late} late</span>}
         <span style={{ fontSize: '0.72rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
           {s.done}/{s.total}
         </span>
@@ -385,7 +383,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
                  if (!r.success) { setDone(!next); onError(r.error ?? 'Could not save that') }
                })
              }}
-             style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#8FBF1F', flexShrink: 0 }} />
+             style={{ width: 15, height: 15, cursor: 'pointer', accentColor: UI.violet, flexShrink: 0 }} />
 
       {isAdmin ? (
         <input defaultValue={step.name} aria-label={`Name of ${step.name}`}
@@ -407,7 +405,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
                  style={{ ...INPUT, width: 58, textAlign: 'center' }} />
           <input type="date" defaultValue={step.dueDate ?? ''} aria-label={`Due date of ${step.name}`}
                  onChange={e => act(() => updateStep(step.id, { due_date: e.target.value || null }))}
-                 style={{ ...INPUT, width: 134, color: late ? COLORS.coral : 'var(--ink)' }} />
+                 style={{ ...INPUT, width: 134, color: late ? UI.rose : 'var(--ink)' }} />
           <select value={step.assigneeId ?? ''} aria-label={`Assignee of ${step.name}`}
                   onChange={e => act(() => updateStep(step.id, { assignee_id: e.target.value || null }))}
                   style={{ ...INPUT, width: 130 }}>
@@ -417,13 +415,23 @@ function StepRow({ step, today, members, isAdmin, onError }: {
         </>
       ) : (
         <>
-          <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{step.durationDays}d</span>
-          <span style={{ fontSize: '0.72rem', fontWeight: late ? 700 : 400, color: late ? COLORS.coral : soon ? 'var(--ink)' : 'var(--muted)' }}>
+          <span title="Planned duration" style={{
+            fontSize: 12, fontWeight: 700, padding: '3px 9px', borderRadius: 7, whiteSpace: 'nowrap',
+            background: durationTone(step.durationDays).bg, color: durationTone(step.durationDays).fg,
+          }}>{step.durationDays}d</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: late ? 700 : 400, color: late ? UI.rose : soon ? 'var(--ink)' : 'var(--muted)' }}>
             {fmt(step.dueDate)}
           </span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--muted)', width: 90, textAlign: 'right' }}>
-            {step.assigneeName ?? '—'}
-          </span>
+          {step.assigneeName ? (
+            <span title={step.assigneeName} style={{
+              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+              background: personColor(step.assigneeName), color: '#fff',
+              fontSize: 9, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{initials(step.assigneeName)}</span>
+          ) : (
+            <span style={{ fontSize: 12, color: UI.faint, width: 24, textAlign: 'center' }}>—</span>
+          )}
         </>
       )}
 
@@ -443,7 +451,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
 
       {isAdmin && (
         <button onClick={() => act(() => removeStep(step.id))} title={`Remove ${step.name}`}
-                style={{ border: 'none', background: 'transparent', color: COLORS.coral, cursor: 'pointer', fontSize: '0.78rem', padding: 3 }}>
+                style={{ border: 'none', background: 'transparent', color: UI.rose, cursor: 'pointer', fontSize: '0.78rem', padding: 3 }}>
           ✕
         </button>
       )}
@@ -464,13 +472,13 @@ function Timeline({ projects, today }: { projects: ProjectView[]; today: string 
   const pct = (d: string) => ((ms(d) - ms(min)) / Math.max(1, ms(max) - ms(min))) * 100
 
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 14, padding: '16px 18px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--muted)', marginBottom: 10 }}>
+    <div style={{ ...CARD, padding: '18px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: UI.faint, marginBottom: 12 }}>
         <span>{fmt(min)}</span><span>{fmt(max)}</span>
       </div>
       <div style={{ position: 'relative', display: 'grid', gap: 6 }}>
         {/* today */}
-        <div style={{ position: 'absolute', left: `${pct(today)}%`, top: 0, bottom: 0, width: 2, background: '#8FBF1F', zIndex: 1 }} />
+        <div style={{ position: 'absolute', left: `${pct(today)}%`, top: 0, bottom: 0, width: 2, background: UI.violet, zIndex: 1 }} />
         {rows.map(({ p, span }) => {
           const left = pct(span.start)
           const width = Math.max(1.5, pct(span.end) - left)
@@ -479,11 +487,11 @@ function Timeline({ projects, today }: { projects: ProjectView[]; today: string 
               <span style={{ width: 190, fontSize: '0.74rem', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {p.name}
               </span>
-              <div style={{ position: 'relative', flex: 1, height: 18, background: '#F6F6F4', borderRadius: 5 }}>
+              <div style={{ position: 'relative', flex: 1, height: 20, background: UI.lineSoft, borderRadius: 6 }}>
                 <div title={`${fmt(span.start)} → ${fmt(span.end)}`}
                      style={{
                        position: 'absolute', left: `${left}%`, width: `${width}%`, top: 3, bottom: 3,
-                       background: p.brandColor ?? '#C8F24E', borderRadius: 4, minWidth: 4,
+                       background: p.brandColor ?? UI.violet, borderRadius: 5, minWidth: 5,
                      }} />
               </div>
             </div>
@@ -502,12 +510,12 @@ function Weeks({ projects, today }: { projects: ProjectView[]; today: string }) 
     <div style={{ display: 'grid', gap: 10 }}>
       {weeks.map(w => (
         <div key={w.start} style={{
-          background: '#fff', borderRadius: 12, padding: '12px 15px',
-          border: w.current ? '1.5px solid #8FBF1F' : '1px solid var(--line)',
+          ...CARD, padding: '14px 17px',
+          border: w.current ? `1.5px solid ${UI.violet}` : `1px solid ${UI.line}`,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>
-              {fmt(w.start)} – {fmt(w.end)} {w.current && <span style={{ color: '#6D8F16' }}>· this week</span>}
+            <span style={{ fontWeight: 700, fontSize: 14, color: UI.ink }}>
+              {fmt(w.start)} – {fmt(w.end)} {w.current && <span style={{ color: UI.violet }}>· this week</span>}
             </span>
             <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{w.items.length} step{w.items.length === 1 ? '' : 's'}</span>
           </div>
@@ -515,7 +523,7 @@ function Weeks({ projects, today }: { projects: ProjectView[]; today: string }) 
             {w.items.map(it => (
               <li key={it.id} style={{ display: 'flex', gap: 8, fontSize: '0.76rem', alignItems: 'baseline' }}>
                 <span style={{ color: 'var(--muted)', width: 54, flexShrink: 0 }}>{fmt(it.dueDate)}</span>
-                <span style={{ flex: 1, color: isLate(it, today) ? COLORS.coral : 'var(--ink)' }}>{it.name}</span>
+                <span style={{ flex: 1, color: isLate(it, today) ? UI.rose : 'var(--ink)' }}>{it.name}</span>
                 <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>{it.project.name}</span>
                 {it.assigneeName && <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>· {it.assigneeName}</span>}
               </li>
@@ -585,44 +593,39 @@ function NewProject({ onError }: { onError: (s: string) => void }) {
 
 function Progress({ percent }: { percent: number }) {
   return (
-    <div style={{ height: 5, background: '#F0F0EB', borderRadius: 3, marginTop: 9, overflow: 'hidden' }}>
-      <div style={{ width: `${percent}%`, height: '100%', background: '#C8F24E', borderRadius: 3 }} />
+    <div style={{ display: 'flex', gap: 3, marginTop: 11 }}>
+      {segments(percent, 100).map((on, i) => (
+        <span key={i} style={{ flex: 1, height: 6, borderRadius: 4, background: on ? UI.green : UI.lineSoft }} />
+      ))}
     </div>
   )
 }
 
 const Chip = ({ children }: { children: React.ReactNode }) => (
   <span style={{
-    fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em',
-    background: '#F0F0EB', color: 'var(--muted)', padding: '2px 7px', borderRadius: 5,
+    fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+    background: UI.lineSoft, color: UI.muted, padding: '3px 8px', borderRadius: 7,
   }}>{children}</span>
 )
 
 const Empty = ({ children }: { children: React.ReactNode }) => (
-  <p style={{ fontSize: '0.82rem', color: 'var(--muted)', padding: '18px 0' }}>{children}</p>
+  <p style={{ fontSize: 14, color: UI.muted, padding: '26px 0' }}>{children}</p>
 )
 
-const EYEBROW: React.CSSProperties = {
-  fontWeight: 700, fontSize: '0.62rem', letterSpacing: '.14em',
-  textTransform: 'uppercase', color: 'var(--muted)', margin: 0,
-}
-const INPUT: React.CSSProperties = {
-  fontSize: '0.78rem', padding: '5px 8px', borderRadius: 7,
-  border: '1px solid var(--line)', background: '#FCFCFB',
-  color: 'var(--ink)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-}
+const EYEBROW: React.CSSProperties = { ...font.eyebrow, margin: 0 }
+const INPUT: React.CSSProperties = { ...INPUT_UI, fontSize: 13, padding: '7px 10px' }
 const BTN_DARK: React.CSSProperties = {
-  fontSize: '0.75rem', fontWeight: 700, padding: '6px 14px', borderRadius: 8,
-  border: 'none', background: 'var(--ink)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+  fontSize: 13, fontWeight: 700, padding: '9px 18px', borderRadius: 11,
+  border: 'none', background: UI.violet, color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
 }
 const BTN_GHOST: React.CSSProperties = {
-  fontSize: '0.66rem', fontWeight: 700, padding: '4px 8px', borderRadius: 6,
-  border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit',
+  fontSize: 11.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8,
+  border: `1px solid ${UI.line}`, background: UI.card, color: UI.ink, cursor: 'pointer', fontFamily: 'inherit',
 }
 const TAB = (active: boolean): React.CSSProperties => ({
-  fontSize: '0.82rem', fontWeight: 700, padding: '8px 18px', borderRadius: 7,
+  fontSize: 14, fontWeight: 700, padding: '10px 22px', borderRadius: 11,
   border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-  background: active ? '#fff' : 'transparent',
-  color: active ? 'var(--ink)' : 'var(--muted)',
-  boxShadow: active ? '0 1px 3px rgba(16,16,11,.12)' : 'none',
+  background: active ? UI.card : 'transparent',
+  color: active ? UI.ink : UI.muted,
+  boxShadow: active ? UI.shadowSm : 'none',
 })

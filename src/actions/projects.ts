@@ -90,12 +90,31 @@ export async function removeProject(projectId: string): Promise<Result> {
   return { success: true }
 }
 
+/**
+ * Edit a step.
+ *
+ * An admin can change any step. Everyone else can change the ones assigned to
+ * them — the team board is where people manage their own work, and making it
+ * read-only for the team would defeat the point of giving them one. Reassigning
+ * is included: handing a task to someone else is a normal thing to need, and
+ * the person losing it is the one giving it away.
+ *
+ * What nobody but an admin can do is touch a step that was never theirs.
+ */
 export async function updateStep(
   stepId: string,
   patch: { name?: string; duration_days?: number; due_date?: string | null; assignee_id?: string | null },
 ): Promise<Result> {
-  const guard = await requireAdmin()
-  if (guard.error) return { success: false, error: guard.error }
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  if (member.access !== 'admin') {
+    const step = await prisma.projectStep.findUnique({
+      where: { id: stepId }, select: { assignee_id: true },
+    })
+    if (!step) return { success: false, error: 'not_found' }
+    if (step.assignee_id !== member.id) return { success: false, error: 'not_authorized' }
+  }
 
   const data: Record<string, unknown> = {}
   if (patch.name !== undefined) {
@@ -123,19 +142,55 @@ export async function updateStep(
   }
 }
 
-export async function addStep(projectId: string, name: string): Promise<Result> {
-  const guard = await requireAdmin()
-  if (guard.error) return { success: false, error: guard.error }
+/**
+ * Add a step to a project.
+ *
+ * Open to anyone signed in, because the team board needs it: work turns up that
+ * was not in the plan, and the alternative is people keeping it somewhere the
+ * plan cannot see. A non-admin may only assign it to themselves — adding work
+ * to someone else's list is a management action.
+ */
+export async function addStep(
+  projectId: string,
+  name: string,
+  extra?: { assignee_id?: string | null; due_date?: string | null; duration_days?: number },
+): Promise<Result> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
   if (!name.trim()) return { success: false, error: 'Name cannot be empty' }
+
+  let assignee = extra?.assignee_id ?? null
+  if (member.access !== 'admin' && assignee && assignee !== member.id) {
+    return { success: false, error: 'Only an admin can add work to someone else’s list.' }
+  }
+  if (member.access !== 'admin') assignee = assignee ?? member.id
 
   const last = await prisma.projectStep.findFirst({
     where: { project_id: projectId }, orderBy: { sort_order: 'desc' }, select: { sort_order: true },
   })
   await prisma.projectStep.create({
-    data: { project_id: projectId, name: name.trim(), sort_order: (last?.sort_order ?? -1) + 1 },
+    data: {
+      project_id: projectId,
+      name: name.trim(),
+      assignee_id: assignee,
+      due_date: extra?.due_date ? new Date(extra.due_date) : null,
+      duration_days: extra?.duration_days ?? 1,
+      sort_order: (last?.sort_order ?? -1) + 1,
+    },
   })
   revalidateAll()
   return { success: true }
+}
+
+/** Projects a step can be added to, for the team board's "add task" form. */
+export async function listProjectsForPicker(): Promise<{ id: string; name: string; brandName: string | null }[]> {
+  const member = await getSessionMember()
+  if (!member) return []
+  const rows = await prisma.project.findMany({
+    orderBy: [{ focus: 'desc' }, { name: 'asc' }],
+    select: { id: true, name: true, brand: { select: { name: true } } },
+  })
+  return rows.map(r => ({ id: r.id, name: r.name, brandName: r.brand?.name ?? null }))
 }
 
 export async function removeStep(stepId: string): Promise<Result> {
