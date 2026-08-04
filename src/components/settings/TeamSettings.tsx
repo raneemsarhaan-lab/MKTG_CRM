@@ -5,6 +5,7 @@ import type { Member } from '@/types/index'
 import { COLORS, ACCESS_BADGE } from '@/lib/tokens'
 import { initials, avatarColor } from '@/lib/utils'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { ImageUpload } from '@/components/shared/ImageUpload'
 import { updateMember, addMember, removeMember, resetMemberPassword } from '@/actions/members'
 import { STAGE_META } from '@/lib/stage-meta'
 
@@ -596,23 +597,18 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           </span>
         )}
 
-        {/* Photo. A URL — there is no upload backend, so this points at an
-            image hosted elsewhere. */}
-        <input
-          defaultValue={m.avatar_url ?? ''}
-          placeholder="Photo URL"
-          aria-label={`Photo URL for ${m.name}`}
-          onBlur={e => {
-            const v = e.target.value.trim()
-            if (v !== (m.avatar_url ?? '')) handleField({ avatar_url: v || null })
-          }}
-          style={{
-            fontSize: '0.72rem', padding: '5px 8px', borderRadius: 6,
-            border: '1px solid var(--line)', background: '#F6F6F4',
-            color: 'var(--ink)', outline: 'none', fontFamily: 'inherit',
-            width: 200, minWidth: 0,
-          }}
-        />
+        {/* Photo — uploaded from this computer, or a link. Stored in the same
+            column either way; see ImageUpload for why an upload becomes a data
+            URL rather than a file. */}
+        <div style={{ width: 210, minWidth: 0 }}>
+          <ImageUpload
+            value={m.avatar_url ?? null}
+            max={192}
+            round
+            disabled={isPending}
+            onChange={v => handleField({ avatar_url: v })}
+          />
+        </div>
       </div>
 
       {/* The generated password, shown once. It is not stored anywhere in

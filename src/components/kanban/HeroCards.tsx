@@ -89,7 +89,18 @@ function StatBox({ value, label, color }: { value: number; label: string; color:
 export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) {
   const momentum  = weekMomentum(tasks, today)
   const stats     = statCounts(tasks, today)
-  const attention = attentionItems(tasks, currentUser.id, today)
+  const attention = attentionItems(tasks, currentUser.id, today, currentUser.role)
+
+  // The card has room for four, and overdue work sorts to the top. Someone
+  // with a long overdue list would therefore never see the queue waiting on
+  // their review — which is the half of this card they cannot discover any
+  // other way. Guarantee it a place.
+  const attentionTop = attention.slice(0, 4)
+  const waiting = attention.filter(a => a.viaStage)
+  if (waiting.length && !attentionTop.some(a => a.viaStage)) {
+    attentionTop[Math.min(3, attentionTop.length)] = waiting[0]
+  }
+  const attentionMore = attention.length - attentionTop.length
   const activity  = activityItems(tasks, currentUser.id, 4)
   const quote     = quoteOfDay(today)
 
@@ -192,7 +203,7 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
               Nothing needs you right now 🎉
             </div>
           )}
-          {attention.slice(0, 4).map(a => (
+          {attentionTop.map(a => (
             <button
               key={a.id}
               type="button"
@@ -205,14 +216,26 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
             >
               <span style={{
                 width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                background: a.due === 'overdue' ? '#FDE7EA' : a.due === 'today' ? '#FFF3E6' : '#F0EBFE',
+                background: a.due === 'overdue' ? '#FDE7EA' : a.due === 'today' ? '#FFF3E6'
+                          : a.due === 'waiting' ? '#E9F3FF' : '#F0EBFE',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }} aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                     stroke={a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#EA8C0B' : PIPE.purple}
+                     stroke={a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#EA8C0B'
+                           : a.due === 'waiting' ? '#2563A8' : PIPE.purple}
                      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4M8 2v4M3 10h18" />
+                  {a.viaStage ? (
+                    /* An eye: this is waiting on your review, not your delivery. */
+                    <>
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                      <circle cx="12" cy="12" r="2.6" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </>
+                  )}
                 </svg>
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -225,7 +248,8 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
                 <span style={{
                   display: 'block', marginTop: 2, fontSize: 11.5,
                   fontWeight: a.due === 'tomorrow' ? 500 : 600,
-                  color: a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#E0294B' : '#8A90A0',
+                  color: a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#E0294B'
+                       : a.due === 'waiting' ? '#2563A8' : '#8A90A0',
                 }}>
                   {a.dueText}
                 </span>
@@ -236,6 +260,12 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
               </svg>
             </button>
           ))}
+
+          {attentionMore > 0 && (
+            <span style={{ fontSize: 11.5, color: PIPE.textMuted, textAlign: 'center', paddingTop: 2 }}>
+              +{attentionMore} more
+            </span>
+          )}
         </div>
 
         {attention.length > 4 && (
