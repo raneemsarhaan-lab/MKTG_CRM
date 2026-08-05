@@ -68,7 +68,7 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
         {/* ── §4 Header ───────────────────────────────────────────────── */}
         <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
           <div>
-            <div style={font.eyebrow}>Portfolio</div>
+            <div style={font.eyebrow}>Projects</div>
             <svg width="46" height="7" viewBox="0 0 46 7" fill="none" aria-hidden="true"
                  style={{ display: 'block', margin: '5px 0 8px' }}>
               <path d="M2 4.5C12 2 34 2 44 4" stroke={UI.lime} strokeWidth="4" strokeLinecap="round" />

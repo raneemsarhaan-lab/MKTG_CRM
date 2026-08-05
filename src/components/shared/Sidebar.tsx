@@ -26,9 +26,9 @@ import { UserMenu } from './UserMenu'
 const STORAGE_KEY = 'fluxo.sidebar.expanded'
 
 const NAV = [
+  { href: '/board',    key: 'board',    adminOnly: false },
   { href: '/overview', key: 'overview', adminOnly: false },
   { href: '/projects', key: 'projects', adminOnly: false },
-  { href: '/board',    key: 'board',    adminOnly: false },
   { href: '/team',     key: 'team',     adminOnly: false },
   { href: '/capacity', key: 'capacity', adminOnly: true  },
   { href: '/settings', key: 'settings', adminOnly: true  },

@@ -1,12 +1,12 @@
 {
   "nav": {
-    "overview": "الرئيسية",
-    "board": "خط الإنتاج",
+    "overview": "نظرة عامة",
+    "board": "اللوح",
     "capacity": "الطاقة",
     "settings": "الإعدادات",
     "toggleLanguage": "التبديل إلى الإنجليزية",
-    "projects": "المحفظة",
-    "team": "مهام الفريق"
+    "projects": "المشاريع",
+    "team": "المهام"
   },
   "greeting": {
     "morning": "صباح الخير",
