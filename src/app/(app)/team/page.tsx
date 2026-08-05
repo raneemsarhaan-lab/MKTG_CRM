@@ -39,19 +39,22 @@ export default async function TeamPage() {
     done: s.done,
     assigneeId: s.assignee_id,
     assigneeName: s.assignee?.name ?? null,
+    assigneeAvatar: s.assignee?.avatar_url ?? null,
     taskId: s.task_id,
     projectId: s.project_id,
     projectName: s.project.name,
     brandName: s.project.brand?.name ?? null,
     brandColor: s.project.brand?.color ?? null,
+    brandLogo: s.project.brand?.logo_url ?? null,
   }))
 
   // Only people who actually have planned work, so the tabs stay short.
   const people = isAdmin
     ? [...new Map(rows.filter(r => r.assignee).map(r => [r.assignee!.id, {
         id: r.assignee!.id, name: r.assignee!.name, role: r.assignee!.role,
+        avatar: r.assignee!.avatar_url ?? null,
       }])).values()].sort((a, b) => a.name.localeCompare(b.name))
-    : [{ id: member.id, name: member.name, role: member.role }]
+    : [{ id: member.id, name: member.name, role: member.role, avatar: member.avatar_url ?? null }]
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
