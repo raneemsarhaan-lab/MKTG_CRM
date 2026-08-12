@@ -43,7 +43,7 @@ So the calculation model in the mock is right and reproducible; the figures have
 | Mock element | Status |
 |---|---|
 | **Consumed hours** ("102 · 5% of expected") and the per-brand **% column** | **Derivable — no new data.** Proven against live data: see below. |
-| **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | No milestone flag exists; marker steps exist by naming convention only. |
+| **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | **In scope, needs one new flag.** Marker steps already exist by convention; the flag makes them explicit — see below. |
 | **Deliverables** ("105 steps · 10 posts") | Steps exist; "posts" presumably means pipeline tasks, but the link between a brand's tasks and its projects is not defined. |
 | **Seniority** ("Video editor · Junior") | Members have a role, not a seniority level. |
 | **Supervision overhead** ("incl. 16d supervision") | No rule exists that adds review time to a manager's load. |
@@ -63,6 +63,12 @@ All four match. And `17.0 done-days × 6h = 102h` — the mock's CONSUMED HOURS 
 
 "Consumed" therefore means *plan progress valued in hours*, and it moves when someone ticks a step. It is in scope.
 
+#### Milestones exist, but only as a naming convention
+
+The plan already contains milestone steps — `GO LIVE (15 Aug is a Saturday)`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES (30 Oct is a Friday)`, `SERIES RUNS 1–30 NOV`, `DELIVERED — fuels September marketing`. Nothing distinguishes them but capital letters: detecting them by name finds 7 where the mock counts 10, and duration is no help since they are all 1 day rather than 0.
+
+So milestones are real, and inference is not good enough to build on. One boolean makes them explicit, seeded from the existing marker names so the plan arrives already flagged.
+
 ---
 
 ## Clarifications
@@ -70,6 +76,7 @@ All four match. And `17.0 done-days × 6h = 102h` — the mock's CONSUMED HOURS 
 ### Session 2026-08-12
 
 - Q: Where do "consumed hours" and the per-brand % column come from, given no time tracking exists? → A: **Option A** — consumed hours = done step-days × hours-per-step-day; the brand % column = done-days ÷ total-days. Purely derived from the `done` flag already on every step. No schema change, no time tracking, and the figure moves when someone ticks a step.
+- Q: What makes a step a milestone, given the plan only marks them by naming convention? → A: **Option A** — an explicit `milestone` flag on the step, toggled in the Projects tab. The plan import seeds it from the marker names already present (`GO LIVE`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES`, `DELIVERED …`) so nothing is lost on day one, but from then on it is explicit rather than inferred from capitalisation.
 
 ---
 
@@ -159,6 +166,15 @@ As an admin, I want to control how a planned day converts into hours, and over w
 - **FR-006**: The panel MUST show the count of planned steps in scope.
 - **FR-006a**: The panel MUST show **consumed hours**, computed as `done step-days × hours-per-step-day`, together with that figure as a percentage of expected hours and a proportional bar. "Consumed" means plan progress valued in hours; it MUST NOT be described or labelled as time worked, because no hours-worked data exists.
 - **FR-006b**: Consumed hours and every completion percentage MUST move as soon as a step's `done` flag changes, with no separate entry step.
+- **FR-006c**: The panel MUST show a **milestones** total for the scope, split into those still ahead (due date today or later, or undated) and those already passed (due date before today).
+
+**Milestones**
+
+- **FR-028**: A step MUST carry an explicit milestone flag, defaulting to off.
+- **FR-029**: An admin MUST be able to turn a step's milestone flag on or off from the Projects tab, alongside the step's other fields.
+- **FR-030**: The plan import MUST seed the flag for steps whose names follow the existing marker convention, and MUST NOT overwrite the flag on any step that already exists — the plan is edited in the app, and an import that reverted that would be worse than no import.
+- **FR-031**: Each brand row MUST show that brand's milestone count.
+- **FR-032**: A milestone step MUST still count as ordinary planned work in every days, hours and capacity figure. Flagging a step marks its significance; it does not remove it from the plan.
 
 **Brand rollup**
 
@@ -197,15 +213,15 @@ As an admin, I want to control how a planned day converts into hours, and over w
 **Honesty of the numbers**
 
 - **FR-026**: Where a figure is derived from an assumption rather than recorded fact, the panel MUST state the assumption alongside the figure.
-- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived and therefore included (FR-006a, FR-008). Milestones, deliverable/post counts, seniority and supervision overhead remain excluded unless resolved by a later clarification.
+- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived (FR-006a, FR-008); milestones are explicit (FR-028). Deliverable/post counts, seniority and supervision overhead remain excluded unless resolved by a later clarification.
 
 ### Key Entities
 
 - **Project**: a planned piece of work belonging to a brand, flagged Focus or not, with a due date. Already exists.
-- **Project step**: a unit of a project carrying a duration in days, an optional due date, an optional assignee and a done flag. Already exists. This is the atom of every figure in this feature.
+- **Project step**: a unit of a project carrying a duration in days, an optional due date, an optional assignee and a done flag. Already exists. This is the atom of every figure in this feature. **Gains one field**: a milestone flag, defaulting to off (FR-028).
 - **Member**: a person, with a role and a weekly capacity in hours. Already exists.
 - **Brand**: already exists, with a name and colour.
-- **Workload assumption**: the hours-per-step-day conversion and the capacity period. New, and the only new persisted data this feature requires.
+- **Workload assumption**: the hours-per-step-day conversion and the capacity period. New. Together with the step milestone flag, this is the whole of the new persisted data this feature requires.
 
 ---
 
@@ -239,7 +255,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 ## Out of Scope
 
 - **Time tracking** — capturing hours actually worked. The "consumed hours" tile is in scope (FR-006a) but is derived from completed step-days, not from tracked time.
-- Milestones as a first-class concept.
+- **Milestone dependencies, ordering or gating** — a milestone is a marked step, not a phase boundary that blocks anything.
 - Deliverable and "post" counts that join projects to pipeline tasks.
 - Seniority levels and any seniority-based effort multiplier.
 - Supervision overhead automatically added to a manager's load.
@@ -253,7 +269,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 Three decisions materially change what gets built. Each was put to the user with options; none is irreversible, and each is recorded here so it can be overturned deliberately rather than drifted away from.
 
-- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarification — consumed hours and completion percentages**, which turned out to be derivable from the `done` flag rather than requiring time tracking. Milestones, deliverables/posts, seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
+- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarifications — consumed hours, completion percentages and milestones**. The first two turned out to be derivable from the `done` flag rather than requiring time tracking; milestones already exist in the plan as a naming convention and need only one boolean to become explicit. Deliverables/posts, seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
 - **D2 — Capacity rows: one per person, plus an Unassigned row.** *Rationale*: the plan assigns to three named people, and each member already carries their own recorded weekly capacity. Grouping by role would produce the same rows with different labels today, while hiding which person inside a role is drowning. The Unassigned row is not optional — it carries 41% of the plan.
 - **D3 — Placement: a new "Workload" tab on the Projects board, admin-only.** *Rationale*: existing tabs stay untouched, and utilisation figures sit with management exactly as the Capacity view already does. A person's own card stays available to them on the team board.
 
