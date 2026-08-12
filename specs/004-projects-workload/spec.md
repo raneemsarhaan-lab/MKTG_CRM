@@ -38,19 +38,38 @@ So the calculation model in the mock is right and reproducible; the figures have
 1. **41% of the plan has no assignee.** 391 of 960 step-days are unassigned. Only three people carry any load at all (Samaa 164d, Yosra 276d, Salma 129d). A capacity view that silently omits unassigned work will tell the team they are half as busy as they are. Unassigned load MUST be visible, not dropped.
 2. **Not every step-day has a due date.** Samaa's months add to 134 of her 164 days; the other 30 sit on steps with no date and therefore no month. A month-by-month view MUST account for undated work rather than quietly losing it.
 
-### What the mock asks for that the system cannot supply
-
-Five elements of the mock have no source anywhere in the product today:
+### What the mock asks for beyond the plain rollups
 
 | Mock element | Status |
 |---|---|
-| **Consumed hours** ("102 · 5% of expected") | No time tracking exists. Nothing records hours worked. |
-| **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | No milestone concept exists on projects or steps. |
+| **Consumed hours** ("102 · 5% of expected") and the per-brand **% column** | **Derivable — no new data.** Proven against live data: see below. |
+| **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | No milestone flag exists; marker steps exist by naming convention only. |
 | **Deliverables** ("105 steps · 10 posts") | Steps exist; "posts" presumably means pipeline tasks, but the link between a brand's tasks and its projects is not defined. |
 | **Seniority** ("Video editor · Junior") | Members have a role, not a seniority level. |
 | **Supervision overhead** ("incl. 16d supervision") | No rule exists that adds review time to a manager's load. |
 
-Each is a separate feature, not a formatting detail. Scope is addressed in Q1 below.
+#### Consumed hours is not tracked time
+
+The mock was initially read as requiring time tracking, which does not exist in this product. It does not. Computing **done step-days** against the live plan reproduces the mock exactly:
+
+| Brand | done-days / total-days | Mock's % |
+|---|---|---|
+| Forefront | 0.0 / 94.0 = **0%** | 0% |
+| Islam Personal Branding | 0.0 / 84.0 = **0%** | 0% |
+| The Strategy Community | 0.0 / 224.0 = **0%** | 0% |
+| Omnisight | 17.0 / 24.0 = **71%** | 71% |
+
+All four match. And `17.0 done-days × 6h = 102h` — the mock's CONSUMED HOURS to the unit — with `17 / 366 ≈ 5%`, its exact caption. Four independent exact matches; this is the definition, not a coincidence.
+
+"Consumed" therefore means *plan progress valued in hours*, and it moves when someone ticks a step. It is in scope.
+
+---
+
+## Clarifications
+
+### Session 2026-08-12
+
+- Q: Where do "consumed hours" and the per-brand % column come from, given no time tracking exists? → A: **Option A** — consumed hours = done step-days × hours-per-step-day; the brand % column = done-days ÷ total-days. Purely derived from the `done` flag already on every step. No schema change, no time tracking, and the figure moves when someone ticks a step.
 
 ---
 
@@ -138,11 +157,13 @@ As an admin, I want to control how a planned day converts into hours, and over w
 - **FR-004**: The panel MUST show the number of projects in scope, split into active and completed.
 - **FR-005**: The panel MUST show total planned step-days in scope and the equivalent hours, stating the conversion used (e.g. "426 step-days × 8h").
 - **FR-006**: The panel MUST show the count of planned steps in scope.
+- **FR-006a**: The panel MUST show **consumed hours**, computed as `done step-days × hours-per-step-day`, together with that figure as a percentage of expected hours and a proportional bar. "Consumed" means plan progress valued in hours; it MUST NOT be described or labelled as time worked, because no hours-worked data exists.
+- **FR-006b**: Consumed hours and every completion percentage MUST move as soon as a step's `done` flag changes, with no separate entry step.
 
 **Brand rollup**
 
 - **FR-007**: The panel MUST list every brand that has at least one project in scope, plus a group for projects with no brand.
-- **FR-008**: Each brand row MUST show project count, planned days, planned hours, and the brand's share of the portfolio's planned days.
+- **FR-008**: Each brand row MUST show project count, planned days, planned hours, and a completion percentage computed as **done step-days ÷ total step-days** for that brand, with a proportional bar.
 - **FR-009**: Each brand row MUST carry the brand's own colour, consistent with how brands are identified elsewhere in the product.
 - **FR-010**: Brand rows MUST be ordered by planned days, heaviest first.
 
@@ -176,7 +197,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 **Honesty of the numbers**
 
 - **FR-026**: Where a figure is derived from an assumption rather than recorded fact, the panel MUST state the assumption alongside the figure.
-- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Milestones, consumed hours, deliverable/post counts, seniority and supervision overhead are excluded from this feature per Q1.
+- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived and therefore included (FR-006a, FR-008). Milestones, deliverable/post counts, seniority and supervision overhead remain excluded unless resolved by a later clarification.
 
 ### Key Entities
 
@@ -217,7 +238,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 ## Out of Scope
 
-- Time tracking and any "consumed hours" figure.
+- **Time tracking** — capturing hours actually worked. The "consumed hours" tile is in scope (FR-006a) but is derived from completed step-days, not from tracked time.
 - Milestones as a first-class concept.
 - Deliverable and "post" counts that join projects to pipeline tasks.
 - Seniority levels and any seniority-based effort multiplier.
@@ -232,7 +253,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 Three decisions materially change what gets built. Each was put to the user with options; none is irreversible, and each is recorded here so it can be overturned deliberately rather than drifted away from.
 
-- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup and per-person capacity. The five unsupported metrics (consumed hours, milestones, deliverables/posts, seniority, supervision overhead) are excluded per FR-027 and Out of Scope. *Rationale*: every one of them needs data the product does not collect; consumed hours in particular needs time tracking, which is a product decision and a team habit, not a tile. Shipping the honest subset gives the manager the answer they asked for — who is overloaded, which brand is heaviest — with every figure traceable.
+- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarification — consumed hours and completion percentages**, which turned out to be derivable from the `done` flag rather than requiring time tracking. Milestones, deliverables/posts, seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
 - **D2 — Capacity rows: one per person, plus an Unassigned row.** *Rationale*: the plan assigns to three named people, and each member already carries their own recorded weekly capacity. Grouping by role would produce the same rows with different labels today, while hiding which person inside a role is drowning. The Unassigned row is not optional — it carries 41% of the plan.
 - **D3 — Placement: a new "Workload" tab on the Projects board, admin-only.** *Rationale*: existing tabs stay untouched, and utilisation figures sit with management exactly as the Capacity view already does. A person's own card stays available to them on the team board.
 
