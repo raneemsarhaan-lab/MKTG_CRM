@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { initials } from '@/lib/utils'
-import { setStepDone, convertStepToTask, updateStep, addStep } from '@/actions/projects'
+import { setStepDone, convertStepToTask, updateStep, addStep, addSteps } from '@/actions/projects'
+import { looksLikeList, parsePastedList } from '@/lib/paste-list'
 import { isLate, todayISO } from '@/lib/projects'
 import {
   UI, TILE, font, card, control, input,
@@ -504,28 +505,78 @@ function NewTaskForm({ projects, members, defaultAssignee, onDone, onError }: {
   const [who, setWho]   = useState(defaultAssignee)
   const [due, setDue]   = useState('')
   const [days, setDays] = useState('1')
+  const [pasted, setPasted] = useState<string[] | null>(null)
   const [isPending, start] = useTransition()
 
+  const extra = () => ({
+    assignee_id: who || null,
+    due_date: due || null,
+    duration_days: parseFloat(days) || 1,
+  })
+
   function submit() {
-    if (!name.trim() || !proj) return
+    if (!proj) return
     onError('')
-    start(async () => {
-      const r = await addStep(proj, name, {
-        assignee_id: who || null,
-        due_date: due || null,
-        duration_days: parseFloat(days) || 1,
+
+    if (pasted) {
+      const names = pasted.filter(n => n.trim())
+      if (!names.length) return
+      start(async () => {
+        const r = await addSteps(proj, names, extra())
+        if (r.success) { setPasted(null); setName(''); setDue(''); onDone() }
+        else onError(r.error ?? 'Could not add those tasks')
       })
+      return
+    }
+
+    if (!name.trim()) return
+    start(async () => {
+      const r = await addStep(proj, name, extra())
       if (r.success) { setName(''); setDue(''); onDone() }
       else onError(r.error ?? 'Could not add that task')
     })
   }
 
+  /** A list on the clipboard becomes one task per line — see paste-list.ts
+   *  for why this has to happen in the paste event rather than in onChange. */
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData('text/plain')
+    if (!text || !looksLikeList(text)) return
+    e.preventDefault()
+    const { names } = parsePastedList(text)
+    setPasted(names)
+    setName('')
+    onError('')
+  }
+
   return (
     <div style={{ ...card, borderRadius: 18, padding: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
       <Labelled label="Task" grow>
-        <input value={name} onChange={e => setName(e.target.value)} autoFocus
-               onKeyDown={e => { if (e.key === 'Enter') submit() }}
-               placeholder="What needs doing?" style={{ ...input, width: '100%' }} />
+        {pasted ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, ...input,
+            width: '100%', background: UI.limeBg, borderColor: UI.limeCta,
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: UI.ink }}>
+              {pasted.filter(n => n.trim()).length} tasks pasted
+            </span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: UI.soft,
+                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {pasted.slice(0, 3).join(' · ')}{pasted.length > 3 ? ' …' : ''}
+            </span>
+            <button onClick={() => setPasted(null)} aria-label="Clear the pasted list"
+                    style={{ border: 'none', background: 'transparent', color: UI.redStrong,
+                             cursor: 'pointer', fontSize: 13, padding: 2 }}>
+              ✕
+            </button>
+          </div>
+        ) : (
+          <input value={name} onChange={e => setName(e.target.value)} autoFocus
+                 onKeyDown={e => { if (e.key === 'Enter') submit() }}
+                 onPaste={handlePaste}
+                 aria-label="Task name"
+                 placeholder="What needs doing? — or paste a list" style={{ ...input, width: '100%' }} />
+        )}
       </Labelled>
       <Labelled label="Project">
         <select value={proj} onChange={e => setProj(e.target.value)} style={{ ...input, width: 220 }}>

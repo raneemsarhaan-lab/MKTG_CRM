@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator } from '@/lib/authz'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
+import { MAX_PASTED } from '@/lib/paste-list'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 // ─── moveTask ───────────────────────────────────────────────────────────────
@@ -414,4 +415,66 @@ export async function createTask(
 
   revalidatePath('/board')
   return { success: true, id: task.id }
+}
+
+/**
+ * Create many tasks at once, from a pasted list.
+ *
+ * Everything except the name is shared: one brand, one owner, one due date.
+ * That is the whole point — a list arrives as names and nothing else, and
+ * filling the context once beats typing it twenty times.
+ *
+ * `createMany` rather than a loop of `createTask`: one permission check, one
+ * round trip, one revalidate. Two hundred sequential inserts through the
+ * single-task path would also fire two hundred `revalidatePath` calls.
+ */
+export async function createTasks(
+  names: string[],
+  shared: Omit<CreateTaskInput, 'name'>,
+): Promise<{ success: boolean; created?: number; error?: string }> {
+  const auth = await requireTaskCreator()
+  if (auth.error) return { success: false, error: auth.error }
+  const member = auth.member
+
+  const clean = names.map(n => n.trim()).filter(Boolean)
+  if (!clean.length) return { success: false, error: 'Nothing to create' }
+  if (clean.length > MAX_PASTED) {
+    return { success: false, error: `That is more than ${MAX_PASTED} tasks in one go` }
+  }
+  if (!shared.brand_id) return { success: false, error: 'Select a brand' }
+
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+  const nineStage = ws?.nine_stage_default ?? false
+  const now = new Date()
+  const due = new Date(shared.due_date)
+
+  try {
+    const result = await prisma.task.createMany({
+      data: clean.map(name => ({
+        name,
+        description:        shared.description?.trim() || null,
+        brand_id:           shared.brand_id,
+        content_type_label: shared.content_type_label || null,
+        platform:           shared.platform ?? null,
+        campaign:           shared.campaign ?? null,
+        task_owner_id:      shared.task_owner_id,
+        initiator_role:     member.role,
+        nine_stage:         nineStage,
+        status:             'todo',
+        stage_date:         now,
+        due_date:           due,
+        hours_estimate:     shared.hours_estimate ?? 0,
+        priority:           shared.priority ?? 'Medium',
+        cover_image_url:    shared.cover_image_url ?? null,
+        created_by:         member.id,
+      })),
+    })
+
+    revalidatePath('/board')
+    revalidatePath('/overview')
+    revalidatePath('/capacity')
+    return { success: true, created: result.count }
+  } catch (e: unknown) {
+    return { success: false, error: String(e).slice(0, 200) }
+  }
 }

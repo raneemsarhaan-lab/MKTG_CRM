@@ -3,11 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Member, Brand, ContentType } from '@/types/index'
-import { createTask } from '@/actions/tasks'
+import { createTask, createTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { COLORS } from '@/lib/tokens'
 import { FieldPill, PillOption, PillInput } from './FieldPill'
 import { shortDate } from '@/lib/myboard'
+import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
 
 /**
  * New task — intake modal.
@@ -57,6 +58,10 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
   const [error, setError] = useState('')
   const [showMore, setShowMore] = useState(false)
 
+  /** Non-null once a list has been pasted: one entry per task to create. */
+  const [bulk, setBulk] = useState<string[] | null>(null)
+  const [droppedCount, setDroppedCount] = useState(0)
+
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     name: '',
@@ -80,7 +85,51 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
     setForm(p => ({ ...p, [k]: v }))
   }
 
+  /**
+   * Catch a pasted list before the browser flattens it.
+   *
+   * Pasting multi-line text into `<input type="text">` does not give you the
+   * newlines — the browser joins or truncates the value, so by the time
+   * onChange fires the list is already gone. The clipboard has to be read in
+   * the paste event itself, which is why this cannot be done in onChange.
+   */
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData('text/plain')
+    if (!text || !looksLikeList(text)) return   // one name — behave as always
+    e.preventDefault()
+    const { names, dropped } = parsePastedList(text)
+    setBulk(names)
+    setDroppedCount(dropped)
+    setError('')
+  }
+
+  function submitBulk() {
+    const names = (bulk ?? []).map(n => n.trim()).filter(Boolean)
+    if (!names.length)     { setError('Nothing to create'); return }
+    if (!form.brand_id)    { setError('Select a brand'); return }
+    setError('')
+
+    startTransition(async () => {
+      const result = await createTasks(names, {
+        description:        form.description || undefined,
+        brand_id:           form.brand_id,
+        content_type_label: form.content_type_label,
+        platform:           form.platform,
+        task_owner_id:      form.task_owner_id,
+        due_date:           form.due_date,
+        hours_estimate:     form.hours_estimate,
+        priority:           form.priority,
+        campaign:           form.campaign || undefined,
+        cover_image_url:    form.cover_image_url || undefined,
+      })
+      if (!result.success) { setError(result.error ?? 'Failed to create those tasks'); return }
+      router.refresh()
+      setShowTaskForm(false)
+    })
+  }
+
   function submit(andAnother: boolean) {
+    if (bulk) { submitBulk(); return }
     if (!form.name.trim()) { setError('Task name is required'); return }
     if (!form.brand_id)    { setError('Select a brand'); return }
     setError('')
@@ -213,20 +262,30 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           </div>
 
           {/* ── Title ────────────────────────────────────────────────────── */}
-          <input
-            type="text"
-            value={form.name}
-            onChange={e => patch('name', e.target.value)}
-            placeholder="Task name"
-            autoFocus
-            aria-label="Task name"
-            style={{
-              width: '100%', fontSize: 22, fontWeight: 700, color: COLORS.ink,
-              background: 'transparent', border: 'none', outline: 'none',
-              fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
-              padding: '4px 0', marginBottom: 4,
-            }}
-          />
+          {bulk ? (
+            <BulkNames
+              names={bulk}
+              onChange={setBulk}
+              onCancel={() => setBulk(null)}
+              dropped={droppedCount}
+            />
+          ) : (
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => patch('name', e.target.value)}
+              onPaste={handlePaste}
+              placeholder="Task name — or paste a list"
+              autoFocus
+              aria-label="Task name"
+              style={{
+                width: '100%', fontSize: 22, fontWeight: 700, color: COLORS.ink,
+                background: 'transparent', border: 'none', outline: 'none',
+                fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
+                padding: '4px 0', marginBottom: 4,
+              }}
+            />
+          )}
 
           {/* ── Description ──────────────────────────────────────────────── */}
           <textarea
@@ -433,7 +492,11 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 fontFamily: 'var(--font-heading)', opacity: isPending ? 0.7 : 1,
               }}
             >
-              {isPending ? 'Creating…' : 'Create Task'}
+              {isPending
+                ? 'Creating…'
+                : bulk
+                  ? `Create ${bulk.filter(n => n.trim()).length} Tasks`
+                  : 'Create Task'}
             </button>
             <button
               type="button"
@@ -454,6 +517,98 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The pasted list, before it becomes tasks.
+ *
+ * Shown rather than created straight away. A paste is the one moment where a
+ * stray line or a heading the parser could not tell from a task is likely, and
+ * twenty wrong tasks are far more work to undo than to review — so every line
+ * is editable and removable first. Everything else on the form (brand, owner,
+ * due date, priority) applies to all of them, which is the point.
+ */
+function BulkNames({ names, onChange, onCancel, dropped }: {
+  names: string[]
+  onChange: (next: string[]) => void
+  onCancel: () => void
+  dropped: number
+}) {
+  const kept = names.filter(n => n.trim()).length
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 10, marginBottom: 8, flexWrap: 'wrap',
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, color: COLORS.ink,
+        }}>
+          {kept} task{kept === 1 ? '' : 's'} from your list
+        </span>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            border: 'none', background: 'transparent', color: COLORS.muted,
+            fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            textDecoration: 'underline', padding: 0,
+          }}
+        >
+          Back to a single task
+        </button>
+      </div>
+
+      <div style={{
+        maxHeight: 240, overflowY: 'auto', border: `1px solid ${COLORS.line}`,
+        borderRadius: 10, padding: 6, display: 'grid', gap: 4,
+      }}>
+        {names.map((n, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              width: 22, textAlign: 'right', fontSize: 11, fontWeight: 700,
+              color: COLORS.muted, flexShrink: 0, fontVariantNumeric: 'tabular-nums',
+            }}>
+              {i + 1}
+            </span>
+            <input
+              value={n}
+              aria-label={`Task ${i + 1} of ${names.length}`}
+              onChange={e => {
+                const next = [...names]
+                next[i] = e.target.value
+                onChange(next)
+              }}
+              style={{
+                flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: COLORS.ink,
+                background: '#F6F6F4', border: `1px solid ${COLORS.line}`, borderRadius: 7,
+                padding: '6px 9px', outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(names.filter((_, j) => j !== i))}
+              aria-label={`Remove "${n}"`}
+              title="Remove this line"
+              style={{
+                border: 'none', background: 'transparent', color: COLORS.coral,
+                cursor: 'pointer', fontSize: 13, padding: 4, flexShrink: 0, lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {dropped > 0 && (
+        <p role="alert" style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.coral, fontWeight: 600 }}>
+          Only the first {MAX_PASTED} lines were taken — {dropped} more were left out.
+        </p>
+      )}
     </div>
   )
 }

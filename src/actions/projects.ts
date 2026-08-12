@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireAdmin } from '@/lib/authz'
+import { MAX_PASTED } from '@/lib/paste-list'
 
 /**
  * Plan actions.
@@ -202,6 +203,61 @@ export async function addStep(
   })
   revalidateAll()
   return { success: true }
+}
+
+/**
+ * Add many steps at once, from a pasted list.
+ *
+ * The same permission rule as `addStep`, applied once rather than per name:
+ * anyone may add to their own list, only an admin may add to someone else's.
+ *
+ * Order is preserved. A pasted plan is written in the order it should happen,
+ * and shuffling it would make the paste worse than typing the steps out.
+ */
+export async function addSteps(
+  projectId: string,
+  names: string[],
+  extra?: { assignee_id?: string | null; due_date?: string | null; duration_days?: number },
+): Promise<Result & { created?: number }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const clean = names.map(n => n.trim()).filter(Boolean)
+  if (!clean.length) return { success: false, error: 'Nothing to add' }
+  if (clean.length > MAX_PASTED) {
+    return { success: false, error: `That is more than ${MAX_PASTED} steps in one go` }
+  }
+
+  let assignee = extra?.assignee_id ?? null
+  if (member.access !== 'admin' && assignee && assignee !== member.id) {
+    return { success: false, error: 'Only an admin can add work to someone else’s list.' }
+  }
+  if (member.access !== 'admin') assignee = assignee ?? member.id
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } })
+  if (!project) return { success: false, error: 'That project no longer exists' }
+
+  const last = await prisma.projectStep.findFirst({
+    where: { project_id: projectId }, orderBy: { sort_order: 'desc' }, select: { sort_order: true },
+  })
+  const base = (last?.sort_order ?? -1) + 1
+
+  try {
+    const result = await prisma.projectStep.createMany({
+      data: clean.map((name, i) => ({
+        project_id: projectId,
+        name,
+        assignee_id: assignee,
+        due_date: extra?.due_date ? new Date(extra.due_date) : null,
+        duration_days: extra?.duration_days ?? 1,
+        sort_order: base + i,
+      })),
+    })
+    revalidateAll()
+    return { success: true, created: result.count }
+  } catch (e: unknown) {
+    return { success: false, error: String(e).slice(0, 200) }
+  }
 }
 
 /** Projects a step can be added to, for the team board's "add task" form. */

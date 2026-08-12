@@ -11,9 +11,10 @@ import {
   trackOf, TRACK_STYLE, personColor, durationTone,
 } from '@/lib/board-ui'
 import { initials } from '@/lib/utils'
+import { looksLikeList, parsePastedList } from '@/lib/paste-list'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
-  convertStepToTask, addStep, removeStep, removeProject, createProject,
+  convertStepToTask, addStep, addSteps, removeStep, removeProject, createProject,
 } from '@/actions/projects'
 
 /**
@@ -575,7 +576,20 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <input value={newStep} onChange={e => setNewStep(e.target.value)}
                      onKeyDown={e => { if (e.key === 'Enter' && newStep.trim()) { act(() => addStep(p.id, newStep)); setNewStep('') } }}
-                     placeholder="Add a step…" style={{ ...input, flex: 1 }} />
+                     /* A pasted list becomes one step per line. No preview here,
+                        unlike the task form: the steps appear immediately in the
+                        list above, each already editable and removable, so the
+                        result is the review. */
+                     onPaste={e => {
+                       const text = e.clipboardData.getData('text/plain')
+                       if (!text || !looksLikeList(text)) return
+                       e.preventDefault()
+                       const { names } = parsePastedList(text)
+                       setNewStep('')
+                       act(() => addSteps(p.id, names))
+                     }}
+                     aria-label={`Add a step to ${p.name}`}
+                     placeholder="Add a step — or paste a list" style={{ ...input, flex: 1 }} />
               <button onClick={() => { if (newStep.trim()) { act(() => addStep(p.id, newStep)); setNewStep('') } }}
                       style={PRIMARY}>Add</button>
             </div>
