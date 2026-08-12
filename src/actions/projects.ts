@@ -79,13 +79,35 @@ export async function createProject(name: string, brandId?: string | null): Prom
   return { success: true }
 }
 
+/**
+ * Delete a project and everything under it.
+ *
+ * Steps cascade. A step that was pushed to the board leaves its task behind on
+ * purpose — the plan is being deleted, not the work already in flight.
+ *
+ * A project that came from data/projects-plan.json is also tombstoned. The
+ * plan importer runs on every container start and creates any key it cannot
+ * find, so without this the project — and all of its steps — would be back
+ * after the next deploy.
+ */
 export async function removeProject(projectId: string): Promise<Result> {
   const guard = await requireAdmin()
   if (guard.error) return { success: false, error: guard.error }
 
-  // Steps cascade. A step that was pushed to the board leaves its task behind
-  // on purpose — the plan is being deleted, not the work already in flight.
-  await prisma.project.delete({ where: { id: projectId } })
+  const p = await prisma.project.findUnique({
+    where: { id: projectId }, select: { key: true, name: true },
+  })
+  if (!p) return { success: false, error: 'That project no longer exists' }
+
+  await prisma.$transaction(async tx => {
+    await tx.project.delete({ where: { id: projectId } })
+    if (p.key) {
+      await tx.tombstone.createMany({
+        data: [{ kind: 'project', key: p.key, label: p.name }],
+        skipDuplicates: true,
+      })
+    }
+  })
   revalidateAll()
   return { success: true }
 }
@@ -193,10 +215,27 @@ export async function listProjectsForPicker(): Promise<{ id: string; name: strin
   return rows.map(r => ({ id: r.id, name: r.name, brandName: r.brand?.name ?? null }))
 }
 
+/** Tombstoned for the same reason as a project — see removeProject. A step
+ *  added in the app has no plan key and cannot be re-imported, so there is
+ *  nothing to record for those. */
 export async function removeStep(stepId: string): Promise<Result> {
   const guard = await requireAdmin()
   if (guard.error) return { success: false, error: guard.error }
-  await prisma.projectStep.delete({ where: { id: stepId } })
+
+  const s = await prisma.projectStep.findUnique({
+    where: { id: stepId }, select: { key: true, name: true },
+  })
+  if (!s) return { success: false, error: 'That step no longer exists' }
+
+  await prisma.$transaction(async tx => {
+    await tx.projectStep.delete({ where: { id: stepId } })
+    if (s.key) {
+      await tx.tombstone.createMany({
+        data: [{ kind: 'step', key: s.key, label: s.name }],
+        skipDuplicates: true,
+      })
+    }
+  })
   revalidateAll()
   return { success: true }
 }

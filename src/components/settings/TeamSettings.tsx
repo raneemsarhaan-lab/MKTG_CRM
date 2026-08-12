@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { COLORS, ACCESS_BADGE } from '@/lib/tokens'
 import { initials, avatarColor } from '@/lib/utils'
@@ -37,6 +38,7 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
   const [reassignTo, setReassignTo]       = useState('')
   const [removeError, setRemoveError]     = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   function handleAdd() {
     setAddError(null)
@@ -61,7 +63,7 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
     setRemoveError(null)
     startTransition(async () => {
       const result = await removeMember(member.id)
-      if (result.success) return
+      if (result.success) { router.refresh(); return }
       if (result.needsReassign) {
         setReassignTo('')
         setRemoveWarning({
@@ -82,7 +84,7 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
     setRemoveError(null)
     startTransition(async () => {
       const res = await removeMember(removeWarning.memberId, reassignTo)
-      if (res.success) setRemoveWarning(null)
+      if (res.success) { setRemoveWarning(null); router.refresh() }
       else setRemoveError(res.error ?? 'Could not remove that member')
     })
   }
@@ -349,6 +351,23 @@ interface MemberRowProps {
   onRemove: () => void
 }
 
+/** The editable fields of a member row, as held while being edited. */
+interface Draft {
+  name:            string
+  role:            string
+  capacity_hrs_wk: number
+  access:          'admin' | 'superuser' | 'user'
+  avatar_url:      string | null
+}
+
+const draftOf = (m: Member): Draft => ({
+  name:            m.name,
+  role:            m.role,
+  capacity_hrs_wk: m.capacity_hrs_wk,
+  access:          m.access as Draft['access'],
+  avatar_url:      m.avatar_url ?? null,
+})
+
 function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   const [isPending, startTransition] = useTransition()
   const [newPwd, setNewPwd] = useState('')
@@ -356,6 +375,61 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   const [issued, setIssued] = useState('')
   const pwdRef = useRef<HTMLInputElement>(null)
   const ac = ACCESS_BADGE[m.access] as { bg: string; text: string }
+
+  /**
+   * Edits are held here until Save.
+   *
+   * These fields used to write on blur. That is fine while everything
+   * succeeds, but `updateMember` can refuse — a duplicate email, an empty
+   * name — and a blur handler has nowhere to put the refusal, so the box kept
+   * showing a value the database had rejected. Tabbing between three fields
+   * also fired three separate writes. One button, one write, one answer.
+   */
+  const [draft, setDraft] = useState<Draft>(() => draftOf(m))
+  const [saveMsg, setSaveMsg] = useState('')
+  const [saveErr, setSaveErr] = useState('')
+
+  // Re-sync when the server sends a new value for this row — after a save, or
+  // after someone else changed it. Keyed on the values themselves so an edit
+  // in progress is not thrown away by an unrelated re-render.
+  useEffect(() => {
+    setDraft(draftOf(m))
+  }, [m.name, m.role, m.capacity_hrs_wk, m.access, m.avatar_url])
+
+  const dirty =
+    draft.name !== m.name ||
+    draft.role !== m.role ||
+    draft.capacity_hrs_wk !== m.capacity_hrs_wk ||
+    draft.access !== m.access ||
+    (draft.avatar_url ?? null) !== (m.avatar_url ?? null)
+
+  function handleSave() {
+    if (!dirty) return
+    setSaveErr(''); setSaveMsg('')
+    if (!draft.name.trim()) { setSaveErr('Name cannot be empty'); return }
+    if (!(draft.capacity_hrs_wk > 0)) { setSaveErr('Capacity must be at least 1 hour'); return }
+
+    startTransition(async () => {
+      const r = await updateMember(m.id, {
+        name:            draft.name.trim(),
+        role:            draft.role.trim(),
+        capacity_hrs_wk: draft.capacity_hrs_wk,
+        access:          draft.access,
+        avatar_url:      draft.avatar_url,
+      })
+      if (r.success) {
+        setSaveMsg('Saved')
+        setTimeout(() => setSaveMsg(''), 3000)
+      } else {
+        setSaveErr(r.error ?? 'Could not save those changes')
+      }
+    })
+  }
+
+  function set<K extends keyof Draft>(key: K, value: Draft[K]) {
+    setSaveErr(''); setSaveMsg('')
+    setDraft(d => ({ ...d, [key]: value }))
+  }
 
   /**
    * The value is read from the element, not from React state.
@@ -410,17 +484,14 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
     })
   }
 
-  const ownedStages = REVIEW_STAGES.filter(s => STAGE_META[s].owner_role === m.role)
-
-  function handleField(patch: Parameters<typeof updateMember>[1]) {
-    startTransition(async () => { await updateMember(m.id, patch) })
-  }
+  const ownedStages = REVIEW_STAGES.filter(s => STAGE_META[s].owner_role === draft.role)
 
   return (
     <div style={{
       padding: '14px 18px',
       borderTop: first ? 'none' : '1px solid #F6F6F4',
       opacity: isPending ? 0.6 : 1,
+      background: dirty ? '#FDFCF3' : 'transparent',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {/* Avatar — the photo when one is set, initials otherwise */}
@@ -431,10 +502,10 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           fontSize: '0.7rem', fontWeight: 700, flexShrink: 0,
         }}>
           <ImageWithFallback
-            src={m.avatar_url}
+            src={draft.avatar_url}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            fallback={<>{initials(m.name)}</>}
+            fallback={<>{initials(draft.name || m.name)}</>}
           />
         </div>
 
@@ -442,13 +513,10 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
-              defaultValue={m.name}
+              value={draft.name}
               aria-label={`Name of ${m.name}`}
-              onBlur={e => {
-                const v = e.target.value.trim()
-                if (v && v !== m.name) handleField({ name: v })
-                else e.target.value = m.name
-              }}
+              onChange={e => set('name', e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
               style={{
                 fontWeight: 700, fontSize: '0.87rem', color: 'var(--ink)',
                 background: 'transparent', border: '1px solid transparent',
@@ -456,16 +524,16 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
                 outline: 'none', fontFamily: 'inherit', minWidth: 0, flex: 1,
               }}
               onFocus={e => (e.target.style.borderColor = 'var(--line)')}
-              onBlurCapture={e => (e.target.style.borderColor = 'transparent')}
+              onBlur={e => (e.target.style.borderColor = 'transparent')}
             />
             {isYou && <span style={{ fontWeight: 400, fontSize: '0.7rem', color: 'var(--muted)' }}>(you)</span>}
           </div>
           <input
-            defaultValue={m.role}
+            value={draft.role}
             placeholder="Role"
-            onBlur={e => {
-              if (e.target.value !== m.role) handleField({ role: e.target.value })
-            }}
+            aria-label={`Role of ${m.name}`}
+            onChange={e => set('role', e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
             style={{
               fontSize: '0.72rem', marginTop: 2, outline: 'none',
               background: 'transparent', border: 'none', width: '100%',
@@ -478,11 +546,10 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <input
             type="number" min={1} max={168}
-            defaultValue={m.capacity_hrs_wk}
-            onBlur={e => {
-              const val = parseInt(e.target.value, 10)
-              if (!isNaN(val) && val > 0 && val !== m.capacity_hrs_wk) handleField({ capacity_hrs_wk: val })
-            }}
+            value={draft.capacity_hrs_wk}
+            aria-label={`Weekly capacity of ${m.name} in hours`}
+            onChange={e => set('capacity_hrs_wk', parseInt(e.target.value, 10) || 0)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
             title="Weekly capacity (hours)"
             style={{
               width: 52, textAlign: 'center', fontSize: '0.82rem', fontWeight: 600,
@@ -495,8 +562,9 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
 
         {/* Access select */}
         <select
-          defaultValue={m.access}
-          onChange={e => handleField({ access: e.target.value as 'admin' | 'superuser' | 'user' })}
+          value={draft.access}
+          aria-label={`Access level of ${m.name}`}
+          onChange={e => set('access', e.target.value as Draft['access'])}
           style={{
             fontSize: '0.75rem', padding: '5px 8px', borderRadius: 7,
             border: '1px solid var(--line)', background: '#F6F6F4',
@@ -529,10 +597,51 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           {m.access === 'admin' ? 'Admin' : m.access === 'superuser' ? 'Super User' : 'User'}
         </span>
 
+        {/* Save — the row's fields, its photo and its access level all go in
+            one write. Enabled only when something actually changed, so the
+            row can be read without wondering whether it is mid-edit. */}
+        <button
+          onClick={handleSave}
+          disabled={!dirty || isPending}
+          // Sixteen buttons on this page all read "Save". The label names the
+          // person so a screen reader announces which row it belongs to.
+          aria-label={`Save changes to ${m.name}`}
+          title={dirty ? `Save changes to ${m.name}` : 'No unsaved changes'}
+          style={{
+            fontSize: '0.7rem', padding: '6px 14px', borderRadius: 7,
+            background: dirty ? '#4B7A12' : '#EFEFEC',
+            color: dirty ? '#fff' : 'var(--muted)', border: 'none',
+            cursor: dirty && !isPending ? 'pointer' : 'default',
+            fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap',
+            flexShrink: 0, opacity: isPending ? 0.5 : 1,
+          }}
+        >
+          {isPending ? 'Saving…' : 'Save'}
+        </button>
+        {dirty && (
+          <button
+            onClick={() => { setDraft(draftOf(m)); setSaveErr(''); setSaveMsg('') }}
+            disabled={isPending}
+            aria-label={`Discard unsaved changes to ${m.name}`}
+            title={`Discard unsaved changes to ${m.name}`}
+            style={{
+              fontSize: '0.7rem', padding: '6px 10px', borderRadius: 7,
+              background: 'transparent', color: 'var(--muted)', border: '1px solid var(--line)',
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            Discard
+          </button>
+        )}
+
         {/* Remove */}
         <button
           onClick={isYou ? undefined : onRemove}
           disabled={isYou}
+          // "✕" is the whole button, so without a label every row's remove
+          // control announces itself identically.
+          aria-label={isYou ? "Can't remove yourself" : `Remove ${m.name}`}
           title={isYou ? "Can't remove yourself" : `Remove ${m.name}`}
           style={{
             border: 'none', background: 'transparent',
@@ -544,6 +653,22 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
           ✕
         </button>
       </div>
+
+      {/* Save state. The error matters most: an edit that used to be written
+          on blur could be refused — a duplicate email, an empty name — with
+          nowhere to say so, leaving the box showing a value the database had
+          rejected. */}
+      {(saveErr || saveMsg || dirty) && (
+        <div
+          role={saveErr ? 'alert' : undefined}
+          style={{
+            marginTop: 6, paddingLeft: 46, fontSize: '0.7rem', fontWeight: 700,
+            color: saveErr ? COLORS.coral : saveMsg ? '#4B7A12' : '#8A6414',
+          }}
+        >
+          {saveErr || (saveMsg ? `✓ ${saveMsg}` : 'Unsaved changes — press Save.')}
+        </div>
+      )}
 
       {/* Reset password */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
@@ -602,13 +727,14 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
             URL rather than a file. */}
         <div style={{ width: 210, minWidth: 0 }}>
           <ImageUpload
-            value={m.avatar_url ?? null}
+            value={draft.avatar_url}
             max={192}
             round
             disabled={isPending}
-            onChange={v => handleField({ avatar_url: v })}
+            onChange={v => set('avatar_url', v)}
           />
         </div>
+
       </div>
 
       {/* The generated password, shown once. It is not stored anywhere in

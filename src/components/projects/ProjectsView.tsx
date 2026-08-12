@@ -13,7 +13,7 @@ import {
 import { initials } from '@/lib/utils'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
-  convertStepToTask, addStep, removeStep, createProject,
+  convertStepToTask, addStep, removeStep, removeProject, createProject,
 } from '@/actions/projects'
 
 /**
@@ -475,6 +475,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
   const [open, setOpen] = useState(false)
   const [isPending, start] = useTransition()
   const [newStep, setNewStep] = useState('')
+  const [confirming, setConfirming] = useState(false)
   const s = statsOf(p, today)
 
   function act(fn: () => Promise<{ success: boolean; error?: string }>) {
@@ -530,7 +531,38 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
         )}
 
         <FocusStar project={p} isAdmin={isAdmin} onError={onError} />
+
+        {isAdmin && (
+          <button onClick={() => setConfirming(true)} aria-label={`Remove ${p.name}`}
+                  title={`Remove ${p.name}`}
+                  style={{ border: 'none', background: 'transparent', color: UI.redStrong,
+                           cursor: 'pointer', fontSize: 13, padding: 3, flexShrink: 0 }}>
+            ✕
+          </button>
+        )}
       </div>
+
+      {/* Deleting a project takes every step with it, which a step's own ✕
+          does not — so this one asks first, and says how much goes. */}
+      {confirming && (
+        <div role="alertdialog" aria-label={`Remove ${p.name}?`}
+             style={{
+               borderTop: `1px solid ${UI.groupLine}`, background: '#FEF6F7',
+               padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+             }}>
+          <span style={{ flex: 1, fontWeight: 600, fontSize: 12.5, color: UI.textPrimary, minWidth: 220 }}>
+            Remove <strong>{p.name}</strong>
+            {s.total > 0 && <> and its {s.total} step{s.total === 1 ? '' : 's'}</>}?
+            {' '}This cannot be undone.
+            {p.steps.some(st => st.taskId) && ' Steps already on the board keep their tasks.'}
+          </span>
+          <button onClick={() => { setConfirming(false); act(() => removeProject(p.id)) }}
+                  style={{ ...PILL, background: UI.redStrong, color: '#FFFFFF', border: 'none', fontWeight: 700 }}>
+            Remove project
+          </button>
+          <button onClick={() => setConfirming(false)} style={PILL}>Cancel</button>
+        </div>
+      )}
 
       {open && (
         <div style={{ borderTop: `1px solid ${UI.groupLine}`, background: UI.groupBg, padding: '12px 14px 14px 40px', display: 'grid', gap: 6 }}>

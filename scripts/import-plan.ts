@@ -79,16 +79,28 @@ async function main() {
       .map(s => s.key!),
   )
 
-  let created = 0, addedSteps = 0, skipped = 0
+  // Projects and steps an admin deleted in the app. "Not in the database" and
+  // "deleted on purpose" look identical from here, and creating whatever is
+  // missing would undo the deletion on every deploy.
+  const tombs = await prisma.tombstone.findMany({
+    where: { kind: { in: ['project', 'step'] } },
+    select: { kind: true, key: true },
+  })
+  const deadProjects = new Set(tombs.filter(t => t.kind === 'project').map(t => t.key))
+  const deadSteps    = new Set(tombs.filter(t => t.kind === 'step').map(t => t.key))
+
+  let created = 0, addedSteps = 0, skipped = 0, removed = 0
 
   for (const [i, p] of plan.projects.entries()) {
+    if (deadProjects.has(p.key)) { removed++; continue }
+
     if (existing.has(p.key)) {
       // Already here and possibly edited. Only fill in steps that are new to
       // the plan, never touch the project row itself.
       const row = await prisma.project.findUnique({ where: { key: p.key }, select: { id: true } })
       if (row) {
         for (const [j, s] of p.steps.entries()) {
-          if (existingSteps.has(s.key)) continue
+          if (existingSteps.has(s.key) || deadSteps.has(s.key)) continue
           await prisma.projectStep.create({
             data: {
               key: s.key, project_id: row.id, name: s.name,
@@ -115,7 +127,7 @@ async function main() {
         focus: p.focus,
         sort_order: i,
         steps: {
-          create: p.steps.map((s, j) => ({
+          create: p.steps.filter(s => !deadSteps.has(s.key)).map((s, j) => ({
             key: s.key, name: s.name,
             duration_days: s.duration_days,
             due_date: s.due_date ? new Date(s.due_date) : null,
@@ -127,13 +139,14 @@ async function main() {
       },
     })
     created++
-    addedSteps += p.steps.length
+    addedSteps += p.steps.filter(s => !deadSteps.has(s.key)).length
   }
 
   const unbranded = await prisma.project.count({ where: { brand_id: null } })
   console.log(
     `✅ Plan loaded — ${created} projects created, ${skipped} already present, ` +
     `${addedSteps} steps added.` +
+    (removed ? ` ${removed} project(s) skipped — removed in the app.` : '') +
     (unbranded ? ` ${unbranded} project(s) have no brand — set them under Unassigned.` : ''),
   )
 }

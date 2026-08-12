@@ -81,7 +81,19 @@ async function main() {
     { name: 'Graphic Designer',             email: 'design@forefront.consulting',  role: 'Graphic Designer',            access: 'user',      capacity_hrs_wk: 40, status: 'Available' },
     { name: 'Video Editor',                 email: 'video@forefront.consulting',   role: 'Video Editor',                access: 'user',      capacity_hrs_wk: 40, status: 'Available' },
   ]
+  // Accounts removed in the app. The seed runs on every container start and
+  // re-creates whatever is missing, which is exactly what made a removed
+  // member come back after a deploy.
+  const removedEmails = new Set(
+    (await prisma.tombstone.findMany({ where: { kind: 'member' }, select: { key: true } }))
+      .map(t => t.key),
+  )
+
   for (const m of members) {
+    if (removedEmails.has(m.email)) {
+      console.log(`  – skipping ${m.email} — removed in the app`)
+      continue
+    }
     // The admin account gets its own password; the rest still share the
     // default until they are rotated (HANDOVER §14).
     const password_hash = m.access === 'admin' ? adminPassword : defaultPassword
