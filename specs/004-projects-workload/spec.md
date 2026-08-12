@@ -110,6 +110,7 @@ Utilisation is measured on **effort** days, because that is the honest answer to
 - Q: What counts as a "deliverable", and what is a "post" in "105 steps · 10 posts"? → A: **Option D — drop it.** The deliverables tile is not built. A workable derivation existed (every step in scope, split by whether it has reached the pipeline board via `ProjectStep.task_id`), but the count answers no question the manager asked: the steps figure is already shown, and the split adds a number without a decision attached to it.
 - Q: Should seniority and supervision overhead change the capacity maths, or are they labels? → A: **Option C** — both change the maths. A member carries a seniority level that scales the effort their assigned work costs, and a supervisor's row carries overhead hours for work they review but were never assigned. This introduces the first figures on the panel that are not a direct sum of the plan, which is why the panel must now separate **plan days** from **effort days** — see below.
 - Q: How is supervision overhead calculated? → A: **Per step, not per person**, given as a rule: *if the assignee's level needs supervision and the step is not simple, `adjusted = days × factor` (1.8× for complex work) and `supervision = adjusted × 0.25`.* Three consequences: the seniority multiplier applies **only to complex steps** rather than to all of a person's work; supervision is a share of the **adjusted** figure, not the planned one; and steps now need a notion of simple versus complex, which does not exist in the data — resolved by a configurable duration threshold with a per-step override (FR-045).
+- Q: Who receives the supervision hours the rule generates? → A: **The Marketing Manager.** Recorded as a configurable supervising *role* defaulting to Marketing Manager, rather than a hardcoded person — the product already resolves reviewers this way for the pipeline's review stages, and a named person would break the first time someone changed job. Resolves the item deferred at the end of the clarification session (FR-048–FR-051).
 - Q: What makes a step a milestone, given the plan only marks them by naming convention? → A: **Option A** — an explicit `milestone` flag on the step, toggled in the Projects tab. The plan import seeds it from the marker names already present (`GO LIVE`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES`, `DELIVERED …`) so nothing is lost on day one, but from then on it is explicit rather than inferred from capitalisation.
 
 ---
@@ -248,6 +249,13 @@ As an admin, I want to control how a planned day converts into hours, and over w
 - **FR-040**: The rule and the rates in force MUST be visible from the panel. No rate may be hardcoded.
 - **FR-041**: Supervision MUST NOT be counted twice: the reviewed work stays with the person it is assigned to, and the supervisor's overhead is additional effort, not a transfer. A step's plan days are counted exactly once, on the assignee.
 - **FR-042**: A workspace where nobody carries a supervision rate MUST show no overhead anywhere, rather than a zero component on every row.
+
+**Who supervision lands on**
+
+- **FR-048**: Supervision overhead MUST accrue to the member holding the **supervising role**, which MUST be configurable and MUST default to *Marketing Manager*. It MUST NOT be pinned to a named person — the product already resolves review-stage owners by role, and a named person breaks the first time someone changes job.
+- **FR-049**: Where more than one member holds the supervising role, the overhead MUST be divided evenly between them and the division MUST be stated on the row, so a shared figure is never mistaken for an individual one.
+- **FR-050**: Where **no** member holds the supervising role, the overhead MUST still appear, as an unattributed supervision row. Work that needs supervising and has no supervisor is a finding, not a rounding error, and must not disappear because the recipient is missing.
+- **FR-051**: A member MUST NOT supervise their own work. Steps assigned to a holder of the supervising role generate no overhead, so the figure cannot feed on itself.
 
 **Step complexity**
 

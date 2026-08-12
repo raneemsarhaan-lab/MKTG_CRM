@@ -52,7 +52,9 @@ Five questions asked and answered; the spec grew from 27 to 47 functional requir
 - **Seniority and supervision** change the maths, which breaks reconciliation. Resolved by carrying plan days and effort days separately (FR-043, FR-044): utilisation is measured on effort, reconciliation is checked on plan.
 - **The supervision rule** was given as code and validated against live data — the video editor's 33 complex days give 14.8d against the mock's 16d. It introduces step complexity, which no field supplies; FR-045–FR-047 default it to a configurable duration threshold with a per-step override.
 
-**One item is now outstanding**: FR-038 computes the supervision amount but does not say **who receives it**. The mock puts it on "Marketing manager"; with several admins in this workspace that is ambiguous, and putting hours on the wrong person's row is worse than showing none. This needs answering before implementation. The question quota (5) was reached, so it is deferred rather than guessed.
+**The deferred item is now closed.** Supervision accrues to the Marketing Manager, recorded as a configurable supervising *role* rather than a named person (FR-048–FR-051), matching how the product already resolves review-stage owners. Three edge cases are specified rather than left to the implementation: the role held by several people (split evenly, and say so), the role held by nobody (show it unattributed — unsupervised work is a finding, not a rounding error), and self-supervision (excluded, so the figure cannot feed on itself).
+
+**Still unasked, lower impact**: the two greyed rows in the mock, "Islam & client approvals" and "External waits (print, guests, clients)". Nothing in the data marks a step as an approval or a wait, and the Unassigned row already accounts for the days. Worth revisiting only if those categories earn their own treatment.
 
 **Downstream artifacts are now stale.** `plan.md`, `research.md`, `data-model.md` and `contracts/workload.md` were written against the pre-clarification spec and do not know about milestones, seniority, supervision, complexity or the plan/effort split. Re-run `/speckit-plan` before `/speckit-tasks`.
 
