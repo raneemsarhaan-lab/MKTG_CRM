@@ -42,7 +42,21 @@
 
 **Resolution of the open marker**: FR-021 (who may see whose numbers) was put to the user with three options. It is now settled by D3 — admin-only, matching the existing Capacity view — and recorded under Decisions Taken so it can be overturned deliberately rather than drifting. The two alternatives are preserved in the conversation that produced this spec.
 
+## Clarification session 2026-08-12
+
+Five questions asked and answered; the spec grew from 27 to 47 functional requirements. Two answers reversed Phase 0 conclusions and one cost the spec a property:
+
+- **Consumed hours** was excluded as "needs time tracking". It does not — it is done step-days valued in hours, and reproduces the mock's four brand percentages and its 102h figure exactly. Now FR-006a/FR-006b/FR-008.
+- **Milestones** are in, as an explicit flag seeded from the plan's existing marker names (FR-028–FR-032).
+- **Deliverables** dropped by choice, not for lack of a source — recorded so its absence is not later "fixed".
+- **Seniority and supervision** change the maths, which breaks reconciliation. Resolved by carrying plan days and effort days separately (FR-043, FR-044): utilisation is measured on effort, reconciliation is checked on plan.
+- **The supervision rule** was given as code and validated against live data — the video editor's 33 complex days give 14.8d against the mock's 16d. It introduces step complexity, which no field supplies; FR-045–FR-047 default it to a configurable duration threshold with a per-step override.
+
+**One item is now outstanding**: FR-038 computes the supervision amount but does not say **who receives it**. The mock puts it on "Marketing manager"; with several admins in this workspace that is ambiguous, and putting hours on the wrong person's row is worse than showing none. This needs answering before implementation. The question quota (5) was reached, so it is deferred rather than guessed.
+
+**Downstream artifacts are now stale.** `plan.md`, `research.md`, `data-model.md` and `contracts/workload.md` were written against the pre-clarification spec and do not know about milestones, seniority, supervision, complexity or the plan/effort split. Re-run `/speckit-plan` before `/speckit-tasks`.
+
 ## Notes
 
-- All checklist items pass. Spec is ready for `/speckit-plan`.
+- All checklist items pass on the spec itself.
 - The three decisions (D1 scope, D2 capacity grouping, D3 placement) are defaults taken so planning was not blocked. If any is overturned, revise the spec before implementation rather than patching it downstream.

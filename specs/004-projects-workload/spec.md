@@ -83,7 +83,20 @@ The resolution is to carry both figures rather than replace one with the other:
 | Figure | Meaning | Reconciles to the plan? |
 |---|---|---|
 | **Plan days** | The step durations as planned | **Yes** — always. Rows + unassigned = portfolio total. |
-| **Effort days** | Plan days × seniority multiplier, plus supervision overhead | No, and is not meant to. This is the load estimate. |
+| **Effort days** | `simple days + (complex days × factor)`, plus supervision overhead | No, and is not meant to. This is the load estimate. |
+
+The rule as given is per step, not per person:
+
+```
+if (level needs supervision && !isSimple(step)) {
+  adjusted    = days × factor      // 1.8× for complex work
+  supervision = adjusted × 0.25    // 25% of the junior's time
+}
+```
+
+Two things follow that are easy to miss. The factor applies **only to complex steps** — a simple step costs its planned duration whoever holds it, because the premium is for difficulty, not for existing. And supervision is a share of the **adjusted** figure, so it compounds with the factor rather than sitting beside it.
+
+This also introduces the one thing the rule needs that the data does not have: a notion of simple versus complex. Rather than requiring 327 steps to be tagged before the panel works, classification defaults to a configurable duration threshold, with a per-step override for the cases the threshold gets wrong (FR-045, FR-046).
 
 Utilisation is measured on **effort** days, because that is the honest answer to "can this person absorb this". Reconciliation is checked on **plan** days, because that is what the plan actually says. Every adjusted figure must be able to show its unadjusted origin, so an admin can always see how much of a person's load is the plan and how much is an assumption the workspace configured.
 
@@ -96,6 +109,7 @@ Utilisation is measured on **effort** days, because that is the honest answer to
 - Q: Where do "consumed hours" and the per-brand % column come from, given no time tracking exists? → A: **Option A** — consumed hours = done step-days × hours-per-step-day; the brand % column = done-days ÷ total-days. Purely derived from the `done` flag already on every step. No schema change, no time tracking, and the figure moves when someone ticks a step.
 - Q: What counts as a "deliverable", and what is a "post" in "105 steps · 10 posts"? → A: **Option D — drop it.** The deliverables tile is not built. A workable derivation existed (every step in scope, split by whether it has reached the pipeline board via `ProjectStep.task_id`), but the count answers no question the manager asked: the steps figure is already shown, and the split adds a number without a decision attached to it.
 - Q: Should seniority and supervision overhead change the capacity maths, or are they labels? → A: **Option C** — both change the maths. A member carries a seniority level that scales the effort their assigned work costs, and a supervisor's row carries overhead hours for work they review but were never assigned. This introduces the first figures on the panel that are not a direct sum of the plan, which is why the panel must now separate **plan days** from **effort days** — see below.
+- Q: How is supervision overhead calculated? → A: **Per step, not per person**, given as a rule: *if the assignee's level needs supervision and the step is not simple, `adjusted = days × factor` (1.8× for complex work) and `supervision = adjusted × 0.25`.* Three consequences: the seniority multiplier applies **only to complex steps** rather than to all of a person's work; supervision is a share of the **adjusted** figure, not the planned one; and steps now need a notion of simple versus complex, which does not exist in the data — resolved by a configurable duration threshold with a per-step override (FR-045).
 - Q: What makes a step a milestone, given the plan only marks them by naming convention? → A: **Option A** — an explicit `milestone` flag on the step, toggled in the Projects tab. The plan import seeds it from the marker names already present (`GO LIVE`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES`, `DELIVERED …`) so nothing is lost on day one, but from then on it is explicit rather than inferred from capitalisation.
 
 ---
@@ -222,18 +236,24 @@ As an admin, I want to control how a planned day converts into hours, and over w
 **Seniority**
 
 - **FR-033**: A member MUST carry a seniority level — junior, mid or senior — defaulting to mid, editable by an admin in Team settings.
-- **FR-034**: Each level MUST carry an effort multiplier configurable by an admin. Mid is fixed at 1.0 and is the reference; junior and senior default to 1.25 and 0.85 respectively. Multipliers MUST be shown wherever they are applied, never buried in a settings page.
-- **FR-035**: A member's effort days MUST equal their plan days × their level's multiplier. Their plan days MUST remain visible alongside.
+- **FR-034**: Each level MUST carry an effort factor and a supervision rate, both configurable by an admin. Defaults: senior 1.0 / 0%, mid 1.0 / 0%, junior **1.8 / 25%**. Both MUST be shown wherever they change a number, never buried in a settings page.
+- **FR-035**: The effort factor MUST apply **only to steps classified complex**. A simple step costs its planned duration whoever holds it — the premium is for difficulty, not for existing. A member's effort days therefore equal `simple days + (complex days × factor)`, with their plan days visible alongside.
 - **FR-036**: Seniority MUST NOT alter brand rollups, portfolio totals or milestone counts. It describes how long a person takes, not how much work the plan contains.
 - **FR-037**: A member's seniority MUST appear on their capacity row and on their person card, so an adjusted number is never shown without its cause.
 
 **Supervision overhead**
 
-- **FR-038**: A supervisor's row MUST include overhead days for work they review but were not assigned, added on top of their own plan days.
-- **FR-039**: The overhead MUST be shown as a distinct component of that row — "112d incl. 16d supervision" — and never silently folded into the total.
-- **FR-040**: Supervision overhead MUST be derived from a stated, configurable rule rather than a hardcoded constant, and the rule in force MUST be visible from the panel.
-- **FR-041**: Supervision overhead MUST NOT be counted twice: the reviewed work stays with the person it is assigned to, and the supervisor's overhead is additional effort, not a transfer.
-- **FR-042**: A workspace with no supervision configured MUST show no overhead anywhere, rather than a zero component on every row.
+- **FR-038**: Supervision MUST be computed **per step**, not per person, as `supervision days = adjusted days × the assignee's supervision rate`, where `adjusted days` is the step's duration after the effort factor. A step generates supervision only when it is classified complex **and** its assignee's level carries a non-zero supervision rate.
+- **FR-039**: A supervisor's row MUST show its overhead as a distinct component — "112d incl. 16d supervision" — never silently folded into the total.
+- **FR-040**: The rule and the rates in force MUST be visible from the panel. No rate may be hardcoded.
+- **FR-041**: Supervision MUST NOT be counted twice: the reviewed work stays with the person it is assigned to, and the supervisor's overhead is additional effort, not a transfer. A step's plan days are counted exactly once, on the assignee.
+- **FR-042**: A workspace where nobody carries a supervision rate MUST show no overhead anywhere, rather than a zero component on every row.
+
+**Step complexity**
+
+- **FR-045**: Every step MUST be classified simple or complex. Since no such marker exists in the data, classification MUST default to a **configurable duration threshold** — a step at or below the threshold is simple — so the feature works on day one with nothing tagged by hand.
+- **FR-046**: An admin MUST be able to override the classification on an individual step, and an overridden step MUST NOT be reclassified when the threshold changes.
+- **FR-047**: The threshold in force and the resulting simple/complex split MUST be visible on the panel, because it moves every effort and supervision figure.
 
 **Reconciliation of adjusted figures**
 
@@ -259,10 +279,10 @@ As an admin, I want to control how a planned day converts into hours, and over w
 ### Key Entities
 
 - **Project**: a planned piece of work belonging to a brand, flagged Focus or not, with a due date. Already exists.
-- **Project step**: a unit of a project carrying a duration in days, an optional due date, an optional assignee and a done flag. Already exists. This is the atom of every figure in this feature. **Gains one field**: a milestone flag, defaulting to off (FR-028).
+- **Project step**: a unit of a project carrying a duration in days, an optional due date, an optional assignee and a done flag. Already exists. This is the atom of every figure in this feature. **Gains two fields**: a milestone flag defaulting to off (FR-028), and an optional complexity override, absent by default so the duration threshold decides (FR-045, FR-046).
 - **Member**: a person, with a role and a weekly capacity in hours. Already exists. **Gains one field**: a seniority level, defaulting to mid (FR-033).
 - **Brand**: already exists, with a name and colour.
-- **Workload assumption**: the hours-per-step-day conversion, the capacity period, the seniority multipliers and the supervision rule. New. Together with the step milestone flag and the member seniority level, this is the whole of the new persisted data this feature requires.
+- **Workload assumption**: the hours-per-step-day conversion, the capacity period, the per-level effort factors and supervision rates, and the complexity threshold. New. Together with the step's milestone flag and complexity override and the member's seniority level, this is the whole of the new persisted data this feature requires.
 
 ---
 
