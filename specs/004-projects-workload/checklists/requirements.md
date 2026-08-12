@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **1 remaining (FR-021), pending Q3**
+- [x] No [NEEDS CLARIFICATION] markers remain — resolved by D3 (admin-only panel)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -40,8 +40,9 @@
 
 **Five mock elements have no data source** — consumed hours, milestones, deliverable/post counts, seniority, supervision overhead. Excluded via FR-027 and Out of Scope, pending Q1.
 
-**Remaining marker**: FR-021 (who may see whose numbers) is genuinely undecidable without the user — it is the difference between an admin planning tool and a team transparency view, and both are defensible. Held for Q3 rather than guessed.
+**Resolution of the open marker**: FR-021 (who may see whose numbers) was put to the user with three options. It is now settled by D3 — admin-only, matching the existing Capacity view — and recorded under Decisions Taken so it can be overturned deliberately rather than drifting. The two alternatives are preserved in the conversation that produced this spec.
 
 ## Notes
 
-- Items marked incomplete require spec updates before `/speckit-plan`.
+- All checklist items pass. Spec is ready for `/speckit-plan`.
+- The three decisions (D1 scope, D2 capacity grouping, D3 placement) are defaults taken so planning was not blocked. If any is overturned, revise the spec before implementation rather than patching it downstream.

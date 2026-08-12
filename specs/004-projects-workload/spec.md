@@ -164,7 +164,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 **Permissions**
 
-- **FR-021**: A non-admin MUST be able to see their own workload card. Whether they can see other people's cards, the brand rollup, or the whole-team capacity section is [NEEDS CLARIFICATION: see Q3 — this determines whether the panel is an admin-only planning view or a team-wide transparency view].
+- **FR-021**: The workload panel — portfolio totals, brand rollup and whole-team capacity — MUST be admin-only, consistent with the existing Capacity view. A non-admin MUST NOT see other people's utilisation. Their own workload card remains available to them on the team board.
 - **FR-022**: Changing the calculation assumptions (FR-023) MUST be restricted to admins; every other viewer sees the assumptions as read-only text.
 
 **Assumptions and settings**
@@ -228,10 +228,12 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 ---
 
-## Open Questions
+## Decisions Taken
 
-Three decisions materially change what gets built. Each is presented with options in the accompanying request to the user.
+Three decisions materially change what gets built. Each was put to the user with options; none is irreversible, and each is recorded here so it can be overturned deliberately rather than drifted away from.
 
-- **Q1 — Scope**: build only what current data supports, or introduce the missing concepts (milestones, time tracking, deliverables, seniority)?
-- **Q2 — Capacity grouping**: group capacity rows by person, or by role as the mock shows?
-- **Q3 — Placement and permissions**: where the panel sits on the Projects board, and who may see whose numbers.
+- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup and per-person capacity. The five unsupported metrics (consumed hours, milestones, deliverables/posts, seniority, supervision overhead) are excluded per FR-027 and Out of Scope. *Rationale*: every one of them needs data the product does not collect; consumed hours in particular needs time tracking, which is a product decision and a team habit, not a tile. Shipping the honest subset gives the manager the answer they asked for — who is overloaded, which brand is heaviest — with every figure traceable.
+- **D2 — Capacity rows: one per person, plus an Unassigned row.** *Rationale*: the plan assigns to three named people, and each member already carries their own recorded weekly capacity. Grouping by role would produce the same rows with different labels today, while hiding which person inside a role is drowning. The Unassigned row is not optional — it carries 41% of the plan.
+- **D3 — Placement: a new "Workload" tab on the Projects board, admin-only.** *Rationale*: existing tabs stay untouched, and utilisation figures sit with management exactly as the Capacity view already does. A person's own card stays available to them on the team board.
+
+**To overturn any of these**, say so and the spec is revised before planning proceeds — the three alternatives are preserved in the conversation that produced this spec.
