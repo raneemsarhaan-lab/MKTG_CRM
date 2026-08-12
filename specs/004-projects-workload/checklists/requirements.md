@@ -38,7 +38,7 @@
 - Hours figures and several monthly figures do **not** reproduce (mock Forefront 444h vs. 94 live step-days; mock Aug 38d vs. 26d live). Recorded in the spec as data drift so acceptance is written against the model, not the mock's numbers.
 - 391 of 960 step-days are unassigned (41%) and 30 of Samaa's 164 days are undated. Both drive requirements (FR-014, FR-019) that the reference screenshots do not cover.
 
-**Five mock elements have no data source** — consumed hours, milestones, deliverable/post counts, seniority, supervision overhead. Excluded via FR-027 and Out of Scope, pending Q1.
+**Five mock elements had no obvious data source** — consumed hours, milestones, deliverable/post counts, seniority, supervision overhead. All five were resolved by the clarification session below; only deliverables remains unbuilt, and by choice rather than for want of data.
 
 **Resolution of the open marker**: FR-021 (who may see whose numbers) was put to the user with three options. It is now settled by D3 — admin-only, matching the existing Capacity view — and recorded under Decisions Taken so it can be overturned deliberately rather than drifting. The two alternatives are preserved in the conversation that produced this spec.
 
