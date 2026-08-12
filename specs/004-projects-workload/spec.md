@@ -45,8 +45,8 @@ So the calculation model in the mock is right and reproducible; the figures have
 | **Consumed hours** ("102 · 5% of expected") and the per-brand **% column** | **Derivable — no new data.** Proven against live data: see below. |
 | **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | **In scope, needs one new flag.** Marker steps already exist by convention; the flag makes them explicit — see below. |
 | **Deliverables** ("105 steps · 10 posts") | **Dropped by decision** (2026-08-12 clarification). Derivable, but not built — see Out of Scope. |
-| **Seniority** ("Video editor · Junior") | Members have a role, not a seniority level. |
-| **Supervision overhead** ("incl. 16d supervision") | No rule exists that adds review time to a manager's load. |
+| **Seniority** ("Video editor · Junior") | **In scope, changes the maths.** Needs a level on a member and a configurable multiplier — see below. |
+| **Supervision overhead** ("incl. 16d supervision") | **In scope, changes the maths.** Needs a rule that gives a supervisor hours for work they review — see below. |
 
 #### Consumed hours is not tracked time
 
@@ -69,6 +69,24 @@ The plan already contains milestone steps — `GO LIVE (15 Aug is a Saturday)`, 
 
 So milestones are real, and inference is not good enough to build on. One boolean makes them explicit, seeded from the existing marker names so the plan arrives already flagged.
 
+#### Plan days and effort days are now two different things
+
+Seniority and supervision are the first figures on this panel that are **not** a direct sum of the plan:
+
+- A junior takes longer over the same step, so their *effort* exceeds the step's planned duration.
+- A supervisor spends time on work that was never assigned to them, so their *effort* exists with no step behind it at all.
+
+Until this decision, every number reconciled to the plan: the capacity rows added up to the portfolio total, and that property was the panel's main defence against being quietly wrong. Multipliers and overhead break it — and a panel where the rows no longer sum to the total, with no explanation, is exactly the kind of dashboard people stop trusting.
+
+The resolution is to carry both figures rather than replace one with the other:
+
+| Figure | Meaning | Reconciles to the plan? |
+|---|---|---|
+| **Plan days** | The step durations as planned | **Yes** — always. Rows + unassigned = portfolio total. |
+| **Effort days** | Plan days × seniority multiplier, plus supervision overhead | No, and is not meant to. This is the load estimate. |
+
+Utilisation is measured on **effort** days, because that is the honest answer to "can this person absorb this". Reconciliation is checked on **plan** days, because that is what the plan actually says. Every adjusted figure must be able to show its unadjusted origin, so an admin can always see how much of a person's load is the plan and how much is an assumption the workspace configured.
+
 ---
 
 ## Clarifications
@@ -77,6 +95,7 @@ So milestones are real, and inference is not good enough to build on. One boolea
 
 - Q: Where do "consumed hours" and the per-brand % column come from, given no time tracking exists? → A: **Option A** — consumed hours = done step-days × hours-per-step-day; the brand % column = done-days ÷ total-days. Purely derived from the `done` flag already on every step. No schema change, no time tracking, and the figure moves when someone ticks a step.
 - Q: What counts as a "deliverable", and what is a "post" in "105 steps · 10 posts"? → A: **Option D — drop it.** The deliverables tile is not built. A workable derivation existed (every step in scope, split by whether it has reached the pipeline board via `ProjectStep.task_id`), but the count answers no question the manager asked: the steps figure is already shown, and the split adds a number without a decision attached to it.
+- Q: Should seniority and supervision overhead change the capacity maths, or are they labels? → A: **Option C** — both change the maths. A member carries a seniority level that scales the effort their assigned work costs, and a supervisor's row carries overhead hours for work they review but were never assigned. This introduces the first figures on the panel that are not a direct sum of the plan, which is why the panel must now separate **plan days** from **effort days** — see below.
 - Q: What makes a step a milestone, given the plan only marks them by naming convention? → A: **Option A** — an explicit `milestone` flag on the step, toggled in the Projects tab. The plan import seeds it from the marker names already present (`GO LIVE`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES`, `DELIVERED …`) so nothing is lost on day one, but from then on it is explicit rather than inferred from capitalisation.
 
 ---
@@ -200,6 +219,27 @@ As an admin, I want to control how a planned day converts into hours, and over w
 - **FR-019**: Planned days on steps with no due date MUST be reported separately as undated and MUST NOT be assigned to an arbitrary month.
 - **FR-020**: A person with no assigned steps MUST show an explanatory empty state.
 
+**Seniority**
+
+- **FR-033**: A member MUST carry a seniority level — junior, mid or senior — defaulting to mid, editable by an admin in Team settings.
+- **FR-034**: Each level MUST carry an effort multiplier configurable by an admin. Mid is fixed at 1.0 and is the reference; junior and senior default to 1.25 and 0.85 respectively. Multipliers MUST be shown wherever they are applied, never buried in a settings page.
+- **FR-035**: A member's effort days MUST equal their plan days × their level's multiplier. Their plan days MUST remain visible alongside.
+- **FR-036**: Seniority MUST NOT alter brand rollups, portfolio totals or milestone counts. It describes how long a person takes, not how much work the plan contains.
+- **FR-037**: A member's seniority MUST appear on their capacity row and on their person card, so an adjusted number is never shown without its cause.
+
+**Supervision overhead**
+
+- **FR-038**: A supervisor's row MUST include overhead days for work they review but were not assigned, added on top of their own plan days.
+- **FR-039**: The overhead MUST be shown as a distinct component of that row — "112d incl. 16d supervision" — and never silently folded into the total.
+- **FR-040**: Supervision overhead MUST be derived from a stated, configurable rule rather than a hardcoded constant, and the rule in force MUST be visible from the panel.
+- **FR-041**: Supervision overhead MUST NOT be counted twice: the reviewed work stays with the person it is assigned to, and the supervisor's overhead is additional effort, not a transfer.
+- **FR-042**: A workspace with no supervision configured MUST show no overhead anywhere, rather than a zero component on every row.
+
+**Reconciliation of adjusted figures**
+
+- **FR-043**: The panel MUST carry plan days and effort days as separate figures. Utilisation MUST be computed on effort days; reconciliation to the portfolio total MUST hold on plan days.
+- **FR-044**: Where a row's effort differs from its plan days, the panel MUST make the difference inspectable — a viewer must be able to see how much of the number is the plan and how much is a configured assumption.
+
 **Permissions**
 
 - **FR-021**: The workload panel — portfolio totals, brand rollup and whole-team capacity — MUST be admin-only, consistent with the existing Capacity view. A non-admin MUST NOT see other people's utilisation. Their own workload card remains available to them on the team board.
@@ -214,15 +254,15 @@ As an admin, I want to control how a planned day converts into hours, and over w
 **Honesty of the numbers**
 
 - **FR-026**: Where a figure is derived from an assumption rather than recorded fact, the panel MUST state the assumption alongside the figure.
-- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived (FR-006a, FR-008); milestones are explicit (FR-028). Deliverable/post counts are dropped by decision. Seniority and supervision overhead remain excluded unless resolved by a later clarification.
+- **FR-027**: Every figure on the panel MUST be either derived from stored data or the visible result of a configured assumption — never a hardcoded guess presented as a measurement. Consumed hours and completion percentages are derived (FR-006a, FR-008); milestones are explicit (FR-028); seniority and supervision are configured assumptions and MUST be labelled as such wherever they change a number (FR-034, FR-040, FR-044). Deliverable/post counts are dropped by decision.
 
 ### Key Entities
 
 - **Project**: a planned piece of work belonging to a brand, flagged Focus or not, with a due date. Already exists.
 - **Project step**: a unit of a project carrying a duration in days, an optional due date, an optional assignee and a done flag. Already exists. This is the atom of every figure in this feature. **Gains one field**: a milestone flag, defaulting to off (FR-028).
-- **Member**: a person, with a role and a weekly capacity in hours. Already exists.
+- **Member**: a person, with a role and a weekly capacity in hours. Already exists. **Gains one field**: a seniority level, defaulting to mid (FR-033).
 - **Brand**: already exists, with a name and colour.
-- **Workload assumption**: the hours-per-step-day conversion and the capacity period. New. Together with the step milestone flag, this is the whole of the new persisted data this feature requires.
+- **Workload assumption**: the hours-per-step-day conversion, the capacity period, the seniority multipliers and the supervision rule. New. Together with the step milestone flag and the member seniority level, this is the whole of the new persisted data this feature requires.
 
 ---
 
@@ -258,8 +298,6 @@ As an admin, I want to control how a planned day converts into hours, and over w
 - **Time tracking** — capturing hours actually worked. The "consumed hours" tile is in scope (FR-006a) but is derived from completed step-days, not from tracked time.
 - **Milestone dependencies, ordering or gating** — a milestone is a marked step, not a phase boundary that blocks anything.
 - **The deliverables tile and its "steps · posts" split.** Dropped deliberately, not for want of a data source: the step count is already on the panel, and splitting it by whether a step has reached the board adds a figure with no decision attached to it. `ProjectStep.task_id` remains available if it is ever wanted.
-- Seniority levels and any seniority-based effort multiplier.
-- Supervision overhead automatically added to a manager's load.
 - Public-holiday calendars.
 - Reassigning work from inside the workload panel — the panel reports; editing stays where it already lives.
 - Export to spreadsheet or PDF.
@@ -270,7 +308,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 Three decisions materially change what gets built. Each was put to the user with options; none is irreversible, and each is recorded here so it can be overturned deliberately rather than drifted away from.
 
-- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarifications — consumed hours, completion percentages and milestones**. The first two turned out to be derivable from the `done` flag rather than requiring time tracking; milestones already exist in the plan as a naming convention and need only one boolean to become explicit. Deliverables were dropped by choice rather than for lack of data; seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
+- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarifications — consumed hours, completion percentages and milestones**. The first two turned out to be derivable from the `done` flag rather than requiring time tracking; milestones already exist in the plan as a naming convention and need only one boolean to become explicit. Deliverables were dropped by choice rather than for lack of data. **Seniority and supervision overhead were later brought in** by the same clarification session and are the panel's only configured assumptions, which is why they must always show their workings (FR-043, FR-044). *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
 - **D2 — Capacity rows: one per person, plus an Unassigned row.** *Rationale*: the plan assigns to three named people, and each member already carries their own recorded weekly capacity. Grouping by role would produce the same rows with different labels today, while hiding which person inside a role is drowning. The Unassigned row is not optional — it carries 41% of the plan.
 - **D3 — Placement: a new "Workload" tab on the Projects board, admin-only.** *Rationale*: existing tabs stay untouched, and utilisation figures sit with management exactly as the Capacity view already does. A person's own card stays available to them on the team board.
 
