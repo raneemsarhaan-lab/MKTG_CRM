@@ -386,9 +386,24 @@ async function main() {
   const csvNames = new Set<string>()
   for (const r of rows) parseAssignees(r['Assignees']).forEach(n => csvNames.add(n))
 
+  // People an admin removed in the app. Both keys are needed: this loop finds
+  // people by display name and creates them by email, and either one may be
+  // the thing that matches.
+  const memberTombs = await prisma.tombstone.findMany({
+    where: { kind: { in: ['member', 'member-name'] } },
+    select: { kind: true, key: true },
+  })
+  const deadEmails = new Set(memberTombs.filter(t => t.kind === 'member').map(t => t.key))
+  const deadNames  = new Set(memberTombs.filter(t => t.kind === 'member-name').map(t => t.key))
+
   for (const name of csvNames) {
     if (memberByName.has(name.toLowerCase())) continue
     const email = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@forefront.consulting`
+
+    if (deadNames.has(name.toLowerCase()) || deadEmails.has(email)) {
+      console.log(`  – skipping "${name}" — removed in the app`)
+      continue
+    }
 
     // The loop above matches on display name, but the account is keyed by
     // email — "Raneem Sarhaan" in the export and "Raneem S." in the app derive

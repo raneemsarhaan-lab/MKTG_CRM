@@ -34,6 +34,12 @@ async function main() {
   }
 
   const password_hash = await bcrypt.hash(password, 10)
+
+  // If this address was removed in the app it carries a tombstone, and the
+  // importers will refuse to re-create it. This script is the deliberate
+  // override — someone with deployment access has asked for the account back.
+  await prisma.tombstone.deleteMany({ where: { kind: 'member', key: email } })
+
   const existing = await prisma.member.findUnique({ where: { email } })
 
   if (existing) {

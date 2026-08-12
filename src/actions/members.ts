@@ -79,16 +79,28 @@ export async function addMember(
 
   try {
     const password_hash = await bcrypt.hash(input.password, 10)
+    const name  = input.name.trim()
+    const email = input.email.trim().toLowerCase()
+
     await prisma.member.create({
       data: {
-        name:            input.name.trim(),
-        email:           input.email.trim().toLowerCase(),
+        name, email,
         role:            input.role.trim() || 'Team Member',
         access:          input.access,
         capacity_hrs_wk: input.capacity_hrs_wk ?? 40,
         status:          'Available',
         password_hash,
       },
+    })
+
+    // Adding someone back overrules an earlier removal — otherwise the
+    // importers would keep skipping them and the account could never be
+    // brought back into sync with the ClickUp export.
+    await prisma.tombstone.deleteMany({
+      where: { OR: [
+        { kind: 'member',      key: email },
+        { kind: 'member-name', key: name.toLowerCase() },
+      ] },
     })
     revalidateAll()
     return { success: true }
@@ -130,6 +142,13 @@ export async function resetMemberPassword(
  * still needs an owner for history, and the database requires one. Comments
  * are kept and stay attributed, which is why the author relation has to be
  * moved rather than cascaded away.
+ *
+ * The deletion is also recorded as a Tombstone. Without it the removal only
+ * held until the next deploy: the seed re-creates its seven default accounts
+ * and the ClickUp importer re-creates anyone named in the export, both of them
+ * on every container start. That is why a removed member kept reappearing.
+ * Both the email and the display name are recorded, because the seed matches
+ * on one and the importer on the other.
  */
 export async function removeMember(
   memberId: string,
@@ -148,6 +167,11 @@ export async function removeMember(
   if (memberId === auth.member.id) {
     return { success: false, error: 'You cannot remove your own account' }
   }
+
+  const doomed = await prisma.member.findUnique({
+    where: { id: memberId }, select: { name: true, email: true },
+  })
+  if (!doomed) return { success: false, error: 'That member no longer exists' }
 
   const [owned, active, comments, created] = await Promise.all([
     prisma.task.count({ where: { task_owner_id: memberId } }),
@@ -175,6 +199,17 @@ export async function removeMember(
         await tx.taskComment.updateMany({ where: { author_id: memberId }, data: { author_id: reassignTo } })
       }
       await tx.member.delete({ where: { id: memberId } })
+
+      // Same transaction as the delete: a tombstone without a deletion would
+      // block a legitimate import, and a deletion without a tombstone is the
+      // bug this exists to fix. Neither half is correct on its own.
+      await tx.tombstone.createMany({
+        data: [
+          { kind: 'member',      key: doomed.email.toLowerCase(), label: doomed.name },
+          { kind: 'member-name', key: doomed.name.toLowerCase(),  label: doomed.name },
+        ],
+        skipDuplicates: true,
+      })
     })
     revalidateAll()
     return { success: true, ownedTasks: owned, comments }

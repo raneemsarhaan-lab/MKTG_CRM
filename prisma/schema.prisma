@@ -220,3 +220,28 @@ model WorkspaceSettings {
 
   @@map("workspace_settings")
 }
+
+/// A record of something an admin deleted on purpose.
+///
+/// Three importers run on every container start — the seed, the ClickUp
+/// export, and the Aspiring/Focus plan — and each one creates whatever it
+/// cannot find. That is deliberate: it is what makes them safe to re-run. But
+/// it also means a plain DELETE only lasts until the next deploy, and the
+/// person who removed a member watched them come back.
+///
+/// Deleting still deletes. This table only records that the deletion was
+/// intended, so the importers can tell "never imported" apart from "imported
+/// and then removed". Re-adding the same person or project clears the record.
+///
+/// kind: 'member' (key = email) | 'member-name' (key = lowercased name, which
+/// is what the ClickUp export matches on) | 'project' | 'step' (key = the
+/// plan key).
+model Tombstone {
+  kind       String
+  key        String
+  label      String?
+  removed_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([kind, key])
+  @@map("tombstones")
+}
