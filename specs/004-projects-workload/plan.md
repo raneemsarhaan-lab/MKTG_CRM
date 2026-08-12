@@ -2,21 +2,25 @@
 
 **Branch**: `004-projects-workload` | **Date**: 2026-08-12 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/004-projects-workload/spec.md`
+**Input**: Feature specification from `/specs/004-projects-workload/spec.md` (54 functional requirements, post-clarification)
+
+> **This plan was rewritten on 2026-08-12** after the clarification session. The first version assumed the panel was pure arithmetic over existing data. Four of the five deferred metrics came back in, and one of them — the seniority/supervision rule — changed the feature's centre of gravity. Nothing below is carried over unexamined.
 
 ## Summary
 
-Add an admin-only **Workload** tab to the Projects board that rolls the existing plan up two ways — by brand, and by person — and a per-person card showing month-by-month load against the working days each month actually contains.
+Add an admin-only **Workload** tab to the Projects board that rolls the plan up by brand and by person, plus a per-person card showing month-by-month load.
 
-Technically this is mostly arithmetic over data already loaded by `/projects`. The plan is 40 projects and 327 steps; every figure the spec asks for is a fold over `ProjectStep.duration_days`, `due_date`, `assignee_id` and `done`, grouped by `Project.brand_id` or by `Member`. No new query, no new page load, no new table.
+The first plan described this as "mostly arithmetic over data already loaded". That is no longer true. The clarification session added:
 
-Three things do need building:
+- **Milestones** — a flag on a step, seeded by the importer from the plan's existing marker names.
+- **Consumed hours** — done step-days valued in hours. Free, and proven exact against live data.
+- **Seniority** — a level on a member, with a configurable effort factor that applies **only to complex steps**.
+- **Supervision** — computed per step off the *adjusted* days, accruing to a configurable supervising role.
+- **Step complexity** — a threshold with per-step overrides, because the rule needs a simple/complex distinction the data does not have.
 
-1. **`src/lib/workload.ts`** — a pure module holding every calculation, mirroring how `src/lib/projects.ts` already keeps the two boards agreeing with each other. Both the Workload tab and the per-person card read from it, so they cannot drift.
-2. **Two persisted assumptions** — hours per step-day, and the end of the capacity period. These go on the existing `WorkspaceSettings` singleton as two columns, not a new table (see research R1).
-3. **UI** — a `WorkloadPanel` under a new `'workload'` entry in the board's existing `Tab` union, plus a `PersonWorkloadCard` reused on the team board for a person's own numbers.
+The load-bearing consequence is not any single one of those. It is that **plan days and effort days are now different quantities**. Before, every figure summed to the plan, and that property was the panel's whole defence against being quietly wrong. A multiplier and a phantom overhead break it. So the module carries both: plan days always reconcile, effort days deliberately do not, utilisation is measured on effort, and reconciliation is checked on plan (FR-043, FR-044).
 
-The load-bearing design decisions are about honesty rather than mechanics: 41% of the plan's step-days have no assignee and must be shown rather than dropped, and ~18% of one person's days sit on undated steps that belong to no month. Both are folded into the module's return types so a caller cannot forget them.
+Everything still funnels through one pure module, `src/lib/workload.ts`, which imports neither React nor Prisma. That mattered before; with a five-input calculation it matters more, because it is the only way the arithmetic can be checked without a browser.
 
 ## Technical Context
 
@@ -24,49 +28,50 @@ The load-bearing design decisions are about honesty rather than mechanics: 41% o
 
 **Primary Dependencies**: Next.js 16.2.10 (App Router, server components + server actions), Prisma 5.22 — pinned; Prisma 7 will not load this schema's `datasource db { url = env(...) }`
 
-**Storage**: PostgreSQL via Prisma. Two new nullable-with-default columns on `workspace_settings`; no new tables, no data migration.
+**Storage**: PostgreSQL via Prisma. Four columns added to `workspace_settings`, two to `project_steps`, one to `members`, and **one new table** for the per-level rates (research R1). Every addition carries a default, so `prisma db push` needs no backfill.
 
-**Testing**: No test runner is configured in this repository. Verification is by typecheck, production build, and Playwright driving a local PostgreSQL — the method used for the last three features. See [quickstart.md](./quickstart.md).
+**Testing**: No test runner is configured. Verification is typecheck, production build, a `tsx` reconciliation harness against the pure module, and Playwright driving a local PostgreSQL. See [quickstart.md](./quickstart.md).
 
-**Target Platform**: Web, deployed on Cranl. Container start runs `scripts/migrate.sh`, which does `prisma db push`, so the two new columns are created on deploy with no separate step.
+**Target Platform**: Web, deployed on Cranl. `scripts/migrate.sh` runs `prisma db push` at container start, so schema changes land on deploy. The seed must create the three seniority rows; the plan importer must seed milestone flags.
 
-**Project Type**: Single Next.js application; no separate frontend/backend.
+**Project Type**: Single Next.js application.
 
-**Performance Goals**: The whole plan is ~330 steps. Every rollup is O(steps) over data the page already fetches. No new database round-trip; the panel must add no perceptible time to `/projects`.
+**Performance Goals**: ~330 steps, 16 members, 4 brands. Every rollup is O(steps) over data the page already fetches. No new database round-trip on the projects page beyond widening two existing selects.
 
 **Constraints**:
-- **No RLS.** The Supabase→Prisma migration removed row-level security, so every server action is its own and only permission gate. The one new action here (`updateWorkloadAssumptions`) must call `requireAdmin()` before it touches anything.
-- **Admin-only surface.** `FR-021` makes the panel admin-only, but hiding a tab is presentation. The page already resolves `isAdmin`; the action enforces it independently.
-- **Two decimal traps.** `duration_days` is `Decimal(5,1)` and arrives as a Prisma `Decimal`, not a number — the existing page already calls `Number(...)` on it, and any new read must do the same. Summing halves (`0.5` durations exist) means totals must be rounded for display but never for arithmetic.
+- **No RLS.** Every server action is its own and only permission gate. This feature adds three (`updateWorkloadAssumptions`, `updateSeniorityLevel`, and step-flag edits), and each needs `requireAdmin()` before it touches anything.
+- **Two decimal traps.** `duration_days` is `Decimal(5,1)` and arrives as a Prisma `Decimal`. The new rate columns are decimals too. Convert once at the boundary; round for display, never for arithmetic. A factor of 1.8 applied to halves produces values like 3.6 — display rounding must not be allowed to break reconciliation.
+- **Order of operations is fixed by the rule.** `adjusted = days × factor`, then `supervision = adjusted × rate`. Supervision compounds off the adjusted figure, not the planned one. Reversing these gives plausible, wrong numbers.
+- **Self-supervision must be excluded** (FR-051), or a marketing manager holding complex steps feeds their own overhead.
 
-**Scale/Scope**: 40 projects, 327 steps, 16 members, 4 brands + an unbranded group. One new tab, two new components, one new lib module, one new server action, two new columns.
+**Scale/Scope**: One new tab, three new components, one new lib module, three new/extended server actions, one new table, seven new columns, two importer changes.
 
 ## Constitution Check
 
 *GATE: evaluated before Phase 0 and re-checked after Phase 1.*
 
-The constitution is at version 2.0.0, ratified 2026-07-15. **It predates the Supabase→Prisma migration and describes a stack this repository no longer has.** That drift is pre-existing and is not caused by this feature; it is recorded below and in [research.md](./research.md) R5 so it can be amended deliberately.
+Constitution 2.0.0 (ratified 2026-07-15) predates the Supabase→Prisma migration and describes a stack this repository no longer has. That drift is pre-existing; it is recorded here and in [research.md](./research.md) R6 rather than planned around.
 
 | Principle | Verdict | Notes |
 |---|---|---|
-| **I. Design System Fidelity** | ⚠️ Deviation, pre-existing | The constitution's canonical token map is `src/lib/tokens.ts`. Both planning boards were rebuilt in spec 003 against `src/lib/board-ui.ts`, a separate palette from the handoff design specs. The Workload tab lives on the Projects board, so it MUST use `board-ui.ts` — using the constitutional tokens here would make the new tab clash with the four tabs beside it. No new colour literals: everything comes from `UI`, `TILE`, `font`, `card`, `control`, `input`. |
-| **II. Workflow Pipeline Integrity** | ✅ Pass | The 9-stage pipeline is untouched. This feature reads `ProjectStep`, which is deliberately separate from `Task`. No SLA logic is read or changed. |
-| **III. Role-Based Feature Access** | ✅ Pass in substance, ⚠️ mechanism differs | The rule "Capacity and Settings hidden from non-admins" is honoured and extended: the Workload tab is admin-only. The constitution requires DB-level enforcement via Postgres RLS; **RLS no longer exists**, so enforcement is `requireAdmin()` inside the server action. This is the same mechanism every other action in the codebase now uses. |
-| **IV. Design-Driven Development** | ⚠️ Deviation, justified | Requires a standalone HTML design file as the source of truth. The handoff here is two screenshots. Mitigated by transcribing every observed element into the spec, and by verifying the mock's numbers against live data — which found the mock is a stale snapshot, so pixel-matching its figures would be actively wrong. Layout and structure follow the screenshots; figures follow the data. |
-| **V. Cultural UX & Celebration System** | ✅ Not applicable | Read-only view; no stage advances, so no celebration path is touched. |
-| **VI. State Architecture & Persistence** | ⚠️ Deviation, pre-existing | The constitution mandates Zustand + Supabase. The repository uses server components with Prisma and a custom HMAC session. This feature follows the code: server-fetched data, `useState` for tab and person selection, no new global state. The two persisted assumptions go to Postgres, satisfying the principle's actual intent — nothing durable in local storage. |
+| **I. Design System Fidelity** | ⚠️ Deviation, pre-existing | The constitutional token map is `src/lib/tokens.ts`; both planning boards were rebuilt in spec 003 on `src/lib/board-ui.ts`. The Workload tab sits beside four tabs built on the latter and must match them. No new colour literals — see [contracts/workload.md](./contracts/workload.md) §5. |
+| **II. Workflow Pipeline Integrity** | ✅ Pass | The 9-stage pipeline is untouched. This feature reads `ProjectStep`, deliberately separate from `Task`. The dropped deliverables tile was the only thing that would have crossed into pipeline data. |
+| **III. Role-Based Feature Access** | ✅ Pass in substance, ⚠️ mechanism differs | Workload tab is admin-only, extending "Capacity and Settings hidden from non-admins". The constitution requires DB-level enforcement via RLS; RLS no longer exists, so `requireAdmin()` in each action is the whole gate. |
+| **IV. Design-Driven Development** | ⚠️ Deviation, justified | Requires a standalone HTML design file; the handoff is screenshots. Phase 0 proved the mock is a stale snapshot, so matching its figures would ship wrong numbers. Structure follows the screenshots; figures follow the data. |
+| **V. Cultural UX & Celebration System** | ✅ Not applicable | Read-only view. No stage advances. |
+| **VI. State Architecture & Persistence** | ⚠️ Deviation, pre-existing | Constitution mandates Zustand + Supabase; the repo uses server components with Prisma and a custom HMAC session. The principle's actual intent — nothing durable outside Postgres — is honoured: all seven new settings persist to the database. |
 
-**Gate result: PASS.** Three deviations, all pre-existing and all documented. None is introduced by this feature, and none is a licence to write ad-hoc colours or skip a permission check.
+**New consideration raised by the clarification.** §III fixes review-stage ownership by role (`c-final` and `final-check` → Marketing Manager). FR-048 makes supervision accrue to a configurable role **defaulting to Marketing Manager**, which is consistent with that table rather than a coincidence — it is the same person the constitution already puts on review duty. Making the role configurable rather than hardcoded keeps this a setting, not a second, competing ownership table. That is a deliberate choice to avoid a §II conflict.
+
+**Gate result: PASS.** Three deviations, all pre-existing, none introduced here.
 
 ### Post-design re-check (after Phase 1)
 
-Re-evaluated against the artifacts now that the design exists. Nothing moved, and two things got firmer:
+- **§I** — [contracts/workload.md](./contracts/workload.md) §5 pins every visual element to a named `board-ui.ts` export, including the new "shows its workings" affordance for adjusted figures.
+- **§III** — three actions now need gating, not one. Each is a separate task, and the contract states `requireAdmin()` as clause 1 of every one.
+- **§II** — re-examined after adding the supervising role. Supervision reads `Member.role` only; it does not read, write or depend on stage ownership, SLA or any pipeline table. No coupling introduced.
 
-- **§I** — [contracts/workload.md](./contracts/workload.md) §4 pins every visual element to a named `board-ui.ts` export. There is no route to an ad-hoc colour that would not show up in review as a raw hex.
-- **§III** — the `requireAdmin()` call is written into the action contract as clause 1, with the reason stated: with RLS gone it is the entire gate. It is a distinct task in Phase 2, not a line inside a larger one.
-- **§IV** — the deviation stands and is now better justified: Phase 0 proved the reference screenshots are a stale snapshot (mock Forefront 444h ⇒ 74 step-days vs. 94 live), so pixel-matching their figures would ship wrong numbers. Structure follows the screenshots; figures follow the data.
-
-No new violations. No entry added to Complexity Tracking.
+No new violations. Complexity Tracking gains one entry for the new table.
 
 ## Project Structure
 
@@ -74,43 +79,56 @@ No new violations. No entry added to Complexity Tracking.
 
 ```text
 specs/004-projects-workload/
-├── plan.md              # This file
-├── research.md          # Phase 0 output
-├── data-model.md        # Phase 1 output
-├── quickstart.md        # Phase 1 output
+├── plan.md              # This file (rewritten 2026-08-12)
+├── research.md          # Phase 0 (rewritten)
+├── data-model.md        # Phase 1 (rewritten)
+├── quickstart.md        # Phase 1 (rewritten)
 ├── contracts/
-│   └── workload.md      # Phase 1 output — module + action contracts
+│   └── workload.md      # Phase 1 (rewritten)
 ├── checklists/
-│   └── requirements.md  # From /speckit-specify
-└── tasks.md             # Phase 2 — created by /speckit-tasks, not here
+│   └── requirements.md  # From /speckit-specify + /speckit-clarify
+└── tasks.md             # Phase 2 — /speckit-tasks, not created here
 ```
 
 ### Source Code (repository root)
 
 ```text
 prisma/
-└── schema.prisma                         # + hours_per_step_day, capacity_period_end on WorkspaceSettings
+├── schema.prisma                      # + SeniorityLevel model; + 7 columns (see data-model.md)
+└── seed.ts                            # + the three seniority rows, upsert-style
+
+scripts/
+└── import-plan.ts                     # + seed step.milestone from marker names, never overwriting
 
 src/
-├── app/(app)/projects/page.tsx           # widen the member select; load workspace settings
+├── app/(app)/projects/page.tsx        # widen member select (role, seniority, capacity);
+│                                      #   load workspace settings + seniority levels
 ├── actions/
-│   └── settings.ts                       # + updateWorkloadAssumptions (requireAdmin)
+│   ├── settings.ts                    # + updateWorkloadAssumptions, updateSeniorityLevel
+│   ├── projects.ts                    # updateStep gains milestone + complexity override
+│   └── members.ts                     # updateMember gains seniority
 ├── lib/
-│   ├── projects.ts                       # unchanged — reused for ProjectView/StepView and isLate
-│   ├── workload.ts                       # NEW — every calculation in this feature
-│   └── board-ui.ts                       # unchanged — the panel's only source of colour
-└── components/projects/
-    ├── ProjectsView.tsx                  # + 'workload' in the Tab union, admin-gated
-    ├── WorkloadPanel.tsx                 # NEW — totals, brand rollup, capacity rollup
-    ├── PersonWorkloadCard.tsx            # NEW — one person, month by month
-    └── TeamBoard.tsx                     # + a person's own card (FR-021 second half)
+│   ├── projects.ts                    # unchanged — ProjectView/StepView, isLate, byBrand
+│   ├── workload.ts                    # NEW — every calculation in this feature
+│   └── board-ui.ts                    # unchanged — the panel's only source of colour
+└── components/
+    ├── projects/
+    │   ├── ProjectsView.tsx           # + 'workload' in the Tab union, admin-gated
+    │   ├── WorkloadPanel.tsx          # NEW — totals, brand rollup, capacity rollup
+    │   ├── PersonWorkloadCard.tsx     # NEW — one person, month by month
+    │   └── TeamBoard.tsx              # + a person's own card (FR-021)
+    └── settings/
+        ├── TeamSettings.tsx           # + seniority on the member row (its Save button already exists)
+        └── WorkloadSettings.tsx       # NEW — rates, threshold, supervising role
 ```
 
-**Structure Decision**: The existing single-app layout is kept. The one structural choice worth naming is putting all arithmetic in `src/lib/workload.ts` with no React and no Prisma imports — the same shape as `src/lib/projects.ts`, whose docstring already explains why: *"any number that means 'late' or 'this week' has to agree across both. Deriving them twice is how two screens start telling the same person different things."* This feature adds a third and fourth surface reading the same steps, which makes that rule more important, not less. It is also what makes the maths testable without a browser.
+**Structure Decision**: The single-app layout is kept. The choice worth naming is still that all arithmetic lives in `src/lib/workload.ts` with no React and no Prisma import — and it is now doing more work than it was. Five configurable inputs (hours per step-day, per-level factor, per-level rate, complexity threshold, supervising role) feed one calculation consumed by three surfaces. Deriving any of it twice would produce two answers to "is Yosra overloaded", which is precisely the failure `src/lib/projects.ts` was factored out to prevent. It is also the only way to check the reconciliation properties without a browser.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Second palette (`board-ui.ts`) alongside the constitutional `tokens.ts` | The Workload tab sits beside four tabs already built on `board-ui.ts`; matching them is the only visually coherent option | Using `tokens.ts` would make one tab in five look foreign. The real fix is a constitution amendment reconciling the two palettes — out of scope here, raised in research R5. |
-| Permission enforced in the action rather than by RLS | RLS was removed with Supabase and does not exist to be used | There is no database-level gate available. The action check is the whole defence, which is why it is a task in its own right rather than a line in a bigger one. |
+| A new `SeniorityLevel` table | Each level carries two configurable rates, and the set of levels is a list the settings UI must render and edit | Six more columns on the `WorkspaceSettings` singleton (`junior_factor`, `junior_rate`, `mid_factor`, …) encodes a list as columns, cannot gain a level without a migration, and gives the UI nothing to iterate. See research R1. |
+| Second palette (`board-ui.ts`) alongside constitutional `tokens.ts` | The tab sits beside four built on `board-ui.ts` | Using `tokens.ts` makes one tab in five look foreign. Real fix is a constitution amendment — research R6. |
+| Permission enforced in actions rather than by RLS | RLS was removed with Supabase and does not exist | No database-level gate is available. Each of the three actions gets its own task rather than a line inside a bigger one. |
+| Plan days and effort days both carried | Seniority and supervision make effort ≠ plan, but reconciliation must still be checkable | Carrying only effort loses the ability to prove no step-day was lost. Carrying only plan makes utilisation a lie. Both, with the difference inspectable, is the honest option — FR-043. |

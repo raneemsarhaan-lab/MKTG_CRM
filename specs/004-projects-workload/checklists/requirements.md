@@ -56,7 +56,7 @@ Five questions asked and answered; the spec grew from 27 to 47 functional requir
 
 **Still unasked, lower impact**: the two greyed rows in the mock, "Islam & client approvals" and "External waits (print, guests, clients)". Nothing in the data marks a step as an approval or a wait, and the Unassigned row already accounts for the days. Worth revisiting only if those categories earn their own treatment.
 
-**Downstream artifacts are now stale.** `plan.md`, `research.md`, `data-model.md` and `contracts/workload.md` were written against the pre-clarification spec and do not know about milestones, seniority, supervision, complexity or the plan/effort split. Re-run `/speckit-plan` before `/speckit-tasks`.
+**Downstream artifacts refreshed 2026-08-12.** `plan.md`, `research.md`, `data-model.md`, `contracts/workload.md` and `quickstart.md` were rewritten — not appended to — against the clarified spec. They now cover milestones, seniority, supervision, step complexity and the plan/effort split. Ready for `/speckit-tasks`.
 
 ## Notes
 

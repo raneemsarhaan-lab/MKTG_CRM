@@ -1,142 +1,177 @@
 # Phase 1 Data Model: Projects Workload
 
-**Feature**: `specs/004-projects-workload` | **Date**: 2026-08-12
+**Feature**: `specs/004-projects-workload` | **Date**: 2026-08-12 (rewritten post-clarification)
 
-This feature is overwhelmingly a read model. Four existing entities supply every figure; one existing entity gains two columns. Nothing else is persisted.
+Mostly still a read model. Four existing entities supply the figures; three gain fields, and one small table is added.
 
 ---
 
-## Existing entities (read only — unchanged)
-
-### ProjectStep
-
-The atom of this feature. Every number in the panel is a fold over these rows.
-
-| Field | Type | Used for |
-|---|---|---|
-| `duration_days` | `Decimal(5,1)` | The unit of load. **Arrives as a Prisma `Decimal`, not a number** — must go through `Number(...)`, as `projects/page.tsx` already does. Halves (`0.5`) occur. |
-| `due_date` | `Date?` | Places a step in a month, and decides overdue. Null on ~18% of one person's days — see undated handling. |
-| `assignee_id` | `String?` → Member | Which capacity row the load lands in. Null on 41% of all step-days. |
-| `done` | `Boolean` | Excludes a step from "still open" and from overdue. Does **not** exclude it from "planned". |
-| `project_id` | → Project | Reaches brand and Focus flag. |
+## Existing entities — read only, unchanged
 
 ### Project
 
 | Field | Used for |
 |---|---|
 | `brand_id` | Brand grouping; null → the unbranded group (7 projects today) |
-| `focus` | Scope selection — the panel follows the board's toggle |
-| `standing` | Not used by this feature; standing projects count like any other |
-| `due_date` | Not used — a project's date is not its steps' dates |
-
-### Member
-
-| Field | Used for |
-|---|---|
-| `name`, `role` | Row label and subtitle |
-| `capacity_hrs_wk` | The denominator. Divided by 5 for a daily rate; varies 20–40 in live data |
-| `avatar_url` | Optional row avatar |
+| `focus` | Scope — the panel follows the board's toggle |
+| `standing`, `due_date` | Not used. A project's date is not its steps' dates. |
 
 ### Brand
 
-`name`, `color`, `logo_url` — row identity. Reused exactly as the Projects board already renders brand headers.
+`name`, `color`, `logo_url` — row identity, rendered as the Projects board already renders brand headers.
 
 ---
 
-## Modified entity
+## Modified entities
 
-### WorkspaceSettings (singleton, `id = 1`)
+### ProjectStep — gains two fields
 
-Two columns added. Both have defaults, so `prisma db push` needs no backfill and existing rows stay valid.
+The atom of every figure. Every number is a fold over these rows.
+
+| Field | Type | Used for |
+|---|---|---|
+| `duration_days` | `Decimal(5,1)` | The unit of load. **Arrives as a Prisma `Decimal`** — convert once at the boundary. Halves occur. |
+| `due_date` | `Date?` | Places a step in a month; decides overdue. Null on ~18% of one person's days. |
+| `assignee_id` | `String?` | Which capacity row the load lands in, and whose seniority applies. Null on 41% of step-days. |
+| `done` | `Boolean` | Excludes from "still open" and overdue; **includes** in consumed hours. Does not exclude from planned. |
+| **`milestone`** | `Boolean` **default false** | FR-028. Seeded by the importer from marker names; never overwritten on an existing step. |
+| **`complexity`** | `String?` **default null** | FR-045/046. `'simple'` / `'complex'` when overridden; null means the threshold decides. Deliberately nullable so an override survives a threshold change. |
+
+### Member — gains one field
+
+| Field | Used for |
+|---|---|
+| `name`, `role` | Row label and subtitle. **`role` also selects the supervisor** (FR-048). |
+| `capacity_hrs_wk` | The denominator. `/5` for a daily rate; varies 20–40 in live data. |
+| `avatar_url` | Optional row avatar. |
+| **`seniority`** | `String` **default `'mid'`** — FR-033. A plain string, not a foreign key: see "Resilience" below. |
+
+### WorkspaceSettings — singleton `id = 1`, gains four columns
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `capacity_hrs_per_wk` | `Int` | 40 | *existing* |
 | `nine_stage_default` | `Boolean` | false | *existing* |
-| **`hours_per_step_day`** | `Decimal(4,1)` | **8** | One planned step-day, in hours. Range 1–24. |
-| **`capacity_period_end`** | `Date?` | **null** | End of the capacity window. Null → run to the last dated step in scope. |
+| **`hours_per_step_day`** | `Decimal(4,1)` | 8 | One planned step-day in hours. Range 1–24. |
+| **`capacity_period_end`** | `Date?` | null | Null → run to the last dated step in scope. |
+| **`complexity_threshold_days`** | `Decimal(4,1)` | 3 | At or below → simple, unless the step overrides. |
+| **`supervising_role`** | `String` | `Marketing Manager` | Whose row receives supervision overhead. |
 
-The period **start** is always today. It is not stored: a stored start would silently go stale and quietly inflate everyone's available hours the longer nobody looked at it.
+The period **start** is always today and is never stored — a stored start goes stale silently and inflates everyone's available hours the longer nobody looks.
 
 ---
 
-## Derived types (no persistence — `src/lib/workload.ts`)
+## New entity
 
-These are the module's contract. Full signatures in [contracts/workload.md](./contracts/workload.md).
+### SeniorityLevel
+
+Three seeded rows. A list, not a set of columns — see research R1.
+
+| Field | Type | Notes |
+|---|---|---|
+| `key` | `String @id` | `'junior'` \| `'mid'` \| `'senior'` |
+| `label` | `String` | Display name |
+| `effort_factor` | `Decimal(4,2)` | Multiplies **complex** step durations only |
+| `supervision_rate` | `Decimal(4,2)` | Share of *adjusted* days that becomes supervision |
+| `sort_order` | `Int` | Display order |
+
+Seeded defaults (FR-034):
+
+| key | label | effort_factor | supervision_rate |
+|---|---|---|---|
+| `junior` | Junior | **1.80** | **0.25** |
+| `mid` | Mid | 1.00 | 0.00 |
+| `senior` | Senior | 1.00 | 0.00 |
+
+**Resilience**: `Member.seniority` is a plain string with a default rather than a hard FK. A member whose level has no row resolves to factor 1.0 / rate 0 — the neutral value — so a bad settings edit degrades to "no adjustment" rather than an unrenderable page.
+
+---
+
+## Derived types — `src/lib/workload.ts`, no persistence
+
+Full signatures in [contracts/workload.md](./contracts/workload.md).
 
 ### `WorkloadAssumptions`
 
 ```
-hoursPerStepDay: number     // from settings, default 8
-periodStart:     string      // today, ISO
-periodEnd:       string      // settings, or the last dated step in scope
-workingDays:     number      // businessDaysBetween(start, end)
+hoursPerStepDay | periodStart (today) | periodEnd | workingDays
+complexityThresholdDays | supervisingRole
+levels: Record<string, { effortFactor, supervisionRate }>
 ```
 
-### `BrandLoad` — one per brand, plus one for unbranded
+### `StepCost` — one step, priced
 
 ```
-brandId | brandName | brandColor | projects | steps | days | hours | sharePct
+planDays | isSimple | adjustedDays | supervisionDays
 ```
 
-`sharePct` is share of the portfolio's planned days, not of hours — the two are the same ratio, and days are the measured quantity.
+`isSimple` = `step.complexity === 'simple'` if set, else `duration ≤ threshold`. Order matters: the override wins.
 
-### `CapacityRow` — one per member with load, plus one unassigned
-
-```
-kind: 'member' | 'unassigned'
-memberId? | name | role? | days | hours | availableHours | utilisationPct | over: boolean
-```
-
-- `availableHours = workingDays × (capacity_hrs_wk / 5)`; **zero for the unassigned row** — nobody is available to do it.
-- `utilisationPct` is `null` when `availableHours` is 0, never `Infinity` or `NaN`. The unassigned row shows days and hours with no percentage, which is the honest rendering.
-- `over` is `utilisationPct !== null && utilisationPct >= 100`.
-
-### `PersonLoad` — one person, in depth
+### `BrandLoad`
 
 ```
-memberId | name | role
-steps | stepsOpen | days | daysOpen | hours
-overdueCount | oldestOverdue: string | null
-months: MonthLoad[]
-undatedDays: number
+brandId | brandName | brandColor
+projects | steps | milestones
+planDays | doneDays | hours | completionPct
+```
+
+`completionPct` = `doneDays ÷ planDays` (FR-008) — the mock's per-brand % column. Brand rollups use **plan** days only: seniority describes how long a person takes, not how much work exists (FR-036).
+
+### `CapacityRow`
+
+```
+kind: 'member' | 'unassigned' | 'supervision-unowned'
+memberId? | name | role? | seniority?
+planDays | effortDays | supervisionReceived | supervisionShare?
+hours | availableHours | utilisationPct | over
+```
+
+- `effortDays = simpleDays + (complexDays × factor) + supervisionReceived`
+- `availableHours = workingDays × (capacity_hrs_wk / 5)`; **zero** on the unassigned and unowned-supervision rows.
+- `utilisationPct` is `null` when available hours are 0 — never `Infinity` or `NaN`.
+- `supervisionShare` is set only when several members hold the supervising role, and states the split (FR-049).
+- `kind: 'supervision-unowned'` appears only when supervision was generated and nobody holds the role (FR-050).
+
+### `PersonLoad`
+
+```
+memberId | name | role | seniority
+steps | stepsOpen | planDays | effortDays | daysOpen | hours
+overdueCount | oldestOverdue
+months: MonthLoad[] | undatedPlanDays
 ```
 
 ### `MonthLoad`
 
 ```
-month: string        // 'YYYY-MM'
-label: string        // 'Aug'
-days: number
-workingDays: number  // weekdays in that month, clipped to the period
-utilisationPct: number | null
-over: boolean
+month ('YYYY-MM') | label | planDays | effortDays
+workingDays | utilisationPct | over
 ```
 
 ---
 
 ## Invariants
 
-These are the properties worth asserting, and the ones the reconciliation harness checks (research R6):
+Asserted by the reconciliation harness (research R7, [quickstart.md](./quickstart.md)):
 
-1. **Capacity reconciles.** `Σ capacityRows.days` (members + unassigned) `= portfolio total planned days`. No step-day may be counted twice or lost.
-2. **A person reconciles.** For any member, `Σ months.days + undatedDays = person.days`.
-3. **Done never counts as open.** `daysOpen ≤ days`, and a done step is never overdue regardless of its date.
-4. **Percentages are guarded.** `utilisationPct` is `null` — never `Infinity`, `NaN` or `0` — whenever the denominator is 0.
-5. **Decimals stay decimal.** Sums are computed on numbers converted once at the boundary; display rounds, arithmetic does not.
-6. **Scope is uniform.** Every figure on the panel is computed from the same filtered project array the rest of the board is showing.
+1. **Plan days reconcile.** `Σ capacityRows.planDays` (members + unassigned) `= portfolio total plan days`. No step-day counted twice or lost. **This holds on plan days only** — effort days are not expected to reconcile, and asserting on them would be wrong.
+2. **A person reconciles.** `Σ months.planDays + undatedPlanDays = person.planDays`.
+3. **Effort never undercuts plan.** `effortDays ≥ planDays` wherever the factor ≥ 1, with equality when all of a person's work is simple.
+4. **Supervision is conserved.** Total generated = total received. Nothing lost to rounding when split between role-holders; nothing invented when there are none — it lands on the unowned row instead.
+5. **Nobody supervises themselves.** Steps assigned to a holder of the supervising role generate zero supervision (FR-051).
+6. **Done never counts as open.** `daysOpen ≤ planDays`; a done step is never overdue whatever its date.
+7. **Percentages are guarded.** `utilisationPct` is `null` — never `Infinity`, `NaN` or a misleading `0` — when the denominator is 0.
+8. **Decimals stay decimal.** Converted once at the boundary; display rounds, arithmetic does not. A factor of 1.8 on halves yields values like 3.6; rounding those before summing breaks invariant 1.
+9. **Scope is uniform.** Every figure comes from the same filtered project array the rest of the board is showing.
 
 ---
 
-## What is deliberately not modelled
-
-Per spec D1 and FR-027, with the reason each was excluded:
+## Not modelled
 
 | Not modelled | Why |
 |---|---|
-| Consumed hours | No time tracking exists; nothing records hours worked |
-| Milestones | No milestone concept on projects or steps |
-| Deliverables / posts | The join from a brand's pipeline tasks to its projects is undefined |
-| Seniority | Members have a role, not a level |
-| Supervision overhead | No rule exists that adds review time to a manager's load |
-| Public holidays | No holiday data anywhere in the product (FR-025) |
+| Time tracking / hours worked | Out of scope. "Consumed hours" is done step-days valued in hours, not tracked time. |
+| Deliverables and "posts" | Dropped by decision, though derivable via `ProjectStep.task_id`. |
+| Milestone dependencies or gating | A milestone is a marked step, not a phase boundary. |
+| Public holidays | No holiday data anywhere in the product (FR-025). |
+| Per-member factor overrides | Rates are per level, not per person. A member who is an exception should have their level changed. |
