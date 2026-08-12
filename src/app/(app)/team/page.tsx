@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { TeamBoard, type TeamStep } from '@/components/projects/TeamBoard'
+import { assumptionsOf, personLoad } from '@/lib/workload'
+import { todayISO, type ProjectView } from '@/lib/projects'
 
 /**
  * Team tasks.
@@ -17,7 +19,7 @@ export default async function TeamPage() {
 
   const isAdmin = member.access === 'admin'
 
-  const [rows, brands, allMembers, projects] = await Promise.all([
+  const [rows, brands, allMembers, projects, ws, levelRows] = await Promise.all([
     prisma.projectStep.findMany({
       where: isAdmin ? { assignee_id: { not: null } } : { assignee_id: member.id },
       orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }],
@@ -29,6 +31,8 @@ export default async function TeamPage() {
       orderBy: [{ focus: 'desc' }, { name: 'asc' }],
       select: { id: true, name: true, brand: { select: { name: true } } },
     }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
+    prisma.seniorityLevel.findMany(),
   ])
 
   const steps: TeamStep[] = rows.map(s => ({
@@ -56,9 +60,44 @@ export default async function TeamPage() {
       }])).values()].sort((a, b) => a.name.localeCompare(b.name))
     : [{ id: member.id, name: member.name, role: member.role, avatar: member.avatar_url ?? null }]
 
+  // A person's own workload card (FR-021). Computed here rather than in the
+  // component so it comes from the same module the admin panel reads — the two
+  // must never produce different numbers for the same human being.
+  //
+  // `rows` is already scoped to the viewer for a non-admin, so this reshapes
+  // exactly what they are allowed to see and nothing more.
+  const mineRows = rows.filter(r => r.assignee_id === member.id)
+  const asProjects: ProjectView[] = [{
+    id: 'own', name: 'own', brandId: null, brandName: null, brandColor: null,
+    standing: false, dueDate: null, focus: true,
+    steps: mineRows.map(s => ({
+      id: s.id, name: s.name,
+      durationDays: Number(s.duration_days),
+      dueDate: s.due_date ? s.due_date.toISOString().slice(0, 10) : null,
+      done: s.done, assigneeId: s.assignee_id, assigneeName: s.assignee?.name ?? null,
+      taskId: s.task_id, milestone: s.milestone, complexity: s.complexity,
+    })),
+  }]
+  const today = todayISO()
+  const assumptions = assumptionsOf(asProjects, today, {
+    hoursPerStepDay:         Number(ws?.hours_per_step_day ?? 8),
+    capacityPeriodEnd:       ws?.capacity_period_end ? ws.capacity_period_end.toISOString().slice(0, 10) : null,
+    complexityThresholdDays: Number(ws?.complexity_threshold_days ?? 3),
+    supervisingRole:         ws?.supervising_role ?? 'Marketing Manager',
+    levels: Object.fromEntries(levelRows.map(l => [l.key, {
+      effortFactor: Number(l.effort_factor), supervisionRate: Number(l.supervision_rate),
+    }])),
+  })
+  const myLoad = personLoad(asProjects, {
+    id: member.id, name: member.name, role: member.role,
+    seniority: member.seniority ?? 'mid', capacityHrsWk: member.capacity_hrs_wk,
+  }, assumptions, today)
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <TeamBoard
+        myLoad={myLoad}
+        hoursPerStepDay={assumptions.hoursPerStepDay}
         steps={steps}
         people={people}
         allMembers={allMembers}

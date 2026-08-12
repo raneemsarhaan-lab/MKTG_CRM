@@ -126,7 +126,13 @@ export async function removeProject(projectId: string): Promise<Result> {
  */
 export async function updateStep(
   stepId: string,
-  patch: { name?: string; duration_days?: number; due_date?: string | null; assignee_id?: string | null },
+  patch: {
+    name?: string; duration_days?: number; due_date?: string | null
+    assignee_id?: string | null
+    milestone?: boolean
+    /** 'simple' | 'complex' to override, null to let the threshold decide. */
+    complexity?: 'simple' | 'complex' | null
+  },
 ): Promise<Result> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
@@ -153,6 +159,15 @@ export async function updateStep(
   }
   if (patch.due_date !== undefined) data.due_date = patch.due_date ? new Date(patch.due_date) : null
   if (patch.assignee_id !== undefined) data.assignee_id = patch.assignee_id || null
+  if (patch.milestone !== undefined) data.milestone = patch.milestone
+  if (patch.complexity !== undefined) {
+    if (patch.complexity !== null && patch.complexity !== 'simple' && patch.complexity !== 'complex') {
+      return { success: false, error: 'Complexity must be simple, complex, or cleared' }
+    }
+    // Null hands the step back to the workspace threshold. An explicit value
+    // survives the threshold being changed later, which is the point of it.
+    data.complexity = patch.complexity
+  }
 
   if (!Object.keys(data).length) return { success: true }
 

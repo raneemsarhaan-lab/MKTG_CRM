@@ -49,6 +49,26 @@ function matchBrand(planName: string | null, brands: { id: string; name: string 
   return partial?.id ?? null
 }
 
+
+/**
+ * Does this step name follow the plan's milestone convention?
+ *
+ * The plan marks milestones by writing them in capitals — GO LIVE, LAUNCH,
+ * ENROLMENT OPENS, CAMPAIGN CLOSES, SERIES RUNS 1-30 NOV, DELIVERED. Nothing
+ * else distinguishes them, which is exactly why the flag exists: this runs
+ * once, when a step is first created, and after that the flag is the truth.
+ *
+ * Deliberately not applied to steps that already exist. The plan is edited in
+ * the app, and a re-import that re-flagged everything would undo that.
+ */
+function looksLikeMilestone(name: string): boolean {
+  const letters = [...name].filter(c => /\p{L}/u.test(c))
+  if (letters.length < 3) return false
+  const caps = letters.filter(c => c === c.toUpperCase() && c !== c.toLowerCase()).length
+  if (caps / letters.length > 0.6) return true
+  return /\b(GO LIVE|LAUNCH|DELIVERED|OPENS|CLOSES)\b/.test(name)
+}
+
 async function main() {
   if (!existsSync(PLAN_PATH)) {
     console.log('▶ No plan at data/projects-plan.json — skipping.')
@@ -107,6 +127,7 @@ async function main() {
               duration_days: s.duration_days,
               due_date: s.due_date ? new Date(s.due_date) : null,
               done: s.done,
+              milestone: looksLikeMilestone(s.name),
               assignee_id: s.assignee ? memberByShort.get(s.assignee) ?? null : null,
               sort_order: j,
             },
@@ -132,6 +153,7 @@ async function main() {
             duration_days: s.duration_days,
             due_date: s.due_date ? new Date(s.due_date) : null,
             done: s.done,
+            milestone: looksLikeMilestone(s.name),
             assignee_id: s.assignee ? memberByShort.get(s.assignee) ?? null : null,
             sort_order: j,
           })),

@@ -22,6 +22,7 @@ export function mapMember(m: any): Member {
     access:          m.access,
     capacity_hrs_wk: m.capacity_hrs_wk,
     status:          m.status,
+    seniority:       m.seniority ?? 'mid',
     color:           m.color    ?? undefined,
     avatar_url:      m.avatar_url ?? undefined,
     // A boolean, never the hash. Members created by the ClickUp import have

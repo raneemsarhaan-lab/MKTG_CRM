@@ -10,12 +10,13 @@ export default async function SettingsPage() {
   if (!member) redirect('/login')
   if (member.access !== 'admin') redirect('/overview')
 
-  const [members, brands, contentTypes, slaRows, wsRow] = await Promise.all([
+  const [members, brands, contentTypes, slaRows, wsRow, levels] = await Promise.all([
     prisma.member.findMany({ orderBy: { name: 'asc' } }),
     prisma.brand.findMany({ orderBy: { name: 'asc' }, include: { assets: { orderBy: { uploaded_at: 'asc' } } } }),
     prisma.contentType.findMany({ orderBy: { label: 'asc' } }),
     prisma.slaConfig.findMany(),
     prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
+    prisma.seniorityLevel.findMany({ orderBy: { sort_order: 'asc' } }),
   ])
 
   const workspaceSettings: WorkspaceSettings = wsRow
@@ -27,6 +28,21 @@ export default async function SettingsPage() {
       <SettingsView
         members={members.map(mapMember)}
         currentUserId={member.id}
+        seniorityLevels={levels.map(l => ({ key: l.key, label: l.label }))}
+        workload={{
+          settings: {
+            hoursPerStepDay:         Number(wsRow?.hours_per_step_day ?? 8),
+            capacityPeriodEnd:       wsRow?.capacity_period_end ? wsRow.capacity_period_end.toISOString().slice(0, 10) : null,
+            complexityThresholdDays: Number(wsRow?.complexity_threshold_days ?? 3),
+            supervisingRole:         wsRow?.supervising_role ?? 'Marketing Manager',
+          },
+          levels: levels.map(l => ({
+            key: l.key, label: l.label,
+            effortFactor: Number(l.effort_factor),
+            supervisionRate: Number(l.supervision_rate),
+          })),
+          roles: [...new Set(members.map(m => m.role))].sort(),
+        }}
         brands={brands.map(b => ({
           id: b.id, name: b.name, color: b.color,
           logo_url: b.logo_url ?? undefined,

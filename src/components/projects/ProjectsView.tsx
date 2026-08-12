@@ -12,6 +12,8 @@ import {
 } from '@/lib/board-ui'
 import { initials } from '@/lib/utils'
 import { looksLikeList, parsePastedList } from '@/lib/paste-list'
+import type { MemberInput, LevelRates } from '@/lib/workload'
+import { WorkloadPanel } from './WorkloadPanel'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
   convertStepToTask, addStep, addSteps, removeStep, removeProject, createProject,
@@ -32,11 +34,19 @@ import {
 interface Props {
   projects: ProjectView[]
   brands:   { id: string; name: string; color: string; logo_url?: string | null }[]
-  members:  { id: string; name: string }[]
-  isAdmin:  boolean
+  members:  MemberInput[]
+  settings: {
+    hoursPerStepDay: number
+    capacityPeriodEnd: string | null
+    complexityThresholdDays: number
+    supervisingRole: string
+  }
+  levels:    Record<string, LevelRates>
+  levelList: { key: string; label: string }[]
+  isAdmin:   boolean
 }
 
-type Tab  = 'overview' | 'projects' | 'timeline' | 'weeks'
+type Tab  = 'overview' | 'projects' | 'timeline' | 'weeks' | 'workload'
 type List = 'focus' | 'aspiring'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -46,7 +56,7 @@ const fmt = (iso: string | null) => {
   return `${+d} ${MONTHS[+m - 1]}`
 }
 
-export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
+export function ProjectsView({ projects, brands, members, settings, levels, levelList, isAdmin }: Props) {
   const [list, setList]   = useState<List>('focus')
   const [tab, setTab]     = useState<Tab>('overview')
   const [error, setError] = useState('')
@@ -141,7 +151,7 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
           display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 4,
           border: `1px solid ${UI.border}`, borderRadius: 14, padding: 6, background: '#FFFFFF',
         }}>
-          {(['overview', 'projects', 'timeline', 'weeks'] as Tab[]).map(t => {
+          {(['overview', 'projects', 'timeline', 'weeks', ...(isAdmin ? ['workload' as Tab] : [])] as Tab[]).map(t => {
             const active = tab === t
             return (
               <button key={t} onClick={() => setTab(t)} aria-pressed={active}
@@ -154,7 +164,8 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
                         color: active ? UI.ink : UI.textSecond,
                       }}>
                 <TabIcon name={t} active={active} />
-                {t === 'overview' ? 'Overview' : t === 'projects' ? 'Projects' : t === 'timeline' ? 'Timeline' : 'Weeks'}
+                {t === 'overview' ? 'Overview' : t === 'projects' ? 'Projects'
+                  : t === 'timeline' ? 'Timeline' : t === 'weeks' ? 'Weeks' : 'Workload'}
               </button>
             )
           })}
@@ -166,6 +177,18 @@ export function ProjectsView({ projects, brands, members, isAdmin }: Props) {
         {tab === 'projects' && (
           <ProjectList projects={shown} today={today} brands={brands} members={members}
                        isAdmin={isAdmin} onError={setError} />
+        )}
+        {tab === 'workload' && isAdmin && (
+          <WorkloadPanel
+            projects={shown}
+            scopeLabel={list === 'focus' ? 'Focus' : 'Aspiring'}
+            members={members}
+            settings={settings}
+            levels={levels}
+            isAdmin={isAdmin}
+            today={today}
+            onError={setError}
+          />
         )}
         {tab === 'timeline' && <Timeline projects={shown} today={today} />}
         {tab === 'weeks'    && <Weeks projects={shown} today={today} />}
@@ -686,10 +709,41 @@ function StepRow({ step, today, members, isAdmin, onError }: {
       ) : null}
 
       {isAdmin && (
-        <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
-                style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
-          ✕
-        </button>
+        <>
+          {/* Milestone — a marked point in the plan. Still ordinary planned
+              work in every days figure; the star marks that it matters. */}
+          <button onClick={() => act(() => updateStep(step.id, { milestone: !step.milestone }))}
+                  aria-pressed={!!step.milestone}
+                  aria-label={step.milestone ? `Unmark ${step.name} as a milestone` : `Mark ${step.name} as a milestone`}
+                  title={step.milestone ? 'A milestone' : 'Mark as a milestone'}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer',
+                    fontSize: 14, padding: 3, lineHeight: 1, flexShrink: 0,
+                    color: step.milestone ? UI.star : '#D8D8DF',
+                  }}>
+            ★
+          </button>
+
+          {/* Complexity — blank hands the step back to the workspace
+              threshold; an explicit choice survives the threshold changing. */}
+          <select value={step.complexity ?? ''}
+                  aria-label={`Complexity of ${step.name}`}
+                  title="Overrides the workspace duration threshold for this step"
+                  onChange={e => act(() => updateStep(step.id, {
+                    complexity: (e.target.value || null) as 'simple' | 'complex' | null,
+                  }))}
+                  style={{ ...input, width: 96, appearance: 'none',
+                           color: step.complexity ? UI.textPrimary : UI.faintest }}>
+            <option value="">auto</option>
+            <option value="simple">simple</option>
+            <option value="complex">complex</option>
+          </select>
+
+          <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
+                  style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
+            ✕
+          </button>
+        </>
       )}
     </div>
   )
@@ -860,6 +914,7 @@ function TabIcon({ name, active }: { name: Tab; active: boolean }) {
     projects: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>,
     timeline: <><path d="M4 6h10M4 12h16M4 18h7" /></>,
     weeks:    <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+    workload: <><path d="M4 20V10M10 20V4M16 20v-7M22 20v-4" /></>,
   }
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill={active && name === 'overview' ? UI.ink : 'none'}
