@@ -3,6 +3,15 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+/** Same convention the plan importer uses — see scripts/import-plan.ts. */
+function looksLikeMilestone(name: string): boolean {
+  const letters = [...name].filter(c => /\p{L}/u.test(c))
+  if (letters.length < 3) return false
+  const caps = letters.filter(c => c === c.toUpperCase() && c !== c.toLowerCase()).length
+  if (caps / letters.length > 0.6) return true
+  return /\b(GO LIVE|LAUNCH|DELIVERED|OPENS|CLOSES)\b/.test(name)
+}
+
 async function main() {
   const defaultPassword = await bcrypt.hash('FluxoAdmin2026!', 10)
   const adminPassword   = await bcrypt.hash('Fluxo-rSpNJNGb9c7prM', 10)
@@ -102,6 +111,44 @@ async function main() {
       update: {},
       create: { ...m, password_hash },
     })
+  }
+
+  // Seniority levels — what each rung costs.
+  //
+  // `update: {}` on purpose: the rates are meant to be tuned in Settings, and
+  // this file runs on every container start. A blanket update would reset an
+  // admin's tuning on each deploy.
+  const levels = [
+    { key: 'junior', label: 'Junior', effort_factor: 1.8, supervision_rate: 0.25, sort_order: 0 },
+    { key: 'mid',    label: 'Mid',    effort_factor: 1.0, supervision_rate: 0.0,  sort_order: 1 },
+    { key: 'senior', label: 'Senior', effort_factor: 1.0, supervision_rate: 0.0,  sort_order: 2 },
+  ]
+  for (const l of levels) {
+    await prisma.seniorityLevel.upsert({ where: { key: l.key }, update: {}, create: l })
+  }
+
+  // One-time milestone backfill.
+  //
+  // The plan importer flags a milestone when it creates a step, which does
+  // nothing for the 327 steps that already exist — the feature would ship with
+  // an empty tile on the only deployment that has data. Backfilling is safe
+  // *because the column is new*: every value is still the default, so there is
+  // no admin intent to overwrite yet.
+  //
+  // It must happen exactly once, or unflagging a step by hand would be undone
+  // on the next deploy. The marker row is the guard.
+  const BACKFILL = { kind: 'migration', key: 'milestone-backfill' }
+  const alreadyRun = await prisma.tombstone.findUnique({
+    where: { kind_key: { kind: BACKFILL.kind, key: BACKFILL.key } },
+  })
+  if (!alreadyRun) {
+    const steps = await prisma.projectStep.findMany({ select: { id: true, name: true } })
+    const hits = steps.filter(s => looksLikeMilestone(s.name)).map(s => s.id)
+    if (hits.length) {
+      await prisma.projectStep.updateMany({ where: { id: { in: hits } }, data: { milestone: true } })
+    }
+    await prisma.tombstone.create({ data: { ...BACKFILL, label: `${hits.length} steps flagged` } })
+    console.log(`  ✦ flagged ${hits.length} existing step(s) as milestones (one-time)`)
   }
 
   // Workspace settings

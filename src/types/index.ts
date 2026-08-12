@@ -37,6 +37,8 @@ export interface Member {
    * whether one exists. Set on the Settings page, which is admin-only.
    */
   has_password?: boolean
+  /** Matches a SeniorityLevel key. Optional so older callers still compile. */
+  seniority?: string
 }
 
 export interface Brand {

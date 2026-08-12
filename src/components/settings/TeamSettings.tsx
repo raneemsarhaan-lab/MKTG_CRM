@@ -21,6 +21,9 @@ const ACCESS_OPTS = [
 interface TeamSettingsProps {
   members: Member[]
   currentUserId: string
+  /** Seniority rungs from the database, so a workspace that adds one gets it
+   *  here without a code change. Empty hides the control entirely. */
+  seniorityLevels?: { key: string; label: string }[]
 }
 
 interface RemoveWarning {
@@ -31,7 +34,7 @@ interface RemoveWarning {
   comments:   number
 }
 
-export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
+export function TeamSettings({ members, currentUserId, seniorityLevels = [] }: TeamSettingsProps) {
   const [draft, setDraft] = useState<{ name: string; email: string; role: string; access: 'admin' | 'superuser' | 'user'; password: string }>({ name: '', email: '', role: '', access: 'user', password: '' })
   const [addError, setAddError] = useState<string | null>(null)
   const [removeWarning, setRemoveWarning] = useState<RemoveWarning | null>(null)
@@ -121,6 +124,7 @@ export function TeamSettings({ members, currentUserId }: TeamSettingsProps) {
               member={m}
               isYou={m.id === currentUserId}
               first={i === 0}
+              seniorityLevels={seniorityLevels}
               onRemove={() => handleRemove(m)}
             />
           ))
@@ -348,6 +352,7 @@ interface MemberRowProps {
   member: Member
   isYou: boolean
   first: boolean
+  seniorityLevels: { key: string; label: string }[]
   onRemove: () => void
 }
 
@@ -358,6 +363,7 @@ interface Draft {
   capacity_hrs_wk: number
   access:          'admin' | 'superuser' | 'user'
   avatar_url:      string | null
+  seniority:       string
 }
 
 const draftOf = (m: Member): Draft => ({
@@ -366,9 +372,10 @@ const draftOf = (m: Member): Draft => ({
   capacity_hrs_wk: m.capacity_hrs_wk,
   access:          m.access as Draft['access'],
   avatar_url:      m.avatar_url ?? null,
+  seniority:       m.seniority ?? 'mid',
 })
 
-function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
+function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: MemberRowProps) {
   const [isPending, startTransition] = useTransition()
   const [newPwd, setNewPwd] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
@@ -394,14 +401,15 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
   // in progress is not thrown away by an unrelated re-render.
   useEffect(() => {
     setDraft(draftOf(m))
-  }, [m.name, m.role, m.capacity_hrs_wk, m.access, m.avatar_url])
+  }, [m.name, m.role, m.capacity_hrs_wk, m.access, m.avatar_url, m.seniority])
 
   const dirty =
     draft.name !== m.name ||
     draft.role !== m.role ||
     draft.capacity_hrs_wk !== m.capacity_hrs_wk ||
     draft.access !== m.access ||
-    (draft.avatar_url ?? null) !== (m.avatar_url ?? null)
+    (draft.avatar_url ?? null) !== (m.avatar_url ?? null) ||
+    draft.seniority !== (m.seniority ?? 'mid')
 
   function handleSave() {
     if (!dirty) return
@@ -416,6 +424,7 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         capacity_hrs_wk: draft.capacity_hrs_wk,
         access:          draft.access,
         avatar_url:      draft.avatar_url,
+        seniority:       draft.seniority,
       })
       if (r.success) {
         setSaveMsg('Saved')
@@ -573,6 +582,25 @@ function MemberRow({ member: m, isYou, first, onRemove }: MemberRowProps) {
         >
           {ACCESS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+
+        {/* Seniority — what this person's work is estimated to cost.
+            Part of the same draft, so it saves with the row rather than
+            adding a second place a change can be lost. */}
+        {seniorityLevels.length > 0 && (
+          <select
+            value={draft.seniority}
+            aria-label={`Seniority of ${m.name}`}
+            title="Changes what this person's complex work is estimated to cost"
+            onChange={e => set('seniority', e.target.value)}
+            style={{
+              fontSize: '0.75rem', padding: '5px 8px', borderRadius: 7,
+              border: '1px solid var(--line)', background: '#F6F6F4',
+              color: 'var(--ink)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            {seniorityLevels.map(l => <option key={l.key} value={l.key}>{l.label}</option>)}
+          </select>
+        )}
 
         {/* An account with no password exists and can hold work, but cannot
             sign in. The import creates people that way. */}

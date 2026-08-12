@@ -18,6 +18,11 @@ export interface StepView {
   assigneeId: string | null
   assigneeName: string | null
   taskId: string | null
+  /** A marked point in the plan — see the schema. Optional so older callers
+   *  that build a StepView without it keep compiling. */
+  milestone?: boolean
+  /** 'simple' | 'complex' when overridden; null lets the threshold decide. */
+  complexity?: string | null
 }
 
 export interface ProjectView {

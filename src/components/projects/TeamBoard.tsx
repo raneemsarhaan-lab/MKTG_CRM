@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { initials } from '@/lib/utils'
 import { setStepDone, convertStepToTask, updateStep, addStep, addSteps } from '@/actions/projects'
 import { looksLikeList, parsePastedList } from '@/lib/paste-list'
+import type { PersonLoad } from '@/lib/workload'
+import { PersonWorkloadCard } from './PersonWorkloadCard'
 import { isLate, todayISO } from '@/lib/projects'
 import {
   UI, TILE, font, card, control, input,
@@ -44,6 +46,10 @@ export interface TeamStep {
 }
 
 interface Props {
+  /** The viewer's own workload, computed server-side from the same module the
+   *  admin Workload tab uses, so the two cannot disagree about them. */
+  myLoad?: PersonLoad
+  hoursPerStepDay?: number
   steps:      TeamStep[]
   people:     { id: string; name: string; role: string; avatar: string | null }[]
   allMembers: { id: string; name: string }[]
@@ -67,7 +73,7 @@ const monthLabel = (k: string) =>
   k === 'zzzz' ? 'NO DATE' : `${MONTHS[+k.slice(5, 7) - 1].toUpperCase()} ${k.slice(0, 4)}`
 
 export function TeamBoard({
-  steps, people, allMembers, projects, brands, isAdmin, viewerId, canPush,
+  steps, people, allMembers, projects, brands, isAdmin, viewerId, canPush, myLoad, hoursPerStepDay,
 }: Props) {
   const [who, setWho]       = useState(isAdmin ? (people[0]?.id ?? viewerId) : viewerId)
   const [brand, setBrand]   = useState('')
@@ -182,6 +188,13 @@ export function TeamBoard({
                value={String(Math.round(stats.days))} unit="days"
                fill={27} fillColor={UI.purplePale} />
         </div>
+
+        {/* Your own workload, month by month. Shown when you are looking at
+            yourself — an admin flipping between people gets the full picture
+            on the Workload tab instead, where it can be compared. */}
+        {myLoad && who === viewerId && myLoad.steps > 0 && (
+          <PersonWorkloadCard load={myLoad} hoursPerStepDay={hoursPerStepDay ?? 8} compact />
+        )}
 
         {/* ── §6 Filter row ───────────────────────────────────────────── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

@@ -6,10 +6,18 @@ import { TeamSettings } from './TeamSettings'
 import { WorkflowSettings } from './WorkflowSettings'
 import { BrandSettings, type BrandWithAssets } from './BrandSettings'
 import { Diagnostics } from './Diagnostics'
+import { WorkloadSettings } from './WorkloadSettings'
 
-type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics'
+type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics' | 'workload'
 
 interface SettingsViewProps {
+  seniorityLevels?: { key: string; label: string }[]
+  workload?: {
+    settings: { hoursPerStepDay: number; capacityPeriodEnd: string | null
+                complexityThresholdDays: number; supervisingRole: string }
+    levels: { key: string; label: string; effortFactor: number; supervisionRate: number }[]
+    roles: string[]
+  }
   members: Member[]
   currentUserId: string
   brands: BrandWithAssets[]
@@ -18,7 +26,7 @@ interface SettingsViewProps {
   workspaceSettings: WorkspaceSettings
 }
 
-export function SettingsView({ members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings }: SettingsViewProps) {
+export function SettingsView({ seniorityLevels, workload, members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings }: SettingsViewProps) {
   const [tab, setTab] = useState<Tab>('team')
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -62,6 +70,9 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
           <button style={tabBtn(tab === 'workflow')} onClick={() => setTab('workflow')}>
             SLA &amp; Workflow
           </button>
+          <button style={tabBtn(tab === 'workload')} onClick={() => setTab('workload')}>
+            Workload
+          </button>
           <button style={tabBtn(tab === 'diagnostics')} onClick={() => setTab('diagnostics')}>
             Diagnostics
           </button>
@@ -69,9 +80,12 @@ export function SettingsView({ members, currentUserId, brands, contentTypes, sla
 
         {/* Tab content */}
         {tab === 'team' && (
-          <TeamSettings members={members} currentUserId={currentUserId} />
+          <TeamSettings members={members} currentUserId={currentUserId} seniorityLevels={seniorityLevels} />
         )}
         {tab === 'brands' && <BrandSettings brands={brands} />}
+        {tab === 'workload' && workload && (
+          <WorkloadSettings settings={workload.settings} levels={workload.levels} roles={workload.roles} />
+        )}
         {tab === 'diagnostics' && <Diagnostics />}
         {tab === 'workflow' && (
           <WorkflowSettings

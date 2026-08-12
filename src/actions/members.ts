@@ -14,6 +14,8 @@ type MemberPatch = Partial<{
   status:          string
   /** Profile picture. A URL — there is no upload backend. */
   avatar_url:      string | null
+  /** Matches a SeniorityLevel key. Changes what their work is estimated to cost. */
+  seniority:       string
 }>
 
 type AddMemberInput = {
@@ -55,6 +57,11 @@ export async function updateMember(
   if (patch.capacity_hrs_wk !== undefined) data.capacity_hrs_wk = patch.capacity_hrs_wk
   if (patch.status !== undefined)          data.status          = patch.status
   if (patch.avatar_url !== undefined)      data.avatar_url      = patch.avatar_url?.trim() || null
+  if (patch.seniority !== undefined) {
+    const known = await prisma.seniorityLevel.findUnique({ where: { key: patch.seniority } })
+    if (!known) return { success: false, error: 'No such seniority level' }
+    data.seniority = patch.seniority
+  }
 
   try {
     await prisma.member.update({ where: { id: memberId }, data })

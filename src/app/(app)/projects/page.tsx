@@ -15,7 +15,7 @@ export default async function ProjectsPage() {
   const member = await getSessionMember()
   if (!member) redirect('/login')
 
-  const [rows, brands, members] = await Promise.all([
+  const [rows, brands, members, ws, levelRows] = await Promise.all([
     prisma.project.findMany({
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       include: {
@@ -24,8 +24,27 @@ export default async function ProjectsPage() {
       },
     }),
     prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, logo_url: true } }),
-    prisma.member.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.member.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, role: true, seniority: true, capacity_hrs_wk: true, avatar_url: true },
+    }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
+    prisma.seniorityLevel.findMany({ orderBy: { sort_order: 'asc' } }),
   ])
+
+  // Decimal columns arrive as Prisma Decimal. Convert once, here at the
+  // boundary — the workload module deals in numbers and nothing downstream
+  // should have to remember this.
+  const levels = Object.fromEntries(levelRows.map(l => [l.key, {
+    effortFactor: Number(l.effort_factor),
+    supervisionRate: Number(l.supervision_rate),
+  }]))
+  const settings = {
+    hoursPerStepDay:         Number(ws?.hours_per_step_day ?? 8),
+    capacityPeriodEnd:       ws?.capacity_period_end ? ws.capacity_period_end.toISOString().slice(0, 10) : null,
+    complexityThresholdDays: Number(ws?.complexity_threshold_days ?? 3),
+    supervisingRole:         ws?.supervising_role ?? 'Marketing Manager',
+  }
 
   const projects: ProjectView[] = rows.map(p => ({
     id: p.id,
@@ -42,6 +61,8 @@ export default async function ProjectsPage() {
       durationDays: Number(s.duration_days),
       dueDate: s.due_date ? s.due_date.toISOString().slice(0, 10) : null,
       done: s.done,
+      milestone: s.milestone,
+      complexity: s.complexity,
       assigneeId: s.assignee_id,
       assigneeName: s.assignee?.name ?? null,
       taskId: s.task_id,
@@ -53,7 +74,14 @@ export default async function ProjectsPage() {
       <ProjectsView
         projects={projects}
         brands={brands}
-        members={members}
+        members={members.map(m => ({
+          id: m.id, name: m.name, role: m.role,
+          seniority: m.seniority, capacityHrsWk: m.capacity_hrs_wk,
+          avatarUrl: m.avatar_url,
+        }))}
+        settings={settings}
+        levels={levels}
+        levelList={levelRows.map(l => ({ key: l.key, label: l.label }))}
         isAdmin={member.access === 'admin'}
       />
     </div>

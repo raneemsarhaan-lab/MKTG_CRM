@@ -14,6 +14,10 @@ model Member {
   role            String
   access          String   @default("user")
   capacity_hrs_wk Int      @default(40)
+  /// Matches SeniorityLevel.key. A plain string rather than a relation: an
+  /// unknown level resolves to the neutral rates in code, so a bad settings
+  /// edit degrades to "no adjustment" instead of a page that will not render.
+  seniority       String   @default("mid")
   status          String   @default("Available")
   color           String?
   avatar_url      String?
@@ -79,6 +83,16 @@ model ProjectStep {
   duration_days Decimal   @default(0) @db.Decimal(5, 1)
   due_date      DateTime? @db.Date
   done          Boolean   @default(false)
+  /// A marked point in the plan — a launch, an opening, a delivery. Set by the
+  /// plan importer from the marker-name convention when a step is first
+  /// created, and editable thereafter. A milestone is still ordinary planned
+  /// work in every days and capacity figure; the flag marks its significance,
+  /// it does not remove it from the plan.
+  milestone     Boolean   @default(false)
+  /// 'simple' | 'complex' when an admin has overridden the classification.
+  /// Null means the workspace's duration threshold decides. Nullable on
+  /// purpose: an override has to survive someone tuning the threshold.
+  complexity    String?
   assignee_id   String?   @db.Uuid
   /// Set once this step has been pushed onto the pipeline board. Kept so the
   /// step can show that it is being produced, and so pushing it twice does
@@ -216,9 +230,41 @@ model WorkspaceSettings {
   id                  Int      @id
   capacity_hrs_per_wk Int      @default(40)
   nine_stage_default  Boolean  @default(false)
+
+  /// How many hours one planned step-day costs. The plan is written in days;
+  /// this is what turns it into hours.
+  hours_per_step_day  Decimal  @default(8) @db.Decimal(4, 1)
+  /// End of the capacity window. Null runs to the last dated step in scope.
+  /// The start is always today and is deliberately not stored — a stored start
+  /// goes stale in silence and inflates everyone's available hours.
+  capacity_period_end DateTime? @db.Date
+  /// At or below this many days a step is simple, unless it says otherwise.
+  complexity_threshold_days Decimal @default(3) @db.Decimal(4, 1)
+  /// Whose row receives supervision overhead. A role, never a named person.
+  supervising_role    String   @default("Marketing Manager")
+
   updated_at          DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("workspace_settings")
+}
+
+/// A seniority level and what it costs.
+///
+/// A table rather than columns on WorkspaceSettings because this is a list the
+/// settings screen renders row by row, and because a workspace that wants a
+/// fourth rung should not need a migration to get one.
+model SeniorityLevel {
+  key              String  @id
+  label            String
+  /// Multiplies the duration of COMPLEX steps only. A simple step costs its
+  /// planned duration whoever holds it — the premium is for difficulty.
+  effort_factor    Decimal @default(1) @db.Decimal(4, 2)
+  /// Share of the ADJUSTED days that becomes supervision for someone else.
+  /// It compounds with the factor rather than sitting beside it.
+  supervision_rate Decimal @default(0) @db.Decimal(4, 2)
+  sort_order       Int     @default(0)
+
+  @@map("seniority_levels")
 }
 
 /// A record of something an admin deleted on purpose.
