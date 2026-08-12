@@ -44,7 +44,7 @@ So the calculation model in the mock is right and reproducible; the figures have
 |---|---|
 | **Consumed hours** ("102 · 5% of expected") and the per-brand **% column** | **Derivable — no new data.** Proven against live data: see below. |
 | **Milestones** ("10 ahead · 0 passed", "1 ms" per brand) | **In scope, needs one new flag.** Marker steps already exist by convention; the flag makes them explicit — see below. |
-| **Deliverables** ("105 steps · 10 posts") | Steps exist; "posts" presumably means pipeline tasks, but the link between a brand's tasks and its projects is not defined. |
+| **Deliverables** ("105 steps · 10 posts") | **Dropped by decision** (2026-08-12 clarification). Derivable, but not built — see Out of Scope. |
 | **Seniority** ("Video editor · Junior") | Members have a role, not a seniority level. |
 | **Supervision overhead** ("incl. 16d supervision") | No rule exists that adds review time to a manager's load. |
 
@@ -76,6 +76,7 @@ So milestones are real, and inference is not good enough to build on. One boolea
 ### Session 2026-08-12
 
 - Q: Where do "consumed hours" and the per-brand % column come from, given no time tracking exists? → A: **Option A** — consumed hours = done step-days × hours-per-step-day; the brand % column = done-days ÷ total-days. Purely derived from the `done` flag already on every step. No schema change, no time tracking, and the figure moves when someone ticks a step.
+- Q: What counts as a "deliverable", and what is a "post" in "105 steps · 10 posts"? → A: **Option D — drop it.** The deliverables tile is not built. A workable derivation existed (every step in scope, split by whether it has reached the pipeline board via `ProjectStep.task_id`), but the count answers no question the manager asked: the steps figure is already shown, and the split adds a number without a decision attached to it.
 - Q: What makes a step a milestone, given the plan only marks them by naming convention? → A: **Option A** — an explicit `milestone` flag on the step, toggled in the Projects tab. The plan import seeds it from the marker names already present (`GO LIVE`, `LAUNCH`, `ENROLMENT OPENS`, `CAMPAIGN CLOSES`, `DELIVERED …`) so nothing is lost on day one, but from then on it is explicit rather than inferred from capitalisation.
 
 ---
@@ -213,7 +214,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 **Honesty of the numbers**
 
 - **FR-026**: Where a figure is derived from an assumption rather than recorded fact, the panel MUST state the assumption alongside the figure.
-- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived (FR-006a, FR-008); milestones are explicit (FR-028). Deliverable/post counts, seniority and supervision overhead remain excluded unless resolved by a later clarification.
+- **FR-027**: The panel MUST NOT display any metric it cannot derive from real data. Consumed hours and completion percentages are derived (FR-006a, FR-008); milestones are explicit (FR-028). Deliverable/post counts are dropped by decision. Seniority and supervision overhead remain excluded unless resolved by a later clarification.
 
 ### Key Entities
 
@@ -256,7 +257,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 - **Time tracking** — capturing hours actually worked. The "consumed hours" tile is in scope (FR-006a) but is derived from completed step-days, not from tracked time.
 - **Milestone dependencies, ordering or gating** — a milestone is a marked step, not a phase boundary that blocks anything.
-- Deliverable and "post" counts that join projects to pipeline tasks.
+- **The deliverables tile and its "steps · posts" split.** Dropped deliberately, not for want of a data source: the step count is already on the panel, and splitting it by whether a step has reached the board adds a figure with no decision attached to it. `ProjectStep.task_id` remains available if it is ever wanted.
 - Seniority levels and any seniority-based effort multiplier.
 - Supervision overhead automatically added to a manager's load.
 - Public-holiday calendars.
@@ -269,7 +270,7 @@ As an admin, I want to control how a planned day converts into hours, and over w
 
 Three decisions materially change what gets built. Each was put to the user with options; none is irreversible, and each is recorded here so it can be overturned deliberately rather than drifted away from.
 
-- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarifications — consumed hours, completion percentages and milestones**. The first two turned out to be derivable from the `done` flag rather than requiring time tracking; milestones already exist in the plan as a naming convention and need only one boolean to become explicit. Deliverables/posts, seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
+- **D1 — Scope: build only what the data supports.** Projects, planned days, hours, brand rollup, per-person capacity, **and — revised by the 2026-08-12 clarifications — consumed hours, completion percentages and milestones**. The first two turned out to be derivable from the `done` flag rather than requiring time tracking; milestones already exist in the plan as a naming convention and need only one boolean to become explicit. Deliverables were dropped by choice rather than for lack of data; seniority and supervision overhead remain excluded per FR-027 and Out of Scope. *Rationale*: shipping what is traceable gives the manager the answer they asked for — who is overloaded, which brand is heaviest, how far along each one is — with every figure pointing at a record.
 - **D2 — Capacity rows: one per person, plus an Unassigned row.** *Rationale*: the plan assigns to three named people, and each member already carries their own recorded weekly capacity. Grouping by role would produce the same rows with different labels today, while hiding which person inside a role is drowning. The Unassigned row is not optional — it carries 41% of the plan.
 - **D3 — Placement: a new "Workload" tab on the Projects board, admin-only.** *Rationale*: existing tabs stay untouched, and utilisation figures sit with management exactly as the Capacity view already does. A person's own card stays available to them on the team board.
 
