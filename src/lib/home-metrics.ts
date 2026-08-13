@@ -283,7 +283,7 @@ export const QUOTES: { text: string; author: string }[] = [
   { text: 'Everything is designed. Few things are designed well.',                  author: 'Brian Reed' },
   { text: 'Don’t find customers for your products. Find products for your customers.', author: 'Seth Godin' },
   { text: 'Action is the foundational key to all success.',                         author: 'Pablo Picasso' },
-  { text: 'Small wins, every day.',                                                 author: 'Fluxo' },
+  { text: 'Small wins, every day.',                                                 author: 'Momentum' },
 ]
 
 export function quoteOfDay(date: Date): { text: string; author: string; index: number } {

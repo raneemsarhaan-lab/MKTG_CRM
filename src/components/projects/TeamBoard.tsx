@@ -15,7 +15,7 @@ import {
 /**
  * Team tasks — the plan's steps, grouped by the person doing them.
  *
- * Built to "Fluxo Team Tasks - Design Spec.md". Every measurement is from that
+ * Built to "Momentum Team Tasks - Design Spec.md". Every measurement is from that
  * file.
  *
  * The same records the Portfolio board shows by project. A member sees only

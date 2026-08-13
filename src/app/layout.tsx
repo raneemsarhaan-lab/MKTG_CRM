@@ -75,8 +75,11 @@ const caveat = Caveat({
 })
 
 export const metadata: Metadata = {
-  title: 'Fluxo — Creative Operations',
+  title: 'Momentum — Creative Operations',
   description: 'Marketing CRM for Forefront Consulting',
+  // Next serves app/icon.svg as the favicon automatically; naming it here as
+  // well keeps the tab icon working when a browser prefers an explicit link.
+  icons: { icon: '/icon.svg' },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The Momentum E symbol. Kept as its own file rather than generated, so
+       the browser tab icon does not depend on the app rendering at all. -->
+  <rect width="32" height="32" rx="7" fill="#FFFFFF"/>
+  <rect x="5"   y="7.5"  width="22"   height="4.6" rx="2.3" fill="#2C57F0"/>
+  <rect x="5"   y="13.7" width="16.5" height="4.6" rx="2.3" fill="#16223C"/>
+  <rect x="5"   y="19.9" width="22"   height="4.6" rx="2.3" fill="#C7E22E"/>
+</svg>

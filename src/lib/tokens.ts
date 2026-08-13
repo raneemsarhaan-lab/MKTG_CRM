@@ -1,4 +1,4 @@
-// Fluxo Design Tokens — typed constants matching globals.css CSS variables
+// Momentum Design Tokens — typed constants matching globals.css CSS variables
 // constitution.md §I Design System Fidelity
 
 export const COLORS = {

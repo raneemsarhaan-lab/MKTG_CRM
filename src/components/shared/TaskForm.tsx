@@ -15,10 +15,10 @@ import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
  *
  * Follows ClickUp's intake pattern: a borderless title, an inline description,
  * and a row of pills that open popovers, rather than a stack of permanently
- * visible labelled selects. Rendered in Fluxo's tokens, so the interaction
+ * visible labelled selects. Rendered in Momentum's tokens, so the interaction
  * model is ClickUp's and the visual language stays this product's.
  *
- * Two Fluxo rules constrain it:
+ * Two Momentum rules constrain it:
  *  - The status chip is read-only. New tasks always enter the first stage and
  *    the 8-vs-9-stage flow is stamped at creation (HANDOVER §8), so offering a
  *    stage picker here would let intake skip a required approval.
