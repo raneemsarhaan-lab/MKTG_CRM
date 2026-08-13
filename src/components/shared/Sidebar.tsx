@@ -1,5 +1,7 @@
 'use client'
 
+import { MomentumWordmark } from './Logo'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -99,21 +101,11 @@ export function Sidebar({ member }: { member: Member }) {
       position: 'sticky', top: 0, height: '100vh', alignSelf: 'flex-start',
     }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-          <div style={{
-            fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 33,
-            letterSpacing: '-0.03em', color: PIPE.ink, lineHeight: 1,
-          }}>
-            Fluxo
-          </div>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-               style={{ marginTop: -2 }} aria-hidden="true">
-            <path d="M12 2l2.1 6.1L20 10l-5.9 2.1L12 18l-2.1-5.9L4 10l5.9-1.9L12 2z"
-                  fill={PIPE.limeCta} stroke={PIPE.ink} strokeWidth="1.4" strokeLinejoin="round" />
-          </svg>
-        </div>
+        {/* 23px, not larger: the sidebar is 200px wide with 20px padding
+            either side, and the wordmark clips past ~24px. */}
+        <MomentumWordmark fontSize={23} />
         <div style={{
-          marginTop: 9, display: 'inline-block', background: PIPE.limePrimary,
+          marginTop: 11, display: 'inline-block', background: PIPE.limePrimary,
           borderRadius: 999, padding: '6px 14px', fontSize: 12.5, fontWeight: 700, color: PIPE.ink,
         }}>
           Creative Ops

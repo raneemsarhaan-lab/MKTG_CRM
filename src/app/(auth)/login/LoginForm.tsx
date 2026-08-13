@@ -1,5 +1,7 @@
 'use client'
 
+import { MomentumWordmark } from '@/components/shared/Logo'
+
 import { useEffect, useState } from 'react'
 
 /**
@@ -136,17 +138,8 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
       >
         {/* Logo / wordmark */}
         <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-          <h1
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontWeight: 900,
-              fontSize: '28px',
-              letterSpacing: '-0.02em',
-              color: 'var(--ink)',
-              margin: 0,
-            }}
-          >
-            Fluxo
+          <h1 style={{ margin: 0 }}>
+            <MomentumWordmark fontSize={30} />
           </h1>
           <p style={{ color: 'var(--muted)', fontSize: '14px', marginTop: '4px' }}>
             Creative Operations

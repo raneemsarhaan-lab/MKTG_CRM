@@ -22,7 +22,7 @@ import {
 /**
  * Portfolio — Aspiring and Focus.
  *
- * Built to "Fluxo Portfolio - Design Spec.md". Every measurement here is from
+ * Built to "Momentum Portfolio - Design Spec.md". Every measurement here is from
  * that file; where a number looks arbitrary it is because the spec names it.
  *
  * Aspiring is the whole portfolio; Focus is the subset being worked on now.

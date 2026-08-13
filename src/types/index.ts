@@ -1,4 +1,4 @@
-// Fluxo CRM Core — complete type surface
+// Momentum CRM Core — complete type surface
 // data-model.md §TypeScript Types
 
 // ─── Primitive aliases ─────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 /**
- * Pipeline redesign tokens — "Fluxo Home — Implementation Spec" §1.
+ * Pipeline redesign tokens — "Momentum Home — Implementation Spec" §1.
  *
  * A separate table from lib/tokens.ts on purpose. That file holds the earlier
  * My Board handoff, whose palette this one does not match (its border is

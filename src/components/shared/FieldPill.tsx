@@ -8,7 +8,7 @@ import { COLORS } from '@/lib/tokens'
  *
  * A compact chip that shows its current value and opens a small panel to
  * change it, instead of a permanently visible labelled field. Rendered in
- * Fluxo's own tokens rather than ClickUp's.
+ * Momentum's own tokens rather than ClickUp's.
  *
  * Closes on outside click and on Escape; Escape is stopped from bubbling so
  * it dismisses the popover without also closing the modal behind it.

@@ -1,8 +1,8 @@
 /**
  * The planning boards' design system, from the handoff.
  *
- * Every value is transcribed from "Fluxo Portfolio - Design Spec.md" §1 and
- * "Fluxo Team Tasks - Design Spec.md" §1. The two specs overlap and agree;
+ * Every value is transcribed from "Momentum Portfolio - Design Spec.md" §1 and
+ * "Momentum Team Tasks - Design Spec.md" §1. The two specs overlap and agree;
  * where only one names a token it is still kept here, because both boards draw
  * from this file.
  *

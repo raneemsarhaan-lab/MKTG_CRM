@@ -1,5 +1,7 @@
 'use client'
 
+import { MomentumMark } from './Logo'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -130,13 +132,14 @@ export function NavRail({ member, onExpand }: NavRailProps) {
           boxShadow:     '0 16px 44px rgba(0,0,0,.35)',
         }}
       >
-        {/* Logo tile — 40×40, radius 13, sparkle glyph stroked #111111 at 2px */}
+        {/* Logo tile — the E symbol on its own. The wordmark is illegible at
+            40px, and the three bars are the mark that survives the crop. */}
         <div
           style={{
             width:          40,
             height:         40,
             borderRadius:   13,
-            background:     'var(--brand-lime)',
+            background:     '#FFFFFF',
             display:        'flex',
             alignItems:     'center',
             justifyContent: 'center',
@@ -144,19 +147,7 @@ export function NavRail({ member, onExpand }: NavRailProps) {
             flexShrink:     0,
           }}
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="21"
-            height="21"
-            fill="none"
-            stroke="#111111"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 3 L14 9 L20 11 L14 13 L12 19 L10 13 L4 11 L10 9 Z" />
-          </svg>
+          <MomentumMark size={22} title="Momentum" />
         </div>
 
         {/* Nav list flexes so the avatar always pins to the bottom */}
