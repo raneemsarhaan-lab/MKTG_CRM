@@ -12,6 +12,29 @@ function looksLikeMilestone(name: string): boolean {
   return /\b(GO LIVE|LAUNCH|DELIVERED|OPENS|CLOSES)\b/.test(name)
 }
 
+
+/**
+ * Run something exactly once, ever, across all future deploys.
+ *
+ * The seed runs on every container start, so anything that CHANGES existing
+ * rows has to be guarded or it re-asserts itself forever — undoing whatever an
+ * admin did in between. A marker row is the guard: written after the work
+ * succeeds, checked before it runs.
+ *
+ * This is the only sanctioned way to change data that already exists. Everything
+ * else in this file creates and then leaves alone.
+ */
+async function once(key: string, label: string, work: () => Promise<string>) {
+  const marker = { kind: 'migration', key }
+  const done = await prisma.tombstone.findUnique({
+    where: { kind_key: { kind: marker.kind, key: marker.key } },
+  })
+  if (done) return
+  const result = await work()
+  await prisma.tombstone.create({ data: { ...marker, label: result } })
+  console.log(`  ✦ ${label} — ${result} (one-time)`)
+}
+
 async function main() {
   const defaultPassword = await bcrypt.hash('FluxoAdmin2026!', 10)
   const adminPassword   = await bcrypt.hash('Fluxo-rSpNJNGb9c7prM', 10)
@@ -31,7 +54,11 @@ async function main() {
     { id: 'publish',     label_en: 'Published',       label_ar: 'تم النشر',                  phase: 'Ship',     owner_role: null,                terminal_flag: true,  sort_order: 10 },
   ]
   for (const s of stages) {
-    await prisma.stage.upsert({ where: { id: s.id }, update: s, create: s })
+    // create-only, like everything else here. Nothing in the app writes to
+    // this table today, but a seed that asserts its values on every start is
+    // one UI away from silently reverting them — and stage ownership is
+    // exactly the kind of thing that gets changed deliberately.
+    await prisma.stage.upsert({ where: { id: s.id }, update: {}, create: s })
   }
 
   // Brands
@@ -46,7 +73,9 @@ async function main() {
     { name: 'Islam Personal Branding', color: '#1E293B', logo_url: '/brands/islam.png' },
   ]
   for (const b of brands) {
-    await prisma.brand.upsert({ where: { name: b.name }, update: b, create: b })
+    // create-only: brand colour, logo and description are edited in Settings,
+    // and `update: b` was resetting all three on every single deploy.
+    await prisma.brand.upsert({ where: { name: b.name }, update: {}, create: b })
   }
 
   // Content types
@@ -72,9 +101,11 @@ async function main() {
   }
   for (const stage_id of slaStages) {
     for (const [label, days] of Object.entries(slaDays[stage_id] ?? {})) {
+      // create-only: the SLA matrix is tuned in Settings, and updating here
+      // threw that tuning away on every deploy.
       await prisma.slaConfig.upsert({
         where:  { stage_id_content_type_label: { stage_id, content_type_label: label } },
-        update: { max_business_days: days },
+        update: {},
         create: { stage_id, content_type_label: label, max_business_days: days },
       })
     }
@@ -137,19 +168,14 @@ async function main() {
   //
   // It must happen exactly once, or unflagging a step by hand would be undone
   // on the next deploy. The marker row is the guard.
-  const BACKFILL = { kind: 'migration', key: 'milestone-backfill' }
-  const alreadyRun = await prisma.tombstone.findUnique({
-    where: { kind_key: { kind: BACKFILL.kind, key: BACKFILL.key } },
-  })
-  if (!alreadyRun) {
+  await once('milestone-backfill', 'flagged existing steps as milestones', async () => {
     const steps = await prisma.projectStep.findMany({ select: { id: true, name: true } })
     const hits = steps.filter(s => looksLikeMilestone(s.name)).map(s => s.id)
     if (hits.length) {
       await prisma.projectStep.updateMany({ where: { id: { in: hits } }, data: { milestone: true } })
     }
-    await prisma.tombstone.create({ data: { ...BACKFILL, label: `${hits.length} steps flagged` } })
-    console.log(`  ✦ flagged ${hits.length} existing step(s) as milestones (one-time)`)
-  }
+    return `${hits.length} steps`
+  })
 
   // Workspace settings
   await prisma.workspaceSettings.upsert({
