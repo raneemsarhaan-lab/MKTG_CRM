@@ -35,6 +35,32 @@ async function once(key: string, label: string, work: () => Promise<string>) {
   console.log(`  ✦ ${label} — ${result} (one-time)`)
 }
 
+
+/**
+ * Has this seeded row already been created, once, ever?
+ *
+ * The seed matches its rows by a natural key — a member by email, a brand by
+ * name — and both of those are editable in the app. Rename one and the seed
+ * stops recognising it, decides it is missing, and creates it again. That is
+ * not a lost edit; it is a phantom row. For a member it is worse still: the
+ * ghost arrives with the shared default password and can be signed into.
+ *
+ * A marker fixes it: written the first time the row is ensured, checked ever
+ * after. Renaming is then invisible to the seed, which is the point. Adding a
+ * genuinely new name to one of these lists still works, because it has no
+ * marker yet.
+ */
+async function seedOnce(kind: string, key: string, ensure: () => Promise<void>) {
+  const marker = { kind: `seed-${kind}`, key }
+  const seen = await prisma.tombstone.findUnique({
+    where: { kind_key: { kind: marker.kind, key: marker.key } },
+  })
+  if (seen) return false
+  await ensure()
+  await prisma.tombstone.create({ data: marker })
+  return true
+}
+
 async function main() {
   const defaultPassword = await bcrypt.hash('FluxoAdmin2026!', 10)
   const adminPassword   = await bcrypt.hash('Fluxo-rSpNJNGb9c7prM', 10)
@@ -73,9 +99,11 @@ async function main() {
     { name: 'Islam Personal Branding', color: '#1E293B', logo_url: '/brands/islam.png' },
   ]
   for (const b of brands) {
-    // create-only: brand colour, logo and description are edited in Settings,
-    // and `update: b` was resetting all three on every single deploy.
-    await prisma.brand.upsert({ where: { name: b.name }, update: {}, create: b })
+    // create-only, and only once ever: colour, logo and description are edited
+    // in Settings, and so is the name — which the upsert matches on.
+    await seedOnce('brand', b.name, async () => {
+      await prisma.brand.upsert({ where: { name: b.name }, update: {}, create: b })
+    })
   }
 
   // Content types
@@ -136,11 +164,17 @@ async function main() {
     }
     // The admin account gets its own password; the rest still share the
     // default until they are rotated (HANDOVER §14).
+    //
+    // Once ever, keyed on the seeded address. Change someone's email in the
+    // app and the plain upsert would create a second account at the old one,
+    // carrying that shared default password — a working sign-in nobody made.
     const password_hash = m.access === 'admin' ? adminPassword : defaultPassword
-    await prisma.member.upsert({
-      where:  { email: m.email },
-      update: {},
-      create: { ...m, password_hash },
+    await seedOnce('member', m.email, async () => {
+      await prisma.member.upsert({
+        where:  { email: m.email },
+        update: {},
+        create: { ...m, password_hash },
+      })
     })
   }
 
