@@ -1,46 +1,57 @@
-# Fluxo Marketing CRM — Project Handover
+# Momentum Marketing CRM — Project Handover
 
 **Owner:** Raneem Sarhan · Forefront Consulting
-**Last updated:** 30 July 2026
+**Last updated:** 13 August 2026
 **Purpose:** Complete record of everything built and every decision agreed, so the project can be restarted in a fresh repository with nothing lost.
+
+> **The product was called Fluxo until 13 August 2026.** The name changed to
+> Momentum; the session cookie, locale cookie and browser-storage keys kept
+> their `fluxo` prefixes on purpose, because renaming them would have signed
+> everyone out and reset their preferences in exchange for a string nobody
+> sees. Expect to meet both names.
 
 ---
 
-## 1. What Fluxo is
+## 1. What Momentum is
 
 An internal marketing operations CRM for Forefront Consulting. It tracks creative content — posts, videos, reels, designs, emails — through a staged production pipeline from idea to publication, with per-stage ownership, SLA tracking, and team capacity visibility.
 
-**Four screens:**
+**Six screens:**
 
 | Screen | Route | Who sees it | Purpose |
 |---|---|---|---|
 | Overview | `/overview` | Everyone | Personal command centre — my tasks, my workload, team digest |
-| Creative Ops | `/board` | Everyone | The Kanban pipeline, all tasks, all stages |
+| Board | `/board` | Everyone | The Kanban pipeline, all tasks, all stages |
+| Projects | `/projects` | Everyone reads; admins shape | The Aspiring / Focus plan, and the admin-only **Workload** tab |
+| Team | `/team` | Everyone (own work only) | A person's planned steps, month by month |
 | Capacity | `/capacity` | Admin only | Per-member workload bars across the team |
-| Settings | `/settings` | Admin only | Team & access management, SLA matrix, workflow config |
+| Settings | `/settings` | Admin only | Team & access, brands, SLA, workload assumptions |
+
+**Two models of work, deliberately separate.** A **Task** is a deliverable
+moving through the staged pipeline with an SLA. A **Project** is a plan made of
+steps measured in days. They meet at `ProjectStep.task_id`, when a planned step
+is pushed onto the board.
 
 ---
 
 ## 2. Current status
 
-The application is **feature-complete** and **type-checks clean**. It has been fully migrated off Supabase and onto Prisma + NextAuth.
+Live on Cranl at `mktg-crm-ef1r6x.cranl.net`, deployed from `main`.
 
 | Area | Status |
 |---|---|
-| Core build (phases 1–10) | ✅ Complete |
-| Reference UI reproduction | ✅ Complete |
-| Supabase → Prisma migration | ✅ Complete, `npm run typecheck` passes |
-| Deploy script | ✅ Complete |
-| Deployed and running on Cranl | ⬜ Blocked — see §11 |
+| Core pipeline build | ✅ Complete |
+| Supabase → Prisma migration | ✅ Complete |
+| **NextAuth → custom HMAC session** | ✅ Complete — see §6. NextAuth is gone. |
+| Projects / Aspiring–Focus plan | ✅ Complete |
+| Workload panel (per person, per brand) | ✅ Complete — `specs/004-projects-workload` |
+| Paste-a-list bulk task creation | ✅ Complete |
+| Deployed and running | ✅ Live |
 
-**Two commits carry the migration:**
-
-```
-ef1b0b3  chore: add deploy script (prisma push + seed) and npm deploy command
-943f66b  feat: migrate from Supabase to Prisma + NextAuth (email/password)
-```
-
-These sit on branch `claude/build-fluxo-tool-pSio1`, on top of `ae05779`.
+Work is specified under `specs/` using Spec Kit — `spec.md` → `plan.md` →
+`tasks.md`, with the decisions and their rationale recorded in each. Spec 004
+is the fullest example and the best place to see how a feature here is
+expected to be argued for.
 
 ---
 
@@ -64,7 +75,7 @@ The app was deployed to Cranl and hung on an infinite loading spinner — the pa
 | Language | TypeScript 5.8 | `npm run typecheck` must pass before any commit |
 | Database | PostgreSQL | Cranl-hosted |
 | ORM | **Prisma v5** | ⚠️ Must be v5 — see warning below |
-| Auth | NextAuth v4 | `CredentialsProvider`, JWT sessions |
+| Auth | **Custom HMAC session** | `src/lib/session.ts` — NextAuth was removed, see §6 |
 | Password hashing | bcryptjs | 10 rounds |
 | Drag & drop | @dnd-kit | Within-column reorder only |
 | State | Zustand | `useUIStore` |
@@ -148,19 +159,64 @@ Single row, `id = 1`. Holds `capacity_hrs_per_wk` and `nine_stage_default`.
 
 ### Login: email + password only
 
-**No Google OAuth.** This was discussed and deliberately dropped. OAuth would have required a Google Cloud project, an OAuth consent screen, and client credentials — real setup work for an internal tool with seven users, and it would have tied logins to Google accounts we don't control.
+**No Google OAuth.** Deliberately dropped — real setup work for an internal
+tool with seven users, and it would tie logins to Google accounts we don't
+control.
 
-**No public signup.** There is no registration page. Accounts exist only when an admin creates them.
+**No public signup.** Accounts exist only when an admin creates them, at
+Settings → Team & Access → Add member. Passwords are bcrypt-hashed before they
+touch the database, and each row has a **Reset** and a **Generate** control.
 
-**How accounts are made:** Settings → Team → Add member. The admin supplies name, email, role, access tier, and an initial password. The password is bcrypt-hashed before it touches the database. Each member row also has a **Reset password** control for admins.
+### NextAuth was removed. Read this before touching auth.
 
-**Session:** JWT strategy. The member's `id` is written into the token in the `jwt` callback and read back out in the `session` callback, so `session.user.id` is available everywhere. Typed in `src/types/next-auth.d.ts`.
+The app used NextAuth v4 with the Credentials provider. It could not be made to
+work and was ripped out.
 
-**Route protection:** `src/middleware.ts` uses NextAuth's `withAuth`. Everything is protected except static assets, `/api/auth/*`, and `/login`:
+**The failure:** sign-in silently did nothing. No error, no cookie, no server
+log — and `signIn()` returned `{ error: null, ok: true }`, reporting success.
+Four plausible diagnoses were wrong before `/api/session-check` found it.
+NextAuth's `core/index.js` contains:
+
+```js
+if (provider.type === "credentials" && !csrfTokenVerified)
+  return { redirect: signin?csrf=true }
+```
+
+It bails *before* `authorize()` ever runs. The CSRF token and its cookie were
+arriving unpaired behind the deployment's proxy, so every attempt was rejected
+at a point that produced no evidence of itself.
+
+**What replaced it —** `src/lib/session.ts`:
+
+- One cookie, one fixed name: `fluxo_session` (kept through the rename — see
+  the note at the top of this file).
+- HMAC-SHA256 over the payload via Web Crypto (`crypto.subtle`), so edge
+  middleware and the Node server use the *same* verifier. Signed by
+  `NEXTAUTH_SECRET`, which kept its name to avoid a redeploy dance.
+- `secure` is derived from `x-forwarded-proto` — the actual connection — never
+  from an environment variable someone can forget to set.
+- `src/app/api/login/route.ts` is a plain POST with no CSRF dance. It logs
+  every outcome server-side under `[fluxo:auth]` while telling the browser one
+  generic message, so a failure is diagnosable without being enumerable.
+- `src/app/api/logout/route.ts` answers both GET and POST, so a stuck session
+  can be cleared from the address bar.
+- `src/app/api/session-check/route.ts` is deliberately public. It reports
+  cookie *names* (never values), config flags and a plain-English diagnosis.
+  It is what cracked the original bug; leave it in place.
+
+**Route protection:** `src/middleware.ts` verifies that same cookie with that
+same function.
 
 ```ts
-matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth|login).*)']
+matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth|api/login|api/logout|api/session-check|login).*)']
 ```
+
+**Break-glass:** `scripts/reset-admin.ts` resets or creates an admin from
+`ADMIN_RESET_EMAIL` and `ADMIN_RESET_PASSWORD`. Inert unless both are set. It
+runs *before* the ClickUp import on purpose — the import refuses to start
+without an admin, and `set -e` would abort the script before the reset ran,
+which is precisely the situation it exists for. **Unset both once you are back
+in,** or the password silently resets on every restart.
 
 ### The three access tiers
 
@@ -262,14 +318,22 @@ prisma/
   schema.prisma          9 models, snake_case @@map to original table names
   seed.ts                Stages, brands, content types, SLA matrix, members, settings
 scripts/
-  migrate.sh             prisma db push --accept-data-loss && prisma db seed
+  migrate.sh             db push → seed → reset-admin → ClickUp import → plan import
+  reset-admin.ts         Break-glass admin reset (§6). Inert unless armed
+  import-clickup.ts      Tasks from data/clickup-export.csv. Creates only
+  import-plan.ts         Projects/steps from data/projects-plan.json. Creates only
+  check-workload.ts      Reconciliation harness for lib/workload.ts. Run with tsx
 messages/
   en.json  ar.json       next-intl catalogues
 src/
-  middleware.ts          NextAuth withAuth route protection
+  middleware.ts          Verifies the session cookie — same function that issues it
   lib/
     prisma.ts            Singleton client (avoids dev hot-reload connection leak)
-    auth.ts              NextAuth config — CredentialsProvider, JWT callbacks
+    session.ts           signSession / verifySession / cookieOptions — §6
+    authz.ts             getSessionMember, requireAdmin, requireMember
+    workload.ts          Plan priced by person and brand. No React, no Prisma
+    projects.ts          Plan maths shared by both planning boards
+    paste-list.ts        Turns a pasted list into task names
     mappers.ts           Prisma types → app types. See note below
     stage-meta.ts        STAGE_META, ALL_STAGES
     tokens.ts            COLORS, STAGE_COLORS, ACCESS_BADGE, STAT_CARD_TINTS
@@ -285,7 +349,9 @@ src/
     settings.ts          updateSLA, updateWeeklyCapacity, updateNineStageDefault
   app/
     layout.tsx           Wraps children in <Providers> (SessionProvider)
-    api/auth/[...nextauth]/route.ts
+    api/login/route.ts     Sign in — plain POST, no CSRF dance
+    api/logout/route.ts    Sign out — GET or POST
+    api/session-check/route.ts  Public diagnostic; reports names, never values
     (auth)/login/page.tsx
     (app)/
       layout.tsx         getServerSession guard → redirect('/login')
@@ -325,10 +391,25 @@ Exports: `mapMember`, `mapBrand`, `mapContentType`, `mapTask`, `mapComment`, `ma
 Cranl's Raw editor expects `KEY=VALUE`, one per line. A previous attempt pasted bare values with no key names, which is why nothing was picked up — the app saw no `DATABASE_URL` at all.
 
 ```
-DATABASE_URL=postgresql://marketing-crm:XfMHrmVewOtr3ueFfLh0AsbBKQt2StHt@marketing-crm-xarvoh:5432/marketing-crm
-NEXTAUTH_SECRET=fluxo-secret-2026-xkz9
-NEXTAUTH_URL=https://marketing-crm-ikdtpr.cranl.net
+DATABASE_URL=postgresql://marketing-crm:<PASSWORD>@marketing-crm-xarvoh:5432/marketing-crm
+NEXTAUTH_SECRET=<A LONG RANDOM STRING>
 ```
+
+> ### ⚠️ The real values used to be printed here
+>
+> They were removed on 13 August 2026. Both had been committed to this file and
+> pasted into chat transcripts, which is why §14 lists rotating them as **High**
+> priority — that item is not hypothetical, and it is not yet done.
+>
+> Generate a secret with `openssl rand -base64 32`. It signs the session
+> cookie: change it and everyone is signed out once, which is the intended
+> effect of rotating it.
+
+`NEXTAUTH_URL` is **no longer required**. The custom session derives `secure`
+from the request's own `x-forwarded-proto` rather than from a variable someone
+can forget to set — that variable being missing is what hung the very first
+deployment.
+
 
 > ### ⚠️ Use the INTERNAL database URL
 >
@@ -362,7 +443,7 @@ npm run deploy
 
 ```
 Email:    raneem.sarhaan@forefront.consulting
-Password: Fluxo-rSpNJNGb9c7prM
+Password: Momentum-rSpNJNGb9c7prM
 ```
 
 This is what `prisma/seed.ts` actually creates. Earlier revisions of this file
@@ -450,7 +531,7 @@ Run through this after the first successful deploy.
 
 **Auth**
 - [ ] Visiting the app URL redirects to `/login`
-- [ ] `raneem.sarhaan@forefront.consulting` / `Fluxo-rSpNJNGb9c7prM` lands on `/overview`
+- [ ] `raneem.sarhaan@forefront.consulting` / `Momentum-rSpNJNGb9c7prM` lands on `/overview`
 - [ ] A wrong password is rejected without hanging
 - [ ] Signing out returns to `/login`
 
@@ -480,11 +561,16 @@ Run through this after the first successful deploy.
 
 | Item | Priority | Notes |
 |---|---|---|
-| Rotate DB password and `NEXTAUTH_SECRET` | **High** | Exposed in chat transcripts |
-| Change default passwords for all 7 members | **High** | All share `FluxoAdmin2026!` |
+| Rotate the DB password and `NEXTAUTH_SECRET` | **High** | Both exposed in chat transcripts |
+| Set passwords for the nine accounts that have none | **High** | Created by the ClickUp import; they hold work but cannot sign in. Settings flags them "No sign-in" |
+| Replace the shared `FluxoAdmin2026!` on seeded accounts | **High** | Still the default for anyone not yet rotated |
+| Assign brands to the seven unbranded projects | Medium | They group under "No brand" on the Projects board |
+| `d-check` ownership → Islam | Medium | Currently Brand Director in `stage-meta.ts`, `seed.ts` and the constitution. Needs a constitution amendment beside it, and a `once()` migration to reach the live database — §5 |
+| Amend the constitution to 3.0.0 | Medium | It still describes Supabase, RLS and Zustand, none of which exist here. Every plan re-litigates this |
+| Replace the reconstructed logo with the real artwork | Medium | `src/components/shared/Logo.tsx` draws it; colours were eyeballed, letterforms are Montserrat. Drop the SVGs in and swap that one file |
+| Decide whether the Workload panel stays admin-only | Medium | An assumed default, never a decision |
 | Restore database-level authorization | Medium | RLS lost in the migration — §6 |
-| Live end-to-end verification | Medium | Never completed; §13 is the script |
-| File upload for attachments | Low | Model exists, `url` populated manually |
+| File upload for attachments | Low | Model exists; images are stored as data URLs, other files as URLs |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
 ---
@@ -499,3 +585,21 @@ Run through this after the first successful deploy.
 6. **The nine-stage choice lives in exactly one place** — `workspace_settings.nine_stage_default`, immutable per-task after creation — §8.
 7. **Stage changes go through the modal's Advance action,** never through drag — that is where the permission check lives.
 8. **The reference UI files are the source of truth** for layout and design. Do not invent layout decisions that contradict them.
+9. **Every server action carries its own permission check.** There is no RLS
+   behind it — that call is the entire gate, and a missing one is a privilege
+   escalation, not a style problem.
+10. **The seed creates things and then leaves them alone.** Anything that
+    changes an existing row goes through `once()` in `prisma/seed.ts`, guarded
+    by a marker. This is not stylistic: brands, SLA and stages used to
+    re-assert themselves on every deploy and silently threw away admin edits,
+    and seeding by email once created a ghost account carrying the shared
+    default password — §5.
+11. **The importers never overwrite what already exists,** and deletions are
+    recorded as tombstones so a re-import cannot resurrect them — §5.
+12. **All planning arithmetic lives in `src/lib/workload.ts` and
+    `src/lib/projects.ts`,** which import neither React nor Prisma. Deriving a
+    figure twice is how two screens start telling the same person different
+    things.
+13. **Plan days reconcile; effort days do not.** Utilisation is measured on
+    effort, reconciliation is asserted on plan. Never assert that effort sums
+    to the portfolio total — it is not meant to.
