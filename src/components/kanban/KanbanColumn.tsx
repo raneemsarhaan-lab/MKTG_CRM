@@ -49,6 +49,8 @@ export function KanbanColumn({
     // The whole column is the drop target, not just the card list — a column
     // holding one card would otherwise offer a 100px-tall place to aim at.
     <div
+      role="region"
+      aria-label={`${stage.label_en} column`}
       ref={setNodeRef}
       style={{
         background: '#FFFFFF',
