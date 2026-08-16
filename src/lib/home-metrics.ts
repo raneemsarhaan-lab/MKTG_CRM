@@ -96,24 +96,22 @@ export function statCounts(tasks: Task[], today: Date): {
 export interface AttentionItem {
   id:      string
   title:   string
-  due:     'today' | 'tomorrow' | 'overdue' | 'waiting'
+  due:     'today' | 'tomorrow' | 'overdue' | 'soon' | 'undated'
   dueText: string
   stage:   StageId
-  /** True when it is here because the stage is yours, not the task. */
-  viaStage: boolean
 }
 
 /**
- * Needs Your Attention — two different claims on the same person.
+ * Needs Your Attention — everything on this person's plate, worst first.
  *
- * Work you own that is due now or has slipped, and work sitting in a stage you
- * own waiting for you to look at it. The second was missing, which meant a
- * reviewer's list was empty however long the queue in front of them was: the
- * tasks belong to whoever is producing them, not to the person reviewing.
+ * One list, not two. It was previously split: a short "due now or slipped"
+ * list, then a second "My tasks" block underneath repeating whatever was
+ * already above it. For anyone whose open work is mostly late — which is most
+ * people, most of the time — the two lists were the same list, printed twice.
  *
- * A task waiting in your stage has no deadline of its own to breach — it is
- * late the moment it arrives — so it is listed regardless of due date, and
- * ordered ahead of everything except work already overdue.
+ * The rule is simply ownership: a task is yours if you own it. Order is by how
+ * much it hurts — most overdue first, then today, tomorrow, then by date, with
+ * undated work last because nothing about it is claiming a moment.
  *
  * Published tasks are excluded: a finished task cannot need attention, however
  * old its date.
@@ -122,39 +120,33 @@ export function attentionItems(
   tasks: Task[],
   memberId: string,
   today: Date,
-  memberRole?: string,
 ): AttentionItem[] {
-  const seen = new Set<string>()
   const out: (AttentionItem & { sort: number })[] = []
 
   for (const t of tasks) {
     if (t.status === 'publish') continue
+    if (t.task_owner_id !== memberId) continue
 
-    const mine = t.task_owner_id === memberId
     const days = t.due_date ? calDaysBetween(today, new Date(t.due_date as string)) : null
 
-    if (mine && days !== null && days <= 1) {
-      seen.add(t.id)
+    if (days === null) {
+      // Undated work sorts below everything dated, however far out that is.
       out.push({
-        id: t.id, title: t.name, stage: t.status, viaStage: false,
-        due:     days < 0 ? 'overdue' : days === 0 ? 'today' : 'tomorrow',
-        dueText: days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : 'Due tomorrow',
-        sort:    days,
+        id: t.id, title: t.name, stage: t.status,
+        due: 'undated', dueText: 'No date', sort: Number.MAX_SAFE_INTEGER,
       })
+      continue
     }
-  }
 
-  if (memberRole) {
-    for (const t of tasks) {
-      if (t.status === 'publish' || seen.has(t.id)) continue
-      if (STAGE_META[t.status]?.owner_role !== memberRole) continue
-      out.push({
-        id: t.id, title: t.name, stage: t.status, viaStage: true,
-        due: 'waiting',
-        dueText: `Waiting in ${STAGE_META[t.status].label_en}`,
-        sort: 0.5,          // after anything overdue, before tomorrow
-      })
-    }
+    out.push({
+      id: t.id, title: t.name, stage: t.status,
+      due:     days < 0 ? 'overdue' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'soon',
+      dueText: days < 0 ? `${Math.abs(days)}d overdue`
+             : days === 0 ? 'Due today'
+             : days === 1 ? 'Due tomorrow'
+             : `Due in ${days}d`,
+      sort: days,
+    })
   }
 
   return out.sort((a, b) => a.sort - b.sort).map(({ sort: _sort, ...item }) => item)

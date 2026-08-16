@@ -182,7 +182,7 @@ export function KanbanBoard({
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
-  const attentionCount = attentionItems(tasks, currentUser.id, today, currentUser.role).length
+  const attentionCount = attentionItems(tasks, currentUser.id, today).length
 
   /**
    * The stages before Ready to Design.

@@ -146,12 +146,12 @@ function summary(selected: string[], label: (v: string) => string): string | nul
 
 
 /** Brand chip mark — the emblem when the brand has one, else its initial. */
-function BrandMark({ brand }: { brand: Brand }) {
+function BrandMark({ brand, size = 22 }: { brand: Brand; size?: number }) {
   const initial = brand.name.trim()[0]?.toUpperCase() ?? '?'
   return (
     <span style={{
-      width: 22, height: 22, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
-      background: brand.color, color: '#FFFFFF', fontSize: 11, fontWeight: 800,
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: brand.color, color: '#FFFFFF', fontSize: size * 0.5, fontWeight: 800,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {brand.logo_url
@@ -224,7 +224,7 @@ export function BoardFilters({
     <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {/* Brand chips — §6 left group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
           <button
             type="button"
             onClick={() => set('brandIds', [])}
@@ -241,6 +241,10 @@ export function BoardFilters({
             All brands
           </button>
 
+          {/* Logo only. Five brands spelled out in full ate the whole row and
+              pushed Board and Filter onto a second line; the logos are the
+              part people actually recognise. The name is still on the button
+              for anyone hovering, and for a screen reader it is all there is. */}
           {brands.map(b => {
             const on = filters.brandIds.includes(b.id)
             return (
@@ -249,16 +253,16 @@ export function BoardFilters({
                 type="button"
                 onClick={() => toggle('brandIds', b.id)}
                 aria-pressed={on}
+                aria-label={b.name}
+                title={b.name}
                 style={{
                   ...CHIP_BASE,
+                  width: 44, padding: 0, borderRadius: '50%', justifyContent: 'center',
                   background: on ? PIPE.limePrimary : '#FFFFFF',
                   border: on ? '1px solid transparent' : `1px solid ${PIPE.borderInput}`,
-                  fontWeight: on ? 700 : 600,
-                  color: on ? PIPE.ink : PIPE.textPrimary,
                 }}
               >
-                <BrandMark brand={b} />
-                {b.name}
+                <BrandMark brand={b} size={on ? 30 : 32} />
               </button>
             )
           })}
