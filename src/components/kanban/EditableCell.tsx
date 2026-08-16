@@ -31,7 +31,7 @@ const LABEL: React.CSSProperties = {
 
 const VALUE: React.CSSProperties = {
   color: COLORS.ink,
-  fontSize: '0.82rem',
+  fontSize: '0.94rem',
   fontWeight: 600,
 }
 

@@ -167,12 +167,12 @@ function Prop({ icon, label, children }: {
   icon: IconName; label: string; children: React.ReactNode
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', alignItems: 'center', minHeight: 38 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: CU.label }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '158px minmax(0, 1fr)', alignItems: 'center', minHeight: 38 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 15, color: CU.label }}>
         <Icon name={icon} size={16} />
         {label}
       </span>
-      <div style={{ minWidth: 0, fontSize: 13.5, color: CU.text }}>{children}</div>
+      <div style={{ minWidth: 0, fontSize: 15, color: CU.text }}>{children}</div>
     </div>
   )
 }
@@ -183,14 +183,14 @@ function Field({ icon, label, children }: {
 }) {
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '210px minmax(0, 1fr)', alignItems: 'center',
+      display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', alignItems: 'center',
       minHeight: 42, padding: '0 4px', borderBottom: `1px solid ${CU.lineSoft}`,
     }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: CU.text }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 15, color: CU.text }}>
         <Icon name={icon} size={16} color={CU.faint} />
         {label}
       </span>
-      <div style={{ minWidth: 0, fontSize: 13.5, color: CU.text }}>{children}</div>
+      <div style={{ minWidth: 0, fontSize: 15, color: CU.text }}>{children}</div>
     </div>
   )
 }
@@ -203,7 +203,7 @@ function ActionRow({ icon, label, onClick }: { icon: IconName; label: string; on
               display: 'flex', alignItems: 'center', gap: 11, width: '100%',
               padding: '11px 8px', border: 'none', background: 'transparent',
               borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 14, color: CU.text, textAlign: 'start',
+              fontSize: 15.5, color: CU.text, textAlign: 'start',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
@@ -529,7 +529,7 @@ export function TaskModal({
           background: '#fff', borderRadius: 12, width: '100%', maxWidth: 1280,
           height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 2px 6px rgba(20,20,20,.06), 0 24px 68px rgba(20,20,20,.22)',
-          color: CU.text, fontSize: 14,
+          color: CU.text, fontSize: 15.5,
         }}
       >
         {/* ── TOP BAR — spans the whole panel ───────────────────────────── */}
@@ -543,12 +543,12 @@ export function TaskModal({
               width: 20, height: 20, borderRadius: 5, flexShrink: 0,
               background: task.brand?.color ?? '#C4C4BE', color: '#fff',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 800,
+              fontSize: 12, fontWeight: 800,
             }}>
               {(task.brand?.name ?? '?')[0]?.toUpperCase()}
             </span>
             <span style={{
-              fontWeight: 600, fontSize: 13.5, color: CU.text,
+              fontWeight: 600, fontSize: 15, color: CU.text,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200,
             }}>
               {task.brand?.name ?? 'No brand'}
@@ -561,7 +561,7 @@ export function TaskModal({
                         title={`Open parent: ${task.parent.name}`}
                         style={{
                           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                          fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: CU.blue,
+                          fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: CU.blue,
                           maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
                   {task.parent.name}
@@ -574,7 +574,7 @@ export function TaskModal({
                 <span style={{ color: CU.faint }}>/</span>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  fontWeight: 700, fontSize: 13, letterSpacing: '.02em',
+                  fontWeight: 700, fontSize: 14, letterSpacing: '.02em',
                   color: CU.text, textTransform: 'uppercase',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220,
                 }}>
@@ -585,7 +585,7 @@ export function TaskModal({
             )}
           </div>
 
-          <span style={{ fontSize: 13, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
+          <span style={{ fontSize: 14, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
             Created {fmtShort(task.created_at)}
           </span>
 
@@ -630,7 +630,7 @@ export function TaskModal({
             }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px',
-                border: `1px solid ${CU.line}`, borderRadius: 8, fontSize: 13.5, fontWeight: 600,
+                border: `1px solid ${CU.line}`, borderRadius: 8, fontSize: 15, fontWeight: 600,
               }}>
                 <Icon name="target" size={15} color={stageMeta.color} />
                 Task
@@ -639,7 +639,7 @@ export function TaskModal({
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
                         border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
-                        fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: CU.label,
+                        fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: CU.label,
                       }}>
                 <Icon name="link" size={13} color={CU.label} />
                 {copied === 'id' ? 'Copied' : 'ID'}
@@ -647,14 +647,14 @@ export function TaskModal({
               {attachments.length > 0 && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
-                  background: CU.chipBg, borderRadius: 7, fontSize: 12, fontWeight: 600, color: CU.label,
+                  background: CU.chipBg, borderRadius: 7, fontSize: 13, fontWeight: 600, color: CU.label,
                 }}>
                   <Icon name="clip" size={13} color={CU.label} />
                   {attachments.length}
                 </span>
               )}
               {copied === 'link' && (
-                <span style={{ fontSize: 12, color: CU.label }}>Link copied</span>
+                <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
               )}
             </div>
 
@@ -677,7 +677,7 @@ export function TaskModal({
                   }}
                   style={{
                     width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
-                    fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', color: CU.ink,
+                    fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: CU.ink,
                     border: `1px solid ${CU.line}`, borderRadius: 8, padding: '4px 8px',
                     margin: '0 -8px 20px', outline: 'none',
                   }}
@@ -687,7 +687,7 @@ export function TaskModal({
                   onClick={() => { if (canEdit) { setNameText(task.name); setEditingName(true) } }}
                   title={canEdit ? 'Click to rename' : undefined}
                   style={{
-                    fontSize: 30, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.25,
+                    fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.25,
                     color: CU.ink, margin: '0 0 22px', cursor: canEdit ? 'text' : 'default',
                   }}
                 >
@@ -704,7 +704,7 @@ export function TaskModal({
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
                     <span style={{
                       background: stageMeta.color, color: '#fff', borderRadius: 5,
-                      padding: '4px 10px', fontSize: 11.5, fontWeight: 800,
+                      padding: '4px 10px', fontSize: 12.5, fontWeight: 800,
                       letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap',
                     }}>
                       {stageMeta.label_en}
@@ -718,7 +718,7 @@ export function TaskModal({
                           border: `1px solid ${CU.line}`, background: isOverride ? COLORS.ink : '#fff',
                           color: isOverride ? COLORS.lime : CU.text,
                           borderRadius: 6, cursor: 'pointer', padding: '4px 9px',
-                          fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                          fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
                           opacity: isPending ? 0.6 : 1, whiteSpace: 'nowrap',
                         }}
                       >
@@ -758,7 +758,7 @@ export function TaskModal({
                     </span>
                     {daysLeft !== null && (
                       <span style={{
-                        flexShrink: 0, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                        flexShrink: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
                         color: overdue ? '#D22040' : CU.faint,
                       }}>
                         {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
@@ -798,7 +798,7 @@ export function TaskModal({
               </div>
 
               {error && (
-                <p role="alert" style={{ color: '#D22040', fontSize: 13, margin: '12px 0 0' }}>{error}</p>
+                <p role="alert" style={{ color: '#D22040', fontSize: 14, margin: '12px 0 0' }}>{error}</p>
               )}
 
               <div style={{ height: 1, background: CU.line, margin: '22px 0 18px' }} />
@@ -887,7 +887,7 @@ export function TaskModal({
                                 display: 'inline-flex', alignItems: 'center', gap: 6, height: 30,
                                 padding: '0 12px', borderRadius: 8, cursor: 'pointer',
                                 border: `1px solid ${CU.line}`, background: '#fff',
-                                fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: CU.text,
+                                fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: CU.text,
                                 boxShadow: '0 1px 3px rgba(20,20,20,.07)',
                               }}>
                         <Icon name={briefOpen ? 'chevronUp' : 'chevron'} size={15} color={CU.label} />
@@ -904,7 +904,7 @@ export function TaskModal({
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
                           background: 'transparent', cursor: 'pointer', padding: '0 0 10px',
-                          fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: CU.text,
+                          fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: CU.text,
                         }}>
                   <Icon name="chevron" size={14} color={CU.label}
                         style={{ transform: fieldsOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
@@ -920,7 +920,7 @@ export function TaskModal({
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
                                 background: 'transparent', cursor: 'pointer', padding: '11px 4px',
-                                fontFamily: 'inherit', fontSize: 13.5, color: CU.label,
+                                fontFamily: 'inherit', fontSize: 15, color: CU.label,
                               }}>
                         <Icon name={showEmpty ? 'chevronUp' : 'chevron'} size={14} color={CU.faint} />
                         {showEmpty
@@ -935,7 +935,7 @@ export function TaskModal({
               {/* ── Subtasks + actions ───────────────────────────────────── */}
               {(task.subtasks?.length ?? 0) > 0 && (
                 <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: CU.text, marginBottom: 8 }}>
+                  <div style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, marginBottom: 8 }}>
                     Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
                   </div>
                   <div style={{ display: 'grid', gap: 4 }}>
@@ -947,13 +947,13 @@ export function TaskModal({
                                   display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                                   padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
                                   border: `1px solid ${CU.line}`, background: '#fff',
-                                  fontFamily: 'inherit', fontSize: 13.5, color: CU.text, textAlign: 'start',
+                                  fontFamily: 'inherit', fontSize: 15, color: CU.text, textAlign: 'start',
                                 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
                           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {s.name}
                           </span>
-                          <span style={{ fontSize: 12, color: CU.label, whiteSpace: 'nowrap' }}>{meta.label_en}</span>
+                          <span style={{ fontSize: 13, color: CU.label, whiteSpace: 'nowrap' }}>{meta.label_en}</span>
                         </button>
                       )
                     })}
@@ -976,14 +976,14 @@ export function TaskModal({
                         }}
                         style={{
                           flex: 1, minWidth: 0, height: 38, padding: '0 11px', fontFamily: 'inherit',
-                          fontSize: 14, border: `1px solid ${CU.line}`, borderRadius: 8, outline: 'none',
+                          fontSize: 15.5, border: `1px solid ${CU.line}`, borderRadius: 8, outline: 'none',
                         }}
                       />
                       <button type="button" onClick={submitSubtask} disabled={isPending}
                               style={{
                                 height: 38, padding: '0 16px', border: 'none', borderRadius: 8,
                                 background: COLORS.ink, color: COLORS.lime, cursor: 'pointer',
-                                fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700,
+                                fontFamily: 'inherit', fontSize: 15, fontWeight: 700,
                               }}>
                         Add
                       </button>
@@ -1000,7 +1000,7 @@ export function TaskModal({
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
                           background: 'transparent', cursor: 'pointer', padding: '0 0 12px',
-                          fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: CU.text,
+                          fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: CU.text,
                         }}>
                   <Icon name="chevron" size={14} color={CU.label}
                         style={{ transform: filesOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
@@ -1022,7 +1022,7 @@ export function TaskModal({
                         tabIndex={0}
                         style={{
                           border: `1.5px dashed ${CU.line}`, borderRadius: 10, padding: '22px 12px',
-                          textAlign: 'center', fontSize: 14, color: CU.label, cursor: 'pointer',
+                          textAlign: 'center', fontSize: 15.5, color: CU.label, cursor: 'pointer',
                         }}
                         onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
@@ -1032,7 +1032,7 @@ export function TaskModal({
                     )}
 
                     {attachments.length === 0 && !canEdit && (
-                      <p style={{ margin: 0, fontSize: 13.5, color: CU.faint }}>No files.</p>
+                      <p style={{ margin: 0, fontSize: 15, color: CU.faint }}>No files.</p>
                     )}
 
                     {attachments.length > 0 && (
@@ -1063,7 +1063,7 @@ export function TaskModal({
                                 <a href={a.url ?? undefined} target="_blank" rel="noopener noreferrer"
                                    title={a.filename}
                                    style={{
-                                     flex: 1, minWidth: 0, fontSize: 13, color: CU.text, textDecoration: 'none',
+                                     flex: 1, minWidth: 0, fontSize: 14, color: CU.text, textDecoration: 'none',
                                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                    }}>
                                   {shortName(a.filename, 22)}
@@ -1082,7 +1082,7 @@ export function TaskModal({
               {isPublished && (
                 <div style={{
                   marginTop: 22, padding: '11px 14px', borderRadius: 9,
-                  background: '#F0FDF4', color: '#15803D', fontSize: 13.5, fontWeight: 600,
+                  background: '#F0FDF4', color: '#15803D', fontSize: 15, fontWeight: 600,
                 }}>
                   ✓ Published — this task is complete
                 </div>
@@ -1099,11 +1099,11 @@ export function TaskModal({
               height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
               padding: '0 12px 0 18px', borderBottom: `1px solid ${CU.line}`,
             }}>
-              <span style={{ flex: 1, fontSize: 16, fontWeight: 700, color: CU.ink }}>Activity</span>
+              <span style={{ flex: 1, fontSize: 17.5, fontWeight: 700, color: CU.ink }}>Activity</span>
               <IconButton name="search" label="Search activity" />
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingInlineEnd: 4 }}>
                 <Icon name="bell" size={17} color={CU.blue} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: CU.blue }}>{task.comments.length}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: CU.blue }}>{task.comments.length}</span>
               </span>
               <IconButton name="filter" label="Filter activity" />
             </div>
@@ -1117,7 +1117,7 @@ export function TaskModal({
                             style={{
                               display: 'flex', alignItems: 'center', gap: 8, border: 'none',
                               background: 'transparent', cursor: 'pointer', padding: '4px 0 12px',
-                              fontFamily: 'inherit', fontSize: 13.5, color: CU.text,
+                              fontFamily: 'inherit', fontSize: 15, color: CU.text,
                             }}>
                       <Icon name="chevronR" size={14} color={CU.label} />
                       Show more {hiddenActivity > 0 && <span style={{ color: CU.faint }}>({hiddenActivity})</span>}
@@ -1127,9 +1127,9 @@ export function TaskModal({
                     display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) auto',
                     gap: 8, alignItems: 'start', marginBottom: 14,
                   }}>
-                    <span style={{ color: CU.faint, lineHeight: '20px', fontSize: 15 }}>•</span>
-                    <span style={{ fontSize: 13.5, color: CU.text, lineHeight: 1.5 }}>{a.node}</span>
-                    <span style={{ fontSize: 12.5, color: CU.label, whiteSpace: 'nowrap', lineHeight: '20px' }}>
+                    <span style={{ color: CU.faint, lineHeight: '20px', fontSize: 16.5 }}>•</span>
+                    <span style={{ fontSize: 15, color: CU.text, lineHeight: 1.5 }}>{a.node}</span>
+                    <span style={{ fontSize: 13.5, color: CU.label, whiteSpace: 'nowrap', lineHeight: '20px' }}>
                       {fmtTime(a.when)}
                     </span>
                   </div>
@@ -1141,7 +1141,7 @@ export function TaskModal({
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8, border: 'none',
                           background: 'transparent', cursor: 'pointer', padding: '0 0 8px',
-                          fontFamily: 'inherit', fontSize: 13.5, color: CU.text,
+                          fontFamily: 'inherit', fontSize: 15, color: CU.text,
                         }}>
                   <Icon name="chevronUp" size={14} color={CU.label} />
                   Hide
@@ -1165,7 +1165,7 @@ export function TaskModal({
                   rows={2}
                   style={{
                     width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none',
-                    resize: 'none', fontFamily: 'inherit', fontSize: 14, color: CU.text,
+                    resize: 'none', fontFamily: 'inherit', fontSize: 15.5, color: CU.text,
                     padding: '12px 14px 4px', background: 'transparent', borderRadius: 10,
                   }}
                 />
@@ -1227,7 +1227,7 @@ function MenuSplit({ label, onClick, divider }: { label: string; onClick: () => 
     <button type="button" onClick={onClick}
             style={{
               height: 34, border: 'none', background: '#fff', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 12.5, color: CU.text,
+              fontFamily: 'inherit', fontSize: 13.5, color: CU.text,
               borderInlineStart: divider ? `1px solid ${CU.line}` : 'none',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
@@ -1244,7 +1244,7 @@ function MenuItem({ icon, label, onClick }: { icon: IconName; label: string; onC
               display: 'flex', alignItems: 'center', gap: 11, width: '100%',
               padding: '9px 10px', border: 'none', background: 'transparent',
               borderRadius: 7, cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 13.5, color: CU.text, textAlign: 'start',
+              fontSize: 15, color: CU.text, textAlign: 'start',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
