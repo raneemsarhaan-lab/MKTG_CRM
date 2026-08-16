@@ -67,6 +67,8 @@ export function mapAttachment(a: any): TaskAttachment {
     task_id:     a.task_id,
     filename:    a.filename,
     url:         a.url ?? undefined,
+    data:        a.data ?? undefined,
+    uploaded_by: a.uploaded_by ?? undefined,
     uploaded_at: toIsoStr(a.uploaded_at),
   }
 }

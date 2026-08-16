@@ -7,12 +7,19 @@ import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId } from '@/lib/stage-meta'
 import { COLORS } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { moveTask, addComment, updateTask, createSubtask, type TaskPatch } from '@/actions/tasks'
+import {
+  moveTask, addComment, updateTask, createSubtask,
+  addAttachments, removeAttachment, loadAttachments,
+  type TaskPatch,
+} from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
 import { BriefEditor } from './BriefEditor'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
-import { isImageAttachment, shortName } from '@/lib/attachments'
+import {
+  isImageAttachment, shortName, attachmentSrc,
+  MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO,
+} from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { useUIStore } from '@/store/useUIStore'
 
@@ -124,6 +131,44 @@ function Icon({ name, size = 16, color = CU.label, width = 1.7, style }: {
       {p[name]}
     </svg>
   )
+}
+
+/* ── turning a picked file into something storable ───────────────────── */
+
+/** Read a file exactly as it is. Used for anything that is not a picture. */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload  = () => resolve(String(r.result))
+    r.onerror = () => reject(new Error('unreadable'))
+    r.readAsDataURL(file)
+  })
+}
+
+/**
+ * Scale a picture to fit `max` on its longest edge and re-encode it.
+ *
+ * The same trick ImageUpload uses for logos and avatars, and for the same
+ * reason: the bytes are going into a text column, so an untouched phone photo
+ * has to come down before it gets there. PNG keeps transparency; everything
+ * else is far smaller as JPEG, and 0.82 is where the artefacts stop showing.
+ */
+async function shrinkImage(file: File, max: number): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale  = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const w = Math.max(1, Math.round(bitmap.width * scale))
+  const h = Math.max(1, Math.round(bitmap.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('This browser cannot process images')
+  ctx.drawImage(bitmap, 0, 0, w, h)
+  bitmap.close?.()
+
+  const type = file.type === 'image/png' || file.type === 'image/svg+xml' ? 'image/png' : 'image/jpeg'
+  return canvas.toDataURL(type, 0.82)
 }
 
 function Avatar({ name, size = 24 }: { name: string; size?: number }) {
@@ -244,10 +289,14 @@ export function TaskModal({
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [lightbox, setLightbox]           = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
+  const [dragging, setDragging]           = useState(false)
+  const [uploading, setUploading]         = useState(false)
+  const [uploadError, setUploadError]     = useState('')
   const [isPending, startTransition]      = useTransition()
 
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
 
@@ -258,7 +307,55 @@ export function TaskModal({
   const daysLeft  = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
   const overdue   = daysLeft !== null && daysLeft < 0
 
-  const attachments = task.attachments ?? []
+  /**
+   * The board hands us every task's attachments but without `data` — see the
+   * model comment in schema.prisma. So the rows arrive as filenames and links,
+   * and we fetch this one task's full rows once, which is what makes an
+   * uploaded file actually show its contents.
+   */
+  const [files, setFiles] = useState<TaskAttachment[]>(task.attachments ?? [])
+  const [reloadFiles, setReloadFiles] = useState(0)
+  /**
+   * What has already been fetched, as a ref rather than state.
+   *
+   * It has to be a ref: the effect below sets it, so as state it would be a
+   * dependency the effect changes itself — React would tear the effect down
+   * and the cleanup would cancel the very fetch that was in flight. The
+   * symptom was an uploaded picture saving correctly and then rendering as a
+   * placeholder, because the rows carrying its bytes were thrown away on
+   * arrival.
+   */
+  const loadedRef = useRef<string | null>(null)
+
+  // Keyed on the task id alone, also deliberately: `task.attachments` is a
+  // fresh array on every board render, so watching it meant every
+  // router.refresh() put back the rows without their contents. From here this
+  // component owns `files` — uploads and removals update it directly.
+  useEffect(() => {
+    setFiles(task.attachments ?? [])
+    loadedRef.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id])
+
+  useEffect(() => {
+    if (!filesOpen) return
+    const key = `${task.id}:${reloadFiles}`
+    if (loadedRef.current === key) return
+    loadedRef.current = key
+
+    let live = true
+    void loadAttachments(task.id).then(rows => {
+      if (!live) return
+      setFiles(rows.map(r => ({
+        id: r.id, task_id: task.id, filename: r.filename,
+        url: r.url ?? undefined, data: r.data ?? undefined,
+        uploaded_by: r.uploaded_by ?? undefined, uploaded_at: r.uploaded_at,
+      })))
+    })
+    return () => { live = false }
+  }, [filesOpen, task.id, reloadFiles])
+
+  const attachments = files
 
   // Long briefs are folded, as ClickUp folds them. The threshold is on the
   // markdown rather than the rendered height because the height is not known
@@ -359,6 +456,59 @@ export function TaskModal({
       router.refresh()
       setCmtText('')
     })
+  }
+
+  /**
+   * Take files from a drop or the picker and store them on the task.
+   *
+   * There is no object store behind this app, so the bytes end up in Postgres
+   * as data URLs — the same route brand logos and avatars already take. That
+   * makes the size limit real rather than polite, so pictures are scaled down
+   * on a canvas first: an untouched phone photo is several megabytes and comes
+   * back under a couple of hundred kilobytes. Anything that is not an image
+   * has to fit as it is, and is refused with its own name if it does not.
+   */
+  async function acceptFiles(list: FileList | null) {
+    if (!canEdit || !list?.length) return
+    setUploadError('')
+
+    const picked = Array.from(list).slice(0, MAX_ATTACHMENTS_PER_GO)
+    if (list.length > MAX_ATTACHMENTS_PER_GO) {
+      setUploadError(`Only the first ${MAX_ATTACHMENTS_PER_GO} files were taken.`)
+    }
+
+    setUploading(true)
+    try {
+      const prepared: { filename: string; data: string }[] = []
+      const rejected: string[] = []
+
+      for (const file of picked) {
+        try {
+          const data = file.type.startsWith('image/')
+            ? await shrinkImage(file, 1600)
+            : await readAsDataUrl(file)
+          if (data.length > MAX_ATTACHMENT_CHARS) rejected.push(file.name)
+          else prepared.push({ filename: file.name, data })
+        } catch {
+          rejected.push(file.name)
+        }
+      }
+
+      if (rejected.length) {
+        setUploadError(
+          `Too large to store: ${rejected.join(', ')}. Files need to be under about 1 MB — ` +
+          'pictures are shrunk automatically, anything else has to be small already.',
+        )
+      }
+      if (!prepared.length) return
+
+      const res = await addAttachments(task.id, prepared)
+      if (!res.success) { setUploadError(res.error ?? 'Could not attach those files'); return }
+      setReloadFiles(n => n + 1)   // pull the new rows, contents and all
+      router.refresh()             // and refresh the card behind the panel
+    } finally {
+      setUploading(false)
+    }
   }
 
   function copy(what: 'link' | 'id') {
@@ -1017,18 +1167,47 @@ export function TaskModal({
                         exists only to refuse them is worse than none. */}
                     {canEdit && (
                       <div
-                        onClick={() => { setBriefText(task.description ?? ''); setEditingBrief(true) }}
+                        onClick={() => fileRef.current?.click()}
+                        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={e => {
+                          e.preventDefault(); setDragging(false)
+                          void acceptFiles(e.dataTransfer.files)
+                        }}
                         role="button"
                         tabIndex={0}
-                        style={{
-                          border: `1.5px dashed ${CU.line}`, borderRadius: 10, padding: '22px 12px',
-                          textAlign: 'center', fontSize: 15.5, color: CU.label, cursor: 'pointer',
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click() }
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                        style={{
+                          border: `1.5px dashed ${dragging ? CU.blue : CU.line}`, borderRadius: 10,
+                          padding: '22px 12px', textAlign: 'center', fontSize: 15.5,
+                          color: dragging ? CU.blue : CU.label, cursor: 'pointer',
+                          background: dragging ? '#F3F7FF' : 'transparent',
+                          transition: 'border-color .12s, background .12s, color .12s',
+                        }}
+                        onMouseEnter={e => { if (!dragging) e.currentTarget.style.background = CU.hover }}
+                        onMouseLeave={e => { if (!dragging) e.currentTarget.style.background = 'transparent' }}
                       >
-                        Add files from the description editor — <span style={{ textDecoration: 'underline' }}>open it</span>
+                        {uploading
+                          ? 'Reading files…'
+                          : <>Drop files here or <span style={{ textDecoration: 'underline' }}>browse</span></>}
                       </div>
+                    )}
+
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      multiple
+                      onChange={e => { void acceptFiles(e.target.files); e.target.value = '' }}
+                      style={{ display: 'none' }}
+                      aria-label="Attach files to this task"
+                    />
+
+                    {uploadError && (
+                      <p role="alert" style={{ margin: '10px 0 0', fontSize: 14, color: '#D22040' }}>
+                        {uploadError}
+                      </p>
                     )}
 
                     {attachments.length === 0 && !canEdit && (
@@ -1042,8 +1221,12 @@ export function TaskModal({
                       }}>
                         {attachments.map(a => {
                           const image = isImageAttachment(a)
+                          const src   = attachmentSrc(a)
+                          const who   = a.uploaded_by
+                            ? members.find(m => m.id === a.uploaded_by)?.name ?? task.task_owner.name
+                            : task.task_owner.name
                           return (
-                            <div key={a.id} style={{ background: CU.hover, borderRadius: 10, padding: 10 }}>
+                            <div key={a.id} style={{ background: CU.hover, borderRadius: 10, padding: 10, position: 'relative' }}>
                               <div style={{
                                 height: 132, borderRadius: 6, background: '#fff', overflow: 'hidden',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1052,7 +1235,7 @@ export function TaskModal({
                                    onClick={() => { if (image) setLightbox(a) }}>
                                 {image
                                   ? <ImageWithFallback
-                                      src={a.url ?? ''}
+                                      src={src ?? ''}
                                       alt={a.filename}
                                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                       fallback={<Icon name="image" size={30} color="#C3C7CE" width={1.5} />}
@@ -1060,7 +1243,8 @@ export function TaskModal({
                                   : <Icon name="file" size={30} color="#C3C7CE" width={1.5} />}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 }}>
-                                <a href={a.url ?? undefined} target="_blank" rel="noopener noreferrer"
+                                <a href={src ?? undefined} download={a.data ? a.filename : undefined}
+                                   target="_blank" rel="noopener noreferrer"
                                    title={a.filename}
                                    style={{
                                      flex: 1, minWidth: 0, fontSize: 14, color: CU.text, textDecoration: 'none',
@@ -1068,7 +1252,34 @@ export function TaskModal({
                                    }}>
                                   {shortName(a.filename, 22)}
                                 </a>
-                                <Avatar name={task.task_owner.name} size={22} />
+                                <Avatar name={who} size={22} />
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setUploadError('')
+                                      startTransition(async () => {
+                                        const r = await removeAttachment(a.id)
+                                        if (r.success) {
+                                          setFiles(f => f.filter(x => x.id !== a.id))
+                                          router.refresh()
+                                        }
+                                        else setUploadError(r.error ?? 'Could not remove that file')
+                                      })
+                                    }}
+                                    aria-label={`Remove ${a.filename}`}
+                                    title={`Remove ${a.filename}`}
+                                    style={{
+                                      width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
+                                      background: 'transparent', cursor: 'pointer', padding: 0,
+                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#FDE7EA' }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                  >
+                                    <Icon name="close" size={13} color="#D22040" width={2.2} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )
