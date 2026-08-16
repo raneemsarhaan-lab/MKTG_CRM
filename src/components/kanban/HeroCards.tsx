@@ -6,7 +6,8 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import {
   activityItems, attentionItems, quoteOfDay, statCounts, timeAgo, weekMomentum,
 } from '@/lib/home-metrics'
-import { initials, avatarColor } from '@/lib/utils'
+import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
+import { STAGE_META, ALL_STAGES } from '@/lib/stage-meta'
 
 /**
  * The four hero cards — Pipeline handoff §5.
@@ -101,6 +102,18 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
     attentionTop[Math.min(3, attentionTop.length)] = waiting[0]
   }
   const attentionMore = attention.length - attentionTop.length
+
+  // Everything you own and where it has got to. This used to be its own column
+  // on the board; it lives here now, under the same heading, because "what
+  // needs me" and "where is my work" are the same question asked twice and
+  // splitting them across two places meant reading both to answer either.
+  const mine = tasks.filter(t => t.task_owner_id === currentUser.id && t.status !== 'publish')
+  const minePublished = tasks.filter(t => t.task_owner_id === currentUser.id).length - mine.length
+  const mineByStage = mine.reduce<Partial<Record<string, typeof tasks>>>((acc, t) => {
+    (acc[t.status] ??= []).push(t)
+    return acc
+  }, {})
+  const mineStages = ALL_STAGES.filter(id => mineByStage[id]?.length)
   const activity  = activityItems(tasks, currentUser.id, 4)
   const quote     = quoteOfDay(today)
 
@@ -266,6 +279,89 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
               +{attentionMore} more
             </span>
           )}
+
+          {/* ── My tasks ───────────────────────────────────────────────── */}
+          <div style={{ borderTop: `1px solid ${PIPE.border}`, marginTop: 4, paddingTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: 6, background: '#F4FBD6', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }} aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
+                     strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              <span style={{ fontWeight: 800, fontSize: 12, color: PIPE.ink, flex: 1 }}>My tasks</span>
+              <span style={{ fontSize: 11, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>
+                {mine.length} open{minePublished > 0 && ` · ${minePublished} published`}
+              </span>
+            </div>
+
+            {mine.length === 0 ? (
+              <p style={{ fontSize: 12, color: PIPE.textMuted, textAlign: 'center', padding: '10px 0', margin: 0 }}>
+                Nothing assigned to you.
+              </p>
+            ) : (
+              // Capped and scrollable: this card sits in a four-across row, and
+              // a producer with thirty open tasks would otherwise push every
+              // card beside it down the page.
+              <div style={{ maxHeight: 208, overflowY: 'auto', overflowX: 'hidden', display: 'grid', gap: 10, minWidth: 0 }}>
+                {mineStages.map(stageId => {
+                  const meta = STAGE_META[stageId]
+                  return (
+                    <div key={stageId} style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta?.color ?? PIPE.purpleStroke }} />
+                        <span style={{
+                          fontSize: 10, fontWeight: 800, letterSpacing: '.05em',
+                          textTransform: 'uppercase', color: PIPE.textSecondary,
+                        }}>
+                          {meta?.label_en ?? stageId}
+                        </span>
+                        <span style={{ fontSize: 10, color: PIPE.textFaint }}>{mineByStage[stageId]!.length}</span>
+                      </div>
+                      <div style={{ display: 'grid', gap: 4, gridTemplateColumns: 'minmax(0, 1fr)' }}>
+                        {mineByStage[stageId]!.map(t => {
+                          const days = t.due_date ? calDaysBetween(today, new Date(t.due_date)) : null
+                          const late = days !== null && days < 0
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => onOpenTask(t.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 7, width: '100%',
+                                border: `1px solid ${late ? '#F6D9DE' : PIPE.border}`,
+                                background: late ? '#FDF3F4' : '#FCFCFB',
+                                borderRadius: 9, padding: '6px 8px', cursor: 'pointer',
+                                fontFamily: 'inherit', textAlign: 'start',
+                              }}
+                            >
+                              <span style={{
+                                flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: PIPE.textPrimary,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>
+                                {t.name}
+                              </span>
+                              {days !== null && (
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+                                  color: late ? '#D22040' : days <= 1 ? '#EA8C0B' : PIPE.textFaint,
+                                }}>
+                                  {late ? `${Math.abs(days)}d late` : days === 0 ? 'today' : `${days}d`}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {attention.length > 4 && (
