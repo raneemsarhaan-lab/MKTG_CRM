@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId } from '@/types/index'
-import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
+import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { attentionItems } from '@/lib/home-metrics'
 import { initials, avatarColor } from '@/lib/utils'
@@ -184,14 +184,45 @@ export function KanbanBoard({
 
   const attentionCount = attentionItems(tasks, currentUser.id, today, currentUser.role).length
 
+  /**
+   * The stages before Ready to Design.
+   *
+   * A designer's work starts at r-design; four columns of content drafting in
+   * front of it is somebody else's queue. Hidden by default for design-side
+   * roles — but only defaulted, never enforced, because seeing what is coming
+   * is the whole reason to look upstream.
+   *
+   * The preference is read after mount, not during render: reading
+   * localStorage while rendering makes the server and client disagree.
+   */
+  const [showUpstream, setShowUpstream] = useState(true)
+  useEffect(() => {
+    const stored = window.localStorage.getItem('momentum.board.upstream')
+    setShowUpstream(stored !== null ? stored === '1' : !startsDownstream(currentUser.role))
+  }, [currentUser.role])
+  function toggleUpstream() {
+    setShowUpstream(v => {
+      window.localStorage.setItem('momentum.board.upstream', v ? '0' : '1')
+      return !v
+    })
+  }
+  const upstreamCount = tasks.filter(
+    t => (UPSTREAM_STAGES as string[]).includes(t.status),
+  ).length
+  const shownStages = showUpstream
+    ? ALL_STAGES
+    : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
+
 
   // ── Bulk selection ────────────────────────────────────────────────────────
   // Shift-click extends from the last click through the *visible* order, which
   // is what the eye expects — the filtered, column-grouped sequence, not the
   // order the server happened to send.
+  // "Visible" has to mean visible: with the upstream columns hidden, a
+  // shift-click must not sweep up cards that are not on screen.
   const visibleOrder = useMemo(
-    () => ALL_STAGES.flatMap(id => (tasksByStage[id] ?? []).map(t => t.id)),
-    [tasksByStage],
+    () => shownStages.flatMap(id => (tasksByStage[id] ?? []).map(t => t.id)),
+    [tasksByStage, shownStages],
   )
   const [lastClicked, setLastClicked] = useState<string | null>(null)
 
@@ -345,6 +376,40 @@ export function KanbanBoard({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
 
+            {/* Upstream columns. Always present rather than only when hidden,
+                so the control does not move about depending on state. */}
+            <button
+              type="button"
+              onClick={toggleUpstream}
+              aria-pressed={showUpstream}
+              title={showUpstream
+                ? 'Hide the stages before Ready to Design'
+                : 'See what is coming before it reaches you'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px',
+                borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5,
+                fontWeight: 700, whiteSpace: 'nowrap',
+                border: `1.5px solid ${showUpstream ? PIPE.ink : PIPE.border}`,
+                background: showUpstream ? '#F4FBD6' : '#FFFFFF',
+                color: PIPE.ink,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                <circle cx="12" cy="12" r="2.6" />
+              </svg>
+              {showUpstream ? 'Hide what\u2019s upstream' : 'Preview what\u2019s coming'}
+              {!showUpstream && upstreamCount > 0 && (
+                <span style={{
+                  minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
+                  background: PIPE.ink, color: '#FFFFFF', fontSize: 10.5, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {upstreamCount}
+                </span>
+              )}
+            </button>
 
             <span style={{
               width: 42, height: 42, borderRadius: '50%', boxSizing: 'border-box',
@@ -461,7 +526,7 @@ export function KanbanBoard({
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
         }}>
-          {ALL_STAGES.map(stageId => {
+          {shownStages.map(stageId => {
             const stage      = STAGE_META[stageId]
             const stageTasks = tasksByStage[stageId] ?? []
 

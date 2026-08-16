@@ -150,3 +150,27 @@ export function isWorkingStage(stageId: StageId): boolean {
 export const ALL_STAGES: StageId[] = [
   'todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish',
 ]
+
+
+/**
+ * Everything before "Ready to Design" — the Intake and Content phases.
+ *
+ * A designer's board starts at r-design: what happens before that is somebody
+ * else's queue, and eleven columns of it is mostly noise to them. Kept as a
+ * derived list rather than a hand-written one so it cannot drift if a stage is
+ * inserted.
+ */
+export const UPSTREAM_STAGES: StageId[] =
+  ALL_STAGES.slice(0, ALL_STAGES.indexOf('r-design')) as StageId[]
+
+/**
+ * Roles whose board hides the upstream columns until asked.
+ *
+ * Matched loosely on the role text, so "Art Director", "Senior Graphic
+ * Designer" and "Video Editor (freelance)" all qualify without anyone having
+ * to keep a list of exact job titles in sync with Settings.
+ */
+export function startsDownstream(role: string | null | undefined): boolean {
+  if (!role) return false
+  return /design|art director|video|editor|motion/i.test(role)
+}
