@@ -214,11 +214,27 @@ model TaskComment {
   @@map("task_comments")
 }
 
+/// An attachment is one of two things, and the distinction is load-bearing.
+///
+/// `url` is a link to a file that lives somewhere else — every row imported
+/// from ClickUp is one of these. It is short, so the board can afford to read
+/// it for all 300-odd tasks at once, which it does: a task card's cover is the
+/// first image attachment's url.
+///
+/// `data` is a file uploaded here, inlined as a data URL. There is no object
+/// store behind this app and no credentials to add one, so the bytes live in
+/// Postgres — the same trick brand logos and avatars already use. It is large,
+/// so it is deliberately NOT selected by the board query; the task panel loads
+/// it for its own task only, when the Attachments section is opened.
+///
+/// Never add `data` to a query that spans tasks.
 model TaskAttachment {
   id          String   @id @default(uuid()) @db.Uuid
   task_id     String   @db.Uuid
   filename    String
   url         String?
+  data        String?  @db.Text
+  uploaded_by String?  @db.Uuid
   uploaded_at DateTime @default(now()) @db.Timestamptz(6)
 
   task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)

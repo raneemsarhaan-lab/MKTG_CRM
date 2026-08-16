@@ -6,6 +6,7 @@ import { getSessionMember, requireTaskCreator } from '@/lib/authz'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import { MAX_PASTED } from '@/lib/paste-list'
+import { MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO } from '@/lib/attachments'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 // ─── moveTask ───────────────────────────────────────────────────────────────
@@ -477,4 +478,104 @@ export async function createTasks(
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
   }
+}
+
+/* ── attachments ───────────────────────────────────────────────────────── */
+
+type NewAttachment = { filename: string; data: string }
+
+/** Same rule as updateTask: the owner, or an admin or superuser. */
+async function mayAttachTo(taskId: string, memberId: string, access: string) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId }, select: { task_owner_id: true },
+  })
+  if (!task) return { ok: false as const, error: 'not_found' }
+  const allowed = task.task_owner_id === memberId || access === 'admin' || access === 'superuser'
+  return allowed ? { ok: true as const } : { ok: false as const, error: 'not_authorized' }
+}
+
+/**
+ * Attach files to a task.
+ *
+ * Files arrive already encoded as data URLs — the browser does the reading and
+ * the shrinking, because a server action's payload is the same round trip
+ * either way and the resize has to happen on a canvas regardless.
+ */
+export async function addAttachments(
+  taskId: string,
+  files: NewAttachment[],
+): Promise<{ success: boolean; created?: number; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const guard = await mayAttachTo(taskId, member.id, member.access)
+  if (!guard.ok) return { success: false, error: guard.error }
+
+  const clean = files
+    .filter(f => f.filename.trim() && f.data.startsWith('data:'))
+    .slice(0, MAX_ATTACHMENTS_PER_GO)
+  if (!clean.length) return { success: false, error: 'Nothing to attach' }
+
+  const tooBig = clean.find(f => f.data.length > MAX_ATTACHMENT_CHARS)
+  if (tooBig) {
+    return { success: false, error: `${tooBig.filename} is too large to store — keep files under about 1 MB.` }
+  }
+
+  try {
+    const result = await prisma.taskAttachment.createMany({
+      data: clean.map(f => ({
+        task_id:     taskId,
+        filename:    f.filename.trim().slice(0, 200),
+        data:        f.data,
+        uploaded_by: member.id,
+      })),
+    })
+    revalidatePath('/board')
+    return { success: true, created: result.count }
+  } catch (e: unknown) {
+    return { success: false, error: String(e).slice(0, 200) }
+  }
+}
+
+export async function removeAttachment(
+  attachmentId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const a = await prisma.taskAttachment.findUnique({
+    where: { id: attachmentId }, select: { task_id: true },
+  })
+  if (!a) return { success: false, error: 'That file is already gone' }
+
+  const guard = await mayAttachTo(a.task_id, member.id, member.access)
+  if (!guard.ok) return { success: false, error: guard.error }
+
+  await prisma.taskAttachment.delete({ where: { id: attachmentId } })
+  revalidatePath('/board')
+  return { success: true }
+}
+
+/**
+ * The full attachment rows for one task, `data` included.
+ *
+ * The board query deliberately leaves `data` out — it reads every task, and
+ * inlined files across 300 of them would be megabytes on every page load. So
+ * the panel asks for its own task's files when it needs to show them.
+ */
+export async function loadAttachments(taskId: string): Promise<{
+  id: string; filename: string; url: string | null; data: string | null
+  uploaded_by: string | null; uploaded_at: string
+}[]> {
+  const member = await getSessionMember()
+  if (!member) return []
+
+  const rows = await prisma.taskAttachment.findMany({
+    where: { task_id: taskId },
+    orderBy: { uploaded_at: 'asc' },
+  })
+  return rows.map(r => ({
+    id: r.id, filename: r.filename, url: r.url, data: r.data,
+    uploaded_by: r.uploaded_by, uploaded_at: r.uploaded_at.toISOString(),
+  }))
 }

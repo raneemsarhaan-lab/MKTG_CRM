@@ -14,7 +14,13 @@ export default async function BoardPage() {
         brand:      true,
         task_owner: true,
         comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },
-        attachments: true,
+        // Never `true` here. This query reads every task, and an uploaded
+        // file is inlined in `data` — pulling those across 300 rows would be
+        // megabytes on every board load. The card cover only needs `url`;
+        // the task panel loads its own task's files when it opens.
+        attachments: {
+          select: { id: true, task_id: true, filename: true, url: true, uploaded_at: true },
+        },
         parent:     { select: { id: true, name: true } },
         subtasks:   { select: { id: true, name: true, status: true }, orderBy: { created_at: 'asc' } },
       },

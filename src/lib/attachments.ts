@@ -32,8 +32,18 @@ export function attachmentKind(filename: string): AttachmentKind {
   return 'other'
 }
 
-export function isImageAttachment(a: { filename: string; url?: string | null }): boolean {
-  return Boolean(a.url) && attachmentKind(a.filename) === 'image'
+export function isImageAttachment(a: { filename: string; url?: string | null; data?: string | null }): boolean {
+  return Boolean(a.url || a.data) && attachmentKind(a.filename) === 'image'
+}
+
+/**
+ * Where to point an <img> or a link for this attachment.
+ *
+ * An uploaded file carries its own bytes; an imported one is a link. `data`
+ * wins when both are somehow present, because it is the copy we control.
+ */
+export function attachmentSrc(a: { url?: string | null; data?: string | null }): string | null {
+  return a.data || a.url || null
 }
 
 /** Newest first. Ties keep their incoming order, which is stable enough here. */
@@ -80,3 +90,14 @@ export function shortName(filename: string, max = 28): string {
   const head = filename.slice(0, max - ext.length - 2)
   return `${head}…${ext ? '.' + ext : ''}`
 }
+
+/**
+ * How big a single uploaded file may be, measured on the data URL that is
+ * actually stored rather than on the file the user picked.
+ *
+ * The bytes live in Postgres — there is no object store behind this app — so
+ * this is not a politeness limit, it is what keeps a task row readable. The
+ * panel shrinks pictures before they get here; anything else has to fit as-is.
+ */
+export const MAX_ATTACHMENT_CHARS = 1_500_000      // ≈1.1 MB of file
+export const MAX_ATTACHMENTS_PER_GO = 12

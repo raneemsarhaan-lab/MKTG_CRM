@@ -112,7 +112,15 @@ export interface TaskAttachment {
   id: string
   task_id: string
   filename: string
+  /** A link to a file living elsewhere — every imported ClickUp row. */
   url?: string
+  /**
+   * A file uploaded here, inlined as a data URL. Absent on the board, which
+   * reads every task and cannot afford to carry these; the task panel loads
+   * them for its own task. See the model comment in schema.prisma.
+   */
+  data?: string
+  uploaded_by?: string
   uploaded_at: string
 }
 
