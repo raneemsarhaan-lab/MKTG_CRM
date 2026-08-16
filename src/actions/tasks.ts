@@ -98,18 +98,40 @@ export async function setTaskStage(
 
 // ─── addComment ─────────────────────────────────────────────────────────────
 
+/**
+ * Post a comment, optionally naming people in it.
+ *
+ * `mentions` carries member ids the composer collected while the comment was
+ * being written. They are checked against the member table here rather than
+ * trusted: a server action is a URL like any other, and an id that does not
+ * belong to a member has no business being stored as one.
+ */
 export async function addComment(
   taskId: string,
   body: string,
+  mentions: string[] = [],
 ): Promise<{ success: boolean; error?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
+  const text = body.trim()
+  if (!text) return { success: false, error: 'A comment cannot be empty' }
+
+  let named: string[] = []
+  if (mentions.length) {
+    const rows = await prisma.member.findMany({
+      where: { id: { in: [...new Set(mentions)] } },
+      select: { id: true },
+    })
+    named = rows.map(r => r.id)
+  }
+
   await prisma.taskComment.create({
-    data: { task_id: taskId, author_id: member.id, body: body.trim() },
+    data: { task_id: taskId, author_id: member.id, body: text, mentions: named },
   })
 
   revalidatePath('/board')
+  revalidatePath('/overview')
   return { success: true }
 }
 

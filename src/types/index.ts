@@ -105,6 +105,8 @@ export interface TaskComment {
   author_id: string
   author?: Member
   body: string
+  /** Member ids named with @ in the body. */
+  mentions?: string[]
   created_at: string
 }
 

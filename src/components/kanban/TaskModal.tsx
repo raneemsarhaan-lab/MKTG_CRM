@@ -133,6 +133,45 @@ function Icon({ name, size = 16, color = CU.label, width = 1.7, style }: {
   )
 }
 
+/** A small, deliberately unambitious palette — the ones people actually use. */
+const EMOJI = [
+  '👍','🙌','🎉','🔥','✅','👀','🙏','💡',
+  '❤️','😊','😅','😬','🤔','⚠️','⏰','📌',
+]
+
+/**
+ * Draw the @names in a posted comment as mentions.
+ *
+ * Matching is on the text rather than the stored ids: the ids say who was
+ * meant, this says where in the sentence they were meant. Longest names first,
+ * so "Islam Saadany" is not matched as "Islam" with a stray surname after it.
+ */
+function withMentions(body: string, members: Member[]): React.ReactNode {
+  const names = members.map(m => m.name).filter(Boolean).sort((a, b) => b.length - a.length)
+  if (!names.length) return body
+
+  const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`@(${escaped.join('|')})`, 'g')
+
+  const out: React.ReactNode[] = []
+  let last = 0
+  for (const m of body.matchAll(re)) {
+    const at = m.index ?? 0
+    if (at > last) out.push(body.slice(last, at))
+    out.push(
+      <span key={`${at}-${m[1]}`} style={{
+        background: '#EEF3FF', color: CU.blue, borderRadius: 5,
+        padding: '1px 4px', fontWeight: 600,
+      }}>
+        @{m[1]}
+      </span>,
+    )
+    last = at + m[0].length
+  }
+  if (last < body.length) out.push(body.slice(last))
+  return out
+}
+
 /* ── turning a picked file into something storable ───────────────────── */
 
 /** Read a file exactly as it is. Used for anything that is not a picture. */
@@ -289,6 +328,11 @@ export function TaskModal({
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [lightbox, setLightbox]           = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
+  const [picked, setPicked]               = useState<string[]>([])
+  const [mentionOpen, setMentionOpen]     = useState(false)
+  const [mentionQuery, setMentionQuery]   = useState('')
+  const [mentionIndex, setMentionIndex]   = useState(0)
+  const [emojiOpen, setEmojiOpen]         = useState(false)
   const [dragging, setDragging]           = useState(false)
   const [uploading, setUploading]         = useState(false)
   const [uploadError, setUploadError]     = useState('')
@@ -297,6 +341,7 @@ export function TaskModal({
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const cmtRef  = useRef<HTMLTextAreaElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
 
@@ -448,13 +493,123 @@ export function TaskModal({
     })
   }
 
+  /* ── naming people in a comment ──────────────────────────────────────── */
+
+  /**
+   * Who is still named in what has been typed.
+   *
+   * Picking someone records their id, but the text stays editable — delete
+   * the "@Salma" and the mention should go with it. So the list is derived
+   * from the body on every render rather than kept as the truth: whoever's
+   * handle survives in the text is who gets stored.
+   */
+  const mentioned = useMemo(
+    () => members.filter(m => picked.includes(m.id) && cmtText.includes(`@${m.name}`)),
+    [members, picked, cmtText],
+  )
+
+  const mentionMatches = useMemo(() => {
+    const q = mentionQuery.trim().toLowerCase()
+    const pool = members.filter(m => m.id !== currentUser.id)
+    if (!q) return pool.slice(0, 8)
+    return pool.filter(m => m.name.toLowerCase().includes(q) || (m.role ?? '').toLowerCase().includes(q)).slice(0, 8)
+  }, [members, mentionQuery, currentUser.id])
+
+  useEffect(() => { setMentionIndex(0) }, [mentionQuery, mentionOpen])
+
+  /** The "@word" being typed immediately before the caret, if there is one. */
+  function mentionTokenAt(el: HTMLTextAreaElement): { at: number; query: string } | null {
+    const caret = el.selectionStart ?? 0
+    const upto  = el.value.slice(0, caret)
+    const at    = upto.lastIndexOf('@')
+    if (at === -1) return null
+    // Only right after whitespace or at the very start — an email address is
+    // not a mention.
+    if (at > 0 && !/\s/.test(upto[at - 1])) return null
+    const query = upto.slice(at + 1)
+    if (query.includes('\n')) return null
+    return { at, query }
+  }
+
+  function syncMentionQuery(el: HTMLTextAreaElement) {
+    const token = mentionTokenAt(el)
+    if (!token) { setMentionOpen(false); return }
+    setEmojiOpen(false)
+    setMentionQuery(token.query)
+    setMentionOpen(true)
+  }
+
+  function openMentionPicker() {
+    const el = cmtRef.current
+    if (!el) return
+    const caret = el.selectionStart ?? cmtText.length
+    const needsSpace = caret > 0 && !/\s/.test(cmtText[caret - 1])
+    const insert = `${needsSpace ? ' ' : ''}@`
+    const next = cmtText.slice(0, caret) + insert + cmtText.slice(caret)
+    setCmtText(next)
+    setMentionQuery('')
+    setMentionOpen(true)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = caret + insert.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
+  function insertMention(m: Member) {
+    const el = cmtRef.current
+    if (!el) return
+    const token = mentionTokenAt(el)
+    const caret = el.selectionStart ?? cmtText.length
+    const from  = token ? token.at : caret
+    const next  = `${cmtText.slice(0, from)}@${m.name} ${cmtText.slice(caret)}`
+    setCmtText(next)
+    setPicked(p => (p.includes(m.id) ? p : [...p, m.id]))
+    setMentionOpen(false)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = from + m.name.length + 2
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
+  function insertAtCursor(text: string) {
+    const el = cmtRef.current
+    if (!el) { setCmtText(t => t + text); return }
+    const start = el.selectionStart ?? cmtText.length
+    const end   = el.selectionEnd ?? start
+    setCmtText(cmtText.slice(0, start) + text + cmtText.slice(end))
+    setEmojiOpen(false)
+    requestAnimationFrame(() => {
+      el.focus()
+      const pos = start + text.length
+      el.setSelectionRange(pos, pos)
+    })
+  }
+
+  function onComposerKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionOpen && mentionMatches.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionMatches.length); return }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionMatches.length) % mentionMatches.length); return }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionMatches[mentionIndex]); return }
+      if (e.key === 'Escape')    { e.preventDefault(); setMentionOpen(false); return }
+    }
+    if (e.key === 'Escape' && emojiOpen) { e.preventDefault(); setEmojiOpen(false); return }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleComment() }
+  }
+
   function handleComment() {
     const text = cmtText.trim()
     if (!text) return
+    const ids = mentioned.map(m => m.id)
     startTransition(async () => {
-      await addComment(task.id, text)
+      const r = await addComment(task.id, text, ids)
+      if (!r.success) { setError(r.error ?? 'Could not post that comment'); return }
       router.refresh()
       setCmtText('')
+      setPicked([])
+      setMentionOpen(false)
+      setEmojiOpen(false)
     })
   }
 
@@ -637,24 +792,36 @@ export function TaskModal({
         id: 'stage', when: new Date(task.stage_date),
         node: <>Moved to <strong style={{ fontWeight: 600 }}>{stageMeta.label_en}</strong></>,
       },
-      ...task.comments.map(c => ({
-        id: c.id, when: new Date(c.created_at),
-        node: (
-          <>
-            <strong style={{ fontWeight: 600 }}>{c.author?.name ?? 'Someone'}</strong> commented
-            <span style={{
-              display: 'block', marginTop: 6, padding: '8px 11px', borderRadius: 9,
-              background: '#FFFFFF', border: `1px solid ${CU.line}`,
-              color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-            }}>
-              {c.body}
-            </span>
-          </>
-        ),
-      })),
+      ...task.comments.map(c => {
+        const atMe = (c.mentions ?? []).includes(currentUser.id)
+        return {
+          id: c.id, when: new Date(c.created_at),
+          node: (
+            <>
+              <strong style={{ fontWeight: 600 }}>{c.author?.name ?? 'Someone'}</strong> commented
+              {atMe && (
+                <span style={{
+                  marginInlineStart: 7, padding: '2px 7px', borderRadius: 999,
+                  background: '#EEF3FF', color: CU.blue, fontSize: 11.5, fontWeight: 700,
+                }}>
+                  mentioned you
+                </span>
+              )}
+              <span style={{
+                display: 'block', marginTop: 6, padding: '8px 11px', borderRadius: 9,
+                background: '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                border: `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
+              }}>
+                {withMentions(c.body, members)}
+              </span>
+            </>
+          ),
+        }
+      }),
     ]
     return items.sort((a, b) => a.when.getTime() - b.when.getTime())
-  }, [task.created_at, task.stage_date, task.comments, task.task_owner.name, stageMeta.label_en])
+  }, [task.created_at, task.stage_date, task.comments, task.task_owner.name,
+      stageMeta.label_en, members, currentUser.id])
 
   // ClickUp shows the first couple and hides the rest behind "Show more".
   const HEAD = 1
@@ -1361,18 +1528,80 @@ export function TaskModal({
             </div>
 
             {/* Composer */}
-            <div style={{ padding: '10px 14px 14px', flexShrink: 0 }}>
+            <div style={{ padding: '10px 14px 14px', flexShrink: 0, position: 'relative' }}>
+
+              {/* Who you can name. Opens on the @ button and on typing an @,
+                  and filters as you keep typing after it. */}
+              {mentionOpen && (
+                <div role="listbox" aria-label="Mention someone" style={{
+                  position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
+                  background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
+                  boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 6,
+                  maxHeight: 268, overflowY: 'auto',
+                }}>
+                  {mentionMatches.length === 0 && (
+                    <p style={{ margin: 0, padding: '10px 10px', fontSize: 14, color: CU.faint }}>
+                      Nobody by that name.
+                    </p>
+                  )}
+                  {mentionMatches.map((m, i) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="option"
+                      aria-selected={i === mentionIndex}
+                      onMouseEnter={() => setMentionIndex(i)}
+                      onClick={() => insertMention(m)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        padding: '8px 10px', border: 'none', borderRadius: 8, cursor: 'pointer',
+                        background: i === mentionIndex ? CU.hover : 'transparent',
+                        fontFamily: 'inherit', fontSize: 14.5, color: CU.text, textAlign: 'start',
+                      }}
+                    >
+                      <Avatar name={m.name} size={26} />
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.name}
+                      </span>
+                      <span style={{ fontSize: 12.5, color: CU.faint, whiteSpace: 'nowrap' }}>{m.role}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {emojiOpen && (
+                <div role="menu" aria-label="Insert an emoji" style={{
+                  position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
+                  background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
+                  boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 8,
+                  display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 2,
+                }}>
+                  {EMOJI.map(e => (
+                    <button key={e} type="button" onClick={() => insertAtCursor(e)}
+                            aria-label={`Insert ${e}`}
+                            style={{
+                              height: 34, border: 'none', background: 'transparent', borderRadius: 7,
+                              cursor: 'pointer', fontSize: 19, lineHeight: 1, padding: 0,
+                            }}
+                            onMouseEnter={ev => { ev.currentTarget.style.background = CU.hover }}
+                            onMouseLeave={ev => { ev.currentTarget.style.background = 'transparent' }}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div style={{
                 border: `1px solid ${CU.line}`, borderRadius: 10, background: '#fff',
                 boxShadow: '0 1px 3px rgba(20,20,20,.05)',
               }}>
                 <textarea
+                  ref={cmtRef}
                   value={cmtText}
-                  onChange={e => setCmtText(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleComment() }
-                  }}
-                  placeholder="Write a comment..."
+                  onChange={e => { setCmtText(e.target.value); syncMentionQuery(e.target) }}
+                  onKeyDown={onComposerKey}
+                  onBlur={() => window.setTimeout(() => setMentionOpen(false), 150)}
+                  placeholder="Write a comment — type @ to name someone"
                   rows={2}
                   style={{
                     width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none',
@@ -1380,16 +1609,36 @@ export function TaskModal({
                     padding: '12px 14px 4px', background: 'transparent', borderRadius: 10,
                   }}
                 />
+
+                {mentioned.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 14px 6px' }}>
+                    {mentioned.map(m => (
+                      <span key={m.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, height: 24,
+                        padding: '0 9px', borderRadius: 999, background: '#EEF3FF',
+                        fontSize: 12.5, fontWeight: 600, color: CU.blue,
+                      }}>
+                        <Icon name="at" size={12} color={CU.blue} width={2} />
+                        {m.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px 8px',
                 }}>
-                  <IconButton name="plus"    label="Insert" size={17} />
-                  <IconButton name="sparkle" label="Suggest" size={16} />
-                  <IconButton name="clip"    label="Attach" size={16} />
-                  <IconButton name="at"      label="Mention" size={16} />
-                  <IconButton name="person"  label="Assign" size={16} />
-                  <IconButton name="emoji"   label="Emoji" size={16} />
-                  <IconButton name="video"   label="Record" size={16} />
+                  {/* Attach — the same upload path as the Attachments section;
+                      files belong to the task, not to the comment, because a
+                      comment has nowhere to keep one. */}
+                  {canEdit && (
+                    <IconButton name="clip" label="Attach a file to this task"
+                                onClick={() => fileRef.current?.click()} size={16} />
+                  )}
+                  <IconButton name="at" label="Mention someone" size={16}
+                              onClick={() => { setEmojiOpen(false); openMentionPicker() }} />
+                  <IconButton name="emoji" label="Insert an emoji" size={16}
+                              onClick={() => { setMentionOpen(false); setEmojiOpen(v => !v) }} />
                   <span style={{ flex: 1 }} />
                   <button
                     type="button"

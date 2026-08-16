@@ -206,6 +206,13 @@ model TaskComment {
   task_id    String   @db.Uuid
   author_id  String   @db.Uuid
   body       String
+  /// Members named with @ in this comment.
+  ///
+  /// The names are already in `body` — this is the machine-readable half, so
+  /// "was I mentioned" is a query rather than a string search. It matters
+  /// because two people can share a first name and a rename must not orphan a
+  /// mention: the id keeps pointing at the person either way.
+  mentions   String[] @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
   task   Task   @relation(fields: [task_id], references: [id], onDelete: Cascade)
