@@ -55,7 +55,7 @@ const CONTROL: React.CSSProperties = {
  * populated task reads as text rather than as a form.
  */
 export function InlineValue({
-  canEdit, type, value, display, options, min, step, placeholder, onCommit,
+  canEdit, type, value, display, options, min, step, placeholder, emptyLabel, onCommit,
 }: {
   canEdit:  boolean
   type:     'text' | 'number' | 'date' | 'select'
@@ -65,6 +65,9 @@ export function InlineValue({
   min?:     string | number
   step?:    number
   placeholder?: string
+  /** What a blank looks like. The task panel's Fields block uses "–"; the
+   *  property grid above it, and every other caller, keeps "Empty". */
+  emptyLabel?: string
   onCommit: (next: string) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -74,7 +77,7 @@ export function InlineValue({
   useEffect(() => { if (!editing) setDraft(String(value ?? '')) }, [value, editing])
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
 
-  const EMPTY = <span style={{ color: COLORS.muted, fontWeight: 400 }}>Empty</span>
+  const EMPTY = <span style={{ color: COLORS.muted, fontWeight: 400 }}>{emptyLabel ?? 'Empty'}</span>
 
   if (!canEdit) {
     return <div style={{ ...VALUE, padding: '3px 6px' }}>{display || EMPTY}</div>
