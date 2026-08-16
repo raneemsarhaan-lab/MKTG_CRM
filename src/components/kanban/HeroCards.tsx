@@ -6,8 +6,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import {
   activityItems, attentionItems, quoteOfDay, statCounts, timeAgo, weekMomentum,
 } from '@/lib/home-metrics'
-import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { STAGE_META, ALL_STAGES } from '@/lib/stage-meta'
+import { initials, avatarColor } from '@/lib/utils'
 
 /**
  * The four hero cards — Pipeline handoff §5.
@@ -90,30 +89,14 @@ function StatBox({ value, label, color }: { value: number; label: string; color:
 export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) {
   const momentum  = weekMomentum(tasks, today)
   const stats     = statCounts(tasks, today)
-  const attention = attentionItems(tasks, currentUser.id, today, currentUser.role)
+  // One list of everything you own that is still open, worst first. It used to
+  // be two — a short urgent list with a "My tasks" block repeating it
+  // underneath — which for anyone whose work is mostly late printed the same
+  // tasks twice.
+  const attention = attentionItems(tasks, currentUser.id, today)
+  const overdue   = attention.filter(a => a.due === 'overdue').length
+  const published = tasks.filter(t => t.task_owner_id === currentUser.id && t.status === 'publish').length
 
-  // The card has room for four, and overdue work sorts to the top. Someone
-  // with a long overdue list would therefore never see the queue waiting on
-  // their review — which is the half of this card they cannot discover any
-  // other way. Guarantee it a place.
-  const attentionTop = attention.slice(0, 4)
-  const waiting = attention.filter(a => a.viaStage)
-  if (waiting.length && !attentionTop.some(a => a.viaStage)) {
-    attentionTop[Math.min(3, attentionTop.length)] = waiting[0]
-  }
-  const attentionMore = attention.length - attentionTop.length
-
-  // Everything you own and where it has got to. This used to be its own column
-  // on the board; it lives here now, under the same heading, because "what
-  // needs me" and "where is my work" are the same question asked twice and
-  // splitting them across two places meant reading both to answer either.
-  const mine = tasks.filter(t => t.task_owner_id === currentUser.id && t.status !== 'publish')
-  const minePublished = tasks.filter(t => t.task_owner_id === currentUser.id).length - mine.length
-  const mineByStage = mine.reduce<Partial<Record<string, typeof tasks>>>((acc, t) => {
-    (acc[t.status] ??= []).push(t)
-    return acc
-  }, {})
-  const mineStages = ALL_STAGES.filter(id => mineByStage[id]?.length)
   const activity  = activityItems(tasks, currentUser.id, 4)
   const quote     = quoteOfDay(today)
 
@@ -207,7 +190,27 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 22 }}>
+        {/* What the list adds up to, so the count is readable without
+            counting the rows — and without a second list to hold it. */}
+        <div style={{
+          margin: '5px 0 0 28px', display: 'flex', alignItems: 'center', gap: 7,
+          fontWeight: 600, fontSize: 12,
+        }}>
+          <span style={{ color: overdue > 0 ? '#D22040' : PIPE.textMuted }}>
+            {attention.length} open{overdue > 0 && ` · ${overdue} late`}
+          </span>
+          {published > 0 && (
+            <span style={{ fontWeight: 500, color: PIPE.textFaint }}>· {published} published</span>
+          )}
+        </div>
+
+        {/* Capped and scrollable: this card sits in a four-across row, and
+            someone with thirty open tasks would otherwise push every card
+            beside it down the page. */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14,
+          maxHeight: 322, overflowY: 'auto', overflowX: 'hidden', minWidth: 0,
+        }}>
           {attention.length === 0 && (
             <div style={{
               minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -216,7 +219,7 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
               Nothing needs you right now 🎉
             </div>
           )}
-          {attentionTop.map(a => (
+          {attention.map(a => (
             <button
               key={a.id}
               type="button"
@@ -230,25 +233,15 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
               <span style={{
                 width: 30, height: 30, borderRadius: 8, flexShrink: 0,
                 background: a.due === 'overdue' ? '#FDE7EA' : a.due === 'today' ? '#FFF3E6'
-                          : a.due === 'waiting' ? '#E9F3FF' : '#F0EBFE',
+                          : a.due === 'undated' ? '#F1F1F4' : '#F0EBFE',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }} aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                      stroke={a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#EA8C0B'
-                           : a.due === 'waiting' ? '#2563A8' : PIPE.purple}
+                           : a.due === 'undated' ? '#9A9AA6' : PIPE.purple}
                      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  {a.viaStage ? (
-                    /* An eye: this is waiting on your review, not your delivery. */
-                    <>
-                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                      <circle cx="12" cy="12" r="2.6" />
-                    </>
-                  ) : (
-                    <>
-                      <rect x="3" y="4" width="18" height="18" rx="2" />
-                      <path d="M16 2v4M8 2v4M3 10h18" />
-                    </>
-                  )}
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
                 </svg>
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -260,9 +253,9 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
                 </span>
                 <span style={{
                   display: 'block', marginTop: 2, fontSize: 11.5,
-                  fontWeight: a.due === 'tomorrow' ? 500 : 600,
+                  fontWeight: a.due === 'overdue' || a.due === 'today' ? 600 : 500,
                   color: a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#E0294B'
-                       : a.due === 'waiting' ? '#2563A8' : '#8A90A0',
+                       : a.due === 'undated' ? '#A0A0AC' : '#8A90A0',
                 }}>
                   {a.dueText}
                 </span>
@@ -274,94 +267,6 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
             </button>
           ))}
 
-          {attentionMore > 0 && (
-            <span style={{ fontSize: 11.5, color: PIPE.textMuted, textAlign: 'center', paddingTop: 2 }}>
-              +{attentionMore} more
-            </span>
-          )}
-
-          {/* ── My tasks ───────────────────────────────────────────────── */}
-          <div style={{ borderTop: `1px solid ${PIPE.border}`, marginTop: 4, paddingTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
-              <span style={{
-                width: 20, height: 20, borderRadius: 6, background: '#F4FBD6', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }} aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
-                     strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </span>
-              <span style={{ fontWeight: 800, fontSize: 12, color: PIPE.ink, flex: 1 }}>My tasks</span>
-              <span style={{ fontSize: 11, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>
-                {mine.length} open{minePublished > 0 && ` · ${minePublished} published`}
-              </span>
-            </div>
-
-            {mine.length === 0 ? (
-              <p style={{ fontSize: 12, color: PIPE.textMuted, textAlign: 'center', padding: '10px 0', margin: 0 }}>
-                Nothing assigned to you.
-              </p>
-            ) : (
-              // Capped and scrollable: this card sits in a four-across row, and
-              // a producer with thirty open tasks would otherwise push every
-              // card beside it down the page.
-              <div style={{ maxHeight: 208, overflowY: 'auto', overflowX: 'hidden', display: 'grid', gap: 10, minWidth: 0 }}>
-                {mineStages.map(stageId => {
-                  const meta = STAGE_META[stageId]
-                  return (
-                    <div key={stageId} style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: meta?.color ?? PIPE.purpleStroke }} />
-                        <span style={{
-                          fontSize: 10, fontWeight: 800, letterSpacing: '.05em',
-                          textTransform: 'uppercase', color: PIPE.textSecondary,
-                        }}>
-                          {meta?.label_en ?? stageId}
-                        </span>
-                        <span style={{ fontSize: 10, color: PIPE.textFaint }}>{mineByStage[stageId]!.length}</span>
-                      </div>
-                      <div style={{ display: 'grid', gap: 4, gridTemplateColumns: 'minmax(0, 1fr)' }}>
-                        {mineByStage[stageId]!.map(t => {
-                          const days = t.due_date ? calDaysBetween(today, new Date(t.due_date)) : null
-                          const late = days !== null && days < 0
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => onOpenTask(t.id)}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 7, width: '100%',
-                                border: `1px solid ${late ? '#F6D9DE' : PIPE.border}`,
-                                background: late ? '#FDF3F4' : '#FCFCFB',
-                                borderRadius: 9, padding: '6px 8px', cursor: 'pointer',
-                                fontFamily: 'inherit', textAlign: 'start',
-                              }}
-                            >
-                              <span style={{
-                                flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: 600, color: PIPE.textPrimary,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}>
-                                {t.name}
-                              </span>
-                              {days !== null && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-                                  color: late ? '#D22040' : days <= 1 ? '#EA8C0B' : PIPE.textFaint,
-                                }}>
-                                  {late ? `${Math.abs(days)}d late` : days === 0 ? 'today' : `${days}d`}
-                                </span>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
         </div>
 
         {attention.length > 4 && (
