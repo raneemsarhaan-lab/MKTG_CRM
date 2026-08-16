@@ -8,12 +8,15 @@ import { MAX_PASTED } from '@/lib/paste-list'
 /**
  * Plan actions.
  *
- * Two different rules live here, and the difference matters:
+ * Three rules live here, and the differences matter:
  *
- *  - Shaping the plan — creating projects, moving them in and out of Focus,
- *    changing dates, assigning people — is admin work.
- *  - Ticking a step off is done by whoever it is assigned to. Requiring an
- *    admin for that would make the team board read-only for the team.
+ *  - Portfolio shape — creating and deleting projects, moving them in and out
+ *    of Focus, renaming, changing brand — is admin work. It alters what every
+ *    rollup says, for people with no part in the project.
+ *  - Maintaining a plan you work in — its delivery date, its steps' durations
+ *    and dates, who holds what — belongs to the people delivering it. The test
+ *    is holdsAStepIn: a project you have a step in is one of yours.
+ *  - Ticking a step off is done by whoever it is assigned to.
  *
  * Since the Prisma migration removed row-level security these checks are the
  * only thing enforcing either rule.
@@ -28,7 +31,27 @@ function revalidateAll() {
   revalidatePath('/overview')
 }
 
-/* ── shaping the plan: admin ─────────────────────────────────────────────── */
+
+/**
+ * May this person shape this project?
+ *
+ * "Their projects" means the ones they are actually working in — a project
+ * where they hold at least one step. That is the same principle already
+ * governing steps (you can edit what is assigned to you), widened by one hop
+ * so a plan can be maintained by the people delivering it rather than only by
+ * an admin.
+ *
+ * It is deliberately not "any project": a plan you have no part in is somebody
+ * else's, and reshaping it should take an admin.
+ */
+async function holdsAStepIn(projectId: string, memberId: string): Promise<boolean> {
+  const n = await prisma.projectStep.count({
+    where: { project_id: projectId, assignee_id: memberId },
+  })
+  return n > 0
+}
+
+/* ── shaping the plan ─────────────────────────────────────────────── */
 
 export async function toggleProjectFocus(projectId: string): Promise<Result> {
   const guard = await requireAdmin()
@@ -42,12 +65,34 @@ export async function toggleProjectFocus(projectId: string): Promise<Result> {
   return { success: true }
 }
 
+/**
+ * Edit a project.
+ *
+ * An admin can change anything. Someone holding a step in it can change the
+ * delivery date — that is the field that moves when the work moves, and making
+ * them queue behind an admin to record it is how a plan goes stale.
+ *
+ * Name, brand and standing stay admin-only. Those are portfolio shape: a
+ * rename or a brand change alters what every rollup and every report says, for
+ * people with no part in the project.
+ */
 export async function updateProject(
   projectId: string,
   patch: { name?: string; brand_id?: string | null; due_date?: string | null; standing?: boolean },
 ): Promise<Result> {
-  const guard = await requireAdmin()
-  if (guard.error) return { success: false, error: guard.error }
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const isAdmin = member.access === 'admin'
+  if (!isAdmin) {
+    if (!(await holdsAStepIn(projectId, member.id))) {
+      return { success: false, error: 'You can only edit a project you hold a step in.' }
+    }
+    const structural = patch.name !== undefined || patch.brand_id !== undefined || patch.standing !== undefined
+    if (structural) {
+      return { success: false, error: 'Only an admin can rename a project or change its brand.' }
+    }
+  }
 
   const data: Record<string, unknown> = {}
   if (patch.name !== undefined) {
@@ -117,12 +162,12 @@ export async function removeProject(projectId: string): Promise<Result> {
  * Edit a step.
  *
  * An admin can change any step. Everyone else can change the ones assigned to
- * them — the team board is where people manage their own work, and making it
- * read-only for the team would defeat the point of giving them one. Reassigning
- * is included: handing a task to someone else is a normal thing to need, and
- * the person losing it is the one giving it away.
+ * them, and the ones in a project they are working in — a plan is kept honest
+ * by the team delivering it, not by an admin fielding every corrected duration.
+ * Reassigning is included: handing work over is a normal thing to need.
  *
- * What nobody but an admin can do is touch a step that was never theirs.
+ * What nobody but an admin can do is touch a step in a project they have no
+ * part in.
  */
 export async function updateStep(
   stepId: string,
@@ -139,10 +184,16 @@ export async function updateStep(
 
   if (member.access !== 'admin') {
     const step = await prisma.projectStep.findUnique({
-      where: { id: stepId }, select: { assignee_id: true },
+      where: { id: stepId }, select: { assignee_id: true, project_id: true },
     })
     if (!step) return { success: false, error: 'not_found' }
-    if (step.assignee_id !== member.id) return { success: false, error: 'not_authorized' }
+    // Yours, or in a project you are working in. The second half is what lets
+    // a team keep its own plan honest — durations corrected, dates moved, work
+    // handed over — without an admin in the loop for every nudge.
+    const mine = step.assignee_id === member.id
+    if (!mine && !(await holdsAStepIn(step.project_id, member.id))) {
+      return { success: false, error: 'not_authorized' }
+    }
   }
 
   const data: Record<string, unknown> = {}

@@ -44,6 +44,8 @@ interface Props {
   levels:    Record<string, LevelRates>
   levelList: { key: string; label: string }[]
   isAdmin:   boolean
+  /** Who is looking. A project they hold a step in is one of theirs to maintain. */
+  viewerId:  string
 }
 
 type Tab  = 'overview' | 'projects' | 'timeline' | 'weeks' | 'workload'
@@ -56,7 +58,16 @@ const fmt = (iso: string | null) => {
   return `${+d} ${MONTHS[+m - 1]}`
 }
 
-export function ProjectsView({ projects, brands, members, settings, levels, levelList, isAdmin }: Props) {
+/**
+ * Can this viewer maintain this project?
+ *
+ * Mirrors holdsAStepIn() in the server action — the check that actually
+ * counts. This one only decides what is worth rendering.
+ */
+const canMaintain = (p: ProjectView, viewerId: string, isAdmin: boolean) =>
+  isAdmin || p.steps.some(s => s.assigneeId === viewerId)
+
+export function ProjectsView({ projects, brands, members, settings, levels, levelList, isAdmin, viewerId }: Props) {
   const [list, setList]   = useState<List>('focus')
   const [tab, setTab]     = useState<Tab>('overview')
   const [error, setError] = useState('')
@@ -176,7 +187,7 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
         )}
         {tab === 'projects' && (
           <ProjectList projects={shown} today={today} brands={brands} members={members}
-                       isAdmin={isAdmin} onError={setError} />
+                       isAdmin={isAdmin} viewerId={viewerId} onError={setError} />
         )}
         {tab === 'workload' && isAdmin && (
           <WorkloadPanel
@@ -467,11 +478,11 @@ function BrandHeader({ name, count, brands, right }: {
 
 /* ── Projects tab — the editable list ────────────────────────────────── */
 
-function ProjectList({ projects, today, brands, members, isAdmin, onError }: {
+function ProjectList({ projects, today, brands, members, isAdmin, viewerId, onError }: {
   projects: ProjectView[]; today: string
   brands: { id: string; name: string; color: string; logo_url?: string | null }[]
   members: { id: string; name: string }[]
-  isAdmin: boolean; onError: (s: string) => void
+  isAdmin: boolean; viewerId: string; onError: (s: string) => void
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -481,7 +492,8 @@ function ProjectList({ projects, today, brands, members, isAdmin, onError }: {
           <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
             {list.map(p => (
               <ProjectRow key={p.id} project={p} today={today} brands={brands}
-                          members={members} isAdmin={isAdmin} onError={onError} />
+                          members={members} isAdmin={isAdmin}
+                          canEdit={canMaintain(p, viewerId, isAdmin)} onError={onError} />
             ))}
           </div>
         </section>
@@ -490,11 +502,15 @@ function ProjectList({ projects, today, brands, members, isAdmin, onError }: {
   )
 }
 
-function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
+function ProjectRow({ project: p, today, brands, members, isAdmin, canEdit, onError }: {
   project: ProjectView; today: string
   brands: { id: string; name: string; color: string }[]
   members: { id: string; name: string }[]
-  isAdmin: boolean; onError: (s: string) => void
+  /** Full portfolio rights: rename, rebrand, delete, move in and out of Focus. */
+  isAdmin: boolean
+  /** Maintain rights: the delivery date, and the steps inside. */
+  canEdit: boolean
+  onError: (s: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [isPending, start] = useTransition()
@@ -538,20 +554,23 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
           {s.done}/{s.total} steps
         </span>
 
-        {isAdmin ? (
-          <>
-            <input type="date" defaultValue={p.dueDate ?? ''} aria-label={`Due date of ${p.name}`}
-                   onChange={e => act(() => updateProject(p.id, { due_date: e.target.value || null }))}
-                   style={{ ...input, width: 150 }} />
-            <select value={p.brandId ?? ''} aria-label={`Brand of ${p.name}`}
-                    onChange={e => act(() => updateProject(p.id, { brand_id: e.target.value || null }))}
-                    style={{ ...input, width: 168 }}>
-              <option value="">— no brand —</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </>
+        {/* The delivery date moves when the work moves, so anyone delivering it
+            can record that. The brand is portfolio shape — admin only. */}
+        {canEdit ? (
+          <input type="date" defaultValue={p.dueDate ?? ''} aria-label={`Due date of ${p.name}`}
+                 onChange={e => act(() => updateProject(p.id, { due_date: e.target.value || null }))}
+                 style={{ ...input, width: 150 }} />
         ) : (
           <span style={{ fontWeight: 500, fontSize: 12.5, color: UI.soft }}>due {fmt(p.dueDate)}</span>
+        )}
+
+        {isAdmin && (
+          <select value={p.brandId ?? ''} aria-label={`Brand of ${p.name}`}
+                  onChange={e => act(() => updateProject(p.id, { brand_id: e.target.value || null }))}
+                  style={{ ...input, width: 168 }}>
+            <option value="">— no brand —</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         )}
 
         <FocusStar project={p} isAdmin={isAdmin} onError={onError} />
@@ -591,11 +610,12 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
       {open && (
         <div style={{ borderTop: `1px solid ${UI.groupLine}`, background: UI.groupBg, padding: '12px 14px 14px 40px', display: 'grid', gap: 6 }}>
           {p.steps.map(st => (
-            <StepRow key={st.id} step={st} today={today} members={members} isAdmin={isAdmin} onError={onError} />
+            <StepRow key={st.id} step={st} today={today} members={members}
+                     isAdmin={isAdmin} canEdit={canEdit} onError={onError} />
           ))}
           {!p.steps.length && <p style={{ fontSize: 13, color: UI.soft }}>No steps yet.</p>}
 
-          {isAdmin && (
+          {canEdit && (
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <input value={newStep} onChange={e => setNewStep(e.target.value)}
                      onKeyDown={e => { if (e.key === 'Enter' && newStep.trim()) { act(() => addStep(p.id, newStep)); setNewStep('') } }}
@@ -623,10 +643,14 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, onError }: {
   )
 }
 
-function StepRow({ step, today, members, isAdmin, onError }: {
+function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
   step: StepView; today: string
   members: { id: string; name: string }[]
-  isAdmin: boolean; onError: (s: string) => void
+  /** Deleting a step, and pushing it to the board, stay admin work. */
+  isAdmin: boolean
+  /** Maintaining it — name, duration, date, owner — belongs to the team in it. */
+  canEdit: boolean
+  onError: (s: string) => void
 }) {
   const [isPending, start] = useTransition()
   const [done, setDone] = useState(step.done)
@@ -659,7 +683,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
              }}
              style={{ width: 18, height: 18, accentColor: UI.purple, cursor: 'pointer', flexShrink: 0 }} />
 
-      {isAdmin ? (
+      {canEdit ? (
         <input defaultValue={step.name} aria-label={`Name of ${step.name}`}
                onBlur={e => { const v = e.target.value.trim(); if (v && v !== step.name) act(() => updateStep(step.id, { name: v })) }}
                style={{ ...input, flex: 1, border: '1px solid transparent', background: 'transparent',
@@ -670,7 +694,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
         </span>
       )}
 
-      {isAdmin ? (
+      {canEdit ? (
         <>
           <input type="number" min={0} step={0.5} defaultValue={step.durationDays}
                  aria-label={`Duration of ${step.name} in days`}
@@ -708,7 +732,7 @@ function StepRow({ step, today, members, isAdmin, onError }: {
         </button>
       ) : null}
 
-      {isAdmin && (
+      {canEdit && (
         <>
           {/* Milestone — a marked point in the plan. Still ordinary planned
               work in every days figure; the star marks that it matters. */}
@@ -738,12 +762,16 @@ function StepRow({ step, today, members, isAdmin, onError }: {
             <option value="simple">simple</option>
             <option value="complex">complex</option>
           </select>
-
-          <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
-                  style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
-            ✕
-          </button>
         </>
+      )}
+
+      {/* Deleting stays admin work: a step can be a commitment to someone
+          outside the project, and removing it removes it from every rollup. */}
+      {isAdmin && (
+        <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
+                style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
+          ✕
+        </button>
       )}
     </div>
   )
