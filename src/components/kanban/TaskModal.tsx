@@ -744,14 +744,23 @@ export function TaskModal({
                 </Prop>
 
                 <Prop icon="calendar" label="Due date">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
-                    <InlineValue
-                      canEdit={canEdit} type="date" value={task.due_date ?? ''}
-                      display={task.due_date ? fmtDate(task.due_date) : ''}
-                      onCommit={v => applyPatch({ due_date: v })}
-                    />
+                  {/* The InlineValue button fills its parent, so it gets a
+                      shrink-to-fit box of its own — otherwise it claims the
+                      whole row and knocks the overdue count onto a line by
+                      itself, which then drags the label out of alignment. */}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ flex: '0 1 auto', minWidth: 0 }}>
+                      <InlineValue
+                        canEdit={canEdit} type="date" value={task.due_date ?? ''}
+                        display={task.due_date ? fmtDate(task.due_date) : ''}
+                        onCommit={v => applyPatch({ due_date: v })}
+                      />
+                    </span>
                     {daysLeft !== null && (
-                      <span style={{ fontSize: 12, fontWeight: 600, color: overdue ? '#D22040' : CU.faint }}>
+                      <span style={{
+                        flexShrink: 0, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+                        color: overdue ? '#D22040' : CU.faint,
+                      }}>
                         {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
                       </span>
                     )}
@@ -1003,28 +1012,33 @@ export function TaskModal({
                     {/* The drop zone is ClickUp's, and it is honest about what it
                         is: files reach a task through the brief editor's
                         uploader, so this points at that rather than pretending
-                        to accept a drop it cannot store. */}
-                    <div
-                      onClick={() => { if (canEdit) { setBriefText(task.description ?? ''); setEditingBrief(true) } }}
-                      role={canEdit ? 'button' : undefined}
-                      tabIndex={canEdit ? 0 : undefined}
-                      style={{
-                        border: `1.5px dashed ${CU.line}`, borderRadius: 10, padding: '22px 12px',
-                        textAlign: 'center', fontSize: 14, color: CU.label,
-                        cursor: canEdit ? 'pointer' : 'default',
-                      }}
-                      onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = CU.hover }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                    >
-                      {canEdit
-                        ? <>Add files from the description editor — <span style={{ textDecoration: 'underline' }}>open it</span></>
-                        : 'No files can be added to this task by you.'}
-                    </div>
+                        to accept a drop it cannot store. Someone who cannot
+                        edit the task gets no zone at all — a dead one that
+                        exists only to refuse them is worse than none. */}
+                    {canEdit && (
+                      <div
+                        onClick={() => { setBriefText(task.description ?? ''); setEditingBrief(true) }}
+                        role="button"
+                        tabIndex={0}
+                        style={{
+                          border: `1.5px dashed ${CU.line}`, borderRadius: 10, padding: '22px 12px',
+                          textAlign: 'center', fontSize: 14, color: CU.label, cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        Add files from the description editor — <span style={{ textDecoration: 'underline' }}>open it</span>
+                      </div>
+                    )}
+
+                    {attachments.length === 0 && !canEdit && (
+                      <p style={{ margin: 0, fontSize: 13.5, color: CU.faint }}>No files.</p>
+                    )}
 
                     {attachments.length > 0 && (
                       <div style={{
                         display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-                        gap: 12, marginTop: 14,
+                        gap: 12, marginTop: canEdit ? 14 : 0,
                       }}>
                         {attachments.map(a => {
                           const image = isImageAttachment(a)
