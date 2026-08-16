@@ -14,8 +14,10 @@ import { MAX_PASTED } from '@/lib/paste-list'
  *    of Focus, renaming, changing brand — is admin work. It alters what every
  *    rollup says, for people with no part in the project.
  *  - Maintaining a plan you work in — its delivery date, its steps' durations
- *    and dates, who holds what — belongs to the people delivering it. The test
- *    is holdsAStepIn: a project you have a step in is one of yours.
+ *    and dates, who holds what, which of them are milestones, and removing a
+ *    step that turned out not to be needed — belongs to the people delivering
+ *    it. The test is holdsAStepIn: a project you have a step in is one of
+ *    yours.
  *  - Ticking a step off is done by whoever it is assigned to.
  *
  * Since the Prisma migration removed row-level security these checks are the
@@ -337,17 +339,32 @@ export async function listProjectsForPicker(): Promise<{ id: string; name: strin
   return rows.map(r => ({ id: r.id, name: r.name, brandName: r.brand?.name ?? null }))
 }
 
-/** Tombstoned for the same reason as a project — see removeProject. A step
- *  added in the app has no plan key and cannot be re-imported, so there is
- *  nothing to record for those. */
+/**
+ * Remove a step.
+ *
+ * Same rule as editing one: an admin, or someone holding a step in the same
+ * project. A plan that can be corrected but not pruned still goes stale — a
+ * step that turned out not to be needed has to be able to leave.
+ *
+ * Deleting the project itself stays admin-only. That is a different act: it
+ * takes every step with it, including other people's.
+ *
+ * Tombstoned for the same reason as a project — see removeProject. A step
+ * added in the app has no plan key and cannot be re-imported, so there is
+ * nothing to record for those.
+ */
 export async function removeStep(stepId: string): Promise<Result> {
-  const guard = await requireAdmin()
-  if (guard.error) return { success: false, error: guard.error }
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
 
   const s = await prisma.projectStep.findUnique({
-    where: { id: stepId }, select: { key: true, name: true },
+    where: { id: stepId }, select: { key: true, name: true, project_id: true },
   })
   if (!s) return { success: false, error: 'That step no longer exists' }
+
+  if (member.access !== 'admin' && !(await holdsAStepIn(s.project_id, member.id))) {
+    return { success: false, error: 'You can only remove a step from a project you hold a step in.' }
+  }
 
   await prisma.$transaction(async tx => {
     await tx.projectStep.delete({ where: { id: stepId } })

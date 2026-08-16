@@ -646,9 +646,9 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canEdit, onEr
 function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
   step: StepView; today: string
   members: { id: string; name: string }[]
-  /** Deleting a step, and pushing it to the board, stay admin work. */
+  /** Pushing a step to the board stays admin work. */
   isAdmin: boolean
-  /** Maintaining it — name, duration, date, owner — belongs to the team in it. */
+  /** Maintaining it — name, duration, date, owner, milestone, removal. */
   canEdit: boolean
   onError: (s: string) => void
 }) {
@@ -765,9 +765,10 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
         </>
       )}
 
-      {/* Deleting stays admin work: a step can be a commitment to someone
-          outside the project, and removing it removes it from every rollup. */}
-      {isAdmin && (
+      {/* Removing a step is part of maintaining the plan — a plan you can
+          correct but not prune still goes stale. Deleting the whole project
+          is the admin-only one; that takes other people's steps with it. */}
+      {canEdit && (
         <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
                 style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
           ✕
