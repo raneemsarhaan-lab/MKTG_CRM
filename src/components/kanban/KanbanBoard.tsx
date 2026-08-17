@@ -764,6 +764,9 @@ export function KanbanBoard({
           brands={brands}
           members={members}
           contentTypes={contentTypes}
+          // Names only — the composer's # picker and the chips a posted
+          // comment draws. Cheap: the board already holds every row.
+          allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
           onClose={() => selectTask(null)}
         />
       )}
