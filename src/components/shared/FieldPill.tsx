@@ -107,14 +107,14 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
           // it is the same tint the To Do chip and Show custom fields already
           // use, so the form has one language rather than two.
           border: 'none',
-          background: '#F1F2F4',
+          background: '#F7F8FA',
           color: active ? COLORS.ink : COLORS.muted,
           fontSize: 13.5, fontWeight: active ? 600 : 500,
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
           transition: 'background 140ms ease-out',
         }}
-        onMouseEnter={e => { if (variant !== 'view') e.currentTarget.style.background = '#E7E9ED' }}
-        onMouseLeave={e => { if (variant !== 'view') e.currentTarget.style.background = '#F1F2F4' }}
+        onMouseEnter={e => { if (variant !== 'view') e.currentTarget.style.background = '#EFF1F5' }}
+        onMouseLeave={e => { if (variant !== 'view') e.currentTarget.style.background = '#F7F8FA' }}
       >
         {variant === 'view' && (
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
