@@ -280,10 +280,10 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               autoFocus
               aria-label="Task name"
               style={{
-                width: '100%', fontSize: 19, fontWeight: 700, color: COLORS.ink,
-                background: '#fff', border: `1px solid ${COLORS.line}`, borderRadius: 10,
+                width: '100%', fontSize: 23, fontWeight: 700, color: COLORS.ink,
+                background: 'transparent', border: 'none', borderRadius: 10,
                 outline: 'none', fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
-                padding: '13px 15px', marginBottom: 12,
+                padding: '10px 2px 6px', marginBottom: 6,
               }}
             />
           )}
@@ -377,8 +377,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               aria-label="More fields"
               title="More fields"
               style={{
-                width: 32, height: 32, borderRadius: 8,
-                border: `1px solid ${COLORS.line}`, background: '#fff',
+                width: 34, height: 34, borderRadius: 9,
+                border: 'none', background: '#F1F2F4',
                 color: COLORS.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
               }}
             >

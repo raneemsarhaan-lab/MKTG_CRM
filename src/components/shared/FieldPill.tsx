@@ -101,18 +101,20 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
         } : {
           display: 'inline-flex', alignItems: 'center', gap: 7,
           padding: '8px 13px', borderRadius: 9,
-          // The border stays the same hairline whether the field is filled or
-          // not. It used to go near-black once filled, which put a row of hard
-          // outlines across the intake form and made a set of ordinary
-          // dropdowns read as five separate emphases. Filled is said with the
-          // text instead: darker and heavier, the way the reference says it.
-          border: `1px solid ${COLORS.line}`,
-          background: '#fff',
+          // No outline at all. A row of boxes made five ordinary dropdowns
+          // look like five separate emphases; the tint is enough to say
+          // "this is a control" without drawing a frame round each one, and
+          // it is the same tint the To Do chip and Show custom fields already
+          // use, so the form has one language rather than two.
+          border: 'none',
+          background: '#F1F2F4',
           color: active ? COLORS.ink : COLORS.muted,
           fontSize: 13.5, fontWeight: active ? 600 : 500,
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-          transition: 'border-color 140ms ease-out, background 140ms ease-out',
+          transition: 'background 140ms ease-out',
         }}
+        onMouseEnter={e => { if (variant !== 'view') e.currentTarget.style.background = '#E7E9ED' }}
+        onMouseLeave={e => { if (variant !== 'view') e.currentTarget.style.background = '#F1F2F4' }}
       >
         {variant === 'view' && (
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
