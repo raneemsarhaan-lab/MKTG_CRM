@@ -166,40 +166,72 @@ export interface ActivityItem {
 }
 
 /**
- * Activity — anything that happened on work the user owns, plus their own
- * comments elsewhere.
+ * Activity — what has happened on the user's work.
  *
- * Two sources, because those are the two this product actually records:
- * comments, and the moment a task entered its current stage. There is no
- * event log, so only the *current* stage entry is visible — an older move is
- * overwritten by a newer one rather than kept as history.
+ * Four sources, and they are four because those are what this product
+ * actually timestamps: a comment, a mention, a file arriving, and the moment
+ * a task entered the stage it is in. There is no event log, so only the
+ * *current* stage entry is visible — an older move is overwritten by a newer
+ * one rather than kept as history, and an edit to a date or an owner leaves
+ * no trace at all. Adding those means an events table, not a wider query.
  */
 export function activityItems(
   tasks: (Task & {
     task_owner?: { name: string }
-    comments?: { id: string; body: string; created_at: string; author_id: string; author?: { name: string } }[]
+    comments?: {
+      id: string; body: string; created_at: string; author_id: string
+      mentions?: string[]; author?: { name: string }
+    }[]
+    attachments?: { id: string; filename: string; uploaded_at: string; uploaded_by?: string | null }[]
   })[],
   memberId: string,
   limit = 4,
+  members: { id: string; name: string }[] = [],
 ): ActivityItem[] {
   const items: ActivityItem[] = []
+  const nameOf = (id?: string | null) => members.find(m => m.id === id)?.name
 
   for (const t of tasks) {
     const mine = t.task_owner_id === memberId
 
     for (const c of t.comments ?? []) {
-      if (!mine && c.author_id !== memberId) continue
+      const named = (c.mentions ?? []).includes(memberId)
+      // Yours, written by you, or one that named you. The third is the reason
+      // this argument list grew: being mentioned on somebody else's task is
+      // exactly the update you would otherwise never see.
+      if (!mine && c.author_id !== memberId && !named) continue
       const author = c.author?.name ?? 'Someone'
       items.push({
         id:         `c-${c.id}`,
         avatarName: author,
         prefix:     '',
         bold:       author,
-        suffix:     'commented on',
+        suffix:     named ? 'mentioned you on' : 'commented on',
         target:     t.name,
         at:         c.created_at,
         taskId:     t.id,
-        dot:        '#2563EB',
+        dot:        named ? '#D6336C' : '#2563EB',
+      })
+    }
+
+    // A file landing on your task is a real event with a real timestamp —
+    // uploaded_at and uploaded_by are recorded — so it belongs here. Imported
+    // ClickUp rows carry no uploader and are skipped: they all arrived in one
+    // batch and would bury everything else.
+    for (const a of t.attachments ?? []) {
+      if (!a.uploaded_by) continue
+      if (!mine && a.uploaded_by !== memberId) continue
+      const who = nameOf(a.uploaded_by) ?? 'Someone'
+      items.push({
+        id:         `a-${a.id}`,
+        avatarName: who,
+        prefix:     '',
+        bold:       who,
+        suffix:     `attached ${a.filename} to`,
+        target:     t.name,
+        at:         a.uploaded_at,
+        taskId:     t.id,
+        dot:        '#0EA5A5',
       })
     }
 

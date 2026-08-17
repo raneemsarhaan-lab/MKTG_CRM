@@ -594,6 +594,7 @@ export function KanbanBoard({
       <HeroCards
         tasks={tasks}
         currentUser={currentUser}
+        members={members}
         today={today}
         onOpenTask={id => selectTask(id)}
       />

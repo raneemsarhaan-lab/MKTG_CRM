@@ -506,6 +506,9 @@ export async function createTasks(
 
 type NewAttachment = { filename: string; data: string }
 
+/** How big the card thumbnail may be. A dozen kilobytes, not a picture. */
+const MAX_THUMB_CHARS = 60_000
+
 /** Same rule as updateTask: the owner, or an admin or superuser. */
 async function mayAttachTo(taskId: string, memberId: string, access: string) {
   const task = await prisma.task.findUnique({
@@ -526,6 +529,15 @@ async function mayAttachTo(taskId: string, memberId: string, access: string) {
 export async function addAttachments(
   taskId: string,
   files: NewAttachment[],
+  /**
+   * A small preview of the newest image in this batch, for the task card.
+   *
+   * It is stored on the task rather than the attachment because the board
+   * reads every task and never selects an attachment's bytes — see the model
+   * comments. One small thumbnail per task is affordable; three hundred rows
+   * of full-size uploads is not.
+   */
+  thumb?: string | null,
 ): Promise<{ success: boolean; created?: number; error?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
@@ -552,7 +564,12 @@ export async function addAttachments(
         uploaded_by: member.id,
       })),
     })
+    if (thumb && thumb.startsWith('data:') && thumb.length <= MAX_THUMB_CHARS) {
+      await prisma.task.update({ where: { id: taskId }, data: { cover_thumb: thumb } })
+    }
+
     revalidatePath('/board')
+    revalidatePath('/overview')
     return { success: true, created: result.count }
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
@@ -574,7 +591,18 @@ export async function removeAttachment(
   if (!guard.ok) return { success: false, error: guard.error }
 
   await prisma.taskAttachment.delete({ where: { id: attachmentId } })
+
+  // The card's preview came from an upload. If none is left, clear it rather
+  // than keep showing a picture the task no longer has.
+  const stillHasUpload = await prisma.taskAttachment.count({
+    where: { task_id: a.task_id, data: { not: null } },
+  })
+  if (stillHasUpload === 0) {
+    await prisma.task.update({ where: { id: a.task_id }, data: { cover_thumb: null } })
+  }
+
   revalidatePath('/board')
+  revalidatePath('/overview')
   return { success: true }
 }
 
