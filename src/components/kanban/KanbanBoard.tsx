@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useTransition } from 'react'
+import { useState, useMemo, useEffect, useRef, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay,
@@ -182,7 +182,55 @@ export function KanbanBoard({
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
-  const attentionCount = attentionItems(tasks, currentUser.id, today).length
+  const attention = useMemo(
+    () => attentionItems(tasks, currentUser.id, today),
+    [tasks, currentUser.id, today],
+  )
+
+  /**
+   * The bell's contents.
+   *
+   * Two kinds of thing arrive here: somebody named you in a comment, and work
+   * of yours that is due or has slipped. Mentions come first — a person is
+   * waiting on an answer, which a date is not — and newest first inside that.
+   */
+  const notices = useMemo(() => {
+    const mentions = tasks.flatMap(t =>
+      (t.comments ?? [])
+        .filter(c => (c.mentions ?? []).includes(currentUser.id))
+        .map(c => ({
+          kind: 'mention' as const,
+          id: c.id,
+          taskId: t.id,
+          who: c.author?.name ?? 'Someone',
+          taskName: t.name,
+          body: c.body,
+          when: new Date(c.created_at).getTime(),
+        })),
+    ).sort((a, b) => b.when - a.when)
+
+    const due = attention
+      .filter(a => a.due === 'overdue' || a.due === 'today')
+      .map(a => ({ kind: 'due' as const, id: a.id, taskId: a.id, taskName: a.title, dueText: a.dueText }))
+
+    return { mentions, due, total: mentions.length + due.length }
+  }, [tasks, currentUser.id, attention])
+
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!bellOpen) return
+    function onDown(e: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false)
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setBellOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [bellOpen])
 
   /**
    * The stages before Ready to Design.
@@ -353,24 +401,118 @@ export function KanbanBoard({
             </svg>
           </div>
 
-          {/* The bell counts the same work the attention card lists — it is
-              not a notification inbox, and pretending otherwise would put a
-              number on the screen with nothing behind it. */}
-          <div style={{ position: 'relative' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
-                 strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"
-                 aria-label={`${attentionCount} tasks need attention`} role="img">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
-            </svg>
-            {attentionCount > 0 && (
-              <span style={{
-                position: 'absolute', top: -8, right: -8, minWidth: 20, height: 20,
+          {/* The bell used to be a bare <svg> with a count on it — a number on
+              the screen you could not do anything with. It opens now, because
+              since mentions arrived there is something behind it: people
+              waiting on you, then your own work that is due or has slipped. */}
+          <div ref={bellRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setBellOpen(v => !v)}
+              aria-haspopup="dialog"
+              aria-expanded={bellOpen}
+              aria-label={notices.total
+                ? `Notifications — ${notices.mentions.length} mention${notices.mentions.length === 1 ? '' : 's'}, ${notices.due.length} due`
+                : 'Notifications — nothing waiting'}
+              title="Notifications"
+              style={{
+                width: 38, height: 38, borderRadius: 10, border: 'none', padding: 0,
+                background: bellOpen ? PIPE.surface : 'transparent', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              onMouseEnter={e => { if (!bellOpen) e.currentTarget.style.background = PIPE.surface }}
+              onMouseLeave={e => { if (!bellOpen) e.currentTarget.style.background = 'transparent' }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
+                   strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
+              </svg>
+            </button>
+            {notices.total > 0 && (
+              <span aria-hidden="true" style={{
+                position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20,
                 borderRadius: 999, background: PIPE.purple, color: '#FFF',
                 fontWeight: 700, fontSize: 11, border: '2px solid #FFFFFF',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+                pointerEvents: 'none',
               }}>
-                {attentionCount > 99 ? '99+' : attentionCount}
+                {notices.total > 99 ? '99+' : notices.total}
               </span>
+            )}
+
+            {bellOpen && (
+              <div role="dialog" aria-label="Notifications" style={{
+                position: 'absolute', top: 46, insetInlineEnd: 0, zIndex: 20, width: 372,
+                maxHeight: 460, overflowY: 'auto', background: '#FFFFFF',
+                border: `1px solid ${PIPE.border}`, borderRadius: 14,
+                boxShadow: '0 14px 40px rgba(20,19,26,.18)', padding: 8,
+              }}>
+                {notices.total === 0 && (
+                  <p style={{ margin: 0, padding: '26px 12px', textAlign: 'center', fontSize: 13.5, color: PIPE.textMuted }}>
+                    Nothing waiting on you 🎉
+                  </p>
+                )}
+
+                {notices.mentions.length > 0 && (
+                  <div style={{
+                    padding: '8px 10px 6px', fontSize: 11, fontWeight: 800, letterSpacing: '.08em',
+                    textTransform: 'uppercase', color: PIPE.textMuted,
+                  }}>
+                    Mentions
+                  </div>
+                )}
+                {notices.mentions.map(n => (
+                  <button key={n.id} type="button"
+                          onClick={() => { setBellOpen(false); selectTask(n.taskId) }}
+                          style={NOTICE_ROW}
+                          onMouseEnter={e => { e.currentTarget.style.background = PIPE.surface }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                    <span style={{ fontSize: 13.5, color: PIPE.textPrimary }}>
+                      <strong style={{ fontWeight: 700 }}>{n.who}</strong> mentioned you
+                    </span>
+                    <span style={{
+                      fontSize: 12.5, color: PIPE.textSecondary, marginTop: 3,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {n.body}
+                    </span>
+                    <span style={{
+                      fontSize: 11.5, color: PIPE.textFaint, marginTop: 3,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {n.taskName}
+                    </span>
+                  </button>
+                ))}
+
+                {notices.due.length > 0 && (
+                  <div style={{
+                    padding: '10px 10px 6px', fontSize: 11, fontWeight: 800, letterSpacing: '.08em',
+                    textTransform: 'uppercase', color: PIPE.textMuted,
+                    borderTop: notices.mentions.length ? `1px solid ${PIPE.border}` : 'none',
+                    marginTop: notices.mentions.length ? 6 : 0,
+                  }}>
+                    Due
+                  </div>
+                )}
+                {notices.due.map(n => (
+                  <button key={n.id} type="button"
+                          onClick={() => { setBellOpen(false); selectTask(n.taskId) }}
+                          style={NOTICE_ROW}
+                          onMouseEnter={e => { e.currentTarget.style.background = PIPE.surface }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                    <span style={{
+                      fontSize: 13.5, color: PIPE.textPrimary,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {n.taskName}
+                    </span>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#D22040', marginTop: 3 }}>
+                      {n.dueText}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
@@ -607,4 +749,12 @@ export function KanbanBoard({
       )}
     </div>
   )
+}
+
+/** A row in the bell's panel — three stacked lines, whole-row hit target. */
+const NOTICE_ROW: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+  width: '100%', minWidth: 0, padding: '9px 10px', border: 'none',
+  background: 'transparent', borderRadius: 9, cursor: 'pointer',
+  fontFamily: 'inherit', textAlign: 'start',
 }

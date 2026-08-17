@@ -90,9 +90,11 @@ const ICON = {
   ),
 }
 
+// Overview first: it is where "/" and signing in both land, so it is the
+// home of this app and the nav should not say otherwise.
 const NAV_ITEMS = [
-  { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
   { href: '/overview', key: 'overview', icon: ICON.overview, adminOnly: false },
+  { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
   { href: '/projects', key: 'projects', icon: ICON.projects, adminOnly: false },
   { href: '/team',     key: 'team',     icon: ICON.team,     adminOnly: false },
   { href: '/capacity', key: 'capacity', icon: ICON.capacity, adminOnly: true  },

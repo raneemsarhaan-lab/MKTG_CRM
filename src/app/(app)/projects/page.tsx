@@ -83,6 +83,7 @@ export default async function ProjectsPage() {
         levels={levels}
         levelList={levelRows.map(l => ({ key: l.key, label: l.label }))}
         isAdmin={member.access === 'admin'}
+        canManage={member.access === 'admin' || member.access === 'superuser'}
         viewerId={member.id}
       />
     </div>

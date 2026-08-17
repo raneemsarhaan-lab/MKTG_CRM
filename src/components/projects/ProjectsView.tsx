@@ -43,7 +43,10 @@ interface Props {
   }
   levels:    Record<string, LevelRates>
   levelList: { key: string; label: string }[]
+  /** Full portfolio rights: delete a project, move it in and out of Focus. */
   isAdmin:   boolean
+  /** Admin or superuser — may rename, rebrand and create projects. */
+  canManage: boolean
   /** Who is looking. A project they hold a step in is one of theirs to maintain. */
   viewerId:  string
 }
@@ -64,10 +67,10 @@ const fmt = (iso: string | null) => {
  * Mirrors holdsAStepIn() in the server action — the check that actually
  * counts. This one only decides what is worth rendering.
  */
-const canMaintain = (p: ProjectView, viewerId: string, isAdmin: boolean) =>
-  isAdmin || p.steps.some(s => s.assigneeId === viewerId)
+const canMaintain = (p: ProjectView, viewerId: string, canManage: boolean) =>
+  canManage || p.steps.some(s => s.assigneeId === viewerId)
 
-export function ProjectsView({ projects, brands, members, settings, levels, levelList, isAdmin, viewerId }: Props) {
+export function ProjectsView({ projects, brands, members, settings, levels, levelList, isAdmin, canManage, viewerId }: Props) {
   const [list, setList]   = useState<List>('focus')
   const [tab, setTab]     = useState<Tab>('overview')
   const [error, setError] = useState('')
@@ -187,7 +190,7 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
         )}
         {tab === 'projects' && (
           <ProjectList projects={shown} today={today} brands={brands} members={members}
-                       isAdmin={isAdmin} viewerId={viewerId} onError={setError} />
+                       isAdmin={isAdmin} canManage={canManage} viewerId={viewerId} onError={setError} />
         )}
         {tab === 'workload' && isAdmin && (
           <WorkloadPanel
@@ -204,7 +207,7 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
         {tab === 'timeline' && <Timeline projects={shown} today={today} />}
         {tab === 'weeks'    && <Weeks projects={shown} today={today} />}
 
-        {isAdmin && tab === 'projects' && <NewProject onError={setError} />}
+        {canManage && tab === 'projects' && <NewProject onError={setError} />}
       </div>
     </div>
   )
@@ -478,11 +481,11 @@ function BrandHeader({ name, count, brands, right }: {
 
 /* ── Projects tab — the editable list ────────────────────────────────── */
 
-function ProjectList({ projects, today, brands, members, isAdmin, viewerId, onError }: {
+function ProjectList({ projects, today, brands, members, isAdmin, canManage, viewerId, onError }: {
   projects: ProjectView[]; today: string
   brands: { id: string; name: string; color: string; logo_url?: string | null }[]
   members: { id: string; name: string }[]
-  isAdmin: boolean; viewerId: string; onError: (s: string) => void
+  isAdmin: boolean; canManage: boolean; viewerId: string; onError: (s: string) => void
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -492,8 +495,8 @@ function ProjectList({ projects, today, brands, members, isAdmin, viewerId, onEr
           <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
             {list.map(p => (
               <ProjectRow key={p.id} project={p} today={today} brands={brands}
-                          members={members} isAdmin={isAdmin}
-                          canEdit={canMaintain(p, viewerId, isAdmin)} onError={onError} />
+                          members={members} isAdmin={isAdmin} canManage={canManage}
+                          canEdit={canMaintain(p, viewerId, canManage)} onError={onError} />
             ))}
           </div>
         </section>
@@ -502,12 +505,14 @@ function ProjectList({ projects, today, brands, members, isAdmin, viewerId, onEr
   )
 }
 
-function ProjectRow({ project: p, today, brands, members, isAdmin, canEdit, onError }: {
+function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, canEdit, onError }: {
   project: ProjectView; today: string
   brands: { id: string; name: string; color: string }[]
   members: { id: string; name: string }[]
-  /** Full portfolio rights: rename, rebrand, delete, move in and out of Focus. */
+  /** Delete, and the Focus star. */
   isAdmin: boolean
+  /** Rename and rebrand — admin or superuser. */
+  canManage: boolean
   /** Maintain rights: the delivery date, and the steps inside. */
   canEdit: boolean
   onError: (s: string) => void
@@ -536,7 +541,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canEdit, onEr
                 style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
         </button>
 
-        {isAdmin ? (
+        {canManage ? (
           <input defaultValue={p.name} aria-label={`Name of ${p.name}`}
                  onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.name) act(() => updateProject(p.id, { name: v })) }}
                  style={{ ...input, flex: 1, fontWeight: 700, fontSize: 14.5, border: '1px solid transparent', background: 'transparent' }} />
@@ -564,7 +569,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canEdit, onEr
           <span style={{ fontWeight: 500, fontSize: 12.5, color: UI.soft }}>due {fmt(p.dueDate)}</span>
         )}
 
-        {isAdmin && (
+        {canManage && (
           <select value={p.brandId ?? ''} aria-label={`Brand of ${p.name}`}
                   onChange={e => act(() => updateProject(p.id, { brand_id: e.target.value || null }))}
                   style={{ ...input, width: 168 }}>

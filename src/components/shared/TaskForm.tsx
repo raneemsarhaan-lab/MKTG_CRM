@@ -192,8 +192,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           padding: '14px 18px', borderBottom: `1px solid ${COLORS.line}`,
         }}>
           <span style={{
-            fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15,
-            color: COLORS.ink, paddingBottom: 4, borderBottom: `2px solid ${COLORS.lime}`,
+            fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 17,
+            color: COLORS.ink, paddingBottom: 10, borderBottom: '2.5px solid #5B4CF0',
+            marginBottom: -15,
           }}>
             Task
           </span>
@@ -279,10 +280,10 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               autoFocus
               aria-label="Task name"
               style={{
-                width: '100%', fontSize: 22, fontWeight: 700, color: COLORS.ink,
-                background: 'transparent', border: 'none', outline: 'none',
-                fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
-                padding: '4px 0', marginBottom: 4,
+                width: '100%', fontSize: 19, fontWeight: 700, color: COLORS.ink,
+                background: '#fff', border: `1px solid ${COLORS.line}`, borderRadius: 10,
+                outline: 'none', fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
+                padding: '13px 15px', marginBottom: 12,
               }}
             />
           )}
@@ -291,14 +292,14 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           <textarea
             value={form.description}
             onChange={e => patch('description', e.target.value)}
-            placeholder="Add a brief…"
+            placeholder="Add description"
             aria-label="Description"
             rows={3}
             style={{
-              width: '100%', fontSize: 14, color: COLORS.ink, background: 'transparent',
-              border: 'none', outline: 'none', resize: 'vertical', minHeight: 64,
-              fontFamily: 'inherit', boxSizing: 'border-box', padding: '4px 0',
-              marginBottom: 16, lineHeight: 1.5,
+              width: '100%', fontSize: 15, color: COLORS.ink, background: 'transparent',
+              border: 'none', outline: 'none', resize: 'vertical', minHeight: 96,
+              fontFamily: 'inherit', boxSizing: 'border-box', padding: '2px 2px',
+              marginBottom: 18, lineHeight: 1.5,
             }}
           />
 
@@ -368,6 +369,44 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               ))}
             </FieldPill>
 
+            {/* Overflow — secondary fields, ClickUp's "…" */}
+            <button
+              type="button"
+              onClick={() => setShowMore(s => !s)}
+              aria-expanded={showMore}
+              aria-label="More fields"
+              title="More fields"
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                border: `1px solid ${COLORS.line}`, background: '#fff',
+                color: COLORS.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
+              }}
+            >
+              …
+            </button>
+          </div>
+
+          {/* ── Fields ───────────────────────────────────────────────────
+              The reference keeps its custom fields behind a button so intake
+              stays a title and a brand. Ours holds the four that are not part
+              of getting a task onto the board. */}
+          <div style={{ marginTop: 22 }}>
+            <div style={{ fontSize: 13.5, color: COLORS.muted, marginBottom: 8 }}>Fields</div>
+            {!showMore ? (
+              <button
+                type="button"
+                onClick={() => setShowMore(true)}
+                style={{
+                  padding: '9px 14px', borderRadius: 9, border: 'none', background: '#F1F2F4',
+                  color: COLORS.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Show custom fields
+              </button>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <FieldPill label="Platform" value={form.platform} active width={190}>
               {closePill => PLATFORMS.map(p => (
                 <PillOption
@@ -410,39 +449,34 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 />
               )}
             </FieldPill>
-
-            {/* Overflow — secondary fields, ClickUp's "…" */}
-            <button
-              type="button"
-              onClick={() => setShowMore(s => !s)}
-              aria-expanded={showMore}
-              aria-label="More fields"
-              style={{
-                width: 32, height: 32, borderRadius: 8,
-                border: `1px solid ${COLORS.line}`, background: '#fff',
-                color: COLORS.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
-              }}
-            >
-              …
-            </button>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label style={{
+                    display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
+                    textTransform: 'uppercase', color: COLORS.muted, marginBottom: 6,
+                  }}>
+                    Cover image URL
+                  </label>
+                  <PillInput
+                    type="url"
+                    value={form.cover_image_url}
+                    placeholder="https://…"
+                    onChange={e => patch('cover_image_url', e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMore(false)}
+                  style={{
+                    marginTop: 12, padding: 0, border: 'none', background: 'transparent',
+                    color: COLORS.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  Hide custom fields
+                </button>
+              </>
+            )}
           </div>
-
-          {showMore && (
-            <div style={{ marginTop: 12 }}>
-              <label style={{
-                display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
-                textTransform: 'uppercase', color: COLORS.muted, marginBottom: 6,
-              }}>
-                Cover image URL
-              </label>
-              <PillInput
-                type="url"
-                value={form.cover_image_url}
-                placeholder="https://…"
-                onChange={e => patch('cover_image_url', e.target.value)}
-              />
-            </div>
-          )}
 
           {/* Pipeline note — the stage count is decided here and then frozen */}
           <p style={{ fontSize: 12, color: COLORS.muted, margin: '16px 0 0' }}>
@@ -459,8 +493,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 18px', borderTop: `1px solid ${COLORS.line}`, gap: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          padding: '12px 18px', borderTop: `1px solid ${COLORS.line}`, gap: 10,
         }}>
           {/* Attachment: TaskAttachment rows carry a URL, and file upload is
               still an open item (HANDOVER §14), so this reveals the URL field

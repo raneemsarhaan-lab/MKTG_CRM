@@ -27,9 +27,10 @@ import { UserMenu } from './UserMenu'
 
 const STORAGE_KEY = 'fluxo.sidebar.expanded'
 
+// Overview first — see NAV_ITEMS in NavRail; the two lists must agree.
 const NAV = [
-  { href: '/board',    key: 'board',    adminOnly: false },
   { href: '/overview', key: 'overview', adminOnly: false },
+  { href: '/board',    key: 'board',    adminOnly: false },
   { href: '/projects', key: 'projects', adminOnly: false },
   { href: '/team',     key: 'team',     adminOnly: false },
   { href: '/capacity', key: 'capacity', adminOnly: true  },
