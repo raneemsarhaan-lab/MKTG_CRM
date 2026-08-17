@@ -15,9 +15,10 @@ export function CapacityDashboard({ members, tasks }: CapacityDashboardProps) {
   const activeTasks = tasks.filter(t => t.status !== 'publish')
   const totalHours  = activeTasks.reduce((s, t) => s + (t.hours_estimate ?? 0), 0)
 
-  // Per-member active tasks (task_owner_id match)
+  // Per-member active tasks. Keyed on the assignee: capacity is about who
+  // is doing the work, not who is answerable for it.
   const tasksByMember = (memberId: string) =>
-    activeTasks.filter(t => t.task_owner_id === memberId)
+    activeTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === memberId)
 
   // Brand-level breakdown for the summary header
   const brandTotals: Record<string, { name: string; color: string; hours: number; count: number }> = {}

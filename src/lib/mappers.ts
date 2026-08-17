@@ -87,6 +87,8 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     campaign:           t.campaign   ?? undefined,
     task_owner_id:      t.task_owner_id,
     task_owner:         t.task_owner ? mapMember(t.task_owner) : undefined,
+    assignee_id:        t.assignee_id ?? null,
+    assignee:           t.assignee ? mapMember(t.assignee) : undefined,
     initiator_role:     t.initiator_role,
     nine_stage:         t.nine_stage,
     status:             t.status,

@@ -93,7 +93,10 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
     brand_id: brands[0]?.id ?? '',
     content_type_label: contentTypes[0]?.label ?? 'Post',
     platform: 'LinkedIn' as typeof PLATFORMS[number],
+    // The owner is whoever raises the task — they are accountable for it.
+    // The assignee starts as them too and is the thing intake actually picks.
     task_owner_id: currentUser.id,
+    assignee_id:   currentUser.id,
     due_date: today,
     hours_estimate: 2,
     priority: 'Medium' as typeof PRIORITIES[number],
@@ -140,6 +143,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         content_type_label: form.content_type_label,
         platform:           form.platform,
         task_owner_id:      form.task_owner_id,
+        assignee_id:        form.assignee_id,
         due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
@@ -166,6 +170,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         content_type_label: form.content_type_label,
         platform:           form.platform,
         task_owner_id:      form.task_owner_id,
+        assignee_id:        form.assignee_id,
         due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
@@ -187,7 +192,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
   }
 
   const brand  = brands.find(b => b.id === form.brand_id)
-  const owner  = members.find(m => m.id === form.task_owner_id)
+  const assignee = members.find(m => m.id === form.assignee_id)
   const close  = () => setShowTaskForm(false)
 
   return (
@@ -336,13 +341,13 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               To Do
             </span>
 
-            <FieldPill label="Assignee" value={owner?.name} active
+            <FieldPill label="Assignee" value={assignee?.name} active
                        icon={<Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />}>
               {closePill => members.map(m => (
                 <PillOption
                   key={m.id}
-                  selected={m.id === form.task_owner_id}
-                  onClick={() => { patch('task_owner_id', m.id); closePill() }}
+                  selected={m.id === form.assignee_id}
+                  onClick={() => { patch('assignee_id', m.id); closePill() }}
                 >
                   {m.name}
                   <span style={{ color: COLORS.muted, fontWeight: 500, fontSize: 12 }}>· {m.role}</span>

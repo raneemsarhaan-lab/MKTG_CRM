@@ -13,6 +13,7 @@ export default async function BoardPage() {
       include: {
         brand:      true,
         task_owner: true,
+        assignee:   true,
         comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },
         // Never `true` here. This query reads every task, and an uploaded
         // file is inlined in `data` — pulling those across 300 rows would be
