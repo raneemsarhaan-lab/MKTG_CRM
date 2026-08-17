@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
+import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
 import type { Brand } from '@/types/index'
-import { STAGE_META, nextStageId } from '@/lib/stage-meta'
+import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
 import { COLORS } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
-  moveTask, addComment, updateTask, createSubtask,
+  moveTask, setTaskStage, addComment, updateTask, createSubtask,
   addAttachments, removeAttachment, loadAttachments,
   type TaskPatch,
 } from '@/actions/tasks'
@@ -333,6 +333,7 @@ export function TaskModal({
   const [mentionQuery, setMentionQuery]   = useState('')
   const [mentionIndex, setMentionIndex]   = useState(0)
   const [emojiOpen, setEmojiOpen]         = useState(false)
+  const [stageOpen, setStageOpen]         = useState(false)
   const [dragging, setDragging]           = useState(false)
   const [uploading, setUploading]         = useState(false)
   const [uploadError, setUploadError]     = useState('')
@@ -342,6 +343,8 @@ export function TaskModal({
   const menuRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cmtRef  = useRef<HTMLTextAreaElement>(null)
+  const stageBtnRef  = useRef<HTMLButtonElement>(null)
+  const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
 
@@ -349,6 +352,7 @@ export function TaskModal({
   const stageMeta = STAGE_META[task.status]
   const nextStage = nextStageId(task.status, task.nine_stage)
   const nextMeta  = nextStage ? STAGE_META[nextStage] : null
+  const pipeline  = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
   const daysLeft  = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
   const overdue   = daysLeft !== null && daysLeft < 0
 
@@ -431,13 +435,14 @@ export function TaskModal({
       if (e.key !== 'Escape') return
       if (lightbox) { setLightbox(null); return }
       if (menuOpen) { setMenuOpen(false); return }
+      if (stageOpen) { setStageOpen(false); return }
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, lightbox, menuOpen])
+  }, [onClose, lightbox, menuOpen, stageOpen])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -447,6 +452,17 @@ export function TaskModal({
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [menuOpen])
+
+  useEffect(() => {
+    if (!stageOpen) return
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node
+      if (stageMenuRef.current?.contains(t) || stageBtnRef.current?.contains(t)) return
+      setStageOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [stageOpen])
 
   function applyPatch(patch: TaskPatch, after?: () => void) {
     setError('')
@@ -596,6 +612,33 @@ export function TaskModal({
     }
     if (e.key === 'Escape' && emojiOpen) { e.preventDefault(); setEmojiOpen(false); return }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleComment() }
+  }
+
+  /**
+   * Move to any stage in this task's pipeline, forward or back.
+   *
+   * setTaskStage carries the same permission rule as advancing — your own
+   * stage, or an admin/superuser override — and decides for itself whether a
+   * move is worth celebrating, so a task pulled backwards does not throw
+   * confetti.
+   */
+  function handleSetStage(next: StageId) {
+    setStageOpen(false)
+    if (next === task.status) return
+    setError('')
+    startTransition(async () => {
+      const r = await setTaskStage(task.id, next)
+      if (!r.success) {
+        setError(r.error === 'not_authorized'
+          ? 'That stage belongs to someone else — ask an admin to move it.'
+          : r.error ?? 'Could not move that task')
+        return
+      }
+      router.refresh()
+      if (r.shouldCelebrate) {
+        setCelebration({ taskName: task.name, stageLabel: STAGE_META[next].label_en })
+      }
+    })
   }
 
   function handleComment() {
@@ -1018,14 +1061,69 @@ export function TaskModal({
                 columnGap: 28, rowGap: 2,
               }}>
                 <Prop icon="status" label="Status">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
-                    <span style={{
-                      background: stageMeta.color, color: '#fff', borderRadius: 5,
-                      padding: '4px 10px', fontSize: 12.5, fontWeight: 800,
-                      letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                    }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', position: 'relative' }}>
+                    {/* The pill is the picker. The arrow button beside it still
+                        does the common thing in one click — this is for the
+                        other case, where the work went back or skipped ahead. */}
+                    <button
+                      type="button"
+                      ref={stageBtnRef}
+                      onClick={() => setStageOpen(v => !v)}
+                      disabled={isPending}
+                      aria-haspopup="listbox"
+                      aria-expanded={stageOpen}
+                      aria-label={`Stage: ${stageMeta.label_en}. Change it`}
+                      title="Change the stage"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none',
+                        background: stageMeta.color, color: '#fff', borderRadius: 5,
+                        padding: '4px 8px 4px 10px', fontSize: 12.5, fontWeight: 800,
+                        letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                        cursor: 'pointer', fontFamily: 'inherit', opacity: isPending ? 0.6 : 1,
+                      }}
+                    >
                       {stageMeta.label_en}
-                    </span>
+                      <Icon name="chevron" size={13} color="#fff" width={2.6} />
+                    </button>
+
+                    {stageOpen && (
+                      <div role="listbox" aria-label="Move to a stage" ref={stageMenuRef} style={{
+                        position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0, zIndex: 5,
+                        minWidth: 232, maxHeight: 330, overflowY: 'auto',
+                        background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
+                        boxShadow: '0 12px 34px rgba(20,20,20,.18)', padding: 6,
+                      }}>
+                        {pipeline.map((id, i) => {
+                          const meta = STAGE_META[id]
+                          const here = id === task.status
+                          const back = i < pipeline.indexOf(task.status as typeof id)
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              role="option"
+                              aria-selected={here}
+                              onClick={() => handleSetStage(id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                padding: '8px 10px', border: 'none', borderRadius: 8,
+                                cursor: here ? 'default' : 'pointer', textAlign: 'start',
+                                background: here ? CU.hover : 'transparent',
+                                fontFamily: 'inherit', fontSize: 14, color: CU.text,
+                              }}
+                              onMouseEnter={e => { if (!here) e.currentTarget.style.background = CU.hover }}
+                              onMouseLeave={e => { if (!here) e.currentTarget.style.background = 'transparent' }}
+                            >
+                              <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
+                              <span style={{ flex: 1, minWidth: 0 }}>{meta.label_en}</span>
+                              {here && <span style={{ fontSize: 12, color: CU.faint }}>now</span>}
+                              {!here && back && <span style={{ fontSize: 12, color: CU.faint }}>back</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
                     {canAdvance && nextMeta && (
                       <button
                         onClick={handleAdvance}

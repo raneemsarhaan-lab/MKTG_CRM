@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getSessionMember, requireAdmin } from '@/lib/authz'
+import { getSessionMember, requireAdmin, requireTaskCreator } from '@/lib/authz'
 import { MAX_PASTED } from '@/lib/paste-list'
 
 /**
@@ -10,9 +10,14 @@ import { MAX_PASTED } from '@/lib/paste-list'
  *
  * Three rules live here, and the differences matter:
  *
- *  - Portfolio shape — creating and deleting projects, moving them in and out
- *    of Focus, renaming, changing brand — is admin work. It alters what every
- *    rollup says, for people with no part in the project.
+ *  - Portfolio shape — renaming, changing brand, creating a project — is
+ *    management work: an admin or a superuser. It alters what every rollup
+ *    says, for people with no part in the project, which is why it is not open
+ *    to everyone; but a superuser already creates and edits any task, so
+ *    withholding it from them was an inconsistency rather than a rule.
+ *  - Deleting a project, and moving one in or out of Focus, stay admin-only.
+ *    One destroys other people's steps; the other decides what the whole team
+ *    is pointed at this quarter.
  *  - Maintaining a plan you work in — its delivery date, its steps' durations
  *    and dates, who holds what, which of them are milestones, and removing a
  *    step that turned out not to be needed — belongs to the people delivering
@@ -34,6 +39,11 @@ function revalidateAll() {
 }
 
 
+/** Admin or superuser — the tier that already creates and edits any task. */
+function manages(access: string): boolean {
+  return access === 'admin' || access === 'superuser'
+}
+
 /**
  * May this person shape this project?
  *
@@ -44,7 +54,7 @@ function revalidateAll() {
  * an admin.
  *
  * It is deliberately not "any project": a plan you have no part in is somebody
- * else's, and reshaping it should take an admin.
+ * else's, and reshaping it should take management.
  */
 async function holdsAStepIn(projectId: string, memberId: string): Promise<boolean> {
   const n = await prisma.projectStep.count({
@@ -70,11 +80,11 @@ export async function toggleProjectFocus(projectId: string): Promise<Result> {
 /**
  * Edit a project.
  *
- * An admin can change anything. Someone holding a step in it can change the
- * delivery date — that is the field that moves when the work moves, and making
- * them queue behind an admin to record it is how a plan goes stale.
+ * An admin or a superuser can change anything. Someone holding a step in it can
+ * change the delivery date — that is the field that moves when the work moves,
+ * and making them queue behind a manager to record it is how a plan goes stale.
  *
- * Name, brand and standing stay admin-only. Those are portfolio shape: a
+ * Name, brand and standing stay with management. Those are portfolio shape: a
  * rename or a brand change alters what every rollup and every report says, for
  * people with no part in the project.
  */
@@ -85,14 +95,13 @@ export async function updateProject(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  const isAdmin = member.access === 'admin'
-  if (!isAdmin) {
+  if (!manages(member.access)) {
     if (!(await holdsAStepIn(projectId, member.id))) {
       return { success: false, error: 'You can only edit a project you hold a step in.' }
     }
     const structural = patch.name !== undefined || patch.brand_id !== undefined || patch.standing !== undefined
     if (structural) {
-      return { success: false, error: 'Only an admin can rename a project or change its brand.' }
+      return { success: false, error: 'Renaming a project or changing its brand takes an admin or a superuser.' }
     }
   }
 
@@ -118,7 +127,7 @@ export async function updateProject(
 }
 
 export async function createProject(name: string, brandId?: string | null): Promise<Result> {
-  const guard = await requireAdmin()
+  const guard = await requireTaskCreator()
   if (guard.error) return { success: false, error: guard.error }
   if (!name.trim()) return { success: false, error: 'Name cannot be empty' }
 
@@ -163,13 +172,13 @@ export async function removeProject(projectId: string): Promise<Result> {
 /**
  * Edit a step.
  *
- * An admin can change any step. Everyone else can change the ones assigned to
- * them, and the ones in a project they are working in — a plan is kept honest
- * by the team delivering it, not by an admin fielding every corrected duration.
- * Reassigning is included: handing work over is a normal thing to need.
+ * An admin or superuser can change any step. Everyone else can change the ones
+ * assigned to them, and the ones in a project they are working in — a plan is
+ * kept honest by the team delivering it, not by a manager fielding every
+ * corrected duration. Reassigning is included: handing work over is a normal
+ * thing to need.
  *
- * What nobody but an admin can do is touch a step in a project they have no
- * part in.
+ * What takes management is touching a step in a project you have no part in.
  */
 export async function updateStep(
   stepId: string,
@@ -184,7 +193,7 @@ export async function updateStep(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  if (member.access !== 'admin') {
+  if (!manages(member.access)) {
     const step = await prisma.projectStep.findUnique({
       where: { id: stepId }, select: { assignee_id: true, project_id: true },
     })
@@ -251,10 +260,10 @@ export async function addStep(
   if (!name.trim()) return { success: false, error: 'Name cannot be empty' }
 
   let assignee = extra?.assignee_id ?? null
-  if (member.access !== 'admin' && assignee && assignee !== member.id) {
+  if (!manages(member.access) && assignee && assignee !== member.id) {
     return { success: false, error: 'Only an admin can add work to someone else’s list.' }
   }
-  if (member.access !== 'admin') assignee = assignee ?? member.id
+  if (!manages(member.access)) assignee = assignee ?? member.id
 
   const last = await prisma.projectStep.findFirst({
     where: { project_id: projectId }, orderBy: { sort_order: 'desc' }, select: { sort_order: true },
@@ -297,10 +306,10 @@ export async function addSteps(
   }
 
   let assignee = extra?.assignee_id ?? null
-  if (member.access !== 'admin' && assignee && assignee !== member.id) {
+  if (!manages(member.access) && assignee && assignee !== member.id) {
     return { success: false, error: 'Only an admin can add work to someone else’s list.' }
   }
-  if (member.access !== 'admin') assignee = assignee ?? member.id
+  if (!manages(member.access)) assignee = assignee ?? member.id
 
   const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } })
   if (!project) return { success: false, error: 'That project no longer exists' }
@@ -362,7 +371,7 @@ export async function removeStep(stepId: string): Promise<Result> {
   })
   if (!s) return { success: false, error: 'That step no longer exists' }
 
-  if (member.access !== 'admin' && !(await holdsAStepIn(s.project_id, member.id))) {
+  if (!manages(member.access) && !(await holdsAStepIn(s.project_id, member.id))) {
     return { success: false, error: 'You can only remove a step from a project you hold a step in.' }
   }
 
@@ -397,7 +406,7 @@ export async function setStepDone(stepId: string, done: boolean): Promise<Result
   })
   if (!step) return { success: false, error: 'not_found' }
 
-  if (member.access !== 'admin' && step.assignee_id !== member.id) {
+  if (!manages(member.access) && step.assignee_id !== member.id) {
     return { success: false, error: 'not_authorized' }
   }
 
