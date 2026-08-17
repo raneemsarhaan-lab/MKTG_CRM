@@ -192,7 +192,7 @@ function readAsDataUrl(file: File): Promise<string> {
  * has to come down before it gets there. PNG keeps transparency; everything
  * else is far smaller as JPEG, and 0.82 is where the artefacts stop showing.
  */
-async function shrinkImage(file: File, max: number): Promise<string> {
+async function shrinkImage(file: File, max: number, quality = 0.82): Promise<string> {
   const bitmap = await createImageBitmap(file)
   const scale  = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
   const w = Math.max(1, Math.round(bitmap.width * scale))
@@ -206,8 +206,12 @@ async function shrinkImage(file: File, max: number): Promise<string> {
   ctx.drawImage(bitmap, 0, 0, w, h)
   bitmap.close?.()
 
-  const type = file.type === 'image/png' || file.type === 'image/svg+xml' ? 'image/png' : 'image/jpeg'
-  return canvas.toDataURL(type, 0.82)
+  // A thumbnail is always JPEG: transparency does not matter at 360px and PNG
+  // would be several times the size, which is the whole constraint here.
+  const type = quality < 0.7
+    ? 'image/jpeg'
+    : file.type === 'image/png' || file.type === 'image/svg+xml' ? 'image/png' : 'image/jpeg'
+  return canvas.toDataURL(type, quality)
 }
 
 function Avatar({ name, size = 24 }: { name: string; size?: number }) {
@@ -679,14 +683,18 @@ export function TaskModal({
     try {
       const prepared: { filename: string; data: string }[] = []
       const rejected: string[] = []
+      // The newest picture in this batch also becomes the card's preview.
+      let thumb: string | null = null
 
       for (const file of picked) {
         try {
-          const data = file.type.startsWith('image/')
+          const isImage = file.type.startsWith('image/')
+          const data = isImage
             ? await shrinkImage(file, 1600)
             : await readAsDataUrl(file)
-          if (data.length > MAX_ATTACHMENT_CHARS) rejected.push(file.name)
-          else prepared.push({ filename: file.name, data })
+          if (data.length > MAX_ATTACHMENT_CHARS) { rejected.push(file.name); continue }
+          prepared.push({ filename: file.name, data })
+          if (isImage) thumb = await shrinkImage(file, 360, 0.62)
         } catch {
           rejected.push(file.name)
         }
@@ -700,7 +708,7 @@ export function TaskModal({
       }
       if (!prepared.length) return
 
-      const res = await addAttachments(task.id, prepared)
+      const res = await addAttachments(task.id, prepared, thumb)
       if (!res.success) { setUploadError(res.error ?? 'Could not attach those files'); return }
       setReloadFiles(n => n + 1)   // pull the new rows, contents and all
       router.refresh()             // and refresh the card behind the panel

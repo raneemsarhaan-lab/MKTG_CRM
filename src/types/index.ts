@@ -88,6 +88,8 @@ export interface Task {
   due_date: string | null
   hours_estimate: number
   cover_image_url?: string
+  /** Auto-preview of the newest uploaded image. Not a user field. */
+  cover_thumb?: string
   priority: Priority
   created_by?: string
   created_at: string

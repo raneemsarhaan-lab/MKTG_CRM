@@ -66,10 +66,16 @@ export function imageAttachments(
  */
 export function coverImageFor(task: {
   cover_image_url?: string | null
+  cover_thumb?: string | null
   attachments?: TaskAttachment[]
 }): string | null {
+  // An explicit choice wins. Then the newest image uploaded here — carried as
+  // a thumbnail on the task, because the board never loads an attachment's own
+  // bytes. Then, for imported work, the newest linked image.
   if (task.cover_image_url) return task.cover_image_url
-  return imageAttachments(task.attachments)[0]?.url ?? null
+  if (task.cover_thumb)     return task.cover_thumb
+  const images = imageAttachments(task.attachments)
+  return images[0]?.data || images[0]?.url || null
 }
 
 /** Single glyph per kind, for the non-image file rows. */

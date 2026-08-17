@@ -20,9 +20,15 @@ import { initials, avatarColor } from '@/lib/utils'
 interface HeroProps {
   tasks:       (Task & {
     task_owner?: { name: string }
-    comments?: { id: string; body: string; created_at: string; author_id: string; author?: { name: string } }[]
+    comments?: {
+      id: string; body: string; created_at: string; author_id: string
+      mentions?: string[]; author?: { name: string }
+    }[]
+    attachments?: { id: string; filename: string; uploaded_at: string; uploaded_by?: string | null }[]
   })[]
   currentUser: Member
+  /** For naming whoever attached a file — the row records an id, not a name. */
+  members:     Member[]
   today:       Date
   onOpenTask:  (id: string) => void
 }
@@ -86,7 +92,7 @@ function StatBox({ value, label, color }: { value: number; label: string; color:
   )
 }
 
-export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) {
+export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: HeroProps) {
   const momentum  = weekMomentum(tasks, today)
   const stats     = statCounts(tasks, today)
   // One list of everything you own that is still open, worst first. It used to
@@ -97,7 +103,7 @@ export function HeroCards({ tasks, currentUser, today, onOpenTask }: HeroProps) 
   const overdue   = attention.filter(a => a.due === 'overdue').length
   const published = tasks.filter(t => t.task_owner_id === currentUser.id && t.status === 'publish').length
 
-  const activity  = activityItems(tasks, currentUser.id, 4)
+  const activity  = activityItems(tasks, currentUser.id, 5, members)
   const quote     = quoteOfDay(today)
 
   const up = momentum.delta >= 0

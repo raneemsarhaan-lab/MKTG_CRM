@@ -178,6 +178,16 @@ model Task {
   due_date           DateTime? @db.Date
   hours_estimate     Decimal  @default(0) @db.Decimal(5, 1)
   cover_image_url    String?
+  /// A small preview of the newest image uploaded to this task.
+  ///
+  /// The board reads every task, and an attachment's own bytes live in
+  /// TaskAttachment.data which the board query deliberately never selects —
+  /// see the model comment there. So the card cannot show an uploaded picture
+  /// unless something small enough to carry across 300 rows sits on the task
+  /// itself. This is that: one thumbnail, longest edge 360px, re-encoded, a
+  /// dozen kilobytes or so. It is set on upload and is not a user field —
+  /// cover_image_url above is the one somebody chooses.
+  cover_thumb        String?  @db.Text
   priority           String   @default("Medium")
   created_by         String?  @db.Uuid
   created_at         DateTime @default(now()) @db.Timestamptz(6)

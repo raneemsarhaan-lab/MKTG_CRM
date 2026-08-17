@@ -19,7 +19,10 @@ export default async function BoardPage() {
         // megabytes on every board load. The card cover only needs `url`;
         // the task panel loads its own task's files when it opens.
         attachments: {
-          select: { id: true, task_id: true, filename: true, url: true, uploaded_at: true },
+          select: {
+            id: true, task_id: true, filename: true, url: true,
+            uploaded_at: true, uploaded_by: true,
+          },
         },
         parent:     { select: { id: true, name: true } },
         subtasks:   { select: { id: true, name: true, status: true }, orderBy: { created_at: 'asc' } },

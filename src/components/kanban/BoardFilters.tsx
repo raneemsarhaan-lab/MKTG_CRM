@@ -120,6 +120,9 @@ interface BoardFiltersProps {
   members:  Member[]
   shown:    number
   total:    number
+  /** Whose work the board is showing. Defaults to just yours. */
+  scope:    'me' | 'team'
+  onScope:  (next: 'me' | 'team') => void
 }
 
 function Check({ on }: { on: boolean }) {
@@ -181,7 +184,7 @@ const CHIP_BASE: React.CSSProperties = {
 const VIEW_BASE: React.CSSProperties = { ...CHIP_BASE, borderRadius: 12 }
 
 export function BoardFilters({
-  filters, onChange, tasks, brands, members, shown, total,
+  filters, onChange, tasks, brands, members, shown, total, scope, onScope,
 }: BoardFiltersProps) {
   const set = <K extends keyof BoardFilterState>(key: K, value: BoardFilterState[K]) =>
     onChange({ ...filters, [key]: value })
@@ -223,6 +226,36 @@ export function BoardFilters({
   return (
     <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        {/* Whose board this is. First control in the row, because it changes
+            what every other control is filtering. */}
+        <div role="group" aria-label="Whose tasks to show" style={{
+          display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
+          background: PIPE.surface, borderRadius: 999, padding: 4,
+        }}>
+          {(['me', 'team'] as const).map(v => {
+            const on = scope === v
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onScope(v)}
+                aria-pressed={on}
+                style={{
+                  height: 36, padding: '0 16px', borderRadius: 999, border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5,
+                  background: on ? '#FFFFFF' : 'transparent',
+                  fontWeight: on ? 700 : 600,
+                  color: on ? PIPE.ink : PIPE.textSecondary,
+                  boxShadow: on ? '0 1px 2px rgba(20,19,26,.10)' : 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {v === 'me' ? 'Only me' : 'Team'}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Brand chips — §6 left group */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
           <button

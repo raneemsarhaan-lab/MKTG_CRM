@@ -94,6 +94,7 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     due_date:           t.due_date ? toDateStr(t.due_date) : null,
     hours_estimate:     Number(t.hours_estimate),
     cover_image_url:    t.cover_image_url ?? undefined,
+    cover_thumb:        t.cover_thumb ?? undefined,
     priority:           t.priority,
     created_by:         t.created_by ?? undefined,
     created_at:         toIsoStr(t.created_at),
