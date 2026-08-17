@@ -24,8 +24,9 @@ model Member {
   password_hash   String?
   created_at      DateTime @default(now()) @db.Timestamptz(6)
 
-  tasks_owned   Task[]        @relation("TaskOwner")
-  tasks_created Task[]        @relation("TaskCreator")
+  tasks_owned    Task[]       @relation("TaskOwner")
+  tasks_assigned Task[]       @relation("TaskAssignee")
+  tasks_created  Task[]       @relation("TaskCreator")
   comments      TaskComment[]
   project_steps ProjectStep[] @relation("StepAssignee")
 
@@ -170,7 +171,21 @@ model Task {
   content_type_label String?
   platform           String?
   campaign           String?
+  /// Who is accountable for this task — usually whoever asked for it.
+  ///
+  /// Distinct from assignee_id below, which is who is doing it. They are the
+  /// same person on most tasks and every imported one, but they are different
+  /// facts: a manager owns a deliverable and hands the work to a designer.
+  /// Nothing personal keys off this — see assignee_id.
   task_owner_id      String   @db.Uuid
+  /// Who is doing the work.
+  ///
+  /// This is the one everything personal follows: My Day, Needs Your
+  /// Attention, the bell, the board's Only me, and the capacity figures.
+  /// Nullable because a task can genuinely be waiting for somebody to pick
+  /// up; existing rows were backfilled from task_owner_id, which is what they
+  /// meant before the two were separated.
+  assignee_id        String?  @db.Uuid
   initiator_role     String
   nine_stage         Boolean  @default(false)
   status             String   @default("todo")
@@ -201,6 +216,7 @@ model Task {
   subtasks     Task[]       @relation("Subtasks")
   brand        Brand?       @relation(fields: [brand_id], references: [id])
   task_owner   Member       @relation("TaskOwner", fields: [task_owner_id], references: [id])
+  assignee     Member?      @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
   creator      Member?      @relation("TaskCreator", fields: [created_by], references: [id])
   stage        Stage        @relation(fields: [status], references: [id])
   content_type ContentType? @relation("TaskContentType", fields: [content_type_label], references: [label])

@@ -80,6 +80,9 @@ export interface Task {
   platform?: string
   campaign?: string
   task_owner_id: string
+  /** Who is doing the work. Null when nobody has picked it up. */
+  assignee_id?: string | null
+  assignee?: Member
   task_owner?: Member
   initiator_role: string
   nine_stage: boolean

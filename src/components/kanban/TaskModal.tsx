@@ -357,6 +357,9 @@ export function TaskModal({
   const nextStage = nextStageId(task.status, task.nine_stage)
   const nextMeta  = nextStage ? STAGE_META[nextStage] : null
   const pipeline  = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
+  // The board's query includes the relation; a panel opened from elsewhere may
+  // only have the id, so fall back to the member list.
+  const assignee  = task.assignee ?? members.find(m => m.id === task.assignee_id) ?? null
   const daysLeft  = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
   const overdue   = daysLeft !== null && daysLeft < 0
 
@@ -416,8 +419,10 @@ export function TaskModal({
   const clipped = (task.description ?? '').length > 420
 
   // Mirrors updateTask's server-side check — the server one is authoritative.
+  // Mirrors canAct() in the server action — owner or assignee, or a manager.
   const canEdit =
     task.task_owner_id === currentUser.id ||
+    task.assignee_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
 
@@ -426,7 +431,7 @@ export function TaskModal({
   const isPublished = task.status === 'publish'
 
   const isOwnStage = stageMeta.owner_role === null
-    ? task.task_owner_id === currentUser.id
+    ? task.assignee_id === currentUser.id || task.task_owner_id === currentUser.id
     : stageMeta.owner_role === currentUser.role
 
   const canAdvance = !isPublished && nextStage !== null && (isOwnStage || isAdmin || isSuperuser)
@@ -796,7 +801,17 @@ export function TaskModal({
       key: 'owner', filled: true,
       node: (
         <Field key="owner" icon="user" label="Owner">
-          <Avatar name={task.task_owner.name} size={26} />
+          <InlineValue
+            canEdit={canEdit} type="select" value={task.task_owner_id}
+            display={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                <Avatar name={task.task_owner.name} size={26} />
+                {task.task_owner.name}
+              </span>
+            }
+            options={members.map(m => ({ value: m.id, label: m.name }))}
+            onCommit={v => applyPatch({ task_owner_id: v })}
+          />
         </Field>
       ),
     },
@@ -1151,18 +1166,23 @@ export function TaskModal({
                   </span>
                 </Prop>
 
-                <Prop icon="user" label="Assignees">
+                {/* Assignee is who is doing it; Owner sits in Fields below and
+                    is who is answerable for it. Everything personal — My Day,
+                    the attention card, the bell — follows this one. */}
+                <Prop icon="user" label="Assignee">
                   <InlineValue
                     canEdit={canEdit} type="select"
-                    value={task.task_owner_id}
-                    display={
+                    value={task.assignee_id ?? ''}
+                    display={assignee ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-                        <Avatar name={task.task_owner.name} size={26} />
-                        {task.task_owner.name}
+                        <Avatar name={assignee.name} size={26} />
+                        {assignee.name}
                       </span>
-                    }
-                    options={members.map(m => ({ value: m.id, label: m.name }))}
-                    onCommit={v => applyPatch({ task_owner_id: v })}
+                    ) : ''}
+                    emptyLabel="Nobody yet"
+                    options={[{ value: '', label: '— nobody —' },
+                              ...members.map(m => ({ value: m.id, label: m.name }))]}
+                    onCommit={v => applyPatch({ assignee_id: v || null })}
                   />
                 </Prop>
 

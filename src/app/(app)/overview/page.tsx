@@ -24,12 +24,14 @@ export default async function OverviewPage() {
 
   const [openTasks, completed, slaRows] = await Promise.all([
     prisma.task.findMany({
-      where:   { task_owner_id: member.id, NOT: { status: 'publish' } },
+      // My Day is the work you are doing, not the work you are answerable
+      // for — see the assignee_id comment in schema.prisma.
+      where:   { assignee_id: member.id, NOT: { status: 'publish' } },
       include: { task_owner: true },
       orderBy: { due_date: 'asc' },
     }),
     prisma.task.findMany({
-      where:  { task_owner_id: member.id, status: 'publish' },
+      where:  { assignee_id: member.id, status: 'publish' },
       select: { id: true, updated_at: true },
     }),
     prisma.slaConfig.findMany(),

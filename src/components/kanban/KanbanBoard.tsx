@@ -115,7 +115,9 @@ export function KanbanBoard({
   }
 
   const scopedTasks = useMemo(
-    () => (scope === 'me' ? tasks.filter(t => t.task_owner_id === currentUser.id) : tasks),
+    () => (scope === 'me'
+      ? tasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id)
+      : tasks),
     [tasks, scope, currentUser.id],
   )
 

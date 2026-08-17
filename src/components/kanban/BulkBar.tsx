@@ -17,6 +17,7 @@ import type { Brand, ContentType, Member, StageId } from '@/types/index'
 export interface BulkPatch {
   status?:             StageId
   task_owner_id?:      string
+  assignee_id?:        string | null
   brand_id?:           string
   content_type_label?: string
   priority?:           'Low' | 'Medium' | 'High'
@@ -143,7 +144,7 @@ export function BulkBar({
           {menu === 'assignee' && (
             <Menu onClose={close}>
               {members.map(m => (
-                <Item key={m.id} onClick={() => apply({ task_owner_id: m.id })}>{m.name}</Item>
+                <Item key={m.id} onClick={() => apply({ assignee_id: m.id })}>{m.name}</Item>
               ))}
             </Menu>
           )}

@@ -211,6 +211,24 @@ async function main() {
     return `${hits.length} steps`
   })
 
+  /**
+   * Owner and assignee used to be one column.
+   *
+   * Everything that existed before the split meant "the person whose task
+   * this is", so every row's assignee starts as its owner. Guarded by once()
+   * rather than run every deploy: a task deliberately left unassigned must
+   * stay unassigned, and an unguarded backfill would hand it straight back to
+   * the owner on the next container start.
+   */
+  await once('assignee-backfill', 'gave existing tasks an assignee', async () => {
+    // Raw SQL because this copies one column into another, which updateMany
+    // cannot express.
+    const rows = await prisma.$executeRawUnsafe(
+      'UPDATE tasks SET assignee_id = task_owner_id WHERE assignee_id IS NULL',
+    )
+    return `${rows} tasks`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

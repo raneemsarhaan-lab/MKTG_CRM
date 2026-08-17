@@ -109,7 +109,9 @@ export interface AttentionItem {
  * already above it. For anyone whose open work is mostly late — which is most
  * people, most of the time — the two lists were the same list, printed twice.
  *
- * The rule is simply ownership: a task is yours if you own it. Order is by how
+ * The rule is assignment, not ownership: this card is the work you are doing.
+ * Owning a task means being accountable for it, which is a different thing and
+ * belongs on the task, not in a personal to-do list. Order is by how
  * much it hurts — most overdue first, then today, tomorrow, then by date, with
  * undated work last because nothing about it is claiming a moment.
  *
@@ -125,7 +127,7 @@ export function attentionItems(
 
   for (const t of tasks) {
     if (t.status === 'publish') continue
-    if (t.task_owner_id !== memberId) continue
+    if ((t.assignee_id ?? t.task_owner_id) !== memberId) continue
 
     const days = t.due_date ? calDaysBetween(today, new Date(t.due_date as string)) : null
 
@@ -192,7 +194,9 @@ export function activityItems(
   const nameOf = (id?: string | null) => members.find(m => m.id === id)?.name
 
   for (const t of tasks) {
-    const mine = t.task_owner_id === memberId
+    // Your feed covers both: work you are doing and work you are answerable
+    // for. They are usually the same task and occasionally are not.
+    const mine = (t.assignee_id ?? t.task_owner_id) === memberId || t.task_owner_id === memberId
 
     for (const c of t.comments ?? []) {
       const named = (c.mentions ?? []).includes(memberId)

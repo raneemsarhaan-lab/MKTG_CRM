@@ -77,9 +77,11 @@ export function applyBoardFilters<T extends Task>(
       const hay = `${t.name} ${t.task_owner?.name ?? ''} ${t.campaign ?? ''} ${t.brand?.name ?? ''}`
       if (!hay.toLowerCase().includes(q)) return false
     }
-    if (f.onlyMine && t.task_owner_id !== ctx.currentUserId) return false
+    if (f.onlyMine && (t.assignee_id ?? t.task_owner_id) !== ctx.currentUserId) return false
     if (f.brandIds.length     && !f.brandIds.includes(t.brand_id)) return false
-    if (f.ownerIds.length     && !f.ownerIds.includes(t.task_owner_id)) return false
+    // The Assignee filter means who is doing it, which is what people mean
+    // when they ask whose task it is.
+    if (f.ownerIds.length     && !f.ownerIds.includes(t.assignee_id ?? t.task_owner_id)) return false
     if (f.contentTypes.length && !f.contentTypes.includes(t.content_type_label)) return false
     if (f.platforms.length    && !f.platforms.includes(t.platform ?? '')) return false
     if (f.priorities.length   && !f.priorities.includes(t.priority)) return false
@@ -206,7 +208,7 @@ export function BoardFilters({
   const usedPlatforms = useMemo(
     () => [...new Set(tasks.map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
     [tasks])
-  const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.task_owner_id)), [tasks])
+  const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.assignee_id ?? t.task_owner_id)), [tasks])
 
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
 

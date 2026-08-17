@@ -9,6 +9,23 @@ import { MAX_PASTED } from '@/lib/paste-list'
 import { MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO } from '@/lib/attachments'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
+/**
+ * Who may act on a task.
+ *
+ * Owner and assignee are different facts — one is accountable, the other is
+ * doing it — but either may edit, because both are working on the thing. An
+ * admin or superuser overrides both.
+ */
+function canAct(
+  task: { task_owner_id: string; assignee_id: string | null },
+  member: { id: string; access: string },
+): boolean {
+  return task.task_owner_id === member.id
+    || task.assignee_id === member.id
+    || member.access === 'admin'
+    || member.access === 'superuser'
+}
+
 // ─── moveTask ───────────────────────────────────────────────────────────────
 
 export async function moveTask(taskId: string): Promise<MoveTaskResult> {
@@ -25,8 +42,10 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   // Mirrors `canAdvance` in TaskModal — the client hides the button, this
   // enforces it. Admin and superuser may advance any stage as an override.
   const stageMeta = STAGE_META[task.status as StageId]
+  // A working stage belongs to whoever is doing the task — or its owner, who
+  // is accountable for it. A review stage belongs to a role.
   const isOwnStage = !stageMeta.owner_role
-    ? task.task_owner_id === member.id
+    ? task.assignee_id === member.id || task.task_owner_id === member.id
     : stageMeta.owner_role === member.role
 
   const canAdvance = isOwnStage || member.access === 'admin' || member.access === 'superuser'
@@ -77,7 +96,7 @@ export async function setTaskStage(
 
   const stageMeta = STAGE_META[task.status as StageId]
   const isOwnStage = !stageMeta.owner_role
-    ? task.task_owner_id === member.id
+    ? task.assignee_id === member.id || task.task_owner_id === member.id
     : stageMeta.owner_role === member.role
 
   const allowed = isOwnStage || member.access === 'admin' || member.access === 'superuser'
@@ -164,6 +183,8 @@ export interface TaskPatch {
   platform?:           string
   campaign?:           string
   task_owner_id?:      string
+  /** Null hands the task back to nobody. */
+  assignee_id?:        string | null
   due_date?:           string   // ISO yyyy-mm-dd
   hours_estimate?:     number
   priority?:           'Low' | 'Medium' | 'High'
@@ -180,11 +201,7 @@ export async function updateTask(
   const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, error: 'not_found' }
 
-  const allowed =
-    task.task_owner_id === member.id ||
-    member.access === 'admin' ||
-    member.access === 'superuser'
-  if (!allowed) return { success: false, error: 'not_authorized' }
+  if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
 
   // Build the update explicitly — never spread the caller's object into
   // Prisma, or an extra key like `status` would ride along.
@@ -201,6 +218,7 @@ export async function updateTask(
   if (patch.platform !== undefined)           data.platform           = patch.platform || null
   if (patch.campaign !== undefined)           data.campaign           = patch.campaign.trim() || null
   if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
+  if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
   if (patch.priority !== undefined)           data.priority           = patch.priority
 
@@ -252,6 +270,7 @@ export async function createSubtask(
   // Same rule as editing the parent: its owner, or an admin/superuser.
   const allowed =
     parent.task_owner_id === member.id ||
+    parent.assignee_id === member.id ||
     member.access === 'admin' ||
     member.access === 'superuser'
   if (!allowed) return { success: false, error: 'not_authorized' }
@@ -265,6 +284,7 @@ export async function createSubtask(
       platform:           parent.platform,
       campaign:           parent.campaign,
       task_owner_id:      parent.task_owner_id,
+      assignee_id:        parent.assignee_id,
       initiator_role:     member.role,
       nine_stage:         parent.nine_stage,
       status:             'todo',
@@ -324,7 +344,7 @@ export async function bulkUpdateTasks(
 
       const stageMeta = STAGE_META[task.status as StageId]
       const ownsStage = !stageMeta.owner_role
-        ? task.task_owner_id === member.id
+        ? task.assignee_id === member.id || task.task_owner_id === member.id
         : stageMeta.owner_role === member.role
       if (!ownsStage && !isAdmin) { refused++; continue }
 
@@ -335,10 +355,11 @@ export async function bulkUpdateTasks(
     }
 
     if (patch.status === undefined || Object.keys(patch).length > 1) {
-      if (task.task_owner_id !== member.id && !isAdmin) { refused++; continue }
+      if (task.task_owner_id !== member.id && task.assignee_id !== member.id && !isAdmin) { refused++; continue }
     }
 
     if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
+    if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
     if (patch.brand_id !== undefined)           data.brand_id           = patch.brand_id || null
     if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
@@ -377,7 +398,7 @@ export async function bulkDeleteTasks(taskIds: string[]): Promise<BulkResult> {
   const isAdmin = member.access === 'admin' || member.access === 'superuser'
   const tasks   = await prisma.task.findMany({ where: { id: { in: taskIds } } })
 
-  const allowed = tasks.filter(t => isAdmin || t.task_owner_id === member.id).map(t => t.id)
+  const allowed = tasks.filter(t => isAdmin || t.task_owner_id === member.id || t.assignee_id === member.id).map(t => t.id)
   const refused = tasks.length - allowed.length
 
   if (allowed.length) await prisma.task.deleteMany({ where: { id: { in: allowed } } })
@@ -396,6 +417,8 @@ interface CreateTaskInput {
   brand_id:           string
   content_type_label: string
   task_owner_id:      string
+  /** Who will do it. Defaults to the owner when not given. */
+  assignee_id?:       string | null
   due_date:           string
   platform?:          string
   campaign?:          string
@@ -424,6 +447,7 @@ export async function createTask(
       platform:           input.platform   ?? null,
       campaign:           input.campaign   ?? null,
       task_owner_id:      input.task_owner_id,
+      assignee_id:        input.assignee_id ?? input.task_owner_id,
       initiator_role:     member.role,
       nine_stage:         nineStage,
       status:             'todo',
@@ -481,6 +505,7 @@ export async function createTasks(
         platform:           shared.platform ?? null,
         campaign:           shared.campaign ?? null,
         task_owner_id:      shared.task_owner_id,
+        assignee_id:        shared.assignee_id ?? shared.task_owner_id,
         initiator_role:     member.role,
         nine_stage:         nineStage,
         status:             'todo',
@@ -512,11 +537,12 @@ const MAX_THUMB_CHARS = 60_000
 /** Same rule as updateTask: the owner, or an admin or superuser. */
 async function mayAttachTo(taskId: string, memberId: string, access: string) {
   const task = await prisma.task.findUnique({
-    where: { id: taskId }, select: { task_owner_id: true },
+    where: { id: taskId }, select: { task_owner_id: true, assignee_id: true },
   })
   if (!task) return { ok: false as const, error: 'not_found' }
-  const allowed = task.task_owner_id === memberId || access === 'admin' || access === 'superuser'
-  return allowed ? { ok: true as const } : { ok: false as const, error: 'not_authorized' }
+  return canAct(task, { id: memberId, access })
+    ? { ok: true as const }
+    : { ok: false as const, error: 'not_authorized' }
 }
 
 /**

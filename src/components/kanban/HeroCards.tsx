@@ -101,7 +101,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
   // tasks twice.
   const attention = attentionItems(tasks, currentUser.id, today)
   const overdue   = attention.filter(a => a.due === 'overdue').length
-  const published = tasks.filter(t => t.task_owner_id === currentUser.id && t.status === 'publish').length
+  const published = tasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id && t.status === 'publish').length
 
   const activity  = activityItems(tasks, currentUser.id, 5, members)
   const quote     = quoteOfDay(today)
