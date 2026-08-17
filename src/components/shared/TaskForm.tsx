@@ -42,6 +42,30 @@ const PRIORITY_COLOR: Record<string, string> = {
   Low:    '#7C8288',
 }
 
+/**
+ * A brand's own mark.
+ *
+ * The colour square said which brand only to someone who had learnt the
+ * colours; the logo is the thing people actually recognise, and it is the same
+ * mark the board's brand filter uses. Brands with no artwork keep the colour,
+ * now as a lettered disc rather than a chip of paint.
+ */
+function BrandMark({ brand, size = 18 }: { brand: { name: string; color: string; logo_url?: string | null }; size?: number }) {
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: brand.color, color: '#FFFFFF',
+      fontSize: size * 0.5, fontWeight: 800, lineHeight: 1,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {brand.logo_url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={brand.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : brand.name.trim()[0]?.toUpperCase()}
+    </span>
+  )
+}
+
 function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -218,12 +242,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               label="Brand"
               value={brand?.name}
               active
-              icon={
-                <span aria-hidden="true" style={{
-                  width: 10, height: 10, borderRadius: 3,
-                  background: brand?.color ?? COLORS.muted, display: 'inline-block',
-                }} />
-              }
+              icon={brand ? <BrandMark brand={brand} size={18} /> : undefined}
             >
               {closePill => brands.map(b => (
                 <PillOption
@@ -231,9 +250,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                   selected={b.id === form.brand_id}
                   onClick={() => { patch('brand_id', b.id); closePill() }}
                 >
-                  <span aria-hidden="true" style={{
-                    width: 10, height: 10, borderRadius: 3, background: b.color,
-                  }} />
+                  <BrandMark brand={b} size={20} />
                   {b.name}
                 </PillOption>
               ))}
