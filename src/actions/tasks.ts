@@ -118,17 +118,18 @@ export async function setTaskStage(
 // ─── addComment ─────────────────────────────────────────────────────────────
 
 /**
- * Post a comment, optionally naming people in it.
+ * Post a comment, optionally naming people and linking tasks in it.
  *
- * `mentions` carries member ids the composer collected while the comment was
- * being written. They are checked against the member table here rather than
+ * `mentions` and `taskRefs` carry ids the composer collected while the comment
+ * was being written. Both are checked against their own table here rather than
  * trusted: a server action is a URL like any other, and an id that does not
- * belong to a member has no business being stored as one.
+ * belong to a member — or to a task — has no business being stored as one.
  */
 export async function addComment(
   taskId: string,
   body: string,
   mentions: string[] = [],
+  taskRefs: string[] = [],
 ): Promise<{ success: boolean; error?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
@@ -145,8 +146,20 @@ export async function addComment(
     named = rows.map(r => r.id)
   }
 
+  let linked: string[] = []
+  if (taskRefs.length) {
+    const rows = await prisma.task.findMany({
+      where: { id: { in: [...new Set(taskRefs)] } },
+      select: { id: true },
+    })
+    linked = rows.map(r => r.id)
+  }
+
   await prisma.taskComment.create({
-    data: { task_id: taskId, author_id: member.id, body: text, mentions: named },
+    data: {
+      task_id: taskId, author_id: member.id, body: text,
+      mentions: named, task_refs: linked,
+    },
   })
 
   revalidatePath('/board')

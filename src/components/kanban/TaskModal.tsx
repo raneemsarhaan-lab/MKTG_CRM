@@ -21,6 +21,8 @@ import {
   MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO,
 } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { LinkCard } from './LinkCard'
+import { URL_RE, trimUrl, hrefFor } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
 
 /**
@@ -72,6 +74,8 @@ interface TaskModalProps {
   brands?: Brand[]
   members?: Member[]
   contentTypes?: { id: string; label: string }[]
+  /** Everything the composer can link to with #, and a chip can jump to. */
+  allTasks?: TaskRef[]
 }
 
 /* ── icons — 16px line set, ClickUp's weight ─────────────────────────── */
@@ -139,36 +143,120 @@ const EMOJI = [
   '❤️','😊','😅','😬','🤔','⚠️','⏰','📌',
 ]
 
-/**
- * Draw the @names in a posted comment as mentions.
- *
- * Matching is on the text rather than the stored ids: the ids say who was
- * meant, this says where in the sentence they were meant. Longest names first,
- * so "Islam Saadany" is not matched as "Islam" with a stray surname after it.
- */
-function withMentions(body: string, members: Member[]): React.ReactNode {
-  const names = members.map(m => m.name).filter(Boolean).sort((a, b) => b.length - a.length)
-  if (!names.length) return body
+/** A task the composer can offer and a posted comment can link to. */
+export interface TaskRef { id: string; name: string; status: StageId }
 
-  const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const re = new RegExp(`@(${escaped.join('|')})`, 'g')
+/** A row in the composer's picker — a person to name, or a task to link. */
+type Suggestion =
+  | { kind: 'member'; id: string; name: string; role: string }
+  | { kind: 'task';   id: string; name: string; status: StageId }
+
+/** Every distinct link in a comment, in the order it was written. */
+function urlsIn(body: string): string[] {
+  const out: string[] = []
+  for (const m of body.matchAll(URL_RE)) {
+    const url = trimUrl(m[0])
+    if (url && !out.includes(url)) out.push(url)
+  }
+  return out
+}
+
+/**
+ * Draw the bare URLs in a run of text as links.
+ *
+ * A pasted link is the single most common thing in these comments and it was
+ * arriving as dead text — worse, as one unbroken word wide enough to push the
+ * comment out of its own bubble. So it becomes an anchor, and it is allowed to
+ * break anywhere.
+ */
+function linkify(text: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(URL_RE)) {
+    const at  = m.index ?? 0
+    const url = trimUrl(m[0])
+    if (!url) continue
+    if (at > last) out.push(text.slice(last, at))
+    out.push(
+      <a key={`${keyBase}-${at}`} href={hrefFor(url)} target="_blank"
+         rel="noopener noreferrer nofollow"
+         onClick={e => e.stopPropagation()}
+         style={{ color: CU.blue, textDecoration: 'underline', overflowWrap: 'anywhere' }}>
+        {url}
+      </a>,
+    )
+    last = at + url.length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/**
+ * Draw the @names and #tasks in a posted comment as chips.
+ *
+ * Matching is on the text rather than the stored ids: the ids say who and what
+ * was meant, this says where in the sentence they were meant. Longest names
+ * first, so "Islam Saadany" is not matched as "Islam" with a stray surname
+ * after it, and a long task name wins over a shorter one it contains.
+ *
+ * Only tasks this comment actually recorded a link to are passed in, so a
+ * comment that happens to quote a task's name in passing stays plain text.
+ */
+function withRefs(
+  body: string,
+  members: Member[],
+  linked: TaskRef[],
+  onOpenTask?: (id: string) => void,
+): React.ReactNode {
+  const refs = [
+    ...members.filter(m => m.name).map(m => ({ kind: 'member' as const, name: m.name, id: m.id })),
+    ...linked.filter(t => t.name).map(t => ({ kind: 'task' as const, name: t.name, id: t.id })),
+  ].sort((a, b) => b.name.length - a.name.length)
+  if (!refs.length) return linkify(body, 'l')
+
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(refs.map(r => `${r.kind === 'task' ? '#' : '@'}${esc(r.name)}`).join('|'), 'g')
 
   const out: React.ReactNode[] = []
   let last = 0
   for (const m of body.matchAll(re)) {
-    const at = m.index ?? 0
-    if (at > last) out.push(body.slice(last, at))
-    out.push(
-      <span key={`${at}-${m[1]}`} style={{
-        background: '#EEF3FF', color: CU.blue, borderRadius: 5,
-        padding: '1px 4px', fontWeight: 600,
-      }}>
-        @{m[1]}
-      </span>,
-    )
+    const at    = m.index ?? 0
+    const sigil = m[0][0]
+    const name  = m[0].slice(1)
+    const ref   = refs.find(r => r.name === name && (r.kind === 'task') === (sigil === '#'))
+    if (at > last) out.push(...linkify(body.slice(last, at), `l${last}`))
+
+    if (ref?.kind === 'task') {
+      out.push(
+        <button
+          key={`${at}-${ref.id}`}
+          type="button"
+          onClick={() => onOpenTask?.(ref.id)}
+          title={`Open ${ref.name}`}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'baseline',
+            background: '#F3EEFF', color: '#6D28D9', borderRadius: 5, border: 'none',
+            padding: '1px 5px', margin: 0, fontFamily: 'inherit', fontSize: 'inherit',
+            fontWeight: 600, cursor: onOpenTask ? 'pointer' : 'default', textAlign: 'start',
+          }}
+        >
+          <Icon name="link" size={11} color="#6D28D9" width={2.2} />
+          {ref.name}
+        </button>,
+      )
+    } else {
+      out.push(
+        <span key={`${at}-${name}`} style={{
+          background: '#EEF3FF', color: CU.blue, borderRadius: 5,
+          padding: '1px 4px', fontWeight: 600,
+        }}>
+          @{name}
+        </span>,
+      )
+    }
     last = at + m[0].length
   }
-  if (last < body.length) out.push(body.slice(last))
+  if (last < body.length) out.push(...linkify(body.slice(last), `l${last}`))
   return out
 }
 
@@ -314,7 +402,7 @@ const fmtTime = (d: string | Date) =>
 
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
-  brands = [], members = [], contentTypes = [],
+  brands = [], members = [], contentTypes = [], allTasks = [],
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -333,8 +421,10 @@ export function TaskModal({
   const [lightbox, setLightbox]           = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
   const [picked, setPicked]               = useState<string[]>([])
+  const [pickedTasks, setPickedTasks]     = useState<string[]>([])
   const [mentionOpen, setMentionOpen]     = useState(false)
   const [mentionQuery, setMentionQuery]   = useState('')
+  const [mentionSigil, setMentionSigil]   = useState<'@' | '#'>('@')
   const [mentionIndex, setMentionIndex]   = useState(0)
   const [emojiOpen, setEmojiOpen]         = useState(false)
   const [stageOpen, setStageOpen]         = useState(false)
@@ -518,42 +608,69 @@ export function TaskModal({
     })
   }
 
-  /* ── naming people in a comment ──────────────────────────────────────── */
+  /* ── naming people and linking tasks in a comment ────────────────────── */
 
   /**
-   * Who is still named in what has been typed.
+   * Who and what is still named in what has been typed.
    *
    * Picking someone records their id, but the text stays editable — delete
    * the "@Salma" and the mention should go with it. So the list is derived
    * from the body on every render rather than kept as the truth: whoever's
-   * handle survives in the text is who gets stored.
+   * handle survives in the text is who gets stored. Task links work the same
+   * way, on "#" and the task's name.
    */
   const mentioned = useMemo(
     () => members.filter(m => picked.includes(m.id) && cmtText.includes(`@${m.name}`)),
     [members, picked, cmtText],
   )
 
-  const mentionMatches = useMemo(() => {
+  const linkedTasks = useMemo(
+    () => allTasks.filter(t => pickedTasks.includes(t.id) && cmtText.includes(`#${t.name}`)),
+    [allTasks, pickedTasks, cmtText],
+  )
+
+  /**
+   * What the picker offers.
+   *
+   * "#" is tasks only. "@" is people, and — once something has been typed —
+   * the tasks that match it too, below them: ClickUp names both from the one
+   * key, and an empty "@" that led with a wall of task names would bury the
+   * people it is mostly used for.
+   */
+  const mentionMatches = useMemo<Suggestion[]>(() => {
     const q = mentionQuery.trim().toLowerCase()
-    const pool = members.filter(m => m.id !== currentUser.id)
-    if (!q) return pool.slice(0, 8)
-    return pool.filter(m => m.name.toLowerCase().includes(q) || (m.role ?? '').toLowerCase().includes(q)).slice(0, 8)
-  }, [members, mentionQuery, currentUser.id])
+
+    const people: Suggestion[] = mentionSigil === '#' ? [] : members
+      .filter(m => m.id !== currentUser.id)
+      .filter(m => !q || m.name.toLowerCase().includes(q) || (m.role ?? '').toLowerCase().includes(q))
+      .slice(0, q ? 5 : 8)
+      .map(m => ({ kind: 'member', id: m.id, name: m.name, role: m.role ?? '' }))
+
+    const wantTasks = mentionSigil === '#' || q.length > 0
+    const tasks: Suggestion[] = !wantTasks ? [] : allTasks
+      .filter(t => t.id !== task.id)
+      .filter(t => !q || t.name.toLowerCase().includes(q))
+      .slice(0, mentionSigil === '#' ? 8 : 4)
+      .map(t => ({ kind: 'task', id: t.id, name: t.name, status: t.status }))
+
+    return [...people, ...tasks]
+  }, [members, allTasks, mentionQuery, mentionSigil, currentUser.id, task.id])
 
   useEffect(() => { setMentionIndex(0) }, [mentionQuery, mentionOpen])
 
-  /** The "@word" being typed immediately before the caret, if there is one. */
-  function mentionTokenAt(el: HTMLTextAreaElement): { at: number; query: string } | null {
+  /** The "@word" or "#word" being typed immediately before the caret. */
+  function mentionTokenAt(el: HTMLTextAreaElement):
+    { at: number; query: string; sigil: '@' | '#' } | null {
     const caret = el.selectionStart ?? 0
     const upto  = el.value.slice(0, caret)
-    const at    = upto.lastIndexOf('@')
+    const at    = Math.max(upto.lastIndexOf('@'), upto.lastIndexOf('#'))
     if (at === -1) return null
     // Only right after whitespace or at the very start — an email address is
-    // not a mention.
+    // not a mention, and a colour like #F4F5F7 is not a task.
     if (at > 0 && !/\s/.test(upto[at - 1])) return null
     const query = upto.slice(at + 1)
     if (query.includes('\n')) return null
-    return { at, query }
+    return { at, query, sigil: upto[at] as '@' | '#' }
   }
 
   function syncMentionQuery(el: HTMLTextAreaElement) {
@@ -561,6 +678,7 @@ export function TaskModal({
     if (!token) { setMentionOpen(false); return }
     setEmojiOpen(false)
     setMentionQuery(token.query)
+    setMentionSigil(token.sigil)
     setMentionOpen(true)
   }
 
@@ -573,6 +691,7 @@ export function TaskModal({
     const next = cmtText.slice(0, caret) + insert + cmtText.slice(caret)
     setCmtText(next)
     setMentionQuery('')
+    setMentionSigil('@')
     setMentionOpen(true)
     requestAnimationFrame(() => {
       el.focus()
@@ -581,19 +700,21 @@ export function TaskModal({
     })
   }
 
-  function insertMention(m: Member) {
+  function insertMention(s: Suggestion) {
     const el = cmtRef.current
     if (!el) return
     const token = mentionTokenAt(el)
     const caret = el.selectionStart ?? cmtText.length
     const from  = token ? token.at : caret
-    const next  = `${cmtText.slice(0, from)}@${m.name} ${cmtText.slice(caret)}`
+    const sigil = s.kind === 'task' ? '#' : '@'
+    const next  = `${cmtText.slice(0, from)}${sigil}${s.name} ${cmtText.slice(caret)}`
     setCmtText(next)
-    setPicked(p => (p.includes(m.id) ? p : [...p, m.id]))
+    if (s.kind === 'task') setPickedTasks(p => (p.includes(s.id) ? p : [...p, s.id]))
+    else                   setPicked(p => (p.includes(s.id) ? p : [...p, s.id]))
     setMentionOpen(false)
     requestAnimationFrame(() => {
       el.focus()
-      const pos = from + m.name.length + 2
+      const pos = from + s.name.length + 2
       el.setSelectionRange(pos, pos)
     })
   }
@@ -653,13 +774,15 @@ export function TaskModal({
   function handleComment() {
     const text = cmtText.trim()
     if (!text) return
-    const ids = mentioned.map(m => m.id)
+    const ids   = mentioned.map(m => m.id)
+    const links = linkedTasks.map(t => t.id)
     startTransition(async () => {
-      const r = await addComment(task.id, text, ids)
+      const r = await addComment(task.id, text, ids, links)
       if (!r.success) { setError(r.error ?? 'Could not post that comment'); return }
       router.refresh()
       setCmtText('')
       setPicked([])
+      setPickedTasks([])
       setMentionOpen(false)
       setEmojiOpen(false)
     })
@@ -877,8 +1000,22 @@ export function TaskModal({
                 display: 'block', marginTop: 6, padding: '8px 11px', borderRadius: 9,
                 background: '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
                 border: `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
+                // A pasted URL is one unbroken word and will happily run out
+                // of the bubble and off the panel unless it is allowed to
+                // break mid-word.
+                overflowWrap: 'anywhere', minWidth: 0,
               }}>
-                {withMentions(c.body, members)}
+                {withRefs(
+                  c.body,
+                  members,
+                  (c.task_refs ?? [])
+                    .map(id => allTasks.find(t => t.id === id))
+                    .filter((t): t is TaskRef => !!t),
+                  selectTask,
+                )}
+                {/* Two cards at most: a comment that is a list of links should
+                    stay a comment, not become a page of thumbnails. */}
+                {urlsIn(c.body).slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
               </span>
             </>
           ),
@@ -887,7 +1024,7 @@ export function TaskModal({
     ]
     return items.sort((a, b) => a.when.getTime() - b.when.getTime())
   }, [task.created_at, task.stage_date, task.comments, task.task_owner.name,
-      stageMeta.label_en, members, currentUser.id])
+      stageMeta.label_en, members, currentUser.id, allTasks, selectTask])
 
   // ClickUp shows the first couple and hides the rest behind "Show more".
   const HEAD = 1
@@ -1656,10 +1793,11 @@ export function TaskModal({
             {/* Composer */}
             <div style={{ padding: '10px 14px 14px', flexShrink: 0, position: 'relative' }}>
 
-              {/* Who you can name. Opens on the @ button and on typing an @,
-                  and filters as you keep typing after it. */}
+              {/* Who you can name and what you can link to. Opens on the @
+                  button, on typing an @, and on typing a # — and filters as
+                  you keep typing after it. */}
               {mentionOpen && (
-                <div role="listbox" aria-label="Mention someone" style={{
+                <div role="listbox" aria-label="Name someone or link a task" style={{
                   position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
                   background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
                   boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 6,
@@ -1667,31 +1805,57 @@ export function TaskModal({
                 }}>
                   {mentionMatches.length === 0 && (
                     <p style={{ margin: 0, padding: '10px 10px', fontSize: 14, color: CU.faint }}>
-                      Nobody by that name.
+                      {mentionSigil === '#' ? 'No task by that name.' : 'Nothing by that name.'}
                     </p>
                   )}
-                  {mentionMatches.map((m, i) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="option"
-                      aria-selected={i === mentionIndex}
-                      onMouseEnter={() => setMentionIndex(i)}
-                      onClick={() => insertMention(m)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                        padding: '8px 10px', border: 'none', borderRadius: 8, cursor: 'pointer',
-                        background: i === mentionIndex ? CU.hover : 'transparent',
-                        fontFamily: 'inherit', fontSize: 14.5, color: CU.text, textAlign: 'start',
-                      }}
-                    >
-                      <Avatar name={m.name} size={26} />
-                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {m.name}
-                      </span>
-                      <span style={{ fontSize: 12.5, color: CU.faint, whiteSpace: 'nowrap' }}>{m.role}</span>
-                    </button>
-                  ))}
+                  {mentionMatches.map((s, i) => {
+                    // The heading appears on the first task row, and only when
+                    // people came before it — otherwise the list needs no
+                    // dividing.
+                    const opensTasks = s.kind === 'task' && mentionMatches[i - 1]?.kind === 'member'
+                    return (
+                      <div key={`${s.kind}-${s.id}`}>
+                        {opensTasks && (
+                          <p style={{
+                            margin: '6px 0 2px', padding: '0 10px', fontSize: 11, fontWeight: 800,
+                            letterSpacing: '.07em', textTransform: 'uppercase', color: CU.faint,
+                            borderTop: `1px solid ${CU.lineSoft}`, paddingTop: 8,
+                          }}>
+                            Tasks
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={i === mentionIndex}
+                          onMouseEnter={() => setMentionIndex(i)}
+                          onClick={() => insertMention(s)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                            padding: '8px 10px', border: 'none', borderRadius: 8, cursor: 'pointer',
+                            background: i === mentionIndex ? CU.hover : 'transparent',
+                            fontFamily: 'inherit', fontSize: 14.5, color: CU.text, textAlign: 'start',
+                          }}
+                        >
+                          {s.kind === 'member' ? <Avatar name={s.name} size={26} /> : (
+                            <span style={{
+                              width: 26, height: 26, borderRadius: 7, background: '#F3EEFF',
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              flexShrink: 0,
+                            }}>
+                              <Icon name="link" size={14} color="#6D28D9" width={2.2} />
+                            </span>
+                          )}
+                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.name}
+                          </span>
+                          <span style={{ fontSize: 12.5, color: CU.faint, whiteSpace: 'nowrap' }}>
+                            {s.kind === 'member' ? s.role : STAGE_META[s.status].label_en}
+                          </span>
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
@@ -1727,7 +1891,7 @@ export function TaskModal({
                   onChange={e => { setCmtText(e.target.value); syncMentionQuery(e.target) }}
                   onKeyDown={onComposerKey}
                   onBlur={() => window.setTimeout(() => setMentionOpen(false), 150)}
-                  placeholder="Write a comment — type @ to name someone"
+                  placeholder="Write a comment — @ names, # links a task"
                   rows={2}
                   style={{
                     width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none',
@@ -1736,7 +1900,7 @@ export function TaskModal({
                   }}
                 />
 
-                {mentioned.length > 0 && (
+                {(mentioned.length > 0 || linkedTasks.length > 0) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 14px 6px' }}>
                     {mentioned.map(m => (
                       <span key={m.id} style={{
@@ -1746,6 +1910,18 @@ export function TaskModal({
                       }}>
                         <Icon name="at" size={12} color={CU.blue} width={2} />
                         {m.name}
+                      </span>
+                    ))}
+                    {linkedTasks.map(t => (
+                      <span key={t.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, height: 24,
+                        maxWidth: 240, padding: '0 9px', borderRadius: 999, background: '#F3EEFF',
+                        fontSize: 12.5, fontWeight: 600, color: '#6D28D9',
+                      }}>
+                        <Icon name="link" size={12} color="#6D28D9" width={2} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.name}
+                        </span>
                       </span>
                     ))}
                   </div>

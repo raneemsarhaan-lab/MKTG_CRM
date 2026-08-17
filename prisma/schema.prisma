@@ -24,11 +24,11 @@ model Member {
   password_hash   String?
   created_at      DateTime @default(now()) @db.Timestamptz(6)
 
-  tasks_owned    Task[]       @relation("TaskOwner")
-  tasks_assigned Task[]       @relation("TaskAssignee")
-  tasks_created  Task[]       @relation("TaskCreator")
-  comments      TaskComment[]
-  project_steps ProjectStep[] @relation("StepAssignee")
+  tasks_owned    Task[]        @relation("TaskOwner")
+  tasks_assigned Task[]        @relation("TaskAssignee")
+  tasks_created  Task[]        @relation("TaskCreator")
+  comments       TaskComment[]
+  project_steps  ProjectStep[] @relation("StepAssignee")
 
   @@map("members")
 }
@@ -161,13 +161,13 @@ model SlaConfig {
 }
 
 model Task {
-  id                 String   @id @default(uuid()) @db.Uuid
+  id                 String    @id @default(uuid()) @db.Uuid
   /// Source key when a task came from an external system (ClickUp import).
   /// Unique so a re-import updates rather than duplicates.
-  external_id        String?  @unique
+  external_id        String?   @unique
   name               String
-  description        String?  @db.Text
-  brand_id           String?  @db.Uuid
+  description        String?   @db.Text
+  brand_id           String?   @db.Uuid
   content_type_label String?
   platform           String?
   campaign           String?
@@ -177,7 +177,7 @@ model Task {
   /// same person on most tasks and every imported one, but they are different
   /// facts: a manager owns a deliverable and hands the work to a designer.
   /// Nothing personal keys off this — see assignee_id.
-  task_owner_id      String   @db.Uuid
+  task_owner_id      String    @db.Uuid
   /// Who is doing the work.
   ///
   /// This is the one everything personal follows: My Day, Needs Your
@@ -185,13 +185,13 @@ model Task {
   /// Nullable because a task can genuinely be waiting for somebody to pick
   /// up; existing rows were backfilled from task_owner_id, which is what they
   /// meant before the two were separated.
-  assignee_id        String?  @db.Uuid
+  assignee_id        String?   @db.Uuid
   initiator_role     String
-  nine_stage         Boolean  @default(false)
-  status             String   @default("todo")
-  stage_date         DateTime @default(now()) @db.Date
+  nine_stage         Boolean   @default(false)
+  status             String    @default("todo")
+  stage_date         DateTime  @default(now()) @db.Date
   due_date           DateTime? @db.Date
-  hours_estimate     Decimal  @default(0) @db.Decimal(5, 1)
+  hours_estimate     Decimal   @default(0) @db.Decimal(5, 1)
   cover_image_url    String?
   /// A small preview of the newest image uploaded to this task.
   ///
@@ -202,24 +202,24 @@ model Task {
   /// itself. This is that: one thumbnail, longest edge 360px, re-encoded, a
   /// dozen kilobytes or so. It is set on upload and is not a user field —
   /// cover_image_url above is the one somebody chooses.
-  cover_thumb        String?  @db.Text
-  priority           String   @default("Medium")
-  created_by         String?  @db.Uuid
-  created_at         DateTime @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+  cover_thumb        String?   @db.Text
+  priority           String    @default("Medium")
+  created_by         String?   @db.Uuid
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
   /// Set when this task was created as a subtask from another task's brief.
   /// A subtask is an ordinary task — its own stage, SLA and owner — that
   /// happens to know its parent, so nothing else in the pipeline changes.
-  parent_task_id     String?  @db.Uuid
+  parent_task_id     String?   @db.Uuid
 
-  parent       Task?        @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
-  subtasks     Task[]       @relation("Subtasks")
-  brand        Brand?       @relation(fields: [brand_id], references: [id])
-  task_owner   Member       @relation("TaskOwner", fields: [task_owner_id], references: [id])
-  assignee     Member?      @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
-  creator      Member?      @relation("TaskCreator", fields: [created_by], references: [id])
-  stage        Stage        @relation(fields: [status], references: [id])
-  content_type ContentType? @relation("TaskContentType", fields: [content_type_label], references: [label])
+  parent       Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks     Task[]           @relation("Subtasks")
+  brand        Brand?           @relation(fields: [brand_id], references: [id])
+  task_owner   Member           @relation("TaskOwner", fields: [task_owner_id], references: [id])
+  assignee     Member?          @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  creator      Member?          @relation("TaskCreator", fields: [created_by], references: [id])
+  stage        Stage            @relation(fields: [status], references: [id])
+  content_type ContentType?     @relation("TaskContentType", fields: [content_type_label], references: [label])
   comments     TaskComment[]
   attachments  TaskAttachment[]
   project_step ProjectStep?
@@ -239,6 +239,14 @@ model TaskComment {
   /// because two people can share a first name and a rename must not orphan a
   /// mention: the id keeps pointing at the person either way.
   mentions   String[] @db.Uuid
+  /// Tasks linked with # in this comment.
+  ///
+  /// Same reasoning as `mentions`, one step over: the name is in `body` for a
+  /// human to read and the id is here so the link survives a rename. It also
+  /// keeps the chip honest — a comment written before task links existed, or
+  /// one that merely happens to quote a task's name, has nothing stored and so
+  /// draws no link.
+  task_refs  String[] @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
   task   Task   @relation(fields: [task_id], references: [id], onDelete: Cascade)
@@ -276,23 +284,23 @@ model TaskAttachment {
 }
 
 model WorkspaceSettings {
-  id                  Int      @id
-  capacity_hrs_per_wk Int      @default(40)
-  nine_stage_default  Boolean  @default(false)
+  id                  Int     @id
+  capacity_hrs_per_wk Int     @default(40)
+  nine_stage_default  Boolean @default(false)
 
   /// How many hours one planned step-day costs. The plan is written in days;
   /// this is what turns it into hours.
-  hours_per_step_day  Decimal  @default(8) @db.Decimal(4, 1)
+  hours_per_step_day        Decimal   @default(8) @db.Decimal(4, 1)
   /// End of the capacity window. Null runs to the last dated step in scope.
   /// The start is always today and is deliberately not stored — a stored start
   /// goes stale in silence and inflates everyone's available hours.
-  capacity_period_end DateTime? @db.Date
+  capacity_period_end       DateTime? @db.Date
   /// At or below this many days a step is simple, unless it says otherwise.
-  complexity_threshold_days Decimal @default(3) @db.Decimal(4, 1)
+  complexity_threshold_days Decimal   @default(3) @db.Decimal(4, 1)
   /// Whose row receives supervision overhead. A role, never a named person.
-  supervising_role    String   @default("Marketing Manager")
+  supervising_role          String    @default("Marketing Manager")
 
-  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("workspace_settings")
 }
@@ -339,4 +347,29 @@ model Tombstone {
 
   @@id([kind, key])
   @@map("tombstones")
+}
+
+/// What a link in a comment turned out to be.
+///
+/// A preview means fetching a page a user pasted, which is slow, occasionally
+/// impossible, and rude to repeat — the same Drive folder gets pasted a dozen
+/// times and every reader would fetch it again. So a fetch happens once per
+/// URL and the answer is kept here.
+///
+/// A failure is cached too, in `ok`. Plenty of links cannot be previewed at
+/// all — a private Drive folder answers a signed-out fetch with a login page,
+/// and the environment's network policy may not allow outbound requests in the
+/// first place — and a row saying "we looked, there is nothing" is what stops
+/// the card retrying on every render.
+model LinkPreview {
+  url         String   @id
+  ok          Boolean  @default(false)
+  title       String?
+  description String?  @db.Text
+  image_url   String?  @db.Text
+  site_name   String?
+  favicon     String?  @db.Text
+  fetched_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("link_previews")
 }

@@ -57,6 +57,7 @@ export function mapComment(c: any): TaskComment & { author?: Member } {
     author:     c.author ? mapMember(c.author) : undefined,
     body:       c.body,
     mentions:   c.mentions ?? [],
+    task_refs:  c.task_refs ?? [],
     created_at: toIsoStr(c.created_at),
   }
 }
