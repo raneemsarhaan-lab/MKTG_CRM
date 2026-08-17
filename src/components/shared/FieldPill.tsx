@@ -99,12 +99,17 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
           transition: 'border-color 140ms ease-out, background 140ms ease-out',
         } : {
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '7px 12px', borderRadius: 8,
-          border: `1px solid ${active ? COLORS.ink : COLORS.line}`,
-          background: active ? '#F4F4F2' : '#fff',
+          display: 'inline-flex', alignItems: 'center', gap: 7,
+          padding: '8px 13px', borderRadius: 9,
+          // The border stays the same hairline whether the field is filled or
+          // not. It used to go near-black once filled, which put a row of hard
+          // outlines across the intake form and made a set of ordinary
+          // dropdowns read as five separate emphases. Filled is said with the
+          // text instead: darker and heavier, the way the reference says it.
+          border: `1px solid ${COLORS.line}`,
+          background: '#fff',
           color: active ? COLORS.ink : COLORS.muted,
-          fontSize: 13, fontWeight: active ? 700 : 500,
+          fontSize: 13.5, fontWeight: active ? 600 : 500,
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
           transition: 'border-color 140ms ease-out, background 140ms ease-out',
         }}
