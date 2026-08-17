@@ -26,13 +26,21 @@ interface FieldPillProps {
    * handoff's 44px view toggle (§6). Same popover, different trigger.
    */
   variant?:  'field' | 'view'
+  /**
+   * Show the icon and nothing else.
+   *
+   * For a mark that already says what it is — a brand logo — the name beside
+   * it is the same fact written twice. `label` and `value` still describe the
+   * button to a screen reader and on hover; they just are not drawn.
+   */
+  iconOnly?: boolean
   width?:    number
   children:  (close: () => void) => React.ReactNode
 }
 
 const PANEL_MAX = 300
 
-export function FieldPill({ label, value, icon, active, variant = 'field', width = 240, children }: FieldPillProps) {
+export function FieldPill({ label, value, icon, active, variant = 'field', iconOnly, width = 240, children }: FieldPillProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number }>({ left: 0 })
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -89,6 +97,8 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
         onClick={() => setOpen(o => !o)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={iconOnly ? (value ? `${label}: ${value}` : label) : undefined}
+        title={iconOnly ? (value ?? label) : undefined}
         style={variant === 'view' ? {
           display: 'inline-flex', alignItems: 'center', gap: 9, height: 44,
           padding: '0 20px', borderRadius: 12, fontSize: 13.5,
@@ -99,8 +109,8 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
           transition: 'border-color 140ms ease-out, background 140ms ease-out',
         } : {
-          display: 'inline-flex', alignItems: 'center', gap: 7,
-          padding: '8px 13px', borderRadius: 9,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+          padding: iconOnly ? 6 : '8px 13px', borderRadius: iconOnly ? '50%' : 9,
           // No outline at all. A row of boxes made five ordinary dropdowns
           // look like five separate emphases; the tint is enough to say
           // "this is a control" without drawing a frame round each one, and
@@ -123,7 +133,7 @@ export function FieldPill({ label, value, icon, active, variant = 'field', width
           </svg>
         )}
         {icon}
-        {value || label}
+        {!iconOnly && (value || label)}
       </button>
 
       {open && (
