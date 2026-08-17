@@ -63,6 +63,11 @@ export default async function OverviewPage() {
       dueDate: due ? iso(due) : null,
       due,
       stageDays: businessDaysBetween(new Date(t.stage_date), today),
+      // For the day planner: hours_estimate is in hours and mostly zero, so
+      // the planner assumes a length for those and says so on the slot.
+      mins:      Math.round(Number(t.hours_estimate ?? 0) * 60),
+      priority:  (t.priority as 'High' | 'Medium' | 'Low') ?? 'Medium',
+      dueOffset: due ? Math.round((due.getTime() - today.getTime()) / 86_400_000) : null,
       slaDays:   sla.get(`${t.status}|${t.content_type_label ?? ''}`) ?? 1,
       ownerName: t.task_owner?.name ?? '—',
     }
@@ -101,7 +106,10 @@ export default async function OverviewPage() {
         breached: breaches.length,
         completedThisWeek,
       }}
-      myDay={myDay.map(toPanelTask)}
+      myDayPlan={myDay.map(r => ({
+        id: r.id, name: r.title, mins: r.mins,
+        due: r.dueOffset, priority: r.priority,
+      }))}
       thisWeek={thisWeek.map(toPanelTask)}
       breaches={breaches}
     />
