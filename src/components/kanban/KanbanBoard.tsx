@@ -94,11 +94,36 @@ export function KanbanBoard({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  /**
+   * Whose board this is.
+   *
+   * Defaults to your own work, because the board is a place to do a job
+   * rather than a status report — three hundred tasks, most of them somebody
+   * else's, is a wall to read past before you find yours. Team is one click
+   * away and the choice is remembered per browser.
+   *
+   * Read after mount like every other stored preference: reading
+   * localStorage during render makes the server and client disagree.
+   */
+  const [scope, setScope] = useState<'me' | 'team'>('me')
+  useEffect(() => {
+    if (window.localStorage.getItem('momentum.board.scope') === 'team') setScope('team')
+  }, [])
+  function chooseScope(next: 'me' | 'team') {
+    setScope(next)
+    try { window.localStorage.setItem('momentum.board.scope', next) } catch { /* private mode */ }
+  }
+
+  const scopedTasks = useMemo(
+    () => (scope === 'me' ? tasks.filter(t => t.task_owner_id === currentUser.id) : tasks),
+    [tasks, scope, currentUser.id],
+  )
+
   const filteredTasks = useMemo(
-    () => applyBoardFilters(tasks, filters, {
+    () => applyBoardFilters(scopedTasks, filters, {
       currentUserId: currentUser.id, slaConfig, today,
     }),
-    [tasks, filters, currentUser.id, slaConfig, today],
+    [scopedTasks, filters, currentUser.id, slaConfig, today],
   )
 
   const tasksByStage = useMemo(() => {
@@ -606,7 +631,9 @@ export function KanbanBoard({
         brands={brands}
         members={members}
         shown={filteredTasks.length}
-        total={tasks.length}
+        total={scopedTasks.length}
+        scope={scope}
+        onScope={chooseScope}
       />
 
 
