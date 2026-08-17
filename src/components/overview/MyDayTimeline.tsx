@@ -1,6 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { updateTask } from '@/actions/tasks'
 import {
   planDay, rightNow, hhmm, durLabel, DEFAULTS, ASSUMED_MINS,
   type PlanTask, type DaySettings, type Slot,
@@ -48,6 +51,26 @@ const toMins = (t: string) => {
 export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Props) {
   const [s, setS] = useState<DaySettings>(DEFAULTS)
   const [open, setOpen] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [, startTransition] = useTransition()
+  const router = useRouter()
+
+  /**
+   * Set a task's estimate from the slot it produced.
+   *
+   * The panel spends its time telling you an estimate is missing, so the
+   * place to fix it is the line making the complaint rather than three
+   * clicks away on the board. updateTask carries the permission rule, and
+   * these are the viewer's own tasks, so the owner check always passes.
+   */
+  function saveEstimate(taskId: string, hours: number) {
+    setSaveError('')
+    startTransition(async () => {
+      const r = await updateTask(taskId, { hours_estimate: hours })
+      if (r.success) router.refresh()
+      else setSaveError(r.error ?? 'Could not save that estimate')
+    })
+  }
 
   // Read after mount, never during render — reading localStorage while
   // rendering makes the server and the client disagree about the first paint.
@@ -166,7 +189,9 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
             {now === null ? 'Reading the clock…' : 'Nothing left to schedule today 🎉'}
           </p>
         ) : (
-          slots.map((sl, i) => <Row key={`${sl.from}-${i}`} slot={sl} now={now} />)
+          slots.map((sl, i) => (
+            <Row key={`${sl.from}-${i}`} slot={sl} now={now} onEstimate={saveEstimate} />
+          ))
         )}
 
         {status && slots.length > 0 && (
@@ -192,10 +217,14 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
           </div>
         )}
 
+        {saveError && (
+          <p role="alert" style={{ margin: '8px 2px 0', fontSize: 12.5, color: UI.late }}>{saveError}</p>
+        )}
+
         {assumed > 0 && (
           <p style={{ margin: '8px 2px 0', fontSize: 12, color: UI.faint }}>
-            {assumed} of these have no estimate, so {ASSUMED_MINS} minutes was assumed. Set one on the
-            task and the day will lay itself out properly.
+            {assumed} of these have no estimate, so {ASSUMED_MINS} minutes was assumed —
+            click a duration to set the real one.
           </p>
         )}
       </div>
@@ -203,8 +232,12 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
   )
 }
 
-function Row({ slot: sl, now }: { slot: Slot; now: number | null }) {
+function Row({ slot: sl, now, onEstimate }: {
+  slot: Slot; now: number | null; onEstimate: (taskId: string, hours: number) => void
+}) {
   const live = now !== null && now >= sl.from && now < sl.to
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '104px minmax(0, 1fr) auto',
@@ -220,12 +253,21 @@ function Row({ slot: sl, now }: { slot: Slot; now: number | null }) {
       </span>
 
       <span style={{ minWidth: 0 }}>
-        <span style={{
-          fontSize: 14, fontWeight: 600,
-          color: live ? UI.nowInk : sl.kind === 'rest' ? UI.rest : UI.ink,
-        }}>
-          {sl.name}
-        </span>
+        {sl.taskId ? (
+          <Link href={`/board?task=${sl.taskId}`} style={{
+            fontSize: 14, fontWeight: 600, textDecoration: 'none',
+            color: live ? UI.nowInk : UI.ink,
+          }}>
+            {sl.name}
+          </Link>
+        ) : (
+          <span style={{
+            fontSize: 14, fontWeight: 600,
+            color: live ? UI.nowInk : sl.kind === 'rest' ? UI.rest : UI.ink,
+          }}>
+            {sl.name}
+          </span>
+        )}
         {sl.late && <Tag bg={UI.lateBg} fg={UI.late}>overdue</Tag>}
         {sl.cont && <Tag bg={UI.contBg} fg={UI.cont}>cont.</Tag>}
         {sl.assumed && <Tag bg={UI.soft} fg={UI.faint}>no estimate</Tag>}
@@ -244,13 +286,54 @@ function Row({ slot: sl, now }: { slot: Slot; now: number | null }) {
         )}
       </span>
 
-      <span style={{
-        fontFamily: 'var(--font-mono, ui-monospace), ui-monospace, monospace',
-        fontSize: 12.5, whiteSpace: 'nowrap', paddingTop: 1,
-        color: live ? UI.nowInk : UI.muted,
-      }}>
-        {durLabel(sl.to - sl.from)}
-      </span>
+      {sl.taskId && editing ? (
+        <input
+          type="number" min={0.25} max={40} step={0.25} autoFocus
+          value={draft}
+          aria-label={`Estimate for ${sl.name} in hours`}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => {
+            setEditing(false)
+            const v = parseFloat(draft)
+            if (!isNaN(v) && v > 0) onEstimate(sl.taskId!, v)
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter')  e.currentTarget.blur()
+            if (e.key === 'Escape') { setDraft(''); setEditing(false) }
+          }}
+          style={{
+            width: 62, padding: '2px 6px', borderRadius: 6, border: `1px solid ${UI.line}`,
+            background: '#fff', fontFamily: 'inherit', fontSize: 12.5, textAlign: 'right',
+            outline: 'none', boxSizing: 'border-box',
+          }}
+        />
+      ) : sl.taskId ? (
+        <button
+          type="button"
+          onClick={() => { setDraft(String(((sl.to - sl.from) / 60).toFixed(2).replace(/\.?0+$/, ''))); setEditing(true) }}
+          title={sl.assumed ? 'No estimate yet — click to set one' : 'Click to change the estimate'}
+          style={{
+            fontFamily: 'var(--font-mono, ui-monospace), ui-monospace, monospace',
+            fontSize: 12.5, whiteSpace: 'nowrap', padding: '1px 5px', borderRadius: 6,
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            color: live ? UI.nowInk : sl.assumed ? UI.faint : UI.muted,
+            textDecoration: sl.assumed ? 'underline dotted' : 'none',
+            textUnderlineOffset: 3,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = live ? 'rgba(0,0,0,.06)' : UI.soft }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+        >
+          {durLabel(sl.to - sl.from)}
+        </button>
+      ) : (
+        <span style={{
+          fontFamily: 'var(--font-mono, ui-monospace), ui-monospace, monospace',
+          fontSize: 12.5, whiteSpace: 'nowrap', paddingTop: 1,
+          color: live ? UI.nowInk : UI.muted,
+        }}>
+          {durLabel(sl.to - sl.from)}
+        </span>
+      )}
     </div>
   )
 }
