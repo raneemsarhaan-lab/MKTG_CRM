@@ -21,6 +21,8 @@ import {
   MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO,
 } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { LinkCard } from './LinkCard'
+import { URL_RE, trimUrl, hrefFor } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
 
 /**
@@ -149,6 +151,46 @@ type Suggestion =
   | { kind: 'member'; id: string; name: string; role: string }
   | { kind: 'task';   id: string; name: string; status: StageId }
 
+/** Every distinct link in a comment, in the order it was written. */
+function urlsIn(body: string): string[] {
+  const out: string[] = []
+  for (const m of body.matchAll(URL_RE)) {
+    const url = trimUrl(m[0])
+    if (url && !out.includes(url)) out.push(url)
+  }
+  return out
+}
+
+/**
+ * Draw the bare URLs in a run of text as links.
+ *
+ * A pasted link is the single most common thing in these comments and it was
+ * arriving as dead text — worse, as one unbroken word wide enough to push the
+ * comment out of its own bubble. So it becomes an anchor, and it is allowed to
+ * break anywhere.
+ */
+function linkify(text: string, keyBase: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(URL_RE)) {
+    const at  = m.index ?? 0
+    const url = trimUrl(m[0])
+    if (!url) continue
+    if (at > last) out.push(text.slice(last, at))
+    out.push(
+      <a key={`${keyBase}-${at}`} href={hrefFor(url)} target="_blank"
+         rel="noopener noreferrer nofollow"
+         onClick={e => e.stopPropagation()}
+         style={{ color: CU.blue, textDecoration: 'underline', overflowWrap: 'anywhere' }}>
+        {url}
+      </a>,
+    )
+    last = at + url.length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
 /**
  * Draw the @names and #tasks in a posted comment as chips.
  *
@@ -170,7 +212,7 @@ function withRefs(
     ...members.filter(m => m.name).map(m => ({ kind: 'member' as const, name: m.name, id: m.id })),
     ...linked.filter(t => t.name).map(t => ({ kind: 'task' as const, name: t.name, id: t.id })),
   ].sort((a, b) => b.name.length - a.name.length)
-  if (!refs.length) return body
+  if (!refs.length) return linkify(body, 'l')
 
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const re = new RegExp(refs.map(r => `${r.kind === 'task' ? '#' : '@'}${esc(r.name)}`).join('|'), 'g')
@@ -182,7 +224,7 @@ function withRefs(
     const sigil = m[0][0]
     const name  = m[0].slice(1)
     const ref   = refs.find(r => r.name === name && (r.kind === 'task') === (sigil === '#'))
-    if (at > last) out.push(body.slice(last, at))
+    if (at > last) out.push(...linkify(body.slice(last, at), `l${last}`))
 
     if (ref?.kind === 'task') {
       out.push(
@@ -214,7 +256,7 @@ function withRefs(
     }
     last = at + m[0].length
   }
-  if (last < body.length) out.push(body.slice(last))
+  if (last < body.length) out.push(...linkify(body.slice(last), `l${last}`))
   return out
 }
 
@@ -958,6 +1000,10 @@ export function TaskModal({
                 display: 'block', marginTop: 6, padding: '8px 11px', borderRadius: 9,
                 background: '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
                 border: `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
+                // A pasted URL is one unbroken word and will happily run out
+                // of the bubble and off the panel unless it is allowed to
+                // break mid-word.
+                overflowWrap: 'anywhere', minWidth: 0,
               }}>
                 {withRefs(
                   c.body,
@@ -967,6 +1013,9 @@ export function TaskModal({
                     .filter((t): t is TaskRef => !!t),
                   selectTask,
                 )}
+                {/* Two cards at most: a comment that is a list of links should
+                    stay a comment, not become a page of thumbnails. */}
+                {urlsIn(c.body).slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
               </span>
             </>
           ),
