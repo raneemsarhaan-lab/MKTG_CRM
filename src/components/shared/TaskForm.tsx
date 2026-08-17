@@ -242,7 +242,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               label="Brand"
               value={brand?.name}
               active
-              icon={brand ? <BrandMark brand={brand} size={18} /> : undefined}
+              iconOnly
+              icon={brand ? <BrandMark brand={brand} size={22} /> : undefined}
             >
               {closePill => brands.map(b => (
                 <PillOption
