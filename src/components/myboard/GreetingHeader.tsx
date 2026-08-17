@@ -19,14 +19,21 @@ export function GreetingHeader({ firstName }: { firstName: string }) {
       alignItems: 'flex-start', marginBottom: 26,
     }}>
       <div>
+        {/* Same treatment as the board's greeting — accent face at 44, the
+            purple underline beneath it. Two greetings a click apart should not
+            be set in two different typefaces. */}
         <h1 style={{
-          fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 27,
-          color: 'var(--ink-900)', margin: 0,
-          display: 'flex', alignItems: 'center', gap: 8,
+          fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 44,
+          lineHeight: 1, color: 'var(--ink-900)', margin: 0,
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          Good {word}, {firstName} <span aria-hidden="true">👋</span>
+          Good {word}, {firstName} <span aria-hidden="true" style={{ fontSize: 26 }}>👋</span>
         </h1>
-        <p style={{ fontSize: 14.5, color: 'var(--ink-500)', margin: '8px 0 0' }}>
+        <svg width="222" height="12" viewBox="0 0 222 12" fill="none" aria-hidden="true"
+             style={{ display: 'block', margin: '2px 0 0 2px' }}>
+          <path d="M4 8C50 3 160 2 218 6" stroke="#8B5CF6" strokeWidth="3.2" strokeLinecap="round" />
+        </svg>
+        <p style={{ fontSize: 14.5, color: 'var(--ink-500)', margin: '6px 0 0' }}>
           Let&apos;s make{' '}
           {/* Highlighter stroke across the lower 40% of the line box — a
               gradient, never a solid background (§4). */}

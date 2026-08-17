@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { updateTask } from '@/actions/tasks'
 import {
-  planDay, rightNow, hhmm, durLabel, DEFAULTS, ASSUMED_MINS,
+  planDay, rightNow, hhmm, durLabel, DEFAULTS, ASSUMED_MINS, MIN_CHUNK,
   type PlanTask, type DaySettings, type Slot,
 } from '@/lib/day-plan'
 
@@ -26,6 +26,7 @@ interface Props {
 }
 
 const KEY = 'momentum.day.settings'
+const PANEL_KEY = 'momentum.day.panel'
 
 const UI = {
   line:    '#EBEBE8',
@@ -50,7 +51,10 @@ const toMins = (t: string) => {
 
 export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Props) {
   const [s, setS] = useState<DaySettings>(DEFAULTS)
-  const [open, setOpen] = useState(false)
+  // Open by default: these are the knobs that decide what the day below looks
+  // like, and a panel nobody can find is a panel nobody uses. Collapsing it
+  // sticks, so anyone who has set their hours once need not see them again.
+  const [open, setOpen] = useState(true)
   const [saveError, setSaveError] = useState('')
   const [, startTransition] = useTransition()
   const router = useRouter()
@@ -78,8 +82,16 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
     try {
       const raw = window.localStorage.getItem(KEY)
       if (raw) setS({ ...DEFAULTS, ...JSON.parse(raw) })
+      if (window.localStorage.getItem(PANEL_KEY) === 'closed') setOpen(false)
     } catch { /* a corrupt preference is not worth a crash */ }
   }, [])
+
+  function togglePanel() {
+    setOpen(o => {
+      try { window.localStorage.setItem(PANEL_KEY, o ? 'closed' : 'open') } catch { /* private mode */ }
+      return !o
+    })
+  }
 
   function update(patch: Partial<DaySettings>) {
     setS(prev => {
@@ -135,7 +147,7 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
         </span>
         <button
           type="button"
-          onClick={() => setOpen(o => !o)}
+          onClick={togglePanel}
           aria-expanded={open}
           style={{
             border: 'none', background: UI.soft, borderRadius: 8, cursor: 'pointer',
@@ -148,32 +160,62 @@ export function MyDayTimeline({ tasks, held = [], accentColor = '#6E5BE6' }: Pro
 
       {open && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px 18px', flexWrap: 'wrap',
-          padding: '12px 20px', background: '#FBFBFC', borderBottom: `1px solid ${UI.line}`,
+          padding: '14px 20px 16px', background: '#FBFBFC',
+          borderBottom: `1px solid ${UI.line}`,
+          display: 'flex', flexDirection: 'column', gap: 12,
         }}>
-          <Field label="Starts">
-            {/* 132px, not 88 — narrower and the browser's own AM/PM marker is
-                clipped off the end of the field, which makes an afternoon
-                finish impossible to set or even read. */}
-            <input type="time" value={hhmm(s.dayStart)} aria-label="Working day starts"
-                   onChange={e => update({ dayStart: toMins(e.target.value) })} style={INPUT} />
-          </Field>
-          <Field label="Ends">
-            <input type="time" value={hhmm(s.dayEnd)} aria-label="Working day ends"
-                   onChange={e => update({ dayEnd: toMins(e.target.value) })} style={INPUT} />
-          </Field>
-          <Field label="Focus block">
-            <input type="number" min={30} max={240} step={15} value={s.focus} aria-label="Focus block in minutes"
-                   onChange={e => update({ focus: Math.max(30, Number(e.target.value) || 120) })}
-                   style={{ ...INPUT, width: 74 }} />
-            <span style={{ fontSize: 12.5, color: UI.faint }}>min</span>
-          </Field>
-          <Field label="Break">
-            <input type="number" min={5} max={60} step={5} value={s.rest} aria-label="Break in minutes"
-                   onChange={e => update({ rest: Math.max(5, Number(e.target.value) || 30) })}
-                   style={{ ...INPUT, width: 74 }} />
-            <span style={{ fontSize: 12.5, color: UI.faint }}>min</span>
-          </Field>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px 18px', flexWrap: 'wrap' }}>
+            <Field label="Day starts">
+              {/* 132px, not 88 — narrower and the browser's own AM/PM marker is
+                  clipped off the end of the field, which makes an afternoon
+                  finish impossible to set or even read. */}
+              <input type="time" value={hhmm(s.dayStart)} aria-label="Working day starts"
+                     onChange={e => update({ dayStart: toMins(e.target.value) })} style={INPUT} />
+            </Field>
+            <Field label="ends">
+              <input type="time" value={hhmm(s.dayEnd)} aria-label="Working day ends"
+                     onChange={e => update({ dayEnd: toMins(e.target.value) })} style={INPUT} />
+            </Field>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px 18px', flexWrap: 'wrap' }}>
+            <Field label="Focus block">
+              <input type="number" min={30} max={240} step={15} value={s.focus} aria-label="Focus block in minutes"
+                     onChange={e => update({ focus: Math.max(30, Number(e.target.value) || 120) })}
+                     style={{ ...INPUT, width: 84 }} />
+              <span style={{ fontSize: 12.5, color: UI.faint }}>min</span>
+            </Field>
+            <Field label="Break">
+              <input type="number" min={5} max={60} step={5} value={s.rest} aria-label="Break in minutes"
+                     onChange={e => update({ rest: Math.max(5, Number(e.target.value) || 30) })}
+                     style={{ ...INPUT, width: 84 }} />
+              <span style={{ fontSize: 12.5, color: UI.faint }}>min</span>
+            </Field>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px 22px', flexWrap: 'wrap' }}>
+            <Toggle
+              on={s.minChunk !== false}
+              onChange={v => update({ minChunk: v })}
+              label="Minimum chunk"
+              hint={`Never split a task into less than ${MIN_CHUNK} minutes — break early instead`}
+            />
+            <Toggle
+              on={s.ageUndated !== false}
+              onChange={v => update({ ageUndated: v })}
+              label="Age undated work"
+              hint="Let work with no due date drift forward instead of sitting behind everything dated"
+            />
+            <Toggle
+              on={s.holdMeetings !== false}
+              onChange={v => update({ holdMeetings: v })}
+              label="Hold meetings"
+              hint={held.length
+                ? 'Plan around what is already in today’s diary'
+                : 'Plan around what is in the diary — nothing is in today’s'}
+            />
+          </div>
+
           <span style={{ fontSize: 12, color: UI.faint }}>Saved in this browser.</span>
         </div>
       )}
@@ -352,6 +394,43 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
     <span style={{ fontSize: 12.5, color: UI.muted, whiteSpace: 'nowrap' }}>{label}</span>
     {children}
   </span>
+)
+
+/**
+ * A switch, not a checkbox.
+ *
+ * Three of these decide how the day is laid out rather than what is in it, so
+ * they read better as settings that are on than as boxes that are ticked.
+ */
+const Toggle = ({ on, onChange, label, hint }: {
+  on: boolean
+  onChange: (v: boolean) => void
+  label: string
+  hint: string
+}) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    title={hint}
+    onClick={() => onChange(!on)}
+    style={{
+      display: 'inline-flex', alignItems: 'center', gap: 9, padding: 0,
+      border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
+    }}
+  >
+    <span aria-hidden="true" style={{
+      width: 40, height: 22, borderRadius: 999, flexShrink: 0, position: 'relative',
+      background: on ? UI.cont : '#D5D8DF', transition: 'background .15s ease',
+    }}>
+      <span style={{
+        position: 'absolute', top: 3, insetInlineStart: on ? 21 : 3,
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        boxShadow: '0 1px 2px rgba(16,18,26,.25)', transition: 'inset-inline-start .15s ease',
+      }} />
+    </span>
+    <span style={{ fontSize: 13, color: UI.ink, whiteSpace: 'nowrap' }}>{label}</span>
+  </button>
 )
 
 const INPUT: React.CSSProperties = {
