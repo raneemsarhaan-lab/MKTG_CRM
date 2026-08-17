@@ -38,6 +38,25 @@ export interface DaySettings {
   focus:    number
   /** How long that break lasts. */
   rest:     number
+  /**
+   * Refuse to cut a task into a piece smaller than MIN_CHUNK.
+   *
+   * On, the day breaks early or sits out the gap before a meeting rather than
+   * handing you eight minutes of something. Off, every remaining minute gets
+   * filled, which is denser and more fragmented.
+   */
+  minChunk: boolean
+  /**
+   * Let work with no due date drift towards the front as it gets older.
+   *
+   * On, an undated task enters the queue as though it were due AGE_FROM days
+   * out, so it eventually competes with dated work. Off, undated work sits
+   * behind everything with a date — which in a backlog nobody empties means
+   * it is never done.
+   */
+  ageUndated: boolean
+  /** Plan around anything already in today's diary rather than through it. */
+  holdMeetings: boolean
 }
 
 export type SlotKind = 'work' | 'rest' | 'held'
@@ -55,7 +74,10 @@ export interface Slot {
   assumed?: boolean
 }
 
-export const DEFAULTS: DaySettings = { dayStart: 9 * 60, dayEnd: 17 * 60 + 30, focus: 120, rest: 30 }
+export const DEFAULTS: DaySettings = {
+  dayStart: 9 * 60, dayEnd: 17 * 60 + 30, focus: 120, rest: 30,
+  minChunk: true, ageUndated: true, holdMeetings: true,
+}
 
 /** Below this, splitting produces a fragment not worth having. */
 export const MIN_CHUNK = 15
@@ -68,6 +90,9 @@ const RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 /** An undated task starts three weeks out and walks towards the present. */
 const AGE_FROM = 21
 
+/** Where undated work sits when it is not allowed to age: after everything. */
+const NEVER = 3650
+
 export const hhmm = (m: number) =>
   `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
 
@@ -78,15 +103,15 @@ export const durLabel = (m: number) =>
  * Order the work.
  *
  * Earliest deadline first, priority inside a deadline, then the order it came
- * in. Undated work is not parked behind everything dated — it ages towards the
- * front instead, because in a backlog where nothing is ever finished "last"
- * means "never".
+ * in. Undated work is not parked behind everything dated by default — it ages
+ * towards the front instead, because in a backlog where nothing is ever
+ * finished "last" means "never". Turn `ageUndated` off to park it anyway.
  */
-export function orderTasks(tasks: PlanTask[]): PlanTask[] {
+export function orderTasks(tasks: PlanTask[], ageUndated = true): PlanTask[] {
   return tasks
     .map((t, i) => ({
       t,
-      key: t.due ?? AGE_FROM,
+      key: t.due ?? (ageUndated ? AGE_FROM : NEVER),
       rank: RANK[t.priority ?? 'Medium'] ?? 1,
       seq: i,
     }))
@@ -110,12 +135,16 @@ export function planDay(
   const s = settings
   if (s.dayEnd <= s.dayStart) return []
 
-  const queue = orderTasks(tasks)
+  const queue = orderTasks(tasks, s.ageUndated !== false)
     .map(t => ({ ...t, left: t.mins > 0 ? t.mins : ASSUMED_MINS, assumed: t.mins <= 0 }))
     .filter(t => t.left > 0)
 
+  // Below this, splitting produces a fragment not worth having — unless the
+  // reader has said they would rather have the fragment.
+  const floor = s.minChunk === false ? 0 : MIN_CHUNK
+
   const slots: Slot[] = []
-  const diary = held
+  const diary = (s.holdMeetings === false ? [] : held)
     .filter(h => h.to > Math.max(s.dayStart, now) && h.from < s.dayEnd)
     .sort((a, b) => a.from - b.from)
 
@@ -124,6 +153,19 @@ export function planDay(
   let cursor = Math.max(s.dayStart, Math.ceil(now / 5) * 5)
   let sinceRest = 0
   let guard = 0
+
+  /**
+   * Where a break starting now would end.
+   *
+   * Clamped by the next thing in the diary as well as by the end of the day.
+   * Without that clamp a break falling due at 10:40 ran its full half hour
+   * straight over an 11:00 meeting and swallowed it — the meeting was in the
+   * diary, was never planned around, and simply did not appear in the day.
+   */
+  const restEnd = (from: number) => {
+    const meeting = diary.find(h => h.from > from)
+    return Math.min(from + s.rest, s.dayEnd, meeting ? meeting.from : Infinity)
+  }
 
   while (cursor < s.dayEnd && guard++ < 500) {
     const next = diary.find(h => h.to > cursor)
@@ -146,7 +188,7 @@ export function planDay(
     const room = Math.min(untilRest, untilHeld, untilClose)
 
     if (room <= 0) {
-      const to = Math.min(cursor + s.rest, s.dayEnd)
+      const to = restEnd(cursor)
       slots.push({ kind: 'rest', name: 'Break', from: cursor, to })
       cursor = to
       sinceRest = 0
@@ -156,9 +198,9 @@ export function planDay(
     // Splitting here would leave a sliver. Take the break early instead, or
     // sit out the gap before a meeting, rather than cutting a task in two for
     // the sake of ten minutes.
-    if (task.left > room && room < MIN_CHUNK) {
+    if (task.left > room && room < floor) {
       if (untilRest <= untilHeld && untilRest <= untilClose) {
-        const to = Math.min(cursor + s.rest, s.dayEnd)
+        const to = restEnd(cursor)
         slots.push({ kind: 'rest', name: 'Break', from: cursor, to })
         cursor = to
         sinceRest = 0
@@ -179,8 +221,13 @@ export function planDay(
     cursor    += take
     sinceRest += take
 
-    if (sinceRest >= s.focus && queue.some(t => t.left > 0) && cursor < s.dayEnd) {
-      const to = Math.min(cursor + s.rest, s.dayEnd)
+    // A break is due — unless the diary already claims this minute, in which
+    // case the meeting is the break. Placing one here would draw over it, and
+    // the top of the loop resets the focus clock for a meeting anyway.
+    const claimed = diary.some(h => h.from <= cursor && h.to > cursor)
+
+    if (sinceRest >= s.focus && !claimed && queue.some(t => t.left > 0) && cursor < s.dayEnd) {
+      const to = restEnd(cursor)
       slots.push({ kind: 'rest', name: 'Break', from: cursor, to })
       cursor = to
       sinceRest = 0
