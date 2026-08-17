@@ -5,6 +5,8 @@ import { StatCards } from './StatCards'
 import { BoardTaskPanel, type PanelTask } from './BoardTaskPanel'
 import { SlaBreachedPanel, type BreachRow } from './SlaBreachedPanel'
 import { MotivationBanner } from './MotivationBanner'
+import { MyDayTimeline } from '@/components/overview/MyDayTimeline'
+import type { PlanTask } from '@/lib/day-plan'
 
 /**
  * My Board — developer handoff, whole screen.
@@ -22,12 +24,13 @@ export interface MyBoardProps {
     breached:          number
     completedThisWeek: number
   }
-  myDay:    PanelTask[]
-  thisWeek: PanelTask[]
+  /** Today's work, ready for the planner to lay across the working hours. */
+  myDayPlan: PlanTask[]
+  thisWeek:  PanelTask[]
   breaches: BreachRow[]
 }
 
-export function MyBoard({ firstName, stats, myDay, thisWeek, breaches }: MyBoardProps) {
+export function MyBoard({ firstName, stats, myDayPlan, thisWeek, breaches }: MyBoardProps) {
   return (
     <div className="fx-myboard" style={{ padding: '36px 44px 44px' }}>
       <GreetingHeader firstName={firstName} />
@@ -41,19 +44,14 @@ export function MyBoard({ firstName, stats, myDay, thisWeek, breaches }: MyBoard
 
       <div className="fx-panel-grid" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0,1fr))',
+        gridTemplateColumns: 'minmax(0, 1.45fr) minmax(0, 1fr)',
         gap: 16,
         marginBottom: 18,
       }}>
-        <BoardTaskPanel
-          title="My Day"
-          emoji="🔥"
-          accent="var(--violet-link)"
-          badgeBg="var(--violet-badge)"
-          badgeText="var(--violet-label)"
-          tasks={myDay}
-          emptyCopy="Nothing due today 🎉"
-        />
+        {/* My Day is the working hours laid out rather than a list of what is
+            late. This Week beside it stays a list — the week ahead is
+            something you read, not something you are standing in. */}
+        <MyDayTimeline tasks={myDayPlan} accentColor="#6E5BE6" />
 
         <BoardTaskPanel
           title="This Week"
