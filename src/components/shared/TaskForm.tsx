@@ -202,7 +202,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
             onClick={close}
             aria-label="Close"
             style={{
-              width: 28, height: 28, borderRadius: '50%', background: '#F4F4F2',
+              width: 28, height: 28, borderRadius: '50%', background: '#F7F8FA',
               border: 'none', cursor: 'pointer', color: COLORS.muted,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
             }}
@@ -280,9 +280,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               autoFocus
               aria-label="Task name"
               style={{
-                width: '100%', fontSize: 23, fontWeight: 700, color: COLORS.ink,
+                width: '100%', fontSize: 21, fontWeight: 400, color: COLORS.ink,
                 background: 'transparent', border: 'none', borderRadius: 10,
-                outline: 'none', fontFamily: 'var(--font-heading)', boxSizing: 'border-box',
+                outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
                 padding: '10px 2px 6px', marginBottom: 6,
               }}
             />
@@ -310,7 +310,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               title="New tasks always start in To Do"
               style={{
                 display: 'inline-flex', alignItems: 'center', padding: '7px 12px',
-                borderRadius: 8, background: '#F4F4F2', color: COLORS.muted,
+                borderRadius: 8, background: '#F7F8FA', color: COLORS.muted,
                 fontSize: 11.5, fontWeight: 700, letterSpacing: '.05em',
                 textTransform: 'uppercase', whiteSpace: 'nowrap',
               }}
@@ -378,7 +378,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               title="More fields"
               style={{
                 width: 34, height: 34, borderRadius: 9,
-                border: 'none', background: '#F1F2F4',
+                border: 'none', background: '#F7F8FA',
                 color: COLORS.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
               }}
             >
@@ -397,7 +397,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 type="button"
                 onClick={() => setShowMore(true)}
                 style={{
-                  padding: '9px 14px', borderRadius: 9, border: 'none', background: '#F1F2F4',
+                  padding: '9px 14px', borderRadius: 9, border: 'none', background: '#F7F8FA',
                   color: COLORS.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer',
                   fontFamily: 'inherit',
                 }}
