@@ -102,6 +102,14 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     created_by:         t.created_by ?? undefined,
     created_at:         toIsoStr(t.created_at),
     updated_at:         toIsoStr(t.updated_at),
+    plan_step:          t.project_step
+      ? {
+          id:          t.project_step.id,
+          name:        t.project_step.name,
+          projectId:   t.project_step.project.id,
+          projectName: t.project_step.project.name,
+        }
+      : null,
     parent_task_id:     t.parent_task_id ?? null,
     parent:             t.parent ? { id: t.parent.id, name: t.parent.name } : null,
     subtasks:           (t.subtasks ?? []).map((s: any) => ({ id: s.id, name: s.name, status: s.status })),

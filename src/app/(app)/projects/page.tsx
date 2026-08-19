@@ -20,7 +20,18 @@ export default async function ProjectsPage() {
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
       include: {
         brand: true,
-        steps: { orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }], include: { assignee: true } },
+        // Top-level steps only, each carrying its own pieces. A sub-step is
+        // part of a step, not a sibling of one — see parent_id in the schema —
+        // and every figure on this page counts steps, so a flat read would
+        // make a step broken into five look like five steps of work.
+        steps: {
+          where:   { parent_id: null },
+          orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }],
+          include: {
+            assignee: true,
+            children: { orderBy: { sort_order: 'asc' }, include: { assignee: true } },
+          },
+        },
       },
     }),
     prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, logo_url: true } }),
@@ -66,6 +77,13 @@ export default async function ProjectsPage() {
       assigneeId: s.assignee_id,
       assigneeName: s.assignee?.name ?? null,
       taskId: s.task_id,
+      substeps: s.children.map(c => ({
+        id: c.id,
+        name: c.name,
+        done: c.done,
+        assigneeId: c.assignee_id,
+        assigneeName: c.assignee?.name ?? null,
+      })),
     })),
   }))
 

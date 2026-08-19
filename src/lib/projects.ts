@@ -23,6 +23,19 @@ export interface StepView {
   milestone?: boolean
   /** 'simple' | 'complex' when overridden; null lets the threshold decide. */
   complexity?: string | null
+  /** The pieces this step was broken into. Never counted as steps themselves —
+   *  see parent_id in the schema. Optional so callers that do not read them
+   *  keep compiling. */
+  substeps?: SubstepView[]
+}
+
+/** A piece of a step: a name, whether it is done, and who holds it. */
+export interface SubstepView {
+  id: string
+  name: string
+  done: boolean
+  assigneeId: string | null
+  assigneeName: string | null
 }
 
 export interface ProjectView {

@@ -99,11 +99,22 @@ model ProjectStep {
   /// step can show that it is being produced, and so pushing it twice does
   /// not create two tasks.
   task_id       String?   @unique @db.Uuid
+  /// Set when this step is a piece of a larger one.
+  ///
+  /// A sub-step breaks a step down; it is not a step in its own right. It
+  /// carries no duration and no date, and every plan figure — days, capacity,
+  /// workload, the week's counts — is measured over top-level steps only, so
+  /// breaking a step into five does not turn one day of work into six. One
+  /// level deep: a sub-step cannot itself be broken down, because a plan that
+  /// needs a third level needs another project.
+  parent_id     String?   @db.Uuid
   sort_order    Int       @default(0)
 
-  project  Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  assignee Member? @relation("StepAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
-  task     Task?   @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  project  Project       @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  assignee Member?       @relation("StepAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  task     Task?         @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  parent   ProjectStep?  @relation("StepParent", fields: [parent_id], references: [id], onDelete: Cascade)
+  children ProjectStep[] @relation("StepParent")
 
   @@map("project_steps")
 }
