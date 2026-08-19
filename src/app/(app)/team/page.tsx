@@ -21,7 +21,12 @@ export default async function TeamPage() {
 
   const [rows, brands, allMembers, projects, ws, levelRows] = await Promise.all([
     prisma.projectStep.findMany({
-      where: isAdmin ? { assignee_id: { not: null } } : { assignee_id: member.id },
+      // parent_id: null — the team board measures days and capacity, and a
+      // sub-step carries neither. Counting the pieces as well as the step they
+      // came from would inflate everyone's list without adding a day's work.
+      where: isAdmin
+        ? { parent_id: null, assignee_id: { not: null } }
+        : { parent_id: null, assignee_id: member.id },
       orderBy: [{ due_date: 'asc' }, { sort_order: 'asc' }],
       include: { assignee: true, project: { include: { brand: true } } },
     }),

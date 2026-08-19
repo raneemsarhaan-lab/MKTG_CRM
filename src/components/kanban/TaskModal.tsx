@@ -9,7 +9,7 @@ import { COLORS } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
   moveTask, setTaskStage, addComment, updateTask, createSubtask,
-  addAttachments, removeAttachment, loadAttachments,
+  addAttachments, removeAttachment, renameAttachment, loadAttachments,
   type TaskPatch,
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
@@ -24,6 +24,7 @@ import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { LinkCard } from './LinkCard'
 import { URL_RE, trimUrl, hrefFor } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
+import { linkStepToTask, unlinkStepFromTask, listLinkableSteps } from '@/actions/projects'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -82,7 +83,7 @@ interface TaskModalProps {
 
 type IconName =
   | 'status' | 'user' | 'calendar' | 'flag' | 'clock' | 'tag' | 'folder'
-  | 'link' | 'clip' | 'chevron' | 'chevronR' | 'chevronUp' | 'plus' | 'subtask'
+  | 'link' | 'clip' | 'chevron' | 'chevronR' | 'chevronUp' | 'plus' | 'subtask' | 'pencil'
   | 'search' | 'bell' | 'filter' | 'star' | 'panel' | 'close' | 'more'
   | 'brand' | 'type' | 'platform' | 'image' | 'target' | 'expand' | 'send'
   | 'at' | 'emoji' | 'video' | 'mic' | 'person' | 'sparkle' | 'openIn' | 'file'
@@ -127,6 +128,7 @@ function Icon({ name, size = 16, color = CU.label, width = 1.7, style }: {
     mic:      <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" /></>,
     sparkle:  <path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z" />,
     file:     <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
+    pencil:   <><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z" /><path d="M14.5 6.5l3 3" /></>,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
@@ -431,6 +433,15 @@ export function TaskModal({
   const [dragging, setDragging]           = useState(false)
   const [uploading, setUploading]         = useState(false)
   const [uploadError, setUploadError]     = useState('')
+  // Which file is being renamed, and what it is being renamed to. An upload
+  // arrives called IMG_4471.jpg, which tells the next reader nothing.
+  const [renaming, setRenaming]           = useState<string | null>(null)
+  const [renameText, setRenameText]       = useState('')
+  // The plan-step picker. null means "not fetched yet" — the list is only
+  // worth a request when somebody actually opens it.
+  const [planOpen, setPlanOpen]           = useState(false)
+  const [planSteps, setPlanSteps] =
+    useState<{ id: string; name: string; projectName: string }[] | null>(null)
   const [isPending, startTransition]      = useTransition()
 
   const router = useRouter()
@@ -788,6 +799,38 @@ export function TaskModal({
     })
   }
 
+  /* ── the plan ────────────────────────────────────────────────────────── */
+
+  function openPlanPicker() {
+    setPlanOpen(true)
+    if (planSteps !== null) return
+    void listLinkableSteps().then(setPlanSteps).catch(() => setPlanSteps([]))
+  }
+
+  function handleLinkPlan(stepId: string) {
+    setPlanOpen(false)
+    setError('')
+    startTransition(async () => {
+      const r = await linkStepToTask(stepId, task.id)
+      if (!r.success) { setError(r.error ?? 'Could not link that step'); return }
+      // The picker only offers steps with no task, and this one now has one.
+      setPlanSteps(list => (list ?? []).filter(s => s.id !== stepId))
+      router.refresh()
+    })
+  }
+
+  function handleUnlinkPlan() {
+    if (!task.plan_step) return
+    const stepId = task.plan_step.id
+    setError('')
+    startTransition(async () => {
+      const r = await unlinkStepFromTask(stepId)
+      if (!r.success) { setError(r.error ?? 'Could not unlink that step'); return }
+      setPlanSteps(null)   // it is linkable again; refetch when next opened
+      router.refresh()
+    })
+  }
+
   /**
    * Take files from a drop or the picker and store them on the task.
    *
@@ -935,6 +978,68 @@ export function TaskModal({
             options={members.map(m => ({ value: m.id, label: m.name }))}
             onCommit={v => applyPatch({ task_owner_id: v })}
           />
+        </Field>
+      ),
+    },
+    {
+      /* Which plan step this task delivers.
+         The board and the plan describe the same work in two vocabularies —
+         tasks moving through stages, steps measured in days — and until now
+         the only bridge went one way: a step could be pushed to the board,
+         but a task raised first could never be recognised as the step the
+         plan had been waiting on. */
+      key: 'plan', filled: Boolean(task.plan_step),
+      node: (
+        <Field key="plan" icon="folder" label="Project">
+          {task.plan_step ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <a href={`/projects?project=${task.plan_step.projectId}`}
+                 style={{ color: CU.text, fontWeight: 600, textDecoration: 'none' }}>
+                {task.plan_step.projectName}
+              </a>
+              <Icon name="chevronR" size={12} color={CU.faint} width={2.2} />
+              <span style={{ color: CU.label }}>{task.plan_step.name}</span>
+              {canEdit && (
+                <button type="button" onClick={handleUnlinkPlan}
+                        aria-label="Unlink from the plan" title="Unlink from the plan"
+                        style={{
+                          border: 'none', background: 'transparent', cursor: 'pointer',
+                          padding: 2, display: 'inline-flex',
+                        }}>
+                  <Icon name="close" size={12} color={CU.faint} width={2.2} />
+                </button>
+              )}
+            </span>
+          ) : canEdit ? (
+            planOpen ? (
+              <select
+                autoFocus
+                defaultValue=""
+                onChange={e => { if (e.target.value) handleLinkPlan(e.target.value) }}
+                onBlur={() => setPlanOpen(false)}
+                aria-label="Link this task to a plan step"
+                style={{
+                  fontFamily: 'inherit', fontSize: 15, color: CU.text, padding: '4px 6px',
+                  borderRadius: 7, border: `1px solid ${CU.line}`, background: '#fff', maxWidth: 420,
+                }}
+              >
+                <option value="">{planSteps === null ? 'Loading…' : 'Pick a step…'}</option>
+                {(planSteps ?? []).map(st => (
+                  <option key={st.id} value={st.id}>{st.projectName} › {st.name}</option>
+                ))}
+              </select>
+            ) : (
+              <button type="button" onClick={openPlanPicker}
+                      style={{
+                        border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
+                        fontFamily: 'inherit', fontSize: 15, color: CU.faint,
+                      }}>
+                Link to a plan step
+              </button>
+            )
+          ) : (
+            <span style={{ color: CU.faint }}>–</span>
+          )}
         </Field>
       ),
     },
@@ -1673,15 +1778,70 @@ export function TaskModal({
                                   : <Icon name="file" size={30} color="#C3C7CE" width={1.5} />}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 }}>
-                                <a href={src ?? undefined} download={a.data ? a.filename : undefined}
-                                   target="_blank" rel="noopener noreferrer"
-                                   title={a.filename}
-                                   style={{
-                                     flex: 1, minWidth: 0, fontSize: 14, color: CU.text, textDecoration: 'none',
-                                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                   }}>
-                                  {shortName(a.filename, 22)}
-                                </a>
+                                {renaming === a.id ? (
+                                  /* The extension is added back on the server
+                                     if it is typed away — the grid decides what
+                                     is an image from the name, so a file renamed
+                                     to "final cut" would stop previewing. */
+                                  <input
+                                    autoFocus
+                                    value={renameText}
+                                    onChange={e => setRenameText(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) }
+                                      if (e.key === 'Enter')  { e.preventDefault(); e.currentTarget.blur() }
+                                    }}
+                                    onBlur={() => {
+                                      const next = renameText.trim()
+                                      setRenaming(null)
+                                      if (!next || next === a.filename) return
+                                      setUploadError('')
+                                      startTransition(async () => {
+                                        const r = await renameAttachment(a.id, next)
+                                        if (r.success && r.filename) {
+                                          const named = r.filename
+                                          setFiles(f => f.map(x => x.id === a.id ? { ...x, filename: named } : x))
+                                          router.refresh()
+                                        } else {
+                                          setUploadError(r.error ?? 'Could not rename that file')
+                                        }
+                                      })
+                                    }}
+                                    aria-label={`Rename ${a.filename}`}
+                                    style={{
+                                      flex: 1, minWidth: 0, fontSize: 14, fontFamily: 'inherit',
+                                      color: CU.text, padding: '3px 6px', borderRadius: 6,
+                                      border: `1px solid ${CU.blue}`, outline: 'none', background: '#fff',
+                                    }}
+                                  />
+                                ) : (
+                                  <a href={src ?? undefined} download={a.data ? a.filename : undefined}
+                                     target="_blank" rel="noopener noreferrer"
+                                     title={a.filename}
+                                     style={{
+                                       flex: 1, minWidth: 0, fontSize: 14, color: CU.text, textDecoration: 'none',
+                                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                     }}>
+                                    {shortName(a.filename, 22)}
+                                  </a>
+                                )}
+                                {canEdit && renaming !== a.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRenaming(a.id); setRenameText(a.filename) }}
+                                    aria-label={`Rename ${a.filename}`}
+                                    title={`Rename ${a.filename}`}
+                                    style={{
+                                      width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
+                                      background: 'transparent', cursor: 'pointer', padding: 0,
+                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = CU.chipBg }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                  >
+                                    <Icon name="pencil" size={13} color={CU.label} width={2} />
+                                  </button>
+                                )}
                                 <Avatar name={who} size={22} />
                                 {canEdit && (
                                   <button

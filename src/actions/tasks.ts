@@ -646,6 +646,54 @@ export async function removeAttachment(
 }
 
 /**
+ * Rename a file.
+ *
+ * The filename is the only thing most of these rows show — an upload arrives
+ * called "IMG_4471.jpg" or "Screenshot 2026-08-17 at 14.02.11.png", which
+ * tells the next reader nothing. The bytes are untouched; this is the label.
+ *
+ * The extension is preserved rather than trusted to the typist: the grid
+ * decides what is an image from the name, so a file renamed to "final cut"
+ * would stop previewing itself.
+ */
+export async function renameAttachment(
+  attachmentId: string,
+  filename: string,
+): Promise<{ success: boolean; filename?: string; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const a = await prisma.taskAttachment.findUnique({
+    where: { id: attachmentId }, select: { task_id: true, filename: true },
+  })
+  if (!a) return { success: false, error: 'That file is already gone' }
+
+  const guard = await mayAttachTo(a.task_id, member.id, member.access)
+  if (!guard.ok) return { success: false, error: guard.error }
+
+  // Strip what would make this a path rather than a name — separators and
+  // control characters — and nothing else. Spaces, hyphens and brackets are
+  // how people actually name files.
+  const typed = filename
+    .replace(/[\\/\u0000-\u001F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180)
+  if (!typed) return { success: false, error: 'A file needs a name' }
+
+  const oldExt = a.filename.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? ''
+  const next = oldExt && !typed.toLowerCase().endsWith(oldExt.toLowerCase())
+    ? typed + oldExt
+    : typed
+
+  await prisma.taskAttachment.update({ where: { id: attachmentId }, data: { filename: next } })
+
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  return { success: true, filename: next }
+}
+
+/**
  * The full attachment rows for one task, `data` included.
  *
  * The board query deliberately leaves `data` out — it reads every task, and

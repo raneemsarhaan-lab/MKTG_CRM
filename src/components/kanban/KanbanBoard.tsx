@@ -89,6 +89,39 @@ export function KanbanBoard({
     if (deepLinkTaskId) selectTask(deepLinkTaskId)
   }, [deepLinkTaskId, selectTask])
 
+  /**
+   * Opening a card puts it in the address bar, so the URL can be copied out of
+   * the browser rather than only from the panel's own Copy link.
+   *
+   * Written with the history API rather than the router: this page is
+   * server-rendered and reads every task, so a router navigation would refetch
+   * the whole board to change a query string. pushState instead of replaceState
+   * so Back closes the panel the way it closes anything else — the popstate
+   * listener is what makes that actually close it.
+   */
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const shown = url.searchParams.get('task')
+    if (shown === (selectedTaskId ?? null)) return
+
+    if (selectedTaskId) url.searchParams.set('task', selectedTaskId)
+    else                url.searchParams.delete('task')
+
+    // Opening adds an entry to go back from; closing replaces it, so Back does
+    // not walk through every card that was opened and shut.
+    if (selectedTaskId) window.history.pushState(null, '', url)
+    else                window.history.replaceState(null, '', url)
+  }, [selectedTaskId])
+
+  useEffect(() => {
+    function onPop() {
+      const id = new URL(window.location.href).searchParams.get('task')
+      selectTask(id)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [selectTask])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),

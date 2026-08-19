@@ -97,6 +97,8 @@ export interface Task {
   created_by?: string
   created_at: string
   updated_at: string
+  /** The plan step this task is the delivery of, when it is linked to one. */
+  plan_step?: { id: string; name: string; projectId: string; projectName: string } | null
   parent_task_id?: string | null
   parent?: { id: string; name: string } | null
   subtasks?: { id: string; name: string; status: StageId }[]

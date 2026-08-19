@@ -25,6 +25,11 @@ export default async function BoardPage() {
             uploaded_at: true, uploaded_by: true,
           },
         },
+        // The plan step this task delivers, if any — names only, so the panel
+        // can show which project a task belongs to without a second request.
+        project_step: {
+          select: { id: true, name: true, project: { select: { id: true, name: true } } },
+        },
         parent:     { select: { id: true, name: true } },
         subtasks:   { select: { id: true, name: true, status: true }, orderBy: { created_at: 'asc' } },
       },

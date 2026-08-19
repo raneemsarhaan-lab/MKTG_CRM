@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import type { ProjectView, StepView } from '@/lib/projects'
+import type { ProjectView, StepView, SubstepView } from '@/lib/projects'
 import {
   statsOf, portfolioStats, horizon, weeksOf, spanOf, byBrand,
   isLate, todayISO, UNASSIGNED,
@@ -16,7 +16,7 @@ import type { MemberInput, LevelRates } from '@/lib/workload'
 import { WorkloadPanel } from './WorkloadPanel'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
-  convertStepToTask, addStep, addSteps, removeStep, removeProject, createProject,
+  convertStepToTask, addStep, addSteps, addSubstep, removeStep, removeProject, createProject,
 } from '@/actions/projects'
 
 /**
@@ -542,9 +542,25 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
         </button>
 
         {canManage ? (
-          <input defaultValue={p.name} aria-label={`Name of ${p.name}`}
-                 onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.name) act(() => updateProject(p.id, { name: v })) }}
-                 style={{ ...input, flex: 1, fontWeight: 700, fontSize: 14.5, border: '1px solid transparent', background: 'transparent' }} />
+          /* This was already editable and nobody could tell: a transparent
+             border on a transparent background is indistinguishable from a
+             heading. It now lights up under the pointer and takes a real
+             border once focused, so the rename is discoverable rather than
+             merely possible. */
+          <input defaultValue={p.name} aria-label={`Rename ${p.name}`}
+                 title="Click to rename"
+                 onBlur={e => {
+                   e.currentTarget.style.background = 'transparent'
+                   e.currentTarget.style.borderColor = 'transparent'
+                   const v = e.target.value.trim()
+                   if (v && v !== p.name) act(() => updateProject(p.id, { name: v }))
+                 }}
+                 onFocus={e => { e.currentTarget.style.background = '#FFFFFF'; e.currentTarget.style.borderColor = UI.purple }}
+                 onMouseEnter={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.background = UI.groupBg }}
+                 onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.background = 'transparent' }}
+                 style={{ ...input, flex: 1, fontWeight: 700, fontSize: 14.5,
+                          border: '1px solid transparent', background: 'transparent',
+                          cursor: 'text', transition: 'background .12s, border-color .12s' }} />
         ) : (
           <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5, color: UI.textPrimary }}>{p.name}</span>
         )}
@@ -661,6 +677,13 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
   const [done, setDone] = useState(step.done)
   useEffect(() => { setDone(step.done) }, [step.done])
 
+  const subs = step.substeps ?? []
+  const subsDone = subs.filter(x => x.done).length
+  // Open when there is something to see. Breaking a step down is worth doing
+  // precisely because the pieces are visible.
+  const [subsOpen, setSubsOpen] = useState(subs.length > 0)
+  const [newSub, setNewSub] = useState('')
+
   const late = isLate({ ...step, done }, today)
 
   function act(fn: () => Promise<{ success: boolean; error?: string }>) {
@@ -672,6 +695,7 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
   }
 
   return (
+    <div style={{ display: 'grid', gap: 5 }}>
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px',
       background: '#FFFFFF', border: `1px solid ${late ? '#F6D9DE' : UI.border}`,
@@ -773,9 +797,138 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
       {/* Removing a step is part of maintaining the plan — a plan you can
           correct but not prune still goes stale. Deleting the whole project
           is the admin-only one; that takes other people's steps with it. */}
+      {/* Break-down. A step with pieces says how many are done, so the row
+          carries its own progress without opening it. */}
+      {(canEdit || subs.length > 0) && (
+        <button onClick={() => setSubsOpen(o => !o)}
+                aria-expanded={subsOpen}
+                aria-label={subs.length
+                  ? `${subsDone} of ${subs.length} sub-steps of ${step.name}`
+                  : `Break ${step.name} into sub-steps`}
+                title={subs.length ? 'Sub-steps' : 'Break this into sub-steps'}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                  border: 'none', background: subs.length ? UI.groupBg : 'transparent',
+                  borderRadius: 7, padding: '3px 7px', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 11.5, fontWeight: 700,
+                  color: subs.length ? UI.purple : UI.faintest,
+                }}>
+          <Icon name="chevron" size={12} stroke={subs.length ? UI.purple : UI.faintest} width={2.4}
+                style={{ transform: subsOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          {subs.length ? `${subsDone}/${subs.length}` : '+'}
+        </button>
+      )}
+
       {canEdit && (
         <button onClick={() => act(() => removeStep(step.id))} aria-label={`Remove ${step.name}`}
                 style={{ border: 'none', background: 'transparent', color: UI.redStrong, cursor: 'pointer', fontSize: 13, padding: 3 }}>
+          ✕
+        </button>
+      )}
+    </div>
+
+    {/* The pieces. Indented under the step and deliberately plainer than it —
+        a sub-step has no duration and no date, so there is nothing else to
+        show. See parent_id in the schema for why it carries neither. */}
+    {subsOpen && (
+      <div style={{ display: 'grid', gap: 4, marginInlineStart: 26 }}>
+        {subs.map(ss => (
+          <SubstepRow key={ss.id} sub={ss} members={members} canEdit={canEdit} onError={onError} />
+        ))}
+        {canEdit && (
+          <input value={newSub} onChange={e => setNewSub(e.target.value)}
+                 onKeyDown={e => {
+                   if (e.key === 'Enter' && newSub.trim()) {
+                     act(() => addSubstep(step.id, newSub)); setNewSub('')
+                   }
+                 }}
+                 onBlur={() => { if (newSub.trim()) { act(() => addSubstep(step.id, newSub)); setNewSub('') } }}
+                 aria-label={`Add a sub-step to ${step.name}`}
+                 placeholder="Add a sub-step"
+                 style={{ ...input, fontSize: 12.5, padding: '6px 10px', background: '#FFFFFF' }} />
+        )}
+        {!subs.length && !canEdit && (
+          <p style={{ margin: 0, fontSize: 12, color: UI.soft }}>No sub-steps.</p>
+        )}
+      </div>
+    )}
+    </div>
+  )
+}
+
+/**
+ * One piece of a step.
+ *
+ * Everything here is an ordinary step underneath — the same actions tick it
+ * off, rename it and remove it — so nothing new is enforced. What is different
+ * is what it shows: no duration, no date, no board link, because a sub-step
+ * has none of those and drawing empty controls for them would suggest it does.
+ */
+function SubstepRow({ sub, members, canEdit, onError }: {
+  sub: SubstepView
+  members: { id: string; name: string }[]
+  canEdit: boolean
+  onError: (s: string) => void
+}) {
+  const [isPending, start] = useTransition()
+  const [done, setDone] = useState(sub.done)
+  useEffect(() => { setDone(sub.done) }, [sub.done])
+
+  function act(fn: () => Promise<{ success: boolean; error?: string }>) {
+    onError('')
+    start(async () => {
+      const r = await fn()
+      if (!r.success) onError(r.error ?? 'That change could not be saved')
+    })
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '5px 10px',
+      background: '#FFFFFF', border: `1px solid ${UI.border}`, borderRadius: 9,
+      opacity: isPending ? 0.7 : 1,
+    }}>
+      <input type="checkbox" checked={done} aria-label={`${sub.name} done`}
+             onChange={e => {
+               const next = e.target.checked
+               setDone(next); onError('')
+               start(async () => {
+                 const r = await setStepDone(sub.id, next)
+                 if (!r.success) { setDone(!next); onError(r.error ?? 'Could not save that') }
+               })
+             }}
+             style={{ width: 15, height: 15, accentColor: UI.purple, cursor: 'pointer', flexShrink: 0 }} />
+
+      {canEdit ? (
+        <input defaultValue={sub.name} aria-label={`Name of ${sub.name}`}
+               onBlur={e => { const v = e.target.value.trim(); if (v && v !== sub.name) act(() => updateStep(sub.id, { name: v })) }}
+               style={{ ...input, flex: 1, fontSize: 12.5, padding: '3px 6px',
+                        border: '1px solid transparent', background: 'transparent',
+                        textDecoration: done ? 'line-through' : 'none',
+                        color: done ? UI.soft : UI.textPrimary }} />
+      ) : (
+        <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500,
+                       textDecoration: done ? 'line-through' : 'none',
+                       color: done ? UI.soft : UI.textPrimary }}>
+          {sub.name}
+        </span>
+      )}
+
+      {canEdit ? (
+        <select value={sub.assigneeId ?? ''} aria-label={`Assignee of ${sub.name}`}
+                onChange={e => act(() => updateStep(sub.id, { assignee_id: e.target.value || null }))}
+                style={{ ...input, width: 138, fontSize: 12.5, padding: '3px 6px' }}>
+          <option value="">— unassigned —</option>
+          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      ) : (
+        sub.assigneeName && <Avatar name={sub.assigneeName} size={22} />
+      )}
+
+      {canEdit && (
+        <button onClick={() => act(() => removeStep(sub.id))} aria-label={`Remove ${sub.name}`}
+                style={{ border: 'none', background: 'transparent', color: UI.redStrong,
+                         cursor: 'pointer', fontSize: 12, padding: 2 }}>
           ✕
         </button>
       )}

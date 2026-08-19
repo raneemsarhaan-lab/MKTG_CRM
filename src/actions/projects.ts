@@ -283,6 +283,53 @@ export async function addStep(
 }
 
 /**
+ * Break a step into pieces.
+ *
+ * A sub-step is a piece of its parent, not a step of its own: no duration, no
+ * date, no place in the plan's arithmetic. Splitting one day of work into five
+ * named pieces must not turn it into five days, and every rollup counts
+ * top-level steps only — see the schema.
+ *
+ * The permission is the parent's project, on the same rule as everything else
+ * here: management, or somebody delivering the plan.
+ */
+export async function addSubstep(parentId: string, name: string): Promise<Result> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  if (!name.trim()) return { success: false, error: 'Name cannot be empty' }
+
+  const parent = await prisma.projectStep.findUnique({
+    where: { id: parentId },
+    select: { id: true, project_id: true, parent_id: true, assignee_id: true },
+  })
+  if (!parent) return { success: false, error: 'That step no longer exists' }
+  if (parent.parent_id) {
+    return { success: false, error: 'A sub-step cannot be broken down again.' }
+  }
+  if (!manages(member.access) && !(await holdsAStepIn(parent.project_id, member.id))) {
+    return { success: false, error: 'You can only add to a project you hold a step in.' }
+  }
+
+  const last = await prisma.projectStep.findFirst({
+    where: { parent_id: parentId }, orderBy: { sort_order: 'desc' }, select: { sort_order: true },
+  })
+  await prisma.projectStep.create({
+    data: {
+      project_id:  parent.project_id,
+      parent_id:   parentId,
+      name:        name.trim(),
+      // Whoever holds the parent holds its pieces until somebody says
+      // otherwise — a sub-step nobody owns is how a step gets forgotten.
+      assignee_id: parent.assignee_id,
+      duration_days: 0,
+      sort_order:  (last?.sort_order ?? -1) + 1,
+    },
+  })
+  revalidateAll()
+  return { success: true }
+}
+
+/**
  * Add many steps at once, from a pasted list.
  *
  * The same permission rule as `addStep`, applied once rather than per name:
@@ -450,6 +497,10 @@ export async function convertStepToTask(stepId: string): Promise<{ success: bool
         description: `From the plan — **${step.project.name}**.`,
         brand_id: step.project.brand_id,
         task_owner_id: owner,
+        // The step's holder is doing the work, not merely accountable for it.
+        // Without this the task arrives unassigned and never reaches the one
+        // person who is meant to do it — no My Day, no Only-me board, no bell.
+        assignee_id: owner,
         initiator_role: member.role,
         status: 'todo',
         due_date: step.due_date,
@@ -466,4 +517,98 @@ export async function convertStepToTask(stepId: string): Promise<{ success: bool
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
   }
+}
+
+/* ── board ↔ plan ────────────────────────────────────────────────────────── */
+
+/**
+ * Attach a task that already exists on the board to a step in the plan.
+ *
+ * convertStepToTask goes one way — plan first, then board. Most work arrives
+ * the other way round: somebody raises a task, and only later is it recognised
+ * as the thing the plan has been calling a step. Without this the two stay
+ * strangers, and the plan reports a step as untouched while the task beside it
+ * is in review.
+ *
+ * The link is one-to-one in both directions — task_id is unique on the step —
+ * so attaching a task that is already attached elsewhere is refused with the
+ * name of where it went, rather than silently moving it.
+ */
+export async function linkStepToTask(stepId: string, taskId: string): Promise<Result> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const step = await prisma.projectStep.findUnique({
+    where: { id: stepId }, select: { project_id: true, task_id: true },
+  })
+  if (!step) return { success: false, error: 'That step no longer exists' }
+
+  // Same rule as maintaining the plan: management, or somebody delivering it.
+  if (!manages(member.access) && !(await holdsAStepIn(step.project_id, member.id))) {
+    return { success: false, error: 'You can only link work in a project you hold a step in.' }
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, project_step: { select: { id: true, name: true } } },
+  })
+  if (!task) return { success: false, error: 'That task no longer exists' }
+  if (task.project_step && task.project_step.id !== stepId) {
+    return { success: false, error: `That task is already linked to “${task.project_step.name}”.` }
+  }
+  if (step.task_id && step.task_id !== taskId) {
+    return { success: false, error: 'That step is already linked to a task. Unlink it first.' }
+  }
+
+  await prisma.projectStep.update({ where: { id: stepId }, data: { task_id: taskId } })
+  revalidateAll()
+  return { success: true }
+}
+
+/**
+ * Detach a step from its task.
+ *
+ * Neither side is deleted. The step goes back to being planned work and the
+ * task goes back to being unplanned work; unlinking is how a mistake is undone,
+ * not how either is removed.
+ */
+export async function unlinkStepFromTask(stepId: string): Promise<Result> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const step = await prisma.projectStep.findUnique({
+    where: { id: stepId }, select: { project_id: true },
+  })
+  if (!step) return { success: false, error: 'That step no longer exists' }
+
+  if (!manages(member.access) && !(await holdsAStepIn(step.project_id, member.id))) {
+    return { success: false, error: 'You can only unlink work in a project you hold a step in.' }
+  }
+
+  await prisma.projectStep.update({ where: { id: stepId }, data: { task_id: null } })
+  revalidateAll()
+  return { success: true }
+}
+
+/**
+ * The steps a task could be attached to, for the picker on the task panel.
+ *
+ * Only steps with no task, since the link is one-to-one, and only top-level
+ * ones — a sub-step is a piece of a step, not somewhere work lives. Read-only
+ * and signed-in: it lists project and step names, which everyone can already
+ * see on the plan.
+ */
+export async function listLinkableSteps(): Promise<
+  { id: string; name: string; projectName: string }[]
+> {
+  const member = await getSessionMember()
+  if (!member) return []
+
+  const rows = await prisma.projectStep.findMany({
+    where:   { task_id: null, parent_id: null },
+    select:  { id: true, name: true, project: { select: { name: true } } },
+    orderBy: [{ project: { name: 'asc' } }, { sort_order: 'asc' }],
+    take:    500,
+  })
+  return rows.map(r => ({ id: r.id, name: r.name, projectName: r.project.name }))
 }
