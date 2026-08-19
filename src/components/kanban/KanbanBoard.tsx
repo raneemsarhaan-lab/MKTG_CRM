@@ -39,6 +39,8 @@ interface KanbanBoardProps {
   contentTypes: ContentType[]
   slaConfig: SLAConfig
   today: Date
+  /** Whether this deployment has a bucket for uploads. */
+  hasStorage?: boolean
 }
 
 export function KanbanBoard({
@@ -49,6 +51,7 @@ export function KanbanBoard({
   contentTypes,
   slaConfig,
   today,
+  hasStorage = false,
 }: KanbanBoardProps) {
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -800,6 +803,7 @@ export function KanbanBoard({
           // Names only — the composer's # picker and the chips a posted
           // comment draws. Cheap: the board already holds every row.
           allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
+          hasStorage={hasStorage}
           onClose={() => selectTask(null)}
         />
       )}
