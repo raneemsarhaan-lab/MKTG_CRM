@@ -652,6 +652,7 @@ export async function removeAttachment(
 }
 
 /**
+<<<<<<< HEAD
  * Set the small preview a card shows.
  *
  * Its own action because uploads no longer pass through one. The file goes
@@ -682,6 +683,8 @@ export async function setCoverThumb(
 }
 
 /**
+=======
+>>>>>>> origin/main
  * Rename a file.
  *
  * The filename is the only thing most of these rows show — an upload arrives

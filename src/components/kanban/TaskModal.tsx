@@ -888,8 +888,8 @@ export function TaskModal({
   /**
    * Take files from a drop or the picker and store them on the task.
    *
-   * There is no object store behind this app, so the bytes end up in Postgres
-   * as data URLs — the same route brand logos and avatars already take. That
+   * The path taken when no bucket is configured: the bytes end up in Postgres
+   * as data URLs — the same route brand logos and avatars still take. That
    * makes the size limit real rather than polite, so pictures are scaled down
    * on a canvas first: an untouched phone photo is several megabytes and comes
    * back under a couple of hundred kilobytes. Anything that is not an image
