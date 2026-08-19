@@ -107,3 +107,28 @@ export function shortName(filename: string, max = 28): string {
  */
 export const MAX_ATTACHMENT_CHARS = 1_500_000      // ≈1.1 MB of file
 export const MAX_ATTACHMENTS_PER_GO = 12
+
+/**
+ * How big a file may be when there is a bucket to put it in.
+ *
+ * Two hundred megabytes, which is a different kind of number from the one
+ * above: that one exists because the bytes were going into a database row and
+ * a megabyte was already generous. This one exists only so a mis-click cannot
+ * push a disk image through the app server, and it is set where a video an
+ * agency would actually send fits comfortably underneath.
+ *
+ * Nothing is re-encoded on the way. A picture is stored exactly as it was
+ * picked — the shrinking that used to happen was a workaround for storing
+ * images in Postgres, not a decision about quality.
+ */
+export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+
+/** "2.4 MB" — shown on an uploaded file, which records its size. */
+export function fileSize(bytes: number | null | undefined): string {
+  if (!bytes || bytes < 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${Math.round(kb)} KB`
+  const mb = kb / 1024
+  return mb < 10 ? `${mb.toFixed(1)} MB` : `${Math.round(mb)} MB`
+}

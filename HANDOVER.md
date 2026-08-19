@@ -395,6 +395,32 @@ DATABASE_URL=postgresql://marketing-crm:<PASSWORD>@marketing-crm-xarvoh:5432/mar
 NEXTAUTH_SECRET=<A LONG RANDOM STRING>
 ```
 
+#### File storage
+
+Uploaded files live in the Cranl bucket rather than in Postgres. Five values,
+set the same way, in the same Raw editor:
+
+```
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_BUCKET=cranl-<id>-mktg-crm-tool
+S3_ACCESS_KEY_ID=<FROM THE STORAGE PAGE>
+S3_SECRET_ACCESS_KEY=<FROM THE STORAGE PAGE>
+S3_PUBLIC_URL=https://storage-mktg-crm-tool.cranl.net
+```
+
+The first two and the last are on the storage service's Connection Info panel.
+The two keys are issued separately — they are credentials, so they belong here
+and nowhere else, and never in this file.
+
+`S3_REGION` is optional and defaults to `auto`, which is what R2 wants.
+
+Until all five are set the app keeps storing uploads in the database the old
+way, so setting them is not a deadline — it is a switch. Settings →
+Diagnostics reports whether storage is configured and names any value that is
+missing (names only, never values). Once they are set, the next deploy also
+moves the older database-stored uploads into the bucket; that step is optional
+and idempotent, so it is safe if it is interrupted.
+
 > ### ⚠️ The real values used to be printed here
 >
 > They were removed on 13 August 2026. Both had been committed to this file and

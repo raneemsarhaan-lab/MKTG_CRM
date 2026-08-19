@@ -131,6 +131,9 @@ export interface TaskAttachment {
    * them for its own task. See the model comment in schema.prisma.
    */
   data?: string
+  /** Bytes, for files uploaded to the bucket. Imports do not carry a size. */
+  size_bytes?: number | null
+  content_type?: string | null
   uploaded_by?: string
   uploaded_at: string
 }

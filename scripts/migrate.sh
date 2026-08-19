@@ -80,6 +80,12 @@ step 300 fatal   "Seeding reference data and default users" \
 step 60  fatal   "Checking for an admin reset" \
   tsx scripts/reset-admin.ts
 
+# Moves older uploads out of the database and into the bucket, if one is
+# configured. Optional and idempotent: it only looks at rows that still hold
+# their bytes, so a second run has nothing to do.
+step 900 optional "Moving stored files into the bucket" \
+  tsx scripts/migrate-attachments.ts
+
 # The two importers only add rows. If either fails the app still works, with
 # whatever it already had — so they must never be the reason nobody can log in.
 step 900 optional "Importing ClickUp tasks (if an export is present)" \

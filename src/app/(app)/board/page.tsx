@@ -3,6 +3,7 @@ import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { mapMember, mapTask, mapSlaConfig } from '@/lib/mappers'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
+import { configured as storageConfigured } from '@/lib/storage'
 
 export default async function BoardPage() {
   const member = await getSessionMember()
@@ -54,6 +55,7 @@ export default async function BoardPage() {
         brands={brands.map(b => ({ id: b.id, name: b.name, color: b.color, logo_url: b.logo_url ?? undefined, description: b.description ?? undefined }))}
         contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
         slaConfig={mapSlaConfig(slaRows)}
+        hasStorage={storageConfigured()}
         today={today}
       />
     </div>

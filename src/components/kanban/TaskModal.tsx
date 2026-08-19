@@ -9,7 +9,7 @@ import { COLORS } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
   moveTask, setTaskStage, addComment, updateTask, createSubtask,
-  addAttachments, removeAttachment, renameAttachment, loadAttachments,
+  addAttachments, removeAttachment, renameAttachment, loadAttachments, setCoverThumb,
   type TaskPatch,
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
@@ -17,8 +17,8 @@ import { BriefEditor } from './BriefEditor'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import {
-  isImageAttachment, shortName, attachmentSrc,
-  MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO,
+  isImageAttachment, shortName, attachmentSrc, fileSize,
+  MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO, MAX_UPLOAD_BYTES,
 } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { LinkCard } from './LinkCard'
@@ -77,6 +77,12 @@ interface TaskModalProps {
   contentTypes?: { id: string; label: string }[]
   /** Everything the composer can link to with #, and a chip can jump to. */
   allTasks?: TaskRef[]
+  /**
+   * Whether this deployment has a bucket configured. When it does, files go
+   * there at full size; when it does not, they still go into the database the
+   * old way, so an upload never simply stops working.
+   */
+  hasStorage?: boolean
 }
 
 /* ── icons — 16px line set, ClickUp's weight ─────────────────────────── */
@@ -404,7 +410,7 @@ const fmtTime = (d: string | Date) =>
 
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
-  brands = [], members = [], contentTypes = [], allTasks = [],
+  brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -832,6 +838,54 @@ export function TaskModal({
   }
 
   /**
+   * Upload files to the bucket, one request each.
+   *
+   * One at a time rather than in a batch: these are full-size originals now,
+   * and a batch would be one request that either all arrives or all fails,
+   * with nothing on screen until it did. This way each file lands as it
+   * finishes and a single refusal names only itself.
+   *
+   * Everything but the preview goes untouched. The thumbnail is still made
+   * here, in the browser, because it is for the board — which reads every task
+   * and cannot fetch three hundred full-size pictures to draw its covers.
+   */
+  async function uploadToBucket(picked: File[]) {
+    setUploading(true)
+    const failed: string[] = []
+    let thumb: string | null = null
+
+    try {
+      for (const file of picked) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          failed.push(`${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)`)
+          continue
+        }
+        const body = new FormData()
+        body.append('taskId', task.id)
+        body.append('file', file)
+        try {
+          const res  = await fetch('/api/attachments', { method: 'POST', body })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) { failed.push(`${file.name} — ${json.error ?? res.statusText}`); continue }
+          if (file.type.startsWith('image/')) {
+            try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
+          }
+        } catch {
+          failed.push(`${file.name} — the upload did not complete`)
+        }
+      }
+
+      if (thumb) await setCoverThumb(task.id, thumb)
+      if (failed.length) setUploadError(failed.join('; '))
+
+      setReloadFiles(n => n + 1)
+      router.refresh()
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  /**
    * Take files from a drop or the picker and store them on the task.
    *
    * There is no object store behind this app, so the bytes end up in Postgres
@@ -849,6 +903,8 @@ export function TaskModal({
     if (list.length > MAX_ATTACHMENTS_PER_GO) {
       setUploadError(`Only the first ${MAX_ATTACHMENTS_PER_GO} files were taken.`)
     }
+
+    if (hasStorage) { await uploadToBucket(picked); return }
 
     setUploading(true)
     try {
@@ -1725,7 +1781,7 @@ export function TaskModal({
                         onMouseLeave={e => { if (!dragging) e.currentTarget.style.background = 'transparent' }}
                       >
                         {uploading
-                          ? 'Reading files…'
+                          ? (hasStorage ? 'Uploading…' : 'Reading files…')
                           : <>Drop files here or <span style={{ textDecoration: 'underline' }}>browse</span></>}
                       </div>
                     )}
@@ -1842,6 +1898,11 @@ export function TaskModal({
                                     <Icon name="pencil" size={13} color={CU.label} width={2} />
                                   </button>
                                 )}
+                                {a.size_bytes ? (
+                                  <span style={{ fontSize: 12, color: CU.faint, flexShrink: 0 }}>
+                                    {fileSize(a.size_bytes)}
+                                  </span>
+                                ) : null}
                                 <Avatar name={who} size={22} />
                                 {canEdit && (
                                   <button

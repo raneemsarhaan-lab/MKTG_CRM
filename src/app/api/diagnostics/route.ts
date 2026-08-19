@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/authz'
+import { configured as storageConfigured, missingSettings } from '@/lib/storage'
 
 /**
  * What the running server actually sees.
@@ -81,11 +82,20 @@ export async function GET() {
     database = { reachable: false, error: String(e).slice(0, 300) }
   }
 
+  // Whether uploads have somewhere to go. Names of missing settings only —
+  // two of the five are credentials, and a page that prints them to whoever
+  // asks is worse than one that says nothing.
+  const storage = {
+    configured: storageConfigured(),
+    missing:    missingSettings(),
+  }
+
   return NextResponse.json({
     build: process.env.NEXT_PUBLIC_BUILD_STAMP ?? 'unknown',
     checked_at: new Date().toISOString(),
     env,
     request,
     database,
+    storage,
   })
 }

@@ -286,6 +286,19 @@ model TaskAttachment {
   filename    String
   url         String?
   data        String?  @db.Text
+  /// The object's key in the bucket, when the file lives in object storage.
+  ///
+  /// The third of the three ways a row can point at bytes, and now the one new
+  /// uploads take: `url` is where to read it, this is where to delete it. Kept
+  /// separately from the URL because the public address is a CDN origin plus a
+  /// key, and reversing that back into a key to delete an object is guesswork.
+  storage_key String?  @db.Text
+  /// What the file said it was when it arrived, so the CDN can serve it as
+  /// that rather than as a download.
+  content_type String?
+  /// Bytes, as uploaded. Null for imported rows and for the older data-URL
+  /// uploads, whose size was never recorded.
+  size_bytes  Int?
   uploaded_by String?  @db.Uuid
   uploaded_at DateTime @default(now()) @db.Timestamptz(6)
 

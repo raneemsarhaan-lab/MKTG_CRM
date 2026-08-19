@@ -7,6 +7,7 @@ import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import { MAX_PASTED } from '@/lib/paste-list'
 import { MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO } from '@/lib/attachments'
+import { deleteObject } from '@/lib/storage'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 /**
@@ -622,7 +623,7 @@ export async function removeAttachment(
   if (!member) return { success: false, error: 'not_authenticated' }
 
   const a = await prisma.taskAttachment.findUnique({
-    where: { id: attachmentId }, select: { task_id: true },
+    where: { id: attachmentId }, select: { task_id: true, storage_key: true },
   })
   if (!a) return { success: false, error: 'That file is already gone' }
 
@@ -630,6 +631,11 @@ export async function removeAttachment(
   if (!guard.ok) return { success: false, error: guard.error }
 
   await prisma.taskAttachment.delete({ where: { id: attachmentId } })
+
+  // And the object behind it, when there is one. After the row, not before:
+  // deleteObject never throws, so the worst case is an orphaned object nobody
+  // can reach, rather than a row pointing at a file that is already gone.
+  if (a.storage_key) await deleteObject(a.storage_key)
 
   // The card's preview came from an upload. If none is left, clear it rather
   // than keep showing a picture the task no longer has.
@@ -640,6 +646,36 @@ export async function removeAttachment(
     await prisma.task.update({ where: { id: a.task_id }, data: { cover_thumb: null } })
   }
 
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  return { success: true }
+}
+
+/**
+ * Set the small preview a card shows.
+ *
+ * Its own action because uploads no longer pass through one. The file goes
+ * straight to the bucket; only this — a few kilobytes of downscaled JPEG —
+ * still belongs on the task row, because the board reads every task and cannot
+ * fetch three hundred full-size pictures to draw its covers.
+ */
+export async function setCoverThumb(
+  taskId: string,
+  thumb: string,
+): Promise<{ success: boolean; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const guard = await mayAttachTo(taskId, member.id, member.access)
+  if (!guard.ok) return { success: false, error: guard.error }
+
+  // A preview is small by construction. Anything this size is not one, and
+  // storing it would put back exactly the weight the bucket just removed.
+  if (!thumb.startsWith('data:image/') || thumb.length > 200_000) {
+    return { success: false, error: 'That is not a preview' }
+  }
+
+  await prisma.task.update({ where: { id: taskId }, data: { cover_thumb: thumb } })
   revalidatePath('/board')
   revalidatePath('/overview')
   return { success: true }
@@ -702,6 +738,7 @@ export async function renameAttachment(
  */
 export async function loadAttachments(taskId: string): Promise<{
   id: string; filename: string; url: string | null; data: string | null
+  size_bytes: number | null; content_type: string | null
   uploaded_by: string | null; uploaded_at: string
 }[]> {
   const member = await getSessionMember()
@@ -713,6 +750,7 @@ export async function loadAttachments(taskId: string): Promise<{
   })
   return rows.map(r => ({
     id: r.id, filename: r.filename, url: r.url, data: r.data,
+    size_bytes: r.size_bytes, content_type: r.content_type,
     uploaded_by: r.uploaded_by, uploaded_at: r.uploaded_at.toISOString(),
   }))
 }
