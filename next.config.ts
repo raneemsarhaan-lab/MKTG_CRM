@@ -54,6 +54,18 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins,
+      /**
+       * A server action's body defaults to 1 MB, which is fine for a form and
+       * far too small for a file. Uploads go to the bucket now and never touch
+       * an action — but a deployment with no bucket configured still falls back
+       * to sending the bytes this way, and on that path the default meant a
+       * photo would not send, with the refusal thrown inside the action where
+       * nobody saw it.
+       *
+       * Generous rather than precise: this is a ceiling on one file, and the
+       * real limit on that path is MAX_ATTACHMENT_CHARS, which is smaller.
+       */
+      bodySizeLimit: '8mb',
     },
   },
   images: {

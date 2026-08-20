@@ -639,8 +639,15 @@ export async function removeAttachment(
 
   // The card's preview came from an upload. If none is left, clear it rather
   // than keep showing a picture the task no longer has.
+  // "An upload" means one of ours, wherever its bytes are: inlined in `data`
+  // for the older ones, or in the bucket for the rest. Counting only `data`
+  // meant that once files moved to the bucket this was always zero, so removing
+  // any single file wiped the card's preview even when pictures remained.
   const stillHasUpload = await prisma.taskAttachment.count({
-    where: { task_id: a.task_id, data: { not: null } },
+    where: {
+      task_id: a.task_id,
+      OR: [{ data: { not: null } }, { storage_key: { not: null } }],
+    },
   })
   if (stillHasUpload === 0) {
     await prisma.task.update({ where: { id: a.task_id }, data: { cover_thumb: null } })

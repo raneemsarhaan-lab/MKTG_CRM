@@ -517,17 +517,34 @@ async function main() {
       created++
     }
 
-    // Attachments are replaced wholesale rather than merged: the export is the
-    // source of truth for them, and TaskAttachment has no external key to
-    // upsert on, so merging would duplicate on every re-run. The set is
-    // compared first so an unchanged task is not rewritten on every boot.
+    // Attachments *from the export* are replaced wholesale rather than merged:
+    // the export is the source of truth for them, and TaskAttachment has no
+    // external key to upsert on, so merging would duplicate on every re-run.
+    // The set is compared first so an unchanged task is not rewritten on every
+    // boot.
+    //
+    // "From the export" is doing the load-bearing work in that sentence, and it
+    // did not used to be there. This deleted every attachment on the task,
+    // which was harmless while the import was the only way to get one — and
+    // became data loss the moment people could upload. A file attached in the
+    // app survived until the next deploy, when this removed it. The picture
+    // stayed visible at the top of the panel, because the card's preview is a
+    // column on the task and this never touched that, so a task showed its
+    // artwork above an Attachments section reading zero.
+    //
+    // An imported row is one nobody uploaded: no uploader, no object in the
+    // bucket, no inlined bytes. Those are the only rows this may replace.
+    const isImported = { uploaded_by: null, storage_key: null, data: null }
+
     const files   = parseAttachments(r['Attachments'])
-    const current = await prisma.taskAttachment.findMany({ where: { task_id: taskId } })
+    const current = await prisma.taskAttachment.findMany({
+      where: { task_id: taskId, ...isImported },
+    })
     const key = (l: { filename: string; url: string | null }[]) =>
       l.map(f => `${f.filename} ${f.url ?? ''}`).sort().join('')
 
     if (key(current) !== key(files.map(f => ({ filename: f.title, url: f.url || null })))) {
-      await prisma.taskAttachment.deleteMany({ where: { task_id: taskId } })
+      await prisma.taskAttachment.deleteMany({ where: { task_id: taskId, ...isImported } })
       if (files.length) {
         await prisma.taskAttachment.createMany({
           data: files.map(f => ({ task_id: taskId, filename: f.title, url: f.url || null })),

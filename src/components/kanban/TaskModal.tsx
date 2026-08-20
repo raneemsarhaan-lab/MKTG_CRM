@@ -935,8 +935,36 @@ export function TaskModal({
       }
       if (!prepared.length) return
 
-      const res = await addAttachments(task.id, prepared, thumb)
-      if (!res.success) { setUploadError(res.error ?? 'Could not attach those files'); return }
+      /* One call per file, not one call for the batch.
+       *
+       * A server action's body is capped, and sending every file in a single
+       * call spent that budget on the batch: three photos fitted, a fourth did
+       * not, and the whole call was rejected — so the number of files you could
+       * attach depended on their combined size, which is not a rule anybody
+       * could have guessed. Worse, the rejection was thrown inside the action
+       * and never reached the panel, so it looked like nothing had happened.
+       *
+       * Per file, the cap is a per-file cap, each one lands as it finishes, and
+       * a refusal names the file it refused. The bucket path already worked
+       * this way; this is the same shape for deployments without one. */
+      const failed: string[] = []
+      for (const [i, file] of prepared.entries()) {
+        try {
+          // The thumbnail rides along with the last picture only — it is one
+          // field on the task, not one per file.
+          const res = await addAttachments(
+            task.id, [file], i === prepared.length - 1 ? thumb : null,
+          )
+          if (!res.success) failed.push(`${file.filename} — ${res.error ?? 'refused'}`)
+        } catch (e: unknown) {
+          const why = String(e).includes('Body exceeded')
+            ? 'too large to send without file storage configured'
+            : 'the upload did not complete'
+          failed.push(`${file.filename} — ${why}`)
+        }
+      }
+      if (failed.length) setUploadError(failed.join('; '))
+
       setReloadFiles(n => n + 1)   // pull the new rows, contents and all
       router.refresh()             // and refresh the card behind the panel
     } finally {
