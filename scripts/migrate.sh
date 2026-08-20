@@ -86,6 +86,11 @@ step 60  fatal   "Checking for an admin reset" \
 step 900 optional "Moving stored files into the bucket" \
   tsx scripts/migrate-attachments.ts
 
+# Inert unless RECOVER_ORPHANED_FILES=1. Puts back rows for files still in the
+# bucket whose rows an earlier version of the importer deleted.
+step 300 optional "Checking for files to recover" \
+  tsx scripts/recover-attachments.ts
+
 # The two importers only add rows. If either fails the app still works, with
 # whatever it already had — so they must never be the reason nobody can log in.
 step 900 optional "Importing ClickUp tasks (if an export is present)" \
