@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Member, Brand, ContentType } from '@/types/index'
 import { createTask, createTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
+import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { COLORS } from '@/lib/tokens'
 import { FieldPill, PillOption, PillInput } from './FieldPill'
 import { shortDate } from '@/lib/myboard'
@@ -80,6 +81,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
+  const [projectPicker, setProjectPicker] = useState(false)
   const [showMore, setShowMore] = useState(false)
 
   /** Non-null once a list has been pasted: one entry per task to create. */
@@ -100,7 +102,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
     due_date: today,
     hours_estimate: 2,
     priority: 'Medium' as typeof PRIORITIES[number],
-    campaign: '',
+    project_id: '',
+    project_name: '',
     cover_image_url: '',
   })
 
@@ -147,7 +150,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
-        campaign:           form.campaign || undefined,
+        project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create those tasks'); return }
@@ -174,7 +177,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
-        campaign:           form.campaign || undefined,
+        project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create task'); return }
@@ -184,7 +187,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
 
       if (andAnother) {
         // Keep the context fields, clear what is task-specific.
-        setForm(p => ({ ...p, name: '', description: '', campaign: '' }))
+        setForm(p => ({ ...p, name: '', description: '' }))
       } else {
         setShowTaskForm(false)
       }
@@ -442,22 +445,41 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               ))}
             </FieldPill>
 
-            <FieldPill
-              label="Campaign"
-              value={form.campaign || undefined}
-              active={!!form.campaign}
-              width={240}
-            >
-              {closePill => (
-                <PillInput
-                  type="text"
-                  value={form.campaign}
-                  placeholder="e.g. Brand Launch"
-                  onChange={e => patch('campaign', e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); closePill() } }}
+            {/* Project, where Campaign used to be. Campaign was free text that
+                grouped nothing — not one of the 316 tasks ever had a value in
+                it — and a second grouping beside the project is one idea too
+                many. */}
+            <span style={{
+              position: 'relative', display: 'inline-flex',
+              zIndex: projectPicker ? 40 : undefined,
+            }}>
+              <button
+                type="button"
+                onClick={() => setProjectPicker(v => !v)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, height: 34,
+                  padding: '0 12px', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  background: form.project_id ? '#F3EEFF' : '#F7F8FA',
+                  color: form.project_id ? '#6D28D9' : '#7C828D',
+                  font: 'inherit', fontSize: 13, fontWeight: form.project_id ? 600 : 500,
+                  maxWidth: 260,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {form.project_name || 'Project'}
+                </span>
+              </button>
+              {projectPicker && (
+                <ProjectPicker
+                  current={form.project_id ? { id: form.project_id, name: form.project_name } : null}
+                  onClose={() => setProjectPicker(false)}
+                  onPick={p => {
+                    setProjectPicker(false)
+                    setForm(f => ({ ...f, project_id: p?.id ?? '', project_name: p?.name ?? '' }))
+                  }}
                 />
               )}
-            </FieldPill>
+            </span>
 
             <FieldPill label="Estimate" value={`${form.hours_estimate}h`} active width={180}>
               {closePill => (

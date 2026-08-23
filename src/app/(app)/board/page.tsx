@@ -13,6 +13,9 @@ export default async function BoardPage() {
     prisma.task.findMany({
       include: {
         brand:      true,
+        // Names only — the card shows the project under the brand, and the
+        // panel shows it in Fields. Two short strings per task.
+        project:    { select: { id: true, name: true } },
         task_owner: true,
         assignee:   true,
         comments:   { include: { author: true }, orderBy: { created_at: 'asc' } },

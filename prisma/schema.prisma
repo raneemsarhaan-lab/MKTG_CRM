@@ -72,6 +72,7 @@ model Project {
 
   brand Brand?        @relation(fields: [brand_id], references: [id], onDelete: SetNull)
   steps ProjectStep[]
+  tasks Task[]
 
   @@map("projects")
 }
@@ -181,7 +182,21 @@ model Task {
   brand_id           String?   @db.Uuid
   content_type_label String?
   platform           String?
-  campaign           String?
+  /// The project this work serves.
+  ///
+  /// The container, not a label: a project holds many tasks, and a task needs
+  /// no plan step to belong to one. That distinction is the whole point —
+  /// ProjectStep.task_id pairs a task with one planned step and is unique, so
+  /// it could never express "all the work under this project". It stays, as
+  /// optional precision, for work that genuinely is the delivery of a step.
+  ///
+  /// Nullable on purpose. Requiring it at intake would trade quick capture for
+  /// coverage; instead the board counts what is unattached per brand, so the
+  /// gap is visible rather than enforced.
+  ///
+  /// This replaces `campaign`, a free-text field that grouped nothing because
+  /// nothing was ever typed into it — every one of the 316 tasks had it empty.
+  project_id         String?   @db.Uuid
   /// Who is accountable for this task — usually whoever asked for it.
   ///
   /// Distinct from assignee_id below, which is who is doing it. They are the
@@ -226,6 +241,7 @@ model Task {
   parent       Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
   subtasks     Task[]           @relation("Subtasks")
   brand        Brand?           @relation(fields: [brand_id], references: [id])
+  project      Project?         @relation(fields: [project_id], references: [id], onDelete: SetNull)
   task_owner   Member           @relation("TaskOwner", fields: [task_owner_id], references: [id])
   assignee     Member?          @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
   creator      Member?          @relation("TaskCreator", fields: [created_by], references: [id])
@@ -281,26 +297,26 @@ model TaskComment {
 ///
 /// Never add `data` to a query that spans tasks.
 model TaskAttachment {
-  id          String   @id @default(uuid()) @db.Uuid
-  task_id     String   @db.Uuid
-  filename    String
-  url         String?
-  data        String?  @db.Text
+  id           String   @id @default(uuid()) @db.Uuid
+  task_id      String   @db.Uuid
+  filename     String
+  url          String?
+  data         String?  @db.Text
   /// The object's key in the bucket, when the file lives in object storage.
   ///
   /// The third of the three ways a row can point at bytes, and now the one new
   /// uploads take: `url` is where to read it, this is where to delete it. Kept
   /// separately from the URL because the public address is a CDN origin plus a
   /// key, and reversing that back into a key to delete an object is guesswork.
-  storage_key String?  @db.Text
+  storage_key  String?  @db.Text
   /// What the file said it was when it arrived, so the CDN can serve it as
   /// that rather than as a download.
   content_type String?
   /// Bytes, as uploaded. Null for imported rows and for the older data-URL
   /// uploads, whose size was never recorded.
-  size_bytes  Int?
-  uploaded_by String?  @db.Uuid
-  uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+  size_bytes   Int?
+  uploaded_by  String?  @db.Uuid
+  uploaded_at  DateTime @default(now()) @db.Timestamptz(6)
 
   task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
 

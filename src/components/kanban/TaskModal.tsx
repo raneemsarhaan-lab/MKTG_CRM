@@ -24,7 +24,8 @@ import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { LinkCard } from './LinkCard'
 import { URL_RE, trimUrl, hrefFor } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
-import { linkStepToTask, unlinkStepFromTask, listLinkableSteps } from '@/actions/projects'
+import { unlinkStepFromTask } from '@/actions/projects'
+import { ProjectPicker } from '@/components/shared/ProjectPicker'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -43,6 +44,7 @@ import { linkStepToTask, unlinkStepFromTask, listLinkableSteps } from '@/actions
  */
 
 type FullTask = Task & {
+  project?: { id: string; name: string } | null
   brand: Brand
   task_owner: Member
   comments: (TaskComment & { author: Member })[]
@@ -443,11 +445,7 @@ export function TaskModal({
   // arrives called IMG_4471.jpg, which tells the next reader nothing.
   const [renaming, setRenaming]           = useState<string | null>(null)
   const [renameText, setRenameText]       = useState('')
-  // The plan-step picker. null means "not fetched yet" — the list is only
-  // worth a request when somebody actually opens it.
-  const [planOpen, setPlanOpen]           = useState(false)
-  const [planSteps, setPlanSteps] =
-    useState<{ id: string; name: string; projectName: string }[] | null>(null)
+  const [pickerOpen, setPickerOpen]       = useState(false)
   const [isPending, startTransition]      = useTransition()
 
   const router = useRouter()
@@ -807,24 +805,6 @@ export function TaskModal({
 
   /* ── the plan ────────────────────────────────────────────────────────── */
 
-  function openPlanPicker() {
-    setPlanOpen(true)
-    if (planSteps !== null) return
-    void listLinkableSteps().then(setPlanSteps).catch(() => setPlanSteps([]))
-  }
-
-  function handleLinkPlan(stepId: string) {
-    setPlanOpen(false)
-    setError('')
-    startTransition(async () => {
-      const r = await linkStepToTask(stepId, task.id)
-      if (!r.success) { setError(r.error ?? 'Could not link that step'); return }
-      // The picker only offers steps with no task, and this one now has one.
-      setPlanSteps(list => (list ?? []).filter(s => s.id !== stepId))
-      router.refresh()
-    })
-  }
-
   function handleUnlinkPlan() {
     if (!task.plan_step) return
     const stepId = task.plan_step.id
@@ -832,7 +812,6 @@ export function TaskModal({
     startTransition(async () => {
       const r = await unlinkStepFromTask(stepId)
       if (!r.success) { setError(r.error ?? 'Could not unlink that step'); return }
-      setPlanSteps(null)   // it is linkable again; refetch when next opened
       router.refresh()
     })
   }
@@ -1035,19 +1014,6 @@ export function TaskModal({
       ),
     },
     {
-      key: 'campaign', filled: Boolean(task.campaign),
-      node: (
-        <Field key="campaign" icon="folder" label="Campaign">
-          <InlineValue
-            canEdit={canEdit} type="text" value={task.campaign ?? ''} display={task.campaign}
-            placeholder="e.g. Brand Launch"
-            emptyLabel="–"
-            onCommit={v => applyPatch({ campaign: v })}
-          />
-        </Field>
-      ),
-    },
-    {
       key: 'owner', filled: true,
       node: (
         <Field key="owner" icon="user" label="Owner">
@@ -1066,61 +1032,80 @@ export function TaskModal({
       ),
     },
     {
-      /* Which plan step this task delivers.
-         The board and the plan describe the same work in two vocabularies —
-         tasks moving through stages, steps measured in days — and until now
-         the only bridge went one way: a step could be pushed to the board,
-         but a task raised first could never be recognised as the step the
-         plan had been waiting on. */
-      key: 'plan', filled: Boolean(task.plan_step),
+      /* The project this work serves.
+         The container, not a label. The picker this replaced listed every free
+         plan step in every project — 311 flat rows — because a task could only
+         attach to a step, one to one. A campaign of twenty posts has one Design
+         step, so there were never going to be enough. */
+      key: 'project', filled: Boolean(task.project),
       node: (
-        <Field key="plan" icon="folder" label="Project">
+        <Field key="project" icon="folder" label="Project">
+          <span style={{
+            position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8,
+            // The wrapper carries the stacking, not the popup: a z-index on the
+            // popup alone is measured inside a parent that still sits below
+            // everything after it in the panel.
+            zIndex: pickerOpen ? 40 : undefined,
+          }}>
+            {task.project ? (
+              <button
+                type="button"
+                onClick={() => canEdit && setPickerOpen(v => !v)}
+                title={canEdit ? 'Change the project' : task.project.name}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  border: 'none', borderRadius: 7, padding: '3px 9px',
+                  background: '#F3EEFF', color: '#6D28D9',
+                  font: 'inherit', fontSize: 14.5, fontWeight: 600,
+                  cursor: canEdit ? 'pointer' : 'default',
+                }}
+              >
+                <Icon name="folder" size={13} color="#6D28D9" width={2.2} />
+                {task.project.name}
+              </button>
+            ) : canEdit ? (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(v => !v)}
+                style={{
+                  border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
+                  font: 'inherit', fontSize: 15, color: CU.faint,
+                }}
+              >
+                Put this under a project
+              </button>
+            ) : (
+              <span style={{ color: CU.faint }}>–</span>
+            )}
+
+            {pickerOpen && (
+              <ProjectPicker
+                current={task.project ?? null}
+                onClose={() => setPickerOpen(false)}
+                onPick={p => { setPickerOpen(false); applyPatch({ project_id: p?.id ?? null }) }}
+              />
+            )}
+          </span>
+        </Field>
+      ),
+    },
+    {
+      /* The plan step, when this task is the delivery of one. Optional
+         precision beneath the project rather than the only way in. */
+      key: 'planstep', filled: Boolean(task.plan_step),
+      node: (
+        <Field key="planstep" icon="link" label="Plan step">
           {task.plan_step ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <a href={`/projects?project=${task.plan_step.projectId}`}
-                 style={{ color: CU.text, fontWeight: 600, textDecoration: 'none' }}>
-                {task.plan_step.projectName}
-              </a>
-              <Icon name="chevronR" size={12} color={CU.faint} width={2.2} />
               <span style={{ color: CU.label }}>{task.plan_step.name}</span>
               {canEdit && (
                 <button type="button" onClick={handleUnlinkPlan}
-                        aria-label="Unlink from the plan" title="Unlink from the plan"
-                        style={{
-                          border: 'none', background: 'transparent', cursor: 'pointer',
-                          padding: 2, display: 'inline-flex',
-                        }}>
+                        aria-label="Unlink from the plan step" title="Unlink from the plan step"
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'inline-flex' }}>
                   <Icon name="close" size={12} color={CU.faint} width={2.2} />
                 </button>
               )}
             </span>
-          ) : canEdit ? (
-            planOpen ? (
-              <select
-                autoFocus
-                defaultValue=""
-                onChange={e => { if (e.target.value) handleLinkPlan(e.target.value) }}
-                onBlur={() => setPlanOpen(false)}
-                aria-label="Link this task to a plan step"
-                style={{
-                  fontFamily: 'inherit', fontSize: 15, color: CU.text, padding: '4px 6px',
-                  borderRadius: 7, border: `1px solid ${CU.line}`, background: '#fff', maxWidth: 420,
-                }}
-              >
-                <option value="">{planSteps === null ? 'Loading…' : 'Pick a step…'}</option>
-                {(planSteps ?? []).map(st => (
-                  <option key={st.id} value={st.id}>{st.projectName} › {st.name}</option>
-                ))}
-              </select>
-            ) : (
-              <button type="button" onClick={openPlanPicker}
-                      style={{
-                        border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
-                        fontFamily: 'inherit', fontSize: 15, color: CU.faint,
-                      }}>
-                Link to a plan step
-              </button>
-            )
           ) : (
             <span style={{ color: CU.faint }}>–</span>
           )}

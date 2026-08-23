@@ -17,6 +17,7 @@ import { WorkloadPanel } from './WorkloadPanel'
 import {
   toggleProjectFocus, updateProject, updateStep, setStepDone,
   convertStepToTask, addStep, addSteps, addSubstep, removeStep, removeProject, createProject,
+  createTaskInProject,
 } from '@/actions/projects'
 
 /**
@@ -520,6 +521,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
   const [open, setOpen] = useState(false)
   const [isPending, start] = useTransition()
   const [newStep, setNewStep] = useState('')
+  const [newTask, setNewTask] = useState('')
   const [confirming, setConfirming] = useState(false)
   const s = statsOf(p, today)
 
@@ -635,6 +637,36 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
                      isAdmin={isAdmin} canEdit={canEdit} onError={onError} />
           ))}
           {!p.steps.length && <p style={{ fontSize: 13, color: UI.soft }}>No steps yet.</p>}
+
+          {/* A task under this project, raised here rather than on the board.
+              A step is a plan item measured in days; this is the work itself,
+              which is what most of a project actually consists of. */}
+          {isAdmin && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <input value={newTask} onChange={e => setNewTask(e.target.value)}
+                     onKeyDown={e => {
+                       if (e.key === 'Enter' && newTask.trim()) {
+                         act(async () => {
+                           const r = await createTaskInProject(p.id, newTask)
+                           setNewTask('')
+                           return r
+                         })
+                       }
+                     }}
+                     aria-label={`Add a task to ${p.name}`}
+                     placeholder="Add a task to this project"
+                     style={{ ...input, flex: 1 }} />
+              <button onClick={() => {
+                        if (!newTask.trim()) return
+                        act(async () => {
+                          const r = await createTaskInProject(p.id, newTask)
+                          setNewTask('')
+                          return r
+                        })
+                      }}
+                      style={PRIMARY}>Add task</button>
+            </div>
+          )}
 
           {canEdit && (
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>

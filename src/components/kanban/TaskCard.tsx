@@ -136,25 +136,50 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           }
         />
 
-        {task.brand && (
-          <span
-            title={task.brand.name}
-            style={{
-              position: 'absolute', top: 7, right: 7, width: 24, height: 24,
-              borderRadius: '50%', border: '2px solid #FFFFFF', overflow: 'hidden',
-              background: brandColor, color: '#FFFFFF',
-              fontSize: brandMark.length > 1 ? 9 : 11, fontWeight: 800,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <ImageWithFallback
-              src={task.brand.logo_url}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              fallback={<>{brandMark}</>}
-            />
-          </span>
-        )}
+      </div>
+
+      {/* Brand, then the project it serves.
+          Two short lines above the title so a column can be read for
+          direction without opening anything. The brand mark moved here from
+          the cover's corner rather than being drawn twice. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+        <span aria-hidden="true" style={{
+          width: 16, height: 16, borderRadius: 4, flexShrink: 0, overflow: 'hidden',
+          background: task.brand ? brandColor : PIPE.surface,
+          color: '#FFFFFF', fontSize: 8, fontWeight: 800,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {task.brand
+            ? <ImageWithFallback
+                src={task.brand.logo_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                fallback={<>{brandMark}</>}
+              />
+            : null}
+        </span>
+        <span style={{
+          minWidth: 0, fontSize: 10.5, fontWeight: 700, color: PIPE.textSecondary,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {task.brand?.name ?? 'No brand'}
+        </span>
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        margin: '2px 0 6px 22px', fontSize: 10, fontWeight: 600,
+        color: task.project ? '#6D28D9' : PIPE.textFaintest,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+             style={{ flexShrink: 0 }}>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </svg>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {task.project?.name ?? 'No project'}
+        </span>
       </div>
 
       {/* Title */}
