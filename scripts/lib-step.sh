@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# Shared plumbing for the boot scripts. Sourced, never run.
+
+# Run the tools from node_modules directly rather than through npx.
+#
+# The deployment sets npm's deprecated `production` config, so every npm and
+# npx invocation printed "npm warn config production Use --omit=dev instead" —
+# four red lines in a startup log that is otherwise the only place a real
+# failure shows up. Nothing here needs npm to find a binary.
+export PATH="$PWD/node_modules/.bin:$PATH"
+
+# Prisma checks for a newer version on every command and advertises v7 in a red
+# box. Prisma 7 changes how `datasource db { url = env(...) }` resolves and will
+# not load this schema, which is why package.json pins ^5.22.0 — so the advert
+# is not merely noise, it points at a change that would break the app.
+export PRISMA_HIDE_UPDATE_MESSAGE=true
+export CHECKPOINT_DISABLE=1
+
+# ── why every step is time-boxed ──────────────────────────────────────────
+#
+# A step that can block forever is a step that can hold a deploy open forever —
+# and one did: a deploy sat "in progress" for six hours with a build log that
+# had completed in a minute. A step waiting on a database lock waits without
+# printing anything, and the platform, seeing no port, waits with it.
+#
+# So: a limit on each step, and a clear line saying which one ran out. Fast and
+# loud beats silent and indefinite.
+step() {                     # step <seconds> <fatal|optional> <label> <cmd...>
+  local limit=$1 mode=$2 label=$3; shift 3
+  echo "▶ ${label}..."
+  local started=$SECONDS
+
+  # Captured on the command itself, not after an `if`: the exit status of an
+  # `if` whose branch was not taken is 0, so reading $? there reports every
+  # failure as a success — and this function's failure path ends in `exit`,
+  # which would have made that "exit 0" and carried straight on to serving
+  # pages against a schema that was never pushed.
+  local code=0
+  timeout --signal=TERM --kill-after=15s "${limit}s" "$@" || code=$?
+
+  if [ "$code" -eq 0 ]; then
+    echo "  ✓ ${label} — $(( SECONDS - started ))s"
+    return 0
+  fi
+
+  if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
+    echo "  ✗ ${label} — gave up after ${limit}s."
+    echo "    Nothing here reaches the network, so a stall here is the"
+    echo "    database: a lock held by the previous container, or a pool with"
+    echo "    no connections left."
+  else
+    echo "  ✗ ${label} — exited ${code}."
+  fi
+  if [ "$mode" = "optional" ]; then
+    echo "    Continuing — this step loads data, it does not define the schema."
+    return 0
+  fi
+  exit "$code"
+}
