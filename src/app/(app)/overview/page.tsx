@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { MyBoard } from '@/components/myboard/MyBoard'
 import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
 import type { BreachRow } from '@/components/myboard/SlaBreachedPanel'
-import { typeEmoji } from '@/lib/myboard'
+import { typeEmoji, PANEL_ROWS } from '@/lib/myboard'
 import { businessDaysBetween } from '@/lib/utils'
 import type { StageId } from '@/types/index'
+import type { Prisma } from '@prisma/client'
 
 /**
  * My Board — the personal dashboard.
@@ -18,24 +19,21 @@ import type { StageId } from '@/types/index'
  * /overview here, which is the route the rest of the app already redirects to
  * (page guards, middleware). The nav rail's Overview item points at it.
  */
-export default async function OverviewPage() {
+
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
   const member = await getSessionMember()
   if (!member) redirect('/login')
 
-  const [openTasks, completed, slaRows] = await Promise.all([
-    prisma.task.findMany({
-      // My Day is the work you are doing, not the work you are answerable
-      // for — see the assignee_id comment in schema.prisma.
-      where:   { assignee_id: member.id, NOT: { status: 'publish' } },
-      include: { task_owner: true },
-      orderBy: { due_date: 'asc' },
-    }),
-    prisma.task.findMany({
-      where:  { assignee_id: member.id, status: 'publish' },
-      select: { id: true, updated_at: true },
-    }),
-    prisma.slaConfig.findMany(),
-  ])
+  // Team view is admin-only and decided *here*, from the session member — the
+  // toggle in the header is a convenience, not the gate. A non-admin who types
+  // ?view=team gets their own board, because this line ignores the parameter
+  // for them. There is no RLS behind this to catch a mistake.
+  const canSeeTeam = member.access === 'admin'
+  const teamView   = canSeeTeam && (await searchParams).view === 'team'
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -43,8 +41,34 @@ export default async function OverviewPage() {
   const endOfWeek = new Date(today)
   endOfWeek.setDate(endOfWeek.getDate() + 7)
 
+  // "Last week" is the rolling seven days behind today, matching the way the
+  // week ahead is counted. It is the same window the Completed card counts.
   const startOfWeek = new Date(today)
   startOfWeek.setDate(startOfWeek.getDate() - 7)
+
+  // My Day is the work you are doing, not the work you are answerable for —
+  // see the assignee_id comment in schema.prisma. The team view widens that to
+  // everyone's work; a task nobody has picked up is in nobody's day, so it
+  // stays out of both and is the board's problem, not the dashboard's.
+  const scope: Prisma.TaskWhereInput = teamView
+    ? { assignee_id: { not: null } }
+    : { assignee_id: member.id }
+
+  const [openTasks, completed, slaRows] = await Promise.all([
+    prisma.task.findMany({
+      where:   { ...scope, NOT: { status: 'publish' } },
+      include: { task_owner: true, assignee: true },
+      orderBy: { due_date: 'asc' },
+    }),
+    // Bounded to the window that is actually displayed. Reading every task the
+    // team has ever published to count seven days of them does not scale.
+    prisma.task.findMany({
+      where:   { ...scope, status: 'publish', updated_at: { gte: startOfWeek } },
+      include: { assignee: true },
+      orderBy: { updated_at: 'desc' },
+    }),
+    prisma.slaConfig.findMany(),
+  ])
 
   const iso = (d: Date) => d.toISOString().split('T')[0]
 
@@ -72,16 +96,54 @@ export default async function OverviewPage() {
       dueOffset: due ? Math.round((due.getTime() - today.getTime()) / 86_400_000) : null,
       slaDays:   sla.get(`${t.status}|${t.content_type_label ?? ''}`) ?? 1,
       ownerName: t.task_owner?.name ?? '—',
+      person:    t.assignee?.name ?? 'Unassigned',
     }
   })
 
+  // The person chip is only worth a line in the team view — in your own board
+  // every row is yours and naming you on each one is noise.
   const toPanelTask = (r: (typeof rows)[number]): PanelTask => ({
     id: r.id, title: r.title, emoji: r.emoji, stage: r.stage, dueDate: r.dueDate,
+    person: teamView ? r.person : undefined,
   })
 
   // My Day — due today or already overdue. This Week — the next seven days.
   const myDay    = rows.filter(r => r.due && r.due <= today)
   const thisWeek = rows.filter(r => r.due && r.due > today && r.due <= endOfWeek)
+
+  // Last week, both halves of it: work that shipped in those seven days, and
+  // work that was due in them and is still open. The second half is the point
+  // of the section — it is the only place a slip is named as a slip rather
+  // than folded into today's list.
+  const shipped: PanelTask[] = completed.map(t => ({
+    id:      t.id,
+    title:   t.name,
+    emoji:   typeEmoji(t.content_type_label),
+    stage:   'publish' as StageId,
+    // updated_at is the closest thing to a ship date the model carries; it is
+    // already what the Completed card counts.
+    dueDate: iso(t.updated_at),
+    done:    true,
+    person:  teamView ? (t.assignee?.name ?? 'Unassigned') : undefined,
+  }))
+
+  const slipped: PanelTask[] = rows
+    .filter(r => r.due && r.due >= startOfWeek && r.due < today)
+    .map(toPanelTask)
+
+  // Slips lead, but never so many that the week's shipped work falls off the
+  // panel entirely — half the visible rows are held for each side unless one
+  // is short. Nothing is dropped here: what does not fit is ordered behind
+  // what does, and the panel counts the overflow on its "+N more" line.
+  const half     = Math.floor(PANEL_ROWS / 2)
+  const slipTake = Math.min(slipped.length, Math.max(half, PANEL_ROWS - shipped.length))
+  const shipTake = Math.min(shipped.length, PANEL_ROWS - slipTake)
+  const lastWeek = [
+    ...slipped.slice(0, slipTake),
+    ...shipped.slice(0, shipTake),
+    ...slipped.slice(slipTake),
+    ...shipped.slice(shipTake),
+  ]
 
   // A breach is time-in-stage past the stage's SLA for that content type.
   const breaches: BreachRow[] = rows
@@ -97,22 +159,24 @@ export default async function OverviewPage() {
       breachedByDays: r.stageDays - r.slaDays,
     }))
 
-  const completedThisWeek = completed.filter(c => c.updated_at >= startOfWeek).length
-
   return (
     <MyBoard
       firstName={member.name.split(' ')[0]}
+      canSeeTeam={canSeeTeam}
+      teamView={teamView}
       stats={{
-        today:    myDay.length,
-        week:     thisWeek.length,
-        breached: breaches.length,
-        completedThisWeek,
+        today:             myDay.length,
+        week:              thisWeek.length,
+        breached:          breaches.length,
+        completedThisWeek: completed.length,
       }}
       myDayPlan={myDay.map(r => ({
         id: r.id, name: r.title, mins: r.mins,
         due: r.dueOffset, priority: r.priority,
       }))}
+      today={myDay.map(toPanelTask)}
       thisWeek={thisWeek.map(toPanelTask)}
+      lastWeek={lastWeek}
       breaches={breaches}
     />
   )

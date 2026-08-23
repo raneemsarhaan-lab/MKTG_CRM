@@ -17,6 +17,8 @@ interface StatCardsProps {
   week:              number
   breached:          number
   completedThisWeek: number
+  /** Team view: the numbers cover everyone, so the first card is not "My Day". */
+  teamView?:         boolean
 }
 
 /** Count-up 0→value over 400ms, first paint only. Skipped under reduced motion. */
@@ -95,7 +97,12 @@ function StatCard({ href, surface, label, labelCol, emoji, value, accent, captio
   )
 }
 
-export function StatCards({ today, week, breached, completedThisWeek }: StatCardsProps) {
+export function StatCards({ today, week, breached, completedThisWeek, teamView = false }: StatCardsProps) {
+  // Keep the scope when following a card — a link that quietly drops ?view=team
+  // sends an admin from the team's numbers back to their own.
+  const href = (filter: string) =>
+    `/overview?${teamView ? 'view=team&' : ''}filter=${filter}`
+
   return (
     <div style={{
       display: 'grid',
@@ -105,9 +112,9 @@ export function StatCards({ today, week, breached, completedThisWeek }: StatCard
     }}>
       {/* My Day — violet */}
       <StatCard
-        href="/overview?filter=today"
+        href={href('today')}
         surface="var(--violet-surface)" labelCol="var(--violet-label)" accent="var(--violet-accent)"
-        emoji="☀️" label="My Day" value={today} caption="Tasks"
+        emoji="☀️" label={teamView ? 'Team Today' : 'My Day'} value={today} caption="Tasks"
       >
         <svg viewBox="0 0 150 40" aria-hidden="true"
              style={{ position: 'absolute', left: 16, bottom: 12, width: 108, height: 28, overflow: 'visible' }}>
@@ -121,7 +128,7 @@ export function StatCards({ today, week, breached, completedThisWeek }: StatCard
 
       {/* This Week — amber */}
       <StatCard
-        href="/overview?filter=week"
+        href={href('week')}
         surface="var(--amber-surface)" labelCol="var(--amber-label)" accent="var(--amber-accent)"
         emoji="📅" label="This Week" value={week} caption="Tasks"
       >
@@ -144,7 +151,7 @@ export function StatCards({ today, week, breached, completedThisWeek }: StatCard
 
       {/* SLA Breached — red */}
       <StatCard
-        href="/overview?filter=breached"
+        href={href('breached')}
         surface="var(--red-surface)" labelCol="var(--red-label)" accent="var(--red-accent)"
         emoji="⚠️" label="SLA Breached" value={breached} caption="Items"
       >
@@ -164,7 +171,7 @@ export function StatCards({ today, week, breached, completedThisWeek }: StatCard
 
       {/* Completed — green */}
       <StatCard
-        href="/overview?filter=completed"
+        href={href('completed')}
         surface="var(--green-surface)" labelCol="var(--green-label)" accent="var(--green-accent)"
         emoji="✅" label="Completed" value={completedThisWeek} caption="This Week"
       >

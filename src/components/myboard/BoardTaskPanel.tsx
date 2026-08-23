@@ -18,6 +18,16 @@ export interface PanelTask {
   emoji:   string
   stage:   StageId
   dueDate: string | null   // ISO yyyy-mm-dd; null for imported history
+  /**
+   * Whose task. Only set in the team view — in the personal view every row
+   * belongs to the reader and naming them on each line is noise.
+   */
+  person?: string
+  /**
+   * Finished. A shipped task is not late however long ago it was due, so the
+   * status column reads "Done" and `dueDate` carries the day it shipped.
+   */
+  done?:   boolean
 }
 
 interface BoardTaskPanelProps {
@@ -29,11 +39,23 @@ interface BoardTaskPanelProps {
   tasks:      PanelTask[]
   emptyCopy:  string        // e.g. "Nothing due today 🎉"
   ornament?:  React.ReactNode
+  /** Off for panels that look backwards — you do not add a task to last week. */
+  showAdd?:   boolean
+  /**
+   * Rows to render before deferring to the board. The remainder is counted on
+   * a "+N more" line rather than dropped quietly: a panel that stops at ten
+   * with no sign it did so reads as a complete list.
+   */
+  max?:       number
 }
 
 export function BoardTaskPanel({
   title, emoji, accent, badgeBg, badgeText, tasks, emptyCopy, ornament,
+  showAdd = true, max,
 }: BoardTaskPanelProps) {
+  const shown  = max ? tasks.slice(0, max) : tasks
+  const hidden = tasks.length - shown.length
+
   return (
     <section
       style={{
@@ -74,7 +96,7 @@ export function BoardTaskPanel({
         </div>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {tasks.map(t => {
+          {shown.map(t => {
             const badge  = STAGE_BADGE[t.stage]
             const status = t.dueDate ? dueStatus(t.dueDate) : null
             return (
@@ -105,11 +127,26 @@ export function BoardTaskPanel({
                       {t.title}
                     </span>
                     <span style={{
-                      display: 'inline-block', marginTop: 4, fontSize: 11.5,
-                      fontWeight: 700, color: badgeText, background: badgeBg,
-                      padding: '2px 9px', borderRadius: 6,
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      marginTop: 4, minWidth: 0,
                     }}>
-                      {badge.label}
+                      <span style={{
+                        fontSize: 11.5, fontWeight: 700,
+                        color: badgeText, background: badgeBg,
+                        padding: '2px 9px', borderRadius: 6, flexShrink: 0,
+                      }}>
+                        {badge.label}
+                      </span>
+                      {t.person && (
+                        <span style={{
+                          fontSize: 11.5, fontWeight: 700,
+                          color: 'var(--violet-label)', background: 'var(--violet-badge)',
+                          padding: '2px 9px', borderRadius: 6,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {t.person}
+                        </span>
+                      )}
                     </span>
                   </span>
 
@@ -118,9 +155,11 @@ export function BoardTaskPanel({
                       display: 'block', fontSize: 13, fontWeight: 700,
                       /* Overdue is never carried by colour alone — the label
                          itself reads "Nd late" (§10). */
-                      color: status?.overdue ? 'var(--late-text)' : 'var(--ink-900)',
+                      color: t.done    ? 'var(--green-label)'
+                           : status?.overdue ? 'var(--late-text)'
+                           : 'var(--ink-900)',
                     }}>
-                      {status?.label ?? 'No date'}
+                      {t.done ? 'Done' : (status?.label ?? 'No date')}
                     </span>
                     <span style={{
                       display: 'block', fontSize: 12,
@@ -136,13 +175,26 @@ export function BoardTaskPanel({
         </ul>
       )}
 
-      <Link href="/board?new=1" className="fx-panel-link"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, marginTop: 16,
-              fontSize: 13.5, fontWeight: 700, color: accent, textDecoration: 'none',
-            }}>
-        + Add task
-      </Link>
+      {hidden > 0 && (
+        <Link href="/board" className="fx-panel-link"
+              style={{
+                display: 'block', marginTop: 12, paddingTop: 12,
+                borderTop: '1px solid var(--border-row)',
+                fontSize: 13, fontWeight: 700, color: accent, textDecoration: 'none',
+              }}>
+          +{hidden} more →
+        </Link>
+      )}
+
+      {showAdd && (
+        <Link href="/board?new=1" className="fx-panel-link"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 16,
+                fontSize: 13.5, fontWeight: 700, color: accent, textDecoration: 'none',
+              }}>
+          + Add task
+        </Link>
+      )}
 
       {ornament}
     </section>

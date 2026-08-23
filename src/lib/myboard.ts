@@ -1,6 +1,17 @@
 import type { StageId } from '@/types/index'
 
 /**
+ * Rows a dashboard panel shows before handing off to the board. Personal lists
+ * rarely reach it; the team view's do on the first afternoon, and a dashboard
+ * you have to scroll for forty seconds is not a dashboard.
+ *
+ * It lives here rather than in the panel because the page balances the Last
+ * Week halves against it — and a server component cannot read a runtime value
+ * out of a 'use client' module.
+ */
+export const PANEL_ROWS = 12
+
+/**
  * My Board presentation mappings — developer handoff §6.
  *
  * The badge label and dot colour are *derived* from the stage enum, never
