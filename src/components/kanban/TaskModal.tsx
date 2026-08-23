@@ -839,18 +839,29 @@ export function TaskModal({
           failed.push(`${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)`)
           continue
         }
-        // A fresh id per file, echoed back by the route. See below.
+        // A fresh id per file. It goes in the URL and comes back in the reply,
+        // which is what lets this tell its own answer from a stored one.
         const ref  = crypto.randomUUID()
         const body = new FormData()
-        body.append('ref', ref)
         body.append('taskId', task.id)
         body.append('file', file)
         try {
-          const res  = await fetch('/api/attachments', {
+          /* Its own URL per file, and that is the part that actually works.
+           *
+           * Whatever sits in front of this deployment caches upload replies
+           * and does not care what the response says: no-store on the route,
+           * no-store in next.config and no-store on this request all went
+           * ignored, and a POST kept coming back as somebody's upload from
+           * 20 August. What such a cache keys on is the URL, and every upload
+           * went to the same one. The ref is a path segment rather than a
+           * query string because a cache already ignoring no-store may drop
+           * a query too; a path cannot be normalised away.
+           *
+           * The header and the cache hint stay. They are what should have
+           * been enough, and they will be if the cache is ever fixed. */
+          const res  = await fetch(`/api/attachments/${ref}`, {
             method: 'POST',
             body,
-            // Belt and braces with the response header: an upload is never a
-            // document, and must never be answered from a stored copy.
             cache:  'no-store',
           })
           const json = await res.json().catch(() => null)
