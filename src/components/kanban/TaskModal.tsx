@@ -844,8 +844,25 @@ export function TaskModal({
         body.append('file', file)
         try {
           const res  = await fetch('/api/attachments', { method: 'POST', body })
-          const json = await res.json().catch(() => ({}))
-          if (!res.ok) { failed.push(`${file.name} — ${json.error ?? res.statusText}`); continue }
+          const json = await res.json().catch(() => null)
+          if (!res.ok) {
+            failed.push(`${file.name} — ${json?.error ?? res.statusText}`)
+            continue
+          }
+          /* A 200 is not proof the file was stored.
+           *
+           * The middleware turns away a request with no valid session by
+           * redirecting it, and fetch follows redirects: an expired cookie
+           * means this POST quietly lands on the login page, which answers
+           * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
+           * upload counted as a success that never happened — no row, no
+           * error, nothing on screen. Only our own JSON means it landed. */
+          if (!json?.attachment) {
+            failed.push(res.redirected
+              ? `${file.name} — your session expired; sign in again and retry`
+              : `${file.name} — the server did not store it (unexpected reply)`)
+            continue
+          }
           if (file.type.startsWith('image/')) {
             try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
           }
@@ -854,12 +871,26 @@ export function TaskModal({
         }
       }
 
-      if (thumb) await setCoverThumb(task.id, thumb)
+      /* Cosmetic, guarded, and last.
+       *
+       * This used to run first and unguarded, and it is a server action — so
+       * any failure in it (a stale action id after a deploy, a momentary 502)
+       * threw past the three lines below. The file was already in the bucket
+       * and the row already written, but the panel never re-read them, the
+       * error list was never shown, and the exception left as an unhandled
+       * rejection nobody sees. The whole of "I uploaded it and nothing
+       * happened" fits in that gap. A card preview is not worth it. */
+      if (thumb) {
+        try { await setCoverThumb(task.id, thumb) } catch { /* preview only */ }
+      }
       if (failed.length) setUploadError(failed.join('; '))
-
+    } catch (e: unknown) {
+      setUploadError(`That upload did not finish: ${String(e).slice(0, 160)}`)
+    } finally {
+      // Always, whatever happened above. A file that landed has to appear, and
+      // one that did not has to leave a panel that is telling the truth.
       setReloadFiles(n => n + 1)
       router.refresh()
-    } finally {
       setUploading(false)
     }
   }
@@ -875,7 +906,15 @@ export function TaskModal({
    * has to fit as it is, and is refused with its own name if it does not.
    */
   async function acceptFiles(list: FileList | null) {
-    if (!canEdit || !list?.length) return
+    if (!list?.length) return
+    // Said out loud rather than returned from silently. The drop zone is not
+    // rendered without edit rights, but the paperclip and a drag can still
+    // reach here, and "nothing happened" is the one answer that teaches
+    // nobody anything.
+    if (!canEdit) {
+      setUploadError('You can only attach files to tasks you own or are assigned.')
+      return
+    }
     setUploadError('')
 
     const picked = Array.from(list).slice(0, MAX_ATTACHMENTS_PER_GO)
@@ -943,10 +982,14 @@ export function TaskModal({
         }
       }
       if (failed.length) setUploadError(failed.join('; '))
-
+    } catch (e: unknown) {
+      // Nothing may leave this function as a rejection: both callers invoke it
+      // with `void`, so an escape is an "Uncaught (in promise)" in a console
+      // nobody has open and a panel that just sits there.
+      setUploadError(`That upload did not finish: ${String(e).slice(0, 160)}`)
+    } finally {
       setReloadFiles(n => n + 1)   // pull the new rows, contents and all
       router.refresh()             // and refresh the card behind the panel
-    } finally {
       setUploading(false)
     }
   }
