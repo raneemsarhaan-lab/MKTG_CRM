@@ -90,6 +90,42 @@ export async function GET() {
     missing:    missingSettings(),
   }
 
+  /**
+   * Whether uploads are landing.
+   *
+   * "The file didn't attach" has two very different causes that look identical
+   * from the panel: the row was never written, or it was written and something
+   * removed it afterwards. Counting them separates the two in one look —
+   * `uploaded` is what people put here, `imported` is what came from ClickUp,
+   * and `newest_upload` says whether anything has landed recently at all.
+   *
+   * Counts only. No filenames, no task ids, nothing about who uploaded what.
+   */
+  let attachments: Record<string, unknown>
+  try {
+    const uploadedWhere = { NOT: { uploaded_by: null } }
+    const [total, uploaded, newest] = await Promise.all([
+      prisma.taskAttachment.count(),
+      prisma.taskAttachment.count({ where: uploadedWhere }),
+      prisma.taskAttachment.findFirst({
+        where:   uploadedWhere,
+        orderBy: { uploaded_at: 'desc' },
+        select:  { uploaded_at: true },
+      }),
+    ])
+    attachments = {
+      total,
+      uploaded,
+      imported:      total - uploaded,
+      // A row with no storage key predates the bucket and holds its bytes in
+      // Postgres — expected on old rows, a red flag on new ones.
+      in_bucket:     await prisma.taskAttachment.count({ where: { NOT: { storage_key: null } } }),
+      newest_upload: newest?.uploaded_at.toISOString() ?? null,
+    }
+  } catch (e: unknown) {
+    attachments = { error: String(e).slice(0, 200) }
+  }
+
   return NextResponse.json({
     build: process.env.NEXT_PUBLIC_BUILD_STAMP ?? 'unknown',
     checked_at: new Date().toISOString(),
@@ -97,5 +133,6 @@ export async function GET() {
     request,
     database,
     storage,
+    attachments,
   })
 }

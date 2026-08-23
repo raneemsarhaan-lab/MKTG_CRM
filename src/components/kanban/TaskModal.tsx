@@ -1761,6 +1761,24 @@ export function TaskModal({
                   Attachments <span style={{ color: CU.faint, fontWeight: 500 }}>{attachments.length}</span>
                 </button>
 
+                {/* Outside the fold, deliberately.
+                 *
+                 * The paperclip in the comment box opens this same input. While
+                 * it lived inside the collapsed section the ref was null, the
+                 * optional chaining swallowed the call, and the button did
+                 * nothing at all — no picker, no error, nothing to report. A
+                 * control that silently does nothing is worse than one that
+                 * refuses, and it is indistinguishable from an upload that
+                 * failed. */}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  onChange={e => { void acceptFiles(e.target.files); e.target.value = '' }}
+                  style={{ display: 'none' }}
+                  aria-label="Attach files to this task"
+                />
+
                 {filesOpen && (
                   <>
                     {/* The drop zone is ClickUp's, and it is honest about what it
@@ -1798,15 +1816,6 @@ export function TaskModal({
                           : <>Drop files here or <span style={{ textDecoration: 'underline' }}>browse</span></>}
                       </div>
                     )}
-
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      multiple
-                      onChange={e => { void acceptFiles(e.target.files); e.target.value = '' }}
-                      style={{ display: 'none' }}
-                      aria-label="Attach files to this task"
-                    />
 
                     {uploadError && (
                       <p role="alert" style={{ margin: '10px 0 0', fontSize: 14, color: '#D22040' }}>
@@ -2169,7 +2178,15 @@ export function TaskModal({
                       comment has nowhere to keep one. */}
                   {canEdit && (
                     <IconButton name="clip" label="Attach a file to this task"
-                                onClick={() => fileRef.current?.click()} size={16} />
+                                onClick={() => {
+                                  // Open the section the file is about to land
+                                  // in. Attaching from down here and having
+                                  // nothing visibly change is how an upload
+                                  // that worked gets reported as one that did
+                                  // not.
+                                  setFilesOpen(true)
+                                  fileRef.current?.click()
+                                }} size={16} />
                   )}
                   <IconButton name="at" label="Mention someone" size={16}
                               onClick={() => { setEmojiOpen(false); openMentionPicker() }} />
