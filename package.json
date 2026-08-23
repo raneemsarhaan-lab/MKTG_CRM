@@ -11,11 +11,12 @@
     "build": "bash scripts/preflight.sh && next build",
     "migrate": "bash scripts/migrate.sh",
     "deploy": "npm run build",
-    "start": "bash scripts/migrate.sh && next start",
+    "start": "bash scripts/start.sh",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "import:clickup": "tsx scripts/import-clickup.ts",
-    "preflight": "bash scripts/preflight.sh"
+    "preflight": "bash scripts/preflight.sh",
+    "backfill": "bash scripts/backfill.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
