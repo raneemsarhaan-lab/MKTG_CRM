@@ -55,7 +55,12 @@ export function Diagnostics() {
     try {
       const fd = new FormData()
       fd.append('file', new File([new Blob(['momentum storage check'])], 'storage-check.txt', { type: 'text/plain' }))
-      const res  = await fetch('/api/storage-check', { method: 'POST', body: fd })
+      // Unique per run, for the same reason uploads are — see the comment on
+      // the fetch in TaskModal. A diagnostic answered from cache is worse than
+      // no diagnostic.
+      const res  = await fetch(`/api/storage-check?u=${crypto.randomUUID()}`, {
+        method: 'POST', body: fd, cache: 'no-store',
+      })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.steps) {
         setSteps([{
