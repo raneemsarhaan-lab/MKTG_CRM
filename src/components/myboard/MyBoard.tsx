@@ -37,11 +37,15 @@ export interface MyBoardProps {
   thisWeek:  PanelTask[]
   /** The week just gone: what shipped, and what was due and did not. */
   lastWeek:  PanelTask[]
+  /** "Aug 23 – 29" — the dates each week panel covers, named on the panel. */
+  thisWeekSpan: string
+  lastWeekSpan: string
   breaches: BreachRow[]
 }
 
 export function MyBoard({
-  firstName, canSeeTeam, teamView, stats, myDayPlan, today, thisWeek, lastWeek, breaches,
+  firstName, canSeeTeam, teamView, stats, myDayPlan, today, thisWeek, lastWeek,
+  thisWeekSpan, lastWeekSpan, breaches,
 }: MyBoardProps) {
   return (
     <div className="fx-myboard" style={{ padding: '36px 44px 44px' }}>
@@ -93,7 +97,8 @@ export function MyBoard({
           badgeBg="var(--amber-badge)"
           badgeText="var(--amber-label)"
           tasks={thisWeek}
-          emptyCopy="Clear week ahead ✨"
+          subtitle={thisWeekSpan}
+          emptyCopy="Nothing left due this week ✨"
           max={PANEL_ROWS}
           ornament={
             /* 34×50 violet lightning bolt, behind the content (§6) */
@@ -118,6 +123,7 @@ export function MyBoard({
           badgeBg="var(--green-badge)"
           badgeText="var(--green-label)"
           tasks={lastWeek}
+          subtitle={lastWeekSpan}
           emptyCopy="Nothing landed last week"
           showAdd={false}
           /* The page has already ordered these so both halves survive the cut. */

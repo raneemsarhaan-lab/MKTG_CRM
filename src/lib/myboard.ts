@@ -78,6 +78,35 @@ export function dueStatus(dueISO: string, now: Date = new Date()): {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+/**
+ * The Sunday on or before `d`, at midnight — the start of its week.
+ *
+ * The working week here runs Sunday to Thursday, so weeks are anchored on
+ * Sunday rather than Monday. "This week" and "last week" are real weeks with
+ * a boundary the team shares, not rolling seven-day windows that mean
+ * something different depending on which day you open the dashboard.
+ *
+ * The window a week covers is the full Sunday-to-Saturday span. Friday and
+ * Saturday are not worked, but a due date can still land on one, and a task
+ * that falls between two weeks is a task nobody sees.
+ */
+export function weekStart(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - x.getDay())   // getDay(): 0 = Sunday
+  return x
+}
+
+/** "Aug 16 – 22" · "Aug 30 – Sep 5" — a week's span, for a panel subtitle. */
+export function weekSpan(start: Date): string {
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const tail = start.getMonth() === end.getMonth()
+    ? `${end.getDate()}`
+    : `${MONTHS[end.getMonth()]} ${end.getDate()}`
+  return `${MONTHS[start.getMonth()]} ${start.getDate()} – ${tail}`
+}
+
 /** "Jul 11" — task row meta date. */
 export function shortDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00')

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { MyBoard } from '@/components/myboard/MyBoard'
 import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
 import type { BreachRow } from '@/components/myboard/SlaBreachedPanel'
-import { typeEmoji, PANEL_ROWS } from '@/lib/myboard'
+import { typeEmoji, weekStart, weekSpan, PANEL_ROWS } from '@/lib/myboard'
 import { businessDaysBetween } from '@/lib/utils'
 import type { StageId } from '@/types/index'
 import type { Prisma } from '@prisma/client'
@@ -38,13 +38,13 @@ export default async function OverviewPage({
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const endOfWeek = new Date(today)
-  endOfWeek.setDate(endOfWeek.getDate() + 7)
-
-  // "Last week" is the rolling seven days behind today, matching the way the
-  // week ahead is counted. It is the same window the Completed card counts.
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(startOfWeek.getDate() - 7)
+  // Real weeks, not rolling seven-day windows: the working week runs Sunday to
+  // Thursday, so a week opens on Sunday and every panel agrees where the line
+  // is. Late in the week "This Week" thins out — that is the truth of it, and
+  // My Day still carries anything due today or already overdue.
+  const weekOpen     = weekStart(today)
+  const nextWeekOpen = new Date(weekOpen); nextWeekOpen.setDate(nextWeekOpen.getDate() + 7)
+  const lastWeekOpen = new Date(weekOpen); lastWeekOpen.setDate(lastWeekOpen.getDate() - 7)
 
   // My Day is the work you are doing, not the work you are answerable for —
   // see the assignee_id comment in schema.prisma. The team view widens that to
@@ -60,10 +60,11 @@ export default async function OverviewPage({
       include: { task_owner: true, assignee: true },
       orderBy: { due_date: 'asc' },
     }),
-    // Bounded to the window that is actually displayed. Reading every task the
-    // team has ever published to count seven days of them does not scale.
+    // Two weeks, which is everything displayed: last week's shipped list and
+    // this week's Completed count. Reading every task the team has ever
+    // published to count two weeks of them does not scale.
     prisma.task.findMany({
-      where:   { ...scope, status: 'publish', updated_at: { gte: startOfWeek } },
+      where:   { ...scope, status: 'publish', updated_at: { gte: lastWeekOpen } },
       include: { assignee: true },
       orderBy: { updated_at: 'desc' },
     }),
@@ -107,15 +108,15 @@ export default async function OverviewPage({
     person: teamView ? r.person : undefined,
   })
 
-  // My Day — due today or already overdue. This Week — the next seven days.
+  // My Day — due today or already overdue. This Week — the rest of this week.
   const myDay    = rows.filter(r => r.due && r.due <= today)
-  const thisWeek = rows.filter(r => r.due && r.due > today && r.due <= endOfWeek)
+  const thisWeek = rows.filter(r => r.due && r.due > today && r.due < nextWeekOpen)
 
-  // Last week, both halves of it: work that shipped in those seven days, and
-  // work that was due in them and is still open. The second half is the point
-  // of the section — it is the only place a slip is named as a slip rather
-  // than folded into today's list.
-  const shipped: PanelTask[] = completed.map(t => ({
+  // Last week, both halves of it: work that shipped in it, and work that was
+  // due in it and is still open. The second half is the point of the section —
+  // it is the only place a slip is named as a slip rather than folded into
+  // today's list.
+  const shipped: PanelTask[] = completed.filter(t => t.updated_at < weekOpen).map(t => ({
     id:      t.id,
     title:   t.name,
     emoji:   typeEmoji(t.content_type_label),
@@ -128,7 +129,7 @@ export default async function OverviewPage({
   }))
 
   const slipped: PanelTask[] = rows
-    .filter(r => r.due && r.due >= startOfWeek && r.due < today)
+    .filter(r => r.due && r.due >= lastWeekOpen && r.due < weekOpen)
     .map(toPanelTask)
 
   // Slips lead, but never so many that the week's shipped work falls off the
@@ -168,8 +169,11 @@ export default async function OverviewPage({
         today:             myDay.length,
         week:              thisWeek.length,
         breached:          breaches.length,
-        completedThisWeek: completed.length,
+        // What shipped since Sunday — the week you are in, not the last seven days.
+        completedThisWeek: completed.length - shipped.length,
       }}
+      thisWeekSpan={weekSpan(weekOpen)}
+      lastWeekSpan={weekSpan(lastWeekOpen)}
       myDayPlan={myDay.map(r => ({
         id: r.id, name: r.title, mins: r.mins,
         due: r.dueOffset, priority: r.priority,

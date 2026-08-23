@@ -38,6 +38,12 @@ interface BoardTaskPanelProps {
   badgeText:  string
   tasks:      PanelTask[]
   emptyCopy:  string        // e.g. "Nothing due today 🎉"
+  /**
+   * The dates the panel covers, e.g. "Aug 16 – 22". Weeks here are real weeks
+   * with a fixed boundary, so the panel says where that boundary is rather
+   * than leaving the reader to guess which seven days it means.
+   */
+  subtitle?:  string
   ornament?:  React.ReactNode
   /** Off for panels that look backwards — you do not add a task to last week. */
   showAdd?:   boolean
@@ -51,7 +57,7 @@ interface BoardTaskPanelProps {
 
 export function BoardTaskPanel({
   title, emoji, accent, badgeBg, badgeText, tasks, emptyCopy, ornament,
-  showAdd = true, max,
+  showAdd = true, max, subtitle,
 }: BoardTaskPanelProps) {
   const shown  = max ? tasks.slice(0, max) : tasks
   const hidden = tasks.length - shown.length
@@ -79,6 +85,14 @@ export function BoardTaskPanel({
           gap: 8, whiteSpace: 'nowrap', margin: 0,
         }}>
           <span aria-hidden="true">{emoji}</span> {title}
+          {subtitle && (
+            <span style={{
+              fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 12.5,
+              color: 'var(--ink-400)', letterSpacing: 0,
+            }}>
+              {subtitle}
+            </span>
+          )}
         </h2>
         <Link href="/board" className="fx-panel-link"
               style={{ fontSize: 13, fontWeight: 700, color: accent, textDecoration: 'none' }}>
