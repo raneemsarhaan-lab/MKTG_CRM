@@ -1,6 +1,25 @@
 import type { StageId } from '@/types/index'
 
 /**
+ * Rows a dashboard panel shows before handing off to the board. Personal lists
+ * rarely reach it; the team view's do on the first afternoon, and a dashboard
+ * you have to scroll for forty seconds is not a dashboard.
+ *
+ * It lives here rather than in the panel because the page balances the Last
+ * Week halves against it — and a server component cannot read a runtime value
+ * out of a 'use client' module.
+ */
+export const PANEL_ROWS = 12
+
+/**
+ * Rows for a panel sharing the stacked side column. Two panels there against
+ * one day planner beside them, so each gets roughly half the budget — a
+ * column that runs twice the height of the thing it sits next to is a column
+ * that has stopped being a sidebar.
+ */
+export const COLUMN_ROWS = 7
+
+/**
  * My Board presentation mappings — developer handoff §6.
  *
  * The badge label and dot colour are *derived* from the stage enum, never
@@ -66,6 +85,35 @@ export function dueStatus(dueISO: string, now: Date = new Date()): {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * The Sunday on or before `d`, at midnight — the start of its week.
+ *
+ * The working week here runs Sunday to Thursday, so weeks are anchored on
+ * Sunday rather than Monday. "This week" and "last week" are real weeks with
+ * a boundary the team shares, not rolling seven-day windows that mean
+ * something different depending on which day you open the dashboard.
+ *
+ * The window a week covers is the full Sunday-to-Saturday span. Friday and
+ * Saturday are not worked, but a due date can still land on one, and a task
+ * that falls between two weeks is a task nobody sees.
+ */
+export function weekStart(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  x.setDate(x.getDate() - x.getDay())   // getDay(): 0 = Sunday
+  return x
+}
+
+/** "Aug 16 – 22" · "Aug 30 – Sep 5" — a week's span, for a panel subtitle. */
+export function weekSpan(start: Date): string {
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const tail = start.getMonth() === end.getMonth()
+    ? `${end.getDate()}`
+    : `${MONTHS[end.getMonth()]} ${end.getDate()}`
+  return `${MONTHS[start.getMonth()]} ${start.getDate()} – ${tail}`
+}
 
 /** "Jul 11" — task row meta date. */
 export function shortDate(iso: string): string {

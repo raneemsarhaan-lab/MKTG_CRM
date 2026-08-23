@@ -9,7 +9,14 @@ import { pillDate, greetingWord } from '@/lib/myboard'
  * The greeting word is time-derived and the name is the session user's first
  * name only.
  */
-export function GreetingHeader({ firstName }: { firstName: string }) {
+export function GreetingHeader({
+  firstName,
+  toggle,
+}: {
+  firstName: string
+  /** Optional control above the date pill — the admin Mine / Team switch. */
+  toggle?: React.ReactNode
+}) {
   const now  = new Date()
   const word = greetingWord(now.getHours())
 
@@ -49,6 +56,8 @@ export function GreetingHeader({ firstName }: { firstName: string }) {
       </div>
 
       <div style={{ textAlign: 'right' }}>
+        {toggle && <div>{toggle}</div>}
+
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           background: '#fff', border: '1px solid var(--border-input)',
