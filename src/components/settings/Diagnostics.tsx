@@ -27,6 +27,8 @@ type Report = {
   database: Record<string, unknown>
 }
 
+type StorageStep = { step: string; ok: boolean; detail: string; ms: number }
+
 export function Diagnostics() {
   const [report, setReport]   = useState<Report | null>(null)
   const [httpErr, setHttpErr] = useState('')
@@ -34,6 +36,43 @@ export function Diagnostics() {
   const [actionErr, setActionErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [steps, setSteps]     = useState<StorageStep[] | null>(null)
+  const [storing, setStoring] = useState(false)
+
+  /**
+   * Walk the upload path without uploading anything.
+   *
+   * A real multipart POST, the same shape an attachment is, so it meets
+   * whatever the proxy does to those — but bound for a route that writes to
+   * the bucket, reads the object back over the public URL, deletes it, and
+   * reports each step. No task, no row, nothing left behind.
+   *
+   * This is the check that tells a broken bucket apart from a blocked
+   * request, which from the task panel look identical.
+   */
+  async function testStorage() {
+    setStoring(true); setSteps(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', new File([new Blob(['momentum storage check'])], 'storage-check.txt', { type: 'text/plain' }))
+      const res  = await fetch('/api/storage-check', { method: 'POST', body: fd })
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.steps) {
+        setSteps([{
+          step: 'Reaching the upload route', ok: false, ms: 0,
+          detail: res.redirected
+            ? 'the request was redirected — the session is not being accepted'
+            : `the server answered ${res.status}${json?.error ? ` (${json.error})` : ''}`,
+        }])
+        return
+      }
+      setSteps(json.steps)
+    } catch (e: unknown) {
+      setSteps([{ step: 'Reaching the upload route', ok: false, detail: String(e).slice(0, 200), ms: 0 }])
+    } finally {
+      setStoring(false)
+    }
+  }
 
   async function run() {
     setLoading(true); setHttpErr(''); setActionErr(''); setAction('idle')
@@ -84,17 +123,57 @@ export function Diagnostics() {
         be copied and sent on when something needs looking at.
       </p>
 
-      <button
-        onClick={run}
-        disabled={loading || isPending}
-        style={{
-          fontSize: '0.78rem', fontWeight: 700, padding: '9px 18px', borderRadius: 9,
-          border: 'none', background: 'var(--ink)', color: '#fff', cursor: 'pointer',
-          fontFamily: 'inherit', opacity: loading || isPending ? 0.6 : 1,
-        }}
-      >
-        {loading || isPending ? 'Checking…' : 'Run check'}
-      </button>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={run}
+          disabled={loading || isPending}
+          style={{
+            fontSize: '0.78rem', fontWeight: 700, padding: '9px 18px', borderRadius: 9,
+            border: 'none', background: 'var(--ink)', color: '#fff', cursor: 'pointer',
+            fontFamily: 'inherit', opacity: loading || isPending ? 0.6 : 1,
+          }}
+        >
+          {loading || isPending ? 'Checking…' : 'Run check'}
+        </button>
+
+        <button
+          onClick={testStorage}
+          disabled={storing}
+          style={{
+            fontSize: '0.78rem', fontWeight: 700, padding: '9px 18px', borderRadius: 9,
+            border: '1px solid var(--line)', background: '#fff', color: 'var(--ink)',
+            cursor: 'pointer', fontFamily: 'inherit', opacity: storing ? 0.6 : 1,
+          }}
+        >
+          {storing ? 'Testing…' : 'Test file storage'}
+        </button>
+      </div>
+
+      {steps && (
+        <div style={{ marginTop: 18, display: 'grid', gap: 8 }}>
+          {steps.map((s, i) => (
+            <div key={i} style={{
+              border: '1px solid var(--line)', borderRadius: 10, padding: '10px 14px',
+              background: s.ok ? '#F3FBF5' : '#FDF3F2',
+              display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+            }}>
+              <span aria-hidden="true">{s.ok ? '✅' : '❌'}</span>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--ink)' }}>{s.step}</span>
+              <span style={{ fontSize: '0.75rem', color: s.ok ? 'var(--muted)' : COLORS.coral }}>
+                {s.detail}
+              </span>
+              {s.ms > 0 && (
+                <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginLeft: 'auto' }}>{s.ms}ms</span>
+              )}
+            </div>
+          ))}
+          <p style={{ fontSize: '0.72rem', color: 'var(--muted)', margin: '2px 0 0', lineHeight: 1.5 }}>
+            The whole upload path except the file picker: a real multipart request,
+            the bucket, and reading the object back the way a browser would. Nothing
+            is attached to a task and the test object is deleted.
+          </p>
+        </div>
+      )}
 
       {httpErr && (
         <p role="alert" style={{ fontSize: '0.8rem', color: COLORS.coral, marginTop: 14 }}>{httpErr}</p>
