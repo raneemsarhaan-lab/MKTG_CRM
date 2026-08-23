@@ -44,7 +44,20 @@ const nextConfig: NextConfig = {
    */
   async headers() {
     return [{
-      source: '/api/auth/:path*',
+      /**
+       * Nothing under /api may be cached. Not one of these routes is a
+       * document: they are sign-ins, uploads, and reports about this
+       * deployment, and every one of them is personal to the request.
+       *
+       * This used to name only /api/auth, and something in front of the app
+       * took the silence as permission. An upload POST was answered from
+       * cache with the reply to somebody's earlier upload — a 200, with a
+       * real attachment in it, for a file the server never saw. The browser
+       * was told it had worked, no object reached the bucket, and no row was
+       * written. Three days of "the upload does nothing" was that, and from
+       * the panel it is indistinguishable from a broken feature.
+       */
+      source: '/api/:path*',
       headers: [
         { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, max-age=0' },
         { key: 'Pragma',        value: 'no-cache' },

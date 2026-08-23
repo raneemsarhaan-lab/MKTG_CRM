@@ -839,11 +839,20 @@ export function TaskModal({
           failed.push(`${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)`)
           continue
         }
+        // A fresh id per file, echoed back by the route. See below.
+        const ref  = crypto.randomUUID()
         const body = new FormData()
+        body.append('ref', ref)
         body.append('taskId', task.id)
         body.append('file', file)
         try {
-          const res  = await fetch('/api/attachments', { method: 'POST', body })
+          const res  = await fetch('/api/attachments', {
+            method: 'POST',
+            body,
+            // Belt and braces with the response header: an upload is never a
+            // document, and must never be answered from a stored copy.
+            cache:  'no-store',
+          })
           const json = await res.json().catch(() => null)
           if (!res.ok) {
             failed.push(`${file.name} — ${json?.error ?? res.statusText}`)
@@ -861,6 +870,19 @@ export function TaskModal({
             failed.push(res.redirected
               ? `${file.name} — your session expired; sign in again and retry`
               : `${file.name} — the server did not store it (unexpected reply)`)
+            continue
+          }
+          /* The reply has to be the reply to *this* request.
+           *
+           * Something in front of the app was answering upload POSTs from
+           * cache — a 200 carrying a real attachment, belonging to a file
+           * somebody else had uploaded days earlier. It passed every check
+           * above, so the panel refreshed, found nothing new, and showed
+           * nothing: three days of "the upload does nothing". The ref is one
+           * throwaway id per file; if it does not come back, the answer was
+           * not written for us, whatever else is in it. */
+          if (json.ref !== ref) {
+            failed.push(`${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.`)
             continue
           }
           if (file.type.startsWith('image/')) {
