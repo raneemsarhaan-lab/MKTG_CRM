@@ -78,7 +78,9 @@ export interface Task {
   brand?: Brand
   content_type_label: string
   platform?: string
-  campaign?: string
+  /** The project this work serves — the container, not a label. */
+  project_id?: string | null
+  project?: { id: string; name: string } | null
   task_owner_id: string
   /** Who is doing the work. Null when nobody has picked it up. */
   assignee_id?: string | null

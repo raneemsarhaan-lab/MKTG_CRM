@@ -74,7 +74,7 @@ export function applyBoardFilters<T extends Task>(
 
   return tasks.filter(t => {
     if (q) {
-      const hay = `${t.name} ${t.task_owner?.name ?? ''} ${t.campaign ?? ''} ${t.brand?.name ?? ''}`
+      const hay = `${t.name} ${t.task_owner?.name ?? ''} ${t.project?.name ?? ''} ${t.brand?.name ?? ''}`
       if (!hay.toLowerCase().includes(q)) return false
     }
     if (f.onlyMine && (t.assignee_id ?? t.task_owner_id) !== ctx.currentUserId) return false
@@ -223,6 +223,20 @@ export function BoardFilters({
       ? `${filters.dueFrom || '…'} → ${filters.dueTo || '…'}`
       : null
 
+  /**
+   * The count behind the tag.
+   *
+   * Read off the tasks the board already holds rather than fetched: the board
+   * has every row in memory, so a second source could only disagree with what
+   * is on screen. Null when no single brand is selected, which is what keeps
+   * the tag off the row until it is asked for.
+   */
+  const unattached = useMemo(() => {
+    if (filters.brandIds.length !== 1) return null
+    const id = filters.brandIds[0]
+    return tasks.filter(t => t.brand_id === id && !t.project_id).length
+  }, [filters.brandIds, tasks])
+
   const allBrands = filters.brandIds.length === 0
 
   return (
@@ -301,6 +315,23 @@ export function BoardFilters({
               </button>
             )
           })}
+
+          {/* How much of the selected brand's work has no project yet.
+              Only while a brand is selected: a prompt where somebody is
+              already looking, rather than a dashboard nobody asked for. */}
+          {unattached !== null && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, height: 34,
+              padding: '0 12px', borderRadius: 999, whiteSpace: 'nowrap',
+              background: unattached > 0 ? '#FFF3E0' : PIPE.surface,
+              color: unattached > 0 ? '#9A5B02' : PIPE.textMuted,
+              fontSize: 12.5, fontWeight: 600,
+            }}>
+              {unattached > 0
+                ? <><b style={{ fontWeight: 800 }}>{unattached}</b> no project assigned</>
+                : 'Every task has a project'}
+            </span>
+          )}
         </div>
 
         {/* View + filter — §6 right group */}
@@ -325,7 +356,7 @@ export function BoardFilters({
                 <PillSection label="Search">
                   <PillInput
                     value={filters.search}
-                    placeholder="Name, owner, campaign…"
+                    placeholder="Name, owner, project…"
                     onChange={e => set('search', e.target.value)}
                   />
                 </PillSection>

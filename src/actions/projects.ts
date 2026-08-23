@@ -612,3 +612,141 @@ export async function listLinkableSteps(): Promise<
   })
   return rows.map(r => ({ id: r.id, name: r.name, projectName: r.project.name }))
 }
+
+/* ── the project picker ──────────────────────────────────────────────────── */
+
+export interface PickerProject {
+  id: string
+  name: string
+  brandName: string | null
+  brandColor: string | null
+  focus: boolean
+  standing: boolean
+  taskCount: number
+  stepCount: number
+}
+
+/**
+ * Every project, with enough to draw the picker's first level.
+ *
+ * Thirty-eight rows, so all of them at once — the flat list this replaces was
+ * three hundred and eleven, which is precisely why it could not be read. What
+ * is inside a project is fetched only when one is opened.
+ *
+ * Read-only and signed-in: project names and counts are already on the plan.
+ */
+export async function listPickerProjects(): Promise<PickerProject[]> {
+  const member = await getSessionMember()
+  if (!member) return []
+
+  const rows = await prisma.project.findMany({
+    orderBy: [{ focus: 'desc' }, { name: 'asc' }],
+    select: {
+      id: true, name: true, focus: true, standing: true,
+      brand: { select: { name: true, color: true } },
+      _count: { select: { tasks: true, steps: { where: { parent_id: null } } } },
+    },
+  })
+
+  return rows.map(p => ({
+    id: p.id, name: p.name,
+    brandName:  p.brand?.name  ?? null,
+    brandColor: p.brand?.color ?? null,
+    focus: p.focus, standing: p.standing,
+    taskCount: p._count.tasks,
+    stepCount: p._count.steps,
+  }))
+}
+
+export interface PickerContents {
+  tasks: { id: string; name: string; status: string; assigneeName: string | null }[]
+  steps: { id: string; name: string; done: boolean; taskId: string | null }[]
+}
+
+/** What is inside one project — fetched when it is opened, not before. */
+export async function listProjectContents(projectId: string): Promise<PickerContents> {
+  const member = await getSessionMember()
+  if (!member) return { tasks: [], steps: [] }
+
+  const [tasks, steps] = await Promise.all([
+    prisma.task.findMany({
+      where:   { project_id: projectId },
+      orderBy: { created_at: 'desc' },
+      select:  { id: true, name: true, status: true, assignee: { select: { name: true } } },
+      take:    200,
+    }),
+    prisma.projectStep.findMany({
+      where:   { project_id: projectId, parent_id: null },
+      orderBy: { sort_order: 'asc' },
+      select:  { id: true, name: true, done: true, task_id: true },
+    }),
+  ])
+
+  return {
+    tasks: tasks.map(t => ({
+      id: t.id, name: t.name, status: t.status,
+      assigneeName: t.assignee?.name ?? null,
+    })),
+    steps: steps.map(s => ({ id: s.id, name: s.name, done: s.done, taskId: s.task_id })),
+  }
+}
+
+/**
+ * How much of a brand's work has no project yet.
+ *
+ * One number, shown on the board only while that brand is selected — a prompt
+ * where somebody is already looking, rather than a dashboard nobody asked for.
+ */
+export async function countUnattached(brandId: string): Promise<number> {
+  const member = await getSessionMember()
+  if (!member) return 0
+  return prisma.task.count({ where: { brand_id: brandId, project_id: null } })
+}
+
+/**
+ * Raise a task straight into a project.
+ *
+ * The quick way in from the plan: a name, and it lands under this project with
+ * the project's brand, owned by whoever typed it. Everything else — type,
+ * platform, dates — is corrected on the board afterwards, because demanding it
+ * here is how a quick capture becomes a form nobody fills in.
+ *
+ * Deliberately not convertStepToTask: that turns one planned step into its
+ * delivery and marks the step as produced. This is ordinary work under a
+ * project, which is now the common case and had no route at all.
+ */
+export async function createTaskInProject(
+  projectId: string,
+  name: string,
+): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  if (member.access === 'user') return { success: false, error: 'not_authorized' }
+  if (!name.trim()) return { success: false, error: 'A task needs a name' }
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId }, select: { id: true, name: true, brand_id: true },
+  })
+  if (!project) return { success: false, error: 'That project no longer exists' }
+
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+
+  const task = await prisma.task.create({
+    data: {
+      name:           name.trim(),
+      description:    `Raised under **${project.name}**.`,
+      brand_id:       project.brand_id,
+      project_id:     project.id,
+      task_owner_id:  member.id,
+      assignee_id:    member.id,
+      initiator_role: member.role,
+      created_by:     member.id,
+      status:         'todo',
+      nine_stage:     ws?.nine_stage_default ?? false,
+    },
+    select: { id: true },
+  })
+
+  revalidateAll()
+  return { success: true, taskId: task.id }
+}

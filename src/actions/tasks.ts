@@ -195,7 +195,7 @@ export interface TaskPatch {
   brand_id?:           string
   content_type_label?: string
   platform?:           string
-  campaign?:           string
+  project_id?:         string | null
   task_owner_id?:      string
   /** Null hands the task back to nobody. */
   assignee_id?:        string | null
@@ -230,7 +230,7 @@ export async function updateTask(
   if (patch.brand_id !== undefined)           data.brand_id           = patch.brand_id || null
   if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
   if (patch.platform !== undefined)           data.platform           = patch.platform || null
-  if (patch.campaign !== undefined)           data.campaign           = patch.campaign.trim() || null
+  if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
   if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
   if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
@@ -296,7 +296,7 @@ export async function createSubtask(
       brand_id:           parent.brand_id,
       content_type_label: parent.content_type_label,
       platform:           parent.platform,
-      campaign:           parent.campaign,
+      project_id:         parent.project_id,
       task_owner_id:      parent.task_owner_id,
       assignee_id:        parent.assignee_id,
       initiator_role:     member.role,
@@ -377,7 +377,7 @@ export async function bulkUpdateTasks(
     if (patch.brand_id !== undefined)           data.brand_id           = patch.brand_id || null
     if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
-    if (patch.campaign !== undefined)           data.campaign           = patch.campaign.trim() || null
+    if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
     if (patch.priority !== undefined)           data.priority           = patch.priority
     if (patch.due_date !== undefined) {
       const d = new Date(patch.due_date)
@@ -435,7 +435,7 @@ interface CreateTaskInput {
   assignee_id?:       string | null
   due_date:           string
   platform?:          string
-  campaign?:          string
+  project_id?:        string | null
   hours_estimate?:    number
   priority?:          'Low' | 'Medium' | 'High'
   cover_image_url?:   string
@@ -459,7 +459,7 @@ export async function createTask(
       brand_id:           input.brand_id || null,
       content_type_label: input.content_type_label || null,
       platform:           input.platform   ?? null,
-      campaign:           input.campaign   ?? null,
+      project_id:         input.project_id ?? null,
       task_owner_id:      input.task_owner_id,
       assignee_id:        input.assignee_id ?? input.task_owner_id,
       initiator_role:     member.role,
@@ -517,7 +517,7 @@ export async function createTasks(
         brand_id:           shared.brand_id,
         content_type_label: shared.content_type_label || null,
         platform:           shared.platform ?? null,
-        campaign:           shared.campaign ?? null,
+        project_id:         shared.project_id ?? null,
         task_owner_id:      shared.task_owner_id,
         assignee_id:        shared.assignee_id ?? shared.task_owner_id,
         initiator_role:     member.role,
