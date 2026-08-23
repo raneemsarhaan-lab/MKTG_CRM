@@ -12,6 +12,14 @@ import type { StageId } from '@/types/index'
 export const PANEL_ROWS = 12
 
 /**
+ * Rows for a panel sharing the stacked side column. Two panels there against
+ * one day planner beside them, so each gets roughly half the budget — a
+ * column that runs twice the height of the thing it sits next to is a column
+ * that has stopped being a sidebar.
+ */
+export const COLUMN_ROWS = 7
+
+/**
  * My Board presentation mappings — developer handoff §6.
  *
  * The badge label and dot colour are *derived* from the stage enum, never

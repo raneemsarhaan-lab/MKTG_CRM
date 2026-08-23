@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { MyBoard } from '@/components/myboard/MyBoard'
 import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
 import type { BreachRow } from '@/components/myboard/SlaBreachedPanel'
-import { typeEmoji, weekStart, weekSpan, PANEL_ROWS } from '@/lib/myboard'
+import { typeEmoji, weekStart, weekSpan, COLUMN_ROWS } from '@/lib/myboard'
 import { businessDaysBetween } from '@/lib/utils'
 import type { StageId } from '@/types/index'
 import type { Prisma } from '@prisma/client'
@@ -136,9 +136,9 @@ export default async function OverviewPage({
   // panel entirely — half the visible rows are held for each side unless one
   // is short. Nothing is dropped here: what does not fit is ordered behind
   // what does, and the panel counts the overflow on its "+N more" line.
-  const half     = Math.floor(PANEL_ROWS / 2)
-  const slipTake = Math.min(slipped.length, Math.max(half, PANEL_ROWS - shipped.length))
-  const shipTake = Math.min(shipped.length, PANEL_ROWS - slipTake)
+  const half     = Math.floor(COLUMN_ROWS / 2)
+  const slipTake = Math.min(slipped.length, Math.max(half, COLUMN_ROWS - shipped.length))
+  const shipTake = Math.min(shipped.length, COLUMN_ROWS - slipTake)
   const lastWeek = [
     ...slipped.slice(0, slipTake),
     ...shipped.slice(0, shipTake),

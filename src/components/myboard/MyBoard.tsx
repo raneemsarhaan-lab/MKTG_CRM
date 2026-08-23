@@ -7,7 +7,7 @@ import { BoardTaskPanel, type PanelTask } from './BoardTaskPanel'
 import { SlaBreachedPanel, type BreachRow } from './SlaBreachedPanel'
 import { MotivationBanner } from './MotivationBanner'
 import { MyDayTimeline } from '@/components/overview/MyDayTimeline'
-import { PANEL_ROWS } from '@/lib/myboard'
+import { PANEL_ROWS, COLUMN_ROWS } from '@/lib/myboard'
 import type { PlanTask } from '@/lib/day-plan'
 
 /**
@@ -69,8 +69,8 @@ export function MyBoard({
         marginBottom: 18,
       }}>
         {/* My Day is the working hours laid out rather than a list of what is
-            late. This Week beside it stays a list — the week ahead is
-            something you read, not something you are standing in.
+            late. The two weeks stack beside it as lists — a week is something
+            you read, not something you are standing in.
 
             The planner only makes sense for one person's day: it lays tasks
             across *your* working hours. In the team view it becomes a list,
@@ -90,45 +90,48 @@ export function MyBoard({
           <MyDayTimeline tasks={myDayPlan} accentColor="#6E5BE6" />
         )}
 
-        <BoardTaskPanel
-          title="This Week"
-          emoji="📅"
-          accent="var(--amber-accent-2)"
-          badgeBg="var(--amber-badge)"
-          badgeText="var(--amber-label)"
-          tasks={thisWeek}
-          subtitle={thisWeekSpan}
-          emptyCopy="Nothing left due this week ✨"
-          max={PANEL_ROWS}
-          ornament={
-            /* 34×50 violet lightning bolt, behind the content (§6) */
-            <svg viewBox="0 0 40 60" aria-hidden="true" style={{
-              position: 'absolute', right: 14, bottom: 14,
-              width: 34, height: 50, opacity: 0.85, zIndex: 0,
-            }}>
-              <path d="M22 2 L8 34 L18 34 L14 58 L34 26 L22 26 Z" fill="var(--bolt-violet)" />
-            </svg>
-          }
-        />
-      </div>
+        {/* The two weeks share the right column, next week's work above the
+            week just gone. Reading down the column is reading forwards in
+            time from today, which is the order you think in. Both are auto
+            height, so a quiet week takes the space it needs and no more. */}
+        <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
+          <BoardTaskPanel
+            title="This Week"
+            emoji="📅"
+            accent="var(--amber-accent-2)"
+            badgeBg="var(--amber-badge)"
+            badgeText="var(--amber-label)"
+            tasks={thisWeek}
+            subtitle={thisWeekSpan}
+            emptyCopy="Nothing left due this week ✨"
+            max={COLUMN_ROWS}
+            ornament={
+              /* 34×50 violet lightning bolt, behind the content (§6) */
+              <svg viewBox="0 0 40 60" aria-hidden="true" style={{
+                position: 'absolute', right: 14, bottom: 14,
+                width: 34, height: 50, opacity: 0.85, zIndex: 0,
+              }}>
+                <path d="M22 2 L8 34 L18 34 L14 58 L34 26 L22 26 Z" fill="var(--bolt-violet)" />
+              </svg>
+            }
+          />
 
-      {/* Last Week reads the other direction: what was due in those seven days
-          and is still open, then what actually shipped. Full width because it
-          is a retrospective, not a queue you work from. */}
-      <div style={{ marginBottom: 18 }}>
-        <BoardTaskPanel
-          title="Last Week"
-          emoji="🗓️"
-          accent="var(--green-accent)"
-          badgeBg="var(--green-badge)"
-          badgeText="var(--green-label)"
-          tasks={lastWeek}
-          subtitle={lastWeekSpan}
-          emptyCopy="Nothing landed last week"
-          showAdd={false}
-          /* The page has already ordered these so both halves survive the cut. */
-          max={PANEL_ROWS}
-        />
+          {/* Last Week reads the other direction: what was due in it and is
+              still open, then what actually shipped. */}
+          <BoardTaskPanel
+            title="Last Week"
+            emoji="🗓️"
+            accent="var(--green-accent)"
+            badgeBg="var(--green-badge)"
+            badgeText="var(--green-label)"
+            tasks={lastWeek}
+            subtitle={lastWeekSpan}
+            emptyCopy="Nothing landed last week"
+            showAdd={false}
+            /* The page has already ordered these so both halves survive the cut. */
+            max={COLUMN_ROWS}
+          />
+        </div>
       </div>
 
       <SlaBreachedPanel rows={breaches} />
