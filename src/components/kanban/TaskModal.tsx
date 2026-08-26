@@ -16,6 +16,7 @@ import { InlineValue } from './EditableCell'
 import { BriefEditor } from './BriefEditor'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
+import { useIsPhone } from '@/hooks/useMediaQuery'
 import {
   isImageAttachment, shortName, attachmentSrc, fileSize,
   MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO, MAX_UPLOAD_BYTES,
@@ -331,6 +332,7 @@ function IconButton({ name, label, onClick, size = 17, color = CU.label }: {
 }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} title={label}
+            className="fx-icon-btn"
             style={{
               width: 30, height: 30, borderRadius: 7, border: 'none', background: 'transparent',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -353,7 +355,7 @@ function Prop({ icon, label, children }: {
   icon: IconName; label: string; children: React.ReactNode
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '158px minmax(0, 1fr)', alignItems: 'center', minHeight: 38 }}>
+    <div className="fx-prop" style={{ display: 'grid', gridTemplateColumns: '158px minmax(0, 1fr)', alignItems: 'center', minHeight: 38 }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, fontSize: 15, color: CU.label }}>
         <Icon name={icon} size={16} />
         {label}
@@ -368,7 +370,7 @@ function Field({ icon, label, children }: {
   icon: IconName; label: string; children: React.ReactNode
 }) {
   return (
-    <div style={{
+    <div className="fx-field" style={{
       display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', alignItems: 'center',
       minHeight: 42, padding: '0 4px', borderBottom: `1px solid ${CU.lineSoft}`,
     }}>
@@ -430,6 +432,11 @@ export function TaskModal({
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [lightbox, setLightbox]           = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
+  /* Which half of the panel a phone is showing. Desktop shows both at once
+     and never reads this. Reset to the task on open, because arriving in
+     somebody's comment thread is not what tapping a card asks for. */
+  const isPhone                           = useIsPhone()
+  const [pane, setPane]                   = useState<'task' | 'activity'>('task')
   const [picked, setPicked]               = useState<string[]>([])
   const [pickedTasks, setPickedTasks]     = useState<string[]>([])
   const [mentionOpen, setMentionOpen]     = useState(false)
@@ -1287,6 +1294,7 @@ export function TaskModal({
   return (
     <div
       onClick={onClose}
+      className="fx-task-overlay"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)',
         zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1295,6 +1303,7 @@ export function TaskModal({
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="fx-task-panel"
         style={{
           background: '#fff', borderRadius: 12, width: '100%', maxWidth: 1280,
           height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -1388,11 +1397,48 @@ export function TaskModal({
           <IconButton name="close" label="Close task" onClick={onClose} size={18} />
         </div>
 
+        {/* ── Task / Activity, on a phone ──────────────────────────────────
+            Below 767px the 400px Activity column has nowhere to be: side by
+            side it would leave the task itself under 40px. The two become
+            tabs instead.
+
+            This is the case the useIsPhone hook exists for — the markup
+            differs, not just its size, and CSS cannot choose between two
+            subtrees. The usual cost of the hook, a frame of desktop layout
+            before hydration, is not paid here: the panel only ever opens on a
+            tap, long after the page has hydrated. */}
+        {isPhone && (
+          <div role="tablist" aria-label="Task sections" style={{
+            display: 'flex', gap: 4, padding: '8px 12px 0', flexShrink: 0,
+            borderBottom: `1px solid ${CU.line}`,
+          }}>
+            {(['task', 'activity'] as const).map(id => (
+              <button
+                key={id}
+                role="tab"
+                type="button"
+                aria-selected={pane === id}
+                onClick={() => setPane(id)}
+                style={{
+                  border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  padding: '8px 14px', minHeight: 44, fontSize: 14.5,
+                  fontWeight: pane === id ? 700 : 600,
+                  color: pane === id ? CU.ink : CU.faint,
+                  boxShadow: pane === id ? `inset 0 -2.5px 0 ${COLORS.violet ?? '#6E5BE6'}` : 'none',
+                }}
+              >
+                {id === 'task' ? 'Task' : `Activity ${task.comments.length || ''}`.trim()}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ── BODY ──────────────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
 
           {/* ── LEFT COLUMN ─────────────────────────────────────────────── */}
-          <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div hidden={isPhone && pane !== 'task'}
+               style={{ flex: '1 1 auto', display: isPhone && pane !== 'task' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0 }}>
 
             {/* chip row */}
             <div style={{
@@ -1985,6 +2031,7 @@ export function TaskModal({
                                     onClick={() => { setRenaming(a.id); setRenameText(a.filename) }}
                                     aria-label={`Rename ${a.filename}`}
                                     title={`Rename ${a.filename}`}
+                                    className="fx-icon-btn"
                                     style={{
                                       width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
                                       background: 'transparent', cursor: 'pointer', padding: 0,
@@ -2018,6 +2065,7 @@ export function TaskModal({
                                     }}
                                     aria-label={`Remove ${a.filename}`}
                                     title={`Remove ${a.filename}`}
+                                    className="fx-icon-btn"
                                     style={{
                                       width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
                                       background: 'transparent', cursor: 'pointer', padding: 0,
@@ -2051,10 +2099,15 @@ export function TaskModal({
           </div>
 
           {/* ── RIGHT — Activity rail ───────────────────────────────────── */}
-          <aside style={{
-            flex: '0 0 400px', display: 'flex', flexDirection: 'column',
-            borderInlineStart: `1px solid ${CU.line}`, minWidth: 0, background: '#fff',
-          }}>
+          <aside
+            hidden={isPhone && pane !== 'activity'}
+            className="fx-task-activity"
+            style={{
+              flex: '0 0 400px',
+              display: isPhone && pane !== 'activity' ? 'none' : 'flex',
+              flexDirection: 'column',
+              borderInlineStart: `1px solid ${CU.line}`, minWidth: 0, background: '#fff',
+            }}>
             <div style={{
               height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
               padding: '0 12px 0 18px', borderBottom: `1px solid ${CU.line}`,

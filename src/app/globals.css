@@ -281,6 +281,53 @@ html {
   .fx-motivation { padding: 20px 18px !important; gap: 14px !important; }
   .fx-motivation-extra { display: none !important; }
 
+  /* ── The task panel ───────────────────────────────────────────────────────
+     A 1280px modal floating inside 2vh/2vw of scrim is a desktop shape. On a
+     phone it takes the screen: no scrim margin, no corners, full height. dvh
+     again, so the browser's address bar does not push the bottom of the panel
+     — and the comment box — out of reach. */
+  /* Above the tab bar. A full-screen panel outranks the app's own navigation,
+     and at z-index 50 against the bar's 60 the nav sat across the bottom of
+     the task — over the comment box, which is the thing people open a task on
+     a phone to reach. */
+  .fx-task-overlay { padding: 0 !important; z-index: 70 !important; }
+  .fx-task-panel {
+    border-radius: 0 !important;
+    max-width: none !important;
+    height: 100dvh !important;
+  }
+
+  /* Activity is a tab here, not a column: it gets the whole width and loses
+     the divider it shared with the task. */
+  .fx-task-activity {
+    flex: 1 1 auto !important;
+    border-inline-start: 0 !important;
+  }
+
+  /* Fields put the label above the value. A 220px label column leaves 130px
+     for the value on a 390px screen, which is narrower than most of the
+     values — dates, names, a stage chip. */
+  .fx-prop,
+  .fx-field {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 2px;
+    padding: 9px 4px !important;
+    min-height: 0 !important;
+  }
+  .fx-prop > span:first-child,
+  .fx-field > span:first-child { font-size: 13px !important; }
+
+  /* Icon-only controls get a thumb-sized hit area without getting bigger.
+     Close, the ⋯ menu, rename and remove sit at 22–30px, which is fine for a
+     cursor and a coin-toss for a fingertip. The icon inside is untouched —
+     only the area that answers a tap grows. Wide text controls are left alone:
+     a 147×33 chip is already easy to hit. */
+  .fx-icon-btn {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+
   /* ── The day's slots ──────────────────────────────────────────────────────
      "09:00 – 10:00" is given a 104px gutter, which with the gap and the
      padding leaves about 226px of a 390px screen for the name of the task —
