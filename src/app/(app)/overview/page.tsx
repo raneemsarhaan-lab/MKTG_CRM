@@ -96,7 +96,8 @@ export default async function OverviewPage({
       priority:  (t.priority as 'High' | 'Medium' | 'Low') ?? 'Medium',
       dueOffset: due ? Math.round((due.getTime() - today.getTime()) / 86_400_000) : null,
       slaDays:   sla.get(`${t.status}|${t.content_type_label ?? ''}`) ?? 1,
-      ownerName: t.task_owner?.name ?? '—',
+      ownerName:   t.task_owner?.name ?? '—',
+      ownerAvatar: t.task_owner?.avatar_url ?? null,
       person:    t.assignee?.name ?? 'Unassigned',
     }
   })
@@ -155,6 +156,7 @@ export default async function OverviewPage({
       emoji:          r.emoji,
       stage:          r.stage,
       ownerName:      r.ownerName,
+      ownerAvatar:    r.ownerAvatar,
       dueDate:        r.dueDate,
       slaDays:        r.slaDays,
       breachedByDays: r.stageDays - r.slaDays,

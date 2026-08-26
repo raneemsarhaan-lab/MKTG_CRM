@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { STAGE_BADGE, longDate, humanDays } from '@/lib/myboard'
+import { initials, avatarColor } from '@/lib/utils'
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import type { StageId } from '@/types/index'
 
 /**
@@ -29,6 +31,8 @@ export interface BreachRow {
   emoji:          string
   stage:          StageId
   ownerName:      string
+  /** The owner's picture, when they have set one. */
+  ownerAvatar?:   string | null
   dueDate:        string | null  // ISO; null for imported history
   slaDays:        number
   breachedByDays: number
@@ -131,11 +135,45 @@ export function SlaBreachedPanel({ rows }: { rows: BreachRow[] }) {
                 </span>
               </td>
               <td data-label="Owner" style={{ border: 0 }}>
-                <span style={{
-                  background: 'var(--violet-badge)', color: 'var(--violet-label)',
-                  fontWeight: 700, fontSize: 12, padding: '3px 9px', borderRadius: 6,
-                }}>
-                  {b.ownerName}
+                {/* A face rather than a name chip.
+                  *
+                  * "Raneem S." in this column wrapped to two lines and pushed
+                  * the row apart; a name is the widest way to say who someone
+                  * is and this is the narrowest column that has to say it. The
+                  * picture is 26px whoever they are, and the name is still
+                  * there for a screen reader and on hover.
+                  *
+                  * On a phone the row is a card with room for both, so the
+                  * name comes back beside it — see .fx-owner in globals.css. */}
+                <span
+                  className="fx-owner"
+                  title={b.ownerName}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}
+                >
+                  <ImageWithFallback
+                    src={b.ownerAvatar}
+                    alt=""
+                    style={{
+                      width: 26, height: 26, borderRadius: '50%', objectFit: 'cover',
+                      flexShrink: 0, display: 'block',
+                    }}
+                    fallback={
+                      <span aria-hidden="true" style={{
+                        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                        background: avatarColor(b.ownerName), color: '#fff',
+                        display: 'grid', placeItems: 'center',
+                        fontSize: 10.5, fontWeight: 800, letterSpacing: '.02em',
+                      }}>
+                        {initials(b.ownerName)}
+                      </span>
+                    }
+                  />
+                  <span className="fx-owner-name" style={{
+                    fontWeight: 600, fontSize: 13, color: 'var(--ink-800)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {b.ownerName}
+                  </span>
                 </span>
               </td>
               <td data-label="Due" style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 600 }}>

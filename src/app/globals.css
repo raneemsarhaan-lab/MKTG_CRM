@@ -270,6 +270,8 @@ html {
     color: var(--ink-400);
     font-weight: 600;
   }
+  /* The owner sits on the right of its card row, face first. */
+  .fx-owner { justify-content: flex-end; }
   /* The 1023px rule hid this column; a card has room for it. */
   .fx-sla td:nth-child(4) { display: flex !important; }
 
