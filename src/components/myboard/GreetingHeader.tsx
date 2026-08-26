@@ -21,9 +21,12 @@ export function GreetingHeader({
   const word = greetingWord(now.getHours())
 
   return (
-    <div style={{
+    /* The class is the phone's handle on this row: at 390px the greeting and
+       the Mine / Team switch beside it come to 417px, and the page scrolls
+       sideways. globals.css wraps it there. Everything else is unchanged. */
+    <div className="fx-greeting" style={{
       display: 'flex', justifyContent: 'space-between',
-      alignItems: 'flex-start', marginBottom: 26,
+      alignItems: 'flex-start', marginBottom: 26, gap: 12,
     }}>
       <div>
         {/* Same treatment as the board's greeting — accent face at 44, the

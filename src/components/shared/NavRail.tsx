@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { NAV_ICON, navFor } from '@/lib/nav'
 import type { Member } from '@/types/index'
 import { initials, avatarColor } from '@/lib/utils'
 import { LangToggle } from './LangToggle'
@@ -28,85 +29,11 @@ interface NavRailProps {
   onExpand?: () => void
 }
 
-const ICON = {
-  // Lucide layout-grid
-  board: (
-    <>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-    </>
-  ),
-  // Lucide layout-dashboard
-  overview: (
-    <>
-      <rect width="7" height="9" x="3" y="3" rx="1" />
-      <rect width="7" height="5" x="14" y="3" rx="1" />
-      <rect width="7" height="9" x="14" y="12" rx="1" />
-      <rect width="7" height="5" x="3" y="16" rx="1" />
-    </>
-  ),
-  // Lucide target
-  projects: (
-    <>
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </>
-  ),
-  // Lucide list-checks
-  team: (
-    <>
-      <path d="m3 17 2 2 4-4" />
-      <path d="m3 7 2 2 4-4" />
-      <line x1="13" x2="21" y1="6" y2="6" />
-      <line x1="13" x2="21" y1="12" y2="12" />
-      <line x1="13" x2="21" y1="18" y2="18" />
-    </>
-  ),
-  // Lucide users
-  capacity: (
-    <>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </>
-  ),
-  // Lucide sliders-horizontal
-  settings: (
-    <>
-      <line x1="21" x2="14" y1="4" y2="4" />
-      <line x1="10" x2="3" y1="4" y2="4" />
-      <line x1="21" x2="12" y1="12" y2="12" />
-      <line x1="8" x2="3" y1="12" y2="12" />
-      <line x1="21" x2="16" y1="20" y2="20" />
-      <line x1="12" x2="3" y1="20" y2="20" />
-      <line x1="14" x2="14" y1="2" y2="6" />
-      <line x1="8" x2="8" y1="10" y2="14" />
-      <line x1="16" x2="16" y1="18" y2="22" />
-    </>
-  ),
-}
-
-// Overview first: it is where "/" and signing in both land, so it is the
-// home of this app and the nav should not say otherwise.
-const NAV_ITEMS = [
-  { href: '/overview', key: 'overview', icon: ICON.overview, adminOnly: false },
-  { href: '/board',    key: 'board',    icon: ICON.board,    adminOnly: false },
-  { href: '/projects', key: 'projects', icon: ICON.projects, adminOnly: false },
-  { href: '/team',     key: 'team',     icon: ICON.team,     adminOnly: false },
-  { href: '/capacity', key: 'capacity', icon: ICON.capacity, adminOnly: true  },
-  { href: '/settings', key: 'settings', icon: ICON.settings, adminOnly: true  },
-] as const
-
 export function NavRail({ member, onExpand }: NavRailProps) {
   const pathname = usePathname()
-  const isAdmin  = member.access === 'admin'
   const t        = useTranslations('nav')
 
-  const items = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin)
+  const items = navFor(member.access)
 
   return (
     <aside
@@ -157,7 +84,7 @@ export function NavRail({ member, onExpand }: NavRailProps) {
           aria-label="Main navigation"
           style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}
         >
-          {items.map(({ href, key, icon }) => {
+          {items.map(({ href, key }) => {
             const active = pathname.startsWith(href)
             return (
               <Link
@@ -191,7 +118,7 @@ export function NavRail({ member, onExpand }: NavRailProps) {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  {icon}
+                  {NAV_ICON[key]}
                 </svg>
               </Link>
             )
