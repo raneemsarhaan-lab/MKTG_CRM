@@ -281,6 +281,55 @@ html {
   .fx-motivation { padding: 20px 18px !important; gap: 14px !important; }
   .fx-motivation-extra { display: none !important; }
 
+  /* ── The board ────────────────────────────────────────────────────────────
+     Eleven 244px columns on one scrolling row is about seven phone screens
+     wide. Squeezing them would make a worse tool, not a smaller one, so the
+     same columns stack instead: each stage a heading with its cards at full
+     width beneath it. The board's own component already draws that; it only
+     needed to stop flowing sideways. Empty stages are dropped in the
+     component — stacked, they are headings with nothing under them. */
+  .fx-board-cols {
+    grid-auto-flow: row !important;
+    grid-auto-columns: auto !important;
+    overflow-x: visible !important;
+    padding: 0 14px 16px !important;
+    gap: 18px !important;
+  }
+  /* Each column scrolled internally to fit a fixed-height row; stacked, the
+     page does the scrolling and a column is as tall as its cards. */
+  .fx-board-cols > div > div:last-child { overflow-y: visible !important; }
+
+  /* The greeting and the search / bell / avatar / New task cluster unrolled
+     into a 700px column before the board even started. */
+  .fx-board-head { padding: 16px 14px 0 !important; gap: 12px !important; }
+  .fx-board-head > div:first-child span { font-size: 30px !important; }
+
+  /* Five controls, five rows. Search takes the first line with the bell
+     beside it; the upstream toggle and New task share the second. */
+  .fx-board-tools { width: 100%; gap: 10px !important; padding-top: 0 !important; }
+  .fx-board-search { flex: 1 1 200px; }
+  .fx-board-ident  { flex: 1 1 auto; }
+  /* The avatar and the name beside it: the More tab already says who you are
+     signed in as, and this is the only row here you cannot act on. */
+  .fx-board-ident > span { display: none !important; }
+
+  /* Two-up hero cards: a 1fr of 390px is about 110px, which is where the
+     Daily Spark card was setting one letter per line. */
+  .fx-hero-split { grid-template-columns: minmax(0, 1fr) !important; }
+
+  /* Completed / In Progress / Review / Published. Four across insists on
+     342px and the min-width holds that floor even once the card is narrower
+     — the last of the four hung 15px off the right edge and took the whole
+     page sideways with it. Two across, no floor, same four counts. */
+  .fx-statgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    min-width: 0 !important;
+  }
+
+  /* See the comment on the element: the dial repeats the percentage printed
+     next to it, and costs a fifth of the screen to do it. */
+  .fx-donut { display: none !important; }
+
   /* ── The task panel ───────────────────────────────────────────────────────
      A 1280px modal floating inside 2vh/2vw of scrim is a desktop shape. On a
      phone it takes the screen: no scrim margin, no corners, full height. dvh

@@ -21,6 +21,7 @@ import {
 } from './BoardFilters'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
+import { useIsPhone } from '@/hooks/useMediaQuery'
 import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
 
@@ -307,6 +308,7 @@ export function KanbanBoard({
    * localStorage while rendering makes the server and client disagree.
    */
   const [showUpstream, setShowUpstream] = useState(true)
+  const isPhone = useIsPhone()
   useEffect(() => {
     const stored = window.localStorage.getItem('momentum.board.upstream')
     setShowUpstream(stored !== null ? stored === '1' : !startsDownstream(currentUser.role))
@@ -320,9 +322,20 @@ export function KanbanBoard({
   const upstreamCount = tasks.filter(
     t => (UPSTREAM_STAGES as string[]).includes(t.status),
   ).length
-  const shownStages = showUpstream
+  const stagesInScope = showUpstream
     ? ALL_STAGES
     : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
+
+  /* Stacked, an empty stage is a heading with nothing beneath it.
+   *
+   * Side by side an empty column still says something — it shows the shape of
+   * the pipeline and gives a card somewhere to be dropped. One under another
+   * it is eleven headings to scroll past to reach the work, and there is no
+   * dropping on a phone anyway. So the phone shows only the stages that have
+   * something in them. */
+  const shownStages = isPhone
+    ? stagesInScope.filter(id => (tasksByStage[id] ?? []).length > 0)
+    : stagesInScope
 
 
   // ── Bulk selection ────────────────────────────────────────────────────────
@@ -419,7 +432,7 @@ export function KanbanBoard({
       }}
     >
       {/* Greeting header — Pipeline handoff §4. */}
-      <div style={{
+      <div className="fx-board-head" style={{
         padding: '24px 26px 0 38px', flexShrink: 0, display: 'flex',
         alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap',
       }}>
@@ -442,15 +455,20 @@ export function KanbanBoard({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 6, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative' }}>
+        {/* Search, bell, upstream toggle, identity, New task. On a desktop
+            this is one line; wrapped onto a 390px screen each part took a row
+            of its own and the board started 370px down the page. The classes
+            let globals.css pair them up and drop the identity chip, which the
+            More tab already carries. */}
+        <div className="fx-board-tools" style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 6, flexWrap: 'wrap' }}>
+          <div className="fx-board-search" style={{ position: 'relative' }}>
             <input
               value={filters.search}
               onChange={e => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search tasks, campaigns, assets..."
               aria-label="Search tasks"
               style={{
-                width: 362, height: 46, boxSizing: 'border-box',
+                width: 362, maxWidth: '100%', height: 46, boxSizing: 'border-box',
                 border: `1px solid ${PIPE.borderInput}`, borderRadius: 999,
                 background: '#FFFFFF', padding: '0 12px 0 44px',
                 fontSize: 13.5, fontWeight: 500, color: PIPE.textPrimary,
@@ -579,7 +597,7 @@ export function KanbanBoard({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="fx-board-ident" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
 
             {/* Upstream columns. Always present rather than only when hidden,
                 so the control does not move about depending on state. */}
@@ -728,8 +746,12 @@ export function KanbanBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={() => { setActiveDragId(null); setOverStage(null) }}
       >
-        {/* §7 board: fixed 244px columns on a single scrolling row. */}
-        <div style={{
+        {/* §7 board: fixed 244px columns on a single scrolling row.
+            On a phone the same columns stack — see .fx-board-cols. Eleven
+            columns at 244px is about seven screens wide, and shrinking them
+            makes a worse tool rather than a smaller one; stacked, each stage
+            is a heading with its cards at full width under it. */}
+        <div className="fx-board-cols" style={{
           display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
