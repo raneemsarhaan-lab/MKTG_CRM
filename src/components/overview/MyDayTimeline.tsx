@@ -281,7 +281,7 @@ function Row({ slot: sl, now, onEstimate }: {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   return (
-    <div style={{
+    <div className="fx-slot" style={{
       display: 'grid', gridTemplateColumns: '104px minmax(0, 1fr) auto',
       gap: 12, alignItems: 'start', padding: '9px 10px', borderRadius: 10,
       background: live ? UI.now : sl.kind === 'rest' ? UI.restBg : 'transparent',
