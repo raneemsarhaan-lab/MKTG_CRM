@@ -98,7 +98,8 @@ export function WorkloadPanel({
       </div>
 
       {/* ── KPI row ────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+      {/* Five tiles across — two on a phone, see .fx-kpi-row. */}
+      <div className="fx-kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
         <Kpi tile={TILE.purple} stroke={UI.purple} icon="folder" label="Projects"
              value={String(port.projects)}
              caption={`${port.projects - port.projectsDone} active · ${port.projectsDone} done`} />
@@ -124,7 +125,7 @@ export function WorkloadPanel({
       {/* ── By brand ───────────────────────────────────────────────────── */}
       <section style={{ ...card, borderRadius: 18, padding: '16px 20px 18px' }}>
         <Caption>By brand</Caption>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="fx-scroll-x" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 620 }}>
             <thead>
               <tr>
@@ -164,7 +165,7 @@ export function WorkloadPanel({
         <Caption>
           Capacity · {a.workingDays} working days to {fmtDate(a.periodEnd)} · each person&rsquo;s own weekly hours
         </Caption>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="fx-scroll-x" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 680 }}>
             <thead>
               <tr>

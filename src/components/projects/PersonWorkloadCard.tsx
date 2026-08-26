@@ -52,7 +52,8 @@ export function PersonWorkloadCard({ load, hoursPerStepDay, compact, onClose }: 
              aria-label={`Workload for ${load.name}`}>
       <Header load={load} color={color} onClose={onClose} />
 
-      <div style={{
+      {/* Two on a phone whichever mode this is in — see .fx-kpi-row. */}
+      <div className="fx-kpi-row" style={{
         display: 'grid', gap: 12, marginTop: 18,
         gridTemplateColumns: `repeat(${compact ? 2 : 4}, 1fr)`,
       }}>

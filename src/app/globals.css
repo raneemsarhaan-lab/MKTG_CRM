@@ -392,6 +392,105 @@ html {
     font-size: 11.5px !important;
   }
 
+  /* ── Projects and Team ────────────────────────────────────────────────────
+     Both pages are built to the same plan: a padded column, a header with
+     something beside the title, a row of KPI tiles, then a tab strip. They
+     share the classes because they share the problem. */
+  .fx-proj { padding: 16px 14px 32px !important; gap: 16px !important; }
+
+  /* The thing beside the title — a Focus / Aspiring toggle on Projects, the
+     person picker and progress card on Team — drops below it. */
+  .fx-proj-head { flex-wrap: wrap !important; gap: 14px !important; }
+
+  /* Four and five tiles across come to 64–80px each on a 390px screen, which
+     is narrower than "4/111". Two across, and they read. */
+  .fx-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  /* Three project cards across becomes one. */
+  .fx-col1 { grid-template-columns: minmax(0, 1fr) !important; }
+
+  /* Tab strips — Settings' five, Projects' five, Team's. inline-flex sizes
+     the strip to its contents, so the last tabs sat past the right edge of a
+     container that scrolls sideways with no affordance saying so: whole
+     pages of the app with no way to reach them. Two rows instead. */
+  .fx-tabs {
+    display: flex !important;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  /* Rows built as one long line — a project, a step, a person's task. Each
+     ends in the controls that act on it, and on a phone those were the part
+     that fell off the edge. Wrapping keeps every control, in order; the name
+     takes the first line and what acts on it takes the next. */
+  .fx-step-row {
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+  }
+  .fx-step-name { flex: 1 1 150px !important; }
+
+  /* Two dense numeric tables stay tables — the SLA matrix and the capacity
+     table are read by comparing across a row, which a stack of cards cannot
+     do. They already scrolled sideways; what was missing was any sign that
+     they did, so the columns past the edge simply looked absent. The line
+     sticks to the left edge so it is readable wherever the table is scrolled
+     to, and it is content, not decoration, so a screen reader reads it. */
+  .fx-scroll-x::after {
+    content: 'Scroll sideways for the rest of this table →';
+    position: sticky;
+    left: 0;
+    display: block;
+    margin-top: 9px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  /* Team's header cluster: decoration out, the card takes the width. */
+  .fx-team-aside    { width: 100%; }
+  .fx-team-illus    { display: none !important; }
+  .fx-progress-card { width: 100% !important; }
+
+  /* The 21-day workload chart. A clipped bar chart shows you it continues —
+     unlike a table, where a column past the edge just looks absent — so this
+     one scrolls without a caption. */
+  .fx-horizon { grid-template-columns: 28px minmax(0, 1fr) !important; }
+  .fx-horizon > div:last-child { overflow-x: auto; }
+  .fx-horizon > div:last-child > * { min-width: 470px; }
+
+  /* A 232px brand select and everything after it on one line. */
+  .fx-filter-row { flex-wrap: wrap !important; gap: 10px !important; }
+  .fx-filter-row > label { width: 100% !important; }
+
+  /* ── Settings ─────────────────────────────────────────────────────────────
+     The page is a 900px column inside 40px of padding either side. The
+     padding is a fifth of a 390px screen before anything is drawn. */
+  .fx-settings { padding: 20px 14px 40px !important; }
+
+  /* ── Settings › Team & Access ─────────────────────────────────────────────
+     The member row wraps: avatar and name take the first line, then capacity,
+     access, seniority and the badges, then Save and Remove. Nothing is hidden
+     — every control an admin has on a desktop is on the phone too, in the
+     same order, reading down instead of across. */
+  .fx-member-row {
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+  /* Wide enough that a name is legible, narrow enough that the row after it
+     still has somewhere to start. */
+  .fx-member-id { flex: 1 1 160px !important; }
+
+  /* The password row carries the photo control at the end of it — 210px with
+     nowhere to go on this screen, so it takes a line of its own. The indent
+     that aligns this under the name on a desktop is dropped; there is no
+     width here to spend on alignment. */
+  .fx-member-pwd {
+    flex-wrap: wrap !important;
+    padding-left: 0 !important;
+    row-gap: 8px !important;
+  }
+  .fx-member-photo { width: 100% !important; }
+
   /* iOS zooms the page when a focused field is under 16px. That zoom does not
      undo itself, so the rest of the app is left magnified and scrolling
      sideways — one of the fastest ways to make a site feel broken. */
