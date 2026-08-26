@@ -6,11 +6,18 @@
  *
  * Both quote lines are white-space: nowrap; if the copy is ever changed, keep
  * the two lines to a combined 34 characters or they overflow at 1280px.
+ *
+ * On a phone the arrow and the sticky note are dropped (.fx-motivation-extra
+ * in globals.css). There is room for the quote and the mug at 390px and not
+ * for five things, and the whole banner is aria-hidden — it says nothing a
+ * reader loses. Crowding all of it in put the words underneath the ornaments,
+ * which is worse than showing fewer of them.
  */
 export function MotivationBanner() {
   return (
     <div
       aria-hidden="true"
+      className="fx-motivation"
       style={{
         background:   'linear-gradient(100deg, #4A3BB0, #8B7CF0)',
         borderRadius: 18,
@@ -63,7 +70,8 @@ export function MotivationBanner() {
         </svg>
       </div>
 
-      <svg viewBox="0 0 40 24" style={{ width: 36, height: 22, flexShrink: 0, opacity: 0.8 }}>
+      <svg viewBox="0 0 40 24" className="fx-motivation-extra"
+           style={{ width: 36, height: 22, flexShrink: 0, opacity: 0.8 }}>
         <path d="M2 20 C 14 22, 24 8, 36 4" fill="none" stroke="#fff"
               strokeWidth="1.5" strokeLinecap="round" />
         <path d="M28 3 L36 4 L34 11" fill="none" stroke="#fff"
@@ -71,7 +79,7 @@ export function MotivationBanner() {
       </svg>
 
       {/* Sticky note — deliberately square-ish 3px radius, rotated -2deg */}
-      <div style={{
+      <div className="fx-motivation-extra" style={{
         background: 'var(--sticky-note)', color: 'var(--ink-800)',
         padding: '10px 16px', borderRadius: 3,
         fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 15,

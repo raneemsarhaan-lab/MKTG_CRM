@@ -13,6 +13,14 @@ import type { StageId } from '@/types/index'
  *
  * Rules: at most 3 rows, sorted most-breached first, and the whole panel is
  * hidden when empty — never render an empty red table.
+ *
+ * On a phone it stays a table and stops looking like one. Five columns in
+ * 362px crushed the task names to "P…" and "Di…" and ran the headers together
+ * as "DUE DATEBREACHED BY" — the panel that exists to tell you what is late
+ * could not tell you which thing. Each row becomes a card instead, with every
+ * cell carrying its column name in `data-label` for the phone rules in
+ * globals.css to print beside the value. The markup is unchanged, so what a
+ * screen reader is handed is still a table with real headers.
  */
 
 export interface BreachRow {
@@ -81,7 +89,7 @@ export function SlaBreachedPanel({ rows }: { rows: BreachRow[] }) {
         </Link>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table className="fx-sla" style={{ width: '100%', borderCollapse: 'collapse' }}>
         <caption className="sr-only">Tasks that have breached their SLA</caption>
         <thead>
           <tr style={{
@@ -122,7 +130,7 @@ export function SlaBreachedPanel({ rows }: { rows: BreachRow[] }) {
                   {STAGE_BADGE[b.stage].label}
                 </span>
               </td>
-              <td style={{ border: 0 }}>
+              <td data-label="Owner" style={{ border: 0 }}>
                 <span style={{
                   background: 'var(--violet-badge)', color: 'var(--violet-label)',
                   fontWeight: 700, fontSize: 12, padding: '3px 9px', borderRadius: 6,
@@ -130,12 +138,12 @@ export function SlaBreachedPanel({ rows }: { rows: BreachRow[] }) {
                   {b.ownerName}
                 </span>
               </td>
-              <td style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 600 }}>
+              <td data-label="Due" style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 600 }}>
                 {b.dueDate ? longDate(b.dueDate) : '—'}
               </td>
               {/* SLA is the contracted turnaround, not the overrun (§7) */}
-              <td style={{ border: 0, color: 'var(--ink-500)' }}>{b.slaDays}d</td>
-              <td style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 700 }}>
+              <td data-label="SLA" style={{ border: 0, color: 'var(--ink-500)' }}>{b.slaDays}d</td>
+              <td data-label="Breached by" style={{ border: 0, color: 'var(--red-accent-2)', fontWeight: 700 }}>
                 {humanDays(b.breachedByDays)}
               </td>
             </tr>
