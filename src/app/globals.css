@@ -180,8 +180,9 @@ html {
 }
 
 /* ─── My Board responsive — handoff §9.3 ─────────────────────────────────────
-   ≥1280px is the reference layout. Below 768px is explicitly out of scope for
-   this release and needs a mobile design pass. */
+   ≥1280px is the reference layout. Phone width — 767px and below — is handled
+   by the shell rules further down; the per-screen mobile passes are still to
+   come, screen by screen. */
 @media (max-width: 1279px) {
   .fx-myboard { padding: 28px 28px 32px !important; }
 }
@@ -196,6 +197,48 @@ html {
   .fx-myboard td:nth-child(4) { display: none; }
   .fx-myboard thead tr,
   .fx-myboard tbody tr { grid-template-columns: 2fr 1fr 1fr 1fr !important; }
+}
+
+/* ─── Phone shell ────────────────────────────────────────────────────────────
+   767px matches PHONE_MAX in src/lib/breakpoints.ts, which is what the
+   useIsPhone hook reads. A stylesheet cannot import, so the number is written
+   twice; if one moves, move both, or components and layout will disagree at
+   exactly one width.
+
+   The shell switches here rather than in JavaScript on purpose. The server has
+   no viewport, so a JS switch renders the desktop sidebar, hydrates, and jumps
+   — on the very first screen someone sees. CSS is right on the first paint. */
+.fx-tabbar { display: none; }
+
+@media (max-width: 767px) {
+  /* The 200px sidebar is half a phone. Both its forms go; the tab bar
+     replaces them. */
+  .fx-shell > aside { display: none !important; }
+  .fx-tabbar { display: flex; }
+
+  /* Room for the bar, plus the home indicator underneath it, so the last row
+     of any list is reachable rather than sitting behind the navigation. */
+  .fx-shell > main {
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Screen padding built for a 1280px canvas wastes a third of a phone. */
+  .fx-myboard { padding: 18px 14px 22px !important; }
+
+  /* The greeting and the Mine / Team switch do not fit on one line at 390px —
+     together they measure 417 and the whole page scrolls sideways. Wrapping
+     is the whole fix; the switch drops under the greeting and sits left with
+     it rather than hanging off the edge. */
+  .fx-greeting { flex-wrap: wrap; }
+  .fx-greeting > div:last-child { text-align: left !important; }
+
+  /* The greeting is set at 44px for a 1280px canvas. */
+  .fx-greeting h1 { font-size: 34px !important; }
+
+  /* iOS zooms the page when a focused field is under 16px. That zoom does not
+     undo itself, so the rest of the app is left magnified and scrolling
+     sideways — one of the fastest ways to make a site feel broken. */
+  input, select, textarea { font-size: 16px; }
 }
 
 /* Visually-hidden text that stays available to screen readers */

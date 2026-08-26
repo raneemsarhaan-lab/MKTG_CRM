@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Member } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
+import { logout } from '@/lib/logout'
 import { initials, avatarColor } from '@/lib/utils'
 import { ImageWithFallback } from './ImageWithFallback'
 import { ImageUpload } from './ImageUpload'
@@ -19,12 +20,7 @@ import { updateMyProfile, changeMyPassword } from '@/actions/profile'
  * request fails, the navigation still happens — /login is the right place to
  * end up either way.
  */
-async function logout() {
-  try {
-    await fetch('/api/logout', { method: 'POST', cache: 'no-store', credentials: 'same-origin' })
-  } catch { /* navigate regardless */ }
-  window.location.assign('/login')
-}
+
 
 /**
  * The account menu behind the sidebar's user row.
