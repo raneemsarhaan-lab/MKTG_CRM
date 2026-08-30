@@ -237,7 +237,31 @@ export function BoardFilters({
     return tasks.filter(t => t.brand_id === id && !t.project_id).length
   }, [filters.brandIds, tasks])
 
+  /* An empty brandIds is "no brand filter", which is what every read of it
+     elsewhere expects — the board, the counts, the URL. But nothing selected
+     and everything selected are the same board, and the chips used to draw
+     that state as every brand switched off, which reads as "showing none".
+     So the chips are drawn from this instead: all on until one is taken off. */
   const allBrands = filters.brandIds.length === 0
+  const selectedBrands = allBrands ? brands.map(b => b.id) : filters.brandIds
+
+  /** Turn one brand off, or back on, from a set that starts with all of them. */
+  const toggleBrand = (id: string) => {
+    const next = selectedBrands.includes(id)
+      ? selectedBrands.filter(x => x !== id)
+      : [...selectedBrands, id]
+    // Back to every brand, or down to none: both are the same board, and a
+    // board filtered to nothing is a dead end nobody chooses on purpose. The
+    // filter goes back to empty, and the pill says so.
+    set('brandIds', next.length === 0 || next.length === brands.length ? [] : next)
+  }
+
+  // What the pill says. Naming the one brand is more use than counting to one.
+  const brandLabel = allBrands
+    ? 'All brands'
+    : selectedBrands.length === 1
+      ? brands.find(b => b.id === selectedBrands[0])?.name ?? '1 brand'
+      : `${selectedBrands.length} of ${brands.length} brands`
 
   return (
     <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
@@ -273,11 +297,16 @@ export function BoardFilters({
         </div>
 
         {/* Brand chips — §6 left group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
+        {/* At 390px the chips wrap inside this group, which makes it three
+            rows tall; centred against the scope switch beside it, its first
+            row then sat *above* "Only me / Team" and the row read backwards.
+            globals.css gives it its own line there. */}
+        <div className="fx-filter-brands" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
           <button
             type="button"
             onClick={() => set('brandIds', [])}
             aria-pressed={allBrands}
+            title={allBrands ? 'Every brand is showing' : 'Show every brand again'}
             style={{
               ...CHIP_BASE,
               background: allBrands ? PIPE.limePrimary : '#FFFFFF',
@@ -286,8 +315,7 @@ export function BoardFilters({
               color: allBrands ? PIPE.ink : PIPE.textPrimary,
             }}
           >
-            <GridIcon fill={allBrands ? PIPE.ink : PIPE.textPrimary} />
-            All brands
+            {brandLabel}
           </button>
 
           {/* Logo only. Five brands spelled out in full ate the whole row and
@@ -295,15 +323,15 @@ export function BoardFilters({
               part people actually recognise. The name is still on the button
               for anyone hovering, and for a screen reader it is all there is. */}
           {brands.map(b => {
-            const on = filters.brandIds.includes(b.id)
+            const on = selectedBrands.includes(b.id)
             return (
               <button
                 key={b.id}
                 type="button"
-                onClick={() => toggle('brandIds', b.id)}
+                onClick={() => toggleBrand(b.id)}
                 aria-pressed={on}
                 aria-label={b.name}
-                title={b.name}
+                title={on ? `${b.name} — click to hide` : `${b.name} — click to show`}
                 style={{
                   ...CHIP_BASE,
                   width: 44, padding: 0, borderRadius: '50%', justifyContent: 'center',

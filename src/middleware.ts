@@ -29,9 +29,23 @@ export default async function middleware(req: NextRequest) {
  * `api/login` and `api/logout` are the sign-in path itself; guarding them
  * would make signing in require being signed in. `api/session-check` reports
  * why a session is missing, so it has to answer for someone who has none.
+ *
+ * The manifest and the icons are here because a browser does not fetch them
+ * as the person. A `<link rel="manifest">` is fetched with credentials
+ * omitted unless it carries crossorigin="use-credentials", and the icon
+ * fetches behave the same way, so every one of them arrived here without the
+ * session cookie and was answered with the login page. The browser then had
+ * HTML where it wanted JSON or a PNG, said nothing, and simply did not offer
+ * to install the app. The tab icon had the same problem for anyone signed
+ * out, which is every visit to /login.
+ *
+ * All five files are the product's name and mark. They carry no workspace
+ * data and reveal nothing that the login page does not already show.
  */
+/* One unbroken string on purpose: Next parses this pattern out of the source
+   at build time, so it cannot be split across concatenated lines. */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/login|api/logout|api/session-check|login).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg|apple-icon.png|icon-192.png|icon-512.png|icon-maskable-512.png|api/auth|api/login|api/logout|api/session-check|login).*)',
   ],
 }
