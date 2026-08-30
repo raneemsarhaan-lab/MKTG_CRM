@@ -8,7 +8,6 @@ import {
   activityItems, attentionItems, quoteOfDay, statCounts, timeAgo, weekMomentum,
 } from '@/lib/home-metrics'
 import { initials, avatarColor } from '@/lib/utils'
-import { PHONE_QUERY } from '@/lib/breakpoints'
 
 /**
  * The four hero cards — Pipeline handoff §5.
@@ -63,10 +62,7 @@ function CardTitle({ icon, children, trailing }: {
 function Donut({ pct }: { pct: number }) {
   const deg = Math.round((Math.min(100, Math.max(0, pct)) / 100) * 360)
   return (
-    /* The dial says the same thing as the 62px figure beside it. On a desktop
-       that repetition is the card's shape; on a phone it is 148px of the
-       screen spent saying the number twice, so globals.css drops it. */
-    <div className="fx-donut" style={{ width: 148, height: 148, position: 'relative', flexShrink: 0 }}>
+    <div style={{ width: 148, height: 148, position: 'relative', flexShrink: 0 }}>
       <div style={{
         position: 'absolute', inset: 0, border: '2px dashed #C9B6F5', borderRadius: '50%',
       }} />
@@ -121,13 +117,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
   // the server's.
   const [weekOpen, setWeekOpen] = useState(true)
   useEffect(() => {
-    const stored = window.localStorage.getItem(WEEK_KEY)
-    if (stored === 'closed') { setWeekOpen(false); return }
-    // Stacked on a phone these four cards come to about 1,600px — two screens
-    // of summary before the first task card, on the screen where scrolling
-    // costs the most. Closed to start with there; the toggle is right above
-    // it and opening once is remembered, same as on a desktop.
-    if (!stored && window.matchMedia(PHONE_QUERY).matches) setWeekOpen(false)
+    if (window.localStorage.getItem(WEEK_KEY) === 'closed') setWeekOpen(false)
   }, [])
 
   function toggleWeek() {
@@ -163,7 +153,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
       {/* The week and the quote read once in the morning; the two lists below
           are worked from all day. So the top row folds away and stays folded,
           and the working row rises to meet the header. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="fx-week-toggle" style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button
           type="button"
           onClick={toggleWeek}
@@ -187,7 +177,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
       </div>
 
       {weekOpen && (
-        <div className="fx-hero-split" style={{
+        <div className="fx-hero-split fx-week" style={{
           display: 'grid', gridTemplateColumns: 'minmax(0, 2.5fr) minmax(0, 1fr)',
           /* .fx-hero-split — stacks on a phone; a 1fr of 390px is 110px, and
              the Daily Spark card set one letter per line inside it. */
@@ -251,11 +241,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
             <Donut pct={momentum.pct} />
           </div>
 
-          {/* Four across needs 342px of its own (4 × 78 plus the gaps) and the
-              minWidth holds that floor, so on a 390px screen this row is the
-              one thing that pushes the page sideways. globals.css drops it to
-              two across there and releases the floor. */}
-          <div className="fx-statgrid" style={{
+          <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(4, minmax(78px, 1fr))',
             gap: 10, flex: 1, minWidth: 320,
           }}>
@@ -515,7 +501,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
       </section>
 
       {/* ── Activity ──────────────────────────────────────────────────── */}
-      <section style={{ ...CARD, padding: '18px 18px 20px' }}>
+      <section className="fx-activity" style={{ ...CARD, padding: '18px 18px 20px' }}>
         <CardTitle
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB"
