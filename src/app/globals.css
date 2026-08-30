@@ -317,6 +317,12 @@ html {
      below), and one card in a 1fr of 390px is about 110px wide. */
   .fx-hero-split { grid-template-columns: minmax(0, 1fr) !important; }
 
+  /* Only me / Team, then the brands under it. The brand chips wrap into
+     three rows at this width, and a three-row group centred beside a
+     one-row switch puts its first row above that switch — the filter row
+     read bottom-to-top. Its own line, in the order it is written. */
+  .fx-filter-brands { flex: 1 1 100% !important; }
+
   /* Your Week — the momentum figure, the dial, the four counts, Daily Spark —
      and the activity feed, both gone on a phone. They are read once and
      scrolled past; Needs Your Attention, which is what the board is opened
