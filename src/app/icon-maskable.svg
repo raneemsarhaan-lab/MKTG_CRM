@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable / Apple source for the Momentum mark.
+
+       Two things separate this from app/icon.svg. The background is
+       full-bleed rather than a rounded rectangle, because a launcher applies
+       its own mask shape and a rounded rect inside a circle reads as a badge
+       with a chip out of it; and the mark is inset to 58% so it survives the
+       most aggressive of those masks — the maskable safe zone is the centre
+       circle of 80% diameter, and the corner of this mark sits 188px from
+       centre against a 205px radius.
+
+       iOS uses the same drawing (app/apple-icon.png): it applies its own
+       corner radius and paints transparency black, so it needs a full-bleed
+       square too.
+
+       PNGs are generated from this by scripts/icons.mjs — edit here, not
+       there. -->
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <g transform="translate(40 40) scale(13.5)">
+    <rect x="5" y="7.5"  width="22"   height="4.6" rx="2.3" fill="#2C57F0"/>
+    <rect x="5" y="13.7" width="16.5" height="4.6" rx="2.3" fill="#16223C"/>
+    <rect x="5" y="19.9" width="22"   height="4.6" rx="2.3" fill="#C7E22E"/>
+  </g>
+</svg>

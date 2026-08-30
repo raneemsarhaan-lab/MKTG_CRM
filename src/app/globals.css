@@ -497,6 +497,27 @@ html {
   input, select, textarea { font-size: 16px; }
 }
 
+/* ─── Installed to a home screen ──────────────────────────────────────────────
+   In a browser tab the address bar occupies the top of the screen and the
+   page never sees the notch. Installed, there is no address bar: with
+   viewport-fit=cover (set in layout.tsx) the page runs under the status bar
+   and the notch, and the first line of every screen is drawn behind them.
+
+   env(safe-area-inset-top) is the height of that furniture — zero on a device
+   without any, so this costs nothing where it is not needed. It is spent
+   here, once, rather than in each screen's own padding.
+
+   Not scoped to the phone breakpoint: an installed tablet has the same
+   problem, and on a device with no inset the rules are no-ops. */
+@media (display-mode: standalone) {
+  .fx-shell > main { padding-top: env(safe-area-inset-top, 0px); }
+
+  /* The task panel is fixed to the top of the screen and taller than the
+     shell, so it does not inherit the padding above — its own close button
+     and title would sit under the clock. */
+  .fx-task-panel { padding-top: env(safe-area-inset-top, 0px) !important; }
+}
+
 /* Visually-hidden text that stays available to screen readers */
 .sr-only {
   position: absolute;

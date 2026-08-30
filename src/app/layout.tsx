@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Montserrat, Inter, Caveat } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getLocale } from 'next-intl/server'
@@ -79,7 +79,47 @@ export const metadata: Metadata = {
   description: 'Marketing CRM for Forefront Consulting',
   // Next serves app/icon.svg as the favicon automatically; naming it here as
   // well keeps the tab icon working when a browser prefers an explicit link.
-  icons: { icon: '/icon.svg' },
+  // Naming icons here replaces what Next would infer from the app directory,
+  // so apple-icon.png has to be named too — without it there is no
+  // <link rel="apple-touch-icon">, and iOS puts a screenshot of the login
+  // page on the home screen instead of the mark.
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.png',
+  },
+  // Installed from the home screen there is no address bar, so this is the
+  // only place the app's name appears. Next serves the manifest from
+  // app/manifest.ts; naming it here is what puts the <link> in the head.
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Momentum',
+    // The status bar sits over the page rather than beside it, which is what
+    // makes the safe-area insets below matter. Anything else leaves an opaque
+    // band in a colour that is not ours.
+    statusBarStyle: 'default',
+  },
+  // Next emits the standardised `mobile-web-app-capable`, which iOS has only
+  // honoured since 16.4. The old spelling is what anything older reads, and
+  // without it those phones open the home-screen icon in a Safari tab with
+  // the address bar still there.
+  other: { 'apple-mobile-web-app-capable': 'yes' },
+}
+
+/**
+ * Installed, there is no browser chrome — the page runs to all four edges of
+ * the screen, under the notch and over the home indicator. viewportFit cover
+ * is what makes env(safe-area-inset-*) return real numbers instead of zero;
+ * globals.css spends them.
+ *
+ * maximumScale and userScalable are deliberately left alone. Locking zoom is
+ * the usual companion to this and it takes pinch-to-zoom away from anyone who
+ * needs it, to fix a problem — iOS zooming on a focused field — that the
+ * 16px rule in globals.css already fixed properly.
+ */
+export const viewport: Viewport = {
+  themeColor: '#F6F6F4',
+  viewportFit: 'cover',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
