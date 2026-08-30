@@ -122,13 +122,15 @@ export function TeamBoard({
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#FFFFFF' }}>
-      <div style={{
+      <div className="fx-proj" style={{
         maxWidth: 1336, padding: '24px 26px 34px 38px',
         display: 'flex', flexDirection: 'column', gap: 20,
       }}>
 
         {/* ── §4 Header ───────────────────────────────────────────────── */}
-        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 26 }}>
+        {/* The title, the person picker and the progress card beside them do
+            not fit on a phone; globals.css lets them stack. */}
+        <header className="fx-proj-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 26 }}>
           <div>
             <div style={font.eyebrow}>Team</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8 }}>
@@ -166,14 +168,19 @@ export function TeamBoard({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexShrink: 0 }}>
-            <Illustration />
+          {/* 150px of illustration plus a 320px card is 488 — wider than a
+              phone, and the one thing on this page that left it draggable
+              sideways. The illustration goes there (it is decoration, already
+              aria-hidden) and the card takes the width. */}
+          <div className="fx-team-aside" style={{ display: 'flex', alignItems: 'flex-start', gap: 18, flexShrink: 0 }}>
+            <div className="fx-team-illus"><Illustration /></div>
             <ProgressCard percent={percent} done={stats.done} total={stats.total} />
           </div>
         </header>
 
         {/* ── §5 KPI row ──────────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        {/* Four tiles across is 80px each on a phone. Two across there. */}
+        <div className="fx-kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
           <Kpi tile={TILE.purple} stroke={UI.purple} icon="user" label="Assigned"
                value={String(stats.total)} unit="tasks"
                fill={stats.total ? 42 : 0} fillColor={UI.purple} />
@@ -197,7 +204,7 @@ export function TeamBoard({
         )}
 
         {/* ── §6 Filter row ───────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="fx-filter-row" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <label style={{ ...control, width: 232, padding: '0 16px', gap: 10 }}>
             <Icon name="table" size={17} stroke={UI.muted} width={2} />
             <select value={brand} onChange={e => setBrand(e.target.value)} aria-label="Filter by brand" style={BARE}>
@@ -409,7 +416,11 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
       background: '#FFFFFF', border: `1px solid ${late ? '#F6D9DE' : UI.border}`,
       borderRadius: 12, opacity: isPending ? 0.75 : 1,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 12px 11px 14px' }}>
+      {/* Checkbox, name, avatar, duration, due date, board, Edit. On a phone
+          the last two were off the edge — the two controls on the row that do
+          anything. It wraps there: the name takes the first line, everything
+          that describes or acts on it takes the second. */}
+      <div className="fx-step-row" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '11px 12px 11px 14px' }}>
         <input
           type="checkbox" checked={done} aria-label={`${step.name} done`}
           onChange={e => {
@@ -426,7 +437,7 @@ function Row({ step, today, canPush, canEdit, members, isAdmin, onError }: {
           style={{ width: 18, height: 18, borderRadius: 5, accentColor: UI.purple, cursor: 'pointer', flexShrink: 0 }}
         />
 
-        <span style={{
+        <span className="fx-step-name" style={{
           flex: 1, fontWeight: 600, fontSize: 13.5,
           color: done ? UI.soft : UI.textPrimary,
           textDecoration: done ? 'line-through' : 'none',
@@ -632,7 +643,7 @@ function ProgressCard({ percent, done, total }: { percent: number; done: number;
   const d = pts.map((y, i) => `${i === 0 ? 'M' : 'L'}${6 + i * 23},${52 - y}`).join(' ')
 
   return (
-    <div style={{ width: 320, border: `1px solid ${UI.border}`, borderRadius: 18, padding: '16px 18px 18px' }}>
+    <div className="fx-progress-card" style={{ width: 320, border: `1px solid ${UI.border}`, borderRadius: 18, padding: '16px 18px 18px' }}>
       <div style={{ fontWeight: 700, fontSize: 14, color: UI.textPrimary }}>Today&apos;s progress</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 6 }}>
         <span style={{ fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 50, lineHeight: 1, color: UI.purple }}>

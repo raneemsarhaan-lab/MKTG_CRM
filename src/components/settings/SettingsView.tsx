@@ -40,7 +40,10 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '36px 40px 60px' }}>
+      {/* 40px of padding either side is 80 of a 390px screen. globals.css
+          narrows it there; the class is the only handle it has, because the
+          padding is inline and a stylesheet cannot outrank that. */}
+      <div className="fx-settings" style={{ maxWidth: 900, margin: '0 auto', padding: '36px 40px 60px' }}>
 
         {/* Page header */}
         <div style={{ marginBottom: 28 }}>
@@ -57,7 +60,11 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
         </div>
 
         {/* Tab switcher */}
-        <div style={{
+        {/* Five tabs on one line come to 488px. On a phone that put Workload
+            and Diagnostics past the right edge of a container that scrolls
+            without saying so — two settings pages with no way to find them.
+            globals.css wraps this to two rows there. */}
+        <div className="fx-tabs" style={{
           display: 'inline-flex', borderRadius: 10, padding: 4,
           background: '#EBEBEB', marginBottom: 28, gap: 2,
         }}>

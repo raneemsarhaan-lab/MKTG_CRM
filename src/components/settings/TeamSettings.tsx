@@ -502,7 +502,11 @@ function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: Membe
       opacity: isPending ? 0.6 : 1,
       background: dirty ? '#FDFCF3' : 'transparent',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Ten controls on one line. On a phone the line does not fit and the
+          row was clipped from the name onwards — the person's name, their
+          access, Save and Remove all off the edge of a container that scrolls
+          sideways without an affordance saying so. globals.css wraps it. */}
+      <div className="fx-member-row" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {/* Avatar — the photo when one is set, initials otherwise */}
         <div style={{
           width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
@@ -519,7 +523,7 @@ function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: Membe
         </div>
 
         {/* Name + role */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fx-member-id" style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               value={draft.name}
@@ -671,6 +675,10 @@ function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: Membe
           // control announces itself identically.
           aria-label={isYou ? "Can't remove yourself" : `Remove ${m.name}`}
           title={isYou ? "Can't remove yourself" : `Remove ${m.name}`}
+          // 22px of glyph is a coin-toss for a fingertip, and this one removes
+          // a person. fx-icon-btn gives it a 40px target on a phone without
+          // making the ✕ itself any bigger.
+          className="fx-icon-btn"
           style={{
             border: 'none', background: 'transparent',
             cursor: isYou ? 'default' : 'pointer',
@@ -699,7 +707,10 @@ function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: Membe
       )}
 
       {/* Reset password */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
+      {/* The 46px indent lines this up under the name on a desktop; on a phone
+          it is a sixth of the screen spent on alignment, and the photo control
+          at the end of the line is 210px that has nowhere to go. */}
+      <div className="fx-member-pwd" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 46 }}>
         <input
           ref={pwdRef}
           type="password"
@@ -753,7 +764,7 @@ function MemberRow({ member: m, isYou, first, seniorityLevels, onRemove }: Membe
         {/* Photo — uploaded from this computer, or a link. Stored in the same
             column either way; see ImageUpload for why an upload becomes a data
             URL rather than a file. */}
-        <div style={{ width: 210, minWidth: 0 }}>
+        <div className="fx-member-photo" style={{ width: 210, minWidth: 0 }}>
           <ImageUpload
             value={draft.avatar_url}
             max={192}

@@ -86,13 +86,15 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#FFFFFF' }}>
       {/* §2 — main padding and the 20px rhythm between every top-level section */}
-      <div style={{
+      <div className="fx-proj" style={{
         maxWidth: 1336, padding: '24px 26px 34px 38px',
         display: 'flex', flexDirection: 'column', gap: 20,
       }}>
 
         {/* ── §4 Header ───────────────────────────────────────────────── */}
-        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
+        {/* The title and the Focus / Aspiring toggle beside it do not both fit
+            on a phone; globals.css lets the toggle drop to its own line. */}
+        <header className="fx-proj-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
           <div>
             <div style={font.eyebrow}>Projects</div>
             <svg width="46" height="7" viewBox="0 0 46 7" fill="none" aria-hidden="true"
@@ -141,7 +143,9 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
         )}
 
         {/* ── §5 KPI row ──────────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
+        {/* Five tiles across a 390px screen is 64px each. Two across on a
+            phone — see .fx-kpi-row. */}
+        <div className="fx-kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14 }}>
           <Kpi tile={TILE.purple} stroke={UI.purple} icon="folder"
                label="Projects" value={String(stats.projects)} caption="Active projects" />
           <Kpi tile={TILE.lime} stroke={UI.green} icon="check"
@@ -162,7 +166,10 @@ export function ProjectsView({ projects, brands, members, settings, levels, leve
         <Horizon projects={shown} today={today} />
 
         {/* ── §7 View tabs ────────────────────────────────────────────── */}
-        <div style={{
+        {/* Overview / Projects / Timeline / Weeks / Workload. inline-flex
+            sizes to its contents, so on a phone the last two sat past the
+            edge with nothing to say they were there. */}
+        <div className="fx-tabs" style={{
           display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', gap: 4,
           border: `1px solid ${UI.border}`, borderRadius: 14, padding: 6, background: '#FFFFFF',
         }}>
@@ -280,7 +287,12 @@ function Horizon({ projects, today }: { projects: ProjectView[]; today: string }
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 8, marginTop: 20 }}>
+      {/* Twenty-one day columns and their date labels need about 470px before
+          the digits start colliding. On a phone that is wider than the card,
+          and because the 1fr track cannot shrink past its contents the whole
+          page was left draggable sideways. globals.css lets the plot scroll
+          inside the card instead, with the y-axis staying put. */}
+      <div className="fx-horizon" style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 8, marginTop: 20 }}>
         <div style={{
           height: PLOT, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
           textAlign: 'right', paddingBottom: 1, fontWeight: 600, fontSize: 11, color: UI.faintest,
@@ -365,7 +377,8 @@ function Overview({ projects, today, brands, isAdmin, onError }: {
       {groups.map(([brandName, list]) => (
         <section key={brandName} style={{ ...card, borderRadius: 18, padding: '16px 18px 18px' }}>
           <BrandHeader name={brandName} count={list.length} brands={brands} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 16 }}>
+          {/* Three project cards across becomes one on a phone — see .fx-col1 */}
+          <div className="fx-col1" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 16 }}>
             {list.map(p => (
               <ProjectCard key={p.id} project={p} today={today} isAdmin={isAdmin} onError={onError} />
             ))}
@@ -535,7 +548,10 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
 
   return (
     <div style={{ border: `1px solid ${UI.border}`, borderRadius: 14, opacity: isPending ? 0.7 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
+      {/* Chevron, name, badges, due date, brand, ★, ✕. Everything from the
+          due date onwards was off the right edge on a phone; the row wraps
+          there — see .fx-step-row. */}
+      <div className="fx-step-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
         <button onClick={() => setOpen(!open)} aria-expanded={open}
                 aria-label={`${open ? 'Collapse' : 'Expand'} ${p.name}`}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, lineHeight: 0 }}>
@@ -549,7 +565,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
              heading. It now lights up under the pointer and takes a real
              border once focused, so the rename is discoverable rather than
              merely possible. */
-          <input defaultValue={p.name} aria-label={`Rename ${p.name}`}
+          <input className="fx-step-name" defaultValue={p.name} aria-label={`Rename ${p.name}`}
                  title="Click to rename"
                  onBlur={e => {
                    e.currentTarget.style.background = 'transparent'
@@ -564,7 +580,7 @@ function ProjectRow({ project: p, today, brands, members, isAdmin, canManage, ca
                           border: '1px solid transparent', background: 'transparent',
                           cursor: 'text', transition: 'background .12s, border-color .12s' }} />
         ) : (
-          <span style={{ flex: 1, fontWeight: 700, fontSize: 14.5, color: UI.textPrimary }}>{p.name}</span>
+          <span className="fx-step-name" style={{ flex: 1, fontWeight: 700, fontSize: 14.5, color: UI.textPrimary }}>{p.name}</span>
         )}
 
         {p.standing && (
@@ -728,7 +744,9 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
 
   return (
     <div style={{ display: 'grid', gap: 5 }}>
-    <div style={{
+    {/* Up to nine controls on one line when you can edit. It wraps on a
+        phone — see .fx-step-row. */}
+    <div className="fx-step-row" style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px',
       background: '#FFFFFF', border: `1px solid ${late ? '#F6D9DE' : UI.border}`,
       borderRadius: 12, opacity: isPending ? 0.7 : 1,
@@ -745,12 +763,12 @@ function StepRow({ step, today, members, isAdmin, canEdit, onError }: {
              style={{ width: 18, height: 18, accentColor: UI.purple, cursor: 'pointer', flexShrink: 0 }} />
 
       {canEdit ? (
-        <input defaultValue={step.name} aria-label={`Name of ${step.name}`}
+        <input className="fx-step-name" defaultValue={step.name} aria-label={`Name of ${step.name}`}
                onBlur={e => { const v = e.target.value.trim(); if (v && v !== step.name) act(() => updateStep(step.id, { name: v })) }}
                style={{ ...input, flex: 1, border: '1px solid transparent', background: 'transparent',
                         textDecoration: done ? 'line-through' : 'none', color: done ? UI.soft : UI.textPrimary }} />
       ) : (
-        <span style={{ flex: 1, fontWeight: 600, fontSize: 13.5, textDecoration: done ? 'line-through' : 'none', color: done ? UI.soft : UI.textPrimary }}>
+        <span className="fx-step-name" style={{ flex: 1, fontWeight: 600, fontSize: 13.5, textDecoration: done ? 'line-through' : 'none', color: done ? UI.soft : UI.textPrimary }}>
           {step.name}
         </span>
       )}
