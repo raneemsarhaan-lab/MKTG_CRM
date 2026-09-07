@@ -126,11 +126,21 @@ function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
 }
 
 /** A borderless toolbar action — the only chrome is a hover/active tint. */
-function ToolButton({ children, title, active, disabled, wide, onClick }: {
+function ToolButton({ children, title, active, disabled, wide, chip, tone, onClick }: {
   children: React.ReactNode; title: string; active?: boolean; disabled?: boolean
-  wide?: boolean; onClick: () => void
+  /** A labelled control (a dropdown trigger, Preview) rather than a bare icon. */
+  wide?: boolean
+  /** A dropdown trigger — sits on its own light chip even at rest, so it reads
+   *  as a control rather than another icon in the row. */
+  chip?: boolean
+  /** 'accent' keeps the label blue even at rest — Preview reads as a view
+   *  action, not a formatting toggle. */
+  tone?: 'default' | 'accent'
+  onClick: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const lit = active || hover
+  const accent = tone === 'accent'
   return (
     <button
       type="button" title={title} aria-label={title} disabled={disabled}
@@ -139,12 +149,13 @@ function ToolButton({ children, title, active, disabled, wide, onClick }: {
       onMouseLeave={() => setHover(false)}
       onClick={onClick}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5, height: 30,
-        padding: wide ? '0 9px' : '0 7px', minWidth: wide ? undefined : 30,
-        border: 'none', borderRadius: 8, cursor: disabled ? 'default' : 'pointer',
-        fontFamily: 'inherit', fontSize: 12.5, fontWeight: active ? 700 : 500,
-        background: active ? BR.blueActive : hover ? BR.blueLight : 'transparent',
-        color: active ? BR.blue : BR.ink, opacity: disabled ? 0.4 : 1,
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 34,
+        padding: wide ? '0 12px' : '0 8px', minWidth: wide ? undefined : 34,
+        border: 'none', borderRadius: 9, cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit', fontSize: 13, fontWeight: active || accent ? 700 : 500,
+        background: lit ? (accent ? BR.blueLight : BR.blueActive) : chip ? '#fff' : 'transparent',
+        color: lit || accent ? BR.blue : BR.ink, opacity: disabled ? 0.4 : 1,
+        boxShadow: chip && !lit ? '0 1px 2px rgba(24,35,63,0.05)' : 'none',
         transition: 'background .1s',
       }}
     >
@@ -155,7 +166,7 @@ function ToolButton({ children, title, active, disabled, wide, onClick }: {
 
 /** A hairline between logical toolbar groups — never between two single buttons. */
 function Sep() {
-  return <span aria-hidden="true" style={{ width: 1, height: 20, background: BR.line, margin: '0 2px', flexShrink: 0 }} />
+  return <span aria-hidden="true" style={{ width: 1, height: 26, background: BR.line, margin: '0 4px', flexShrink: 0 }} />
 }
 
 /** Split the value around the selection, expanded to whole lines when asked. */
@@ -414,27 +425,27 @@ export function BriefEditor({
     { icon: <ToolIcon name="youtube" />,  label: 'YouTube',  run: () => openPrompt('youtube') },
   ]
 
-  const contentRadius: React.CSSProperties['borderRadius'] = '0 0 16px 16px'
+  const contentRadius: React.CSSProperties['borderRadius'] = '0 0 18px 18px'
 
   return (
     <div>
       <div style={{
-        borderRadius: 16, background: '#fff', overflow: 'hidden',
+        borderRadius: 18, background: '#fff', overflow: 'hidden',
         boxShadow: focused
           ? '0 0 0 2px rgba(53,99,233,0.08), 0 4px 20px rgba(24,35,63,0.04)'
           : '0 2px 12px rgba(24,35,63,0.05)',
         transition: 'box-shadow .12s',
       }}>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap',
-          height: 50, padding: '8px 10px', background: BR.surface, borderRadius: '14px 14px 0 0',
+          display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+          minHeight: 58, padding: '10px 16px', background: BR.surface, borderRadius: '18px 18px 0 0',
           position: 'relative',
         }}>
           {/* Text style */}
           <div style={{ position: 'relative' }}>
-            <ToolButton title="Text style" active={menu === 'style'} disabled={preview} wide
+            <ToolButton title="Text style" active={menu === 'style'} disabled={preview} wide chip
                         onClick={() => setMenu(m => (m === 'style' ? null : 'style'))}>
-              Text style <ToolIcon name="chevron" size={13} />
+              Text style <ToolIcon name="chevron" size={14} />
             </ToolButton>
             {menu === 'style' && (
               <Menu onClose={() => setMenu(null)}>
@@ -451,11 +462,11 @@ export function BriefEditor({
           <Sep />
 
           {TOOLS.map((group, gi) => (
-            <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {gi > 0 && <Sep />}
               {group.map(t => (
                 <ToolButton key={t.id} title={t.title} disabled={preview} onClick={() => run(t.cmd)}>
-                  <span style={t.style}>{t.label}</span>
+                  <span style={{ fontSize: 15, ...t.style }}>{t.label}</span>
                 </ToolButton>
               ))}
             </div>
@@ -465,9 +476,9 @@ export function BriefEditor({
 
           {/* Insert */}
           <div style={{ position: 'relative' }}>
-            <ToolButton title="Insert" active={menu === 'insert'} disabled={preview} wide
+            <ToolButton title="Insert" active={menu === 'insert'} disabled={preview} wide chip
                         onClick={() => setMenu(m => (m === 'insert' ? null : 'insert'))}>
-              + Insert <ToolIcon name="chevron" size={13} />
+              + Insert <ToolIcon name="chevron" size={14} />
             </ToolButton>
             {menu === 'insert' && (
               <Menu onClose={() => setMenu(null)}>
@@ -484,7 +495,7 @@ export function BriefEditor({
           <div style={{ position: 'relative' }}>
             <ToolButton title="More actions" active={menu === 'more'}
                         onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}>
-              ⋯
+              <span style={{ fontSize: 16 }}>⋯</span>
             </ToolButton>
             {menu === 'more' && (
               <Menu onClose={() => setMenu(null)}>
@@ -500,9 +511,9 @@ export function BriefEditor({
 
           <span style={{ flex: 1 }} />
 
-          <ToolButton title="Preview" active={preview} wide
+          <ToolButton title="Preview" active={preview} tone="accent" wide
                       onClick={() => { setPreview(p => !p); setCtxMenu(null) }}>
-            <ToolIcon name="eye" size={15} /> Preview
+            <ToolIcon name="eye" size={17} /> Preview
           </ToolButton>
         </div>
 
