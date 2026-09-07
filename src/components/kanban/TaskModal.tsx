@@ -96,7 +96,7 @@ type IconName =
   | 'link' | 'clip' | 'chevron' | 'chevronR' | 'chevronUp' | 'plus' | 'subtask' | 'pencil'
   | 'search' | 'bell' | 'filter' | 'star' | 'panel' | 'close' | 'more'
   | 'brand' | 'type' | 'platform' | 'image' | 'target' | 'expand' | 'send'
-  | 'at' | 'emoji' | 'video' | 'mic' | 'person' | 'sparkle' | 'openIn' | 'file'
+  | 'at' | 'emoji' | 'video' | 'mic' | 'person' | 'sparkle' | 'openIn' | 'file' | 'download'
 
 function Icon({ name, size = 16, color = CU.label, width = 1.7, style }: {
   name: IconName; size?: number; color?: string; width?: number; style?: React.CSSProperties
@@ -138,6 +138,7 @@ function Icon({ name, size = 16, color = CU.label, width = 1.7, style }: {
     mic:      <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" /></>,
     sparkle:  <path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9L12 18.5l-1.9-5.6L4.5 11l5.6-1.9z" />,
     file:     <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
+    download: <><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5" /><path d="M4 19.5h16" /></>,
     pencil:   <><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3z" /><path d="M14.5 6.5l3 3" /></>,
   }
   return (
@@ -378,6 +379,122 @@ function FileTypeBadge({ filename }: { filename: string }) {
   )
 }
 
+/**
+ * The full-screen overlay opened by clicking an attachment.
+ *
+ * Pictures, PDFs, audio and video play inline; anything else — a slide deck,
+ * a spreadsheet, plain text — has nothing this can render, so it falls back
+ * to the same badge the grid uses plus a plain "no preview" line. Download
+ * stays reachable on every kind either way: looking at a preview is not the
+ * same as wanting to keep the file.
+ *
+ * A click on the dark backdrop closes it, same as the image lightbox this
+ * replaces. A click on the picture itself closes it too, for the same reason
+ * the old lightbox did — there is no other control on it. A click on
+ * anything with its own controls (the PDF frame, audio, video, the toolbar)
+ * does not, or pressing play would also dismiss the whole preview.
+ */
+function AttachmentPreview({ attachment, onClose }: { attachment: TaskAttachment; onClose: () => void }) {
+  const src   = attachmentSrc(attachment)
+  const image = isImageAttachment(attachment)
+  const kind  = attachmentKind(attachment.filename)
+  const isPdf = extensionOf(attachment.filename) === 'pdf'
+
+  // A bucket URL is cross-origin, where the browser ignores `download` and
+  // just navigates — opening it in a new tab at least reaches the file, same
+  // as the row's own filename link. A local data URL is same-origin and
+  // downloads in place.
+  const downloadProps = attachment.data
+    ? { download: attachment.filename }
+    : { target: '_blank', rel: 'noopener noreferrer' }
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview of ${attachment.filename}`}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(10,10,12,.86)', zIndex: 60,
+        display: 'flex', flexDirection: 'column', padding: 20, cursor: image ? 'zoom-out' : 'default',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, padding: '4px 4px 16px' }}
+      >
+        <span style={{
+          flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: '#fff',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }} title={attachment.filename}>
+          {attachment.filename}
+        </span>
+        {attachment.size_bytes ? (
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', flexShrink: 0 }}>
+            {fileSize(attachment.size_bytes)}
+          </span>
+        ) : null}
+        {src && (
+          <a
+            href={src} {...downloadProps}
+            title={`Download ${attachment.filename}`}
+            aria-label={`Download ${attachment.filename}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+              background: 'rgba(255,255,255,.14)', color: '#fff',
+            }}
+          >
+            <Icon name="download" size={17} color="#fff" width={2} />
+          </a>
+        )}
+        <button
+          type="button" onClick={onClose}
+          aria-label="Close preview" title="Close"
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 34, height: 34, borderRadius: 8, flexShrink: 0, border: 'none', cursor: 'pointer',
+            background: 'rgba(255,255,255,.14)', color: '#fff',
+          }}
+        >
+          <Icon name="close" size={16} color="#fff" width={2} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src ?? ''} alt={attachment.filename}
+               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+        ) : isPdf && src ? (
+          <iframe
+            src={src} title={attachment.filename} onClick={e => e.stopPropagation()}
+            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: '#fff' }}
+          />
+        ) : kind === 'video' && src ? (
+          <video src={src} controls autoPlay onClick={e => e.stopPropagation()}
+                 style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8 }} />
+        ) : kind === 'audio' && src ? (
+          <audio src={src} controls onClick={e => e.stopPropagation()} style={{ width: 'min(480px, 90vw)' }} />
+        ) : (
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+              background: '#fff', borderRadius: 12, padding: '40px 48px',
+            }}
+          >
+            <FileTypeBadge filename={attachment.filename} />
+            <p style={{ margin: 0, fontSize: 14, color: CU.label, textAlign: 'center' }}>
+              No preview for this file type.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** A square, quiet icon button — the window controls along the top bar. */
 function IconButton({ name, label, onClick, size = 17, color = CU.label }: {
   name: IconName; label: string; onClick?: () => void; size?: number; color?: string
@@ -482,7 +599,7 @@ export function TaskModal({
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskName, setSubtaskName]     = useState('')
   const [showAllActivity, setShowAllActivity] = useState(false)
-  const [lightbox, setLightbox]           = useState<TaskAttachment | null>(null)
+  const [preview, setPreview]             = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
   /* Which half of the panel a phone is showing. Desktop shows both at once
      and never reads this. Reset to the task on open, because arriving in
@@ -602,11 +719,11 @@ export function TaskModal({
   const isOverride = canAdvance && !isOwnStage && (isAdmin || isSuperuser)
 
   // Escape closes the panel — unless something smaller is open, which takes it
-  // first: the lightbox, then the menu, then whatever field is being edited.
+  // first: the attachment preview, then the menu, then whatever field is being edited.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      if (lightbox) { setLightbox(null); return }
+      if (preview) { setPreview(null); return }
       if (menuOpen) { setMenuOpen(false); return }
       if (stageOpen) { setStageOpen(false); return }
       const tag = (e.target as HTMLElement)?.tagName
@@ -615,7 +732,7 @@ export function TaskModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, lightbox, menuOpen, stageOpen])
+  }, [onClose, preview, menuOpen, stageOpen])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -2052,9 +2169,9 @@ export function TaskModal({
                               <div style={{
                                 height: 132, borderRadius: 6, background: '#fff', overflow: 'hidden',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: image ? 'zoom-in' : 'default',
+                                cursor: 'zoom-in',
                               }}
-                                   onClick={() => { if (image) setLightbox(a) }}>
+                                   onClick={() => setPreview(a)}>
                                 {image
                                   ? <ImageWithFallback
                                       src={src ?? ''}
@@ -2431,20 +2548,8 @@ export function TaskModal({
         </div>
       </div>
 
-      {/* Lightbox for an image attachment */}
-      {lightbox && (
-        <div
-          onClick={e => { e.stopPropagation(); setLightbox(null) }}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(10,10,12,.86)', zIndex: 60,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, cursor: 'zoom-out',
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox.url ?? ''} alt={lightbox.filename}
-               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
-        </div>
-      )}
+      {/* Attachment preview: any uploaded file, not only images. */}
+      {preview && <AttachmentPreview attachment={preview} onClose={() => setPreview(null)} />}
     </div>
   )
 }
