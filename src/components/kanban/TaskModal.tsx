@@ -1039,7 +1039,7 @@ export function TaskModal({
 
       if (rejected.length) {
         setUploadError(
-          `Too large to store: ${rejected.join(', ')}. Files need to be under about 1 MB — ` +
+          `Too large to store: ${rejected.join(', ')}. Files need to be under about 5 MB — ` +
           'pictures are shrunk automatically, anything else has to be small already.',
         )
       }
