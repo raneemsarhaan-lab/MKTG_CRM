@@ -80,6 +80,19 @@ const nextConfig: NextConfig = {
        */
       bodySizeLimit: '8mb',
     },
+    /**
+     * Every request answered by middleware.ts — which is every attachment
+     * upload, since the matcher below only excludes the sign-in routes — has
+     * its body cloned so middleware could inspect it, and Next silently caps
+     * that clone at 10 MB unless told otherwise: anything past the cap is cut
+     * off mid-stream, not rejected, so the multipart body loses its closing
+     * boundary and /api/attachments/[ref] fails with "That upload could not
+     * be read" — which reads as a broken upload rather than a size ceiling,
+     * and hits any file over 10 MB. A one-page image clears that easily; an
+     * exported deck or brief rarely does. Matched to MAX_UPLOAD_BYTES in
+     * src/lib/attachments.ts, the limit that is meant to govern this.
+     */
+    proxyClientMaxBodySize: '200mb',
   },
   images: {
     remotePatterns: [
