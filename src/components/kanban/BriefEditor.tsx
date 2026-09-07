@@ -14,9 +14,15 @@ import type { TaskAttachment } from '@/types/index'
  * current selection, which keeps the stored value round-trippable: what the
  * import wrote, the editor can re-emit unchanged.
  *
- * There is no Save button: `onSave` fires on its own, debounced, as the text
- * changes, and is flushed immediately on blur and on close so nothing typed
- * in the last moment is lost. The rendered preview sits live underneath the
+ * There is no Save button: every change calls `onSave` right away, with no
+ * artificial delay. What is throttled is concurrency, not time — if a save is
+ * still in flight when the next change comes in, it waits for that request to
+ * finish and then sends the latest text, rather than firing a second request
+ * in parallel. Two overlapping saves can resolve out of order over the
+ * network, and the one that finishes last wins even if it was sent first —
+ * that is how a save typed a moment earlier clobbers one typed a moment
+ * later. Sending saves one at a time removes the race instead of just
+ * shortening its window. The rendered preview sits live underneath the
  * textarea rather than behind a toggle, so it and the raw Markdown are always
  * in view together and there is nothing to remember to refresh.
  */
@@ -24,7 +30,8 @@ import type { TaskAttachment } from '@/types/index'
 interface BriefEditorProps {
   value:  string
   saving: boolean
-  onSave: (next: string) => void
+  /** May return a Promise; awaited so a save in flight is never overlapped. */
+  onSave: (next: string) => void | Promise<unknown>
   /** Stop editing. Nothing is discarded — autosave already covers that. */
   onDone: () => void
   /** Offered as one-click choices when inserting an image. */
@@ -32,9 +39,6 @@ interface BriefEditorProps {
   /** Creates a real child task and returns a link to it, or null if cancelled. */
   onCreateSubtask?: (name: string) => Promise<{ name: string; href: string } | null>
 }
-
-/** How long to let typing settle before autosaving. */
-const AUTOSAVE_MS = 900
 
 type Cmd =
   | { kind: 'wrap';    before: string; after: string }
@@ -297,7 +301,7 @@ export function BriefEditor({
   value, saving, onSave, onDone, attachments = [], onCreateSubtask,
 }: BriefEditorProps) {
   const [text, setTextState]  = useState(value)
-  const [pending, setPending] = useState(false)
+  const [busySaving, setBusySaving] = useState(false)
   const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
   const [focused, setFocused] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -309,20 +313,37 @@ export function BriefEditor({
 
   const images = imageAttachments(attachments)
 
-  // Autosave bookkeeping. Refs, not state: a debounce timer firing later, or
-  // the unmount cleanup, needs the *latest* text and the *latest* save target
+  // Autosave bookkeeping. Refs, not state: a request resolving later, or the
+  // unmount cleanup, needs the *latest* text and the *latest* save target
   // without waiting on a render — a stale closure here is how the last few
   // keystrokes typed right before closing the editor go unsaved.
-  const textRef  = useRef(value)
-  const savedRef = useRef(value)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textRef    = useRef(value)
+  const savedRef   = useRef(value)
+  const inFlightRef = useRef(false)
 
-  function flush() {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-    setPending(false)
-    if (textRef.current === savedRef.current) return
-    savedRef.current = textRef.current
-    onSave(textRef.current)
+  /**
+   * Send whatever hasn't been saved yet — but only one request at a time.
+   *
+   * Called again from its own `.finally`, so a burst of keystrokes while a
+   * save is in flight collapses into exactly one follow-up request carrying
+   * the latest text, sent the instant the first one completes, rather than a
+   * second request racing it. Two requests in flight together can finish in
+   * either order over the network; the one that lands last wins regardless of
+   * which was sent first, which is how an older save can silently overwrite a
+   * newer one. Never running two at once removes that race instead of just
+   * narrowing its window.
+   */
+  function pump() {
+    if (inFlightRef.current) return
+    const next = textRef.current
+    if (next === savedRef.current) { setBusySaving(false); return }
+    savedRef.current = next
+    inFlightRef.current = true
+    setBusySaving(true)
+    Promise.resolve(onSave(next)).finally(() => {
+      inFlightRef.current = false
+      pump()
+    })
   }
 
   /** Every change to the text goes through here, whatever triggered it —
@@ -331,14 +352,18 @@ export function BriefEditor({
   function setText(next: string) {
     textRef.current = next
     setTextState(next)
-    setPending(true)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(flush, AUTOSAVE_MS)
+    pump()
   }
 
-  // Flush whatever the debounce hasn't gotten to yet if the editor unmounts
-  // out from under it — closing the task panel mid-keystroke, say.
-  useEffect(() => flush, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Catch whatever the editor unmounts before pump() gets to it — closing the
+  // task panel mid-keystroke, say. A save already in flight keeps going and
+  // still lands, and its own `.finally` still sends any text newer than it
+  // once it resolves (those closures don't care that the component is gone);
+  // sending another one here too would just race that one. This only covers
+  // a change that never got a chance to start a request at all.
+  useEffect(() => () => {
+    if (!inFlightRef.current && textRef.current !== savedRef.current) onSave(textRef.current)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function run(cmd: Cmd) {
     const el = ref.current
@@ -416,11 +441,10 @@ export function BriefEditor({
     if (e.key === 'Escape') {
       e.stopPropagation()
       if (ctxMenu) { setCtxMenu(null); return }
-      flush()
       onDone()
       return
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); flush(); onDone(); return }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onDone(); return }
     if (!(e.metaKey || e.ctrlKey)) return
 
     const key = e.key.toLowerCase()
@@ -547,9 +571,9 @@ export function BriefEditor({
 
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 4px',
-            fontSize: 12.5, fontWeight: 600, color: pending || saving ? BR.blue : BR.faint,
+            fontSize: 12.5, fontWeight: 600, color: busySaving || saving ? BR.blue : BR.faint,
           }}>
-            {pending || saving ? 'Saving…' : 'Saved'}
+            {busySaving || saving ? 'Saving…' : 'Saved'}
           </span>
         </div>
 
@@ -619,7 +643,7 @@ export function BriefEditor({
           onKeyDown={onKeyDown}
           onContextMenu={onContextMenu}
           onFocus={() => setFocused(true)}
-          onBlur={() => { setFocused(false); flush() }}
+          onBlur={() => setFocused(false)}
           autoFocus
           rows={9}
           placeholder="What needs making, for whom, and any constraints…"
@@ -702,7 +726,7 @@ export function BriefEditor({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => { flush(); onDone() }}
+          onClick={onDone}
           style={{
             padding: '7px 16px', borderRadius: 9, border: 'none',
             background: BR.blue, color: '#fff', fontWeight: 700,
@@ -712,7 +736,7 @@ export function BriefEditor({
           Done
         </button>
         <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
-          {note || (pending || saving ? 'Saving…' : 'Saved · Esc closes · right-click for formatting')}
+          {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · right-click for formatting')}
         </span>
       </div>
     </div>

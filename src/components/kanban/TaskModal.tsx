@@ -677,12 +677,15 @@ export function TaskModal({
     return () => document.removeEventListener('mousedown', onDown)
   }, [stageOpen])
 
-  function applyPatch(patch: TaskPatch, after?: () => void) {
+  function applyPatch(patch: TaskPatch, after?: () => void): Promise<void> {
     setError('')
-    startTransition(async () => {
-      const res = await updateTask(task.id, patch)
-      if (res.success) { router.refresh(); after?.() }
-      else setError(res.error ?? 'Could not save the change')
+    return new Promise(resolve => {
+      startTransition(async () => {
+        const res = await updateTask(task.id, patch)
+        if (res.success) { router.refresh(); after?.() }
+        else setError(res.error ?? 'Could not save the change')
+        resolve()
+      })
     })
   }
 
