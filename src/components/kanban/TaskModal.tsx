@@ -332,6 +332,23 @@ async function shrinkImage(file: File, max: number, quality = 0.82): Promise<str
   return canvas.toDataURL(type, quality)
 }
 
+/** The brand's uploaded logo, or its colour as a lettered disc when it has
+ *  none — the same mark the board's brand filter and the task form use. */
+function BrandMark({ brand, size = 20 }: { brand: { name: string; color: string; logo_url?: string }; size?: number }) {
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: brand.color, color: '#fff', fontSize: size * 0.5, fontWeight: 800, lineHeight: 1,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {brand.logo_url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={brand.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : brand.name.trim()[0]?.toUpperCase()}
+    </span>
+  )
+}
+
 function Avatar({ name, size = 24, color }: { name: string; size?: number; color?: string }) {
   return (
     <span title={name} style={{
@@ -1165,8 +1182,8 @@ export function TaskModal({
           <InlineValue
             canEdit={canEdit} type="select" value={task.brand_id ?? ''}
             display={task.brand?.name ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 7, height: 7, borderRadius: 2, background: task.brand.color, flexShrink: 0 }} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                <BrandMark brand={task.brand} size={20} />
                 {task.brand.name}
               </span>
             ) : ''}
