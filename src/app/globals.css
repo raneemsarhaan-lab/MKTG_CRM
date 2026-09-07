@@ -353,6 +353,21 @@ html {
     height: 100dvh !important;
   }
 
+  /* ── The attachment preview ───────────────────────────────────────────────
+     Same dvh fix, same reason: `inset: 0` on a fixed element sizes against
+     the address-bar-collapsed viewport, not whatever is actually on screen.
+     With the bar still showing, the bottom slice of a PDF or a video rendered
+     past the real edge — a multi-page PDF cut off like that reads as "only
+     one page". Padding shrinks too, with room for the notch and the home
+     indicator, so a phone-width toolbar and PDF frame keep the space the
+     20px desktop gutter would otherwise take from them. */
+  .fx-attachment-preview {
+    height: 100dvh !important;
+    padding: 10px !important;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
   /* Activity is a tab here, not a column: it gets the whole width and loses
      the divider it shared with the task. */
   .fx-task-activity {
