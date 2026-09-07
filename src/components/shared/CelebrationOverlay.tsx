@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useUIStore } from '@/store/useUIStore'
 import { COLORS } from '@/lib/tokens'
-import { playCelebrationSound } from '@/lib/celebration-audio'
+import { playCelebrationSound, stopCelebrationSound } from '@/lib/celebration-audio'
 import { randomCelebration, type Reaction, type ReactionMessage, type ConfettiShape } from '@/lib/celebrations'
 
 // ─── Canvas confetti ───────────────────────────────────────────────────────────
@@ -150,10 +150,13 @@ export function CelebrationOverlay() {
   const [pickedReaction, setPickedReaction] = useState<Reaction | null>(null)
   const [pickedLine, setPickedLine]         = useState<ReactionMessage | null>(null)
 
-  const dismiss = useCallback(() => setCelebration(null), [setCelebration])
+  const dismiss = useCallback(() => {
+    stopCelebrationSound()
+    setCelebration(null)
+  }, [setCelebration])
 
   useEffect(() => {
-    if (!celebration) { setPickedReaction(null); setPickedLine(null); return }
+    if (!celebration) { stopCelebrationSound(); setPickedReaction(null); setPickedLine(null); return }
     const { reaction, line } = randomCelebration()
     setPickedReaction(reaction)
     setPickedLine(line)
@@ -219,7 +222,7 @@ export function CelebrationOverlay() {
       {/* Panel */}
       <div
         ref={panelRef}
-        onClick={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); stopCelebrationSound() }}
         tabIndex={-1}
         style={{
           position: 'relative', zIndex: 2,
@@ -233,7 +236,7 @@ export function CelebrationOverlay() {
       >
         {/* Dismiss */}
         <button
-          onClick={dismiss}
+          onClick={e => { e.stopPropagation(); dismiss() }}
           aria-label="Dismiss celebration"
           style={{
             position: 'absolute', top: 14, right: 14,
@@ -285,7 +288,7 @@ export function CelebrationOverlay() {
 
         {/* Replay — the reaction is random, so this repeats the same one */}
         <button
-          onClick={() => playCelebrationSound(pickedReaction.key)}
+          onClick={e => { e.stopPropagation(); playCelebrationSound(pickedReaction.key) }}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', borderRadius: 999,

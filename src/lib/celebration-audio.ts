@@ -11,6 +11,9 @@ import { REACTION_BY_KEY, type ReactionKey } from '@/lib/celebrations'
 
 type Reaction = ReactionKey
 
+/** Hard ceiling on how long any celebration sound may play, recorded or synthesized. */
+const MAX_DURATION_MS = 3000
+
 let audioCtx: AudioContext | null = null
 
 function getAudioCtx(): AudioContext | null {
@@ -19,8 +22,10 @@ function getAudioCtx(): AudioContext | null {
   return audioCtx
 }
 
+type SynthNode = OscillatorNode | AudioBufferSourceNode
+
 // zaghrota: rapid LFO oscillation on a bright sine, ~500ms
-function playZaghrota(ctx: AudioContext) {
+function playZaghrota(ctx: AudioContext, nodes: SynthNode[]) {
   const osc = ctx.createOscillator()
   const lfo = ctx.createOscillator()
   const lfoGain = ctx.createGain()
@@ -47,10 +52,11 @@ function playZaghrota(ctx: AudioContext) {
   osc.start()
   osc.stop(ctx.currentTime + 0.5)
   lfo.stop(ctx.currentTime + 0.5)
+  nodes.push(osc, lfo)
 }
 
 // tasqeef: 4 rhythmic clap pulses on sawtooth, ~800ms
-function playTasqeef(ctx: AudioContext) {
+function playTasqeef(ctx: AudioContext, nodes: SynthNode[]) {
   for (let i = 0; i < 4; i++) {
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
@@ -66,11 +72,12 @@ function playTasqeef(ctx: AudioContext) {
     gain.connect(ctx.destination)
     osc.start(t)
     osc.stop(t + 0.15)
+    nodes.push(osc)
   }
 }
 
 // mabhour: ascending arpeggio C5→E5→G5 on triangle, ~600ms
-function playMabhour(ctx: AudioContext) {
+function playMabhour(ctx: AudioContext, nodes: SynthNode[]) {
   const notes = [523.25, 659.25, 783.99]   // C5, E5, G5
   notes.forEach((freq, i) => {
     const osc = ctx.createOscillator()
@@ -88,11 +95,12 @@ function playMabhour(ctx: AudioContext) {
     gain.connect(ctx.destination)
     osc.start(t)
     osc.stop(t + 0.21)
+    nodes.push(osc)
   })
 }
 
 // tabla: low-freq noise burst through bandpass, ~700ms
-function playTabla(ctx: AudioContext) {
+function playTabla(ctx: AudioContext, nodes: SynthNode[]) {
   const bufferSize = ctx.sampleRate * 0.7
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
   const data = buffer.getChannelData(0)
@@ -115,9 +123,10 @@ function playTabla(ctx: AudioContext) {
   bpf.connect(gain)
   gain.connect(ctx.destination)
   source.start()
+  nodes.push(source)
 }
 
-const PLAYERS: Record<Reaction, (ctx: AudioContext) => void> = {
+const PLAYERS: Record<Reaction, (ctx: AudioContext, nodes: SynthNode[]) => void> = {
   zaghrota: playZaghrota,
   tasqeef:  playTasqeef,
   mabhour:  playMabhour,
@@ -126,11 +135,40 @@ const PLAYERS: Record<Reaction, (ctx: AudioContext) => void> = {
 
 /** Last element created, so a new celebration can cut off the previous one. */
 let current: HTMLAudioElement | null = null
+/** Oscillators/buffer sources from the active synthesized fallback, so they can be cut off early. */
+let currentSynthNodes: SynthNode[] = []
+/** Enforces MAX_DURATION_MS on whichever source is currently playing. */
+let stopTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearStopTimer(): void {
+  if (stopTimer !== null) {
+    clearTimeout(stopTimer)
+    stopTimer = null
+  }
+}
+
+/** Immediately silences any celebration sound in progress — recorded or synthesized. */
+export function stopCelebrationSound(): void {
+  clearStopTimer()
+
+  current?.pause()
+  current = null
+
+  for (const node of currentSynthNodes) {
+    try { node.stop() } catch { /* already stopped */ }
+  }
+  currentSynthNodes = []
+}
 
 function playSynthesized(reaction: Reaction): void {
   const ctx = getAudioCtx()
   if (!ctx) return
-  const run = () => PLAYERS[reaction](ctx)
+  const nodes: SynthNode[] = []
+  const run = () => {
+    PLAYERS[reaction](ctx, nodes)
+    currentSynthNodes = nodes
+    stopTimer = setTimeout(stopCelebrationSound, MAX_DURATION_MS)
+  }
   if (ctx.state === 'running') {
     run()
   } else {
@@ -148,8 +186,7 @@ function playSynthesized(reaction: Reaction): void {
 export function playCelebrationSound(reaction: Reaction): void {
   if (typeof window === 'undefined') return
 
-  current?.pause()
-  current = null
+  stopCelebrationSound()
 
   const sources = REACTION_BY_KEY[reaction]?.sources ?? []
   if (sources.length === 0) { playSynthesized(reaction); return }
@@ -162,7 +199,9 @@ export function playCelebrationSound(reaction: Reaction): void {
   const tryNext = () => {
     if (index >= sources.length) { playSynthesized(reaction); return }
     el.src = sources[index++]
-    el.play().catch(tryNext)
+    el.play()
+      .then(() => { stopTimer = setTimeout(stopCelebrationSound, MAX_DURATION_MS) })
+      .catch(tryNext)
   }
 
   // A source that fetches but cannot decode fires 'error' rather than
