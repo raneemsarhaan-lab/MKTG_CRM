@@ -18,12 +18,13 @@ import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import {
-  isImageAttachment, shortName, attachmentSrc, fileSize,
+  isImageAttachment, shortName, attachmentSrc, fileSize, attachmentKind, extensionOf,
   MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO, MAX_UPLOAD_BYTES,
+  type AttachmentKind,
 } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { LinkCard } from './LinkCard'
-import { URL_RE, trimUrl, hrefFor } from '@/lib/links'
+import { URL_RE, trimUrl, hrefFor, hostOf, prettyPath } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
 import { unlinkStepFromTask } from '@/actions/projects'
 import { ProjectPicker } from '@/components/shared/ProjectPicker'
@@ -173,12 +174,26 @@ function urlsIn(body: string): string[] {
 }
 
 /**
+ * A one-line stand-in for a pasted URL: "claude.ai/design/p/914cfd78-…".
+ *
+ * The full address stays on `href` and in `title` — this is only what the
+ * comment shows inline. A raw link can run sixty characters of query string
+ * and folder id, and printed in full it wrapped five lines deep before the
+ * LinkCard even got a chance to say the same thing with a title and a
+ * favicon. One line here, then whatever the card below adds.
+ */
+function linkLabel(url: string, max = 42): string {
+  const label = (hostOf(url) + prettyPath(url)) || url.replace(/^https?:\/\//, '')
+  return label.length <= max ? label : label.slice(0, max - 1) + '…'
+}
+
+/**
  * Draw the bare URLs in a run of text as links.
  *
  * A pasted link is the single most common thing in these comments and it was
  * arriving as dead text — worse, as one unbroken word wide enough to push the
- * comment out of its own bubble. So it becomes an anchor, and it is allowed to
- * break anywhere.
+ * comment out of its own bubble. So it becomes an anchor, shown as a short
+ * label rather than the address itself.
  */
 function linkify(text: string, keyBase: string): React.ReactNode[] {
   const out: React.ReactNode[] = []
@@ -190,10 +205,10 @@ function linkify(text: string, keyBase: string): React.ReactNode[] {
     if (at > last) out.push(text.slice(last, at))
     out.push(
       <a key={`${keyBase}-${at}`} href={hrefFor(url)} target="_blank"
-         rel="noopener noreferrer nofollow"
+         rel="noopener noreferrer nofollow" title={url}
          onClick={e => e.stopPropagation()}
          style={{ color: CU.blue, textDecoration: 'underline', overflowWrap: 'anywhere' }}>
-        {url}
+        {linkLabel(url)}
       </a>,
     )
     last = at + url.length
@@ -323,6 +338,43 @@ function Avatar({ name, size = 24 }: { name: string; size?: number }) {
     }}>
       {initials(name)}
     </span>
+  )
+}
+
+/** A colour per kind of non-image file, so a PDF doesn't sit under the same
+ *  grey blank as a stray .txt — the badge is the only thing that says what
+ *  it is before it's opened. */
+const EXT_COLORS: Record<string, string> = {
+  pdf: '#E5484D',
+  doc: '#2F6FEB', docx: '#2F6FEB',
+  ppt: '#D97706', pptx: '#D97706',
+  xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A',
+}
+
+function fileBadgeColor(kind: AttachmentKind, ext: string): string {
+  if (EXT_COLORS[ext]) return EXT_COLORS[ext]
+  if (kind === 'video') return '#7C3AED'
+  if (kind === 'audio') return '#0D9488'
+  return '#8A8F98'
+}
+
+/** The non-image attachment tile: a plain file glyph plus its extension, coloured by kind. */
+function FileTypeBadge({ filename }: { filename: string }) {
+  const kind = attachmentKind(filename)
+  const ext  = extensionOf(filename).toUpperCase()
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+      <Icon name="file" size={30} color="#C3C7CE" width={1.5} />
+      {ext && (
+        <span style={{
+          fontSize: 10.5, fontWeight: 800, letterSpacing: '.02em', color: '#fff',
+          background: fileBadgeColor(kind, ext.toLowerCase()), borderRadius: 4, padding: '2px 7px',
+          lineHeight: 1.4,
+        }}>
+          {ext}
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -1033,6 +1085,39 @@ export function TaskModal({
       setUploading(false)
     }
   }
+
+  /**
+   * Catch a file dropped anywhere on the panel, not just the dedicated zone.
+   *
+   * Without this, a drop outside that one box falls through to the browser's
+   * own handling of a dragged file, which is to navigate the tab to it — the
+   * task panel vanishes and is replaced by a raw PDF or image with no way
+   * back but the back button. Every drag over the panel is intercepted so
+   * that never happens, but only ones actually carrying files: a drag
+   * reordering selected text inside a field must still work normally.
+   */
+  useEffect(() => {
+    const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files')
+
+    function onDragOver(e: DragEvent) {
+      if (isFileDrag(e)) e.preventDefault()
+    }
+    function onDrop(e: DragEvent) {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      if (!canEdit) return
+      const dropped = e.dataTransfer?.files
+      if (dropped?.length) void acceptFiles(dropped)
+    }
+
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('drop', onDrop)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit])
 
   function copy(what: 'link' | 'id') {
     const value = what === 'id'
@@ -1912,10 +1997,12 @@ export function TaskModal({
                     {canEdit && (
                       <div
                         onClick={() => fileRef.current?.click()}
-                        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                        onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragging(true) }}
                         onDragLeave={() => setDragging(false)}
                         onDrop={e => {
-                          e.preventDefault(); setDragging(false)
+                          // Stopped here so the window-level catch-all below
+                          // does not also see this drop and upload it twice.
+                          e.preventDefault(); e.stopPropagation(); setDragging(false)
                           void acceptFiles(e.dataTransfer.files)
                         }}
                         role="button"
@@ -1975,7 +2062,7 @@ export function TaskModal({
                                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                       fallback={<Icon name="image" size={30} color="#C3C7CE" width={1.5} />}
                                     />
-                                  : <Icon name="file" size={30} color="#C3C7CE" width={1.5} />}
+                                  : <FileTypeBadge filename={a.filename} />}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 }}>
                                 {renaming === a.id ? (
