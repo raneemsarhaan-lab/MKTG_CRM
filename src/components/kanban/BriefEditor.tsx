@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Brief } from '@/components/shared/Brief'
 import { imageAttachments } from '@/lib/attachments'
 import type { TaskAttachment } from '@/types/index'
@@ -14,20 +14,27 @@ import type { TaskAttachment } from '@/types/index'
  * current selection, which keeps the stored value round-trippable: what the
  * import wrote, the editor can re-emit unchanged.
  *
- * Preview reuses the panel's own renderer, so what you see while writing is
- * exactly what the task will show.
+ * There is no Save button: `onSave` fires on its own, debounced, as the text
+ * changes, and is flushed immediately on blur and on close so nothing typed
+ * in the last moment is lost. The rendered preview sits live underneath the
+ * textarea rather than behind a toggle, so it and the raw Markdown are always
+ * in view together and there is nothing to remember to refresh.
  */
 
 interface BriefEditorProps {
-  value:    string
-  saving:   boolean
-  onSave:   (next: string) => void
-  onCancel: () => void
+  value:  string
+  saving: boolean
+  onSave: (next: string) => void
+  /** Stop editing. Nothing is discarded — autosave already covers that. */
+  onDone: () => void
   /** Offered as one-click choices when inserting an image. */
   attachments?: TaskAttachment[]
   /** Creates a real child task and returns a link to it, or null if cancelled. */
   onCreateSubtask?: (name: string) => Promise<{ name: string; href: string } | null>
 }
+
+/** How long to let typing settle before autosaving. */
+const AUTOSAVE_MS = 900
 
 type Cmd =
   | { kind: 'wrap';    before: string; after: string }
@@ -89,7 +96,7 @@ const TOGGLE_SKELETON =
 type ToolIconName =
   | 'code' | 'link' | 'bulletList' | 'numberedList' | 'quote'
   | 'image' | 'divider' | 'toggle' | 'table' | 'toc' | 'youtube'
-  | 'clear' | 'copy' | 'task' | 'subtask' | 'eye' | 'chevron'
+  | 'clear' | 'copy' | 'task' | 'subtask' | 'chevron'
 
 function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
   const paths: Record<ToolIconName, React.ReactNode> = {
@@ -113,7 +120,6 @@ function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
     copy: <><rect x="9" y="3" width="11" height="13" rx="2" /><path d="M6 8H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1" /></>,
     task: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m8 12.5 2.5 2.5L16 9.5" /></>,
     subtask: <><path d="M6 4v9a3 3 0 0 0 3 3h6" /><circle cx="18" cy="16" r="2.6" /><path d="M18 6.4v3.6M16.2 8.2h3.6" /></>,
-    eye: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></>,
     chevron: <path d="M6 9.5l6 6 6-6" />,
   }
   return (
@@ -126,21 +132,17 @@ function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
 }
 
 /** A borderless toolbar action — the only chrome is a hover/active tint. */
-function ToolButton({ children, title, active, disabled, wide, chip, tone, onClick }: {
+function ToolButton({ children, title, active, disabled, wide, chip, onClick }: {
   children: React.ReactNode; title: string; active?: boolean; disabled?: boolean
-  /** A labelled control (a dropdown trigger, Preview) rather than a bare icon. */
+  /** A labelled control (a dropdown trigger) rather than a bare icon. */
   wide?: boolean
   /** A dropdown trigger — sits on its own light chip even at rest, so it reads
    *  as a control rather than another icon in the row. */
   chip?: boolean
-  /** 'accent' keeps the label blue even at rest — Preview reads as a view
-   *  action, not a formatting toggle. */
-  tone?: 'default' | 'accent'
   onClick: () => void
 }) {
   const [hover, setHover] = useState(false)
   const lit = active || hover
-  const accent = tone === 'accent'
   return (
     <button
       type="button" title={title} aria-label={title} disabled={disabled}
@@ -152,9 +154,9 @@ function ToolButton({ children, title, active, disabled, wide, chip, tone, onCli
         display: 'inline-flex', alignItems: 'center', gap: 6, height: 34,
         padding: wide ? '0 12px' : '0 8px', minWidth: wide ? undefined : 34,
         border: 'none', borderRadius: 9, cursor: disabled ? 'default' : 'pointer',
-        fontFamily: 'inherit', fontSize: 13, fontWeight: active || accent ? 700 : 500,
-        background: lit ? (accent ? BR.blueLight : BR.blueActive) : chip ? '#fff' : 'transparent',
-        color: lit || accent ? BR.blue : BR.ink, opacity: disabled ? 0.4 : 1,
+        fontFamily: 'inherit', fontSize: 13, fontWeight: active ? 700 : 500,
+        background: lit ? BR.blueActive : chip ? '#fff' : 'transparent',
+        color: lit ? BR.blue : BR.ink, opacity: disabled ? 0.4 : 1,
         boxShadow: chip && !lit ? '0 1px 2px rgba(24,35,63,0.05)' : 'none',
         transition: 'background .1s',
       }}
@@ -292,10 +294,10 @@ const PROMPTS: Record<PromptKind, { label: string; placeholder: string; cta: str
 }
 
 export function BriefEditor({
-  value, saving, onSave, onCancel, attachments = [], onCreateSubtask,
+  value, saving, onSave, onDone, attachments = [], onCreateSubtask,
 }: BriefEditorProps) {
-  const [text, setText]       = useState(value)
-  const [preview, setPreview] = useState(false)
+  const [text, setTextState]  = useState(value)
+  const [pending, setPending] = useState(false)
   const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
   const [focused, setFocused] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -306,6 +308,37 @@ export function BriefEditor({
   const ref = useRef<HTMLTextAreaElement>(null)
 
   const images = imageAttachments(attachments)
+
+  // Autosave bookkeeping. Refs, not state: a debounce timer firing later, or
+  // the unmount cleanup, needs the *latest* text and the *latest* save target
+  // without waiting on a render — a stale closure here is how the last few
+  // keystrokes typed right before closing the editor go unsaved.
+  const textRef  = useRef(value)
+  const savedRef = useRef(value)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function flush() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    setPending(false)
+    if (textRef.current === savedRef.current) return
+    savedRef.current = textRef.current
+    onSave(textRef.current)
+  }
+
+  /** Every change to the text goes through here, whatever triggered it —
+   *  typing, a toolbar command, or the right-click menu — so autosave sees
+   *  all of them alike. */
+  function setText(next: string) {
+    textRef.current = next
+    setTextState(next)
+    setPending(true)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(flush, AUTOSAVE_MS)
+  }
+
+  // Flush whatever the debounce hasn't gotten to yet if the editor unmounts
+  // out from under it — closing the task panel mid-keystroke, say.
+  useEffect(() => flush, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function run(cmd: Cmd) {
     const el = ref.current
@@ -383,10 +416,11 @@ export function BriefEditor({
     if (e.key === 'Escape') {
       e.stopPropagation()
       if (ctxMenu) { setCtxMenu(null); return }
-      onCancel()
+      flush()
+      onDone()
       return
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSave(text); return }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); flush(); onDone(); return }
     if (!(e.metaKey || e.ctrlKey)) return
 
     const key = e.key.toLowerCase()
@@ -443,7 +477,7 @@ export function BriefEditor({
         }}>
           {/* Text style */}
           <div style={{ position: 'relative' }}>
-            <ToolButton title="Text style" active={menu === 'style'} disabled={preview} wide chip
+            <ToolButton title="Text style" active={menu === 'style'} wide chip
                         onClick={() => setMenu(m => (m === 'style' ? null : 'style'))}>
               Text style <ToolIcon name="chevron" size={14} />
             </ToolButton>
@@ -465,7 +499,7 @@ export function BriefEditor({
             <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {gi > 0 && <Sep />}
               {group.map(t => (
-                <ToolButton key={t.id} title={t.title} disabled={preview} onClick={() => run(t.cmd)}>
+                <ToolButton key={t.id} title={t.title} onClick={() => run(t.cmd)}>
                   <span style={{ fontSize: 15, ...t.style }}>{t.label}</span>
                 </ToolButton>
               ))}
@@ -476,7 +510,7 @@ export function BriefEditor({
 
           {/* Insert */}
           <div style={{ position: 'relative' }}>
-            <ToolButton title="Insert" active={menu === 'insert'} disabled={preview} wide chip
+            <ToolButton title="Insert" active={menu === 'insert'} wide chip
                         onClick={() => setMenu(m => (m === 'insert' ? null : 'insert'))}>
               + Insert <ToolIcon name="chevron" size={14} />
             </ToolButton>
@@ -511,10 +545,12 @@ export function BriefEditor({
 
           <span style={{ flex: 1 }} />
 
-          <ToolButton title="Preview" active={preview} tone="accent" wide
-                      onClick={() => { setPreview(p => !p); setCtxMenu(null) }}>
-            <ToolIcon name="eye" size={17} /> Preview
-          </ToolButton>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 4px',
+            fontSize: 12.5, fontWeight: 600, color: pending || saving ? BR.blue : BR.faint,
+          }}>
+            {pending || saving ? 'Saving…' : 'Saved'}
+          </span>
         </div>
 
         {/* Value prompt for the insert items that need one */}
@@ -576,34 +612,42 @@ export function BriefEditor({
           </div>
         )}
 
-        {preview ? (
-          <div style={{ padding: '24px 28px 32px', minHeight: 140, background: '#fff', borderRadius: contentRadius }}>
+        <textarea
+          ref={ref}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={onKeyDown}
+          onContextMenu={onContextMenu}
+          onFocus={() => setFocused(true)}
+          onBlur={() => { setFocused(false); flush() }}
+          autoFocus
+          rows={9}
+          placeholder="What needs making, for whom, and any constraints…"
+          style={{
+            width: '100%', padding: '24px 28px 14px',
+            border: 'none', background: '#fff', color: BR.ink,
+            fontSize: 16, lineHeight: 1.65, fontFamily: 'inherit',
+            outline: 'none', resize: 'vertical', boxSizing: 'border-box', display: 'block',
+          }}
+        />
+
+        {/* The rendered brief, live underneath the source — no toggle to
+            remember, no stale preview: it is always exactly `text`. */}
+        <div style={{ borderTop: `1px solid ${BR.line}`, borderRadius: contentRadius, background: '#fff' }}>
+          <div style={{
+            padding: '10px 28px 0', fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
+            textTransform: 'uppercase', color: BR.faint,
+          }}>
+            Preview
+          </div>
+          <div style={{ padding: '8px 28px 26px', minHeight: 60 }}>
             {text.trim()
               ? <Brief markdown={text} />
               : <span style={{ color: BR.faint, fontStyle: 'italic', fontSize: 15 }}>
                   Nothing to preview yet.
                 </span>}
           </div>
-        ) : (
-          <textarea
-            ref={ref}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-            onContextMenu={onContextMenu}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            autoFocus
-            rows={10}
-            placeholder="What needs making, for whom, and any constraints…"
-            style={{
-              width: '100%', padding: '24px 28px 32px', borderRadius: contentRadius,
-              border: 'none', background: '#fff', color: BR.ink,
-              fontSize: 16, lineHeight: 1.65, fontFamily: 'inherit',
-              outline: 'none', resize: 'vertical', boxSizing: 'border-box', display: 'block',
-            }}
-          />
-        )}
+        </div>
       </div>
 
       {/* Right-click formatting menu — the same commands as the toolbar,
@@ -655,35 +699,20 @@ export function BriefEditor({
         </ContextMenu>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => onSave(text)}
-          disabled={saving}
+          onClick={() => { flush(); onDone() }}
           style={{
             padding: '7px 16px', borderRadius: 9, border: 'none',
             background: BR.blue, color: '#fff', fontWeight: 700,
             fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-            opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          style={{
-            padding: '7px 16px', borderRadius: 9, border: 'none',
-            background: 'transparent', color: BR.label,
-            fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = BR.surface }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-        >
-          Cancel
+          Done
         </button>
         <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
-          {note || 'Ctrl+Enter saves · Esc cancels · right-click for formatting'}
+          {note || (pending || saving ? 'Saving…' : 'Saved · Esc closes · right-click for formatting')}
         </span>
       </div>
     </div>

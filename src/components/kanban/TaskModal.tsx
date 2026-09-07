@@ -1839,8 +1839,8 @@ export function TaskModal({
                 <BriefEditor
                   value={briefText}
                   saving={isPending}
-                  onSave={next => applyPatch({ description: next }, () => setEditingBrief(false))}
-                  onCancel={() => setEditingBrief(false)}
+                  onSave={next => applyPatch({ description: next })}
+                  onDone={() => setEditingBrief(false)}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
                 />
