@@ -592,7 +592,7 @@ export async function addAttachments(
 
   const tooBig = clean.find(f => f.data.length > MAX_ATTACHMENT_CHARS)
   if (tooBig) {
-    return { success: false, error: `${tooBig.filename} is too large to store — keep files under about 1 MB.` }
+    return { success: false, error: `${tooBig.filename} is too large to store — keep files under about 5 MB.` }
   }
 
   try {

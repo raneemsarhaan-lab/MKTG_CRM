@@ -104,8 +104,14 @@ export function shortName(filename: string, max = 28): string {
  * The bytes live in Postgres — there is no object store behind this app — so
  * this is not a politeness limit, it is what keeps a task row readable. The
  * panel shrinks pictures before they get here; anything else has to fit as-is.
+ *
+ * Capped well under the 8 MB server-action body limit in next.config.ts
+ * (base64 runs about a third larger than the file itself, and a thumbnail up
+ * to MAX_THUMB_CHARS can ride along on the same request) rather than at it,
+ * so the ceiling here is the one that is hit, with a message that explains
+ * why, instead of a raw "Body exceeded" from Next with nothing to act on.
  */
-export const MAX_ATTACHMENT_CHARS = 1_500_000      // ≈1.1 MB of file
+export const MAX_ATTACHMENT_CHARS = 7_000_000      // ≈5 MB of file
 export const MAX_ATTACHMENTS_PER_GO = 12
 
 /**
