@@ -393,6 +393,15 @@ function FileTypeBadge({ filename }: { filename: string }) {
  * the old lightbox did — there is no other control on it. A click on
  * anything with its own controls (the PDF frame, audio, video, the toolbar)
  * does not, or pressing play would also dismiss the whole preview.
+ *
+ * `.fx-attachment-preview` in globals.css gives this `100dvh` on a phone —
+ * the same fix `.fx-task-panel` already needed. `inset: 0` on a `position:
+ * fixed` element tracks mobile Safari's *largest* viewport, the one with the
+ * address bar already collapsed, not whatever is actually visible — so with
+ * the bar still showing, the bottom slice of the PDF frame (or the video, or
+ * the toolbar itself) rendered below the real edge of the screen. A multi-page
+ * PDF cut off like that reads as "it only has one page"; `dvh` tracks the
+ * visible viewport instead and the rest of the document is there to scroll to.
  */
 function AttachmentPreview({ attachment, onClose }: { attachment: TaskAttachment; onClose: () => void }) {
   const src   = attachmentSrc(attachment)
@@ -414,6 +423,7 @@ function AttachmentPreview({ attachment, onClose }: { attachment: TaskAttachment
       role="dialog"
       aria-modal="true"
       aria-label={`Preview of ${attachment.filename}`}
+      className="fx-attachment-preview"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(10,10,12,.86)', zIndex: 60,
         display: 'flex', flexDirection: 'column', padding: 20, cursor: image ? 'zoom-out' : 'default',
@@ -467,8 +477,25 @@ function AttachmentPreview({ attachment, onClose }: { attachment: TaskAttachment
           <img src={src ?? ''} alt={attachment.filename}
                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
         ) : isPdf && src ? (
+          /* `#toolbar=0&navpanes=0&view=FitH` — old Adobe open-parameters
+           * that Chrome's own PDF viewer still honours.
+           *
+           * toolbar=0 turns off its built-in toolbar, which is a fixed-width
+           * control strip that does not shrink for a narrow iframe: on a
+           * phone it overflowed sideways and pushed the page itself off to
+           * the right of the visible strip, leaving a sliver of page one at
+           * the edge — which is exactly what "the PDF only shows the first
+           * page" looks like. The overlay's own toolbar above already
+           * carries download and close, so nothing it offered is lost.
+           *
+           * Without a toolbar there is also no zoom control, and PDFium's
+           * default is a fixed 100% — full-size on a 390px phone, which is
+           * the same page-one-only symptom from a different cause: a page
+           * three times the viewport's width to scroll sideways through
+           * before scrolling down could even matter. view=FitH fits each
+           * page to the iframe's width instead, on every device. */
           <iframe
-            src={src} title={attachment.filename} onClick={e => e.stopPropagation()}
+            src={`${src}#toolbar=0&navpanes=0&view=FitH`} title={attachment.filename} onClick={e => e.stopPropagation()}
             style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: '#fff' }}
           />
         ) : kind === 'video' && src ? (
