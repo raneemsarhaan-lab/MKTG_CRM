@@ -588,7 +588,8 @@ html {
   border-inline-start: 3px solid var(--line);
   color: var(--muted);
 }
-.fx-brief a { color: #6E5BE6; text-decoration: underline; }
+.fx-brief a { color: #3563E9; font-weight: 500; text-decoration: none; }
+.fx-brief a:hover { text-decoration: underline; }
 .fx-brief img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5em 0; }
 .fx-brief hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
 .fx-brief code {
@@ -663,6 +664,57 @@ html {
   height: 100%;
   border: 0;
 }
+
+/* A recognised video timestamp — "0:30 – 0:34" — as a compact blue pill. */
+.fx-brief .fx-timestamp {
+  display: inline-flex;
+  align-items: center;
+  background: #EEF3FF;
+  color: #3563E9;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.92em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A pasted Drive/Figma/Claude link, standing alone, as a compact rich chip
+   rather than a bare wall of URL. Optional presentation only — the stored
+   markdown still carries the real href untouched. */
+.fx-brief .fx-linkchip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #F6F8FF;
+  text-decoration: none;
+  color: inherit;
+}
+.fx-brief .fx-linkchip:hover { background: #EEF3FF; }
+.fx-brief .fx-linkchip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: #fff;
+  flex-shrink: 0;
+}
+.fx-brief .fx-linkchip-text { min-width: 0; flex: 1; }
+.fx-brief .fx-linkchip-title {
+  display: block;
+  font-size: 0.94em;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-brief .fx-linkchip-source { display: block; font-size: 0.82em; color: var(--muted); }
+.fx-brief .fx-linkchip-ext { color: var(--muted); flex-shrink: 0; }
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */
 .font-heading { font-family: var(--font-heading); }
