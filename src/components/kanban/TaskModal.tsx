@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
 import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
-import { COLORS } from '@/lib/tokens'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
   moveTask, setTaskStage, addComment, updateTask, createSubtask,
@@ -56,17 +55,22 @@ type FullTask = Task & {
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
 const PRIORITIES = ['High', 'Medium', 'Low']
 
-/** ClickUp's greys, sampled off the reference. */
+/** The brand palette — blue primary, lime-green secondary accent. */
 const CU = {
-  ink:        '#1A1A1A',
-  text:       '#292D34',
-  label:      '#7C828D',
-  faint:      '#A5AAB3',
-  line:       '#E8EAED',
-  lineSoft:   '#F1F2F4',
-  hover:      '#F7F8F9',
-  chipBg:     '#F4F5F7',
-  blue:       '#3B82F6',
+  ink:        '#18233F',
+  text:       '#18233F',
+  label:      '#68738D',
+  faint:      '#929CB0',
+  line:       '#E9EDF4',
+  lineSoft:   '#EEF1F8',
+  hover:      '#F3F6FD',
+  chipBg:     '#F3F6FD',
+  blue:       '#3563E9',
+  blueLight:  '#EEF3FF',
+  blueXLight: '#F6F8FF',
+  green:      '#B7DE16',
+  greenSoft:  '#F2F8D9',
+  surface:    '#F8FAFD',
 } as const
 
 interface TaskModalProps {
@@ -329,11 +333,28 @@ async function shrinkImage(file: File, max: number, quality = 0.82): Promise<str
   return canvas.toDataURL(type, quality)
 }
 
-function Avatar({ name, size = 24 }: { name: string; size?: number }) {
+/** The brand's uploaded logo, or its colour as a lettered disc when it has
+ *  none — the same mark the board's brand filter and the task form use. */
+function BrandMark({ brand, size = 20 }: { brand: { name: string; color: string; logo_url?: string }; size?: number }) {
+  return (
+    <span aria-hidden="true" style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+      background: brand.color, color: '#fff', fontSize: size * 0.5, fontWeight: 800, lineHeight: 1,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {brand.logo_url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={brand.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : brand.name.trim()[0]?.toUpperCase()}
+    </span>
+  )
+}
+
+function Avatar({ name, size = 24, color }: { name: string; size?: number; color?: string }) {
   return (
     <span title={name} style={{
       width: size, height: size, borderRadius: '50%',
-      background: avatarColor(name), color: '#fff',
+      background: color ?? avatarColor(name), color: '#fff',
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.4, fontWeight: 700, flexShrink: 0, letterSpacing: '-.01em',
     }}>
@@ -561,39 +582,57 @@ function Prop({ icon, label, children }: {
   )
 }
 
-/** A row in the Fields block — hairline-separated, value in its own column. */
+/** A row in the Fields block — its own white, borderless, shadowed card. */
 function Field({ icon, label, children }: {
   icon: IconName; label: string; children: React.ReactNode
 }) {
   return (
     <div className="fx-field" style={{
-      display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', alignItems: 'center',
-      minHeight: 42, padding: '0 4px', borderBottom: `1px solid ${CU.lineSoft}`,
+      display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', alignItems: 'center',
+      minHeight: 46, padding: '0 12px', marginBottom: 6, borderRadius: 13,
+      background: '#FFFFFF', boxShadow: '0 1px 2px rgba(24,35,63,0.03)',
     }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 15, color: CU.text }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 14, fontWeight: 500, color: CU.label }}>
         <Icon name={icon} size={16} color={CU.faint} />
         {label}
       </span>
-      <div style={{ minWidth: 0, fontSize: 15, color: CU.text }}>{children}</div>
+      <div style={{ minWidth: 0, fontSize: 14.5, fontWeight: 600, color: CU.text }}>{children}</div>
     </div>
   )
 }
 
-/** The full-width action rows — "Add subtask" and friends. */
-function ActionRow({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+/** The lightweight "Add subtask" action row — a pale-blue chip, not a button. */
+function ActionRow({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
             style={{
-              display: 'flex', alignItems: 'center', gap: 11, width: '100%',
-              padding: '11px 8px', border: 'none', background: 'transparent',
-              borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-              fontSize: 15.5, color: CU.text, textAlign: 'start',
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '10px 12px', border: 'none', background: CU.blueXLight,
+              borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: 15, fontWeight: 600, color: CU.blue, textAlign: 'start',
+              transition: 'background .12s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-      <Icon name={icon} size={17} color={CU.label} />
+            onMouseEnter={e => { e.currentTarget.style.background = CU.blueLight }}
+            onMouseLeave={e => { e.currentTarget.style.background = CU.blueXLight }}>
+      <span style={{
+        width: 20, height: 20, borderRadius: '50%', background: CU.blue, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon name="plus" size={12} color="#fff" width={2.6} />
+      </span>
       {label}
     </button>
+  )
+}
+
+/** The small brand motif beside the "Fields" heading — blue, navy, lime. */
+function BrandMotif() {
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, marginInlineStart: 2 }} aria-hidden="true">
+      <span style={{ width: 12, height: 2, borderRadius: 1, background: CU.blue }} />
+      <span style={{ width: 12, height: 2, borderRadius: 1, background: CU.ink }} />
+      <span style={{ width: 12, height: 2, borderRadius: 1, background: CU.green }} />
+    </span>
   )
 }
 
@@ -628,6 +667,7 @@ export function TaskModal({
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [preview, setPreview]             = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
+  const [sendHover, setSendHover]         = useState(false)
   /* Which half of the panel a phone is showing. Desktop shows both at once
      and never reads this. Reset to the task on open, because arriving in
      somebody's comment thread is not what tapping a card asks for. */
@@ -781,12 +821,15 @@ export function TaskModal({
     return () => document.removeEventListener('mousedown', onDown)
   }, [stageOpen])
 
-  function applyPatch(patch: TaskPatch, after?: () => void) {
+  function applyPatch(patch: TaskPatch, after?: () => void): Promise<void> {
     setError('')
-    startTransition(async () => {
-      const res = await updateTask(task.id, patch)
-      if (res.success) { router.refresh(); after?.() }
-      else setError(res.error ?? 'Could not save the change')
+    return new Promise(resolve => {
+      startTransition(async () => {
+        const res = await updateTask(task.id, patch)
+        if (res.success) { router.refresh(); after?.() }
+        else setError(res.error ?? 'Could not save the change')
+        resolve()
+      })
     })
   }
 
@@ -1286,8 +1329,8 @@ export function TaskModal({
           <InlineValue
             canEdit={canEdit} type="select" value={task.brand_id ?? ''}
             display={task.brand?.name ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: task.brand.color }} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                <BrandMark brand={task.brand} size={20} />
                 {task.brand.name}
               </span>
             ) : ''}
@@ -1304,7 +1347,15 @@ export function TaskModal({
         <Field key="type" icon="type" label="Type">
           <InlineValue
             canEdit={canEdit} type="select" value={task.content_type_label}
-            display={task.content_type_label}
+            display={task.content_type_label ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px',
+                borderRadius: 8, background: CU.blueLight, color: CU.blue, fontWeight: 700, fontSize: 13,
+              }}>
+                <Icon name="folder" size={13} color={CU.blue} width={2.2} />
+                {task.content_type_label}
+              </span>
+            ) : ''}
             options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
             emptyLabel="–"
             onCommit={v => applyPatch({ content_type_label: v })}
@@ -1333,7 +1384,7 @@ export function TaskModal({
             canEdit={canEdit} type="select" value={task.task_owner_id}
             display={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-                <Avatar name={task.task_owner.name} size={26} />
+                <Avatar name={task.task_owner.name} size={26} color="#8AA50D" />
                 {task.task_owner.name}
               </span>
             }
@@ -1366,13 +1417,13 @@ export function TaskModal({
                 title={canEdit ? 'Change the project' : task.project.name}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
-                  border: 'none', borderRadius: 7, padding: '3px 9px',
-                  background: '#F3EEFF', color: '#6D28D9',
+                  border: 'none', borderRadius: 8, padding: '3px 10px',
+                  background: CU.greenSoft, color: '#47755D',
                   font: 'inherit', fontSize: 14.5, fontWeight: 600,
                   cursor: canEdit ? 'pointer' : 'default',
                 }}
               >
-                <Icon name="folder" size={13} color="#6D28D9" width={2.2} />
+                <Icon name="folder" size={13} color={CU.green} width={2.2} />
                 {task.project.name}
               </button>
             ) : canEdit ? (
@@ -1458,40 +1509,46 @@ export function TaskModal({
    * we do not keep a per-move history, so the log does not claim one.
    */
   const activity = useMemo(() => {
-    const items: { id: string; when: Date; node: React.ReactNode }[] = [
+    const items: { id: string; when: Date; dot: string; node: React.ReactNode }[] = [
       {
-        id: 'created', when: new Date(task.created_at),
+        id: 'created', when: new Date(task.created_at), dot: CU.green,
         node: <><strong style={{ fontWeight: 600 }}>{task.task_owner.name}</strong> created this task</>,
       },
       {
-        id: 'stage', when: new Date(task.stage_date),
+        id: 'stage', when: new Date(task.stage_date), dot: CU.green,
         node: <>Moved to <strong style={{ fontWeight: 600 }}>{stageMeta.label_en}</strong></>,
       },
       ...task.comments.map(c => {
         const atMe = (c.mentions ?? []).includes(currentUser.id)
+        // A comment that is nothing but a pasted link is fully represented by
+        // the rich preview card below it — showing the same address again as
+        // shortened inline text would just be the raw URL twice over.
+        const bodyUrls = urlsIn(c.body)
+        const onlyLinks = bodyUrls.length > 0 &&
+          !bodyUrls.reduce((s, u) => s.split(u).join(''), c.body).trim()
         return {
-          id: c.id, when: new Date(c.created_at),
+          id: c.id, when: new Date(c.created_at), dot: CU.blue,
           node: (
             <>
               <strong style={{ fontWeight: 600 }}>{c.author?.name ?? 'Someone'}</strong> commented
               {atMe && (
                 <span style={{
                   marginInlineStart: 7, padding: '2px 7px', borderRadius: 999,
-                  background: '#EEF3FF', color: CU.blue, fontSize: 11.5, fontWeight: 700,
+                  background: CU.blueLight, color: CU.blue, fontSize: 11.5, fontWeight: 700,
                 }}>
                   mentioned you
                 </span>
               )}
               <span style={{
-                display: 'block', marginTop: 6, padding: '8px 11px', borderRadius: 9,
-                background: '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-                border: `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
+                display: 'block', marginTop: 6, padding: onlyLinks ? 0 : '8px 11px', borderRadius: 9,
+                background: onlyLinks ? 'transparent' : '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                border: onlyLinks ? 'none' : `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
                 // A pasted URL is one unbroken word and will happily run out
                 // of the bubble and off the panel unless it is allowed to
                 // break mid-word.
                 overflowWrap: 'anywhere', minWidth: 0,
               }}>
-                {withRefs(
+                {!onlyLinks && withRefs(
                   c.body,
                   members,
                   (c.task_refs ?? [])
@@ -1501,7 +1558,7 @@ export function TaskModal({
                 )}
                 {/* Two cards at most: a comment that is a list of links should
                     stay a comment, not become a page of thumbnails. */}
-                {urlsIn(c.body).slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
+                {bodyUrls.slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
               </span>
             </>
           ),
@@ -1653,7 +1710,7 @@ export function TaskModal({
                   padding: '8px 14px', minHeight: 44, fontSize: 14.5,
                   fontWeight: pane === id ? 700 : 600,
                   color: pane === id ? CU.ink : CU.faint,
-                  boxShadow: pane === id ? `inset 0 -2.5px 0 ${COLORS.violet ?? '#6E5BE6'}` : 'none',
+                  boxShadow: pane === id ? `inset 0 -2.5px 0 ${CU.blue}` : 'none',
                 }}
               >
                 {id === 'task' ? 'Task' : `Activity ${task.comments.length || ''}`.trim()}
@@ -1675,9 +1732,10 @@ export function TaskModal({
             }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 11px',
-                border: `1px solid ${CU.line}`, borderRadius: 8, fontSize: 15, fontWeight: 600,
+                border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600,
+                background: CU.blueLight, color: CU.blue,
               }}>
-                <Icon name="target" size={15} color={stageMeta.color} />
+                <Icon name="target" size={15} color={CU.blue} />
                 Task
               </span>
               <button type="button" onClick={() => copy('id')} title="Copy task ID"
@@ -1815,11 +1873,12 @@ export function TaskModal({
                         disabled={isPending}
                         title={`Move to ${nextMeta.label_en}`}
                         style={{
-                          border: `1px solid ${CU.line}`, background: isOverride ? COLORS.ink : '#fff',
-                          color: isOverride ? COLORS.lime : CU.text,
-                          borderRadius: 6, cursor: 'pointer', padding: '4px 9px',
+                          border: 'none', background: isOverride ? CU.ink : CU.blueLight,
+                          color: isOverride ? CU.green : CU.blue,
+                          borderRadius: 8, cursor: 'pointer', padding: '5px 10px',
                           fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
                           opacity: isPending ? 0.6 : 1, whiteSpace: 'nowrap',
+                          boxShadow: isOverride ? 'none' : '0 1px 2px rgba(24,35,63,0.03)',
                         }}
                       >
                         {isOverride ? '⚡ ' : ''}→ {nextMeta.label_en}
@@ -1927,8 +1986,8 @@ export function TaskModal({
                 <BriefEditor
                   value={briefText}
                   saving={isPending}
-                  onSave={next => applyPatch({ description: next }, () => setEditingBrief(false))}
-                  onCancel={() => setEditingBrief(false)}
+                  onSave={next => applyPatch({ description: next })}
+                  onDone={() => setEditingBrief(false)}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
                 />
@@ -1990,10 +2049,10 @@ export function TaskModal({
                       <button type="button" onClick={() => setBriefOpen(v => !v)}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 6, height: 30,
-                                padding: '0 12px', borderRadius: 8, cursor: 'pointer',
-                                border: `1px solid ${CU.line}`, background: '#fff',
+                                padding: '0 12px', borderRadius: 10, cursor: 'pointer',
+                                border: 'none', background: '#fff',
                                 fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: CU.text,
-                                boxShadow: '0 1px 3px rgba(20,20,20,.07)',
+                                boxShadow: '0 4px 20px rgba(23,36,65,0.06)',
                               }}>
                         <Icon name={briefOpen ? 'chevronUp' : 'chevron'} size={15} color={CU.label} />
                         {briefOpen ? 'Collapse' : 'Expand'}
@@ -2004,7 +2063,7 @@ export function TaskModal({
               )}
 
               {/* ── Fields ───────────────────────────────────────────────── */}
-              <div style={{ marginTop: 26 }}>
+              <div style={{ marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
                 <button type="button" onClick={() => setFieldsOpen(v => !v)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
@@ -2014,18 +2073,19 @@ export function TaskModal({
                   <Icon name="chevron" size={14} color={CU.label}
                         style={{ transform: fieldsOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
                   Fields
+                  <BrandMotif />
                 </button>
 
                 {fieldsOpen && (
-                  <div style={{ paddingInlineStart: 20, borderTop: `1px solid ${CU.lineSoft}` }}>
+                  <div>
                     {fields.filter(f => f.filled).map(f => f.node)}
                     {showEmpty && fields.filter(f => !f.filled).map(f => f.node)}
                     {emptyCount > 0 && (
                       <button type="button" onClick={() => setShowEmpty(v => !v)}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
-                                background: 'transparent', cursor: 'pointer', padding: '11px 4px',
-                                fontFamily: 'inherit', fontSize: 15, color: CU.label,
+                                background: 'transparent', cursor: 'pointer', padding: '9px 4px 4px',
+                                fontFamily: 'inherit', fontSize: 14.5, color: CU.label,
                               }}>
                         <Icon name={showEmpty ? 'chevronUp' : 'chevron'} size={14} color={CU.faint} />
                         {showEmpty
@@ -2050,8 +2110,9 @@ export function TaskModal({
                         <button key={s.id} type="button" onClick={() => selectTask(s.id)}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                  padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
-                                  border: `1px solid ${CU.line}`, background: '#fff',
+                                  padding: '9px 10px', borderRadius: 12, cursor: 'pointer',
+                                  border: 'none', background: '#fff',
+                                  boxShadow: '0 1px 2px rgba(24,35,63,0.03)',
                                   fontFamily: 'inherit', fontSize: 15, color: CU.text, textAlign: 'start',
                                 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
@@ -2087,14 +2148,14 @@ export function TaskModal({
                       <button type="button" onClick={submitSubtask} disabled={isPending}
                               style={{
                                 height: 38, padding: '0 16px', border: 'none', borderRadius: 8,
-                                background: COLORS.ink, color: COLORS.lime, cursor: 'pointer',
+                                background: CU.blue, color: '#fff', cursor: 'pointer',
                                 fontFamily: 'inherit', fontSize: 15, fontWeight: 700,
                               }}>
                         Add
                       </button>
                     </div>
                   ) : (
-                    <ActionRow icon="subtask" label="Add subtask" onClick={() => setAddingSubtask(true)} />
+                    <ActionRow label="Add subtask" onClick={() => setAddingSubtask(true)} />
                   )}
                 </div>
               )}
@@ -2155,18 +2216,18 @@ export function TaskModal({
                           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click() }
                         }}
                         style={{
-                          border: `1.5px dashed ${dragging ? CU.blue : CU.line}`, borderRadius: 10,
-                          padding: '22px 12px', textAlign: 'center', fontSize: 15.5,
-                          color: dragging ? CU.blue : CU.label, cursor: 'pointer',
-                          background: dragging ? '#F3F7FF' : 'transparent',
+                          border: `1px dashed ${dragging ? CU.blue : '#DDE4F0'}`, borderRadius: 16,
+                          padding: '22px 12px', textAlign: 'center', fontSize: 15,
+                          color: CU.label, cursor: 'pointer',
+                          background: dragging ? CU.blueLight : CU.surface,
                           transition: 'border-color .12s, background .12s, color .12s',
                         }}
-                        onMouseEnter={e => { if (!dragging) e.currentTarget.style.background = CU.hover }}
-                        onMouseLeave={e => { if (!dragging) e.currentTarget.style.background = 'transparent' }}
+                        onMouseEnter={e => { if (!dragging) e.currentTarget.style.background = CU.blueXLight }}
+                        onMouseLeave={e => { if (!dragging) e.currentTarget.style.background = CU.surface }}
                       >
                         {uploading
                           ? (hasStorage ? 'Uploading…' : 'Reading files…')
-                          : <>Drop files here or <span style={{ textDecoration: 'underline' }}>browse</span></>}
+                          : <>Drop files here or <span style={{ color: CU.blue, fontWeight: 600 }}>browse</span></>}
                       </div>
                     )}
 
@@ -2337,7 +2398,7 @@ export function TaskModal({
               flex: '0 0 400px',
               display: isPhone && pane !== 'activity' ? 'none' : 'flex',
               flexDirection: 'column',
-              borderInlineStart: `1px solid ${CU.line}`, minWidth: 0, background: '#fff',
+              borderInlineStart: `1px solid ${CU.lineSoft}`, minWidth: 0, background: '#fff',
             }}>
             <div style={{
               height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
@@ -2353,32 +2414,47 @@ export function TaskModal({
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
-              {shown.map((a, i) => (
-                <div key={a.id}>
-                  {/* ClickUp folds the middle of a long log away */}
-                  {collapsible && !showAllActivity && i === HEAD && (
-                    <button type="button" onClick={() => setShowAllActivity(true)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8, border: 'none',
-                              background: 'transparent', cursor: 'pointer', padding: '4px 0 12px',
-                              fontFamily: 'inherit', fontSize: 15, color: CU.text,
-                            }}>
-                      <Icon name="chevronR" size={14} color={CU.label} />
-                      Show more {hiddenActivity > 0 && <span style={{ color: CU.faint }}>({hiddenActivity})</span>}
-                    </button>
-                  )}
-                  <div style={{
-                    display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) auto',
-                    gap: 8, alignItems: 'start', marginBottom: 14,
-                  }}>
-                    <span style={{ color: CU.faint, lineHeight: '20px', fontSize: 16.5 }}>•</span>
-                    <span style={{ fontSize: 15, color: CU.text, lineHeight: 1.5 }}>{a.node}</span>
-                    <span style={{ fontSize: 13.5, color: CU.label, whiteSpace: 'nowrap', lineHeight: '20px' }}>
-                      {fmtTime(a.when)}
-                    </span>
+              <div style={{ position: 'relative' }}>
+                {/* The connecting timeline line, drawn once behind every dot
+                    rather than per row — a row's own height is not known
+                    until it wraps, so a line per row never quite meets the
+                    next one. */}
+                {shown.length > 1 && (
+                  <div aria-hidden="true" style={{
+                    position: 'absolute', insetInlineStart: 4, top: 8, bottom: 22,
+                    width: 1.5, background: '#E8EDF5',
+                  }} />
+                )}
+                {shown.map((a, i) => (
+                  <div key={a.id}>
+                    {/* ClickUp folds the middle of a long log away */}
+                    {collapsible && !showAllActivity && i === HEAD && (
+                      <button type="button" onClick={() => setShowAllActivity(true)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, border: 'none',
+                                background: 'transparent', cursor: 'pointer', padding: '4px 0 12px',
+                                fontFamily: 'inherit', fontSize: 15, color: CU.text,
+                              }}>
+                        <Icon name="chevronR" size={14} color={CU.label} />
+                        Show more {hiddenActivity > 0 && <span style={{ color: CU.faint }}>({hiddenActivity})</span>}
+                      </button>
+                    )}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) auto',
+                      gap: 8, alignItems: 'start', marginBottom: 14, position: 'relative',
+                    }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', background: a.dot,
+                        marginTop: 6, flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 15, color: CU.text, lineHeight: 1.5 }}>{a.node}</span>
+                      <span style={{ fontSize: 13.5, color: CU.label, whiteSpace: 'nowrap', lineHeight: '20px' }}>
+                        {fmtTime(a.when)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
               {collapsible && showAllActivity && (
                 <button type="button" onClick={() => setShowAllActivity(false)}
@@ -2485,8 +2561,8 @@ export function TaskModal({
               )}
 
               <div style={{
-                border: `1px solid ${CU.line}`, borderRadius: 10, background: '#fff',
-                boxShadow: '0 1px 3px rgba(20,20,20,.05)',
+                border: 'none', borderRadius: 14, background: '#fff',
+                boxShadow: '0 4px 20px rgba(23,36,65,0.04)',
               }}>
                 <textarea
                   ref={cmtRef}
@@ -2560,13 +2636,18 @@ export function TaskModal({
                     aria-label="Send comment"
                     title="Send — ⌘Enter"
                     style={{
-                      width: 34, height: 30, borderRadius: 7, border: 'none', cursor: 'pointer',
+                      width: 34, height: 30, borderRadius: 9, border: 'none',
+                      cursor: cmtText.trim() ? 'pointer' : 'default',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      background: cmtText.trim() ? COLORS.ink : CU.chipBg,
-                      opacity: isPending ? 0.6 : 1,
+                      background: sendHover && cmtText.trim() && !isPending ? CU.blue : CU.blueLight,
+                      opacity: isPending || !cmtText.trim() ? 0.55 : 1,
+                      transition: 'background .12s',
                     }}
+                    onMouseEnter={() => setSendHover(true)}
+                    onMouseLeave={() => setSendHover(false)}
                   >
-                    <Icon name="send" size={15} color={cmtText.trim() ? COLORS.lime : CU.faint} width={2} />
+                    <Icon name="send" size={15}
+                          color={sendHover && cmtText.trim() && !isPending ? '#fff' : CU.blue} width={2} />
                   </button>
                 </div>
               </div>

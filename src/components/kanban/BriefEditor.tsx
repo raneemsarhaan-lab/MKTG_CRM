@@ -1,7 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { COLORS } from '@/lib/tokens'
+import { useEffect, useRef, useState } from 'react'
 import { Brief } from '@/components/shared/Brief'
 import { imageAttachments } from '@/lib/attachments'
 import type { TaskAttachment } from '@/types/index'
@@ -15,15 +14,26 @@ import type { TaskAttachment } from '@/types/index'
  * current selection, which keeps the stored value round-trippable: what the
  * import wrote, the editor can re-emit unchanged.
  *
- * Preview reuses the panel's own renderer, so what you see while writing is
- * exactly what the task will show.
+ * There is no Save button: every change calls `onSave` right away, with no
+ * artificial delay. What is throttled is concurrency, not time — if a save is
+ * still in flight when the next change comes in, it waits for that request to
+ * finish and then sends the latest text, rather than firing a second request
+ * in parallel. Two overlapping saves can resolve out of order over the
+ * network, and the one that finishes last wins even if it was sent first —
+ * that is how a save typed a moment earlier clobbers one typed a moment
+ * later. Sending saves one at a time removes the race instead of just
+ * shortening its window. The rendered preview sits live underneath the
+ * textarea rather than behind a toggle, so it and the raw Markdown are always
+ * in view together and there is nothing to remember to refresh.
  */
 
 interface BriefEditorProps {
-  value:    string
-  saving:   boolean
-  onSave:   (next: string) => void
-  onCancel: () => void
+  value:  string
+  saving: boolean
+  /** May return a Promise; awaited so a save in flight is never overlapped. */
+  onSave: (next: string) => void | Promise<unknown>
+  /** Stop editing. Nothing is discarded — autosave already covers that. */
+  onDone: () => void
   /** Offered as one-click choices when inserting an image. */
   attachments?: TaskAttachment[]
   /** Creates a real child task and returns a link to it, or null if cancelled. */
@@ -32,11 +42,30 @@ interface BriefEditorProps {
 
 type Cmd =
   | { kind: 'wrap';    before: string; after: string }
-  | { kind: 'heading'; level: 1 | 2 | 3 }
+  | { kind: 'heading'; level: 0 | 1 | 2 | 3 }
   | { kind: 'prefix';  prefix: string }
   | { kind: 'ordered' }
   | { kind: 'link' }
   | { kind: 'block';   text: string; caretBack?: number }
+
+/** The blue + lime brand palette, local to the editor. */
+const BR = {
+  ink:        '#18233F',
+  label:      '#68738D',
+  faint:      '#929CB0',
+  line:       '#E9EDF4',
+  surface:    '#F8FAFD',
+  blue:       '#3563E9',
+  blueLight:  '#EEF3FF',
+  blueActive: '#E5EDFF',
+} as const
+
+const TEXT_STYLES: { level: 0 | 1 | 2 | 3; label: string; sample: React.CSSProperties }[] = [
+  { level: 0, label: 'Normal text', sample: { fontWeight: 500 } },
+  { level: 1, label: 'Heading 1',   sample: { fontWeight: 800, fontSize: '1.05em' } },
+  { level: 2, label: 'Heading 2',   sample: { fontWeight: 800, fontSize: '0.98em' } },
+  { level: 3, label: 'Heading 3',   sample: { fontWeight: 800, fontSize: '0.92em' } },
+]
 
 interface ToolbarItem {
   id:     string
@@ -47,11 +76,6 @@ interface ToolbarItem {
 }
 
 const TOOLS: ToolbarItem[][] = [
-  [
-    { id: 'h1', label: 'H1', title: 'Heading 1 (Ctrl+Alt+1)', cmd: { kind: 'heading', level: 1 }, style: { fontSize: '0.78rem', fontWeight: 800 } },
-    { id: 'h2', label: 'H2', title: 'Heading 2 (Ctrl+Alt+2)', cmd: { kind: 'heading', level: 2 }, style: { fontSize: '0.72rem', fontWeight: 800 } },
-    { id: 'h3', label: 'H3', title: 'Heading 3 (Ctrl+Alt+3)', cmd: { kind: 'heading', level: 3 }, style: { fontSize: '0.68rem', fontWeight: 800 } },
-  ],
   [
     { id: 'bold',   label: 'B', title: 'Bold (Ctrl+B)',            cmd: { kind: 'wrap', before: '**', after: '**' }, style: { fontWeight: 900 } },
     { id: 'italic', label: 'I', title: 'Italic (Ctrl+I)',          cmd: { kind: 'wrap', before: '_',  after: '_'  }, style: { fontStyle: 'italic', fontFamily: 'serif' } },
@@ -76,7 +100,7 @@ const TOGGLE_SKELETON =
 type ToolIconName =
   | 'code' | 'link' | 'bulletList' | 'numberedList' | 'quote'
   | 'image' | 'divider' | 'toggle' | 'table' | 'toc' | 'youtube'
-  | 'clear' | 'copy' | 'task' | 'subtask'
+  | 'clear' | 'copy' | 'task' | 'subtask' | 'chevron'
 
 function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
   const paths: Record<ToolIconName, React.ReactNode> = {
@@ -100,6 +124,7 @@ function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
     copy: <><rect x="9" y="3" width="11" height="13" rx="2" /><path d="M6 8H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1" /></>,
     task: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m8 12.5 2.5 2.5L16 9.5" /></>,
     subtask: <><path d="M6 4v9a3 3 0 0 0 3 3h6" /><circle cx="18" cy="16" r="2.6" /><path d="M18 6.4v3.6M16.2 8.2h3.6" /></>,
+    chevron: <path d="M6 9.5l6 6 6-6" />,
   }
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -108,6 +133,46 @@ function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
       {paths[name]}
     </svg>
   )
+}
+
+/** A borderless toolbar action — the only chrome is a hover/active tint. */
+function ToolButton({ children, title, active, disabled, wide, chip, onClick }: {
+  children: React.ReactNode; title: string; active?: boolean; disabled?: boolean
+  /** A labelled control (a dropdown trigger) rather than a bare icon. */
+  wide?: boolean
+  /** A dropdown trigger — sits on its own light chip even at rest, so it reads
+   *  as a control rather than another icon in the row. */
+  chip?: boolean
+  onClick: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const lit = active || hover
+  return (
+    <button
+      type="button" title={title} aria-label={title} disabled={disabled}
+      onMouseDown={e => e.preventDefault()}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 34,
+        padding: wide ? '0 12px' : '0 8px', minWidth: wide ? undefined : 34,
+        border: 'none', borderRadius: 9, cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit', fontSize: 13, fontWeight: active ? 700 : 500,
+        background: lit ? BR.blueActive : chip ? '#fff' : 'transparent',
+        color: lit ? BR.blue : BR.ink, opacity: disabled ? 0.4 : 1,
+        boxShadow: chip && !lit ? '0 1px 2px rgba(24,35,63,0.05)' : 'none',
+        transition: 'background .1s',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** A hairline between logical toolbar groups — never between two single buttons. */
+function Sep() {
+  return <span aria-hidden="true" style={{ width: 1, height: 26, background: BR.line, margin: '0 4px', flexShrink: 0 }} />
 }
 
 /** Split the value around the selection, expanded to whole lines when asked. */
@@ -190,7 +255,10 @@ export function apply(cmd: Cmd, text: string, start: number, end: number): {
   const lines = text.slice(from, to).split('\n')
 
   let rewritten: string[]
-  if (cmd.kind === 'heading') {
+  if (cmd.kind === 'heading' && cmd.level === 0) {
+    // "Normal text" — always strips, regardless of what heading (if any) was there.
+    rewritten = lines.map(l => l.replace(/^#{1,6} +/, ''))
+  } else if (cmd.kind === 'heading') {
     const hashes = '#'.repeat(cmd.level) + ' '
     const already = lines.every(l => l.startsWith(hashes))
     rewritten = lines.map(l => {
@@ -230,11 +298,12 @@ const PROMPTS: Record<PromptKind, { label: string; placeholder: string; cta: str
 }
 
 export function BriefEditor({
-  value, saving, onSave, onCancel, attachments = [], onCreateSubtask,
+  value, saving, onSave, onDone, attachments = [], onCreateSubtask,
 }: BriefEditorProps) {
-  const [text, setText]       = useState(value)
-  const [preview, setPreview] = useState(false)
-  const [menu, setMenu]       = useState<'insert' | 'more' | null>(null)
+  const [text, setTextState]  = useState(value)
+  const [busySaving, setBusySaving] = useState(false)
+  const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
+  const [focused, setFocused] = useState(false)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [prompt, setPrompt]   = useState<PromptKind | null>(null)
   const [draft, setDraft]     = useState('')
@@ -243,6 +312,58 @@ export function BriefEditor({
   const ref = useRef<HTMLTextAreaElement>(null)
 
   const images = imageAttachments(attachments)
+
+  // Autosave bookkeeping. Refs, not state: a request resolving later, or the
+  // unmount cleanup, needs the *latest* text and the *latest* save target
+  // without waiting on a render — a stale closure here is how the last few
+  // keystrokes typed right before closing the editor go unsaved.
+  const textRef    = useRef(value)
+  const savedRef   = useRef(value)
+  const inFlightRef = useRef(false)
+
+  /**
+   * Send whatever hasn't been saved yet — but only one request at a time.
+   *
+   * Called again from its own `.finally`, so a burst of keystrokes while a
+   * save is in flight collapses into exactly one follow-up request carrying
+   * the latest text, sent the instant the first one completes, rather than a
+   * second request racing it. Two requests in flight together can finish in
+   * either order over the network; the one that lands last wins regardless of
+   * which was sent first, which is how an older save can silently overwrite a
+   * newer one. Never running two at once removes that race instead of just
+   * narrowing its window.
+   */
+  function pump() {
+    if (inFlightRef.current) return
+    const next = textRef.current
+    if (next === savedRef.current) { setBusySaving(false); return }
+    savedRef.current = next
+    inFlightRef.current = true
+    setBusySaving(true)
+    Promise.resolve(onSave(next)).finally(() => {
+      inFlightRef.current = false
+      pump()
+    })
+  }
+
+  /** Every change to the text goes through here, whatever triggered it —
+   *  typing, a toolbar command, or the right-click menu — so autosave sees
+   *  all of them alike. */
+  function setText(next: string) {
+    textRef.current = next
+    setTextState(next)
+    pump()
+  }
+
+  // Catch whatever the editor unmounts before pump() gets to it — closing the
+  // task panel mid-keystroke, say. A save already in flight keeps going and
+  // still lands, and its own `.finally` still sends any text newer than it
+  // once it resolves (those closures don't care that the component is gone);
+  // sending another one here too would just race that one. This only covers
+  // a change that never got a chance to start a request at all.
+  useEffect(() => () => {
+    if (!inFlightRef.current && textRef.current !== savedRef.current) onSave(textRef.current)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function run(cmd: Cmd) {
     const el = ref.current
@@ -320,10 +441,10 @@ export function BriefEditor({
     if (e.key === 'Escape') {
       e.stopPropagation()
       if (ctxMenu) { setCtxMenu(null); return }
-      onCancel()
+      onDone()
       return
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSave(text); return }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onDone(); return }
     if (!(e.metaKey || e.ctrlKey)) return
 
     const key = e.key.toLowerCase()
@@ -349,12 +470,6 @@ export function BriefEditor({
     }
   }
 
-  const btn: React.CSSProperties = {
-    minWidth: 26, height: 24, padding: '0 6px', borderRadius: 6,
-    border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.ink,
-    fontSize: '0.7rem', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
-  }
-
   const INSERT_ITEMS: { icon: React.ReactNode; label: string; run: () => void; hint?: string }[] = [
     { icon: <ToolIcon name="task" />, label: 'Task', run: () => { setMenu(null); run({ kind: 'prefix', prefix: '- [ ] ' }) } },
     ...(onCreateSubtask
@@ -368,181 +483,196 @@ export function BriefEditor({
     { icon: <ToolIcon name="youtube" />,  label: 'YouTube',  run: () => openPrompt('youtube') },
   ]
 
+  const contentRadius: React.CSSProperties['borderRadius'] = '0 0 18px 18px'
+
   return (
     <div>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-        padding: '6px 8px', border: `1px solid ${COLORS.line}`,
-        borderRadius: '10px 10px 0 0', borderBottom: 'none', background: '#FAFAF9',
-        position: 'relative',
+        borderRadius: 18, background: '#fff', overflow: 'hidden',
+        boxShadow: focused
+          ? '0 0 0 2px rgba(53,99,233,0.08), 0 4px 20px rgba(24,35,63,0.04)'
+          : '0 2px 12px rgba(24,35,63,0.05)',
+        transition: 'box-shadow .12s',
       }}>
-        {TOOLS.map((group, gi) => (
-          <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {group.map(t => (
-              <button
-                key={t.id}
-                type="button"
-                title={t.title}
-                aria-label={t.title}
-                disabled={preview}
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => run(t.cmd)}
-                style={{ ...btn, ...t.style, opacity: preview ? 0.4 : 1 }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        ))}
-
-        {/* Insert */}
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            disabled={preview}
-            aria-haspopup="menu"
-            aria-expanded={menu === 'insert'}
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => setMenu(m => (m === 'insert' ? null : 'insert'))}
-            style={{
-              ...btn, fontWeight: 700, opacity: preview ? 0.4 : 1,
-              background: menu === 'insert' ? '#EFEFED' : '#fff',
-            }}
-          >
-            + Insert ▾
-          </button>
-          {menu === 'insert' && (
-            <Menu onClose={() => setMenu(null)}>
-              {INSERT_ITEMS.map(it => (
-                <MenuItem key={it.label} icon={it.icon} onClick={it.run} hint={it.hint}>
-                  {it.label}
-                </MenuItem>
-              ))}
-            </Menu>
-          )}
-        </div>
-
-        {/* Overflow: clear format / copy markdown */}
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            title="More"
-            aria-label="More actions"
-            aria-haspopup="menu"
-            aria-expanded={menu === 'more'}
-            onMouseDown={e => e.preventDefault()}
-            onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}
-            style={{ ...btn, background: menu === 'more' ? '#EFEFED' : '#fff' }}
-          >
-            ⋯
-          </button>
-          {menu === 'more' && (
-            <Menu onClose={() => setMenu(null)}>
-              <MenuItem icon={<ToolIcon name="clear" />} onClick={() => { setMenu(null); clearFormat() }} hint="selection, or all">
-                Clear format
-              </MenuItem>
-              <MenuItem icon={<ToolIcon name="copy" />} onClick={() => { setMenu(null); void copyMarkdown() }}>
-                Copy Markdown
-              </MenuItem>
-            </Menu>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => { setPreview(p => !p); setCtxMenu(null) }}
-          style={{
-            ...btn, marginInlineStart: 'auto', fontWeight: 700,
-            background: preview ? COLORS.ink : '#fff',
-            color: preview ? COLORS.lime : COLORS.muted,
-          }}
-        >
-          {preview ? 'Edit' : 'Preview'}
-        </button>
-      </div>
-
-      {/* Value prompt for the insert items that need one */}
-      {prompt && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-          padding: '7px 8px', border: `1px solid ${COLORS.line}`, borderBottom: 'none',
-          background: '#FFFDF3',
+          display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+          minHeight: 58, padding: '10px 16px', background: BR.surface, borderRadius: '18px 18px 0 0',
+          position: 'relative',
         }}>
-          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: COLORS.muted }}>
-            {PROMPTS[prompt].label}
-          </span>
-          <input
-            value={draft}
-            autoFocus
-            placeholder={PROMPTS[prompt].placeholder}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => {
-              e.stopPropagation()
-              if (e.key === 'Enter')  { e.preventDefault(); void confirmPrompt() }
-              if (e.key === 'Escape') { setPrompt(null); setDraft('') }
-            }}
-            style={{
-              flex: 1, minWidth: 180, padding: '4px 7px', borderRadius: 6,
-              border: `1px solid ${COLORS.line}`, fontSize: '0.76rem',
-              fontFamily: 'inherit', outline: 'none',
-            }}
-          />
-          <button type="button" onClick={() => void confirmPrompt()} disabled={busy || !draft.trim()}
-                  style={{ ...btn, fontWeight: 700, opacity: busy || !draft.trim() ? 0.5 : 1 }}>
-            {busy ? 'Working…' : PROMPTS[prompt].cta}
-          </button>
-          <button type="button" onClick={() => { setPrompt(null); setDraft('') }} style={btn}>
-            Cancel
-          </button>
+          {/* Text style */}
+          <div style={{ position: 'relative' }}>
+            <ToolButton title="Text style" active={menu === 'style'} wide chip
+                        onClick={() => setMenu(m => (m === 'style' ? null : 'style'))}>
+              Text style <ToolIcon name="chevron" size={14} />
+            </ToolButton>
+            {menu === 'style' && (
+              <Menu onClose={() => setMenu(null)}>
+                {TEXT_STYLES.map(s => (
+                  <MenuItem key={s.level} icon={null}
+                            onClick={() => { setMenu(null); run({ kind: 'heading', level: s.level }) }}>
+                    <span style={s.sample}>{s.label}</span>
+                  </MenuItem>
+                ))}
+              </Menu>
+            )}
+          </div>
 
-          {prompt === 'image' && images.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.66rem', color: COLORS.muted }}>or use an attachment:</span>
-              {images.slice(0, 6).map(a => (
-                <button
-                  key={a.id}
-                  type="button"
-                  title={a.filename}
-                  onClick={() => { insertBlock(`![${a.filename}](${a.url})`); setPrompt(null) }}
-                  style={{ ...btn, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {a.filename}
-                </button>
+          <Sep />
+
+          {TOOLS.map((group, gi) => (
+            <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {gi > 0 && <Sep />}
+              {group.map(t => (
+                <ToolButton key={t.id} title={t.title} onClick={() => run(t.cmd)}>
+                  <span style={{ fontSize: 15, ...t.style }}>{t.label}</span>
+                </ToolButton>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          ))}
 
-      {preview ? (
-        <div style={{
-          border: `1px solid ${COLORS.line}`, borderRadius: '0 0 10px 10px',
-          padding: '0.6rem 0.7rem', minHeight: 140, background: '#fff',
-        }}>
-          {text.trim()
-            ? <Brief markdown={text} />
-            : <span style={{ color: COLORS.muted, fontStyle: 'italic', fontSize: '0.85rem' }}>
-                Nothing to preview yet.
-              </span>}
+          <Sep />
+
+          {/* Insert */}
+          <div style={{ position: 'relative' }}>
+            <ToolButton title="Insert" active={menu === 'insert'} wide chip
+                        onClick={() => setMenu(m => (m === 'insert' ? null : 'insert'))}>
+              + Insert <ToolIcon name="chevron" size={14} />
+            </ToolButton>
+            {menu === 'insert' && (
+              <Menu onClose={() => setMenu(null)}>
+                {INSERT_ITEMS.map(it => (
+                  <MenuItem key={it.label} icon={it.icon} onClick={it.run} hint={it.hint}>
+                    {it.label}
+                  </MenuItem>
+                ))}
+              </Menu>
+            )}
+          </div>
+
+          {/* Overflow: clear format / copy markdown */}
+          <div style={{ position: 'relative' }}>
+            <ToolButton title="More actions" active={menu === 'more'}
+                        onClick={() => setMenu(m => (m === 'more' ? null : 'more'))}>
+              <span style={{ fontSize: 16 }}>⋯</span>
+            </ToolButton>
+            {menu === 'more' && (
+              <Menu onClose={() => setMenu(null)}>
+                <MenuItem icon={<ToolIcon name="clear" />} onClick={() => { setMenu(null); clearFormat() }} hint="selection, or all">
+                  Clear format
+                </MenuItem>
+                <MenuItem icon={<ToolIcon name="copy" />} onClick={() => { setMenu(null); void copyMarkdown() }}>
+                  Copy Markdown
+                </MenuItem>
+              </Menu>
+            )}
+          </div>
+
+          <span style={{ flex: 1 }} />
+
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 4px',
+            fontSize: 12.5, fontWeight: 600, color: busySaving || saving ? BR.blue : BR.faint,
+          }}>
+            {busySaving || saving ? 'Saving…' : 'Saved'}
+          </span>
         </div>
-      ) : (
+
+        {/* Value prompt for the insert items that need one */}
+        {prompt && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+            padding: '10px 14px', background: BR.blueLight,
+          }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: BR.blue }}>
+              {PROMPTS[prompt].label}
+            </span>
+            <input
+              value={draft}
+              autoFocus
+              placeholder={PROMPTS[prompt].placeholder}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                e.stopPropagation()
+                if (e.key === 'Enter')  { e.preventDefault(); void confirmPrompt() }
+                if (e.key === 'Escape') { setPrompt(null); setDraft('') }
+              }}
+              style={{
+                flex: 1, minWidth: 180, height: 30, padding: '0 10px', borderRadius: 8,
+                border: 'none', background: '#fff', fontSize: 13,
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <button type="button" onClick={() => void confirmPrompt()} disabled={busy || !draft.trim()}
+                    style={{
+                      height: 30, padding: '0 12px', border: 'none', borderRadius: 8,
+                      background: BR.blue, color: '#fff', fontWeight: 700, fontSize: 12.5,
+                      cursor: 'pointer', fontFamily: 'inherit', opacity: busy || !draft.trim() ? 0.5 : 1,
+                    }}>
+              {busy ? 'Working…' : PROMPTS[prompt].cta}
+            </button>
+            <ToolButton title="Cancel" onClick={() => { setPrompt(null); setDraft('') }}>Cancel</ToolButton>
+
+            {prompt === 'image' && images.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: BR.label }}>or use an attachment:</span>
+                {images.slice(0, 6).map(a => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    title={a.filename}
+                    onClick={() => { insertBlock(`![${a.filename}](${a.url})`); setPrompt(null) }}
+                    style={{
+                      height: 28, padding: '0 10px', border: 'none', borderRadius: 7,
+                      background: '#fff', color: BR.ink, fontSize: 12.5, cursor: 'pointer',
+                      fontFamily: 'inherit', maxWidth: 160, overflow: 'hidden',
+                      textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {a.filename}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <textarea
           ref={ref}
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onContextMenu={onContextMenu}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           autoFocus
-          rows={10}
+          rows={9}
           placeholder="What needs making, for whom, and any constraints…"
           style={{
-            width: '100%', padding: '0.6rem 0.7rem', borderRadius: '0 0 10px 10px',
-            border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.ink,
-            fontSize: '0.85rem', lineHeight: 1.55, fontFamily: 'inherit',
+            width: '100%', padding: '24px 28px 14px',
+            border: 'none', background: '#fff', color: BR.ink,
+            fontSize: 16, lineHeight: 1.65, fontFamily: 'inherit',
             outline: 'none', resize: 'vertical', boxSizing: 'border-box', display: 'block',
           }}
         />
-      )}
+
+        {/* The rendered brief, live underneath the source — no toggle to
+            remember, no stale preview: it is always exactly `text`. */}
+        <div style={{ borderTop: `1px solid ${BR.line}`, borderRadius: contentRadius, background: '#fff' }}>
+          <div style={{
+            padding: '10px 28px 0', fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
+            textTransform: 'uppercase', color: BR.faint,
+          }}>
+            Preview
+          </div>
+          <div style={{ padding: '8px 28px 26px', minHeight: 60 }}>
+            {text.trim()
+              ? <Brief markdown={text} />
+              : <span style={{ color: BR.faint, fontStyle: 'italic', fontSize: 15 }}>
+                  Nothing to preview yet.
+                </span>}
+          </div>
+        </div>
+      </div>
 
       {/* Right-click formatting menu — the same commands as the toolbar,
           reachable without a trip to the top of the editor. */}
@@ -560,7 +690,7 @@ export function BriefEditor({
           <MenuItem icon={<ToolIcon name="code" size={14} />} onClick={() => runAndClose({ kind: 'wrap', before: '`', after: '`' })} hint="Ctrl+E">
             Inline code
           </MenuItem>
-          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
           <MenuItem icon={<span style={{ fontSize: '0.66rem', fontWeight: 800 }}>H1</span>} onClick={() => runAndClose({ kind: 'heading', level: 1 })} hint="Ctrl+Alt+1">
             Heading 1
           </MenuItem>
@@ -570,7 +700,7 @@ export function BriefEditor({
           <MenuItem icon={<span style={{ fontSize: '0.56rem', fontWeight: 800 }}>H3</span>} onClick={() => runAndClose({ kind: 'heading', level: 3 })} hint="Ctrl+Alt+3">
             Heading 3
           </MenuItem>
-          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
           <MenuItem icon={<ToolIcon name="bulletList" size={14} />} onClick={() => runAndClose({ kind: 'prefix', prefix: '- ' })} hint="Ctrl+Shift+8">
             Bulleted list
           </MenuItem>
@@ -583,7 +713,7 @@ export function BriefEditor({
           <MenuItem icon={<ToolIcon name="link" size={14} />} onClick={() => runAndClose({ kind: 'link' })} hint="Ctrl+K">
             Link
           </MenuItem>
-          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
           <MenuItem icon={<ToolIcon name="clear" size={14} />} onClick={() => { setCtxMenu(null); clearFormat() }} hint="selection, or all">
             Clear formatting
           </MenuItem>
@@ -593,33 +723,20 @@ export function BriefEditor({
         </ContextMenu>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => onSave(text)}
-          disabled={saving}
+          onClick={onDone}
           style={{
-            padding: '0.4rem 0.9rem', borderRadius: 8, border: 'none',
-            background: COLORS.ink, color: COLORS.lime, fontWeight: 700,
-            fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
-            opacity: saving ? 0.7 : 1,
+            padding: '7px 16px', borderRadius: 9, border: 'none',
+            background: BR.blue, color: '#fff', fontWeight: 700,
+            fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
-          {saving ? 'Saving…' : 'Save'}
+          Done
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          style={{
-            padding: '0.4rem 0.9rem', borderRadius: 8,
-            border: `1px solid ${COLORS.line}`, background: '#fff', color: COLORS.muted,
-            fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
-          Cancel
-        </button>
-        <span style={{ fontSize: '0.66rem', color: note ? COLORS.ink : COLORS.muted, fontWeight: note ? 700 : 400 }}>
-          {note || 'Ctrl+Enter saves · Esc cancels · right-click for formatting'}
+        <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
+          {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · right-click for formatting')}
         </span>
       </div>
     </div>
@@ -635,9 +752,9 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
       <div
         role="menu"
         style={{
-          position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 4, zIndex: 71,
-          minWidth: 210, background: '#fff', border: `1px solid ${COLORS.line}`,
-          borderRadius: 10, boxShadow: '0 12px 32px rgba(23,19,33,.18)', padding: 5,
+          position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 6, zIndex: 71,
+          minWidth: 210, background: '#fff', border: 'none',
+          borderRadius: 12, boxShadow: '0 12px 32px rgba(24,35,63,.14)', padding: 5,
         }}
       >
         {children}
@@ -670,8 +787,8 @@ function ContextMenu({ x, y, onClose, children }: {
         style={{
           position: 'fixed', left, top, zIndex: 91,
           minWidth: width, maxHeight: '70vh', overflowY: 'auto',
-          background: '#fff', border: `1px solid ${COLORS.line}`,
-          borderRadius: 10, boxShadow: '0 12px 32px rgba(23,19,33,.18)', padding: 5,
+          background: '#fff', border: 'none',
+          borderRadius: 12, boxShadow: '0 12px 32px rgba(24,35,63,.14)', padding: 5,
         }}
       >
         {children}
@@ -691,16 +808,16 @@ function MenuItem({ icon, children, hint, onClick }: {
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-        padding: '7px 9px', borderRadius: 7, border: 'none', background: 'transparent',
-        color: COLORS.ink, fontSize: '0.8rem', fontFamily: 'inherit',
+        padding: '7px 9px', borderRadius: 8, border: 'none', background: 'transparent',
+        color: BR.ink, fontSize: 12.5, fontFamily: 'inherit',
         cursor: 'pointer', textAlign: 'start',
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
+      onMouseEnter={e => (e.currentTarget.style.background = BR.blueLight)}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      <span aria-hidden="true" style={{ width: 16, textAlign: 'center', color: COLORS.muted }}>{icon}</span>
+      {icon !== null && <span aria-hidden="true" style={{ width: 16, textAlign: 'center', color: BR.label }}>{icon}</span>}
       {children}
-      {hint && <span style={{ marginInlineStart: 'auto', fontSize: '0.62rem', color: COLORS.muted }}>{hint}</span>}
+      {hint && <span style={{ marginInlineStart: 'auto', fontSize: 11, color: BR.faint }}>{hint}</span>}
     </button>
   )
 }

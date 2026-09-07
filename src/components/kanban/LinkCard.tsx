@@ -22,15 +22,19 @@ import { hostOf, hrefFor, prettyPath } from '@/lib/links'
 const seen = new Map<string, LinkPreviewData | null>()
 
 const C = {
-  line:  '#E8EAED',
-  text:  '#292D34',
-  faint: '#7C828D',
-  hover: '#F7F8F9',
+  text:   '#18233F',
+  faint:  '#68738D',
+  muted:  '#929CB0',
+  surface:'#F7F9FC',
+  blue:   '#3563E9',
+  blueLight: '#EEF3FF',
+  blueHover: '#E2EAFF',
 }
 
 export function LinkCard({ url }: { url: string }) {
   const href = hrefFor(url)
   const [data, setData] = useState<LinkPreviewData | null | undefined>(() => seen.get(href))
+  const [hover, setHover] = useState(false)
 
   useEffect(() => {
     if (seen.has(href)) { setData(seen.get(href)); return }
@@ -51,22 +55,42 @@ export function LinkCard({ url }: { url: string }) {
   // title when that adds something, and the path when it does not.
   const same     = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
   const headline = rich?.title && !same(rich.title, site) ? rich.title : (path || site)
-  const blurb    = rich?.description && !same(rich.description, headline) && !same(rich.description, site)
-    ? rich.description
-    : (headline !== path ? path : '')
+  const domain   = host + (path && path !== headline ? path : '')
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
-        display: 'flex', marginTop: 8, border: `1px solid ${C.line}`, borderRadius: 10,
-        overflow: 'hidden', textDecoration: 'none', color: 'inherit', background: '#fff',
+        display: 'block', marginTop: 8, border: 'none', borderRadius: 18,
+        overflow: 'hidden', textDecoration: 'none', color: 'inherit', background: C.surface,
+        boxShadow: '0 4px 20px rgba(23,36,65,0.04)',
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = C.hover }}
-      onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}
     >
+      <span style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px 0', fontSize: 12, fontWeight: 700, color: C.faint,
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+          {rich?.favicon && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={rich.favicon} alt="" width={14} height={14}
+                 referrerPolicy="no-referrer"
+                 onError={e => { e.currentTarget.style.display = 'none' }}
+                 style={{ borderRadius: 3, flexShrink: 0 }} />
+          )}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{site}</span>
+        </span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.muted}
+             strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+          <path d="M12 3v12M8 7l4-4 4 4" />
+        </svg>
+      </span>
+
       {rich?.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -74,53 +98,42 @@ export function LinkCard({ url }: { url: string }) {
           alt=""
           referrerPolicy="no-referrer"
           onError={e => { e.currentTarget.style.display = 'none' }}
-          style={{
-            width: 86, height: 86, objectFit: 'cover', flexShrink: 0,
-            borderInlineEnd: `1px solid ${C.line}`, background: C.hover,
-          }}
+          style={{ display: 'block', width: '100%', maxHeight: 220, objectFit: 'cover', marginTop: 9 }}
         />
       )}
 
-      <span style={{ minWidth: 0, flex: 1, padding: '9px 11px', display: 'block' }}>
-        <span style={{
-          display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5,
-          color: C.faint, fontWeight: 600,
-        }}>
-          {rich?.favicon && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={rich.favicon} alt="" width={13} height={13}
-                 referrerPolicy="no-referrer"
-                 onError={e => { e.currentTarget.style.display = 'none' }}
-                 style={{ borderRadius: 3, flexShrink: 0 }} />
-          )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {site}
-          </span>
-        </span>
-
+      <span style={{ display: 'block', padding: '10px 12px 12px' }}>
         <span style={{
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          overflow: 'hidden', marginTop: 3, fontSize: 13.5, fontWeight: 600,
+          overflow: 'hidden', fontSize: 14.5, fontWeight: 700,
           color: C.text, lineHeight: 1.35, wordBreak: 'break-word',
         }}>
           {headline}
         </span>
 
-        {blurb && (
+        {domain && (
           <span style={{
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden', marginTop: 3, fontSize: 12.5, color: C.faint,
-            lineHeight: 1.4, wordBreak: 'break-word',
+            display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            marginTop: 3, fontSize: 12.5, color: C.muted,
           }}>
-            {blurb}
+            {domain}
           </span>
         )}
 
         {data === undefined && (
-          <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: C.faint }}>
+          <span style={{ display: 'block', marginTop: 4, fontSize: 11.5, color: C.muted }}>
             Loading preview…
           </span>
         )}
+
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 9,
+          height: 26, padding: '0 10px', borderRadius: 8,
+          background: hover ? C.blueHover : C.blueLight, color: C.blue,
+          fontSize: 12.5, fontWeight: 700, transition: 'background .12s',
+        }}>
+          Open link →
+        </span>
       </span>
     </a>
   )
