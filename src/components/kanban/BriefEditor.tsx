@@ -48,21 +48,21 @@ interface ToolbarItem {
 
 const TOOLS: ToolbarItem[][] = [
   [
-    { id: 'h1', label: 'H1', title: 'Heading 1', cmd: { kind: 'heading', level: 1 }, style: { fontSize: '0.78rem', fontWeight: 800 } },
-    { id: 'h2', label: 'H2', title: 'Heading 2', cmd: { kind: 'heading', level: 2 }, style: { fontSize: '0.72rem', fontWeight: 800 } },
-    { id: 'h3', label: 'H3', title: 'Heading 3', cmd: { kind: 'heading', level: 3 }, style: { fontSize: '0.68rem', fontWeight: 800 } },
+    { id: 'h1', label: 'H1', title: 'Heading 1 (Ctrl+Alt+1)', cmd: { kind: 'heading', level: 1 }, style: { fontSize: '0.78rem', fontWeight: 800 } },
+    { id: 'h2', label: 'H2', title: 'Heading 2 (Ctrl+Alt+2)', cmd: { kind: 'heading', level: 2 }, style: { fontSize: '0.72rem', fontWeight: 800 } },
+    { id: 'h3', label: 'H3', title: 'Heading 3 (Ctrl+Alt+3)', cmd: { kind: 'heading', level: 3 }, style: { fontSize: '0.68rem', fontWeight: 800 } },
   ],
   [
-    { id: 'bold',   label: 'B',   title: 'Bold (Ctrl+B)',   cmd: { kind: 'wrap', before: '**', after: '**' }, style: { fontWeight: 900 } },
-    { id: 'italic', label: 'I',   title: 'Italic (Ctrl+I)', cmd: { kind: 'wrap', before: '_',  after: '_'  }, style: { fontStyle: 'italic', fontFamily: 'serif' } },
-    { id: 'strike', label: 'S',   title: 'Strikethrough',   cmd: { kind: 'wrap', before: '~~', after: '~~' }, style: { textDecoration: 'line-through' } },
-    { id: 'code',   label: '</>', title: 'Inline code',     cmd: { kind: 'wrap', before: '`',  after: '`'  }, style: { fontSize: '0.62rem' } },
+    { id: 'bold',   label: 'B', title: 'Bold (Ctrl+B)',            cmd: { kind: 'wrap', before: '**', after: '**' }, style: { fontWeight: 900 } },
+    { id: 'italic', label: 'I', title: 'Italic (Ctrl+I)',          cmd: { kind: 'wrap', before: '_',  after: '_'  }, style: { fontStyle: 'italic', fontFamily: 'serif' } },
+    { id: 'strike', label: 'S', title: 'Strikethrough (Ctrl+Shift+X)', cmd: { kind: 'wrap', before: '~~', after: '~~' }, style: { textDecoration: 'line-through' } },
+    { id: 'code',   label: <ToolIcon name="code" />, title: 'Inline code (Ctrl+E)', cmd: { kind: 'wrap', before: '`', after: '`' } },
   ],
   [
-    { id: 'ul',    label: '• —', title: 'Bulleted list', cmd: { kind: 'prefix', prefix: '- ' } },
-    { id: 'ol',    label: '1.',  title: 'Numbered list', cmd: { kind: 'ordered' } },
-    { id: 'quote', label: '❝',   title: 'Quote',         cmd: { kind: 'prefix', prefix: '> ' } },
-    { id: 'link',  label: '🔗',  title: 'Link (Ctrl+K)', cmd: { kind: 'link' } },
+    { id: 'ul',    label: <ToolIcon name="bulletList" />,   title: 'Bulleted list (Ctrl+Shift+8)', cmd: { kind: 'prefix', prefix: '- ' } },
+    { id: 'ol',    label: <ToolIcon name="numberedList" />, title: 'Numbered list (Ctrl+Shift+7)', cmd: { kind: 'ordered' } },
+    { id: 'quote', label: <ToolIcon name="quote" />,        title: 'Quote (Ctrl+Shift+9)',         cmd: { kind: 'prefix', prefix: '> ' } },
+    { id: 'link',  label: <ToolIcon name="link" />,         title: 'Link (Ctrl+K)',                cmd: { kind: 'link' } },
   ],
 ]
 
@@ -71,6 +71,44 @@ const TABLE_SKELETON =
 
 const TOGGLE_SKELETON =
   '<details>\n<summary>Toggle title</summary>\n\nHidden content.\n\n</details>'
+
+/** Line-icon set for the toolbar and its menus — matches the app's outlined SVG style. */
+type ToolIconName =
+  | 'code' | 'link' | 'bulletList' | 'numberedList' | 'quote'
+  | 'image' | 'divider' | 'toggle' | 'table' | 'toc' | 'youtube'
+  | 'clear' | 'copy' | 'task' | 'subtask'
+
+function ToolIcon({ name, size = 15 }: { name: ToolIconName; size?: number }) {
+  const paths: Record<ToolIconName, React.ReactNode> = {
+    code: <path d="M9 6 4 12l5 6M15 6l5 6-5 6" />,
+    link: <><path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.6 1.6" /><path d="M13.4 10.6a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.6-1.6" /></>,
+    bulletList: <><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" /><path d="M9 6h11M9 12h11M9 18h11" /></>,
+    numberedList: <>
+      <text x="2.2" y="8"  fontSize="6.5" fontWeight={700} fill="currentColor" stroke="none">1</text>
+      <text x="2.2" y="14" fontSize="6.5" fontWeight={700} fill="currentColor" stroke="none">2</text>
+      <text x="2.2" y="20" fontSize="6.5" fontWeight={700} fill="currentColor" stroke="none">3</text>
+      <path d="M9 6h11M9 12h11M9 18h11" />
+    </>,
+    quote: <path d="M6 9a2.4 2.4 0 0 0-2.4 2.4v1.2A2.4 2.4 0 0 0 6 15h.2L5 18M15.6 9a2.4 2.4 0 0 0-2.4 2.4v1.2a2.4 2.4 0 0 0 2.4 2.4h.2L14.4 18" />,
+    image: <><rect x="3" y="4.5" width="18" height="15" rx="2.2" /><circle cx="8.5" cy="10" r="1.6" /><path d="m3.6 17.5 5-4.6 4 3.4 3-2.4 4.8 4" /></>,
+    divider: <path d="M4 12h16" />,
+    toggle: <path d="M9.5 6l6 6-6 6" />,
+    table: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M3 16h18M9 4v16M15 4v16" /></>,
+    toc: <path d="M4 6h16M4 12h12M4 18h9" />,
+    youtube: <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10.5 9.5v5l4.5-2.5z" fill="currentColor" stroke="none" /></>,
+    clear: <><path d="M5 5h9M9.5 5v13" /><path d="M15.5 14.5l4.5 4.5M20 14.5l-4.5 4.5" /></>,
+    copy: <><rect x="9" y="3" width="11" height="13" rx="2" /><path d="M6 8H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1" /></>,
+    task: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="m8 12.5 2.5 2.5L16 9.5" /></>,
+    subtask: <><path d="M6 4v9a3 3 0 0 0 3 3h6" /><circle cx="18" cy="16" r="2.6" /><path d="M18 6.4v3.6M16.2 8.2h3.6" /></>,
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+         style={{ flexShrink: 0 }}>
+      {paths[name]}
+    </svg>
+  )
+}
 
 /** Split the value around the selection, expanded to whole lines when asked. */
 function lineRange(text: string, start: number, end: number) {
@@ -197,6 +235,7 @@ export function BriefEditor({
   const [text, setText]       = useState(value)
   const [preview, setPreview] = useState(false)
   const [menu, setMenu]       = useState<'insert' | 'more' | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [prompt, setPrompt]   = useState<PromptKind | null>(null)
   const [draft, setDraft]     = useState('')
   const [note, setNote]       = useState('')
@@ -245,14 +284,69 @@ export function BriefEditor({
     setDraft('')
   }
 
+  function clearFormat() {
+    const el = ref.current
+    if (!el) return
+    const { selectionStart: s, selectionEnd: e } = el
+    if (s === e) { setText(clearFormatting(text)); return }
+    const cleaned = clearFormatting(text.slice(s, e))
+    setText(text.slice(0, s) + cleaned + text.slice(e))
+  }
+
+  async function copyMarkdown() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setNote('Markdown copied')
+    } catch {
+      setNote('Clipboard blocked by the browser')
+    }
+    setTimeout(() => setNote(''), 2500)
+  }
+
+  function onContextMenu(e: React.MouseEvent<HTMLTextAreaElement>) {
+    e.preventDefault()
+    setMenu(null)
+    setCtxMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  function runAndClose(cmd: Cmd) {
+    setCtxMenu(null)
+    run(cmd)
+  }
+
+  // Mirrors the toolbar's own combos, plus a few the buttons don't have room
+  // for (inline code, quote) — every button here has a matching keystroke.
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Escape') { e.stopPropagation(); onCancel(); return }
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      if (ctxMenu) { setCtxMenu(null); return }
+      onCancel()
+      return
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSave(text); return }
     if (!(e.metaKey || e.ctrlKey)) return
+
     const key = e.key.toLowerCase()
-    if (key === 'b') { e.preventDefault(); run({ kind: 'wrap', before: '**', after: '**' }) }
-    if (key === 'i') { e.preventDefault(); run({ kind: 'wrap', before: '_',  after: '_'  }) }
-    if (key === 'k') { e.preventDefault(); run({ kind: 'link' }) }
+
+    if (!e.shiftKey && !e.altKey) {
+      if (key === 'b') { e.preventDefault(); run({ kind: 'wrap', before: '**', after: '**' }); return }
+      if (key === 'i') { e.preventDefault(); run({ kind: 'wrap', before: '_',  after: '_'  }); return }
+      if (key === 'e') { e.preventDefault(); run({ kind: 'wrap', before: '`',  after: '`'  }); return }
+      if (key === 'k') { e.preventDefault(); run({ kind: 'link' }); return }
+    }
+
+    if (e.shiftKey && !e.altKey) {
+      if (key === 'x')                 { e.preventDefault(); run({ kind: 'wrap', before: '~~', after: '~~' }); return }
+      if (e.code === 'Digit7')         { e.preventDefault(); run({ kind: 'ordered' }); return }
+      if (e.code === 'Digit8')         { e.preventDefault(); run({ kind: 'prefix', prefix: '- ' }); return }
+      if (e.code === 'Digit9')         { e.preventDefault(); run({ kind: 'prefix', prefix: '> ' }); return }
+    }
+
+    if (e.altKey && !e.shiftKey) {
+      if (key === '1') { e.preventDefault(); run({ kind: 'heading', level: 1 }); return }
+      if (key === '2') { e.preventDefault(); run({ kind: 'heading', level: 2 }); return }
+      if (key === '3') { e.preventDefault(); run({ kind: 'heading', level: 3 }); return }
+    }
   }
 
   const btn: React.CSSProperties = {
@@ -261,17 +355,17 @@ export function BriefEditor({
     fontSize: '0.7rem', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1,
   }
 
-  const INSERT_ITEMS: { icon: string; label: string; run: () => void; hint?: string }[] = [
-    { icon: '☑', label: 'Task',     run: () => { setMenu(null); run({ kind: 'prefix', prefix: '- [ ] ' }) } },
+  const INSERT_ITEMS: { icon: React.ReactNode; label: string; run: () => void; hint?: string }[] = [
+    { icon: <ToolIcon name="task" />, label: 'Task', run: () => { setMenu(null); run({ kind: 'prefix', prefix: '- [ ] ' }) } },
     ...(onCreateSubtask
-      ? [{ icon: '⑂', label: 'New subtask', run: () => openPrompt('subtask'), hint: 'creates a real task' }]
+      ? [{ icon: <ToolIcon name="subtask" />, label: 'New subtask', run: () => openPrompt('subtask'), hint: 'creates a real task' }]
       : []),
-    { icon: '▤', label: 'Image',    run: () => openPrompt('image') },
-    { icon: '—', label: 'Divider',  run: () => insertBlock('---') },
-    { icon: '▸', label: 'Toggle list', run: () => insertBlock(TOGGLE_SKELETON, TOGGLE_SKELETON.length - TOGGLE_SKELETON.indexOf('Toggle title') - 'Toggle title'.length) },
-    { icon: '▦', label: 'Table',    run: () => insertBlock(TABLE_SKELETON) },
-    { icon: '☰', label: 'Table of contents', run: () => insertBlock('[[toc]]') },
-    { icon: '▶', label: 'YouTube',  run: () => openPrompt('youtube') },
+    { icon: <ToolIcon name="image" />,    label: 'Image',    run: () => openPrompt('image') },
+    { icon: <ToolIcon name="divider" />,  label: 'Divider',  run: () => insertBlock('---') },
+    { icon: <ToolIcon name="toggle" />,   label: 'Toggle list', run: () => insertBlock(TOGGLE_SKELETON, TOGGLE_SKELETON.length - TOGGLE_SKELETON.indexOf('Toggle title') - 'Toggle title'.length) },
+    { icon: <ToolIcon name="table" />,    label: 'Table',    run: () => insertBlock(TABLE_SKELETON) },
+    { icon: <ToolIcon name="toc" />,      label: 'Table of contents', run: () => insertBlock('[[toc]]') },
+    { icon: <ToolIcon name="youtube" />,  label: 'YouTube',  run: () => openPrompt('youtube') },
   ]
 
   return (
@@ -344,34 +438,10 @@ export function BriefEditor({
           </button>
           {menu === 'more' && (
             <Menu onClose={() => setMenu(null)}>
-              <MenuItem
-                icon="⃠"
-                onClick={() => {
-                  setMenu(null)
-                  const el = ref.current
-                  if (!el) return
-                  const { selectionStart: s, selectionEnd: e } = el
-                  if (s === e) { setText(clearFormatting(text)); return }
-                  const cleaned = clearFormatting(text.slice(s, e))
-                  setText(text.slice(0, s) + cleaned + text.slice(e))
-                }}
-                hint="selection, or all"
-              >
+              <MenuItem icon={<ToolIcon name="clear" />} onClick={() => { setMenu(null); clearFormat() }} hint="selection, or all">
                 Clear format
               </MenuItem>
-              <MenuItem
-                icon="M↓"
-                onClick={async () => {
-                  setMenu(null)
-                  try {
-                    await navigator.clipboard.writeText(text)
-                    setNote('Markdown copied')
-                  } catch {
-                    setNote('Clipboard blocked by the browser')
-                  }
-                  setTimeout(() => setNote(''), 2500)
-                }}
-              >
+              <MenuItem icon={<ToolIcon name="copy" />} onClick={() => { setMenu(null); void copyMarkdown() }}>
                 Copy Markdown
               </MenuItem>
             </Menu>
@@ -380,7 +450,7 @@ export function BriefEditor({
 
         <button
           type="button"
-          onClick={() => setPreview(p => !p)}
+          onClick={() => { setPreview(p => !p); setCtxMenu(null) }}
           style={{
             ...btn, marginInlineStart: 'auto', fontWeight: 700,
             background: preview ? COLORS.ink : '#fff',
@@ -461,6 +531,7 @@ export function BriefEditor({
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={onKeyDown}
+          onContextMenu={onContextMenu}
           autoFocus
           rows={10}
           placeholder="What needs making, for whom, and any constraints…"
@@ -471,6 +542,55 @@ export function BriefEditor({
             outline: 'none', resize: 'vertical', boxSizing: 'border-box', display: 'block',
           }}
         />
+      )}
+
+      {/* Right-click formatting menu — the same commands as the toolbar,
+          reachable without a trip to the top of the editor. */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
+          <MenuItem icon={<b style={{ fontSize: '0.72rem' }}>B</b>} onClick={() => runAndClose({ kind: 'wrap', before: '**', after: '**' })} hint="Ctrl+B">
+            Bold
+          </MenuItem>
+          <MenuItem icon={<i style={{ fontSize: '0.72rem', fontFamily: 'serif' }}>I</i>} onClick={() => runAndClose({ kind: 'wrap', before: '_', after: '_' })} hint="Ctrl+I">
+            Italic
+          </MenuItem>
+          <MenuItem icon={<span style={{ fontSize: '0.72rem', textDecoration: 'line-through' }}>S</span>} onClick={() => runAndClose({ kind: 'wrap', before: '~~', after: '~~' })} hint="Ctrl+Shift+X">
+            Strikethrough
+          </MenuItem>
+          <MenuItem icon={<ToolIcon name="code" size={14} />} onClick={() => runAndClose({ kind: 'wrap', before: '`', after: '`' })} hint="Ctrl+E">
+            Inline code
+          </MenuItem>
+          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <MenuItem icon={<span style={{ fontSize: '0.66rem', fontWeight: 800 }}>H1</span>} onClick={() => runAndClose({ kind: 'heading', level: 1 })} hint="Ctrl+Alt+1">
+            Heading 1
+          </MenuItem>
+          <MenuItem icon={<span style={{ fontSize: '0.6rem', fontWeight: 800 }}>H2</span>} onClick={() => runAndClose({ kind: 'heading', level: 2 })} hint="Ctrl+Alt+2">
+            Heading 2
+          </MenuItem>
+          <MenuItem icon={<span style={{ fontSize: '0.56rem', fontWeight: 800 }}>H3</span>} onClick={() => runAndClose({ kind: 'heading', level: 3 })} hint="Ctrl+Alt+3">
+            Heading 3
+          </MenuItem>
+          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <MenuItem icon={<ToolIcon name="bulletList" size={14} />} onClick={() => runAndClose({ kind: 'prefix', prefix: '- ' })} hint="Ctrl+Shift+8">
+            Bulleted list
+          </MenuItem>
+          <MenuItem icon={<ToolIcon name="numberedList" size={14} />} onClick={() => runAndClose({ kind: 'ordered' })} hint="Ctrl+Shift+7">
+            Numbered list
+          </MenuItem>
+          <MenuItem icon={<ToolIcon name="quote" size={14} />} onClick={() => runAndClose({ kind: 'prefix', prefix: '> ' })} hint="Ctrl+Shift+9">
+            Quote
+          </MenuItem>
+          <MenuItem icon={<ToolIcon name="link" size={14} />} onClick={() => runAndClose({ kind: 'link' })} hint="Ctrl+K">
+            Link
+          </MenuItem>
+          <div style={{ height: 1, background: COLORS.line, margin: '4px 2px' }} />
+          <MenuItem icon={<ToolIcon name="clear" size={14} />} onClick={() => { setCtxMenu(null); clearFormat() }} hint="selection, or all">
+            Clear formatting
+          </MenuItem>
+          <MenuItem icon={<ToolIcon name="copy" size={14} />} onClick={() => { setCtxMenu(null); void copyMarkdown() }}>
+            Copy Markdown
+          </MenuItem>
+        </ContextMenu>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -499,7 +619,7 @@ export function BriefEditor({
           Cancel
         </button>
         <span style={{ fontSize: '0.66rem', color: note ? COLORS.ink : COLORS.muted, fontWeight: note ? 700 : 400 }}>
-          {note || 'Ctrl+Enter saves · Esc cancels'}
+          {note || 'Ctrl+Enter saves · Esc cancels · right-click for formatting'}
         </span>
       </div>
     </div>
@@ -526,8 +646,42 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
   )
 }
 
+/** A floating menu anchored to a screen point rather than a toolbar button — the right-click menu. */
+function ContextMenu({ x, y, onClose, children }: {
+  x: number; y: number; onClose: () => void; children: React.ReactNode
+}) {
+  const width = 220
+  // The menu's real height isn't known until it paints, so this reserves
+  // roughly what the full item list needs rather than measuring it.
+  const estimatedHeight = 460
+  const left = typeof window === 'undefined' ? x : Math.min(x, window.innerWidth - width - 8)
+  const top  = typeof window === 'undefined' ? y : Math.max(8, Math.min(y, window.innerHeight - estimatedHeight))
+  return (
+    <>
+      {/* Click- or right-click-away layer, so the menu closes without a
+          document listener fighting the textarea's own event handling. */}
+      <div
+        onClick={onClose}
+        onContextMenu={e => { e.preventDefault(); onClose() }}
+        style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+      />
+      <div
+        role="menu"
+        style={{
+          position: 'fixed', left, top, zIndex: 91,
+          minWidth: width, maxHeight: '70vh', overflowY: 'auto',
+          background: '#fff', border: `1px solid ${COLORS.line}`,
+          borderRadius: 10, boxShadow: '0 12px 32px rgba(23,19,33,.18)', padding: 5,
+        }}
+      >
+        {children}
+      </div>
+    </>
+  )
+}
+
 function MenuItem({ icon, children, hint, onClick }: {
-  icon: string; children: React.ReactNode; hint?: string; onClick: () => void
+  icon: React.ReactNode; children: React.ReactNode; hint?: string; onClick: () => void
 }) {
   return (
     <button
