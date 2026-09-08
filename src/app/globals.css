@@ -660,6 +660,45 @@ html {
 }
 .fx-brief details[open] > summary::before { transform: rotate(90deg); }
 .fx-brief details > *:not(summary) { margin-top: 0.5em; }
+/* The editable Toggle node wraps its body in a div (so the <summary> can be
+   an independently editable field rather than parsed document content);
+   the read-only render has no such wrapper, so the child-spacing rule is
+   mirrored one level down only where that wrapper exists. */
+.fx-brief details > div[data-toggle-body] > *:not(:first-child) { margin-top: 0.5em; }
+
+/* ─── Editable surface (Tiptap/ProseMirror) ───────────────────────────────── */
+.fx-brief-edit {
+  outline: none;
+  cursor: text;
+  min-height: 160px;
+}
+.fx-brief-edit p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+/* Task lists: Tiptap renders `<ul data-type="taskList"><li data-checked>`,
+   not GFM's plain `<li><input>` — the read-only checkbox rule above still
+   applies to the input itself, this just lays the row out. */
+.fx-brief ul[data-type="taskList"] {
+  list-style: none;
+  padding-inline-start: 0;
+}
+.fx-brief ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.fx-brief ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+  user-select: none;
+}
+.fx-brief ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
+.fx-brief ul[data-type="taskList"] li[data-checked="true"] > div { color: var(--muted); text-decoration: line-through; }
+/* An image dropped in mid-edit shouldn't be full-bleed by default. */
+.fx-brief-edit img.ProseMirror-selectednode { outline: 2px solid var(--violet-link); outline-offset: 2px; }
 
 /* YouTube embed — 16:9, never wider than the panel */
 .fx-brief .fx-embed {
