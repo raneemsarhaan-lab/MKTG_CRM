@@ -52,8 +52,13 @@ interface BriefEditorProps {
   saving: boolean
   /** May return a Promise; awaited so a save in flight is never overlapped. */
   onSave: (next: string) => void | Promise<unknown>
-  /** Stop editing. Nothing is discarded — autosave already covers that. */
-  onDone: () => void
+  /**
+   * Stop editing. Nothing is discarded — autosave already covers that.
+   *
+   * Omitted when there is no separate edit/view mode to exit — the create-task
+   * form embeds this as its description field, with no "Done" to click back to.
+   */
+  onDone?: () => void
   /** Offered as one-click choices when inserting an image. */
   attachments?: TaskAttachment[]
   /** Creates a real child task and returns a link to it, or null if cancelled. */
@@ -332,6 +337,7 @@ export function BriefEditor({
     editorProps: {
       attributes: { class: 'fx-brief fx-brief-edit' },
       handleKeyDown(_view, event) {
+        if (!onDone) return false
         if (event.key === 'Escape') { onDone(); return true }
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { onDone(); return true }
         return false
@@ -644,22 +650,24 @@ export function BriefEditor({
         <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: contentRadius }} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={onDone}
-          style={{
-            padding: '7px 16px', borderRadius: 9, border: 'none',
-            background: BR.blue, color: '#fff', fontWeight: 700,
-            fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
-          Done
-        </button>
-        <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
-          {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · select text for formatting')}
-        </span>
-      </div>
+      {onDone && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onDone}
+            style={{
+              padding: '7px 16px', borderRadius: 9, border: 'none',
+              background: BR.blue, color: '#fff', fontWeight: 700,
+              fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Done
+          </button>
+          <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
+            {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · select text for formatting')}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

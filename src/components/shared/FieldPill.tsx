@@ -1,7 +1,17 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { COLORS } from '@/lib/tokens'
+
+/** The blue + lime brand palette, local to this chip — see TaskModal's `CU`. */
+const CU = {
+  ink:       '#18233F',
+  muted:     '#68738D',
+  line:      '#E9EDF4',
+  chipBg:    '#F3F6FD',
+  hover:     '#E9EFFC',
+  blue:      '#3563E9',
+  blueLight: '#EEF3FF',
+}
 
 /**
  * Pill-with-popover — the ClickUp intake pattern.
@@ -117,14 +127,14 @@ export function FieldPill({ label, value, icon, active, variant = 'field', iconO
           // it is the same tint the To Do chip and Show custom fields already
           // use, so the form has one language rather than two.
           border: 'none',
-          background: '#F7F8FA',
-          color: active ? COLORS.ink : COLORS.muted,
+          background: CU.chipBg,
+          color: active ? CU.ink : CU.muted,
           fontSize: 13.5, fontWeight: active ? 600 : 500,
           fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
           transition: 'background 140ms ease-out',
         }}
-        onMouseEnter={e => { if (variant !== 'view') e.currentTarget.style.background = '#EFF1F5' }}
-        onMouseLeave={e => { if (variant !== 'view') e.currentTarget.style.background = '#F7F8FA' }}
+        onMouseEnter={e => { if (variant !== 'view') e.currentTarget.style.background = CU.hover }}
+        onMouseLeave={e => { if (variant !== 'view') e.currentTarget.style.background = CU.chipBg }}
       >
         {variant === 'view' && (
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
@@ -143,14 +153,14 @@ export function FieldPill({ label, value, icon, active, variant = 'field', iconO
           style={{
             position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left,
             zIndex: 60, width,
-            background: '#fff', border: `1px solid ${COLORS.line}`,
-            borderRadius: 12, boxShadow: '0 12px 32px rgba(23,19,33,.18)',
+            background: '#fff', border: `1px solid ${CU.line}`,
+            borderRadius: 12, boxShadow: '0 12px 32px rgba(24,35,63,.14)',
             padding: 8, maxHeight: PANEL_MAX - 20, overflowY: 'auto',
           }}
         >
           <div style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
-            textTransform: 'uppercase', color: COLORS.muted, padding: '4px 8px 8px',
+            textTransform: 'uppercase', color: CU.muted, padding: '4px 8px 8px',
           }}>
             {label}
           </div>
@@ -172,8 +182,8 @@ export function PillOption({
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
         padding: '8px 10px', borderRadius: 8, border: 'none',
-        background: selected ? '#F4F4F2' : 'transparent',
-        color: COLORS.ink, fontSize: 13, fontWeight: selected ? 700 : 500,
+        background: selected ? CU.blueLight : 'transparent',
+        color: selected ? CU.blue : CU.ink, fontSize: 13, fontWeight: selected ? 700 : 500,
         fontFamily: 'inherit', cursor: 'pointer', textAlign: 'start',
       }}
     >
@@ -189,8 +199,8 @@ export function PillInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       style={{
         width: '100%', padding: '8px 10px', borderRadius: 8,
-        border: `1px solid ${COLORS.line}`, background: '#fff',
-        color: COLORS.ink, fontSize: 13, fontFamily: 'inherit',
+        border: `1px solid ${CU.line}`, background: '#fff',
+        color: CU.ink, fontSize: 13, fontFamily: 'inherit',
         outline: 'none', boxSizing: 'border-box',
         ...props.style,
       }}
