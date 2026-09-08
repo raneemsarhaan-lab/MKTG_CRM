@@ -1,30 +1,50 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Brief } from '@/components/shared/Brief'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
+import StarterKit from '@tiptap/starter-kit'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
+import TiptapImage from '@tiptap/extension-image'
+import Placeholder from '@tiptap/extension-placeholder'
+import { TableKit } from '@tiptap/extension-table/kit'
+import { Markdown, type MarkdownStorage } from 'tiptap-markdown'
+import { Node } from '@tiptap/core'
 import { imageAttachments } from '@/lib/attachments'
 import type { TaskAttachment } from '@/types/index'
 
+// tiptap-markdown predates Tiptap v3's stricter Storage typing and doesn't
+// declare this itself — without it, `editor.storage.markdown` has no type.
+declare module '@tiptap/core' {
+  interface Storage {
+    markdown: MarkdownStorage
+  }
+}
+
 /**
- * Brief editor — formatting toolbar plus an Insert menu.
+ * Brief editor — a real rich-text surface, not a Markdown textarea.
  *
- * Briefs are stored as Markdown, which is what the ClickUp import produces and
- * what the panel renders, so the toolbar edits Markdown source rather than
- * running a contenteditable surface. Every button is a text transform on the
- * current selection, which keeps the stored value round-trippable: what the
- * import wrote, the editor can re-emit unchanged.
+ * Briefs are stored as Markdown, which is what the ClickUp import produces
+ * and what the panel renders. Earlier versions of this editor kept that as
+ * the *editing* format too — a plain textarea where clicking Bold wrapped
+ * the selection in `**`, with a separate read-only preview underneath to
+ * see the result. That showed raw syntax while typing, which is not how a
+ * rich-text editor reads. Tiptap (a ProseMirror-based editor) plus the
+ * `Markdown` extension flips that around: the box you type in already
+ * renders bold as bold, a heading as a heading, a checkbox as a checkbox —
+ * Markdown is only the wire format, produced from and parsed back into the
+ * same rich document, via `editor.storage.markdown.getMarkdown()`.
  *
  * There is no Save button: every change calls `onSave` right away, with no
  * artificial delay. What is throttled is concurrency, not time — if a save is
- * still in flight when the next change comes in, it waits for that request to
+ * still in flight when the text changes again, it waits for that request to
  * finish and then sends the latest text, rather than firing a second request
  * in parallel. Two overlapping saves can resolve out of order over the
  * network, and the one that finishes last wins even if it was sent first —
  * that is how a save typed a moment earlier clobbers one typed a moment
  * later. Sending saves one at a time removes the race instead of just
- * shortening its window. The rendered preview sits live underneath the
- * textarea rather than behind a toggle, so it and the raw Markdown are always
- * in view together and there is nothing to remember to refresh.
+ * shortening its window.
  */
 
 interface BriefEditorProps {
@@ -39,14 +59,6 @@ interface BriefEditorProps {
   /** Creates a real child task and returns a link to it, or null if cancelled. */
   onCreateSubtask?: (name: string) => Promise<{ name: string; href: string } | null>
 }
-
-type Cmd =
-  | { kind: 'wrap';    before: string; after: string }
-  | { kind: 'heading'; level: 0 | 1 | 2 | 3 }
-  | { kind: 'prefix';  prefix: string }
-  | { kind: 'ordered' }
-  | { kind: 'link' }
-  | { kind: 'block';   text: string; caretBack?: number }
 
 /** The blue + lime brand palette, local to the editor. */
 const BR = {
@@ -67,34 +79,102 @@ const TEXT_STYLES: { level: 0 | 1 | 2 | 3; label: string; sample: React.CSSPrope
   { level: 3, label: 'Heading 3',   sample: { fontWeight: 800, fontSize: '0.92em' } },
 ]
 
-interface ToolbarItem {
-  id:     string
-  label:  React.ReactNode
-  title:  string
-  cmd:    Cmd
-  style?: React.CSSProperties
+/**
+ * A collapsible `<details>/<summary>` block.
+ *
+ * Tiptap has no built-in node for this, and without one, ProseMirror's HTML
+ * parser drops the tags it doesn't recognise and keeps only their text —
+ * a brief already using Insert ▸ Toggle list would lose the toggle entirely,
+ * flattened to plain paragraphs the moment it was reopened. `contentElement`
+ * excludes the `<summary>` from the parsed body so its title doesn't also
+ * turn up duplicated as the toggle's first line; `addStorage().markdown`
+ * re-emits the exact same two tags on save, so existing content round-trips
+ * unchanged.
+ */
+const Toggle = Node.create({
+  name: 'toggle',
+  group: 'block',
+  content: 'block+',
+  defining: true,
+  addAttributes() {
+    return {
+      summary: {
+        default: 'Toggle title',
+        parseHTML: (el: HTMLElement) => el.querySelector('summary')?.textContent || 'Toggle title',
+      },
+    }
+  },
+  parseHTML() {
+    return [{
+      tag: 'details',
+      contentElement: (el: HTMLElement) => {
+        const clone = el.cloneNode(true) as HTMLElement
+        clone.querySelector('summary')?.remove()
+        return clone
+      },
+    }]
+  },
+  renderHTML({ HTMLAttributes, node }) {
+    return ['details', HTMLAttributes, ['summary', {}, node.attrs.summary], ['div', { 'data-toggle-body': '' }, 0]]
+  },
+  addNodeView() {
+    // A plain renderHTML NodeView would make the <summary> itself part of
+    // the editable document, which is exactly the duplication contentElement
+    // guards against on the way in. Rendering it by hand keeps the title an
+    // independent, directly-editable field instead.
+    return ({ node, editor, getPos }) => {
+      const dom = document.createElement('details')
+      dom.open = true
+      const summary = document.createElement('summary')
+      summary.contentEditable = 'true'
+      summary.textContent = node.attrs.summary
+      summary.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault() })
+      summary.addEventListener('blur', () => {
+        const pos = typeof getPos === 'function' ? getPos() : undefined
+        if (pos == null) return
+        editor.commands.command(({ tr }) => {
+          tr.setNodeAttribute(pos, 'summary', summary.textContent || 'Toggle title')
+          return true
+        })
+      })
+      const body = document.createElement('div')
+      body.setAttribute('data-toggle-body', '')
+      dom.append(summary, body)
+      return {
+        dom,
+        contentDOM: body,
+        update: (updated) => {
+          if (updated.type.name !== 'toggle') return false
+          if (document.activeElement !== summary) summary.textContent = updated.attrs.summary
+          return true
+        },
+      }
+    }
+  },
+  addStorage() {
+    return {
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prosemirror-markdown's serializer state isn't re-exported by tiptap-markdown
+        serialize(state: any, node: any) {
+          state.write(`<details>\n<summary>${node.attrs.summary}</summary>\n\n`)
+          state.renderContent(node)
+          state.ensureNewLine()
+          state.write('</details>')
+          state.closeBlock(node)
+        },
+      },
+    }
+  },
+})
+
+/** The `[[toc]]` marker, as literal text — expanded to a real table of
+ *  contents at render time by `Brief`'s own `expandToc`, same as before.
+ *  The Markdown serializer escapes bare brackets it doesn't recognise as a
+ *  link or image (`\[\[toc\]\]`), so that has to be undone before saving or
+ *  `expandToc`'s literal-string match would stop finding it. */
+function getMarkdown(editor: Editor): string {
+  return editor.storage.markdown.getMarkdown().replace(/\\\[\\\[toc\\\]\\\]/g, '[[toc]]')
 }
-
-const TOOLS: ToolbarItem[][] = [
-  [
-    { id: 'bold',   label: 'B', title: 'Bold (Ctrl+B)',            cmd: { kind: 'wrap', before: '**', after: '**' }, style: { fontWeight: 900 } },
-    { id: 'italic', label: 'I', title: 'Italic (Ctrl+I)',          cmd: { kind: 'wrap', before: '_',  after: '_'  }, style: { fontStyle: 'italic', fontFamily: 'serif' } },
-    { id: 'strike', label: 'S', title: 'Strikethrough (Ctrl+Shift+X)', cmd: { kind: 'wrap', before: '~~', after: '~~' }, style: { textDecoration: 'line-through' } },
-    { id: 'code',   label: <ToolIcon name="code" />, title: 'Inline code (Ctrl+E)', cmd: { kind: 'wrap', before: '`', after: '`' } },
-  ],
-  [
-    { id: 'ul',    label: <ToolIcon name="bulletList" />,   title: 'Bulleted list (Ctrl+Shift+8)', cmd: { kind: 'prefix', prefix: '- ' } },
-    { id: 'ol',    label: <ToolIcon name="numberedList" />, title: 'Numbered list (Ctrl+Shift+7)', cmd: { kind: 'ordered' } },
-    { id: 'quote', label: <ToolIcon name="quote" />,        title: 'Quote (Ctrl+Shift+9)',         cmd: { kind: 'prefix', prefix: '> ' } },
-    { id: 'link',  label: <ToolIcon name="link" />,         title: 'Link (Ctrl+K)',                cmd: { kind: 'link' } },
-  ],
-]
-
-const TABLE_SKELETON =
-  '| Column | Column |\n| --- | --- |\n|  |  |\n|  |  |'
-
-const TOGGLE_SKELETON =
-  '<details>\n<summary>Toggle title</summary>\n\nHidden content.\n\n</details>'
 
 /** Line-icon set for the toolbar and its menus — matches the app's outlined SVG style. */
 type ToolIconName =
@@ -175,141 +255,30 @@ function Sep() {
   return <span aria-hidden="true" style={{ width: 1, height: 26, background: BR.line, margin: '0 4px', flexShrink: 0 }} />
 }
 
-/** Split the value around the selection, expanded to whole lines when asked. */
-function lineRange(text: string, start: number, end: number) {
-  const from = text.lastIndexOf('\n', start - 1) + 1
-  const nl   = text.indexOf('\n', end)
-  const to   = nl === -1 ? text.length : nl
-  return { from, to }
-}
-
-/**
- * Strip Markdown back to its text — the "Clear format" action.
- *
- * Deliberately conservative: it removes markers, never words. Link and image
- * syntax collapses to the label rather than vanishing with the URL.
- */
-export function clearFormatting(text: string): string {
-  return text
-    .replace(/^\s{0,3}(#{1,6})\s+/gm, '')                 // headings
-    .replace(/^\s{0,3}>\s?/gm, '')                        // quotes
-    .replace(/^(\s*)(?:[-*+]|\d+[.)])\s+\[[ xX]\]\s+/gm, '$1') // task items
-    .replace(/^(\s*)(?:[-*+]|\d+[.)])\s+/gm, '$1')        // list markers
-    .replace(/^\s{0,3}([-*_])\s*(?:\1\s*){2,}$/gm, '')    // rules
-    .replace(/^\s*(```|~~~).*$/gm, '')                    // fences
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')             // images → alt
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')              // links → label
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')                   // bold
-    .replace(/(\*|_)(.*?)\1/g, '$2')                      // italic
-    .replace(/~~(.*?)~~/g, '$1')                          // strike
-    .replace(/`([^`]*)`/g, '$1')                          // code
-    .replace(/<\/?[a-zA-Z][^>]*>/g, '')                   // html tags
-    .replace(/\\([\\`*_{}[\]()#+\-.!<>|~])/g, '$1')       // escapes
-    .replace(/ {2}$/gm, '')                               // hard breaks
-    .replace(/\n{3,}/g, '\n\n')
-}
-
-export function apply(cmd: Cmd, text: string, start: number, end: number): {
-  text: string; start: number; end: number
-} {
-  const selected = text.slice(start, end)
-
-  if (cmd.kind === 'wrap') {
-    const { before, after } = cmd
-    if (selected.startsWith(before) && selected.endsWith(after) &&
-        selected.length >= before.length + after.length) {
-      const inner = selected.slice(before.length, selected.length - after.length)
-      return { text: text.slice(0, start) + inner + text.slice(end), start, end: start + inner.length }
-    }
-    const next = before + selected + after
-    return {
-      text:  text.slice(0, start) + next + text.slice(end),
-      start: start + before.length,
-      end:   start + before.length + selected.length,
-    }
-  }
-
-  if (cmd.kind === 'link') {
-    const label = selected || 'link text'
-    const next  = `[${label}](https://)`
-    return {
-      text:  text.slice(0, start) + next + text.slice(end),
-      start: start + next.length - 1,
-      end:   start + next.length - 1,
-    }
-  }
-
-  if (cmd.kind === 'block') {
-    // Block content needs its own line and a blank line before it, or Markdown
-    // folds it into the paragraph the caret happened to be sitting in.
-    const beforeText = text.slice(0, start)
-    const afterText  = text.slice(end)
-    const lead  = beforeText === '' || beforeText.endsWith('\n\n') ? '' : beforeText.endsWith('\n') ? '\n' : '\n\n'
-    const trail = afterText.startsWith('\n') ? '\n' : '\n\n'
-    const next  = lead + cmd.text + trail
-    const caret = start + next.length - trail.length - (cmd.caretBack ?? 0)
-    return { text: beforeText + next + afterText, start: caret, end: caret }
-  }
-
-  const { from, to } = lineRange(text, start, end)
-  const lines = text.slice(from, to).split('\n')
-
-  let rewritten: string[]
-  if (cmd.kind === 'heading' && cmd.level === 0) {
-    // "Normal text" — always strips, regardless of what heading (if any) was there.
-    rewritten = lines.map(l => l.replace(/^#{1,6} +/, ''))
-  } else if (cmd.kind === 'heading') {
-    const hashes = '#'.repeat(cmd.level) + ' '
-    const already = lines.every(l => l.startsWith(hashes))
-    rewritten = lines.map(l => {
-      const bare = l.replace(/^#{1,6} +/, '')
-      return already ? bare : hashes + bare
-    })
-  } else if (cmd.kind === 'prefix') {
-    const already = lines.every(l => l.startsWith(cmd.prefix))
-    rewritten = lines.map(l =>
-      already ? l.slice(cmd.prefix.length) : cmd.prefix + l.replace(/^([-*] |> |\d+\. )/, ''))
-  } else {
-    const already = lines.every(l => /^\d+\. /.test(l))
-    rewritten = lines.map((l, i) =>
-      already ? l.replace(/^\d+\. /, '') : `${i + 1}. ` + l.replace(/^([-*] |> |\d+\. )/, ''))
-  }
-
-  const block = rewritten.join('\n')
-  const next  = text.slice(0, from) + block + text.slice(to)
-
-  // With nothing selected, land the caret after the marker instead of
-  // selecting the line — otherwise the first thing typed replaces the bullet
-  // or checkbox that was just inserted.
-  if (start === end) {
-    const caret = start + (rewritten[0].length - lines[0].length)
-    return { text: next, start: caret, end: caret }
-  }
-  return { text: next, start: from, end: from + block.length }
-}
-
 /** Insert items that need a value before they can be inserted. */
-type PromptKind = 'image' | 'youtube' | 'subtask'
+type PromptKind = 'image' | 'youtube' | 'subtask' | 'link'
 
 const PROMPTS: Record<PromptKind, { label: string; placeholder: string; cta: string }> = {
   image:   { label: 'Image URL',   placeholder: 'https://…', cta: 'Insert image' },
   youtube: { label: 'YouTube URL', placeholder: 'https://youtube.com/watch?v=…', cta: 'Embed video' },
   subtask: { label: 'Subtask name', placeholder: 'What needs doing?', cta: 'Create subtask' },
+  link:    { label: 'Link URL',    placeholder: 'https://…', cta: 'Add link' },
 }
 
 export function BriefEditor({
   value, saving, onSave, onDone, attachments = [], onCreateSubtask,
 }: BriefEditorProps) {
-  const [text, setTextState]  = useState(value)
   const [busySaving, setBusySaving] = useState(false)
   const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
   const [focused, setFocused] = useState(false)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [prompt, setPrompt]   = useState<PromptKind | null>(null)
   const [draft, setDraft]     = useState('')
   const [note, setNote]       = useState('')
   const [busy, setBusy]       = useState(false)
-  const ref = useRef<HTMLTextAreaElement>(null)
+  // Bumped on every editor transaction so the toolbar's active states
+  // (`editor.isActive('bold')` and friends) re-evaluate on selection moves
+  // too, not just on content changes.
+  const [, bump] = useState(0)
 
   const images = imageAttachments(attachments)
 
@@ -317,8 +286,8 @@ export function BriefEditor({
   // unmount cleanup, needs the *latest* text and the *latest* save target
   // without waiting on a render — a stale closure here is how the last few
   // keystrokes typed right before closing the editor go unsaved.
-  const textRef    = useRef(value)
-  const savedRef   = useRef(value)
+  const textRef     = useRef(value)
+  const savedRef     = useRef(value)
   const inFlightRef = useRef(false)
 
   /**
@@ -346,77 +315,93 @@ export function BriefEditor({
     })
   }
 
-  /** Every change to the text goes through here, whatever triggered it —
-   *  typing, a toolbar command, or the right-click menu — so autosave sees
-   *  all of them alike. */
-  function setText(next: string) {
-    textRef.current = next
-    setTextState(next)
-    pump()
-  }
+  const editor = useEditor({
+    immediatelyRender: false,
+    autofocus: 'end',
+    extensions: [
+      StarterKit,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      TiptapImage,
+      Toggle,
+      TableKit,
+      Placeholder.configure({ placeholder: 'What needs making, for whom, and any constraints…' }),
+      Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: true }),
+    ],
+    content: value,
+    editorProps: {
+      attributes: { class: 'fx-brief fx-brief-edit' },
+      handleKeyDown(_view, event) {
+        if (event.key === 'Escape') { onDone(); return true }
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { onDone(); return true }
+        return false
+      },
+    },
+    onUpdate({ editor }) {
+      textRef.current = getMarkdown(editor)
+      pump()
+    },
+    onTransaction: () => bump(n => n + 1),
+    onFocus: () => setFocused(true),
+    onBlur:  () => setFocused(false),
+  })
 
-  // Catch whatever the editor unmounts before pump() gets to it — closing the
-  // task panel mid-keystroke, say. A save already in flight keeps going and
-  // still lands, and its own `.finally` still sends any text newer than it
-  // once it resolves (those closures don't care that the component is gone);
-  // sending another one here too would just race that one. This only covers
-  // a change that never got a chance to start a request at all.
+  // Catch whatever never got a chance to start a save at all if the editor
+  // unmounts out from under it — closing the task panel mid-keystroke, say.
+  // A save already in flight keeps going and still lands, and its own
+  // `.finally` still sends any text newer than it once it resolves (those
+  // closures don't care that the component is gone); sending another one
+  // here too would just race that one.
   useEffect(() => () => {
     if (!inFlightRef.current && textRef.current !== savedRef.current) onSave(textRef.current)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function run(cmd: Cmd) {
-    const el = ref.current
-    if (!el) return
-    const res = apply(cmd, text, el.selectionStart, el.selectionEnd)
-    setText(res.text)
-    // Selection has to be restored after React paints the new value, or the
-    // caret jumps to the end and the next click of the same button misfires.
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(res.start, res.end)
-    })
-  }
-
-  function insertBlock(body: string, caretBack = 0) {
-    setMenu(null)
-    run({ kind: 'block', text: body, caretBack })
-  }
-
   function openPrompt(kind: PromptKind) {
     setMenu(null)
-    setDraft('')
+    setDraft(kind === 'link' ? (editor?.getAttributes('link').href as string | undefined) ?? '' : '')
     setPrompt(kind)
   }
 
   async function confirmPrompt() {
     const v = draft.trim()
-    if (!v) return
-    if (prompt === 'image')   insertBlock(`![](${v})`, 0)
-    if (prompt === 'youtube') insertBlock(v, 0)
+    if (!v || !editor) return
+    if (prompt === 'image') editor.chain().focus().setImage({ src: v }).run()
+    if (prompt === 'youtube') editor.chain().focus().insertContent({ type: 'paragraph', content: [{ type: 'text', text: v }] }).run()
+    if (prompt === 'link') {
+      if (editor.state.selection.empty) {
+        editor.chain().focus().insertContent({ type: 'text', text: v, marks: [{ type: 'link', attrs: { href: v } }] }).run()
+      } else {
+        editor.chain().focus().extendMarkRange('link').setLink({ href: v }).run()
+      }
+    }
     if (prompt === 'subtask' && onCreateSubtask) {
       setBusy(true)
       const made = await onCreateSubtask(v)
       setBusy(false)
       if (!made) { setNote('Could not create that subtask'); return }
-      insertBlock(`- [ ] [${made.name}](${made.href})`, 0)
+      editor.chain().focus().insertContent({
+        type: 'taskList',
+        content: [{
+          type: 'taskItem', attrs: { checked: false },
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: made.name, marks: [{ type: 'link', attrs: { href: made.href } }] }] }],
+        }],
+      }).run()
     }
     setPrompt(null)
     setDraft('')
   }
 
   function clearFormat() {
-    const el = ref.current
-    if (!el) return
-    const { selectionStart: s, selectionEnd: e } = el
-    if (s === e) { setText(clearFormatting(text)); return }
-    const cleaned = clearFormatting(text.slice(s, e))
-    setText(text.slice(0, s) + cleaned + text.slice(e))
+    if (!editor) return
+    const chain = editor.chain().focus()
+    if (editor.state.selection.empty) chain.selectAll()
+    chain.unsetAllMarks().clearNodes().run()
   }
 
   async function copyMarkdown() {
+    if (!editor) return
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(getMarkdown(editor))
       setNote('Markdown copied')
     } catch {
       setNote('Clipboard blocked by the browser')
@@ -424,64 +409,55 @@ export function BriefEditor({
     setTimeout(() => setNote(''), 2500)
   }
 
-  function onContextMenu(e: React.MouseEvent<HTMLTextAreaElement>) {
-    e.preventDefault()
-    setMenu(null)
-    setCtxMenu({ x: e.clientX, y: e.clientY })
-  }
+  if (!editor) return null
 
-  function runAndClose(cmd: Cmd) {
-    setCtxMenu(null)
-    run(cmd)
-  }
-
-  // Mirrors the toolbar's own combos, plus a few the buttons don't have room
-  // for (inline code, quote) — every button here has a matching keystroke.
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      if (ctxMenu) { setCtxMenu(null); return }
-      onDone()
-      return
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onDone(); return }
-    if (!(e.metaKey || e.ctrlKey)) return
-
-    const key = e.key.toLowerCase()
-
-    if (!e.shiftKey && !e.altKey) {
-      if (key === 'b') { e.preventDefault(); run({ kind: 'wrap', before: '**', after: '**' }); return }
-      if (key === 'i') { e.preventDefault(); run({ kind: 'wrap', before: '_',  after: '_'  }); return }
-      if (key === 'e') { e.preventDefault(); run({ kind: 'wrap', before: '`',  after: '`'  }); return }
-      if (key === 'k') { e.preventDefault(); run({ kind: 'link' }); return }
-    }
-
-    if (e.shiftKey && !e.altKey) {
-      if (key === 'x')                 { e.preventDefault(); run({ kind: 'wrap', before: '~~', after: '~~' }); return }
-      if (e.code === 'Digit7')         { e.preventDefault(); run({ kind: 'ordered' }); return }
-      if (e.code === 'Digit8')         { e.preventDefault(); run({ kind: 'prefix', prefix: '- ' }); return }
-      if (e.code === 'Digit9')         { e.preventDefault(); run({ kind: 'prefix', prefix: '> ' }); return }
-    }
-
-    if (e.altKey && !e.shiftKey) {
-      if (key === '1') { e.preventDefault(); run({ kind: 'heading', level: 1 }); return }
-      if (key === '2') { e.preventDefault(); run({ kind: 'heading', level: 2 }); return }
-      if (key === '3') { e.preventDefault(); run({ kind: 'heading', level: 3 }); return }
-    }
-  }
+  const TOOLS: { id: string; title: string; label: React.ReactNode; active: boolean; run: () => void }[][] = [
+    [
+      { id: 'bold',   title: 'Bold (Ctrl+B)', label: <span style={{ fontWeight: 900 }}>B</span>,
+        active: editor.isActive('bold'), run: () => editor.chain().focus().toggleBold().run() },
+      { id: 'italic', title: 'Italic (Ctrl+I)', label: <span style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</span>,
+        active: editor.isActive('italic'), run: () => editor.chain().focus().toggleItalic().run() },
+      { id: 'strike', title: 'Strikethrough (Ctrl+Shift+X)', label: <span style={{ textDecoration: 'line-through' }}>S</span>,
+        active: editor.isActive('strike'), run: () => editor.chain().focus().toggleStrike().run() },
+      { id: 'code',   title: 'Inline code (Ctrl+E)', label: <ToolIcon name="code" />,
+        active: editor.isActive('code'), run: () => editor.chain().focus().toggleCode().run() },
+    ],
+    [
+      { id: 'ul',    title: 'Bulleted list (Ctrl+Shift+8)', label: <ToolIcon name="bulletList" />,
+        active: editor.isActive('bulletList'), run: () => editor.chain().focus().toggleBulletList().run() },
+      { id: 'ol',    title: 'Numbered list (Ctrl+Shift+7)', label: <ToolIcon name="numberedList" />,
+        active: editor.isActive('orderedList'), run: () => editor.chain().focus().toggleOrderedList().run() },
+      { id: 'quote', title: 'Quote (Ctrl+Shift+9)', label: <ToolIcon name="quote" />,
+        active: editor.isActive('blockquote'), run: () => editor.chain().focus().toggleBlockquote().run() },
+      { id: 'link',  title: 'Link (Ctrl+K)', label: <ToolIcon name="link" />,
+        active: editor.isActive('link'), run: () => openPrompt('link') },
+    ],
+  ]
 
   const INSERT_ITEMS: { icon: React.ReactNode; label: string; run: () => void; hint?: string }[] = [
-    { icon: <ToolIcon name="task" />, label: 'Task', run: () => { setMenu(null); run({ kind: 'prefix', prefix: '- [ ] ' }) } },
+    { icon: <ToolIcon name="task" />, label: 'Task', run: () => { setMenu(null); editor.chain().focus().toggleTaskList().run() } },
     ...(onCreateSubtask
       ? [{ icon: <ToolIcon name="subtask" />, label: 'New subtask', run: () => openPrompt('subtask'), hint: 'creates a real task' }]
       : []),
     { icon: <ToolIcon name="image" />,    label: 'Image',    run: () => openPrompt('image') },
-    { icon: <ToolIcon name="divider" />,  label: 'Divider',  run: () => insertBlock('---') },
-    { icon: <ToolIcon name="toggle" />,   label: 'Toggle list', run: () => insertBlock(TOGGLE_SKELETON, TOGGLE_SKELETON.length - TOGGLE_SKELETON.indexOf('Toggle title') - 'Toggle title'.length) },
-    { icon: <ToolIcon name="table" />,    label: 'Table',    run: () => insertBlock(TABLE_SKELETON) },
-    { icon: <ToolIcon name="toc" />,      label: 'Table of contents', run: () => insertBlock('[[toc]]') },
+    { icon: <ToolIcon name="divider" />,  label: 'Divider',  run: () => { setMenu(null); editor.chain().focus().setHorizontalRule().run() } },
+    { icon: <ToolIcon name="toggle" />,   label: 'Toggle list', run: () => {
+      setMenu(null)
+      editor.chain().focus().insertContent({
+        type: 'toggle', attrs: { summary: 'Toggle title' },
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hidden content.' }] }],
+      }).run()
+    } },
+    { icon: <ToolIcon name="table" />,    label: 'Table',    run: () => { setMenu(null); editor.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run() } },
+    { icon: <ToolIcon name="toc" />,      label: 'Table of contents', run: () => { setMenu(null); editor.chain().focus().insertContent('[[toc]]').run() } },
     { icon: <ToolIcon name="youtube" />,  label: 'YouTube',  run: () => openPrompt('youtube') },
   ]
+
+  const currentStyle =
+    editor.isActive('heading', { level: 1 }) ? TEXT_STYLES[1] :
+    editor.isActive('heading', { level: 2 }) ? TEXT_STYLES[2] :
+    editor.isActive('heading', { level: 3 }) ? TEXT_STYLES[3] :
+    TEXT_STYLES[0]
 
   const contentRadius: React.CSSProperties['borderRadius'] = '0 0 18px 18px'
 
@@ -503,13 +479,18 @@ export function BriefEditor({
           <div style={{ position: 'relative' }}>
             <ToolButton title="Text style" active={menu === 'style'} wide chip
                         onClick={() => setMenu(m => (m === 'style' ? null : 'style'))}>
-              Text style <ToolIcon name="chevron" size={14} />
+              <span style={currentStyle.level === 0 ? undefined : { fontWeight: 700 }}>{currentStyle.label}</span>
+              <ToolIcon name="chevron" size={14} />
             </ToolButton>
             {menu === 'style' && (
               <Menu onClose={() => setMenu(null)}>
                 {TEXT_STYLES.map(s => (
                   <MenuItem key={s.level} icon={null}
-                            onClick={() => { setMenu(null); run({ kind: 'heading', level: s.level }) }}>
+                            onClick={() => {
+                              setMenu(null)
+                              if (s.level === 0) editor.chain().focus().setParagraph().run()
+                              else editor.chain().focus().toggleHeading({ level: s.level }).run()
+                            }}>
                     <span style={s.sample}>{s.label}</span>
                   </MenuItem>
                 ))}
@@ -523,8 +504,8 @@ export function BriefEditor({
             <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {gi > 0 && <Sep />}
               {group.map(t => (
-                <ToolButton key={t.id} title={t.title} onClick={() => run(t.cmd)}>
-                  <span style={{ fontSize: 15, ...t.style }}>{t.label}</span>
+                <ToolButton key={t.id} title={t.title} active={t.active} onClick={t.run}>
+                  <span style={{ fontSize: 15 }}>{t.label}</span>
                 </ToolButton>
               ))}
             </div>
@@ -620,7 +601,7 @@ export function BriefEditor({
                     key={a.id}
                     type="button"
                     title={a.filename}
-                    onClick={() => { insertBlock(`![${a.filename}](${a.url})`); setPrompt(null) }}
+                    onClick={() => { editor.chain().focus().setImage({ src: a.url ?? '', alt: a.filename }).run(); setPrompt(null) }}
                     style={{
                       height: 28, padding: '0 10px', border: 'none', borderRadius: 7,
                       background: '#fff', color: BR.ink, fontSize: 12.5, cursor: 'pointer',
@@ -636,92 +617,32 @@ export function BriefEditor({
           </div>
         )}
 
-        <textarea
-          ref={ref}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-          onContextMenu={onContextMenu}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoFocus
-          rows={9}
-          placeholder="What needs making, for whom, and any constraints…"
-          style={{
-            width: '100%', padding: '24px 28px 14px',
-            border: 'none', background: '#fff', color: BR.ink,
-            fontSize: 16, lineHeight: 1.65, fontFamily: 'inherit',
-            outline: 'none', resize: 'vertical', boxSizing: 'border-box', display: 'block',
-          }}
-        />
-
-        {/* The rendered brief, live underneath the source — no toggle to
-            remember, no stale preview: it is always exactly `text`. */}
-        <div style={{ borderTop: `1px solid ${BR.line}`, borderRadius: contentRadius, background: '#fff' }}>
+        <BubbleMenu editor={editor}>
           <div style={{
-            padding: '10px 28px 0', fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
-            textTransform: 'uppercase', color: BR.faint,
+            display: 'flex', alignItems: 'center', gap: 2, background: '#fff', borderRadius: 10,
+            boxShadow: '0 12px 32px rgba(24,35,63,.16)', padding: 4,
           }}>
-            Preview
+            <ToolButton title="Bold (Ctrl+B)" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+              <b style={{ fontSize: 14 }}>B</b>
+            </ToolButton>
+            <ToolButton title="Italic (Ctrl+I)" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+              <i style={{ fontSize: 14, fontFamily: 'serif' }}>I</i>
+            </ToolButton>
+            <ToolButton title="Strikethrough (Ctrl+Shift+X)" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+              <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>
+            </ToolButton>
+            <ToolButton title="Inline code (Ctrl+E)" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+              <ToolIcon name="code" size={14} />
+            </ToolButton>
+            <Sep />
+            <ToolButton title="Link (Ctrl+K)" active={editor.isActive('link')} onClick={() => openPrompt('link')}>
+              <ToolIcon name="link" size={14} />
+            </ToolButton>
           </div>
-          <div style={{ padding: '8px 28px 26px', minHeight: 60 }}>
-            {text.trim()
-              ? <Brief markdown={text} />
-              : <span style={{ color: BR.faint, fontStyle: 'italic', fontSize: 15 }}>
-                  Nothing to preview yet.
-                </span>}
-          </div>
-        </div>
-      </div>
+        </BubbleMenu>
 
-      {/* Right-click formatting menu — the same commands as the toolbar,
-          reachable without a trip to the top of the editor. */}
-      {ctxMenu && (
-        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)}>
-          <MenuItem icon={<b style={{ fontSize: '0.72rem' }}>B</b>} onClick={() => runAndClose({ kind: 'wrap', before: '**', after: '**' })} hint="Ctrl+B">
-            Bold
-          </MenuItem>
-          <MenuItem icon={<i style={{ fontSize: '0.72rem', fontFamily: 'serif' }}>I</i>} onClick={() => runAndClose({ kind: 'wrap', before: '_', after: '_' })} hint="Ctrl+I">
-            Italic
-          </MenuItem>
-          <MenuItem icon={<span style={{ fontSize: '0.72rem', textDecoration: 'line-through' }}>S</span>} onClick={() => runAndClose({ kind: 'wrap', before: '~~', after: '~~' })} hint="Ctrl+Shift+X">
-            Strikethrough
-          </MenuItem>
-          <MenuItem icon={<ToolIcon name="code" size={14} />} onClick={() => runAndClose({ kind: 'wrap', before: '`', after: '`' })} hint="Ctrl+E">
-            Inline code
-          </MenuItem>
-          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
-          <MenuItem icon={<span style={{ fontSize: '0.66rem', fontWeight: 800 }}>H1</span>} onClick={() => runAndClose({ kind: 'heading', level: 1 })} hint="Ctrl+Alt+1">
-            Heading 1
-          </MenuItem>
-          <MenuItem icon={<span style={{ fontSize: '0.6rem', fontWeight: 800 }}>H2</span>} onClick={() => runAndClose({ kind: 'heading', level: 2 })} hint="Ctrl+Alt+2">
-            Heading 2
-          </MenuItem>
-          <MenuItem icon={<span style={{ fontSize: '0.56rem', fontWeight: 800 }}>H3</span>} onClick={() => runAndClose({ kind: 'heading', level: 3 })} hint="Ctrl+Alt+3">
-            Heading 3
-          </MenuItem>
-          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
-          <MenuItem icon={<ToolIcon name="bulletList" size={14} />} onClick={() => runAndClose({ kind: 'prefix', prefix: '- ' })} hint="Ctrl+Shift+8">
-            Bulleted list
-          </MenuItem>
-          <MenuItem icon={<ToolIcon name="numberedList" size={14} />} onClick={() => runAndClose({ kind: 'ordered' })} hint="Ctrl+Shift+7">
-            Numbered list
-          </MenuItem>
-          <MenuItem icon={<ToolIcon name="quote" size={14} />} onClick={() => runAndClose({ kind: 'prefix', prefix: '> ' })} hint="Ctrl+Shift+9">
-            Quote
-          </MenuItem>
-          <MenuItem icon={<ToolIcon name="link" size={14} />} onClick={() => runAndClose({ kind: 'link' })} hint="Ctrl+K">
-            Link
-          </MenuItem>
-          <div style={{ height: 1, background: BR.line, margin: '4px 2px' }} />
-          <MenuItem icon={<ToolIcon name="clear" size={14} />} onClick={() => { setCtxMenu(null); clearFormat() }} hint="selection, or all">
-            Clear formatting
-          </MenuItem>
-          <MenuItem icon={<ToolIcon name="copy" size={14} />} onClick={() => { setCtxMenu(null); void copyMarkdown() }}>
-            Copy Markdown
-          </MenuItem>
-        </ContextMenu>
-      )}
+        <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: contentRadius }} />
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <button
@@ -736,7 +657,7 @@ export function BriefEditor({
           Done
         </button>
         <span style={{ fontSize: 12, color: note ? BR.ink : BR.faint, fontWeight: note ? 700 : 400 }}>
-          {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · right-click for formatting')}
+          {note || (busySaving || saving ? 'Saving…' : 'Saved · Esc closes · select text for formatting')}
         </span>
       </div>
     </div>
@@ -754,40 +675,6 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
         style={{
           position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 6, zIndex: 71,
           minWidth: 210, background: '#fff', border: 'none',
-          borderRadius: 12, boxShadow: '0 12px 32px rgba(24,35,63,.14)', padding: 5,
-        }}
-      >
-        {children}
-      </div>
-    </>
-  )
-}
-
-/** A floating menu anchored to a screen point rather than a toolbar button — the right-click menu. */
-function ContextMenu({ x, y, onClose, children }: {
-  x: number; y: number; onClose: () => void; children: React.ReactNode
-}) {
-  const width = 220
-  // The menu's real height isn't known until it paints, so this reserves
-  // roughly what the full item list needs rather than measuring it.
-  const estimatedHeight = 460
-  const left = typeof window === 'undefined' ? x : Math.min(x, window.innerWidth - width - 8)
-  const top  = typeof window === 'undefined' ? y : Math.max(8, Math.min(y, window.innerHeight - estimatedHeight))
-  return (
-    <>
-      {/* Click- or right-click-away layer, so the menu closes without a
-          document listener fighting the textarea's own event handling. */}
-      <div
-        onClick={onClose}
-        onContextMenu={e => { e.preventDefault(); onClose() }}
-        style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-      />
-      <div
-        role="menu"
-        style={{
-          position: 'fixed', left, top, zIndex: 91,
-          minWidth: width, maxHeight: '70vh', overflowY: 'auto',
-          background: '#fff', border: 'none',
           borderRadius: 12, boxShadow: '0 12px 32px rgba(24,35,63,.14)', padding: 5,
         }}
       >
