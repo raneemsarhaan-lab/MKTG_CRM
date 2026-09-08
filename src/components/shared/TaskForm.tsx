@@ -6,10 +6,26 @@ import type { Member, Brand, ContentType } from '@/types/index'
 import { createTask, createTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { ProjectPicker } from '@/components/shared/ProjectPicker'
-import { COLORS } from '@/lib/tokens'
+import { BriefEditor } from '@/components/kanban/BriefEditor'
 import { FieldPill, PillOption, PillInput } from './FieldPill'
 import { shortDate } from '@/lib/myboard'
 import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
+
+/** The blue + lime brand palette, local to this form — see TaskModal's `CU`. */
+const CU = {
+  ink:       '#18233F',
+  muted:     '#68738D',
+  faint:     '#929CB0',
+  line:      '#E9EDF4',
+  surface:   '#F8FAFD',
+  chipBg:    '#F3F6FD',
+  hover:     '#E9EFFC',
+  blue:      '#3563E9',
+  blueDark:  '#2C51C4',
+  blueLight: '#EEF3FF',
+  green:     '#B7DE16',
+  coral:     '#D57D6F',
+} as const
 
 /**
  * New task — intake modal.
@@ -87,6 +103,11 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
   /** Non-null once a list has been pasted: one entry per task to create. */
   const [bulk, setBulk] = useState<string[] | null>(null)
   const [droppedCount, setDroppedCount] = useState(0)
+
+  // BriefEditor owns its own Tiptap document once mounted and does not watch
+  // `value` for external resets — bumping this key forces a clean remount
+  // (fresh initial content) after "Create and add another" clears the brief.
+  const [descKey, setDescKey] = useState(0)
 
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
@@ -188,6 +209,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
       if (andAnother) {
         // Keep the context fields, clear what is task-specific.
         setForm(p => ({ ...p, name: '', description: '' }))
+        setDescKey(k => k + 1)
       } else {
         setShowTaskForm(false)
       }
@@ -221,11 +243,11 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', borderBottom: `1px solid ${COLORS.line}`,
+          padding: '14px 18px', borderBottom: `1px solid ${CU.line}`,
         }}>
           <span style={{
             fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 17,
-            color: COLORS.ink, paddingBottom: 10, borderBottom: '2.5px solid #5B4CF0',
+            color: CU.ink, paddingBottom: 10, borderBottom: `2.5px solid ${CU.blue}`,
             marginBottom: -15,
           }}>
             Task
@@ -234,8 +256,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
             onClick={close}
             aria-label="Close"
             style={{
-              width: 28, height: 28, borderRadius: '50%', background: '#F7F8FA',
-              border: 'none', cursor: 'pointer', color: COLORS.muted,
+              width: 28, height: 28, borderRadius: '50%', background: CU.chipBg,
+              border: 'none', cursor: 'pointer', color: CU.muted,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
             }}
           >
@@ -306,7 +328,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               autoFocus
               aria-label="Task name"
               style={{
-                width: '100%', fontSize: 21, fontWeight: 400, color: COLORS.ink,
+                width: '100%', fontSize: 21, fontWeight: 400, color: CU.ink,
                 background: 'transparent', border: 'none', borderRadius: 10,
                 outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
                 padding: '10px 2px 6px', marginBottom: 6,
@@ -315,19 +337,18 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           )}
 
           {/* ── Description ──────────────────────────────────────────────── */}
-          <textarea
-            value={form.description}
-            onChange={e => patch('description', e.target.value)}
-            placeholder="Add description"
-            aria-label="Description"
-            rows={3}
-            style={{
-              width: '100%', fontSize: 15, color: COLORS.ink, background: 'transparent',
-              border: 'none', outline: 'none', resize: 'vertical', minHeight: 96,
-              fontFamily: 'inherit', boxSizing: 'border-box', padding: '2px 2px',
-              marginBottom: 18, lineHeight: 1.5,
-            }}
-          />
+          {/* Same rich editor as the task detail panel — `onDone` is left
+              unset since there is no separate edit mode to exit here, and
+              `onSave` just writes into local form state until Create Task
+              actually persists it. */}
+          <div style={{ marginBottom: 18 }}>
+            <BriefEditor
+              key={descKey}
+              value={form.description}
+              saving={false}
+              onSave={next => patch('description', next)}
+            />
+          </div>
 
           {/* ── Attribute pills ──────────────────────────────────────────── */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -336,7 +357,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               title="New tasks always start in To Do"
               style={{
                 display: 'inline-flex', alignItems: 'center', padding: '7px 12px',
-                borderRadius: 8, background: '#F7F8FA', color: COLORS.muted,
+                borderRadius: 8, background: CU.chipBg, color: CU.muted,
                 fontSize: 11.5, fontWeight: 700, letterSpacing: '.05em',
                 textTransform: 'uppercase', whiteSpace: 'nowrap',
               }}
@@ -353,7 +374,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                   onClick={() => { patch('assignee_id', m.id); closePill() }}
                 >
                   {m.name}
-                  <span style={{ color: COLORS.muted, fontWeight: 500, fontSize: 12 }}>· {m.role}</span>
+                  <span style={{ color: CU.muted, fontWeight: 500, fontSize: 12 }}>· {m.role}</span>
                 </PillOption>
               ))}
             </FieldPill>
@@ -404,8 +425,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               title="More fields"
               style={{
                 width: 34, height: 34, borderRadius: 9,
-                border: 'none', background: '#F7F8FA',
-                color: COLORS.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
+                border: 'none', background: CU.chipBg,
+                color: CU.muted, cursor: 'pointer', fontSize: 15, lineHeight: 1,
               }}
             >
               …
@@ -417,14 +438,14 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               stays a title and a brand. Ours holds the four that are not part
               of getting a task onto the board. */}
           <div style={{ marginTop: 22 }}>
-            <div style={{ fontSize: 13.5, color: COLORS.muted, marginBottom: 8 }}>Fields</div>
+            <div style={{ fontSize: 13.5, color: CU.muted, marginBottom: 8 }}>Fields</div>
             {!showMore ? (
               <button
                 type="button"
                 onClick={() => setShowMore(true)}
                 style={{
-                  padding: '9px 14px', borderRadius: 9, border: 'none', background: '#F7F8FA',
-                  color: COLORS.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer',
+                  padding: '9px 14px', borderRadius: 9, border: 'none', background: CU.chipBg,
+                  color: CU.ink, fontSize: 14, fontWeight: 500, cursor: 'pointer',
                   fontFamily: 'inherit',
                 }}
               >
@@ -459,8 +480,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7, height: 34,
                   padding: '0 12px', borderRadius: 9, border: 'none', cursor: 'pointer',
-                  background: form.project_id ? '#F3EEFF' : '#F7F8FA',
-                  color: form.project_id ? '#6D28D9' : '#7C828D',
+                  background: form.project_id ? CU.blueLight : CU.chipBg,
+                  color: form.project_id ? CU.blue : CU.muted,
                   font: 'inherit', fontSize: 13, fontWeight: form.project_id ? 600 : 500,
                   maxWidth: 260,
                 }}
@@ -498,7 +519,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 <div style={{ marginTop: 12 }}>
                   <label style={{
                     display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
-                    textTransform: 'uppercase', color: COLORS.muted, marginBottom: 6,
+                    textTransform: 'uppercase', color: CU.muted, marginBottom: 6,
                   }}>
                     Cover image URL
                   </label>
@@ -514,7 +535,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                   onClick={() => setShowMore(false)}
                   style={{
                     marginTop: 12, padding: 0, border: 'none', background: 'transparent',
-                    color: COLORS.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                    color: CU.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
                   Hide custom fields
@@ -524,8 +545,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
           </div>
 
           {/* Pipeline note — the stage count is decided here and then frozen */}
-          <p style={{ fontSize: 12, color: COLORS.muted, margin: '16px 0 0' }}>
-            Enters <strong style={{ color: COLORS.ink }}>To Do</strong>; SLA starts on creation.
+          <p style={{ fontSize: 12, color: CU.muted, margin: '16px 0 0' }}>
+            Enters <strong style={{ color: CU.ink }}>To Do</strong>; SLA starts on creation.
             Creating as {currentUser.role}.
           </p>
 
@@ -539,7 +560,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          padding: '12px 18px', borderTop: `1px solid ${COLORS.line}`, gap: 10,
+          padding: '12px 18px', borderTop: `1px solid ${CU.line}`, gap: 10,
         }}>
           {/* Attachment: TaskAttachment rows carry a URL, and file upload is
               still an open item (HANDOVER §14), so this reveals the URL field
@@ -551,7 +572,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
             title="Add cover image by URL"
             style={{
               width: 32, height: 32, borderRadius: 8, border: 'none',
-              background: 'transparent', color: COLORS.muted, cursor: 'pointer',
+              background: 'transparent', color: CU.muted, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -565,9 +586,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               onClick={() => submit(false)}
               disabled={isPending}
               style={{
-                padding: '10px 20px', background: COLORS.ink, border: 'none',
-                borderRadius: '10px 0 0 10px', color: COLORS.lime,
-                fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                padding: '10px 20px', background: CU.blue, border: 'none',
+                borderRadius: '10px 0 0 10px', color: '#fff',
+                fontSize: 14, fontWeight: 700, cursor: 'pointer',
                 fontFamily: 'var(--font-heading)', opacity: isPending ? 0.7 : 1,
               }}
             >
@@ -584,9 +605,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               title="Create and add another"
               aria-label="Create and add another"
               style={{
-                padding: '10px 12px', background: COLORS.ink,
+                padding: '10px 12px', background: CU.blueDark,
                 border: 'none', borderInlineStart: '1px solid rgba(255,255,255,.18)',
-                borderRadius: '0 10px 10px 0', color: COLORS.lime,
+                borderRadius: '0 10px 10px 0', color: '#fff',
                 cursor: 'pointer', opacity: isPending ? 0.7 : 1,
                 display: 'flex', alignItems: 'center',
               }}
@@ -624,7 +645,7 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
         gap: 10, marginBottom: 8, flexWrap: 'wrap',
       }}>
         <span style={{
-          fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, color: COLORS.ink,
+          fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, color: CU.ink,
         }}>
           {kept} task{kept === 1 ? '' : 's'} from your list
         </span>
@@ -632,7 +653,7 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
           type="button"
           onClick={onCancel}
           style={{
-            border: 'none', background: 'transparent', color: COLORS.muted,
+            border: 'none', background: 'transparent', color: CU.muted,
             fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
             textDecoration: 'underline', padding: 0,
           }}
@@ -642,14 +663,14 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
       </div>
 
       <div style={{
-        maxHeight: 240, overflowY: 'auto', border: `1px solid ${COLORS.line}`,
+        maxHeight: 240, overflowY: 'auto', border: `1px solid ${CU.line}`,
         borderRadius: 10, padding: 6, display: 'grid', gap: 4,
       }}>
         {names.map((n, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{
               width: 22, textAlign: 'right', fontSize: 11, fontWeight: 700,
-              color: COLORS.muted, flexShrink: 0, fontVariantNumeric: 'tabular-nums',
+              color: CU.muted, flexShrink: 0, fontVariantNumeric: 'tabular-nums',
             }}>
               {i + 1}
             </span>
@@ -662,8 +683,8 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
                 onChange(next)
               }}
               style={{
-                flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: COLORS.ink,
-                background: '#F6F6F4', border: `1px solid ${COLORS.line}`, borderRadius: 7,
+                flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: CU.ink,
+                background: CU.chipBg, border: `1px solid ${CU.line}`, borderRadius: 7,
                 padding: '6px 9px', outline: 'none', fontFamily: 'inherit',
               }}
             />
@@ -673,7 +694,7 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
               aria-label={`Remove "${n}"`}
               title="Remove this line"
               style={{
-                border: 'none', background: 'transparent', color: COLORS.coral,
+                border: 'none', background: 'transparent', color: CU.coral,
                 cursor: 'pointer', fontSize: 13, padding: 4, flexShrink: 0, lineHeight: 1,
               }}
             >
@@ -684,7 +705,7 @@ function BulkNames({ names, onChange, onCancel, dropped }: {
       </div>
 
       {dropped > 0 && (
-        <p role="alert" style={{ margin: '8px 0 0', fontSize: 12, color: COLORS.coral, fontWeight: 600 }}>
+        <p role="alert" style={{ margin: '8px 0 0', fontSize: 12, color: CU.coral, fontWeight: 600 }}>
           Only the first {MAX_PASTED} lines were taken — {dropped} more were left out.
         </p>
       )}
