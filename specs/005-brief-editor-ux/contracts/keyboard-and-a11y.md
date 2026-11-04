@@ -40,7 +40,7 @@
 | Link card | `role="dialog"`, `aria-label` = link host; buttons Open / Edit / Remove |
 | Upload placeholder | `aria-live="polite"` text "Uploading <filename>…" |
 | Read brief (`TaskModal`) | `role="button"`, `tabIndex=0`, `aria-label` = t('briefEditor.clickToEdit') |
-| Column-resize handle | `role="separator"`, `aria-orientation="vertical"`, label "Drag to resize columns"; keyboard alternative is Equal widths (FR-069) |
+| Column / table-edge resize handle | `role="separator"`, `aria-orientation="vertical"`, label "Drag to resize columns" or "Drag to resize the table"; keyboard alternatives are Equal widths and Full width (FR-069) |
 
 ## Direction
 

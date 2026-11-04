@@ -12,7 +12,7 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Organization**: Grouped by user story (US1–US9 from spec.md) so each can be built, checked and shipped on its own.
 
-**Revised 2026-11-04** after the preview review: T061–T063 (click to edit, click away to finish; no Edit/Done buttons) and T064–T067 (resizable table columns) were added to US4 and US6. IDs stay stable; the new tasks are listed inside the phase they belong to.
+**Revised 2026-11-04** after the preview review: T061–T063 (click to edit, click away to finish; no Edit/Done buttons) and T064–T067 (resizable tables: columns and both outer edges) were added to US4 and US6. IDs stay stable; the new tasks are listed inside the phase they belong to.
 
 **Conventions used throughout**
 
@@ -228,19 +228,21 @@ description: "Task list for the Brief Editor UX Overhaul"
   - Remove the `\[\[toc\]\]` un-escape in `getMarkdown` (FR-066, R12).
 - [ ] T046 [US6] Add lab scenarios `task-insert-below`, `youtube-block`, `table-menu`, `toggle-placeholders` and `toc-block` to `scripts/brief-editor-lab/scenarios.mjs`. Re-run `roundtrip-fixtures`.
 - [ ] T064 [US6] Enable column resizing in `brief-editor/extensions.ts`:
-  - `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: false } })`.
+  - `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: true } })` for the borders between columns.
+  - Add a `TableEdges` ProseMirror plugin in `brief-editor/tableEdges.ts`. It adds widget decorations on the table's start and end edges (mirrored in RTL) and adds `width` (default 100) and `offset` (default 0) attrs to the table node, rendered as `style="width:W%;margin-inline-start:O%"`. Dragging the end edge changes `width`; dragging the start edge changes `offset` and `width` together. The edge column's `colwidth` absorbs the change, clamped to `offset + width ≤ 100` and columns ≥ 64 px.
   - In `src/app/globals.css`, style `.fx-brief-edit .column-resize-handle` as a 3 px `BRIEF_UI.blue` bar and set `.fx-brief-edit.resize-cursor { cursor: col-resize }`. Widen the hit area to 14 px under `@media (pointer: coarse)`.
-  - In `brief-editor/TableMenu.tsx`, show a small badge with the two adjacent columns' percentages while dragging, and add an **Equal widths** button that clears every cell's `colwidth` (FR-067, FR-069, research R26).
+  - In `brief-editor/TableMenu.tsx`, show a small badge while dragging (two column percentages for an inner border, or the table's width percentage for an outer edge). Add **Equal widths** (clears every `colwidth`) and **Full width** (resets `width`/`offset`) buttons (FR-067, FR-069, research R26).
 - [ ] T065 [US6] Persist widths in `brief-editor/extensions.ts` by extending the table node's Markdown `serialize` and its `parseHTML` attributes:
-  - When any cell in the first row has a `colwidth`, write the table as HTML `<table data-widths="a,b,c">` with `<thead>`/`<tbody>`, cells containing inline HTML (`<strong>`, `<em>`, `<a>`, `<code>`, `<u>`, `<s>`). Widths are integer percentages summing to 100, from the first row's `colwidth`s.
+  - When any cell in the first row has a `colwidth`, or `width`/`offset` differ from 100/0, write the table as HTML `<table data-widths="a,b,c" data-width="W" data-offset="O">` (omit `data-width`/`data-offset` at their defaults) with `<thead>`/`<tbody>`, cells containing inline HTML (`<strong>`, `<em>`, `<a>`, `<code>`, `<u>`, `<s>`). Widths are integer percentages summing to 100, from the first row's `colwidth`s.
   - Otherwise keep the existing GFM serializer untouched.
-  - `parseHTML` reads `data-widths` and sets each column's `colwidth` to `percent × current editor width`.
+  - `parseHTML` reads `data-widths` and sets each column's `colwidth` to `percent × table width`, and reads `data-width`/`data-offset` into the attrs.
   - Add `fixtures/table-widths.md` and extend `roundtrip-fixtures` (FR-068, SC-012).
-- [ ] T066 [P] [US6] In `src/components/shared/Brief.tsx`, allow the `data-widths` attribute on `table` in the sanitize schema (next to the `details`/`summary` additions, ~line 32). In the `table` component renderer, emit `<colgroup>` with one `<col style={{ width: n + '%' }}>` per value, with `tableLayout: 'fixed'` and `width: '100%'` when `data-widths` is present (FR-068).
+- [ ] T066 [P] [US6] In `src/components/shared/Brief.tsx`, allow the `data-widths`, `data-width` and `data-offset` attributes on `table` in the sanitize schema (next to the `details`/`summary` additions, ~line 32). In the `table` component renderer, emit `<colgroup>` with one `<col style={{ width: n + '%' }}>` per value, with `tableLayout: 'fixed'`, `width: (data-width ?? 100) + '%'` and `marginInlineStart: (data-offset ?? 0) + '%'` (FR-068).
 - [ ] T067 [US6] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`:
   - `table-resize`: drag a column border; both columns change, neither goes below 64 px.
+  - `table-edges`: drag the end edge inwards, so the table narrows and the last column absorbs it; drag the start edge inwards, so the table's start moves; dragging outwards stops at the brief's edges. Repeat with `locale=ar`.
   - `table-widths-roundtrip`: resize, close, reopen, and render through `Brief`; widths are equal within ±1% (SC-012).
-  - `table-equal-widths`: Equal widths restores a GFM pipe table in the saved Markdown.
+  - `table-equal-widths`: Equal widths plus Full width restores a GFM pipe table in the saved Markdown.
 
 ---
 

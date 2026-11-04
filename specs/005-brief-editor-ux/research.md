@@ -207,16 +207,18 @@ plus `error` mapped to the existing `COLORS.coral`. The editor's local `BR` cons
 
 **Alternatives.** A permanently mounted read-only Tiptap that toggles `editable`: rejected, because it would drop `Brief`'s embeds, chips and Expand, and render 300 briefs' worth of editors on the board. Blur-based exit: rejected, because blur also fires when focus moves into the editor's own menus and prompts.
 
-## R26. Resizable table columns (FR-067–069, F2)
+## R26. Resizable tables (FR-067–069, F2)
 
 **Finding.** TableKit supports `resizable: true` (column-resize handles via `prosemirror-tables`), storing widths as `colwidth` (pixels) on cells and rendering `<colgroup>`. `tiptap-markdown` writes tables as GFM pipe tables, which can't carry widths, so widths would be lost on save. `Brief.tsx`'s sanitizer allows neither `colgroup`/`col` nor width attributes.
 
 **Decision.**
-- Enable `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: false } })`. Style the handle with `BRIEF_UI.blue` and show a width badge while dragging (as in the preview).
+- Enable `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: true } })` for the borders between columns and the end edge. Style the handle with `BRIEF_UI.blue` and show a size badge while dragging (as in the preview).
+- `prosemirror-tables` has no handle on the table's **start** edge and treats the end edge as "widen the last column". So a small `TableEdges` plugin adds decorations on both outer edges (mirrored in RTL). Dragging the end edge changes the table's `width`; dragging the start edge changes its `offset` (inline-start margin) and width together. The edge column absorbs the change, clamped so `offset + width ≤ 100%` and no column goes below 64 px. The preview implements exactly this behaviour.
 - Store widths as **percentages** so they survive different panel widths: on save, convert each column's pixel `colwidth` to a share of the table's total.
-- Serialization: a table with no explicit widths stays a GFM pipe table (unchanged, FR-100). A table with widths is written as an HTML table `<table data-widths="30,15,55">…</table>`, with cell contents in Markdown-compatible inline HTML. The table's `parseHTML` reads `data-widths` back into `colwidth`s at mount, scaled to the current width.
-- Read view: allow `table[data-widths]` in the sanitize schema, and render a `<colgroup>` from it in `Brief.tsx`'s `table` component with `table-layout: fixed`.
-- **Equal widths** in the table menu clears the widths, so the table goes back to a plain GFM pipe table.
+- Table node attrs `width` (percent of the brief, default 100) and `offset` (percent, default 0).
+- Serialization: a table with no explicit widths and the defaults stays a GFM pipe table (unchanged, FR-100). Otherwise it is written as an HTML table `<table data-widths="30,15,55" data-width="70" data-offset="10">…</table>`, with cell contents in Markdown-compatible inline HTML. The table's `parseHTML` reads `data-widths` back into `colwidth`s at mount, scaled to the current width.
+- Read view: allow `data-widths`, `data-width` and `data-offset` on `table` in the sanitize schema. `Brief.tsx`'s `table` component renders a `<colgroup>` from `data-widths` and applies `width`/`margin-inline-start` from the other two, with `table-layout: fixed`.
+- **Equal widths** clears the column widths; **Full width** resets `width`/`offset`. With both reset, the table goes back to a plain GFM pipe table.
 - Touch: the handle's hit area widens to 14 px when the pointer is coarse.
 
 **Alternatives.** An HTML comment before a GFM table holding the widths: rejected, because ProseMirror's HTML parser drops comments, so the editor could never read them back. Pixel widths: rejected, because the panel is a different width on a phone, a laptop and in the Create Task form.

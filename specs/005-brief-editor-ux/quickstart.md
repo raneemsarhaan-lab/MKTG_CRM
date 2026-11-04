@@ -79,8 +79,9 @@ Each scenario corresponds to a spec acceptance scenario.
 | `toggle-placeholders` | US6 #5 | empty title and body with hints |
 | `toc-block` | US6 #6 | labelled block, not raw text |
 | `table-resize` | US6 #7 | dragging a border resizes both columns; minimum width respected |
-| `table-widths-roundtrip` | US6 #8 | widths identical (±1%) after reopening and in `Brief` (SC-012) |
-| `table-equal-widths` | FR-069 | Equal widths saves a plain GFM table |
+| `table-edges` | US6 #8 | the outer left and right edges resize the table; stops at the brief's edges; mirrored in Arabic |
+| `table-widths-roundtrip` | US6 #9 | widths identical (±1%) after reopening and in `Brief` (SC-012) |
+| `table-equal-widths` | FR-069 | Equal widths plus Full width saves a plain GFM table |
 | `sticky-toolbar` | US7 #1 | after scrolling a long brief, toolbar top ≥ 0 |
 | `phone-toolbar` | US7 #2 | 390 px: one row; no row starts with a divider; no page overflow (SC-008) |
 | `arabic` | US8 | `locale=ar`: no English strings in the editor (SC-009); toolbar mirrored |
@@ -97,7 +98,7 @@ Prerequisites: a deployment or local run with `DATABASE_URL` and the bucket vari
 3. Turn the network off in DevTools and type. The status turns to "Couldn't save · Retry". Press Esc and the bar asks before leaving. Turn the network on and press Retry. Close and reopen the task: the text is there.
 4. Click a word in the read brief. Editing starts with the cursor on that word, the text doesn't jump, and there is no Edit or Done button. Click elsewhere in the panel and editing ends.
 5. While editing, click a link inside the brief. The link card appears and no tab opens. While reading, the same link opens in a new tab.
-6. Drag a table's column border, click away, close and reopen the task. The widths are kept.
+6. Drag a table's column border and its right and left edges, click away, close and reopen the task. The widths and position are kept.
 7. Switch to Arabic (language toggle). The editor is fully Arabic and mirrored.
 8. Open **+ New Task** and paste an image into the description. The note says images can be added once the task is created.
 9. On a phone (or DevTools at 390 px), open a long brief and scroll. The toolbar stays visible on a single row.

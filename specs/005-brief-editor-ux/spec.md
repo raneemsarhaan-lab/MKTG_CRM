@@ -45,7 +45,7 @@ Every audit item maps to at least one requirement.
 | E12 | Tables can't gain or lose rows and columns | FR-063, FR-064 |
 | E13 | Toolbar scrolls out of view | FR-070 |
 | E14 | No "/" menu; shortcuts undiscoverable | FR-040 – FR-043 |
-| E15 | Underline lost after Done | FR-080 |
+| E15 | Underline lost after leaving editing | FR-080 |
 | E16 | Menus and toolbar not keyboard / screen-reader accessible | FR-044 – FR-046 |
 | E17 | Toolbar wraps to three rows on a phone | FR-071 |
 | E18 | Labels English-only | FR-090, FR-091 |
@@ -55,7 +55,7 @@ Every audit item maps to at least one requirement.
 | E22 | List items look double-spaced | FR-081 |
 | E23 | Editor colours outside the shared palette | FR-082 |
 | F1 | Click to edit, click away to finish; no Edit or Done button | FR-014 – FR-017 |
-| F2 | Resizable table columns | FR-067 – FR-069 |
+| F2 | Resizable tables: columns, and the table's left and right edges | FR-067 – FR-069 |
 
 ---
 
@@ -172,7 +172,8 @@ A producer inserts a checklist under a paragraph, a YouTube reference that shows
 5. **Given** a toggle list is inserted, **Then** its title and body are empty, with grey hints ("Toggle title", "Hidden content") that disappear as the person types.
 6. **Given** a table of contents is inserted, **Then** it appears as a labelled block ("Table of contents — built from this brief's headings"), not as raw text.
 7. **Given** a table, **When** the person drags the border between two columns (mouse or touch), **Then** those two columns resize live, showing their widths as percentages, and no column can shrink below a readable minimum.
-8. **Given** a table whose columns were resized, **When** the brief is read or reopened, **Then** the columns keep their widths; **When** the person chooses Equal widths in the table menu, **Then** all columns become equal.
+8. **Given** a table, **When** the person drags the table's outer left or right edge, **Then** the whole table becomes narrower or wider (never wider than the brief), the column at that edge takes up the difference, and the table's width shows as a percentage while dragging.
+9. **Given** a table whose columns or edges were resized, **When** the brief is read or reopened, **Then** the table keeps its width, position and column widths; **When** the person chooses Equal widths, **Then** all columns become equal; **When** they choose Full width, **Then** the table spans the brief again.
 
 ---
 
@@ -305,9 +306,9 @@ What the person sees while editing looks the same after clicking away: underline
 - **FR-064**: A newly inserted table MUST fill the editor's width and include a header row.
 - **FR-065**: A newly inserted toggle list MUST have an empty title and body, showing grey hints until typed into.
 - **FR-066**: A table of contents MUST appear while editing as a labelled block, not as raw text.
-- **FR-067**: Table columns MUST be resizable by dragging the border between two columns, with mouse or touch, showing both widths while dragging, with a minimum column width so no column collapses.
-- **FR-068**: Resized column widths MUST be kept when the brief is saved and reopened, and MUST display the same in the read view.
-- **FR-069**: The table menu MUST offer Equal widths, which also serves as the keyboard way to reset widths.
+- **FR-067**: Tables MUST be resizable with mouse or touch: dragging the border between two columns trades width between them; dragging the table's outer left or right edge changes the table's overall width and starting position, up to the brief's full width, with the edge column absorbing the change. Sizes show while dragging, and no column can shrink below a readable minimum.
+- **FR-068**: Resized column widths, table width and table position MUST be kept when the brief is saved and reopened, and MUST display the same in the read view.
+- **FR-069**: The table menu MUST offer **Equal widths** (resets the columns) and **Full width** (resets the table's width and position); these are also the keyboard way to undo a resize.
 
 **Layout (Story 7)**
 
@@ -316,7 +317,7 @@ What the person sees while editing looks the same after clicking away: underline
 
 **Consistency (Story 9)**
 
-- **FR-080**: Underlined text MUST appear underlined in the read view after Done.
+- **FR-080**: Underlined text MUST appear underlined in the read view after editing ends.
 - **FR-081**: List items MUST have the same tight spacing in the editing and read views.
 - **FR-082**: The editor MUST draw its colours from the product's shared design palette (Constitution §I); the editor's blue and lime colours are added to that palette rather than defined inside the editor.
 
@@ -351,18 +352,18 @@ What the person sees while editing looks the same after clicking away: underline
 - **SC-009**: In Arabic, 0 English strings are visible in the editor across every menu, card and message.
 - **SC-010**: All existing briefs open, display and save without visible change unless edited.
 - **SC-011**: Clicking a word in the read brief puts the cursor on that word in 100% of tested clicks on paragraphs, list items, headings and table cells, and the clicked text moves by no more than 4 px on screen.
-- **SC-012**: Column widths set by dragging are identical (±1%) after closing and reopening the brief, and in the read view.
+- **SC-012**: Column widths, table width and table position set by dragging are identical (±1%) after closing and reopening the brief, and in the read view.
 
 ## Assumptions
 
 - The audit of 2026-11-04 is the scope. Other ideas from it (comments in briefs, version history, collaborative editing) are out of scope.
 - **E23 resolution**: rather than amending Constitution §I, the editor's blue and lime colours are added to the shared design palette, so the design chosen in #80 and #81 stays and the rule is honoured (FR-082). If the team prefers to amend the constitution instead, FR-082 changes accordingly.
 - **E15 resolution**: underline stays (people expect Ctrl+U) and the read view is made to show it, rather than removing underline from the editor.
-- **E21 resolution**: the save status lives in the toolbar; the hint line next to Done is reduced to the Done button and any one-off messages.
+- **E21 resolution**: the save status lives in the toolbar; the footer under the editor keeps only one-off messages (there is no Done button, FR-014).
 - Pasted and dropped images use the existing attachment storage, limits and permissions; no new storage is introduced.
 - Images are uploaded only from image data or files, not by fetching remote images found in pasted web content.
 - The unsaved-changes warning (FR-004) appears only after a save has failed; ordinary in-flight saves keep the current "nothing is discarded" behaviour.
 - Both places the editor appears, the task panel and the Create Task form, get these changes. Where the Create Task form has no task yet, pasted images wait for the task to be created before uploading, or the form explains that images can be added after creating the task. The planning phase decides which.
 - The read-only brief view is changed only where needed for FR-080, FR-081, FR-066 and FR-068.
 - **F1**: the `TaskModal` read view keeps its rich rendering (embeds, link chips, Expand); the editor replaces it on click, at the clicked position. The Create Task form has no read view, so it is always in editing and click-away does not apply there.
-- **F2**: only columns resize; rows grow with their content. Tables whose columns were never resized keep being stored exactly as today.
+- **F2**: columns and the table's outer edges resize; rows grow with their content. Tables whose columns were never resized keep being stored exactly as today.
