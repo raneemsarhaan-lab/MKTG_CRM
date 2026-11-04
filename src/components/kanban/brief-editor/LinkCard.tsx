@@ -50,8 +50,8 @@ export function LinkCard({ editor, hiddenRef, onEdit, onNote }: {
         }}
       >
         <div style={{ minWidth: 0, fontSize: 12.5, lineHeight: 1.3 }}>
-          <b style={{ display: 'block', color: BRIEF_UI.ink }}>{host}</b>
-          {shortPath && <span title={href} style={{ display: 'block', color: BRIEF_UI.label, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 190 }}>{shortPath}</span>}
+          <b data-url="" dir="ltr" style={{ display: 'block', color: BRIEF_UI.ink }}>{host}</b>
+          {shortPath && <span data-url="" dir="ltr" title={href} style={{ display: 'block', color: BRIEF_UI.label, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 190 }}>{shortPath}</span>}
         </div>
         <a href={href.startsWith('/') ? href : hrefFor(href)} target="_blank" rel="noopener noreferrer" style={cardBtn(BRIEF_UI.blueLight, BRIEF_UI.blue)}>
           {t('open')} <ToolIcon name="external" size={12} />

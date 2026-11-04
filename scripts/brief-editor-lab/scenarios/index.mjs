@@ -7,6 +7,7 @@ import { editing } from './editing.mjs'
 import { keyboard } from './keyboard.mjs'
 import { blocks } from './blocks.mjs'
 import { layout } from './layout.mjs'
+import { arabic } from './arabic.mjs'
 
 export const SCENARIOS = [
   ...save,
@@ -16,5 +17,6 @@ export const SCENARIOS = [
   ...keyboard,
   ...blocks,
   ...layout,
+  ...arabic,
   ...roundtrip,
 ]

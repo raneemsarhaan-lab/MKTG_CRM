@@ -273,12 +273,12 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Lab `locale=ar`: there is no Latin-letter text in the editor UI other than URLs and filenames, and the toolbar's first group is at the right edge.
 
-- [ ] T057 [US8] Review and complete the Arabic translations for every `briefEditor` key in `messages/ar.json`, so the key set matches `messages/en.json` exactly (add a lab check that compares the two). Add Arabic `/` keywords to `BLOCK_ITEMS` in `brief-editor/blocks.ts` (e.g. جدول, عنوان, قائمة, مهمة, صورة, فيديو). Build shortcut labels per platform (⌘ vs Ctrl) in one helper, `brief-editor/shortcut.ts`.
-- [ ] T058 [US8] RTL pass over `src/components/kanban/brief-editor/*` and `BriefEditor.tsx`:
+- [X] T057 [US8] Review and complete the Arabic translations for every `briefEditor` key in `messages/ar.json`, so the key set matches `messages/en.json` exactly (add a lab check that compares the two). Add Arabic `/` keywords to `BLOCK_ITEMS` in `brief-editor/blocks.ts` (e.g. جدول, عنوان, قائمة, مهمة, صورة, فيديو). Build shortcut labels per platform (⌘ vs Ctrl) in one helper, `brief-editor/shortcut.ts`.
+- [X] T058 [US8] RTL pass over `src/components/kanban/brief-editor/*` and `BriefEditor.tsx`:
   - Replace any `left`/`right`/`marginLeft`/`paddingRight` with logical properties.
   - `LinkCard`, `TableMenu` and `SlashMenu` read `dir` from `editor.view.dom` and pass `placement: dir === 'rtl' ? 'bottom-end' : 'bottom-start'` to their floating options.
   - Confirm the toolbar arrow-key reversal from T037 (FR-091).
-- [ ] T059 [US8] Add lab scenario `arabic` to `scripts/brief-editor-lab/scenarios.mjs`: with `locale=ar`, open each menu, the link card, the table menu and the "/" menu, and assert no `[A-Za-z]{3,}` text outside URLs and filenames (SC-009). Take an RTL screenshot.
+- [X] T059 [US8] Add lab scenario `arabic` to `scripts/brief-editor-lab/scenarios.mjs`: with `locale=ar`, open each menu, the link card, the table menu and the "/" menu, and assert no `[A-Za-z]{3,}` text outside URLs and filenames (SC-009). Take an RTL screenshot.
 
 ---
 

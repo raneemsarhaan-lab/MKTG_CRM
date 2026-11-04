@@ -27,6 +27,7 @@ import { ValuePrompt, type PromptKind } from './brief-editor/ValuePrompt'
 import { OverlayStackProvider, createOverlayStack } from './brief-editor/useOverlayStack'
 import { positionForAnchor, scrollParent } from './brief-editor/readAnchor'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { withShortcut } from './brief-editor/shortcut'
 
 /**
  * Brief editor — a real rich-text surface, not a Markdown textarea.
@@ -424,23 +425,23 @@ export function BriefEditor({
 
   const TOOLS: { id: string; title: string; label: React.ReactNode; active: boolean; run: () => void }[][] = [
     [
-      { id: 'bold',   title: `${t('bold')} (Ctrl+B)`, label: <span style={{ fontWeight: 900 }}>B</span>,
+      { id: 'bold',   title: withShortcut(t('bold'), 'Mod+B'), label: <span style={{ fontWeight: 900 }}>B</span>,
         active: editor.isActive('bold'), run: () => editor.chain().focus().toggleBold().run() },
-      { id: 'italic', title: `${t('italic')} (Ctrl+I)`, label: <span style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</span>,
+      { id: 'italic', title: withShortcut(t('italic'), 'Mod+I'), label: <span style={{ fontStyle: 'italic', fontFamily: 'serif' }}>I</span>,
         active: editor.isActive('italic'), run: () => editor.chain().focus().toggleItalic().run() },
-      { id: 'strike', title: `${t('strike')} (Ctrl+Shift+X)`, label: <span style={{ textDecoration: 'line-through' }}>S</span>,
+      { id: 'strike', title: withShortcut(t('strike'), 'Mod+Shift+X'), label: <span style={{ textDecoration: 'line-through' }}>S</span>,
         active: editor.isActive('strike'), run: () => editor.chain().focus().toggleStrike().run() },
-      { id: 'code',   title: `${t('code')} (Ctrl+E)`, label: <ToolIcon name="code" />,
+      { id: 'code',   title: withShortcut(t('code'), 'Mod+E'), label: <ToolIcon name="code" />,
         active: editor.isActive('code'), run: () => editor.chain().focus().toggleCode().run() },
     ],
     [
-      { id: 'ul',    title: `${t('bulletList')} (Ctrl+Shift+8)`, label: <ToolIcon name="bulletList" />,
+      { id: 'ul',    title: withShortcut(t('bulletList'), 'Mod+Shift+8'), label: <ToolIcon name="bulletList" />,
         active: editor.isActive('bulletList'), run: () => editor.chain().focus().toggleBulletList().run() },
-      { id: 'ol',    title: `${t('numberedList')} (Ctrl+Shift+7)`, label: <ToolIcon name="numberedList" />,
+      { id: 'ol',    title: withShortcut(t('numberedList'), 'Mod+Shift+7'), label: <ToolIcon name="numberedList" />,
         active: editor.isActive('orderedList'), run: () => editor.chain().focus().toggleOrderedList().run() },
-      { id: 'quote', title: `${t('quote')} (Ctrl+Shift+9)`, label: <ToolIcon name="quote" />,
+      { id: 'quote', title: withShortcut(t('quote'), 'Mod+Shift+9'), label: <ToolIcon name="quote" />,
         active: editor.isActive('blockquote'), run: () => editor.chain().focus().toggleBlockquote().run() },
-      { id: 'link',  title: `${t('link')} (Ctrl+K)`, label: <ToolIcon name="link" />,
+      { id: 'link',  title: withShortcut(t('link'), 'Mod+K'), label: <ToolIcon name="link" />,
         active: editor.isActive('link'), run: () => openPrompt('link') },
     ],
   ]
@@ -476,10 +477,10 @@ export function BriefEditor({
         }}>
           {/* Undo / Redo (FR-013) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <ToolButton title={`${t('undo')} (Ctrl+Z)`} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
+            <ToolButton title={withShortcut(t('undo'), 'Mod+Z')} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
               <ToolIcon name="undo" />
             </ToolButton>
-            <ToolButton title={`${t('redo')} (Ctrl+Shift+Z)`} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
+            <ToolButton title={withShortcut(t('redo'), 'Mod+Shift+Z')} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
               <ToolIcon name="redo" />
             </ToolButton>
           </div>
