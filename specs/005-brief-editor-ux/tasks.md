@@ -74,22 +74,22 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Lab modes `save=fail`, `save=throw` and `save=hang`: the status shows "Couldn't save · Retry"; after switching to `save=ok` and pressing Retry, the last saved text equals everything typed.
 
-- [ ] T010 [US1] Create `brief-editor/useSaveQueue.ts` implementing data-model §3:
+- [X] T010 [US1] Create `brief-editor/useSaveQueue.ts` implementing data-model §3:
   - State `{ status, latest, confirmed, inFlight, failures, nextRetryAt }`; `confirmed` advances only when `onSave` resolves `true`.
   - At most one request in flight; each send carries the newest `latest`.
   - A 20 s watchdog treats an unsettled call as failed.
   - Backoff 2 s / 5 s / 15 s / 30 s while in `error`, reset on success.
   - Exposes `update(text)`, `retry()`, `status`, and `flushOnUnmount()` (send once if `latest !== confirmed` and nothing is in flight).
   - Calls `onSaveStateChange` on every status change.
-- [ ] T011 [US1] Wire `useSaveQueue` into `src/components/kanban/BriefEditor.tsx`. Replace `pump`, `textRef`, `savedRef`, `inFlightRef` and `busySaving`; `onUpdate` calls `update(getMarkdown(editor))`. Change the props per `contracts/brief-editor-props.md`: `onSave: (md) => Promise<boolean>`, remove `saving`, add an optional `onSaveStateChange`.
-- [ ] T012 [P] [US1] In `src/components/kanban/TaskModal.tsx`, make `applyPatch` return `Promise<boolean>`. Wrap `await updateTask(...)` in `try/catch` so the promise resolves in every path: `true` on `res.success`, `false` on failure or throw, keeping the existing `setError` messages. Pass `onSave={next => applyPatch({ description: next })}`, remove `saving={isPending}`, and store the editor's `(state, pendingUploads)` from `onSaveStateChange` in a ref.
-- [ ] T013 [P] [US1] In `src/components/shared/TaskForm.tsx`, change the `BriefEditor` usage to `onSave={next => { setForm(f => ({ ...f, description: next })); return Promise.resolve(true) }}` and remove the `saving` prop.
-- [ ] T014 [US1] Add the save status to the toolbar in `brief-editor/Toolbar.tsx`:
+- [X] T011 [US1] Wire `useSaveQueue` into `src/components/kanban/BriefEditor.tsx`. Replace `pump`, `textRef`, `savedRef`, `inFlightRef` and `busySaving`; `onUpdate` calls `update(getMarkdown(editor))`. Change the props per `contracts/brief-editor-props.md`: `onSave: (md) => Promise<boolean>`, remove `saving`, add an optional `onSaveStateChange`.
+- [X] T012 [P] [US1] In `src/components/kanban/TaskModal.tsx`, make `applyPatch` return `Promise<boolean>`. Wrap `await updateTask(...)` in `try/catch` so the promise resolves in every path: `true` on `res.success`, `false` on failure or throw, keeping the existing `setError` messages. Pass `onSave={next => applyPatch({ description: next })}`, remove `saving={isPending}`, and store the editor's `(state, pendingUploads)` from `onSaveStateChange` in a ref.
+- [X] T013 [P] [US1] In `src/components/shared/TaskForm.tsx`, change the `BriefEditor` usage to `onSave={next => { setForm(f => ({ ...f, description: next })); return Promise.resolve(true) }}` and remove the `saving` prop.
+- [X] T014 [US1] Add the save status to the toolbar in `brief-editor/Toolbar.tsx`:
   - `role="status"` with text from `t('saved' | 'saving' | 'couldntSave')`.
   - In error it shows a **Retry** button calling `retry()`, coloured `BRIEF_UI.error`.
   - Remove the duplicate status and the "Esc closes · select text for formatting" hint from the footer in `BriefEditor.tsx`; the footer keeps one-off notes only; the Done button is removed in T034 (FR-005, FR-014, R19).
-- [ ] T015 [US1] Add the unsaved-changes confirm bar (`brief-editor/ConfirmLeave.tsx`, registered on the overlay stack). Text: "Your last changes aren't saved." when `status === 'error'`, or "An image is still uploading." when `pendingUploads > 0` (the count comes from T023; it is 0 until US3 lands), with **Stay** (focus back to the editor) and **Leave anyway** (calls `onDone`). Click-away, Esc (empty stack) and Mod+Enter all route through it when either condition holds (FR-004). `BriefEditor.tsx` calls `onSaveStateChange(status, pendingUploads)` whenever either changes. In `TaskModal.tsx`, the panel's close control shows the same choice when the stored state is `'error'` or `pendingUploads > 0`, using the panel's existing inline styles, no `window.confirm`.
-- [ ] T016 [US1] Add lab scenarios `save-fail-shows-error`, `save-retry-sends-latest`, `save-hang-watchdog`, `leave-guard` and `single-status` to `scripts/brief-editor-lab/scenarios.mjs`, as described in quickstart.md §2.
+- [X] T015 [US1] Add the unsaved-changes confirm bar (`brief-editor/ConfirmLeave.tsx`, registered on the overlay stack). Text: "Your last changes aren't saved." when `status === 'error'`, or "An image is still uploading." when `pendingUploads > 0` (the count comes from T023; it is 0 until US3 lands), with **Stay** (focus back to the editor) and **Leave anyway** (calls `onDone`). Click-away, Esc (empty stack) and Mod+Enter all route through it when either condition holds (FR-004). `BriefEditor.tsx` calls `onSaveStateChange(status, pendingUploads)` whenever either changes. In `TaskModal.tsx`, the panel's close control shows the same choice when the stored state is `'error'` or `pendingUploads > 0`, using the panel's existing inline styles, no `window.confirm`.
+- [X] T016 [US1] Add lab scenarios `save-fail-shows-error`, `save-retry-sends-latest`, `save-hang-watchdog`, `leave-guard` and `single-status` to `scripts/brief-editor-lab/scenarios.mjs`, as described in quickstart.md §2.
 
 **Checkpoint**: US1 is shippable alone. Saving is trustworthy in both hosts.
 

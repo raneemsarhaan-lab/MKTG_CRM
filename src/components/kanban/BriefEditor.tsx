@@ -15,7 +15,9 @@ import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
 import { Toggle, getMarkdown } from './brief-editor/extensions'
-import { ToolIcon, ToolButton, Sep } from './brief-editor/Toolbar'
+import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
+import { ConfirmLeave } from './brief-editor/ConfirmLeave'
+import { useSaveQueue, type SaveStatus } from './brief-editor/useSaveQueue'
 import { Menu, MenuItem } from './brief-editor/Menu'
 import { ValuePrompt, type PromptKind } from './brief-editor/ValuePrompt'
 import { OverlayStackProvider, createOverlayStack } from './brief-editor/useOverlayStack'
@@ -34,19 +36,23 @@ import { OverlayStackProvider, createOverlayStack } from './brief-editor/useOver
  * the toolbar parts, the menus, the value prompt and the overlay stack that
  * decides what Esc closes.
  *
- * There is no Save button: every change calls `onSave` right away, with no
- * artificial delay. What is throttled is concurrency, not time — if a save is
- * still in flight when the text changes again, it waits for that request to
- * finish and then sends the latest text, rather than firing a second request
- * in parallel. Two overlapping saves can resolve out of order over the
- * network, and the one that finishes last wins even if it was sent first.
+ * There is no Save button: every change is sent right away by
+ * `useSaveQueue`, one request at a time and always the newest text. The
+ * toolbar shows "Saved" only once the host confirms the save, and a failure
+ * shows "Couldn't save · Retry" and retries by itself (research R1).
  */
 
 interface BriefEditorProps {
   value:  string
-  saving: boolean
-  /** May return a Promise; awaited so a save in flight is never overlapped. */
-  onSave: (next: string) => void | Promise<unknown>
+  /**
+   * Store the brief. Must resolve `true` once stored and `false` when not,
+   * and must settle in every path, including when the underlying action
+   * throws (contracts/brief-editor-props.md). Never called twice at once.
+   */
+  onSave: (next: string) => Promise<boolean>
+  /** Told whenever the save state or the number of uploads in progress changes,
+   *  so the host can guard its own close control (FR-004). */
+  onSaveStateChange?: (state: SaveStatus, pendingUploads: number) => void
   /**
    * Stop editing. Nothing is discarded — autosave already covers that.
    *
@@ -68,11 +74,13 @@ const TEXT_STYLES: { level: 0 | 1 | 2 | 3; key: 'normal' | 'h1' | 'h2' | 'h3'; s
 ]
 
 export function BriefEditor({
-  value, saving, onSave, onDone, attachments = [], onCreateSubtask,
+  value, onSave, onSaveStateChange, onDone, attachments = [], onCreateSubtask,
 }: BriefEditorProps) {
   const t = useTranslations('briefEditor')
   const stack = useMemo(createOverlayStack, [])
-  const [busySaving, setBusySaving] = useState(false)
+  const save = useSaveQueue(value, onSave)
+  const [pendingUploads] = useState(0)
+  const [confirmLeave, setConfirmLeave] = useState<'unsaved' | 'uploading' | null>(null)
   const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
   const [focused, setFocused] = useState(false)
   const [prompt, setPrompt]   = useState<PromptKind | null>(null)
@@ -88,27 +96,29 @@ export function BriefEditor({
 
   const images = imageAttachments(attachments)
 
-  // Autosave bookkeeping. Refs, not state: a request resolving later, or the
-  // unmount cleanup, needs the *latest* text and the *latest* save target
-  // without waiting on a render — a stale closure here is how the last few
-  // keystrokes typed right before closing the editor go unsaved.
-  const textRef     = useRef(value)
-  const savedRef    = useRef(value)
-  const inFlightRef = useRef(false)
+  // Tell the host about the save state, so its own close control can ask
+  // before throwing away unsaved text (FR-004).
+  const stateCb = useRef(onSaveStateChange)
+  stateCb.current = onSaveStateChange
+  useEffect(() => { stateCb.current?.(save.status, pendingUploads) }, [save.status, pendingUploads])
 
-  /** Send whatever hasn't been saved yet — but only one request at a time. */
-  function pump() {
-    if (inFlightRef.current) return
-    const next = textRef.current
-    if (next === savedRef.current) { setBusySaving(false); return }
-    savedRef.current = next
-    inFlightRef.current = true
-    setBusySaving(true)
-    Promise.resolve(onSave(next)).finally(() => {
-      inFlightRef.current = false
-      pump()
-    })
+  // Read by the key handler, which Tiptap captures once at creation.
+  const leaveRef = useRef<() => void>(() => {})
+
+  /**
+   * Leave editing, the way Esc and a click outside both do (contracts/
+   * keyboard-and-a11y.md "Esc layering"): close the top menu or prompt if one
+   * is open; otherwise, if a save has failed or an image is still uploading,
+   * ask first; otherwise leave.
+   */
+  function requestLeave() {
+    if (stack.closeTop()) return
+    if (!onDone) return
+    if (save.status === 'error') { setConfirmLeave('unsaved'); return }
+    if (pendingUploads > 0) { setConfirmLeave('uploading'); return }
+    onDone()
   }
+  leaveRef.current = requestLeave
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -127,26 +137,21 @@ export function BriefEditor({
     editorProps: {
       attributes: { class: 'fx-brief fx-brief-edit' },
       handleKeyDown(_view, event) {
-        if (!onDone) return false
-        if (event.key === 'Escape') { if (!stack.closeTop()) onDone(); return true }
-        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { onDone(); return true }
+        if (event.key === 'Escape') {
+          if (!onDone && stack.isEmpty()) return false
+          leaveRef.current(); return true
+        }
+        if (onDone && (event.metaKey || event.ctrlKey) && event.key === 'Enter') { leaveRef.current(); return true }
         return false
       },
     },
     onUpdate({ editor }) {
-      textRef.current = getMarkdown(editor)
-      pump()
+      save.update(getMarkdown(editor))
     },
     onTransaction: () => bump(n => n + 1),
     onFocus: () => setFocused(true),
     onBlur:  () => setFocused(false),
   })
-
-  // Catch whatever never got a chance to start a save at all if the editor
-  // unmounts out from under it — closing the task panel mid-keystroke, say.
-  useEffect(() => () => {
-    if (!inFlightRef.current && textRef.current !== savedRef.current) onSave(textRef.current)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openPrompt(kind: PromptKind) {
     setMenu(null)
@@ -342,13 +347,20 @@ export function BriefEditor({
 
           <span style={{ flex: 1 }} />
 
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 4px',
-            fontSize: 12.5, fontWeight: 600, color: busySaving || saving ? BRIEF_UI.blue : BRIEF_UI.faint,
-          }}>
-            {busySaving || saving ? t('saving') : t('saved')}
-          </span>
+          <SaveStatusBadge
+            status={save.status}
+            labels={{ saved: t('saved'), saving: t('saving'), couldntSave: t('couldntSave'), retry: t('retry') }}
+            onRetry={save.retry}
+          />
         </div>
+
+        {confirmLeave && (
+          <ConfirmLeave
+            reason={confirmLeave}
+            onStay={() => { setConfirmLeave(null); editor.commands.focus() }}
+            onLeave={() => { setConfirmLeave(null); onDone?.() }}
+          />
+        )}
 
         {/* Value prompt for the insert items that need one */}
         {prompt && (
@@ -390,11 +402,11 @@ export function BriefEditor({
         <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: '0 0 18px 18px' }} />
       </div>
 
-      {onDone && (
+      {(onDone || note) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-          <button
+          {onDone && <button
             type="button"
-            onClick={onDone}
+            onClick={requestLeave}
             style={{
               padding: '7px 16px', borderRadius: 9, border: 'none',
               background: BRIEF_UI.blue, color: COLORS.panel, fontWeight: 700,
@@ -402,9 +414,9 @@ export function BriefEditor({
             }}
           >
             {t('done')}
-          </button>
-          <span style={{ fontSize: 12, color: note ? BRIEF_UI.ink : BRIEF_UI.faint, fontWeight: note ? 700 : 400 }}>
-            {note || (busySaving || saving ? t('saving') : t('saved'))}
+          </button>}
+          <span role="status" style={{ fontSize: 12, color: BRIEF_UI.ink, fontWeight: 700 }}>
+            {note}
           </span>
         </div>
       )}

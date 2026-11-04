@@ -100,3 +100,39 @@ export function ToolButton({ children, title, active, disabled, wide, chip, pres
 export function Sep() {
   return <span aria-hidden="true" style={{ width: 1, height: 26, background: BRIEF_UI.line, margin: '0 4px', flexShrink: 0 }} />
 }
+
+/**
+ * The one place the save state shows (FR-005, R19). "Saved" is grey, "Saving…"
+ * blue, "Couldn't save" coral with a Retry button (FR-002). On a phone the
+ * words are visually hidden behind a dot, except when Retry is needed.
+ */
+export function SaveStatusBadge({ status, labels, onRetry, compact }: {
+  status: 'saved' | 'saving' | 'error'
+  labels: { saved: string; saving: string; couldntSave: string; retry: string }
+  onRetry: () => void
+  compact?: boolean
+}) {
+  const color = status === 'error' ? BRIEF_UI.error : status === 'saving' ? BRIEF_UI.blue : BRIEF_UI.faint
+  const text = status === 'error' ? labels.couldntSave : status === 'saving' ? labels.saving : labels.saved
+  const hideText = compact && status !== 'error'
+  return (
+    <span data-save-status={status} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 4px', flexShrink: 0,
+      fontSize: 12.5, fontWeight: 600, color, whiteSpace: 'nowrap',
+    }}>
+      {compact && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />}
+      <span role="status" aria-live="polite" style={hideText ? VISUALLY_HIDDEN : undefined}>{text}</span>
+      {status === 'error' && (
+        <button type="button" onMouseDown={e => e.preventDefault()} onClick={onRetry}
+                style={{ height: 24, padding: '0 9px', border: 'none', borderRadius: 6, background: BRIEF_UI.error, color: COLORS.panel, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {labels.retry}
+        </button>
+      )}
+    </span>
+  )
+}
+
+export const VISUALLY_HIDDEN: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+}

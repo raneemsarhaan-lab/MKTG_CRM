@@ -91,8 +91,8 @@ function App() {
     <BriefEditor
       key={key}
       value={md}
-      saving={false}
       onSave={save}
+      onSaveStateChange={(state, pending) => { lab.state = state; lab.pending = pending }}
       onDone={host === 'form' ? undefined : () => { lab.done++; setEditing(false) }}
       attachments={[{ id: 'a1', task_id: 't', filename: 'hero-banner.png', url: SAMPLE_PNG, uploaded_at: '' } as never]}
       onCreateSubtask={async name => { await wait(300); return { name, href: '/board?task=new-123' } }}

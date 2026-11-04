@@ -13,6 +13,7 @@ import {
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
 import { BriefEditor } from './BriefEditor'
+import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
@@ -653,6 +654,16 @@ export function TaskModal({
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
+  // The brief editor's last reported save state (spec 005 FR-004): closing the
+  // panel while a save has failed or an image is uploading asks first.
+  const briefState = useRef<{ state: 'saved' | 'saving' | 'error'; pending: number }>({ state: 'saved', pending: 0 })
+  const [closeGuard, setCloseGuard] = useState<'unsaved' | 'uploading' | null>(null)
+  function requestClose() {
+    const { state, pending } = briefState.current
+    if (editingBrief && state === 'error') { setCloseGuard('unsaved'); return }
+    if (editingBrief && pending > 0) { setCloseGuard('uploading'); return }
+    onClose()
+  }
   const [briefText, setBriefText]         = useState('')
   const [error, setError]                 = useState('')
   const [editingName, setEditingName]     = useState(false)
@@ -793,13 +804,18 @@ export function TaskModal({
       if (preview) { setPreview(null); return }
       if (menuOpen) { setMenuOpen(false); return }
       if (stageOpen) { setStageOpen(false); return }
+      // The brief editor handles its own Esc (closing its menus, then leaving
+      // editing); it marks the event handled, and it must not also close the
+      // whole panel.
+      if (e.defaultPrevented || (e.target as HTMLElement)?.isContentEditable) return
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      onClose()
+      if (closeGuard) { setCloseGuard(null); return }
+      requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, preview, menuOpen, stageOpen])
+  })
 
   useEffect(() => {
     if (!menuOpen) return
@@ -821,14 +837,26 @@ export function TaskModal({
     return () => document.removeEventListener('mousedown', onDown)
   }, [stageOpen])
 
-  function applyPatch(patch: TaskPatch, after?: () => void): Promise<void> {
+  /**
+   * Save a change to the task. Resolves `true` once stored, `false` when not —
+   * and always resolves. The brief editor relies on that: before, a thrown
+   * action (a network drop, a stale action id after a deploy) skipped
+   * `resolve()`, so the editor waited on this forever and every later
+   * keystroke queued behind it, unsent, under "Saving…" (spec 005, research R1).
+   */
+  function applyPatch(patch: TaskPatch, after?: () => void): Promise<boolean> {
     setError('')
     return new Promise(resolve => {
       startTransition(async () => {
-        const res = await updateTask(task.id, patch)
-        if (res.success) { router.refresh(); after?.() }
-        else setError(res.error ?? 'Could not save the change')
-        resolve()
+        try {
+          const res = await updateTask(task.id, patch)
+          if (res.success) { router.refresh(); after?.(); resolve(true); return }
+          setError(res.error ?? 'Could not save the change')
+          resolve(false)
+        } catch {
+          setError('Could not save the change — check your connection')
+          resolve(false)
+        }
       })
     })
   }
@@ -1579,7 +1607,7 @@ export function TaskModal({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestClose}
       className="fx-task-overlay"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)',
@@ -1675,13 +1703,33 @@ export function TaskModal({
                 <MenuItem icon="subtask" label="Add subtask"
                           onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
                 <MenuItem icon="openIn" label="Open the board behind this"
-                          onClick={() => { setMenuOpen(false); onClose() }} />
+                          onClick={() => { setMenuOpen(false); requestClose() }} />
               </div>
             )}
           </div>
 
-          <IconButton name="close" label="Close task" onClick={onClose} size={18} />
+          <IconButton name="close" label="Close task" onClick={requestClose} size={18} />
         </div>
+
+        {closeGuard && (
+          <div role="alertdialog" aria-live="assertive" style={{
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flexShrink: 0,
+            padding: '9px 16px', background: alpha(COLORS.coral, 0.08), borderBottom: `1px solid ${CU.line}`, fontSize: 13.5,
+          }}>
+            <b style={{ color: COLORS.coral }}>
+              {closeGuard === 'unsaved' ? 'Your last changes to the brief aren’t saved.' : 'An image is still uploading to the brief.'}
+            </b>
+            <span style={{ flex: 1 }} />
+            <button type="button" onClick={() => setCloseGuard(null)} autoFocus
+                    style={{ height: 30, padding: '0 14px', border: 'none', borderRadius: 8, background: CU.blue, color: COLORS.panel, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Stay
+            </button>
+            <button type="button" onClick={() => { setCloseGuard(null); onClose() }}
+                    style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: 'transparent', color: CU.text, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Leave anyway
+            </button>
+          </div>
+        )}
 
         {/* ── Task / Activity, on a phone ──────────────────────────────────
             Below 767px the 400px Activity column has nowhere to be: side by
@@ -1985,8 +2033,8 @@ export function TaskModal({
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}
-                  saving={isPending}
                   onSave={next => applyPatch({ description: next })}
+                  onSaveStateChange={(state, pending) => { briefState.current = { state, pending } }}
                   onDone={() => setEditingBrief(false)}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}

@@ -345,8 +345,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
             <BriefEditor
               key={descKey}
               value={form.description}
-              saving={false}
-              onSave={next => patch('description', next)}
+              onSave={next => { patch('description', next); return Promise.resolve(true) }}
             />
           </div>
 
