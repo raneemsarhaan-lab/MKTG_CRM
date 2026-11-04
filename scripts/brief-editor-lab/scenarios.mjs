@@ -76,7 +76,13 @@ function makeHelpers(page, context, base) {
       return (await t.lab()).md
     },
     editor: () => page.locator('.ProseMirror').first(),
-    async focusEnd() { await t.editor().click(); await page.keyboard.press('Control+End') },
+    // The bottom corner (padding), not the middle: a table's resize handle or a
+    // checkbox can sit elsewhere.
+    async focusEnd() {
+      const b = await t.editor().boundingBox()
+      await t.editor().click({ position: { x: 6, y: b.height - 6 } })
+      await page.keyboard.press('Control+End')
+    },
     btn: title => page.locator(`button[title^="${title}"]`).first(),
     assert(cond, msg) { if (!cond) throw new Error(msg) },
     eq(a, b, msg) { if (a !== b) throw new Error(`${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`) },

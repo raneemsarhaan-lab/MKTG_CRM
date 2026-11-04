@@ -12,9 +12,11 @@ import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
-import { Toggle, LinkShortcut, BriefImage, SlashCommand, dismissSlash, getMarkdown, type SlashBridge, type SlashState } from './brief-editor/extensions'
+import { Toggle, LinkShortcut, BriefImage, SlashCommand, Youtube, Toc, dismissSlash, getMarkdown, type SlashBridge, type SlashState } from './brief-editor/extensions'
+import { BriefTable, TableResize } from './brief-editor/tableEdges'
+import { TableMenu } from './brief-editor/TableMenu'
 import { SlashMenu } from './brief-editor/SlashMenu'
-import { blockItems, filterBlocks, type BlockContext, type BlockItem } from './brief-editor/blocks'
+import { blockItems, filterBlocks, insertYoutube, type BlockContext, type BlockItem } from './brief-editor/blocks'
 import { ImageUpload, insertImageBlock, blockSlot, type ImageUploadContext, type UploadResult, type UploadUnavailableReason } from './brief-editor/imageUpload'
 import { LinkCard } from './brief-editor/LinkCard'
 import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
@@ -177,6 +179,12 @@ export function BriefEditor({
     },
   }
 
+  // The size badge while a table is being resized (FR-067).
+  const [badge, setBadge] = useState<{ text: string; x: number; y: number } | null>(null)
+  const sizeBadge = useRef((text: string, x: number, y: number) => setBadge(text ? { text, x, y } : null))
+  const sizeTexts = useRef({ wide: (n: number) => t('wide', { n }), columns: t('dragColumns'), table: t('dragTable') })
+  sizeTexts.current = { wide: (n: number) => t('wide', { n }), columns: t('dragColumns'), table: t('dragTable') }
+
   // Read by the key handler and extensions, which Tiptap captures once at creation.
   const leaveRef = useRef<() => void>(() => {})
   const openLinkRef = useRef<() => void>(() => {})
@@ -216,9 +224,21 @@ export function BriefEditor({
       // database is a data: URL; without this it vanished on reopening.
       BriefImage.configure({ allowBase64: true }),
       ImageUpload.configure({ ctx: uploadCtx }),
-      Toggle,
-      TableKit,
-      Placeholder.configure({ placeholder: t('placeholder') }),
+      Toggle.configure({ titleHint: t('toggleTitle'), defaultTitle: t('toggleDefaultTitle') }),
+      Youtube.configure({ label: t('videoBlock') }),
+      Toc.configure({ label: t('tocLabel'), empty: t('tocEmpty') }),
+      TableKit.configure({ table: false }),
+      // No built-in table view: it sizes columns itself and would ignore ours.
+      BriefTable.configure({ resizable: false, View: null }),
+      TableResize.configure({ label: sizeBadge, texts: sizeTexts }),
+      // The main hint on an empty brief. Empty lines inside a toggle get the
+      // "Hidden content" hint from CSS (--brief-toggle-hint, set below), since
+      // the placeholder callback can't safely look at where a line sits.
+      Placeholder.configure({
+        includeChildren: true,
+        showOnlyCurrent: false,
+        placeholder: ({ editor: ed }) => (ed.isEmpty ? t('placeholder') : ''),
+      }),
       Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: true }),
     ],
     content: value,
@@ -299,7 +319,7 @@ export function BriefEditor({
   async function confirmPrompt(v: string) {
     if (!editor) return
     if (prompt === 'image') insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), v)
-    if (prompt === 'youtube') editor.chain().focus().insertContent({ type: 'paragraph', content: [{ type: 'text', text: v }] }).run()
+    if (prompt === 'youtube') insertYoutube(editor, v, promptRange.current?.from ?? editor.state.selection.from)
     if (prompt === 'link') {
       const r = promptRange.current
       const size = editor.state.doc.content.size
@@ -563,9 +583,22 @@ export function BriefEditor({
           <SlashMenu state={slash} active={slashActive} onClose={() => dismissSlash(editor)} />
         )}
 
+        <TableMenu editor={editor} />
+
+        {badge && (
+          <div aria-hidden="true" style={{
+            position: 'fixed', left: badge.x, top: badge.y, transform: 'translate(-50%, -50%)', zIndex: 90,
+            background: BRIEF_UI.ink, color: COLORS.panel, borderRadius: 6, padding: '3px 7px',
+            fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none', fontVariantNumeric: 'tabular-nums',
+          }}>{badge.text}</div>
+        )}
+
         <LinkCard editor={editor} hiddenRef={promptOpenRef} onEdit={() => openPrompt('link')} onNote={flashNote} />
 
-        <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: '0 0 18px 18px' }} />
+        <EditorContent editor={editor} style={{
+          padding: '24px 28px 32px', borderRadius: '0 0 18px 18px',
+          ['--brief-toggle-hint' as string]: JSON.stringify(t('toggleBody')),
+        }} />
       </div>
 
       {note && (

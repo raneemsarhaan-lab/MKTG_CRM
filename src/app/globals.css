@@ -743,6 +743,100 @@ html {
 @keyframes fx-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .fx-brief-edit .fx-upload i { animation: none; } }
 
+/* ─── Spec 005 editor blocks ─────────────────────────────────────────────── */
+/* Tables: full width, fixed layout so dragged column shares hold (FR-064, FR-067). */
+.fx-brief-edit table { display: table; width: 100%; table-layout: fixed; }
+.fx-col-handle {
+  position: fixed;
+  z-index: 60;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.fx-col-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 1.5px;
+  border-radius: 2px;
+  background: var(--brief-blue);
+  opacity: 0.55;
+}
+.fx-col-handle:hover::after,
+.fx-col-handle.on::after { opacity: 1; }
+@media (pointer: coarse) { .fx-col-handle { width: 14px; } .fx-col-handle::after { inset: 0 5.5px; } }
+body.fx-resizing { cursor: col-resize; user-select: none; }
+
+/* Toggle: grey hints instead of filler text (FR-065). */
+.fx-brief-edit summary:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  font-weight: 500;
+}
+.fx-brief-edit details p.is-empty::before {
+  content: var(--brief-toggle-hint, "");
+  float: left;
+  height: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* YouTube block while editing: thumbnail, play badge, address (FR-060). */
+.fx-brief-edit .fx-yt {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  margin: 0 0 0.8em;
+  border: 1px solid var(--brief-line);
+  border-radius: 12px;
+  cursor: default;
+}
+.fx-brief-edit .fx-yt.ProseMirror-selectednode { outline: 2px solid var(--brief-blue); outline-offset: 2px; }
+.fx-brief-edit .fx-yt-thumb {
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--brief-ink) center / cover no-repeat;
+  display: grid;
+  place-items: center;
+}
+.fx-brief-edit .fx-yt-thumb i {
+  width: 34px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--coral);
+  display: grid;
+  place-items: center;
+}
+.fx-brief-edit .fx-yt-thumb i::after {
+  content: "";
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent var(--panel);
+}
+.fx-brief-edit .fx-yt-meta { min-width: 0; font-size: 0.86em; color: var(--brief-label); }
+.fx-brief-edit .fx-yt-meta b { display: block; color: var(--brief-ink); }
+.fx-brief-edit .fx-yt-meta span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Table of contents block while editing (FR-066). */
+.fx-brief-edit .fx-toc {
+  padding: 0.6em 0.8em;
+  margin: 0 0 0.8em;
+  border: 1px solid var(--brief-line);
+  border-radius: 12px;
+  background: var(--brief-surface);
+  cursor: default;
+}
+.fx-brief-edit .fx-toc.ProseMirror-selectednode { outline: 2px solid var(--brief-blue); outline-offset: 2px; }
+.fx-brief-edit .fx-toc-label {
+  font: 700 0.7rem var(--font-heading);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brief-label);
+}
+.fx-brief-edit .fx-toc ol { margin: 0.3em 0 0; font-size: 0.92em; color: var(--brief-blue); }
+.fx-brief-edit .fx-toc ol.is-empty { list-style: none; padding: 0; color: var(--muted); }
+
 /* YouTube embed — 16:9, never wider than the panel */
 .fx-brief .fx-embed {
   display: block;

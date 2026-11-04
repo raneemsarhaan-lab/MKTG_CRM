@@ -3,6 +3,7 @@ import type { MarkdownStorage } from 'tiptap-markdown'
 import TiptapImage from '@tiptap/extension-image'
 import { PluginKey } from '@tiptap/pm/state'
 import Suggestion, { exitSuggestion, type SuggestionProps } from '@tiptap/suggestion'
+import { youtubeId } from '@/lib/links'
 
 // tiptap-markdown predates Tiptap v3's stricter Storage typing and doesn't
 // declare this itself — without it, `editor.storage.markdown` has no type.
@@ -24,11 +25,12 @@ declare module '@tiptap/core' {
  * re-emits the exact same two tags on save, so existing content round-trips
  * unchanged.
  */
-export const Toggle = Node.create({
+export const Toggle = Node.create<{ titleHint: string; defaultTitle: string }>({
   name: 'toggle',
   group: 'block',
   content: 'block+',
   defining: true,
+  addOptions() { return { titleHint: 'Toggle title', defaultTitle: 'Details' } },
   addAttributes() {
     return {
       summary: {
@@ -60,13 +62,15 @@ export const Toggle = Node.create({
       dom.open = true
       const summary = document.createElement('summary')
       summary.contentEditable = 'true'
+      // An empty title shows a grey hint rather than filler text to delete (FR-065).
+      summary.setAttribute('data-placeholder', this.options.titleHint)
       summary.textContent = node.attrs.summary
       summary.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault() })
       summary.addEventListener('blur', () => {
         const pos = typeof getPos === 'function' ? getPos() : undefined
         if (pos == null) return
         editor.commands.command(({ tr }) => {
-          tr.setNodeAttribute(pos, 'summary', summary.textContent || 'Toggle title')
+          tr.setNodeAttribute(pos, 'summary', summary.textContent ?? '')
           return true
         })
       })
@@ -88,8 +92,11 @@ export const Toggle = Node.create({
     return {
       markdown: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prosemirror-markdown's serializer state isn't re-exported by tiptap-markdown
-        serialize(state: any, node: any) {
-          state.write(`<details>\n<summary>${node.attrs.summary}</summary>\n\n`)
+        serialize(this: { options: { defaultTitle: string } }, state: any, node: any) {
+          // A toggle left untitled is saved with a neutral title, so the read
+          // view never shows a blank row.
+          const title = String(node.attrs.summary ?? '').trim() || this.options.defaultTitle
+          state.write(`<details>\n<summary>${title}</summary>\n\n`)
           state.renderContent(node)
           state.ensureNewLine()
           state.write('</details>')
@@ -211,3 +218,137 @@ export const SlashCommand = Extension.create<{ bridge: { current: SlashBridge } 
 export function dismissSlash(editor: Editor) {
   exitSuggestion(editor.view, slashKey)
 }
+
+/**
+ * A YouTube video as a block (FR-060, FR-061, research R8): a thumbnail, a
+ * play badge and the address, selectable and deletable as one unit.
+ *
+ * It reads and writes the form the read view already turns into an embed —
+ * a paragraph holding nothing but a YouTube link — so nothing new is stored.
+ * Existing briefs with a bare YouTube address on its own line become this
+ * block too, and keep their bare form when saved (`bare`), so an untouched
+ * brief saves unchanged (FR-100).
+ */
+export const Youtube = Node.create<{ label: string }>({
+  name: 'youtube',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addOptions() { return { label: 'YouTube video' } },
+  addAttributes() {
+    return { src: { default: '' }, bare: { default: false } }
+  },
+  parseHTML() {
+    return [
+      { tag: 'div[data-youtube]', getAttrs: el => ({ src: (el as HTMLElement).getAttribute('data-youtube') ?? '' }) },
+      {
+        tag: 'p',
+        priority: 60,
+        getAttrs: el => {
+          const kids = [...(el as HTMLElement).childNodes].filter(n => !(n.nodeType === 3 && !n.textContent?.trim()))
+          if (kids.length !== 1) return false
+          const only = kids[0]
+          if (only.nodeName === 'A') {
+            const href = (only as HTMLElement).getAttribute('href') ?? ''
+            return youtubeId(href) && (only.textContent ?? '').trim() === href ? { src: href, bare: false } : false
+          }
+          const text = (only.textContent ?? '').trim()
+          return only.nodeType === 3 && /^\S+$/.test(text) && youtubeId(text) ? { src: text, bare: true } : false
+        },
+      },
+    ]
+  },
+  renderHTML({ node }) {
+    return ['div', { 'data-youtube': node.attrs.src }]
+  },
+  addNodeView() {
+    return ({ node }) => {
+      const dom = document.createElement('div')
+      dom.className = 'fx-yt'
+      dom.setAttribute('data-youtube', node.attrs.src)
+      dom.contentEditable = 'false'
+      const thumb = document.createElement('span')
+      thumb.className = 'fx-yt-thumb'
+      const id = youtubeId(node.attrs.src)
+      if (id) thumb.style.backgroundImage = `url("https://i.ytimg.com/vi/${id}/hqdefault.jpg")`
+      const play = document.createElement('i')
+      play.setAttribute('aria-hidden', 'true')
+      thumb.append(play)
+      const meta = document.createElement('span')
+      meta.className = 'fx-yt-meta'
+      const b = document.createElement('b')
+      b.textContent = this.options.label
+      const url = document.createElement('span')
+      url.textContent = node.attrs.src.replace(/^https?:\/\/(www\.)?/, '')
+      meta.append(b, url)
+      dom.append(thumb, meta)
+      return { dom }
+    }
+  },
+  addStorage() {
+    return {
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prosemirror-markdown's serializer state isn't re-exported by tiptap-markdown
+        serialize(state: any, node: any) {
+          state.write(node.attrs.bare ? node.attrs.src : `<${node.attrs.src}>`)
+          state.closeBlock(node)
+        },
+        parse: {},
+      },
+    }
+  },
+})
+
+/**
+ * The table of contents as a labelled block (FR-066, research R12), listing
+ * the brief's headings live. Stored as the same `[[toc]]` line the read view
+ * already expands, so nothing new is stored.
+ */
+export const Toc = Node.create<{ label: string; empty: string }>({
+  name: 'toc',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  addOptions() { return { label: 'Table of contents', empty: '' } },
+  parseHTML() {
+    return [
+      { tag: 'div[data-toc]' },
+      { tag: 'p', priority: 60, getAttrs: el => ((el as HTMLElement).textContent?.trim() === '[[toc]]' ? {} : false) },
+    ]
+  },
+  renderHTML() { return ['div', { 'data-toc': '' }] },
+  addNodeView() {
+    return ({ editor }) => {
+      const dom = document.createElement('div')
+      dom.className = 'fx-toc'
+      dom.setAttribute('data-toc', '')
+      dom.contentEditable = 'false'
+      const title = document.createElement('div')
+      title.className = 'fx-toc-label'
+      title.textContent = this.options.label
+      const list = document.createElement('ol')
+      dom.append(title, list)
+      const refresh = () => {
+        const heads: string[] = []
+        editor.state.doc.descendants(n => { if (n.type.name === 'heading' && n.textContent.trim()) heads.push(n.textContent.trim()); return n.type.name !== 'heading' })
+        list.replaceChildren(...(heads.length ? heads : [this.options.empty]).map(h => {
+          const li = document.createElement('li'); li.textContent = h; return li
+        }))
+        list.classList.toggle('is-empty', !heads.length)
+      }
+      refresh()
+      editor.on('update', refresh)
+      return { dom, update: n => n.type.name === 'toc', destroy: () => { editor.off('update', refresh) } }
+    }
+  },
+  addStorage() {
+    return {
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prosemirror-markdown's serializer state isn't re-exported by tiptap-markdown
+        serialize(state: any, node: any) { state.write('[[toc]]'); state.closeBlock(node) },
+        parse: {},
+      },
+    }
+  },
+})

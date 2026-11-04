@@ -5,6 +5,7 @@ import { links } from './links.mjs'
 import { images } from './images.mjs'
 import { editing } from './editing.mjs'
 import { keyboard } from './keyboard.mjs'
+import { blocks } from './blocks.mjs'
 
 export const SCENARIOS = [
   ...save,
@@ -12,5 +13,6 @@ export const SCENARIOS = [
   ...images,
   ...editing,
   ...keyboard,
+  ...blocks,
   ...roundtrip,
 ]

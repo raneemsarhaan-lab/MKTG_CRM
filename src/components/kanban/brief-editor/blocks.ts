@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import { blockSlot } from './imageUpload'
 import type { ToolIconName } from './Toolbar'
 import type { PromptKind } from './ValuePrompt'
 
@@ -49,7 +50,7 @@ export const BLOCK_ITEMS: BlockItem[] = [
   { id: 'quote', labelKey: 'quote', keywords: ['quote', 'blockquote', 'اقتباس'], icon: 'quote', mdHint: '>', group: 'block',
     run: e => { e.chain().focus().toggleBlockquote().run() } },
   { id: 'table', labelKey: 'table', keywords: ['table', 'grid', 'جدول'], icon: 'table', group: 'block',
-    run: e => { e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() } },
+    run: e => { insertTable(e) } },
   { id: 'image', labelKey: 'image', keywords: ['image', 'picture', 'photo', 'screenshot', 'صورة'], icon: 'image', group: 'block',
     run: (_e, ctx) => ctx.openPrompt('image') },
   { id: 'youtube', labelKey: 'youtube', keywords: ['youtube', 'video', 'embed', 'فيديو', 'يوتيوب'], icon: 'youtube', group: 'block',
@@ -74,19 +75,57 @@ export function filterBlocks(items: BlockItem[], query: string, label: (key: str
     label(b.labelKey).toLowerCase().includes(q) || b.keywords.some(k => k.toLowerCase().includes(q)))
 }
 
-// ── Block inserts whose behaviour spec 005 US6 refines ────────────────────
+// ── Block inserts (spec 005 US6) ──────────────────────────────────────────
 
+/**
+ * A new empty checklist item on the line below, leaving the current line as
+ * it is (FR-062). It used to turn the current line into a checkbox (E11).
+ */
 function insertTask(e: Editor) {
-  e.chain().focus().toggleTaskList().run()
+  const { $from } = e.state.selection
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === 'taskItem') {
+      // Already in a checklist: a new item after this one.
+      const end = $from.end(d) - 1
+      e.chain().focus().setTextSelection(end).splitListItem('taskItem').run()
+      return
+    }
+  }
+  const at = blockSlot(e.state, $from.pos)
+  e.chain().focus()
+    .insertContentAt(at, { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph' }] }] })
+    .setTextSelection(at + 3)
+    .run()
 }
 
+/** An empty toggle with grey hints for its title and body (FR-065). */
 function insertToggle(e: Editor) {
-  e.chain().focus().insertContent({
-    type: 'toggle', attrs: { summary: 'Toggle title' },
-    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hidden content.' }] }],
-  }).run()
+  const at = blockSlot(e.state, e.state.selection.from)
+  e.chain().focus()
+    .insertContentAt(at, { type: 'toggle', attrs: { summary: '' }, content: [{ type: 'paragraph' }] })
+    .setTextSelection(at + 2)
+    .run()
 }
 
+/** A labelled table-of-contents block (FR-066). */
 function insertToc(e: Editor) {
-  e.chain().focus().insertContent('[[toc]]').run()
+  const at = blockSlot(e.state, e.state.selection.from)
+  e.chain().focus().insertContentAt(at, [{ type: 'toc' }, { type: 'paragraph' }]).run()
+}
+
+/** A YouTube video block on its own line (FR-060). */
+export function insertYoutube(e: Editor, src: string, near: number) {
+  const at = blockSlot(e.state, near)
+  e.chain().focus().insertContentAt(at, [{ type: 'youtube', attrs: { src } }, { type: 'paragraph' }]).run()
+}
+
+/** A full-width 3 × 3 table with a header row, on its own line (FR-064). */
+function insertTable(e: Editor) {
+  const at = blockSlot(e.state, e.state.selection.from)
+  const cell = (type: string) => ({ type, content: [{ type: 'paragraph' }] })
+  const row = (type: string) => ({ type: 'tableRow', content: [cell(type), cell(type), cell(type)] })
+  e.chain().focus()
+    .insertContentAt(at, [{ type: 'table', content: [row('tableHeader'), row('tableCell'), row('tableCell')] }, { type: 'paragraph' }])
+    .setTextSelection(at + 4)
+    .run()
 }

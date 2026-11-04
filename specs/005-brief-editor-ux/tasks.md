@@ -208,38 +208,38 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Insert each block below an existing paragraph; the paragraph is unchanged and every block survives close and reopen (`roundtrip-fixtures` still passes). Resize a table's columns and outer edges, reopen: sizes are kept within ±1%.
 
-- [ ] T043 [US6] Implement the Task item's `run` in `brief-editor/blocks.ts`. If `editor.isActive('taskItem')`, run `splitListItem('taskItem')`. Otherwise `insertContentAt($from.after(depth 1), { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph' }] }] })` and place the cursor inside (FR-062, R9).
-- [ ] T044 [US6] Add a `Youtube` node in `brief-editor/extensions.ts`: atom block, attrs `{ src }`.
+- [X] T043 [US6] Implement the Task item's `run` in `brief-editor/blocks.ts`. If `editor.isActive('taskItem')`, run `splitListItem('taskItem')`. Otherwise `insertContentAt($from.after(depth 1), { type: 'taskList', content: [{ type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph' }] }] })` and place the cursor inside (FR-062, R9).
+- [X] T044 [US6] Add a `Youtube` node in `brief-editor/extensions.ts`: atom block, attrs `{ src }`.
   - `parseHTML`: priority 60, tag `p`, with `getAttrs` accepting a paragraph whose only meaningful child is an `<a>` with a YouTube href, or whose trimmed text is a YouTube URL (use `youtubeId`).
   - Markdown serializer: `state.write('<' + src + '>'); state.closeBlock(node)`.
   - Node view: thumbnail `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, a play badge and the URL text, selectable and deletable as one unit.
   - In `ValuePrompt.tsx`, the `youtube` kind validates with `youtubeId` (FR-061) and inserts the node as a block. Add `youtube.md` cases to the fixtures check (FR-060).
-- [ ] T045 [US6] Create `brief-editor/TableMenu.tsx`: a `BubbleMenu` shown when `editor.isActive('table')`, with buttons for `addRowBefore`, `addRowAfter`, `addColumnBefore`, `addColumnAfter`, `deleteRow`, `deleteColumn` and `deleteTable`. It uses localized labels and icons and registers on the overlay stack. Change the Table item in `blocks.ts` to `insertTable({ rows: 3, cols: 3, withHeaderRow: true })` (FR-063, FR-064).
-- [ ] T046 [P] [US6] In `src/app/globals.css`, add editor-only table rules (colours, if any, only via the `--brief-*` variables from T005): `.fx-brief-edit .tableWrapper { overflow-x: auto; margin: 0 0 .7em }` and `.fx-brief-edit table { display: table; width: 100%; table-layout: fixed }`. Leave the read-view `.fx-brief table` rules unchanged (R10).
-- [ ] T047 [US6] In `brief-editor/extensions.ts`, change Toggle:
+- [X] T045 [US6] Create `brief-editor/TableMenu.tsx`: a `BubbleMenu` shown when `editor.isActive('table')`, with buttons for `addRowBefore`, `addRowAfter`, `addColumnBefore`, `addColumnAfter`, `deleteRow`, `deleteColumn` and `deleteTable`. It uses localized labels and icons and registers on the overlay stack. Change the Table item in `blocks.ts` to `insertTable({ rows: 3, cols: 3, withHeaderRow: true })` (FR-063, FR-064).
+- [X] T046 [P] [US6] In `src/app/globals.css`, add editor-only table rules (colours, if any, only via the `--brief-*` variables from T005): `.fx-brief-edit .tableWrapper { overflow-x: auto; margin: 0 0 .7em }` and `.fx-brief-edit table { display: table; width: 100%; table-layout: fixed }`. Leave the read-view `.fx-brief table` rules unchanged (R10).
+- [X] T047 [US6] In `brief-editor/extensions.ts`, change Toggle:
   - Insert with `summary: ''` and an empty paragraph body (no filler text).
   - The node view's `<summary>` gets `data-placeholder={t('toggleTitle')}`, with CSS `summary:empty::before { content: attr(data-placeholder); color: var(--muted) }` in `globals.css`.
   - Configure `Placeholder` with `includeChildren: true` and a function returning `t('toggleBody')` for empty paragraphs inside a toggle and the default placeholder elsewhere.
   - The serializer writes `t('toggleDefaultTitle')` ("Details") when the summary is empty.
   - Existing toggles stay unchanged (FR-065, R11).
-- [ ] T048 [US6] Add a `Toc` node in `brief-editor/extensions.ts`: atom block.
+- [X] T048 [US6] Add a `Toc` node in `brief-editor/extensions.ts`: atom block.
   - `parseHTML`: tag `p` with exact text `[[toc]]`, priority 60.
   - Serializer: `state.write('[[toc]]'); state.closeBlock(node)`.
   - Node view: a labelled box `t('tocLabel')` listing the document's current headings, refreshed on `update`.
   - Remove the `\[\[toc\]\]` un-escape in `getMarkdown` (FR-066, R12).
-- [ ] T049 [US6] Add lab scenarios `task-insert-below`, `youtube-block`, `table-menu`, `toggle-placeholders` and `toc-block` to `scripts/brief-editor-lab/scenarios.mjs`. Re-run `roundtrip-fixtures`.
-- [ ] T050 [US6] Enable column resizing in `brief-editor/extensions.ts`:
+- [X] T049 [US6] Add lab scenarios `task-insert-below`, `youtube-block`, `table-menu`, `toggle-placeholders` and `toc-block` to `scripts/brief-editor-lab/scenarios.mjs`. Re-run `roundtrip-fixtures`.
+- [X] T050 [US6] Enable column resizing in `brief-editor/extensions.ts`:
   - `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: true } })` for the borders between columns.
   - Add a `TableEdges` ProseMirror plugin in `brief-editor/tableEdges.ts`. It adds widget decorations on the table's start and end edges (mirrored in RTL) and adds `width` (default 100) and `offset` (default 0) attrs to the table node, rendered as `style="width:W%;margin-inline-start:O%"`. Dragging the end edge changes `width`; dragging the start edge changes `offset` and `width` together. The edge column's `colwidth` absorbs the change, clamped to `offset + width ≤ 100` and columns ≥ 64 px.
   - In `src/app/globals.css`, style `.fx-brief-edit .column-resize-handle` as a 3 px bar coloured `var(--brief-blue)` and set `.fx-brief-edit.resize-cursor { cursor: col-resize }`. Widen the hit area to 14 px under `@media (pointer: coarse)`.
   - In `brief-editor/TableMenu.tsx`, show a small badge while dragging (two column percentages for an inner border, or the table's width percentage for an outer edge). Add **Equal widths** (clears every `colwidth`) and **Full width** (resets `width`/`offset`) buttons (FR-067, FR-069, research R26).
-- [ ] T051 [US6] Persist widths in `brief-editor/extensions.ts` by extending the table node's Markdown `serialize` and its `parseHTML` attributes:
+- [X] T051 [US6] Persist widths in `brief-editor/extensions.ts` by extending the table node's Markdown `serialize` and its `parseHTML` attributes:
   - When any cell in the first row has a `colwidth`, or `width`/`offset` differ from 100/0, write the table as HTML `<table data-widths="a,b,c" data-width="W" data-offset="O">` (omit `data-width`/`data-offset` at their defaults) with `<thead>`/`<tbody>`. Serialize each cell's content as HTML with ProseMirror's `DOMSerializer.fromSchema(schema)` (this keeps lists, several paragraphs, images, links and marks in full; U2), and strip editor-only attributes such as `class` and `data-*` other than the three size attributes. Widths are integer percentages summing to 100, from the first row's `colwidth`s.
   - Otherwise keep the existing GFM serializer untouched.
   - `parseHTML` reads `data-widths` and sets each column's `colwidth` to `percent × table width`, and reads `data-width`/`data-offset` into the attrs.
   - Add `fixtures/table-widths.md` (including one cell with a bulleted list and one with two paragraphs) and extend `roundtrip-fixtures` (FR-068, SC-012).
-- [ ] T052 [P] [US6] In `src/components/shared/Brief.tsx`, allow the `data-widths`, `data-width` and `data-offset` attributes on `table` in the sanitize schema (next to the `details`/`summary` additions, ~line 32). In the `table` component renderer, emit `<colgroup>` with one `<col style={{ width: n + '%' }}>` per value, with `tableLayout: 'fixed'`, `width: (data-width ?? 100) + '%'` and `marginInlineStart: (data-offset ?? 0) + '%'` (FR-068).
-- [ ] T053 [US6] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`:
+- [X] T052 [P] [US6] In `src/components/shared/Brief.tsx`, allow the `data-widths`, `data-width` and `data-offset` attributes on `table` in the sanitize schema (next to the `details`/`summary` additions, ~line 32). In the `table` component renderer, emit `<colgroup>` with one `<col style={{ width: n + '%' }}>` per value, with `tableLayout: 'fixed'`, `width: (data-width ?? 100) + '%'` and `marginInlineStart: (data-offset ?? 0) + '%'` (FR-068).
+- [X] T053 [US6] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`:
   - `table-resize`: drag a column border; both columns change, neither goes below 64 px.
   - `table-edges`: drag the end edge inwards, so the table narrows and the last column absorbs it; drag the start edge inwards, so the table's start moves; dragging outwards stops at the brief's edges. Repeat with `locale=ar`.
   - `table-widths-roundtrip`: resize, close, reopen, and render through `Brief`; widths are equal within ±1% (SC-012).
