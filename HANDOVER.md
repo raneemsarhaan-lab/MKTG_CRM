@@ -293,6 +293,41 @@ Business days elapsed since `stage_date` are compared against `sla_config.max_bu
 
 ---
 
+### The brief editor
+
+`src/components/kanban/BriefEditor.tsx` plus the modules in
+`src/components/kanban/brief-editor/`, rebuilt in spec 005
+(`specs/005-brief-editor-ux/`). Design file: `design/brief-editor-ux.html`.
+
+- **Click to edit, click away to finish.** There is no Edit or Done button.
+  `TaskModal` records where the read brief was clicked (`anchorFromPoint`)
+  and the editor starts there without the text moving; a click outside the
+  brief or Esc ends editing.
+- **Save contract.** `onSave(markdown) → Promise<boolean>`: `true` only once
+  stored, and it must always settle. `TaskModal.applyPatch` resolves `false`
+  on failure or a thrown action. The editor shows "Couldn't save · Retry",
+  retries on a 2/5/15/30 s backoff, treats a save unsettled after 20 s as
+  failed, and asks before leaving with unsaved text or an image still
+  uploading (`onSaveStateChange` lets the panel's close button ask too).
+- **Pasted and dropped images** upload through `TaskModal.uploadOne` (the same
+  checks as the attachments area) and only when the bucket is configured;
+  otherwise the editor explains why. A drop the editor handled is not
+  uploaded again by the panel's window-level drop handler.
+- **Stored format is unchanged Markdown**, with two editor-only blocks that
+  reuse what the read view already understands (a YouTube link alone on a
+  line; `[[toc]]`) and one addition: a table resized by dragging is stored as
+  an HTML table with `data-widths`, `data-width`, `data-offset` (percentages),
+  which `Brief.tsx` renders. Untouched tables stay pipe tables.
+- **"/" menu, keyboard menus, roving toolbar focus**, all strings in the
+  `briefEditor` message namespace (English and Arabic), colours from
+  `BRIEF_UI` in `tokens.ts`, mirrored as `--brief-*` CSS variables.
+- **Test it with the lab**: `npm run lab:brief` builds a standalone page that
+  mounts the real editor with a stub host and runs Playwright scenarios
+  (`scripts/brief-editor-lab/`). No database or login. One scenario per
+  acceptance scenario in the spec, plus round-trip fixtures that every brief
+  must survive unchanged. Set `LAB_CHROMIUM` if Playwright's own browser is
+  not downloaded.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.

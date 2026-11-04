@@ -107,3 +107,42 @@ export function isPrivateAddress(addr: string): boolean {
   if (x >= 224) return true                                      // multicast and reserved
   return false
 }
+
+/**
+ * Turn what someone typed into a link box into an address, or say why not.
+ *
+ * Briefs are full of links, and the commonest typo is leaving off the scheme:
+ * "forefront.consulting" saved as-is is a relative link that goes nowhere
+ * (audit E3). So a bare domain or `www.` gets `https://`, `http(s)://` and
+ * `mailto:` pass through, a site-relative path (`/board?task=…`) is kept, and
+ * anything with spaces or no dot in its host is refused with a reason the
+ * person can act on. FR-022, FR-023, research R3.
+ */
+export type NormalisedUrl =
+  | { ok: true; href: string }
+  | { ok: false; reason: 'empty' | 'spaces' | 'invalid' }
+
+export function normaliseUrl(input: string): NormalisedUrl {
+  const v = input.trim()
+  if (!v) return { ok: false, reason: 'empty' }
+  if (/\s/.test(v)) return { ok: false, reason: 'spaces' }
+  if (/^mailto:[^@\s]+@[^@\s]+\.[^@\s]+$/i.test(v)) return { ok: true, href: v }
+  if (/^\/(?!\/)/.test(v)) return { ok: true, href: v }   // in-app link, e.g. a subtask
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`
+  let u: URL
+  try { u = new URL(withScheme) } catch { return { ok: false, reason: 'invalid' } }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, reason: 'invalid' }
+  const host = u.hostname
+  if (!host.includes('.') || host.startsWith('.') || host.endsWith('.')) return { ok: false, reason: 'invalid' }
+  // Keep what was typed (plus the scheme) rather than u.href, which would
+  // add a trailing slash and re-encode characters the person can see.
+  return { ok: true, href: withScheme }
+}
+
+/** youtu.be/ID, watch?v=ID, /embed/ID, /shorts/ID, /live/ID → ID */
+export function youtubeId(url: string): string | null {
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  )
+  return m ? m[1] : null
+}

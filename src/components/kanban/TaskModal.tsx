@@ -12,7 +12,9 @@ import {
   type TaskPatch,
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
-import { BriefEditor } from './BriefEditor'
+import { BriefEditor, type UploadResult } from './BriefEditor'
+import { anchorFromPoint, type ReadAnchor } from './brief-editor/readAnchor'
+import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
@@ -653,6 +655,21 @@ export function TaskModal({
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
+  // Where the read brief was clicked, so editing starts on that word (spec 005 FR-015).
+  const [briefCursor, setBriefCursor]     = useState<ReadAnchor | undefined>(undefined)
+  // The brief editor's last reported save state (spec 005 FR-004): closing the
+  // panel while a save has failed or an image is uploading asks first.
+  const briefState = useRef<{ state: 'saved' | 'saving' | 'error'; pending: number }>({ state: 'saved', pending: 0 })
+  const [closeGuard, setCloseGuard] = useState<'unsaved' | 'uploading' | null>(null)
+  function requestClose() {
+    // A click on the panel's close control is also a click outside the brief,
+    // so the editor has already asked; don't ask twice.
+    if (editingBrief && document.querySelector('[data-confirm-leave]')) return
+    const { state, pending } = briefState.current
+    if (editingBrief && state === 'error') { setCloseGuard('unsaved'); return }
+    if (editingBrief && pending > 0) { setCloseGuard('uploading'); return }
+    onClose()
+  }
   const [briefText, setBriefText]         = useState('')
   const [error, setError]                 = useState('')
   const [editingName, setEditingName]     = useState(false)
@@ -793,13 +810,18 @@ export function TaskModal({
       if (preview) { setPreview(null); return }
       if (menuOpen) { setMenuOpen(false); return }
       if (stageOpen) { setStageOpen(false); return }
+      // The brief editor handles its own Esc (closing its menus, then leaving
+      // editing); it marks the event handled, and it must not also close the
+      // whole panel.
+      if (e.defaultPrevented || (e.target as HTMLElement)?.isContentEditable) return
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      onClose()
+      if (closeGuard) { setCloseGuard(null); return }
+      requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, preview, menuOpen, stageOpen])
+  })
 
   useEffect(() => {
     if (!menuOpen) return
@@ -821,14 +843,26 @@ export function TaskModal({
     return () => document.removeEventListener('mousedown', onDown)
   }, [stageOpen])
 
-  function applyPatch(patch: TaskPatch, after?: () => void): Promise<void> {
+  /**
+   * Save a change to the task. Resolves `true` once stored, `false` when not —
+   * and always resolves. The brief editor relies on that: before, a thrown
+   * action (a network drop, a stale action id after a deploy) skipped
+   * `resolve()`, so the editor waited on this forever and every later
+   * keystroke queued behind it, unsent, under "Saving…" (spec 005, research R1).
+   */
+  function applyPatch(patch: TaskPatch, after?: () => void): Promise<boolean> {
     setError('')
     return new Promise(resolve => {
       startTransition(async () => {
-        const res = await updateTask(task.id, patch)
-        if (res.success) { router.refresh(); after?.() }
-        else setError(res.error ?? 'Could not save the change')
-        resolve()
+        try {
+          const res = await updateTask(task.id, patch)
+          if (res.success) { router.refresh(); after?.(); resolve(true); return }
+          setError(res.error ?? 'Could not save the change')
+          resolve(false)
+        } catch {
+          setError('Could not save the change — check your connection')
+          resolve(false)
+        }
       })
     })
   }
@@ -1074,6 +1108,75 @@ export function TaskModal({
    * here, in the browser, because it is for the board — which reads every task
    * and cannot fetch three hundred full-size pictures to draw its covers.
    */
+  /**
+   * Upload one file to the bucket and say what happened. Shared by the
+   * attachments area and the brief editor's paste/drop (spec 005 R5), so both
+   * get every check below. Never throws.
+   */
+  async function uploadOne(file: File): Promise<UploadResult> {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return { ok: false, error: `${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)` }
+    }
+    // A fresh id per file. It goes in the URL and comes back in the reply,
+    // which is what lets this tell its own answer from a stored one.
+    const ref  = crypto.randomUUID()
+    const body = new FormData()
+    body.append('taskId', task.id)
+    body.append('file', file)
+    try {
+      /* Its own URL per file, and that is the part that actually works.
+       *
+       * Whatever sits in front of this deployment caches upload replies
+       * and does not care what the response says: no-store on the route,
+       * no-store in next.config and no-store on this request all went
+       * ignored, and a POST kept coming back as somebody's upload from
+       * 20 August. What such a cache keys on is the URL, and every upload
+       * went to the same one. The ref is a path segment rather than a
+       * query string because a cache already ignoring no-store may drop
+       * a query too; a path cannot be normalised away.
+       *
+       * The header and the cache hint stay. They are what should have
+       * been enough, and they will be if the cache is ever fixed. */
+      const res  = await fetch(`/api/attachments/${ref}`, {
+        method: 'POST',
+        body,
+        cache:  'no-store',
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        return { ok: false, error: `${file.name} — ${json?.error ?? res.statusText}` }
+      }
+      /* A 200 is not proof the file was stored.
+       *
+       * The middleware turns away a request with no valid session by
+       * redirecting it, and fetch follows redirects: an expired cookie
+       * means this POST quietly lands on the login page, which answers
+       * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
+       * upload counted as a success that never happened — no row, no
+       * error, nothing on screen. Only our own JSON means it landed. */
+      if (!json?.attachment) {
+        return { ok: false, error: res.redirected
+          ? `${file.name} — your session expired; sign in again and retry`
+          : `${file.name} — the server did not store it (unexpected reply)` }
+      }
+      /* The reply has to be the reply to *this* request.
+       *
+       * Something in front of the app was answering upload POSTs from
+       * cache — a 200 carrying a real attachment, belonging to a file
+       * somebody else had uploaded days earlier. It passed every check
+       * above, so the panel refreshed, found nothing new, and showed
+       * nothing: three days of "the upload does nothing". The ref is one
+       * throwaway id per file; if it does not come back, the answer was
+       * not written for us, whatever else is in it. */
+      if (json.ref !== ref) {
+        return { ok: false, error: `${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.` }
+      }
+      return { ok: true, url: json.attachment.url as string, filename: file.name }
+    } catch {
+      return { ok: false, error: `${file.name} — the upload did not complete` }
+    }
+  }
+
   async function uploadToBucket(picked: File[]) {
     setUploading(true)
     const failed: string[] = []
@@ -1081,72 +1184,10 @@ export function TaskModal({
 
     try {
       for (const file of picked) {
-        if (file.size > MAX_UPLOAD_BYTES) {
-          failed.push(`${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)`)
-          continue
-        }
-        // A fresh id per file. It goes in the URL and comes back in the reply,
-        // which is what lets this tell its own answer from a stored one.
-        const ref  = crypto.randomUUID()
-        const body = new FormData()
-        body.append('taskId', task.id)
-        body.append('file', file)
-        try {
-          /* Its own URL per file, and that is the part that actually works.
-           *
-           * Whatever sits in front of this deployment caches upload replies
-           * and does not care what the response says: no-store on the route,
-           * no-store in next.config and no-store on this request all went
-           * ignored, and a POST kept coming back as somebody's upload from
-           * 20 August. What such a cache keys on is the URL, and every upload
-           * went to the same one. The ref is a path segment rather than a
-           * query string because a cache already ignoring no-store may drop
-           * a query too; a path cannot be normalised away.
-           *
-           * The header and the cache hint stay. They are what should have
-           * been enough, and they will be if the cache is ever fixed. */
-          const res  = await fetch(`/api/attachments/${ref}`, {
-            method: 'POST',
-            body,
-            cache:  'no-store',
-          })
-          const json = await res.json().catch(() => null)
-          if (!res.ok) {
-            failed.push(`${file.name} — ${json?.error ?? res.statusText}`)
-            continue
-          }
-          /* A 200 is not proof the file was stored.
-           *
-           * The middleware turns away a request with no valid session by
-           * redirecting it, and fetch follows redirects: an expired cookie
-           * means this POST quietly lands on the login page, which answers
-           * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
-           * upload counted as a success that never happened — no row, no
-           * error, nothing on screen. Only our own JSON means it landed. */
-          if (!json?.attachment) {
-            failed.push(res.redirected
-              ? `${file.name} — your session expired; sign in again and retry`
-              : `${file.name} — the server did not store it (unexpected reply)`)
-            continue
-          }
-          /* The reply has to be the reply to *this* request.
-           *
-           * Something in front of the app was answering upload POSTs from
-           * cache — a 200 carrying a real attachment, belonging to a file
-           * somebody else had uploaded days earlier. It passed every check
-           * above, so the panel refreshed, found nothing new, and showed
-           * nothing: three days of "the upload does nothing". The ref is one
-           * throwaway id per file; if it does not come back, the answer was
-           * not written for us, whatever else is in it. */
-          if (json.ref !== ref) {
-            failed.push(`${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.`)
-            continue
-          }
-          if (file.type.startsWith('image/')) {
-            try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
-          }
-        } catch {
-          failed.push(`${file.name} — the upload did not complete`)
+        const r = await uploadOne(file)
+        if (!r.ok) { failed.push(r.error); continue }
+        if (file.type.startsWith('image/')) {
+          try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
         }
       }
 
@@ -1291,6 +1332,9 @@ export function TaskModal({
     }
     function onDrop(e: DragEvent) {
       if (!isFileDrag(e)) return
+      // Already handled: the brief editor takes image drops itself and inserts
+      // them, and must not have them uploaded a second time here (R5).
+      if (e.defaultPrevented) return
       e.preventDefault()
       if (!canEdit) return
       const dropped = e.dataTransfer?.files
@@ -1579,7 +1623,7 @@ export function TaskModal({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestClose}
       className="fx-task-overlay"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)',
@@ -1675,13 +1719,33 @@ export function TaskModal({
                 <MenuItem icon="subtask" label="Add subtask"
                           onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
                 <MenuItem icon="openIn" label="Open the board behind this"
-                          onClick={() => { setMenuOpen(false); onClose() }} />
+                          onClick={() => { setMenuOpen(false); requestClose() }} />
               </div>
             )}
           </div>
 
-          <IconButton name="close" label="Close task" onClick={onClose} size={18} />
+          <IconButton name="close" label="Close task" onClick={requestClose} size={18} />
         </div>
+
+        {closeGuard && (
+          <div role="alertdialog" aria-live="assertive" style={{
+            display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flexShrink: 0,
+            padding: '9px 16px', background: alpha(COLORS.coral, 0.08), borderBottom: `1px solid ${CU.line}`, fontSize: 13.5,
+          }}>
+            <b style={{ color: COLORS.coral }}>
+              {closeGuard === 'unsaved' ? 'Your last changes to the brief aren’t saved.' : 'An image is still uploading to the brief.'}
+            </b>
+            <span style={{ flex: 1 }} />
+            <button type="button" onClick={() => setCloseGuard(null)} autoFocus
+                    style={{ height: 30, padding: '0 14px', border: 'none', borderRadius: 8, background: CU.blue, color: COLORS.panel, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Stay
+            </button>
+            <button type="button" onClick={() => { setCloseGuard(null); onClose() }}
+                    style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: 'transparent', color: CU.text, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Leave anyway
+            </button>
+          </div>
+        )}
 
         {/* ── Task / Activity, on a phone ──────────────────────────────────
             Below 767px the 400px Activity column has nowhere to be: side by
@@ -1985,9 +2049,22 @@ export function TaskModal({
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}
-                  saving={isPending}
                   onSave={next => applyPatch({ description: next })}
+                  onSaveStateChange={(state, pending) => { briefState.current = { state, pending } }}
+                  onUploadImages={canEdit && hasStorage ? async file => {
+                    const r = await uploadOne(file)
+                    if (r.ok) {
+                      if (file.type.startsWith('image/')) {
+                        try { await setCoverThumb(task.id, await shrinkImage(file, 360, 0.62)) } catch { /* preview only */ }
+                      }
+                      setReloadFiles(n => n + 1)
+                      router.refresh()
+                    }
+                    return r
+                  } : undefined}
+                  uploadUnavailableReason={!canEdit ? 'no-permission' : 'no-storage'}
                   onDone={() => setEditingBrief(false)}
+                  initialCursor={briefCursor}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
                 />
@@ -1997,6 +2074,8 @@ export function TaskModal({
                     onClick={e => {
                       if (!canEdit) return
                       if ((e.target as HTMLElement).closest('a, input, button, summary, iframe, label')) return
+                      const root = e.currentTarget.querySelector<HTMLElement>('.fx-brief')
+                      setBriefCursor(root ? anchorFromPoint(root, e.clientX, e.clientY) ?? undefined : undefined)
                       setBriefText(task.description ?? '')
                       setEditingBrief(true)
                     }}
@@ -2005,10 +2084,11 @@ export function TaskModal({
                     onKeyDown={e => {
                       if (!canEdit) return
                       if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault(); setBriefText(task.description ?? ''); setEditingBrief(true)
+                        e.preventDefault(); setBriefCursor(undefined); setBriefText(task.description ?? ''); setEditingBrief(true)
                       }
                     }}
                     title={canEdit ? 'Click to edit' : undefined}
+                    aria-label={canEdit ? 'Edit the brief' : undefined}
                     style={{
                       cursor: canEdit ? 'text' : 'default', borderRadius: 8,
                       padding: '6px 8px', margin: '0 -8px',
