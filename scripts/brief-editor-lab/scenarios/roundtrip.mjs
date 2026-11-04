@@ -8,7 +8,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures')
-const names = fs.readdirSync(DIR).filter(f => f.endsWith('.md')).map(f => f.replace(/\.md$/, ''))
+const names = fs.readdirSync(DIR).filter(f => f.endsWith('.md') && f !== 'README.md').map(f => f.replace(/\.md$/, ''))
 const baselineFile = path.join(DIR, 'baseline.json')
 const KNOWN_DIFFS = fs.existsSync(baselineFile) ? JSON.parse(fs.readFileSync(baselineFile, 'utf8')) : {}
 

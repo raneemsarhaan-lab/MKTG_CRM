@@ -15,6 +15,31 @@ export const COLORS = {
   line:   '#E1E1E0',
 } as const
 
+/**
+ * The blue + lime UI palette of the task panel's editing surfaces: the brief
+ * editor today, TaskModal's and TaskForm's local `CU` constants next.
+ *
+ * Mirrored once as `--brief-*` CSS variables in globals.css, because a
+ * stylesheet cannot read this file. Change both together.
+ */
+export const BRIEF_UI = {
+  ink:        '#18233F',
+  label:      '#68738D',
+  faint:      '#929CB0',
+  line:       '#E9EDF4',
+  surface:    '#F8FAFD',
+  blue:       '#3563E9',
+  blueLight:  '#EEF3FF',
+  blueActive: '#E5EDFF',
+  error:      COLORS.coral,
+} as const
+
+/** `#RRGGBB` → `rgba(r, g, b, a)`: shadows and tints derived from a token. */
+export function alpha(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
+}
+
 export const STAGE_COLORS: Record<string, string> = {
   'todo':         '#64748B',
   'c-prog':       '#3B82F6',

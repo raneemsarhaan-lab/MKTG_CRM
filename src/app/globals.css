@@ -15,6 +15,16 @@
   --panel:  #FFFFFF;
   --line:   #E1E1E0;
 
+  /* Brief editor palette: mirrors BRIEF_UI in src/lib/tokens.ts (change both together) */
+  --brief-ink:          #18233F;
+  --brief-label:        #68738D;
+  --brief-faint:        #929CB0;
+  --brief-line:         #E9EDF4;
+  --brief-surface:      #F8FAFD;
+  --brief-blue:         #3563E9;
+  --brief-blue-light:   #EEF3FF;
+  --brief-blue-active:  #E5EDFF;
+
   /* Stage colors */
   --stage-todo:         #64748B;
   --stage-c-prog:       #3B82F6;

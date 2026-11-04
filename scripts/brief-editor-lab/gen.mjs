@@ -17,7 +17,7 @@ fs.writeFileSync(path.join(OUT, 'brief.css'), `${roots.join('\n')}\n\n${brief}`)
 
 const dir = path.join(LAB, 'fixtures')
 const fixtures = Object.fromEntries(
-  fs.readdirSync(dir).filter(f => f.endsWith('.md'))
+  fs.readdirSync(dir).filter(f => f.endsWith('.md') && f !== 'README.md')
     .map(f => [f.replace(/\.md$/, ''), fs.readFileSync(path.join(dir, f), 'utf8')]),
 )
 fs.writeFileSync(path.join(LAB, 'fixtures.gen.ts'),

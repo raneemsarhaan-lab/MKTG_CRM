@@ -52,15 +52,15 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Purpose**: Tokens, translations, the module split, the overlay stack and shared URL helpers. No behaviour visible to users changes in this phase.
 
-- [ ] T005 [P] Add `BRIEF_UI` to `src/lib/tokens.ts` with the exact values in research R17 (`ink #18233F, label #68738D, faint #929CB0, line #E9EDF4, surface #F8FAFD, blue #3563E9, blueLight #EEF3FF, blueActive #E5EDFF`) plus `error: COLORS.coral`, exported `as const`. In `src/app/globals.css`, declare the same values once as CSS variables `--brief-ink`, `--brief-label`, `--brief-faint`, `--brief-line`, `--brief-surface`, `--brief-blue`, `--brief-blue-light`, `--brief-blue-active` in `:root`, with a comment naming `BRIEF_UI` as their source. CSS added later in this feature uses only these variables (C2).
-- [ ] T006 [P] Add a `briefEditor` namespace to `messages/en.json` and `messages/ar.json` containing every string the editor shows today: toolbar titles, Text style labels, Insert items and hints, ⋯ items, prompt labels, placeholders and CTAs, Saved/Saving…, "Click anywhere in the brief to edit", notes such as "Markdown copied" and "Could not create that subtask", and the editor placeholder. Give each one an Arabic translation.
-- [ ] T007 Split the editor without changing behaviour:
+- [X] T005 [P] Add `BRIEF_UI` to `src/lib/tokens.ts` with the exact values in research R17 (`ink #18233F, label #68738D, faint #929CB0, line #E9EDF4, surface #F8FAFD, blue #3563E9, blueLight #EEF3FF, blueActive #E5EDFF`) plus `error: COLORS.coral`, exported `as const`. In `src/app/globals.css`, declare the same values once as CSS variables `--brief-ink`, `--brief-label`, `--brief-faint`, `--brief-line`, `--brief-surface`, `--brief-blue`, `--brief-blue-light`, `--brief-blue-active` in `:root`, with a comment naming `BRIEF_UI` as their source. CSS added later in this feature uses only these variables (C2).
+- [X] T006 [P] Add a `briefEditor` namespace to `messages/en.json` and `messages/ar.json` containing every string the editor shows today: toolbar titles, Text style labels, Insert items and hints, ⋯ items, prompt labels, placeholders and CTAs, Saved/Saving…, "Click anywhere in the brief to edit", notes such as "Markdown copied" and "Could not create that subtask", and the editor placeholder. Give each one an Arabic translation.
+- [X] T007 Split the editor without changing behaviour:
   - Move the `Toggle` node and `getMarkdown` to `src/components/kanban/brief-editor/extensions.ts`.
   - Move `ToolIcon`, `ToolButton` and `Sep` to `brief-editor/Toolbar.tsx`; `Menu` and `MenuItem` to `brief-editor/Menu.tsx`; the value prompt UI to `brief-editor/ValuePrompt.tsx`.
   - Replace the local `BR` constant with `BRIEF_UI` imports, and every literal string with `t('…')` from T006.
   - `BriefEditor.tsx` keeps the same props and import path. Run `npm run typecheck` and `npm run lab:brief`; `roundtrip-fixtures` must still pass.
-- [ ] T008 Create `brief-editor/useOverlayStack.ts` per data-model §5: `push({ id, close, returnFocusTo }) → pop fn`, `closeTop(): boolean`, `isEmpty()`. Provide it to child components through a React context exported from the same file (`OverlayStackProvider`, `useOverlay(id, open, close, returnFocusTo)`).
-- [ ] T009 [P] In `src/lib/links.ts` add:
+- [X] T008 Create `brief-editor/useOverlayStack.ts` per data-model §5: `push({ id, close, returnFocusTo }) → pop fn`, `closeTop(): boolean`, `isEmpty()`. Provide it to child components through a React context exported from the same file (`OverlayStackProvider`, `useOverlay(id, open, close, returnFocusTo)`).
+- [X] T009 [P] In `src/lib/links.ts` add:
   - `normaliseUrl(input: string): { ok: true; href: string } | { ok: false; reason: 'empty' | 'spaces' | 'not-an-address' }`. It accepts `http(s)://`, `mailto:`, `www.` and bare `host.tld[/path]` (adding `https://`), and rejects anything with whitespace or no dot in the host (R3).
   - `youtubeId` moved from `src/components/shared/Brief.tsx`; `Brief.tsx` re-imports it from `@/lib/links`.
 
