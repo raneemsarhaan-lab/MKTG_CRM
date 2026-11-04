@@ -184,21 +184,21 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Keyboard only: `/tab` + Enter inserts a table; every menu works with arrows/Enter/Esc; the axe scan reports no critical issues.
 
-- [ ] T036 [US5] Rewrite `brief-editor/Menu.tsx` as an accessible menu:
+- [X] T036 [US5] Rewrite `brief-editor/Menu.tsx` as an accessible menu:
   - `role="menu"`; items `menuitem`, or `menuitemradio` with `aria-checked` when given a `checked` prop.
   - On open, focus the checked item or the first item. Arrow Up/Down wrap; Home/End; first-letter typeahead; Enter/Space choose; Esc closes and returns focus to the trigger; Tab closes.
   - Triggers get `aria-haspopup="menu"` and `aria-expanded`.
   - Menu position uses `insetInlineStart`.
-- [ ] T037 [US5] Make `brief-editor/Toolbar.tsx` a `role="toolbar"` with `aria-label={t('toolbar')}` and roving `tabIndex`: one stop in the Tab order; Arrow Left/Right move, reversed when `getComputedStyle(el).direction === 'rtl'`; Home/End. Toggle buttons get `aria-pressed={active}`. In `BriefEditor.tsx` set `editorProps.attributes` to `{ class: 'fx-brief fx-brief-edit', 'aria-label': t('label'), 'aria-multiline': 'true', role: 'textbox' }` (FR-045, FR-046).
-- [ ] T038 [US5] In the Text style menu, use `setParagraph()` / `setHeading({ level })` instead of `toggleHeading`, and pass `checked` for the current style so it shows ✓ (FR-047).
-- [ ] T039 [US5] Create `brief-editor/blocks.ts`, exporting `BLOCK_ITEMS: { id, labelKey, keywords: string[] /* EN + AR */, icon, mdHint?, run(editor, ctx) }[]`. It covers Normal text, Heading 1–3, Bulleted list, Numbered list, Task, Quote, Divider, Image, Table, Toggle list, YouTube, Table of contents and (when `onCreateSubtask` exists) New subtask. The Insert menu and Text style menu render from it, with `mdHint` shown as a muted right-aligned hint (FR-043, R21).
-- [ ] T040 [US5] Add a `SlashCommand` extension in `brief-editor/extensions.ts` using `@tiptap/suggestion`:
+- [X] T037 [US5] Make `brief-editor/Toolbar.tsx` a `role="toolbar"` with `aria-label={t('toolbar')}` and roving `tabIndex`: one stop in the Tab order; Arrow Left/Right move, reversed when `getComputedStyle(el).direction === 'rtl'`; Home/End. Toggle buttons get `aria-pressed={active}`. In `BriefEditor.tsx` set `editorProps.attributes` to `{ class: 'fx-brief fx-brief-edit', 'aria-label': t('label'), 'aria-multiline': 'true', role: 'textbox' }` (FR-045, FR-046).
+- [X] T038 [US5] In the Text style menu, use `setParagraph()` / `setHeading({ level })` instead of `toggleHeading`, and pass `checked` for the current style so it shows ✓ (FR-047).
+- [X] T039 [US5] Create `brief-editor/blocks.ts`, exporting `BLOCK_ITEMS: { id, labelKey, keywords: string[] /* EN + AR */, icon, mdHint?, run(editor, ctx) }[]`. It covers Normal text, Heading 1–3, Bulleted list, Numbered list, Task, Quote, Divider, Image, Table, Toggle list, YouTube, Table of contents and (when `onCreateSubtask` exists) New subtask. The Insert menu and Text style menu render from it, with `mdHint` shown as a muted right-aligned hint (FR-043, R21).
+- [X] T040 [US5] Add a `SlashCommand` extension in `brief-editor/extensions.ts` using `@tiptap/suggestion`:
   - Settings: `char: '/'`, `allowSpaces: false`, and `allow: ({ state, range }) =>` true only when `range.from` is the start of the textblock or the previous character is whitespace (FR-042).
   - `items: ({ query })` filters `BLOCK_ITEMS` by label and keywords, case-insensitive.
   - `command` deletes the range and runs the item.
   - Render with a new `brief-editor/SlashMenu.tsx`: a `role="listbox"` floating list positioned from `clientRect`, with arrow, Enter and Esc handling via the suggestion `onKeyDown`. Esc leaves the typed "/" (FR-040, FR-041). Register it on the overlay stack while open.
-- [ ] T041 [US5] Change the editor placeholder to `t('placeholder')`, "Write the brief… type / for blocks", in `BriefEditor.tsx`. Add Markdown and keyboard hints to toolbar tooltips via `brief-editor/Toolbar.tsx` (FR-043).
-- [ ] T042 [US5] Add lab scenarios `slash-menu`, `menu-keyboard`, `style-checkmark` and `a11y-roles` to `scripts/brief-editor-lab/scenarios.mjs`. `a11y-roles` injects `node_modules/axe-core/axe.min.js` and runs `axe.run` with each menu open in turn, failing on any `critical` violation (SC-007).
+- [X] T041 [US5] Change the editor placeholder to `t('placeholder')`, "Write the brief… type / for blocks", in `BriefEditor.tsx`. Add Markdown and keyboard hints to toolbar tooltips via `brief-editor/Toolbar.tsx` (FR-043).
+- [X] T042 [US5] Add lab scenarios `slash-menu`, `menu-keyboard`, `style-checkmark` and `a11y-roles` to `scripts/brief-editor-lab/scenarios.mjs`. `a11y-roles` injects `node_modules/axe-core/axe.min.js` and runs `axe.run` with each menu open in turn, failing on any `critical` violation (SC-007).
 
 ---
 

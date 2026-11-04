@@ -1,6 +1,8 @@
 import { Extension, Node, type Editor } from '@tiptap/core'
 import type { MarkdownStorage } from 'tiptap-markdown'
 import TiptapImage from '@tiptap/extension-image'
+import { PluginKey } from '@tiptap/pm/state'
+import Suggestion, { exitSuggestion, type SuggestionProps } from '@tiptap/suggestion'
 
 // tiptap-markdown predates Tiptap v3's stricter Storage typing and doesn't
 // declare this itself — without it, `editor.storage.markdown` has no type.
@@ -145,3 +147,67 @@ export const BriefImage = TiptapImage.extend({
     }
   },
 })
+
+/** What the "/" menu component is told by the suggestion plugin. */
+export interface SlashState {
+  items: import('./blocks').BlockItem[]
+  rect: DOMRect | null
+  select: (item: import('./blocks').BlockItem) => void
+}
+export interface SlashBridge {
+  items: (query: string) => import('./blocks').BlockItem[]
+  run: (item: import('./blocks').BlockItem) => void
+  show: (s: SlashState | null) => void
+  /** Arrow keys and Enter while the menu is open; true when handled. */
+  key: (event: KeyboardEvent) => boolean
+}
+
+export const slashKey = new PluginKey('briefSlash')
+
+/**
+ * Type "/" at the start of a line or after a space for a menu of every text
+ * style and block (FR-040–042, research R6). Typing narrows it; arrows,
+ * Enter and Esc work it. A "/" inside a word ("and/or", "4/11") opens
+ * nothing, because the character before it must be a space or nothing.
+ */
+export const SlashCommand = Extension.create<{ bridge: { current: SlashBridge } | null }>({
+  name: 'briefSlash',
+  addOptions() { return { bridge: null } },
+  addProseMirrorPlugins() {
+    const bridge = this.options.bridge
+    return [Suggestion({
+      editor: this.editor,
+      pluginKey: slashKey,
+      char: '/',
+      allowSpaces: false,
+      allowedPrefixes: [' ', ' '],
+      items: ({ query }) => bridge?.current.items(query) ?? [],
+      command: ({ editor, range, props }) => {
+        editor.chain().focus().deleteRange(range).run()
+        bridge?.current.run(props as import('./blocks').BlockItem)
+      },
+      render: () => {
+        let last: SuggestionProps | null = null
+        const push = (p: SuggestionProps) => {
+          last = p
+          bridge?.current.show({
+            items: p.items as import('./blocks').BlockItem[],
+            rect: p.clientRect?.() ?? null,
+            select: item => p.command(item),
+          })
+        }
+        return {
+          onStart: push,
+          onUpdate: push,
+          onKeyDown: ({ event }) => (last ? bridge?.current.key(event) ?? false : false),
+          onExit: () => { last = null; bridge?.current.show(null) },
+        }
+      },
+    })]
+  },
+})
+
+/** Close the "/" menu and leave the typed "/" where it is (Esc). */
+export function dismissSlash(editor: Editor) {
+  exitSuggestion(editor.view, slashKey)
+}

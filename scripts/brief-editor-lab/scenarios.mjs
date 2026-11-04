@@ -47,7 +47,7 @@ for (const sc of chosen) {
     console.log(`PASS ${sc.id}`)
   } catch (e) {
     failed++
-    console.log(`FAIL ${sc.id}: ${String(e.message ?? e).split('\n')[0]}`)
+    console.log(`FAIL ${sc.id}: ${String(e.message ?? e).split('\n').slice(0, 4).join(' | ')}`)
     await page.screenshot({ path: path.join(OUT, `fail-${sc.id}.png`) }).catch(() => {})
   }
   await context.close()

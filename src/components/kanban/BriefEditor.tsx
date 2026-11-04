@@ -12,7 +12,9 @@ import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
-import { Toggle, LinkShortcut, BriefImage, getMarkdown } from './brief-editor/extensions'
+import { Toggle, LinkShortcut, BriefImage, SlashCommand, dismissSlash, getMarkdown, type SlashBridge, type SlashState } from './brief-editor/extensions'
+import { SlashMenu } from './brief-editor/SlashMenu'
+import { blockItems, filterBlocks, type BlockContext, type BlockItem } from './brief-editor/blocks'
 import { ImageUpload, insertImageBlock, blockSlot, type ImageUploadContext, type UploadResult, type UploadUnavailableReason } from './brief-editor/imageUpload'
 import { LinkCard } from './brief-editor/LinkCard'
 import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
@@ -82,12 +84,13 @@ interface BriefEditorProps {
 
 export type { UploadResult, UploadUnavailableReason }
 
-const TEXT_STYLES: { level: 0 | 1 | 2 | 3; key: 'normal' | 'h1' | 'h2' | 'h3'; sample: React.CSSProperties }[] = [
-  { level: 0, key: 'normal', sample: { fontWeight: 500 } },
-  { level: 1, key: 'h1',     sample: { fontWeight: 800, fontSize: '1.05em' } },
-  { level: 2, key: 'h2',     sample: { fontWeight: 800, fontSize: '0.98em' } },
-  { level: 3, key: 'h3',     sample: { fontWeight: 800, fontSize: '0.92em' } },
-]
+/** How each text style reads in the Text style menu. */
+const STYLE_SAMPLE: Record<string, React.CSSProperties> = {
+  paragraph: { fontWeight: 500 },
+  h1: { fontWeight: 800, fontSize: '1.05em' },
+  h2: { fontWeight: 800, fontSize: '0.98em' },
+  h3: { fontWeight: 800, fontSize: '0.92em' },
+}
 
 export function BriefEditor({
   value, onSave, onSaveStateChange, onDone, initialCursor, attachments = [], onCreateSubtask,
@@ -112,6 +115,11 @@ export function BriefEditor({
   const promptRange = useRef<{ from: number; to: number } | null>(null)
   const [note, setNote]       = useState('')
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [slash, setSlash] = useState<SlashState | null>(null)
+  const [slashActive, setSlashActive] = useState(0)
+  const slashRef = useRef<{ state: SlashState | null; active: number }>({ state: null, active: 0 })
+  slashRef.current = { state: slash, active: slashActive }
   const styleBtn  = useRef<HTMLButtonElement>(null)
   const insertBtn = useRef<HTMLButtonElement>(null)
   const moreBtn   = useRef<HTMLButtonElement>(null)
@@ -142,6 +150,30 @@ export function BriefEditor({
       tooBig: (name, mb) => t('tooBig', { name, mb }),
       skipped: max => t('skipped', { max }),
       unavailable: reason => t(reason === 'no-permission' ? 'noPermission' : reason === 'no-storage' ? 'noStorage' : 'notCreated'),
+    },
+  }
+
+  // The block items every menu offers (research R6), and how they run.
+  const blockCtx: BlockContext = { openPrompt: kind => openPrompt(kind), canCreateSubtask: !!onCreateSubtask }
+  const items = blockItems(blockCtx)
+
+  // The "/" menu: the suggestion plugin asks this what to show and how to run
+  // a pick; arrows and Enter reach it through the editor (FR-040–042).
+  const slashBridge = useRef<SlashBridge>(null as unknown as SlashBridge)
+  slashBridge.current = {
+    items: query => filterBlocks(items, query, key => t(key)),
+    run: item => { if (editor) item.run(editor, blockCtx) },
+    show: state => {
+      setSlash(state)
+      setSlashActive(a => (state && a < state.items.length ? a : 0))
+    },
+    key: event => {
+      const { state, active } = slashRef.current
+      if (!state || !state.items.length) return false
+      if (event.key === 'ArrowDown') { setSlashActive((active + 1) % state.items.length); return true }
+      if (event.key === 'ArrowUp') { setSlashActive((active - 1 + state.items.length) % state.items.length); return true }
+      if (event.key === 'Enter' || event.key === 'Tab') { state.select(state.items[active]); return true }
+      return false
     },
   }
 
@@ -177,6 +209,7 @@ export function BriefEditor({
         link: { openOnClick: false, autolink: true, linkOnPaste: true, defaultProtocol: 'https' },
       }),
       LinkShortcut.configure({ open: () => openLinkRef.current() }),
+      SlashCommand.configure({ bridge: slashBridge }),
       TaskList,
       TaskItem.configure({ nested: true }),
       // allowBase64: an image picked from an older attachment stored in the
@@ -190,7 +223,12 @@ export function BriefEditor({
     ],
     content: value,
     editorProps: {
-      attributes: { class: 'fx-brief fx-brief-edit' },
+      attributes: {
+        class: 'fx-brief fx-brief-edit',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': t('label'),
+      },
       handleKeyDown(_view, event) {
         if (event.key === 'Escape') {
           if (!onDone && stack.isEmpty()) return false
@@ -308,6 +346,53 @@ export function BriefEditor({
     }
   }
 
+  // Roving focus for the toolbar: one Tab stop; arrow keys move between the
+  // buttons, reversed in right-to-left (FR-045, R16).
+  useEffect(() => {
+    const bar = toolbarRef.current
+    if (!bar) return
+    const btns = [...bar.querySelectorAll<HTMLButtonElement>('button[data-tool]')].filter(b => !b.disabled && !b.closest('[role="menu"]'))
+    const focusedAt = btns.indexOf(document.activeElement as HTMLButtonElement)
+    if (focusedAt >= 0) rovingAt.current = focusedAt
+    const keep = Math.min(rovingAt.current, btns.length - 1)
+    bar.querySelectorAll<HTMLButtonElement>('button[data-tool]').forEach(b => { if (b.disabled) b.tabIndex = -1 })
+    btns.forEach((b, i) => { b.tabIndex = i === keep ? 0 : -1 })
+  })
+  const rovingAt = useRef(0)
+  function onToolbarKey(e: React.KeyboardEvent) {
+    const bar = toolbarRef.current
+    if (!bar || (e.target as HTMLElement).closest('[role="menu"]')) return
+    const btns = [...bar.querySelectorAll<HTMLButtonElement>('button[data-tool]')].filter(b => !b.disabled && !b.closest('[role="menu"]'))
+    const i = btns.indexOf(document.activeElement as HTMLButtonElement)
+    if (i < 0) return
+    const rtl = getComputedStyle(bar).direction === 'rtl'
+    let n: number | null = null
+    if (e.key === 'ArrowRight') n = rtl ? i - 1 : i + 1
+    if (e.key === 'ArrowLeft') n = rtl ? i + 1 : i - 1
+    if (e.key === 'Home') n = 0
+    if (e.key === 'End') n = btns.length - 1
+    if (n === null) return
+    e.preventDefault()
+    n = (n + btns.length) % btns.length
+    btns.forEach(b => { b.tabIndex = -1 })
+    btns[n].tabIndex = 0
+    rovingAt.current = n
+    btns[n].focus()
+  }
+
+  // Tell assistive technology which "/" item is highlighted.
+  useEffect(() => {
+    const dom = editor?.view.dom
+    if (!dom) return
+    if (slash && slash.items[slashActive]) {
+      dom.setAttribute('aria-controls', 'brief-slash-menu')
+      dom.setAttribute('aria-activedescendant', `brief-slash-${slash.items[slashActive].id}`)
+    } else {
+      dom.removeAttribute('aria-controls')
+      dom.removeAttribute('aria-activedescendant')
+    }
+  }, [editor, slash, slashActive])
+
   if (!editor) return null
 
   const TOOLS: { id: string; title: string; label: React.ReactNode; active: boolean; run: () => void }[][] = [
@@ -333,30 +418,15 @@ export function BriefEditor({
     ],
   ]
 
-  const INSERT_ITEMS: { icon: React.ReactNode; label: string; run: () => void; hint?: string }[] = [
-    { icon: <ToolIcon name="task" />, label: t('task'), run: () => { setMenu(null); editor.chain().focus().toggleTaskList().run() } },
-    ...(onCreateSubtask
-      ? [{ icon: <ToolIcon name="subtask" />, label: t('subtask'), run: () => openPrompt('subtask'), hint: t('subtaskHint') }]
-      : []),
-    { icon: <ToolIcon name="image" />,    label: t('image'),    run: () => openPrompt('image') },
-    { icon: <ToolIcon name="divider" />,  label: t('divider'),  run: () => { setMenu(null); editor.chain().focus().setHorizontalRule().run() } },
-    { icon: <ToolIcon name="toggle" />,   label: t('toggle'), run: () => {
-      setMenu(null)
-      editor.chain().focus().insertContent({
-        type: 'toggle', attrs: { summary: 'Toggle title' },
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hidden content.' }] }],
-      }).run()
-    } },
-    { icon: <ToolIcon name="table" />,    label: t('table'),    run: () => { setMenu(null); editor.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run() } },
-    { icon: <ToolIcon name="toc" />,      label: t('toc'), run: () => { setMenu(null); editor.chain().focus().insertContent('[[toc]]').run() } },
-    { icon: <ToolIcon name="youtube" />,  label: t('youtube'),  run: () => openPrompt('youtube') },
-  ]
 
   const currentStyle =
-    editor.isActive('heading', { level: 1 }) ? TEXT_STYLES[1] :
-    editor.isActive('heading', { level: 2 }) ? TEXT_STYLES[2] :
-    editor.isActive('heading', { level: 3 }) ? TEXT_STYLES[3] :
-    TEXT_STYLES[0]
+    editor.isActive('heading', { level: 1 }) ? 'h1' :
+    editor.isActive('heading', { level: 2 }) ? 'h2' :
+    editor.isActive('heading', { level: 3 }) ? 'h3' :
+    'paragraph'
+  const styleItems = items.filter(b => b.group === 'style')
+  const insertItems = items.filter(b => b.group === 'block')
+  const runItem = (item: BlockItem) => { setMenu(null); item.run(editor, blockCtx) }
 
   return (
     <OverlayStackProvider stack={stack}>
@@ -368,7 +438,7 @@ export function BriefEditor({
           : `0 2px 12px ${alpha(BRIEF_UI.ink, 0.05)}`,
         transition: 'box-shadow .12s',
       }}>
-        <div style={{
+        <div ref={toolbarRef} role="toolbar" aria-label={t('toolbar')} onKeyDown={onToolbarKey} style={{
           display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
           minHeight: 58, padding: '10px 16px', background: BRIEF_UI.surface, borderRadius: '18px 18px 0 0',
           position: 'relative',
@@ -389,19 +459,16 @@ export function BriefEditor({
           <div style={{ position: 'relative' }}>
             <ToolButton buttonRef={styleBtn} title={t('textStyle')} active={menu === 'style'} wide chip menu expanded={menu === 'style'}
                         onClick={() => setMenu(m => (m === 'style' ? null : 'style'))}>
-              <span style={currentStyle.level === 0 ? undefined : { fontWeight: 700 }}>{t(currentStyle.key)}</span>
+              <span style={currentStyle === 'paragraph' ? undefined : { fontWeight: 700 }}>{t(styleItems.find(b => b.id === currentStyle)?.labelKey ?? 'normal')}</span>
               <ToolIcon name="chevron" size={14} />
             </ToolButton>
             {menu === 'style' && (
               <Menu id="style" label={t('textStyle')} anchor={styleBtn.current} onClose={() => setMenu(null)}>
-                {TEXT_STYLES.map(s => (
-                  <MenuItem key={s.level} icon={null}
-                            onClick={() => {
-                              setMenu(null)
-                              if (s.level === 0) editor.chain().focus().setParagraph().run()
-                              else editor.chain().focus().toggleHeading({ level: s.level }).run()
-                            }}>
-                    <span style={s.sample}>{t(s.key)}</span>
+                {styleItems.map(item => (
+                  // setHeading, not toggleHeading: picking the current style keeps it (FR-047).
+                  <MenuItem key={item.id} icon={null} checked={item.id === currentStyle} hint={item.mdHint}
+                            onClick={() => runItem(item)}>
+                    <span style={STYLE_SAMPLE[item.id]}>{t(item.labelKey)}</span>
                   </MenuItem>
                 ))}
               </Menu>
@@ -414,7 +481,7 @@ export function BriefEditor({
             <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {gi > 0 && <Sep />}
               {group.map(tool => (
-                <ToolButton key={tool.id} title={tool.title} active={tool.active} onClick={tool.run}>
+                <ToolButton key={tool.id} title={tool.title} active={tool.active} pressed={tool.id === 'link' ? undefined : tool.active} onClick={tool.run}>
                   <span style={{ fontSize: 15 }}>{tool.label}</span>
                 </ToolButton>
               ))}
@@ -431,9 +498,10 @@ export function BriefEditor({
             </ToolButton>
             {menu === 'insert' && (
               <Menu id="insert" label={t('insert')} anchor={insertBtn.current} onClose={() => setMenu(null)}>
-                {INSERT_ITEMS.map(it => (
-                  <MenuItem key={it.label} icon={it.icon} onClick={it.run} hint={it.hint}>
-                    {it.label}
+                {insertItems.map(item => (
+                  <MenuItem key={item.id} icon={<ToolIcon name={item.icon} />} onClick={() => runItem(item)}
+                            hint={item.mdHint ?? (item.id === 'subtask' ? t('subtaskHint') : undefined)}>
+                    {t(item.labelKey)}
                   </MenuItem>
                 ))}
               </Menu>
@@ -489,6 +557,10 @@ export function BriefEditor({
             }}
             onCancel={closePrompt}
           />
+        )}
+
+        {slash && (
+          <SlashMenu state={slash} active={slashActive} onClose={() => dismissSlash(editor)} />
         )}
 
         <LinkCard editor={editor} hiddenRef={promptOpenRef} onEdit={() => openPrompt('link')} onNote={flashNote} />
