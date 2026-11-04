@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,6 @@
 
 ## Notes
 
-- One open question: FR-052, who may add pieces (+ Piece, Paste plan). Waiting on the user.
+- FR-052 (who may add pieces) resolved with the recommended default, option A: admins and superusers for every theme, and any member for themes they own or are assigned. Recorded under Assumptions as a §III exception needing PR sign-off.
 - Recommended defaults applied (user: "use this as reference"): themes are projects; pillars group pieces; content status names as display labels; Archived = dropped; one Content sheet with videos expanding into clips; new types Article, Report, Framework/Model; paste matches existing tasks by Task Link.
 - The reference sheet was read on 2026-11-04: "Plan (Organized)" has 18 pieces in 2 themes (Strategy: Samaa, 2/week; Newsjacking: Noran, 1/week).

@@ -241,7 +241,7 @@ Noran adds next week's newsjacking report with **+ Piece** under the Newsjacking
 
 **Adding and editing**
 
-- **FR-052**: **+ Piece** and **Paste plan** MUST be available to [NEEDS CLARIFICATION: Who may add pieces to the plan? Today "user"-level members (Content Creators) can't create tasks. Spec 008 made an exception for clips only. Samaa and Noran own the two themes in the reference sheet; if they are "user"-level, they couldn't add their own pieces.].
+- **FR-052**: **+ Piece** and **Paste plan** MUST be available to admins and superusers for every theme, and to any member for the themes they own or are assigned to (recommended default; see Assumptions). Pieces they add are owned by them. This does not let "user"-level members create tasks outside a theme they own: the New task form stays as it is.
 - **FR-053**: Members who may edit a piece (its owner, assignee, admin or superuser) MUST be able to edit its title, type, pillar, assignee, due date and links inline, and archive or restore it.
 - **FR-054**: The content types MUST include **Article**, **Report** and **Framework/Model**, with SLA thresholds per stage like the others. "Social Media" in the reference maps to Post.
 
@@ -275,6 +275,7 @@ Noran adds next week's newsjacking report with **+ Piece** under the Newsjacking
 - **SC-005**: No cell in the Content sheet ever holds a non-link as a link. Every link cell opens a working web address or is empty.
 - **SC-006**: On a 1366×768 screen, at least 20 rows are visible at once.
 - **SC-007**: Every action in this spec can be done with the keyboard alone.
+- **SC-009**: A theme owner with "user" access can add a piece to their own theme, and cannot add one to another theme, in 100% of checks.
 - **SC-008**: Within two weeks of launch, the team stops editing the Content Library Google Sheet (checked with the Marketing Manager).
 
 ## Assumptions
@@ -288,6 +289,7 @@ Noran adds next week's newsjacking report with **+ Piece** under the Newsjacking
 - **New content types**: Article, Report and Framework/Model are added. Their SLA thresholds default to Post's until an admin sets them in Settings.
 - **"Social Media" type** in the reference maps to Post, and "Framework/Model" to the new Framework/Model type.
 - **Owner names** in the reference (Samaa, Noran) are matched to team members by name when pasting. An unknown name falls back to the member pasting, and is listed in the preview.
+- **Who may add pieces (recommended default, applied on 2026-11-04 when the spec was finalised without an answer)**: admins and superusers add to every theme; any member adds to themes they own or are assigned to. Samaa and Noran can therefore run their own streams. For "user"-level members this is a second narrow exception to "can't create tasks", like spec 008's clips. The PR's constitution check (§III) asks for sign-off, and `/speckit-clarify` can change it.
 - **Task Link** is used only when bringing the sheet in. After that, the row is the task.
 - **Built on spec 008**: the grid, keyboard model, status menu, paste reading, link checks and archive are the video sheet's, reused.
 - **Out of scope**:
