@@ -29,6 +29,7 @@ model Member {
   tasks_created  Task[]        @relation("TaskCreator")
   comments       TaskComment[]
   project_steps  ProjectStep[] @relation("StepAssignee")
+  themes_owned   Project[]     @relation("ThemeOwner")
 
   @@map("members")
 }
@@ -70,9 +71,23 @@ model Project {
   sort_order Int       @default(0)
   created_at DateTime  @default(now()) @db.Timestamptz(6)
 
-  brand Brand?        @relation(fields: [brand_id], references: [id], onDelete: SetNull)
-  steps ProjectStep[]
-  tasks Task[]
+  /// A content stream shown in the Content sheet (spec 009): Strategy,
+  /// Newsjacking… Not every project is one; campaigns and plans stay off it.
+  is_theme         Boolean   @default(false)
+  /// Who runs the theme. May add pieces to it and edit its details.
+  owner_id         String?   @db.Uuid
+  /// How many pieces the theme should publish per period ("2 per week").
+  frequency_count  Int?
+  /// "week" or "month".
+  frequency_period String?
+  /// Who it is for: keys from the fixed audience list (src/components/content/audience.ts).
+  audience         String[]  @default([])
+
+  brand   Brand?          @relation(fields: [brand_id], references: [id], onDelete: SetNull)
+  owner   Member?         @relation("ThemeOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  steps   ProjectStep[]
+  tasks   Task[]
+  pillars ContentPillar[]
 
   @@map("projects")
 }
@@ -249,7 +264,12 @@ model Task {
   /// restored. The video sheet still shows it, greyed. Not a stage: the
   /// pipeline is untouched (Constitution §II).
   dropped_at         DateTime? @db.Timestamptz(6)
+  /// The pillar inside its theme (spec 009), e.g. "AI".
+  pillar_id          String?   @db.Uuid
+  /// The social post's link (LinkedIn), beside published_url (spec 009).
+  post_url           String?   @db.Text
 
+  pillar       ContentPillar?   @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
   parent       Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
   subtasks     Task[]           @relation("Subtasks")
   brand        Brand?           @relation(fields: [brand_id], references: [id])
@@ -280,6 +300,22 @@ model Task {
 /// One row per clip task. `video_id` repeats the clip's parent so that a file
 /// name can be unique per video: two people pasting the same rows at once get
 /// one clip, not two. NULL file names never clash.
+/// A group of pieces inside one theme (spec 009): "AI", "Decision Making".
+/// Removing one keeps its pieces in the theme, with no pillar.
+model ContentPillar {
+  id         String   @id @default(uuid()) @db.Uuid
+  project_id String   @db.Uuid
+  name       String
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([project_id])
+  @@map("content_pillars")
+}
+
 model TaskClip {
   task_id    String   @id @db.Uuid
   video_id   String?  @db.Uuid
@@ -362,6 +398,9 @@ model TaskAttachment {
   size_bytes   Int?
   uploaded_by  String?  @db.Uuid
   uploaded_at  DateTime @default(now()) @db.Timestamptz(6)
+  /// On a link attachment: what the link is for, "working_doc" or "design"
+  /// (spec 009). One per role per task; null for files and other links.
+  link_role    String?
 
   task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
 

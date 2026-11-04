@@ -72,6 +72,7 @@ export function mapAttachment(a: any): TaskAttachment {
     data:        a.data ?? undefined,
     size_bytes:  a.size_bytes ?? null,
     content_type: a.content_type ?? null,
+    link_role:   a.link_role ?? null,
     uploaded_by: a.uploaded_by ?? undefined,
     uploaded_at: toIsoStr(a.uploaded_at),
   }
@@ -119,6 +120,8 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
       id: s.id, name: s.name, status: s.status, dropped_at: s.dropped_at ? toIsoStr(s.dropped_at) : null,
     })),
     published_url:      t.published_url ?? null,
+    post_url:           t.post_url ?? null,
+    pillar_id:          t.pillar_id ?? null,
     dropped_at:         t.dropped_at ? toIsoStr(t.dropped_at) : null,
     clip:               t.clip
       ? {
@@ -144,4 +147,21 @@ export function mapSlaConfig(rows: any[]): SLAConfig {
     config[row.stage_id][row.content_type_label] = row.max_business_days
   })
   return config
+}
+
+/** A theme project for the Content sheet (spec 009). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapTheme(p: any): import('@/types/index').ContentTheme {
+  return {
+    id: p.id,
+    name: p.name,
+    brand_id: p.brand_id ?? null,
+    owner_id: p.owner_id ?? null,
+    frequency_count: p.frequency_count ?? null,
+    frequency_period: p.frequency_period === 'week' || p.frequency_period === 'month' ? p.frequency_period : null,
+    audience: (p.audience ?? []) as import('@/types/index').AudienceKey[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pillars: (p.pillars ?? []).map((x: any) => ({ id: x.id, name: x.name, sort_order: x.sort_order }))
+      .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order),
+  }
 }

@@ -19,7 +19,13 @@ export type StageId =
 export type AccessLevel = 'admin' | 'superuser' | 'user'
 
 /** The board page's two views of the same tasks (spec 008). */
-export type BoardView = 'board' | 'sheet'
+export type BoardView = 'board' | 'sheet' | 'content'
+/** A theme's cadence period (spec 009). */
+export type FrequencyPeriod = 'week' | 'month'
+/** The team's fixed audience segments (spec 009). */
+export type AudienceKey = 'c-level' | 'strategy-heads' | 'top-management' | 'second-line' | 'ceo-mid'
+/** What a link attachment is for (spec 009). */
+export type LinkRole = 'working_doc' | 'design'
 /** The video sheet's column sets (spec 008 FR-050). */
 export type SheetColumnSet = 'editing' | 'copy' | 'full'
 /** Every column the video sheet can show, in display order. */
@@ -121,6 +127,22 @@ export interface Task {
   dropped_at?: string | null
   /** Clip details, when this task is a clip with details (spec 008). */
   clip?: ClipDetails | null
+  /** The pillar inside its theme (spec 009). */
+  pillar_id?: string | null
+  /** The social post's link (spec 009). */
+  post_url?: string | null
+}
+
+/** A theme of the Content sheet: a project flagged as a content stream (spec 009). */
+export interface ContentTheme {
+  id: string
+  name: string
+  brand_id: string | null
+  owner_id: string | null
+  frequency_count: number | null
+  frequency_period: FrequencyPeriod | null
+  audience: AudienceKey[]
+  pillars: { id: string; name: string; sort_order: number }[]
 }
 
 /** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */
@@ -162,6 +184,8 @@ export interface TaskAttachment {
   /** Bytes, for files uploaded to the bucket. Imports do not carry a size. */
   size_bytes?: number | null
   content_type?: string | null
+  /** On a link attachment: working doc or design (spec 009). */
+  link_role?: LinkRole | null
   uploaded_by?: string
   uploaded_at: string
 }

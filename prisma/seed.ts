@@ -107,7 +107,8 @@ async function main() {
   }
 
   // Content types
-  const labels = ['Post', 'Video', 'Reel', 'Design', 'Email', 'Story', 'Deck', 'Other']
+  // Article, Report and Framework/Model: the Content Library's types (spec 009).
+  const labels = ['Post', 'Video', 'Reel', 'Design', 'Email', 'Story', 'Deck', 'Other', 'Article', 'Report', 'Framework/Model']
   for (const label of labels) {
     await prisma.contentType.upsert({ where: { label }, update: {}, create: { label } })
   }
@@ -126,6 +127,10 @@ async function main() {
     'ready-publish': { Post: 1, Video: 1, Reel: 1, Design: 1, Email: 1, Story: 1, Deck: 1, Other: 1 },
     'scheduled':   { Post: 2, Video: 2, Reel: 2, Design: 2, Email: 2, Story: 2, Deck: 2, Other: 2 },
     'publish':     { Post: 0, Video: 0, Reel: 0, Design: 0, Email: 0, Story: 0, Deck: 0, Other: 0 },
+  }
+  // The spec 009 types start from Post's thresholds until an admin tunes them.
+  for (const stage_id of slaStages) {
+    for (const label of ['Article', 'Report', 'Framework/Model']) slaDays[stage_id][label] = slaDays[stage_id].Post
   }
   for (const stage_id of slaStages) {
     for (const [label, days] of Object.entries(slaDays[stage_id] ?? {})) {

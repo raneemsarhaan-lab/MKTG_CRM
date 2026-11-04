@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
-import { mapMember, mapTask, mapSlaConfig } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme } from '@/lib/mappers'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { configured as storageConfigured } from '@/lib/storage'
 
@@ -9,7 +9,7 @@ export default async function BoardPage() {
   const member = await getSessionMember()
   if (!member) redirect('/login')
 
-  const [tasks, members, brands, contentTypes, slaRows] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -29,6 +29,8 @@ export default async function BoardPage() {
             uploaded_at: true, uploaded_by: true,
             // Tells a Drive link (text/uri-list) from a file (spec 008 R7).
             content_type: true,
+            // Working doc or design, for the Content sheet (spec 009).
+            link_role: true,
           },
         },
         // The plan step this task delivers, if any — names only, so the panel
@@ -49,6 +51,15 @@ export default async function BoardPage() {
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
     prisma.contentType.findMany({ orderBy: { label: 'asc' } }),
     prisma.slaConfig.findMany(),
+    // The Content sheet's themes (spec 009): flagged projects, with their pillars.
+    prisma.project.findMany({
+      where: { is_theme: true },
+      orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+      select: {
+        id: true, name: true, brand_id: true, owner_id: true, frequency_count: true, frequency_period: true, audience: true,
+        pillars: { select: { id: true, name: true, sort_order: true } },
+      },
+    }),
   ])
 
   const today = new Date()
@@ -64,6 +75,7 @@ export default async function BoardPage() {
         brands={brands.map(b => ({ id: b.id, name: b.name, color: b.color, logo_url: b.logo_url ?? undefined, description: b.description ?? undefined }))}
         contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
         slaConfig={mapSlaConfig(slaRows)}
+        themes={themes.map(mapTheme)}
         hasStorage={storageConfigured()}
         today={today}
       />

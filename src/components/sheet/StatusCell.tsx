@@ -12,17 +12,18 @@ import { STAGE_COLORS } from '@/lib/tokens'
 import { allowedStages, nextOnPath } from '@/lib/stage-moves'
 import type { MenuItem } from './SheetMenu'
 
-export function useStageNames() {
-  const t = useTranslations('sheet')
+/** Stage names for a sheet: video words (spec 008) or content words (spec 009). */
+export function useStageNames(ns: 'sheet' | 'content' = 'sheet') {
+  const t = useTranslations(ns)
   return {
     video: (id: StageId) => t(`stage.${id}`),
     real: (id: StageId) => STAGE_META[id]?.label_en ?? id,
   }
 }
 
-export function StatusContent({ task, me, tipId }: { task: Task; me: Member; tipId: string }) {
-  const t = useTranslations('sheet')
-  const names = useStageNames()
+export function StatusContent({ task, me, tipId, ns = 'sheet' }: { task: Task; me: Member; tipId: string; ns?: 'sheet' | 'content' }) {
+  const t = useTranslations(ns)
+  const names = useStageNames(ns)
   const status = task.status as StageId
   const moves = allowedStages(task, me)
   return (

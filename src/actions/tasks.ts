@@ -593,17 +593,26 @@ export async function addLinkAttachment(
   return { success: true, row: shape(row) }
 }
 
+/** A task that may be dropped: a clip of a video (spec 008) or a piece of a theme (spec 009). */
+async function droppable(task: { parent_task_id: string | null; project_id: string | null }): Promise<boolean> {
+  if (await videoOf(task)) return true
+  if (!task.project_id) return false
+  const p = await prisma.project.findUnique({ where: { id: task.project_id }, select: { is_theme: true } })
+  return !!p?.is_theme
+}
+
 /**
- * Drop a clip: off the board, greyed in the sheet, nothing deleted
- * (spec 008 FR-060, FR-063). Same rule as editing it. Idempotent.
+ * Drop a clip, or archive a piece: off the board, greyed in the sheets,
+ * nothing deleted (spec 008 FR-060, FR-063; spec 009 FR-022). Same rule as
+ * editing it. Idempotent.
  */
-export async function dropClip(taskId: string): Promise<{ success: boolean; error?: string; dropped_at?: string }> {
+export async function dropTask(taskId: string): Promise<{ success: boolean; error?: string; dropped_at?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, error: 'not_found' }
   if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
-  if (!(await videoOf(task))) return { success: false, error: 'not_a_clip' }
+  if (!(await droppable(task))) return { success: false, error: 'not_a_clip' }
   if (task.dropped_at) return { success: true, dropped_at: task.dropped_at.toISOString() }
 
   const at = new Date()
@@ -619,13 +628,13 @@ export async function dropClip(taskId: string): Promise<{ success: boolean; erro
  * as it was when dropped (spec 008 FR-061, research R14): the stage date moves
  * forward so the business days it had spent in its stage are the same again.
  */
-export async function restoreClip(taskId: string): Promise<{ success: boolean; error?: string; stage_date?: string }> {
+export async function restoreTask(taskId: string): Promise<{ success: boolean; error?: string; stage_date?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, error: 'not_found' }
   if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
-  if (!(await videoOf(task))) return { success: false, error: 'not_a_clip' }
+  if (!(await droppable(task))) return { success: false, error: 'not_a_clip' }
   const ymd = (d: Date) => d.toISOString().slice(0, 10)
   if (!task.dropped_at) return { success: true, stage_date: ymd(task.stage_date) }
 
@@ -639,6 +648,10 @@ export async function restoreClip(taskId: string): Promise<{ success: boolean; e
   revalidatePath('/capacity')
   return { success: true, stage_date: ymd(day) }
 }
+
+/** Spec 008's names for the same actions. */
+export async function dropClip(taskId: string) { return dropTask(taskId) }
+export async function restoreClip(taskId: string) { return restoreTask(taskId) }
 
 // ─── bulk operations ────────────────────────────────────────────────────────
 
