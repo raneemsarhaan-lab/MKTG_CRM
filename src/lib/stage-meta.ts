@@ -174,3 +174,9 @@ export function startsDownstream(role: string | null | undefined): boolean {
   if (!role) return false
   return /design|art director|video|editor|motion/i.test(role)
 }
+
+/**
+ * The stages the video sheet counts as "editing" in its summary line
+ * (spec 008 FR-004): Ready to Edit through Final Cut. Display only.
+ */
+export const VIDEO_EDITING_STAGES: StageId[] = ['r-design', 'd-prog', 'd-check', 'final-check']

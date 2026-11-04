@@ -17,6 +17,23 @@ export function businessDaysBetween(from: Date, to: Date): number {
   return count
 }
 
+/**
+ * The date `n` business days before `to`: the inverse of businessDaysBetween,
+ * so `businessDaysBetween(subtractBusinessDays(to, n), to) === n`. Used to
+ * restore a dropped clip with its SLA clock as it was (spec 008 FR-061).
+ */
+export function subtractBusinessDays(to: Date, n: number): Date {
+  const cur = new Date(to)
+  cur.setHours(0, 0, 0, 0)
+  let count = 0
+  while (count < n) {
+    cur.setDate(cur.getDate() - 1)
+    const day = cur.getDay()
+    if (day !== 0 && day !== 6) count++
+  }
+  return cur
+}
+
 /** Count calendar days between two dates (positive = to is after from). */
 export function calDaysBetween(from: Date, to: Date): number {
   const ms = to.getTime() - from.getTime()

@@ -115,7 +115,22 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
       : null,
     parent_task_id:     t.parent_task_id ?? null,
     parent:             t.parent ? { id: t.parent.id, name: t.parent.name } : null,
-    subtasks:           (t.subtasks ?? []).map((s: any) => ({ id: s.id, name: s.name, status: s.status })),
+    subtasks:           (t.subtasks ?? []).map((s: any) => ({
+      id: s.id, name: s.name, status: s.status, dropped_at: s.dropped_at ? toIsoStr(s.dropped_at) : null,
+    })),
+    published_url:      t.published_url ?? null,
+    dropped_at:         t.dropped_at ? toIsoStr(t.dropped_at) : null,
+    clip:               t.clip
+      ? {
+          clip_no:    t.clip.clip_no ?? null,
+          source:     t.clip.source ?? null,
+          file_name:  t.clip.file_name ?? null,
+          in_ms:      t.clip.in_ms ?? null,
+          out_ms:     t.clip.out_ms ?? null,
+          video_id:   t.clip.video_id ?? null,
+          created_at: t.clip.created_at ? toIsoStr(t.clip.created_at) : undefined,
+        }
+      : null,
     comments:           (t.comments    ?? []).map(mapComment),
     attachments:        (t.attachments ?? []).map(mapAttachment),
   }

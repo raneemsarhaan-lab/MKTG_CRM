@@ -26,3 +26,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Sheet lab build output
+scripts/sheet-lab/out/

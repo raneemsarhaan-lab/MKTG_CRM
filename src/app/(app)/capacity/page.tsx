@@ -12,7 +12,8 @@ export default async function CapacityPage() {
   const [members, tasks] = await Promise.all([
     prisma.member.findMany({ orderBy: { name: 'asc' } }),
     prisma.task.findMany({
-      where: { NOT: { status: 'publish' } },
+      // Dropped clips (spec 008) carry no load.
+      where: { dropped_at: null, NOT: { status: 'publish' } },
       include: { brand: true },
     }),
   ])

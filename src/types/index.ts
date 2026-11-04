@@ -17,6 +17,15 @@ export type StageId =
   | 'publish'       // Published (terminal)
 
 export type AccessLevel = 'admin' | 'superuser' | 'user'
+
+/** The board page's two views of the same tasks (spec 008). */
+export type BoardView = 'board' | 'sheet'
+/** The video sheet's column sets (spec 008 FR-050). */
+export type SheetColumnSet = 'editing' | 'copy' | 'full'
+/** Every column the video sheet can show, in display order. */
+export type SheetColumn =
+  | 'title' | 'clipNo' | 'type' | 'status' | 'editor' | 'source' | 'fileName'
+  | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
 export type Priority = 'Low' | 'Medium' | 'High'
 
@@ -103,9 +112,26 @@ export interface Task {
   plan_step?: { id: string; name: string; projectId: string; projectName: string } | null
   parent_task_id?: string | null
   parent?: { id: string; name: string } | null
-  subtasks?: { id: string; name: string; status: StageId }[]
+  subtasks?: { id: string; name: string; status: StageId; dropped_at?: string | null }[]
   comments?: TaskComment[]
   attachments?: TaskAttachment[]
+  /** The live post's link (spec 008). */
+  published_url?: string | null
+  /** ISO time the clip was dropped; absent or null while live (spec 008). */
+  dropped_at?: string | null
+  /** Clip details, when this task is a clip with details (spec 008). */
+  clip?: ClipDetails | null
+}
+
+/** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */
+export interface ClipDetails {
+  clip_no: number | null
+  source: string | null
+  file_name: string | null
+  in_ms: number | null
+  out_ms: number | null
+  video_id: string | null
+  created_at?: string
 }
 
 export interface TaskComment {

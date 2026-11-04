@@ -32,6 +32,22 @@ export function attachmentKind(filename: string): AttachmentKind {
   return 'other'
 }
 
+/** The content type that marks an attachment as a link, not a file (spec 008 R7). */
+export const LINK_CONTENT_TYPE = 'text/uri-list'
+
+/** A Drive or web link attached to a task: opens in a new tab, never in the preview. */
+export function isLinkAttachment(a: { content_type?: string | null }): boolean {
+  return a.content_type === LINK_CONTENT_TYPE
+}
+
+/** What a link is called on its tile: "Google Drive", or the site's host name. */
+export function linkLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    return /(^|\.)(drive|docs)\.google\.com$/.test(host) ? 'Google Drive' : host
+  } catch { return 'Link' }
+}
+
 export function isImageAttachment(a: { filename: string; url?: string | null; data?: string | null }): boolean {
   return Boolean(a.url || a.data) && attachmentKind(a.filename) === 'image'
 }

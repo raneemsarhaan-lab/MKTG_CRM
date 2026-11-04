@@ -18,7 +18,8 @@
     "preflight": "bash scripts/preflight.sh",
     "backfill": "bash scripts/backfill.sh",
     "lab:brief": "bash scripts/brief-editor-lab/build.sh && node scripts/brief-editor-lab/scenarios.mjs",
-    "lab:attachments": "bash scripts/attachments-lab/build.sh && node scripts/attachments-lab/scenarios.mjs"
+    "lab:attachments": "bash scripts/attachments-lab/build.sh && node scripts/attachments-lab/scenarios.mjs",
+    "lab:sheet": "bash scripts/sheet-lab/build.sh && node scripts/sheet-lab/scenarios.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",

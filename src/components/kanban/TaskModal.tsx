@@ -18,7 +18,8 @@ import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
-import { shortName, MAX_ATTACHMENT_CHARS, MAX_INLINE_BYTES, MAX_UPLOAD_BYTES } from '@/lib/attachments'
+import { shortName } from '@/lib/attachments'
+import { makeUploader, uploadToStorage, shrinkImage } from '@/lib/attachment-upload'
 import { useTranslations } from 'next-intl'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { AttachmentsSection, type AttachmentsHandle, type UploadFn } from './attachments/AttachmentsSection'
@@ -95,6 +96,13 @@ interface TaskModalProps {
    * old way, so an upload never simply stops working.
    */
   hasStorage?: boolean
+  /** Open this file's preview as soon as the panel's files load (spec 008 FR-045). */
+  initialPreviewId?: string
+  /**
+   * "Open sheet" on a video or a clip (spec 008). The board passes its own
+   * switch; elsewhere the button navigates to the board's sheet.
+   */
+  onOpenSheet?: (videoId: string, rowId: string | null) => void
 }
 
 /* ── icons — 16px line set, ClickUp's weight ─────────────────────────── */
@@ -318,48 +326,6 @@ export function withRefs(
   return out
 }
 
-/* ── turning a picked file into something storable ───────────────────── */
-
-/** Read a file exactly as it is. Used for anything that is not a picture. */
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload  = () => resolve(String(r.result))
-    r.onerror = () => reject(new Error('unreadable'))
-    r.readAsDataURL(file)
-  })
-}
-
-/**
- * Scale a picture to fit `max` on its longest edge and re-encode it.
- *
- * The same trick ImageUpload uses for logos and avatars, and for the same
- * reason: the bytes are going into a text column, so an untouched phone photo
- * has to come down before it gets there. PNG keeps transparency; everything
- * else is far smaller as JPEG, and 0.82 is where the artefacts stop showing.
- */
-async function shrinkImage(file: File, max: number, quality = 0.82): Promise<string> {
-  const bitmap = await createImageBitmap(file)
-  const scale  = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
-  const w = Math.max(1, Math.round(bitmap.width * scale))
-  const h = Math.max(1, Math.round(bitmap.height * scale))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('This browser cannot process images')
-  ctx.drawImage(bitmap, 0, 0, w, h)
-  bitmap.close?.()
-
-  // A thumbnail is always JPEG: transparency does not matter at 360px and PNG
-  // would be several times the size, which is the whole constraint here.
-  const type = quality < 0.7
-    ? 'image/jpeg'
-    : file.type === 'image/png' || file.type === 'image/svg+xml' ? 'image/png' : 'image/jpeg'
-  return canvas.toDataURL(type, quality)
-}
-
 /** The brand's uploaded logo, or its colour as a lettered disc when it has
  *  none — the same mark the board's brand filter and the task form use. */
 function BrandMark({ brand, size = 20 }: { brand: { name: string; color: string; logo_url?: string }; size?: number }) {
@@ -497,6 +463,7 @@ const fmtTime = (d: string | Date) =>
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
+  initialPreviewId, onOpenSheet,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -557,6 +524,34 @@ export function TaskModal({
   const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
+
+  // From a sheet's Files cell: open that file's preview once the files have loaded.
+  useEffect(() => {
+    if (!initialPreviewId) return
+    let tries = 0
+    const timer = setInterval(() => {
+      if (sectionRef.current?.openPreview(initialPreviewId) || ++tries > 40) clearInterval(timer)
+    }, 150)
+    return () => clearInterval(timer)
+  }, [initialPreviewId, task.id])
+
+  /**
+   * The video sheet this task belongs to (spec 008): a video's own, or for a
+   * clip its video's, with the clip's row highlighted.
+   */
+  const sheetTarget = task.content_type_label === 'Video' && !task.parent_task_id
+    ? { video: task.id, row: null as string | null }
+    : task.parent_task_id && (task.clip || ['Reel', 'Video'].includes(task.content_type_label))
+      ? { video: task.parent_task_id, row: task.id }
+      : null
+  const tsheet = useTranslations('sheet')
+  function openSheet() {
+    if (!sheetTarget) return
+    if (onOpenSheet) { onOpenSheet(sheetTarget.video, sheetTarget.row); return }
+    const q = new URLSearchParams({ view: 'sheet', video: sheetTarget.video })
+    if (sheetTarget.row) q.set('row', sheetTarget.row)
+    router.push(`/board?${q}`)
+  }
 
   const cover     = coverImageFor(task)
   const stageMeta = STAGE_META[task.status]
@@ -904,121 +899,21 @@ export function TaskModal({
     })
   }
 
-  /**
-   * Upload one file to the bucket, with progress (spec 007 FR-053, research R5).
-   *
-   * `XMLHttpRequest` rather than `fetch` because only it reports upload
-   * progress. Every check the fetch version made is kept: its own URL per file,
-   * a reply that must be our JSON, an expired session that lands on the login
-   * page, and a reply that must echo this request's ref. The file is sent
-   * exactly as picked, under the name the queue chose. Never throws.
-   */
-  function uploadToStorage(file: File, name: string, onProgress: (pct: number | null) => void): Promise<
-    { ok: true; attachment: TaskAttachment } | { ok: false; error: string; retryable: boolean }
-  > {
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return Promise.resolve({ ok: false, retryable: false, error: ta('tooLargeDetail', {
-        size: formatBytes(file.size), limit: ta('limitShortStorage') }) })
-    }
-    return new Promise(resolve => {
-      /* Its own URL per file. Whatever sits in front of this deployment caches
-       * upload replies whatever the response says; what such a cache keys on is
-       * the URL, so a fresh path segment (not a query, which a cache may drop)
-       * makes every upload distinct. The no-store header stays for when the
-       * cache is fixed. */
-      const ref  = crypto.randomUUID()
-      const url  = `/api/attachments/${ref}`
-      const body = new FormData()
-      body.append('taskId', task.id)
-      body.append('file', file, name)
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', url)
-      xhr.setRequestHeader('Cache-Control', 'no-store')
-      xhr.upload.onprogress = e => {
-        if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)))
-      }
-      xhr.onerror = () => resolve({ ok: false, retryable: true, error: ta('errNetwork') })
-      xhr.onabort = () => resolve({ ok: false, retryable: true, error: ta('errNetwork') })
-      xhr.onload = () => {
-        let json: { ref?: string; error?: string; attachment?: TaskAttachment } | null = null
-        try { json = JSON.parse(xhr.responseText) } catch { /* not ours */ }
-        if (xhr.status < 200 || xhr.status >= 300) {
-          resolve({ ok: false, error: json?.error ?? (xhr.statusText || `HTTP ${xhr.status}`),
-            retryable: xhr.status >= 500 || xhr.status === 401 })
-          return
-        }
-        /* A 200 is not proof the file was stored: an expired session is
-         * redirected to the login page, which answers 200 with HTML. Only our
-         * own JSON means it landed. */
-        if (!json?.attachment) {
-          const redirected = Boolean(xhr.responseURL) && !xhr.responseURL.includes(url)
-          resolve({ ok: false, retryable: true, error: redirected ? ta('errSession') : ta('errUnexpected') })
-          return
-        }
-        /* The reply has to be the reply to *this* request: a cached 200 once
-         * carried somebody else's upload from days earlier. */
-        if (json.ref !== ref) { resolve({ ok: false, retryable: true, error: ta('errReplay') }); return }
-        onProgress(100)
-        resolve({ ok: true, attachment: { ...json.attachment, task_id: task.id } })
-      }
-      xhr.send(body)
-    })
-  }
-
   /** The brief editor's image paste and drop (spec 005 R5) use the same path. */
   async function uploadOne(file: File): Promise<UploadResult> {
-    const r = await uploadToStorage(file, file.name, () => {})
+    const r = await uploadToStorage(task.id, file, file.name, () => {}, ta)
     if (!r.ok) return { ok: false, error: `${file.name} — ${r.error}` }
     return { ok: true, url: r.attachment.url ?? '', filename: r.attachment.filename }
   }
 
   /**
-   * The Attachments section's upload (contracts/attachments-section.md): one
-   * file, under the name the queue chose, with progress.
-   *
-   * With a bucket, the original goes there. Without one, the original is read
-   * as a data URL and stored as it is: nothing is shrunk or re-encoded to make
-   * it fit (spec 007 FR-059, research R6), so a file over the inline limit is
-   * refused instead. Either way the board's small cover thumbnail is a separate
-   * copy that never replaces the file.
+   * The Attachments section's upload (contracts/attachments-section.md), shared
+   * with the video sheet's Files cell: src/lib/attachment-upload.ts. Nothing is
+   * shrunk or re-encoded (spec 007 FR-059).
    */
-  const uploadForSection: UploadFn = async (file, name, onProgress) => {
-    const isImage = file.type.startsWith('image/')
-    const thumbFor = async () => (isImage ? await shrinkImage(file, 360, 0.62).catch(() => null) : null)
-
-    if (hasStorage) {
-      const r = await uploadToStorage(file, name, onProgress)
-      if (r.ok) {
-        // Cosmetic, guarded, last: a failed thumbnail must not hide a stored file.
-        const thumb = await thumbFor()
-        if (thumb) { try { await setCoverThumb(task.id, thumb) } catch { /* preview only */ } }
-        router.refresh()
-      }
-      return r
-    }
-
-    onProgress(null)   // a server action reports no progress
-    const tooLarge = () => ({ ok: false as const, retryable: false, error: ta('tooLargeDetail', {
-      size: formatBytes(file.size), limit: ta('limitShortInline') }) })
-    if (file.size > MAX_INLINE_BYTES) return tooLarge()
-    let data: string
-    try { data = await readAsDataUrl(file) } catch { return { ok: false, retryable: true, error: ta('errNetwork') } }
-    if (data.length > MAX_ATTACHMENT_CHARS) return tooLarge()
-    try {
-      const res = await addAttachments(task.id, [{ filename: name, data }], await thumbFor())
-      const row = res.rows?.[0]
-      if (!res.success || !row) return { ok: false, retryable: false, error: res.error ?? ta('errUnexpected') }
-      router.refresh()
-      return { ok: true, attachment: {
-        id: row.id, task_id: task.id, filename: row.filename, data,
-        uploaded_by: row.uploaded_by ?? undefined, uploaded_at: row.uploaded_at,
-        size_bytes: row.size_bytes, content_type: row.content_type,
-      } }
-    } catch (e: unknown) {
-      // The 8 MB action body limit: say so instead of a raw framework error.
-      return String(e).includes('Body exceeded') ? tooLarge() : { ok: false, retryable: true, error: ta('errNetwork') }
-    }
-  }
+  const uploadForSection: UploadFn = makeUploader({
+    taskId: task.id, hasStorage, t: ta, onStored: () => router.refresh(),
+  })
 
   async function loadForSection(): Promise<TaskAttachment[]> {
     const rows = await loadAttachments(task.id)
@@ -1560,6 +1455,17 @@ export function TaskModal({
                   {attachments.length}
                 </button>
               )}
+              {sheetTarget && (
+                <button type="button" onClick={openSheet} data-open-sheet=""
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
+                          border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: CU.label,
+                        }}>
+                  <Icon name="subtask" size={13} color={CU.label} />
+                  {tsheet('openSheet')}
+                </button>
+              )}
               {copied === 'link' && (
                 <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
               )}
@@ -1936,10 +1842,16 @@ export function TaskModal({
                                   fontFamily: 'inherit', fontSize: 15, color: CU.text, textAlign: 'start',
                                 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            // A dropped clip (spec 008 FR-060): kept, greyed, struck through.
+                            ...(s.dropped_at ? { textDecoration: 'line-through', color: CU.faint } : {}),
+                          }}>
                             {s.name}
                           </span>
-                          <span style={{ fontSize: 13, color: CU.label, whiteSpace: 'nowrap' }}>{meta.label_en}</span>
+                          <span style={{ fontSize: 13, color: CU.label, whiteSpace: 'nowrap' }}>
+                            {s.dropped_at ? tsheet('drop.droppedSr') : meta.label_en}
+                          </span>
                         </button>
                       )
                     })}

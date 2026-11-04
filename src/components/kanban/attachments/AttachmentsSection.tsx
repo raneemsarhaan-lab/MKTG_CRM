@@ -1,5 +1,7 @@
 'use client'
 
+import { isLinkAttachment } from '@/lib/attachments'
+
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Member, TaskAttachment } from '@/types/index'
@@ -202,7 +204,8 @@ export function AttachmentsSection({
   }, [canEdit, queue, t])
 
   /* ── preview (US2) ───────────────────────────────────────────────────── */
-  const ordered = useMemo(() => newestFirst(files), [files])
+  // The preview walks files only: a Drive or web link opens in a new tab instead (spec 008 R7).
+  const ordered = useMemo(() => newestFirst(files).filter(f => !isLinkAttachment(f)), [files])
   const previewIndex = preview ? ordered.findIndex(f => f.id === preview.id) : -1
 
   // The file showing was removed by someone else: move on, or close (edge case, G1).
@@ -215,7 +218,7 @@ export function AttachmentsSection({
   }, [preview, previewIndex, ordered, loading, t])
 
   const openPreview = useCallback((id: string) => {
-    const i = newestFirst(filesRef.current).findIndex(f => f.id === id)
+    const i = newestFirst(filesRef.current).filter(f => !isLinkAttachment(f)).findIndex(f => f.id === id)
     if (i < 0) return false
     setMenuId(null)
     setPreview({ id, index: i })

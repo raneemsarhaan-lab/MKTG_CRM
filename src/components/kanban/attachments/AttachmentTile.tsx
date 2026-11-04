@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { TaskAttachment } from '@/types/index'
-import { attachmentSrc, extensionOf, isImageAttachment } from '@/lib/attachments'
+import { attachmentSrc, extensionOf, isImageAttachment, isLinkAttachment } from '@/lib/attachments'
 import { initials, avatarColor } from '@/lib/utils'
 import { AttIcon } from './icons'
 import { ageLabel } from './order'
@@ -31,9 +31,9 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-function Thumb({ a, children }: { a: Pick<TaskAttachment, 'filename' | 'url' | 'data'>; children?: React.ReactNode }) {
-  const image = isImageAttachment(a)
-  const ext = extensionOf(a.filename)
+function Thumb({ a, children, badge }: { a: Pick<TaskAttachment, 'filename' | 'url' | 'data'>; children?: React.ReactNode; badge?: string }) {
+  const image = !badge && isImageAttachment(a)
+  const ext = badge ?? extensionOf(a.filename)
   return (
     <span className="fx-att-thumb">
       {image
@@ -99,9 +99,28 @@ export function AttachmentTile({
   }
 
   const dl = downloadProps(a)
+  const link = isLinkAttachment(a)
 
   return (
     <div className="fx-att-tile" data-att-tile={a.id}>
+      {link ? (
+        // A Drive or web link (spec 008 R7): opens in a new tab, never in the preview.
+        <a
+          className="fx-att-open"
+          data-att-open={a.id}
+          data-att-link=""
+          href={a.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${t('openLink')}: ${a.filename}`}
+          onKeyDown={e => {
+            if (!canEdit) return
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDelete() }
+          }}
+        >
+          <Thumb a={a} badge={t('link')} />
+        </a>
+      ) : (
       <button
         type="button"
         className="fx-att-open"
@@ -118,6 +137,7 @@ export function AttachmentTile({
           {isLatest && <span className="fx-att-pills"><span className="fx-att-pill is-latest">{t('latest')}</span></span>}
         </Thumb>
       </button>
+      )}
 
       <div className="fx-att-info">
         {renaming ? (

@@ -27,6 +27,8 @@ export default async function BoardPage() {
           select: {
             id: true, task_id: true, filename: true, url: true,
             uploaded_at: true, uploaded_by: true,
+            // Tells a Drive link (text/uri-list) from a file (spec 008 R7).
+            content_type: true,
           },
         },
         // The plan step this task delivers, if any — names only, so the panel
@@ -35,7 +37,11 @@ export default async function BoardPage() {
           select: { id: true, name: true, project: { select: { id: true, name: true } } },
         },
         parent:     { select: { id: true, name: true } },
-        subtasks:   { select: { id: true, name: true, status: true }, orderBy: { created_at: 'asc' } },
+        subtasks:   { select: { id: true, name: true, status: true, dropped_at: true }, orderBy: { created_at: 'asc' } },
+        // A clip's details, for the video sheet (spec 008). Small: numbers and two short strings.
+        clip: {
+          select: { clip_no: true, source: true, file_name: true, in_ms: true, out_ms: true, video_id: true, created_at: true },
+        },
       },
       orderBy: { created_at: 'desc' },
     }),

@@ -54,6 +54,45 @@ export const ATTACH_UI = {
 } as const
 
 /**
+ * The video sheet (spec 008): a dense spreadsheet grid. Mirrored as `--sheet-*`
+ * CSS variables in globals.css. Change both together.
+ */
+export const SHEET_UI = {
+  ink:          COLORS.ink,
+  panel:        COLORS.panel,
+  /** Gridlines on every cell. */
+  grid:         '#E2E3E3',
+  /** The header row and the summary line. */
+  headerBg:     '#F3F4F2',
+  /** Row numbers and other quiet text. */
+  muted:        '#6F7276',
+  /** The row-number gutter. */
+  gutter:       '#F8F9F8',
+  /** The line after the frozen title column and under the header. */
+  frozenLine:   '#C9CBC9',
+  /** The video's own row. */
+  videoRowBg:   '#F4F8E4',
+  /** A row reached from "Open sheet" on a clip, and the active row. */
+  highlight:    '#FAFDE9',
+  hover:        '#F6F8FB',
+  /** Dropped clips: struck through, in this colour. */
+  droppedInk:   COLORS.muted,
+  /** "Missing link" on a published clip. */
+  missingLink:  '#B26A00',
+  missingLinkBg:'#FDF3E3',
+  /** The active cell's ring, and focus. */
+  focus:        BRIEF_UI.blue,
+  link:         '#1F5FD1',
+  /** The status menu's "Next" item. */
+  menuNext:     COLORS.lime,
+  menuNextInk:  COLORS.ink,
+  danger:       ATTACH_UI.danger,
+  dangerSoft:   ATTACH_UI.dangerSoft,
+  /** Behind the Paste clips dialog (CSS uses it at 45 % opacity). */
+  backdrop:     '#111214',
+} as const
+
+/**
  * One colour per kind of non-image file, for the extension badge on a tile
  * and in the preview (spec 007 FR-004). Lifted from TaskModal's EXT_COLORS.
  */
