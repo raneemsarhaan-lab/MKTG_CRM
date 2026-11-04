@@ -101,18 +101,18 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Lab scenarios `link-*` pass. Clicking a link opens no page.
 
-- [ ] T017 [US2] In `brief-editor/extensions.ts`, configure StarterKit's link: `StarterKit.configure({ link: { openOnClick: false, autolink: true, linkOnPaste: true, defaultProtocol: 'https', isAllowedUri: (url) => normaliseUrl(url).ok } })`. Use it in `BriefEditor.tsx` instead of the bare `StarterKit`.
-- [ ] T018 [US2] Create `brief-editor/LinkCard.tsx`: a `BubbleMenu` with `shouldShow={({ editor }) => editor.isActive('link')}`, `role="dialog"` and `aria-label` set to the host. It shows `hostOf(href)` plus `prettyPath(href)` shortened to 32 characters, with the full URL in `title`. Buttons:
+- [X] T017 [US2] In `brief-editor/extensions.ts`, configure StarterKit's link: `StarterKit.configure({ link: { openOnClick: false, autolink: true, linkOnPaste: true, defaultProtocol: 'https', isAllowedUri: (url) => normaliseUrl(url).ok } })`. Use it in `BriefEditor.tsx` instead of the bare `StarterKit`.
+- [X] T018 [US2] Create `brief-editor/LinkCard.tsx`: a `BubbleMenu` with `shouldShow={({ editor }) => editor.isActive('link')}`, `role="dialog"` and `aria-label` set to the host. It shows `hostOf(href)` plus `prettyPath(href)` shortened to 32 characters, with the full URL in `title`. Buttons:
   - **Open ↗**: a real `<a href target="_blank" rel="noopener noreferrer">`.
   - **Edit**: opens ValuePrompt `link`, pre-filled.
   - **Remove**: `chain().focus().extendMarkRange('link').unsetLink().run()`.
   Delete the formatting `BubbleMenu` from `BriefEditor.tsx` (FR-021, FR-025).
-- [ ] T019 [US2] Add a `LinkShortcut` extension in `brief-editor/extensions.ts` (`addKeyboardShortcuts: { 'Mod-k': () => { openLinkPrompt(); return true } }`, with the callback passed through extension options), so Mod+K opens the link prompt (FR-024).
-- [ ] T020 [US2] In `brief-editor/ValuePrompt.tsx`, validate the `link` kind with `normaliseUrl`:
+- [X] T019 [US2] Add a `LinkShortcut` extension in `brief-editor/extensions.ts` (`addKeyboardShortcuts: { 'Mod-k': () => { openLinkPrompt(); return true } }`, with the callback passed through extension options), so Mod+K opens the link prompt (FR-024).
+- [X] T020 [US2] In `brief-editor/ValuePrompt.tsx`, validate the `link` kind with `normaliseUrl`:
   - Show the localized reason under the input; disable the CTA while invalid.
   - On confirm, use `ok.href`: with no selection, insert the text as a link; with a selection, `extendMarkRange('link').setLink({ href })`.
   - Pre-fill from `editor.getAttributes('link').href` (FR-022, FR-023).
-- [ ] T021 [US2] Add lab scenarios `link-click-no-open`, `link-open-edit-remove`, `link-mod-k` and `link-normalise` to `scripts/brief-editor-lab/scenarios.mjs`.
+- [X] T021 [US2] Add lab scenarios `link-click-no-open`, `link-open-edit-remove`, `link-mod-k` and `link-normalise` to `scripts/brief-editor-lab/scenarios.mjs`.
 
 ---
 

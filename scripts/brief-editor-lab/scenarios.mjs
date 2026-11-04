@@ -67,7 +67,12 @@ function makeHelpers(page, context, base) {
     },
     lab: () => page.evaluate(() => window.__lab),
     /** The last Markdown the stub host stored, after any save in flight lands. */
-    async md(settle = 500) { await page.waitForTimeout(settle); return (await t.lab()).md },
+    async md(settle = 300) {
+      await page.waitForTimeout(settle)
+      await page.waitForFunction(() => !document.querySelector('[data-save-status="saving"]'), null, { timeout: 25_000 }).catch(() => {})
+      await page.waitForTimeout(50)
+      return (await t.lab()).md
+    },
     editor: () => page.locator('.ProseMirror').first(),
     async focusEnd() { await t.editor().click(); await page.keyboard.press('Control+End') },
     btn: title => page.locator(`button[title^="${title}"]`).first(),

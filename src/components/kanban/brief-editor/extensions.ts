@@ -1,4 +1,4 @@
-import { Node, type Editor } from '@tiptap/core'
+import { Extension, Node, type Editor } from '@tiptap/core'
 import type { MarkdownStorage } from 'tiptap-markdown'
 
 // tiptap-markdown predates Tiptap v3's stricter Storage typing and doesn't
@@ -105,3 +105,16 @@ export const Toggle = Node.create({
 export function getMarkdown(editor: Editor): string {
   return editor.storage.markdown.getMarkdown().replace(/\\\[\\\[toc\\\]\\\]/g, '[[toc]]')
 }
+
+/**
+ * Mod+K opens the link box (FR-024). The tooltip promised it before, but
+ * nothing was bound (audit E8). `open` is read through a ref by the caller,
+ * because extensions are created once with the editor.
+ */
+export const LinkShortcut = Extension.create<{ open: () => void }>({
+  name: 'briefLinkShortcut',
+  addOptions() { return { open: () => {} } },
+  addKeyboardShortcuts() {
+    return { 'Mod-k': () => { this.options.open(); return true } }
+  },
+})

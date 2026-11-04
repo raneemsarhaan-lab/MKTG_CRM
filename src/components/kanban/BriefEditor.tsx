@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useEditor, EditorContent } from '@tiptap/react'
-import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -14,7 +13,8 @@ import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
-import { Toggle, getMarkdown } from './brief-editor/extensions'
+import { Toggle, LinkShortcut, getMarkdown } from './brief-editor/extensions'
+import { LinkCard } from './brief-editor/LinkCard'
 import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
 import { ConfirmLeave } from './brief-editor/ConfirmLeave'
 import { useSaveQueue, type SaveStatus } from './brief-editor/useSaveQueue'
@@ -85,7 +85,15 @@ export function BriefEditor({
   const [focused, setFocused] = useState(false)
   const [prompt, setPrompt]   = useState<PromptKind | null>(null)
   const [promptInitial, setPromptInitial] = useState('')
+  // Bumped on every open, so reopening the box (Mod+K again, Edit on another
+  // link) starts from that link's address rather than the last draft.
+  const [promptSeq, setPromptSeq] = useState(0)
+  // The selection when the box opened. Typing in the box takes focus from the
+  // editor, and the editor's own selection can move meanwhile (a save landing,
+  // a click elsewhere), so the link goes onto the range that was selected.
+  const promptRange = useRef<{ from: number; to: number } | null>(null)
   const [note, setNote]       = useState('')
+  const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const styleBtn  = useRef<HTMLButtonElement>(null)
   const insertBtn = useRef<HTMLButtonElement>(null)
   const moreBtn   = useRef<HTMLButtonElement>(null)
@@ -102,8 +110,11 @@ export function BriefEditor({
   stateCb.current = onSaveStateChange
   useEffect(() => { stateCb.current?.(save.status, pendingUploads) }, [save.status, pendingUploads])
 
-  // Read by the key handler, which Tiptap captures once at creation.
+  // Read by the key handler and extensions, which Tiptap captures once at creation.
   const leaveRef = useRef<() => void>(() => {})
+  const openLinkRef = useRef<() => void>(() => {})
+  const promptOpenRef = useRef(false)
+  promptOpenRef.current = prompt !== null
 
   /**
    * Leave editing, the way Esc and a click outside both do (contracts/
@@ -124,7 +135,13 @@ export function BriefEditor({
     immediatelyRender: false,
     autofocus: 'end',
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // A click inside the editor places the cursor; the link card offers
+        // Open (research R3). Parsing keeps Tiptap's default URI check, so
+        // existing relative, anchor and mailto links in briefs survive (FR-100).
+        link: { openOnClick: false, autolink: true, linkOnPaste: true, defaultProtocol: 'https' },
+      }),
+      LinkShortcut.configure({ open: () => openLinkRef.current() }),
       TaskList,
       TaskItem.configure({ nested: true }),
       TiptapImage,
@@ -156,8 +173,12 @@ export function BriefEditor({
   function openPrompt(kind: PromptKind) {
     setMenu(null)
     setPromptInitial(kind === 'link' ? (editor?.getAttributes('link').href as string | undefined) ?? '' : '')
+    promptRange.current = editor ? { from: editor.state.selection.from, to: editor.state.selection.to } : null
     setPrompt(kind)
+    setPromptSeq(n => n + 1)
   }
+
+  openLinkRef.current = () => openPrompt('link')
 
   function closePrompt() {
     setPrompt(null)
@@ -169,15 +190,17 @@ export function BriefEditor({
     if (prompt === 'image') editor.chain().focus().setImage({ src: v }).run()
     if (prompt === 'youtube') editor.chain().focus().insertContent({ type: 'paragraph', content: [{ type: 'text', text: v }] }).run()
     if (prompt === 'link') {
-      if (editor.state.selection.empty && !editor.isActive('link')) {
-        editor.chain().focus().insertContent({ type: 'text', text: v, marks: [{ type: 'link', attrs: { href: v } }] }).run()
-      } else {
-        editor.chain().focus().extendMarkRange('link').setLink({ href: v }).run()
-      }
+      const r = promptRange.current
+      const size = editor.state.doc.content.size
+      const range = r && r.to <= size ? r : { from: editor.state.selection.from, to: editor.state.selection.to }
+      const chain = editor.chain().focus().setTextSelection(range)
+      if (range.from !== range.to) chain.setLink({ href: v }).run()
+      else if (editor.isActive('link')) chain.extendMarkRange('link').setLink({ href: v }).run()
+      else chain.insertContent({ type: 'text', text: v, marks: [{ type: 'link', attrs: { href: v } }] }).run()
     }
     if (prompt === 'subtask' && onCreateSubtask) {
       const made = await onCreateSubtask(v)
-      if (!made) { setNote(t('subtaskFailed')); return }
+      if (!made) { flashNote(t('subtaskFailed')); return }
       editor.chain().focus().insertContent({
         type: 'taskList',
         content: [{
@@ -196,15 +219,20 @@ export function BriefEditor({
     chain.unsetAllMarks().clearNodes().run()
   }
 
+  function flashNote(msg: string, ms = 2500) {
+    setNote(msg)
+    clearTimeout(noteTimer.current)
+    noteTimer.current = setTimeout(() => setNote(''), ms)
+  }
+
   async function copyMarkdown() {
     if (!editor) return
     try {
       await navigator.clipboard.writeText(getMarkdown(editor))
-      setNote(t('markdownCopied'))
+      flashNote(t('markdownCopied'))
     } catch {
-      setNote(t('clipboardBlocked'))
+      flashNote(t('clipboardBlocked'))
     }
-    setTimeout(() => setNote(''), 2500)
   }
 
   if (!editor) return null
@@ -365,7 +393,7 @@ export function BriefEditor({
         {/* Value prompt for the insert items that need one */}
         {prompt && (
           <ValuePrompt
-            key={prompt}
+            key={`${prompt}:${promptSeq}`}
             kind={prompt}
             initial={promptInitial}
             images={images}
@@ -375,29 +403,7 @@ export function BriefEditor({
           />
         )}
 
-        <BubbleMenu editor={editor}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 2, background: COLORS.panel, borderRadius: 10,
-            boxShadow: `0 12px 32px ${alpha(BRIEF_UI.ink, 0.16)}`, padding: 4,
-          }}>
-            <ToolButton title={`${t('bold')} (Ctrl+B)`} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
-              <b style={{ fontSize: 14 }}>B</b>
-            </ToolButton>
-            <ToolButton title={`${t('italic')} (Ctrl+I)`} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
-              <i style={{ fontSize: 14, fontFamily: 'serif' }}>I</i>
-            </ToolButton>
-            <ToolButton title={`${t('strike')} (Ctrl+Shift+X)`} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
-              <span style={{ fontSize: 14, textDecoration: 'line-through' }}>S</span>
-            </ToolButton>
-            <ToolButton title={`${t('code')} (Ctrl+E)`} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
-              <ToolIcon name="code" size={14} />
-            </ToolButton>
-            <Sep />
-            <ToolButton title={`${t('link')} (Ctrl+K)`} active={editor.isActive('link')} onClick={() => openPrompt('link')}>
-              <ToolIcon name="link" size={14} />
-            </ToolButton>
-          </div>
-        </BubbleMenu>
+        <LinkCard editor={editor} hiddenRef={promptOpenRef} onEdit={() => openPrompt('link')} onNote={flashNote} />
 
         <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: '0 0 18px 18px' }} />
       </div>
