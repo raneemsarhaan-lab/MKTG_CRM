@@ -13,13 +13,13 @@ How spec 009 was checked, and what wasn't. Run end to end without stopping, at t
 | `next build` (production) | Pass |
 | `prisma db push` + seed on local PostgreSQL | Pass: `content_pillars`; theme fields on `projects`; `tasks.pillar_id`, `tasks.post_url`; `task_attachments.link_role`; Article, Report and Framework/Model with 11 SLA rows each |
 | `npm run lab:attachments` (regression) | 60/60 pass |
-| `npm run lab:brief` (regression) | See §2 |
+| `npm run lab:brief` (regression) | 55/55 pass |
 
 ## 2. Sheet lab: `npm run lab:sheet` (both sheets)
 
 **The shared grid core (T008).** Spec 008's video sheet runs on the core extracted for this feature. Its 68 checks passed on the core before any content UI was built, and pass again in the full run.
 
-**Full run: see the result recorded below.** Spec 008's checks, plus spec 009's:
+**Full run: 109/109 pass** (14 Node checks and 95 browser scenarios). Spec 008's checks, plus spec 009's:
 - **4 Node checks**:
   - readers: status words including "Initial Design", "Final Design", Archived and blank; types including "Social Media" → Post; frequency, audience, Task Links and links;
   - reading the reference rows as plain text: 18 pieces, merged cells carried down, pillars not carried into the next theme, "Link error" and the post title never links;
