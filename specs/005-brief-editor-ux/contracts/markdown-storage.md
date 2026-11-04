@@ -10,7 +10,7 @@ The stored format of `tasks.description`. Two readers depend on it: the editor (
 | Quote | `> text` | blockquote | blockquote |
 | Divider | `---` | `<hr>` | horizontalRule |
 | Table | GFM pipe table with header row | table (scrolls if wide) | table |
-| Resized table (F2) | `<table data-widths="30,15,55" data-width="70" data-offset="10">…</table>` (HTML; all percentages; `data-width`/`data-offset` omitted at 100/0) | table at that width and position with those column widths (**requires the three `data-*` attributes in the sanitize allow-list**, FR-068) | table with `colwidth`s, `width`, `offset` |
+| Resized table (F2) | `<table data-widths="30,15,55" data-width="70" data-offset="10">…</table>` (HTML; all percentages; `data-width`/`data-offset` omitted at 100/0; cell content as full HTML: lists, paragraphs, images kept) | table at that width and position with those column widths (**requires the three `data-*` attributes in the sanitize allow-list**, FR-068) | table with `colwidth`s, `width`, `offset` |
 | Image | `![alt](https://…)` on its own line | `<img>` | image (block) |
 | Toggle | `<details>\n<summary>Title</summary>\n\nbody\n\n</details>` | collapsible | toggle `{ summary }` |
 | YouTube (**new node**) | `<https://www.youtube.com/watch?v=ID>` on its own line | 16:9 embed (existing `youtubeId` rule) | youtube `{ src }` |

@@ -22,7 +22,7 @@ interface BriefEditorProps {
   /** REMOVED: `saving: boolean`. The editor owns its save state now (see onSaveStateChange). */
 
   /** Optional. Called whenever save state changes, so the host can guard its own close button. NEW. */
-  onSaveStateChange?: (state: 'saved' | 'saving' | 'error') => void
+  onSaveStateChange?: (state: 'saved' | 'saving' | 'error', pendingUploads: number) => void
 
   /** Leave editing. Called on a click outside the editor or Esc (through the overlay stack
    *  and the unsaved-changes bar). There is no Done button. Omitted where there is no read
@@ -68,7 +68,7 @@ type UploadResult =
 - `uploadUnavailableReason` = `!canEdit ? 'no-permission' : 'no-storage'` when `onUploadImages` is not passed.
 - The window-level `drop` listener returns early when `e.defaultPrevented`, so drops handled by the editor are not uploaded twice.
 - The read view's `onClick` records `initialCursor` and the clicked block's on-screen `top` before setting `editingBrief`. After the editor mounts, it scrolls the panel by the difference so the text stays still (R25).
-- The panel close control consults the last `onSaveStateChange` value. If it is `'error'`, it shows the same "Stay · Leave anyway" choice before closing.
+- The panel close control consults the last `onSaveStateChange` values. If the state is `'error'` or `pendingUploads > 0`, it shows the same "Stay · Leave anyway" choice before closing.
 
 ### `TaskForm`
 

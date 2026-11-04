@@ -18,7 +18,7 @@ Every decision below was checked against the installed code: Tiptap 3.31.3, `tip
 - The editor marks text as saved only on `true`. On `false` the state becomes `error`; the newest text stays queued.
 - Automatic retry with backoff (2 s, 5 s, 15 s, then every 30 s) while in `error`, plus a manual **Retry**. Any keystroke also triggers a send. A send always carries the newest text (the existing one-request-at-a-time rule is kept).
 - A watchdog: if a save has not settled after 20 s, treat it as failed (covers hosts that break the contract).
-- Leaving (Done, Esc, or the host closing the panel) while `error` shows an in-editor confirm bar: "Your last changes aren't saved. **Stay** · Leave anyway". The editor exposes its state via `onSaveStateChange` so `TaskModal`'s own close button can ask the same question.
+- Leaving (click-away, Esc, or the host closing the panel) shows an in-editor confirm bar when the save state is `error` ("Your last changes aren't saved. **Stay** · Leave anyway") **or an image upload is still running** ("An image is still uploading. **Stay** · Leave anyway"). Leaving the editor mid-upload would otherwise unmount it: the file would land as an attachment but never appear in the brief. The editor reports both through `onSaveStateChange(state, pendingUploads)`, so `TaskModal`'s own close button can ask the same question.
 - On unmount the existing "send whatever is unsent" behaviour stays.
 
 **Rationale.** It fixes both the false "Saved" and the hang, keeps the race-free single-flight queue that already works, and needs no server change.
@@ -153,7 +153,7 @@ export const BRIEF_UI = { ink: '#18233F', label: '#68738D', faint: '#929CB0', li
   surface: '#F8FAFD', blue: '#3563E9', blueLight: '#EEF3FF', blueActive: '#E5EDFF' } as const
 ```
 
-plus `error` mapped to the existing `COLORS.coral`. The editor's local `BR` constant is deleted and every use reads `BRIEF_UI`. This matches the spec assumption: extend the palette, don't amend §I. `TaskModal`'s and `TaskForm`'s `CU` constants hold the same values; switching them over is a one-line follow-up, out of scope here.
+plus `error` mapped to the existing `COLORS.coral`. The same values are declared once as CSS variables in `src/app/globals.css` (`--brief-ink`, `--brief-label`, `--brief-faint`, `--brief-line`, `--brief-surface`, `--brief-blue`, `--brief-blue-light`, `--brief-blue-active`), with a comment pointing at `BRIEF_UI` as their source. Every stylesheet rule this feature adds uses only these variables or the existing `--ink`/`--muted`/`--line`; no hex values in CSS. The editor's local `BR` constant is deleted and every use reads `BRIEF_UI`. This matches the spec assumption: extend the palette, don't amend §I. `TaskModal`'s and `TaskForm`'s `CU` constants hold the same values; switching them over is a one-line follow-up, out of scope here.
 
 ## R18. Arabic and RTL (FR-090, FR-091, E18)
 
@@ -216,7 +216,7 @@ plus `error` mapped to the existing `COLORS.coral`. The editor's local `BR` cons
 - `prosemirror-tables` has no handle on the table's **start** edge and treats the end edge as "widen the last column". So a small `TableEdges` plugin adds decorations on both outer edges (mirrored in RTL). Dragging the end edge changes the table's `width`; dragging the start edge changes its `offset` (inline-start margin) and width together. The edge column absorbs the change, clamped so `offset + width ≤ 100%` and no column goes below 64 px. The preview implements exactly this behaviour.
 - Store widths as **percentages** so they survive different panel widths: on save, convert each column's pixel `colwidth` to a share of the table's total.
 - Table node attrs `width` (percent of the brief, default 100) and `offset` (percent, default 0).
-- Serialization: a table with no explicit widths and the defaults stays a GFM pipe table (unchanged, FR-100). Otherwise it is written as an HTML table `<table data-widths="30,15,55" data-width="70" data-offset="10">…</table>`, with cell contents in Markdown-compatible inline HTML. The table's `parseHTML` reads `data-widths` back into `colwidth`s at mount, scaled to the current width.
+- Serialization: a table with no explicit widths and the defaults stays a GFM pipe table (unchanged, FR-100). Otherwise it is written as an HTML table `<table data-widths="30,15,55" data-width="70" data-offset="10">…</table>`, with each cell's content serialized as HTML by the editor's own DOM serializer, so lists, several paragraphs, images and links inside a cell are kept in full (all are tags the read view's sanitizer already allows). Nothing is flattened. The table's `parseHTML` reads `data-widths` back into `colwidth`s at mount, scaled to the current width.
 - Read view: allow `data-widths`, `data-width` and `data-offset` on `table` in the sanitize schema. `Brief.tsx`'s `table` component renders a `<colgroup>` from `data-widths` and applies `width`/`margin-inline-start` from the other two, with `table-layout: fixed`.
 - **Equal widths** clears the column widths; **Full width** resets `width`/`offset`. With both reset, the table goes back to a plain GFM pipe table.
 - Touch: the handle's hit area widens to 14 px when the pointer is coarse.

@@ -36,6 +36,7 @@ The stub host can be switched per scenario:
 | `save=hang` | never settles (checks the 20 s watchdog) |
 | `upload=ok` | resolves `{ ok: true, url }` with a data-URL image after 400 ms |
 | `upload=fail` | resolves `{ ok: false, error }` |
+| `upload=slow` | resolves `{ ok: true, url }` after 3 s, for leaving mid-upload |
 | `upload=absent` | prop omitted, checks each `uploadUnavailableReason` |
 | `locale=ar` | Arabic messages and `dir="rtl"` |
 
@@ -57,6 +58,7 @@ Each scenario corresponds to a spec acceptance scenario.
 | `link-mod-k` | US2 #4 | Mod+K opens the prefilled box |
 | `link-normalise` | US2 #5–6 | `forefront.consulting` saves as `https://forefront.consulting`; `see the deck` is rejected |
 | `paste-image` | US3 #1 | synthetic paste of a PNG: placeholder, then image; the Markdown has the uploaded URL |
+| `leave-during-upload` | FR-004 | `upload=slow`: clicking away mid-upload shows "An image is still uploading"; Stay keeps editing until the image is inserted |
 | `drop-images-order` | US3 #2 | drop 3 files: inserted in order |
 | `upload-fail` | US3 #3 | `upload=fail`: placeholder removed; note names the file |
 | `image-url-validate` | US3 #4–5 | invalid address rejected; valid address shows a preview |
@@ -93,7 +95,7 @@ Each scenario corresponds to a spec acceptance scenario.
 
 Prerequisites: a deployment or local run with `DATABASE_URL` and the bucket variables set (HANDOVER §storage), signed in as a member who can edit a task.
 
-1. Open a task and its brief. Paste a screenshot (⌘V). It appears in place and in the task's attachment list, and the board card's thumbnail updates.
+1. Open a task and its brief. Paste a 5 MB screenshot (⌘V) and time it from paste to the image appearing: under 5 s on an office connection (SC-003). It appears in place and in the task's attachment list, and the board card's thumbnail updates.
 2. Drop an image onto the brief. It is inserted once and attached once (check the attachment count goes up by exactly one).
 3. Turn the network off in DevTools and type. The status turns to "Couldn't save · Retry". Press Esc and the bar asks before leaving. Turn the network on and press Retry. Close and reopen the task: the text is there.
 4. Click a word in the read brief. Editing starts with the cursor on that word, the text doesn't jump, and there is no Edit or Done button. Click elsewhere in the panel and editing ends.

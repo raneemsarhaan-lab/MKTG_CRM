@@ -239,7 +239,8 @@ What the person sees while editing looks the same after clicking away: underline
 - **YouTube Shorts, youtu.be and timestamped links**: accepted as YouTube videos.
 - **Existing briefs** that already contain filler toggle text, raw `[[toc]]`, bare YouTube addresses or relative links: they open and render as before; nothing is rewritten unless the person edits that part.
 - **"/" typed as content** (dates like 4/11, paths, "and/or"): no menu opens.
-- **Esc while an upload is in progress**: closes only the upload's menu if one is open; otherwise the unsaved-changes rule applies until the upload finishes.
+- **Esc or click-away while an upload is in progress**: closes the top menu if one is open; otherwise the person is asked to confirm ("An image is still uploading"), as for a failed save (FR-004). If they leave anyway, the upload finishes as a task attachment but is not inserted into the brief.
+- **A resized table whose cells hold lists, several paragraphs or images**: the cell content is kept in full (FR-068), not flattened to one line.
 
 ## Requirements *(mandatory)*
 
@@ -250,7 +251,7 @@ What the person sees while editing looks the same after clicking away: underline
 - **FR-001**: The editor MUST treat text as saved only after a save has succeeded.
 - **FR-002**: When a save fails, the editor MUST show "Couldn't save" with a Retry action, and MUST keep the unsaved text.
 - **FR-003**: After a failure, any further typing or Retry MUST send the newest text; no older text may overwrite newer text.
-- **FR-004**: Leaving editing (clicking outside the brief, Esc, or closing the panel) with unsaved changes after a failure MUST ask the person to confirm leaving.
+- **FR-004**: Leaving editing (clicking outside the brief, Esc, or closing the panel) MUST ask the person to confirm when a save has failed, or when an image is still uploading. Leaving anyway keeps any finished upload as a task attachment.
 - **FR-005**: The save status MUST appear in exactly one place in the editor.
 
 **Undo and accidental damage (Story 4)**
@@ -328,7 +329,7 @@ What the person sees while editing looks the same after clicking away: underline
 
 **Compatibility (all stories)**
 
-- **FR-100**: Briefs MUST continue to be stored in the same format, so existing briefs open unchanged and briefs written after this change still display correctly everywhere briefs are shown.
+- **FR-100**: Briefs MUST continue to be stored in the same Markdown format, so existing briefs open unchanged and briefs written after this change still display correctly everywhere briefs are shown. The one addition is a table whose size was changed by dragging (FR-067): it is stored as an HTML table carrying its sizes, which the read view also renders. A table nobody resized is stored exactly as today.
 - **FR-101**: Existing editor behaviour listed under Context as working (autosave ordering, Markdown shortcuts, pasting Markdown, pasting a URL over a selection, checkbox ticking, New subtask, toggle and table round-trips, Copy Markdown) MUST keep working.
 
 ### Key Entities
@@ -362,7 +363,7 @@ What the person sees while editing looks the same after clicking away: underline
 - **E21 resolution**: the save status lives in the toolbar; the footer under the editor keeps only one-off messages (there is no Done button, FR-014).
 - Pasted and dropped images use the existing attachment storage, limits and permissions; no new storage is introduced.
 - Images are uploaded only from image data or files, not by fetching remote images found in pasted web content.
-- The unsaved-changes warning (FR-004) appears only after a save has failed; ordinary in-flight saves keep the current "nothing is discarded" behaviour.
+- The unsaved-changes warning (FR-004) appears only after a save has failed or while an image is uploading; ordinary in-flight text saves keep the current "nothing is discarded" behaviour.
 - Both places the editor appears, the task panel and the Create Task form, get these changes. Where the Create Task form has no task yet, pasted images wait for the task to be created before uploading, or the form explains that images can be added after creating the task. The planning phase decides which.
 - The read-only brief view is changed only where needed for FR-080, FR-081, FR-066 and FR-068.
 - **F1**: the `TaskModal` read view keeps its rich rendering (embeds, link chips, Expand); the editor replaces it on click, at the clicked position. The Create Task form has no read view, so it is always in editing and click-away does not apply there.

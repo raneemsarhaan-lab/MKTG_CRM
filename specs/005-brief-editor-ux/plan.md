@@ -16,7 +16,7 @@ Revised after the preview review: editing starts by clicking the brief and ends 
 
 Technical approach, in one line each (decisions in [research.md](./research.md)):
 
-- Everything stays in `BriefEditor.tsx`, split into small co-located modules under `src/components/kanban/brief-editor/`. The Markdown storage format is unchanged.
+- Everything stays in `BriefEditor.tsx`, split into small co-located modules under `src/components/kanban/brief-editor/`. The Markdown storage format is unchanged, with one addition: a table resized by dragging is stored as an HTML table carrying its sizes (research R26, FR-100). Untouched tables stay Markdown tables.
 - New blocks (YouTube, table of contents) are editor-only node types that read and write the *same Markdown the read view already understands*. Old briefs parse into them; new briefs stay readable by `Brief.tsx`.
 - The parent ↔ editor boundary gets two explicit contracts: `onSave` resolves to success or failure and never hangs, and `onUploadImages` uploads files and returns their addresses. See [contracts/brief-editor-props.md](./contracts/brief-editor-props.md).
 - One new package, `@tiptap/suggestion@3.31.3`, for the "/" menu. It is the official sub-package of the Tiptap version already installed.
@@ -51,10 +51,10 @@ Technical approach, in one line each (decisions in [research.md](./research.md))
 
 | Principle | Applies? | Status | Notes |
 |---|---|---|---|
-| §I Design System Fidelity: no colour literals outside the token map | Yes | **PASS (after fix)** | Today the editor violates this (`BR` palette, audit E23). The plan moves the blue + lime UI palette into `src/lib/tokens.ts` as `BRIEF_UI` and the editor imports it (FR-082). `TaskModal`'s `CU` and `TaskForm`'s `CU` carry the same literals. They are out of this spec's scope, but they can switch to the same tokens in a follow-up. Typography stays Inter for body, Montserrat for brief headings via `--font-heading`. |
+| §I Design System Fidelity: no colour literals outside the token map | Yes | **PASS (after fix)** | Today the editor violates this (`BR` palette, audit E23). The plan moves the blue + lime UI palette into `src/lib/tokens.ts` as `BRIEF_UI` and the editor imports it (FR-082). CSS can't read TypeScript, so the same values are declared once as CSS variables (`--brief-*`) in `src/app/globals.css`, and stylesheet rules use only those variables, never hex values (research R17). `TaskModal`'s `CU` and `TaskForm`'s `CU` carry the same literals. They are out of this spec's scope, but they can switch to the same tokens in a follow-up. Typography stays Inter for body, Montserrat for brief headings via `--font-heading`. |
 | §II Workflow Pipeline Integrity | No | N/A | No stage, SLA or ownership change. |
 | §III Role-Based Feature Access: UI MUST conditionally render, not rely on API checks alone | Yes | **PASS** | Image paste/drop is offered only when the host passes `onUploadImages`, which `TaskModal` passes only when `canEdit && hasStorage`. The server route keeps its existing `mayAttachTo` guard. |
-| §IV Design-Driven Development: a standalone HTML design file MUST precede new views or major components | Yes | **PASS (conditional)** | The link card, "/" menu, table menu and reworked toolbar are new UI. Task **T001** produces `design/brief-editor-ux.html` (toolbar desktop + phone, link card, "/" menu, table menu, save-failure state, Arabic) and is a hard prerequisite for every UI task. |
+| §IV Design-Driven Development: a standalone HTML design file MUST precede new views or major components | Yes | **PASS (conditional)** | The link card, "/" menu, table menu and reworked toolbar are new UI. Task **T001** produces `design/brief-editor-ux.html` (toolbar desktop + phone, link card, "/" menu, table menu, save-failure state, click-to-edit, table resizing, Arabic) and is a hard prerequisite for every UI task. **Format:** the existing `design/ui/*.html` files are compressed bundles; this one is the approved preview committed as plain, readable HTML. That satisfies the MUST (a standalone HTML design file, the source of truth for layout, colours, interactions and copy), and it needs no decompression step. The PR's Constitution Check (T067) states this explicitly so reviewers can object. |
 | §V Cultural UX: Arabic copy as content data | Yes | **PASS** | All editor strings move to a `briefEditor` namespace in `messages/en.json` and `messages/ar.json` (FR-090). |
 | §VI State Architecture: no persisted client state, no new Zustand keys | Yes | **PASS** | Save state and overlays are local component state; nothing is persisted client-side. |
 | Tech Stack: adding a *major* dependency needs an amendment | Yes | **PASS** | `@tiptap/suggestion` is a sub-package of the already-adopted Tiptap at the same pinned version, not a new major dependency. Recorded in research R6. |
@@ -97,6 +97,10 @@ src/
 │   │   │   ├── extensions.ts               # Toggle, Youtube, Toc, LinkShortcut, SlashCommand config
 │   │   │   ├── useSaveQueue.ts             # save contract: queue, retry, state (R1)
 │   │   │   ├── useOverlayStack.ts          # Esc layering (R2)
+│   │   │   ├── ConfirmLeave.tsx            # "Stay · Leave anyway" bar: failed save or upload in progress (R1, R5)
+│   │   │   ├── blocks.ts                   # BLOCK_ITEMS shared by Insert, Text style and "/" (R6, R21)
+│   │   │   ├── tableEdges.ts               # drag the table's outer edges: width + offset (R26)
+│   │   │   ├── shortcut.ts                 # ⌘ vs Ctrl labels (R18)
 │   │   │   ├── imageUpload.ts              # paste/drop → placeholder decorations → insert (R5)
 │   │   │   ├── Toolbar.tsx                 # role=toolbar, sticky, phone row (R13, R14, R16)
 │   │   │   ├── Menu.tsx                    # roving-focus menu used by all dropdowns (R16)
@@ -126,8 +130,8 @@ Each band is a releasable increment, mirroring the spec's priorities.
 | Band | Stories | Key requirements | Depends on |
 |---|---|---|---|
 | 0. Foundations | n/a | T001 design file; token palette; i18n namespace scaffold; lab harness | none |
-| 1. Trust (P1) | US1, US4, US2, US3 | FR-001–005, 010–013, 020–025, 030–036 | Band 0 |
-| 2. Reach (P2) | US5, US6, US7, US8 | FR-040–047, 060–066, 070–071, 090–091 | Band 1's `Menu` and overlay stack |
+| 1. Trust (P1) | US1, US4, US2, US3 | FR-001–005, 010–017, 020–025, 030–036 | Band 0 |
+| 2. Reach (P2) | US5, US6, US7, US8 | FR-040–047, 060–069, 070–071, 090–091 | Band 1's `Menu` and overlay stack |
 | 3. Match (P3) | US9 | FR-080–082 | none (can run in parallel with Band 2) |
 
 ## Complexity Tracking

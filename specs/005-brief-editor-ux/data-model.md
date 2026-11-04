@@ -70,7 +70,8 @@ One per open editor. Owned by `useSaveQueue`; exposed to the host through `onSav
     └─ onSave → true but latest ≠ confirmed (typed meanwhile) → saving (send newest)
 ```
 
-- Leaving while `status === 'error'` raises the confirm bar (FR-004). Leaving while `saving` does not; the unmount flush sends the rest (existing behaviour).
+- Leaving while `status === 'error'` **or** while any upload job (§4) is `queued`/`uploading` raises the confirm bar (FR-004). Leaving while only a text save is `saving` does not; the unmount flush sends the rest (existing behaviour).
+- The editor reports `(status, pendingUploads)` to the host on every change of either value.
 - Backoff schedule while in `error`: 2 s, 5 s, 15 s, then every 30 s. It is reset by any success.
 
 ## 4. Upload job (client only)

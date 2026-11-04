@@ -23,7 +23,7 @@
 ## Esc layering (FR-010, FR-011)
 
 1. If an overlay is open, close the top one and return focus to its opener; stop. Overlays are: a menu, the "/" menu, the link-card edit, the value prompt, the table menu, the confirm bar.
-2. Else if the save state is `error`, show the confirm bar ("Your last changes aren't saved. Stay · Leave anyway"); stop.
+2. Else if the save state is `error`, or an image is still uploading, show the confirm bar ("Your last changes aren't saved." / "An image is still uploading." · Stay · Leave anyway); stop.
 3. Else call `onDone` (leave editing; there is no Done button).
 
 ## Roles and names (FR-045–047)
