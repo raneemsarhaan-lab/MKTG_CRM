@@ -67,7 +67,7 @@ Start `next dev` (delete `.next/dev` first if styles look stale; see HANDOVER.md
 | 4 | Video Editor (not assignee of clip 5) | Open clip 5's status | Plain badge, no menu. A forged `setTaskStage` call returns `not_authorized` |
 | 5 | Content Creator (`user` level, not on the video) | Sheet opens on **Copy**. **Paste clips** with 3 rows copied from a Google Sheet: 1 new, 1 existing, 1 without a file name | Preview "1 new · 1 already in the sheet · 1 without a clip file name"; Add → 1 clip. `psql`: owner = Content Creator, `assignee_id` null, `content_type_label = 'Reel'`, `status = 'todo'`, a `task_clips` row with the parsed times, and a `text/uri-list` attachment |
 | 6 | Content Creator | Look for **New task** | Still hidden (FR-036). A forged `createTask` call is refused |
-| 7 | Two tabs, two members | Paste the same new row in both, then Add in both | One clip is created; the second tab says it was already added (unique index) |
+| 7 | Two tabs, two members | Paste the same new row in both, then Add in both at the same moment | One clip is created; the other tab says it was already added. Neither add fails |
 | 8 | Admin | Paste 13 rows from the team sheet into an empty video | 13 correct clips in under a minute (SC-001) |
 | 9 | Admin | Edit a title, the editor and an out time; then an out time before the in time | The card shows the title and assignee, and the length recomputes; the bad out time is refused with a note |
 | 10 | Admin | Paste a Drive link into clip 2's Files cell | The cell shows "Drive"; the task panel lists a LINK tile that opens in a new tab |
@@ -79,6 +79,7 @@ Start `next dev` (delete `.next/dev` first if styles look stale; see HANDOVER.md
 | 16 | Admin | From clip 6's task panel → **Open sheet** | The video's sheet, with clip 6's row highlighted |
 | 17 | Any | Arabic (`fluxo-locale=ar`) | The grid, summary, preview and menus mirror; times stay in Western digits |
 | 18 | Any | Keyboard only: steps 2, 5, 9, 10, 13, 14 | All possible (SC-008) |
+| 19 | Admin, browser window 1366×768 (viewport about 1366×657) | Sheet on the seeded video | At least 20 clip rows visible without scrolling (SC-007) |
 
 ## 4. Not verifiable here
 

@@ -242,7 +242,7 @@ Every open question from the Technical Context is settled here. Each decision sa
 
 **Rationale**:
 - These are per-device preferences, like the board's scope and its upstream toggle, which already use direct `localStorage` keys.
-- They aren't application data, and they aren't in the Zustand store, so §VI's "no persisted keys in the store" still holds. The PR's constitution check notes the precedent.
+- They aren't application data, and they aren't in the Zustand store. Constitution §VI was amended to 2.1.0 (analysis finding C1) to allow exactly this: per-device view preferences under `momentum.*` keys, read after mount, wrapped in try/catch.
 
 **Alternatives considered**:
 - *A column on `Member`*: it would follow people across devices, but it's a schema change and a server action for a view preference.
@@ -259,7 +259,7 @@ Every open question from the Technical Context is settled here. Each decision sa
 ## R14. Drop and Restore
 
 **Decision**:
-- `dropClip(taskId)` sets `dropped_at = now()`. It is guarded by `canAct`, and the task must be a clip (it has a `TaskClip` row).
+- `dropClip(taskId)` sets `dropped_at = now()`. It is guarded by `canAct`, and the task must be a clip (its parent is a video, with or without a `TaskClip` row).
 - `restoreClip(taskId)` clears `dropped_at` and moves `stage_date` forward, so the SLA clock reads as it did when dropped:
   `stage_date = subtractBusinessDays(today, businessDaysBetween(stage_date, dropped_at))`.
   `subtractBusinessDays` is added beside `businessDaysBetween` in `src/lib/utils.ts`.

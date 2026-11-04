@@ -73,7 +73,7 @@ The technical approach (details in [research.md](./research.md)):
 | **III. Role-Based Feature Access** | Gates in the UI *and* on the server; `user` = own tasks only. | **Pass, with a sign-off.** Edit, upload, drop and move controls render only when `canAct` or `allowedStages` allow, and every action checks again on the server. **Exception for sign-off:** `user`-level members may add clips through `addClips` only. The clip is owned by the person adding it (so it is "their own task"), and it can only be a Reel subtask of a Video. `createTask`, `createSubtask` and the New task form are unchanged for `user` (FR-036). The PR's constitution check asks reviewers to approve it. |
 | **IV. Design-Driven Development** | A standalone HTML design committed before UI work. | **Pass, with a task and a sign-off.** The "Momentum Video Sheet" preview is updated for the decisions (video names with real-name hover, grouped status menu, Files cell, column sets, Drop, paste preview with unmatched rows) and committed as `design/video-sheet.html` before any UI task. Like specs 005 and 007, it is plain, readable HTML rather than the bundled prototype format, so the format needs the same sign-off. |
 | **V. Cultural UX** | Arabic strings; celebrations on own-stage forward moves only. | **Pass.** A new `sheet` namespace in both message files, with the proposed Arabic video names flagged for native review (R4). The grid mirrors in RTL, and times use Western digits. Status moves call the board's own move, so the celebration fires under the same rule. |
-| **VI. State Architecture** | Ephemeral UI state in Zustand; no persisted store keys; unions in types first. | **Pass, with a note.** No new store state: the view and video live in the URL, and cell editing is local. The new unions (`SheetColumnSet`, `BoardView`, `SheetColumn`) go in `src/types/index.ts` first. The column-set and Show-dropped preferences use direct `localStorage` keys, following the existing `momentum.board.scope` and `momentum.board.upstream`. They aren't application data and aren't in the store; the PR notes the precedent. |
+| **VI. State Architecture** | Ephemeral UI state in Zustand; no persisted store keys; unions in types first. | **Pass (constitution 2.1.0).** No new store state: the view and video live in the URL, and cell editing is local. The new unions (`SheetColumnSet`, `BoardView`, `SheetColumn`) go in `src/types/index.ts` first. The column-set and Show-dropped preferences are per-device view preferences in `localStorage` (`momentum.sheet.*`), read after mount and wrapped in try/catch, which §VI allows since the 2.1.0 amendment made with this plan (analysis finding C1). |
 | **Tech Stack** | No new major dependency. | **Pass.** None added. |
 
 No unjustified violations. The §III clip exception and the §IV design format are recorded under Complexity Tracking.
@@ -136,7 +136,7 @@ src/components/sheet/                     # NEW
 └── time.ts                               # formatClipTime, parseClipTime (pure)
 
 src/components/kanban/KanbanBoard.tsx     # Board | Sheet toggle, URL state, liveTasks split, SheetHost (shared move)
-src/components/kanban/TaskModal.tsx       # Uses makeUploader; "Open sheet" on videos and clips; published link field
+src/components/kanban/TaskModal.tsx       # Uses makeUploader; "Open sheet" on videos and clips; opens a given preview
 src/components/kanban/attachments/AttachmentTile.tsx   # LINK tile: opens in a new tab, no preview
 src/app/globals.css                       # --sheet-* variables and the .fx-sheet-* block
 messages/en.json, messages/ar.json        # + "sheet" namespace (incl. sheet.stage.*), attachments.link
@@ -169,6 +169,8 @@ All unknowns are settled in [research.md](./research.md) (R1–R15). The decisio
 
 ## Spec corrections (made with this plan)
 
+- **After /speckit-analyze (2026-11-04)**: FR-035 (+ Clip creates the clip when its title is saved), FR-047 (the prompt is for moves made in the sheet), FR-052 (per member, per device), and the US1 and US6 narratives. Constitution §VI amended to 2.1.0 to allow per-device view preferences (finding C1).
+
 - **US2 narrative and scenario 2, FR-021**: the board lets whoever holds the current stage, or an admin or superuser, move a task to *any* stage on its path, not only the next one. The spec now says the menu lists exactly those moves, grouped with the next stage first. The intent is unchanged: "only the moves the board allows".
 
 ## Constitution Check (post-design)
@@ -178,7 +180,7 @@ Re-checked against the Phase 1 design:
 - **§II**: holds. No stage data changed; `allowedStages` reproduces the existing rule exactly, and the lab checks it against the old inline logic for every stage, role and access combination. Drop and Restore don't touch `status`.
 - **§III**: holds, with the recorded exception. Every new action checks on the server, and the UI hides what the server would refuse. `addClips` can't create anything but a Reel subtask of a Video owned by the caller.
 - **§V**: holds. The celebration comes only from the shared board move.
-- **§VI**: holds. No store change, and the new unions are in `src/types/index.ts` first. The localStorage preferences follow the board's existing keys.
+- **§VI**: holds under constitution 2.1.0. No store change, and the new unions are in `src/types/index.ts` first. The two preferences are per-device view preferences, which the amendment allows.
 
 ## Complexity Tracking
 

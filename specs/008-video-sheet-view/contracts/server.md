@@ -33,7 +33,7 @@ addClips(videoId: string, rows: ClipRowInput[]): Promise<{
   - 1–200 rows;
   - links are `http(s)` (else the link is ignored and the row kept, with `bad_link` in its result).
 - **Creates**: the task, its `TaskClip` and an optional link attachment for each row, in one transaction, with the defaults in research R2.
-- **Duplicates**: a duplicate `(video_id, file_name)` row is skipped and its file name returned in `skipped` (edge case "two people paste").
+- **Duplicates**: inside the transaction, the video row is locked first (`SELECT id FROM tasks WHERE id = $1 FOR UPDATE` via `$queryRaw`), then its clips' file names are read, lower-cased. Rows whose lower-cased name is already there, or repeats earlier in the same batch, are skipped and returned in `skipped` (edge case "two people paste"). Adds to one video therefore run one at a time, so the unique index is a last guard and is never hit in normal use. (A unique violation inside a PostgreSQL transaction would abort every later row, which is why it isn't used to detect duplicates.)
 - **Times**: for a row with a `file_name` matching `FILE_RE`, `clip_no`, `source`, `in_ms` and `out_ms` come from the name. A row whose name doesn't match stores the name as given, with blank details.
 
 ## `updateClip(taskId, patch)`: new
@@ -62,7 +62,7 @@ dropClip(taskId: string): Promise<{ success: boolean; error?: string }>
 restoreClip(taskId: string): Promise<{ success: boolean; error?: string; stage_date?: string }>
 ```
 
-- **Who**: `canAct`. The task must have a `TaskClip` row (else `not_a_clip`).
+- **Who**: `canAct`. The task must be a clip: its parent is a video (else `not_a_clip`).
 - **Drop**: sets `dropped_at = now()`. It never changes status, attachments or comments (FR-063).
 - **Restore**: clears `dropped_at` and sets `stage_date = subtractBusinessDays(today, businessDaysBetween(stage_date, dropped_at))` (FR-061, research R14). It returns the new stage date for the optimistic update.
 - Both are idempotent: dropping a dropped clip, or restoring a live one, succeeds with no change.

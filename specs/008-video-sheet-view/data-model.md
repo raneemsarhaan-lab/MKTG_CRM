@@ -34,7 +34,7 @@ Indexes:
 
 **Derived, never stored**:
 - `length_ms = out_ms − in_ms`, when both are set.
-- `is_clip = clip != null`.
+- `is_clip`: the task's `parent_task_id` is a video. A clip may have no `TaskClip` row (subtasks made before this feature, or by `createSubtask`, which copies the parent's type, so they are typed Video); its details then show as blank cells.
 - `is_video = content_type_label === 'Video' && parent_task_id == null`.
 
 ### `TaskAttachment` (existing): no schema change

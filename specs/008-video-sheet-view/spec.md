@@ -44,7 +44,7 @@ The Marketing Manager opens the "Strategy Execution and Leadership" video and sw
 - the full video as the top row;
 - its clips underneath, in clip order, one row each, with title, clip #, type, status (in video words such as "Editing"), editor, source, file name, in, out, length, Drive and published link.
 
-A line above the grid sums it up: "13 clips · 15m 40s · 5 editing · 3 published (1 no link) · 1 dropped".
+A line above the grid sums it up: "12 clips · 15m 40s · 5 editing · 3 published (1 no link) · 1 dropped".
 
 **Why this priority**: This is the view itself. Without it there is nothing to edit, assign or link.
 
@@ -134,7 +134,7 @@ A Video Editor finishes clip 13. In its **Files** cell they press **Upload** and
 
 ### User Story 6 - Each role opens on the columns it needs (Priority: P2)
 
-A Video Editor opens the sheet and sees the **Editing** columns: title, #, status, editor, source, in, out, length, files. A Content Creator sees **Copy**: title, #, type, status, editor, published link. A **Full** set shows everything. Each person's choice is remembered.
+A Video Editor opens the sheet and sees the **Editing** columns: title, #, status, editor, source, file name, in, out, length, files. A Content Creator sees **Copy**: title, #, type, status, editor, published link. A **Full** set shows everything. Each person's choice is remembered.
 
 **Why this priority**: In/out times are noise for copywriters, and captions are noise for editors. One choice makes the sheet readable for both.
 
@@ -229,7 +229,7 @@ When a clip moves to **Published**, the sheet asks for the post link. Clips that
 - **FR-032**: **Paste clips** MUST accept rows copied from a spreadsheet (rich or plain text). It recognises clip file names of the form `NN_SOURCE_XmYY.Ys-XmYY.Ys.ext` (mp4, mov, m4v), and reads clip #, source, in, out and length from them. The title is the longest other text cell; the Drive link is the row's link.
 - **FR-033**: Before adding, a preview MUST list new rows (with #, title, source, in → out, length, link) and say how many are already in the sheet (same file name under this video) and how many have no clip file name.
 - **FR-034**: Rows without a clip file name MUST be listed, and each can be fixed in place or left out.
-- **FR-035**: **+ Clip** MUST add one empty clip row, with the same ownership and defaults, with its title cell focused.
+- **FR-035**: **+ Clip** MUST add a row ready for a title, with its title cell focused. The clip is created, with the same ownership and defaults, when the title is saved; leaving the row empty adds nothing.
 - **FR-036**: Adding clips MUST NOT let "user"-level members create standalone tasks. The exception covers clip subtasks of a video only.
 
 **Editing inline**
@@ -247,7 +247,7 @@ When a clip moves to **Published**, the sheet asks for the post link. Clips that
 - **FR-044**: The video row's Files cell MUST work the same way, for the full-length source.
 - **FR-045**: Clicking a Files cell MUST offer: open the link, preview an uploaded file (the spec 007 preview), and open the clip's task.
 - **FR-046**: Uploading MUST follow the same permission as editing the clip. Pasting a link while adding clips is part of adding (FR-030).
-- **FR-047**: When a clip moves to Published, the sheet MUST ask for its published link (paste or skip).
+- **FR-047**: When a clip is moved to Published from the sheet, the sheet MUST ask for its published link (paste or skip). A clip moved to Published on the board shows "Missing link" in the sheet until one is added.
 - **FR-048**: A published clip without a published link MUST show "Missing link" and be counted in the summary.
 
 **Columns, scope and roles**
@@ -257,7 +257,7 @@ When a clip moves to **Published**, the sheet asks for the post link. Clips that
   - **Copy**: title, #, type, status, editor, published link;
   - **Full**: everything.
 - **FR-051**: A member's first view MUST be Editing for editing roles (role text containing video, editor, motion or design), Copy for writing roles (content, copy or writer), and Full otherwise.
-- **FR-052**: The chosen set MUST be remembered per member.
+- **FR-052**: The chosen set MUST be remembered for each member on the device they use (Constitution §VI, 2.1.0).
 - **FR-053**: The video row and the summary line MUST show in every set.
 - **FR-054**: The sheet MUST show the whole video by default, with a **Mine** toggle limited to clips the member is assigned to or owns.
 
@@ -304,7 +304,7 @@ When a clip moves to **Published**, the sheet asks for the post link. Clips that
 - **Stage names (user decision)**: Video names in the sheet only, as display labels (FR-010–FR-013). The pipeline is unchanged, so Constitution §II holds.
 - **Files (user decision)**: Both links and uploads. Uploads reuse spec 007's path and limits. With file storage, clips up to 200 MB upload; full-length recordings are expected to stay as Drive links. Whether Cranl has file storage is still to be confirmed (spec 007 T045). Without it, uploads over about 5 MB are refused with the offer to paste a link.
 - **Who may edit a clip**: The existing rule (owner, assignee, admin or superuser) applies to inline edits, status moves (with the stage-owner rules), uploads and dropping. Anyone may add clips, and anyone who can open the video may view the sheet.
-- **Column-set choice and Show dropped** are remembered per member on their device; nothing about them is shared.
+- **Column-set choice and Show dropped** are remembered per member on their device; nothing about them is shared. Constitution 2.1.0 (§VI) allows such per-device view preferences.
 - **The file-name pattern** is the team's current export format (`04_IMG_0293_2m20.2s-3m49.0s.mp4`). Other formats go to the "fix or leave out" list.
 - **The design**: the "Momentum Video Sheet" preview will be updated for these decisions (video stage names, the restricted status menu, the Files cell, column sets) and committed to `design/` before UI work, per Constitution §IV.
 - **Out of scope**:

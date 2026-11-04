@@ -28,7 +28,7 @@ interface SheetHost {
   videoId: string | null            // null = all videos with clips
   highlightId: string | null        // ?row=
   onOpenVideo(id: string | null): void          // writes ?video=
-  onOpenTask(id: string): void                  // opens TaskModal (selectedTaskId)
+  onOpenTask(id: string, opts?: { previewId?: string }): void   // opens TaskModal; previewId opens that file's preview
   api: {
     move(taskId: string, to: StageId): Promise<MoveTaskResult>      // the board's own move: optimistic, celebration, refresh
     update(taskId: string, patch: TaskPatch): Promise<Result>        // updateTask
@@ -82,6 +82,7 @@ Exactly one cell is in the tab order: the active one, which starts on the first 
 | Space | On a video row: collapse / expand | — | Choose |
 | Ctrl/⌘+V | Paste rows → `PastePreview`; in a Files cell, a link → attach | Native paste | — |
 | Delete | On a clip row with `canAct`: opens the Drop confirm | — | — |
+| Enter on a row number | The row menu: Drop or Restore (with `canAct`) and Open task, in every column set | — | — |
 | Typing a character | Starts editing a text cell with that character | — | Typeahead |
 
 Toolbar controls (Board | Sheet, column set, Mine, Show dropped, Paste clips, + Clip) are ordinary buttons in the tab order before and after the grid.
@@ -91,7 +92,7 @@ Toolbar controls (Board | Sheet, column set, Mine, Show dropped, Paste clips, + 
 - **Roles and counts**: the container has `role="grid"`, `aria-label="{video} clips"` (or "Videos and clips"), `aria-rowcount` and `aria-colcount`.
 - **Rows**: each row has `role="row"` and `aria-rowindex`. Video rows have `aria-expanded` and `aria-level=1`; clip rows `aria-level=2`. Dropped rows have `aria-disabled` and an off-screen "dropped".
 - **Headers**: `role="columnheader"` with `aria-sort="ascending"` on #. The title cell is `role="rowheader"`.
-- **Status cell**: `aria-haspopup="menu"` when moves exist. Its accessible name is "{video name}, {real name}".
+- **Status cell**: `aria-haspopup="menu"` when moves exist. Its accessible name is "{video name}, {real name}". A visible tooltip "{video} · {real}" shows on hover **and on keyboard focus**, linked by `aria-describedby` (FR-012).
 - **Live region** (`role="status"`, polite) announces saves, refusals with their reason, upload progress at 25 % steps, "Clip dropped · Undo" and "{n} clips added".
 - **Refused edits** put the reason on the cell with `aria-describedby`.
 - **axe**: no critical or serious issues on the grid, menus, paste preview or prompt (lab scenario `axe-*`).
