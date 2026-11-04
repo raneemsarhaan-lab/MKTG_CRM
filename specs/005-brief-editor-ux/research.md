@@ -193,6 +193,34 @@ plus `error` mapped to the existing `COLORS.coral`. The editor's local `BR` cons
 - Each fixture is loaded, saved without edits, and compared, so existing briefs open unchanged. The same fixtures are rendered through `Brief.tsx` before and after, comparing the HTML.
 - Any difference other than whitespace fails the check.
 
+## R25. Click to edit, click away to finish (FR-014–017, F1)
+
+**Finding.** `TaskModal` already enters editing when the read brief is clicked (it ignores clicks on links, inputs, buttons, summaries and iframes), but the editor then mounts with `autofocus: 'end'`, so the cursor jumps to the end of the brief, and the content shifts down by the toolbar's height. Leaving requires the **Done** button or Esc.
+
+**Decision.**
+- Keep `Brief` for reading: it renders embeds, link chips, timestamp highlights and the Expand clip, which a read-only editor would not.
+- On click, record a **text anchor**: the index of the clicked top-level block among the brief's blocks, plus the character offset within that block's text (from `document.caretRangeFromPoint` / `caretPositionFromPoint`, measured before anything re-renders). Pass it to the editor as a new `initialCursor` prop. The editor resolves it to a document position by walking top-level nodes and their text, clamped to the block's end; it falls back to `'end'` if the anchor can't be resolved.
+- Scroll compensation: the host measures the clicked block's `top` before swapping, and after the editor mounts scrolls the panel by the difference, so the text stays put (SC-011). The [preview](https://claude.ai/artifact/Kmwf5sJKJunFtvGMfwdSNR) uses exactly this and lands on the clicked word.
+- Leaving: the editor listens for `pointerdown` on `document` while mounted with `onDone`. A pointerdown outside its root that is not on an overlay, and not part of a drag-selection that started inside, triggers the Esc chain: close the top overlay if any, else the confirm bar if `error`, else `onDone`. The click then proceeds normally to whatever was clicked.
+- Remove the Done button from the editor footer. The footer keeps one-off notes only.
+- Ticking a checkbox in the read view keeps saving through `Brief`'s existing `onToggleTask` (FR-017; already implemented).
+
+**Alternatives.** A permanently mounted read-only Tiptap that toggles `editable`: rejected, because it would drop `Brief`'s embeds, chips and Expand, and render 300 briefs' worth of editors on the board. Blur-based exit: rejected, because blur also fires when focus moves into the editor's own menus and prompts.
+
+## R26. Resizable table columns (FR-067–069, F2)
+
+**Finding.** TableKit supports `resizable: true` (column-resize handles via `prosemirror-tables`), storing widths as `colwidth` (pixels) on cells and rendering `<colgroup>`. `tiptap-markdown` writes tables as GFM pipe tables, which can't carry widths, so widths would be lost on save. `Brief.tsx`'s sanitizer allows neither `colgroup`/`col` nor width attributes.
+
+**Decision.**
+- Enable `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: false } })`. Style the handle with `BRIEF_UI.blue` and show a width badge while dragging (as in the preview).
+- Store widths as **percentages** so they survive different panel widths: on save, convert each column's pixel `colwidth` to a share of the table's total.
+- Serialization: a table with no explicit widths stays a GFM pipe table (unchanged, FR-100). A table with widths is written as an HTML table `<table data-widths="30,15,55">…</table>`, with cell contents in Markdown-compatible inline HTML. The table's `parseHTML` reads `data-widths` back into `colwidth`s at mount, scaled to the current width.
+- Read view: allow `table[data-widths]` in the sanitize schema, and render a `<colgroup>` from it in `Brief.tsx`'s `table` component with `table-layout: fixed`.
+- **Equal widths** in the table menu clears the widths, so the table goes back to a plain GFM pipe table.
+- Touch: the handle's hit area widens to 14 px when the pointer is coarse.
+
+**Alternatives.** An HTML comment before a GFM table holding the widths: rejected, because ProseMirror's HTML parser drops comments, so the editor could never read them back. Pixel widths: rejected, because the panel is a different width on a phone, a laptop and in the Create Task form.
+
 ## R24. Validation harness
 
 **Finding.** The repo has no test runner. The audit used an esbuild-bundled standalone page that mounts the real `BriefEditor` with stub hosts and is driven by Playwright (already available in the environment).

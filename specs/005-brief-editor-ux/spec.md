@@ -8,11 +8,13 @@
 
 **Input**: User description: "Brief editor UX overhaul" — accompanied by a 23-item audit (E1–E23) produced by exercising every control of the current brief editor in a browser on 2026-11-04.
 
+**Revised 2026-11-04** after reviewing the [interactive preview](https://claude.ai/artifact/Kmwf5sJKJunFtvGMfwdSNR): (F1) editing starts by clicking the brief and ends by clicking away, with no Edit or Done button; (F2) table columns can be resized.
+
 ---
 
 ## Context
 
-The brief is where a task's instructions live: what to make, for whom, with which references. It is edited in the task panel and in the Create Task form, saves itself as you type, and is shown read-only once you press Done.
+The brief is where a task's instructions live: what to make, for whom, with which references. It is edited in the task panel and in the Create Task form, saves itself as you type, and is shown read-only again once you click away from it.
 
 The editor already does a lot right. Autosave never lets an older save overwrite a newer one; Markdown shortcuts (`# `, `- `, `1. `, `> `, `[ ] `, `**bold**`) work; pasted Markdown arrives formatted; pasting a URL over selected text makes a link; ticking a checkbox saves; New subtask creates a real task and links it; toggle lists and tables survive closing and reopening.
 
@@ -52,6 +54,8 @@ Every audit item maps to at least one requirement.
 | E21 | Status shown twice; selection popup duplicates toolbar | FR-005, FR-025 |
 | E22 | List items look double-spaced | FR-081 |
 | E23 | Editor colours outside the shared palette | FR-082 |
+| F1 | Click to edit, click away to finish; no Edit or Done button | FR-014 – FR-017 |
+| F2 | Resizable table columns | FR-067 – FR-069 |
 
 ---
 
@@ -69,7 +73,7 @@ A marketing manager writes a brief on a flaky connection. If a save fails, they 
 
 1. **Given** the editor is open, **When** a save fails, **Then** the status reads "Couldn't save" with a Retry action, and the unsaved text stays in the editor.
 2. **Given** a save has failed, **When** the person presses Retry or keeps typing, **Then** the latest text is sent again and, on success, the status returns to "Saved".
-3. **Given** a save has failed and not yet succeeded, **When** the person presses Done or Esc, **Then** they are warned that changes are not saved and can choose to stay or leave.
+3. **Given** a save has failed and not yet succeeded, **When** the person clicks outside the brief or presses Esc, **Then** they are warned that changes are not saved and can choose to stay or leave.
 4. **Given** the editor is open, **When** saving succeeds, **Then** the save status appears in exactly one place.
 
 ---
@@ -118,14 +122,17 @@ A writer opens the Insert menu, changes their mind and presses Esc. Only the men
 
 **Why this priority**: Two common actions currently cause outsized damage: Esc throws the person out of the editor, and Clear format with nothing selected flattens the whole brief.
 
-**Independent Test**: With each menu open, press Esc and confirm only the menu closes; press Clear format with no selection and confirm nothing in the brief changes; make edits and undo and redo them with the toolbar.
+**Independent Test**: Click a word in the read brief and confirm the cursor lands on it; click outside and confirm editing ends. With each menu open, press Esc and confirm only the menu closes; press Clear format with no selection and confirm nothing in the brief changes; make edits and undo and redo them with the toolbar.
 
 **Acceptance Scenarios**:
 
 1. **Given** any menu, popup or input box is open in the editor, **When** the person presses Esc, **Then** only that menu, popup or box closes and the editor stays open with the cursor where it was.
-2. **Given** nothing is open, **When** the person presses Esc, **Then** the editor closes (as today), subject to the unsaved-changes warning in Story 1.
-3. **Given** no text is selected, **When** the person looks at Clear format, **Then** it is unavailable; with text selected, it clears formatting from that text only.
-4. **Given** the person has made changes, **When** they press Undo or Redo in the toolbar, **Then** the change is undone or redone, the same as Ctrl+Z and Ctrl+Shift+Z.
+2. **Given** nothing is open, **When** the person presses Esc, **Then** the brief leaves editing and shows as read, subject to the unsaved-changes warning in Story 1.
+3. **Given** the brief is being read, **When** the person clicks anywhere in it other than a link or checkbox, **Then** editing starts with the cursor exactly where they clicked, the text does not jump, and there is no Edit button to press first.
+4. **Given** the brief is being edited, **When** the person clicks anywhere outside it, **Then** editing ends and the brief shows as read; there is no Done button.
+5. **Given** the brief is being read, **When** the person clicks a link, **Then** it opens in a new tab; **When** they tick a checkbox, **Then** it is saved without entering editing.
+6. **Given** no text is selected, **When** the person looks at Clear format, **Then** it is unavailable; with text selected, it clears formatting from that text only.
+7. **Given** the person has made changes, **When** they press Undo or Redo in the toolbar, **Then** the change is undone or redone, the same as Ctrl+Z and Ctrl+Shift+Z.
 
 ---
 
@@ -164,6 +171,8 @@ A producer inserts a checklist under a paragraph, a YouTube reference that shows
 4. **Given** a new table is inserted, **Then** it fills the editor's width and has a header row.
 5. **Given** a toggle list is inserted, **Then** its title and body are empty, with grey hints ("Toggle title", "Hidden content") that disappear as the person types.
 6. **Given** a table of contents is inserted, **Then** it appears as a labelled block ("Table of contents — built from this brief's headings"), not as raw text.
+7. **Given** a table, **When** the person drags the border between two columns (mouse or touch), **Then** those two columns resize live, showing their widths as percentages, and no column can shrink below a readable minimum.
+8. **Given** a table whose columns were resized, **When** the brief is read or reopened, **Then** the columns keep their widths; **When** the person chooses Equal widths in the table menu, **Then** all columns become equal.
 
 ---
 
@@ -199,21 +208,24 @@ A team member using the app in Arabic sees every editor label, menu item, hint a
 
 ### User Story 9 — What you see is what's saved (Priority: P3)
 
-What the person sees while editing looks the same after pressing Done: underlines stay underlined, lists keep their spacing, and the editor's colours match the rest of Momentum.
+What the person sees while editing looks the same after clicking away: underlines stay underlined, lists keep their spacing, and the editor's colours match the rest of Momentum.
 
 **Why this priority**: Small mismatches, but they make the read view feel like a different document from the one just written.
 
-**Independent Test**: Write a brief using every formatting option, press Done, and compare the read view to the editing view.
+**Independent Test**: Write a brief using every formatting option, click away, and compare the read view to the editing view.
 
 **Acceptance Scenarios**:
 
-1. **Given** text is underlined with Ctrl+U, **When** the person presses Done, **Then** the text is still underlined in the read view.
+1. **Given** text is underlined with Ctrl+U, **When** the person clicks away from the brief, **Then** the text is still underlined in the read view.
 2. **Given** a bulleted or numbered list, **Then** items are evenly and tightly spaced in both the editing and read views.
 
 ---
 
 ### Edge Cases
 
+- **Click-away onto another control in the panel** (a field, the stage button): editing ends and that control receives the click as normal.
+- **Click-away while a menu or prompt is open**: the first click closes the menu or prompt only; editing continues (same rule as Esc).
+- **Selecting text by dragging that ends outside the brief**: does not end editing.
 - **Save fails, then the person closes the panel**: they are warned (Story 1, scenario 3); if they leave anyway, the newest text is still attempted once on the way out, as today.
 - **Several saves fail in a row**: the status stays "Couldn't save" and Retry always sends the newest text, never an older one.
 - **Pasting text and an image together** (for example from a web page): the text is pasted as today; images inside are uploaded only if they are image files, not remote addresses.
@@ -237,7 +249,7 @@ What the person sees while editing looks the same after pressing Done: underline
 - **FR-001**: The editor MUST treat text as saved only after a save has succeeded.
 - **FR-002**: When a save fails, the editor MUST show "Couldn't save" with a Retry action, and MUST keep the unsaved text.
 - **FR-003**: After a failure, any further typing or Retry MUST send the newest text; no older text may overwrite newer text.
-- **FR-004**: Leaving the editor (Done, Esc or closing the panel) with unsaved changes after a failure MUST ask the person to confirm leaving.
+- **FR-004**: Leaving editing (clicking outside the brief, Esc, or closing the panel) with unsaved changes after a failure MUST ask the person to confirm leaving.
 - **FR-005**: The save status MUST appear in exactly one place in the editor.
 
 **Undo and accidental damage (Story 4)**
@@ -246,6 +258,13 @@ What the person sees while editing looks the same after pressing Done: underline
 - **FR-011**: Closing a menu with Esc MUST return focus to where it was before the menu opened.
 - **FR-012**: Clear format MUST act only on selected text and MUST be unavailable when nothing is selected.
 - **FR-013**: The toolbar MUST offer Undo and Redo, matching the keyboard shortcuts, and disabled when there is nothing to undo or redo.
+
+**Entering and leaving editing (Story 4, F1)**
+
+- **FR-014**: There MUST be no Edit button and no Done button. Clicking anywhere in the read brief, except on a link or a checkbox, MUST start editing; keyboard users start it with Enter or Space on the focused brief.
+- **FR-015**: Editing MUST start with the cursor at the clicked position, and the brief's text MUST stay where it was on screen when the toolbar appears.
+- **FR-016**: Editing MUST end when the person clicks outside the brief or presses Esc with nothing open; a drag-selection that ends outside the brief does not count as a click outside.
+- **FR-017**: While the brief is being read, links MUST open in a new tab and checkboxes MUST be tickable, saving without entering editing.
 
 **Links (Story 2)**
 
@@ -286,6 +305,9 @@ What the person sees while editing looks the same after pressing Done: underline
 - **FR-064**: A newly inserted table MUST fill the editor's width and include a header row.
 - **FR-065**: A newly inserted toggle list MUST have an empty title and body, showing grey hints until typed into.
 - **FR-066**: A table of contents MUST appear while editing as a labelled block, not as raw text.
+- **FR-067**: Table columns MUST be resizable by dragging the border between two columns, with mouse or touch, showing both widths while dragging, with a minimum column width so no column collapses.
+- **FR-068**: Resized column widths MUST be kept when the brief is saved and reopened, and MUST display the same in the read view.
+- **FR-069**: The table menu MUST offer Equal widths, which also serves as the keyboard way to reset widths.
 
 **Layout (Story 7)**
 
@@ -328,6 +350,8 @@ What the person sees while editing looks the same after pressing Done: underline
 - **SC-008**: At 390px wide, the toolbar is one row tall and nothing on the page scrolls sideways except the toolbar itself.
 - **SC-009**: In Arabic, 0 English strings are visible in the editor across every menu, card and message.
 - **SC-010**: All existing briefs open, display and save without visible change unless edited.
+- **SC-011**: Clicking a word in the read brief puts the cursor on that word in 100% of tested clicks on paragraphs, list items, headings and table cells, and the clicked text moves by no more than 4 px on screen.
+- **SC-012**: Column widths set by dragging are identical (±1%) after closing and reopening the brief, and in the read view.
 
 ## Assumptions
 
@@ -339,4 +363,6 @@ What the person sees while editing looks the same after pressing Done: underline
 - Images are uploaded only from image data or files, not by fetching remote images found in pasted web content.
 - The unsaved-changes warning (FR-004) appears only after a save has failed; ordinary in-flight saves keep the current "nothing is discarded" behaviour.
 - Both places the editor appears, the task panel and the Create Task form, get these changes. Where the Create Task form has no task yet, pasted images wait for the task to be created before uploading, or the form explains that images can be added after creating the task. The planning phase decides which.
-- The read-only brief view is changed only where needed for FR-080, FR-081 and FR-066.
+- The read-only brief view is changed only where needed for FR-080, FR-081, FR-066 and FR-068.
+- **F1**: the `TaskModal` read view keeps its rich rendering (embeds, link chips, Expand); the editor replaces it on click, at the clicked position. The Create Task form has no read view, so it is always in editing and click-away does not apply there.
+- **F2**: only columns resize; rows grow with their content. Tables whose columns were never resized keep being stored exactly as today.

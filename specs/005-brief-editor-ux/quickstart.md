@@ -63,7 +63,12 @@ Each scenario corresponds to a spec acceptance scenario.
 | `image-roundtrip` | US3 #6 | close and reopen: image present |
 | `esc-closes-menu-only` | US4 #1 | for each menu: Esc closes the menu only |
 | `clear-format-selection-only` | US4 #3 | no selection: disabled; selection: only that text changes |
-| `undo-redo-buttons` | US4 #4 | buttons match keyboard |
+| `undo-redo-buttons` | US4 #7 | buttons match keyboard |
+| `click-to-edit-cursor` | US4 #3 | the caret lands on the clicked word; text moves ≤ 4 px (SC-011) |
+| `click-away-exits` | US4 #4 | an outside click ends editing; with `save=fail`, the confirm bar shows instead |
+| `menu-then-click-away` | US4 #4 | the first outside click closes the menu only |
+| `drag-select-outside` | FR-016 | a selection dragged past the edge keeps editing |
+| `read-link-opens` | US4 #5 | in read mode, a link opens a new page |
 | `slash-menu` | US5 #1–3 | `/tab` + Enter inserts a table; "and/or" opens nothing; Esc leaves "/" |
 | `menu-keyboard` | US5 #4 | arrows and Enter in every menu; focus returns to the trigger |
 | `style-checkmark` | US5 #5 | ✓ on the current style; re-pick keeps it |
@@ -73,6 +78,9 @@ Each scenario corresponds to a spec acceptance scenario.
 | `table-menu` | US6 #3–4 | every action; full width; header row |
 | `toggle-placeholders` | US6 #5 | empty title and body with hints |
 | `toc-block` | US6 #6 | labelled block, not raw text |
+| `table-resize` | US6 #7 | dragging a border resizes both columns; minimum width respected |
+| `table-widths-roundtrip` | US6 #8 | widths identical (±1%) after reopening and in `Brief` (SC-012) |
+| `table-equal-widths` | FR-069 | Equal widths saves a plain GFM table |
 | `sticky-toolbar` | US7 #1 | after scrolling a long brief, toolbar top ≥ 0 |
 | `phone-toolbar` | US7 #2 | 390 px: one row; no row starts with a divider; no page overflow (SC-008) |
 | `arabic` | US8 | `locale=ar`: no English strings in the editor (SC-009); toolbar mirrored |
@@ -87,7 +95,9 @@ Prerequisites: a deployment or local run with `DATABASE_URL` and the bucket vari
 1. Open a task and its brief. Paste a screenshot (⌘V). It appears in place and in the task's attachment list, and the board card's thumbnail updates.
 2. Drop an image onto the brief. It is inserted once and attached once (check the attachment count goes up by exactly one).
 3. Turn the network off in DevTools and type. The status turns to "Couldn't save · Retry". Press Esc and the bar asks before leaving. Turn the network on and press Retry. Close and reopen the task: the text is there.
-4. Click a link inside the brief. The link card appears and no tab opens.
-5. Switch to Arabic (language toggle). The editor is fully Arabic and mirrored.
-6. Open **+ New Task** and paste an image into the description. The note says images can be added once the task is created.
-7. On a phone (or DevTools at 390 px), open a long brief and scroll. The toolbar stays visible on a single row.
+4. Click a word in the read brief. Editing starts with the cursor on that word, the text doesn't jump, and there is no Edit or Done button. Click elsewhere in the panel and editing ends.
+5. While editing, click a link inside the brief. The link card appears and no tab opens. While reading, the same link opens in a new tab.
+6. Drag a table's column border, click away, close and reopen the task. The widths are kept.
+7. Switch to Arabic (language toggle). The editor is fully Arabic and mirrored.
+8. Open **+ New Task** and paste an image into the description. The note says images can be added once the task is created.
+9. On a phone (or DevTools at 390 px), open a long brief and scroll. The toolbar stays visible on a single row.

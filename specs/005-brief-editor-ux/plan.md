@@ -10,6 +10,8 @@ Fix the 23 problems the 2026-11-04 audit found in the brief editor, without chan
 
 1. **Stop losing or damaging work (P1)**: a save contract that reports failure, with retry and a guard against leaving; layered Esc; Clear format limited to the selection; Undo/Redo buttons; links that can be clicked, edited and removed and are saved with `https://`; image addresses checked before insert; screenshots pasted or dropped straight into the brief and stored as task attachments.
 2. **Make it findable and reachable (P2)**: a "/" menu; keyboard-operable, screen-reader-labelled toolbar and menus; Task, YouTube, table, toggle and table-of-contents blocks that behave; a toolbar pinned in long briefs and on one row on phones; Arabic labels and right-to-left layout.
+Revised after the preview review: editing starts by clicking the brief and ends by clicking away, with no Edit/Done buttons (F1, research R25), and table columns are resizable, with widths kept as percentages (F2, research R26).
+
 3. **Make editing and reading match (P3)**: underline survives Done, lists keep tight spacing, and the editor's colours come from the shared palette (closing the Constitution §I gap).
 
 Technical approach, in one line each (decisions in [research.md](./research.md)):

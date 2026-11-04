@@ -9,9 +9,11 @@
 | `Mod+B` / `Mod+I` / `Mod+U` / `Mod+Shift+X` / `Mod+E` | editor | bold / italic / underline / strike / inline code |
 | `Mod+K` | editor | open the link box; pre-filled if the selection is a link (FR-024) |
 | `Mod+Z` / `Mod+Shift+Z` | editor | undo / redo, same as the toolbar buttons (FR-013) |
-| `Mod+Enter` | editor (`TaskModal` only) | Done, through the unsaved-changes bar if needed |
+| `Enter` / `Space` | focused read brief (`TaskModal`) | start editing (FR-014) |
+| `Mod+Enter` | editor (`TaskModal` only) | leave editing, through the unsaved-changes bar if needed |
+| click outside the brief | editor (`TaskModal` only) | same as `Esc` (FR-016) |
 | `/` | at start of block or after whitespace | open the "/" menu (FR-040) |
-| `Esc` | anywhere in the editor | close the top overlay; with none open, Done (FR-010) |
+| `Esc` | anywhere in the editor | close the top overlay; with none open, leave editing (FR-010) |
 | `Arrow` keys, `Home`, `End` | in a menu | move highlight; typeahead by letter (FR-044) |
 | `Enter` / `Space` | in a menu | choose |
 | `Tab` / `Shift+Tab` | in a menu | close the menu and move focus on |
@@ -22,7 +24,7 @@
 
 1. If an overlay is open, close the top one and return focus to its opener; stop. Overlays are: a menu, the "/" menu, the link-card edit, the value prompt, the table menu, the confirm bar.
 2. Else if the save state is `error`, show the confirm bar ("Your last changes aren't saved. Stay · Leave anyway"); stop.
-3. Else call `onDone`.
+3. Else call `onDone` (leave editing; there is no Done button).
 
 ## Roles and names (FR-045–047)
 
@@ -37,6 +39,8 @@
 | Save status | `role="status"` (`aria-live="polite"`) with visible or visually hidden text |
 | Link card | `role="dialog"`, `aria-label` = link host; buttons Open / Edit / Remove |
 | Upload placeholder | `aria-live="polite"` text "Uploading <filename>…" |
+| Read brief (`TaskModal`) | `role="button"`, `tabIndex=0`, `aria-label` = t('briefEditor.clickToEdit') |
+| Column-resize handle | `role="separator"`, `aria-orientation="vertical"`, label "Drag to resize columns"; keyboard alternative is Equal widths (FR-069) |
 
 ## Direction
 

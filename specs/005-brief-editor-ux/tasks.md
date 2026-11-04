@@ -12,6 +12,8 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Organization**: Grouped by user story (US1–US9 from spec.md) so each can be built, checked and shipped on its own.
 
+**Revised 2026-11-04** after the preview review: T061–T063 (click to edit, click away to finish; no Edit/Done buttons) and T064–T067 (resizable table columns) were added to US4 and US6. IDs stay stable; the new tasks are listed inside the phase they belong to.
+
 **Conventions used throughout**
 
 | Term | Meaning |
@@ -51,7 +53,7 @@ description: "Task list for the Brief Editor UX Overhaul"
 **Purpose**: Tokens, translations, the module split, the overlay stack and shared URL helpers. No behaviour visible to users changes in this phase.
 
 - [ ] T005 [P] Add `BRIEF_UI` to `src/lib/tokens.ts` with the exact values in research R17 (`ink #18233F, label #68738D, faint #929CB0, line #E9EDF4, surface #F8FAFD, blue #3563E9, blueLight #EEF3FF, blueActive #E5EDFF`) plus `error: COLORS.coral`, exported `as const`.
-- [ ] T006 [P] Add a `briefEditor` namespace to `messages/en.json` and `messages/ar.json` containing every string the editor shows today: toolbar titles, Text style labels, Insert items and hints, ⋯ items, prompt labels, placeholders and CTAs, Saved/Saving…, Done, notes such as "Markdown copied" and "Could not create that subtask", and the editor placeholder. Give each one an Arabic translation.
+- [ ] T006 [P] Add a `briefEditor` namespace to `messages/en.json` and `messages/ar.json` containing every string the editor shows today: toolbar titles, Text style labels, Insert items and hints, ⋯ items, prompt labels, placeholders and CTAs, Saved/Saving…, "Click anywhere in the brief to edit", notes such as "Markdown copied" and "Could not create that subtask", and the editor placeholder. Give each one an Arabic translation.
 - [ ] T007 Split the editor without changing behaviour:
   - Move the `Toggle` node and `getMarkdown` to `src/components/kanban/brief-editor/extensions.ts`.
   - Move `ToolIcon`, `ToolButton` and `Sep` to `brief-editor/Toolbar.tsx`; `Menu` and `MenuItem` to `brief-editor/Menu.tsx`; the value prompt UI to `brief-editor/ValuePrompt.tsx`.
@@ -85,8 +87,8 @@ description: "Task list for the Brief Editor UX Overhaul"
 - [ ] T014 [US1] Add the save status to the toolbar in `brief-editor/Toolbar.tsx`:
   - `role="status"` with text from `t('saved' | 'saving' | 'couldntSave')`.
   - In error it shows a **Retry** button calling `retry()`, coloured `BRIEF_UI.error`.
-  - Remove the duplicate status and the "Esc closes · select text for formatting" hint from the footer in `BriefEditor.tsx`; the footer keeps Done plus one-off notes only (FR-005, R19).
-- [ ] T015 [US1] Add the unsaved-changes confirm bar (`brief-editor/ConfirmLeave.tsx`, registered on the overlay stack). Text: "Your last changes aren't saved." with **Stay** (focus back to the editor) and **Leave anyway** (calls `onDone`). Done, Esc (empty stack) and Mod+Enter all route through it when `status === 'error'` (FR-004). In `TaskModal.tsx`, the panel's close control shows the same choice when the stored editor state is `'error'`, using the panel's existing inline styles, no `window.confirm`.
+  - Remove the duplicate status and the "Esc closes · select text for formatting" hint from the footer in `BriefEditor.tsx`; the footer keeps one-off notes only; the Done button is removed in T062 (FR-005, FR-014, R19).
+- [ ] T015 [US1] Add the unsaved-changes confirm bar (`brief-editor/ConfirmLeave.tsx`, registered on the overlay stack). Text: "Your last changes aren't saved." with **Stay** (focus back to the editor) and **Leave anyway** (calls `onDone`). Click-away, Esc (empty stack) and Mod+Enter all route through it when `status === 'error'` (FR-004). In `TaskModal.tsx`, the panel's close control shows the same choice when the stored editor state is `'error'`, using the panel's existing inline styles, no `window.confirm`.
 - [ ] T016 [US1] Add lab scenarios `save-fail-shows-error`, `save-retry-sends-latest`, `save-hang-watchdog`, `leave-guard` and `single-status` to `scripts/brief-editor-lab/scenarios.mjs`, as described in quickstart.md §2.
 
 **Checkpoint**: US1 is shippable alone. Saving is trustworthy in both hosts.
@@ -156,6 +158,20 @@ description: "Task list for the Brief Editor UX Overhaul"
 - [ ] T030 [P] [US4] In `brief-editor/Toolbar.tsx` / `BriefEditor.tsx`, make Clear format in the ⋯ menu disabled when `editor.state.selection.empty`, and otherwise run `chain().focus().unsetAllMarks().clearNodes().run()` with no `selectAll` fallback. Update its hint to `t('clearFormatHint')`, "selected text" (FR-012).
 - [ ] T031 [P] [US4] Add Undo and Redo buttons as the first toolbar group in `brief-editor/Toolbar.tsx`: `editor.chain().focus().undo().run()` / `redo()`, disabled via `!editor.can().undo()` / `redo()`, with tooltips showing the platform shortcut (FR-013). Add the icons to `ToolIcon`.
 - [ ] T032 [US4] Add lab scenarios `esc-closes-menu-only`, `clear-format-selection-only` and `undo-redo-buttons` to `scripts/brief-editor-lab/scenarios.mjs`.
+- [ ] T061 [US4] In `BriefEditor.tsx` (with `brief-editor/useOverlayStack.ts`):
+  - Add the optional prop `initialCursor?: { block: number; offset: number }`. On create, resolve it by walking the doc's top-level nodes to `block`, then text offset `offset` (clamped to the block's end), and `setTextSelection` there. Fall back to `'end'`.
+  - While mounted with `onDone`, listen for `pointerdown` on `document`. A press outside the editor root and outside any registered overlay runs the Esc chain from T029: close the top overlay, else the confirm bar if `error`, else `onDone`. Ignore it when a drag-selection started inside the editor. Never `preventDefault`, so the clicked control still receives its click.
+  - Delete the Done button from the footer (FR-014, FR-016, research R25).
+- [ ] T062 [US4] In `src/components/kanban/TaskModal.tsx`, change the read-brief `onClick` (the `div` wrapping `<Brief>`, ~line 1996). Before `setEditingBrief(true)`:
+  - Compute `initialCursor` from `document.caretRangeFromPoint(e.clientX, e.clientY)` (or `caretPositionFromPoint`): the index of the clicked top-level child of the `Brief` root and the character offset of the caret within that child's `textContent`.
+  - Record that child's `getBoundingClientRect().top`.
+  After the editor mounts (`useLayoutEffect` keyed on `editingBrief`), scroll the panel's scroll container by `newTop − oldTop`, so the text stays put (FR-015, SC-011). Pass `initialCursor` and keep `onDone={() => setEditingBrief(false)}`. Keyboard: Enter/Space on the focused brief still starts editing at the end. Links and checkboxes keep their current read-view behaviour (FR-017).
+- [ ] T063 [US4] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`. The lab entry gets a `#host=modal` mode that renders `Brief` and swaps to `BriefEditor` on click, the way `TaskModal` does.
+  - `click-to-edit-cursor`: click a word in a paragraph, list item, heading and table cell; the caret is inside that word and the word moved ≤ 4 px.
+  - `click-away-exits`: a click outside ends editing; with `save=fail`, the confirm bar shows instead.
+  - `menu-then-click-away`: the first outside click closes an open menu only.
+  - `drag-select-outside`: a selection dragged past the editor's edge keeps editing.
+  - `read-link-opens`: in read mode a link click opens a new page.
 
 **Checkpoint**: All P1 stories are done. This is the recommended first release.
 
@@ -211,6 +227,20 @@ description: "Task list for the Brief Editor UX Overhaul"
   - Node view: a labelled box `t('tocLabel')` listing the document's current headings, refreshed on `update`.
   - Remove the `\[\[toc\]\]` un-escape in `getMarkdown` (FR-066, R12).
 - [ ] T046 [US6] Add lab scenarios `task-insert-below`, `youtube-block`, `table-menu`, `toggle-placeholders` and `toc-block` to `scripts/brief-editor-lab/scenarios.mjs`. Re-run `roundtrip-fixtures`.
+- [ ] T064 [US6] Enable column resizing in `brief-editor/extensions.ts`:
+  - `TableKit.configure({ table: { resizable: true, handleWidth: 6, cellMinWidth: 64, lastColumnResizable: false } })`.
+  - In `src/app/globals.css`, style `.fx-brief-edit .column-resize-handle` as a 3 px `BRIEF_UI.blue` bar and set `.fx-brief-edit.resize-cursor { cursor: col-resize }`. Widen the hit area to 14 px under `@media (pointer: coarse)`.
+  - In `brief-editor/TableMenu.tsx`, show a small badge with the two adjacent columns' percentages while dragging, and add an **Equal widths** button that clears every cell's `colwidth` (FR-067, FR-069, research R26).
+- [ ] T065 [US6] Persist widths in `brief-editor/extensions.ts` by extending the table node's Markdown `serialize` and its `parseHTML` attributes:
+  - When any cell in the first row has a `colwidth`, write the table as HTML `<table data-widths="a,b,c">` with `<thead>`/`<tbody>`, cells containing inline HTML (`<strong>`, `<em>`, `<a>`, `<code>`, `<u>`, `<s>`). Widths are integer percentages summing to 100, from the first row's `colwidth`s.
+  - Otherwise keep the existing GFM serializer untouched.
+  - `parseHTML` reads `data-widths` and sets each column's `colwidth` to `percent × current editor width`.
+  - Add `fixtures/table-widths.md` and extend `roundtrip-fixtures` (FR-068, SC-012).
+- [ ] T066 [P] [US6] In `src/components/shared/Brief.tsx`, allow the `data-widths` attribute on `table` in the sanitize schema (next to the `details`/`summary` additions, ~line 32). In the `table` component renderer, emit `<colgroup>` with one `<col style={{ width: n + '%' }}>` per value, with `tableLayout: 'fixed'` and `width: '100%'` when `data-widths` is present (FR-068).
+- [ ] T067 [US6] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`:
+  - `table-resize`: drag a column border; both columns change, neither goes below 64 px.
+  - `table-widths-roundtrip`: resize, close, reopen, and render through `Brief`; widths are equal within ±1% (SC-012).
+  - `table-equal-widths`: Equal widths restores a GFM pipe table in the saved Markdown.
 
 ---
 
@@ -251,7 +281,7 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 ## Phase 11: User Story 9 — What you see is what's saved (P3)
 
-**Goal**: Underline survives Done; list spacing matches; editor colours are tokens only (FR-080–082, R15, R17, R20).
+**Goal**: Underline survives clicking away; list spacing matches; editor colours are tokens only (FR-080–082, R15, R17, R20).
 
 **Independent test**: Render saved Markdown through `Brief` in the lab: `<u>` is present and `li > p` margin is 0 in both views. A grep finds no hex literal in the editor modules.
 
@@ -282,7 +312,7 @@ description: "Task list for the Brief Editor UX Overhaul"
 | US1 (Phase 3) | Foundational | Needs T008 for the confirm bar. |
 | US2 (Phase 4) | Foundational | Needs T009 for `normaliseUrl`. |
 | US3 (Phase 5) | Foundational | T022 needs T009; T025–T027 are host-side and independent of T023. |
-| US4 (Phase 6) | Foundational | T029 uses T008; the confirm-bar branch of T029 uses T015 from US1. Without US1, Esc on an empty stack goes straight to `onDone`. |
+| US4 (Phase 6) | Foundational | T029 uses T008; the confirm-bar branch of T029 uses T015 from US1. Without US1, Esc on an empty stack goes straight to `onDone`. T061 needs T029; T062 needs T061. |
 | US5 (Phase 7) | US4 T029 | Menus must be on the overlay stack. |
 | US6 (Phase 8) | Foundational and US5 T036 | Block items live in `blocks.ts`. |
 | US7 (Phase 9) | Foundational | Independent of the other stories. |
@@ -320,7 +350,7 @@ Commit after each task; run `npm run typecheck` before each commit.
 | US1 | T012 and T013 (different host files), once T011 has changed the props |
 | US3 | T027 alongside T022–T025; T025 and T026 touch the same file, so in sequence |
 | US4 | T030 and T031 |
-| US6 | T043 (CSS) alongside T040–T042 |
+| US6 | T043 (CSS) alongside T040–T042; T066 (`Brief.tsx`) alongside T064–T065 |
 | US9 | T053 and T054 at any point |
 | Across stories | US2, US3 and US7 can be built by different people at once after Foundational, because they touch different modules; `BriefEditor.tsx` wiring edits must be merged one at a time |
 
@@ -349,11 +379,11 @@ Setup, Foundational, then US1 (T001–T016). That alone ends the silent data-los
 
 ### Release 1: all P1 stories
 
-Add US2, US3 and US4 (T017–T032). These cover every HIGH item in the audit (E1–E7).
+Add US2, US3 and US4 (T017–T032, T061–T063). These cover every HIGH item in the audit (E1–E7).
 
 ### Release 2: P2 stories
 
-US5, US6, US7, US8 (T033–T052).
+US5, US6, US7, US8 (T033–T052, T064–T067).
 
 ### Any time: P3
 
@@ -365,10 +395,12 @@ US9 (T053–T056). T053 and T054 are one-line changes that can go in the first P
 |---|---|
 | FR-001–005 | T010–T016 |
 | FR-010–013 | T029–T032, T015 |
+| FR-014–017 | T061–T063 |
 | FR-020–025 | T017–T021 |
 | FR-030–036 | T022–T028 |
 | FR-040–047 | T033–T039 |
 | FR-060–066 | T040–T046 |
+| FR-067–069 | T064–T067 |
 | FR-070–071 | T047–T049 |
 | FR-080–082 | T053–T056, T005, T007 |
 | FR-090–091 | T006, T050–T052 |

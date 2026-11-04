@@ -24,9 +24,14 @@ interface BriefEditorProps {
   /** Optional. Called whenever save state changes, so the host can guard its own close button. NEW. */
   onSaveStateChange?: (state: 'saved' | 'saving' | 'error') => void
 
-  /** Stop editing. Omitted where there is no view mode (TaskForm). Unchanged meaning;
-   *  the editor now routes it through the Esc stack and the unsaved-changes bar. */
+  /** Leave editing. Called on a click outside the editor or Esc (through the overlay stack
+   *  and the unsaved-changes bar). There is no Done button. Omitted where there is no read
+   *  view (TaskForm); then click-away does nothing. CHANGED trigger (F1, R25). */
   onDone?: () => void
+
+  /** Where to put the cursor on mount: the clicked top-level block and character offset,
+   *  measured in the read view (R25). Falls back to the end of the brief. NEW, optional. */
+  initialCursor?: { block: number; offset: number }
 
   /** Offered as one-click choices in Insert ▸ Image. Unchanged. */
   attachments?: TaskAttachment[]
@@ -62,6 +67,7 @@ type UploadResult =
 - `onUploadImages` is passed **only** when `canEdit && hasStorage`. It is implemented by `uploadOne(file)`, extracted from `uploadToBucket`'s per-file body. It keeps every existing check (own-reply `ref`, redirect detection, size) and returns `UploadResult` instead of pushing to `failed[]`. After each success it refreshes the attachment list (`setReloadFiles`) and the card thumbnail as today.
 - `uploadUnavailableReason` = `!canEdit ? 'no-permission' : 'no-storage'` when `onUploadImages` is not passed.
 - The window-level `drop` listener returns early when `e.defaultPrevented`, so drops handled by the editor are not uploaded twice.
+- The read view's `onClick` records `initialCursor` and the clicked block's on-screen `top` before setting `editingBrief`. After the editor mounts, it scrolls the panel by the difference so the text stays still (R25).
 - The panel close control consults the last `onSaveStateChange` value. If it is `'error'`, it shows the same "Stay · Leave anyway" choice before closing.
 
 ### `TaskForm`

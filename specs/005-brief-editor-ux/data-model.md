@@ -23,7 +23,7 @@ Every block below must round-trip: parse(serialize(doc)) = doc, and `Brief.tsx` 
 |---|---|---|---|---|
 | paragraph, heading 1–3, bullet/ordered list, blockquote, code block, horizontal rule, hard break | block | existing | CommonMark | none |
 | taskList / taskItem | block | existing | `- [ ]` / `- [x]` | none |
-| table | block | existing | GFM pipe table | header row required (FR-064) |
+| table `{ widths? }` | block | existing (widths new) | GFM pipe table; HTML `<table data-widths>` once resized (R26) | header row required (FR-064); each width ≥ the minimum; widths sum to 100 |
 | image | block | existing (now block-level on insert) | `![alt](src)` on its own line | `src` must pass `normaliseUrl` and load (FR-030) or come from an upload |
 | toggle `{ summary }` | block | existing | `<details><summary>…</summary>…</details>` | empty summary serializes as the localized "Details" |
 | **youtube `{ src }`** | atom block | **new** | `<https://youtube.com/watch?v=ID>` alone on a line | `youtubeId(src) !== null` (FR-061) |
