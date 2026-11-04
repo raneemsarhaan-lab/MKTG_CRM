@@ -32,6 +32,7 @@
 ## Notes
 
 - Validated in one pass on 2026-11-04. One wording fix was made: two assumptions named the browser, and now say "device".
+- Updated 2026-11-04: the Inbox button is now highlighted (FR-012a–FR-012d, User Story 1 scenarios 7–8, SC-010). Re-checked: all items still pass.
 - No clarification markers were needed. The choice with the most impact on users was made as an informed default and recorded under Assumptions: **what the number counts**. It counts reviews waiting, plus own tasks that are late, due today or undated, plus unread mentions; own tasks due later are left out. Confirm or change it in `/speckit-clarify`.
 - FR-072 refers to "the project's design tokens". That is a constitutional constraint (§I), not an implementation choice.
 - The Context table maps every finding from the Board "for you" analysis (N1–N3, N5, H3, A1–A3, L1–L2) to the requirements that address it.

@@ -29,7 +29,7 @@ The fix puts everything that needs the person into one **Inbox**. The Inbox is h
 
 ### User Story 1 - See how much needs me, and open it in one click (Priority: P1)
 
-A team member opens the Board. The pipeline starts right under the header, with no cards above it. In the header, an **Inbox** button shows a number: how many things need them now. They click it, and a panel opens over the board listing those things. They click a task in the list, and its task panel opens.
+A team member opens the Board. The pipeline starts right under the header, with no cards above it. In the header, an **Inbox** button stands out: filled in the brand purple, it shows a number (how many things need them now) and a short line saying what is waiting, such as "2 reviews waiting · 1 due today". They click it, and a panel opens over the board listing those things. They click a task in the list, and its task panel opens.
 
 **Why this priority**: This is the change itself: the board comes first, and one number replaces the bell and the two cards. Without it, nothing else in this spec has a home.
 
@@ -40,9 +40,11 @@ A team member opens the Board. The pipeline starts right under the header, with 
 1. **Given** a member with items that need them, **When** they open the Board, **Then** no "for you" cards appear above the pipeline, and the Inbox button in the header shows the number of items that need them.
 2. **Given** the Inbox is closed, **When** the member clicks the Inbox button, **Then** the Inbox panel opens over the board on the To do tab, showing the same items the number counts.
 3. **Given** the Inbox is open, **When** the member presses Esc, clicks ✕, or clicks anywhere on the board outside the panel, **Then** the panel closes and keyboard focus returns to the Inbox button.
-4. **Given** nothing needs the member, **When** they look at the header, **Then** the Inbox button shows no number, and opening it says "All clear".
+4. **Given** nothing needs the member, **When** they look at the header, **Then** the Inbox button turns quiet (outlined, no fill), shows no number and reads "All clear", and opening it says "All clear".
 5. **Given** something in the count is due today or late, **When** the member looks at the header, **Then** the number is shown in the "urgent" colour instead of the normal one.
 6. **Given** the Inbox is open, **When** the member clicks an item's row (not one of its action buttons), **Then** that task's panel opens.
+7. **Given** items are waiting, **When** the member looks at the header, **Then** the Inbox button is filled in the brand purple and shows a line naming the two most pressing kinds of item (for example "2 reviews waiting · 1 due today").
+8. **Given** a new unread mention or an urgent task, **When** the Board opens, **Then** a soft ring pulses around the Inbox button three times and stops; it does not pulse again until something new arrives after the member opens the Inbox.
 
 ---
 
@@ -158,7 +160,7 @@ Some people want the Inbox always visible. A **pin** in the panel keeps it open 
 - **Snoozed task becomes late**: A task put off until tomorrow comes back at the start of the next day even if it is now late. Snoozing never hides a task for more than one day.
 - **Mention on a task the member can't see**: For `user`-tier members with access to their own tasks only, such a mention is still listed, but opening the task follows the existing access rules.
 - **Mention edited or deleted**: An edited mention shows the new text and keeps its read state. A deleted one leaves the list and the count.
-- **Phone width**: The panel opens full width. The button shows the icon and number without the word "Inbox". Row actions sit on their own line under each row.
+- **Phone width**: The panel opens full width. The button keeps its purple fill, the word "Inbox" and the number, but drops the summary line. Row actions sit on their own line under each row.
 - **Arabic (right-to-left)**: The panel opens from the left side, and tabs, rows and actions are mirrored. Numbers and counts are correct in both languages.
 - **Pinned on a narrow screen**: Below tablet width, there is no room beside the board, so a pinned Inbox sits above the board instead.
 
@@ -178,6 +180,10 @@ Some people want the Inbox always visible. A **pin** in the panel keeps it open 
 - **FR-010**: The header MUST show an Inbox button in place of the bell. The bell and its dropdown MUST be removed.
 - **FR-011**: The Inbox number MUST equal the reviews waiting for the member (FR-020), plus their tasks that are late, due today or undated (FR-022) and not put off, plus their unread mentions (FR-030). It MUST be hidden when the total is zero, and show "99+" above 99.
 - **FR-012**: The number MUST use the urgent colour when at least one counted task is due today or late, and the normal colour otherwise.
+- **FR-012a**: When the count is above zero, the Inbox button MUST be the most prominent header control after "+ New task": filled in the brand purple, at least as tall as "+ New task", with the number in a contrasting badge.
+- **FR-012b**: Beside the word "Inbox", the button MUST show a one-line summary of the two most pressing kinds of waiting item, in this order: reviews waiting, late, due today, new mentions (for example "2 reviews waiting · 1 due today"). When only undated tasks are counted it MUST read "N to do".
+- **FR-012c**: When the count is zero, the button MUST change to a quiet outlined style reading "All clear", so the purple fill keeps meaning "something is waiting".
+- **FR-012d**: When the Board opens with a new unread mention or an urgent task, a soft ring MUST pulse around the button three times and then stop. It MUST NOT pulse again until something new arrives after the member last opened the Inbox, and MUST NOT animate when the member's system asks for reduced motion.
 - **FR-013**: The button's accessible name MUST state the counts in words (for example "Inbox, 3 to do, 2 unread mentions"). Its expanded state MUST be announced.
 - **FR-014**: Clicking the button MUST open the Inbox panel. Clicking it while the panel is open MUST close it.
 
@@ -251,6 +257,7 @@ Some people want the Inbox always visible. A **pin** in the panel keeps it open 
 - **SC-007**: On launch day, no member's Inbox number includes mentions older than 7 days.
 - **SC-008**: The Inbox opens and closes in under half a second on a typical team laptop, and works fully with the keyboard alone.
 - **SC-009**: After two weeks of use, at least 4 of 5 team members asked can say correctly what the Inbox number counts.
+- **SC-010**: When asked "where do you see what needs you?" on first seeing the new Board, at least 4 of 5 team members point to the Inbox button within 5 seconds.
 
 ## Assumptions
 
