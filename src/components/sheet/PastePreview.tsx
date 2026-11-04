@@ -42,18 +42,18 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
 
   useEffect(() => { (initialCells ? dialogRef.current?.querySelector<HTMLElement>('[data-add]') : boxRef.current)?.focus() }, [initialCells])
 
+  // A row without a clip file name is added only once it is fixed in place
+  // (FR-034); until then it is listed, and can be left out of the list.
   const fixedClips: (ParsedClip & { fixed: true })[] = []
-  const keptUnmatched: SheetClipRow[] = []
   preview.unmatched.forEach((u, i) => {
     const f = fixes[i]
     if (!f || f.leftOut) return
     const p = parseClipFileName(f.file_name)
     if (p) fixedClips.push({ ...p, file_name: f.file_name.trim(), title: f.title.trim() || f.file_name.trim(), link: u.link, fixed: true })
-    else if (f.title.trim()) keptUnmatched.push({ title: f.title.trim(), file_name: f.file_name.trim() || null, link: u.link })
   })
   const fresh = [...preview.fresh, ...fixedClips]
   const unmatchedLeft = preview.unmatched.filter((_, i) => !fixes[i]?.leftOut && !parseClipFileName(fixes[i]?.file_name)).length
-  const count = fresh.length + keptUnmatched.length
+  const count = fresh.length
 
   function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     const html = e.clipboardData.getData('text/html')
@@ -68,10 +68,7 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
   async function add() {
     if (!count || busy) return
     setBusy(true); setError(null)
-    const rows: SheetClipRow[] = [
-      ...fresh.map(c => ({ title: c.title, file_name: c.file_name, link: c.link })),
-      ...keptUnmatched,
-    ]
+    const rows: SheetClipRow[] = fresh.map(c => ({ title: c.title, file_name: c.file_name, link: c.link }))
     const res = await onAdd(rows)
     setBusy(false)
     if (!res.success) { setError(res.error ?? t('err.generic')); return }
@@ -141,12 +138,6 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
                         <td className="fx-sheet-mono">{c.source}</td>
                         <td className="fx-sheet-num">{formatClipTime(c.in_ms)} → {formatClipTime(c.out_ms)}</td>
                         <td className="fx-sheet-num">{formatClipTime(c.out_ms - c.in_ms)}</td>
-                        <td>{c.link ? hostOf(c.link) : <span className="fx-sheet-muted">{t('paste.noLink')}</span>}</td>
-                      </tr>
-                    ))}
-                    {keptUnmatched.map((c, i) => (
-                      <tr key={`u${i}`} className="is-fixed">
-                        <td /><td>{c.title}</td><td /><td /><td />
                         <td>{c.link ? hostOf(c.link) : <span className="fx-sheet-muted">{t('paste.noLink')}</span>}</td>
                       </tr>
                     ))}

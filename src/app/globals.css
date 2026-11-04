@@ -37,14 +37,14 @@
   --sheet-panel:        #FFFFFF;
   --sheet-grid:         #E2E3E3;
   --sheet-header-bg:    #F3F4F2;
-  --sheet-muted:        #6F7276;
+  --sheet-muted:        #5E6166;
   --sheet-gutter:       #F8F9F8;
   --sheet-frozen-line:  #C9CBC9;
   --sheet-video-row:    #F4F8E4;
   --sheet-highlight:    #FAFDE9;
   --sheet-hover:        #F6F8FB;
-  --sheet-dropped-ink:  #8A8D91;
-  --sheet-missing:      #B26A00;
+  --sheet-dropped-ink:  #6B6E72;
+  --sheet-missing:      #8A5300;
   --sheet-missing-bg:   #FDF3E3;
   --sheet-focus:        #3563E9;
   --sheet-link:         #1F5FD1;
@@ -1252,7 +1252,8 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 .fx-sheet-tr.is-dropped .is-source, .fx-sheet-tr.is-dropped .is-fileName,
 .fx-sheet-tr.is-dropped .is-in, .fx-sheet-tr.is-dropped .is-out, .fx-sheet-tr.is-dropped .is-length,
 .fx-sheet-tr.is-dropped .is-clipNo, .fx-sheet-tr.is-dropped .is-type { text-decoration: line-through; color: var(--sheet-dropped-ink); }
-.fx-sheet-tr.is-dropped .fx-sheet-status { opacity: .5; }
+.fx-sheet-tr.is-dropped .fx-sheet-status { color: var(--sheet-dropped-ink); }
+.fx-sheet-tr.is-dropped .fx-sheet-dot { opacity: .45; }
 .fx-sheet-tr.is-add > .fx-sheet-td { border-bottom-color: transparent; }
 .fx-sheet-num { justify-content: flex-end; font-variant-numeric: tabular-nums; direction: ltr; }
 .fx-sheet-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; }
@@ -1282,6 +1283,8 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
   padding: 3px 7px; border-radius: 4px; white-space: nowrap; pointer-events: none;
 }
 .fx-sheet-td.is-status:hover > .fx-sheet-tip, .fx-sheet-td.is-status:focus-visible > .fx-sheet-tip { display: block; }
+/* No tooltip while a menu or popover is open over the grid. */
+body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important; }
 .fx-sheet-td.is-status:hover, .fx-sheet-td.is-status:focus-visible { z-index: 5; }
 
 /* files, published, drop */

@@ -50,8 +50,10 @@ export function LinkPrompt({ title, initial, saveLabel, skipLabel, badLink, plac
       <label className="fx-sheet-pop-title">
         {title}
         <input
-          type="url"
+          type="text"
           inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
           value={value}
           placeholder={placeholder}
           aria-invalid={note ? true : undefined}

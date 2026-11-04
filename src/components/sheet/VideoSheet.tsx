@@ -15,7 +15,7 @@ import { useTranslations } from 'next-intl'
 import type { SheetColumnSet, StageId, Task } from '@/types/index'
 import { MAX_INLINE_BYTES, MAX_UPLOAD_BYTES } from '@/lib/attachments'
 import { formatBytes } from '@/components/kanban/attachments/limits'
-import { nextFreeName } from '@/components/kanban/attachments/names'
+import { nextFreeName, sameName } from '@/components/kanban/attachments/names'
 import { buildRows, clipsOf, videosWithClips, type SheetRow } from './rows'
 import { COLUMN_SETS, defaultColumnSet, isColumnSet } from './columns'
 import { summarise } from './summary'
@@ -161,7 +161,9 @@ export function VideoSheet(p: VideoSheetProps) {
       return
     }
     const task = p.tasks.find(x => x.id === taskId)
-    const name = nextFreeName(file.name, (task?.attachments ?? []).map(a => a.filename))
+    const taken = (task?.attachments ?? []).map(a => a.filename)
+    // A clash keeps both, as spec 007's "Keep both" does: "cut (2).mp4".
+    const name = taken.some(x => sameName(x, file.name)) ? nextFreeName(file.name, taken) : file.name
     setFilesState(s => ({ ...s, [taskId]: { kind: 'uploading', name, progress: 0 } }))
     const r = await p.api.upload(taskId)(file, name, pct =>
       setFilesState(s => ({ ...s, [taskId]: { kind: 'uploading', name, progress: pct } })))

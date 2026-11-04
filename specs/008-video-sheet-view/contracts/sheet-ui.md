@@ -89,8 +89,8 @@ Toolbar controls (Board | Sheet, column set, Mine, Show dropped, Paste clips, + 
 
 ## 5. Screen readers
 
-- **Roles and counts**: the container has `role="grid"`, `aria-label="{video} clips"` (or "Videos and clips"), `aria-rowcount` and `aria-colcount`.
-- **Rows**: each row has `role="row"` and `aria-rowindex`. Video rows have `aria-expanded` and `aria-level=1`; clip rows `aria-level=2`. Dropped rows have `aria-disabled` and an off-screen "dropped".
+- **Roles and counts**: the container has `role="treegrid"` (video rows expand and collapse), `aria-label="{video} clips"` (or "Videos and clips"), `aria-rowcount` and `aria-colcount`.
+- **Rows**: each row has `role="row"` and `aria-rowindex`. Video rows have `aria-expanded` and `aria-level=1`; clip rows `aria-level=2`. Dropped rows add an off-screen ", dropped" to their title. They are not `aria-disabled`: Restore and Open task inside them stay usable.
 - **Headers**: `role="columnheader"` with `aria-sort="ascending"` on #. The title cell is `role="rowheader"`.
 - **Status cell**: `aria-haspopup="menu"` when moves exist. Its accessible name is "{video name}, {real name}". A visible tooltip "{video} · {real}" shows on hover **and on keyboard focus**, linked by `aria-describedby` (FR-012).
 - **Live region** (`role="status"`, polite) announces saves, refusals with their reason, upload progress at 25 % steps, "Clip dropped · Undo" and "{n} clips added".

@@ -375,6 +375,46 @@ The task panel's Attachments section lives in
   delete `.next/dev`: Turbopack's on-disk cache once served an old stylesheet
   across restarts.
 
+### Video sheet
+
+A second view of the board for long-form videos and their clips, spec 008
+(`specs/008-video-sheet-view/`). Design file: `design/video-sheet.html`.
+
+- **Data.** A video is a top-level task of type Video. A clip is any child of
+  a video: an ordinary task with its own stage, SLA and owner. Its details
+  (number, source, file name, in, out) are a `task_clips` row; length is never
+  stored. `tasks.published_url` holds the post link; `tasks.dropped_at` marks a
+  dropped clip. **Run `prisma db push` on deploy** (`scripts/migrate.sh` does).
+- **Where it lives.** `src/components/sheet/`, hosted by `KanbanBoard` from the
+  same task state as the board, so the two never disagree. The view is in the
+  address: `/board?view=sheet&video=<id>&row=<id>`. "Open sheet" in the task
+  panel goes there.
+- **One move rule.** `src/lib/stage-moves.ts` (`allowedStages`) decides moves
+  for the board's drag, `moveTask`, `setTaskStage`, bulk moves and the sheet's
+  status menu. The sheet's status changes call the board's own `moveTo`, so the
+  SLA reset and celebration are the board's.
+- **Anyone adds clips.** `addClips` is the only creation path open to
+  "user"-level members; it only makes Reel subtasks of a Video, owned by the
+  person adding them. It locks the video row and skips file names already
+  there (ignoring case), so two people pasting at once get one clip.
+- **Video stage names** ("Editing", "Final Cut"…) are message strings
+  (`sheet.stage.*`), shown in the sheet only. The pipeline is unchanged.
+- **Files.** A Drive link is an attachment with content type `text/uri-list`
+  (`addLinkAttachment`); it opens in a new tab, never in the preview. Uploads
+  share `src/lib/attachment-upload.ts` with the task panel: no compression,
+  the limit checked first, a video's first frame as the card cover.
+- **Dropped clips** leave the board (`liveTasks` in `KanbanBoard`), the
+  overview, capacity and projects queries. Restore moves `stage_date` so the
+  business days in stage are what they were. `members.ts` still counts them on
+  purpose: a member who owns a dropped clip must not be deletable.
+- **Preferences.** The column set (`momentum.sheet.columns.<memberId>`) and
+  Show dropped (`momentum.sheet.dropped`) are per-device `localStorage`, which
+  constitution 2.1.0 §VI allows.
+- **Test it.** `npm run lab:sheet` (`scripts/sheet-lab/`) runs Node checks and
+  browser scenarios against the real sheet with a stub host.
+  `npx tsx scripts/sheet-lab/seed.ts` puts the lab's video into the local
+  database for checks against the running app.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
@@ -679,6 +719,8 @@ Run through this after the first successful deploy.
 | Decide whether the Workload panel stays admin-only | Medium | An assumed default, never a decision |
 | Restore database-level authorization | Medium | RLS lost in the migration — §6 |
 | Check bucket uploads on Cranl | Medium | Spec 007 T045: real upload progress, a 150 MB file byte for byte, a 210 MB refusal. No object storage in the dev environment |
+| Video sheet: Arabic video stage names | Medium | Proposed in spec 008 research R4 (`sheet.stage.*` in `messages/ar.json`); a native speaker should check them |
+| Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
 ---

@@ -230,7 +230,7 @@ export function SheetGrid(p: SheetGridProps) {
       startEdit(row, active.col)
       return
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && row.kind === 'clip' && !isText(row, active.col)) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && row.kind === 'clip' && (active.col === 'title' || !isText(row, active.col))) {
       e.preventDefault(); p.onDelete(row, target); return
     }
     if (e.key === 'Delete' && row.kind === 'clip' && isText(row, active.col) && active.col !== 'title') {
@@ -315,7 +315,8 @@ export function SheetGrid(p: SheetGridProps) {
   return (
     <div
       ref={gridRef}
-      role="grid"
+      // A treegrid: video rows expand and collapse their clips (aria-level, aria-expanded).
+      role="treegrid"
       aria-label={p.label}
       aria-rowcount={rowCount}
       aria-colcount={allCols.length}
@@ -352,7 +353,6 @@ export function SheetGrid(p: SheetGridProps) {
             aria-rowindex={i + 2}
             aria-level={row.kind === 'video' ? 1 : 2}
             aria-expanded={row.kind === 'video' ? !row.collapsed : undefined}
-            aria-disabled={dropped || undefined}
             className={cls}
             data-row={row.key}
             data-task={task?.id}

@@ -65,7 +65,7 @@ export const SHEET_UI = {
   /** The header row and the summary line. */
   headerBg:     '#F3F4F2',
   /** Row numbers and other quiet text. */
-  muted:        '#6F7276',
+  muted:        '#5E6166',
   /** The row-number gutter. */
   gutter:       '#F8F9F8',
   /** The line after the frozen title column and under the header. */
@@ -76,9 +76,9 @@ export const SHEET_UI = {
   highlight:    '#FAFDE9',
   hover:        '#F6F8FB',
   /** Dropped clips: struck through, in this colour. */
-  droppedInk:   COLORS.muted,
+  droppedInk:   '#6B6E72',
   /** "Missing link" on a published clip. */
-  missingLink:  '#B26A00',
+  missingLink:  '#8A5300',
   missingLinkBg:'#FDF3E3',
   /** The active cell's ring, and focus. */
   focus:        BRIEF_UI.blue,

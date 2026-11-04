@@ -104,12 +104,11 @@ export function SheetMenu({ anchor, label, items, onClose }: {
               tabIndex={-1}
               data-menu-item={it.key}
               className={`fx-sheet-menu-item${it.tone ? ` is-${it.tone}` : ''}`}
-              aria-label={it.text}
               onClick={() => it.onSelect()}
             >
               {it.dot && <i className="fx-sheet-dot" style={{ background: it.dot }} aria-hidden="true" />}
               <span className="fx-sheet-menu-label">{it.label}</span>
-              {it.hint && <small aria-hidden="true">{it.hint}</small>}
+              {it.hint && <small>{it.hint}</small>}
             </button>
           </div>
         )

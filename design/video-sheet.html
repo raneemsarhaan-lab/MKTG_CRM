@@ -525,7 +525,8 @@ function draw(){
   $('#newRows').innerHTML=fresh.map(c=>`<tr class="${c.fixed?'fixed':''}"><td class="num">${c.n==null?'':String(c.n).padStart(2,'0')}</td><td>${esc(c.title)}</td><td class="mono">${esc(c.src||'')}</td><td class="num">${c.inMs==null?'':fmt(c.inMs)+' → '+fmt(c.outMs)}</td><td class="num">${c.inMs==null?'':fmt(c.outMs-c.inMs)}</td><td>${c.link?esc(host(c.link)):'<span class="mut">no link</span>'}</td></tr>`).join('');
   $('#badWrap').hidden=!bad.length;
   $('#badRows').innerHTML=bad.map((r,i)=>`<tr><td class="mut" title="${esc(r.cells)}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.cells)}</td><td><input data-badt="${i}" value="${esc(r.title)}" aria-label="Title"></td><td><input data-badf="${i}" value="${esc(r.file)}" placeholder="NN_SOURCE_XmYY.Ys-XmYY.Ys.mp4" aria-label="File name"></td><td><button type="button" class="pbtn" data-leave="${i}">${r.keep?'Leave out':'Keep'}</button></td></tr>`).join('');
-  const addable=fresh.length+bad.filter(r=>r.keep&&r.title.trim()).length;
+  // A row without a clip file name is added only once fixed in place (FR-034).
+  const addable=fresh.length;
   $('#counts').innerHTML=fresh.length||existing||bad.length?`${fresh.length} new · ${existing} already in the sheet · <span class="warn">${bad.filter(r=>r.keep).length} without a clip file name</span>`:'';
   $('#addBtn').textContent=`Add ${addable} clip${addable===1?'':'s'}`;$('#addBtn').disabled=!addable;
 }
@@ -542,7 +543,7 @@ $('#pasteBox').addEventListener('input',()=>classify(cellsFromText($('#pasteBox'
 $('#sampleBtn').onclick=()=>{$('#pasteBox').value=['30_IMG_0296_6m12.4s-7m20.9s.mp4\tStrategy Is a Daily Habit\t'+DRIVE,
   '04_IMG_0293_2m20.2s-3m49.0s.mp4\tKeeping Strategy on Track\t'+DRIVE,'Q&A highlight\tWhat leaders ask first\t'+DRIVE].join('\n');classify(cellsFromText($('#pasteBox').value))};
 $('#addBtn').onclick=()=>{
-  const rows=[...fresh,...bad.filter(r=>r.keep&&r.title.trim()).map(r=>({title:r.title,file:'',link:r.link,n:null}))];
+  const rows=[...fresh];
   rows.forEach(r=>clips.push({id:'c'+(++uid),title:r.title,file:r.file,n:r.n,src:r.src,inMs:r.inMs,outMs:r.outMs,status:'todo',owner:state.me,assignee:null,type:'Reel',pub:'',dropped:false,order:500+uid,files:r.link?[{kind:'link',host:'Google Drive'}]:[]}));
   $('#dlg').hidden=true;reset();render();toast(`${rows.length} clip${rows.length===1?'':'s'} added · To Do, owned by ${me().name}`)};
 
