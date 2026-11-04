@@ -17,7 +17,7 @@ The one rule that reaches the server is that images are stored exactly as added.
 
 The technical approach (details in [research.md](./research.md)):
 - Extract the section from `TaskModal.tsx` (2,700 lines) into `src/components/kanban/attachments/`, following the brief editor's precedent (spec 005).
-- Move delete timers to an app-level provider, so a delete started in a panel can still be undone after the panel closes.
+- Keep pending deletes in the Zustand UI store (timers in a small module), so a delete started in a panel can still be undone after the panel closes.
 - Upload through `XMLHttpRequest` for real progress.
 - Record comment file chips as a token inside the comment text.
 
@@ -46,9 +46,9 @@ The technical approach (details in [research.md](./research.md)):
 | **I. Design System Fidelity** | Colours from the token map, no ad-hoc hex. | **Pass, with work.** The section uses `TaskModal`'s local `CU` constants today. The new module uses `BRIEF_UI` and `COLORS` from `src/lib/tokens.ts`. The Latest pill is `COLORS.lime` with `BRIEF_UI.ink`, and any missing role (danger soft, file-kind badges) is added to `tokens.ts` as a named map (`FILE_KIND_COLORS`), following the `STAGE_COLORS` precedent. |
 | **II. Workflow Pipeline Integrity** | No change to stages, SLA, or the stage model. | **Pass.** Not touched. |
 | **III. Role-Based Feature Access** | Gates enforced in the UI *and* on the server. | **Pass.** Add, rename and delete render only when `canEdit` (owner, assignee, admin, superuser). The server's `mayAttachTo` guard stays on every route and action, including the new DELETE handler. |
-| **IV. Design-Driven Development** | A standalone HTML design committed before UI work. | **Pass, with a task.** The approved preview "Task Attachments Options" is committed as `design/task-attachments.html` before any UI task (T001). It is plain HTML, as `design/brief-editor-ux.html` was in spec 005. |
+| **IV. Design-Driven Development** | A standalone HTML design committed before UI work. | **Pass, with a task and a sign-off.** The approved preview "Task Attachments Options" is committed as `design/task-attachments.html` before any UI task (T001). It is plain, readable HTML rather than the bundled prototype format §IV describes, as `design/brief-editor-ux.html` was in spec 005. §IV requires explicit sign-off for deviations, so the PR's constitution check (T044) asks reviewers to approve the format. |
 | **V. Cultural UX** | Arabic as content data; celebrations untouched. | **Pass.** A new `attachments` namespace exists in `messages/en.json` and `messages/ar.json`. Right-to-left layout, with ←/→ following reading direction. Celebrations are not involved. |
-| **VI. State Architecture** | No new persisted client state; Zustand for UI ephemera only. | **Pass.** Pending deletes live in a React context provider (memory only, cleared on page hide after flushing). Uploads, loading and preview state are component state. Nothing is persisted. |
+| **VI. State Architecture** | App-wide ephemeral UI state in the Zustand store; nothing persisted. | **Pass.** Pending deletes are a non-persisted `pendingDeletes` slice of `useUIStore`, with timers in `src/lib/pending-deletes.ts` (revised after /speckit-analyze C1, which found the first plan's React context provider at odds with §VI). Uploads, loading and preview state stay local component state. Nothing is persisted. |
 | **Tech Stack** | No new major dependency. | **Pass.** None added. |
 
 No violations, so Complexity Tracking stays empty.
@@ -87,10 +87,12 @@ src/components/kanban/attachments/       # NEW: the section, extracted from Task
 ├── order.ts                             # newestFirst, latestImageId (pure)
 └── limits.ts                            # limitFor(hasStorage), formatBytes (pure)
 
+src/store/useUIStore.ts                  # + pendingDeletes slice (ephemeral, not persisted) and its actions
+src/lib/pending-deletes.ts               # NEW: timers keyed by attachment id, commit via removeAttachment, pagehide keepalive flush
 src/components/shared/
-└── PendingDeleteProvider.tsx            # NEW: owns delete timers + the bottom Undo message; flushes on pagehide
+└── PendingDeleteMessage.tsx             # NEW: the bottom "Deleted name · Undo" message after a panel closes
 
-src/app/(app)/layout.tsx                 # Mount PendingDeleteProvider once for every page that opens a task
+src/app/(app)/layout.tsx                 # Mount PendingDeleteMessage once for every page that opens a task
 src/components/kanban/TaskModal.tsx      # Uses AttachmentsSection; paste listener; 📎 count button; comment chips; no-compression path
 src/app/api/attachments/[ref]/route.ts   # + DELETE handler (keepalive flush on page hide), XHR-friendly POST unchanged
 src/actions/tasks.ts                     # addAttachments: accept originals only (no shrink happens client-side any more); unchanged guard
@@ -104,7 +106,7 @@ package.json                             # + "lab:attachments"
 
 **Structure Decision**: Single Next.js project; the feature follows spec 005's layout:
 - A feature folder under `src/components/kanban/`, with pure helpers kept separate so the lab can test them without a browser.
-- A shared provider for the one piece of state that must outlive the panel.
+- One store slice, a timer module and one message component for the only state that must outlive the panel.
 - A lab under `scripts/`.
 
 `AttachmentGallery.tsx` is not imported anywhere and is left alone; removing it is a separate clean-up.
@@ -112,7 +114,7 @@ package.json                             # + "lab:attachments"
 ## Phase 0: Research
 
 All unknowns are resolved in [research.md](./research.md) (R1–R18). The decisions with the most impact:
-- **R4, Undo that outlives the panel:** an app-level provider holds the timer, so no soft delete or schema change is needed.
+- **R4, Undo that outlives the panel:** a `pendingDeletes` slice in the Zustand UI store holds the delete until its window ends, so no soft delete or schema change is needed.
 - **R5, real upload progress:** `XMLHttpRequest` replaces `fetch` in `uploadOne`, keeping all its existing checks.
 - **R6, no compression:** remove the 1600 px shrink from the no-storage path and check size before reading.
 - **R10, comment file chips:** a `[📎 name](attachment:<id>)` token inside the comment text, rendered by the existing chip renderer.
@@ -130,7 +132,7 @@ All unknowns are resolved in [research.md](./research.md) (R1–R18). The decisi
 Re-checked against the Phase 1 design:
 - **§I**: holds. The token additions are named maps in `tokens.ts`, and the lab greps the new folder for hex and `rgba(` literals, as spec 005's lab did.
 - **§III**: holds. The DELETE handler reuses `mayAttachTo`, and the section never renders edit controls without `canEdit`.
-- **§VI**: holds. The provider is memory-only, and the DELETE flush on page hide sends nothing that wasn't already requested.
+- **§VI**: holds. Pending deletes are a non-persisted slice of `useUIStore`, timers stay out of the store, and the DELETE flush on page hide sends nothing that wasn't already requested.
 
 There are no new violations.
 

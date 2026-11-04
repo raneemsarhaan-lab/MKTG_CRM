@@ -17,7 +17,7 @@ Network errors and 5xx are `retryable: true`. 4xx are `retryable: false`, except
 
 ## 2. Delete: new `DELETE /api/attachments/<id>`
 
-Used only by `PendingDeleteProvider` on `pagehide` (keepalive). Normal commits call the existing `removeAttachment` server action.
+Used only by `src/lib/pending-deletes.ts` on `pagehide` (keepalive). Normal commits call the existing `removeAttachment` server action.
 
 | | |
 |---|---|

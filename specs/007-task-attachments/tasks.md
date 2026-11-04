@@ -12,13 +12,15 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 
 **Organization**: Grouped by user story (US1–US8 from spec.md), so each can be built, checked and shipped on its own.
 
+**Revised 2026-11-04** after /speckit-analyze: pending deletes moved from a React context provider to the Zustand UI store (C1, T019); Download and Rename stay available on the grid through the P1 release (I1, I2: T011, T021); the preview walks every stored file (U1: T014, T036); two edge cases added (G1: T014, T019); the brief editor's no-storage paste note (I3: T027); a paste timing check (G2: T028); the §IV sign-off note (C2: T044).
+
 **Conventions used throughout**
 
 | Term | Meaning |
 |---|---|
 | Module dir | `src/components/kanban/attachments/` |
 | Host | `src/components/kanban/TaskModal.tsx` |
-| Provider | `src/components/shared/PendingDeleteProvider.tsx` |
+| Pending deletes | The `pendingDeletes` slice of `src/store/useUIStore.ts`, timers in `src/lib/pending-deletes.ts`, the bottom message in `src/components/shared/PendingDeleteMessage.tsx` (research R4, Constitution §VI) |
 | Lab | `scripts/attachments-lab/`, run with `npm run lab:attachments` |
 | Strings | Every new user-facing string goes through `useTranslations('attachments')`, with keys added to both `messages/en.json` and `messages/ar.json` in the same task |
 | Colours | Only from `BRIEF_UI`, `COLORS` and the new `FILE_KIND_COLORS` in `src/lib/tokens.ts`, or the existing `--brief-*` CSS variables (Constitution §I) |
@@ -40,7 +42,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 - [ ] T002 [P] Create the lab in `scripts/attachments-lab/`, modelled on `scripts/brief-editor-lab/`:
   - `build.sh`: esbuild-bundle `entry.tsx` for the browser, with `next-intl` given `messages/en.json` / `messages/ar.json`.
   - `index.html`.
-  - `entry.tsx`: mounts `<AttachmentsSection>` inside `<PendingDeleteProvider>`, with a **stub host** implementing the props in `contracts/attachments-section.md`:
+  - `entry.tsx`: mounts `<AttachmentsSection>` and `<PendingDeleteMessage>`, with a **stub host** implementing the props in `contracts/attachments-section.md`, and `src/lib/pending-deletes.ts` pointed at a fake `removeAttachment`:
     - `load` resolves after a configurable delay;
     - `upload` reports scripted progress, can fail at a given percentage, records every `File` it receives, and returns fake `TaskAttachment`s;
     - `rename` and `removeAttachment` are recorded with timestamps;
@@ -109,7 +111,8 @@ description: "Task list for Task Attachments, Tidy and Seamless"
   - the root is a `div` holding a picture `<button>` (4:5, `object-fit: cover` for images; otherwise a file icon plus extension badge in `FILE_KIND_COLORS`) and an info block;
   - the name is rendered from `splitName`: whole, or head (`.fx-att-l1`, one line with CSS ellipsis) plus tail (`.fx-att-l2`, never cut). The full name goes in `title` and the button's accessible name;
   - the meta line shows the avatar plus first name (fallback `ownerName`) and `ageLabel`;
-  - pills sit at the top start corner. Add the `.fx-att-*` rules to `globals.css`.
+  - pills sit at the top start corner. Add the `.fx-att-*` rules to `globals.css`;
+  - **keep today's rename** (the pencil button and inline input, moved from the host) so the P1 release doesn't lose it. T029 replaces it with click-to-rename (I2).
 - [ ] T012 [US1] In `AttachmentsSection.tsx`:
   - order with `newestFirst`;
   - add the header "Newest first";
@@ -134,7 +137,9 @@ description: "Task list for Task Attachments, Tidy and Seamless"
   - add the counter ("2 of 4", polite live region), previous and next buttons, and a strip of every file with `aria-current`;
   - keys: ← / → (mirrored in RTL), Home / End, Esc;
   - trap focus inside the dialog and return focus to the source tile on close;
-  - show uploader and age next to name and size in the top bar.
+  - show uploader and age next to name and size in the top bar;
+  - `list` holds **every** stored file in grid order, including those hidden behind Show all (FR-021). On close, if the last file shown is hidden, ask the section to show all, then focus its tile (FR-023);
+  - if the file showing is deleted by someone else (it disappears from `list` on refresh), move to the next file, or close if none is left, with a short note (edge case, G1).
 - [ ] T015 [US2] In `AttachmentPreview.tsx`:
   - a click on the image toggles zoom (scrollable, reset when changing file);
   - a click on the dark area outside the file and controls closes it;
@@ -142,8 +147,8 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 
   Disable transitions under `prefers-reduced-motion`.
 - [ ] T016 [US2] In `AttachmentPreview.tsx`, add "Open in new tab" for PDFs (a real `<a target="_blank" rel="noopener">`), and the "no preview for .*ext* files" message with Download for other types. Exclude uploading and failed files from `list`.
-- [ ] T017 [US2] In `AttachmentTile.tsx`/`AttachmentsSection.tsx`, the picture button opens the preview at that file's index. The name no longer links to the raw file (FR-010), and Download moves to the tile actions (US3/US8) and the preview's top bar.
-- [ ] T018 [US2] Add lab scenarios `us2-1` … `us2-7` in `scripts/attachments-lab/scenarios/us2.mjs`. us2-5 runs in a touch context.
+- [ ] T017 [US2] In `AttachmentTile.tsx`/`AttachmentsSection.tsx`, the picture button opens the preview at that file's index. The name no longer links to the raw file (FR-010). Download is in the preview's top bar here, and on the tile's hover actions from T021, which lands in the same P1 release (I1).
+- [ ] T018 [US2] Add lab scenarios `us2-1` … `us2-7`, `preview-includes-hidden` (15 files, Show all collapsed, step to the 12th, close → all shown, 12th focused) and `edge-deleted-while-previewed` in `scripts/attachments-lab/scenarios/us2.mjs`. us2-5 runs in a touch context.
 
 ---
 
@@ -153,19 +158,15 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 
 **Independent Test**: The spec's US3 test. Undo restores the file. Waiting 5 seconds deletes it. Closing the panel at once shows the bottom message, whose Undo restores the file.
 
-- [ ] T019 [US3] Create `src/components/shared/PendingDeleteProvider.tsx` implementing `usePendingDelete()` from `contracts/attachments-section.md` and the PendingDelete state machine in data-model.md:
-  - timers;
-  - commit via `removeAttachment`;
-  - `panelClosed(taskId)` moves a delete to the `after-close` phase with a deadline ≥ 6 s;
-  - the bottom message "Deleted / Replaced *name* · Undo" at the bottom-centre, with safe-area insets and a polite live region;
-  - `subscribe` for restores;
-  - FR-035 (a new request commits the earlier one);
-  - `pagehide` flushes with `fetch('/api/attachments/<id>', { method: 'DELETE', keepalive: true })`.
-
-  Mount it once in `src/app/(app)/layout.tsx`.
+- [ ] T019 [US3] Implement pending deletes per research R4 (Constitution §VI) and the PendingDelete state machine in data-model.md:
+  - in `src/store/useUIStore.ts`, add a non-persisted `pendingDeletes` slice (entries keyed by attachment id: attachment, taskId, deadline, phase, label, pairedNewId) with the actions `requestDelete`, `undoDelete`, `panelClosed(taskId)` and `commitDelete`;
+  - create `src/lib/pending-deletes.ts` for the timers (kept outside the store), keyed by id: commit via `removeAttachment` when a window ends; FR-035 (a new request commits the earlier one); `panelClosed` extends the deadline to ≥ 6 s from closing; `pagehide` flushes everything with `fetch('/api/attachments/<id>', { method: 'DELETE', keepalive: true })`;
+  - export `usePendingDelete()` matching `contracts/attachments-section.md`, as a thin hook over the slice and the module, including `subscribe` for restores;
+  - create `src/components/shared/PendingDeleteMessage.tsx`: the bottom message "Deleted / Replaced *name* · Undo" for `after-close` entries, bottom-centre, with safe-area insets and a polite live region. Mount it once in `src/app/(app)/layout.tsx`;
+  - if Undo comes after someone else already removed the file, say it can no longer be restored (edge case, G1).
 - [ ] T020 [P] [US3] Move the body of `removeAttachment` into a shared `deleteAttachment(id, member)` in `src/actions/tasks.ts`, keeping the guard, `deleteObject` and the `cover_thumb` clear. Then add a `DELETE` handler to `src/app/api/attachments/[ref]/route.ts` that authenticates, runs `mayAttachTo`, calls it, and returns 204 (also 204 when already gone), per contracts/server.md §2.
 - [ ] T021 [US3] In `AttachmentTile.tsx`/`AttachmentsSection.tsx`:
-  - with a mouse, a Delete button appears on hover or focus at the picture's corner, neutral until hovered;
+  - with a mouse, **Download** and Delete buttons appear on hover or focus at the picture's corner, Delete neutral until hovered (Download is here so the P1 release keeps it after T017; I1);
   - pressing it calls `request(attachment)`;
   - a pending tile renders as the ghost ("Deleted *name* · Undo" plus a 5 s bar, or "5 s" text under reduced motion) and focus moves to Undo;
   - Undo calls `undo(id)` and focus returns to the restored picture;
@@ -173,7 +174,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 
   Edit controls render only when `canEdit`.
 - [ ] T022 [US3] In the host, call `pendingDelete.panelClosed(task.id)` from `requestClose()` and in the component's unmount clean-up.
-- [ ] T023 [US3] Add lab scenarios `us3-1` … `us3-5`, `no-store-before-window` and `panel-close-flush` in `scripts/attachments-lab/scenarios/us3.mjs`. The stub host can unmount the section to simulate closing.
+- [ ] T023 [US3] Add lab scenarios `us3-1` … `us3-5`, `no-store-before-window`, `panel-close-flush` and `edge-undo-gone` in `scripts/attachments-lab/scenarios/us3.mjs`. The stub host can unmount the section to simulate closing.
 
 **Checkpoint**: All P1 stories are done. This is a releasable increment.
 
@@ -215,8 +216,9 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 - [ ] T027 [US4] In the host:
   - route the window `drop` catch-all to `handle.addFiles(files, { source: 'drop' })`, keeping the `defaultPrevented` skip for the brief editor;
   - add a window `paste` listener while the panel is open (R9): skip when `defaultPrevented` or no files; rename generic clipboard names with `screenshotName(new Date())`; call `handle.addFiles(files, { source: 'paste', forComment: target is the comment textarea })`;
-  - without `canEdit`, show the refusal note for paste and drop.
-- [ ] T028 [US4] Add lab scenarios `us4-1` … `us4-7`, `no-image-shrink` and `limit-before-read` in `scripts/attachments-lab/scenarios/us4.mjs`. Run us4-3/us4-4 with `?storage=0` and `?storage=1`.
+  - without `canEdit`, show the refusal note for paste and drop;
+  - in the `briefEditor` namespace of `messages/en.json` and `messages/ar.json`, change the brief editor's no-storage upload note (`brief-editor/imageUpload.ts`, reason `no-storage`) to say the image can be pasted below the brief to attach it to the task (spec edge case; I3).
+- [ ] T028 [US4] Add lab scenarios `us4-1` … `us4-7`, `no-image-shrink` and `limit-before-read` in `scripts/attachments-lab/scenarios/us4.mjs`. Run us4-3/us4-4 with `?storage=0` and `?storage=1`. us4-1 also asserts the pasted file's tile is visible within 1,000 ms of the paste event (SC-003; G2).
 
 ---
 
@@ -232,7 +234,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
   - call the `rename` prop and update the tile from its reply;
   - focus returns to the name.
 
-  Remove the pencil button. Without `canEdit`, the name is plain text.
+  Remove the pencil button and inline input kept by T011. Without `canEdit`, the name is plain text.
 - [ ] T030 [US5] Add lab scenarios `us5-1` … `us5-5` in `scripts/attachments-lab/scenarios/us5.mjs`. us5-5 uses `?readonly=1`.
 
 ---
@@ -262,7 +264,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 **Independent Test**: The spec's US7 test with 15 files and a 700 ms load.
 
 - [ ] T035 [US7] Create `src/components/kanban/attachments/PlaceholderTiles.tsx`: `min(count, 7)` tiles at exactly the tile size with a shimmer (static under reduced motion), plus a `role="status"` "Loading *N* files…". `AttachmentsSection.tsx` shows it until `load()` resolves, with the count from `initialRows`.
-- [ ] T036 [US7] In `AttachmentsSection.tsx`: with more than 7 stored files, show the newest 7 and a "Show all *N* files" button that toggles to "Show fewer". Upload and failed tiles always show first and don't count against the 7. The choice resets when the panel closes.
+- [ ] T036 [US7] In `AttachmentsSection.tsx`: with more than 7 stored files, show the newest 7 and a "Show all *N* files" button that toggles to "Show fewer". Upload and failed tiles always show first and don't count against the 7. The choice resets when the panel closes. Expose `showAll()` for the preview's close (T014).
 - [ ] T037 [US7] Add lab scenarios `us7-1` and `us7-2` in `scripts/attachments-lab/scenarios/us7.mjs`. us7-1 measures the grid's top and bottom positions before and after loading (SC-010).
 
 ---
@@ -274,7 +276,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 **Independent Test**: The spec's US8 test at 390 px touch, and a keyboard-only run.
 
 - [ ] T038 [US8] In `AttachmentTile.tsx` and `globals.css`:
-  - under `@media (hover: hover)`, Download and Delete appear on hover or focus;
+  - under `@media (hover: hover)`, keep T021's Download and Delete hover buttons;
   - under `@media (hover: none)`, those are hidden and a single ⋯ button shows; its menu (`role="menu"`) holds Download, Rename and Delete, focus moves to the first item, and Esc or a click outside closes it and returns focus;
   - hit targets are at least 30 px.
 - [ ] T039 [US8] In `AttachmentTile.tsx`, on the focused picture button, Delete/Backspace calls `request` and F2 starts renaming (when `canEdit`). In `AttachmentsSection.tsx`, add one polite live region for every announcement in contracts/keyboard-and-a11y.md.
@@ -290,11 +292,11 @@ description: "Task list for Task Attachments, Tidy and Seamless"
   - ← moves to the next file.
 
   Add the lab guard `messages-parity` (identical key sets, no English left in Arabic), and an Arabic run of us1-1, us2-2 and us4-2.
-- [ ] T042 [P] Add the lab guards `tokens-only` (no hex or `rgba(` in `src/components/kanban/attachments/` or `PendingDeleteProvider.tsx`), `axe` (no critical issues in the section, preview, ⋯ menu or duplicate bar) and `render-loop`. Fix anything they find.
-- [ ] T043 Run quickstart §1 (typecheck, `scripts/preflight.sh`, `next build`) and §3 against the running app (local Postgres, seeded team, `next dev`, no bucket), including step 7, the SHA-256 byte-for-byte check. Record the results, any bugs found and fixed, and what couldn't be verified in `specs/007-task-attachments/validation.md`, in the format of spec 005's.
-- [ ] T044 [P] Write `specs/007-task-attachments/constitution-check.md` (§I–§VI plus Tech Stack, for the PR description) and add a "Task attachments" section to `HANDOVER.md`:
+- [ ] T042 [P] Add the lab guards `tokens-only` (no hex or `rgba(` in `src/components/kanban/attachments/` or `src/components/shared/PendingDeleteMessage.tsx`), `axe` (no critical issues in the section, preview, ⋯ menu or duplicate bar) and `render-loop`. Fix anything they find.
+- [ ] T043 Run quickstart §1 (typecheck, `scripts/preflight.sh`, `next build`) and §3 against the running app (local Postgres, seeded team, `next dev`, no bucket), including step 7, the SHA-256 byte-for-byte check. Record the results, any bugs found and fixed, and what couldn't be verified in `specs/007-task-attachments/validation.md`, in the format of spec 005's. Optional (SC-001): ask five team members "which file is the latest?" on a task with three versions, and record how many answer correctly within 3 s; otherwise mark SC-001 as measured after launch (G3).
+- [ ] T044 [P] Write `specs/007-task-attachments/constitution-check.md` (§I–§VI plus Tech Stack, for the PR description). Under §IV, state that `design/task-attachments.html` is plain HTML rather than the bundled prototype format and **ask reviewers to sign off** on that deviation, as §IV requires (C2). Under §VI, name the `pendingDeletes` store slice. Add a "Task attachments" section to `HANDOVER.md`:
   - the module layout;
-  - the provider;
+  - pending deletes (store slice, timer module, bottom message);
   - the no-compression rule and the inline limit;
   - the comment token;
   - how to run `lab:attachments`.
@@ -313,6 +315,7 @@ description: "Task list for Task Attachments, Tidy and Seamless"
 | US1 (Phase 3) | Foundational | T012 needs T011. |
 | US2 (Phase 4) | Foundational | T017 uses `AttachmentTile` from T011 (US1). |
 | US3 (Phase 5) | Foundational | T021 uses `AttachmentTile` (T011). T019 and T020 are independent of US1/US2. |
+| P1 release | US1 + US2 + US3 together | T017 (US2) removes the name's raw-file link; T021 (US3) adds the hover Download button. Ship US2 and US3 together, or keep the name link until T021 lands. |
 | US4 (Phase 6) | Foundational; "Replace it" needs T019 (US3) | Without US3, Replace can be held back and only Keep both / Cancel shipped. |
 | US5 (Phase 7) | US1 (T011) | |
 | US6 (Phase 8) | US4 (T024 for `forComment`), US2 (T014 for `openPreview`) | T031 needs only T009. |
@@ -347,7 +350,7 @@ The UI follows `design/task-attachments.html`. Build state before UI, then wire 
 
 ```text
 Agent A: T011 → T012 → T013 (US1, AttachmentTile + section order)
-Agent B: T019 (PendingDeleteProvider) + T020 (DELETE route)   ← no shared files with A
+Agent B: T019 (pendingDeletes store slice + timer module + message) + T020 (DELETE route)   ← no shared files with A
 Then:    T021–T023 (US3 tile wiring) once T011 exists
 ```
 

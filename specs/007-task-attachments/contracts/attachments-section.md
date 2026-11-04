@@ -41,9 +41,9 @@ type UploadResult =
   | { ok: false; error: string; retryable: boolean }
 ```
 
-`delete` is not a prop. The section calls the app-level `usePendingDelete()` (below), which calls `removeAttachment` when a delete commits.
+`delete` is not a prop. The section uses `usePendingDelete()` (below), which reads the `pendingDeletes` slice of `useUIStore` and calls actions backed by `src/lib/pending-deletes.ts`; that module calls `removeAttachment` when a delete commits.
 
-## `usePendingDelete()` (from `PendingDeleteProvider`)
+## `usePendingDelete()` (a thin hook over `useUIStore`'s `pendingDeletes` slice and `src/lib/pending-deletes.ts`)
 
 ```ts
 interface PendingDeleteApi {
@@ -60,7 +60,7 @@ interface PendingDeleteApi {
 }
 ```
 
-The provider sends the server delete through `removeAttachment(id)`. On `pagehide` it uses `fetch('/api/attachments/<id>', { method: 'DELETE', keepalive: true })` (contracts/server.md §2).
+`src/lib/pending-deletes.ts` sends the server delete through `removeAttachment(id)`. On `pagehide` it uses `fetch('/api/attachments/<id>', { method: 'DELETE', keepalive: true })` (contracts/server.md §2). `<PendingDeleteMessage>`, mounted once in `src/app/(app)/layout.tsx`, renders the bottom message for entries in the `after-close` phase.
 
 ## Host responsibilities (TaskModal)
 
@@ -83,4 +83,5 @@ The provider sends the server delete through `removeAttachment(id)`. On `pagehid
 - Names use `splitName`. The full name is in `title` and in the accessible name.
 - Without `canEdit`: no Add files button or tile, names are plain text, no hover or ⋯ actions, and intake shows the refusal note.
 - Placeholders match the tile size exactly. Switching from placeholders to tiles moves nothing above or below the grid.
-- More than 7 stored files → 7 shown + "Show all N files". Uploading and failed tiles are always shown first.
+- More than 7 stored files → 7 shown + "Show all N files". Uploading and failed tiles are always shown first and don't count towards the 7.
+- The preview's list is **every** stored file in grid order, including those hidden behind Show all. If it closes on a hidden file, the section shows all and focuses that tile.

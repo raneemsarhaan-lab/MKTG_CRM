@@ -39,3 +39,10 @@
 - Size limits come from the code: 200 MB per file with file storage, about 5 MB without it. The preview's "5 MB" was a sample; FR-052 requires showing the limit that applies.
 - The Context table maps every finding (U1–U11, S1–S11, Q1) to its requirements. S12 is out of scope at the user's request.
 - FR-081 refers to "the project's design tokens", which is a constitutional constraint (§I), not an implementation choice.
+- **Revised after /speckit-analyze (2026-11-04)**, and re-checked: all items still pass. Spec changes:
+  - FR-021 and FR-023: the preview includes files hidden behind Show all, and focus returns to the tile even when it was hidden.
+  - FR-056: Undo after Replace restores the old file and deletes the new one.
+  - FR-071: uploading and failed tiles show first and aren't counted in the 7.
+  - FR-052: the exact limit labels.
+  - The brief-paste edge case on deployments without storage.
+  - FR-058 and FR-059 put back in order.

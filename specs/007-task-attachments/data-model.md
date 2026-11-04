@@ -66,7 +66,9 @@ Rules:
 
 The section shows the first prompt only. **Replace it** creates a job with `replaces = existingId`. **Keep both** creates a job named `nextFreeName(...)`. **Cancel** drops the file. Then the next prompt shows.
 
-### PendingDelete: owned by `PendingDeleteProvider` (app level)
+### PendingDelete: the `pendingDeletes` slice of `useUIStore` (app level, not persisted)
+
+Timer handles are kept outside the store, in `src/lib/pending-deletes.ts`, keyed by attachment id.
 
 | Field | Type | Notes |
 |---|---|---|

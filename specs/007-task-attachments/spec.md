@@ -191,7 +191,7 @@ On a phone, tiles sit two per row and each has one **⋯** button (Download, Ren
 - **Page closed or reloaded during the 5-second Undo**: the deletion is completed if possible. If it can't be sent, the file stays, so nothing is lost by accident.
 - **Replace on the newest image**: the replacement becomes the newest file and takes the Latest pill, and the board card's cover updates as it does for any new image.
 - **Rename to a name already used**: allowed; the names are told apart by age and uploader. The duplicate check applies to added files only.
-- **Paste while typing in the brief**: the brief's own image paste (spec 005) handles it, so the file is not added twice.
+- **Paste while typing in the brief**: the brief's own image paste (spec 005) handles it, so the file is not added twice. On deployments without file storage, where the brief can't hold images, its note says to paste below the brief to attach the file to the task instead.
 - **Arabic (right-to-left)**: tiles, pills, the preview's arrows and the strip are mirrored. ← and → follow the reading direction.
 - **Imported files with no size or uploader**: they show no size, and the uploader is shown as today; correcting the attribution (S12) is out of scope.
 
@@ -212,9 +212,9 @@ On a phone, tiles sit two per row and each has one **⋯** button (Download, Ren
 
 - **FR-010**: Clicking a tile's picture MUST open the preview. Clicking the name MUST NOT open the preview (see FR-040).
 - **FR-020**: The preview MUST show the file, its full name, uploader, age and size, a position counter ("2 of 4"), previous/next buttons, a strip of every file, Download and Close.
-- **FR-021**: The preview MUST move between files with ← and →, the buttons, the strip, and, on touch screens, a horizontal swipe, in the grid's order.
+- **FR-021**: The preview MUST move between files with ← and →, the buttons, the strip, and, on touch screens, a horizontal swipe, in the grid's order. It MUST include every stored file, including ones hidden behind "Show all" (FR-071); files still uploading or failed are left out.
 - **FR-022**: Clicking an image in the preview MUST toggle between fitted and zoomed-in (scrollable) views. Moving to another file MUST reset the zoom.
-- **FR-023**: Clicking the dark area outside the file and controls MUST close the preview, as Esc and Close do, and return focus to the tile.
+- **FR-023**: Clicking the dark area outside the file and controls MUST close the preview, as Esc and Close do, and return focus to the tile of the file last shown. If that tile is hidden behind "Show all", the section MUST show all files first.
 - **FR-024**: PDFs MUST preview inline and offer "Open in new tab".
 - **FR-025**: Files that can't be previewed MUST say so and offer Download.
 
@@ -237,14 +237,14 @@ On a phone, tiles sit two per row and each has one **⋯** button (Download, Ren
 
 - **FR-050**: The large dashed drop box MUST be replaced by an "Add files" button in the section header and an "Add files" tile at the end of the grid. Dropping files anywhere on the panel MUST attach them, with a "Drop to attach to this task" overlay while dragging.
 - **FR-051**: Pasting files anywhere in the task panel, outside the brief, MUST attach them. A pasted image without a real name MUST be named "Screenshot HH.MM.png" from the local time.
-- **FR-052**: The "Add files" tile MUST state the ways to add ("Paste, drop or browse") and the size limit that applies on this deployment.
+- **FR-052**: The "Add files" tile MUST state the ways to add ("Paste, drop or browse") and the size limit that applies on this deployment, written as "Up to 200 MB each" with file storage and "Up to about 5 MB each" without it. File sizes are shown exactly ("7.0 MB").
 - **FR-053**: Each file being uploaded MUST get its own tile at the front of the list, with an "Uploading" pill and its own progress. When it finishes, it becomes a normal tile.
 - **FR-054**: A file over the limit, pictures included, MUST be refused before any upload, shown as a tile marked "Too large" with its size, the limit and a suggestion ("shrink it, or share a link in a comment"), and a Remove button.
 - **FR-055**: An upload that fails MUST keep its tile, marked "Not uploaded", with the reason in plain words, Retry and Remove. Retry MUST try again without choosing the file again.
-- **FR-056**: A file whose name matches an attached file (ignoring capitals) MUST trigger a choice: "Replace it", which swaps the old file for the new one and offers Undo for 5 seconds; "Keep both", which saves as "*name* (2).ext" or the next free number; or "Cancel". Several clashing files MUST be asked about one at a time.
+- **FR-056**: A file whose name matches an attached file (ignoring capitals) MUST trigger a choice: "Replace it", which swaps the old file for the new one and offers Undo for 5 seconds; "Keep both", which saves as "*name* (2).ext" or the next free number; or "Cancel". Several clashing files MUST be asked about one at a time. Undo after "Replace it" MUST put the task back as it was: the old file returns and the new one is deleted.
 - **FR-057**: At most 12 files MUST be added in one go. Any extra MUST be skipped with a note saying how many and that they can be added next.
-- **FR-059**: The stored file MUST be exactly the file the member added: never resized, re-compressed or converted, on any deployment. Downloading it MUST return the same file, byte for byte. Small preview copies (such as the board card's cover thumbnail) MAY be made for display only and MUST never replace the original.
 - **FR-058**: Members who may not edit the task MUST NOT be able to add, rename or delete files. Pasting or dropping MUST show a short note explaining why.
+- **FR-059**: The stored file MUST be exactly the file the member added: never resized, re-compressed or converted, on any deployment. Downloading it MUST return the same file, byte for byte. Small preview copies (such as the board card's cover thumbnail) MAY be made for display only and MUST never replace the original.
 
 **Keyboard and phones**
 
@@ -256,7 +256,7 @@ On a phone, tiles sit two per row and each has one **⋯** button (Download, Ren
 **Loading, long lists, header count, comments**
 
 - **FR-070**: While files load, the section MUST show grey placeholder tiles of the final size, one per file up to seven, and announce "Loading N files…" to screen readers.
-- **FR-071**: With more than seven files, the section MUST show the seven newest and a "Show all N files" button that reveals the rest and becomes "Show fewer".
+- **FR-071**: With more than seven stored files, the section MUST show the seven newest and a "Show all N files" button that reveals the rest and becomes "Show fewer". Uploading, too-large and failed tiles MUST always show, ahead of the seven, and MUST NOT count towards them.
 - **FR-072**: The 📎 count in the panel header MUST be a button that scrolls to Attachments, opens it if collapsed, and highlights it briefly.
 - **FR-073**: Attaching or pasting a file from the comment box MUST attach it to the task and add a chip for it to the comment being written. The chip can be removed before posting.
 - **FR-074**: A posted comment MUST show its file chips. Clicking a chip MUST open the preview on that file. A chip whose file was deleted MUST say so and do nothing else.

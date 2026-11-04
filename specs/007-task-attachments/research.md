@@ -45,22 +45,22 @@ The full name is in `title` and in the accessible name.
 
 ## R4. Undo that survives closing the panel
 
-**Decision**:
-- A `PendingDeleteProvider`, mounted once in `src/app/(app)/layout.tsx`, owns every pending delete: the attachment, its timer and its Undo.
-- The panel asks the provider to delete and shows the ghost tile while the provider holds it.
-- The server delete (`removeAttachment`) is sent only when the timer ends.
-- If the panel closes first, the provider keeps the timer, shows the bottom message "Deleted *name* · Undo", and sends the delete when that message ends. The message lasts at least 6 seconds from closing.
-- On `pagehide`, the provider flushes all pending deletes with `fetch(DELETE /api/attachments/<id>, { keepalive: true })`.
+**Decision** (revised after /speckit-analyze C1, to follow Constitution §VI):
+- Pending deletes are **ephemeral UI state in the Zustand store**: `useUIStore` gains `pendingDeletes` (not persisted) and the actions `requestDelete`, `undoDelete`, `panelClosed`, `commitDelete`.
+- The timers live beside it in `src/lib/pending-deletes.ts`: plain `setTimeout` handles keyed by attachment id, never stored in Zustand. That module also sends the server delete (`removeAttachment`) when a window ends.
+- The panel calls the store's `requestDelete` and shows the ghost tile while the id is in `pendingDeletes`.
+- If the panel closes first, `panelClosed(taskId)` moves the entry to the `after-close` phase, extends its deadline to at least 6 seconds from closing, and a small `<PendingDeleteMessage>` mounted once in `src/app/(app)/layout.tsx` shows "Deleted *name* · Undo". The delete is sent when that message ends.
+- On `pagehide`, the module flushes everything still pending with `fetch(DELETE /api/attachments/<id>, { keepalive: true })`.
 
 **Rationale**:
 - Once the stored copy is removed, Undo is impossible without the bytes. Keeping the delete *unsent* until the window ends needs no soft delete and no schema change.
 - The user's experience matches FR-034: the file is gone from view, and Undo restores it.
-- Task panels open from the board and the personal board, so the owner must sit above both.
+- Task panels open from the board and the personal board, so the state must sit above both. §VI puts app-wide ephemeral UI state in `useUIStore` (as `celebration` and `selectedTaskId` are), and timers aren't serialisable state, so they stay in a module.
 
 **Alternatives**:
 - A soft-delete column with a clean-up job: rejected, because it adds a schema change and a background job.
 - Deleting at once and re-uploading on Undo: impossible after close, because the bytes are gone.
-- A Zustand store: possible, but a provider keeps timers and the message together, and nothing needs persisting.
+- A React context provider: this was the first plan, but rejected by /speckit-analyze (C1) because §VI assigns app-wide ephemeral UI state to the Zustand store.
 
 **Edge**: if the keepalive request can't be sent (offline), the file stays. The spec prefers keeping a file to losing one.
 
@@ -97,7 +97,7 @@ The full name is in `title` and in the accessible name.
 
 ## R7. Which limit to show
 
-**Decision**: `limitFor(hasStorage)` returns `MAX_UPLOAD_BYTES` (200 MB) or `MAX_INLINE_BYTES` (about 5 MB). The "Add files" tile shows "Paste, drop or browse · Up to *N* each". A too-large tile names the file's size, the limit, and the suggestion "shrink it, or share a link in a comment". The check runs before any reading or uploading.
+**Decision**: `limitFor(hasStorage)` returns `MAX_UPLOAD_BYTES` (200 MB) or `MAX_INLINE_BYTES` (about 5.25 MB). The label comes from `limitLabel(hasStorage)`: "Up to 200 MB each" or "Up to about 5 MB each", so the inline limit never prints as "5.2 MB". File sizes use `formatBytes` and are exact. The "Add files" tile shows "Paste, drop or browse" plus that label. A too-large tile names the file's size, the limit, and the suggestion "shrink it, or share a link in a comment". The check runs before any reading or uploading.
 
 **Rationale**: FR-052 and FR-054 require showing the limit that applies on this deployment, and `hasStorage` is already a `TaskModal` prop.
 
@@ -106,7 +106,7 @@ The full name is in `title` and in the accessible name.
 **Decision**:
 - Duplicate check on the client, ignoring capitals, against stored files (uploading and failed tiles excluded). Clashing files queue, and one bar shows the first: **Replace it · Keep both · Cancel**.
 - **Keep both** uploads as `nextFreeName` ("*name* (2).ext", then (3) …).
-- **Replace** uploads the new file and, once it is stored, starts a pending delete of the old one through the provider. That shows "Replaced *name* · Undo". Undo cancels the old file's delete and deletes the new one, so the task is back as it was.
+- **Replace** uploads the new file and, once it is stored, starts a pending delete of the old one through the `pendingDeletes` store (R4). That shows "Replaced *name* · Undo". Undo cancels the old file's delete and deletes the new one, so the task is back as it was.
 
 **Rationale**:
 - The duplicate check is about the user's intent, so the client is the right place.
