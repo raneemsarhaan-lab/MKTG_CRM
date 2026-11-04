@@ -72,8 +72,19 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const gridRef = useRef<HTMLDivElement>(null)
   const cells = useRef(new Map<string, HTMLElement>())
   const wantFocus = useRef(false)
-  const [editing, setEditing] = useState<{ key: string; col: GridCol; value: string } | null>(null)
+  type Editing = { key: string; col: GridCol; value: string; select?: boolean }
+  const [editing, setEditingState] = useState<Editing | null>(null)
+  /**
+   * The edit as of now, not as of the last render. Fast typing can outrun
+   * React: keys typed before the new input mounts are added here, and Enter
+   * commits what is here.
+   */
+  const editingRef = useRef<Editing | null>(null)
+  const setEditing = (v: Editing | null) => { editingRef.current = v; setEditingState(v) }
   const committing = useRef(false)
+  /** Characters typed on a "+ Clip" / "+ Piece" row before its draft appears. */
+  const pendingChar = useRef('')
+  const draftPending = useRef(false)
 
   const allCols: GridCol[] = ['rowNo', ...m.cols]
   const template = `${m.rowNoWidth}px ${m.cols.map(c => `${m.widths[c]}px`).join(' ')}`
@@ -107,10 +118,22 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     const row = m.rows.find(r => r.key === editDraft)
     if (row) {
       setActive({ key: row.key, col: 'title' })
-      setEditing({ key: row.key, col: 'title', value: '' })
+      setEditing({ key: row.key, col: 'title', value: pendingChar.current })
+      pendingChar.current = ''
+      draftPending.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editDraft])
+
+  /** Enter or click on an acting cell. On a "+" row's title a draft is on its way: keep keys for it. */
+  function activate(row: R, col: GridCol): boolean {
+    const ok = !!m.onActivate?.(row, col)
+    if (ok && col === 'title') {
+      draftPending.current = true
+      setTimeout(() => { if (!editingRef.current) { draftPending.current = false; pendingChar.current = '' } }, 1000)
+    }
+    return ok
+  }
 
   function focusCell(row: R, col: GridCol) {
     wantFocus.current = true
@@ -118,8 +141,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   }
 
   async function commit(next: 'down' | 'right' | 'left' | 'none') {
-    if (!editing || committing.current) return
-    const { key, col, value } = editing
+    const cur = editingRef.current
+    if (!cur || committing.current) return
+    const { key, col, value } = cur
     const row = m.rows.find(r => r.key === key)
     committing.current = true
     setEditing(null)
@@ -135,8 +159,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   }
 
   function cancel() {
-    if (!editing) return
-    const { key, col } = editing
+    const cur = editingRef.current
+    if (!cur) return
+    const { key, col } = cur
     setEditing(null)
     const row = m.rows.find(r => r.key === key)
     if (!row) return
@@ -150,6 +175,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       if (note) onNote(cellKey(row.key, col), note)
       return
     }
+    // Typing a character replaces the value; Enter, F2 and double-click edit it, caret at the end.
     setEditing({ key: row.key, col, value: initial ?? m.textValue(row, col) })
   }
 
@@ -169,7 +195,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const row = m.rows[r], cc = allCols[c]
       if (colsFor(row).includes(cc) && m.isText(row, cc)) {
         focusCell(row, cc)
-        setEditing({ key: row.key, col: cc, value: m.textValue(row, cc) })
+        // Arriving by Tab selects the cell's text, like a form field: typing replaces it.
+        setEditing({ key: row.key, col: cc, value: m.textValue(row, cc), select: true })
         return
       }
     }
@@ -177,6 +204,16 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   }
 
   function onGridKeyDown(e: React.KeyboardEvent) {
+    const printable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey
+    // An edit has started but its input hasn't mounted yet: keep the keys for it.
+    if (!editing && (editingRef.current || draftPending.current)) {
+      if (printable) {
+        e.preventDefault()
+        if (editingRef.current) setEditing({ ...editingRef.current, value: editingRef.current.value + e.key })
+        else pendingChar.current += e.key
+      } else if (e.key === 'Enter' && editingRef.current) { e.preventDefault(); void commit('down') }
+      return
+    }
     if (editing || !active) return
     const target = e.target as HTMLElement
     if (!target.matches('[data-cell]')) return
@@ -214,7 +251,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     }
     if (e.key === 'Enter' || e.key === 'F2') {
       e.preventDefault()
-      if (m.onActivate?.(row, active.col)) return
+      if (activate(row, active.col)) return
       if (m.isMenu(row, active.col)) { m.onOpen(row, active.col, target); return }
       startEdit(row, active.col)
       return
@@ -232,6 +269,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (e.key.length === 1 && !ctrl && !e.altKey && e.key !== ' ' && m.isText(row, active.col)) {
       e.preventDefault()
       startEdit(row, active.col, e.key)
+      return
+    }
+    // Typing on a "+ Clip" / "+ Piece" row starts the new row with that character.
+    if (e.key.length === 1 && !ctrl && !e.altKey && e.key !== ' ' && active.col === 'title') {
+      pendingChar.current = e.key
+      if (activate(row, active.col)) e.preventDefault()
+      else pendingChar.current = ''
     }
   }
 
@@ -303,7 +347,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   onClick={e => {
                     if (isEditing) return
                     if (!isActive) setActive({ key: row.key, col })
-                    if (m.onActivate?.(row, col)) return
+                    if (activate(row, col)) return
                     if (menu) m.onOpen(row, col, e.currentTarget)
                   }}
                   onDoubleClick={() => { if (!isEditing) startEdit(row, col) }}
@@ -317,8 +361,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                         aria-label={m.inputLabel(row, col)}
                         placeholder={m.inputPlaceholder?.(row, col)}
                         dir={m.inputDir?.(col)}
-                        onFocus={e => { if (editing.value.length > 1) e.currentTarget.select() }}
-                        onChange={e => setEditing({ ...editing, value: e.target.value })}
+                        onFocus={e => {
+                          const el = e.currentTarget
+                          if (!el.value) return
+                          if (editing.select) el.select()
+                          else el.setSelectionRange(el.value.length, el.value.length)
+                        }}
+                        onChange={e => setEditing({ ...(editingRef.current ?? editing), value: e.target.value })}
                         onKeyDown={e => {
                           e.stopPropagation()
                           if (e.key === 'Enter') { e.preventDefault(); void commit('down') }

@@ -22,13 +22,14 @@ export const cross = [
       await k('Home'); await k('ArrowRight'); await k('Enter')
       await t.page.keyboard.type(' (v2)'); await k('Enter')
       await t.idle(200)
-      t.assert((await t.task('c11')).name.endsWith('(v2)'), 'edited by keyboard')
+      t.eq((await t.task('c11')).name, 'The Two Anchors of Leadership: Brutal Facts and Ultimate Faith (v2)', 'Enter edits with the caret at the end')
       // + Clip by keyboard.
       await k('Control+End')
       for (let i = 0; i < 20 && (await t.active()) !== 'a:v1|title'; i++) await k('ArrowLeft')
       await k('End'); for (let i = 0; i < 5; i++) await k('ArrowLeft')
       await t.page.locator('[data-cell="a:v1|title"]').focus()
-      await k('Enter'); await t.page.keyboard.type('Keyboard clip'); await k('Enter')
+      // Typing straight onto "+ Clip" starts the new clip with that letter.
+      await t.page.keyboard.type('Keyboard clip'); await k('Enter')
       await t.idle(250)
       t.assert((await t.tasks()).some(x => x.name === 'Keyboard clip'), '+ Clip by keyboard')
       // Paste clips by keyboard: Shift+Tab out of the grid to the toolbar button.

@@ -13,6 +13,7 @@ import { getSessionMember } from '@/lib/authz'
 import type { Prisma } from '@prisma/client'
 import type { AudienceKey, FrequencyPeriod, LinkRole, StageId } from '@/types/index'
 import { LINK_CONTENT_TYPE } from '@/lib/attachments'
+import { periodStart } from '@/components/content/summary'
 import {
   AUDIENCE_KEYS, KNOWN_TYPES, isWebLink, norm, readAudience, readFrequency, readStatus, readType, siteName, taskIdFromLink,
 } from '@/lib/content-plan'
@@ -101,6 +102,11 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
       const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[] }
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
+      // A piece that arrives already Published was published on a day the sheet
+      // doesn't say. Dated just before this week, so the import doesn't count
+      // toward this week's cadence; only pieces published in Momentum do.
+      const before = new Date(periodStart('week', now).getTime() - 864e5)
+      const stageDateFor = (stage: string) => (stage === 'publish' ? before : now)
 
       for (const [i, r] of rows.entries()) {
         const row = i + 1
@@ -185,7 +191,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
             if (status.archived) data.dropped_at = task.dropped_at ?? now
             else if (status.stage !== task.status) {
               data.stage = { connect: { id: status.stage } }
-              data.stage_date = now
+              data.stage_date = stageDateFor(status.stage)
             }
           }
           await tx.task.update({ where: { id: taskId }, data })
@@ -206,7 +212,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           data: {
             name: title, project_id: theme.id, pillar_id: pillarId, brand_id: theme.brand_id,
             content_type_label: type ?? 'Post', task_owner_id: owner, assignee_id: null,
-            initiator_role: member.role, status: status.stage as StageId, stage_date: now,
+            initiator_role: member.role, status: status.stage as StageId, stage_date: stageDateFor(status.stage),
             dropped_at: status.archived ? now : null, hours_estimate: 0, priority: 'Medium', created_by: member.id,
             post_url: links.post, published_url: links.published,
           },
