@@ -14,6 +14,8 @@ Each write revalidates `/board`, `/overview` and `/projects`.
 
 ```ts
 type PlanRowInput = {
+  /** A matched task in another theme moves here only when this is true (spec edge case). */
+  move?: boolean
   theme: string; owner?: string; frequency?: string; audience?: string; pillar?: string
   title: string; type?: string; status?: string
   working_doc?: string; design?: string; task_link?: string; post?: string; published?: string
@@ -50,10 +52,10 @@ Requires `mayAddPiece`. Creates a task in To Do, owned by the caller, with the t
 ## `updatePiece(taskId, patch)`
 
 ```ts
-type PiecePatch = { pillar_id?: string | null; due_date?: string | null; post_url?: string | null }
+type PiecePatch = { pillar_id?: string | null; due_date?: string | null; post_url?: string | null; published_url?: string | null }
 ```
 
-Requires `canAct`. The pillar must belong to the task's theme. The due date is a `YYYY-MM-DD` string or null. (Title, type and assignee go through `updateTask`; the published link through `updateClip`'s published branch, generalised as `updatePublished`.)
+Requires `canAct`. The pillar must belong to the task's theme. The due date is a `YYYY-MM-DD` string or null. (Title, type and assignee go through `updateTask`. Pieces aren't clips, so their published link goes through `updatePiece`, not `updateClip`.)
 
 ## `setPieceLink(taskId, role, url)`
 
