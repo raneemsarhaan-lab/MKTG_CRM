@@ -253,17 +253,17 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Lab `sticky-toolbar` (toolbar top ≥ 0 after scrolling a 60-line brief) and `phone-toolbar` (390 px: toolbar height ≤ one row; `scrollWidth === innerWidth`).
 
-- [ ] T054 [US7] In `BriefEditor.tsx` / `brief-editor/Toolbar.tsx`:
+- [X] T054 [US7] In `BriefEditor.tsx` / `brief-editor/Toolbar.tsx`:
   - Remove `overflow: hidden` from the editor's outer wrapper.
   - Give the toolbar `position: sticky; top: 0; zIndex: 5` and its own `borderRadius: '18px 18px 0 0'`; the content area keeps `'0 0 18px 18px'`.
   - Make sure no ancestor inside `BriefEditor` sets overflow.
   - Check inside the task panel's scroll container in `TaskModal.tsx` that the toolbar sticks (FR-070).
-- [ ] T055 [US7] In `brief-editor/Toolbar.tsx`, below 480 px (use `useIsPhone` from `@/hooks/useMediaQuery`):
+- [X] T055 [US7] In `brief-editor/Toolbar.tsx`, below 480 px (use `useIsPhone` from `@/hooks/useMediaQuery`):
   - `flexWrap: 'nowrap'`, `overflowX: 'auto'`, hidden scrollbar.
   - Order: Undo, Redo, Style, B, I, bullet list, numbered list, link, + Insert, ⋯ (strike, code, quote move into ⋯).
   - Separators become `borderInlineStart` on groups 2+.
   - The status becomes an 8 px dot (grey `BRIEF_UI.faint` / pulsing `BRIEF_UI.blue` / `BRIEF_UI.error`) with visually hidden text, expanding to "Couldn't save · Retry" in error (FR-071, R14).
-- [ ] T056 [US7] Add lab scenarios `sticky-toolbar` and `phone-toolbar` to `scripts/brief-editor-lab/scenarios.mjs`.
+- [X] T056 [US7] Add lab scenarios `sticky-toolbar` and `phone-toolbar` to `scripts/brief-editor-lab/scenarios.mjs`.
 
 ---
 

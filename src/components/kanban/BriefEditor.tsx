@@ -26,6 +26,7 @@ import { Menu, MenuItem } from './brief-editor/Menu'
 import { ValuePrompt, type PromptKind } from './brief-editor/ValuePrompt'
 import { OverlayStackProvider, createOverlayStack } from './brief-editor/useOverlayStack'
 import { positionForAnchor, scrollParent } from './brief-editor/readAnchor'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 /**
  * Brief editor — a real rich-text surface, not a Markdown textarea.
@@ -86,6 +87,9 @@ interface BriefEditorProps {
 
 export type { UploadResult, UploadUnavailableReason }
 
+/** On a phone these move from the toolbar row into ⋯ (FR-071, R14). */
+const PHONE_IN_MORE = ['strike', 'code', 'quote']
+
 /** How each text style reads in the Text style menu. */
 const STYLE_SAMPLE: Record<string, React.CSSProperties> = {
   paragraph: { fontWeight: 500 },
@@ -99,6 +103,9 @@ export function BriefEditor({
   onUploadImages, uploadUnavailableReason = 'not-created',
 }: BriefEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  // A phone: one toolbar row that scrolls sideways, rarer actions in ⋯ (FR-071).
+  // The editor only renders in the browser, so there is no first-paint flash.
+  const phone = useMediaQuery('(max-width: 480px)')
   const t = useTranslations('briefEditor')
   const stack = useMemo(createOverlayStack, [])
   const save = useSaveQueue(value, onSave)
@@ -452,16 +459,20 @@ export function BriefEditor({
     <OverlayStackProvider stack={stack}>
     <div ref={rootRef}>
       <div style={{
-        borderRadius: 18, background: COLORS.panel, overflow: 'hidden',
+        // No overflow: hidden here: it would stop the toolbar sticking (R13).
+        borderRadius: 18, background: COLORS.panel,
         boxShadow: focused
           ? `0 0 0 2px ${alpha(BRIEF_UI.blue, 0.08)}, 0 4px 20px ${alpha(BRIEF_UI.ink, 0.04)}`
           : `0 2px 12px ${alpha(BRIEF_UI.ink, 0.05)}`,
         transition: 'box-shadow .12s',
       }}>
-        <div ref={toolbarRef} role="toolbar" aria-label={t('toolbar')} onKeyDown={onToolbarKey} style={{
-          display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
-          minHeight: 58, padding: '10px 16px', background: BRIEF_UI.surface, borderRadius: '18px 18px 0 0',
-          position: 'relative',
+        {/* Pinned to the top of the panel while a long brief scrolls (FR-070). */}
+        <div ref={toolbarRef} role="toolbar" aria-label={t('toolbar')} onKeyDown={onToolbarKey} data-brief-toolbar="" style={{
+          display: 'flex', alignItems: 'center', gap: phone ? 2 : 4, flexWrap: phone ? 'nowrap' : 'wrap',
+          overflowX: phone ? 'auto' : undefined, scrollbarWidth: phone ? 'none' : undefined,
+          minHeight: phone ? 48 : 58, padding: phone ? '6px 8px' : '10px 16px',
+          background: BRIEF_UI.surface, borderRadius: '18px 18px 0 0',
+          position: 'sticky', top: 0, zIndex: 5,
         }}>
           {/* Undo / Redo (FR-013) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -473,7 +484,7 @@ export function BriefEditor({
             </ToolButton>
           </div>
 
-          <Sep />
+          {!phone && <Sep />}
 
           {/* Text style */}
           <div style={{ position: 'relative' }}>
@@ -495,12 +506,12 @@ export function BriefEditor({
             )}
           </div>
 
-          <Sep />
+          {!phone && <Sep />}
 
           {TOOLS.map((group, gi) => (
             <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {gi > 0 && <Sep />}
-              {group.map(tool => (
+              {gi > 0 && !phone && <Sep />}
+              {group.filter(tool => !phone || !PHONE_IN_MORE.includes(tool.id)).map(tool => (
                 <ToolButton key={tool.id} title={tool.title} active={tool.active} pressed={tool.id === 'link' ? undefined : tool.active} onClick={tool.run}>
                   <span style={{ fontSize: 15 }}>{tool.label}</span>
                 </ToolButton>
@@ -508,7 +519,7 @@ export function BriefEditor({
             </div>
           ))}
 
-          <Sep />
+          {!phone && <Sep />}
 
           {/* Insert */}
           <div style={{ position: 'relative' }}>
@@ -542,6 +553,12 @@ export function BriefEditor({
                 <MenuItem icon={<ToolIcon name="copy" />} onClick={() => { setMenu(null); void copyMarkdown() }}>
                   {t('copyMarkdown')}
                 </MenuItem>
+                {phone && TOOLS.flat().filter(tool => PHONE_IN_MORE.includes(tool.id)).map(tool => (
+                  <MenuItem key={tool.id} icon={<span style={{ fontSize: 13 }}>{tool.label}</span>}
+                            onClick={() => { setMenu(null); tool.run() }}>
+                    {tool.title.replace(/ \(.*\)$/, '')}
+                  </MenuItem>
+                ))}
               </Menu>
             )}
           </div>
@@ -552,6 +569,7 @@ export function BriefEditor({
             status={save.status}
             labels={{ saved: t('saved'), saving: t('saving'), couldntSave: t('couldntSave'), retry: t('retry') }}
             onRetry={save.retry}
+            compact={phone}
           />
         </div>
 

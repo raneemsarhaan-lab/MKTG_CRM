@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import { useOverlay, useOverlayStack } from './useOverlayStack'
 
@@ -27,11 +27,34 @@ export function Menu({ id, label, onClose, anchor, children, align = 'start' }: 
   const stack = useOverlayStack()
   useOverlay(`menu:${id}`, true, onClose, { returnFocusTo: anchor, root: () => ref.current })
 
+  // Fixed to the viewport under its button, so a toolbar that scrolls sideways
+  // (phones) or sticks to the top never clips it. Follows the button on scroll.
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null)
+  useLayoutEffect(() => {
+    function place() {
+      if (!anchor) return
+      const r = anchor.getBoundingClientRect()
+      const rtl = getComputedStyle(anchor).direction === 'rtl'
+      const startAtRight = rtl ? align === 'start' : align === 'end'
+      setPos(startAtRight
+        ? { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) }
+        : { top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 240)) })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
+  }, [anchor, align])
+
+  // Focus the checked or first item once the menu is placed and visible.
+  const focused = useRef(false)
   useEffect(() => {
+    if (!pos || focused.current) return
+    focused.current = true
     const items = itemsOf(ref.current)
     const first = items.find(b => b.getAttribute('aria-checked') === 'true') ?? items[0]
     first?.focus()
-  }, [])
+  }, [pos])
 
   function onKeyDown(e: React.KeyboardEvent) {
     const items = itemsOf(ref.current)
@@ -67,8 +90,9 @@ export function Menu({ id, label, onClose, anchor, children, align = 'start' }: 
         onKeyDown={onKeyDown}
         data-overlay=""
         style={{
-          position: 'absolute', top: '100%', marginTop: 6, zIndex: 71,
-          ...(align === 'end' ? { insetInlineEnd: 0 } : { insetInlineStart: 0 }),
+          position: 'fixed', zIndex: 71,
+          top: pos?.top ?? -9999, left: pos?.left, right: pos?.right,
+          visibility: pos ? 'visible' : 'hidden',
           minWidth: 220, background: COLORS.panel, border: 'none',
           borderRadius: 12, boxShadow: `0 12px 32px ${alpha(BRIEF_UI.ink, 0.14)}`, padding: 5,
           maxHeight: 360, overflowY: 'auto',
