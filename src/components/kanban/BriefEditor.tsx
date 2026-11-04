@@ -6,14 +6,14 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import TiptapImage from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import { TableKit } from '@tiptap/extension-table/kit'
 import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
-import { Toggle, LinkShortcut, getMarkdown } from './brief-editor/extensions'
+import { Toggle, LinkShortcut, BriefImage, getMarkdown } from './brief-editor/extensions'
+import { ImageUpload, insertImageBlock, blockSlot, type ImageUploadContext, type UploadResult, type UploadUnavailableReason } from './brief-editor/imageUpload'
 import { LinkCard } from './brief-editor/LinkCard'
 import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
 import { ConfirmLeave } from './brief-editor/ConfirmLeave'
@@ -64,7 +64,16 @@ interface BriefEditorProps {
   attachments?: TaskAttachment[]
   /** Creates a real child task and returns a link to it, or null if cancelled. */
   onCreateSubtask?: (name: string) => Promise<{ name: string; href: string } | null>
+  /**
+   * Upload a pasted or dropped image as an attachment of the task (FR-032).
+   * One file per call, in order. Absent → pasting an image explains why
+   * instead (`uploadUnavailableReason`).
+   */
+  onUploadImages?: (file: File) => Promise<UploadResult>
+  uploadUnavailableReason?: UploadUnavailableReason
 }
+
+export type { UploadResult, UploadUnavailableReason }
 
 const TEXT_STYLES: { level: 0 | 1 | 2 | 3; key: 'normal' | 'h1' | 'h2' | 'h3'; sample: React.CSSProperties }[] = [
   { level: 0, key: 'normal', sample: { fontWeight: 500 } },
@@ -75,11 +84,12 @@ const TEXT_STYLES: { level: 0 | 1 | 2 | 3; key: 'normal' | 'h1' | 'h2' | 'h3'; s
 
 export function BriefEditor({
   value, onSave, onSaveStateChange, onDone, attachments = [], onCreateSubtask,
+  onUploadImages, uploadUnavailableReason = 'not-created',
 }: BriefEditorProps) {
   const t = useTranslations('briefEditor')
   const stack = useMemo(createOverlayStack, [])
   const save = useSaveQueue(value, onSave)
-  const [pendingUploads] = useState(0)
+  const [pendingUploads, setPendingUploads] = useState(0)
   const [confirmLeave, setConfirmLeave] = useState<'unsaved' | 'uploading' | null>(null)
   const [menu, setMenu]       = useState<'insert' | 'more' | 'style' | null>(null)
   const [focused, setFocused] = useState(false)
@@ -109,6 +119,23 @@ export function BriefEditor({
   const stateCb = useRef(onSaveStateChange)
   stateCb.current = onSaveStateChange
   useEffect(() => { stateCb.current?.(save.status, pendingUploads) }, [save.status, pendingUploads])
+
+  // What the paste/drop uploader needs, read when it runs (research R5).
+  const uploadCtx = useRef<ImageUploadContext>(null as unknown as ImageUploadContext)
+  uploadCtx.current = {
+    upload: onUploadImages,
+    unavailableReason: uploadUnavailableReason,
+    note: msg => flashNote(msg, 6000),
+    pendingChanged: n => setPendingUploads(n),
+    text: {
+      uploading: name => t('uploading', { name }),
+      failed: (name, error) => t('uploadFailed', { name, error }),
+      notAnImage: t('notAnImage'),
+      tooBig: (name, mb) => t('tooBig', { name, mb }),
+      skipped: max => t('skipped', { max }),
+      unavailable: reason => t(reason === 'no-permission' ? 'noPermission' : reason === 'no-storage' ? 'noStorage' : 'notCreated'),
+    },
+  }
 
   // Read by the key handler and extensions, which Tiptap captures once at creation.
   const leaveRef = useRef<() => void>(() => {})
@@ -144,7 +171,10 @@ export function BriefEditor({
       LinkShortcut.configure({ open: () => openLinkRef.current() }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      TiptapImage,
+      // allowBase64: an image picked from an older attachment stored in the
+      // database is a data: URL; without this it vanished on reopening.
+      BriefImage.configure({ allowBase64: true }),
+      ImageUpload.configure({ ctx: uploadCtx }),
       Toggle,
       TableKit,
       Placeholder.configure({ placeholder: t('placeholder') }),
@@ -187,7 +217,7 @@ export function BriefEditor({
 
   async function confirmPrompt(v: string) {
     if (!editor) return
-    if (prompt === 'image') editor.chain().focus().setImage({ src: v }).run()
+    if (prompt === 'image') insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), v)
     if (prompt === 'youtube') editor.chain().focus().insertContent({ type: 'paragraph', content: [{ type: 'text', text: v }] }).run()
     if (prompt === 'link') {
       const r = promptRange.current
@@ -398,7 +428,10 @@ export function BriefEditor({
             initial={promptInitial}
             images={images}
             onConfirm={confirmPrompt}
-            onPickAttachment={a => { editor.chain().focus().setImage({ src: a.url ?? a.data ?? '', alt: a.filename }).run(); setPrompt(null) }}
+            onPickAttachment={a => {
+              insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), a.url ?? a.data ?? '', a.filename)
+              setPrompt(null)
+            }}
             onCancel={closePrompt}
           />
         )}

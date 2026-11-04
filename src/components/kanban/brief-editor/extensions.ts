@@ -1,5 +1,6 @@
 import { Extension, Node, type Editor } from '@tiptap/core'
 import type { MarkdownStorage } from 'tiptap-markdown'
+import TiptapImage from '@tiptap/extension-image'
 
 // tiptap-markdown predates Tiptap v3's stricter Storage typing and doesn't
 // declare this itself — without it, `editor.storage.markdown` has no type.
@@ -116,5 +117,31 @@ export const LinkShortcut = Extension.create<{ open: () => void }>({
   addOptions() { return { open: () => {} } },
   addKeyboardShortcuts() {
     return { 'Mod-k': () => { this.options.open(); return true } }
+  },
+})
+
+/**
+ * Images are blocks: each on its own line in the brief.
+ *
+ * The stock serializer writes an image inline and never closes the block, so
+ * an image followed by a table was saved as `![…](…)| Shot | Length |`, and
+ * the table stopped being a table (found by the lab's round-trip fixtures,
+ * research R4). Closing the block keeps the next block on its own line.
+ */
+export const BriefImage = TiptapImage.extend({
+  addStorage() {
+    return {
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- prosemirror-markdown's serializer state isn't re-exported by tiptap-markdown
+        serialize(state: any, node: any) {
+          const alt = state.esc(node.attrs.alt || '')
+          const src = String(node.attrs.src || '').replace(/[()]/g, '\\$&')
+          const title = node.attrs.title ? ` "${String(node.attrs.title).replace(/"/g, '\\"')}"` : ''
+          state.write(`![${alt}](${src}${title})`)
+          if (!node.type.isInline) state.closeBlock(node)
+        },
+        parse: {},
+      },
+    }
   },
 })

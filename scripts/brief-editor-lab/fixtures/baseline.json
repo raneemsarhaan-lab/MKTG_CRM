@@ -1,5 +1,4 @@
 {
-  "clickup-import": "# Campaign brief\n\n## Audience\n\nMarketing managers in **Egypt** and the *Gulf*.\n\n- Channels\n  - LinkedIn\n  - Instagram\n- Formats\n\n1. Draft the copy\n2. Review with the MD\n\n> Keep the tone confident, never loud.\n\n![cover](https://example.com/cover.png)| Channel | Owner |\n| --- | --- |\n| LinkedIn | Samaa |\n| Instagram | Yosra |",
   "default": "## Goal\n\nRedesign the cover for Post 2 using the approved [Canva draft](https://canva.link/enoti2krrw77ztp). Keep the lime accent and the founder photo.\n\n- [ ] Swap the headline to the Arabic version\n\n- [x] Export 1080×1350 for LinkedIn\n\n## Shot list\n\n| Shot | Length | Notes |\n| --- | --- | --- |\n| Hook | 0:03 | Face to camera |\n| Stat card | 0:05 | 300 numbers, one insight |\n\nQuestions to [the team page](https://forefront.consulting/team).",
   "tasks": "- [ ] shoot b-roll\n\n- [x] book the studio\n\n- [ ] edit the 9:16 cut"
 }

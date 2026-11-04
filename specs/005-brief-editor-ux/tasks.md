@@ -122,11 +122,11 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Lab `upload=ok`: a synthetic paste and a drop of 3 PNGs insert 3 images in order; `upload=fail` leaves no placeholder and shows a note naming the file.
 
-- [ ] T022 [US3] In `brief-editor/ValuePrompt.tsx`, for the `image` kind:
+- [X] T022 [US3] In `brief-editor/ValuePrompt.tsx`, for the `image` kind:
   - Run `normaliseUrl`, then preload with `new Image()` and an 8 s timeout, showing a 120 px preview once loaded.
   - Enable **Insert** only after `onload`; show `t('imageWontLoad')` on error or timeout.
   - Insert as a block after the current block, followed by an empty paragraph, via `insertContentAt`. Attachment chips insert the same way (FR-030, FR-031).
-- [ ] T023 [US3] Create `brief-editor/imageUpload.ts`: a Tiptap `Extension` named `ImageUpload` with options `{ upload?: (f: File) => Promise<UploadResult>, onNote: (msg: string) => void, unavailableReason }` and a ProseMirror plugin that:
+- [X] T023 [US3] Create `brief-editor/imageUpload.ts`: a Tiptap `Extension` named `ImageUpload` with options `{ upload?: (f: File) => Promise<UploadResult>, onNote: (msg: string) => void, unavailableReason }` and a ProseMirror plugin that:
   1. In `handlePaste` and `handleDrop`, collects `image/*` files. It refuses non-images with `t('notAnImage')` and leaves non-file pastes to default handling.
   2. If `upload` is absent, shows the note for `unavailableReason` (`not-created` / `no-permission` / `no-storage`) and returns `true`.
   3. Enforces `MAX_UPLOAD_BYTES` and `MAX_ATTACHMENTS_PER_GO` from `@/lib/attachments`, reporting skipped files.
@@ -134,14 +134,14 @@ description: "Task list for the Brief Editor UX Overhaul"
   5. Uploads sequentially. On `{ ok: true, url }` it inserts `image { src: url, alt: filename }` at the mapped position, or at the cursor if that position was deleted, and removes the decoration. On failure it removes the decoration and calls `onNote` with the file name and error.
   6. Returns `true` from handled drops so ProseMirror prevents the default.
   7. Exposes the number of `queued` + `uploading` jobs to `BriefEditor.tsx` through an `onPendingChange(n)` option, which feeds the leave guard (T015) and `onSaveStateChange` (U1).
-- [ ] T024 [US3] In `BriefEditor.tsx`, add the props `onUploadImages?: (file: File) => Promise<UploadResult>` and `uploadUnavailableReason?`, and export the `UploadResult` type, per `contracts/brief-editor-props.md`. Register `ImageUpload` with them, and show notes in the footer note slot for 4 s.
-- [ ] T025 [US3] In `src/components/kanban/TaskModal.tsx`:
+- [X] T024 [US3] In `BriefEditor.tsx`, add the props `onUploadImages?: (file: File) => Promise<UploadResult>` and `uploadUnavailableReason?`, and export the `UploadResult` type, per `contracts/brief-editor-props.md`. Register `ImageUpload` with them, and show notes in the footer note slot for 4 s.
+- [X] T025 [US3] In `src/components/kanban/TaskModal.tsx`:
   - Extract the per-file body of `uploadToBucket` into `async function uploadOne(file: File): Promise<UploadResult>`, keeping the size check, unique `ref`, `res.redirected` and `json.ref !== ref` checks and messages. It returns `{ ok: true, url: json.attachment.url, filename }` or `{ ok: false, error }`.
   - Make `uploadToBucket` loop over `uploadOne`, keeping the thumbnail, `setUploadError`, `setReloadFiles` and `router.refresh()` behaviour.
   - Pass `onUploadImages={canEdit && hasStorage ? async f => { const r = await uploadOne(f); setReloadFiles(n => n + 1); router.refresh(); return r } : undefined}` and `uploadUnavailableReason={!canEdit ? 'no-permission' : 'no-storage'}`.
-- [ ] T026 [US3] In `src/components/kanban/TaskModal.tsx`, the window-level `onDrop` in the drag `useEffect` returns early `if (e.defaultPrevented)`, so a drop handled by the editor is not uploaded a second time (R5).
-- [ ] T027 [P] [US3] In `src/components/shared/TaskForm.tsx`, pass `uploadUnavailableReason="not-created"` to `BriefEditor` (R22).
-- [ ] T028 [US3] Add lab scenarios `paste-image`, `drop-images-order`, `upload-fail`, `image-url-validate`, `image-roundtrip` and `leave-during-upload` to `scripts/brief-editor-lab/scenarios.mjs`. `leave-during-upload` uses an `upload=slow` stub (3 s): click away or press Esc mid-upload; the confirm bar reads "An image is still uploading", and Stay keeps editing until the image is inserted. Paste and drop use a synthetic `ClipboardEvent` / `DragEvent` with a `DataTransfer` holding PNG `File`s; the `upload=ok` stub returns a data-URL `url`.
+- [X] T026 [US3] In `src/components/kanban/TaskModal.tsx`, the window-level `onDrop` in the drag `useEffect` returns early `if (e.defaultPrevented)`, so a drop handled by the editor is not uploaded a second time (R5).
+- [X] T027 [P] [US3] In `src/components/shared/TaskForm.tsx`, pass `uploadUnavailableReason="not-created"` to `BriefEditor` (R22).
+- [X] T028 [US3] Add lab scenarios `paste-image`, `drop-images-order`, `upload-fail`, `image-url-validate`, `image-roundtrip` and `leave-during-upload` to `scripts/brief-editor-lab/scenarios.mjs`. `leave-during-upload` uses an `upload=slow` stub (3 s): click away or press Esc mid-upload; the confirm bar reads "An image is still uploading", and Stay keeps editing until the image is inserted. Paste and drop use a synthetic `ClipboardEvent` / `DragEvent` with a `DataTransfer` holding PNG `File`s; the `upload=ok` stub returns a data-URL `url`.
 
 ---
 

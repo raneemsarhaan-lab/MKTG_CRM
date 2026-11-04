@@ -346,6 +346,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
               key={descKey}
               value={form.description}
               onSave={next => { patch('description', next); return Promise.resolve(true) }}
+              uploadUnavailableReason="not-created"
             />
           </div>
 

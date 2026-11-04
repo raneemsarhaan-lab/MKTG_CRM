@@ -64,7 +64,8 @@ async function onUploadImages(file: File) {
   const mode = lab.upload
   await wait(mode === 'slow' ? 3000 : 400)
   if (mode === 'fail') return { ok: false as const, error: 'the upload did not complete' }
-  return { ok: true as const, url: SAMPLE_PNG, filename: file.name }
+  // A real address, like the bucket's CDN URL in production.
+  return { ok: true as const, url: `${location.origin}/sample.png?${encodeURIComponent(file.name)}`, filename: file.name }
 }
 
 function App() {
@@ -96,12 +97,11 @@ function App() {
       onDone={host === 'form' ? undefined : () => { lab.done++; setEditing(false) }}
       attachments={[{ id: 'a1', task_id: 't', filename: 'hero-banner.png', url: SAMPLE_PNG, uploaded_at: '' } as never]}
       onCreateSubtask={async name => { await wait(300); return { name, href: '/board?task=new-123' } }}
+      onUploadImages={lab.upload === 'absent' ? undefined : onUploadImages}
+      uploadUnavailableReason={(params.get('reason') as 'not-created' | 'no-permission' | 'no-storage' | null) ?? 'not-created'}
     />
   )
 }
-
-// Keep the bundle from tree-shaking the stub uploader before the editor accepts it.
-void onUploadImages
 
 createRoot(document.getElementById('root')!).render(
   <NextIntlClientProvider locale={locale} messages={locale === 'ar' ? ar : en} timeZone="Africa/Cairo">

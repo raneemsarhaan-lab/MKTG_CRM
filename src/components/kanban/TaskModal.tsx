@@ -12,7 +12,7 @@ import {
   type TaskPatch,
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
-import { BriefEditor } from './BriefEditor'
+import { BriefEditor, type UploadResult } from './BriefEditor'
 import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
@@ -1102,6 +1102,75 @@ export function TaskModal({
    * here, in the browser, because it is for the board — which reads every task
    * and cannot fetch three hundred full-size pictures to draw its covers.
    */
+  /**
+   * Upload one file to the bucket and say what happened. Shared by the
+   * attachments area and the brief editor's paste/drop (spec 005 R5), so both
+   * get every check below. Never throws.
+   */
+  async function uploadOne(file: File): Promise<UploadResult> {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return { ok: false, error: `${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)` }
+    }
+    // A fresh id per file. It goes in the URL and comes back in the reply,
+    // which is what lets this tell its own answer from a stored one.
+    const ref  = crypto.randomUUID()
+    const body = new FormData()
+    body.append('taskId', task.id)
+    body.append('file', file)
+    try {
+      /* Its own URL per file, and that is the part that actually works.
+       *
+       * Whatever sits in front of this deployment caches upload replies
+       * and does not care what the response says: no-store on the route,
+       * no-store in next.config and no-store on this request all went
+       * ignored, and a POST kept coming back as somebody's upload from
+       * 20 August. What such a cache keys on is the URL, and every upload
+       * went to the same one. The ref is a path segment rather than a
+       * query string because a cache already ignoring no-store may drop
+       * a query too; a path cannot be normalised away.
+       *
+       * The header and the cache hint stay. They are what should have
+       * been enough, and they will be if the cache is ever fixed. */
+      const res  = await fetch(`/api/attachments/${ref}`, {
+        method: 'POST',
+        body,
+        cache:  'no-store',
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        return { ok: false, error: `${file.name} — ${json?.error ?? res.statusText}` }
+      }
+      /* A 200 is not proof the file was stored.
+       *
+       * The middleware turns away a request with no valid session by
+       * redirecting it, and fetch follows redirects: an expired cookie
+       * means this POST quietly lands on the login page, which answers
+       * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
+       * upload counted as a success that never happened — no row, no
+       * error, nothing on screen. Only our own JSON means it landed. */
+      if (!json?.attachment) {
+        return { ok: false, error: res.redirected
+          ? `${file.name} — your session expired; sign in again and retry`
+          : `${file.name} — the server did not store it (unexpected reply)` }
+      }
+      /* The reply has to be the reply to *this* request.
+       *
+       * Something in front of the app was answering upload POSTs from
+       * cache — a 200 carrying a real attachment, belonging to a file
+       * somebody else had uploaded days earlier. It passed every check
+       * above, so the panel refreshed, found nothing new, and showed
+       * nothing: three days of "the upload does nothing". The ref is one
+       * throwaway id per file; if it does not come back, the answer was
+       * not written for us, whatever else is in it. */
+      if (json.ref !== ref) {
+        return { ok: false, error: `${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.` }
+      }
+      return { ok: true, url: json.attachment.url as string, filename: file.name }
+    } catch {
+      return { ok: false, error: `${file.name} — the upload did not complete` }
+    }
+  }
+
   async function uploadToBucket(picked: File[]) {
     setUploading(true)
     const failed: string[] = []
@@ -1109,72 +1178,10 @@ export function TaskModal({
 
     try {
       for (const file of picked) {
-        if (file.size > MAX_UPLOAD_BYTES) {
-          failed.push(`${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)`)
-          continue
-        }
-        // A fresh id per file. It goes in the URL and comes back in the reply,
-        // which is what lets this tell its own answer from a stored one.
-        const ref  = crypto.randomUUID()
-        const body = new FormData()
-        body.append('taskId', task.id)
-        body.append('file', file)
-        try {
-          /* Its own URL per file, and that is the part that actually works.
-           *
-           * Whatever sits in front of this deployment caches upload replies
-           * and does not care what the response says: no-store on the route,
-           * no-store in next.config and no-store on this request all went
-           * ignored, and a POST kept coming back as somebody's upload from
-           * 20 August. What such a cache keys on is the URL, and every upload
-           * went to the same one. The ref is a path segment rather than a
-           * query string because a cache already ignoring no-store may drop
-           * a query too; a path cannot be normalised away.
-           *
-           * The header and the cache hint stay. They are what should have
-           * been enough, and they will be if the cache is ever fixed. */
-          const res  = await fetch(`/api/attachments/${ref}`, {
-            method: 'POST',
-            body,
-            cache:  'no-store',
-          })
-          const json = await res.json().catch(() => null)
-          if (!res.ok) {
-            failed.push(`${file.name} — ${json?.error ?? res.statusText}`)
-            continue
-          }
-          /* A 200 is not proof the file was stored.
-           *
-           * The middleware turns away a request with no valid session by
-           * redirecting it, and fetch follows redirects: an expired cookie
-           * means this POST quietly lands on the login page, which answers
-           * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
-           * upload counted as a success that never happened — no row, no
-           * error, nothing on screen. Only our own JSON means it landed. */
-          if (!json?.attachment) {
-            failed.push(res.redirected
-              ? `${file.name} — your session expired; sign in again and retry`
-              : `${file.name} — the server did not store it (unexpected reply)`)
-            continue
-          }
-          /* The reply has to be the reply to *this* request.
-           *
-           * Something in front of the app was answering upload POSTs from
-           * cache — a 200 carrying a real attachment, belonging to a file
-           * somebody else had uploaded days earlier. It passed every check
-           * above, so the panel refreshed, found nothing new, and showed
-           * nothing: three days of "the upload does nothing". The ref is one
-           * throwaway id per file; if it does not come back, the answer was
-           * not written for us, whatever else is in it. */
-          if (json.ref !== ref) {
-            failed.push(`${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.`)
-            continue
-          }
-          if (file.type.startsWith('image/')) {
-            try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
-          }
-        } catch {
-          failed.push(`${file.name} — the upload did not complete`)
+        const r = await uploadOne(file)
+        if (!r.ok) { failed.push(r.error); continue }
+        if (file.type.startsWith('image/')) {
+          try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
         }
       }
 
@@ -1319,6 +1326,9 @@ export function TaskModal({
     }
     function onDrop(e: DragEvent) {
       if (!isFileDrag(e)) return
+      // Already handled: the brief editor takes image drops itself and inserts
+      // them, and must not have them uploaded a second time here (R5).
+      if (e.defaultPrevented) return
       e.preventDefault()
       if (!canEdit) return
       const dropped = e.dataTransfer?.files
@@ -2035,6 +2045,18 @@ export function TaskModal({
                   value={briefText}
                   onSave={next => applyPatch({ description: next })}
                   onSaveStateChange={(state, pending) => { briefState.current = { state, pending } }}
+                  onUploadImages={canEdit && hasStorage ? async file => {
+                    const r = await uploadOne(file)
+                    if (r.ok) {
+                      if (file.type.startsWith('image/')) {
+                        try { await setCoverThumb(task.id, await shrinkImage(file, 360, 0.62)) } catch { /* preview only */ }
+                      }
+                      setReloadFiles(n => n + 1)
+                      router.refresh()
+                    }
+                    return r
+                  } : undefined}
+                  uploadUnavailableReason={!canEdit ? 'no-permission' : 'no-storage'}
                   onDone={() => setEditingBrief(false)}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}

@@ -14,5 +14,5 @@ Baseline differences found on 2026-11-04:
 
 | Fixture | What the editor did | Why it matters |
 |---|---|---|
-| `clickup-import` | The image line was glued to the table that follows it: `![cover](…)\| Channel \| Owner \|`. | **Existing data bug**: the table is no longer a table once saved. The image is serialized inline, without closing the block. Spec 005 inserts images as blocks (research R4); T022 should fix this and remove the entry. |
+| `clickup-import` | The image line was glued to the table that follows it: `![cover](…)\| Channel \| Owner \|`. | **Existing data bug**: the table is no longer a table once saved. **Fixed** by spec 005 T022 (images are saved as their own block); the entry was removed from `baseline.json`. |
 | `default`, `tasks` | Checklist items are saved as a "loose" list, with a blank line between items. | Cosmetic: they still render as checklists. |
