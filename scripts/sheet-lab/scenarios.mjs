@@ -75,7 +75,7 @@ function makeHelpers(page, base) {
     async open(hash) {
       await page.goto('about:blank')
       await page.goto(base + (hash ? `#${hash}` : ''))
-      await page.waitForSelector('[data-video-sheet]', { timeout: 10_000 })
+      await page.waitForSelector('[data-video-sheet], [data-content-sheet]', { timeout: 10_000 })
       await page.waitForTimeout(80)
     },
     lab: () => page.evaluate(() => ({

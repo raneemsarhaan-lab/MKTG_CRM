@@ -88,6 +88,8 @@ export const SHEET_UI = {
   menuNextInk:  COLORS.ink,
   danger:       ATTACH_UI.danger,
   dangerSoft:   ATTACH_UI.dangerSoft,
+  /** A theme meeting its cadence (spec 009). */
+  ok:           '#2B7A37',
   /** Behind the Paste clips dialog (CSS uses it at 45 % opacity). */
   backdrop:     '#111214',
 } as const

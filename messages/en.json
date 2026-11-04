@@ -569,7 +569,8 @@
       "status": "Status",
       "owner": "Owner",
       "links": "Links",
-      "problem": "Problem"
+      "problem": "Problem",
+      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link"
     },
     "problem": {
       "noTitle": "No title",

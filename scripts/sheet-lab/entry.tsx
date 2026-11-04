@@ -28,6 +28,8 @@ import { NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { parseClipFileName, fileNameKey } from '@/lib/clip-file-name'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { MEMBERS, makeTasks, sheetsHtml } from './fixtures'
+import { ContentApp, type ContentLab } from './content-entry'
+import { CONTENT_MEMBERS, referenceHtml, referenceText } from './content-fixtures'
 
 const params  = new URLSearchParams(location.hash.slice(1))
 const locale  = params.get('locale') === 'ar' ? 'ar' : 'en'
@@ -58,7 +60,8 @@ type Lab = {
 }
 declare global { interface Window { __sheet: Lab } }
 
-const me = MEMBERS.find(m => m.id === meId) ?? MEMBERS[0]
+const contentView = params.get('view') === 'content'
+const me = (contentView ? CONTENT_MEMBERS : MEMBERS).find(m => m.id === meId) ?? MEMBERS[0]
 const wait = (ms = delay) => new Promise(r => setTimeout(r, ms))
 const canAct = (t: Task) => t.task_owner_id === me.id || t.assignee_id === me.id || me.access === 'admin' || me.access === 'superuser'
 
@@ -67,6 +70,8 @@ const lab: Lab = window.__sheet = {
   failNext: {}, uploadFailAt: 0, uploads: [], bytesRead: 0, sheetsHtml,
   setTasks: () => {},
 }
+// The content mode's helpers, for scenarios: the reference rows as Sheets copies them.
+Object.assign(lab, { themes: [], referenceHtml, referenceText })
 
 function App() {
   const [tasks, setTasksState] = useState<Task[]>(lab.tasks)
@@ -202,6 +207,6 @@ function App() {
 
 createRoot(document.getElementById('root')!).render(
   <NextIntlClientProvider locale={locale} messages={locale === 'ar' ? ar : en} timeZone="UTC">
-    <App />
+    {contentView ? <ContentApp me={me} lab={lab as unknown as ContentLab} /> : <App />}
   </NextIntlClientProvider>,
 )

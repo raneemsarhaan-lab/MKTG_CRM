@@ -54,6 +54,7 @@
   --sheet-danger-soft:  #FDE7EA;
   --sheet-shadow:       0 8px 28px rgba(17, 18, 20, 0.16);
   --sheet-backdrop:     rgba(17, 18, 20, 0.45);
+  --sheet-ok:           #2B7A37;
 
   /* Stage colors */
   --stage-todo:         #64748B;
@@ -1377,6 +1378,34 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 @media (prefers-reduced-motion: reduce) {
   .fx-sheet-prog i, .fx-sheet-prog i.is-indeterminate { transition: none; animation: none; }
 }
+
+/* Content sheet (spec 009): spanning theme and pillar rows, theme editor, plan preview. */
+.fx-sheet-td.is-span { justify-content: flex-start; }
+.fx-content-theme { display: flex; align-items: center; gap: 4px 14px; min-width: 0; white-space: nowrap; }
+.fx-content-theme-name { font-family: var(--font-heading); font-weight: 700; font-size: 13px; }
+.fx-content-meta { color: var(--sheet-muted); font-weight: 500; }
+.fx-content-ok { color: var(--sheet-ok); font-weight: 700; }
+.fx-content-behind { color: var(--sheet-missing); font-weight: 700; }
+.fx-content-pillar-row > .fx-sheet-td:not(.is-frozen-no) { background: var(--sheet-header-bg); font-weight: 600; font-size: 11.5px; }
+.fx-content-pillar { display: inline-flex; align-items: center; gap: 2px; }
+.fx-content-editor { width: 300px; }
+.fx-content-editor select, .fx-content-freq input, .fx-content-freq select {
+  font: inherit; font-weight: 400; border: 1px solid var(--sheet-grid); border-radius: 5px; padding: 4px 6px;
+  background: var(--sheet-panel); color: var(--sheet-ink);
+}
+.fx-content-freq { display: flex; align-items: center; gap: 6px; }
+.fx-content-freq input { width: 70px; }
+.fx-content-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; }
+.fx-content-fieldset legend { font-weight: 700; margin-bottom: 4px; }
+.fx-content-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; }
+.fx-content-dlg { width: min(1040px, 100%); }
+.fx-content-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fx-content-pill { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--sheet-grid); }
+.fx-content-pill.is-new { background: var(--sheet-next); border-color: var(--sheet-next); color: var(--sheet-next-ink); }
+.fx-content-problem { color: var(--sheet-danger); font-weight: 600; white-space: normal; min-width: 180px; }
+.fx-content-fixes { display: flex; gap: 6px; flex-wrap: wrap; }
+.fx-content-fixes select { font: inherit; border: 1px solid var(--sheet-grid); border-radius: 4px; padding: 2px 4px; background: var(--sheet-panel); color: var(--sheet-ink); }
+.fx-content-usesheet { margin-inline-end: auto; }
 /* ─── end video sheet ───────────────────────────────────────────────────────── */
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */

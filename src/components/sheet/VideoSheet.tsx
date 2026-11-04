@@ -361,6 +361,7 @@ export function VideoSheet(p: VideoSheetProps) {
         <div className="fx-sheet-seg" role="group" aria-label={t('view.label')}>
           <button type="button" aria-pressed="false" onClick={() => p.onView('board')}>{t('view.board')}</button>
           <button type="button" aria-pressed="true">{t('view.sheet')}</button>
+          <button type="button" aria-pressed="false" onClick={() => p.onView('content')}>{t('view.content')}</button>
         </div>
         {p.videoId && (
           <button type="button" className="fx-sheet-back" onClick={() => p.onOpenVideo(null)}>

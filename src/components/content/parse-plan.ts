@@ -154,6 +154,11 @@ export type Classified = PlanRow & {
   ownerId: string | null
 }
 
+/** Problems that don't stop a row: the cell is left empty, or the paster owns it. */
+export function isWarning(p: ProblemCode): boolean {
+  return p.code === 'unknownOwner' || p.code === 'badLink'
+}
+
 /** Whether a member may add pieces to a theme (research R7). */
 export function mayAddTo(theme: ContentTheme | undefined, ctx: PlanContext): boolean {
   if (ctx.me.access === 'admin' || ctx.me.access === 'superuser') return true
@@ -205,8 +210,9 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
     const mine = seen.get(key) ?? new Set<string>()
     if (kind === 'fresh' && mine.has(norm(r.title))) kind = 'existing'
     mine.add(norm(r.title)); seen.set(key, mine)
-    // An unknown owner falls back to the person pasting: a note, not a blocker.
-    const blocking = problems.filter(p => p.code !== 'unknownOwner')
+    // An unknown owner falls back to the person pasting, and a cell that isn't a
+    // link is left empty: notes, not blockers. Nothing else is added unfixed.
+    const blocking = problems.filter(p => !isWarning(p))
     if (blocking.length && kind !== 'existing') kind = 'problem'
     return { ...r, problems, kind, themeIsNew, otherTheme, ownerId }
   })

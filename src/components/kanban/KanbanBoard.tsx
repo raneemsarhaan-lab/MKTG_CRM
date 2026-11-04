@@ -7,7 +7,7 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { attentionItems } from '@/lib/home-metrics'
@@ -17,7 +17,9 @@ import {
 } from '@/actions/tasks'
 import { useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
-import type { SheetApi } from '@/components/sheet/types'
+import { ContentSheet } from '@/components/content/ContentSheet'
+import type { ContentApi } from '@/components/content/types'
+import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
 import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -48,6 +50,8 @@ interface KanbanBoardProps {
   today: Date
   /** Whether this deployment has a bucket for uploads. */
   hasStorage?: boolean
+  /** The Content sheet's themes (spec 009). */
+  themes?: ContentTheme[]
 }
 
 export function KanbanBoard({
@@ -59,6 +63,7 @@ export function KanbanBoard({
   slaConfig,
   today,
   hasStorage = false,
+  themes: initialThemes = [],
 }: KanbanBoardProps) {
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -76,6 +81,8 @@ export function KanbanBoard({
   // new data, or every mutation appears to do nothing until a full reload.
   // Local drag order is intentionally discarded here — it is never persisted.
   useEffect(() => { setTasks(initialTasks) }, [initialTasks])
+  const [themes, setThemes] = useState<ContentTheme[]>(initialThemes)
+  useEffect(() => { setThemes(initialThemes) }, [initialThemes])
 
 
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
@@ -98,13 +105,16 @@ export function KanbanBoard({
    * to highlight a clip. Written with the history API, like ?task below, so
    * switching never refetches the board.
    */
-  const [view, setView] = useState<BoardView>(() => (searchParams.get('view') === 'sheet' ? 'sheet' : 'board'))
+  const [view, setView] = useState<BoardView>(() => {
+    const v = searchParams.get('view')
+    return v === 'sheet' || v === 'content' ? v : 'board'
+  })
   const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
   const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
   useEffect(() => {
     const url = new URL(window.location.href)
     const want: Record<string, string | null> = {
-      view: view === 'sheet' ? 'sheet' : null,
+      view: view === 'board' ? null : view,
       video: view === 'sheet' ? sheetVideo : null,
       row: view === 'sheet' ? sheetRow : null,
     }
@@ -307,7 +317,7 @@ export function KanbanBoard({
   const ta = useTranslations('attachments')
   const patchTask = (id: string, patch: Partial<FullTask>) =>
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
-  const sheetApi: SheetApi = {
+  const sheetApi: ContentApi = {
     move: (taskId, to) => {
       const task = tasks.find(t => t.id === taskId)
       return task ? moveTo(task, to) : Promise.resolve({ success: false, shouldCelebrate: false, error: 'not_found' })
@@ -400,6 +410,91 @@ export function KanbanBoard({
       if (!res.success) patchTask(taskId, { dropped_at: before?.dropped_at ?? null })
       else {
         if ('stage_date' in res && res.stage_date) patchTask(taskId, { stage_date: res.stage_date })
+        router.refresh()
+      }
+      return res
+    },
+    // ── the Content sheet (spec 009) ──
+    async addPlan(rows, opts) {
+      const res = await addPlan(rows, opts).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async addPiece(themeId, input) {
+      const res = await addPiece(themeId, input).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'id' in res && res.id) {
+        const theme = themes.find(x => x.id === themeId)
+        const now = new Date().toISOString()
+        const base = tasks[0]
+        if (base) {
+          setTasks(prev => [{
+            ...base, id: res.id!, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null,
+            brand_id: theme?.brand_id ?? '', content_type_label: 'Post', status: 'todo' as StageId, stage_date: now.slice(0, 10),
+            task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined, parent_task_id: null, parent: null,
+            due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
+            published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
+          }, ...prev])
+        }
+        router.refresh()
+      }
+      return res
+    },
+    async updatePiece(taskId, patch) {
+      const before = tasks.find(t => t.id === taskId)
+      if (!before) return { success: false, error: 'not_found' }
+      patchTask(taskId, patch as Partial<FullTask>)
+      const res = await updatePiece(taskId, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, post_url: before.post_url, published_url: before.published_url })
+      else router.refresh()
+      return res
+    },
+    async setPieceLink(taskId, role, url) {
+      const res = await setPieceLink(taskId, role, url).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) {
+        const row = 'row' in res ? res.row : null
+        setTasks(prev => prev.map(t => (t.id !== taskId ? t : {
+          ...t,
+          attachments: [
+            ...(t.attachments ?? []).filter(a => a.link_role !== role),
+            ...(row ? [{ id: row.id, task_id: taskId, filename: row.filename, url: row.url, content_type: 'text/uri-list', link_role: role, uploaded_at: row.uploaded_at }] : []),
+          ],
+        })))
+        router.refresh()
+      }
+      return res
+    },
+    async addTheme(name) {
+      const res = await addTheme(name).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async saveTheme(id, patch) {
+      const before = themes.find(x => x.id === id)
+      setThemes(prev => prev.map(x => (x.id === id ? { ...x, ...patch, name: patch.name ?? x.name } as ContentTheme : x)))
+      const res = await saveTheme(id, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success && before) setThemes(prev => prev.map(x => (x.id === id ? before : x)))
+      else router.refresh()
+      return res
+    },
+    async savePillar(themeId, input) {
+      const res = await savePillar(themeId, input).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'id' in res && res.id) {
+        const id = res.id
+        setThemes(prev => prev.map(x => (x.id !== themeId ? x : {
+          ...x,
+          pillars: input.id
+            ? x.pillars.map(p => (p.id === input.id ? { ...p, name: input.name } : p))
+            : [...x.pillars, { id, name: input.name, sort_order: x.pillars.length }],
+        })))
+        router.refresh()
+      }
+      return res
+    },
+    async removePillar(id) {
+      const res = await removePillar(id).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) {
+        setThemes(prev => prev.map(x => ({ ...x, pillars: x.pillars.filter(p => p.id !== id) })))
+        setTasks(prev => prev.map(t => (t.pillar_id === id ? { ...t, pillar_id: null } : t)))
         router.refresh()
       }
       return res
@@ -608,6 +703,25 @@ export function KanbanBoard({
       onClose={() => { setPreviewFor(null); selectTask(null) }}
     />
   )
+
+  if (view === 'content') {
+    return (
+      <>
+        <ContentSheet
+          tasks={tasks}
+          themes={themes}
+          me={currentUser}
+          members={members}
+          contentTypes={contentTypes}
+          onOpenTask={id => selectTask(id)}
+          onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
+          onView={v => setView(v)}
+          api={sheetApi}
+        />
+        {taskPanel}
+      </>
+    )
+  }
 
   if (view === 'sheet') {
     return (
@@ -1050,6 +1164,7 @@ function ViewSwitch({ view, onView }: { view: BoardView; onView(v: BoardView): v
     <div className="fx-sheet-seg" role="group" aria-label={t('view.label')} data-view-switch="">
       <button type="button" aria-pressed={view === 'board'} onClick={() => onView('board')}>{t('view.board')}</button>
       <button type="button" aria-pressed={view === 'sheet'} onClick={() => onView('sheet')}>{t('view.sheet')}</button>
+      <button type="button" aria-pressed={view === 'content'} onClick={() => onView('content')}>{t('view.content')}</button>
     </div>
   )
 }

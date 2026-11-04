@@ -166,7 +166,11 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
         if (taskId) {
           const task = await tx.task.findUnique({ where: { id: taskId } })
           if (!task) { res.problems.push({ row, code: 'missingTask' }); continue }
-          if (task.project_id && task.project_id !== theme.id && !r.move) { res.skipped.push(title); continue }
+          // A task in another theme moves only when the preview ticked Move here.
+          if (task.project_id && task.project_id !== theme.id && !r.move) {
+            const other = await tx.project.findUnique({ where: { id: task.project_id }, select: { is_theme: true } })
+            if (other?.is_theme) { res.skipped.push(title); continue }
+          }
           const data: Prisma.TaskUpdateInput = {
             project: { connect: { id: theme.id } },
             pillar: pillarId ? { connect: { id: pillarId } } : undefined,

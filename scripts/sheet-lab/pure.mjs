@@ -154,28 +154,109 @@ export async function runPure(bundle, root) {
   })
 
   check('tokens-only', () => {
-    const dir = path.join(root, 'src/components/sheet')
     const bad = []
-    for (const f of fs.readdirSync(dir)) {
-      const src = fs.readFileSync(path.join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
-      for (const m of src.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)) bad.push(`${f}: ${m[0]}`)
+    for (const d of ['src/components/sheet', 'src/components/content']) {
+      const dir = path.join(root, d)
+      for (const f of fs.readdirSync(dir)) {
+        const src = fs.readFileSync(path.join(dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+        for (const m of src.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)) bad.push(`${f}: ${m[0]}`)
+      }
     }
     if (bad.length) throw new Error(bad.slice(0, 5).join(', '))
   })
 
   check('messages-parity', () => {
-    const en = JSON.parse(fs.readFileSync(path.join(root, 'messages/en.json'), 'utf8')).sheet
-    const ar = JSON.parse(fs.readFileSync(path.join(root, 'messages/ar.json'), 'utf8')).sheet
+    for (const ns of ['sheet', 'content']) {
+    const en = JSON.parse(fs.readFileSync(path.join(root, 'messages/en.json'), 'utf8'))[ns]
+    const ar = JSON.parse(fs.readFileSync(path.join(root, 'messages/ar.json'), 'utf8'))[ns]
     const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (typeof v === 'object' ? flat(v, `${p}${k}.`) : [[`${p}${k}`, v]]))
     const E = Object.fromEntries(flat(en)), A = Object.fromEntries(flat(ar))
     const missing = Object.keys(E).filter(k => !(k in A)), extra = Object.keys(A).filter(k => !(k in E))
     if (missing.length || extra.length) throw new Error(`missing in ar: ${missing.join(', ')}; only in ar: ${extra.join(', ')}`)
     const same = ['stageTitle', 'files.drive', 'paste.fileHint', 'col.clipNo']
     const untranslated = Object.keys(E).filter(k => E[k] === A[k] && !same.includes(k))
-    if (untranslated.length) throw new Error(`untranslated: ${untranslated.join(', ')}`)
+    if (untranslated.length) throw new Error(`${ns} untranslated: ${untranslated.join(', ')}`)
     const stages = Object.keys(h.STAGE_META)
-    for (const s of stages) if (!E[`stage.${s}`]) throw new Error(`no video name for ${s}`)
+    for (const s of stages) if (!E[`stage.${s}`]) throw new Error(`${ns}: no stage name for ${s}`)
+    }
   })
 
+
+  // ── Content sheet (spec 009) ─────────────────────────────────────────────
+  check('content-readers', () => {
+    eq(h.readStatus('Initial Design'), { stage: 'd-prog', archived: false }, 'Initial Design')
+    eq(h.readStatus(' final design '), { stage: 'd-check', archived: false }, 'Final Design, any case')
+    eq(h.readStatus('Ready to publish'), { stage: 'ready-publish', archived: false }, 'Ready to Publish')
+    eq(h.readStatus('D-Check'), { stage: 'd-check', archived: false }, 'real stage name')
+    eq(h.readStatus('Editing'), { stage: 'd-prog', archived: false }, 'video name')
+    eq(h.readStatus(''), { stage: 'todo', archived: false }, 'blank is To Do')
+    eq(h.readStatus('Archived'), { stage: 'todo', archived: true }, 'Archived')
+    eq(h.readStatus('Waiting on legal'), null, 'unknown')
+    eq(h.readType('Social Media'), 'Post', 'Social Media is a Post')
+    eq(h.readType('Framework/Model'), 'Framework/Model', 'framework')
+    eq(h.readType('report'), 'Report', 'report')
+    eq(h.readType('Podcast'), 'Other', 'unknown type')
+    eq(h.readFrequency('2 per week'), { count: 2, period: 'week' }, '2 per week')
+    eq(h.readFrequency('1/month'), { count: 1, period: 'month' }, '1/month')
+    eq(h.readFrequency('often'), null, 'unreadable')
+    eq(h.readAudience('C-Level of large companies, Strategy Heads, Top Management "Heads, Directors.."'), ['c-level', 'strategy-heads', 'top-management'], 'audience')
+    eq(h.readAudience('Strategy Heads, Top Management, 2nd Line manager, CEO Med Size companies'), ['strategy-heads', 'top-management', 'second-line', 'ceo-mid'], 'audience 2')
+    eq(h.taskIdFromLink('https://mktg-crm-ef1r6x.cranl.net/board?task=3BE798DC-ba7a-4742-a1df-d48722c2b039'), '3be798dc-ba7a-4742-a1df-d48722c2b039', 'task link')
+    eq(h.taskIdFromLink('AI Pillar Funnel'), null, 'not a task link')
+    eq(h.isWebLink('Link error'), false, 'Link error is not a link')
+    eq(h.isWebLink('Egypt Businesses Face Prolonged Uncertainty | Forefront'), false, 'a post title is not a link')
+    eq(h.isWebLink('https://www.linkedin.com/posts/x'), true, 'a link')
+    eq(h.siteName('https://docs.google.com/document/d/1'), 'Google Docs', 'site name')
+  })
+  check('content-parse-tsv', () => {
+    const { rows } = h.readPlan(h.cellsFromText(h.referenceText()))
+    eq(rows.length, 18, '18 pieces')
+    eq(rows.filter(r => r.theme === 'Strategy').length, 8, 'Strategy carried down')
+    eq([...new Set(rows.map(r => `${r.theme}|${r.owner}|${r.frequency?.count}/${r.frequency?.period}`))], ['Strategy|Samaa|2/week', 'Newsjacking|Noran|1/week'], 'owner and frequency carried down')
+    eq(rows.filter(r => r.pillar === 'AI').length, 6, 'pillar AI carried down')
+    eq(rows.filter(r => r.pillar === 'Decision Making').length, 2, 'pillar Decision Making')
+    eq(rows.filter(r => r.theme === 'Newsjacking' && r.pillar).length, 0, 'no pillar carried into the next theme')
+    eq(rows.filter(r => r.taskId).length, 7, 'seven Task Links')
+    eq(rows.find(r => r.title === 'iPhone 18 Report').status, { stage: 'todo', archived: true }, 'archived')
+    eq(rows.find(r => r.title === 'Suez Canal Report').status.stage, 'd-check', 'Final Design')
+    eq(rows.find(r => r.title === 'A CEO Guide to Say No').status.stage, 'todo', 'blank status')
+    const fifa = rows.find(r => r.title === 'FIFA World Cup Movement Report')
+    eq([fifa.links.published, fifa.badLinks.published], [null, 'Link error'], '"Link error" is never a link')
+    const fed = rows.find(r => r.title === 'Federal Reserve Decision Report')
+    eq(fed.links.post, null, 'a post title is never a link')
+    eq(rows.filter(r => r.links.doc).length, 0, 'working-doc names are not links')
+    eq(rows.find(r => r.title === 'AI Pillar Article').type, 'Article', 'type')
+    eq(rows.find(r => r.title === 'AI Pillar SM Campaign - Post 2').type, 'Post', 'Social Media → Post')
+  })
+  check('content-classify', () => {
+    const { rows } = h.readPlan(h.cellsFromText(h.referenceText()))
+    const { tasks, themes } = h.makeContent()
+    const admin = h.CONTENT_MEMBERS.find(m => m.id === 'raneem')
+    const c = h.classifyPlan(rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: admin })
+    const count = k => c.filter(r => r.kind === k).length
+    eq([count('fresh'), count('linked'), count('existing'), count('problem')], [11, 7, 0, 0], 'SC-001: 11 new, 7 matched')
+    eq(c.filter(r => r.themeIsNew).map(r => r.theme).filter((v, i, a) => a.indexOf(v) === i), ['Newsjacking'], 'Newsjacking is new')
+    eq(c.filter(r => r.problems.some(p => p.code === 'badLink')).length > 0, true, 'non-links are flagged')
+    eq(c.filter(r => r.ownerId === 'samaa').length, 8, 'owner matched by name')
+    const samaa = h.CONTENT_MEMBERS.find(m => m.id === 'samaa')
+    const cs = h.classifyPlan(rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: samaa })
+    eq(cs.filter(r => r.theme === 'Newsjacking').every(r => r.kind === 'problem'), true, 'a user can\'t add a new theme')
+    eq(cs.filter(r => r.theme === 'Strategy' && r.kind === 'problem').length, 0, 'but can add to the theme she owns')
+  })
+  check('content-cadence-summary', () => {
+    const now = new Date(2026, 10, 4, 12)      // Wednesday 4 Nov 2026
+    eq(h.periodStart('week', now).getDate(), 2, 'week starts Monday')
+    eq(h.periodStart('month', now).getDate(), 1, 'month starts on the 1st')
+    const th = { frequency_count: 2, frequency_period: 'week' }
+    const p = (s, d, dropped = null) => ({ status: s, stage_date: d, dropped_at: dropped })
+    eq(h.cadence(th, [p('publish', '2026-11-03'), p('publish', '2026-10-30'), p('d-prog', '2026-11-04')], now), { done: 1, target: 2, met: false, period: 'week' }, '1 of 2')
+    eq(h.cadence(th, [p('publish', '2026-11-03'), p('publish', '2026-11-04')], now).met, true, '2 of 2 ✓')
+    eq(h.cadence(th, [p('publish', '2026-11-03', 'x'), p('publish', '2026-11-04')], now).done, 1, 'archived pieces don\'t count')
+    eq(h.cadence({ frequency_count: null, frequency_period: null }, [], now), null, 'no frequency')
+    const s = h.summariseContent([{ status: 'publish', published_url: null }, { status: 'publish', published_url: 'x' }, { status: 'd-prog' }, { status: 'todo', dropped_at: 'x' }])
+    eq(s, { pieces: 3, published: 2, design: 1, noLink: 1, archived: 1 }, 'summary')
+    const { tasks, themes } = h.makeContent()
+    eq(h.piecesOf(tasks, 'th-strategy').map(t => t.id).sort(), ['f51f43c9-069d-46af-95c0-04cba2f72efa', 'v1'], 'clips are not pieces')
+  })
   return results
 }
