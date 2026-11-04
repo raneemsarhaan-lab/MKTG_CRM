@@ -1,0 +1,13 @@
+# Constitution Check: spec 007 (for the PR description)
+
+Governance requires a Constitution Check note on PRs that add components or change state shape. This is the note for the task attachments work.
+
+| Principle | How this PR meets it |
+|---|---|
+| **§I Design System Fidelity** | Colours come from `ATTACH_UI`, `FILE_KIND_COLORS`, `BRIEF_UI` and `COLORS` in `src/lib/tokens.ts`. They are mirrored as `--att-*` / `--brief-*` CSS variables in `globals.css`, and the `.fx-att-*` CSS block uses those variables only. The Latest pill is `COLORS.lime` with `BRIEF_UI.ink`. The lab's `tokens-only` check finds no hex or `rgba()` literal in `src/components/kanban/attachments/` or `PendingDeleteMessage.tsx`. `ATTACH_UI` and `FILE_KIND_COLORS` extend the token map, following `STAGE_COLORS`. |
+| **§II Workflow Pipeline Integrity** | Not touched. |
+| **§III Role-Based Feature Access** | Add, rename and delete render only when `canEdit` (owner, assignee, admin, superuser). Paste and drop by anyone else are refused, with a note. On the server, `removeAttachment` and the new `DELETE /api/attachments/<id>` share `src/lib/attachment-delete.ts`, which applies the same rule. The upload route's guard is unchanged. |
+| **§IV Design-Driven Development** | `design/task-attachments.html` was committed before any UI work (T001); it is the approved preview, Option A with its extras. **Sign-off requested:** like `design/brief-editor-ux.html` in spec 005, it is plain, readable HTML rather than the bundled prototype format §IV describes. It is a standalone HTML design file, the source of truth for layout, colours, interactions and copy, and it needs no decompression to read. §IV asks for explicit sign-off on deviations: **reviewers, please approve the format or ask for the bundle.** |
+| **§V Cultural UX** | Every new string is in the `attachments` namespace of `messages/en.json` and `messages/ar.json`. The lab's `messages-parity` check confirms the keys match and nothing is left untranslated. In Arabic the section, preview and messages lay out right to left, and ← moves to the next file. Celebrations are not involved. |
+| **§VI State Architecture** | Pending deletes are a **non-persisted `pendingDeletes` slice of `useUIStore`**, with its type in `src/types/index.ts` first, as §VI asks. Timer handles stay outside the store, in `src/lib/pending-deletes.ts`. Uploads, loading, preview and rename are local component state. Nothing new is persisted, and there is **no schema change**: comment file chips are a token in the comment's own text. |
+| **Tech Stack** | No new dependency. The lab reuses esbuild, Playwright and axe-core from spec 005. |
