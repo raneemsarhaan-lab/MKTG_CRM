@@ -44,7 +44,7 @@ description: "Task list for Video Sheet View"
 
 **Purpose**: The design file required by Constitution §IV, the lab every story validates against, and seed data.
 
-- [ ] T001 Create the §IV design file `design/video-sheet.html`.
+- [X] T001 Create the §IV design file `design/video-sheet.html`.
   - Start from the "Momentum Video Sheet" preview (https://claude.ai/artifact/XgQ5cBf6bdn6QK4XERPaYf); read it with the Artifact tool (action `read`).
   - Update it for the plan's decisions:
     - video stage names, with the real name on hover (FR-010–FR-012);

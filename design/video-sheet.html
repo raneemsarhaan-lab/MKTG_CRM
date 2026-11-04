@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Momentum Video Sheet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Inter:wght@400;500;600&display=swap">
+<!--
+  Spec 008 · Video Sheet · the §IV design file (tasks T001).
+  Approved direction: the "Momentum Video Sheet" preview, updated for the plan's decisions:
+    · video stage names, real name on hover AND keyboard focus (FR-010–FR-012)
+    · status menu limited to the board's moves, grouped Next / Back to / Skip to (research R3)
+    · Editor lists people, editing roles first, plus Unassigned (FR-025)
+    · Files cell: Drive / n files / uploading / too large → "Paste a link instead" / failed → Retry (FR-040–FR-046)
+    · column sets Editing / Copy / Full, Mine, Show dropped (FR-050–FR-054, FR-062)
+    · paste preview with new / already in the sheet / unmatched rows to fix or leave out (FR-032–FR-034)
+    · Published prompt and "Missing link" (FR-047, FR-048)
+    · Drop / Restore from the row menu in every set, and a column in Full (FR-060–FR-063)
+  "Viewing as" switches the member, to show what each role may do. "عربي" mirrors the layout.
+  Colours mirror src/lib/tokens.ts (COLORS, STAGE_COLORS, SHEET_UI). Sample names and links are placeholders.
+-->
+<style>
+/* Layout: a slim dark toolbar, a summary line, then a dense spreadsheet grid filling the screen:
+   gridlines on every cell, 24px rows, frozen header row and frozen row numbers + title. */
+:root{
+  --bg:#FFFFFF; --ink:#1B1A13; --muted:#6F7276; --grid:#E2E3E3; --head:#F3F4F2; --gutter:#F8F9F8;
+  --rail:#17181A; --rail-fg:#F2F2EE; --lime:#C8F24E; --lime-ink:#1B1A13; --sel:#3563E9;
+  --link:#1F5FD1; --video:#F4F8E4; --hover:#F6F8FB; --warn:#B26A00; --warn-bg:#FDF3E3;
+  --danger:#D22040; --danger-bg:#FDE7EA; --hl:#FAFDE9; --pop:#FFFFFF; --shadow:0 8px 28px rgba(17,18,20,.16);
+  --font-head:'Montserrat',system-ui,sans-serif; --font-body:'Inter',system-ui,-apple-system,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17181B; --ink:#E9E9E4; --muted:#9A9DA2; --grid:#2E3034; --head:#202226; --gutter:#1C1E21;
+  --rail:#0B0C0D; --rail-fg:#ECECE6; --sel:#7EA0F7; --link:#8DB4FF; --video:#22281A; --hover:#1F2329;
+  --warn:#F2B355; --warn-bg:#3A2C12; --danger:#F5677E; --danger-bg:#3D1A21; --hl:#252B14; --pop:#202226;
+  --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17181B; --ink:#E9E9E4; --muted:#9A9DA2; --grid:#2E3034; --head:#202226; --gutter:#1C1E21;
+  --rail:#0B0C0D; --rail-fg:#ECECE6; --sel:#7EA0F7; --link:#8DB4FF; --video:#22281A; --hover:#1F2329;
+  --warn:#F2B355; --warn-bg:#3A2C12; --danger:#F5677E; --danger-bg:#3D1A21; --hl:#252B14; --pop:#202226;
+  --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:12.5px/1.3 var(--font-body);display:flex;flex-direction:column;overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--rail)}
+:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+
+/* toolbar */
+.bar{flex:none;background:var(--rail);color:var(--rail-fg);display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.logo{font:800 .85rem var(--font-head);display:flex;align-items:center;gap:6px}
+.logo i{width:12px;height:12px;border-radius:3px;background:var(--lime)}
+.seg{display:inline-flex;background:#ffffff14;border-radius:999px;padding:2px}
+.seg button{border:0;background:transparent;color:#ffffffa0;font:700 .7rem var(--font-head);padding:3px 10px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--lime);color:var(--lime-ink)}
+.tools{margin-inline-start:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tog{font:600 .72rem var(--font-body);border-radius:999px;border:1px solid #ffffff30;background:transparent;color:var(--rail-fg);padding:3px 10px;cursor:pointer}
+.tog[aria-pressed="true"]{background:#ffffff22;border-color:#ffffff60}
+.btn{font:600 .72rem var(--font-body);border-radius:4px;border:1px solid #ffffff30;background:transparent;color:var(--rail-fg);padding:3px 9px;cursor:pointer}
+.btn.primary{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
+.as{font-size:.72rem;color:#ffffffb0;display:flex;align-items:center;gap:6px}
+.as select{font:600 .72rem var(--font-body);background:#ffffff14;color:var(--rail-fg);border:1px solid #ffffff30;border-radius:4px;padding:2px 4px}
+.as select option{color:var(--ink);background:var(--bg)}
+
+/* summary line */
+.sum{flex:none;display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--grid);background:var(--head);
+  font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums;
+  padding-block:6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.sum .vn{font:700 .8rem var(--font-head);color:var(--ink);margin-inline-end:6px}
+.sum b{color:var(--ink);font-weight:600}
+.sum .bad{color:var(--warn);font-weight:600}
+
+/* grid */
+.grid{flex:1;min-height:0;overflow:auto;min-width:0}
+table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content}
+th,td{height:24px;padding:0 6px;border-inline-end:1px solid var(--grid);border-bottom:1px solid var(--grid);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;background:var(--bg);position:relative}
+thead th{position:sticky;top:0;z-index:3;background:var(--head);font-weight:600;font-size:.72rem;text-align:start;height:26px;border-bottom:1px solid var(--muted)}
+.rn{position:sticky;inset-inline-start:0;z-index:2;background:var(--gutter);color:var(--muted);text-align:center;font-size:.68rem;font-variant-numeric:tabular-nums;padding:0;cursor:pointer}
+thead .rn{z-index:4;background:var(--head);cursor:default}
+.ti{position:sticky;inset-inline-start:36px;z-index:2;border-inline-end:2px solid var(--muted)}
+thead .ti{z-index:4}
+tbody tr:hover td{background:var(--hover)}
+tbody tr:hover td.rn{background:var(--gutter)}
+tr.video td{background:var(--video);font-weight:600}
+tr.video td.rn{background:var(--gutter)}
+tr.hl td{background:var(--hl)}
+tr.hl td.rn{box-shadow:inset 3px 0 0 var(--lime)}
+tr.dropped td.txt,tr.dropped .ti .tt{text-decoration:line-through;color:var(--muted)}
+tr.dropped .st{opacity:.45}
+.num{font-variant-numeric:tabular-nums;text-align:end;direction:ltr}
+.c{text-align:center}
+.mono{font:500 .7rem ui-monospace,SFMono-Regular,Menlo,monospace}
+.mut{color:var(--muted)}
+td.act-cell{box-shadow:inset 0 0 0 2px var(--sel)}
+td.ro{cursor:default}
+
+.ti .w{display:flex;align-items:center;gap:2px;min-width:0}
+.caret{flex:none;width:16px;height:16px;border:0;padding:0;background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.collapsed .caret svg{transform:rotate(-90deg)}
+[dir="rtl"] .collapsed .caret svg{transform:rotate(90deg)}
+.sp{flex:none;width:14px}
+.tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.cnt{flex:none;font-size:.66rem;color:var(--muted);font-weight:500;padding-inline-start:4px}
+.cell-in{width:100%;border:0;background:var(--bg);color:inherit;font:inherit;padding:0;height:22px;outline:none}
+
+/* status */
+.st{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:inherit;font:600 .7rem var(--font-body);padding:0;cursor:pointer;max-width:100%}
+.st[disabled]{cursor:default}
+.dot{flex:none;width:7px;height:7px;border-radius:50%}
+.st .chev{color:var(--muted);font-size:.6rem}
+.tip{position:fixed;z-index:30;background:var(--ink);color:var(--bg);font:600 .68rem var(--font-body);padding:3px 7px;border-radius:4px;pointer-events:none;white-space:nowrap}
+
+/* menus */
+.menu{position:fixed;z-index:20;background:var(--pop);border:1px solid var(--grid);border-radius:8px;box-shadow:var(--shadow);padding:4px;min-width:220px;max-height:320px;overflow:auto}
+.menu .grp{font:700 .62rem var(--font-head);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 8px 2px}
+.menu [role="menuitem"]{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;color:var(--ink);font:500 .76rem var(--font-body);padding:5px 8px;border-radius:5px;cursor:pointer;text-align:start}
+.menu [role="menuitem"]:hover,.menu [role="menuitem"]:focus-visible{background:var(--hover);outline:none}
+.menu [role="menuitem"].next{background:var(--lime);color:var(--lime-ink);font-weight:600}
+.menu small{margin-inline-start:auto;color:var(--muted);font-size:.68rem}
+.menu .next small{color:var(--lime-ink);opacity:.7}
+.menu .role{color:var(--muted);font-size:.66rem;margin-inline-start:auto}
+.menu .danger{color:var(--danger)}
+.menu hr{border:0;border-top:1px solid var(--grid);margin:4px 2px}
+
+/* files */
+.files{display:flex;align-items:center;gap:4px;min-width:0}
+.ftag{font:600 .66rem var(--font-body);padding:1px 6px;border-radius:4px;background:var(--head);color:var(--ink);border:1px solid var(--grid)}
+.prog{position:absolute;inset-inline:6px;bottom:3px;height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--sel)}
+.ferr{color:var(--danger);font-weight:600;font-size:.68rem;overflow:hidden;text-overflow:ellipsis}
+.fbtn{border:0;background:transparent;color:var(--link);font:600 .68rem var(--font-body);padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px;flex:none}
+
+a.lk{color:var(--link);text-decoration:underline;text-underline-offset:2px}
+.addl{border:0;background:transparent;color:var(--muted);font:inherit;padding:0;cursor:pointer}
+.addl:hover{color:var(--ink)}
+.miss{color:var(--warn);background:var(--warn-bg);border-radius:3px;padding:0 5px;font-weight:600}
+.dropb{border:0;background:transparent;color:var(--muted);font:inherit;font-size:.68rem;cursor:pointer;padding:0}
+.dropb:hover{color:var(--ink);text-decoration:underline}
+.plus{border:0;background:transparent;color:var(--muted);font:600 .72rem var(--font-body);cursor:pointer;padding:0}
+.plus:hover{color:var(--ink)}
+
+/* popover: published prompt, drop confirm */
+.pop{position:fixed;z-index:25;background:var(--pop);border:1px solid var(--grid);border-radius:8px;box-shadow:var(--shadow);padding:10px;display:grid;gap:8px;width:300px;font-size:.76rem}
+.pop input{font:inherit;border:1px solid var(--grid);border-radius:5px;padding:5px 7px;background:var(--bg);color:var(--ink);width:100%}
+.pop .row{display:flex;gap:6px;justify-content:flex-end}
+.pbtn{font:600 .72rem var(--font-body);border:1px solid var(--grid);background:var(--bg);color:var(--ink);border-radius:5px;padding:4px 10px;cursor:pointer}
+.pbtn.primary{background:var(--lime);border-color:var(--lime);color:var(--lime-ink)}
+.pbtn.danger{background:var(--danger);border-color:var(--danger);color:var(--bg)}
+.note{color:var(--danger);font-size:.7rem}
+
+/* paste preview dialog */
+.dlg{position:fixed;inset:0;z-index:40;background:rgba(17,18,20,.45);display:grid;place-items:center;padding:16px}
+.dlg-in{background:var(--pop);border-radius:10px;box-shadow:var(--shadow);width:min(860px,100%);max-height:calc(100% - 32px);display:flex;flex-direction:column;overflow:hidden}
+.dlg-h{padding:14px 16px 8px;display:grid;gap:4px}
+.dlg-h h2{margin:0;font:800 1rem var(--font-head)}
+.dlg-h p{margin:0;color:var(--muted);font-size:.74rem}
+.dlg-b{overflow:auto;padding:0 16px 8px;display:grid;gap:10px}
+.dlg-b textarea{width:100%;height:56px;resize:vertical;font:500 .72rem ui-monospace,Menlo,monospace;border:1px dashed var(--muted);border-radius:5px;padding:6px;background:var(--bg);color:var(--ink)}
+.counts{font-weight:600;font-size:.78rem}
+.counts .warn{color:var(--warn)}
+.sect{font:700 .66rem var(--font-head);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ptab{width:100%;border-collapse:collapse;font-size:.74rem;table-layout:auto}
+.ptab th,.ptab td{position:static;height:26px;border-inline-end:0;background:transparent;white-space:nowrap}
+.ptab th{font-size:.66rem;color:var(--muted);text-align:start;border-bottom:1px solid var(--grid)}
+.ptab td input{font:inherit;border:1px solid var(--grid);border-radius:4px;padding:2px 5px;width:100%;background:var(--bg);color:var(--ink)}
+.ptab tr.fixed td{background:var(--hl)}
+.dlg-f{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--grid);flex-wrap:wrap;align-items:center}
+.dlg-f .msg{margin-inline-end:auto;color:var(--muted);font-size:.72rem}
+
+.toast{position:fixed;inset-inline-end:max(14px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:6px 12px;border-radius:4px;font-size:.72rem;font-weight:600;opacity:0;transition:opacity .2s;display:flex;gap:10px;align-items:center;z-index:50}
+.toast.on{opacity:1}
+.toast button{border:0;background:transparent;color:var(--lime);font:700 .72rem var(--font-body);cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="logo"><i></i>Momentum</div>
+  <div class="seg" role="group" aria-label="View"><button type="button" aria-pressed="false">Board</button><button type="button" aria-pressed="true">Sheet</button></div>
+  <div class="seg" role="group" aria-label="Columns" id="sets">
+    <button type="button" data-set="editing">Editing</button><button type="button" data-set="copy">Copy</button><button type="button" data-set="full">Full</button>
+  </div>
+  <div class="tools">
+    <button type="button" class="tog" id="mine" aria-pressed="false">Mine</button>
+    <button type="button" class="tog" id="showDropped" aria-pressed="true">Show dropped</button>
+    <button type="button" class="btn primary" id="pasteBtn">Paste clips</button>
+    <label class="as" for="who">Viewing as <select id="who"></select></label>
+    <button type="button" class="tog" id="rtl" aria-pressed="false">عربي</button>
+  </div>
+</header>
+
+<div class="sum" id="sum" role="status"></div>
+
+<div class="grid" id="gridWrap">
+  <table role="grid" aria-label="Strategy Execution and Leadership clips" id="grid">
+    <colgroup id="cols"></colgroup>
+    <thead><tr id="head"></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<div class="dlg" id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="dlg-in">
+    <div class="dlg-h">
+      <h2 id="dlgTitle">Paste clips</h2>
+      <p>Copy the File Name, Suggested Title and Drive Link columns from Google Sheets and paste them here. Clip number, source, in and out come from each file name.</p>
+    </div>
+    <div class="dlg-b">
+      <textarea id="pasteBox" placeholder="Paste here (⌘V / Ctrl+V)…" aria-label="Pasted rows"></textarea>
+      <div class="counts" id="counts"></div>
+      <div id="newWrap" hidden>
+        <div class="sect">New</div>
+        <table class="ptab"><thead><tr><th>#</th><th>Title</th><th>Source</th><th>In → Out</th><th>Length</th><th>Link</th></tr></thead><tbody id="newRows"></tbody></table>
+      </div>
+      <div id="badWrap" hidden>
+        <div class="sect">Without a clip file name · fix or leave out</div>
+        <table class="ptab"><thead><tr><th>Pasted</th><th>Title</th><th>File name</th><th></th></tr></thead><tbody id="badRows"></tbody></table>
+      </div>
+    </div>
+    <div class="dlg-f">
+      <span class="msg" id="dlgMsg"></span>
+      <button type="button" class="pbtn" id="sampleBtn">Try a sample paste</button>
+      <button type="button" class="pbtn" id="closeBtn">Close</button>
+      <button type="button" class="pbtn primary" id="addBtn" disabled>Add 0 clips</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="file" hidden>
+
+<script>
+/* ── data ──────────────────────────────────────────────────────────── */
+const PATH=['todo','c-prog','c-final','r-design','d-prog','d-check','final-check','ready-publish','scheduled','publish'];
+const STAGE={
+  'todo':{real:'To Do',en:'To Do',ar:'افكار للتنفيذ',c:'#64748B',owner:null},
+  'c-prog':{real:'C-In Progress',en:'Script',ar:'النص',c:'#3B82F6',owner:null},
+  'c-final':{real:'C-Review',en:'Script Review',ar:'مراجعة النص',c:'#2E6FB0',owner:'Marketing Manager'},
+  'r-design':{real:'Ready For Design',en:'Ready to Edit',ar:'جاهز للمونتاج',c:'#8B5CF6',owner:null},
+  'd-prog':{real:'D-In Progress',en:'Editing',ar:'مونتاج',c:'#7C3AED',owner:null},
+  'd-check':{real:'D-Check',en:'Edit Review',ar:'مراجعة المونتاج',c:'#5B3FB5',owner:'Brand Director'},
+  'final-check':{real:'F-Check',en:'Final Cut',ar:'النسخة النهائية',c:'#F59E0B',owner:'Marketing Manager'},
+  'ready-publish':{real:'Ready to Publish',en:'Ready to Publish',ar:'جاهز للنشر',c:'#0EA5E9',owner:null},
+  'scheduled':{real:'Scheduled',en:'Scheduled',ar:'مجدول',c:'#14B8A6',owner:null},
+  'publish':{real:'Published',en:'Published',ar:'تم النشر',c:'#22C55E',owner:null},
+};
+const EDITING=['r-design','d-prog','d-check','final-check'];
+const MEMBERS=[
+  {id:'raneem',name:'Raneem',role:'Marketing Manager',access:'admin'},
+  {id:'lina',name:'Lina',role:'Video Editor',access:'user'},
+  {id:'omar',name:'Omar',role:'Video Editor',access:'user'},
+  {id:'hadi',name:'Hadi',role:'Motion Designer',access:'user'},
+  {id:'sara',name:'Sara',role:'Content Creator',access:'user'},
+  {id:'yosra',name:'Yosra',role:'Brand Director',access:'superuser'},
+];
+const M=Object.fromEntries(MEMBERS.map(m=>[m.id,m]));
+const EDIT_RE=/video|editor|motion|design/i, COPY_RE=/content|copy|writer/i;
+const defaultSet=role=>EDIT_RE.test(role)?'editing':COPY_RE.test(role)?'copy':'full';
+
+const FILE_RE=/^(\d+)_(.+)_(\d+)m(\d+(?:\.\d+)?)s-(\d+)m(\d+(?:\.\d+)?)s\.(mp4|mov|m4v)$/i;
+function parseFile(name){const m=FILE_RE.exec((name||'').trim());if(!m)return null;
+  const a=Math.round((+m[3]*60+ +m[4])*1000),b=Math.round((+m[5]*60+ +m[6])*1000);return b>a?{n:+m[1],src:m[2],inMs:a,outMs:b}:null}
+const fmt=ms=>{if(ms==null)return'';const t=Math.round(ms/100),s=t/10;const m=Math.floor(s/60);return m+':'+(s-m*60).toFixed(1).padStart(4,'0')};
+const fmtLong=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'};
+const DRIVE='https://drive.google.com/drive/my-drive';
+
+let uid=0;
+const video={id:'v1',title:'Strategy Execution and Leadership',type:'Video',status:'d-prog',owner:'raneem',assignee:'omar',files:[{kind:'link',host:'Google Drive'}],open:true};
+const RAW=[
+ ['04_IMG_0293_2m20.2s-3m49.0s.mp4','Keeping Strategy on Track','publish','lina','https://www.linkedin.com/feed/'],
+ ['05_IMG_0293_3m56.1s-5m06.8s.mp4','Strategy Deployment: The Missing Link','publish','lina',''],
+ ['08_IMG_0293_8m44.4s-9m44.7s.mp4','The Six Cs of Strategy Deployment','scheduled','omar',''],
+ ['09_IMG_0293_9m44.6s-10m58.0s.mp4','Connecting Every Team to the Strategy','ready-publish','omar',''],
+ ['11_IMG_0293_13m37.1s-14m50.5s.mp4','Tie Rewards to What Matters Most','d-check','lina',''],
+ ['12_IMG_0293_15m08.5s-16m11.6s.mp4','Clear Roles Make Strategy Work','d-check','omar',''],
+ ['13_IMG_0293_16m13.2s-17m17.4s.mp4','Can Your Team See the Strategy?','d-prog','lina',''],
+ ['14_IMG_0294_0m09.9s-1m23.7s.mp4','300 Numbers. Where’s the Insight?','d-prog','omar',''],
+ ['18_IMG_0294_8m34.3s-9m41.6s.mp4','Political Dynamics: Two Ways to See an Organization','r-design','',''],
+ ['22_IMG_0295_6m30.7s-7m32.6s.mp4','The Two Anchors of Leadership: Brutal Facts and Ultimate Faith','r-design','',''],
+ ['23_IMG_0295_8m02.1s-9m17.6s.mp4','Execution Under Pressure Starts with a Calm Leader','c-final','',''],
+ ['24_IMG_0295_9m30.7s-10m42.4s.mp4','When Seasonality Drives Your Business','c-prog','',''],
+ ['28_IMG_0296_3m05.9s-3m56.8s.mp4','Execution First: Results Don’t Come From Talk Alone','d-prog','omar','',true],
+];
+const clips=RAW.map((r,i)=>{const p=parseFile(r[0]);return {id:'c'+(++uid),file:r[0],title:r[1],status:r[2],assignee:r[3]||null,owner:'sara',pub:r[4],
+  type:'Reel',dropped:!!r[5],n:p.n,src:p.src,inMs:p.inMs,outMs:p.outMs,order:i,
+  files:i===0?[{kind:'link',host:'Google Drive'},{kind:'file',name:'04_final.mp4'}]:[{kind:'link',host:'Google Drive'}],up:null}});
+// Demo states for the Files cell
+clips[6].up={state:'uploading',name:'13_final.mp4',pct:62};
+clips[7].up={state:'tooLarge',name:'14_master.mov',size:'7.4 MB'};
+clips[4].up={state:'failed',name:'11_final.mp4',err:'Connection lost'};
+
+const state={me:'raneem',set:null,mine:false,showDropped:true,rtl:false,active:{r:1,c:1},hl:'c7'};
+const COLS={
+  title:{h:'Title',w:330},n:{h:'#',w:36},type:{h:'Type',w:58},status:{h:'Status',w:140},editor:{h:'Editor',w:104},
+  src:{h:'Source',w:84},file:{h:'File name',w:250},in:{h:'In',w:58},out:{h:'Out',w:58},len:{h:'Length',w:58},
+  files:{h:'Files',w:150},pub:{h:'Published',w:120},drop:{h:'',w:62}};
+const SETS={
+  editing:['title','n','status','editor','src','file','in','out','len','files'],
+  copy:['title','n','type','status','editor','pub'],
+  full:['title','n','type','status','editor','src','file','in','out','len','files','pub','drop']};
+
+/* ── rules ─────────────────────────────────────────────────────────── */
+const me=()=>M[state.me];
+const canAct=t=>t.owner===state.me||t.assignee===state.me||me().access==='admin'||me().access==='superuser';
+const holds=t=>{const o=STAGE[t.status].owner;return o?o===me().role:(t.assignee===state.me||t.owner===state.me)};
+function allowedStages(t){
+  if(t.dropped) return [];
+  if(!(holds(t)||me().access==='admin'||me().access==='superuser')) return [];
+  return PATH.filter(s=>s!==t.status);
+}
+const vname=id=>state.rtl?STAGE[id].ar:STAGE[id].en;
+
+/* ── render ────────────────────────────────────────────────────────── */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const host=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch{return 'link'}};
+const caret='<svg width="9" height="9" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.8" fill="none"/></svg>';
+
+function cols(){return SETS[state.set]}
+function visibleClips(){
+  return clips.filter(c=>(state.showDropped||!c.dropped)&&(!state.mine||c.assignee===state.me||c.owner===state.me))
+    .sort((a,b)=>(a.n??1e9)-(b.n??1e9)||a.order-b.order);
+}
+function statusCell(t){
+  const moves=allowedStages(t);
+  const lbl=`${vname(t.status)} · ${STAGE[t.status].real}`;
+  return `<button type="button" class="st" data-status="${t.id}" ${moves.length?'aria-haspopup="menu"':'disabled'} aria-label="${esc(vname(t.status))}, ${esc(STAGE[t.status].real)}" data-tip="${esc(lbl)}"><i class="dot" style="background:${STAGE[t.status].c}"></i>${esc(vname(t.status))}${moves.length?'<span class="chev">▾</span>':''}</button>`;
+}
+function filesCell(t){
+  const u=t.up;
+  if(u&&u.state==='uploading') return `<div class="files"><span class="mut">${esc(u.name)} · ${u.pct}%</span></div><span class="prog" role="progressbar" aria-valuenow="${u.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${u.pct}%"></i></span>`;
+  if(u&&u.state==='tooLarge') return `<div class="files"><span class="ferr" title="Too large · ${u.size}, over the about 5 MB limit">Too large · ${u.size}</span><button type="button" class="fbtn" data-linkinstead="${t.id}">Paste a link instead</button></div>`;
+  if(u&&u.state==='failed') return `<div class="files"><span class="ferr" title="${esc(u.name)}: ${esc(u.err)}">${esc(u.err)}</span><button type="button" class="fbtn" data-retry="${t.id}">Retry</button></div>`;
+  const links=t.files.filter(f=>f.kind==='link'), ups=t.files.filter(f=>f.kind==='file');
+  const tags=[links.length?`<span class="ftag">${links.some(l=>l.host==='Google Drive')?'Drive':'Link'}</span>`:'',ups.length?`<span class="ftag">${ups.length} file${ups.length>1?'s':''}</span>`:''].join('');
+  return `<button type="button" class="files st" data-files="${t.id}" aria-haspopup="menu">${tags||'<span class="mut">+ add</span>'}</button>`;
+}
+function pubCell(t){
+  if(t.pub) return `<a class="lk" href="${esc(t.pub)}" target="_blank" rel="noopener">${esc(host(t.pub))}</a>`;
+  if(t.status==='publish') return `<button type="button" class="addl miss" data-pub="${t.id}">Missing link</button>`;
+  return canAct(t)?`<button type="button" class="addl" data-pub="${t.id}">+ link</button>`:'';
+}
+function cell(col,t,isVideo){
+  switch(col){
+    case 'title':{
+      const lead=isVideo?`<button type="button" class="caret" data-toggle aria-label="${video.open?'Collapse':'Expand'} clips" aria-expanded="${video.open}">${caret}</button>`:'<span class="sp"></span>';
+      const cnt=isVideo?`<span class="cnt">${clips.filter(c=>!c.dropped).length} clips</span>`:'';
+      return `<td class="ti" role="rowheader"><div class="w">${lead}<span class="tt" title="${esc(t.title)}">${esc(t.title)}</span>${cnt}</div></td>`;}
+    case 'n': return `<td class="c num mut" role="gridcell">${isVideo||t.n==null?'':String(t.n).padStart(2,'0')}</td>`;
+    case 'type': return `<td class="txt" role="gridcell">${t.type}</td>`;
+    case 'status': return `<td role="gridcell">${statusCell(t)}</td>`;
+    case 'editor': return `<td role="gridcell">${canAct(t)?`<button type="button" class="st" data-editor="${t.id}" aria-haspopup="menu">${t.assignee?esc(M[t.assignee].name):'<span class="mut">Unassigned</span>'}<span class="chev">▾</span></button>`:(t.assignee?esc(M[t.assignee].name):'<span class="mut">Unassigned</span>')}</td>`;
+    case 'src': return `<td class="txt mono" role="gridcell">${isVideo?'':esc(t.src)}</td>`;
+    case 'file': return `<td class="txt mono" role="gridcell" title="${esc(t.file||'')}">${isVideo?'':esc(t.file)}</td>`;
+    case 'in': return `<td class="num" role="gridcell">${isVideo?'':fmt(t.inMs)}</td>`;
+    case 'out': return `<td class="num" role="gridcell">${isVideo?'':fmt(t.outMs)}</td>`;
+    case 'len': return `<td class="num" role="gridcell">${isVideo?'':fmt(t.outMs-t.inMs)}</td>`;
+    case 'files': return `<td role="gridcell">${filesCell(t)}</td>`;
+    case 'pub': return `<td role="gridcell">${isVideo?'':pubCell(t)}</td>`;
+    case 'drop': return `<td class="c" role="gridcell">${isVideo||!canAct(t)?'':`<button type="button" class="dropb" data-drop="${t.id}">${t.dropped?'Restore':'Drop'}</button>`}</td>`;
+  }
+}
+function render(){
+  document.documentElement.dir=state.rtl?'rtl':'ltr';
+  document.querySelectorAll('#sets button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.set===state.set)));
+  $('#mine').setAttribute('aria-pressed',String(state.mine));
+  $('#showDropped').setAttribute('aria-pressed',String(state.showDropped));
+  $('#rtl').setAttribute('aria-pressed',String(state.rtl));
+  const cs=cols();
+  $('#cols').innerHTML='<col style="width:36px">'+cs.map(c=>`<col style="width:${COLS[c].w}px">`).join('');
+  $('#head').innerHTML='<th class="rn" role="columnheader"></th>'+cs.map(c=>`<th role="columnheader" class="${c==='title'?'ti':['in','out','len'].includes(c)?'num':c==='n'?'c':''}"${c==='n'?' aria-sort="ascending"':''}>${COLS[c].h}</th>`).join('');
+  let rn=1, html=`<tr class="video${video.open?'':' collapsed'}" role="row" aria-level="1" aria-expanded="${video.open}"><td class="rn" role="gridcell">${rn++}</td>${cs.map(c=>cell(c,video,true)).join('')}</tr>`;
+  if(video.open) visibleClips().forEach(c=>{
+    html+=`<tr class="${c.dropped?'dropped':''}${state.hl===c.id?' hl':''}" role="row" aria-level="2"${c.dropped?' aria-disabled="true"':''}><td class="rn" role="gridcell" data-rowmenu="${c.id}" title="Row menu">${rn++}</td>${cs.map(col=>cell(col,c,false)).join('')}</tr>`;});
+  html+=`<tr role="row"><td class="rn"></td><td class="ti"><button type="button" class="plus" id="plusClip">+ Clip</button></td>${cs.slice(1).map(()=>'<td></td>').join('')}</tr>`;
+  for(let i=0;i<6;i++) html+=`<tr aria-hidden="true"><td class="rn">${rn++}</td>${cs.map(()=>'<td></td>').join('')}</tr>`;
+  $('#rows').innerHTML=html;
+  const kept=clips.filter(c=>!c.dropped), pub=kept.filter(c=>c.status==='publish'), miss=pub.filter(c=>!c.pub).length;
+  $('#sum').innerHTML=`<span class="vn">${esc(video.title)}</span><span><b>${kept.length}</b> clips</span><span><b>${fmtLong(kept.reduce((s,c)=>s+(c.outMs-c.inMs),0))}</b></span><span><b>${kept.filter(c=>EDITING.includes(c.status)).length}</b> editing</span><span><b>${pub.length}</b> published${miss?` <span class="bad">(${miss} no link)</span>`:''}</span><span><b>${clips.length-kept.length}</b> dropped</span>`;
+}
+
+/* ── popups ─────────────────────────────────────────────────────────── */
+let openPop=null;
+function closePop(focusBack=true){if(!openPop)return;const {el,from}=openPop;el.remove();openPop=null;if(focusBack&&from&&document.contains(from))from.focus()}
+function place(el,from){document.body.appendChild(el);const r=from.getBoundingClientRect();const w=el.offsetWidth,h=el.offsetHeight;
+  let x=state.rtl?r.right-w:r.left;x=Math.max(8,Math.min(x,innerWidth-w-8));let y=r.bottom+4;if(y+h>innerHeight-8)y=Math.max(8,r.top-h-4);el.style.left=x+'px';el.style.top=y+'px'}
+function menu(from,html){closePop(false);const el=document.createElement('div');el.className='menu';el.setAttribute('role','menu');el.innerHTML=html;place(el,from);openPop={el,from};
+  const items=[...el.querySelectorAll('[role="menuitem"]')];items[0]&&items[0].focus();
+  el.addEventListener('keydown',e=>{const i=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(i+1)%items.length].focus()}
+    if(e.key==='ArrowUp'){e.preventDefault();items[(i-1+items.length)%items.length].focus()}
+    if(e.key==='Home'){e.preventDefault();items[0].focus()}
+    if(e.key==='End'){e.preventDefault();items[items.length-1].focus()}
+    if(e.key==='Escape'){e.preventDefault();closePop()}});
+  return el}
+function popover(from,html){closePop(false);const el=document.createElement('div');el.className='pop';el.innerHTML=html;place(el,from);openPop={el,from};
+  el.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closePop()}});return el}
+const find=id=>id===video.id?video:clips.find(c=>c.id===id);
+
+function statusMenu(t,from){
+  const moves=allowedStages(t);if(!moves.length)return;
+  const i=PATH.indexOf(t.status), next=PATH[i+1];
+  const item=(s,cls='')=>`<button type="button" role="menuitem" class="${cls}" data-move="${s}"><i class="dot" style="background:${STAGE[s].c}"></i>${esc(vname(s))}<small>${STAGE[s].real}</small></button>`;
+  const back=moves.filter(s=>PATH.indexOf(s)<i).reverse(), skip=moves.filter(s=>PATH.indexOf(s)>i+1);
+  const el=menu(from,(next&&moves.includes(next)?`<div class="grp">Next</div>${item(next,'next')}`:'')+
+    (back.length?`<div class="grp">Back to</div>${back.map(s=>item(s)).join('')}`:'')+
+    (skip.length?`<div class="grp">Skip to</div>${skip.map(s=>item(s)).join('')}`:''));
+  el.addEventListener('click',e=>{const b=e.target.closest('[data-move]');if(!b)return;const to=b.dataset.move;
+    const own=holds(t)&&PATH.indexOf(to)>i;t.status=to;closePop(false);render();
+    toast(`Moved to ${vname(to)}${own?' · 🎉 celebration plays':''}`);
+    if(to==='publish'&&t!==video)setTimeout(()=>publishPrompt(t),0);});
+}
+function editorMenu(t,from){
+  const sorted=[...MEMBERS].sort((a,b)=>(EDIT_RE.test(b.role)-EDIT_RE.test(a.role))||a.name.localeCompare(b.name));
+  const el=menu(from,sorted.map(m=>`<button type="button" role="menuitem" data-ed="${m.id}">${esc(m.name)}<span class="role">${esc(m.role)}</span></button>`).join('')+`<hr><button type="button" role="menuitem" data-ed="">Unassigned</button>`);
+  el.addEventListener('click',e=>{const b=e.target.closest('[data-ed]');if(!b)return;t.assignee=b.dataset.ed||null;closePop();render();toast(t.assignee?`Assigned to ${M[t.assignee].name}`:'Unassigned')});
+}
+function filesMenu(t,from){
+  const can=canAct(t);
+  const el=menu(from,t.files.map(f=>f.kind==='link'?`<button type="button" role="menuitem" data-open>Open link · ${esc(f.host)}</button>`:`<button type="button" role="menuitem" data-open>Preview ${esc(f.name)}</button>`).join('')+
+    (can?`<hr><button type="button" role="menuitem" data-upload>Upload… <small>Up to 200 MB</small></button><button type="button" role="menuitem" data-addlink>Paste a link</button>`:'')+
+    `<hr><button type="button" role="menuitem" data-opentask>Open task</button>`);
+  el.addEventListener('click',e=>{
+    if(e.target.closest('[data-upload]')){closePop();t.up={state:'uploading',name:'new_cut.mp4',pct:0};render();
+      const tick=setInterval(()=>{t.up.pct+=20;if(t.up.pct>=100){clearInterval(tick);t.up=null;t.files.push({kind:'file',name:'new_cut.mp4'});toast('Uploaded')}render()},350)}
+    else if(e.target.closest('[data-addlink]')){linkPrompt(t,from)}
+    else if(e.target.closest('[data-open],[data-opentask]')){closePop();toast('Opens in the task panel (prototype)')}
+  });
+}
+function linkPrompt(t,from){
+  const el=popover(from,`<label for="lnk"><b>Paste a Drive or web link</b></label><input id="lnk" placeholder="https://drive.google.com/…"><span class="note" id="lnkNote" hidden>That isn't a web address.</span><div class="row"><button type="button" class="pbtn" data-cancel>Cancel</button><button type="button" class="pbtn primary" data-save>Attach</button></div>`);
+  const i=el.querySelector('input');i.focus();
+  const save=()=>{const v=i.value.trim();if(!/^https?:\/\//i.test(v)){el.querySelector('#lnkNote').hidden=false;return}
+    t.up=null;t.files.push({kind:'link',host:/drive\.google|docs\.google/.test(v)?'Google Drive':host(v)});closePop();render();toast('Link attached')};
+  el.addEventListener('click',e=>{if(e.target.closest('[data-save]'))save();if(e.target.closest('[data-cancel]'))closePop()});
+  i.addEventListener('keydown',e=>{if(e.key==='Enter')save()});
+}
+function publishPrompt(t){
+  const from=document.querySelector(`[data-pub="${t.id}"]`)||document.querySelector(`[data-status="${t.id}"]`);if(!from)return;
+  const el=popover(from,`<label for="pubin"><b>Published! Paste the post link</b></label><input id="pubin" placeholder="https://www.instagram.com/reel/…"><span class="note" id="pubNote" hidden>That isn't a web address.</span><div class="row"><button type="button" class="pbtn" data-skip>Skip</button><button type="button" class="pbtn primary" data-save>Save</button></div>`);
+  const i=el.querySelector('input');i.focus();
+  const save=()=>{const v=i.value.trim();if(!/^https?:\/\//i.test(v)){el.querySelector('#pubNote').hidden=false;return}t.pub=v;closePop();render();toast('Link saved')};
+  el.addEventListener('click',e=>{if(e.target.closest('[data-save]'))save();if(e.target.closest('[data-skip]')){closePop();render()}});
+  i.addEventListener('keydown',e=>{if(e.key==='Enter')save()});
+}
+function rowMenu(t,from){
+  const can=canAct(t);
+  const el=menu(from,(can?`<button type="button" role="menuitem" class="${t.dropped?'':'danger'}" data-dropit>${t.dropped?'Restore to the board':'Drop clip…'}</button>`:'')+`<button type="button" role="menuitem" data-opentask>Open task</button>`);
+  el.addEventListener('click',e=>{if(e.target.closest('[data-dropit]')){t.dropped?restore(t):dropConfirm(t,from)}
+    if(e.target.closest('[data-opentask]')){closePop();toast('Opens in the task panel (prototype)')}});
+}
+function dropConfirm(t,from){
+  const el=popover(from,`<b>Drop clip ${String(t.n).padStart(2,'0')}?</b><span class="mut">It leaves the board and can be restored. Nothing is deleted.</span><div class="row"><button type="button" class="pbtn" data-cancel>Cancel</button><button type="button" class="pbtn danger" data-yes>Drop</button></div>`);
+  el.querySelector('[data-yes]').focus();
+  el.addEventListener('click',e=>{if(e.target.closest('[data-yes]')){t.dropped=true;closePop(false);render();toast('Clip dropped',()=>{t.dropped=false;render()})}if(e.target.closest('[data-cancel]'))closePop()});
+}
+function restore(t){t.dropped=false;closePop(false);render();toast('Restored to the board at '+vname(t.status))}
+
+/* ── tooltip on hover and keyboard focus (FR-012) ───────────────────── */
+let tipEl=null;
+function showTip(el){hideTip();const txt=el.dataset.tip;if(!txt)return;tipEl=document.createElement('div');tipEl.className='tip';tipEl.id='tip';tipEl.textContent=txt;document.body.appendChild(tipEl);
+  const r=el.getBoundingClientRect();tipEl.style.left=Math.max(8,Math.min(r.left,innerWidth-tipEl.offsetWidth-8))+'px';tipEl.style.top=(r.top-tipEl.offsetHeight-6)+'px';el.setAttribute('aria-describedby','tip')}
+function hideTip(){if(tipEl){tipEl.remove();tipEl=null}}
+document.addEventListener('mouseover',e=>{const el=e.target.closest('[data-tip]');if(el)showTip(el);else hideTip()});
+document.addEventListener('focusin',e=>{const el=e.target.closest('[data-tip]');if(el&&el.matches(':focus-visible'))showTip(el);else hideTip()});
+
+/* ── toast ───────────────────────────────────────────────────────────── */
+function toast(m,undo){const t=$('#toast');t.innerHTML=esc(m)+(undo?' <button type="button">Undo</button>':'');t.classList.add('on');
+  if(undo)t.querySelector('button').onclick=()=>{undo();t.classList.remove('on')};clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),undo?5000:1800)}
+
+/* ── events ─────────────────────────────────────────────────────────── */
+document.addEventListener('click',e=>{
+  if(openPop&&!openPop.el.contains(e.target)&&!e.target.closest('[data-status],[data-editor],[data-files],[data-rowmenu],[data-pub],[data-linkinstead]'))closePop(false);
+  const b=e.target.closest('button,td[data-rowmenu]');if(!b)return;
+  if(b.hasAttribute('data-toggle')){video.open=!video.open;render()}
+  else if(b.dataset.status)statusMenu(find(b.dataset.status),b);
+  else if(b.dataset.editor)editorMenu(find(b.dataset.editor),b);
+  else if(b.dataset.files)filesMenu(find(b.dataset.files),b);
+  else if(b.dataset.rowmenu)rowMenu(find(b.dataset.rowmenu),b);
+  else if(b.dataset.drop){const t=find(b.dataset.drop);t.dropped?restore(t):dropConfirm(t,b)}
+  else if(b.dataset.pub){const t=find(b.dataset.pub);if(canAct(t))publishPrompt(t)}
+  else if(b.dataset.linkinstead){linkPrompt(find(b.dataset.linkinstead),b)}
+  else if(b.dataset.retry){const t=find(b.dataset.retry);t.up={state:'uploading',name:t.up.name,pct:10};render();
+    const tick=setInterval(()=>{t.up.pct+=30;if(t.up.pct>=100){clearInterval(tick);t.up=null;t.files.push({kind:'file',name:'11_final.mp4'});toast('Uploaded')}render()},350)}
+  else if(b.dataset.set){state.set=b.dataset.set;render()}
+  else if(b.id==='mine'){state.mine=!state.mine;render()}
+  else if(b.id==='showDropped'){state.showDropped=!state.showDropped;render()}
+  else if(b.id==='rtl'){state.rtl=!state.rtl;render()}
+  else if(b.id==='plusClip'){const c={id:'c'+(++uid),title:'',status:'todo',owner:state.me,assignee:null,type:'Reel',files:[],order:999,n:null,dropped:false};
+    const td=b.closest('td');td.innerHTML='<input class="cell-in" placeholder="Clip title, then Enter" aria-label="New clip title">';const i=td.querySelector('input');i.focus();
+    i.addEventListener('keydown',e=>{if(e.key==='Enter'&&i.value.trim()){c.title=i.value.trim();clips.push(c);render();toast('Clip added · To Do')}if(e.key==='Escape')render()})}
+});
+$('#who').innerHTML=MEMBERS.map(m=>`<option value="${m.id}">${m.name} · ${m.role}${m.access!=='user'?' ('+m.access+')':''}</option>`).join('');
+$('#who').onchange=e=>{state.me=e.target.value;state.set=defaultSet(me().role);closePop(false);render();toast(`${me().name} opens on ${state.set[0].toUpperCase()+state.set.slice(1)}`)};
+
+/* ── paste preview ──────────────────────────────────────────────────── */
+let fresh=[],bad=[];
+$('#pasteBtn').onclick=()=>{$('#dlg').hidden=false;$('#pasteBox').focus()};
+$('#closeBtn').onclick=()=>{$('#dlg').hidden=true;reset();$('#pasteBtn').focus()};
+$('#dlg').addEventListener('keydown',e=>{if(e.key==='Escape'){$('#dlg').hidden=true;reset();$('#pasteBtn').focus()}});
+function reset(){fresh=[];bad=[];$('#pasteBox').value='';draw()}
+const cellsFromText=txt=>txt.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split('\t').map(c=>{c=c.trim();return {text:c,href:/^https?:\/\//i.test(c)?c:''}}));
+function cellsFromHtml(html){const doc=new DOMParser().parseFromString(html,'text/html');
+  return [...doc.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td,th')].map(td=>{const a=td.querySelector('a[href]');return {text:td.textContent.trim(),href:a?a.href:''}}))}
+let existing=0;
+function classify(rows){
+  const have=new Set(clips.map(c=>(c.file||'').toLowerCase()));fresh=[];bad=[];existing=0;
+  rows.forEach(cells=>{if(!cells.some(c=>c.text))return;
+    const fc=cells.find(c=>FILE_RE.test(c.text)&&parseFile(c.text));
+    const link=(cells.find(c=>c.href)||{}).href||'';
+    const title=cells.filter(c=>c!==fc&&!c.href&&c.text).map(c=>c.text).sort((a,b)=>b.length-a.length)[0]||'';
+    if(!fc){bad.push({cells:cells.map(c=>c.text).join(' · '),title,file:'',link,keep:true});return}
+    const key=fc.text.toLowerCase();if(have.has(key)){existing++;return}have.add(key);
+    fresh.push({...parseFile(fc.text),file:fc.text,title:title||fc.text,link})});
+  draw();
+}
+function draw(){
+  $('#newWrap').hidden=!fresh.length;
+  $('#newRows').innerHTML=fresh.map(c=>`<tr class="${c.fixed?'fixed':''}"><td class="num">${c.n==null?'':String(c.n).padStart(2,'0')}</td><td>${esc(c.title)}</td><td class="mono">${esc(c.src||'')}</td><td class="num">${c.inMs==null?'':fmt(c.inMs)+' → '+fmt(c.outMs)}</td><td class="num">${c.inMs==null?'':fmt(c.outMs-c.inMs)}</td><td>${c.link?esc(host(c.link)):'<span class="mut">no link</span>'}</td></tr>`).join('');
+  $('#badWrap').hidden=!bad.length;
+  $('#badRows').innerHTML=bad.map((r,i)=>`<tr><td class="mut" title="${esc(r.cells)}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(r.cells)}</td><td><input data-badt="${i}" value="${esc(r.title)}" aria-label="Title"></td><td><input data-badf="${i}" value="${esc(r.file)}" placeholder="NN_SOURCE_XmYY.Ys-XmYY.Ys.mp4" aria-label="File name"></td><td><button type="button" class="pbtn" data-leave="${i}">${r.keep?'Leave out':'Keep'}</button></td></tr>`).join('');
+  const addable=fresh.length+bad.filter(r=>r.keep&&r.title.trim()).length;
+  $('#counts').innerHTML=fresh.length||existing||bad.length?`${fresh.length} new · ${existing} already in the sheet · <span class="warn">${bad.filter(r=>r.keep).length} without a clip file name</span>`:'';
+  $('#addBtn').textContent=`Add ${addable} clip${addable===1?'':'s'}`;$('#addBtn').disabled=!addable;
+}
+$('#badRows').addEventListener('change',e=>{
+  const t=e.target.dataset.badt,f=e.target.dataset.badf;
+  if(t!=null)bad[t].title=e.target.value;
+  if(f!=null){const p=parseFile(e.target.value);if(p){const r=bad.splice(f,1)[0];fresh.push({...p,file:e.target.value.trim(),title:r.title||e.target.value,link:r.link,fixed:true})}else bad[f].file=e.target.value}
+  draw();
+});
+$('#badRows').addEventListener('click',e=>{const i=e.target.dataset.leave;if(i!=null){bad[i].keep=!bad[i].keep;draw()}});
+$('#pasteBox').addEventListener('paste',e=>{const html=e.clipboardData.getData('text/html'),txt=e.clipboardData.getData('text/plain');
+  if(html&&/<t[rd]/i.test(html)){e.preventDefault();$('#pasteBox').value=txt;classify(cellsFromHtml(html))}else setTimeout(()=>classify(cellsFromText($('#pasteBox').value)),0)});
+$('#pasteBox').addEventListener('input',()=>classify(cellsFromText($('#pasteBox').value)));
+$('#sampleBtn').onclick=()=>{$('#pasteBox').value=['30_IMG_0296_6m12.4s-7m20.9s.mp4\tStrategy Is a Daily Habit\t'+DRIVE,
+  '04_IMG_0293_2m20.2s-3m49.0s.mp4\tKeeping Strategy on Track\t'+DRIVE,'Q&A highlight\tWhat leaders ask first\t'+DRIVE].join('\n');classify(cellsFromText($('#pasteBox').value))};
+$('#addBtn').onclick=()=>{
+  const rows=[...fresh,...bad.filter(r=>r.keep&&r.title.trim()).map(r=>({title:r.title,file:'',link:r.link,n:null}))];
+  rows.forEach(r=>clips.push({id:'c'+(++uid),title:r.title,file:r.file,n:r.n,src:r.src,inMs:r.inMs,outMs:r.outMs,status:'todo',owner:state.me,assignee:null,type:'Reel',pub:'',dropped:false,order:500+uid,files:r.link?[{kind:'link',host:'Google Drive'}]:[]}));
+  $('#dlg').hidden=true;reset();render();toast(`${rows.length} clip${rows.length===1?'':'s'} added · To Do, owned by ${me().name}`)};
+
+state.set=defaultSet(me().role);
+render();
+</script>
+</body>
+</html>
