@@ -280,7 +280,7 @@ Noran adds next week's newsjacking report with **+ Piece** under the Newsjacking
 
 ## Assumptions
 
-- **The reference**: the "Plan (Organized)" tab of the Content Library Google Sheet, read on 2026-11-04: 18 pieces in 2 themes. The older "Plan" tab has the same rows in a less tidy layout. Paste plan accepts both, by their headings.
+- **The reference**: the "Plan (Organized)" tab of the Content Library Google Sheet, read on 2026-11-04: 18 pieces in 2 themes. The older "Plan" tab has the same rows in a less tidy layout, with headings for its first five columns only; Paste plan reads "Plan (Organized)" by its headings and anything without a heading row by the reference's column order. *(Corrected during planning.)*
 - **Themes are projects (recommended default)**: projects already group tasks on the board and the Projects page, and "standing" projects already exist for ongoing streams. A theme is a standing project with owner, frequency and audience.
 - **Pillars are a new group inside a theme**: Momentum has nothing between a project and a task for this.
 - **Status names (recommended default)**: content names in the Content sheet only, mapped onto the pipeline as display labels (FR-020). "Initial Design" and "Final Design" are the reference's own words. The pipeline is unchanged (Constitution §II).
