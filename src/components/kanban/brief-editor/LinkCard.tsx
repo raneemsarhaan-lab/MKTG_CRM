@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Editor } from '@tiptap/core'
 import { BubbleMenu } from '@tiptap/react/menus'
@@ -31,12 +32,20 @@ export function LinkCard({ editor, hiddenRef, onEdit, onNote }: {
   const path = prettyPath(href)
   const shortPath = path.length > 32 ? `${path.slice(0, 31)}…` : path
 
+  // Stable props: the bubble menu re-sends its options whenever these change
+  // identity, and that update is a transaction, which re-renders the editor.
+  const shouldShow = useCallback(
+    ({ editor: ed, view }: { editor: Editor; view: { hasFocus: () => boolean } }) =>
+      !hiddenRef.current && ed.isEditable && ed.isActive('link') && view.hasFocus(),
+    [hiddenRef],
+  )
+
   return (
     <BubbleMenu
       editor={editor}
       pluginKey="briefLinkCard"
-      shouldShow={({ editor: ed, view }) => !hiddenRef.current && ed.isEditable && ed.isActive('link') && view.hasFocus()}
-      options={{ placement: 'bottom-start', offset: 6 }}
+      shouldShow={shouldShow}
+      options={CARD_OPTIONS}
     >
       <div
         role="dialog"
@@ -66,6 +75,8 @@ export function LinkCard({ editor, hiddenRef, onEdit, onNote }: {
     </BubbleMenu>
   )
 }
+
+const CARD_OPTIONS = { placement: 'bottom-start' as const, offset: 6 }
 
 function cardBtn(bg: string, fg: string): React.CSSProperties {
   return {

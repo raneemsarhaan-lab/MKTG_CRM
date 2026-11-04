@@ -39,6 +39,8 @@ for (const sc of chosen) {
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
+  // React's render-loop warning is a console error, not an exception: fail on it too.
+  page.on('console', m => { if (m.type() === 'error' && /Maximum update depth|Too many re-renders/.test(m.text())) errors.push(m.text().slice(0, 120)) })
   const t = makeHelpers(page, context, base)
   try {
     await t.open(sc.hash ?? '')

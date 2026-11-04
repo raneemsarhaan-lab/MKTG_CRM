@@ -141,3 +141,20 @@ export const editing = [
     },
   },
 ]
+
+editing.push({
+  id: 'esc-from-toolbar-leaves-editing',
+  async run(t) {
+    await t.focusEnd()
+    await t.page.locator('button[title="Insert"]').click()
+    await t.page.keyboard.press('Escape')
+    t.eq(await t.page.evaluate(() => document.activeElement?.getAttribute('title')), 'Insert', 'focus back on the toolbar')
+    const handled = await t.page.evaluate(() => new Promise(resolve => {
+      window.addEventListener('keydown', e => resolve(e.defaultPrevented), { once: true })
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    }))
+    await t.page.waitForTimeout(150)
+    t.eq((await t.lab()).done, 1, 'Esc on the toolbar leaves editing')
+    t.eq(handled, true, 'and is marked handled, so the panel does not also close')
+  },
+})

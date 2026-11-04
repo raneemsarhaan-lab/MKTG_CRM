@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Editor } from '@tiptap/core'
 import { BubbleMenu } from '@tiptap/react/menus'
@@ -72,18 +73,28 @@ export function TableMenu({ editor }: { editor: Editor }) {
     { id: 'deleteTable', label: t('deleteTable'), run: () => editor.chain().focus().deleteTable().run(), danger: true },
   ]
 
+  // Stable props: the bubble menu re-sends its options whenever these change
+  // identity, and that update is a transaction, which re-renders the editor.
+  const shouldShow = useCallback(
+    ({ editor: ed, view }: { editor: Editor; view: { hasFocus: () => boolean } }) =>
+      ed.isEditable && ed.isActive('table') && view.hasFocus(),
+    [],
+  )
+  const anchorTable = useCallback(() => {
+    const { from } = editor.state.selection
+    const at = editor.view.domAtPos(from).node as Node
+    const el = (at.nodeType === Node.ELEMENT_NODE ? at as Element : at.parentElement)?.closest('table')
+    return el ? { getBoundingClientRect: () => el.getBoundingClientRect(), getClientRects: () => el.getClientRects() } : null
+  }, [editor])
+  const options = useMemo(() => ({ placement: (rtl ? 'top-end' : 'top-start') as 'top-end' | 'top-start', offset: 8 }), [rtl])
+
   return (
     <BubbleMenu
       editor={editor}
       pluginKey="briefTableMenu"
-      shouldShow={({ editor: ed, view }) => ed.isEditable && ed.isActive('table') && view.hasFocus()}
-      getReferencedVirtualElement={() => {
-        const { from } = editor.state.selection
-        const at = editor.view.domAtPos(from).node as Node
-        const el = (at.nodeType === Node.ELEMENT_NODE ? at as Element : at.parentElement)?.closest('table')
-        return el ? { getBoundingClientRect: () => el.getBoundingClientRect(), getClientRects: () => el.getClientRects() } : null
-      }}
-      options={{ placement: rtl ? 'top-end' : 'top-start', offset: 8 }}
+      shouldShow={shouldShow}
+      getReferencedVirtualElement={anchorTable}
+      options={options}
     >
       <div
         role="toolbar"

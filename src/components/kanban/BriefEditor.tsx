@@ -458,7 +458,17 @@ export function BriefEditor({
 
   return (
     <OverlayStackProvider stack={stack}>
-    <div ref={rootRef}>
+    <div
+      ref={rootRef}
+      // Esc while focus is on the toolbar (after closing a menu, say) leaves
+      // editing too, and is marked handled so the task panel's own Esc
+      // doesn't also close the panel. Inside the text, ProseMirror handles it.
+      onKeyDown={e => {
+        if (e.key !== 'Escape' || e.defaultPrevented || (e.target as HTMLElement).isContentEditable) return
+        e.preventDefault()
+        requestLeave()
+      }}
+    >
       <div style={{
         // No overflow: hidden here: it would stop the toolbar sticking (R13).
         borderRadius: 18, background: COLORS.panel,

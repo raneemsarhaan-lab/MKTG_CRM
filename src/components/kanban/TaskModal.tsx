@@ -662,6 +662,9 @@ export function TaskModal({
   const briefState = useRef<{ state: 'saved' | 'saving' | 'error'; pending: number }>({ state: 'saved', pending: 0 })
   const [closeGuard, setCloseGuard] = useState<'unsaved' | 'uploading' | null>(null)
   function requestClose() {
+    // A click on the panel's close control is also a click outside the brief,
+    // so the editor has already asked; don't ask twice.
+    if (editingBrief && document.querySelector('[data-confirm-leave]')) return
     const { state, pending } = briefState.current
     if (editingBrief && state === 'error') { setCloseGuard('unsaved'); return }
     if (editingBrief && pending > 0) { setCloseGuard('uploading'); return }
