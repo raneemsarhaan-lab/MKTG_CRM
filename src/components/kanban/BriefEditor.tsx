@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -21,6 +21,7 @@ import { useSaveQueue, type SaveStatus } from './brief-editor/useSaveQueue'
 import { Menu, MenuItem } from './brief-editor/Menu'
 import { ValuePrompt, type PromptKind } from './brief-editor/ValuePrompt'
 import { OverlayStackProvider, createOverlayStack } from './brief-editor/useOverlayStack'
+import { positionForAnchor, scrollParent } from './brief-editor/readAnchor'
 
 /**
  * Brief editor — a real rich-text surface, not a Markdown textarea.
@@ -54,12 +55,18 @@ interface BriefEditorProps {
    *  so the host can guard its own close control (FR-004). */
   onSaveStateChange?: (state: SaveStatus, pendingUploads: number) => void
   /**
-   * Stop editing. Nothing is discarded — autosave already covers that.
-   *
-   * Omitted when there is no separate edit/view mode to exit — the create-task
-   * form embeds this as its description field, with no "Done" to click back to.
+   * Leave editing. Called on a click outside the editor or Esc, through the
+   * overlay stack and the unsaved-changes bar; there is no Done button
+   * (FR-014, FR-016). Omitted where there is no read view to go back to (the
+   * Create Task form), and then a click outside does nothing.
    */
   onDone?: () => void
+  /**
+   * Where the person clicked in the read view (`anchorFromPoint`): editing
+   * starts with the cursor there, and the clicked block is kept where it was
+   * on screen while the toolbar appears (FR-015, research R25).
+   */
+  initialCursor?: { block: number; offset: number; top?: number }
   /** Offered as one-click choices when inserting an image. */
   attachments?: TaskAttachment[]
   /** Creates a real child task and returns a link to it, or null if cancelled. */
@@ -83,9 +90,10 @@ const TEXT_STYLES: { level: 0 | 1 | 2 | 3; key: 'normal' | 'h1' | 'h2' | 'h3'; s
 ]
 
 export function BriefEditor({
-  value, onSave, onSaveStateChange, onDone, attachments = [], onCreateSubtask,
+  value, onSave, onSaveStateChange, onDone, initialCursor, attachments = [], onCreateSubtask,
   onUploadImages, uploadUnavailableReason = 'not-created',
 }: BriefEditorProps) {
+  const rootRef = useRef<HTMLDivElement>(null)
   const t = useTranslations('briefEditor')
   const stack = useMemo(createOverlayStack, [])
   const save = useSaveQueue(value, onSave)
@@ -160,7 +168,7 @@ export function BriefEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
-    autofocus: 'end',
+    autofocus: false,
     extensions: [
       StarterKit.configure({
         // A click inside the editor places the cursor; the link card offers
@@ -195,6 +203,13 @@ export function BriefEditor({
     onUpdate({ editor }) {
       save.update(getMarkdown(editor))
     },
+    onCreate({ editor }) {
+      // Start where the person clicked, without the browser scrolling to it;
+      // the layout effect below keeps the clicked text still instead.
+      const pos = initialCursor ? positionForAnchor(editor.state.doc, initialCursor.block, initialCursor.offset) : null
+      if (pos !== null) editor.chain().setTextSelection(pos).focus(undefined, { scrollIntoView: false }).run()
+      else editor.commands.focus('end', { scrollIntoView: !initialCursor })
+    },
     onTransaction: () => bump(n => n + 1),
     onFocus: () => setFocused(true),
     onBlur:  () => setFocused(false),
@@ -209,6 +224,34 @@ export function BriefEditor({
   }
 
   openLinkRef.current = () => openPrompt('link')
+
+  // Keep the clicked block where it was on screen: the toolbar appearing above
+  // the text would otherwise push it down by ~60px (FR-015, SC-011).
+  const compensated = useRef(false)
+  useLayoutEffect(() => {
+    if (!editor || compensated.current || initialCursor?.top === undefined) return
+    compensated.current = true
+    const block = editor.view.dom.children[initialCursor.block] as HTMLElement | undefined
+    if (!block) return
+    const drift = block.getBoundingClientRect().top - initialCursor.top
+    if (Math.abs(drift) > 1) scrollParent(editor.view.dom).scrollTop += drift
+  })
+
+  // A click outside the brief ends editing, like Esc (FR-016). The first such
+  // click closes an open menu or prompt instead; clicks inside floating parts
+  // of the editor (link card, table menu) don't count; the click still goes
+  // on to whatever was clicked.
+  useEffect(() => {
+    if (!onDone) return
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Element | null
+      if (!target || rootRef.current?.contains(target)) return
+      if (target.closest?.('[data-overlay]') || stack.contains(target)) return
+      leaveRef.current()
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [onDone, stack])
 
   function closePrompt() {
     setPrompt(null)
@@ -242,11 +285,11 @@ export function BriefEditor({
     setPrompt(null)
   }
 
+  /** Clear formatting from the selected text only (FR-012). It used to clear
+   *  the whole brief when nothing was selected, without asking (audit E5). */
   function clearFormat() {
-    if (!editor) return
-    const chain = editor.chain().focus()
-    if (editor.state.selection.empty) chain.selectAll()
-    chain.unsetAllMarks().clearNodes().run()
+    if (!editor || editor.state.selection.empty) return
+    editor.chain().focus().unsetAllMarks().clearNodes().run()
   }
 
   function flashNote(msg: string, ms = 2500) {
@@ -317,7 +360,7 @@ export function BriefEditor({
 
   return (
     <OverlayStackProvider stack={stack}>
-    <div>
+    <div ref={rootRef}>
       <div style={{
         borderRadius: 18, background: COLORS.panel, overflow: 'hidden',
         boxShadow: focused
@@ -330,6 +373,18 @@ export function BriefEditor({
           minHeight: 58, padding: '10px 16px', background: BRIEF_UI.surface, borderRadius: '18px 18px 0 0',
           position: 'relative',
         }}>
+          {/* Undo / Redo (FR-013) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ToolButton title={`${t('undo')} (Ctrl+Z)`} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
+              <ToolIcon name="undo" />
+            </ToolButton>
+            <ToolButton title={`${t('redo')} (Ctrl+Shift+Z)`} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
+              <ToolIcon name="redo" />
+            </ToolButton>
+          </div>
+
+          <Sep />
+
           {/* Text style */}
           <div style={{ position: 'relative' }}>
             <ToolButton buttonRef={styleBtn} title={t('textStyle')} active={menu === 'style'} wide chip menu expanded={menu === 'style'}
@@ -393,7 +448,7 @@ export function BriefEditor({
             </ToolButton>
             {menu === 'more' && (
               <Menu id="more" label={t('more')} anchor={moreBtn.current} onClose={() => setMenu(null)}>
-                <MenuItem icon={<ToolIcon name="clear" />} onClick={() => { setMenu(null); clearFormat() }} hint={t('clearFormatHint')}>
+                <MenuItem icon={<ToolIcon name="clear" />} disabled={editor.state.selection.empty} onClick={() => { setMenu(null); clearFormat() }} hint={t('clearFormatHint')}>
                   {t('clearFormat')}
                 </MenuItem>
                 <MenuItem icon={<ToolIcon name="copy" />} onClick={() => { setMenu(null); void copyMarkdown() }}>
@@ -441,22 +496,9 @@ export function BriefEditor({
         <EditorContent editor={editor} style={{ padding: '24px 28px 32px', borderRadius: '0 0 18px 18px' }} />
       </div>
 
-      {(onDone || note) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-          {onDone && <button
-            type="button"
-            onClick={requestLeave}
-            style={{
-              padding: '7px 16px', borderRadius: 9, border: 'none',
-              background: BRIEF_UI.blue, color: COLORS.panel, fontWeight: 700,
-              fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            {t('done')}
-          </button>}
-          <span role="status" style={{ fontSize: 12, color: BRIEF_UI.ink, fontWeight: 700 }}>
-            {note}
-          </span>
+      {note && (
+        <div role="status" style={{ marginTop: 10, fontSize: 12, color: BRIEF_UI.ink, fontWeight: 700 }}>
+          {note}
         </div>
       )}
     </div>

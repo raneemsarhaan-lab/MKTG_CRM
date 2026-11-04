@@ -31,7 +31,7 @@ interface BriefEditorProps {
 
   /** Where to put the cursor on mount: the clicked top-level block and character offset,
    *  measured in the read view (R25). Falls back to the end of the brief. NEW, optional. */
-  initialCursor?: { block: number; offset: number }
+  initialCursor?: { block: number; offset: number; top?: number }
 
   /** Offered as one-click choices in Insert ▸ Image. Unchanged. */
   attachments?: TaskAttachment[]
@@ -67,7 +67,7 @@ type UploadResult =
 - `onUploadImages` is passed **only** when `canEdit && hasStorage`. It is implemented by `uploadOne(file)`, extracted from `uploadToBucket`'s per-file body. It keeps every existing check (own-reply `ref`, redirect detection, size) and returns `UploadResult` instead of pushing to `failed[]`. After each success it refreshes the attachment list (`setReloadFiles`) and the card thumbnail as today.
 - `uploadUnavailableReason` = `!canEdit ? 'no-permission' : 'no-storage'` when `onUploadImages` is not passed.
 - The window-level `drop` listener returns early when `e.defaultPrevented`, so drops handled by the editor are not uploaded twice.
-- The read view's `onClick` records `initialCursor` and the clicked block's on-screen `top` before setting `editingBrief`. After the editor mounts, it scrolls the panel by the difference so the text stays still (R25).
+- The read view's `onClick` records `initialCursor` with `anchorFromPoint` (block, visible-character offset, and the block's on-screen `top`) before setting `editingBrief`. The editor itself places the cursor and scrolls its nearest scrolling ancestor by the difference so the text stays still (R25). (Implementation note: the scroll moved into the editor so both hosts and the lab share it.)
 - The panel close control consults the last `onSaveStateChange` values. If the state is `'error'` or `pendingUploads > 0`, it shows the same "Stay · Leave anyway" choice before closing.
 
 ### `TaskForm`

@@ -23,6 +23,7 @@ import { Brief } from '@/components/shared/Brief'
 import en from '../../messages/en.json'
 import ar from '../../messages/ar.json'
 import { FIXTURES } from './fixtures.gen'
+import { anchorFromPoint, type ReadAnchor } from '@/components/kanban/brief-editor/readAnchor'
 
 const params  = new URLSearchParams(location.hash.slice(1))
 const locale  = params.get('locale') === 'ar' ? 'ar' : 'en'
@@ -72,6 +73,7 @@ function App() {
   const [editing, setEditing] = useState(host !== 'modal')
   const [md, setMd] = useState(initial)
   const [key, setKey] = useState(0)
+  const [cursor, setCursor] = useState<ReadAnchor | undefined>(undefined)
 
   if (params.get('view') === 'read') return <div className="fx-brief-read"><Brief markdown={lab.md} /></div>
 
@@ -80,10 +82,17 @@ function App() {
   if (!editing) {
     return (
       <div>
-        <div id="read" onClick={() => { setEditing(true); setKey(k => k + 1) }} style={{ cursor: 'text', padding: 8, background: '#fff', borderRadius: 12 }}>
+        <div id="read" style={{ cursor: 'text', padding: 8, background: '#fff', borderRadius: 12 }}
+             onClick={e => {
+               // What TaskModal does: links and checkboxes act; anything else starts editing there.
+               if ((e.target as HTMLElement).closest('a, input, button, summary, iframe, label')) return
+               const root = e.currentTarget.querySelector<HTMLElement>('.fx-brief')
+               setCursor(root ? anchorFromPoint(root, e.clientX, e.clientY) ?? undefined : undefined)
+               setEditing(true); setKey(k => k + 1)
+             }}>
           <Brief markdown={md} />
         </div>
-        <button id="reopen" onClick={() => { setEditing(true); setKey(k => k + 1) }}>reopen</button>
+        <button id="reopen" onClick={() => { setCursor(undefined); setEditing(true); setKey(k => k + 1) }}>reopen</button>
       </div>
     )
   }
@@ -95,6 +104,7 @@ function App() {
       onSave={save}
       onSaveStateChange={(state, pending) => { lab.state = state; lab.pending = pending }}
       onDone={host === 'form' ? undefined : () => { lab.done++; setEditing(false) }}
+      initialCursor={cursor}
       attachments={[{ id: 'a1', task_id: 't', filename: 'hero-banner.png', url: SAMPLE_PNG, uploaded_at: '' } as never]}
       onCreateSubtask={async name => { await wait(300); return { name, href: '/board?task=new-123' } }}
       onUploadImages={lab.upload === 'absent' ? undefined : onUploadImages}

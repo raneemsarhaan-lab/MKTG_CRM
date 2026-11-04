@@ -151,23 +151,23 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Click a word in the read brief: the cursor lands on it and the text doesn't move; click outside: editing ends. For each of Style, Insert and ⋯, open it and press Esc: the menu closes and the editor stays. Clear format is disabled with no selection.
 
-- [ ] T029 [US4] Route Esc through the overlay stack:
+- [X] T029 [US4] Route Esc through the overlay stack:
   - Wrap the editor tree in `OverlayStackProvider` in `BriefEditor.tsx`.
   - `brief-editor/Menu.tsx`, `ValuePrompt.tsx` and `LinkCard.tsx` (edit mode) register with `useOverlay` while open, and close on Esc keydown with focus returned to their opener.
   - `editorProps.handleKeyDown` handles Esc as `closeTop()` → else the confirm bar if `status === 'error'` → else `onDone` (contracts/keyboard-and-a11y.md "Esc layering").
   - Keep the click-away layer for pointer users.
-- [ ] T030 [P] [US4] In `brief-editor/Toolbar.tsx` / `BriefEditor.tsx`, make Clear format in the ⋯ menu disabled when `editor.state.selection.empty`, and otherwise run `chain().focus().unsetAllMarks().clearNodes().run()` with no `selectAll` fallback. Update its hint to `t('clearFormatHint')`, "selected text" (FR-012).
-- [ ] T031 [P] [US4] Add Undo and Redo buttons as the first toolbar group in `brief-editor/Toolbar.tsx`: `editor.chain().focus().undo().run()` / `redo()`, disabled via `!editor.can().undo()` / `redo()`, with tooltips showing the platform shortcut (FR-013). Add the icons to `ToolIcon`.
-- [ ] T032 [US4] Add lab scenarios `esc-closes-menu-only`, `clear-format-selection-only` and `undo-redo-buttons` to `scripts/brief-editor-lab/scenarios.mjs`.
-- [ ] T033 [US4] In `BriefEditor.tsx` (with `brief-editor/useOverlayStack.ts`):
+- [X] T030 [P] [US4] In `brief-editor/Toolbar.tsx` / `BriefEditor.tsx`, make Clear format in the ⋯ menu disabled when `editor.state.selection.empty`, and otherwise run `chain().focus().unsetAllMarks().clearNodes().run()` with no `selectAll` fallback. Update its hint to `t('clearFormatHint')`, "selected text" (FR-012).
+- [X] T031 [P] [US4] Add Undo and Redo buttons as the first toolbar group in `brief-editor/Toolbar.tsx`: `editor.chain().focus().undo().run()` / `redo()`, disabled via `!editor.can().undo()` / `redo()`, with tooltips showing the platform shortcut (FR-013). Add the icons to `ToolIcon`.
+- [X] T032 [US4] Add lab scenarios `esc-closes-menu-only`, `clear-format-selection-only` and `undo-redo-buttons` to `scripts/brief-editor-lab/scenarios.mjs`.
+- [X] T033 [US4] In `BriefEditor.tsx` (with `brief-editor/useOverlayStack.ts`):
   - Add the optional prop `initialCursor?: { block: number; offset: number }`. On create, resolve it by walking the doc's top-level nodes to `block`, then text offset `offset` (clamped to the block's end), and `setTextSelection` there. Fall back to `'end'`.
   - While mounted with `onDone`, listen for `pointerdown` on `document`. A press outside the editor root and outside any registered overlay runs the Esc chain from T029: close the top overlay, else the confirm bar if `error` or an upload is pending, else `onDone`. Ignore it when a drag-selection started inside the editor. Never `preventDefault`, so the clicked control still receives its click.
   - Delete the Done button from the footer (FR-014, FR-016, research R25).
-- [ ] T034 [US4] In `src/components/kanban/TaskModal.tsx`, change the read-brief `onClick` (the `div` wrapping `<Brief>`, ~line 1996). Before `setEditingBrief(true)`:
+- [X] T034 [US4] In `src/components/kanban/TaskModal.tsx`, change the read-brief `onClick` (the `div` wrapping `<Brief>`, ~line 1996). Before `setEditingBrief(true)`:
   - Compute `initialCursor` from `document.caretRangeFromPoint(e.clientX, e.clientY)` (or `caretPositionFromPoint`): the index of the clicked top-level child of the `Brief` root and the character offset of the caret within that child's `textContent`.
   - Record that child's `getBoundingClientRect().top`.
   After the editor mounts (`useLayoutEffect` keyed on `editingBrief`), scroll the panel's scroll container by `newTop − oldTop`, so the text stays put (FR-015, SC-011). Pass `initialCursor` and keep `onDone={() => setEditingBrief(false)}`. Keyboard: Enter/Space on the focused brief still starts editing at the end. Links and checkboxes keep their current read-view behaviour (FR-017).
-- [ ] T035 [US4] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`. The lab entry gets a `#host=modal` mode that renders `Brief` and swaps to `BriefEditor` on click, the way `TaskModal` does.
+- [X] T035 [US4] Add lab scenarios to `scripts/brief-editor-lab/scenarios.mjs`. The lab entry gets a `#host=modal` mode that renders `Brief` and swaps to `BriefEditor` on click, the way `TaskModal` does.
   - `click-to-edit-cursor`: click a word in a paragraph, list item, heading and table cell; the caret is inside that word and the word moved ≤ 4 px.
   - `click-away-exits`: a click outside ends editing; with `save=fail`, the confirm bar shows instead.
   - `menu-then-click-away`: the first outside click closes an open menu only.

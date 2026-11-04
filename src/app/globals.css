@@ -636,6 +636,12 @@ html {
 .fx-brief th,
 .fx-brief td { border: 1px solid var(--line); padding: 0.3em 0.5em; text-align: start; }
 .fx-brief th { background: #F7F7F7; font-weight: 700; }
+/* The editor wraps each cell's text in a paragraph; without this the cell
+   grows by a paragraph margin and editing shifts the table (spec 005). */
+.fx-brief td > p,
+.fx-brief th > p { margin: 0; }
+.fx-brief td > p + p,
+.fx-brief th > p + p { margin-top: 0.35em; }
 .fx-brief input[type="checkbox"] {
   margin-inline-end: 0.4em;
   accent-color: var(--ink);

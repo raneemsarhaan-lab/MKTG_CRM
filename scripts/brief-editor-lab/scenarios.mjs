@@ -61,6 +61,8 @@ function makeHelpers(page, context, base) {
   const t = {
     page, context,
     async open(hash) {
+      // about:blank first: a change of hash alone would not reload the lab.
+      await page.goto('about:blank')
       await page.goto(base + (hash ? `#${hash}` : ''))
       await page.waitForSelector('.ProseMirror, #read, .fx-brief-read', { timeout: 10_000 })
       await page.waitForTimeout(150)

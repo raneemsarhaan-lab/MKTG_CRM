@@ -13,6 +13,7 @@ import {
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
 import { BriefEditor, type UploadResult } from './BriefEditor'
+import { anchorFromPoint, type ReadAnchor } from './brief-editor/readAnchor'
 import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
@@ -654,6 +655,8 @@ export function TaskModal({
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
+  // Where the read brief was clicked, so editing starts on that word (spec 005 FR-015).
+  const [briefCursor, setBriefCursor]     = useState<ReadAnchor | undefined>(undefined)
   // The brief editor's last reported save state (spec 005 FR-004): closing the
   // panel while a save has failed or an image is uploading asks first.
   const briefState = useRef<{ state: 'saved' | 'saving' | 'error'; pending: number }>({ state: 'saved', pending: 0 })
@@ -2058,6 +2061,7 @@ export function TaskModal({
                   } : undefined}
                   uploadUnavailableReason={!canEdit ? 'no-permission' : 'no-storage'}
                   onDone={() => setEditingBrief(false)}
+                  initialCursor={briefCursor}
                   attachments={attachments}
                   onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
                 />
@@ -2067,6 +2071,8 @@ export function TaskModal({
                     onClick={e => {
                       if (!canEdit) return
                       if ((e.target as HTMLElement).closest('a, input, button, summary, iframe, label')) return
+                      const root = e.currentTarget.querySelector<HTMLElement>('.fx-brief')
+                      setBriefCursor(root ? anchorFromPoint(root, e.clientX, e.clientY) ?? undefined : undefined)
                       setBriefText(task.description ?? '')
                       setEditingBrief(true)
                     }}
@@ -2075,10 +2081,11 @@ export function TaskModal({
                     onKeyDown={e => {
                       if (!canEdit) return
                       if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault(); setBriefText(task.description ?? ''); setEditingBrief(true)
+                        e.preventDefault(); setBriefCursor(undefined); setBriefText(task.description ?? ''); setEditingBrief(true)
                       }
                     }}
                     title={canEdit ? 'Click to edit' : undefined}
+                    aria-label={canEdit ? 'Edit the brief' : undefined}
                     style={{
                       cursor: canEdit ? 'text' : 'default', borderRadius: 8,
                       padding: '6px 8px', margin: '0 -8px',
