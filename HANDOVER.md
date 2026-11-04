@@ -415,6 +415,27 @@ A second view of the board for long-form videos and their clips, spec 008
   `npx tsx scripts/sheet-lab/seed.ts` puts the lab's video into the local
   database for checks against the running app.
 
+### Content sheet
+
+The team's content plan as a third view, **Board | Sheet | Content** (spec 009, `specs/009-content-library-sheet/`). Design: `design/content-sheet.html`.
+
+- **Data.**
+  - A theme is a project with `is_theme`, plus owner, frequency and audience.
+  - Pillars are `content_pillars`.
+  - A piece is any task in a theme; `tasks.pillar_id` and `post_url`.
+  - Working doc and design are link attachments with `link_role`.
+  - Archive is spec 008's `dropped_at`.
+- **Grid.** `src/components/sheet/GridCore.tsx` is shared by both sheets. The video sheet's `SheetGrid` and the Content sheet's `ContentGrid` are models over it. Spec 008's lab guards it.
+- **Paste plan.** `src/components/content/parse-plan.ts` reads the Content Library (merged cells, headings). `addPlan` in `src/actions/content.ts`:
+  - re-reads every value;
+  - takes `pg_advisory_xact_lock(hashtext('content-plan'))` with `$executeRaw`, because the lock returns `void`;
+  - matches tasks by Task Link;
+  - never stores a non-link as a link.
+- **Who may add pieces:** admins, superusers, a theme's owner, and members who own or are assigned a live piece in it. Only admins and superusers create themes.
+- **Test it.**
+  - `npm run lab:sheet -- cus content` runs the Content scenarios.
+  - `npx tsx scripts/sheet-lab/seed-content.ts out.html` seeds the seven linked tasks for checks against the running app.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
@@ -721,6 +742,8 @@ Run through this after the first successful deploy.
 | Check bucket uploads on Cranl | Medium | Spec 007 T045: real upload progress, a 150 MB file byte for byte, a 210 MB refusal. No object storage in the dev environment |
 | Video sheet: Arabic video stage names | Medium | Proposed in spec 008 research R4 (`sheet.stage.*` in `messages/ar.json`); a native speaker should check them |
 | Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
+| Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
+| Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
 ---

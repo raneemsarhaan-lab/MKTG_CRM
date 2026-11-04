@@ -224,7 +224,9 @@ Noran adds next week's newsjacking report with **+ Piece** under the Newsjacking
 - **FR-031**: Before adding, a preview MUST show the themes and pillars to create or match, and pieces split into new, matched by Task Link, already in the sheet, and rows with problems.
 - **FR-032**: A row with a Task Link to an existing task MUST update that task's theme, pillar, type and empty links instead of creating a new one. Its title and stage change only if the member ticks "Use the sheet's title and status" in the preview.
 - **FR-033**: A new piece MUST be created in the stage its status maps to (FR-020), owned by the row's owner where that name matches a team member (otherwise by the member pasting), with the theme's brand, and its links.
-- **FR-034**: Rows with problems (a link cell that isn't a web address, an unknown status, a Task Link to a missing task, no title) MUST be listed. Each can be fixed in place or left out. Adding never stores a non-link as a link.
+- **FR-034**: Rows with problems MUST be listed:
+  - **Blocking** (no title, an unknown status, a Task Link to a missing task, a theme the member may not add to): fix in place, or leave the row out.
+  - **Warnings** (a link cell that isn't a web address, such as "Link error", a post title or a document's name; an owner who isn't on the team): the row is added. The cell is left empty unless a link is pasted in its place, and the piece is owned by the member pasting. Adding never stores a non-link as a link. *(Refined during implementation: the reference's Working Doc column holds document names, so treating every one as blocking would block most rows.)*
 - **FR-035**: Pasting the same rows again MUST add nothing new.
 
 **Links**

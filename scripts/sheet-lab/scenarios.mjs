@@ -50,7 +50,7 @@ for (const sc of chosen) {
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
-  page.on('console', m => { if (m.type() === 'error' && /Maximum update depth|Too many re-renders|Encountered two children|unique "key"/.test(m.text())) errors.push(m.text().slice(0, 160)) })
+  page.on('console', m => { if (m.type() === 'error' && /Maximum update depth|Too many re-renders|Encountered two children|unique "key"|MISSING_MESSAGE/.test(m.text())) errors.push(m.text().slice(0, 160)) })
   const t = makeHelpers(page, base)
   try {
     await t.open(sc.hash ?? '')
@@ -79,7 +79,7 @@ function makeHelpers(page, base) {
       await page.waitForTimeout(80)
     },
     lab: () => page.evaluate(() => ({
-      calls: window.__sheet.calls.map(c => ({ fn: c.fn, args: c.args })),
+      calls: window.__sheet.calls.map(c => ({ fn: c.fn, args: c.args })), themes: window.__sheet.themes,
       celebrations: window.__sheet.celebrations, opened: window.__sheet.opened, views: window.__sheet.views,
       uploads: window.__sheet.uploads, bytesRead: window.__sheet.bytesRead,
     })),

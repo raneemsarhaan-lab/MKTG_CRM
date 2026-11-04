@@ -28,7 +28,7 @@ Run the reference paste: `scratchpad/realapp-content.cjs` pastes the 18 "Plan (O
 
 | # | Expect |
 |---|---|
-| 1 | Preview: 2 themes, 2 pillars; 11 new, 7 matched by Task Link; problems on "Link error" and the post-title LinkedIn cell |
+| 1 | Preview: 2 themes, 2 pillars; 11 new, 7 matched by Task Link; "Link error" and the post-title LinkedIn cell listed as cells left empty |
 | 2 | Add: 11 tasks created and 7 updated; no duplicate; a second paste adds 0 (SC-001) |
 | 3 | Statuses mapped: Initial Design → D-In Progress, Final Design → D-Check; iPhone 18 archived and not on the board |
 | 4 | A Content Creator owning a theme can + Piece in it, but not in the other theme (SC-009); no New task button |

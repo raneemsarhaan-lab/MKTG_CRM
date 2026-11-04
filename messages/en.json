@@ -600,6 +600,12 @@
       "not_authenticated": "Your session ended. Sign in again.",
       "bad_date": "Use a date like 2026-11-20",
       "generic": "Something went wrong. Try again."
+    },
+    "menu": {
+      "next": "Next",
+      "backTo": "Back to",
+      "skipTo": "Skip to",
+      "statusFor": "Move {name}"
     }
   }
 }

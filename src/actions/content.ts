@@ -96,7 +96,8 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
 
   try {
     const out = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
+      // $executeRaw: the lock returns void, which $queryRaw cannot read back.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
       const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[] }
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
