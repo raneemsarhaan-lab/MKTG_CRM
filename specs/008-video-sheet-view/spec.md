@@ -62,7 +62,7 @@ A line above the grid sums it up: "13 clips · 15m 40s · 5 editing · 3 publish
 
 ### User Story 2 - Change status in the sheet, with the board's rules (Priority: P1)
 
-A Video Editor finishes a clip. In the sheet, its status cell reads **Editing**. They open it and see only the moves they may make: **Edit Review**. They choose it. The clip's card on the board moves to **D-Check** at the same moment, its SLA clock restarts, and, because it is their stage, the celebration plays.
+A Video Editor finishes a clip. In the sheet, its status cell reads **Editing**. They open it and see only the moves the board allows them, with the next stage first: **Edit Review**. They choose it. The clip's card on the board moves to **D-Check** at the same moment, its SLA clock restarts, and, because it is their stage, the celebration plays.
 
 **Why this priority**: The sheet must never become a back door around the pipeline (Constitution §II and §V), and the card and the row must always agree.
 
@@ -71,7 +71,7 @@ A Video Editor finishes a clip. In the sheet, its status cell reads **Editing**.
 **Acceptance Scenarios**:
 
 1. **Given** a clip, **When** its status is shown in the sheet, **Then** it uses the video name for its stage (FR-010), and hovering shows the real one ("Editing · D-In Progress").
-2. **Given** a member opens a clip's status cell, **When** the menu shows, **Then** it lists only the moves the board would allow that member for that task: the next stage when they own the current one, plus the admin and superuser override moves, and nothing else.
+2. **Given** a member opens a clip's status cell, **When** the menu shows, **Then** it lists only the moves the board would allow that member for that task: when they hold its current stage (or are an admin or superuser), any other stage on the task's path, with the next stage first, then earlier stages (to send work back), then later ones. Otherwise it lists nothing.
 3. **Given** a status change in the sheet, **When** it is saved, **Then** the clip's board card shows the same stage, the stage date resets, SLA status recomputes, and the celebration plays under the same rules as on the board.
 4. **Given** a card moved on the board, **When** the sheet is open or next opened, **Then** the clip's row shows the new stage.
 5. **Given** a status change that fails, **When** the server refuses it, **Then** the cell returns to its previous value and says why.
@@ -216,7 +216,7 @@ When a clip moves to **Published**, the sheet asks for the post link. Clips that
 **Status changes**
 
 - **FR-020**: A status change in the sheet MUST go through the same move as the board, with the same permission rules, stage date reset, SLA recomputation and celebration rules (Constitution §II, §V).
-- **FR-021**: The status menu MUST list only the moves the board allows that member for that task. A member with no allowed move sees the status without a menu.
+- **FR-021**: The status menu MUST list only the moves the board allows that member for that task: any stage on the task's path, when the member holds its current stage or is an admin or superuser. The next stage comes first. A member with no allowed move sees the status without a menu. *(Corrected during planning: the board allows any stage on the path, not only the next one.)*
 - **FR-022**: A refused or failed move MUST return the cell to its previous status, with the reason.
 - **FR-023**: A move made on the board MUST appear in the sheet, and the reverse. The two never disagree after a refresh.
 - **FR-024**: Moving the video row MUST NOT move its clips. Each task moves on its own.
