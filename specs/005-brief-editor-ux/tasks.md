@@ -288,10 +288,10 @@ description: "Task list for the Brief Editor UX Overhaul"
 
 **Independent test**: Render saved Markdown through `Brief` in the lab: `<u>` is present and `li > p` margin is 0 in both views. A grep finds no hex literal in the editor modules.
 
-- [ ] T060 [P] [US9] In `src/components/shared/Brief.tsx`, add `'u'` to the sanitize schema's `tagNames` (line ~32) (FR-080).
-- [ ] T061 [P] [US9] In `src/app/globals.css`, add `.fx-brief li > p { margin: 0 }` and `.fx-brief li > p + p { margin-top: .35em }` (FR-081).
-- [ ] T062 [US9] Make sure `src/components/kanban/BriefEditor.tsx` and `src/components/kanban/brief-editor/*` contain no colour literals: `grep -nE "#[0-9A-Fa-f]{3,8}\b|rgba?\(" src/components/kanban/BriefEditor.tsx src/components/kanban/brief-editor/` returns nothing. Replace shadows' `rgba(24,35,63,…)` with values derived from `BRIEF_UI.ink`, using a small `alpha(hex, a)` helper added to `src/lib/tokens.ts` (FR-082).
-- [ ] T063 [US9] Add lab scenarios `underline-readview` and `list-spacing` to `scripts/brief-editor-lab/scenarios.mjs`. The lab entry also mounts `Brief` from `@/components/shared/Brief` with `#view=read` to render saved Markdown.
+- [X] T060 [P] [US9] In `src/components/shared/Brief.tsx`, add `'u'` to the sanitize schema's `tagNames` (line ~32) (FR-080).
+- [X] T061 [P] [US9] In `src/app/globals.css`, add `.fx-brief li > p { margin: 0 }` and `.fx-brief li > p + p { margin-top: .35em }` (FR-081).
+- [X] T062 [US9] Make sure `src/components/kanban/BriefEditor.tsx` and `src/components/kanban/brief-editor/*` contain no colour literals: `grep -nE "#[0-9A-Fa-f]{3,8}\b|rgba?\(" src/components/kanban/BriefEditor.tsx src/components/kanban/brief-editor/` returns nothing. Replace shadows' `rgba(24,35,63,…)` with values derived from `BRIEF_UI.ink`, using a small `alpha(hex, a)` helper added to `src/lib/tokens.ts` (FR-082).
+- [X] T063 [US9] Add lab scenarios `underline-readview` and `list-spacing` to `scripts/brief-editor-lab/scenarios.mjs`. The lab entry also mounts `Brief` from `@/components/shared/Brief` with `#view=read` to render saved Markdown.
 
 ---
 

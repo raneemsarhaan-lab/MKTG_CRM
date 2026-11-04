@@ -607,6 +607,11 @@ html {
 .fx-brief li.contains-task-list { list-style: none; }
 .fx-brief ul.contains-task-list { padding-inline-start: 1rem; }
 .fx-brief li { margin: 0.15em 0; }
+/* The editor wraps each list item's text in a paragraph; without this every
+   item carried a paragraph's bottom margin and lists looked double-spaced
+   (spec 005 FR-081). Both views use .fx-brief, so they now match. */
+.fx-brief li > p { margin: 0; }
+.fx-brief li > p + p { margin-top: 0.35em; }
 .fx-brief blockquote {
   margin: 0 0 0.7em;
   padding-inline-start: 0.75rem;
