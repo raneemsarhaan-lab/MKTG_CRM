@@ -1,0 +1,3 @@
+- [ ] shoot b-roll
+- [x] book the studio
+- [ ] edit the 9:16 cut

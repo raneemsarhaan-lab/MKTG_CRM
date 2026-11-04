@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "import:clickup": "tsx scripts/import-clickup.ts",
     "preflight": "bash scripts/preflight.sh",
-    "backfill": "bash scripts/backfill.sh"
+    "backfill": "bash scripts/backfill.sh",
+    "lab:brief": "bash scripts/brief-editor-lab/build.sh && node scripts/brief-editor-lab/scenarios.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
@@ -34,6 +35,7 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "@tiptap/suggestion": "^3.31.3",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
@@ -67,6 +69,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.21",
+    "axe-core": "^4.14.0",
     "playwright": "^1.61.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
