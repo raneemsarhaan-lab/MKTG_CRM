@@ -169,16 +169,37 @@ export interface CelebrationPayload {
   stageLabel: string
 }
 
+/**
+ * An attachment delete waiting out its Undo window (spec 007, data-model
+ * PendingDelete). Ephemeral: never persisted, and the timer that ends it lives
+ * outside the store, in src/lib/pending-deletes.ts.
+ */
+export interface PendingDelete {
+  attachment: TaskAttachment
+  taskId: string
+  /** When the delete is sent (ms since epoch). */
+  deadline: number
+  /** In the open panel (ghost tile), or after the panel closed (bottom message). */
+  phase: 'in-panel' | 'after-close'
+  label: 'deleted' | 'replaced'
+  /** For "Replace it": the new file to delete if this one is restored. */
+  pairedNewId?: string
+}
+
 export interface UIStore {
   celebration: CelebrationPayload | null
   selectedTaskId: string | null
   showTaskForm: boolean
   profileOpen: boolean
+  /** Keyed by attachment id. */
+  pendingDeletes: Record<string, PendingDelete>
 
   setCelebration: (payload: CelebrationPayload | null) => void
   selectTask: (id: string | null) => void
   setShowTaskForm: (show: boolean) => void
   setProfileOpen: (open: boolean) => void
+  putPendingDelete: (entry: PendingDelete) => void
+  dropPendingDelete: (attachmentId: string) => void
 }
 
 export interface MoveTaskResult {

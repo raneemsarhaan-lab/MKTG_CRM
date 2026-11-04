@@ -24,6 +24,14 @@
   --brief-blue:         #3563E9;
   --brief-blue-light:   #EEF3FF;
   --brief-blue-active:  #E5EDFF;
+  /* Task attachments (spec 007). Source: ATTACH_UI in src/lib/tokens.ts. */
+  --att-latest-bg:      #C8F24E;
+  --att-uploading:      #7C3AED;
+  --att-danger:         #D22040;
+  --att-danger-soft:    #FDE7EA;
+  --att-danger-line:    #F3C2CB;
+  --att-backdrop:       rgba(10, 10, 14, 0.9);
+  --att-on-dark-soft:   rgba(255, 255, 255, 0.14);
 
   /* Stage colors */
   --stage-todo:         #64748B;
@@ -911,6 +919,239 @@ body.fx-resizing { cursor: col-resize; user-select: none; }
 }
 .fx-brief .fx-linkchip-source { display: block; font-size: 0.82em; color: var(--muted); }
 .fx-brief .fx-linkchip-ext { color: var(--muted); flex-shrink: 0; }
+
+/* ─── Task attachments (spec 007) ────────────────────────────────────────────
+   The task panel's Attachments section and its preview. Colours only from the
+   --brief-* and --att-* variables (ATTACH_UI / BRIEF_UI in tokens.ts). The lab
+   (scripts/attachments-lab) copies this block, so keep its two marker lines. */
+.fx-att { position: relative; }
+.fx-att-flash { animation: fx-att-flash 1.3s ease; border-radius: 14px; }
+@keyframes fx-att-flash { 0%, 100% { box-shadow: none; } 25% { box-shadow: 0 0 0 6px var(--brief-blue-light), 0 0 0 8px var(--brief-blue); } }
+
+.fx-att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+@media (max-width: 640px) {
+  .fx-att-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+
+.fx-att-tile {
+  position: relative; min-width: 0; border-radius: 14px; background: var(--panel);
+  border: 1px solid var(--brief-line); transition: border-color .12s, box-shadow .12s;
+}
+.fx-att-tile:hover, .fx-att-tile:focus-within {
+  border-color: var(--brief-blue-active);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--brief-ink) 9%, transparent);
+}
+.fx-att-tile.is-error { border-color: var(--att-danger-line); background: var(--att-danger-soft); }
+
+.fx-att-open {
+  display: block; width: 100%; border: 0; padding: 0; margin: 0; background: transparent;
+  cursor: pointer; border-radius: 13px 13px 0 0; font: inherit; color: inherit;
+}
+.fx-att-open:disabled { cursor: default; }
+.fx-att-thumb {
+  position: relative; display: grid; place-items: center; aspect-ratio: 4 / 5;
+  border-radius: 13px 13px 0 0; overflow: hidden; background: var(--brief-surface);
+}
+.fx-att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fx-att-tile.is-error .fx-att-thumb > :not(.fx-att-pills) { opacity: .45; }
+.fx-att-file { display: grid; justify-items: center; gap: 8px; color: var(--brief-faint); }
+.fx-att-badge {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .02em; color: var(--panel);
+  border-radius: 4px; padding: 2px 7px; line-height: 1.4;
+}
+
+.fx-att-pills {
+  position: absolute; top: 8px; inset-inline-start: 8px; display: flex; flex-wrap: wrap; gap: 5px;
+  max-width: calc(100% - 16px);
+}
+.fx-att-pill {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; white-space: nowrap;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--brief-ink) 18%, transparent);
+}
+.fx-att-pill.is-latest { background: var(--att-latest-bg); color: var(--brief-ink); }
+.fx-att-pill.is-uploading { background: var(--att-uploading); color: var(--panel); }
+.fx-att-pill.is-error { background: var(--att-danger); color: var(--panel); }
+
+.fx-att-info { display: block; padding: 10px 12px 12px; min-width: 0; }
+.fx-att-name {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 2.6em; font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--brief-ink);
+  overflow-wrap: anywhere; text-align: start;
+}
+button.fx-att-name {
+  width: calc(100% + 10px); margin: 0 -5px; padding: 0 5px; border: 0; border-radius: 6px;
+  background: transparent; font-family: inherit; cursor: text;
+}
+button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0 -1.5px 0 var(--brief-line); }
+.fx-att-l1, .fx-att-l2 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-att-rename {
+  display: flex; align-items: center; gap: 1px; margin: 0 -5px; padding: 0 7px; border-radius: 7px;
+  border: 1.5px solid var(--brief-blue); background: var(--panel); box-shadow: 0 0 0 3px var(--brief-blue-light);
+}
+.fx-att-rename input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 4px 0;
+  font-weight: 600; font-size: 13.5px; font-family: inherit; line-height: 1.3; color: var(--brief-ink);
+}
+.fx-att-rename span { flex: none; color: var(--brief-faint); font-weight: 600; font-size: 13.5px; }
+.fx-att-meta {
+  display: flex; align-items: center; gap: 6px; margin-top: 7px; min-width: 0;
+  font-size: 12px; color: var(--brief-label);
+}
+.fx-att-meta > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-att-meta.is-error > span:last-child { color: var(--att-danger); font-weight: 600; white-space: normal; }
+.fx-att-fixes { display: flex; gap: 6px; padding: 0 12px 12px; }
+
+.fx-att-acts {
+  position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px;
+  opacity: 0; transition: opacity .12s;
+}
+.fx-att-tile:hover .fx-att-acts, .fx-att-tile:focus-within .fx-att-acts, .fx-att-acts.is-open { opacity: 1; }
+.fx-att-act {
+  width: 30px; height: 30px; border-radius: 9px; border: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center; background: var(--panel); color: var(--brief-ink);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--brief-ink) 20%, transparent);
+}
+.fx-att-act:hover { color: var(--brief-blue); }
+.fx-att-act.is-danger:hover { color: var(--att-danger); }
+.fx-att-act.is-more { display: none; }
+@media (hover: none) {
+  .fx-att-acts { opacity: 1; }
+  .fx-att-act:not(.is-more) { display: none; }
+  .fx-att-act.is-more { display: grid; }
+}
+.fx-att-menu {
+  position: absolute; top: 42px; inset-inline-end: 8px; z-index: 20; min-width: 170px; padding: 6px;
+  border-radius: 12px; background: var(--panel);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--brief-ink) 18%, transparent);
+}
+.fx-att-menu > * {
+  display: flex; width: 100%; align-items: center; gap: 8px; padding: 9px 10px; border: 0; border-radius: 8px;
+  background: transparent; font-weight: 600; font-size: 13px; font-family: inherit; color: var(--brief-ink); text-decoration: none;
+  cursor: pointer; text-align: start; box-sizing: border-box;
+}
+.fx-att-menu > *:hover, .fx-att-menu > *:focus-visible { background: var(--brief-surface); }
+.fx-att-menu > .is-danger { color: var(--att-danger); }
+
+.fx-att-ghost .fx-att-thumb {
+  border-bottom: 1px dashed var(--brief-line); background: var(--brief-surface);
+  display: grid; align-content: center; justify-items: center; gap: 10px; padding: 12px; text-align: center;
+  font-size: 12.5px; color: var(--brief-label);
+}
+.fx-att-ghost .fx-att-thumb b { color: var(--brief-ink); overflow-wrap: anywhere; }
+.fx-att-undo {
+  height: 32px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--brief-ink); color: var(--panel); font-weight: 700; font-size: 13px; font-family: inherit;
+}
+.fx-att-timer {
+  position: absolute; inset-inline-start: 0; bottom: 0; height: 3px; background: var(--brief-blue);
+  animation: fx-att-drain 5s linear forwards;
+}
+.fx-att-secs { display: none; font-size: 12px; color: var(--brief-label); }
+@keyframes fx-att-drain { from { width: 100%; } to { width: 0; } }
+
+.fx-att-prog {
+  position: absolute; inset-inline: 10px; bottom: 10px; height: 6px; border-radius: 99px;
+  background: var(--panel); overflow: hidden;
+}
+.fx-att-prog > i { display: block; height: 100%; border-radius: 99px; background: var(--att-uploading); transition: width .15s; }
+.fx-att-prog.is-indeterminate > i { width: 40%; animation: fx-att-indet 1.1s ease-in-out infinite; }
+@keyframes fx-att-indet { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+.fx-att-add {
+  display: grid; place-items: center; align-content: center; gap: 6px; min-height: 180px; padding: 12px;
+  border-radius: 14px; border: 1.5px dashed var(--brief-line); background: transparent;
+  color: var(--brief-label); font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer; text-align: center;
+}
+.fx-att-add:hover { border-color: var(--brief-blue); color: var(--brief-blue); background: var(--brief-surface); }
+.fx-att-add small { font-weight: 500; color: var(--brief-faint); font-size: 11.5px; line-height: 1.4; }
+
+.fx-att-skel .fx-att-thumb {
+  background: linear-gradient(90deg, var(--brief-surface) 25%, var(--brief-line) 50%, var(--brief-surface) 75%);
+  background-size: 200% 100%; animation: fx-att-shim 1.1s linear infinite;
+}
+.fx-att-skel .fx-att-name b { display: block; height: 11px; width: 75%; margin-top: 3px; border-radius: 6px; background: var(--brief-surface); }
+.fx-att-skel .fx-att-meta i { width: 18px; height: 18px; border-radius: 50%; background: var(--brief-surface); flex: none; }
+.fx-att-skel .fx-att-meta b { display: block; height: 10px; width: 45%; border-radius: 6px; background: var(--brief-surface); }
+@keyframes fx-att-shim { to { background-position: -200% 0; } }
+
+.fx-att-more-files {
+  margin-top: 12px; width: 100%; height: 38px; border: 1px dashed var(--brief-line); border-radius: 10px;
+  background: var(--brief-surface); color: var(--brief-blue); font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.fx-att-more-files:hover { border-color: var(--brief-blue); }
+.fx-att-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px;
+  padding: 10px 14px; border-radius: 12px; font-size: 13px;
+  background: var(--brief-blue-light); border: 1px solid var(--brief-blue-active); color: var(--brief-ink);
+}
+.fx-att-bar b { overflow-wrap: anywhere; }
+.fx-att-btn {
+  height: 30px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--brief-line);
+  background: var(--panel); color: var(--brief-ink); font-weight: 700; font-size: 12.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.fx-att-btn:hover { border-color: var(--brief-blue); color: var(--brief-blue); }
+.fx-att-btn.is-primary { background: var(--brief-blue); border-color: var(--brief-blue); color: var(--panel); }
+.fx-att-btn.is-danger { color: var(--att-danger); }
+.fx-att-drop {
+  position: absolute; inset: -6px; z-index: 30; border-radius: 16px; pointer-events: none;
+  display: grid; place-items: center; font-weight: 800; font-size: 15px; color: var(--brief-blue);
+  background: color-mix(in srgb, var(--brief-blue) 8%, transparent); border: 2px dashed var(--brief-blue);
+}
+
+/* The preview overlay. `.fx-attachment-preview` keeps the phone dvh fix above. */
+.fx-att-pv {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; color: var(--panel);
+  background: var(--att-backdrop); padding: 16px 20px;
+}
+.fx-att-pv-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 12px; }
+.fx-att-pv-title { flex: 1 1 220px; min-width: 0; }
+.fx-att-pv-title b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-att-pv-title span { font-size: 12.5px; opacity: .7; }
+.fx-att-pv-count { font-size: 12.5px; opacity: .75; font-variant-numeric: tabular-nums; padding: 0 4px; }
+.fx-att-pv-btn {
+  height: 34px; min-width: 34px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;
+  background: var(--att-on-dark-soft); color: var(--panel); font-weight: 700; font-size: 13px; font-family: inherit;
+}
+.fx-att-pv-btn.is-icon { padding: 0; width: 34px; }
+.fx-att-pv-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.fx-att-pv-body { min-height: 0; height: 100%; display: grid; place-items: center; }
+.fx-att-pv-body > img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; cursor: zoom-in; }
+.fx-att-pv-body.is-zoomed { overflow: auto; place-items: start center; }
+.fx-att-pv-body.is-zoomed > img { max-width: none; max-height: none; height: 200%; cursor: zoom-out; }
+.fx-att-pv-nav {
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: var(--att-on-dark-soft); color: var(--panel);
+}
+.fx-att-pv-nav:disabled { opacity: .25; cursor: default; }
+[dir="rtl"] .fx-att-pv-nav svg { transform: scaleX(-1); }
+.fx-att-pv-film { display: flex; gap: 8px; justify-content: center; padding-top: 12px; overflow-x: auto; }
+.fx-att-pv-film button {
+  flex: none; width: 44px; height: 55px; border-radius: 7px; overflow: hidden; padding: 0; cursor: pointer;
+  border: 2px solid transparent; background: var(--att-on-dark-soft); color: var(--panel);
+  font-weight: 800; font-size: 9px; font-family: inherit; display: grid; place-items: center;
+}
+.fx-att-pv-film button[aria-current="true"] { border-color: var(--att-latest-bg); }
+.fx-att-pv-film img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fx-att-pv-card {
+  display: grid; justify-items: center; gap: 12px; padding: 36px 44px; border-radius: 12px; text-align: center;
+  background: var(--panel); color: var(--brief-label); font-size: 14px;
+}
+@media (max-width: 640px) {
+  .fx-att-pv-stage { grid-template-columns: minmax(0, 1fr); position: relative; }
+  .fx-att-pv-nav { position: absolute; top: 50%; width: 38px; height: 38px; z-index: 2; }
+  .fx-att-pv-nav.is-prev { inset-inline-start: 4px; }
+  .fx-att-pv-nav.is-next { inset-inline-end: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-att-flash, .fx-att-skel .fx-att-thumb, .fx-att-prog.is-indeterminate > i { animation: none; }
+  .fx-att-timer { display: none; }
+  .fx-att-secs { display: block; }
+  .fx-att-tile, .fx-att-acts, .fx-att-prog > i { transition: none; }
+}
+/* ─── end task attachments ──────────────────────────────────────────────────── */
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */
 .font-heading { font-family: var(--font-heading); }

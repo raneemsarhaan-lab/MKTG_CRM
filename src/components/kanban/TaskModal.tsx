@@ -8,7 +8,7 @@ import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-me
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
   moveTask, setTaskStage, addComment, updateTask, createSubtask,
-  addAttachments, removeAttachment, renameAttachment, loadAttachments, setCoverThumb,
+  addAttachments, renameAttachment, loadAttachments, setCoverThumb,
   type TaskPatch,
 } from '@/actions/tasks'
 import { InlineValue } from './EditableCell'
@@ -18,12 +18,14 @@ import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
 import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
-import {
-  isImageAttachment, shortName, attachmentSrc, fileSize, attachmentKind, extensionOf,
-  MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO, MAX_UPLOAD_BYTES,
-  type AttachmentKind,
-} from '@/lib/attachments'
+import { shortName, MAX_ATTACHMENT_CHARS, MAX_INLINE_BYTES, MAX_UPLOAD_BYTES } from '@/lib/attachments'
+import { useTranslations } from 'next-intl'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
+import { AttachmentsSection, type AttachmentsHandle, type UploadFn } from './attachments/AttachmentsSection'
+import { CommentFileChip } from './attachments/CommentFileChip'
+import { formatBytes } from './attachments/limits'
+import { formatFileToken, parseFileTokens } from '@/lib/comment-files'
+import { panelClosed } from '@/lib/pending-deletes'
 import { LinkCard } from './LinkCard'
 import { URL_RE, trimUrl, hrefFor, hostOf, prettyPath } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
@@ -235,12 +237,35 @@ function linkify(text: string, keyBase: string): React.ReactNode[] {
  * Only tasks this comment actually recorded a link to are passed in, so a
  * comment that happens to quote a task's name in passing stays plain text.
  */
-function withRefs(
+export function withRefs(
   body: string,
   members: Member[],
   linked: TaskRef[],
   onOpenTask?: (id: string) => void,
+  /** The task's files, for `[📎 name](attachment:id)` tokens (spec 007 FR-074). */
+  files?: { list: TaskAttachment[]; open: (id: string) => void },
 ): React.ReactNode {
+  // File tokens first: each becomes a chip with the file's current name, and
+  // the text between them goes through the @/# rendering below.
+  const tokens = parseFileTokens(body)
+  if (tokens.length) {
+    const out: React.ReactNode[] = []
+    let last = 0
+    for (const tk of tokens) {
+      const before = body.slice(last, tk.start).replace(/\n$/, '')
+      if (before) out.push(<span key={`t${last}`}>{withRefs(before, members, linked, onOpenTask)}</span>)
+      out.push(
+        <span key={`f${tk.start}`} style={{ display: 'block', marginTop: 6 }}>
+          <CommentFileChip file={files?.list.find(f => f.id === tk.id) ?? null} name={tk.name} onOpen={files?.open} />
+        </span>,
+      )
+      last = tk.end
+    }
+    const after = body.slice(last).replace(/^\n/, '')
+    if (after) out.push(<span key={`t${last}`}>{withRefs(after, members, linked, onOpenTask)}</span>)
+    return out
+  }
+
   const refs = [
     ...members.filter(m => m.name).map(m => ({ kind: 'member' as const, name: m.name, id: m.id })),
     ...linked.filter(t => t.name).map(t => ({ kind: 'task' as const, name: t.name, id: t.id })),
@@ -362,186 +387,6 @@ function Avatar({ name, size = 24, color }: { name: string; size?: number; color
     }}>
       {initials(name)}
     </span>
-  )
-}
-
-/** A colour per kind of non-image file, so a PDF doesn't sit under the same
- *  grey blank as a stray .txt — the badge is the only thing that says what
- *  it is before it's opened. */
-const EXT_COLORS: Record<string, string> = {
-  pdf: '#E5484D',
-  doc: '#2F6FEB', docx: '#2F6FEB',
-  ppt: '#D97706', pptx: '#D97706',
-  xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A',
-}
-
-function fileBadgeColor(kind: AttachmentKind, ext: string): string {
-  if (EXT_COLORS[ext]) return EXT_COLORS[ext]
-  if (kind === 'video') return '#7C3AED'
-  if (kind === 'audio') return '#0D9488'
-  return '#8A8F98'
-}
-
-/** The non-image attachment tile: a plain file glyph plus its extension, coloured by kind. */
-function FileTypeBadge({ filename }: { filename: string }) {
-  const kind = attachmentKind(filename)
-  const ext  = extensionOf(filename).toUpperCase()
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-      <Icon name="file" size={30} color="#C3C7CE" width={1.5} />
-      {ext && (
-        <span style={{
-          fontSize: 10.5, fontWeight: 800, letterSpacing: '.02em', color: '#fff',
-          background: fileBadgeColor(kind, ext.toLowerCase()), borderRadius: 4, padding: '2px 7px',
-          lineHeight: 1.4,
-        }}>
-          {ext}
-        </span>
-      )}
-    </div>
-  )
-}
-
-/**
- * The full-screen overlay opened by clicking an attachment.
- *
- * Pictures, PDFs, audio and video play inline; anything else — a slide deck,
- * a spreadsheet, plain text — has nothing this can render, so it falls back
- * to the same badge the grid uses plus a plain "no preview" line. Download
- * stays reachable on every kind either way: looking at a preview is not the
- * same as wanting to keep the file.
- *
- * A click on the dark backdrop closes it, same as the image lightbox this
- * replaces. A click on the picture itself closes it too, for the same reason
- * the old lightbox did — there is no other control on it. A click on
- * anything with its own controls (the PDF frame, audio, video, the toolbar)
- * does not, or pressing play would also dismiss the whole preview.
- *
- * `.fx-attachment-preview` in globals.css gives this `100dvh` on a phone —
- * the same fix `.fx-task-panel` already needed. `inset: 0` on a `position:
- * fixed` element tracks mobile Safari's *largest* viewport, the one with the
- * address bar already collapsed, not whatever is actually visible — so with
- * the bar still showing, the bottom slice of the PDF frame (or the video, or
- * the toolbar itself) rendered below the real edge of the screen. A multi-page
- * PDF cut off like that reads as "it only has one page"; `dvh` tracks the
- * visible viewport instead and the rest of the document is there to scroll to.
- */
-function AttachmentPreview({ attachment, onClose }: { attachment: TaskAttachment; onClose: () => void }) {
-  const src   = attachmentSrc(attachment)
-  const image = isImageAttachment(attachment)
-  const kind  = attachmentKind(attachment.filename)
-  const isPdf = extensionOf(attachment.filename) === 'pdf'
-
-  // A bucket URL is cross-origin, where the browser ignores `download` and
-  // just navigates — opening it in a new tab at least reaches the file, same
-  // as the row's own filename link. A local data URL is same-origin and
-  // downloads in place.
-  const downloadProps = attachment.data
-    ? { download: attachment.filename }
-    : { target: '_blank', rel: 'noopener noreferrer' }
-
-  return (
-    <div
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Preview of ${attachment.filename}`}
-      className="fx-attachment-preview"
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(10,10,12,.86)', zIndex: 60,
-        display: 'flex', flexDirection: 'column', padding: 20, cursor: image ? 'zoom-out' : 'default',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, padding: '4px 4px 16px' }}
-      >
-        <span style={{
-          flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: '#fff',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }} title={attachment.filename}>
-          {attachment.filename}
-        </span>
-        {attachment.size_bytes ? (
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', flexShrink: 0 }}>
-            {fileSize(attachment.size_bytes)}
-          </span>
-        ) : null}
-        {src && (
-          <a
-            href={src} {...downloadProps}
-            title={`Download ${attachment.filename}`}
-            aria-label={`Download ${attachment.filename}`}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-              background: 'rgba(255,255,255,.14)', color: '#fff',
-            }}
-          >
-            <Icon name="download" size={17} color="#fff" width={2} />
-          </a>
-        )}
-        <button
-          type="button" onClick={onClose}
-          aria-label="Close preview" title="Close"
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 34, height: 34, borderRadius: 8, flexShrink: 0, border: 'none', cursor: 'pointer',
-            background: 'rgba(255,255,255,.14)', color: '#fff',
-          }}
-        >
-          <Icon name="close" size={16} color="#fff" width={2} />
-        </button>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src ?? ''} alt={attachment.filename}
-               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
-        ) : isPdf && src ? (
-          /* `#toolbar=0&navpanes=0&view=FitH` — old Adobe open-parameters
-           * that Chrome's own PDF viewer still honours.
-           *
-           * toolbar=0 turns off its built-in toolbar, which is a fixed-width
-           * control strip that does not shrink for a narrow iframe: on a
-           * phone it overflowed sideways and pushed the page itself off to
-           * the right of the visible strip, leaving a sliver of page one at
-           * the edge — which is exactly what "the PDF only shows the first
-           * page" looks like. The overlay's own toolbar above already
-           * carries download and close, so nothing it offered is lost.
-           *
-           * Without a toolbar there is also no zoom control, and PDFium's
-           * default is a fixed 100% — full-size on a 390px phone, which is
-           * the same page-one-only symptom from a different cause: a page
-           * three times the viewport's width to scroll sideways through
-           * before scrolling down could even matter. view=FitH fits each
-           * page to the iframe's width instead, on every device. */
-          <iframe
-            src={`${src}#toolbar=0&navpanes=0&view=FitH`} title={attachment.filename} onClick={e => e.stopPropagation()}
-            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: '#fff' }}
-          />
-        ) : kind === 'video' && src ? (
-          <video src={src} controls autoPlay onClick={e => e.stopPropagation()}
-                 style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 8 }} />
-        ) : kind === 'audio' && src ? (
-          <audio src={src} controls onClick={e => e.stopPropagation()} style={{ width: 'min(480px, 90vw)' }} />
-        ) : (
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-              background: '#fff', borderRadius: 12, padding: '40px 48px',
-            }}
-          >
-            <FileTypeBadge filename={attachment.filename} />
-            <p style={{ margin: 0, fontSize: 14, color: CU.label, textAlign: 'center' }}>
-              No preview for this file type.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
   )
 }
 
@@ -668,6 +513,8 @@ export function TaskModal({
     const { state, pending } = briefState.current
     if (editingBrief && state === 'error') { setCloseGuard('unsaved'); return }
     if (editingBrief && pending > 0) { setCloseGuard('uploading'); return }
+    // Deletes still in their Undo window move to the bottom message (spec 007 FR-034).
+    panelClosed(task.id)
     onClose()
   }
   const [briefText, setBriefText]         = useState('')
@@ -676,13 +523,11 @@ export function TaskModal({
   const [nameText, setNameText]           = useState('')
   const [showEmpty, setShowEmpty]         = useState(false)
   const [fieldsOpen, setFieldsOpen]       = useState(true)
-  const [filesOpen, setFilesOpen]         = useState(true)
   const [briefOpen, setBriefOpen]         = useState(false)
   const [menuOpen, setMenuOpen]           = useState(false)
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskName, setSubtaskName]     = useState('')
   const [showAllActivity, setShowAllActivity] = useState(false)
-  const [preview, setPreview]             = useState<TaskAttachment | null>(null)
   const [copied, setCopied]               = useState('')
   const [sendHover, setSendHover]         = useState(false)
   /* Which half of the panel a phone is showing. Desktop shows both at once
@@ -698,19 +543,15 @@ export function TaskModal({
   const [mentionIndex, setMentionIndex]   = useState(0)
   const [emojiOpen, setEmojiOpen]         = useState(false)
   const [stageOpen, setStageOpen]         = useState(false)
-  const [dragging, setDragging]           = useState(false)
-  const [uploading, setUploading]         = useState(false)
-  const [uploadError, setUploadError]     = useState('')
-  // Which file is being renamed, and what it is being renamed to. An upload
-  // arrives called IMG_4471.jpg, which tells the next reader nothing.
-  const [renaming, setRenaming]           = useState<string | null>(null)
-  const [renameText, setRenameText]       = useState('')
+  // Files attached to the comment being written (spec 007 FR-073): attachment ids.
+  const [draftFiles, setDraftFiles]       = useState<string[]>([])
+  const sectionRef = useRef<AttachmentsHandle>(null)
+  const ta = useTranslations('attachments')
   const [pickerOpen, setPickerOpen]       = useState(false)
   const [isPending, startTransition]      = useTransition()
 
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const cmtRef  = useRef<HTMLTextAreaElement>(null)
   const stageBtnRef  = useRef<HTMLButtonElement>(null)
   const stageMenuRef = useRef<HTMLDivElement>(null)
@@ -729,52 +570,12 @@ export function TaskModal({
   const overdue   = daysLeft !== null && daysLeft < 0
 
   /**
-   * The board hands us every task's attachments but without `data` — see the
-   * model comment in schema.prisma. So the rows arrive as filenames and links,
-   * and we fetch this one task's full rows once, which is what makes an
-   * uploaded file actually show its contents.
+   * The task's files as the Attachments section has them (spec 007). The
+   * section loads and owns them; this mirror feeds the header count, the brief
+   * editor's image list and the comment chips.
    */
   const [files, setFiles] = useState<TaskAttachment[]>(task.attachments ?? [])
-  const [reloadFiles, setReloadFiles] = useState(0)
-  /**
-   * What has already been fetched, as a ref rather than state.
-   *
-   * It has to be a ref: the effect below sets it, so as state it would be a
-   * dependency the effect changes itself — React would tear the effect down
-   * and the cleanup would cancel the very fetch that was in flight. The
-   * symptom was an uploaded picture saving correctly and then rendering as a
-   * placeholder, because the rows carrying its bytes were thrown away on
-   * arrival.
-   */
-  const loadedRef = useRef<string | null>(null)
-
-  // Keyed on the task id alone, also deliberately: `task.attachments` is a
-  // fresh array on every board render, so watching it meant every
-  // router.refresh() put back the rows without their contents. From here this
-  // component owns `files` — uploads and removals update it directly.
-  useEffect(() => {
-    setFiles(task.attachments ?? [])
-    loadedRef.current = null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.id])
-
-  useEffect(() => {
-    if (!filesOpen) return
-    const key = `${task.id}:${reloadFiles}`
-    if (loadedRef.current === key) return
-    loadedRef.current = key
-
-    let live = true
-    void loadAttachments(task.id).then(rows => {
-      if (!live) return
-      setFiles(rows.map(r => ({
-        id: r.id, task_id: task.id, filename: r.filename,
-        url: r.url ?? undefined, data: r.data ?? undefined,
-        uploaded_by: r.uploaded_by ?? undefined, uploaded_at: r.uploaded_at,
-      })))
-    })
-    return () => { live = false }
-  }, [filesOpen, task.id, reloadFiles])
+  useEffect(() => { setFiles(task.attachments ?? []) }, [task.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const attachments = files
 
@@ -803,11 +604,11 @@ export function TaskModal({
   const isOverride = canAdvance && !isOwnStage && (isAdmin || isSuperuser)
 
   // Escape closes the panel — unless something smaller is open, which takes it
-  // first: the attachment preview, then the menu, then whatever field is being edited.
+  // first: the menu, then whatever field is being edited. The attachment preview
+  // handles its own Esc, in the capture phase, before this sees it (spec 007).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
-      if (preview) { setPreview(null); return }
       if (menuOpen) { setMenuOpen(false); return }
       if (stageOpen) { setStageOpen(false); return }
       // The brief editor handles its own Esc (closing its menus, then leaving
@@ -1067,7 +868,13 @@ export function TaskModal({
   }
 
   function handleComment() {
-    const text = cmtText.trim()
+    // Files on the comment travel as tokens in its text (spec 007 R10): one per
+    // line after what was typed. A comment may be files only.
+    const tokens = draftFiles
+      .map(id => attachments.find(f => f.id === id))
+      .filter((f): f is TaskAttachment => !!f)
+      .map(f => formatFileToken(f.filename, f.id))
+    const text = [cmtText.trim(), ...tokens].filter(Boolean).join('\n')
     if (!text) return
     const ids   = mentioned.map(m => m.id)
     const links = linkedTasks.map(t => t.id)
@@ -1076,6 +883,7 @@ export function TaskModal({
       if (!r.success) { setError(r.error ?? 'Could not post that comment'); return }
       router.refresh()
       setCmtText('')
+      setDraftFiles([])
       setPicked([])
       setPickedTasks([])
       setMentionOpen(false)
@@ -1097,221 +905,129 @@ export function TaskModal({
   }
 
   /**
-   * Upload files to the bucket, one request each.
+   * Upload one file to the bucket, with progress (spec 007 FR-053, research R5).
    *
-   * One at a time rather than in a batch: these are full-size originals now,
-   * and a batch would be one request that either all arrives or all fails,
-   * with nothing on screen until it did. This way each file lands as it
-   * finishes and a single refusal names only itself.
-   *
-   * Everything but the preview goes untouched. The thumbnail is still made
-   * here, in the browser, because it is for the board — which reads every task
-   * and cannot fetch three hundred full-size pictures to draw its covers.
+   * `XMLHttpRequest` rather than `fetch` because only it reports upload
+   * progress. Every check the fetch version made is kept: its own URL per file,
+   * a reply that must be our JSON, an expired session that lands on the login
+   * page, and a reply that must echo this request's ref. The file is sent
+   * exactly as picked, under the name the queue chose. Never throws.
    */
-  /**
-   * Upload one file to the bucket and say what happened. Shared by the
-   * attachments area and the brief editor's paste/drop (spec 005 R5), so both
-   * get every check below. Never throws.
-   */
-  async function uploadOne(file: File): Promise<UploadResult> {
+  function uploadToStorage(file: File, name: string, onProgress: (pct: number | null) => void): Promise<
+    { ok: true; attachment: TaskAttachment } | { ok: false; error: string; retryable: boolean }
+  > {
     if (file.size > MAX_UPLOAD_BYTES) {
-      return { ok: false, error: `${file.name} (over ${Math.round(MAX_UPLOAD_BYTES / 1_000_000)} MB)` }
+      return Promise.resolve({ ok: false, retryable: false, error: ta('tooLargeDetail', {
+        size: formatBytes(file.size), limit: ta('limitShortStorage') }) })
     }
-    // A fresh id per file. It goes in the URL and comes back in the reply,
-    // which is what lets this tell its own answer from a stored one.
-    const ref  = crypto.randomUUID()
-    const body = new FormData()
-    body.append('taskId', task.id)
-    body.append('file', file)
-    try {
-      /* Its own URL per file, and that is the part that actually works.
-       *
-       * Whatever sits in front of this deployment caches upload replies
-       * and does not care what the response says: no-store on the route,
-       * no-store in next.config and no-store on this request all went
-       * ignored, and a POST kept coming back as somebody's upload from
-       * 20 August. What such a cache keys on is the URL, and every upload
-       * went to the same one. The ref is a path segment rather than a
-       * query string because a cache already ignoring no-store may drop
-       * a query too; a path cannot be normalised away.
-       *
-       * The header and the cache hint stay. They are what should have
-       * been enough, and they will be if the cache is ever fixed. */
-      const res  = await fetch(`/api/attachments/${ref}`, {
-        method: 'POST',
-        body,
-        cache:  'no-store',
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) {
-        return { ok: false, error: `${file.name} — ${json?.error ?? res.statusText}` }
+    return new Promise(resolve => {
+      /* Its own URL per file. Whatever sits in front of this deployment caches
+       * upload replies whatever the response says; what such a cache keys on is
+       * the URL, so a fresh path segment (not a query, which a cache may drop)
+       * makes every upload distinct. The no-store header stays for when the
+       * cache is fixed. */
+      const ref  = crypto.randomUUID()
+      const url  = `/api/attachments/${ref}`
+      const body = new FormData()
+      body.append('taskId', task.id)
+      body.append('file', file, name)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', url)
+      xhr.setRequestHeader('Cache-Control', 'no-store')
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)))
       }
-      /* A 200 is not proof the file was stored.
-       *
-       * The middleware turns away a request with no valid session by
-       * redirecting it, and fetch follows redirects: an expired cookie
-       * means this POST quietly lands on the login page, which answers
-       * 200 with HTML. `res.ok` is true, the JSON parse fails, and the
-       * upload counted as a success that never happened — no row, no
-       * error, nothing on screen. Only our own JSON means it landed. */
-      if (!json?.attachment) {
-        return { ok: false, error: res.redirected
-          ? `${file.name} — your session expired; sign in again and retry`
-          : `${file.name} — the server did not store it (unexpected reply)` }
+      xhr.onerror = () => resolve({ ok: false, retryable: true, error: ta('errNetwork') })
+      xhr.onabort = () => resolve({ ok: false, retryable: true, error: ta('errNetwork') })
+      xhr.onload = () => {
+        let json: { ref?: string; error?: string; attachment?: TaskAttachment } | null = null
+        try { json = JSON.parse(xhr.responseText) } catch { /* not ours */ }
+        if (xhr.status < 200 || xhr.status >= 300) {
+          resolve({ ok: false, error: json?.error ?? (xhr.statusText || `HTTP ${xhr.status}`),
+            retryable: xhr.status >= 500 || xhr.status === 401 })
+          return
+        }
+        /* A 200 is not proof the file was stored: an expired session is
+         * redirected to the login page, which answers 200 with HTML. Only our
+         * own JSON means it landed. */
+        if (!json?.attachment) {
+          const redirected = Boolean(xhr.responseURL) && !xhr.responseURL.includes(url)
+          resolve({ ok: false, retryable: true, error: redirected ? ta('errSession') : ta('errUnexpected') })
+          return
+        }
+        /* The reply has to be the reply to *this* request: a cached 200 once
+         * carried somebody else's upload from days earlier. */
+        if (json.ref !== ref) { resolve({ ok: false, retryable: true, error: ta('errReplay') }); return }
+        onProgress(100)
+        resolve({ ok: true, attachment: { ...json.attachment, task_id: task.id } })
       }
-      /* The reply has to be the reply to *this* request.
-       *
-       * Something in front of the app was answering upload POSTs from
-       * cache — a 200 carrying a real attachment, belonging to a file
-       * somebody else had uploaded days earlier. It passed every check
-       * above, so the panel refreshed, found nothing new, and showed
-       * nothing: three days of "the upload does nothing". The ref is one
-       * throwaway id per file; if it does not come back, the answer was
-       * not written for us, whatever else is in it. */
-      if (json.ref !== ref) {
-        return { ok: false, error: `${file.name} — the server replayed an older reply, so it was not stored. Something between the browser and the app is caching uploads.` }
-      }
-      return { ok: true, url: json.attachment.url as string, filename: file.name }
-    } catch {
-      return { ok: false, error: `${file.name} — the upload did not complete` }
-    }
+      xhr.send(body)
+    })
   }
 
-  async function uploadToBucket(picked: File[]) {
-    setUploading(true)
-    const failed: string[] = []
-    let thumb: string | null = null
-
-    try {
-      for (const file of picked) {
-        const r = await uploadOne(file)
-        if (!r.ok) { failed.push(r.error); continue }
-        if (file.type.startsWith('image/')) {
-          try { thumb = await shrinkImage(file, 360, 0.62) } catch { /* preview only */ }
-        }
-      }
-
-      /* Cosmetic, guarded, and last.
-       *
-       * This used to run first and unguarded, and it is a server action — so
-       * any failure in it (a stale action id after a deploy, a momentary 502)
-       * threw past the three lines below. The file was already in the bucket
-       * and the row already written, but the panel never re-read them, the
-       * error list was never shown, and the exception left as an unhandled
-       * rejection nobody sees. The whole of "I uploaded it and nothing
-       * happened" fits in that gap. A card preview is not worth it. */
-      if (thumb) {
-        try { await setCoverThumb(task.id, thumb) } catch { /* preview only */ }
-      }
-      if (failed.length) setUploadError(failed.join('; '))
-    } catch (e: unknown) {
-      setUploadError(`That upload did not finish: ${String(e).slice(0, 160)}`)
-    } finally {
-      // Always, whatever happened above. A file that landed has to appear, and
-      // one that did not has to leave a panel that is telling the truth.
-      setReloadFiles(n => n + 1)
-      router.refresh()
-      setUploading(false)
-    }
+  /** The brief editor's image paste and drop (spec 005 R5) use the same path. */
+  async function uploadOne(file: File): Promise<UploadResult> {
+    const r = await uploadToStorage(file, file.name, () => {})
+    if (!r.ok) return { ok: false, error: `${file.name} — ${r.error}` }
+    return { ok: true, url: r.attachment.url ?? '', filename: r.attachment.filename }
   }
 
   /**
-   * Take files from a drop or the picker and store them on the task.
+   * The Attachments section's upload (contracts/attachments-section.md): one
+   * file, under the name the queue chose, with progress.
    *
-   * The path taken when no bucket is configured: the bytes end up in Postgres
-   * as data URLs — the same route brand logos and avatars still take. That
-   * makes the size limit real rather than polite, so pictures are scaled down
-   * on a canvas first: an untouched phone photo is several megabytes and comes
-   * back under a couple of hundred kilobytes. Anything that is not an image
-   * has to fit as it is, and is refused with its own name if it does not.
+   * With a bucket, the original goes there. Without one, the original is read
+   * as a data URL and stored as it is: nothing is shrunk or re-encoded to make
+   * it fit (spec 007 FR-059, research R6), so a file over the inline limit is
+   * refused instead. Either way the board's small cover thumbnail is a separate
+   * copy that never replaces the file.
    */
-  async function acceptFiles(list: FileList | null) {
-    if (!list?.length) return
-    // Said out loud rather than returned from silently. The drop zone is not
-    // rendered without edit rights, but the paperclip and a drag can still
-    // reach here, and "nothing happened" is the one answer that teaches
-    // nobody anything.
-    if (!canEdit) {
-      setUploadError('You can only attach files to tasks you own or are assigned.')
-      return
-    }
-    setUploadError('')
+  const uploadForSection: UploadFn = async (file, name, onProgress) => {
+    const isImage = file.type.startsWith('image/')
+    const thumbFor = async () => (isImage ? await shrinkImage(file, 360, 0.62).catch(() => null) : null)
 
-    const picked = Array.from(list).slice(0, MAX_ATTACHMENTS_PER_GO)
-    if (list.length > MAX_ATTACHMENTS_PER_GO) {
-      setUploadError(`Only the first ${MAX_ATTACHMENTS_PER_GO} files were taken.`)
+    if (hasStorage) {
+      const r = await uploadToStorage(file, name, onProgress)
+      if (r.ok) {
+        // Cosmetic, guarded, last: a failed thumbnail must not hide a stored file.
+        const thumb = await thumbFor()
+        if (thumb) { try { await setCoverThumb(task.id, thumb) } catch { /* preview only */ } }
+        router.refresh()
+      }
+      return r
     }
 
-    if (hasStorage) { await uploadToBucket(picked); return }
-
-    setUploading(true)
+    onProgress(null)   // a server action reports no progress
+    const tooLarge = () => ({ ok: false as const, retryable: false, error: ta('tooLargeDetail', {
+      size: formatBytes(file.size), limit: ta('limitShortInline') }) })
+    if (file.size > MAX_INLINE_BYTES) return tooLarge()
+    let data: string
+    try { data = await readAsDataUrl(file) } catch { return { ok: false, retryable: true, error: ta('errNetwork') } }
+    if (data.length > MAX_ATTACHMENT_CHARS) return tooLarge()
     try {
-      const prepared: { filename: string; data: string }[] = []
-      const rejected: string[] = []
-      // The newest picture in this batch also becomes the card's preview.
-      let thumb: string | null = null
-
-      for (const file of picked) {
-        try {
-          const isImage = file.type.startsWith('image/')
-          const data = isImage
-            ? await shrinkImage(file, 1600)
-            : await readAsDataUrl(file)
-          if (data.length > MAX_ATTACHMENT_CHARS) { rejected.push(file.name); continue }
-          prepared.push({ filename: file.name, data })
-          if (isImage) thumb = await shrinkImage(file, 360, 0.62)
-        } catch {
-          rejected.push(file.name)
-        }
-      }
-
-      if (rejected.length) {
-        setUploadError(
-          `Too large to store: ${rejected.join(', ')}. Files need to be under about 5 MB — ` +
-          'pictures are shrunk automatically, anything else has to be small already.',
-        )
-      }
-      if (!prepared.length) return
-
-      /* One call per file, not one call for the batch.
-       *
-       * A server action's body is capped, and sending every file in a single
-       * call spent that budget on the batch: three photos fitted, a fourth did
-       * not, and the whole call was rejected — so the number of files you could
-       * attach depended on their combined size, which is not a rule anybody
-       * could have guessed. Worse, the rejection was thrown inside the action
-       * and never reached the panel, so it looked like nothing had happened.
-       *
-       * Per file, the cap is a per-file cap, each one lands as it finishes, and
-       * a refusal names the file it refused. The bucket path already worked
-       * this way; this is the same shape for deployments without one. */
-      const failed: string[] = []
-      for (const [i, file] of prepared.entries()) {
-        try {
-          // The thumbnail rides along with the last picture only — it is one
-          // field on the task, not one per file.
-          const res = await addAttachments(
-            task.id, [file], i === prepared.length - 1 ? thumb : null,
-          )
-          if (!res.success) failed.push(`${file.filename} — ${res.error ?? 'refused'}`)
-        } catch (e: unknown) {
-          const why = String(e).includes('Body exceeded')
-            ? 'too large to send without file storage configured'
-            : 'the upload did not complete'
-          failed.push(`${file.filename} — ${why}`)
-        }
-      }
-      if (failed.length) setUploadError(failed.join('; '))
+      const res = await addAttachments(task.id, [{ filename: name, data }], await thumbFor())
+      const row = res.rows?.[0]
+      if (!res.success || !row) return { ok: false, retryable: false, error: res.error ?? ta('errUnexpected') }
+      router.refresh()
+      return { ok: true, attachment: {
+        id: row.id, task_id: task.id, filename: row.filename, data,
+        uploaded_by: row.uploaded_by ?? undefined, uploaded_at: row.uploaded_at,
+        size_bytes: row.size_bytes, content_type: row.content_type,
+      } }
     } catch (e: unknown) {
-      // Nothing may leave this function as a rejection: both callers invoke it
-      // with `void`, so an escape is an "Uncaught (in promise)" in a console
-      // nobody has open and a panel that just sits there.
-      setUploadError(`That upload did not finish: ${String(e).slice(0, 160)}`)
-    } finally {
-      setReloadFiles(n => n + 1)   // pull the new rows, contents and all
-      router.refresh()             // and refresh the card behind the panel
-      setUploading(false)
+      // The 8 MB action body limit: say so instead of a raw framework error.
+      return String(e).includes('Body exceeded') ? tooLarge() : { ok: false, retryable: true, error: ta('errNetwork') }
     }
+  }
+
+  async function loadForSection(): Promise<TaskAttachment[]> {
+    const rows = await loadAttachments(task.id)
+    return rows.map(r => ({
+      id: r.id, task_id: task.id, filename: r.filename,
+      url: r.url ?? undefined, data: r.data ?? undefined,
+      size_bytes: r.size_bytes, content_type: r.content_type,
+      uploaded_by: r.uploaded_by ?? undefined, uploaded_at: r.uploaded_at,
+    }))
   }
 
   /**
@@ -1336,9 +1052,9 @@ export function TaskModal({
       // them, and must not have them uploaded a second time here (R5).
       if (e.defaultPrevented) return
       e.preventDefault()
-      if (!canEdit) return
+      // The section says why when this person can't attach (FR-058).
       const dropped = e.dataTransfer?.files
-      if (dropped?.length) void acceptFiles(dropped)
+      if (dropped?.length) sectionRef.current?.addFiles(Array.from(dropped), { source: 'drop' })
     }
 
     window.addEventListener('dragover', onDragOver)
@@ -1349,6 +1065,24 @@ export function TaskModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit])
+
+  /**
+   * Paste a file anywhere in the panel to attach it (spec 007 FR-051, research R9).
+   * The brief editor handles pastes inside it and marks them handled, so a file
+   * is never added twice; pasted into the comment box, it also becomes a chip on
+   * the comment being written (FR-073).
+   */
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (e.defaultPrevented) return
+      const pasted = Array.from(e.clipboardData?.files ?? [])
+      if (!pasted.length) return
+      e.preventDefault()
+      sectionRef.current?.addFiles(pasted, { source: 'paste', forComment: e.target === cmtRef.current })
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [])
 
   function copy(what: 'link' | 'id') {
     const value = what === 'id'
@@ -1599,6 +1333,7 @@ export function TaskModal({
                     .map(id => allTasks.find(t => t.id === id))
                     .filter((t): t is TaskRef => !!t),
                   selectTask,
+                  { list: attachments, open: id => { sectionRef.current?.openPreview(id) } },
                 )}
                 {/* Two cards at most: a comment that is a list of links should
                     stay a comment, not become a page of thumbnails. */}
@@ -1812,13 +1547,18 @@ export function TaskModal({
                 {copied === 'id' ? 'Copied' : 'ID'}
               </button>
               {attachments.length > 0 && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
-                  background: CU.chipBg, borderRadius: 7, fontSize: 13, fontWeight: 600, color: CU.label,
-                }}>
+                // Jumps to the Attachments section, opening it if folded (spec 007 FR-072).
+                <button type="button" onClick={() => sectionRef.current?.reveal()}
+                        aria-label={ta('goToAttachments')} title={ta('goToAttachments')}
+                        data-att-count=""
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
+                          border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: CU.label,
+                        }}>
                   <Icon name="clip" size={13} color={CU.label} />
                   {attachments.length}
-                </span>
+                </button>
               )}
               {copied === 'link' && (
                 <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
@@ -2057,7 +1797,7 @@ export function TaskModal({
                       if (file.type.startsWith('image/')) {
                         try { await setCoverThumb(task.id, await shrinkImage(file, 360, 0.62)) } catch { /* preview only */ }
                       }
-                      setReloadFiles(n => n + 1)
+                      sectionRef.current?.reload()
                       router.refresh()
                     }
                     return r
@@ -2240,224 +1980,22 @@ export function TaskModal({
                 </div>
               )}
 
-              {/* ── Attachments ──────────────────────────────────────────── */}
-              <div style={{ marginTop: 18 }}>
-                <button type="button" onClick={() => setFilesOpen(v => !v)}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
-                          background: 'transparent', cursor: 'pointer', padding: '0 0 12px',
-                          fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: CU.text,
-                        }}>
-                  <Icon name="chevron" size={14} color={CU.label}
-                        style={{ transform: filesOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
-                  Attachments <span style={{ color: CU.faint, fontWeight: 500 }}>{attachments.length}</span>
-                </button>
-
-                {/* Outside the fold, deliberately.
-                 *
-                 * The paperclip in the comment box opens this same input. While
-                 * it lived inside the collapsed section the ref was null, the
-                 * optional chaining swallowed the call, and the button did
-                 * nothing at all — no picker, no error, nothing to report. A
-                 * control that silently does nothing is worse than one that
-                 * refuses, and it is indistinguishable from an upload that
-                 * failed. */}
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  onChange={e => { void acceptFiles(e.target.files); e.target.value = '' }}
-                  style={{ display: 'none' }}
-                  aria-label="Attach files to this task"
-                />
-
-                {filesOpen && (
-                  <>
-                    {/* The drop zone is ClickUp's, and it is honest about what it
-                        is: files reach a task through the brief editor's
-                        uploader, so this points at that rather than pretending
-                        to accept a drop it cannot store. Someone who cannot
-                        edit the task gets no zone at all — a dead one that
-                        exists only to refuse them is worse than none. */}
-                    {canEdit && (
-                      <div
-                        onClick={() => fileRef.current?.click()}
-                        onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragging(true) }}
-                        onDragLeave={() => setDragging(false)}
-                        onDrop={e => {
-                          // Stopped here so the window-level catch-all below
-                          // does not also see this drop and upload it twice.
-                          e.preventDefault(); e.stopPropagation(); setDragging(false)
-                          void acceptFiles(e.dataTransfer.files)
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click() }
-                        }}
-                        style={{
-                          border: `1px dashed ${dragging ? CU.blue : '#DDE4F0'}`, borderRadius: 16,
-                          padding: '22px 12px', textAlign: 'center', fontSize: 15,
-                          color: CU.label, cursor: 'pointer',
-                          background: dragging ? CU.blueLight : CU.surface,
-                          transition: 'border-color .12s, background .12s, color .12s',
-                        }}
-                        onMouseEnter={e => { if (!dragging) e.currentTarget.style.background = CU.blueXLight }}
-                        onMouseLeave={e => { if (!dragging) e.currentTarget.style.background = CU.surface }}
-                      >
-                        {uploading
-                          ? (hasStorage ? 'Uploading…' : 'Reading files…')
-                          : <>Drop files here or <span style={{ color: CU.blue, fontWeight: 600 }}>browse</span></>}
-                      </div>
-                    )}
-
-                    {uploadError && (
-                      <p role="alert" style={{ margin: '10px 0 0', fontSize: 14, color: '#D22040' }}>
-                        {uploadError}
-                      </p>
-                    )}
-
-                    {attachments.length === 0 && !canEdit && (
-                      <p style={{ margin: 0, fontSize: 15, color: CU.faint }}>No files.</p>
-                    )}
-
-                    {attachments.length > 0 && (
-                      <div style={{
-                        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-                        gap: 12, marginTop: canEdit ? 14 : 0,
-                      }}>
-                        {attachments.map(a => {
-                          const image = isImageAttachment(a)
-                          const src   = attachmentSrc(a)
-                          const who   = a.uploaded_by
-                            ? members.find(m => m.id === a.uploaded_by)?.name ?? task.task_owner.name
-                            : task.task_owner.name
-                          return (
-                            <div key={a.id} style={{ background: CU.hover, borderRadius: 10, padding: 10, position: 'relative' }}>
-                              <div style={{
-                                height: 132, borderRadius: 6, background: '#fff', overflow: 'hidden',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'zoom-in',
-                              }}
-                                   onClick={() => setPreview(a)}>
-                                {image
-                                  ? <ImageWithFallback
-                                      src={src ?? ''}
-                                      alt={a.filename}
-                                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                      fallback={<Icon name="image" size={30} color="#C3C7CE" width={1.5} />}
-                                    />
-                                  : <FileTypeBadge filename={a.filename} />}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 }}>
-                                {renaming === a.id ? (
-                                  /* The extension is added back on the server
-                                     if it is typed away — the grid decides what
-                                     is an image from the name, so a file renamed
-                                     to "final cut" would stop previewing. */
-                                  <input
-                                    autoFocus
-                                    value={renameText}
-                                    onChange={e => setRenameText(e.target.value)}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Escape') { e.preventDefault(); setRenaming(null) }
-                                      if (e.key === 'Enter')  { e.preventDefault(); e.currentTarget.blur() }
-                                    }}
-                                    onBlur={() => {
-                                      const next = renameText.trim()
-                                      setRenaming(null)
-                                      if (!next || next === a.filename) return
-                                      setUploadError('')
-                                      startTransition(async () => {
-                                        const r = await renameAttachment(a.id, next)
-                                        if (r.success && r.filename) {
-                                          const named = r.filename
-                                          setFiles(f => f.map(x => x.id === a.id ? { ...x, filename: named } : x))
-                                          router.refresh()
-                                        } else {
-                                          setUploadError(r.error ?? 'Could not rename that file')
-                                        }
-                                      })
-                                    }}
-                                    aria-label={`Rename ${a.filename}`}
-                                    style={{
-                                      flex: 1, minWidth: 0, fontSize: 14, fontFamily: 'inherit',
-                                      color: CU.text, padding: '3px 6px', borderRadius: 6,
-                                      border: `1px solid ${CU.blue}`, outline: 'none', background: '#fff',
-                                    }}
-                                  />
-                                ) : (
-                                  <a href={src ?? undefined} download={a.data ? a.filename : undefined}
-                                     target="_blank" rel="noopener noreferrer"
-                                     title={a.filename}
-                                     style={{
-                                       flex: 1, minWidth: 0, fontSize: 14, color: CU.text, textDecoration: 'none',
-                                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                     }}>
-                                    {shortName(a.filename, 22)}
-                                  </a>
-                                )}
-                                {canEdit && renaming !== a.id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setRenaming(a.id); setRenameText(a.filename) }}
-                                    aria-label={`Rename ${a.filename}`}
-                                    title={`Rename ${a.filename}`}
-                                    className="fx-icon-btn"
-                                    style={{
-                                      width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
-                                      background: 'transparent', cursor: 'pointer', padding: 0,
-                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                    }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = CU.chipBg }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                  >
-                                    <Icon name="pencil" size={13} color={CU.label} width={2} />
-                                  </button>
-                                )}
-                                {a.size_bytes ? (
-                                  <span style={{ fontSize: 12, color: CU.faint, flexShrink: 0 }}>
-                                    {fileSize(a.size_bytes)}
-                                  </span>
-                                ) : null}
-                                <Avatar name={who} size={22} />
-                                {canEdit && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setUploadError('')
-                                      startTransition(async () => {
-                                        const r = await removeAttachment(a.id)
-                                        if (r.success) {
-                                          setFiles(f => f.filter(x => x.id !== a.id))
-                                          router.refresh()
-                                        }
-                                        else setUploadError(r.error ?? 'Could not remove that file')
-                                      })
-                                    }}
-                                    aria-label={`Remove ${a.filename}`}
-                                    title={`Remove ${a.filename}`}
-                                    className="fx-icon-btn"
-                                    style={{
-                                      width: 22, height: 22, borderRadius: 6, border: 'none', flexShrink: 0,
-                                      background: 'transparent', cursor: 'pointer', padding: 0,
-                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                    }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = '#FDE7EA' }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                  >
-                                    <Icon name="close" size={13} color="#D22040" width={2.2} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              {/* ── Attachments (spec 007) ─────────────────────────────── */}
+              <AttachmentsSection
+                handle={sectionRef}
+                taskId={task.id}
+                initialRows={task.attachments ?? []}
+                load={loadForSection}
+                members={members}
+                ownerName={task.task_owner.name}
+                canEdit={canEdit}
+                hasStorage={hasStorage}
+                upload={uploadForSection}
+                rename={renameAttachment}
+                onChanged={() => router.refresh()}
+                onStoredForComment={a => setDraftFiles(d => (d.includes(a.id) ? d : [...d, a.id]))}
+                onFilesChange={setFiles}
+              />
 
               {isPublished && (
                 <div style={{
@@ -2659,6 +2197,16 @@ export function TaskModal({
                   }}
                 />
 
+                {draftFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 14px 6px' }} data-comment-draft-files="">
+                    {draftFiles.map(id => (
+                      <CommentFileChip key={id} file={attachments.find(f => f.id === id) ?? null} name=""
+                                       onOpen={fid => { sectionRef.current?.openPreview(fid) }}
+                                       onRemove={() => setDraftFiles(d => d.filter(x => x !== id))} />
+                    ))}
+                  </div>
+                )}
+
                 {(mentioned.length > 0 || linkedTasks.length > 0) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 14px 6px' }}>
                     {mentioned.map(m => (
@@ -2689,20 +2237,11 @@ export function TaskModal({
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px 8px',
                 }}>
-                  {/* Attach — the same upload path as the Attachments section;
-                      files belong to the task, not to the comment, because a
-                      comment has nowhere to keep one. */}
+                  {/* Attach: the file goes to the task's Attachments, and a chip
+                      for it onto this comment (spec 007 FR-073). */}
                   {canEdit && (
-                    <IconButton name="clip" label="Attach a file to this task"
-                                onClick={() => {
-                                  // Open the section the file is about to land
-                                  // in. Attaching from down here and having
-                                  // nothing visibly change is how an upload
-                                  // that worked gets reported as one that did
-                                  // not.
-                                  setFilesOpen(true)
-                                  fileRef.current?.click()
-                                }} size={16} />
+                    <IconButton name="clip" label={ta('attachToComment')}
+                                onClick={() => sectionRef.current?.pick({ forComment: true })} size={16} />
                   )}
                   <IconButton name="at" label="Mention someone" size={16}
                               onClick={() => { setEmojiOpen(false); openMentionPicker() }} />
@@ -2712,22 +2251,22 @@ export function TaskModal({
                   <button
                     type="button"
                     onClick={handleComment}
-                    disabled={isPending || !cmtText.trim()}
+                    disabled={isPending || (!cmtText.trim() && !draftFiles.length)}
                     aria-label="Send comment"
                     title="Send — ⌘Enter"
                     style={{
                       width: 34, height: 30, borderRadius: 9, border: 'none',
-                      cursor: cmtText.trim() ? 'pointer' : 'default',
+                      cursor: cmtText.trim() || draftFiles.length ? 'pointer' : 'default',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      background: sendHover && cmtText.trim() && !isPending ? CU.blue : CU.blueLight,
-                      opacity: isPending || !cmtText.trim() ? 0.55 : 1,
+                      background: sendHover && (cmtText.trim() || draftFiles.length) && !isPending ? CU.blue : CU.blueLight,
+                      opacity: isPending || (!cmtText.trim() && !draftFiles.length) ? 0.55 : 1,
                       transition: 'background .12s',
                     }}
                     onMouseEnter={() => setSendHover(true)}
                     onMouseLeave={() => setSendHover(false)}
                   >
                     <Icon name="send" size={15}
-                          color={sendHover && cmtText.trim() && !isPending ? '#fff' : CU.blue} width={2} />
+                          color={sendHover && (cmtText.trim() || draftFiles.length) && !isPending ? '#fff' : CU.blue} width={2} />
                   </button>
                 </div>
               </div>
@@ -2736,8 +2275,7 @@ export function TaskModal({
         </div>
       </div>
 
-      {/* Attachment preview: any uploaded file, not only images. */}
-      {preview && <AttachmentPreview attachment={preview} onClose={() => setPreview(null)} />}
+
     </div>
   )
 }

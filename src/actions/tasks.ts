@@ -7,7 +7,7 @@ import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import { MAX_PASTED } from '@/lib/paste-list'
 import { MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO } from '@/lib/attachments'
-import { deleteObject } from '@/lib/storage'
+import { deleteAttachmentFor } from '@/lib/attachment-delete'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 /**
@@ -562,9 +562,9 @@ async function mayAttachTo(taskId: string, memberId: string, access: string) {
 /**
  * Attach files to a task.
  *
- * Files arrive already encoded as data URLs — the browser does the reading and
- * the shrinking, because a server action's payload is the same round trip
- * either way and the resize has to happen on a canvas regardless.
+ * Files arrive already encoded as data URLs, read by the browser exactly as
+ * picked: nothing is shrunk or re-encoded on the way (spec 007 FR-059). Only
+ * the separate card thumbnail is a small copy.
  */
 export async function addAttachments(
   taskId: string,
@@ -578,7 +578,11 @@ export async function addAttachments(
    * of full-size uploads is not.
    */
   thumb?: string | null,
-): Promise<{ success: boolean; created?: number; error?: string }> {
+): Promise<{
+  success: boolean; created?: number; error?: string
+  /** The stored rows, without their bytes: the panel already holds those (spec 007). */
+  rows?: { id: string; filename: string; uploaded_by: string | null; uploaded_at: string; size_bytes: number | null; content_type: string | null }[]
+}> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
@@ -592,25 +596,38 @@ export async function addAttachments(
 
   const tooBig = clean.find(f => f.data.length > MAX_ATTACHMENT_CHARS)
   if (tooBig) {
-    return { success: false, error: `${tooBig.filename} is too large to store — keep files under about 5 MB.` }
+    return { success: false, error: `${tooBig.filename} is over the about 5 MB limit for files on this workspace.` }
   }
 
   try {
-    const result = await prisma.taskAttachment.createMany({
-      data: clean.map(f => ({
-        task_id:     taskId,
-        filename:    f.filename.trim().slice(0, 200),
-        data:        f.data,
-        uploaded_by: member.id,
-      })),
-    })
+    // One row at a time so each comes back with its id; the size and type are
+    // read off the data URL, which is the file exactly as picked.
+    const rows = []
+    for (const f of clean) {
+      const comma = f.data.indexOf(',')
+      const meta  = f.data.slice(5, comma)                  // "image/png;base64"
+      const b64   = f.data.slice(comma + 1)
+      const pad   = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0
+      const row = await prisma.taskAttachment.create({
+        data: {
+          task_id:      taskId,
+          filename:     f.filename.trim().slice(0, 200),
+          data:         f.data,
+          uploaded_by:  member.id,
+          size_bytes:   meta.endsWith(';base64') ? Math.max(0, Math.floor(b64.length * 3 / 4) - pad) : null,
+          content_type: meta.split(';')[0] || null,
+        },
+        select: { id: true, filename: true, uploaded_by: true, uploaded_at: true, size_bytes: true, content_type: true },
+      })
+      rows.push({ ...row, uploaded_at: row.uploaded_at.toISOString() })
+    }
     if (thumb && thumb.startsWith('data:') && thumb.length <= MAX_THUMB_CHARS) {
       await prisma.task.update({ where: { id: taskId }, data: { cover_thumb: thumb } })
     }
 
     revalidatePath('/board')
     revalidatePath('/overview')
-    return { success: true, created: result.count }
+    return { success: true, created: rows.length, rows }
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
   }
@@ -622,36 +639,10 @@ export async function removeAttachment(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  const a = await prisma.taskAttachment.findUnique({
-    where: { id: attachmentId }, select: { task_id: true, storage_key: true },
-  })
-  if (!a) return { success: false, error: 'That file is already gone' }
-
-  const guard = await mayAttachTo(a.task_id, member.id, member.access)
-  if (!guard.ok) return { success: false, error: guard.error }
-
-  await prisma.taskAttachment.delete({ where: { id: attachmentId } })
-
-  // And the object behind it, when there is one. After the row, not before:
-  // deleteObject never throws, so the worst case is an orphaned object nobody
-  // can reach, rather than a row pointing at a file that is already gone.
-  if (a.storage_key) await deleteObject(a.storage_key)
-
-  // The card's preview came from an upload. If none is left, clear it rather
-  // than keep showing a picture the task no longer has.
-  // "An upload" means one of ours, wherever its bytes are: inlined in `data`
-  // for the older ones, or in the bucket for the rest. Counting only `data`
-  // meant that once files moved to the bucket this was always zero, so removing
-  // any single file wiped the card's preview even when pictures remained.
-  const stillHasUpload = await prisma.taskAttachment.count({
-    where: {
-      task_id: a.task_id,
-      OR: [{ data: { not: null } }, { storage_key: { not: null } }],
-    },
-  })
-  if (stillHasUpload === 0) {
-    await prisma.task.update({ where: { id: a.task_id }, data: { cover_thumb: null } })
-  }
+  // The row, the stored object and the card's preview, under the same guard
+  // the keepalive DELETE route uses (spec 007, src/lib/attachment-delete.ts).
+  const r = await deleteAttachmentFor(attachmentId, member)
+  if (!r.ok) return { success: false, error: r.error }
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -751,9 +742,10 @@ export async function loadAttachments(taskId: string): Promise<{
   const member = await getSessionMember()
   if (!member) return []
 
+  // Newest first, the order the panel shows (spec 007 FR-001, research R2).
   const rows = await prisma.taskAttachment.findMany({
     where: { task_id: taskId },
-    orderBy: { uploaded_at: 'asc' },
+    orderBy: [{ uploaded_at: 'desc' }, { id: 'asc' }],
   })
   return rows.map(r => ({
     id: r.id, filename: r.filename, url: r.url, data: r.data,

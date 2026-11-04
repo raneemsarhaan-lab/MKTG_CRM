@@ -34,6 +34,42 @@ export const BRIEF_UI = {
   error:      COLORS.coral,
 } as const
 
+/**
+ * The task panel's Attachments section (spec 007): roles BRIEF_UI lacks.
+ * Mirrored as `--att-*` CSS variables in globals.css. Change both together.
+ */
+export const ATTACH_UI = {
+  /** The "Latest" pill: the app's neon green with dark text (FR-002). */
+  latestBg:   COLORS.lime,
+  latestText: BRIEF_UI.ink,
+  /** Upload in progress: pill and bar. */
+  uploading:  '#7C3AED',
+  /** Too large / not uploaded: pill, text and tile tint. */
+  danger:     '#D22040',
+  dangerSoft: '#FDE7EA',
+  dangerLine: '#F3C2CB',
+  /** The preview overlay's backdrop, and its controls on top of it. */
+  backdrop:   '#0A0A0E',
+  onDark:     '#FFFFFF',
+} as const
+
+/**
+ * One colour per kind of non-image file, for the extension badge on a tile
+ * and in the preview (spec 007 FR-004). Lifted from TaskModal's EXT_COLORS.
+ */
+export const FILE_KIND_COLORS = {
+  pdf:         '#E5484D',
+  document:    '#2F6FEB',
+  slides:      '#D97706',
+  spreadsheet: '#16A34A',
+  video:       '#7C3AED',
+  audio:       '#0D9488',
+  subtitles:   '#0D9488',
+  archive:     '#6B7280',
+  other:       '#8A8F98',
+} as const
+export type FileKindColor = keyof typeof FILE_KIND_COLORS
+
 /** `#RRGGBB` → `rgba(r, g, b, a)`: shadows and tints derived from a token. */
 export function alpha(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16)
