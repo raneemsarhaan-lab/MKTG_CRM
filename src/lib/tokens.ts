@@ -118,6 +118,40 @@ export function alpha(hex: string, a: number): string {
 }
 
 /**
+ * The Board Inbox (spec 006), from the approved preview "Option B · Inbox
+ * button". Built on the pipeline palette; CSS reads the same values as
+ * --inbox-* variables in globals.css.
+ */
+export const INBOX_UI = {
+  ink:        '#14131A',
+  text:       '#1F2430',
+  text2:      '#4A5061',
+  muted:      '#6B7280',
+  faint:      '#6E727C',
+  border:     '#ECECF1',
+  surface:    '#F3F3F7',
+  panel:      '#FFFFFF',
+  purple:     '#7C3AED',
+  purpleDeep: '#6D28D9',
+  purpleSoft: '#F0EBFE',
+  lime:       '#C9F24E',
+  late:       '#C81E3A',
+  lateSoft:   '#FDE7EA',
+  today:      '#B45309',
+  todaySoft:  '#FFF3E6',
+  /** The urgent badge: orange fill, dark ink for contrast. */
+  urgent:     '#F59E0B',
+  ok:         '#15803D',
+  okSoft:     '#E8F7EE',
+  pink:       '#D6336C',
+  pinkSoft:   '#FCE7F0',
+  teal:       '#0E7C7C',
+  tealSoft:   '#E3F6F6',
+  blue:       '#2563EB',
+  blueSoft:   '#E8EEFE',
+} as const
+
+/**
  * A status pill's fill and edge (the sheets): the stage colour mixed with
  * white, so the dark label keeps AA contrast on every stage.
  */

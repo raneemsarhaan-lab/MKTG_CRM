@@ -1,16 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import type { Member, Task } from '@/types/index'
+import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
-import {
-  activityItems, attentionItems, quoteOfDay, statCounts, timeAgo, weekMomentum,
-} from '@/lib/home-metrics'
-import { initials, avatarColor } from '@/lib/utils'
+import { quoteOfDay, statCounts, weekMomentum } from '@/lib/home-metrics'
 
 /**
- * The four hero cards — Pipeline handoff §5.
+ * Your week: Week Momentum and Daily Spark — Pipeline handoff §5.
+ *
+ * Spec 006 moved Needs your attention and the Activity feed into the Inbox,
+ * so only these two remain, and the Board mounts them only when the member
+ * turns on "Show your week" in the View menu (FR-002).
  *
  * Every figure is computed from the tasks already on the board (see
  * lib/home-metrics). Where the mock shows something this product does not
@@ -19,19 +18,8 @@ import { initials, avatarColor } from '@/lib/utils'
  */
 
 interface HeroProps {
-  tasks:       (Task & {
-    task_owner?: { name: string }
-    comments?: {
-      id: string; body: string; created_at: string; author_id: string
-      mentions?: string[]; author?: { name: string }
-    }[]
-    attachments?: { id: string; filename: string; uploaded_at: string; uploaded_by?: string | null }[]
-  })[]
-  currentUser: Member
-  /** For naming whoever attached a file — the row records an id, not a name. */
-  members:     Member[]
-  today:       Date
-  onOpenTask:  (id: string) => void
+  tasks: Task[]
+  today: Date
 }
 
 const CARD: React.CSSProperties = {
@@ -109,35 +97,9 @@ function StatBox({ value, label, color, icon }: {
   )
 }
 
-const WEEK_KEY = 'momentum.board.week'
-
-export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: HeroProps) {
-  // Open unless this browser has said otherwise, and read after mount only —
-  // reading localStorage during render makes the first paint disagree with
-  // the server's.
-  const [weekOpen, setWeekOpen] = useState(true)
-  useEffect(() => {
-    if (window.localStorage.getItem(WEEK_KEY) === 'closed') setWeekOpen(false)
-  }, [])
-
-  function toggleWeek() {
-    setWeekOpen(o => {
-      try { window.localStorage.setItem(WEEK_KEY, o ? 'closed' : 'open') } catch { /* private mode */ }
-      return !o
-    })
-  }
-
+export function HeroCards({ tasks, today }: HeroProps) {
   const momentum  = weekMomentum(tasks, today)
   const stats     = statCounts(tasks, today)
-  // One list of everything you own that is still open, worst first. It used to
-  // be two — a short urgent list with a "My tasks" block repeating it
-  // underneath — which for anyone whose work is mostly late printed the same
-  // tasks twice.
-  const attention = attentionItems(tasks, currentUser.id, today)
-  const overdue   = attention.filter(a => a.due === 'overdue').length
-  const published = tasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id && t.status === 'publish').length
-
-  const activity  = activityItems(tasks, currentUser.id, 5, members)
   const quote     = quoteOfDay(today)
 
   const up = momentum.delta >= 0
@@ -150,33 +112,6 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
     <div style={{
       padding: '0 26px 0 38px', display: 'flex', flexDirection: 'column', gap: 14,
     }}>
-      {/* The week and the quote read once in the morning; the two lists below
-          are worked from all day. So the top row folds away and stays folded,
-          and the working row rises to meet the header. */}
-      <div className="fx-week-toggle" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          onClick={toggleWeek}
-          aria-expanded={weekOpen}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, height: 26,
-            padding: '0 10px', borderRadius: 999, cursor: 'pointer',
-            border: `1px solid ${PIPE.border}`, background: '#FFFFFF',
-            fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.textMuted,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = PIPE.surface }}
-          onMouseLeave={e => { e.currentTarget.style.background = '#FFFFFF' }}
-        >
-          {weekOpen ? 'Hide your week' : 'Show your week'}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-               style={{ transform: weekOpen ? 'none' : 'rotate(180deg)' }}>
-            <path d="M6 15l6-6 6 6" />
-          </svg>
-        </button>
-      </div>
-
-      {weekOpen && (
         <div className="fx-hero-split fx-week" style={{
           display: 'grid', gridTemplateColumns: 'minmax(0, 2.5fr) minmax(0, 1fr)',
           /* .fx-hero-split — stacks on a phone; a 1fr of 390px is 110px, and
@@ -357,218 +292,7 @@ export function HeroCards({ tasks, currentUser, members, today, onOpenTask }: He
         </div>
       </section>
         </div>
-      )}
 
-      {/* The two that are worked from all day. */}
-      <div className="fx-hero-split" style={{
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)',
-        gap: 18, alignItems: 'start',
-      }}>
-      {/* ── Needs Your Attention ──────────────────────────────────────── */}
-      <section style={{ ...CARD, padding: '18px 14px 20px', position: 'relative' }}>
-        <CardTitle icon={
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EA8C0B"
-               strokeWidth="2" aria-hidden="true">
-            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-            <circle cx="12" cy="12" r="2.6" fill="#EA8C0B" stroke="none" />
-          </svg>
-        }>
-          Needs Your Attention
-        </CardTitle>
-
-        {attention.length > 0 && (
-          <div style={{
-            position: 'absolute', right: 14, top: 10, width: 48, height: 48,
-            background: '#FF74B1', borderRadius: 3, transform: 'rotate(6deg)',
-            boxShadow: '0 4px 10px rgba(255,116,177,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-heading)', fontWeight: 900, fontSize: 28, color: PIPE.ink,
-          }} aria-hidden="true">
-            !
-          </div>
-        )}
-
-        {/* What the list adds up to, so the count is readable without
-            counting the rows — and without a second list to hold it. */}
-        <div style={{
-          margin: '5px 0 0 28px', display: 'flex', alignItems: 'center', gap: 7,
-          fontWeight: 600, fontSize: 12,
-        }}>
-          <span style={{ color: overdue > 0 ? '#D22040' : PIPE.textMuted }}>
-            {attention.length} open{overdue > 0 && ` · ${overdue} late`}
-          </span>
-          {published > 0 && (
-            <span style={{ fontWeight: 500, color: PIPE.textFaint }}>· {published} published</span>
-          )}
-        </div>
-
-        {/* Capped and scrollable: someone with thirty open tasks would
-            otherwise push the whole board down the page. The cap lands
-            wherever it lands, so the last visible row is usually cut in half —
-            a fade over the bottom edge makes that read as "there is more"
-            rather than as a row that failed to draw. */}
-        <div style={{ position: 'relative', minWidth: 0 }}>
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14,
-          maxHeight: 322, overflowY: 'auto', overflowX: 'hidden', minWidth: 0,
-        }}>
-          {attention.length === 0 && (
-            <div style={{
-              minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13.5, fontWeight: 600, color: PIPE.textMuted, textAlign: 'center',
-            }}>
-              Nothing needs you right now 🎉
-            </div>
-          )}
-          {attention.map(a => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onOpenTask(a.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                border: `1px solid ${PIPE.border}`, borderRadius: 12, padding: '11px 8px',
-                background: '#FFFFFF', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'start',
-              }}
-            >
-              <span style={{
-                width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                background: a.due === 'overdue' ? '#FDE7EA' : a.due === 'today' ? '#FFF3E6'
-                          : a.due === 'undated' ? '#F1F1F4' : '#F0EBFE',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }} aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                     stroke={a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#EA8C0B'
-                           : a.due === 'undated' ? '#9A9AA6' : PIPE.purple}
-                     strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{
-                  display: 'block', fontWeight: 700, fontSize: 13, color: PIPE.textPrimary,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {a.title}
-                </span>
-                <span style={{
-                  display: 'block', marginTop: 2, fontSize: 11.5,
-                  fontWeight: a.due === 'overdue' || a.due === 'today' ? 600 : 500,
-                  color: a.due === 'overdue' ? '#D22040' : a.due === 'today' ? '#E0294B'
-                       : a.due === 'undated' ? '#A0A0AC' : '#8A90A0',
-                }}>
-                  {a.dueText}
-                </span>
-              </span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PIPE.textFaint}
-                   strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
-          ))}
-
-        </div>
-        {attention.length > 4 && (
-          <span aria-hidden="true" style={{
-            position: 'absolute', insetInline: 0, bottom: 0, height: 34,
-            background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, #FFFFFF 88%)',
-            pointerEvents: 'none',
-          }} />
-        )}
-        </div>
-
-        {attention.length > 4 && (
-          <div style={{
-            marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center',
-          }}>
-            <Link href="/overview" style={{
-              display: 'flex', alignItems: 'center', gap: 9,
-              fontWeight: 700, fontSize: 13.5, color: PIPE.purple, textDecoration: 'none',
-            }}>
-              View all ({attention.length})
-              <svg width="20" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 12h15M13 6l6 6-6 6" />
-              </svg>
-            </Link>
-            <svg width="118" height="9" viewBox="0 0 118 9" fill="none" aria-hidden="true"
-                 style={{ marginTop: 2 }}>
-              <path d="M3 6C28 2 84 1.6 115 4.4" stroke={PIPE.purpleStroke} strokeWidth="2.6" strokeLinecap="round" />
-            </svg>
-          </div>
-        )}
-      </section>
-
-      {/* ── Activity ──────────────────────────────────────────────────── */}
-      <section className="fx-activity" style={{ ...CARD, padding: '18px 18px 20px' }}>
-        <CardTitle
-          icon={
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB"
-                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 12h4l3 8 4-16 3 8h4" />
-            </svg>
-          }
-          trailing={
-            <Link href="/overview" style={{ fontWeight: 700, fontSize: 12, color: PIPE.purple, textDecoration: 'none' }}>
-              View all
-            </Link>
-          }
-        >
-          Activity Feed
-        </CardTitle>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
-          {activity.length === 0 && (
-            <div style={{ fontSize: 13, color: PIPE.textMuted }}>
-              Nothing on your tasks yet.
-            </div>
-          )}
-          {activity.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onOpenTask(item.taskId)}
-              style={{
-                display: 'flex', alignItems: 'flex-start', gap: 11, width: '100%',
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                fontFamily: 'inherit', textAlign: 'start',
-              }}
-            >
-              <span style={{
-                width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                background: avatarColor(item.avatarName), color: '#FFFFFF',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 13,
-              }} aria-hidden="true">
-                {initials(item.avatarName)}
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, color: PIPE.textSecondary }}>
-                  {item.prefix ? `${item.prefix} ` : ''}
-                  <strong style={{ fontWeight: 700, color: PIPE.textPrimary }}>{item.bold}</strong>
-                  {item.suffix ? ` ${item.suffix}` : ''}
-                </span>
-                <span style={{
-                  display: 'block', marginTop: 3, fontWeight: 500, fontSize: 12.5,
-                  color: PIPE.textSecondary, overflow: 'hidden',
-                  textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {item.target}
-                </span>
-                <span style={{ display: 'block', marginTop: 4, fontWeight: 500, fontSize: 11, color: PIPE.textFaintest }}>
-                  {timeAgo(item.at, today)}
-                </span>
-              </span>
-              <span aria-hidden="true" style={{
-                width: 8, height: 8, borderRadius: '50%', background: item.dot,
-                marginTop: 6, flexShrink: 0,
-              }} />
-            </button>
-          ))}
-        </div>
-      </section>
-      </div>
     </div>
   )
 }

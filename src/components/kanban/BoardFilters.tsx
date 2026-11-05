@@ -125,6 +125,8 @@ interface BoardFiltersProps {
   /** Whose work the board is showing. Defaults to just yours. */
   scope:    'me' | 'team'
   onScope:  (next: 'me' | 'team') => void
+  /** After Board and Filter: the View menu (spec 006 FR-002, FR-003). */
+  trailing?: React.ReactNode
 }
 
 function Check({ on }: { on: boolean }) {
@@ -186,7 +188,7 @@ const CHIP_BASE: React.CSSProperties = {
 const VIEW_BASE: React.CSSProperties = { ...CHIP_BASE, borderRadius: 12 }
 
 export function BoardFilters({
-  filters, onChange, tasks, brands, members, shown, total, scope, onScope,
+  filters, onChange, tasks, brands, members, shown, total, scope, onScope, trailing,
 }: BoardFiltersProps) {
   const set = <K extends keyof BoardFilterState>(key: K, value: BoardFilterState[K]) =>
     onChange({ ...filters, [key]: value })
@@ -480,6 +482,7 @@ export function BoardFilters({
               </>
             )}
           </FieldPill>
+          {trailing}
         </div>
       </div>
 

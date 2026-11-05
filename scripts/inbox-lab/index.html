@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox lab</title>
+<link rel="stylesheet" href="inbox.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: #fff; }
+  .lab-head { display: flex; align-items: center; gap: 14px; padding: 20px 26px; flex-wrap: wrap; }
+  .lab-head h1 { margin: 0 auto 0 0; font-size: 28px; }
+  .lab-filters { display: flex; justify-content: flex-end; padding: 0 26px; }
+  .lab-board { display: grid; grid-auto-flow: column; grid-auto-columns: 244px; gap: 14px; overflow-x: auto; padding: 0 26px 16px; }
+  .lab-col { background: #F3F3F7; border-radius: 14px; min-height: 420px; padding: 10px; }
+  .lab-week { margin: 0 26px; padding: 30px; border: 1px solid #ECECF1; border-radius: 18px; }
+  .lab-new { height: 46px; border: 0; border-radius: 999px; background: #C9F24E; padding: 0 18px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="bundle.js"></script>
+</body>
+</html>
