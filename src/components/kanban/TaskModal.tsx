@@ -98,6 +98,8 @@ interface TaskModalProps {
   hasStorage?: boolean
   /** Open this file's preview as soon as the panel's files load (spec 008 FR-045). */
   initialPreviewId?: string
+  /** Scroll to this comment and flash it, from the Inbox (spec 006 FR-042). */
+  initialCommentId?: string
   /**
    * "Open sheet" on a video or a clip (spec 008). The board passes its own
    * switch; elsewhere the button navigates to the board's sheet.
@@ -463,7 +465,7 @@ const fmtTime = (d: string | Date) =>
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
-  initialPreviewId, onOpenSheet,
+  initialPreviewId, initialCommentId, onOpenSheet,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -495,6 +497,24 @@ export function TaskModal({
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [subtaskName, setSubtaskName]     = useState('')
   const [showAllActivity, setShowAllActivity] = useState(false)
+
+  // From the Inbox: show the whole log, then bring that comment into view and
+  // flash it once (spec 006 FR-042, research R12).
+  useEffect(() => {
+    if (!initialCommentId) return
+    setShowAllActivity(true)
+    let tries = 0
+    const timer = setInterval(() => {
+      const el = document.querySelector<HTMLElement>(`[data-comment-id="${CSS.escape(initialCommentId)}"]`)
+      if (el) {
+        el.scrollIntoView({ block: 'center' })
+        el.classList.add('fx-comment-flash')
+        window.setTimeout(() => el.classList.remove('fx-comment-flash'), 1600)
+      }
+      if (el || ++tries > 40) clearInterval(timer)
+    }, 100)
+    return () => clearInterval(timer)
+  }, [initialCommentId, task.id])
   const [copied, setCopied]               = useState('')
   const [sendHover, setSendHover]         = useState(false)
   /* Which half of the panel a phone is showing. Desktop shows both at once
@@ -1956,7 +1976,7 @@ export function TaskModal({
                   }} />
                 )}
                 {shown.map((a, i) => (
-                  <div key={a.id}>
+                  <div key={a.id} data-comment-id={a.id}>
                     {/* ClickUp folds the middle of a long log away */}
                     {collapsible && !showAllActivity && i === HEAD && (
                       <button type="button" onClick={() => setShowAllActivity(true)}

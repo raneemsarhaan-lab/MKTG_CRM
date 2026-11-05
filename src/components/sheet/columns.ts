@@ -18,7 +18,7 @@ export const COLUMN_SETS: Record<SheetColumnSet, SheetColumn[]> = {
 
 /** Width of each column, in px. The row-number gutter is ROW_NO_WIDTH. */
 export const COLUMN_WIDTHS: Record<SheetColumn, number> = {
-  title: 320, clipNo: 40, type: 70, status: 138, editor: 112, source: 92, fileName: 250,
+  title: 320, clipNo: 40, type: 70, status: 156, editor: 112, source: 92, fileName: 250,
   in: 64, out: 64, length: 64, files: 150, published: 130, drop: 72,
 }
 export const ROW_NO_WIDTH = 40

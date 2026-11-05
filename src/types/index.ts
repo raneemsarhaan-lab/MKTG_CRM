@@ -20,6 +20,25 @@ export type AccessLevel = 'admin' | 'superuser' | 'user'
 
 /** The board page's two views of the same tasks (spec 008). */
 export type BoardView = 'board' | 'sheet' | 'content'
+
+// ─── Board Inbox (spec 006) ──────────────────────────────────────────────────
+
+/** The Inbox panel's tabs, in order (FR-015). */
+export type InboxTab = 'todo' | 'mentions' | 'team' | 'done'
+/** Why one of your own tasks is in To do (FR-022). */
+export type InboxReason = 'late' | 'today' | 'undated'
+
+/** The signed-in member's Inbox records (data-model §2). Never another member's. */
+export interface InboxState {
+  /** Comment ids this member has read (mentions only). */
+  readIds: string[]
+  /** Live snoozes: task id → ISO time it comes back. */
+  snoozes: Record<string, string>
+  /** ISO. Mentions written before this minus 7 days count as read (R5). */
+  since: string
+  pinned: boolean
+  showWeek: boolean
+}
 /** A theme's cadence period (spec 009). */
 export type FrequencyPeriod = 'week' | 'month'
 /** The team's fixed audience segments (spec 009). */

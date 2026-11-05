@@ -8,6 +8,7 @@ import type { useTranslations } from 'next-intl'
 import type { Member } from '@/types/index'
 import { isEditingRole } from './columns'
 import type { MenuItem } from './SheetMenu'
+import { PersonChip } from './PersonChip'
 
 /** Members in the Editor menu's order: editing roles first, each part by name. */
 export function editorOrder(members: Member[]): Member[] {
@@ -21,11 +22,11 @@ export function editorMenuItems(
 ): MenuItem[] {
   return [
     ...editorOrder(members).map(m => ({
-      key: m.id, text: `${m.name}, ${m.role}`, label: m.name, hint: m.role,
+      key: m.id, text: `${m.name}, ${m.role}`, label: <PersonChip member={m} />, hint: m.role,
       tone: m.id === current ? ('next' as const) : undefined,
       onSelect: () => choose(m.id),
     })),
-    { key: '', text: t('unassigned'), label: t('unassigned'), tone: !current ? ('next' as const) : undefined, onSelect: () => choose('') },
+    { key: '', text: t('unassigned'), label: <PersonChip member={undefined} empty={t('unassigned')} />, tone: !current ? ('next' as const) : undefined, onSelect: () => choose('') },
   ]
 }
 
@@ -38,7 +39,5 @@ export function typeMenuItems(types: { label: string }[], current: string, choos
 }
 
 export function EditorContent({ member, t }: { member: Member | undefined; t: ReturnType<typeof useTranslations> }) {
-  return member
-    ? <span className="fx-sheet-ellipsis">{member.name}</span>
-    : <span className="fx-sheet-ellipsis fx-sheet-muted">{t('unassigned')}</span>
+  return <PersonChip member={member} empty={t('unassigned')} />
 }

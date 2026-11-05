@@ -117,6 +117,81 @@ export function alpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
 }
 
+/**
+ * The Board Inbox (spec 006), from the approved preview "Option B · Inbox
+ * button". Built on the pipeline palette; CSS reads the same values as
+ * --inbox-* variables in globals.css.
+ */
+export const INBOX_UI = {
+  ink:        '#14131A',
+  text:       '#1F2430',
+  text2:      '#4A5061',
+  muted:      '#6B7280',
+  faint:      '#6E727C',
+  border:     '#ECECF1',
+  surface:    '#F3F3F7',
+  panel:      '#FFFFFF',
+  purple:     '#7C3AED',
+  purpleDeep: '#6D28D9',
+  purpleSoft: '#F0EBFE',
+  lime:       '#C9F24E',
+  late:       '#C81E3A',
+  lateSoft:   '#FDE7EA',
+  today:      '#B45309',
+  todaySoft:  '#FFF3E6',
+  /** The urgent badge: orange fill, dark ink for contrast. */
+  urgent:     '#F59E0B',
+  ok:         '#15803D',
+  okSoft:     '#E8F7EE',
+  pink:       '#D6336C',
+  pinkSoft:   '#FCE7F0',
+  teal:       '#0E7C7C',
+  tealSoft:   '#E3F6F6',
+  blue:       '#2563EB',
+  blueSoft:   '#E8EEFE',
+} as const
+
+/**
+ * A status pill's fill and edge (the sheets): the stage colour mixed with
+ * white, so the dark label keeps AA contrast on every stage.
+ */
+export function stageTint(stage: string): { fill: string; edge: string } {
+  const hex = (STAGE_COLORS[stage] ?? '#64748B').replace('#', '')
+  const n = parseInt(hex, 16)
+  const mix = (a: number) => {
+    const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * a + 255 * (1 - a)))
+    return `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`
+  }
+  return { fill: mix(0.14), edge: mix(0.38) }
+}
+
+/**
+ * The Content sheet's Type cell (a filled pill per content type). Each colour
+ * carries white text at AA contrast or better. Unknown types take one of these
+ * by name, so a type keeps its colour everywhere.
+ */
+export const CONTENT_TYPE_COLORS: Record<string, string> = {
+  'Post':            '#1D4ED8',
+  'Reel':            '#BE185D',
+  'Video':           '#7E22CE',
+  'Article':         '#0F766E',
+  'Report':          '#B45309',
+  'Framework/Model': '#4338CA',
+  'Story':           '#C2410C',
+  'Deck':            '#334155',
+  'Design':          '#A21CAF',
+  'Email':           '#0369A1',
+  'Other':           '#52525B',
+}
+export function contentTypeColor(label: string | null | undefined): string {
+  if (!label) return CONTENT_TYPE_COLORS.Other
+  if (CONTENT_TYPE_COLORS[label]) return CONTENT_TYPE_COLORS[label]
+  const all = Object.values(CONTENT_TYPE_COLORS)
+  let h = 0
+  for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0
+  return all[h % all.length]
+}
+
 export const STAGE_COLORS: Record<string, string> = {
   'todo':         '#64748B',
   'c-prog':       '#3B82F6',

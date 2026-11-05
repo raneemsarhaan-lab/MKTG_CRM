@@ -55,6 +55,34 @@
   --sheet-shadow:       0 8px 28px rgba(17, 18, 20, 0.16);
   --sheet-backdrop:     rgba(17, 18, 20, 0.45);
   --sheet-ok:           #2B7A37;
+  /* The Board Inbox (spec 006): INBOX_UI in src/lib/tokens.ts. */
+  --inbox-ink:          #14131A;
+  --inbox-text:         #1F2430;
+  --inbox-text2:        #4A5061;
+  --inbox-muted:        #6B7280;
+  --inbox-faint:        #6E727C;
+  --inbox-border:       #ECECF1;
+  --inbox-surface:      #F3F3F7;
+  --inbox-panel:        #FFFFFF;
+  --inbox-purple:       #7C3AED;
+  --inbox-purple-deep:  #6D28D9;
+  --inbox-purple-soft:  #F0EBFE;
+  --inbox-lime:         #C9F24E;
+  --inbox-late:         #C81E3A;
+  --inbox-late-soft:    #FDE7EA;
+  --inbox-today:        #B45309;
+  --inbox-today-soft:   #FFF3E6;
+  --inbox-urgent:       #F59E0B;
+  --inbox-ok:           #15803D;
+  --inbox-ok-soft:      #E8F7EE;
+  --inbox-pink:         #D6336C;
+  --inbox-pink-soft:    #FCE7F0;
+  --inbox-teal:         #0E7C7C;
+  --inbox-teal-soft:    #E3F6F6;
+  --inbox-blue:         #2563EB;
+  --inbox-blue-soft:    #E8EEFE;
+  --inbox-shadow:       0 18px 50px rgba(20, 19, 60, 0.20);
+  --inbox-btn-shadow:   0 8px 20px rgba(124, 58, 237, 0.32);
 
   /* Stage colors */
   --stage-todo:         #64748B;
@@ -1253,7 +1281,7 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 .fx-sheet-tr.is-dropped .is-source, .fx-sheet-tr.is-dropped .is-fileName,
 .fx-sheet-tr.is-dropped .is-in, .fx-sheet-tr.is-dropped .is-out, .fx-sheet-tr.is-dropped .is-length,
 .fx-sheet-tr.is-dropped .is-clipNo, .fx-sheet-tr.is-dropped .is-type { text-decoration: line-through; color: var(--sheet-dropped-ink); }
-.fx-sheet-tr.is-dropped .fx-sheet-status { color: var(--sheet-dropped-ink); }
+.fx-sheet-tr.is-dropped .fx-sheet-status { color: var(--sheet-dropped-ink); background: var(--sheet-gutter) !important; border-color: var(--sheet-grid) !important; }
 .fx-sheet-tr.is-dropped .fx-sheet-dot { opacity: .45; }
 .fx-sheet-tr.is-add > .fx-sheet-td { border-bottom-color: transparent; }
 .fx-sheet-num { justify-content: flex-end; font-variant-numeric: tabular-nums; direction: ltr; }
@@ -1275,7 +1303,23 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 }
 
 /* status */
-.fx-sheet-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; font-size: 11.5px; }
+.fx-sheet-status {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 100%; height: 20px; box-sizing: border-box;
+  padding: 0 8px 0 7px; border: 1px solid var(--sheet-grid); border-radius: 999px;
+  color: var(--sheet-ink); font-weight: 600; font-size: 11px; line-height: 1;
+}
+.fx-sheet-menu-label .fx-sheet-status { vertical-align: middle; }
+
+/* people: avatar and name */
+.fx-person { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.fx-person-av {
+  position: relative; flex: none; width: 20px; height: 20px; border-radius: 50%; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fx-person-av::before { content: attr(data-initials); color: var(--sheet-panel); font-family: var(--font-heading); font-weight: 700; font-size: 8.5px; letter-spacing: .02em; }
+.fx-person-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fx-person-av.is-empty { border: 1.5px dashed var(--sheet-frozen-line); box-sizing: border-box; }
+.fx-sheet-tr.is-dropped .fx-person-av { opacity: .45; }
 .fx-sheet-dot { flex: none; display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
 .fx-sheet-chev { color: var(--sheet-muted); font-size: 9px; }
 .fx-sheet-tip {
@@ -1381,8 +1425,15 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 
 /* Content sheet (spec 009): spanning theme and pillar rows, theme editor, plan preview. */
 .fx-sheet-td.is-span { justify-content: flex-start; }
-.fx-content-theme { display: flex; align-items: center; gap: 4px 14px; min-width: 0; white-space: nowrap; }
+.fx-content-theme { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .fx-content-theme-name { font-family: var(--font-heading); font-weight: 700; font-size: 13px; }
+/* The Type cell: a filled pill, one colour per content type (CONTENT_TYPE_COLORS). */
+.fx-content-type {
+  display: inline-flex; align-items: center; height: 20px; max-width: 100%; box-sizing: border-box; padding: 0 9px;
+  border-radius: 999px; color: var(--sheet-panel); font-weight: 600; font-size: 11px; line-height: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fx-sheet-tr.is-dropped .fx-content-type { background: var(--sheet-gutter) !important; color: var(--sheet-dropped-ink); box-shadow: inset 0 0 0 1px var(--sheet-grid); }
 .fx-content-meta { color: var(--sheet-muted); font-weight: 500; }
 .fx-content-ok { color: var(--sheet-ok); font-weight: 700; }
 .fx-content-behind { color: var(--sheet-missing); font-weight: 700; }
@@ -1421,3 +1472,178 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-task-card:focus-within .fx-card-check,
 .fx-card-check[data-on],
 .fx-board-selecting .fx-card-check { opacity: 1; }
+
+
+/* ── The Board Inbox (spec 006, design/board-inbox.html "Option B · Inbox button") ──
+   The button, the panel and its rows, the View menu and the pinned layout.
+   Only --inbox-* and existing variables. */
+.fx-inbox-btn {
+  position: relative; height: 50px; border: 0; border-radius: 999px; cursor: pointer;
+  padding: 0 20px 0 16px; display: inline-flex; align-items: center; gap: 10px;
+  background: var(--inbox-purple); color: var(--inbox-panel); font-family: inherit;
+  box-shadow: var(--inbox-btn-shadow); transition: background .15s, box-shadow .15s;
+}
+.fx-inbox-btn:hover { background: var(--inbox-purple-deep); }
+.fx-inbox-btn:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 3px; }
+.fx-inbox-btn[aria-expanded="true"] { background: var(--inbox-ink); box-shadow: none; }
+.fx-inbox-btn.is-zero { background: var(--inbox-panel); color: var(--inbox-text); border: 1px solid var(--inbox-border); box-shadow: none; padding-inline-end: 16px; }
+.fx-inbox-btn.is-zero:hover { background: var(--inbox-surface); }
+.fx-inbox-ico { position: relative; display: grid; place-items: center; width: 28px; height: 28px; flex: none; }
+.fx-inbox-badge {
+  position: absolute; top: -9px; inset-inline-end: -12px; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box;
+  border-radius: 999px; background: var(--inbox-lime); color: var(--inbox-ink);
+  font-size: 12px; font-weight: 800; display: grid; place-items: center; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2.5px var(--inbox-purple);
+}
+.fx-inbox-badge.is-urgent { background: var(--inbox-urgent); color: var(--inbox-ink); }
+.fx-inbox-btn:hover .fx-inbox-badge { box-shadow: 0 0 0 2.5px var(--inbox-purple-deep); }
+.fx-inbox-btn[aria-expanded="true"] .fx-inbox-badge { box-shadow: 0 0 0 2.5px var(--inbox-ink); }
+.fx-inbox-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; text-align: start; margin-inline-start: 10px; }
+.fx-inbox-btn.is-zero .fx-inbox-txt { margin-inline-start: 2px; }
+.fx-inbox-txt b { font-size: 14.5px; font-weight: 800; }
+.fx-inbox-txt small { font-size: 11.5px; font-weight: 600; white-space: nowrap; color: var(--inbox-panel); }
+.fx-inbox-btn.is-zero .fx-inbox-txt small { color: var(--inbox-muted); }
+.fx-inbox-btn.is-ring::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 999px; border: 2px solid var(--inbox-purple);
+  opacity: 0; animation: fx-inbox-ring 1.6s ease-out 3; pointer-events: none;
+}
+@keyframes fx-inbox-ring { 0% { opacity: .7; transform: scale(.96); } 100% { opacity: 0; transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .fx-inbox-btn.is-ring::after, .fx-inbox-panel { animation: none !important; } }
+
+/* The panel: over the board on the inline-end side, or beside it when pinned. */
+.fx-inbox-panel {
+  position: fixed; top: var(--inbox-top, 16px); bottom: 16px; inset-inline-end: 16px; z-index: 45;
+  width: 440px; max-width: calc(100vw - 32px); box-sizing: border-box;
+  background: var(--inbox-panel); color: var(--inbox-text); border: 1px solid var(--inbox-border); border-radius: 18px;
+  box-shadow: var(--inbox-shadow); display: flex; flex-direction: column; overflow: hidden;
+  font-family: var(--font-body, system-ui); font-size: 13px; animation: fx-inbox-slide .22s ease-out;
+}
+[dir="rtl"] .fx-inbox-panel { animation-name: fx-inbox-slide-rtl; }
+@keyframes fx-inbox-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fx-inbox-slide-rtl { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.fx-inbox-panel.is-pinned {
+  position: sticky; top: 16px; bottom: auto; inset-inline-end: auto; width: auto; max-width: none;
+  height: calc(100vh - 32px); box-shadow: none; animation: none; z-index: 1;
+}
+.fx-inbox-head { display: flex; align-items: flex-start; gap: 10px; padding: 16px 16px 0; }
+.fx-inbox-head h3 { margin: 0; font: 800 17px var(--font-heading, var(--font-body, system-ui)); color: var(--inbox-ink); }
+.fx-inbox-head p { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--inbox-muted); }
+.fx-inbox-tools { margin-inline-start: auto; display: flex; gap: 4px; }
+.fx-inbox-icon { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--inbox-muted); cursor: pointer; display: grid; place-items: center; }
+.fx-inbox-icon:hover { background: var(--inbox-surface); color: var(--inbox-text); }
+.fx-inbox-icon[aria-pressed="true"] { background: var(--inbox-purple-soft); color: var(--inbox-purple); }
+.fx-inbox-tabs { display: flex; gap: 4px; margin: 12px 16px 0; border-bottom: 1px solid var(--inbox-border); overflow-x: auto; scrollbar-width: none; }
+.fx-inbox-tab {
+  flex: none; white-space: nowrap; border: 0; background: transparent; padding: 9px 12px; margin-bottom: -1px;
+  font: 700 13px var(--font-body, system-ui); color: var(--inbox-muted); cursor: pointer; border-bottom: 2px solid transparent;
+  display: flex; gap: 6px; align-items: center;
+}
+.fx-inbox-tab[aria-selected="true"] { color: var(--inbox-text); border-bottom-color: var(--inbox-ink); }
+.fx-inbox-cnt { min-width: 20px; height: 18px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--inbox-surface); font-size: 11px; display: grid; place-items: center; color: var(--inbox-text); }
+.fx-inbox-tab[aria-selected="true"] .fx-inbox-cnt { background: var(--inbox-ink); color: var(--inbox-panel); }
+.fx-inbox-cnt.is-new, .fx-inbox-tab[aria-selected="true"] .fx-inbox-cnt.is-new { background: var(--inbox-purple); color: var(--inbox-panel); }
+.fx-inbox-scroll { flex: 1; overflow-y: auto; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px; outline: none; }
+.fx-inbox-scroll:focus-visible { box-shadow: inset 0 0 0 2px var(--inbox-purple); }
+.fx-inbox-group { margin: 6px 0 -2px; font: 800 10.5px var(--font-body, system-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--inbox-faint); }
+.fx-inbox-group.is-line { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; color: var(--inbox-muted); }
+.fx-inbox-link { border: 0; background: transparent; padding: 0; color: var(--inbox-purple); font: 700 12px var(--font-body, system-ui); cursor: pointer; }
+.fx-inbox-link:hover { text-decoration: underline; }
+.fx-inbox-tools-line { margin: 0; display: flex; justify-content: flex-end; }
+.fx-inbox-empty { margin: 0; min-height: 80px; display: grid; place-items: center; text-align: center; color: var(--inbox-muted); font-weight: 600; }
+.fx-inbox-total { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--inbox-muted); }
+.fx-inbox-err { margin: 0; padding-inline-start: 40px; font-size: 11.5px; font-weight: 700; color: var(--inbox-late); }
+
+/* rows */
+.fx-inbox-row { border: 1px solid var(--inbox-border); border-radius: 12px; background: var(--inbox-panel); padding: 6px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fx-inbox-row:hover, .fx-inbox-row:focus-within { border-color: var(--inbox-surface); box-shadow: 0 4px 14px rgba(20, 19, 60, .06); }
+.fx-inbox-row[aria-busy="true"] { opacity: .6; }
+.fx-inbox-row.is-feed { border-color: transparent; padding: 2px; }
+.fx-inbox-row.is-feed:hover { background: var(--inbox-surface); box-shadow: none; }
+.fx-inbox-main {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; min-width: 0; padding: 4px; border: 0; border-radius: 8px;
+  background: transparent; text-align: start; font: inherit; color: inherit; cursor: pointer;
+}
+.fx-inbox-main:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 0; }
+.fx-inbox-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--inbox-surface); color: var(--inbox-muted); }
+.fx-inbox-ic.is-review { background: var(--inbox-purple-soft); color: var(--inbox-purple); }
+.fx-inbox-ic.is-late { background: var(--inbox-late-soft); color: var(--inbox-late); }
+.fx-inbox-ic.is-today { background: var(--inbox-today-soft); color: var(--inbox-today); }
+.fx-inbox-ic.is-done { background: var(--inbox-ok-soft); color: var(--inbox-ok); }
+.fx-inbox-fic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.fx-inbox-fic.is-comment { background: var(--inbox-blue-soft); color: var(--inbox-blue); }
+.fx-inbox-fic.is-file { background: var(--inbox-teal-soft); color: var(--inbox-teal); }
+.fx-inbox-fic.is-move { background: var(--inbox-purple-soft); color: var(--inbox-purple); }
+.fx-inbox-fic.is-publish { background: var(--inbox-ok-soft); color: var(--inbox-ok); }
+.fx-inbox-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fx-inbox-name { font-weight: 700; font-size: 13px; color: var(--inbox-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--inbox-muted); }
+.fx-inbox-why { font-weight: 600; }
+.fx-inbox-late { color: var(--inbox-late); font-weight: 700; }
+.fx-inbox-today { color: var(--inbox-today); font-weight: 700; }
+.fx-inbox-mut { color: var(--inbox-muted); font-weight: 500; }
+.fx-inbox-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.fx-inbox-chip.is-today { background: var(--inbox-today-soft); color: var(--inbox-today); }
+.fx-inbox-line { font-size: 13px; color: var(--inbox-text2); }
+.fx-inbox-line b { color: var(--inbox-text); }
+.fx-inbox-target { display: block; margin-top: 2px; font-weight: 600; font-size: 12.5px; color: var(--inbox-text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-inbox-time { display: block; margin-top: 3px; font-size: 11px; color: var(--inbox-faint); }
+.fx-inbox-quote { display: block; margin-top: 5px; font-size: 12.5px; color: var(--inbox-text2); background: var(--inbox-surface); border-radius: 8px; padding: 6px 9px; border-inline-start: 3px solid var(--inbox-pink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fx-inbox-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-top: 8px; background: transparent; }
+.fx-inbox-row.is-unread .fx-inbox-dot { background: var(--inbox-purple); }
+.fx-inbox-row.is-mention .fx-person-av { width: 28px; height: 28px; }
+.fx-inbox-acts { display: flex; flex-wrap: wrap; gap: 6px; padding-inline-start: 44px; padding-bottom: 2px; }
+.fx-inbox-act {
+  height: 28px; border: 1px solid var(--inbox-border); background: var(--inbox-panel); color: var(--inbox-text);
+  border-radius: 8px; padding: 0 10px; font: 700 11.5px var(--font-body, system-ui); cursor: pointer; white-space: nowrap;
+}
+.fx-inbox-act:hover { border-color: var(--inbox-text2); }
+.fx-inbox-act.is-go { background: var(--inbox-ink); color: var(--inbox-panel); border-color: var(--inbox-ink); }
+.fx-inbox-act:disabled { opacity: .55; cursor: default; }
+.fx-inbox-act:focus-visible, .fx-inbox-link:focus-visible, .fx-inbox-icon:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 2px; }
+.fx-inbox-tab:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: -3px; border-radius: 8px; }
+.fx-inbox-input {
+  flex: 1 1 160px; min-width: 0; height: 30px; box-sizing: border-box; border: 1px solid var(--inbox-border); border-radius: 8px;
+  padding: 0 9px; font: 12.5px var(--font-body, system-ui); color: var(--inbox-text); background: var(--inbox-panel);
+}
+.fx-inbox-input:focus { outline: 2px solid var(--inbox-purple); outline-offset: -1px; }
+.fx-inbox-input.is-date { flex: 0 1 auto; }
+
+/* The View menu, at the end of the filters row. */
+.fx-view { position: relative; }
+.fx-view-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--inbox-border); background: var(--inbox-panel); color: var(--inbox-text); font: 600 13px var(--font-body, system-ui);
+}
+.fx-view-btn[aria-expanded="true"], .fx-view-btn:hover { background: var(--inbox-surface); }
+.fx-view-menu {
+  position: absolute; top: calc(100% + 6px); inset-inline-end: 0; z-index: 30; min-width: 250px; padding: 6px;
+  background: var(--inbox-panel); border: 1px solid var(--inbox-border); border-radius: 12px; box-shadow: var(--inbox-shadow);
+}
+.fx-view-item {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--inbox-text); font: 600 13px var(--font-body, system-ui); cursor: pointer; text-align: start;
+}
+.fx-view-item:hover, .fx-view-item:focus-visible { background: var(--inbox-surface); outline: none; box-shadow: inset 0 0 0 2px var(--inbox-purple); }
+.fx-view-switch { flex: none; width: 32px; height: 18px; border-radius: 999px; background: var(--inbox-border); position: relative; transition: background .15s; }
+.fx-view-switch i { position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--inbox-panel); box-shadow: 0 1px 2px rgba(20, 19, 60, .2); transition: inset-inline-start .15s; }
+.fx-view-switch.is-on { background: var(--inbox-purple); }
+.fx-view-switch.is-on i { inset-inline-start: 16px; }
+
+/* The board, and the Inbox beside it when pinned (FR-060, FR-061). */
+.fx-board-main, .fx-board-area { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.fx-board-split { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; align-items: start; padding-inline-end: 20px; }
+.fx-board-split > .fx-board-area { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+@media (max-width: 900px) {
+  .fx-board-split { grid-template-columns: minmax(0, 1fr); padding: 0 14px; }
+  .fx-board-split > .fx-inbox-panel { order: -1; position: static; height: auto; max-height: 70vh; }
+}
+@media (max-width: 767px) {
+  .fx-inbox-txt small { display: none; }
+  .fx-inbox-btn { height: 46px; padding: 0 16px 0 12px; }
+  .fx-inbox-panel:not(.is-pinned) { inset: 0; top: 0; bottom: 0; width: 100%; max-width: none; border-radius: 0; border: 0; z-index: 65; animation: none; }
+  .fx-inbox-acts { padding-inline-start: 4px; }
+}
+
+/* A comment reached from the Inbox (FR-042). */
+.fx-comment-flash { animation: fx-comment-flash 1.4s ease; border-radius: 8px; }
+@keyframes fx-comment-flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 4px var(--inbox-lime); } }

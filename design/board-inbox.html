@@ -1,0 +1,659 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Board For-You Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap">
+<style>
+/* Layout: a dark comparison bar (Today / Option A / Option B) over a faithful mock of the
+   board's top section, with a "what changed" rail beside it. Momentum's PIPE palette;
+   deliberately light-only because it previews a light app. */
+:root{
+  color-scheme:light;
+  --ink:#14131A; --text:#1F2430; --text2:#4A5061; --muted:#6B7280; --faint:#9096A3; --faintest:#9CA3AF;
+  --lime:#C9F24E; --lime-soft:#F4FBD6; --purple:#7C3AED; --purple-soft:#F0EBFE; --navy:#14133C;
+  --border:#ECECF1; --surface:#F3F3F7; --page:#F7F7FA; --panel:#FFFFFF;
+  --late:#D22040; --late-soft:#FDE7EA; --today:#EA8C0B; --today-soft:#FFF3E6; --ok:#16A34A; --ok-soft:#E8F7EE;
+  --pink:#D6336C; --pink-soft:#FCE7F0; --teal:#0EA5A5; --blue:#2563EB;
+  --font:'Inter',system-ui,sans-serif; --head:'Montserrat','Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--page);color:var(--text);font:14px/1.45 var(--font)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.bar{background:var(--navy);color:#fff;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--navy)}
+.bar h1{margin:0;font:800 1rem var(--head);display:flex;align-items:center;gap:8px}
+.bar h1 i{width:13px;height:13px;border-radius:4px;background:var(--lime)}
+.bar p{margin:0;font-size:.78rem;color:#ffffff99}
+.seg{display:flex;background:#ffffff14;border-radius:999px;padding:3px;margin-left:auto;flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:#ffffffb0;padding:6px 14px;border-radius:999px;font-weight:700;font-size:.8rem;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--lime);color:var(--ink)}
+
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;max-width:1440px;margin:0 auto;
+  padding-block:22px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:1100px){.wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* the app mock */
+.app{background:var(--panel);border-radius:22px;box-shadow:0 10px 40px rgba(20,19,60,.07);padding:22px 26px 28px;min-width:0}
+@media (max-width:640px){.app{padding:16px 12px 20px;border-radius:16px}}
+.hdr{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.search{flex:1 1 260px;min-width:0;display:flex;align-items:center;gap:10px;height:46px;border:1px solid var(--border);border-radius:999px;padding:0 16px;color:var(--faint)}
+.search input{border:0;outline:none;flex:1;min-width:0;font:inherit;color:var(--text);background:transparent}
+.search input::placeholder{color:var(--faint)}
+.bell{position:relative;width:44px;height:44px;border-radius:12px;border:0;background:transparent;cursor:pointer;display:grid;place-items:center;color:var(--text)}
+.bell:hover{background:var(--surface)}
+.badge{position:absolute;top:2px;right:0;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--purple);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;border:2px solid var(--panel)}
+.upstream{height:44px;border-radius:999px;border:2px solid var(--ink);background:var(--lime-soft);padding:0 16px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px}
+.me{display:flex;align-items:center;gap:10px}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
+.av.rs{background:#B98436;box-shadow:0 0 0 3px #C9A0F8}
+.av.ye{background:#3FA34D}.av.gd{background:#5B6CF5}.av.sm{width:32px;height:32px;font-size:11px}
+.me b{display:block;font-size:.95rem}.me>span:not(.av) span{display:block;font-size:.8rem;color:var(--muted)}
+.new{height:46px;border:0;border-radius:999px;background:var(--lime);padding:0 22px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--ink)}
+.compact .me>span:not(.av){display:none}
+
+.row2{display:flex;justify-content:space-between;align-items:center;margin:18px 0 12px;gap:10px;flex-wrap:wrap}
+.row2 h2{margin:0;font:800 1.05rem var(--head);letter-spacing:-.01em}
+.pill{height:30px;border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:0 12px;font-size:.8rem;font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.viewmenu{position:relative}
+.menu{position:absolute;right:0;top:36px;z-index:20;background:var(--panel);border-radius:12px;box-shadow:0 12px 32px rgba(20,19,60,.16);padding:6px;min-width:230px}
+.menu label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:8px;font-size:.85rem;cursor:pointer}
+.menu label:hover{background:var(--surface)}
+.menu input{accent-color:var(--purple)}
+
+.grid{display:grid;gap:18px}
+.g-current{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);align-items:start}
+.g-a{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);align-items:stretch}
+.g-b{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);align-items:stretch}
+@media (max-width:900px){.g-current,.g-a,.g-b{grid-template-columns:minmax(0,1fr)}}
+.card{border:1px solid var(--border);border-radius:18px;padding:18px 16px 18px;position:relative;min-width:0;display:flex;flex-direction:column}
+.ct{display:flex;align-items:center;gap:9px;font-weight:800;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+.ct .r{margin-left:auto;text-transform:none;letter-spacing:0}
+.sub{margin:5px 0 0 29px;font-size:12px;font-weight:600;color:var(--muted)}
+.link{border:0;background:transparent;color:var(--purple);font-weight:700;font-size:12px;cursor:pointer;padding:0}
+.sticky{position:absolute;right:16px;top:12px;width:48px;height:48px;background:#FF74B1;border-radius:3px;transform:rotate(6deg);box-shadow:0 4px 10px rgba(255,116,177,.35);display:grid;place-items:center;font:900 28px var(--head);color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:10px;margin-top:14px;min-width:0}
+.scroll{overflow-y:auto;max-height:360px;padding-right:2px}
+
+/* rows */
+.trow{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px 10px;background:var(--panel);cursor:pointer;text-align:start;width:100%;position:relative;min-width:0}
+.trow:hover,.trow:focus-within{border-color:#DADAE3;box-shadow:0 4px 14px rgba(20,19,60,.06)}
+.ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none}
+.tmain{flex:1;min-width:0}
+.tt{display:block;font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;font-size:11.5px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.chip .d{width:6px;height:6px;border-radius:50%}
+.why{font-weight:600}
+.late{color:var(--late)} .today{color:var(--today)} .muted{color:var(--muted)}
+.acts{display:flex;gap:6px;flex:none;opacity:0;transition:opacity .12s}
+.trow:hover .acts,.trow:focus-within .acts{opacity:1}
+@media (hover:none){.acts{opacity:1}}
+.act{height:28px;border:1px solid var(--border);background:var(--panel);border-radius:8px;padding:0 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.act.go{background:var(--ink);color:#fff;border-color:var(--ink)}
+.act:hover{border-color:var(--text2)}
+.date{height:28px;border:1px solid var(--purple);border-radius:8px;font:inherit;font-size:12px;padding:0 6px}
+.group{font:800 10.5px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:6px 0 -2px}
+.chev{flex:none;color:var(--faint)}
+@media (max-width:640px){.trow{flex-wrap:wrap}.acts{width:100%;justify-content:flex-end}}
+
+/* feed rows */
+.frow{display:flex;align-items:flex-start;gap:11px;width:100%;background:none;border:0;padding:6px 4px;border-radius:10px;cursor:pointer;text-align:start}
+.frow:hover{background:var(--surface)}
+.ftext{flex:1;min-width:0;font-size:13px;color:var(--text2)}
+.ftext b{color:var(--text)}
+.ftarget{display:block;margin-top:2px;font-weight:600;font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftime{display:block;margin-top:3px;font-size:11px;color:var(--faintest)}
+.quote{display:block;margin-top:5px;font-size:12.5px;color:var(--text2);background:var(--surface);border-radius:8px;padding:6px 9px;border-inline-start:3px solid var(--pink)}
+.dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+.ficon{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none}
+.unread{width:8px;height:8px;border-radius:50%;background:var(--purple);flex:none;margin-top:12px}
+
+/* inbox tabs */
+.tabs{display:flex;gap:4px;margin-top:14px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.tabs button{white-space:nowrap;flex:none}
+.tab{border:0;background:transparent;padding:9px 12px;font-weight:700;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;gap:6px;align-items:center}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--ink)}
+.cnt{min-width:20px;height:18px;padding:0 6px;border-radius:999px;background:var(--surface);font-size:11px;display:grid;place-items:center}
+.tab[aria-selected="true"] .cnt{background:var(--ink);color:#fff}
+.cnt.new{background:var(--purple);color:#fff}
+.reply{display:flex;gap:6px;margin-top:8px}
+.reply input{flex:1;min-width:0;height:30px;border:1px solid var(--border);border-radius:8px;padding:0 9px;font:inherit;font-size:12.5px}
+.flash{animation:flash 1.2s ease}
+@keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 4px var(--lime)}}
+
+/* bell dropdown */
+.drop{position:absolute;right:0;top:50px;z-index:30;width:320px;max-width:calc(100vw - 32px);background:var(--panel);border-radius:14px;box-shadow:0 14px 40px rgba(20,19,60,.18);padding:8px}
+.drop h4{margin:4px 8px 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.drop .frow{padding:8px}
+
+/* rail */
+.rail{display:grid;gap:12px;align-content:start}
+.note{background:var(--panel);border-radius:16px;padding:16px 18px;box-shadow:0 4px 18px rgba(20,19,60,.05)}
+.note h3{margin:0 0 4px;font:800 .95rem var(--head)}
+.note p{margin:0 0 10px;font-size:.82rem;color:var(--muted)}
+.note ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.note li{font-size:.83rem;display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start}
+.tag{font-size:.66rem;font-weight:800;color:var(--purple);background:var(--purple-soft);border-radius:5px;padding:2px 5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cost{font-size:.8rem;color:var(--text2);background:var(--surface);border-radius:10px;padding:10px 12px;margin-top:10px}
+.cost b{display:block;margin-bottom:2px}
+.try{background:var(--navy);color:#fff}
+.try h3{color:var(--lime)}
+.try p,.try li{color:#ffffffcc}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;font-size:.85rem;opacity:0;transition:.2s;pointer-events:none;z-index:50;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.empty{min-height:80px;display:grid;place-items:center;color:var(--muted);font-weight:600;font-size:13px;text-align:center}
+
+/* Option B · Inbox button: the inbox lives behind one button and opens as a panel over the board */
+/* Highlighted: filled brand purple, a line saying what is waiting, and a soft ring on new items.
+   All clear: it calms down to an outlined button so the colour keeps meaning "something is here". */
+.inboxBtn{position:relative;height:50px;border:0;background:var(--purple);color:#fff;border-radius:999px;padding:0 20px 0 16px;cursor:pointer;
+  display:flex;align-items:center;gap:10px;box-shadow:0 8px 20px rgba(124,58,237,.32);transition:background .15s,box-shadow .15s}
+.inboxBtn:hover{background:#6D28D9;box-shadow:0 10px 24px rgba(124,58,237,.42)}
+.inboxBtn .txt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;text-align:start}
+.inboxBtn .txt b{font-size:14.5px;font-weight:800}
+.inboxBtn .txt small{font-size:11.5px;font-weight:600;color:#ffffffd9;white-space:nowrap}
+/* The number sits on the icon's corner, like an app badge; a ring in the button's own colour cuts it out from the icon. */
+.ico{position:relative;display:grid;place-items:center;width:28px;height:28px;flex:none}
+.ico svg{width:24px;height:24px}
+.ibadge{position:absolute;top:-9px;inset-inline-end:-12px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--lime);color:var(--ink);
+  font-size:12px;font-weight:800;display:grid;place-items:center;font-variant-numeric:tabular-nums;box-shadow:0 0 0 2.5px var(--purple)}
+.ibadge.urgent{background:var(--today);color:#fff}
+.inboxBtn:hover .ibadge{box-shadow:0 0 0 2.5px #6D28D9}
+.inboxBtn[aria-expanded="true"] .ibadge{box-shadow:0 0 0 2.5px var(--ink)}
+.inboxBtn .txt{margin-inline-start:10px}
+.inboxBtn.zero .txt{margin-inline-start:2px}
+.inboxBtn[aria-expanded="true"]{background:var(--ink);box-shadow:none}
+.inboxBtn.zero{background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:none;padding-right:16px}
+.inboxBtn.zero .txt small{color:var(--muted)}
+.inboxBtn.zero:hover{background:var(--surface)}
+.inboxBtn.ring::after{content:"";position:absolute;inset:-5px;border-radius:999px;border:2px solid var(--purple);opacity:0;animation:ring 1.6s ease-out 3;pointer-events:none}
+@keyframes ring{0%{opacity:.7;transform:scale(.96)}100%{opacity:0;transform:scale(1.08)}}
+@media (max-width:640px){.inboxBtn .txt small{display:none}.inboxBtn{height:46px;padding:0 16px 0 12px}}
+
+.stage{position:relative;min-height:540px;margin-top:6px}
+.stage.pinned{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px}
+@media (max-width:900px){.stage.pinned{grid-template-columns:minmax(0,1fr)}}
+.board{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;min-width:0}
+.col{flex:0 0 200px;background:var(--surface);border-radius:14px;padding:10px;min-height:520px}
+.col h5{margin:2px 4px 10px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px}
+.col h5 .n{margin-left:auto;color:var(--faint);font-weight:700}
+.bcard{background:var(--panel);border-radius:10px;padding:10px;margin-bottom:8px;font-size:12.5px;font-weight:600;box-shadow:0 1px 2px rgba(20,19,60,.06);border-top:3px solid var(--c)}
+.bcard small{display:block;margin-top:6px;color:var(--faint);font-weight:600;font-size:11px}
+
+.drawer{position:absolute;top:0;right:0;bottom:0;width:440px;max-width:100%;z-index:25;background:var(--panel);border-radius:18px;
+  box-shadow:0 18px 50px rgba(20,19,60,.20);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border)}
+.drawer.enter{animation:slide .22s ease-out}
+@keyframes slide{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.stage.pinned .drawer{position:static;width:auto;box-shadow:none}
+@media (max-width:640px){.drawer{width:100%;left:0}}
+.dhead{display:flex;align-items:flex-start;gap:10px;padding:16px 16px 0}
+.dhead h3{margin:0;font:800 1.05rem var(--head)}
+.dhead p{margin:2px 0 0;font-size:12px;font-weight:600;color:var(--muted)}
+.dhead .tools{margin-left:auto;display:flex;gap:4px}
+.iconBtn{width:32px;height:32px;border:0;border-radius:8px;background:transparent;cursor:pointer;display:grid;place-items:center;color:var(--muted)}
+.iconBtn:hover{background:var(--surface);color:var(--text)}
+.iconBtn[aria-pressed="true"]{background:var(--purple-soft);color:var(--purple)}
+.drawer .tabs{margin:12px 16px 0}
+.dbody{flex:1;overflow-y:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.drawer .trow{flex-wrap:wrap}
+.drawer .acts{opacity:1;width:100%;padding-inline-start:40px}
+</style>
+
+<header class="bar">
+  <h1><i></i>Board · the "for you" section</h1>
+  <p>Mock-up with sample tasks · not the live app</p>
+  <div class="seg" role="tablist" aria-label="Version">
+    <button role="tab" id="t-now" data-v="now" aria-selected="false">Today</button>
+    <button role="tab" id="t-b" data-v="b" aria-selected="false">Option B · first draft</button>
+    <button role="tab" id="t-c" data-v="c" aria-selected="true">Option B · Inbox button</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <main class="app" id="app" aria-live="polite"></main>
+  <aside class="rail" id="rail"></aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- sample data (Raneem is the Marketing Manager, so C-Review and Final Check are hers to approve) ---------- */
+const STAGE={ 'c-prog':['Writing','#2563EB'], 'c-final':['C-Review','#7C3AED'], 'r-design':['Ready for design','#F59E0B'],
+  'd-prog':['Designing','#0EA5A5'], 'final-check':['Final check','#6366F1'], 'ready-publish':['Ready to publish','#10B981'], 'publish':['Published','#16A34A'] };
+const NEXT={ 'c-prog':'c-final','c-final':'r-design','final-check':'ready-publish','d-prog':'d-check' };
+const PREV={ 'c-final':'c-prog','final-check':'d-prog' };
+
+let S; // state
+function fresh(){
+  return {
+    tasks:[
+      {id:'t1',name:'Sept- W2 - CEO Guide to Say No',stage:'c-prog',mine:true,due:null,sla:null},
+      {id:'t3',name:'Newsjacking SM Post - SUEZ CANAL/ HURMZ REPORT',stage:'c-final',mine:false,review:true,waiting:'2 days',due:1,sla:'At risk',by:'yosra eltopgy'},
+      {id:'t4',name:'AI Pillar SM Campaign - Post 3',stage:'final-check',mine:false,review:true,waiting:'today',due:0,sla:null,by:'Graphic Designer'},
+    ],
+    done:[
+      {name:'Retreat 26 - Envelope',when:'2d ago'},{name:'EGX Halt Report',when:'3d ago'},{name:'Sugar Tax Report',when:'4d ago'},
+      {name:'AI Pillar SM Campaign - Post 1',when:'4d ago'},{name:'Salah Trabzonspor Deal Report',when:'5d ago'},
+    ],
+    events:[
+      {id:'e1',kind:'move',task:'FFNT - Company Profile',to:'d-prog',when:'today',exact:false,mine:true},
+      {id:'e6',kind:'file',who:'Graphic Designer',av:'gd',file:'cover_v3.png',task:'FFNT - Company Profile',when:'3h ago'},
+      {id:'e2',kind:'file',who:'Raneem Sarhaan',av:'rs',file:'Forefront_CompanyProfile_2026_v2.1.pdf',task:'FFNT - Company Profile',when:'16h ago',own:true},
+      {id:'e3',kind:'mention',who:'yosra eltopgy',av:'ye',task:'Newsjacking SM Post - SEUZ CANAL/ HURMZ REPORT',taskId:'t3',body:'@Raneem can you check the headline before 3pm? Two versions in the doc.',when:'1d ago',unread:true},
+      {id:'e7',kind:'comment',who:'yosra eltopgy',av:'ye',task:'Newsjacking SM Post - SEUZ CANAL/ HURMZ REPORT',taskId:'t3',body:'Sources added at the end.',when:'1d ago'},
+      {id:'e4',kind:'mention',who:'yosra eltopgy',av:'ye',task:'Newsjacking SM Post - Egypt/SA WAR REPORT',body:'@Raneem numbers updated per your note. OK to send to design?',when:'1d ago',unread:true},
+      {id:'e5',kind:'publish',task:'Retreat 26 - Envelope',when:'2d ago',mine:true},
+    ],
+    bellSeen:false, bellOpen:false, viewOpen:false, week:false, upstream:true, showMine:false, inboxTab:'todo', snoozed:[],
+    inboxOpen:false, inboxPinned:false, justOpened:false,
+  };
+}
+S=fresh();
+let view='now';
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
+const I={
+  search:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  bell:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+  eye:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.6"/></svg>',
+  cal:c=>`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`,
+  check:c=>`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  chev:'<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>',
+  pulse:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>',
+  at:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>',
+  clip:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg>',
+  arrow:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  bubble:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>',
+  tray:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+  x:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  pin:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+  sliders:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>',
+};
+const stageChip=s=>`<span class="chip" style="background:${STAGE[s][1]}14;color:${STAGE[s][1]}"><span class="d" style="background:${STAGE[s][1]}"></span>${STAGE[s][0]}</span>`;
+const slaChip=s=>s?`<span class="chip" style="background:var(--today-soft);color:var(--today)">${s}</span>`:'';
+
+/* ---------- header ---------- */
+function header(opt){
+  const unreadMentions=S.events.filter(e=>e.kind==='mention'&&e.unread).length;
+  const dueToday=S.tasks.filter(t=>t.due===0).length;
+  let count = opt==='now'?17 : opt==='a' ? (S.bellSeen?0:unreadMentions+dueToday) : inboxUnread();
+  const ph = opt==='now'?'Search tasks, campaigns, assets...':'Search tasks, people, projects, brands';
+  return `<div class="hdr ${opt==='now'?'':'compact'}">
+    <label class="search">${I.search}<input id="q-${opt}" placeholder="${ph}" aria-label="Search"></label>
+    ${opt==='c'?inboxButton():`<div style="position:relative">
+      <button class="bell" id="bellBtn" aria-label="Notifications${count?`, ${count} new`:''}" aria-expanded="${S.bellOpen}">${I.bell}${count?`<span class="badge">${count}</span>`:''}</button>
+      ${S.bellOpen&&opt==='a'?bellDrop():''}
+    </div>`}
+    ${opt==='now'?`<button class="upstream" id="upBtn">${I.eye}${S.upstream?'Hide what’s upstream':'Preview what’s coming'}</button>`:''}
+    <div class="me" title="Raneem Sarhaan · Admin"><span class="av rs">RS</span><span><b>Raneem Sarhaan</b><span>Admin</span></span></div>
+    <button class="new" id="newBtn">+ New task</button>
+  </div>`;
+}
+function bellDrop(){
+  const items=S.events.filter(e=>e.kind==='mention');
+  return `<div class="drop" role="dialog" aria-label="New since you last looked">
+    <h4>New since you last looked</h4>
+    ${items.map(e=>`<button class="frow" data-open="${e.id}"><span class="av ye sm">YE</span><span class="ftext"><b>${esc(e.who)}</b> mentioned you<span class="ftarget">${esc(e.task)}</span><span class="ftime">${e.when}</span></span></button>`).join('')}
+    ${S.tasks.filter(t=>t.due===0).map(t=>`<button class="frow" data-open="${t.id}"><span class="ficon" style="background:var(--today-soft);color:var(--today)">${I.cal('#EA8C0B')}</span><span class="ftext"><b>Due today</b><span class="ftarget">${esc(t.name)}</span></span></button>`).join('')}
+  </div>`;
+}
+
+/* ---------- TODAY (as in the screenshot) ---------- */
+function renderNow(){
+  const mineOpen=S.tasks.filter(t=>t.mine);
+  const feed=[S.events[0],S.events[2],S.events[3],S.events[5],S.events[6]];
+  const dotC={move:'#7C3AED',file:'#0EA5A5',mention:'#D6336C',publish:'#C9D633',comment:'#2563EB'};
+  return header('now')+`
+  <div class="row2" style="justify-content:flex-end"><button class="pill" id="weekBtn">Show your week ⌄</button></div>
+  <div class="grid g-current">
+    <section class="card">
+      <div class="ct"><span style="color:#EA8C0B">${I.eye}</span>Needs your attention</div>
+      <div class="sticky" aria-hidden="true">!</div>
+      <div class="sub">${mineOpen.length} open <span style="font-weight:500;color:var(--faint)">· 193 published</span></div>
+      <div class="list">${mineOpen.map(t=>`<button class="trow" data-open="${t.id}"><span class="ic" style="background:#F1F1F4">${I.cal('#9A9AA6')}</span><span class="tmain"><span class="tt">${esc(t.name)}</span><span class="meta" style="color:#A0A0AC">No date</span></span>${I.chev}</button>`).join('')}</div>
+    </section>
+    <section class="card">
+      <div class="ct">${I.pulse}Activity feed<span class="r"><button class="link" id="viewAll">View all</button></span></div>
+      <div class="list" style="gap:14px;margin-top:18px">${feed.map(e=>{
+        const avatar=e.kind==='move'||e.kind==='publish'?'<span class="av rs">RS</span>':`<span class="av ${e.av}">${e.av==='rs'?'RS':'YE'}</span>`;
+        const line=e.kind==='move'?`Moved to <b>D-In Progress</b>`:e.kind==='publish'?`<b>Published</b>`:e.kind==='file'?`<b>${esc(e.who)}</b> attached ${esc(e.file)} to`:`<b>${esc(e.who)}</b> mentioned you on`;
+        const when=e.kind==='move'?'just now':e.when;
+        return `<button class="frow" data-open="${e.id}">${avatar}<span class="ftext">${line}<span class="ftarget">${esc(e.task)}</span><span class="ftime">${when}</span></span><span class="dot" style="background:${dotC[e.kind]}"></span></button>`}).join('')}</div>
+    </section>
+  </div>`;
+}
+
+/* ---------- OPTION A ---------- */
+function attentionRows(withSnooze){
+  const visible=S.tasks.filter(t=>!S.snoozed.includes(t.id));
+  const review=visible.filter(t=>t.review), mine=visible.filter(t=>t.mine);
+  const row=t=>{
+    const late=t.due!==null&&t.due<0, today=t.due===0;
+    const icBg=late?'var(--late-soft)':today?'var(--today-soft)':t.review?'var(--purple-soft)':'#F1F1F4';
+    const icC=late?'#D22040':today?'#EA8C0B':t.review?'#7C3AED':'#9A9AA6';
+    const why=t.review?`<span class="why">Waiting for your review · ${t.waiting==='today'?'arrived today':t.waiting}</span>`
+             :`<span class="why muted">No due date</span>`;
+    const due=t.due===null?'':t.due===0?'<span class="why today">Due today</span>':t.due<0?`<span class="why late">${-t.due}d late</span>`:`<span>Due in ${t.due}d</span>`;
+    const acts=t.review
+      ?`<button class="act go" data-approve="${t.id}">Approve →</button><button class="act" data-back="${t.id}">Send back</button>`
+      :(S.dateFor===t.id?`<input type="date" class="date" id="date-${t.id}" aria-label="Due date"><button class="act go" data-setdate="${t.id}">Save</button>`
+        :`<button class="act" data-date="${t.id}">Set date</button><button class="act go" data-approve="${t.id}">Move on →</button>`);
+    return `<div class="trow" data-open="${t.id}" tabindex="0" role="button" aria-label="${esc(t.name)}">
+      <span class="ic" style="background:${icBg}">${t.review?I.check(icC):I.cal(icC)}</span>
+      <span class="tmain"><span class="tt">${esc(t.name)}</span><span class="meta">${stageChip(t.stage)}${slaChip(t.sla)}${why}${due?'· '+due:''}</span></span>
+      <span class="acts">${acts}${withSnooze?`<button class="act" data-snooze="${t.id}">Tomorrow</button>`:''}</span>
+    </div>`;
+  };
+  if(!review.length&&!mine.length) return `<div class="empty">Nothing needs you right now. Nice.</div>`;
+  return (review.length?`<div class="group">Waiting for your review · ${review.length}</div>${review.map(row).join('')}`:'')
+       + (mine.length?`<div class="group">Your tasks · ${mine.length}</div>${mine.map(row).join('')}`:'');
+}
+function feedA(){
+  let ev=S.events.filter(e=>S.showMine||!e.own);
+  // group by task: a mention plus a comment on the same task become one line
+  const out=[];const seen={};
+  for(const e of ev){
+    const k=e.task+(e.kind==='mention'||e.kind==='comment'?'#talk':'#'+e.id);
+    if(seen[k]){seen[k].extra++;continue}
+    const g={...e,extra:0};seen[k]=g;out.push(g);
+  }
+  const iconFor={mention:['var(--pink-soft)','var(--pink)',I.at],comment:['#E8EEFE','var(--blue)',I.bubble],file:['#E3F6F6','var(--teal)',I.clip],move:['var(--purple-soft)','var(--purple)',I.arrow],publish:['var(--ok-soft)','var(--ok)',I.check('#16A34A')]};
+  return out.map(e=>{
+    const [bg,fg,ic]=iconFor[e.kind];
+    let line;
+    if(e.kind==='move') line=`<b>${esc(e.task)}</b> moved to ${STAGE[e.to][0]}`;
+    else if(e.kind==='publish') line=`<b>${esc(e.task)}</b> was published`;
+    else if(e.kind==='file') line=`<b>${esc(e.who)}</b> attached ${esc(e.file)}`;
+    else line=`<b>${esc(e.who)}</b> ${e.kind==='mention'?'mentioned you':'commented'}${e.extra?` <span class="muted">· ${e.extra+1} updates</span>`:''}`;
+    const target=e.kind==='move'||e.kind==='publish'?'':`<span class="ftarget">${esc(e.task)}</span>`;
+    const quote=e.kind==='mention'?`<span class="quote">${esc(e.body)}</span>`:'';
+    return `<button class="frow" data-feed="${e.id}"><span class="ficon" style="background:${bg};color:${fg}">${ic}</span><span class="ftext">${line}${target}${quote}<span class="ftime">${e.when}</span></span></button>`;
+  }).join('');
+}
+function viewMenu(){
+  return `<div class="viewmenu"><button class="pill" id="viewBtn" aria-expanded="${S.viewOpen}">${I.sliders} View</button>
+    ${S.viewOpen?`<div class="menu" role="menu"><label>Show your week<input type="checkbox" id="optWeek" ${S.week?'checked':''}></label><label>Columns before design<input type="checkbox" id="optUp" ${S.upstream?'checked':''}></label></div>`:''}</div>`;
+}
+function renderA(){
+  const vis=S.tasks.filter(t=>!S.snoozed.includes(t.id));
+  const review=vis.filter(t=>t.review).length, late=vis.filter(t=>t.due!==null&&t.due<0).length;
+  return header('a')+`
+  <div class="row2"><h2>For you</h2>${viewMenu()}</div>
+  ${S.week?`<div class="card" style="margin-bottom:18px;min-height:90px;justify-content:center;color:var(--muted);text-align:center">Your week (Week Momentum + Daily Spark) appears here when turned on in View.</div>`:''}
+  <div class="grid g-a">
+    <section class="card">
+      <div class="ct"><span style="color:#EA8C0B">${I.eye}</span>Needs your attention${late?`<span class="r"><span class="chip" style="background:var(--late-soft);color:var(--late)">${late} late</span></span>`:''}</div>
+      <div class="sub">${vis.length} need you${review?` · ${review} waiting for your review`:''}</div>
+      <div class="list scroll">${attentionRows(false)}</div>
+    </section>
+    <section class="card">
+      <div class="ct">${I.pulse}What's moving<span class="r"><button class="pill" id="mineBtn" aria-pressed="${S.showMine}" style="height:26px;font-size:11.5px">${S.showMine?'Hide mine':'Show mine'}</button></span></div>
+      <div class="sub">Other people's updates on your work</div>
+      <div class="list scroll" style="gap:6px">${feedA()}</div>
+    </section>
+  </div>`;
+}
+
+/* ---------- OPTION B ---------- */
+function inboxUnread(){
+  return S.events.filter(e=>e.kind==='mention'&&e.unread).length + S.tasks.filter(t=>!S.snoozed.includes(t.id)&&(t.review||t.due===0)).length;
+}
+function inboxBody(tab){
+  const ment=S.events.filter(e=>e.kind==='mention');
+  const newM=ment.filter(e=>e.unread).length;
+  let body='';
+  if(tab==='todo') body=attentionRows(true)+(S.snoozed.length?`<div class="group">Snoozed until tomorrow · ${S.snoozed.length} <button class="link" id="unsnooze">Bring back</button></div>`:'');
+  if(tab==='mentions') body=(newM?`<div style="display:flex;justify-content:flex-end"><button class="link" id="readAll">Mark all read</button></div>`:'')+ment.map(e=>`
+    <div class="trow" style="align-items:flex-start;cursor:default">
+      ${e.unread?'<span class="unread" aria-label="Unread"></span>':'<span style="width:8px"></span>'}
+      <span class="av ye sm">YE</span>
+      <span class="tmain"><span class="ftext"><b>${esc(e.who)}</b> mentioned you · <span class="muted">${e.when}</span></span>
+        <span class="ftarget">${esc(e.task)}</span><span class="quote">${esc(e.body)}</span>
+        <span class="reply"><input id="rep-${e.id}" placeholder="Reply to yosra…" aria-label="Reply"><button class="act go" data-reply="${e.id}">Reply</button>${e.unread?`<button class="act" data-read="${e.id}">Mark read</button>`:''}</span>
+      </span>
+    </div>`).join('');
+  if(tab==='done') body=S.done.map(d=>`<div class="trow" style="cursor:default"><span class="ic" style="background:var(--ok-soft)">${I.check('#16A34A')}</span><span class="tmain"><span class="tt">${esc(d.name)}</span><span class="meta">Published · ${d.when}</span></span></div>`).join('')+`<div class="sub" style="margin:4px 0 0">193 published in total</div>`;
+  if(tab==='team') body=teamUpdates();
+  return body||'<div class="empty">All clear.</div>';
+}
+function teamUpdates(){
+  const others=S.events.filter(e=>!e.own&&e.kind!=='mention');
+  const iconFor={comment:['#E8EEFE','var(--blue)',I.bubble],file:['#E3F6F6','var(--teal)',I.clip],move:['var(--purple-soft)','var(--purple)',I.arrow],publish:['var(--ok-soft)','var(--ok)',I.check('#16A34A')]};
+  return others.map(e=>{const [bg,fg,ic]=iconFor[e.kind];
+    const line=e.kind==='move'?`<b>${esc(e.task)}</b> moved to ${STAGE[e.to][0]}`:e.kind==='publish'?`<b>${esc(e.task)}</b> was published`:e.kind==='file'?`<b>${esc(e.who)}</b> attached ${esc(e.file)}`:`<b>${esc(e.who)}</b> commented`;
+    const target=e.kind==='move'||e.kind==='publish'?'':`<span class="ftarget">${esc(e.task)}</span>`;
+    return `<button class="frow" data-feed="${e.id}"><span class="ficon" style="background:${bg};color:${fg}">${ic}</span><span class="ftext">${line}${target}<span class="ftime">${e.when}</span></span></button>`}).join('');
+}
+function renderB(){
+  const todo=S.tasks.filter(t=>!S.snoozed.includes(t.id)).length;
+  const ment=S.events.filter(e=>e.kind==='mention');
+  const newM=ment.filter(e=>e.unread).length;
+  const tab=S.inboxTab;
+  return header('b')+`
+  <div class="row2"><h2>For you</h2>${viewMenu()}</div>
+  <div class="grid g-b">
+    <section class="card" id="inbox">
+      <div class="ct"><span style="color:var(--purple)">${I.bell.replace('width="24" height="24"','width="18" height="18"')}</span>Your inbox</div>
+      <div class="tabs" role="tablist" aria-label="Inbox">
+        <button class="tab" role="tab" data-tab="todo" aria-selected="${tab==='todo'}">To do <span class="cnt">${todo}</span></button>
+        <button class="tab" role="tab" data-tab="mentions" aria-selected="${tab==='mentions'}">Mentions <span class="cnt ${newM?'new':''}">${newM?newM+' new':ment.length}</span></button>
+        <button class="tab" role="tab" data-tab="done" aria-selected="${tab==='done'}">Done this week <span class="cnt">${S.done.length}</span></button>
+      </div>
+      <div class="list scroll">${inboxBody(tab)}</div>
+    </section>
+    <section class="card">
+      <div class="ct">${I.pulse}Team updates</div>
+      <div class="sub">On your work · mentions live in your inbox</div>
+      <div class="list" style="gap:6px">${teamUpdates()}</div>
+    </section>
+  </div>`;
+}
+
+/* ---------- OPTION B · INBOX BUTTON (hidden by default) ---------- */
+function inboxCounts(){
+  const vis=S.tasks.filter(t=>!S.snoozed.includes(t.id));
+  const todo=vis.filter(t=>t.review||t.due===0||t.mine).length;
+  const unread=S.events.filter(e=>e.kind==='mention'&&e.unread).length;
+  const urgent=vis.some(t=>t.due!==null&&t.due<=0);
+  const reviews=vis.filter(t=>t.review).length, late=vis.filter(t=>t.due!==null&&t.due<0).length, today=vis.filter(t=>t.due===0).length;
+  return {todo,unread,total:todo+unread,urgent,reviews,late,today};
+}
+/* The line under "Inbox": the one or two most pressing kinds, in the order a person should act on them. */
+function inboxSummary(c){
+  const parts=[];
+  if(c.reviews) parts.push(`${c.reviews} review${c.reviews===1?'':'s'} waiting`);
+  if(c.late) parts.push(`${c.late} late`);
+  if(c.today) parts.push(`${c.today} due today`);
+  if(c.unread) parts.push(`${c.unread} new mention${c.unread===1?'':'s'}`);
+  if(!parts.length) return c.todo?`${c.todo} to do`:'All clear';
+  return parts.slice(0,2).join(' · ');
+}
+function inboxButton(){
+  const c=inboxCounts();
+  const label=c.total?`Inbox, ${c.todo} to do, ${c.unread} unread mention${c.unread===1?'':'s'}`:'Inbox, all clear';
+  const ring=c.total&&(c.unread||c.urgent)&&!S.ringDone?' ring':'';
+  return `<button class="inboxBtn ${c.total?'':'zero'}${ring}" id="inboxBtn" aria-expanded="${S.inboxOpen}" aria-controls="inboxPanel" aria-label="${label}">
+    <span class="ico">${I.tray}${c.total?`<span class="ibadge ${c.urgent?'urgent':''}">${c.total>99?'99+':c.total}</span>`:''}</span><span class="txt"><b>Inbox</b><small>${inboxSummary(c)}</small></span>
+  </button>`;
+}
+function boardMock(){
+  const cols=[
+    ['c-prog',[['Sept- W2 - CEO Guide to Say No','No date'],['Q4 Newsletter intro','Due Fri']]],
+    ['c-final',[['Newsjacking SM Post - SUEZ CANAL/ HURMZ REPORT','At risk · due in 1d']]],
+    ['d-prog',[['FFNT - Company Profile','Graphic Designer'],['Eid campaign banners','Due Sun']]],
+    ['final-check',[['AI Pillar SM Campaign - Post 3','Due today']]],
+    ['ready-publish',[['AI Pillar SM Campaign - Post 2','Scheduled Thu']]],
+  ];
+  return `<div class="board" aria-label="Board">${cols.map(([s,cards])=>`<div class="col"><h5><span class="d" style="width:8px;height:8px;border-radius:50%;background:${STAGE[s][1]}"></span>${STAGE[s][0]}<span class="n">${cards.length}</span></h5>
+    ${cards.map(([n,m])=>`<div class="bcard" style="--c:${STAGE[s][1]}">${esc(n)}<small>${esc(m)}</small></div>`).join('')}</div>`).join('')}</div>`;
+}
+function drawer(){
+  const c=inboxCounts();
+  const ment=S.events.filter(e=>e.kind==='mention');
+  const tab=S.inboxTab;
+  const enter=S.justOpened?' enter':''; S.justOpened=false;
+  return `<section class="drawer${enter}" id="inboxPanel" role="dialog" aria-label="Inbox">
+    <div class="dhead">
+      <div><h3>Inbox</h3><p>${c.total?`${c.todo} to do · ${c.unread} unread mention${c.unread===1?'':'s'}`:'All clear'}</p></div>
+      <div class="tools">
+        <button class="iconBtn" id="pinBtn" aria-pressed="${S.inboxPinned}" title="${S.inboxPinned?'Unpin: hide the inbox again':'Keep open beside the board'}" aria-label="Keep the inbox open beside the board">${I.pin}</button>
+        <button class="iconBtn" id="closeInbox" title="Close (Esc)" aria-label="Close inbox">${I.x}</button>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Inbox">
+      <button class="tab" role="tab" data-tab="todo" aria-selected="${tab==='todo'}">To do <span class="cnt">${c.todo}</span></button>
+      <button class="tab" role="tab" data-tab="mentions" aria-selected="${tab==='mentions'}">Mentions <span class="cnt ${c.unread?'new':''}">${c.unread||ment.length}</span></button>
+      <button class="tab" role="tab" data-tab="team" aria-selected="${tab==='team'}">Team</button>
+      <button class="tab" role="tab" data-tab="done" aria-selected="${tab==='done'}">Done <span class="cnt">${S.done.length}</span></button>
+    </div>
+    <div class="dbody">${inboxBody(tab)}</div>
+  </section>`;
+}
+function renderC(){
+  const open=S.inboxOpen||S.inboxPinned;
+  return header('c')+`
+  <div class="row2"><h2>Board</h2>${viewMenu()}</div>
+  <div class="stage ${S.inboxPinned?'pinned':''}">
+    ${boardMock()}
+    ${open?drawer():''}
+  </div>`;
+}
+function openInbox(){
+  const c=inboxCounts();
+  S.inboxOpen=true; S.justOpened=true; S.ringDone=true;
+  S.inboxTab=c.todo?'todo':c.unread?'mentions':'team';
+  render(); $('#inboxPanel [aria-selected="true"]')?.focus();
+}
+function closeInbox(){S.inboxOpen=false;S.inboxPinned=false;render();$('#inboxBtn')?.focus()}
+
+/* ---------- rail ---------- */
+const NOTES={
+  now:{h:'Today',p:'The section as it is now, with the issues from the analysis.',items:[
+    ['N1','Approvals waiting on you (C-Review, Final check) are missing: only tasks assigned to you are listed.'],
+    ['N3','“193 published” sits inside a to-do card.'],
+    ['H3','The bell counts every mention ever (17) and never goes down.'],
+    ['A1','“Moved to D-In Progress” shows your avatar, though nobody recorded who moved it.'],
+    ['A2','“just now” on a stage move that only has a date, no time.'],
+    ['A3','Your own upload shows up in your own feed.'],
+    ['L1','The cards are different heights, leaving empty space.']],
+    try:['Click anything to compare later with A and B.']},
+  a:{h:'Option A · Tighten',p:'Same two cards, cleaned up. No database change.',items:[
+    ['N1','Approvals waiting for your role are listed first, with Approve and Send back.'],
+    ['N2','Every row says why it is here, with its stage and SLA status.'],
+    ['N5','Quick actions on hover: Set date, Move on, Approve.'],
+    ['N3·N4','No published count; the pink note becomes a “late” chip, shown only when something is late.'],
+    ['H3','The bell counts what is new since you last opened it, then clears.'],
+    ['A1·A6','Stage moves say what moved, with no avatar claiming who did it.'],
+    ['A2','A date-only move says “today”, never “just now”.'],
+    ['A3·A4','Your own actions are hidden (Show mine to see them); labelled icons replace coloured dots.'],
+    ['—','Two updates on the same task become one line.'],
+    ['H2·L2','“Upstream” and “Your week” move into one View menu.'],
+    ['L1','Equal-height cards; the attention card gets more width.']],
+    cost:['What it needs','A query change for approvals by role, plus “last opened” for the bell, kept in the browser. No schema change.'],
+    try:['Hover a row and press Approve →.','Set a date on the CEO Guide task.','Open the bell: it clears.','Toggle Show mine.']},
+  b:{h:'Option B · Inbox',p:'One place for what needs you, with read and unread.',items:[
+    ['N1·N2','To do: approvals, due today and undated work, each with a reason.'],
+    ['H3','The bell number is the inbox’s unread count; clicking it jumps to the inbox.'],
+    ['—','Mentions get their own tab: unread first, reply in place, Mark read.'],
+    ['—','Snooze (“Tomorrow”) hides a task until the next day.'],
+    ['N3','Achievements move to Done this week, where 193 published belongs.'],
+    ['A3','Team updates show other people’s work only; mentions live in the inbox.']],
+    cost:['What it needs','A small read/unread table for mentions and snoozes, plus the approvals query. An event log later lets Team updates name who moved what.'],
+    try:['Click the bell.','Open Mentions, reply, Mark read: the counts drop.','Snooze a task with Tomorrow.','Open Done this week.']},
+  c:{h:'Option B · Inbox button',p:'Option B, hidden by default. The board comes first; your inbox is one button with a number.',items:[
+    ['—','No “for you” cards above the board: the board starts right under the header.'],
+    ['H3','One Inbox button replaces the bell. Its number is what needs you: to-dos plus unread mentions.'],
+    ['—','The button stands out: filled purple, second only to New task, with a line saying what is waiting (“2 reviews waiting · 1 due today”).'],
+    ['—','A soft ring pulses three times when something is new or urgent, and stops once you open the Inbox.'],
+    ['—','The number turns orange when something is due today or late. With nothing waiting, the button goes quiet (outlined, “All clear”).'],
+    ['—','Click it and the details open as a panel over the board: To do, Mentions, Team, Done.'],
+    ['N1·N2','To do lists approvals and your tasks, each with a reason and its actions.'],
+    ['—','Replying, Mark read, Approve or Tomorrow lower the number right away.'],
+    ['—','The pin keeps the panel open beside the board, for people who want it always visible.'],
+    ['—','Esc, ✕ or a click on the board closes it; focus goes back to the button.']],
+    cost:['What it needs','The same as Option B: a small read/unread table for mentions and snoozes, plus the approvals query. The pin is a per-person setting.'],
+    try:['Click Inbox (top right).','Approve a review or press Tomorrow: the number drops.','Open Mentions, reply or Mark read.','Press the pin, then click the board: the panel stays.','Press Esc to close.']},
+};
+function renderRail(){
+  const n=NOTES[view];
+  $('#rail').innerHTML=`<div class="note"><h3>${n.h}</h3><p>${n.p}</p><ul>${n.items.map(([t,x])=>`<li><span class="tag">${t}</span><span>${x}</span></li>`).join('')}</ul>${n.cost?`<div class="cost"><b>${n.cost[0]}</b>${n.cost[1]}</div>`:''}</div>
+  <div class="note try"><h3>Try it</h3><ul>${n.try.map(x=>`<li><span>→</span><span>${x}</span></li>`).join('')}</ul></div>`;
+}
+
+/* ---------- render + events ---------- */
+function render(){
+  $('#app').innerHTML = view==='now'?renderNow():view==='a'?renderA():view==='b'?renderB():renderC();
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===view)));
+  renderRail();
+}
+const HASH={now:'today',a:'option-a',b:'option-b',c:'inbox-button'};
+const fromHash=h=>({'#today':'now','#option-a':'a','#option-b':'b','#inbox-button':'c'}[h]||'c');
+function setView(v){view=v;S=fresh();try{history.replaceState(null,'','#'+HASH[v])}catch{};render()}
+document.querySelector('.seg').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setView(b.dataset.v)});
+
+function advance(id,label){
+  const t=S.tasks.find(x=>x.id===id); if(!t) return;
+  const next=NEXT[t.stage]; S.tasks=S.tasks.filter(x=>x.id!==id);
+  if(next) S.done.unshift({name:t.name,when:'just now'});
+  toast(`${t.name.slice(0,38)}… moved to ${next?STAGE[next]?.[0]??'the next stage':'the next stage'}`);
+}
+$('#app').addEventListener('click',e=>{
+  const b=e.target.closest('button,[data-open]'); if(!b) return;
+  const d=b.dataset;
+  if(b.id==='inboxBtn'){if(S.inboxOpen||S.inboxPinned)closeInbox();else openInbox();return}
+  if(b.id==='closeInbox'){closeInbox();return}
+  if(b.id==='pinBtn'){S.inboxPinned=!S.inboxPinned;S.inboxOpen=true;render();toast(S.inboxPinned?'Inbox stays open beside the board':'Inbox goes back to hiding');return}
+  if(b.id==='bellBtn'){
+    if(view==='a'){S.bellOpen=!S.bellOpen; if(S.bellOpen) S.bellSeen=true; render(); return}
+    if(view==='b'){S.inboxTab=S.events.some(x=>x.kind==='mention'&&x.unread)?'mentions':'todo';render();const ib=$('#inbox');ib.scrollIntoView({behavior:'smooth',block:'center'});ib.classList.add('flash');return}
+    toast('17 notifications: every mention you have ever had, plus anything due');return}
+  if(b.id==='upBtn'){S.upstream=!S.upstream;render();toast(S.upstream?'Board shows the columns before design':'Board hides the columns before design');return}
+  if(b.id==='weekBtn'){toast('Opens Week Momentum and Daily Spark above the cards');return}
+  if(b.id==='viewAll'){toast('Goes to the Overview page, which is not a full history');return}
+  if(b.id==='newBtn'){toast('Opens the New task form');return}
+  if(b.id==='viewBtn'){S.viewOpen=!S.viewOpen;render();return}
+  if(b.id==='mineBtn'){S.showMine=!S.showMine;render();return}
+  if(b.id==='readAll'){S.events.forEach(x=>x.unread=false);render();toast('All mentions marked read');return}
+  if(b.id==='unsnooze'){S.snoozed=[];render();return}
+  if(d.tab){S.inboxTab=d.tab;render();return}
+  if(d.approve){e.stopPropagation();advance(d.approve);render();return}
+  if(d.back){e.stopPropagation();const t=S.tasks.find(x=>x.id===d.back);S.tasks=S.tasks.filter(x=>x.id!==d.back);toast(`Sent back to ${STAGE[PREV[t.stage]]?.[0]??'the previous stage'} with a note`);render();return}
+  if(d.date){e.stopPropagation();S.dateFor=d.date;render();const i=$('#date-'+d.date);i&&i.focus();return}
+  if(d.setdate){e.stopPropagation();const v=$('#date-'+d.setdate)?.value;const t=S.tasks.find(x=>x.id===d.setdate);
+    if(!v){toast('Pick a date first');return}
+    const days=Math.round((new Date(v)-new Date(new Date().toDateString()))/864e5);t.due=days;S.dateFor=null;render();toast('Due date set');return}
+  if(d.snooze){e.stopPropagation();S.snoozed.push(d.snooze);render();toast('Hidden until tomorrow');return}
+  if(d.read){S.events.find(x=>x.id===d.read).unread=false;render();return}
+  if(d.reply){const i=$('#rep-'+d.reply);if(!i.value.trim()){i.focus();return}const ev=S.events.find(x=>x.id===d.reply);ev.unread=false;render();toast('Reply posted on the task');return}
+  if(d.feed){const ev=S.events.find(x=>x.id===d.feed);toast(ev.kind==='mention'||ev.kind==='comment'?`Opens the task at ${ev.who}’s comment`:'Opens the task');return}
+  if(d.open){
+    if(e.target.closest('.acts,input')) return;
+    if(view==='a'&&S.bellOpen){S.bellOpen=false;S.bellSeen=true;render()}
+    toast('Opens the task panel');return}
+});
+$('#app').addEventListener('change',e=>{
+  if(e.target.id==='optWeek'){S.week=e.target.checked;render()}
+  if(e.target.id==='optUp'){S.upstream=e.target.checked;toast(S.upstream?'Board shows the columns before design':'Board hides the columns before design')}
+});
+$('#app').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.matches('.trow[data-open]')){toast('Opens the task panel')}
+  if(e.key==='Escape'&&(S.bellOpen||S.viewOpen)){S.bellOpen=false;S.viewOpen=false;render();return}
+  if(e.key==='Escape'&&S.inboxOpen&&!S.inboxPinned){closeInbox()}
+});
+document.addEventListener('click',e=>{
+  if(!e.target.isConnected) return; // the clicked node was replaced by a re-render
+  if((S.bellOpen||S.viewOpen)&&!e.target.closest('.drop,.menu,#bellBtn,#viewBtn')){S.bellOpen=false;S.viewOpen=false;render()}
+  if(view==='c'&&S.inboxOpen&&!S.inboxPinned&&!e.target.closest('.drawer,#inboxBtn,#toast')){closeInbox()}
+});
+
+view=fromHash(location.hash); render();
+window.addEventListener('hashchange',()=>{const v=fromHash(location.hash);if(v!==view)setView(v)});
+</script>
+
+</body></html>

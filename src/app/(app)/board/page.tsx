@@ -9,7 +9,8 @@ export default async function BoardPage() {
   const member = await getSessionMember()
   if (!member) redirect('/login')
 
-  const [tasks, members, brands, contentTypes, slaRows, themes] = await Promise.all([
+  const now = new Date()
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -60,6 +61,10 @@ export default async function BoardPage() {
         pillars: { select: { id: true, name: true, sort_order: true } },
       },
     }),
+    // The Inbox (spec 006): this member's read mentions, live put-offs and prefs.
+    prisma.mentionRead.findMany({ where: { member_id: member.id }, select: { comment_id: true } }),
+    prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
+    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true } }),
   ])
 
   const today = new Date()
@@ -77,6 +82,13 @@ export default async function BoardPage() {
         slaConfig={mapSlaConfig(slaRows)}
         themes={themes.map(mapTheme)}
         hasStorage={storageConfigured()}
+        inbox={{
+          readIds:  reads.map(r => r.comment_id),
+          snoozes:  Object.fromEntries(snoozes.map(z => [z.task_id, z.until.toISOString()])),
+          since:    (prefs?.inbox_since ?? now).toISOString(),
+          pinned:   prefs?.inbox_pinned ?? false,
+          showWeek: prefs?.show_week ?? false,
+        }}
         today={today}
       />
     </div>

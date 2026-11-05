@@ -10,3 +10,7 @@
 | **§VI State Architecture** | No store change. `BoardView` gains `'content'`; `FrequencyPeriod`, `AudienceKey`, `LinkRole` and `ContentTheme` are added to the types first. Show archived is a per-device preference (§VI 2.1.0). |
 | **Tech Stack** | No new dependency. |
 | **Schema** | `content_pillars` (new); theme fields on `projects`; `tasks.pillar_id`, `tasks.post_url`; `task_attachments.link_role`. All nullable or defaulted, applied with `db push`; the seed adds three content types. |
+
+**Amended 2026-11-05 (team columns):**
+- A new piece is now owned by its theme's owner, not by whoever adds it.
+- A `user` who adds a piece to a theme they don't own becomes its assignee. They keep edit rights through the assignee rule, so the §III exception's reach is unchanged.

@@ -432,9 +432,34 @@ The team's content plan as a third view, **Board | Sheet | Content** (spec 009, 
   - matches tasks by Task Link;
   - never stores a non-link as a link.
 - **Who may add pieces:** admins, superusers, a theme's owner, and members who own or are assigned a live piece in it. Only admins and superusers create themes.
+- **Columns** (the team sheet's): Title, Type, Status, Assignee, Working Doc, Design Link, Task Link, LinkedIn Link, Published Link, Pillar, Date.
+  - **Type** is a filled pill, coloured from `CONTENT_TYPE_COLORS` in `src/lib/tokens.ts`.
+  - **Task Link** opens the piece's task.
+  - **Theme rows** read "Strategy · 7". Owner, frequency, cadence and audience are in the name's tooltip and the theme editor.
+- **Owner:** there is no Owner column. A new piece is owned by its theme's owner (Samaa for the content plan). A member who is not the owner, an admin or a superuser becomes its assignee, so they can still edit it.
 - **Test it.**
   - `npm run lab:sheet -- cus content` runs the Content scenarios.
   - `npx tsx scripts/sheet-lab/seed-content.ts out.html` seeds the seven linked tasks for checks against the running app.
+
+### Board Inbox
+
+What needs you, behind one header button (spec 006, `specs/006-board-inbox/`). It replaced the bell and the four "for you" cards. Design: `design/board-inbox.html` (tab "Option B · Inbox button").
+
+- **One model.** `src/lib/inbox.ts` (`inboxModel`) works out every list from the tasks the board already holds. The button's number and the panel come from the same call, so they cannot disagree.
+  - **Reviews:** a live task in a review stage whose `owner_role` is your role. The same rule as `holdsStage`.
+  - **Your tasks:** `(assignee ?? owner) = you`, in a working stage, late, due today or undated.
+  - **Mentions:** comments whose `mentions` include you.
+  - **Team:** other people's comments and files on tasks you own or are assigned, plus the current stage entry. No names on moves, because there is no event log.
+  - **Done:** your Published tasks this week, plus the all-time total.
+- **Records.**
+  - `mention_reads` (read state, per member and comment);
+  - `task_snoozes` (Tomorrow, until the next local midnight, capped at 36 h);
+  - `members.inbox_since`: mentions older than this minus 7 days start read. It was set by `db push` for existing members.
+  - `members.inbox_pinned` and `members.show_week`.
+  - Actions are in `src/actions/inbox.ts`. They act only for the signed-in member.
+- **Moves.** Approve, Send back and Move on go through the board's `moveTo` (`setTaskStage`), so the rule and the celebration are the board's. The Send back note is `addComment`, naming the owner. Set date is `updateTask`.
+- **Browser storage.** Only the pulse's "seen" list (`momentum.inbox.seen`), and the existing `momentum.board.upstream` for Columns before design.
+- **Test it.** `npm run lab:inbox`: 11 Node checks and 38 browser scenarios, no database.
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
@@ -744,6 +769,8 @@ Run through this after the first successful deploy.
 | Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
 | Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
 | Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
+| Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
+| Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
 ---

@@ -9,6 +9,7 @@ const P2 = '3be798dc-ba7a-4742-a1df-d48722c2b039'
 const SUEZ = '76fd7193-0db7-4564-946d-1fcf2bc72e13'
 const POST1 = 'f51f43c9-069d-46af-95c0-04cba2f72efa'
 const summary = t => t.page.locator('[data-summary]').innerText().then(s => s.replace(/\s+/g, ' '))
+const themeTip = t => t.page.getAttribute('[data-cell="t:th-strategy|title"] .fx-content-theme', 'title').then(x => x ?? '')
 const stageText = async (t, key) => (await t.page.locator(`[data-cell="${key}|status"] .fx-sheet-ellipsis`).first().innerText()).trim()
 
 async function pastePlan(t, kind = 'html') {
@@ -38,8 +39,10 @@ export const content = [
     async run(t) {
       const rows = await t.rows()
       t.eq(rows.slice(0, 2), ['t:th-strategy', 'p:pl-ai'], 'theme, then its pillar')
-      const line = (await t.text('t:th-strategy', 'title')).replace(/\s+/g, ' ')
-      for (const s of ['Strategy', 'Samaa', '2 per week', 'this week 1 of 2', 'C-Level of large companies', 'Strategy Heads', 'Top Management']) t.assert(line.includes(s), `theme row shows ${s}: ${line}`)
+      const line = (await t.text('t:th-strategy', 'title')).replace(/\s+/g, ' ').trim()
+      t.eq(line, '▾ Strategy · 2', 'the theme row is simple: name and pieces')
+      const tip = await themeTip(t)
+      for (const s of ['Samaa', '2 per week', 'this week 1 of 2', 'C-Level of large companies', 'Strategy Heads', 'Top Management']) t.assert(tip.includes(s), `its tooltip has ${s}: ${tip}`)
       t.assert((await t.text('p:pl-ai', 'title')).includes('AI'), 'pillar row')
       t.eq(rows.indexOf(`k:${POST1}`) < rows.indexOf('k:v1'), true, 'pillar pieces, then pieces without a pillar')
       t.eq(rows.at(-1), 'a:th-strategy', '+ Piece ends the theme')
@@ -49,7 +52,7 @@ export const content = [
     id: 'cus1-2', hash: C,
     async run(t) {
       const heads = await t.page.$$eval('[role="columnheader"]', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
-      t.eq(heads, ['Title', 'Type', 'Status', 'Owner', 'Assignee', 'Pillar', 'Working doc', 'Design', 'Post', 'Published', 'Date', 'Archive or restore'], 'piece columns')
+      t.eq(heads, ['Title', 'Type', 'Status', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Date', 'Archive or restore'], 'piece columns')
       t.eq(await t.page.getAttribute('[data-cell="t:th-strategy|title"]', 'class').then(c => c.includes('is-span')), true, 'the theme row spans the columns')
     },
   },
@@ -75,7 +78,7 @@ export const content = [
     async run(t) {
       await t.page.locator('[data-cell="t:th-strategy|title"] .fx-sheet-caret').click()
       t.eq(await t.rows(), ['t:th-strategy'], 'collapsed')
-      t.assert((await t.text('t:th-strategy', 'title')).includes('2 pieces'), 'says how many')
+      t.assert((await t.text('t:th-strategy', 'title')).replace(/\s+/g, ' ').includes('Strategy · 2'), 'says how many')
       await t.focusCell('t:th-strategy', 'rowNo')
       await t.page.keyboard.press('Escape')
       await t.page.keyboard.press('Space')
@@ -194,7 +197,7 @@ export const content = [
       t.assert((await t.page.locator('[data-sheet-pop]').innerText()).includes('Published! Paste the published link'), 'asks for the published link')
       await t.page.locator('[data-sheet-pop] input').fill('https://www.forefront.consulting/p2')
       await t.page.keyboard.press('Enter')
-      await t.page.waitForFunction(() => /post link/.test(document.querySelector('[data-sheet-pop]')?.textContent ?? ''))
+      await t.page.waitForFunction(() => /LinkedIn link/.test(document.querySelector('[data-sheet-pop]')?.textContent ?? ''))
       await t.page.locator('[data-sheet-pop] input').fill('https://www.linkedin.com/posts/p2')
       await t.page.keyboard.press('Enter')
       await t.idle(200)
@@ -263,7 +266,7 @@ export const content = [
       await t.page.locator('[data-menu-item="publish"]').click()
       await t.idle(200)
       await t.page.keyboard.press('Escape')
-      t.assert((await t.text('t:th-strategy', 'title')).includes('this week 2 of 2 ✓'), 'cadence met')
+      t.assert((await themeTip(t)).includes('this week 2 of 2'), 'cadence met')
     },
   },
   {
@@ -281,7 +284,7 @@ export const content = [
       const call = (await t.lab()).calls.find(c => c.fn === 'saveTheme')
       t.eq(call.args[1].frequency_count, 3, 'frequency saved')
       t.eq(call.args[1].audience, ['c-level', 'strategy-heads', 'top-management', 'second-line'], 'audience, in list order')
-      t.assert((await t.text('t:th-strategy', 'title')).includes('3 per week'), 'shown')
+      t.assert((await themeTip(t)).includes('3 per week'), 'shown')
     },
   },
   {
@@ -329,6 +332,34 @@ export const content = [
       t.eq((await t.lab()).calls.filter(c => c.fn === 'addPiece').map(c => c.args), [['th-strategy', { title: 'Strategy in 90 seconds', pillarId: null }]], 'added')
       const added = (await t.tasks()).find(x => x.name === 'Strategy in 90 seconds')
       t.eq([added.task_owner_id, added.status, added.project_id], ['samaa', 'todo', 'th-strategy'], 'owned by her, Planned, in the theme')
+    },
+  },
+  {
+    id: 'cus7-owner', hash: `${C}&me=raneem`,
+    async run(t) {
+      // An admin adding to Samaa's theme: Samaa owns it, nobody is assigned.
+      await t.cell('a:th-strategy', 'title').click()
+      await t.page.keyboard.type('Board brief')
+      await t.page.keyboard.press('Enter')
+      await t.idle(200)
+      const added = (await t.tasks()).find(x => x.name === 'Board brief')
+      t.eq([added.task_owner_id, added.assignee_id], ['samaa', null], "the theme's owner owns new pieces")
+    },
+  },
+  {
+    id: 'cus-columns', hash: C,
+    async run(t) {
+      // Task Link: every piece links to its task; activating it opens the task.
+      t.eq((await t.text(`k:${POST1}`, 'task')).trim(), 'Open task', 'Task Link shown')
+      t.eq(await t.page.getAttribute(`[data-cell="k:${POST1}|task"] a`, 'href'), `/board?task=${POST1}`, 'a link to the task')
+      await t.cell(`k:${POST1}`, 'task').click()
+      await t.idle(100)
+      t.eq((await t.lab()).opened.map(o => o.id), [POST1], 'opens the task')
+      // Type: a filled pill, one colour per type.
+      const bg = key => t.page.$eval(`[data-cell="${key}|type"] .fx-content-type`, e => getComputedStyle(e).backgroundColor)
+      t.eq((await t.text(`k:${POST1}`, 'type')).trim(), 'Post', 'type text')
+      t.assert((await bg(`k:${POST1}`)) !== (await bg('k:v1')), 'Post and Video have different colours')
+      t.eq(await t.page.$$eval('[role="columnheader"]', hs => hs.some(h => h.textContent === 'Owner')), false, 'no Owner column')
     },
   },
   {
@@ -384,7 +415,9 @@ export const content = [
       t.eq(await t.active(), 'k:v1|rowNo', 'down to the video')
       for (let i = 0; i < 3; i++) await t.page.keyboard.press('ArrowRight')
       t.eq(await t.active(), 'k:v1|status', 'across to its status')
-      await t.page.keyboard.press('Enter'); await t.page.keyboard.press('Enter')
+      await t.page.keyboard.press('Enter')
+      await t.page.waitForFunction(() => document.activeElement?.matches('[data-sheet-menu] [role="menuitem"]'))
+      await t.page.keyboard.press('Enter')
       await t.idle(200)
       t.eq((await t.task('v1')).status, 'd-check', 'moved by keyboard')
     },

@@ -83,6 +83,7 @@ export const us7 = [
       await t.page.keyboard.press('Home')
       await t.page.keyboard.press('Enter')
       t.eq(await t.menuItems(), ['restore', 'task'], 'the row menu offers Restore')
+      await t.page.waitForFunction(() => document.activeElement?.matches('[data-sheet-menu] [role="menuitem"]'))
       await t.page.keyboard.press('Enter')
       await t.idle(200)
       t.eq((await t.task('c13')).dropped_at, null, 'restored from the Editing set')

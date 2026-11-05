@@ -2,24 +2,29 @@
 
 /**
  * The Content sheet's grid (spec 009): the content model over the shared
- * GridCore. Theme and pillar rows span the columns; pieces carry title, type,
- * status in content words, owner, assignee, pillar, four links, date and
- * archive; an expanded video piece shows its clips.
+ * GridCore. Theme and pillar rows span the columns and read simply, "Strategy
+ * · 5". Pieces carry title, a coloured type, status in content words,
+ * assignee, the team sheet's link columns (Working Doc, Design Link, Task
+ * Link, LinkedIn Link, Published Link), pillar, date and archive; an expanded
+ * video piece shows its clips. There is no Owner column: a theme's owner
+ * (Samaa for the content plan) owns its pieces, and the sheet works by
+ * assignee.
  */
 import { useTranslations } from 'next-intl'
-import type { AudienceKey, ContentTheme, Member, Task, TaskAttachment } from '@/types/index'
+import type { ContentTheme, Member, Task, TaskAttachment } from '@/types/index'
 import { GridCore, type ActiveCell, type GridCol, type GridModel } from '@/components/sheet/GridCore'
 import { StatusContent } from '@/components/sheet/StatusCell'
 import { EditorContent } from '@/components/sheet/EditorCell'
 import { siteName } from '@/lib/content-plan'
 import type { ContentRow } from './rows'
 import { cadence } from './summary'
+import { contentTypeColor } from '@/lib/tokens'
 
-export const CONTENT_COLS = ['title', 'type', 'status', 'owner', 'assignee', 'pillar', 'doc', 'design', 'post', 'published', 'date', 'archive'] as const
+export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
 export type ContentCol = typeof CONTENT_COLS[number]
 const WIDTHS: Record<string, number> = {
-  title: 300, type: 112, status: 136, owner: 112, assignee: 120, pillar: 120,
-  doc: 120, design: 110, post: 110, published: 124, date: 104, archive: 80,
+  title: 300, type: 130, status: 156, assignee: 130,
+  doc: 124, design: 116, task: 104, post: 120, published: 128, pillar: 120, date: 104, archive: 80,
 }
 export const LINK_COLS = ['doc', 'design', 'post', 'published'] as const
 
@@ -75,35 +80,38 @@ export function ContentGrid(p: ContentGridProps) {
     if (row.kind === 'add' || row.kind === 'draft') return false
     if (row.kind === 'theme' || row.kind === 'pillar') return col === 'title' || col === 'rowNo'
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
-    return ['rowNo', 'type', 'status', 'assignee', 'pillar', 'doc', 'design', 'post', 'published', 'archive'].includes(col)
+    return ['rowNo', 'type', 'status', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
   }
 
+  /**
+   * A theme reads like a pillar, "Strategy · 5": its name and its live pieces.
+   * Owner, frequency, cadence and audience stay in the theme editor and in the
+   * name's tooltip.
+   */
   function themeLine(row: Extract<ContentRow, { kind: 'theme' }>) {
     const th = row.theme
     const c = cadence(th, row.pieces, p.now)
     const owner = th.owner_id ? byId.get(th.owner_id)?.name : null
+    const tip = [
+      owner ?? t('theme.noOwner'),
+      th.frequency_count ? t(th.frequency_period === 'month' ? 'theme.perMonth' : 'theme.perWeek', { n: th.frequency_count }) : null,
+      c ? t(c.period === 'month' ? 'theme.cadenceMonth' : 'theme.cadenceWeek', { done: c.done, target: c.target }) : null,
+      th.audience.length ? th.audience.map(a => t(`audience.${a}`)).join(', ') : null,
+    ].filter(Boolean).join(' · ')
     return (
-      <span className="fx-content-theme">
+      <span className="fx-content-theme" title={tip} data-cadence={c ? `${c.done}/${c.target}` : undefined}>
         <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>
         <span className="fx-content-theme-name">{th.name}</span>
-        {row.collapsed && <span className="fx-sheet-count">{t('theme.pieces', { count: row.pieces.filter(x => !x.dropped_at).length })}</span>}
-        <span className="fx-content-meta">{owner ?? t('theme.noOwner')}</span>
-        <span className="fx-content-meta">
-          {th.frequency_count
-            ? <>
-                {t(th.frequency_period === 'month' ? 'theme.perMonth' : 'theme.perWeek', { n: th.frequency_count })}
-                {c && <> · <span className={c.met ? 'fx-content-ok' : 'fx-content-behind'} data-cadence="">
-                  {t(c.period === 'month' ? 'theme.cadenceMonth' : 'theme.cadenceWeek', { done: c.done, target: c.target })}{c.met ? ' ✓' : ''}
-                </span></>}
-              </>
-            : t('theme.noFrequency')}
-        </span>
-        {th.audience.length > 0 && (
-          <span className="fx-content-meta fx-sheet-ellipsis">{th.audience.map((a: AudienceKey) => t(`audience.${a}`)).join(' · ')}</span>
-        )}
+        <span className="fx-sheet-muted"> · {row.pieces.filter(x => !x.dropped_at).length}</span>
       </span>
     )
+  }
+
+  /** The type as a filled pill, one colour per content type. */
+  function typePill(label: string | null | undefined) {
+    if (!label) return null
+    return <span className="fx-content-type" style={{ background: contentTypeColor(label) }}>{label}</span>
   }
 
   function linkCell(task: Task, col: typeof LINK_COLS[number], can: boolean) {
@@ -156,6 +164,7 @@ export function ContentGrid(p: ContentGridProps) {
       if (!task) return ''
       if (col === 'title') return task.name
       if (col === 'date') return task.due_date ?? ''
+      if (col === 'task') return `${typeof window !== 'undefined' ? window.location.origin : ''}/board?task=${task.id}`
       return ''
     },
     describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
@@ -212,9 +221,8 @@ export function ContentGrid(p: ContentGridProps) {
             </span>
           )
         }
-        case 'type':     return <span className="fx-sheet-ellipsis">{task.content_type_label}</span>
+        case 'type':     return typePill(task.content_type_label)
         case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} />
-        case 'owner':    return <span className="fx-sheet-ellipsis">{byId.get(task.task_owner_id)?.name ?? ''}</span>
         case 'assignee': return <EditorContent member={task.assignee_id ? byId.get(task.assignee_id) : undefined} t={ts} />
         case 'pillar': {
           if (isClip) return null
@@ -223,6 +231,12 @@ export function ContentGrid(p: ContentGridProps) {
         }
         case 'doc': case 'design': case 'post': case 'published':
           return isClip ? null : linkCell(task, col, can)
+        case 'task':
+          // Every piece is a task: its link is always there (FR: the team sheet's Task Link).
+          return isClip ? null : (
+            <a className="fx-sheet-link fx-sheet-ellipsis" href={`/board?task=${task.id}`} tabIndex={-1}
+               onClick={e => e.preventDefault()}>{t('links.openTask')}</a>
+          )
         case 'date':
           if (isClip) return null
           if (task.status === 'publish') return <span className="fx-sheet-ellipsis">{t('date.published', { date: shortDate(task.stage_date) })}</span>

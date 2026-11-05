@@ -433,13 +433,13 @@
       "title": "Title",
       "type": "Type",
       "status": "Status",
-      "owner": "Owner",
       "assignee": "Assignee",
+      "doc": "Working Doc",
+      "design": "Design Link",
+      "task": "Task Link",
+      "post": "LinkedIn Link",
+      "published": "Published Link",
       "pillar": "Pillar",
-      "doc": "Working doc",
-      "design": "Design",
-      "post": "Post",
-      "published": "Published",
       "date": "Date",
       "archive": "Archive or restore"
     },
@@ -508,10 +508,11 @@
       "clear": "Remove",
       "doc": "Working doc",
       "design": "Design",
-      "post": "Post",
+      "post": "LinkedIn",
       "published": "Published",
       "publishPrompt": "Published! Paste the published link",
-      "postPrompt": "And the post link (LinkedIn)"
+      "postPrompt": "And the LinkedIn link",
+      "openTask": "Open task"
     },
     "archive": {
       "archive": "Archive",
@@ -606,6 +607,111 @@
       "backTo": "Back to",
       "skipTo": "Skip to",
       "statusFor": "Move {name}"
+    }
+  },
+  "inbox": {
+    "button": {
+      "label": "Inbox",
+      "allClear": "All clear",
+      "sr": ", {todo} to do, {unread, plural, =0 {no unread mentions} one {# unread mention} other {# unread mentions}}"
+    },
+    "summary": {
+      "reviews": "{n, plural, one {# review waiting} other {# reviews waiting}}",
+      "late": "{n} late",
+      "today": "{n} due today",
+      "mentions": "{n, plural, one {# new mention} other {# new mentions}}",
+      "todo": "{n} to do"
+    },
+    "panel": {
+      "title": "Inbox",
+      "counts": "{todo} to do · {unread, plural, =0 {no unread mentions} one {# unread mention} other {# unread mentions}}",
+      "allClear": "All clear",
+      "pin": "Keep the Inbox open beside the board",
+      "unpin": "Unpin and close the Inbox",
+      "close": "Close Inbox"
+    },
+    "tabs": {
+      "label": "Inbox sections",
+      "todo": "To do",
+      "mentions": "Mentions",
+      "team": "Team",
+      "done": "Done",
+      "newCount": "{n} new"
+    },
+    "groups": {
+      "reviews": "Waiting for your review · {n}",
+      "yours": "Your tasks · {n}",
+      "snoozed": "Put off until tomorrow · {n}",
+      "bringBack": "Bring back"
+    },
+    "row": {
+      "arrivedToday": "Arrived today",
+      "waiting": "Waiting {n, plural, one {# day} other {# days}}",
+      "dueToday": "Due today",
+      "dueIn": "Due in {n, plural, one {# day} other {# days}}",
+      "late": "{n, plural, one {# day late} other {# days late}}",
+      "undated": "No due date",
+      "atRisk": "At risk",
+      "willMiss": "Will miss SLA",
+      "stuck": "Stuck",
+      "open": "Open {name}"
+    },
+    "actions": {
+      "approve": "Approve →",
+      "sendBack": "Send back",
+      "moveOn": "Move on →",
+      "setDate": "Set date",
+      "save": "Save",
+      "cancel": "Cancel",
+      "tomorrow": "Tomorrow",
+      "dueDate": "Due date for {name}",
+      "note": "Note for {name} (optional)",
+      "reply": "Reply",
+      "replyTo": "Reply to {name}…",
+      "replyLabel": "Reply to {name}",
+      "markRead": "Mark read",
+      "markAllRead": "Mark all read"
+    },
+    "mention": {
+      "line": "{name} mentioned you",
+      "unread": "Unread"
+    },
+    "team": {
+      "comment": "{name} commented",
+      "file": "{name} added {file}",
+      "move": "Moved to {stage}",
+      "publish": "Published"
+    },
+    "done": {
+      "published": "Published {when}",
+      "total": "{n, plural, one {# published in total} other {# published in total}}",
+      "emptyWeek": "Nothing published yet this week."
+    },
+    "when": {
+      "today": "today",
+      "yesterday": "yesterday",
+      "days": "{n}d ago",
+      "now": "just now",
+      "m": "{n}m ago",
+      "h": "{n}h ago",
+      "d": "{n}d ago"
+    },
+    "empty": {
+      "todo": "Nothing needs you right now.",
+      "mentions": "No mentions yet.",
+      "team": "No updates from the team yet.",
+      "clear": "All clear"
+    },
+    "errors": {
+      "generic": "That didn't work. Try again.",
+      "moved": "Already moved. The list is up to date.",
+      "denied": "You can't move this one."
+    },
+    "view": {
+      "button": "View",
+      "menu": "Board view",
+      "week": "Show your week",
+      "upstream": "Columns before design"
     }
   }
 }

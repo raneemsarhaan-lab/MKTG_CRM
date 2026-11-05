@@ -7,13 +7,13 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
-import { attentionItems } from '@/lib/home-metrics'
+import { inboxModel, openingTab } from '@/lib/inbox'
 import { initials, avatarColor } from '@/lib/utils'
 import {
-  setTaskStage, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip,
+  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip,
 } from '@/actions/tasks'
 import { useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
@@ -29,6 +29,11 @@ import {
 } from './BoardFilters'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
+import { InboxButton } from '@/components/inbox/InboxButton'
+import { InboxPanel } from '@/components/inbox/InboxPanel'
+import { ViewMenu } from '@/components/inbox/ViewMenu'
+import type { InboxApi } from '@/components/inbox/types'
+import { markMentionsRead, replyToMention, snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
@@ -52,7 +57,11 @@ interface KanbanBoardProps {
   hasStorage?: boolean
   /** The Content sheet's themes (spec 009). */
   themes?: ContentTheme[]
+  /** The signed-in member's Inbox records (spec 006). */
+  inbox?: InboxState
 }
+
+const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
 
 export function KanbanBoard({
   initialTasks,
@@ -64,6 +73,7 @@ export function KanbanBoard({
   today,
   hasStorage = false,
   themes: initialThemes = [],
+  inbox: initialInbox = NO_INBOX,
 }: KanbanBoardProps) {
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -430,7 +440,17 @@ export function KanbanBoard({
           setTasks(prev => [{
             ...base, id: res.id!, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null,
             brand_id: theme?.brand_id ?? '', content_type_label: 'Post', status: 'todo' as StageId, stage_date: now.slice(0, 10),
-            task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined, parent_task_id: null, parent: null,
+            // The theme's owner owns it; a member who is not becomes its assignee (addPiece).
+            ...(() => {
+              const ownerId = theme?.owner_id ?? currentUser.id
+              const admin = currentUser.access === 'admin' || currentUser.access === 'superuser'
+              const assigneeId = ownerId !== currentUser.id && !admin ? currentUser.id : null
+              return {
+                task_owner_id: ownerId, task_owner: members.find(m => m.id === ownerId) ?? currentUser,
+                assignee_id: assigneeId, assignee: assigneeId ? currentUser : undefined,
+              }
+            })(),
+            parent_task_id: null, parent: null,
             due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
             published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
           }, ...prev])
@@ -504,56 +524,105 @@ export function KanbanBoard({
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
-  const attention = useMemo(
-    () => attentionItems(liveTasks, currentUser.id, today),
-    [liveTasks, currentUser.id, today],
-  )
+  // ── The Inbox (spec 006) ──────────────────────────────────────────────────
+  // The member's read mentions, put-offs and prefs, kept here so every action
+  // lands at once and rolls back if the server says no (FR-029).
+  const [inbox, setInbox] = useState<InboxState>(initialInbox)
+  const inboxSig = JSON.stringify(initialInbox)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setInbox(initialInbox) }, [inboxSig])
 
-  /**
-   * The bell's contents.
-   *
-   * Two kinds of thing arrive here: somebody named you in a comment, and work
-   * of yours that is due or has slipped. Mentions come first — a person is
-   * waiting on an answer, which a date is not — and newest first inside that.
-   */
-  const notices = useMemo(() => {
-    const mentions = liveTasks.flatMap(t =>
-      (t.comments ?? [])
-        .filter(c => (c.mentions ?? []).includes(currentUser.id))
-        .map(c => ({
-          kind: 'mention' as const,
-          id: c.id,
-          taskId: t.id,
-          who: c.author?.name ?? 'Someone',
-          taskName: t.name,
-          body: c.body,
-          when: new Date(c.created_at).getTime(),
-        })),
-    ).sort((a, b) => b.when - a.when)
-
-    const due = attention
-      .filter(a => a.due === 'overdue' || a.due === 'today')
-      .map(a => ({ kind: 'due' as const, id: a.id, taskId: a.id, taskName: a.title, dueText: a.dueText }))
-
-    return { mentions, due, total: mentions.length + due.length }
-  }, [liveTasks, currentUser.id, attention])
-
-  const [bellOpen, setBellOpen] = useState(false)
-  const bellRef = useRef<HTMLDivElement>(null)
+  // "Now" is the server's day until mount, so the first render matches; then
+  // the device's own clock, ticking each minute for "today" and "late".
+  const [now, setNow] = useState<Date>(today)
   useEffect(() => {
-    if (!bellOpen) return
-    function onDown(e: MouseEvent) {
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false)
-    }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setBellOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [bellOpen])
+    setNow(new Date())
+    const id = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
+  const model = useMemo(
+    () => inboxModel({ tasks: liveTasks, member: currentUser, state: inbox, slaConfig, now }),
+    [liveTasks, currentUser, inbox, slaConfig, now],
+  )
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [inboxTab, setInboxTab] = useState<InboxTab>('todo')
+  const inboxBtn = useRef<HTMLButtonElement>(null)
+  const panelShown = inboxOpen || inbox.pinned
+
+  function openInbox() {
+    setInboxTab(openingTab(model.counts))
+    setInboxOpen(true)
+  }
+  function closeInbox() {
+    setInboxOpen(false)
+    if (inbox.pinned) void savePrefs({ pinned: false })
+    requestAnimationFrame(() => inboxBtn.current?.focus())
+  }
+
+  async function savePrefs(p: { pinned?: boolean; showWeek?: boolean }) {
+    const before = inbox
+    setInbox(s => ({ ...s, ...(p.pinned !== undefined ? { pinned: p.pinned } : {}), ...(p.showWeek !== undefined ? { showWeek: p.showWeek } : {}) }))
+    const res = await setInboxPrefs(p).catch(() => ({ success: false, error: 'generic' }))
+    if (!res.success) setInbox(before)
+    return res
+  }
+
+  /** Apply a local change now; undo it if the server refuses (FR-029). */
+  async function withInbox(change: (s: InboxState) => InboxState, run: () => Promise<{ success: boolean; error?: string }>) {
+    let before: InboxState | null = null
+    setInbox(s => { before = s; return change(s) })
+    let res: { success: boolean; error?: string }
+    try { res = await run() } catch { res = { success: false, error: 'generic' } }
+    if (!res.success && before) setInbox(before)
+    return res
+  }
+
+  const markRead = (ids: string[]) =>
+    withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, ...ids])] }), () => markMentionsRead(ids))
+
+  /** The task panel opens at this comment (Team and Mentions, FR-042). */
+  const [commentFor, setCommentFor] = useState<{ taskId: string; commentId: string } | null>(null)
+
+  const inboxApi: InboxApi = {
+    move: (taskId, to) => {
+      const task = tasks.find(t => t.id === taskId)
+      return task ? moveTo(task, to) : Promise.resolve({ success: false, shouldCelebrate: false, error: 'not_found' })
+    },
+    async comment(taskId, body, mentions) {
+      const res = await addComment(taskId, body, mentions).catch(() => ({ success: false, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async setDate(taskId, iso) {
+      const before = tasks.find(t => t.id === taskId)
+      if (!before) return { success: false, error: 'not_found' }
+      patchTask(taskId, { due_date: iso })
+      const res = await updateTask(taskId, { due_date: iso }).catch(() => ({ success: false, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { due_date: before.due_date })
+      else router.refresh()
+      return res
+    },
+    snooze: (taskId, until) =>
+      withInbox(s => ({ ...s, snoozes: { ...s.snoozes, [taskId]: until } }), () => snoozeTask(taskId, until)),
+    unsnooze: ids =>
+      withInbox(s => { const z = { ...s.snoozes }; ids.forEach(id => delete z[id]); return { ...s, snoozes: z } }, () => unsnoozeTasks(ids)),
+    markRead,
+    async reply(commentId, body) {
+      const res = await withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, commentId])] }), () => replyToMention(commentId, body))
+      if (res.success) router.refresh()
+      return res
+    },
+    setPrefs: savePrefs,
+    openTask(taskId, opts) {
+      // Opening a task from a mention reads it (FR-031).
+      const m = model.mentions.find(x => x.comment.id === opts?.commentId && x.unread)
+      if (m) void markRead([m.comment.id])
+      setCommentFor(opts?.commentId ? { taskId, commentId: opts.commentId } : null)
+      if (!inbox.pinned) setInboxOpen(false)
+      selectTask(taskId)
+    },
+  }
   /**
    * The stages before Ready to Design.
    *
@@ -571,15 +640,10 @@ export function KanbanBoard({
     const stored = window.localStorage.getItem('momentum.board.upstream')
     setShowUpstream(stored !== null ? stored === '1' : !startsDownstream(currentUser.role))
   }, [currentUser.role])
-  function toggleUpstream() {
-    setShowUpstream(v => {
-      window.localStorage.setItem('momentum.board.upstream', v ? '0' : '1')
-      return !v
-    })
+  function setUpstream(v: boolean) {
+    setShowUpstream(v)
+    try { window.localStorage.setItem('momentum.board.upstream', v ? '1' : '0') } catch { /* private mode */ }
   }
-  const upstreamCount = liveTasks.filter(
-    t => (UPSTREAM_STAGES as string[]).includes(t.status),
-  ).length
   const stagesInScope = showUpstream
     ? ALL_STAGES
     : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
@@ -699,8 +763,9 @@ export function KanbanBoard({
       allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
       hasStorage={hasStorage}
       initialPreviewId={previewFor?.taskId === selectedTask.id ? previewFor.previewId : undefined}
+      initialCommentId={commentFor?.taskId === selectedTask.id ? commentFor.commentId : undefined}
       onOpenSheet={openSheet}
-      onClose={() => { setPreviewFor(null); selectTask(null) }}
+      onClose={() => { setPreviewFor(null); setCommentFor(null); selectTask(null) }}
     />
   )
 
@@ -804,157 +869,17 @@ export function KanbanBoard({
             </svg>
           </div>
 
-          {/* The bell used to be a bare <svg> with a count on it — a number on
-              the screen you could not do anything with. It opens now, because
-              since mentions arrived there is something behind it: people
-              waiting on you, then your own work that is due or has slipped. */}
-          <div ref={bellRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => setBellOpen(v => !v)}
-              aria-haspopup="dialog"
-              aria-expanded={bellOpen}
-              aria-label={notices.total
-                ? `Notifications — ${notices.mentions.length} mention${notices.mentions.length === 1 ? '' : 's'}, ${notices.due.length} due`
-                : 'Notifications — nothing waiting'}
-              title="Notifications"
-              style={{
-                width: 38, height: 38, borderRadius: 10, border: 'none', padding: 0,
-                background: bellOpen ? PIPE.surface : 'transparent', cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onMouseEnter={e => { if (!bellOpen) e.currentTarget.style.background = PIPE.surface }}
-              onMouseLeave={e => { if (!bellOpen) e.currentTarget.style.background = 'transparent' }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={PIPE.ink}
-                   strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
-              </svg>
-            </button>
-            {notices.total > 0 && (
-              <span aria-hidden="true" style={{
-                position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20,
-                borderRadius: 999, background: PIPE.purple, color: '#FFF',
-                fontWeight: 700, fontSize: 11, border: '2px solid #FFFFFF',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
-                pointerEvents: 'none',
-              }}>
-                {notices.total > 99 ? '99+' : notices.total}
-              </span>
-            )}
-
-            {bellOpen && (
-              <div role="dialog" aria-label="Notifications" style={{
-                position: 'absolute', top: 46, insetInlineEnd: 0, zIndex: 20, width: 372,
-                maxHeight: 460, overflowY: 'auto', background: '#FFFFFF',
-                border: `1px solid ${PIPE.border}`, borderRadius: 14,
-                boxShadow: '0 14px 40px rgba(20,19,26,.18)', padding: 8,
-              }}>
-                {notices.total === 0 && (
-                  <p style={{ margin: 0, padding: '26px 12px', textAlign: 'center', fontSize: 13.5, color: PIPE.textMuted }}>
-                    Nothing waiting on you 🎉
-                  </p>
-                )}
-
-                {notices.mentions.length > 0 && (
-                  <div style={{
-                    padding: '8px 10px 6px', fontSize: 11, fontWeight: 800, letterSpacing: '.08em',
-                    textTransform: 'uppercase', color: PIPE.textMuted,
-                  }}>
-                    Mentions
-                  </div>
-                )}
-                {notices.mentions.map(n => (
-                  <button key={n.id} type="button"
-                          onClick={() => { setBellOpen(false); selectTask(n.taskId) }}
-                          style={NOTICE_ROW}
-                          onMouseEnter={e => { e.currentTarget.style.background = PIPE.surface }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                    <span style={{ fontSize: 13.5, color: PIPE.textPrimary }}>
-                      <strong style={{ fontWeight: 700 }}>{n.who}</strong> mentioned you
-                    </span>
-                    <span style={{
-                      fontSize: 12.5, color: PIPE.textSecondary, marginTop: 3,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {n.body}
-                    </span>
-                    <span style={{
-                      fontSize: 11.5, color: PIPE.textFaint, marginTop: 3,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {n.taskName}
-                    </span>
-                  </button>
-                ))}
-
-                {notices.due.length > 0 && (
-                  <div style={{
-                    padding: '10px 10px 6px', fontSize: 11, fontWeight: 800, letterSpacing: '.08em',
-                    textTransform: 'uppercase', color: PIPE.textMuted,
-                    borderTop: notices.mentions.length ? `1px solid ${PIPE.border}` : 'none',
-                    marginTop: notices.mentions.length ? 6 : 0,
-                  }}>
-                    Due
-                  </div>
-                )}
-                {notices.due.map(n => (
-                  <button key={n.id} type="button"
-                          onClick={() => { setBellOpen(false); selectTask(n.taskId) }}
-                          style={NOTICE_ROW}
-                          onMouseEnter={e => { e.currentTarget.style.background = PIPE.surface }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
-                    <span style={{
-                      fontSize: 13.5, color: PIPE.textPrimary,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {n.taskName}
-                    </span>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#D22040', marginTop: 3 }}>
-                      {n.dueText}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* The Inbox (spec 006): what needs you, behind one button. It
+              replaced the bell and the "for you" cards above the pipeline. */}
+          <InboxButton
+            ref={inboxBtn}
+            counts={model.counts}
+            ringKeys={model.ringKeys}
+            open={panelShown}
+            onToggle={() => (panelShown ? closeInbox() : openInbox())}
+          />
 
           <div className="fx-board-ident" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
-            {/* Upstream columns. Always present rather than only when hidden,
-                so the control does not move about depending on state. */}
-            <button
-              type="button"
-              onClick={toggleUpstream}
-              aria-pressed={showUpstream}
-              title={showUpstream
-                ? 'Hide the stages before Ready to Design'
-                : 'See what is coming before it reaches you'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 7, height: 38, padding: '0 14px',
-                borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5,
-                fontWeight: 700, whiteSpace: 'nowrap',
-                border: `1.5px solid ${showUpstream ? PIPE.ink : PIPE.border}`,
-                background: showUpstream ? '#F4FBD6' : '#FFFFFF',
-                color: PIPE.ink,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                <circle cx="12" cy="12" r="2.6" />
-              </svg>
-              {showUpstream ? 'Hide what\u2019s upstream' : 'Preview what\u2019s coming'}
-              {!showUpstream && upstreamCount > 0 && (
-                <span style={{
-                  minWidth: 18, height: 18, padding: '0 5px', borderRadius: 999,
-                  background: PIPE.ink, color: '#FFFFFF', fontSize: 10.5, fontWeight: 800,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {upstreamCount}
-                </span>
-              )}
-            </button>
 
             <span style={{
               width: 42, height: 42, borderRadius: '50%', boxSizing: 'border-box',
@@ -994,14 +919,12 @@ export function KanbanBoard({
         </div>
       </div>
 
-      <HeroCards
-        tasks={liveTasks}
-        currentUser={currentUser}
-        members={members}
-        today={today}
-        onOpenTask={id => selectTask(id)}
-      />
+      {/* Your week: off by default, turned on in the View menu (FR-002). */}
+      {inbox.showWeek && <HeroCards tasks={liveTasks} today={today} />}
 
+      {/* Pinned, the Inbox sits beside the board (FR-060); the board narrows. */}
+      <div className={inbox.pinned ? 'fx-board-split' : 'fx-board-main'}>
+      <div className="fx-board-area">
       <BoardFilters
         filters={filters}
         onChange={setFilters}
@@ -1012,6 +935,14 @@ export function KanbanBoard({
         total={scopedTasks.length}
         scope={scope}
         onScope={chooseScope}
+        trailing={
+          <ViewMenu
+            showWeek={inbox.showWeek}
+            onShowWeek={v => void savePrefs({ showWeek: v })}
+            upstream={showUpstream}
+            onUpstream={setUpstream}
+          />
+        }
       />
 
 
@@ -1120,6 +1051,27 @@ export function KanbanBoard({
           )}
         </DragOverlay>
       </DndContext>
+      </div>
+
+      {panelShown && (
+        <InboxPanel
+          model={model}
+          me={currentUser}
+          members={members}
+          now={now}
+          api={inboxApi}
+          tab={inboxTab}
+          onTab={setInboxTab}
+          pinned={inbox.pinned}
+          onPin={() => {
+            if (inbox.pinned) closeInbox()
+            else { setInboxOpen(true); void savePrefs({ pinned: true }) }
+          }}
+          onClose={closeInbox}
+          buttonRef={inboxBtn}
+        />
+      )}
+      </div>
 
       <BulkBar
         count={selected.size}
@@ -1147,14 +1099,6 @@ export function KanbanBoard({
       )}
     </div>
   )
-}
-
-/** A row in the bell's panel — three stacked lines, whole-row hit target. */
-const NOTICE_ROW: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-  width: '100%', minWidth: 0, padding: '9px 10px', border: 'none',
-  background: 'transparent', borderRadius: 9, cursor: 'pointer',
-  fontFamily: 'inherit', textAlign: 'start',
 }
 
 /** Board | Sheet (spec 008 FR-002). The sheet's own toolbar carries the same switch. */

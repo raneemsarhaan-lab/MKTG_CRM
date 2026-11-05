@@ -29,3 +29,5 @@ Thumbs.db
 
 # Sheet lab build output
 scripts/sheet-lab/out/
+# Inbox lab build output
+scripts/inbox-lab/out/

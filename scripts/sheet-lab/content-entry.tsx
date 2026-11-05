@@ -39,6 +39,11 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
   const admin = me.access === 'admin' || me.access === 'superuser'
   const canAct = (t: Task) => t.task_owner_id === me.id || t.assignee_id === me.id || admin
   const ctx = () => ({ tasks: lab.tasks, themes: lab.themes, members: CONTENT_MEMBERS, me })
+  /** As addPiece: the theme's owner owns a new piece; a member who is not becomes its assignee. */
+  const pieceOwner = (themeId: string) => {
+    const owner = lab.themes.find(x => x.id === themeId)?.owner_id ?? me.id
+    return { task_owner_id: owner, assignee_id: owner !== me.id && !admin ? me.id : null }
+  }
 
   const api: ContentApi = {
     async move(taskId, to): Promise<MoveTaskResult> {
@@ -145,7 +150,7 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
       if (!th || !mayAddTo(th, ctx())) return { success: false, error: 'may_not_add' }
       const id = `piece-${lab.tasks.length}`
       const base = lab.tasks.find(x => x.id === 'p1')!
-      setTasks(ts => [{ ...base, id, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null, content_type_label: 'Post', status: 'todo', task_owner_id: me.id, assignee_id: null, attachments: [], created_at: new Date().toISOString(), due_date: null }, ...ts])
+      setTasks(ts => [{ ...base, id, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null, content_type_label: 'Post', status: 'todo', ...pieceOwner(themeId), attachments: [], created_at: new Date().toISOString(), due_date: null }, ...ts])
       return { success: true, id }
     },
     async updatePiece(taskId, p) {
