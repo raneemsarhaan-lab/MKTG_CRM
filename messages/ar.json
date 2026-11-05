@@ -848,5 +848,30 @@
       "week": "إظهار أسبوعك",
       "upstream": "المراحل قبل التصميم"
     }
+  },
+  "header": {
+    "pipeline": "خط الإنتاج",
+    "content": "المحتوى",
+    "tabsLabel": "الصفحات",
+    "search": "ابحث في المهام والحملات والملفات…",
+    "searchOpen": "بحث",
+    "searchClose": "إغلاق البحث",
+    "mine": "مهامي",
+    "team": "مهام الفريق",
+    "scopeLabel": "مهام من",
+    "allBrands": "جميع البراندات",
+    "nBrands": "{n, plural, two {براندان} few {# براندات} many {# براندًا} other {# براند}}",
+    "brandsLabel": "البراندات",
+    "filters": "الفلاتر",
+    "filtersN": "الفلاتر · {n}",
+    "display": "خيارات العرض",
+    "board": "اللوح",
+    "sheet": "الجدول",
+    "viewLabel": "العرض",
+    "newTask": "مهمة جديدة",
+    "noProject": "{n, plural, one {مهمة واحدة بلا مشروع} two {مهمتان بلا مشروع} few {# مهام بلا مشروع} many {# مهمة بلا مشروع} other {# مهمة بلا مشروع}}",
+    "allAttached": "كل المهام لها مشروع",
+    "account": "{name}، {role}",
+    "showing": "يظهر {shown} من {total} مهمة"
   }
 }

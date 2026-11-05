@@ -56,6 +56,10 @@ The sheets stop filling `100dvh` themselves. They take the height left under the
 - **A new listbox primitive.** It would duplicate `FieldPill`. Rejected.
 - **Keep the logo row and add a dropdown.** The row is what wraps the toolbar (spec Context). Rejected.
 
+**As built (two changes from the decision above).**
+- **A small `HeaderMenu`, not `FieldPill`.** `FieldPill` places its panel with a fixed `left`, so it doesn't mirror in Arabic. It also has no arrow-key movement, which contract §3 requires. `src/components/board/HeaderMenu.tsx` is a small button-and-panel primitive for the brand menu and Filters. The panel opens from the start side, focus moves inside, and Esc returns focus to the button. `FieldPill` is unchanged for the task form.
+- **The pick rule fits a dropdown.** The old logo row started from "everything on", and clicking a logo turned that brand off. In a list with "All brands" at the top, picking a brand has to mean only that brand (US2, scenario 2). Further picks add brands, and picking a ticked brand removes it. Choosing every brand, or removing the last one, goes back to empty. Empty still means every brand everywhere `brandIds` is read. The rule is `pickBrand` in `BrandMenu.tsx`.
+
 ## R4. The Filters and Display options triggers
 
 **Decision.**

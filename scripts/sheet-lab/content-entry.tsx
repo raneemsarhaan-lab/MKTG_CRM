@@ -231,6 +231,7 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
       onOpenTask={id => lab.opened.push({ id })}
       onOpenVideoSheet={id => lab.opened.push({ id, opts: { videoSheet: true } })}
       onView={v => lab.views.push(v)}
+      query={new URLSearchParams(location.hash.slice(1)).get('q') ?? undefined}
       api={api}
     />
   )

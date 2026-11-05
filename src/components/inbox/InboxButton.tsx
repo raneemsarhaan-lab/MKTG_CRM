@@ -8,6 +8,10 @@
  * here". The number sits on the icon's corner; it turns orange when anything
  * counted is due today or late. A soft ring pulses three times when something
  * new arrived since the member last opened the Inbox on this device (R9).
+ *
+ * The 'compact' variant is the Board header's (spec 011 FR-012, replacing
+ * spec 006 FR-012a): icon, "Inbox" and the badge, with no fill. The summary
+ * line moves to the tooltip and stays in the accessible name.
  */
 import { forwardRef, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -42,7 +46,8 @@ export const InboxButton = forwardRef<HTMLButtonElement, {
   ringKeys: string[]
   open: boolean
   onToggle(): void
-}>(function InboxButton({ counts, ringKeys, open, onToggle }, ref) {
+  variant?: 'full' | 'compact'
+}>(function InboxButton({ counts, ringKeys, open, onToggle, variant = 'full' }, ref) {
   const t = useTranslations('inbox')
   const [ring, setRing] = useState(false)
   const sig = ringKeys.join('|')
@@ -67,7 +72,8 @@ export const InboxButton = forwardRef<HTMLButtonElement, {
     <button
       ref={ref}
       type="button"
-      className={`fx-inbox-btn${zero ? ' is-zero' : ''}${ring && !zero ? ' is-ring' : ''}`}
+      className={`fx-inbox-btn${variant === 'compact' ? ' is-compact' : ''}${zero ? ' is-zero' : ''}${ring && !zero ? ' is-ring' : ''}`}
+      title={variant === 'compact' ? summary : undefined}
       aria-expanded={open}
       aria-controls="fx-inbox-panel"
       data-inbox-button=""
@@ -87,7 +93,7 @@ export const InboxButton = forwardRef<HTMLButtonElement, {
           1 late, 5 to do, 2 unread mentions". */}
       <span className="fx-inbox-txt">
         <b>{t('button.label')}</b>
-        <small data-inbox-summary="">{summary}</small>
+        <small data-inbox-summary="" className={variant === 'compact' ? 'fx-sheet-sr' : undefined}>{summary}</small>
       </span>
       {!zero && <span className="fx-sheet-sr">{t('button.sr', { todo: counts.todo, unread: counts.unread })}</span>}
     </button>

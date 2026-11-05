@@ -219,6 +219,7 @@ function App() {
       onOpenVideo={id => { setVideoId(id); setRowId(null) }}
       onOpenTask={(id, opts) => lab.opened.push({ id, opts })}
       onView={v => lab.views.push(v)}
+      query={params.get('q') ?? undefined}
       api={api}
     />
   )

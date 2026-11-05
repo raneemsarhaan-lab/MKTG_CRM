@@ -83,6 +83,25 @@
   --inbox-blue-soft:    #E8EEFE;
   --inbox-shadow:       0 18px 50px rgba(20, 19, 60, 0.20);
   --inbox-btn-shadow:   0 8px 20px rgba(124, 58, 237, 0.32);
+  /* The Board header (spec 011): PIPE in src/lib/pipeline-tokens.ts. */
+  --hd-ink:             #14131A;
+  --hd-text:            #1F2430;
+  --hd-muted:           #6B7280;
+  --hd-placeholder:     #A2A7B4;
+  --hd-line:            #ECECF1;
+  --hd-input:           #E9E9EF;
+  --hd-input-hover:     #D5D5DF;
+  --hd-surface:         #F3F3F7;
+  --hd-panel:           #FFFFFF;
+  --hd-purple:          #7C3AED;
+  --hd-purple-soft:     #F0EBFE;
+  --hd-tick:            #8B5CF6;
+  --hd-ring:            #A855F7;
+  --hd-lime:            #C9F24E;
+  --hd-lime-hover:      #D6F551;
+  --hd-warn-bg:         #FFF3E0;
+  --hd-warn:            #9A5B02;
+  --hd-shadow:          0 12px 32px rgba(20, 19, 26, 0.14);
 
   /* Stage colors */
   --stage-todo:         #64748B;
@@ -368,29 +387,10 @@ html {
      page does the scrolling and a column is as tall as its cards. */
   .fx-board-cols > div > div:last-child { overflow-y: visible !important; }
 
-  /* The greeting and the search / bell / avatar / New task cluster unrolled
-     into a 700px column before the board even started. */
-  .fx-board-head { padding: 16px 14px 0 !important; gap: 12px !important; }
-  .fx-board-head > div:first-child span { font-size: 30px !important; }
-
-  /* Five controls, five rows. Search takes the first line with the bell
-     beside it; the upstream toggle and New task share the second. */
-  .fx-board-tools { width: 100%; gap: 10px !important; padding-top: 0 !important; }
-  .fx-board-search { flex: 1 1 200px; }
-  .fx-board-ident  { flex: 1 1 auto; }
-  /* The avatar and the name beside it: the More tab already says who you are
-     signed in as, and this is the only row here you cannot act on. */
-  .fx-board-ident > span { display: none !important; }
-
   /* Two-up hero cards stack. Only the second row is left on a phone (see
      below), and one card in a 1fr of 390px is about 110px wide. */
   .fx-hero-split { grid-template-columns: minmax(0, 1fr) !important; }
 
-  /* Only me / Team, then the brands under it. The brand chips wrap into
-     three rows at this width, and a three-row group centred beside a
-     one-row switch puts its first row above that switch — the filter row
-     read bottom-to-top. Its own line, in the order it is written. */
-  .fx-filter-brands { flex: 1 1 100% !important; }
 
   /* Your Week — the momentum figure, the dial, the four counts, Daily Spark —
      and the activity feed, both gone on a phone. They are read once and
@@ -1709,3 +1709,145 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 /* A comment reached from the Inbox (FR-042). */
 .fx-comment-flash { animation: fx-comment-flash 1.4s ease; border-radius: 8px; }
 @keyframes fx-comment-flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 4px var(--inbox-lime); } }
+
+
+/* ─── board header (spec 011, design/board-header.html) ──────────────────────
+   Three rows above every Board view: the top bar (tabs, search, Inbox,
+   avatar), the title row (title, New task), and the view's toolbar. Logical
+   properties throughout, so it mirrors in Arabic. Breakpoints as
+   src/lib/breakpoints.ts: 1279, 1023, 767. Only --hd-* and existing variables. */
+.fx-hd-wrap { display: flex; flex-direction: column; flex-shrink: 0; }
+.fx-hd { display: flex; flex-direction: column; background: var(--hd-panel); color: var(--hd-text); font-family: var(--font-body); }
+.fx-hd button { font-family: inherit; }
+.fx-hd :focus-visible, .fx-hd-tools :focus-visible, .fx-sheet-bar .fx-hd-pair :focus-visible, .fx-hd-pop :focus-visible {
+  outline: 2.5px solid var(--hd-purple); outline-offset: 2px;
+}
+
+/* row 1 · the top bar */
+.fx-hd-top { display: flex; align-items: center; gap: 16px; min-height: 70px; padding-block: 12px; padding-inline: 38px 26px; border-bottom: 1px solid var(--hd-line); box-sizing: border-box; }
+.fx-hd-tabs { display: flex; gap: 6px; flex: none; }
+.fx-hd-tab { border: 0; background: none; color: var(--hd-ink); font: 700 15px var(--font-heading); padding: 9px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.fx-hd-tab[aria-selected="true"] { background: var(--hd-purple-soft); color: var(--hd-purple); }
+.fx-hd-tab:hover:not([aria-selected="true"]) { background: var(--hd-surface); }
+.fx-hd-search { position: relative; flex: 1 1 360px; max-width: 520px; margin-inline: auto; color: var(--hd-placeholder); }
+.fx-hd-search svg { position: absolute; inset-inline-start: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.fx-hd-search input {
+  width: 100%; height: 44px; box-sizing: border-box; border: 1px solid var(--hd-input); border-radius: 999px;
+  padding-inline: 44px 14px; background: var(--hd-panel); color: var(--hd-text); font: 500 14px var(--font-body); outline: none;
+}
+.fx-hd-search input::placeholder { color: var(--hd-placeholder); }
+.fx-hd-search input:focus { border-color: var(--hd-purple); box-shadow: 0 0 0 3px var(--hd-purple-soft); }
+.fx-hd-search-open, .fx-hd-search-close { display: none; }
+.fx-hd-inbox, .fx-hd-account { display: flex; align-items: center; flex: none; }
+.fx-hd-vr { width: 1px; height: 26px; background: var(--hd-line); flex: none; }
+.fx-hd-avatar { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; line-height: 0; flex: none; }
+.fx-hd-initials { font-style: normal; line-height: 1; }
+.fx-hd-initials::before { content: attr(data-initials); }
+
+/* the compact Inbox (FR-012) */
+.fx-inbox-btn.is-compact { height: 44px; padding: 0 12px; gap: 9px; background: none; color: var(--hd-ink); box-shadow: none; border: 0; border-radius: 999px; }
+.fx-inbox-btn.is-compact:hover, .fx-inbox-btn.is-compact[aria-expanded="true"] { background: var(--hd-surface); }
+.fx-inbox-btn.is-compact.is-zero { border: 0; background: none; padding-inline-end: 12px; }
+.fx-inbox-btn.is-compact.is-zero:hover { background: var(--hd-surface); }
+.fx-inbox-btn.is-compact .fx-inbox-ico { display: contents; }
+.fx-inbox-btn.is-compact .fx-inbox-ico svg { order: 0; width: 22px; height: 22px; }
+.fx-inbox-btn.is-compact .fx-inbox-txt { order: 1; margin: 0; }
+.fx-inbox-btn.is-compact .fx-inbox-txt b { font-size: 15px; font-weight: 700; }
+.fx-inbox-btn.is-compact .fx-inbox-badge { order: 2; position: static; min-width: 22px; height: 22px; background: var(--hd-purple); color: var(--hd-panel); box-shadow: none; }
+.fx-inbox-btn.is-compact .fx-inbox-badge.is-urgent { background: var(--inbox-urgent); color: var(--hd-ink); }
+.fx-inbox-btn.is-compact:hover .fx-inbox-badge, .fx-inbox-btn.is-compact[aria-expanded="true"] .fx-inbox-badge { box-shadow: none; }
+.fx-inbox-btn.is-compact.is-ring::after { inset: -2px; border-width: 1.5px; }
+
+/* row 2 · the title row */
+.fx-hd-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 92px; padding-block: 18px 6px; padding-inline: 38px 26px; box-sizing: border-box; }
+.fx-hd-title { display: flex; align-items: flex-start; gap: 6px; margin: 0; font: 800 38px/1.05 var(--font-heading); color: var(--hd-ink); letter-spacing: -0.02em; }
+.fx-hd-ticks { flex: none; margin-top: -6px; }
+[dir="rtl"] .fx-hd-ticks { transform: scaleX(-1); }
+[dir="rtl"] .fx-hd-title { letter-spacing: 0; }
+.fx-hd-cta { display: inline-flex; align-items: center; gap: 9px; height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--hd-lime); color: var(--hd-ink); font: 700 16px var(--font-heading) !important; cursor: pointer; flex: none; white-space: nowrap; }
+.fx-hd-cta:hover { background: var(--hd-lime-hover); }
+
+/* row 3 · the toolbar */
+.fx-hd-tools { display: flex; align-items: center; gap: 12px; padding-block: 10px 4px; padding-inline: 38px 26px; font-family: var(--font-body); color: var(--hd-text); }
+.fx-hd-end { margin-inline-start: auto; display: flex; align-items: center; gap: 12px; }
+.fx-hd-pair { display: inline-flex; border: 1px solid var(--hd-input); border-radius: 999px; padding: 3px; background: var(--hd-panel); flex: none; }
+.fx-hd-pair button { border: 0; background: none; height: 34px; padding: 0 16px; border-radius: 999px; font: 600 14px var(--font-body); color: var(--hd-text); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.fx-hd-pair button[aria-pressed="true"] { background: var(--hd-purple-soft); color: var(--hd-purple); }
+.fx-hd-pair button:hover:not([aria-pressed="true"]) { background: var(--hd-surface); }
+.fx-hd-menu { position: relative; flex: none; }
+.fx-hd-btn { display: inline-flex; align-items: center; gap: 9px; height: 42px; padding: 0 16px; border: 1px solid var(--hd-input); border-radius: 12px; background: var(--hd-panel); color: var(--hd-text); font: 600 14px var(--font-body); cursor: pointer; white-space: nowrap; max-width: 260px; }
+.fx-hd-btn:hover, .fx-hd-btn[aria-expanded="true"] { border-color: var(--hd-input-hover); background: var(--hd-surface); }
+.fx-hd-menu.is-active > .fx-hd-btn { border-color: var(--hd-purple); color: var(--hd-purple); background: var(--hd-purple-soft); }
+.fx-hd-lbl-keep, .fx-hd-lbl { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fx-hd-brand-name { max-width: 170px; }
+.fx-hd-chev { flex: none; }
+.fx-hd-mark { border-radius: 50%; flex: none; overflow: hidden; color: var(--hd-panel); font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-heading); }
+.fx-hd-mark img { width: 100%; height: 100%; object-fit: cover; }
+.fx-hd-note { font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 6px 11px; white-space: nowrap; background: var(--hd-surface); color: var(--hd-muted); flex: none; }
+.fx-hd-note.is-warn { background: var(--hd-warn-bg); color: var(--hd-warn); }
+.fx-hd-showing { padding-inline: 38px 26px; padding-top: 6px; font-size: 12px; color: var(--hd-muted); }
+.fx-view-btn.fx-hd-btn { height: 42px; font: 600 14px var(--font-body); border-color: var(--hd-input); }
+
+/* the menus under toolbar buttons */
+.fx-hd-pop { position: absolute; top: calc(100% + 8px); inset-inline-start: 0; z-index: 40; max-width: calc(100vw - 24px); max-height: min(70vh, 460px); overflow-y: auto; box-sizing: border-box;
+  background: var(--hd-panel); border: 1px solid var(--hd-line); border-radius: 14px; box-shadow: var(--hd-shadow); padding: 6px; }
+.fx-hd-pop.is-end { inset-inline-start: auto; inset-inline-end: 0; }
+.fx-hd-opt { display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; border-radius: 9px; font: 500 14px var(--font-body); color: var(--hd-text); text-align: start; cursor: pointer; }
+.fx-hd-opt:hover, .fx-hd-opt:focus-visible { background: var(--hd-surface); }
+.fx-hd-opt[aria-pressed="true"] { font-weight: 700; }
+.fx-hd-opt-txt { min-width: 0; overflow-wrap: anywhere; }
+.fx-hd-check { margin-inline-start: auto; color: var(--hd-purple); font-weight: 800; }
+.fx-hd-sep { height: 1px; background: var(--hd-line); margin: 4px 6px; }
+
+/* the sheets under the header: they take the height left */
+.fx-board-page.is-sheet { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-width: 0; background: var(--hd-panel); }
+.fx-board-page.is-sheet > .fx-sheet { flex: 1; min-height: 0; height: auto; }
+.fx-sheet-bar .fx-hd-pair button { height: 28px; padding: 0 12px; font-size: 12.5px; }
+.fx-sheet-bar .fx-hd-vr { height: 20px; }
+
+/* 1024–1279: search narrows, then the toolbar's far end shows icons only (FR-040) */
+@media (max-width: 1279px) {
+  .fx-hd-search { flex-basis: 220px; }
+  .fx-hd-end .fx-hd-lbl { display: none; }
+  .fx-hd-end .fx-hd-btn, .fx-hd-end .fx-hd-pair button { padding-inline: 12px; }
+}
+@media (max-width: 1023px) {
+  .fx-hd-tools .fx-hd-lbl { display: none; }
+}
+
+/* phones (≤ 767): the same order, made compact (US5, FR-041) */
+@media (max-width: 767px) {
+  .fx-board-page.is-sheet { height: calc(100dvh - 62px - env(safe-area-inset-bottom, 0px)); }
+  .fx-hd-top { min-height: 60px; padding: 8px 12px; gap: 4px; }
+  .fx-hd-tab { padding: 0 13px; height: 44px; font-size: 14px; }
+  .fx-hd-search { display: none; }
+  .fx-hd-search-open { display: inline-grid; place-items: center; position: relative; width: 44px; height: 44px; margin-inline-start: auto; border: 0; border-radius: 50%; background: none; color: var(--hd-muted); cursor: pointer; flex: none; }
+  .fx-hd-search-dot { position: absolute; top: 9px; inset-inline-end: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--hd-purple); }
+  .fx-hd-top.is-searching > :not(.fx-hd-search):not(.fx-hd-search-close) { display: none; }
+  .fx-hd-top.is-searching .fx-hd-search { display: block; flex: 1; margin: 0; max-width: none; }
+  .fx-hd-top.is-searching .fx-hd-search-close { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; font-size: 22px; color: var(--hd-muted); cursor: pointer; flex: none; }
+  .fx-hd-vr { display: none; }
+  .fx-hd-top .fx-hd-vr { display: none; }
+  .fx-inbox-btn.is-compact { width: 44px; height: 44px; padding: 0; justify-content: center; }
+  .fx-inbox-btn.is-compact .fx-inbox-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .fx-inbox-btn.is-compact .fx-inbox-badge { position: absolute; top: 2px; inset-inline-end: 0; min-width: 19px; height: 19px; font-size: 11px; padding: 0 5px; box-shadow: 0 0 0 2px var(--hd-panel) !important; }
+  .fx-hd-account { width: 44px; height: 44px; justify-content: center; }
+  .fx-hd-avatar > span { width: 36px !important; height: 36px !important; }
+  .fx-hd-avatar { width: 44px; height: 44px; display: grid; place-items: center; }
+  .fx-hd-pair button { min-width: 44px; justify-content: center; }
+  .fx-view-btn.fx-hd-btn { height: 44px; min-width: 44px; justify-content: center; }
+  .fx-hd-title-row { min-height: 64px; padding: 12px 16px 2px; }
+  .fx-hd-title { font-size: 28px; }
+  .fx-hd-ticks { width: 30px; height: 26px; }
+  .fx-hd-cta { height: 44px; padding: 0 16px; font-size: 14.5px !important; }
+  .fx-hd-tools { padding: 8px 16px 6px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .fx-hd-tools::-webkit-scrollbar { display: none; }
+  .fx-hd-tools > *, .fx-hd-end > * { scroll-snap-align: start; }
+  .fx-hd-end { margin-inline-start: 0; }
+  .fx-hd-tools .fx-hd-vr { display: block; }
+  .fx-hd-pair button { height: 44px; }
+  .fx-hd-btn { height: 44px; }
+  .fx-hd-note, .fx-hd-showing { display: none; }
+  .fx-hd-pop { position: fixed; top: auto; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); inset-inline: 12px; width: auto !important; }
+}
+

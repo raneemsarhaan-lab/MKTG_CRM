@@ -31,3 +31,5 @@ Thumbs.db
 scripts/sheet-lab/out/
 # Inbox lab build output
 scripts/inbox-lab/out/
+# Header lab build output
+scripts/header-lab/out/

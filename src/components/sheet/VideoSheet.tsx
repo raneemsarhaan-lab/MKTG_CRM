@@ -17,6 +17,7 @@ import { MAX_INLINE_BYTES, MAX_UPLOAD_BYTES } from '@/lib/attachments'
 import { formatBytes } from '@/components/kanban/attachments/limits'
 import { nextFreeName, sameName } from '@/components/kanban/attachments/names'
 import { buildRows, clipsOf, videosWithClips, type SheetRow } from './rows'
+import { ViewPair } from '@/components/board/ViewPair'
 import { defaultColumnSet, isColumnSet } from './columns'
 import { summarise } from './summary'
 import { formatLength, parseClipTime } from './time'
@@ -74,8 +75,8 @@ export function VideoSheet(p: VideoSheetProps) {
   const [drafts, setDrafts] = useState<{ key: string; videoId: string }[]>([])
   const [editDraft, setEditDraft] = useState<string | null>(null)
   const rows = useMemo(() => buildRows(p.tasks, {
-    videoId: p.videoId, mine, showDropped, me: me.id, collapsed, drafts,
-  }), [p.tasks, p.videoId, mine, showDropped, me.id, collapsed, drafts])
+    videoId: p.videoId, mine, showDropped, me: me.id, collapsed, drafts, query: p.query,
+  }), [p.tasks, p.videoId, mine, showDropped, me.id, collapsed, drafts, p.query])
 
   const [active, setActive] = useState<ActiveCell | null>(null)
   const activeRow = active ? rows.find(r => r.key === active.key) : undefined
@@ -364,12 +365,10 @@ export function VideoSheet(p: VideoSheetProps) {
 
   return (
     <div className="fx-sheet" data-video-sheet="">
-      <div className="fx-sheet-bar" role="toolbar" aria-label={t('view.label')}>
-        <div className="fx-sheet-seg" role="group" aria-label={t('view.label')}>
-          <button type="button" aria-pressed="false" onClick={() => p.onView('board')}>{t('view.board')}</button>
-          <button type="button" aria-pressed="true">{t('view.sheet')}</button>
-          <button type="button" aria-pressed="false" onClick={() => p.onView('content')}>{t('view.content')}</button>
-        </div>
+      {/* The header's third row on Pipeline · Sheet (spec 011 R2): the sheet's
+          own controls, with Board | Sheet at the end in place of the old
+          three-way switch. Content is a page tab now. */}
+      <div className="fx-sheet-bar" role="toolbar" aria-label={t('view.label')} data-toolbar="">
         {p.videoId && (
           <button type="button" className="fx-sheet-back" onClick={() => p.onOpenVideo(null)}>
             <span aria-hidden="true">‹ </span>{t('backToAll')}
@@ -393,6 +392,8 @@ export function VideoSheet(p: VideoSheetProps) {
         >
           {t('pasteClips')}
         </button>
+        <span className="fx-hd-vr" aria-hidden="true" />
+        <ViewPair view="sheet" onView={v => p.onView(v)} />
       </div>
 
       {focusVideo && (

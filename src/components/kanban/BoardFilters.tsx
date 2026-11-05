@@ -1,12 +1,14 @@
 'use client'
 
 import { useMemo } from 'react'
-import { FieldPill, PillOption, PillInput } from '@/components/shared/FieldPill'
+import { useTranslations } from 'next-intl'
+import { PillOption, PillInput } from '@/components/shared/FieldPill'
+import { HeaderMenu } from '@/components/board/HeaderMenu'
 import { COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { calDaysBetween } from '@/lib/utils'
-import type { AlertStatus, Brand, Member, SLAConfig, Task } from '@/types/index'
+import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
 
 /**
  * Board filters.
@@ -114,19 +116,11 @@ export function applyBoardFilters<T extends Task>(
 
 // ─── UI ──────────────────────────────────────────────────────────────────────
 
-interface BoardFiltersProps {
+interface FiltersButtonProps {
   filters:  BoardFilterState
   onChange: (next: BoardFilterState) => void
   tasks:    Task[]          // unfiltered — the source of the option lists
-  brands:   Brand[]
   members:  Member[]
-  shown:    number
-  total:    number
-  /** Whose work the board is showing. Defaults to just yours. */
-  scope:    'me' | 'team'
-  onScope:  (next: 'me' | 'team') => void
-  /** After Board and Filter: the View menu (spec 006 FR-002, FR-003). */
-  trailing?: React.ReactNode
 }
 
 function Check({ on }: { on: boolean }) {
@@ -145,51 +139,22 @@ function Check({ on }: { on: boolean }) {
   )
 }
 
-function summary(selected: string[], label: (v: string) => string): string | null {
-  if (selected.length === 0) return null
-  if (selected.length === 1) return label(selected[0])
-  return `${selected.length} selected`
-}
-
-
-/** Brand chip mark — the emblem when the brand has one, else its initial. */
-function BrandMark({ brand, size = 22 }: { brand: Brand; size?: number }) {
-  const initial = brand.name.trim()[0]?.toUpperCase() ?? '?'
+function FilterIcon() {
   return (
-    <span style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
-      background: brand.color, color: '#FFFFFF', fontSize: size * 0.5, fontWeight: 800,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {brand.logo_url
-        // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={brand.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : initial}
-    </span>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" aria-hidden="true">
+      <path d="M3 5h18l-7 8v6l-4-2v-4L3 5z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
-const GridIcon = ({ fill }: { fill: string }) => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill={fill} aria-hidden="true">
-    <rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" />
-    <rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" />
-  </svg>
-)
-
-/** §6 chip geometry — 44 tall, 999 radius, 13.5px. */
-const CHIP_BASE: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 9, height: 44,
-  padding: '0 20px', borderRadius: 999, fontSize: 13.5,
-  fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
-  transition: 'background 140ms ease-out, border-color 140ms ease-out',
-}
-
-/** §6 view toggle — same height, 12 radius. */
-const VIEW_BASE: React.CSSProperties = { ...CHIP_BASE, borderRadius: 12 }
-
-export function BoardFilters({
-  filters, onChange, tasks, brands, members, shown, total, scope, onScope, trailing,
-}: BoardFiltersProps) {
+/**
+ * Filters (spec 011 FR-032): the Board toolbar's filter menu. What is inside
+ * is unchanged from the old Filter pill; only the button moved into the
+ * header's toolbar. Brands and search have their own controls, so they do
+ * not count towards the number on the button.
+ */
+export function FiltersButton({ filters, onChange, tasks, members }: FiltersButtonProps) {
+  const t = useTranslations('header')
   const set = <K extends keyof BoardFilterState>(key: K, value: BoardFilterState[K]) =>
     onChange({ ...filters, [key]: value })
 
@@ -215,8 +180,6 @@ export function BoardFilters({
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
 
   const count = activeFilterCount(filters)
-  // The brand chips are their own control, so they do not count towards the
-  // number on the Filter button — that button owns everything behind it.
   const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
 
   const dueText = filters.duePreset !== 'any'
@@ -225,273 +188,113 @@ export function BoardFilters({
       ? `${filters.dueFrom || '…'} → ${filters.dueTo || '…'}`
       : null
 
-  /**
-   * The count behind the tag.
-   *
-   * Read off the tasks the board already holds rather than fetched: the board
-   * has every row in memory, so a second source could only disagree with what
-   * is on screen. Null when no single brand is selected, which is what keeps
-   * the tag off the row until it is asked for.
-   */
-  const unattached = useMemo(() => {
-    if (filters.brandIds.length !== 1) return null
-    const id = filters.brandIds[0]
-    return tasks.filter(t => t.brand_id === id && !t.project_id).length
-  }, [filters.brandIds, tasks])
-
-  /* An empty brandIds is "no brand filter", which is what every read of it
-     elsewhere expects — the board, the counts, the URL. But nothing selected
-     and everything selected are the same board, and the chips used to draw
-     that state as every brand switched off, which reads as "showing none".
-     So the chips are drawn from this instead: all on until one is taken off. */
-  const allBrands = filters.brandIds.length === 0
-  const selectedBrands = allBrands ? brands.map(b => b.id) : filters.brandIds
-
-  /** Turn one brand off, or back on, from a set that starts with all of them. */
-  const toggleBrand = (id: string) => {
-    const next = selectedBrands.includes(id)
-      ? selectedBrands.filter(x => x !== id)
-      : [...selectedBrands, id]
-    // Back to every brand, or down to none: both are the same board, and a
-    // board filtered to nothing is a dead end nobody chooses on purpose. The
-    // filter goes back to empty, and the pill says so.
-    set('brandIds', next.length === 0 || next.length === brands.length ? [] : next)
-  }
-
-  // What the pill says. Naming the one brand is more use than counting to one.
-  const brandLabel = allBrands
-    ? 'All brands'
-    : selectedBrands.length === 1
-      ? brands.find(b => b.id === selectedBrands[0])?.name ?? '1 brand'
-      : `${selectedBrands.length} of ${brands.length} brands`
-
   return (
-    <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        {/* Whose board this is. First control in the row, because it changes
-            what every other control is filtering. */}
-        <div role="group" aria-label="Whose tasks to show" style={{
-          display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0,
-          background: PIPE.surface, borderRadius: 999, padding: 4,
-        }}>
-          {(['me', 'team'] as const).map(v => {
-            const on = scope === v
-            return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onScope(v)}
-                aria-pressed={on}
-                style={{
-                  height: 36, padding: '0 16px', borderRadius: 999, border: 'none',
-                  cursor: 'pointer', fontFamily: 'inherit', fontSize: 13.5,
-                  background: on ? '#FFFFFF' : 'transparent',
-                  fontWeight: on ? 700 : 600,
-                  color: on ? PIPE.ink : PIPE.textSecondary,
-                  boxShadow: on ? '0 1px 2px rgba(20,19,26,.10)' : 'none',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {v === 'me' ? 'Only me' : 'Team'}
-              </button>
-            )
-          })}
-        </div>
+    <HeaderMenu
+      label={t('filters')}
+      data="data-filters"
+      width={280}
+      className={behindButton > 0 ? 'is-active' : ''}
+      trigger={<><FilterIcon /><span className="fx-hd-lbl-keep">{behindButton > 0 ? t('filtersN', { n: behindButton }) : t('filters')}</span></>}
+    >
+      <div className="fx-hd-filters">
+        <PillSection label="Search">
+          <PillInput
+            value={filters.search}
+            placeholder="Name, owner, project…"
+            onChange={e => set('search', e.target.value)}
+          />
+        </PillSection>
 
-        {/* Brand chips — §6 left group */}
-        {/* At 390px the chips wrap inside this group, which makes it three
-            rows tall; centred against the scope switch beside it, its first
-            row then sat *above* "Only me / Team" and the row read backwards.
-            globals.css gives it its own line there. */}
-        <div className="fx-filter-brands" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap', minWidth: 0 }}>
+        <PillSection label="Assignee">
+          {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
+            <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)}
+                        onClick={() => toggle('ownerIds', m.id)}>
+              <Check on={filters.ownerIds.includes(m.id)} /> {memberName(m.id)}
+            </PillOption>
+          ))}
+        </PillSection>
+
+        <PillSection label="Content type">
+          {usedTypes.map(v => (
+            <PillOption key={v} selected={filters.contentTypes.includes(v)}
+                        onClick={() => toggle('contentTypes', v)}>
+              <Check on={filters.contentTypes.includes(v)} /> {v}
+            </PillOption>
+          ))}
+        </PillSection>
+
+        {usedPlatforms.length > 0 && (
+          <PillSection label="Platform">
+            {usedPlatforms.map(v => (
+              <PillOption key={v} selected={filters.platforms.includes(v)}
+                          onClick={() => toggle('platforms', v)}>
+                <Check on={filters.platforms.includes(v)} /> {v}
+              </PillOption>
+            ))}
+          </PillSection>
+        )}
+
+        <PillSection label="Priority">
+          {PRIORITY_OPTIONS.map(v => (
+            <PillOption key={v} selected={filters.priorities.includes(v)}
+                        onClick={() => toggle('priorities', v)}>
+              <Check on={filters.priorities.includes(v)} /> {v}
+            </PillOption>
+          ))}
+        </PillSection>
+
+        <PillSection label="SLA status">
+          {ALERT_OPTIONS.map(v => (
+            <PillOption key={v} selected={filters.alerts.includes(v)}
+                        onClick={() => toggleAlert(v)}>
+              <Check on={filters.alerts.includes(v)} /> {v}
+            </PillOption>
+          ))}
+        </PillSection>
+
+        <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
+          {([
+            ['any', 'Any date'], ['overdue', 'Overdue'], ['today', 'Due today'],
+            ['week', 'Next 7 days'], ['none', 'No due date'],
+          ] as [DuePreset, string][]).map(([v, label]) => (
+            <PillOption key={v} selected={filters.duePreset === v}
+                        onClick={() => set('duePreset', v)}>
+              <Check on={filters.duePreset === v} /> {label}
+            </PillOption>
+          ))}
+          <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+            <PillInput type="date" value={filters.dueFrom}
+                       onChange={e => set('dueFrom', e.target.value)} />
+            <PillInput type="date" value={filters.dueTo}
+                       onChange={e => set('dueTo', e.target.value)} />
+          </div>
+        </PillSection>
+
+        <PillSection label="Only">
+          <PillOption selected={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
+            <Check on={filters.onlyMine} /> My tasks
+          </PillOption>
+          <PillOption selected={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
+            <Check on={filters.withAttachments} /> Has files
+          </PillOption>
+        </PillSection>
+
+        {count > 0 && (
           <button
             type="button"
-            onClick={() => set('brandIds', [])}
-            aria-pressed={allBrands}
-            title={allBrands ? 'Every brand is showing' : 'Show every brand again'}
+            onClick={() => onChange(EMPTY_FILTERS)}
             style={{
-              ...CHIP_BASE,
-              background: allBrands ? PIPE.limePrimary : '#FFFFFF',
-              border: allBrands ? '1px solid transparent' : `1px solid ${PIPE.borderInput}`,
-              fontWeight: allBrands ? 700 : 600,
-              color: allBrands ? PIPE.ink : PIPE.textPrimary,
+              width: '100%', marginTop: 8, padding: '8px 10px', borderRadius: 8,
+              border: `1px solid ${PIPE.borderInput}`, background: '#fff',
+              color: PIPE.textPrimary, fontSize: 12.5, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
-            {brandLabel}
+            Clear {count} filter{count === 1 ? '' : 's'}
           </button>
-
-          {/* Logo only. Five brands spelled out in full ate the whole row and
-              pushed Board and Filter onto a second line; the logos are the
-              part people actually recognise. The name is still on the button
-              for anyone hovering, and for a screen reader it is all there is. */}
-          {brands.map(b => {
-            const on = selectedBrands.includes(b.id)
-            return (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => toggleBrand(b.id)}
-                aria-pressed={on}
-                aria-label={b.name}
-                title={on ? `${b.name} — click to hide` : `${b.name} — click to show`}
-                style={{
-                  ...CHIP_BASE,
-                  width: 44, padding: 0, borderRadius: '50%', justifyContent: 'center',
-                  background: on ? PIPE.limePrimary : '#FFFFFF',
-                  border: on ? '1px solid transparent' : `1px solid ${PIPE.borderInput}`,
-                }}
-              >
-                <BrandMark brand={b} size={on ? 30 : 32} />
-              </button>
-            )
-          })}
-
-          {/* How much of the selected brand's work has no project yet.
-              Only while a brand is selected: a prompt where somebody is
-              already looking, rather than a dashboard nobody asked for. */}
-          {unattached !== null && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, height: 34,
-              padding: '0 12px', borderRadius: 999, whiteSpace: 'nowrap',
-              background: unattached > 0 ? '#FFF3E0' : PIPE.surface,
-              color: unattached > 0 ? '#9A5B02' : PIPE.textMuted,
-              fontSize: 12.5, fontWeight: 600,
-            }}>
-              {unattached > 0
-                ? <><b style={{ fontWeight: 800 }}>{unattached}</b> no project assigned</>
-                : 'Every task has a project'}
-            </span>
-          )}
-        </div>
-
-        {/* View + filter — §6 right group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            ...VIEW_BASE, background: PIPE.navy, color: '#FFFFFF',
-            fontWeight: 700, cursor: 'default',
-          }}>
-            <GridIcon fill="#FFFFFF" />
-            Board
-          </div>
-
-          <FieldPill
-            label="Filter"
-            value={behindButton > 0 ? `Filter · ${behindButton}` : null}
-            active={behindButton > 0}
-            width={260}
-            variant="view"
-          >
-            {() => (
-              <>
-                <PillSection label="Search">
-                  <PillInput
-                    value={filters.search}
-                    placeholder="Name, owner, project…"
-                    onChange={e => set('search', e.target.value)}
-                  />
-                </PillSection>
-
-                <PillSection label="Assignee">
-                  {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
-                    <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)}
-                                onClick={() => toggle('ownerIds', m.id)}>
-                      <Check on={filters.ownerIds.includes(m.id)} /> {memberName(m.id)}
-                    </PillOption>
-                  ))}
-                </PillSection>
-
-                <PillSection label="Content type">
-                  {usedTypes.map(v => (
-                    <PillOption key={v} selected={filters.contentTypes.includes(v)}
-                                onClick={() => toggle('contentTypes', v)}>
-                      <Check on={filters.contentTypes.includes(v)} /> {v}
-                    </PillOption>
-                  ))}
-                </PillSection>
-
-                {usedPlatforms.length > 0 && (
-                  <PillSection label="Platform">
-                    {usedPlatforms.map(v => (
-                      <PillOption key={v} selected={filters.platforms.includes(v)}
-                                  onClick={() => toggle('platforms', v)}>
-                        <Check on={filters.platforms.includes(v)} /> {v}
-                      </PillOption>
-                    ))}
-                  </PillSection>
-                )}
-
-                <PillSection label="Priority">
-                  {PRIORITY_OPTIONS.map(v => (
-                    <PillOption key={v} selected={filters.priorities.includes(v)}
-                                onClick={() => toggle('priorities', v)}>
-                      <Check on={filters.priorities.includes(v)} /> {v}
-                    </PillOption>
-                  ))}
-                </PillSection>
-
-                <PillSection label="SLA status">
-                  {ALERT_OPTIONS.map(v => (
-                    <PillOption key={v} selected={filters.alerts.includes(v)}
-                                onClick={() => toggleAlert(v)}>
-                      <Check on={filters.alerts.includes(v)} /> {v}
-                    </PillOption>
-                  ))}
-                </PillSection>
-
-                <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
-                  {([
-                    ['any', 'Any date'], ['overdue', 'Overdue'], ['today', 'Due today'],
-                    ['week', 'Next 7 days'], ['none', 'No due date'],
-                  ] as [DuePreset, string][]).map(([v, label]) => (
-                    <PillOption key={v} selected={filters.duePreset === v}
-                                onClick={() => set('duePreset', v)}>
-                      <Check on={filters.duePreset === v} /> {label}
-                    </PillOption>
-                  ))}
-                  <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-                    <PillInput type="date" value={filters.dueFrom}
-                               onChange={e => set('dueFrom', e.target.value)} />
-                    <PillInput type="date" value={filters.dueTo}
-                               onChange={e => set('dueTo', e.target.value)} />
-                  </div>
-                </PillSection>
-
-                <PillSection label="Only">
-                  <PillOption selected={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
-                    <Check on={filters.onlyMine} /> My tasks
-                  </PillOption>
-                  <PillOption selected={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
-                    <Check on={filters.withAttachments} /> Has files
-                  </PillOption>
-                </PillSection>
-
-                {count > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange(EMPTY_FILTERS)}
-                    style={{
-                      width: '100%', marginTop: 8, padding: '8px 10px', borderRadius: 8,
-                      border: `1px solid ${PIPE.borderInput}`, background: '#fff',
-                      color: PIPE.textPrimary, fontSize: 12.5, fontWeight: 700,
-                      cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    Clear {count} filter{count === 1 ? '' : 's'}
-                  </button>
-                )}
-              </>
-            )}
-          </FieldPill>
-          {trailing}
-        </div>
+        )}
       </div>
-
-      {count > 0 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: PIPE.textFaint }}>
-          Showing {shown} of {total} tasks
-        </div>
-      )}
-    </div>
+    </HeaderMenu>
   )
 }
 

@@ -9,9 +9,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
-import { PIPE } from '@/lib/pipeline-tokens'
 import { inboxModel, openingTab } from '@/lib/inbox'
-import { initials, avatarColor } from '@/lib/utils'
 import {
   setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip,
 } from '@/actions/tasks'
@@ -25,8 +23,11 @@ import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardOverlay } from './TaskCard'
 import {
-  BoardFilters, EMPTY_FILTERS, applyBoardFilters, type BoardFilterState,
+  FiltersButton, EMPTY_FILTERS, applyBoardFilters, activeFilterCount, type BoardFilterState,
 } from './BoardFilters'
+import { BoardHeader } from '@/components/board/BoardHeader'
+import { BoardToolbar } from '@/components/board/BoardToolbar'
+import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
 import { InboxButton } from '@/components/inbox/InboxButton'
@@ -127,6 +128,10 @@ export function KanbanBoard({
     const v = searchParams.get('view')
     return v === 'sheet' || v === 'content' ? v : 'board'
   })
+  // The Pipeline tab returns to the pipeline view last shown (spec 011 R10).
+  const [lastPipelineView, setLastPipelineView] = useState<'board' | 'sheet'>(() =>
+    searchParams.get('view') === 'sheet' ? 'sheet' : 'board')
+  useEffect(() => { if (view !== 'content') setLastPipelineView(view) }, [view])
   const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
   const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
   useEffect(() => {
@@ -333,6 +338,7 @@ export function KanbanBoard({
 
   // ── The video sheet's host (spec 008 contracts/sheet-ui.md §2) ──────────
   const ta = useTranslations('attachments')
+  const th = useTranslations('header')
   const patchTask = (id: string, patch: Partial<FullTask>) =>
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
   // ── Sheet columns (spec 010): the shared layout and custom values ────────
@@ -812,14 +818,6 @@ export function KanbanBoard({
     return () => window.removeEventListener('keydown', onKey)
   }, [selected.size])
 
-  // Time-derived, and computed on the client only — rendering it on the server
-  // would freeze whatever hour the page was built at.
-  const [greeting, setGreeting] = useState('Hello')
-  useEffect(() => {
-    const h = new Date().getHours()
-    setGreeting(h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening')
-  }, [])
-
   // A file to preview when the panel opens from a sheet's Files cell (spec 008 FR-045).
   const [previewFor, setPreviewFor] = useState<{ taskId: string; previewId: string } | null>(null)
 
@@ -844,9 +842,59 @@ export function KanbanBoard({
     />
   )
 
+  /* ── The header (spec 011): top bar and title row, on every view ── */
+  const header = (
+    <BoardHeader
+      tab={view === 'content' ? 'content' : 'pipeline'}
+      onTab={tab => setView(tab === 'content' ? 'content' : lastPipelineView)}
+      search={filters.search}
+      onSearch={q => setFilters(f => ({ ...f, search: q }))}
+      inbox={
+        <InboxButton
+          ref={inboxBtn}
+          variant="compact"
+          counts={model.counts}
+          ringKeys={model.ringKeys}
+          open={view === 'board' ? panelShown : inboxOpen}
+          onToggle={() => ((view === 'board' ? panelShown : inboxOpen) ? closeInbox() : openInbox())}
+        />
+      }
+      account={<UserMenu member={currentUser} variant="header" />}
+      canCreate={currentUser.access !== 'user'}
+      onNewTask={() => setShowTaskForm(true)}
+    />
+  )
+  const inboxPanel = (pinnable: boolean) => (
+    <InboxPanel
+      model={model}
+      me={currentUser}
+      members={members}
+      now={now}
+      api={inboxApi}
+      tab={inboxTab}
+      onTab={setInboxTab}
+      pinned={pinnable && inbox.pinned}
+      onPin={() => {
+        if (inbox.pinned) closeInbox()
+        else { setInboxOpen(true); void savePrefs({ pinned: true }) }
+      }}
+      onClose={closeInbox}
+      buttonRef={inboxBtn}
+    />
+  )
+  const taskForm = showTaskForm && (
+    <TaskForm
+      currentUser={currentUser}
+      brands={brands}
+      contentTypes={contentTypes}
+      members={members}
+    />
+  )
+
   if (view === 'content') {
     return (
-      <>
+      <div className="fx-board-page is-sheet">
+        {header}
         <ContentSheet
           tasks={tasks}
           themes={themes}
@@ -857,16 +905,20 @@ export function KanbanBoard({
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}
+          query={filters.search}
           api={sheetApi}
         />
         {taskPanel}
-      </>
+        {inboxOpen && inboxPanel(false)}
+        {taskForm}
+      </div>
     )
   }
 
   if (view === 'sheet') {
     return (
-      <>
+      <div className="fx-board-page is-sheet">
+        {header}
         <VideoSheet
           tasks={tasks}
           me={currentUser}
@@ -879,12 +931,20 @@ export function KanbanBoard({
           onOpenVideo={id => { setSheetVideo(id); setSheetRow(null) }}
           onOpenTask={(id, opts) => { setPreviewFor(opts?.previewId ? { taskId: id, previewId: opts.previewId } : null); selectTask(id) }}
           onView={v => setView(v)}
+          query={filters.search}
           api={sheetApi}
         />
         {taskPanel}
-      </>
+        {inboxOpen && inboxPanel(false)}
+        {taskForm}
+      </div>
     )
   }
+
+  // The one brand selected, if exactly one: how much of its work has no project.
+  const noProject = filters.brandIds.length === 1
+    ? liveTasks.filter(t => t.brand_id === filters.brandIds[0] && !t.project_id).length
+    : null
 
   return (
     <div
@@ -894,158 +954,38 @@ export function KanbanBoard({
         gap: 22, paddingBottom: selected.size > 0 ? 90 : 30, background: '#FFFFFF',
       }}
     >
-      {/* Greeting header — Pipeline handoff §4. */}
-      <div className="fx-board-head" style={{
-        padding: '24px 26px 0 38px', flexShrink: 0, display: 'flex',
-        alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap',
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{
-              fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 44,
-              lineHeight: 1, color: PIPE.ink,
-            }}>
-              {greeting}, {currentUser.name.split(' ')[0]}
-            </span>
-            <span aria-hidden="true" style={{ fontSize: 26 }}>👋</span>
-          </div>
-          <svg width="222" height="12" viewBox="0 0 222 12" fill="none" aria-hidden="true"
-               style={{ display: 'block', margin: '2px 0 0 2px' }}>
-            <path d="M4 8C50 3 160 2 218 6" stroke={PIPE.purpleStroke} strokeWidth="3.2" strokeLinecap="round" />
-          </svg>
-          <div style={{ marginTop: 6, fontWeight: 500, fontSize: 14.5, color: PIPE.textSecondary }}>
-            Let&apos;s create, ship and move the needle.
-          </div>
-        </div>
-
-        {/* Search, bell, upstream toggle, identity, New task. On a desktop
-            this is one line; wrapped onto a 390px screen each part took a row
-            of its own and the board started 370px down the page. The classes
-            let globals.css pair them up and drop the identity chip, which the
-            More tab already carries. */}
-        <div className="fx-board-tools" style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 6, flexWrap: 'wrap' }}>
-          <ViewSwitch view={view} onView={setView} />
-          <div className="fx-board-search" style={{ position: 'relative' }}>
-            <input
-              value={filters.search}
-              onChange={e => setFilters({ ...filters, search: e.target.value })}
-              placeholder="Search tasks, campaigns, assets..."
-              aria-label="Search tasks"
-              style={{
-                width: 362, maxWidth: '100%', height: 46, boxSizing: 'border-box',
-                border: `1px solid ${PIPE.borderInput}`, borderRadius: 999,
-                background: '#FFFFFF', padding: '0 12px 0 44px',
-                fontSize: 13.5, fontWeight: 500, color: PIPE.textPrimary,
-                fontFamily: 'inherit', outline: 'none',
-              }}
+      <div className="fx-hd-wrap">
+        {header}
+        <BoardToolbar
+          scope={scope}
+          onScope={chooseScope}
+          brands={brands}
+          brandIds={filters.brandIds}
+          onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
+          noProject={noProject}
+          filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
+          view="board"
+          onView={v => setView(v)}
+          display={
+            <ViewMenu
+              showWeek={inbox.showWeek}
+              onShowWeek={v => void savePrefs({ showWeek: v })}
+              upstream={showUpstream}
+              onUpstream={setUpstream}
             />
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={PIPE.textFaint}
-                 strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"
-                 style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </div>
-
-          {/* The Inbox (spec 006): what needs you, behind one button. It
-              replaced the bell and the "for you" cards above the pipeline. */}
-          <InboxButton
-            ref={inboxBtn}
-            counts={model.counts}
-            ringKeys={model.ringKeys}
-            open={panelShown}
-            onToggle={() => (panelShown ? closeInbox() : openInbox())}
-          />
-
-          <div className="fx-board-ident" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
-            <span style={{
-              width: 42, height: 42, borderRadius: '50%', boxSizing: 'border-box',
-              border: '2.5px solid #A855F7', background: avatarColor(currentUser.name),
-              color: '#FFF', fontWeight: 700, fontSize: 14,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }} aria-hidden="true">
-              {initials(currentUser.name)}
-            </span>
-            <span style={{ lineHeight: 1.25 }}>
-              <span style={{ display: 'block', fontWeight: 700, fontSize: 14, color: PIPE.ink }}>
-                {currentUser.name}
-              </span>
-              <span style={{ display: 'block', fontWeight: 500, fontSize: 12, color: PIPE.textFaint }}>
-                {currentUser.access === 'admin' ? 'Admin' : currentUser.role}
-              </span>
-            </span>
-          </div>
-
-          {currentUser.access !== 'user' && (
-            <button
-              onClick={() => setShowTaskForm(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 9, height: 46,
-                padding: '0 18px', borderRadius: 999, border: 'none',
-                background: PIPE.limeCta, color: PIPE.ink,
-                fontWeight: 700, fontSize: 14.5, cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              New task
-            </button>
-          )}
-        </div>
+          }
+        />
+        {activeFilterCount(filters) > 0 && (
+          <div className="fx-hd-showing">{th('showing', { shown: filteredTasks.length, total: scopedTasks.length })}</div>
+        )}
       </div>
 
-      {/* Your week: off by default, turned on in the View menu (FR-002). */}
+      {/* Your week: off by default, turned on in Display options (FR-002). */}
       {inbox.showWeek && <HeroCards tasks={liveTasks} today={today} />}
 
       {/* Pinned, the Inbox sits beside the board (FR-060); the board narrows. */}
       <div className={inbox.pinned ? 'fx-board-split' : 'fx-board-main'}>
       <div className="fx-board-area">
-      <BoardFilters
-        filters={filters}
-        onChange={setFilters}
-        tasks={liveTasks}
-        brands={brands}
-        members={members}
-        shown={filteredTasks.length}
-        total={scopedTasks.length}
-        scope={scope}
-        onScope={chooseScope}
-        trailing={
-          <ViewMenu
-            showWeek={inbox.showWeek}
-            onShowWeek={v => void savePrefs({ showWeek: v })}
-            upstream={showUpstream}
-            onUpstream={setUpstream}
-          />
-        }
-      />
-
-
-      {/* PIPELINE heading — handoff §7. Caveat, with the hand-drawn ticks and
-          underline that carry the rest of the design's voice. */}
-      <div style={{ padding: '0 26px 0 38px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 2l2.1 6.1L20 10l-5.9 2.1L12 18l-2.1-5.9L4 10l5.9-1.9L12 2z"
-                  fill={PIPE.limePrimary} stroke={PIPE.ink} strokeWidth="1.3" strokeLinejoin="round" />
-          </svg>
-          <h1 style={{
-            fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 30,
-            letterSpacing: '0.04em', color: PIPE.ink, lineHeight: 1, margin: 0,
-          }}>
-            PIPELINE
-          </h1>
-          <svg width="26" height="22" viewBox="0 0 26 22" fill="none" aria-hidden="true">
-            <path d="M3 18L8 4M14 17l5-12" stroke={PIPE.purpleStroke} strokeWidth="2.4" strokeLinecap="round" />
-          </svg>
-        </div>
-        <svg width="148" height="9" viewBox="0 0 148 9" fill="none" aria-hidden="true"
-             style={{ display: 'block', margin: '2px 0 0 32px' }}>
-          <path d="M3 6C34 2 100 1.6 145 4.2" stroke={PIPE.purpleStroke} strokeWidth="2.6" strokeLinecap="round" />
-        </svg>
-      </div>
 
       {dragError && (
         <div
@@ -1130,24 +1070,7 @@ export function KanbanBoard({
       </DndContext>
       </div>
 
-      {panelShown && (
-        <InboxPanel
-          model={model}
-          me={currentUser}
-          members={members}
-          now={now}
-          api={inboxApi}
-          tab={inboxTab}
-          onTab={setInboxTab}
-          pinned={inbox.pinned}
-          onPin={() => {
-            if (inbox.pinned) closeInbox()
-            else { setInboxOpen(true); void savePrefs({ pinned: true }) }
-          }}
-          onClose={closeInbox}
-          buttonRef={inboxBtn}
-        />
-      )}
+      {panelShown && inboxPanel(true)}
       </div>
 
       <BulkBar
@@ -1166,26 +1089,7 @@ export function KanbanBoard({
       {taskPanel}
 
       {/* Task creation form */}
-      {showTaskForm && (
-        <TaskForm
-          currentUser={currentUser}
-          brands={brands}
-          contentTypes={contentTypes}
-          members={members}
-        />
-      )}
-    </div>
-  )
-}
-
-/** Board | Sheet (spec 008 FR-002). The sheet's own toolbar carries the same switch. */
-function ViewSwitch({ view, onView }: { view: BoardView; onView(v: BoardView): void }) {
-  const t = useTranslations('sheet')
-  return (
-    <div className="fx-sheet-seg" role="group" aria-label={t('view.label')} data-view-switch="">
-      <button type="button" aria-pressed={view === 'board'} onClick={() => onView('board')}>{t('view.board')}</button>
-      <button type="button" aria-pressed={view === 'sheet'} onClick={() => onView('sheet')}>{t('view.sheet')}</button>
-      <button type="button" aria-pressed={view === 'content'} onClick={() => onView('content')}>{t('view.content')}</button>
+      {taskForm}
     </div>
   )
 }

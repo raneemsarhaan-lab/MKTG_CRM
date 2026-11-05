@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import type { Member } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { logout } from '@/lib/logout'
@@ -36,8 +37,12 @@ import { updateMyProfile, changeMyPassword } from '@/actions/profile'
 
 interface Props {
   member: Member
-  /** Where the trigger sits, so the panel opens on the correct side. */
-  variant?: 'sidebar' | 'rail'
+  /**
+   * Where the trigger sits, so the panel opens on the correct side. 'header'
+   * is the Board header's avatar (spec 011 FR-013): just the photo or
+   * initials, with the panel opening downward under it.
+   */
+  variant?: 'sidebar' | 'rail' | 'header'
 }
 
 type Panel = 'menu' | 'profile' | 'password'
@@ -45,7 +50,7 @@ type Panel = 'menu' | 'profile' | 'password'
 export function UserMenu({ member, variant = 'sidebar' }: Props) {
   const [open, setOpen]   = useState(false)
   const [panel, setPanel] = useState<Panel>('menu')
-  const [pos, setPos]     = useState<{ left: number; bottom: number }>({ left: 0, bottom: 0 })
+  const [pos, setPos]     = useState<{ left: number; bottom?: number; top?: number }>({ left: 0, bottom: 0 })
   const [note, setNote]   = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -64,6 +69,13 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
     function place() {
       const r = btnRef.current?.getBoundingClientRect()
       if (!r) return
+      if (variant === 'header') {
+        // Under the avatar, aligned to its inline end: the page's edge side.
+        const rtl = btnRef.current ? getComputedStyle(btnRef.current).direction === 'rtl' : false
+        const left = rtl ? r.left : r.right - 280
+        setPos({ left: Math.max(12, Math.min(left, window.innerWidth - 292)), top: r.bottom + 8 })
+        return
+      }
       setPos({
         left:   Math.min(r.left, window.innerWidth - 300),
         bottom: Math.max(12, window.innerHeight - r.top + 8),
@@ -76,7 +88,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [open])
+  }, [open, variant])
 
   useEffect(() => {
     if (!open) return
@@ -127,6 +139,9 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
   }
 
   const isRail = variant === 'rail'
+  const isHeader = variant === 'header'
+  const th = useTranslations('header')
+  const roleLabel = member.access === 'admin' ? 'Admin' : member.role
 
   return (
     <div ref={wrapRef} style={{ display: 'contents' }}>
@@ -136,8 +151,11 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
         onClick={() => (open ? close() : setOpen(true))}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Account menu"
-        style={isRail ? {
+        aria-label={isHeader ? th('account', { name: member.name, role: roleLabel }) : 'Account menu'}
+        title={isHeader ? `${member.name} · ${roleLabel}` : undefined}
+        data-account={isHeader ? '' : undefined}
+        className={isHeader ? 'fx-hd-avatar' : undefined}
+        style={isHeader ? undefined : isRail ? {
           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
           position: 'relative', flexShrink: 0, marginTop: 12, lineHeight: 0,
         } : {
@@ -147,10 +165,10 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
           fontFamily: 'inherit', textAlign: 'start',
         }}
       >
-        <span style={{
+        <span aria-hidden={isHeader ? true : undefined} style={{
           width: isRail ? 40 : 40, height: isRail ? 40 : 40, borderRadius: '50%',
           flexShrink: 0, overflow: 'hidden', boxSizing: 'border-box',
-          border: isRail ? '2px solid #34383B' : '2px solid #E9D5FF',
+          border: isHeader ? '2.5px solid #A855F7' : isRail ? '2px solid #34383B' : '2px solid #E9D5FF',
           background: avatarColor(member.name), color: '#FFFFFF',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 13,
@@ -159,11 +177,13 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
             src={member.avatar_url}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            fallback={<>{initials(member.name)}</>}
+            // In the header the initials are drawn by CSS (data-initials), so
+            // the button's name is just the member's name and role (label in name).
+            fallback={isHeader ? <i className="fx-hd-initials" data-initials={initials(member.name)} /> : <>{initials(member.name)}</>}
           />
         </span>
 
-        {!isRail && (
+        {!isRail && !isHeader && (
           <>
             <span style={{ minWidth: 0, lineHeight: 1.25, flex: 1 }}>
               <span style={{
@@ -190,7 +210,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
           role="menu"
           aria-label="Account"
           style={{
-            position: 'fixed', left: pos.left, bottom: pos.bottom, zIndex: 90,
+            position: 'fixed', left: pos.left, bottom: pos.bottom, top: pos.top, zIndex: 90,
             width: 280, background: '#FFFFFF', borderRadius: 14,
             border: `1px solid ${PIPE.border}`, boxShadow: '0 18px 44px rgba(20,19,26,.24)',
             padding: 8,
