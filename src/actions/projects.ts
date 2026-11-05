@@ -670,7 +670,7 @@ export async function listProjectContents(projectId: string): Promise<PickerCont
 
   const [tasks, steps] = await Promise.all([
     prisma.task.findMany({
-      where:   { project_id: projectId },
+      where:   { project_id: projectId, dropped_at: null },
       orderBy: { created_at: 'desc' },
       select:  { id: true, name: true, status: true, assignee: { select: { name: true } } },
       take:    200,
@@ -700,7 +700,7 @@ export async function listProjectContents(projectId: string): Promise<PickerCont
 export async function countUnattached(brandId: string): Promise<number> {
   const member = await getSessionMember()
   if (!member) return 0
-  return prisma.task.count({ where: { brand_id: brandId, project_id: null } })
+  return prisma.task.count({ where: { brand_id: brandId, project_id: null, dropped_at: null } })
 }
 
 /**

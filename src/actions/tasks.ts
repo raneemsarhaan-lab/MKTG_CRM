@@ -7,7 +7,11 @@ import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import { MAX_PASTED } from '@/lib/paste-list'
 import { MAX_ATTACHMENT_CHARS, MAX_ATTACHMENTS_PER_GO } from '@/lib/attachments'
-import { deleteObject } from '@/lib/storage'
+import { deleteAttachmentFor } from '@/lib/attachment-delete'
+import { parseClipFileName, fileNameKey } from '@/lib/clip-file-name'
+import { LINK_CONTENT_TYPE, linkLabel } from '@/lib/attachments'
+import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
+import { allowedStages, holdsStage } from '@/lib/stage-moves'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 /**
@@ -38,19 +42,15 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
 
   const nextStage = nextStageId(task.status as StageId, task.nine_stage)
   if (!nextStage) return { success: false, shouldCelebrate: false, error: 'terminal' }
+  if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
 
-  // Own-stage check: working stage → task owner; review stage → role match.
-  // Mirrors `canAdvance` in TaskModal — the client hides the button, this
-  // enforces it. Admin and superuser may advance any stage as an override.
-  const stageMeta = STAGE_META[task.status as StageId]
-  // A working stage belongs to whoever is doing the task — or its owner, who
-  // is accountable for it. A review stage belongs to a role.
-  const isOwnStage = !stageMeta.owner_role
-    ? task.assignee_id === member.id || task.task_owner_id === member.id
-    : stageMeta.owner_role === member.role
-
-  const canAdvance = isOwnStage || member.access === 'admin' || member.access === 'superuser'
-  if (!canAdvance) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  // Own-stage check, shared with the board, the sheet and bulk moves
+  // (src/lib/stage-moves.ts): a working stage belongs to the assignee or the
+  // owner, a review stage to its role; admin and superuser may override.
+  const isOwnStage = holdsStage(task, member)
+  if (!allowedStages(task, member).includes(nextStage)) {
+    return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  }
 
   // An override advance is not the overrider's win — no celebration.
   const shouldCelebrate = isOwnStage
@@ -94,14 +94,14 @@ export async function setTaskStage(
   const toIdx   = path.indexOf(stageId)
   if (toIdx === -1) return { success: false, shouldCelebrate: false, error: 'stage_not_in_pipeline' }
   if (toIdx === fromIdx) return { success: true, shouldCelebrate: false }
+  if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
 
-  const stageMeta = STAGE_META[task.status as StageId]
-  const isOwnStage = !stageMeta.owner_role
-    ? task.assignee_id === member.id || task.task_owner_id === member.id
-    : stageMeta.owner_role === member.role
-
-  const allowed = isOwnStage || member.access === 'admin' || member.access === 'superuser'
-  if (!allowed) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  // The shared rule (src/lib/stage-moves.ts): the sheet's status menu offers
+  // exactly this list, so the two can never disagree (spec 008 SC-003).
+  const isOwnStage = holdsStage(task, member)
+  if (!allowedStages(task, member).includes(stageId)) {
+    return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  }
 
   await prisma.task.update({
     where: { id: taskId },
@@ -315,6 +315,344 @@ export async function createSubtask(
   return { success: true, id: task.id, name: task.name }
 }
 
+// ─── video sheet: clip details (spec 008) ──────────────────────────────────
+
+export interface ClipPatch {
+  clip_no?: number | null
+  source?: string | null
+  file_name?: string | null
+  in_ms?: number | null
+  out_ms?: number | null
+  /** On the task itself, not the clip row. */
+  published_url?: string | null
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** A web link we will store: http(s) only, at most 2,000 characters. */
+function cleanLink(raw: string | null | undefined): string | null | false {
+  const v = (raw ?? '').trim()
+  if (!v) return null
+  if (v.length > 2000) return false
+  try {
+    const u = new URL(v)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : false
+  } catch { return false }
+}
+
+/** Whether a task is a clip: a child of a Video task (spec 008 data-model §1). */
+async function videoOf(task: { parent_task_id: string | null }) {
+  if (!task.parent_task_id) return null
+  const parent = await prisma.task.findUnique({
+    where: { id: task.parent_task_id },
+    select: { id: true, content_type_label: true, parent_task_id: true },
+  })
+  return parent && parent.content_type_label === 'Video' && !parent.parent_task_id ? parent : null
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: string }).code === 'P2002'
+}
+
+/**
+ * Save a clip's details from the video sheet (spec 008 FR-037, FR-038).
+ *
+ * Title, editor and type go through updateTask; these are the fields only a
+ * clip has, plus the published link. Same rule as editing any task. Creates
+ * the details row when a clip has none yet (a subtask made before the sheet).
+ */
+export async function updateClip(
+  taskId: string,
+  patch: ClipPatch,
+): Promise<{ success: boolean; error?: string; clip?: import('@/types/index').ClipDetails; published_url?: string | null }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: { clip: true } })
+  if (!task) return { success: false, error: 'not_found' }
+  if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
+  const video = await videoOf(task)
+  if (!video) return { success: false, error: 'not_a_clip' }
+
+  const data: Record<string, unknown> = {}
+  if (patch.clip_no !== undefined) {
+    if (patch.clip_no !== null && (!Number.isInteger(patch.clip_no) || patch.clip_no < 0 || patch.clip_no > 9999)) {
+      return { success: false, error: 'bad_number' }
+    }
+    data.clip_no = patch.clip_no
+  }
+  if (patch.source !== undefined)    data.source    = (patch.source ?? '').trim().slice(0, 120) || null
+  if (patch.file_name !== undefined) data.file_name = (patch.file_name ?? '').trim().slice(0, 200) || null
+  for (const k of ['in_ms', 'out_ms'] as const) {
+    const v = patch[k]
+    if (v === undefined) continue
+    if (v !== null && (!Number.isInteger(v) || v < 0 || v > DAY_MS)) return { success: false, error: 'bad_times' }
+    data[k] = v
+  }
+  const inMs  = (data.in_ms  !== undefined ? data.in_ms  : task.clip?.in_ms)  as number | null | undefined
+  const outMs = (data.out_ms !== undefined ? data.out_ms : task.clip?.out_ms) as number | null | undefined
+  if (inMs != null && outMs != null && !(outMs > inMs)) return { success: false, error: 'bad_times' }
+
+  let published: string | null | undefined
+  if (patch.published_url !== undefined) {
+    const link = cleanLink(patch.published_url)
+    if (link === false) return { success: false, error: 'bad_link' }
+    published = link
+  }
+
+  try {
+    const clip = Object.keys(data).length || !task.clip
+      ? await prisma.taskClip.upsert({
+          where:  { task_id: taskId },
+          create: { task_id: taskId, video_id: video.id, ...data },
+          update: data,
+        })
+      : task.clip
+    await prisma.task.update({
+      where: { id: taskId },
+      data:  { updated_at: new Date(), ...(published !== undefined ? { published_url: published } : {}) },
+    })
+    revalidatePath('/board')
+    return {
+      success: true,
+      published_url: published !== undefined ? published : task.published_url,
+      clip: {
+        clip_no: clip.clip_no, source: clip.source, file_name: clip.file_name,
+        in_ms: clip.in_ms, out_ms: clip.out_ms, video_id: clip.video_id, created_at: clip.created_at.toISOString(),
+      },
+    }
+  } catch (e: unknown) {
+    if (isUniqueViolation(e)) return { success: false, error: 'duplicate_file_name' }
+    return { success: false, error: 'generic' }
+  }
+}
+
+export interface ClipRowInput {
+  title: string
+  /** Re-read on the server; times sent by the browser are never trusted. */
+  file_name?: string | null
+  link?: string | null
+}
+export interface AddedClip {
+  id: string
+  name: string
+  clip: import('@/types/index').ClipDetails
+  link_attachment: { id: string; filename: string; url: string; content_type: string; uploaded_at: string } | null
+}
+
+/** At most this many clips in one add (contracts/server.md). */
+const MAX_CLIPS_PER_ADD = 200
+
+/**
+ * Add clips to a video: the sheet's Paste clips and + Clip (spec 008
+ * FR-030–FR-036, research R2).
+ *
+ * Any signed-in member may add clips, whatever their access level: the one
+ * creation path open to "user"-level members, and it can only make Reel
+ * subtasks of a Video, owned by the member adding them. createTask and
+ * createSubtask are unchanged (FR-036).
+ *
+ * Duplicates are skipped, not errors. The video row is locked first so adds to
+ * one video run one at a time; the existing file names are read under that
+ * lock and compared ignoring letter case. The unique index is only a last
+ * guard: a unique violation inside a PostgreSQL transaction would abort every
+ * later row, so it is never what detects a duplicate.
+ */
+export async function addClips(
+  videoId: string,
+  rows: ClipRowInput[],
+): Promise<{ success: boolean; created?: AddedClip[]; skipped?: string[]; error?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'Nothing to add' }
+  if (rows.length > MAX_CLIPS_PER_ADD) return { success: false, error: `At most ${MAX_CLIPS_PER_ADD} clips at a time` }
+
+  const video = await prisma.task.findUnique({ where: { id: videoId } })
+  if (!video) return { success: false, error: 'not_found' }
+  if (video.content_type_label !== 'Video' || video.parent_task_id || video.dropped_at) {
+    return { success: false, error: 'not_a_video' }
+  }
+
+  // Clean every row before touching the database.
+  const clean = rows.map(r => {
+    const file = (r.file_name ?? '').trim().slice(0, 200) || null
+    const parsed = parseClipFileName(file)
+    const link = cleanLink(r.link)
+    const title = (r.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
+      || file
+      || ''
+    return { title, file, parsed, link: link === false ? null : link }
+  })
+  if (clean.some(r => !r.title)) return { success: false, error: 'Task name cannot be empty' }
+
+  try {
+    const result = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM tasks WHERE id = ${videoId}::uuid FOR UPDATE`
+      const existing = await tx.taskClip.findMany({ where: { video_id: videoId }, select: { file_name: true } })
+      const seen = new Set(existing.map(e => fileNameKey(e.file_name)).filter(Boolean))
+      const created: AddedClip[] = []
+      const skipped: string[] = []
+      const now = new Date()
+      for (const r of clean) {
+        if (r.file) {
+          const key = fileNameKey(r.file)
+          if (seen.has(key)) { skipped.push(r.file); continue }
+          seen.add(key)
+        }
+        const task = await tx.task.create({
+          data: {
+            name:               r.title,
+            parent_task_id:     video.id,
+            brand_id:           video.brand_id,
+            content_type_label: 'Reel',
+            platform:           video.platform,
+            project_id:         video.project_id,
+            task_owner_id:      member.id,
+            assignee_id:        null,
+            initiator_role:     member.role,
+            nine_stage:         video.nine_stage,
+            status:             'todo',
+            stage_date:         now,
+            hours_estimate:     0,
+            priority:           'Medium',
+            created_by:         member.id,
+          },
+        })
+        const clip = await tx.taskClip.create({
+          data: {
+            task_id:   task.id,
+            video_id:  video.id,
+            file_name: r.file,
+            clip_no:   r.parsed?.clip_no ?? null,
+            source:    r.parsed?.source ?? null,
+            in_ms:     r.parsed?.in_ms ?? null,
+            out_ms:    r.parsed?.out_ms ?? null,
+          },
+        })
+        const att = r.link
+          ? await tx.taskAttachment.create({
+              data: {
+                task_id: task.id, filename: linkLabel(r.link), url: r.link,
+                content_type: LINK_CONTENT_TYPE, uploaded_by: member.id,
+              },
+            })
+          : null
+        created.push({
+          id: task.id, name: task.name,
+          clip: {
+            clip_no: clip.clip_no, source: clip.source, file_name: clip.file_name, in_ms: clip.in_ms,
+            out_ms: clip.out_ms, video_id: clip.video_id, created_at: clip.created_at.toISOString(),
+          },
+          link_attachment: att
+            ? { id: att.id, filename: att.filename, url: att.url ?? '', content_type: LINK_CONTENT_TYPE, uploaded_at: att.uploaded_at.toISOString() }
+            : null,
+        })
+      }
+      return { created, skipped }
+    }, { timeout: 30_000 })
+
+    revalidatePath('/board')
+    revalidatePath('/overview')
+    return { success: true, ...result }
+  } catch (e: unknown) {
+    // Only reachable if the lock was somehow bypassed; say so plainly.
+    if (isUniqueViolation(e)) return { success: false, error: 'duplicate_file_name' }
+    return { success: false, error: String(e).slice(0, 200) }
+  }
+}
+
+/**
+ * Attach a Drive or web link to a task (spec 008 FR-040, research R7).
+ *
+ * Stored as an ordinary attachment whose content type marks it as a link, so
+ * it shows in the task's Attachments section and opens in a new tab. Same rule
+ * as uploading. The same URL twice returns the row already there.
+ */
+export async function addLinkAttachment(
+  taskId: string,
+  url: string,
+): Promise<{ success: boolean; error?: string; row?: { id: string; filename: string; url: string; content_type: string; uploaded_by: string | null; uploaded_at: string } }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  const guard = await mayAttachTo(taskId, member.id, member.access)
+  if (!guard.ok) return { success: false, error: guard.error }
+  const link = cleanLink(url)
+  if (!link) return { success: false, error: 'bad_link' }
+
+  const shape = (a: { id: string; filename: string; url: string | null; uploaded_by: string | null; uploaded_at: Date }) => ({
+    id: a.id, filename: a.filename, url: a.url ?? link, content_type: LINK_CONTENT_TYPE,
+    uploaded_by: a.uploaded_by, uploaded_at: a.uploaded_at.toISOString(),
+  })
+  const already = await prisma.taskAttachment.findFirst({ where: { task_id: taskId, url: link, content_type: LINK_CONTENT_TYPE } })
+  if (already) return { success: true, row: shape(already) }
+
+  const row = await prisma.taskAttachment.create({
+    data: { task_id: taskId, filename: linkLabel(link), url: link, content_type: LINK_CONTENT_TYPE, uploaded_by: member.id },
+  })
+  revalidatePath('/board')
+  return { success: true, row: shape(row) }
+}
+
+/** A task that may be dropped: a clip of a video (spec 008) or a piece of a theme (spec 009). */
+async function droppable(task: { parent_task_id: string | null; project_id: string | null }): Promise<boolean> {
+  if (await videoOf(task)) return true
+  if (!task.project_id) return false
+  const p = await prisma.project.findUnique({ where: { id: task.project_id }, select: { is_theme: true } })
+  return !!p?.is_theme
+}
+
+/**
+ * Drop a clip, or archive a piece: off the board, greyed in the sheets,
+ * nothing deleted (spec 008 FR-060, FR-063; spec 009 FR-022). Same rule as
+ * editing it. Idempotent.
+ */
+export async function dropTask(taskId: string): Promise<{ success: boolean; error?: string; dropped_at?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, error: 'not_found' }
+  if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
+  if (!(await droppable(task))) return { success: false, error: 'not_a_clip' }
+  if (task.dropped_at) return { success: true, dropped_at: task.dropped_at.toISOString() }
+
+  const at = new Date()
+  await prisma.task.update({ where: { id: taskId }, data: { dropped_at: at, updated_at: at } })
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  revalidatePath('/capacity')
+  return { success: true, dropped_at: at.toISOString() }
+}
+
+/**
+ * Restore a dropped clip to the board at the stage it had, with its SLA clock
+ * as it was when dropped (spec 008 FR-061, research R14): the stage date moves
+ * forward so the business days it had spent in its stage are the same again.
+ */
+export async function restoreTask(taskId: string): Promise<{ success: boolean; error?: string; stage_date?: string }> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, error: 'not_authenticated' }
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, error: 'not_found' }
+  if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
+  if (!(await droppable(task))) return { success: false, error: 'not_a_clip' }
+  const ymd = (d: Date) => d.toISOString().slice(0, 10)
+  if (!task.dropped_at) return { success: true, stage_date: ymd(task.stage_date) }
+
+  const spent = businessDaysBetween(task.stage_date, task.dropped_at)
+  const stageDate = subtractBusinessDays(new Date(), spent)
+  // stage_date is a DATE column: store the local calendar day at UTC midnight.
+  const day = new Date(Date.UTC(stageDate.getFullYear(), stageDate.getMonth(), stageDate.getDate()))
+  await prisma.task.update({ where: { id: taskId }, data: { dropped_at: null, stage_date: day, updated_at: new Date() } })
+  revalidatePath('/board')
+  revalidatePath('/overview')
+  revalidatePath('/capacity')
+  return { success: true, stage_date: ymd(day) }
+}
+
+/** Spec 008's names for the same actions. */
+export async function dropClip(taskId: string) { return dropTask(taskId) }
+export async function restoreClip(taskId: string) { return restoreTask(taskId) }
+
 // ─── bulk operations ────────────────────────────────────────────────────────
 
 export interface BulkResult {
@@ -354,15 +692,11 @@ export async function bulkUpdateTasks(
 
     if (patch.status !== undefined) {
       const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
-      if (!path.includes(patch.status)) { refused++; continue }
+      if (!path.includes(patch.status) || task.dropped_at) { refused++; continue }
 
-      const stageMeta = STAGE_META[task.status as StageId]
-      const ownsStage = !stageMeta.owner_role
-        ? task.assignee_id === member.id || task.task_owner_id === member.id
-        : stageMeta.owner_role === member.role
-      if (!ownsStage && !isAdmin) { refused++; continue }
-
+      // The same rule as a drag or the sheet's menu (src/lib/stage-moves.ts).
       if (patch.status !== task.status) {
+        if (!allowedStages(task, member).includes(patch.status)) { refused++; continue }
         data.status = patch.status
         data.stage_date = new Date()
       }
@@ -562,9 +896,9 @@ async function mayAttachTo(taskId: string, memberId: string, access: string) {
 /**
  * Attach files to a task.
  *
- * Files arrive already encoded as data URLs — the browser does the reading and
- * the shrinking, because a server action's payload is the same round trip
- * either way and the resize has to happen on a canvas regardless.
+ * Files arrive already encoded as data URLs, read by the browser exactly as
+ * picked: nothing is shrunk or re-encoded on the way (spec 007 FR-059). Only
+ * the separate card thumbnail is a small copy.
  */
 export async function addAttachments(
   taskId: string,
@@ -578,7 +912,11 @@ export async function addAttachments(
    * of full-size uploads is not.
    */
   thumb?: string | null,
-): Promise<{ success: boolean; created?: number; error?: string }> {
+): Promise<{
+  success: boolean; created?: number; error?: string
+  /** The stored rows, without their bytes: the panel already holds those (spec 007). */
+  rows?: { id: string; filename: string; uploaded_by: string | null; uploaded_at: string; size_bytes: number | null; content_type: string | null }[]
+}> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
@@ -592,25 +930,38 @@ export async function addAttachments(
 
   const tooBig = clean.find(f => f.data.length > MAX_ATTACHMENT_CHARS)
   if (tooBig) {
-    return { success: false, error: `${tooBig.filename} is too large to store — keep files under about 5 MB.` }
+    return { success: false, error: `${tooBig.filename} is over the about 5 MB limit for files on this workspace.` }
   }
 
   try {
-    const result = await prisma.taskAttachment.createMany({
-      data: clean.map(f => ({
-        task_id:     taskId,
-        filename:    f.filename.trim().slice(0, 200),
-        data:        f.data,
-        uploaded_by: member.id,
-      })),
-    })
+    // One row at a time so each comes back with its id; the size and type are
+    // read off the data URL, which is the file exactly as picked.
+    const rows = []
+    for (const f of clean) {
+      const comma = f.data.indexOf(',')
+      const meta  = f.data.slice(5, comma)                  // "image/png;base64"
+      const b64   = f.data.slice(comma + 1)
+      const pad   = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0
+      const row = await prisma.taskAttachment.create({
+        data: {
+          task_id:      taskId,
+          filename:     f.filename.trim().slice(0, 200),
+          data:         f.data,
+          uploaded_by:  member.id,
+          size_bytes:   meta.endsWith(';base64') ? Math.max(0, Math.floor(b64.length * 3 / 4) - pad) : null,
+          content_type: meta.split(';')[0] || null,
+        },
+        select: { id: true, filename: true, uploaded_by: true, uploaded_at: true, size_bytes: true, content_type: true },
+      })
+      rows.push({ ...row, uploaded_at: row.uploaded_at.toISOString() })
+    }
     if (thumb && thumb.startsWith('data:') && thumb.length <= MAX_THUMB_CHARS) {
       await prisma.task.update({ where: { id: taskId }, data: { cover_thumb: thumb } })
     }
 
     revalidatePath('/board')
     revalidatePath('/overview')
-    return { success: true, created: result.count }
+    return { success: true, created: rows.length, rows }
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
   }
@@ -622,36 +973,10 @@ export async function removeAttachment(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  const a = await prisma.taskAttachment.findUnique({
-    where: { id: attachmentId }, select: { task_id: true, storage_key: true },
-  })
-  if (!a) return { success: false, error: 'That file is already gone' }
-
-  const guard = await mayAttachTo(a.task_id, member.id, member.access)
-  if (!guard.ok) return { success: false, error: guard.error }
-
-  await prisma.taskAttachment.delete({ where: { id: attachmentId } })
-
-  // And the object behind it, when there is one. After the row, not before:
-  // deleteObject never throws, so the worst case is an orphaned object nobody
-  // can reach, rather than a row pointing at a file that is already gone.
-  if (a.storage_key) await deleteObject(a.storage_key)
-
-  // The card's preview came from an upload. If none is left, clear it rather
-  // than keep showing a picture the task no longer has.
-  // "An upload" means one of ours, wherever its bytes are: inlined in `data`
-  // for the older ones, or in the bucket for the rest. Counting only `data`
-  // meant that once files moved to the bucket this was always zero, so removing
-  // any single file wiped the card's preview even when pictures remained.
-  const stillHasUpload = await prisma.taskAttachment.count({
-    where: {
-      task_id: a.task_id,
-      OR: [{ data: { not: null } }, { storage_key: { not: null } }],
-    },
-  })
-  if (stillHasUpload === 0) {
-    await prisma.task.update({ where: { id: a.task_id }, data: { cover_thumb: null } })
-  }
+  // The row, the stored object and the card's preview, under the same guard
+  // the keepalive DELETE route uses (spec 007, src/lib/attachment-delete.ts).
+  const r = await deleteAttachmentFor(attachmentId, member)
+  if (!r.ok) return { success: false, error: r.error }
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -751,9 +1076,10 @@ export async function loadAttachments(taskId: string): Promise<{
   const member = await getSessionMember()
   if (!member) return []
 
+  // Newest first, the order the panel shows (spec 007 FR-001, research R2).
   const rows = await prisma.taskAttachment.findMany({
     where: { task_id: taskId },
-    orderBy: { uploaded_at: 'asc' },
+    orderBy: [{ uploaded_at: 'desc' }, { id: 'asc' }],
   })
   return rows.map(r => ({
     id: r.id, filename: r.filename, url: r.url, data: r.data,

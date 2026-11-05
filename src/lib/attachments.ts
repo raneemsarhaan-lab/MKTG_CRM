@@ -32,6 +32,22 @@ export function attachmentKind(filename: string): AttachmentKind {
   return 'other'
 }
 
+/** The content type that marks an attachment as a link, not a file (spec 008 R7). */
+export const LINK_CONTENT_TYPE = 'text/uri-list'
+
+/** A Drive or web link attached to a task: opens in a new tab, never in the preview. */
+export function isLinkAttachment(a: { content_type?: string | null }): boolean {
+  return a.content_type === LINK_CONTENT_TYPE
+}
+
+/** What a link is called on its tile: "Google Drive", or the site's host name. */
+export function linkLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    return /(^|\.)(drive|docs)\.google\.com$/.test(host) ? 'Google Drive' : host
+  } catch { return 'Link' }
+}
+
 export function isImageAttachment(a: { filename: string; url?: string | null; data?: string | null }): boolean {
   return Boolean(a.url || a.data) && attachmentKind(a.filename) === 'image'
 }
@@ -102,8 +118,9 @@ export function shortName(filename: string, max = 28): string {
  * actually stored rather than on the file the user picked.
  *
  * The bytes live in Postgres — there is no object store behind this app — so
- * this is not a politeness limit, it is what keeps a task row readable. The
- * panel shrinks pictures before they get here; anything else has to fit as-is.
+ * this is not a politeness limit, it is what keeps a task row readable. Every
+ * file, pictures included, has to fit as-is: nothing is shrunk or re-encoded
+ * to make it fit (spec 007 FR-059).
  *
  * Capped well under the 8 MB server-action body limit in next.config.ts
  * (base64 runs about a third larger than the file itself, and a thumbnail up
@@ -113,6 +130,14 @@ export function shortName(filename: string, max = 28): string {
  */
 export const MAX_ATTACHMENT_CHARS = 7_000_000      // ≈5 MB of file
 export const MAX_ATTACHMENTS_PER_GO = 12
+
+/**
+ * The same limit in bytes of the original file, checked before a file is read
+ * (spec 007 FR-054, research R6). A data URL is base64 — 4 characters for every
+ * 3 bytes — plus a short "data:<type>;base64," prefix, allowed for here.
+ * About 5.25 MB; shown to people as "about 5 MB".
+ */
+export const MAX_INLINE_BYTES = Math.floor((MAX_ATTACHMENT_CHARS - 256) * 3 / 4)
 
 /**
  * How big a file may be when there is a bucket to put it in.

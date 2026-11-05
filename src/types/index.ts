@@ -17,6 +17,21 @@ export type StageId =
   | 'publish'       // Published (terminal)
 
 export type AccessLevel = 'admin' | 'superuser' | 'user'
+
+/** The board page's two views of the same tasks (spec 008). */
+export type BoardView = 'board' | 'sheet' | 'content'
+/** A theme's cadence period (spec 009). */
+export type FrequencyPeriod = 'week' | 'month'
+/** The team's fixed audience segments (spec 009). */
+export type AudienceKey = 'c-level' | 'strategy-heads' | 'top-management' | 'second-line' | 'ceo-mid'
+/** What a link attachment is for (spec 009). */
+export type LinkRole = 'working_doc' | 'design'
+/** The video sheet's column sets (spec 008 FR-050). */
+export type SheetColumnSet = 'editing' | 'copy' | 'full'
+/** Every column the video sheet can show, in display order. */
+export type SheetColumn =
+  | 'title' | 'clipNo' | 'type' | 'status' | 'editor' | 'source' | 'fileName'
+  | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
 export type Priority = 'Low' | 'Medium' | 'High'
 
@@ -103,9 +118,42 @@ export interface Task {
   plan_step?: { id: string; name: string; projectId: string; projectName: string } | null
   parent_task_id?: string | null
   parent?: { id: string; name: string } | null
-  subtasks?: { id: string; name: string; status: StageId }[]
+  subtasks?: { id: string; name: string; status: StageId; dropped_at?: string | null }[]
   comments?: TaskComment[]
   attachments?: TaskAttachment[]
+  /** The live post's link (spec 008). */
+  published_url?: string | null
+  /** ISO time the clip was dropped; absent or null while live (spec 008). */
+  dropped_at?: string | null
+  /** Clip details, when this task is a clip with details (spec 008). */
+  clip?: ClipDetails | null
+  /** The pillar inside its theme (spec 009). */
+  pillar_id?: string | null
+  /** The social post's link (spec 009). */
+  post_url?: string | null
+}
+
+/** A theme of the Content sheet: a project flagged as a content stream (spec 009). */
+export interface ContentTheme {
+  id: string
+  name: string
+  brand_id: string | null
+  owner_id: string | null
+  frequency_count: number | null
+  frequency_period: FrequencyPeriod | null
+  audience: AudienceKey[]
+  pillars: { id: string; name: string; sort_order: number }[]
+}
+
+/** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */
+export interface ClipDetails {
+  clip_no: number | null
+  source: string | null
+  file_name: string | null
+  in_ms: number | null
+  out_ms: number | null
+  video_id: string | null
+  created_at?: string
 }
 
 export interface TaskComment {
@@ -136,6 +184,8 @@ export interface TaskAttachment {
   /** Bytes, for files uploaded to the bucket. Imports do not carry a size. */
   size_bytes?: number | null
   content_type?: string | null
+  /** On a link attachment: working doc or design (spec 009). */
+  link_role?: LinkRole | null
   uploaded_by?: string
   uploaded_at: string
 }
@@ -169,16 +219,37 @@ export interface CelebrationPayload {
   stageLabel: string
 }
 
+/**
+ * An attachment delete waiting out its Undo window (spec 007, data-model
+ * PendingDelete). Ephemeral: never persisted, and the timer that ends it lives
+ * outside the store, in src/lib/pending-deletes.ts.
+ */
+export interface PendingDelete {
+  attachment: TaskAttachment
+  taskId: string
+  /** When the delete is sent (ms since epoch). */
+  deadline: number
+  /** In the open panel (ghost tile), or after the panel closed (bottom message). */
+  phase: 'in-panel' | 'after-close'
+  label: 'deleted' | 'replaced'
+  /** For "Replace it": the new file to delete if this one is restored. */
+  pairedNewId?: string
+}
+
 export interface UIStore {
   celebration: CelebrationPayload | null
   selectedTaskId: string | null
   showTaskForm: boolean
   profileOpen: boolean
+  /** Keyed by attachment id. */
+  pendingDeletes: Record<string, PendingDelete>
 
   setCelebration: (payload: CelebrationPayload | null) => void
   selectTask: (id: string | null) => void
   setShowTaskForm: (show: boolean) => void
   setProfileOpen: (open: boolean) => void
+  putPendingDelete: (entry: PendingDelete) => void
+  dropPendingDelete: (attachmentId: string) => void
 }
 
 export interface MoveTaskResult {

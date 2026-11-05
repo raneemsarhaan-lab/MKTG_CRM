@@ -17,9 +17,15 @@ tsconfig.tsbuildinfo
 scripts/brief-editor-lab/out/
 scripts/brief-editor-lab/fixtures.gen.ts
 
+# Attachments lab build output
+scripts/attachments-lab/out/
+
 # Editor and OS clutter
 Thumbs.db
 *.tmp
 *.swp
 .vscode/
 .idea/
+
+# Sheet lab build output
+scripts/sheet-lab/out/

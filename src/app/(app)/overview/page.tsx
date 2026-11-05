@@ -56,7 +56,8 @@ export default async function OverviewPage({
 
   const [openTasks, completed, slaRows] = await Promise.all([
     prisma.task.findMany({
-      where:   { ...scope, NOT: { status: 'publish' } },
+      // Dropped clips (spec 008) are off every view but the video sheet.
+      where:   { ...scope, dropped_at: null, NOT: { status: 'publish' } },
       include: { task_owner: true, assignee: true },
       orderBy: { due_date: 'asc' },
     }),
@@ -64,7 +65,7 @@ export default async function OverviewPage({
     // this week's Completed count. Reading every task the team has ever
     // published to count two weeks of them does not scale.
     prisma.task.findMany({
-      where:   { ...scope, status: 'publish', updated_at: { gte: lastWeekOpen } },
+      where:   { ...scope, dropped_at: null, status: 'publish', updated_at: { gte: lastWeekOpen } },
       include: { assignee: true },
       orderBy: { updated_at: 'desc' },
     }),

@@ -328,6 +328,114 @@ Business days elapsed since `stage_date` are compared against `sla_config.max_bu
   must survive unchanged. Set `LAB_CHROMIUM` if Playwright's own browser is
   not downloaded.
 
+### Task attachments
+
+The task panel's Attachments section lives in
+`src/components/kanban/attachments/`, rebuilt in spec 007
+(`specs/007-task-attachments/`). Design file: `design/task-attachments.html`
+(Option A "Tidy" with its extras).
+
+- **Layout.** `AttachmentsSection` is the section and the preview. Data comes
+  in through props, so it runs in the lab without a database. Pure helpers sit
+  beside it:
+  - `names.ts`: two-line names that keep their ending, "Keep both" names,
+    screenshot names, rename rules;
+  - `order.ts`: newest first, the Latest pill, ages;
+  - `limits.ts`: the size limit for this deployment.
+
+  `TaskModal` supplies the upload, load and rename, routes paste and drop to
+  the section, and draws comment file chips.
+- **No compression, ever.** The stored file is the file that was picked.
+  With a bucket, uploads go to `/api/attachments/<ref>` by `XMLHttpRequest`,
+  which gives progress and keeps every check the fetch version had. Without a
+  bucket the original is stored inline as a data URL, and anything over
+  `MAX_INLINE_BYTES` (about 5 MB) is refused before it is read, never shrunk.
+  The board's 360 px cover thumbnail (`cover_thumb`) is a separate display
+  copy.
+- **Delete with Undo.** Pending deletes are a non-persisted `pendingDeletes`
+  slice of `useUIStore`. The timers are in `src/lib/pending-deletes.ts`, and
+  nothing is sent to the server until the 5-second window ends. Closing the
+  panel moves the delete to the bottom message (`PendingDeleteMessage`,
+  mounted once in `src/app/(app)/layout.tsx` via `PendingDeletes`) with at
+  least 6 seconds to undo. If the page is closed, it is sent with `keepalive`
+  to `DELETE /api/attachments/<id>`. `removeAttachment` and that route share
+  `src/lib/attachment-delete.ts`.
+- **Comment file chips** are tokens in the comment text:
+  `[📎 name](attachment:<uuid>)` (`src/lib/comment-files.ts`). `withRefs`
+  draws them with the file's current name, or "name · deleted".
+- **Strings** are in the `attachments` namespace (English and Arabic). Colours
+  come from `ATTACH_UI`, `FILE_KIND_COLORS` and `BRIEF_UI` in `tokens.ts`; CSS
+  is the `.fx-att-*` block in `globals.css`, using `--brief-*` and `--att-*`
+  variables only.
+- **Test it with the lab**: `npm run lab:attachments` (`scripts/attachments-lab/`)
+  runs pure checks in Node (names, order, limits, the comment token, no colour
+  literals, English/Arabic parity), then Playwright scenarios, one per
+  acceptance scenario in the spec, against the real section with a stub host.
+- **Dev server gotcha.** If CSS changes don't show in `next dev`, stop it and
+  delete `.next/dev`: Turbopack's on-disk cache once served an old stylesheet
+  across restarts.
+
+### Video sheet
+
+A second view of the board for long-form videos and their clips, spec 008
+(`specs/008-video-sheet-view/`). Design file: `design/video-sheet.html`.
+
+- **Data.** A video is a top-level task of type Video. A clip is any child of
+  a video: an ordinary task with its own stage, SLA and owner. Its details
+  (number, source, file name, in, out) are a `task_clips` row; length is never
+  stored. `tasks.published_url` holds the post link; `tasks.dropped_at` marks a
+  dropped clip. **Run `prisma db push` on deploy** (`scripts/migrate.sh` does).
+- **Where it lives.** `src/components/sheet/`, hosted by `KanbanBoard` from the
+  same task state as the board, so the two never disagree. The view is in the
+  address: `/board?view=sheet&video=<id>&row=<id>`. "Open sheet" in the task
+  panel goes there.
+- **One move rule.** `src/lib/stage-moves.ts` (`allowedStages`) decides moves
+  for the board's drag, `moveTask`, `setTaskStage`, bulk moves and the sheet's
+  status menu. The sheet's status changes call the board's own `moveTo`, so the
+  SLA reset and celebration are the board's.
+- **Anyone adds clips.** `addClips` is the only creation path open to
+  "user"-level members; it only makes Reel subtasks of a Video, owned by the
+  person adding them. It locks the video row and skips file names already
+  there (ignoring case), so two people pasting at once get one clip.
+- **Video stage names** ("Editing", "Final Cut"…) are message strings
+  (`sheet.stage.*`), shown in the sheet only. The pipeline is unchanged.
+- **Files.** A Drive link is an attachment with content type `text/uri-list`
+  (`addLinkAttachment`); it opens in a new tab, never in the preview. Uploads
+  share `src/lib/attachment-upload.ts` with the task panel: no compression,
+  the limit checked first, a video's first frame as the card cover.
+- **Dropped clips** leave the board (`liveTasks` in `KanbanBoard`), the
+  overview, capacity and projects queries. Restore moves `stage_date` so the
+  business days in stage are what they were. `members.ts` still counts them on
+  purpose: a member who owns a dropped clip must not be deletable.
+- **Preferences.** The column set (`momentum.sheet.columns.<memberId>`) and
+  Show dropped (`momentum.sheet.dropped`) are per-device `localStorage`, which
+  constitution 2.1.0 §VI allows.
+- **Test it.** `npm run lab:sheet` (`scripts/sheet-lab/`) runs Node checks and
+  browser scenarios against the real sheet with a stub host.
+  `npx tsx scripts/sheet-lab/seed.ts` puts the lab's video into the local
+  database for checks against the running app.
+
+### Content sheet
+
+The team's content plan as a third view, **Board | Sheet | Content** (spec 009, `specs/009-content-library-sheet/`). Design: `design/content-sheet.html`.
+
+- **Data.**
+  - A theme is a project with `is_theme`, plus owner, frequency and audience.
+  - Pillars are `content_pillars`.
+  - A piece is any task in a theme; `tasks.pillar_id` and `post_url`.
+  - Working doc and design are link attachments with `link_role`.
+  - Archive is spec 008's `dropped_at`.
+- **Grid.** `src/components/sheet/GridCore.tsx` is shared by both sheets. The video sheet's `SheetGrid` and the Content sheet's `ContentGrid` are models over it. Spec 008's lab guards it.
+- **Paste plan.** `src/components/content/parse-plan.ts` reads the Content Library (merged cells, headings). `addPlan` in `src/actions/content.ts`:
+  - re-reads every value;
+  - takes `pg_advisory_xact_lock(hashtext('content-plan'))` with `$executeRaw`, because the lock returns `void`;
+  - matches tasks by Task Link;
+  - never stores a non-link as a link.
+- **Who may add pieces:** admins, superusers, a theme's owner, and members who own or are assigned a live piece in it. Only admins and superusers create themes.
+- **Test it.**
+  - `npm run lab:sheet -- cus content` runs the Content scenarios.
+  - `npx tsx scripts/sheet-lab/seed-content.ts out.html` seeds the seven linked tasks for checks against the running app.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
@@ -631,7 +739,11 @@ Run through this after the first successful deploy.
 | Replace the reconstructed logo with the real artwork | Medium | `src/components/shared/Logo.tsx` draws it; colours were eyeballed, letterforms are Montserrat. Drop the SVGs in and swap that one file |
 | Decide whether the Workload panel stays admin-only | Medium | An assumed default, never a decision |
 | Restore database-level authorization | Medium | RLS lost in the migration — §6 |
-| File upload for attachments | Low | Model exists; images are stored as data URLs, other files as URLs |
+| Check bucket uploads on Cranl | Medium | Spec 007 T045: real upload progress, a 150 MB file byte for byte, a 210 MB refusal. No object storage in the dev environment |
+| Video sheet: Arabic video stage names | Medium | Proposed in spec 008 research R4 (`sheet.stage.*` in `messages/ar.json`); a native speaker should check them |
+| Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
+| Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
+| Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
 ---

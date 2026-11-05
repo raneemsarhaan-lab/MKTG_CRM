@@ -34,6 +34,83 @@ export const BRIEF_UI = {
   error:      COLORS.coral,
 } as const
 
+/**
+ * The task panel's Attachments section (spec 007): roles BRIEF_UI lacks.
+ * Mirrored as `--att-*` CSS variables in globals.css. Change both together.
+ */
+export const ATTACH_UI = {
+  /** The "Latest" pill: the app's neon green with dark text (FR-002). */
+  latestBg:   COLORS.lime,
+  latestText: BRIEF_UI.ink,
+  /** Upload in progress: pill and bar. */
+  uploading:  '#7C3AED',
+  /** Too large / not uploaded: pill, text and tile tint. */
+  danger:     '#D22040',
+  dangerSoft: '#FDE7EA',
+  dangerLine: '#F3C2CB',
+  /** The preview overlay's backdrop, and its controls on top of it. */
+  backdrop:   '#0A0A0E',
+  onDark:     '#FFFFFF',
+} as const
+
+/**
+ * The video sheet (spec 008): a dense spreadsheet grid. Mirrored as `--sheet-*`
+ * CSS variables in globals.css. Change both together.
+ */
+export const SHEET_UI = {
+  ink:          COLORS.ink,
+  panel:        COLORS.panel,
+  /** Gridlines on every cell. */
+  grid:         '#E2E3E3',
+  /** The header row and the summary line. */
+  headerBg:     '#F3F4F2',
+  /** Row numbers and other quiet text. */
+  muted:        '#5E6166',
+  /** The row-number gutter. */
+  gutter:       '#F8F9F8',
+  /** The line after the frozen title column and under the header. */
+  frozenLine:   '#C9CBC9',
+  /** The video's own row. */
+  videoRowBg:   '#F4F8E4',
+  /** A row reached from "Open sheet" on a clip, and the active row. */
+  highlight:    '#FAFDE9',
+  hover:        '#F6F8FB',
+  /** Dropped clips: struck through, in this colour. */
+  droppedInk:   '#6B6E72',
+  /** "Missing link" on a published clip. */
+  missingLink:  '#8A5300',
+  missingLinkBg:'#FDF3E3',
+  /** The active cell's ring, and focus. */
+  focus:        BRIEF_UI.blue,
+  link:         '#1F5FD1',
+  /** The status menu's "Next" item. */
+  menuNext:     COLORS.lime,
+  menuNextInk:  COLORS.ink,
+  danger:       ATTACH_UI.danger,
+  dangerSoft:   ATTACH_UI.dangerSoft,
+  /** A theme meeting its cadence (spec 009). */
+  ok:           '#2B7A37',
+  /** Behind the Paste clips dialog (CSS uses it at 45 % opacity). */
+  backdrop:     '#111214',
+} as const
+
+/**
+ * One colour per kind of non-image file, for the extension badge on a tile
+ * and in the preview (spec 007 FR-004). Lifted from TaskModal's EXT_COLORS.
+ */
+export const FILE_KIND_COLORS = {
+  pdf:         '#E5484D',
+  document:    '#2F6FEB',
+  slides:      '#D97706',
+  spreadsheet: '#16A34A',
+  video:       '#7C3AED',
+  audio:       '#0D9488',
+  subtitles:   '#0D9488',
+  archive:     '#6B7280',
+  other:       '#8A8F98',
+} as const
+export type FileKindColor = keyof typeof FILE_KIND_COLORS
+
 /** `#RRGGBB` → `rgba(r, g, b, a)`: shadows and tints derived from a token. */
 export function alpha(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16)

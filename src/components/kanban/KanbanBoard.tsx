@@ -7,12 +7,20 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { attentionItems } from '@/lib/home-metrics'
 import { initials, avatarColor } from '@/lib/utils'
-import { setTaskStage, bulkUpdateTasks, bulkDeleteTasks } from '@/actions/tasks'
+import {
+  setTaskStage, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip,
+} from '@/actions/tasks'
+import { useTranslations } from 'next-intl'
+import { VideoSheet } from '@/components/sheet/VideoSheet'
+import { ContentSheet } from '@/components/content/ContentSheet'
+import type { ContentApi } from '@/components/content/types'
+import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
+import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardOverlay } from './TaskCard'
@@ -42,6 +50,8 @@ interface KanbanBoardProps {
   today: Date
   /** Whether this deployment has a bucket for uploads. */
   hasStorage?: boolean
+  /** The Content sheet's themes (spec 009). */
+  themes?: ContentTheme[]
 }
 
 export function KanbanBoard({
@@ -53,6 +63,7 @@ export function KanbanBoard({
   slaConfig,
   today,
   hasStorage = false,
+  themes: initialThemes = [],
 }: KanbanBoardProps) {
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -70,6 +81,8 @@ export function KanbanBoard({
   // new data, or every mutation appears to do nothing until a full reload.
   // Local drag order is intentionally discarded here — it is never persisted.
   useEffect(() => { setTasks(initialTasks) }, [initialTasks])
+  const [themes, setThemes] = useState<ContentTheme[]>(initialThemes)
+  useEffect(() => { setThemes(initialThemes) }, [initialThemes])
 
 
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
@@ -85,6 +98,41 @@ export function KanbanBoard({
   useEffect(() => {
     if (wantsNewTask) setShowTaskForm(true)
   }, [wantsNewTask, setShowTaskForm])
+
+  /**
+   * Board or Sheet (spec 008), kept in the address so a sheet can be linked to
+   * and a reload keeps it: ?view=sheet, &video=<id> for one video, &row=<id>
+   * to highlight a clip. Written with the history API, like ?task below, so
+   * switching never refetches the board.
+   */
+  const [view, setView] = useState<BoardView>(() => {
+    const v = searchParams.get('view')
+    return v === 'sheet' || v === 'content' ? v : 'board'
+  })
+  const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
+  const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const want: Record<string, string | null> = {
+      view: view === 'board' ? null : view,
+      video: view === 'sheet' ? sheetVideo : null,
+      row: view === 'sheet' ? sheetRow : null,
+    }
+    let changed = false
+    for (const [k, v] of Object.entries(want)) {
+      if ((url.searchParams.get(k) ?? null) === v) continue
+      changed = true
+      if (v) url.searchParams.set(k, v); else url.searchParams.delete(k)
+    }
+    if (changed) window.history.replaceState(null, '', url)
+  }, [view, sheetVideo, sheetRow])
+  /** "Open sheet" from a task panel: a video's sheet, with a clip's row highlighted. */
+  function openSheet(videoId: string, rowId: string | null) {
+    selectTask(null)
+    setSheetVideo(videoId)
+    setSheetRow(rowId)
+    setView('sheet')
+  }
 
   // ...and its task rows link with ?task=<id>. Without this the link lands on
   // the board with nothing open.
@@ -151,11 +199,18 @@ export function KanbanBoard({
     try { window.localStorage.setItem('momentum.board.scope', next) } catch { /* private mode */ }
   }
 
+  /**
+   * Dropped clips (spec 008 FR-060) leave the board, the metrics, the alerts,
+   * the bell and bulk actions. Split once, here; only the video sheet reads
+   * `tasks` with them in.
+   */
+  const liveTasks = useMemo(() => tasks.filter(t => !t.dropped_at), [tasks])
+
   const scopedTasks = useMemo(
     () => (scope === 'me'
-      ? tasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id)
-      : tasks),
-    [tasks, scope, currentUser.id],
+      ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id)
+      : liveTasks),
+    [liveTasks, scope, currentUser.id],
   )
 
   const filteredTasks = useMemo(
@@ -221,34 +276,237 @@ export function KanbanBoard({
       return
     }
 
-    // Optimistic: move it now, put it back if the server says no.
     setDragError('')
-    setTasks(prev => prev.map(t => (t.id === dragged.id ? { ...t, status: toStage } : t)))
-
     startTransition(async () => {
-      const res = await setTaskStage(dragged.id, toStage)
+      const res = await moveTo(dragged, toStage)
       if (!res.success) {
-        setTasks(prev => prev.map(t => (t.id === dragged.id ? { ...t, status: fromStage } : t)))
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
             : 'Could not move that task',
         )
-        return
-      }
-      router.refresh()
-      if (res.shouldCelebrate) {
-        setCelebration({ taskName: dragged.name, stageLabel: STAGE_META[toStage].label_en })
       }
     })
+  }
+
+  /**
+   * The board's move, shared with the video sheet (spec 008 FR-020, T021).
+   *
+   * Optimistic: the card or row moves now (stage date today) and goes back if
+   * the server says no. The server decides with the same rule the sheet's menu
+   * uses, and the celebration plays under the same rule as a drag (§V).
+   */
+  async function moveTo(task: Pick<Task, 'id' | 'name' | 'status' | 'stage_date'>, toStage: StageId): Promise<MoveTaskResult> {
+    const from = { status: task.status, stage_date: task.stage_date }
+    const todayStr = new Date().toISOString().slice(0, 10)
+    setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: toStage, stage_date: todayStr } : t)))
+    let res: MoveTaskResult
+    try { res = await setTaskStage(task.id, toStage) } catch { res = { success: false, shouldCelebrate: false, error: 'generic' } }
+    if (!res.success) {
+      setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, ...from } : t)))
+      return res
+    }
+    router.refresh()
+    if (res.shouldCelebrate) {
+      setCelebration({ taskName: task.name, stageLabel: STAGE_META[toStage].label_en })
+    }
+    return res
+  }
+
+  // ── The video sheet's host (spec 008 contracts/sheet-ui.md §2) ──────────
+  const ta = useTranslations('attachments')
+  const patchTask = (id: string, patch: Partial<FullTask>) =>
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
+  const sheetApi: ContentApi = {
+    move: (taskId, to) => {
+      const task = tasks.find(t => t.id === taskId)
+      return task ? moveTo(task, to) : Promise.resolve({ success: false, shouldCelebrate: false, error: 'not_found' })
+    },
+    async update(taskId, patch) {
+      const before = tasks.find(t => t.id === taskId)
+      if (!before) return { success: false, error: 'not_found' }
+      const optimistic: Partial<FullTask> = {}
+      if (patch.name !== undefined) optimistic.name = patch.name
+      if (patch.content_type_label !== undefined) optimistic.content_type_label = patch.content_type_label
+      if (patch.assignee_id !== undefined) {
+        optimistic.assignee_id = patch.assignee_id || null
+        optimistic.assignee = members.find(m => m.id === patch.assignee_id)
+      }
+      patchTask(taskId, optimistic)
+      const res = await updateTask(taskId, patch).catch(() => ({ success: false, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { name: before.name, content_type_label: before.content_type_label, assignee_id: before.assignee_id, assignee: before.assignee })
+      else router.refresh()
+      return res
+    },
+    async updateClip(taskId, patch) {
+      const before = tasks.find(t => t.id === taskId)
+      if (!before) return { success: false, error: 'not_found' }
+      const { published_url, ...clipPatch } = patch
+      const base = before.clip ?? { clip_no: null, source: null, file_name: null, in_ms: null, out_ms: null, video_id: before.parent_task_id ?? null }
+      patchTask(taskId, {
+        clip: { ...base, ...clipPatch },
+        ...(published_url !== undefined ? { published_url } : {}),
+      })
+      const res = await updateClip(taskId, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { clip: before.clip, published_url: before.published_url })
+      else if ('clip' in res && res.clip) patchTask(taskId, { clip: res.clip })
+      return res
+    },
+    async addClips(videoId, rows) {
+      const res = await addClips(videoId, rows).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'created' in res && res.created?.length) {
+        const video = tasks.find(t => t.id === videoId)
+        const now = new Date().toISOString()
+        const added = res.created.map(c => ({
+          ...(video as FullTask),
+          id: c.id, name: c.name, parent_task_id: videoId, parent: { id: videoId, name: video?.name ?? '' },
+          content_type_label: 'Reel', status: 'todo' as StageId, stage_date: now.slice(0, 10),
+          task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined,
+          due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now,
+          comments: [], subtasks: [], published_url: null, dropped_at: null, clip: c.clip,
+          cover_image_url: undefined, cover_thumb: undefined,
+          attachments: c.link_attachment ? [{ ...c.link_attachment, task_id: c.id, uploaded_by: currentUser.id }] : [],
+        }))
+        setTasks(prev => [...added, ...prev])
+        router.refresh()
+      }
+      return res
+    },
+    async addLink(taskId, url) {
+      const res = await addLinkAttachment(taskId, url).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'row' in res && res.row) {
+        const row = res.row
+        setTasks(prev => prev.map(t => (t.id === taskId && !(t.attachments ?? []).some(a => a.id === row.id)
+          ? { ...t, attachments: [...(t.attachments ?? []), { ...row, task_id: taskId, uploaded_by: row.uploaded_by ?? undefined }] }
+          : t)))
+        router.refresh()
+      }
+      return res
+    },
+    upload: taskId => {
+      const up = makeUploader({ taskId, hasStorage, t: ta, onStored: () => router.refresh() })
+      return async (file, name, onProgress) => {
+        const r = await up(file, name, onProgress)
+        if (r.ok) {
+          const { data: _bytes, ...meta } = r.attachment
+          void _bytes
+          setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, attachments: [...(t.attachments ?? []), meta] } : t)))
+        }
+        return r
+      }
+    },
+    async drop(taskId) {
+      const at = new Date().toISOString()
+      patchTask(taskId, { dropped_at: at })
+      const res = await dropClip(taskId).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { dropped_at: null })
+      else router.refresh()
+      return res
+    },
+    async restore(taskId) {
+      const before = tasks.find(t => t.id === taskId)
+      patchTask(taskId, { dropped_at: null })
+      const res = await restoreClip(taskId).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { dropped_at: before?.dropped_at ?? null })
+      else {
+        if ('stage_date' in res && res.stage_date) patchTask(taskId, { stage_date: res.stage_date })
+        router.refresh()
+      }
+      return res
+    },
+    // ── the Content sheet (spec 009) ──
+    async addPlan(rows, opts) {
+      const res = await addPlan(rows, opts).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async addPiece(themeId, input) {
+      const res = await addPiece(themeId, input).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'id' in res && res.id) {
+        const theme = themes.find(x => x.id === themeId)
+        const now = new Date().toISOString()
+        const base = tasks[0]
+        if (base) {
+          setTasks(prev => [{
+            ...base, id: res.id!, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null,
+            brand_id: theme?.brand_id ?? '', content_type_label: 'Post', status: 'todo' as StageId, stage_date: now.slice(0, 10),
+            task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined, parent_task_id: null, parent: null,
+            due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
+            published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
+          }, ...prev])
+        }
+        router.refresh()
+      }
+      return res
+    },
+    async updatePiece(taskId, patch) {
+      const before = tasks.find(t => t.id === taskId)
+      if (!before) return { success: false, error: 'not_found' }
+      patchTask(taskId, patch as Partial<FullTask>)
+      const res = await updatePiece(taskId, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, post_url: before.post_url, published_url: before.published_url })
+      else router.refresh()
+      return res
+    },
+    async setPieceLink(taskId, role, url) {
+      const res = await setPieceLink(taskId, role, url).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) {
+        const row = 'row' in res ? res.row : null
+        setTasks(prev => prev.map(t => (t.id !== taskId ? t : {
+          ...t,
+          attachments: [
+            ...(t.attachments ?? []).filter(a => a.link_role !== role),
+            ...(row ? [{ id: row.id, task_id: taskId, filename: row.filename, url: row.url, content_type: 'text/uri-list', link_role: role, uploaded_at: row.uploaded_at }] : []),
+          ],
+        })))
+        router.refresh()
+      }
+      return res
+    },
+    async addTheme(name) {
+      const res = await addTheme(name).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async saveTheme(id, patch) {
+      const before = themes.find(x => x.id === id)
+      setThemes(prev => prev.map(x => (x.id === id ? { ...x, ...patch, name: patch.name ?? x.name } as ContentTheme : x)))
+      const res = await saveTheme(id, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!res.success && before) setThemes(prev => prev.map(x => (x.id === id ? before : x)))
+      else router.refresh()
+      return res
+    },
+    async savePillar(themeId, input) {
+      const res = await savePillar(themeId, input).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && 'id' in res && res.id) {
+        const id = res.id
+        setThemes(prev => prev.map(x => (x.id !== themeId ? x : {
+          ...x,
+          pillars: input.id
+            ? x.pillars.map(p => (p.id === input.id ? { ...p, name: input.name } : p))
+            : [...x.pillars, { id, name: input.name, sort_order: x.pillars.length }],
+        })))
+        router.refresh()
+      }
+      return res
+    },
+    async removePillar(id) {
+      const res = await removePillar(id).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) {
+        setThemes(prev => prev.map(x => ({ ...x, pillars: x.pillars.filter(p => p.id !== id) })))
+        setTasks(prev => prev.map(t => (t.pillar_id === id ? { ...t, pillar_id: null } : t)))
+        router.refresh()
+      }
+      return res
+    },
   }
 
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) ?? null : null
   const draggedTask  = activeDragId ? tasks.find(t => t.id === activeDragId) ?? null : null
 
   const attention = useMemo(
-    () => attentionItems(tasks, currentUser.id, today),
-    [tasks, currentUser.id, today],
+    () => attentionItems(liveTasks, currentUser.id, today),
+    [liveTasks, currentUser.id, today],
   )
 
   /**
@@ -259,7 +517,7 @@ export function KanbanBoard({
    * waiting on an answer, which a date is not — and newest first inside that.
    */
   const notices = useMemo(() => {
-    const mentions = tasks.flatMap(t =>
+    const mentions = liveTasks.flatMap(t =>
       (t.comments ?? [])
         .filter(c => (c.mentions ?? []).includes(currentUser.id))
         .map(c => ({
@@ -278,7 +536,7 @@ export function KanbanBoard({
       .map(a => ({ kind: 'due' as const, id: a.id, taskId: a.id, taskName: a.title, dueText: a.dueText }))
 
     return { mentions, due, total: mentions.length + due.length }
-  }, [tasks, currentUser.id, attention])
+  }, [liveTasks, currentUser.id, attention])
 
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef<HTMLDivElement>(null)
@@ -319,7 +577,7 @@ export function KanbanBoard({
       return !v
     })
   }
-  const upstreamCount = tasks.filter(
+  const upstreamCount = liveTasks.filter(
     t => (UPSTREAM_STAGES as string[]).includes(t.status),
   ).length
   const stagesInScope = showUpstream
@@ -423,6 +681,69 @@ export function KanbanBoard({
     setGreeting(h < 12 ? 'Good morning' : h < 18 ? 'Hey' : 'Good evening')
   }, [])
 
+  // A file to preview when the panel opens from a sheet's Files cell (spec 008 FR-045).
+  const [previewFor, setPreviewFor] = useState<{ taskId: string; previewId: string } | null>(null)
+
+  const taskPanel = selectedTask && (
+    <TaskModal
+      task={selectedTask}
+      currentUser={currentUser}
+      stages={[]}
+      slaConfig={slaConfig}
+      today={today}
+      brands={brands}
+      members={members}
+      contentTypes={contentTypes}
+      // Names only — the composer's # picker and the chips a posted
+      // comment draws. Cheap: the board already holds every row.
+      allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
+      hasStorage={hasStorage}
+      initialPreviewId={previewFor?.taskId === selectedTask.id ? previewFor.previewId : undefined}
+      onOpenSheet={openSheet}
+      onClose={() => { setPreviewFor(null); selectTask(null) }}
+    />
+  )
+
+  if (view === 'content') {
+    return (
+      <>
+        <ContentSheet
+          tasks={tasks}
+          themes={themes}
+          me={currentUser}
+          members={members}
+          contentTypes={contentTypes}
+          onOpenTask={id => selectTask(id)}
+          onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
+          onView={v => setView(v)}
+          api={sheetApi}
+        />
+        {taskPanel}
+      </>
+    )
+  }
+
+  if (view === 'sheet') {
+    return (
+      <>
+        <VideoSheet
+          tasks={tasks}
+          me={currentUser}
+          members={members}
+          contentTypes={contentTypes}
+          hasStorage={hasStorage}
+          videoId={sheetVideo}
+          highlightId={sheetRow}
+          onOpenVideo={id => { setSheetVideo(id); setSheetRow(null) }}
+          onOpenTask={(id, opts) => { setPreviewFor(opts?.previewId ? { taskId: id, previewId: opts.previewId } : null); selectTask(id) }}
+          onView={v => setView(v)}
+          api={sheetApi}
+        />
+        {taskPanel}
+      </>
+    )
+  }
+
   return (
     <div
       className={selected.size > 0 ? 'fx-board-selecting' : undefined}
@@ -461,6 +782,7 @@ export function KanbanBoard({
             let globals.css pair them up and drop the identity chip, which the
             More tab already carries. */}
         <div className="fx-board-tools" style={{ display: 'flex', alignItems: 'center', gap: 18, paddingTop: 6, flexWrap: 'wrap' }}>
+          <ViewSwitch view={view} onView={setView} />
           <div className="fx-board-search" style={{ position: 'relative' }}>
             <input
               value={filters.search}
@@ -673,7 +995,7 @@ export function KanbanBoard({
       </div>
 
       <HeroCards
-        tasks={tasks}
+        tasks={liveTasks}
         currentUser={currentUser}
         members={members}
         today={today}
@@ -683,7 +1005,7 @@ export function KanbanBoard({
       <BoardFilters
         filters={filters}
         onChange={setFilters}
-        tasks={tasks}
+        tasks={liveTasks}
         brands={brands}
         members={members}
         shown={filteredTasks.length}
@@ -812,23 +1134,7 @@ export function KanbanBoard({
       />
 
       {/* Task modal */}
-      {selectedTask && (
-        <TaskModal
-          task={selectedTask}
-          currentUser={currentUser}
-          stages={[]}
-          slaConfig={slaConfig}
-          today={today}
-          brands={brands}
-          members={members}
-          contentTypes={contentTypes}
-          // Names only — the composer's # picker and the chips a posted
-          // comment draws. Cheap: the board already holds every row.
-          allTasks={tasks.map(t => ({ id: t.id, name: t.name, status: t.status }))}
-          hasStorage={hasStorage}
-          onClose={() => selectTask(null)}
-        />
-      )}
+      {taskPanel}
 
       {/* Task creation form */}
       {showTaskForm && (
@@ -849,4 +1155,16 @@ const NOTICE_ROW: React.CSSProperties = {
   width: '100%', minWidth: 0, padding: '9px 10px', border: 'none',
   background: 'transparent', borderRadius: 9, cursor: 'pointer',
   fontFamily: 'inherit', textAlign: 'start',
+}
+
+/** Board | Sheet (spec 008 FR-002). The sheet's own toolbar carries the same switch. */
+function ViewSwitch({ view, onView }: { view: BoardView; onView(v: BoardView): void }) {
+  const t = useTranslations('sheet')
+  return (
+    <div className="fx-sheet-seg" role="group" aria-label={t('view.label')} data-view-switch="">
+      <button type="button" aria-pressed={view === 'board'} onClick={() => onView('board')}>{t('view.board')}</button>
+      <button type="button" aria-pressed={view === 'sheet'} onClick={() => onView('sheet')}>{t('view.sheet')}</button>
+      <button type="button" aria-pressed={view === 'content'} onClick={() => onView('content')}>{t('view.content')}</button>
+    </div>
+  )
 }

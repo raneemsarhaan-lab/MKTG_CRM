@@ -1,6 +1,28 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 2.0.0 → 2.1.0 (2026-11-04)
+Type of bump: MINOR — §VI gains an explicit allowance for per-device view
+  preferences in localStorage, outside the Zustand store.
+
+Modified principles:
+  - §VI: "No localStorage persistence" now applies to application data and to
+    the Zustand store. Small per-device view preferences (a toggle, a chosen
+    column set, a collapsed panel) MAY use localStorage under `momentum.*` keys.
+    This matches existing practice (board scope and upstream toggle, sidebar,
+    My Day) and spec 008's column set and Show dropped. Resolves spec 008
+    /speckit-analyze finding C1.
+
+Templates:
+  ✅ .specify/templates/plan-template.md — no changes needed
+  ✅ .specify/templates/spec-template.md — no changes needed
+  ✅ .specify/templates/tasks-template.md — no changes needed
+
+Follow-up TODOs:
+  - None.
+
+Previous report (2.0.0)
+-----------------------
 Version change: 1.0.0 → 2.0.0
 Type of bump: MAJOR — framework migration from Vite/React to Next.js 15 App Router;
   multiple principle updates to align with accepted plan.md decisions
@@ -206,7 +228,13 @@ App state MUST follow the Zustand + Supabase dual-layer pattern.
 **Zustand store (`src/store/useUIStore.ts`):**
 - Persisted keys: NONE. All application data (tasks, members, brands,
   slaConfig) lives in Postgres and is fetched server-side via Server Components
-  and Server Actions. No localStorage persistence.
+  and Server Actions. No localStorage persistence of application data or of
+  the store.
+- Per-device view preferences (a toggle, a chosen column set, a collapsed
+  panel) MAY be kept in `localStorage` outside the store, under a `momentum.*`
+  key. They MUST be read after mount (never during render), wrapped in
+  try/catch, and the view MUST render correctly without them. They MUST NOT
+  hold application data or anything another member needs to see.
 - Ephemeral UI state only: `celebration`, `selectedTaskId`, `showTaskForm`,
   `profileOpen`.
 - `currentUser` is resolved server-side on every request from the Supabase
@@ -278,4 +306,4 @@ src/
   Spec Kit skills (`/speckit-plan`, `/speckit-specify`, etc.) read this file
   to enforce compliance gates.
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-07-15
+**Version**: 2.1.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-04
