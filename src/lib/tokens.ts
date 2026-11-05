@@ -165,6 +165,33 @@ export function stageTint(stage: string): { fill: string; edge: string } {
   return { fill: mix(0.14), edge: mix(0.38) }
 }
 
+/**
+ * The Content sheet's Type cell (a filled pill per content type). Each colour
+ * carries white text at AA contrast or better. Unknown types take one of these
+ * by name, so a type keeps its colour everywhere.
+ */
+export const CONTENT_TYPE_COLORS: Record<string, string> = {
+  'Post':            '#1D4ED8',
+  'Reel':            '#BE185D',
+  'Video':           '#7E22CE',
+  'Article':         '#0F766E',
+  'Report':          '#B45309',
+  'Framework/Model': '#4338CA',
+  'Story':           '#C2410C',
+  'Deck':            '#334155',
+  'Design':          '#A21CAF',
+  'Email':           '#0369A1',
+  'Other':           '#52525B',
+}
+export function contentTypeColor(label: string | null | undefined): string {
+  if (!label) return CONTENT_TYPE_COLORS.Other
+  if (CONTENT_TYPE_COLORS[label]) return CONTENT_TYPE_COLORS[label]
+  const all = Object.values(CONTENT_TYPE_COLORS)
+  let h = 0
+  for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0
+  return all[h % all.length]
+}
+
 export const STAGE_COLORS: Record<string, string> = {
   'todo':         '#64748B',
   'c-prog':       '#3B82F6',

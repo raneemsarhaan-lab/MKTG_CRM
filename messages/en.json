@@ -433,13 +433,13 @@
       "title": "Title",
       "type": "Type",
       "status": "Status",
-      "owner": "Owner",
       "assignee": "Assignee",
+      "doc": "Working Doc",
+      "design": "Design Link",
+      "task": "Task Link",
+      "post": "LinkedIn Link",
+      "published": "Published Link",
       "pillar": "Pillar",
-      "doc": "Working doc",
-      "design": "Design",
-      "post": "Post",
-      "published": "Published",
       "date": "Date",
       "archive": "Archive or restore"
     },
@@ -508,10 +508,11 @@
       "clear": "Remove",
       "doc": "Working doc",
       "design": "Design",
-      "post": "Post",
+      "post": "LinkedIn",
       "published": "Published",
       "publishPrompt": "Published! Paste the published link",
-      "postPrompt": "And the post link (LinkedIn)"
+      "postPrompt": "And the LinkedIn link",
+      "openTask": "Open task"
     },
     "archive": {
       "archive": "Archive",

@@ -232,7 +232,14 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
 
 // ─── Pieces ─────────────────────────────────────────────────────────────────
 
-/** + Piece (FR-052, US7): a task in To Do, in the theme, owned by the member. */
+/**
+ * + Piece (FR-052, US7): a task in To Do, in the theme.
+ *
+ * The theme's owner owns it (the content plan's pieces all belong to its
+ * owner, Samaa), so the sheet needs no Owner column. A member who is not the
+ * owner and not an admin or superuser becomes its assignee, so they can still
+ * work on what they added.
+ */
 export async function addPiece(themeId: string, input: { title: string; pillarId?: string | null }): Promise<{ success: boolean; error?: string; id?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
@@ -246,10 +253,12 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
     const p = await prisma.contentPillar.findUnique({ where: { id: input.pillarId } })
     if (p?.project_id === themeId) pillarId = p.id
   }
+  const owner = theme.owner_id ?? member.id
+  const assignee = owner !== member.id && !isAdmin(member) ? member.id : null
   const task = await prisma.task.create({
     data: {
       name: title, project_id: themeId, pillar_id: pillarId, brand_id: theme.brand_id, content_type_label: 'Post',
-      task_owner_id: member.id, initiator_role: member.role, status: 'todo', stage_date: new Date(),
+      task_owner_id: owner, assignee_id: assignee, initiator_role: member.role, status: 'todo', stage_date: new Date(),
       hours_estimate: 0, priority: 'Medium', created_by: member.id,
     },
   })

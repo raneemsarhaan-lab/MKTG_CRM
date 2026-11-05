@@ -236,6 +236,10 @@ export function ContentSheet(p: ContentSheetProps) {
         if (url) window.open(url, '_blank', 'noopener,noreferrer')
         return
       }
+      case 'task':
+        if (isClip) return
+        p.onOpenTask(task.id)
+        return
       case 'archive':
         if (isClip || !can) return
         if (task.dropped_at) { void restore(task); return }

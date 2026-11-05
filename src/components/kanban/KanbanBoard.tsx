@@ -440,7 +440,17 @@ export function KanbanBoard({
           setTasks(prev => [{
             ...base, id: res.id!, name: input.title, project_id: themeId, pillar_id: input.pillarId ?? null,
             brand_id: theme?.brand_id ?? '', content_type_label: 'Post', status: 'todo' as StageId, stage_date: now.slice(0, 10),
-            task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined, parent_task_id: null, parent: null,
+            // The theme's owner owns it; a member who is not becomes its assignee (addPiece).
+            ...(() => {
+              const ownerId = theme?.owner_id ?? currentUser.id
+              const admin = currentUser.access === 'admin' || currentUser.access === 'superuser'
+              const assigneeId = ownerId !== currentUser.id && !admin ? currentUser.id : null
+              return {
+                task_owner_id: ownerId, task_owner: members.find(m => m.id === ownerId) ?? currentUser,
+                assignee_id: assigneeId, assignee: assigneeId ? currentUser : undefined,
+              }
+            })(),
+            parent_task_id: null, parent: null,
             due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
             published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
           }, ...prev])

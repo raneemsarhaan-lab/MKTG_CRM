@@ -1425,8 +1425,15 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 
 /* Content sheet (spec 009): spanning theme and pillar rows, theme editor, plan preview. */
 .fx-sheet-td.is-span { justify-content: flex-start; }
-.fx-content-theme { display: flex; align-items: center; gap: 4px 14px; min-width: 0; white-space: nowrap; }
+.fx-content-theme { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .fx-content-theme-name { font-family: var(--font-heading); font-weight: 700; font-size: 13px; }
+/* The Type cell: a filled pill, one colour per content type (CONTENT_TYPE_COLORS). */
+.fx-content-type {
+  display: inline-flex; align-items: center; height: 20px; max-width: 100%; box-sizing: border-box; padding: 0 9px;
+  border-radius: 999px; color: var(--sheet-panel); font-weight: 600; font-size: 11px; line-height: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fx-sheet-tr.is-dropped .fx-content-type { background: var(--sheet-gutter) !important; color: var(--sheet-dropped-ink); box-shadow: inset 0 0 0 1px var(--sheet-grid); }
 .fx-content-meta { color: var(--sheet-muted); font-weight: 500; }
 .fx-content-ok { color: var(--sheet-ok); font-weight: 700; }
 .fx-content-behind { color: var(--sheet-missing); font-weight: 700; }

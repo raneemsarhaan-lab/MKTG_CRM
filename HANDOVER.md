@@ -432,6 +432,11 @@ The team's content plan as a third view, **Board | Sheet | Content** (spec 009, 
   - matches tasks by Task Link;
   - never stores a non-link as a link.
 - **Who may add pieces:** admins, superusers, a theme's owner, and members who own or are assigned a live piece in it. Only admins and superusers create themes.
+- **Columns** (the team sheet's): Title, Type, Status, Assignee, Working Doc, Design Link, Task Link, LinkedIn Link, Published Link, Pillar, Date.
+  - **Type** is a filled pill, coloured from `CONTENT_TYPE_COLORS` in `src/lib/tokens.ts`.
+  - **Task Link** opens the piece's task.
+  - **Theme rows** read "Strategy · 7". Owner, frequency, cadence and audience are in the name's tooltip and the theme editor.
+- **Owner:** there is no Owner column. A new piece is owned by its theme's owner (Samaa for the content plan). A member who is not the owner, an admin or a superuser becomes its assignee, so they can still edit it.
 - **Test it.**
   - `npm run lab:sheet -- cus content` runs the Content scenarios.
   - `npx tsx scripts/sheet-lab/seed-content.ts out.html` seeds the seven linked tasks for checks against the running app.
