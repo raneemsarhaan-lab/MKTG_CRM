@@ -467,6 +467,42 @@ Both sheets' columns can be shaped like a spreadsheet (spec 010, `specs/010-shee
 - **Paste.** Paste plan and Paste clips match pasted headings to columns by their current names, so renamed and custom columns fill too. Values that don't fit a column are listed and never stored. Headings with no matching column are listed as Not imported, each with an **Add as a column** button. Rows already in the sheet only get their empty cells filled. The server writes the values inside the paste's transaction (`src/lib/sheet-values.ts`).
 - **Test it.** `npm run lab:sheet -- col vcol cols` runs the column scenarios. Open the lab with `#cols=1` to load the sample columns (`scripts/sheet-lab/column-fixtures.ts`).
 
+### Board header
+
+The band above every Board view (spec 011, `specs/011-board-header/`). Design: `design/board-header.html`, drawn from the team's reference image.
+
+- **Three rows:**
+  1. **Top bar**: Pipeline | Content tabs, search, the compact Inbox, the avatar (`UserMenu`, `variant="header"`).
+  2. **Title row**: "Pipeline" or "Content" with the purple ticks, and + New task (hidden for `user` members).
+  3. **The view's toolbar.**
+- **Files.**
+  - `src/components/board/`:
+    - `BoardHeader` (rows 1 and 2);
+    - `BoardToolbar`;
+    - `BrandMenu` (with `pickBrand`);
+    - `ViewPair` (Board | Sheet);
+    - `HeaderMenu` (button with a menu, keyboard-ready);
+    - `TitleTicks`.
+  - CSS: the "board header (spec 011)" block at the end of `globals.css`, with its `--hd-*` variables.
+  - Strings: `header.*`.
+- **Tabs and views.**
+  - `BoardTab` is derived from `BoardView`: `content` means the Content tab, and board or sheet means Pipeline.
+  - The Pipeline tab returns to the last pipeline view.
+  - `?view=sheet|content` links are unchanged.
+- **The third row.**
+  - Board: `BoardToolbar`, containing:
+    - My tasks | Team tasks;
+    - the brand dropdown;
+    - Filters (`FiltersButton`, the same menu as before);
+    - the "no project" note;
+    - Board | Sheet;
+    - Display options (`ViewMenu`).
+  - Sheet: the video sheet's own bar, ending with `ViewPair`.
+  - Content: the Content sheet's own bar.
+- **The sheets** render inside `.fx-board-page.is-sheet` and take the height left under the header. The Inbox panel (as an overlay) and the task form now work on every view.
+- **Search** filters cards on Board, and rows by title on Sheet and Content. On those two it keeps each match's video or theme row.
+- **Test it.** `npm run lab:header`, plus `lab:sheet` (`pipe-*`) and `lab:inbox`.
+
 ### Board Inbox
 
 What needs you, behind one header button (spec 006, `specs/006-board-inbox/`). It replaced the bell and the four "for you" cards. Design: `design/board-inbox.html` (tab "Option B · Inbox button").
@@ -796,6 +832,7 @@ Run through this after the first successful deploy.
 | Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
 | Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
 | Sheet columns: Arabic strings | Medium | `sheet.columns.*` in `messages/ar.json`; native review (spec 010) |
+| Board header: Arabic strings | Medium | `header.*` in `messages/ar.json`; native review (spec 011) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |

@@ -20,6 +20,8 @@ export type AccessLevel = 'admin' | 'superuser' | 'user'
 
 /** The board page's two views of the same tasks (spec 008). */
 export type BoardView = 'board' | 'sheet' | 'content'
+/** The Board page's tabs (spec 011): Pipeline holds Board and Sheet; Content is its own page. */
+export type BoardTab = 'pipeline' | 'content'
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
 

@@ -68,6 +68,17 @@ export interface RowOptions {
   collapsed: ReadonlySet<string>
   /** "+ Clip" rows not saved yet: their key and video. */
   drafts: readonly { key: string; videoId: string }[]
+  /** The header's search (spec 011 R6): titles and file names; empty shows everything. */
+  query?: string
+}
+
+/** Whether text contains the search, ignoring case and extra spaces. */
+export function matchesQuery(text: string | null | undefined, q: string): boolean {
+  return (text ?? '').toLowerCase().includes(q)
+}
+/** The search as matched: trimmed and lower-cased. */
+export function normQuery(q: string | undefined): string {
+  return (q ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
 /**
@@ -83,12 +94,19 @@ export function buildRows(tasks: SheetTask[], o: RowOptions): SheetRow[] {
       })()
     : videosWithClips(tasks)
   const rows: SheetRow[] = []
+  const q = normQuery(o.query)
   let n = 1
   for (const { video, clips } of groups) {
-    const collapsed = o.collapsed.has(video.id)
+    // A video whose name matches keeps all its clips; otherwise only the
+    // matching clips show, under their video, opened so they can be seen.
+    const videoHit = !q || matchesQuery(video.name, q)
+    const clipHit = (c: SheetTask) => videoHit || matchesQuery(c.name, q) || matchesQuery(c.clip?.file_name, q)
+    if (!videoHit && !clips.some(clipHit)) continue
+    const collapsed = o.collapsed.has(video.id) && videoHit
     rows.push({ kind: 'video', key: `v:${video.id}`, task: video, clips, collapsed, n: n++ })
     if (collapsed) continue
     for (const c of clips) {
+      if (!clipHit(c)) continue
       if (!o.showDropped && c.dropped_at) continue
       if (o.mine && !isMine(c, o.me)) continue
       rows.push({ kind: 'clip', key: `c:${c.id}`, task: c, video, n: n++ })

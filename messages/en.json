@@ -848,5 +848,30 @@
       "week": "Show your week",
       "upstream": "Columns before design"
     }
+  },
+  "header": {
+    "pipeline": "Pipeline",
+    "content": "Content",
+    "tabsLabel": "Pages",
+    "search": "Search tasks, campaigns, assets…",
+    "searchOpen": "Search",
+    "searchClose": "Close search",
+    "mine": "My tasks",
+    "team": "Team tasks",
+    "scopeLabel": "Whose tasks",
+    "allBrands": "All brands",
+    "nBrands": "{n} brands",
+    "brandsLabel": "Brands",
+    "filters": "Filters",
+    "filtersN": "Filters · {n}",
+    "display": "Display options",
+    "board": "Board",
+    "sheet": "Sheet",
+    "viewLabel": "View",
+    "newTask": "New task",
+    "noProject": "{n, plural, one {# no project assigned} other {# no project assigned}}",
+    "allAttached": "Every task has a project",
+    "account": "{name}, {role}",
+    "showing": "Showing {shown} of {total} tasks"
   }
 }

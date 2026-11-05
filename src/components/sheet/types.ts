@@ -66,6 +66,8 @@ export interface VideoSheetProps {
   onOpenTask(id: string, opts?: { previewId?: string }): void
   /** The toolbar's Board | Sheet switch. */
   onView(view: BoardView): void
+  /** The header's search (spec 011 R6): narrows rows by title. */
+  query?: string
   api: SheetApi
   /** The sheet's shaped columns and custom values (spec 010). */
   columns: ColumnsBundle

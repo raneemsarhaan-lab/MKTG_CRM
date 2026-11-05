@@ -81,8 +81,8 @@ export function ContentSheet(p: ContentSheetProps) {
     set(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
-    mine, showArchived, me: me.id, collapsed, expanded, drafts,
-  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, expanded, drafts])
+    mine, showArchived, me: me.id, collapsed, expanded, drafts, query: p.query,
+  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, expanded, drafts, p.query])
   const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesOf(p.tasks, th.id))), [p.tasks, p.themes])
 
   // ── permissions ─────────────────────────────────────────────────────────
@@ -316,12 +316,9 @@ export function ContentSheet(p: ContentSheetProps) {
 
   return (
     <div className="fx-sheet" data-content-sheet="">
-      <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')}>
-        <div className="fx-sheet-seg" role="group" aria-label={ts('view.label')}>
-          <button type="button" aria-pressed="false" onClick={() => p.onView('board')}>{ts('view.board')}</button>
-          <button type="button" aria-pressed="false" onClick={() => p.onView('sheet')}>{ts('view.sheet')}</button>
-          <button type="button" aria-pressed="true">{ts('view.content')}</button>
-        </div>
+      {/* The header's third row on the Content tab (spec 011 R2): the sheet's
+          own controls. Pipeline | Content are the header's tabs now. */}
+      <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
         <span className="fx-sheet-bar-gap" />
         {cl.toolbar}
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>

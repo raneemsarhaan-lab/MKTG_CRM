@@ -6,7 +6,7 @@
  * clips. Clips are not pieces: a child of a video is never listed on its own.
  */
 import type { ContentTheme, Task } from '@/types/index'
-import { clipsOf, isVideoTask } from '@/components/sheet/rows'
+import { clipsOf, isVideoTask, matchesQuery, normQuery } from '@/components/sheet/rows'
 
 export type ContentRow =
   | { kind: 'theme'; key: string; theme: ContentTheme; pieces: Task[]; collapsed: boolean; n: number }
@@ -35,15 +35,23 @@ export interface ContentRowOptions {
   collapsed: ReadonlySet<string>
   expanded: ReadonlySet<string>
   drafts: readonly { key: string; themeId: string; pillarId: string | null }[]
+  /** The header's search (spec 011 R6): piece and theme names; empty shows everything. */
+  query?: string
 }
 
 export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: ContentRowOptions): ContentRow[] {
   const rows: ContentRow[] = []
+  const q = normQuery(o.query)
   let n = 1
-  const visible = (t: Task) => (o.showArchived || !t.dropped_at) && (!o.mine || t.task_owner_id === o.me || t.assignee_id === o.me)
+  const shown = (t: Task) => (o.showArchived || !t.dropped_at) && (!o.mine || t.task_owner_id === o.me || t.assignee_id === o.me)
   for (const theme of themes) {
     const pieces = piecesOf(tasks, theme.id).sort(comparePieces)
-    const collapsed = o.collapsed.has(theme.id)
+    // A theme whose name matches keeps all its pieces; otherwise only the
+    // matching pieces show, under their theme and pillar.
+    const themeHit = !q || matchesQuery(theme.name, q)
+    const visible = (t: Task) => shown(t) && (themeHit || matchesQuery(t.name, q))
+    if (!themeHit && !pieces.some(visible)) continue
+    const collapsed = o.collapsed.has(theme.id) && themeHit
     rows.push({ kind: 'theme', key: `t:${theme.id}`, theme, pieces, collapsed, n: n++ })
     if (collapsed) continue
     const pushPiece = (task: Task) => {
@@ -55,6 +63,7 @@ export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: Conte
     const known = new Set(theme.pillars.map(p => p.id))
     for (const pillar of theme.pillars) {
       const inPillar = pieces.filter(t => t.pillar_id === pillar.id)
+      if (!themeHit && !inPillar.some(visible)) continue
       rows.push({ kind: 'pillar', key: `p:${pillar.id}`, theme, pillar, count: inPillar.filter(t => !t.dropped_at).length, n: n++ })
       inPillar.filter(visible).forEach(pushPiece)
       for (const d of o.drafts) if (d.themeId === theme.id && d.pillarId === pillar.id) rows.push({ kind: 'draft', key: `d:${d.key}`, theme, pillarId: pillar.id, n: n++ })
