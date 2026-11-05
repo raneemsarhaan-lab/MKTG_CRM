@@ -135,6 +135,12 @@ button,select{font:inherit;color:inherit}
 .mi.danger{color:var(--danger)}
 .mi.next{background:var(--lime);color:var(--lime-ink)}
 .mi[disabled]{opacity:.45;cursor:default}
+.combo .in{margin:2px 0 6px}
+.combo .opts{display:grid;gap:1px;max-height:260px;overflow:auto}
+.combo .mi[aria-selected="true"]{background:var(--hover);box-shadow:inset 0 0 0 2px var(--focus)}
+.combo .mi mark{background:transparent;color:inherit;text-decoration:underline;text-underline-offset:2px}
+.combo .add{color:var(--link);font-weight:600}
+.combo .empty{padding:6px 9px;color:var(--muted)}
 .sep{height:1px;background:var(--grid);margin:4px 2px}
 .ph{font:700 10px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 9px 2px}
 .field{display:grid;gap:4px;padding:6px 8px}
@@ -198,7 +204,7 @@ button,select{font:inherit;color:inherit}
   <button class="btn primary" id="pasteBtn">Paste plan</button>
 </header>
 <div class="try" aria-label="Try it">
-  <span><b>Try it:</b> click any cell</span><span>double-click or Enter to edit text</span><span>a heading's ▾ menu changes columns</span><span>drag headings and edges</span><span>switch "Viewing as" to see read-only rows</span><span>Alt+↓ opens the column menu</span>
+  <span><b>Try it:</b> click any cell</span><span>double-click or Enter to edit text</span><span>on a Type or Platform cell, just type: “po” finds Post, a new word offers to add it</span><span>a heading's ▾ menu changes columns</span><span>drag headings and edges</span><span>switch "Viewing as" to see read-only rows</span><span>Alt+↓ opens the column menu</span>
 </div>
 <div class="sum" id="sum"></div>
 <div class="scroll" id="scroll"><div class="grid" id="grid" role="treegrid" aria-label="Content plan"></div></div>
@@ -472,6 +478,56 @@ function menu(anchor,label,items,pick){
     if(e.key.length===1&&/\S/.test(e.key)){ const j=its.findIndex(x=>x.textContent.trim().toLowerCase().startsWith(e.key.toLowerCase())); if(j>=0) its[j].focus() } });
   return p;
 }
+/* A type-ahead list: type to filter, ↑↓ to move, Enter to pick; offers to add what isn't there. */
+function combo(anchor,{label,items,current,initial='',addWord,mayAdd,addHint,onPick,onAdd,clear}){
+  const p=openPop(anchor,`<div class="combo"><input class="in" id="cbIn" role="combobox" aria-expanded="true" aria-controls="cbList" aria-autocomplete="list" aria-label="${esc(label)}" placeholder="Type to search ${esc(label.toLowerCase())}…" value="${esc(initial)}" autocomplete="off"><div class="opts" id="cbList" role="listbox" aria-label="${esc(label)}"></div></div>`);
+  const inp=p.querySelector('#cbIn'), list=p.querySelector('#cbList');
+  let shownItems=[], sel=0;
+  const norm=x=>x.toLowerCase().replace(/\s+/g,' ').trim();
+  function draw(){
+    const q=norm(inp.value);
+    const hits=items.filter(it=>!q||norm(it.text).includes(q)).sort((a,b)=>(norm(b.text).startsWith(q))-(norm(a.text).startsWith(q)));
+    const exact=items.some(it=>norm(it.text)===q);
+    shownItems=hits.map(it=>({...it,kind:'pick'}));
+    if(q&&!exact&&addWord) shownItems.push({kind:'add',text:inp.value.trim()});
+    if(clear&&!q) shownItems.push({kind:'clear'});
+    sel=Math.min(sel,Math.max(0,shownItems.length-1));
+    const hl=t=>{ if(!q) return esc(t); const i=norm(t).indexOf(q); return i<0?esc(t):esc(t.slice(0,i))+'<mark>'+esc(t.slice(i,i+q.length))+'</mark>'+esc(t.slice(i+q.length)) };
+    list.innerHTML=shownItems.length?shownItems.map((it,i)=>it.kind==='add'
+      ?`<button class="mi add" role="option" id="cb${i}" aria-selected="${i===sel}" data-i="${i}" ${mayAdd?'':'disabled'}>+ Add “${esc(it.text)}” as ${addWord}<small>${mayAdd?esc(addHint||''):'Ask an admin to add it'}</small></button>`
+      :it.kind==='clear'?`<button class="mi" role="option" id="cb${i}" aria-selected="${i===sel}" data-i="${i}">Clear</button>`
+      :`<button class="mi" role="option" id="cb${i}" aria-selected="${i===sel}" data-i="${i}">${it.html(hl)}${it.v===current?'<small>current</small>':''}</button>`).join(''):`<div class="empty">No match</div>`;
+    inp.setAttribute('aria-activedescendant',shownItems.length?'cb'+sel:'');
+  }
+  function choose(i){ const it=shownItems[i]; if(!it) return;
+    if(it.kind==='add'){ if(!mayAdd) return; closePop(); onAdd(it.text) }
+    else if(it.kind==='clear'){ closePop(); onPick('') }
+    else { closePop(); onPick(it.v) } }
+  inp.oninput=()=>{ sel=0; draw() };
+  inp.onkeydown=e=>{
+    if(e.key==='ArrowDown'){ e.preventDefault(); sel=(sel+1)%Math.max(1,shownItems.length); draw() }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); sel=(sel-1+shownItems.length)%Math.max(1,shownItems.length); draw() }
+    else if(e.key==='Enter'){ e.preventDefault(); choose(sel) }
+    else if(e.key==='Tab'){ closePop() } };
+  list.onclick=e=>{ const b=e.target.closest('[data-i]'); if(b&&!b.disabled) choose(+b.dataset.i) };
+  draw();
+  // Focus now, caret at the end, so letters typed quickly after the first one follow it.
+  inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length);
+  return p;
+}
+function typeCombo(it,anchor,initial=''){
+  combo(anchor,{label:'Type',initial,current:it.type,addWord:'a type',mayAdd:isAdmin(),addHint:'starts with Post’s deadlines',
+    items:Object.keys(TYPE).map(t=>({v:t,text:t,html:hl=>`<span class="ty" style="background:${TYPE[t]}">${hl(t)}</span>`})),
+    onPick:t=>{ it.type=t; render(); toast(`Type set to ${t}`) },
+    onAdd:q=>{ const name=q.replace(/\s+/g,' ').replace(/^./,ch=>ch.toUpperCase()); TYPE[name]=CHOICE_COLORS[Object.keys(TYPE).length%CHOICE_COLORS.length]; it.type=name; render(); toast(`Added “${name}” as a type for everyone · it starts with Post’s deadlines (Settings)`) }});
+}
+function choiceCombo(c,v,key,anchor,initial=''){
+  combo(anchor,{label:labelOf(c),initial,current:v[key],addWord:'an option',mayAdd:true,addHint:`to ${labelOf(c)}`,clear:true,
+    items:c.options.map(o=>({v:o.id,text:o.name,html:hl=>`<span class="pill" style="background:${o.color}">${hl(o.name)}</span>`})),
+    onPick:o=>{ if(o) v[key]=o; else delete v[key]; render() },
+    onAdd:q=>{ const o={id:'o'+(uid++),name:q.replace(/\s+/g,' ').trim(),color:CHOICE_COLORS[c.options.length%CHOICE_COLORS.length]}; c.options.push(o); v[key]=o.id; stamp(c); render(); toast(`Added “${o.name}” to ${labelOf(c)} for everyone`) }});
+}
+
 function toast(msg,undo){
   const t=$('#toast'); clearTimeout(toast.h); t.hidden=false;
   t.innerHTML=`<span>${msg}</span>${undo?'<button id="undoBtn">Undo</button>':''}`;
@@ -611,14 +667,14 @@ function act(id,anchor){
     if(c.kind==='link'){ linkPrompt(anchor,`${labelOf(c)} link`,v[key],u=>{ if(u) v[key]=u; else delete v[key] }); return }
     if(c.kind==='checkbox'){ if(v[key]) delete v[key]; else v[key]='1'; render(); return }
     if(c.kind==='person') return menu(anchor,labelOf(c),[...Object.keys(PEOPLE).map(p=>({v:p,html:person(p),hint:PEOPLE[p][1],cls:v[key]===p?'next':''})),{sep:1},{v:'',html:person(null,'Clear')}],p=>{ if(p) v[key]=p; else delete v[key]; render() });
-    if(c.kind==='choice') return menu(anchor,labelOf(c),[...c.options.map(o=>({v:o.id,html:`<span class="pill" style="background:${o.color}">${esc(o.name)}</span>`,cls:v[key]===o.id?'next':''})),{sep:1},{v:'',html:'Clear'}],o=>{ if(o) v[key]=o; else delete v[key]; render() });
+    if(c.kind==='choice') return choiceCombo(c,v,key,anchor);
     return;
   }
   if(key==='title'){ if(!can||gone){ note(id,gone?'Restore it to edit':"You can't edit this row"); return } editStart(id,it.name); return }
   if(key==='archive'||key==='drop'){ if(!can) return; if(gone){ it.archived=false; it.dropped=false; render(); toast(`${esc(it.name)} restored`) } else archiveConfirm(it,anchor,key==='drop'); return }
   if(gone&&key!=='published'&&key!=='doc'&&key!=='design'&&key!=='post'){ note(id,'Restore it to edit'); return }
   if(key==='status'){ if(!can) return note(id,`Only ${it.assignee?PEOPLE[it.assignee][0]:'its owner'} or an admin can move this`); return statusMenu(it,anchor,S.view==='content'?STAGE:VSTAGE,S.view==='content'?STAGES_C:STAGES_V,id) }
-  if(key==='type'&&S.view==='content'){ if(!can) return note(id,"You can't edit this row"); return menu(anchor,'Type',Object.keys(TYPE).map(t=>({v:t,html:`<span class="ty" style="background:${TYPE[t]}">${t}</span>`,cls:it.type===t?'next':''})),t=>{ it.type=t; render(); toast(`Type set to ${t}`) }) }
+  if(key==='type'&&S.view==='content'){ if(!can) return note(id,"You can't edit this row"); return typeCombo(it,anchor) }
   if(key==='assignee'||key==='editor'){ if(!can) return note(id,"You can't edit this row"); const f=key; return menu(anchor,key==='editor'?'Editor':'Assignee',[...Object.keys(PEOPLE).map(p=>({v:p,html:person(p),hint:PEOPLE[p][1],cls:it[f]===p?'next':''})),{sep:1},{v:'',html:person(null)}],p=>{ it[f]=p||null; render(); toast(p?`Assigned to ${PEOPLE[p][0]}`:'Unassigned') }) }
   if(['doc','design','post','published'].includes(key)){ const url=it[key]; if(!can||gone){ if(url) toast(`Opens ${site(url)} in a new tab`); return } const lab={doc:'Working doc',design:'Design',post:'LinkedIn',published:'Published'}[key]; return linkPrompt(anchor,`${lab} link for ${it.name}`,url,v=>{ it[key]=v }) }
   if(key==='pillar'){ if(!can) return note(id,"You can't edit this row"); const t=themeOf(it.theme); return menu(anchor,'Pillar',[...t.pillars.map(pl=>({v:pl.id,html:esc(pl.name),cls:it.pillar===pl.id?'next':''})),{sep:1},{v:'',html:'No pillar'}],v=>{ it.pillar=v||null; render() }) }
@@ -769,6 +825,11 @@ grid.addEventListener('keydown',e=>{
   if(e.key===' '&&rk.startsWith('t:')){ e.preventDefault(); const t=themeOf(rk.slice(2)); t.collapsed=!t.collapsed; render(); return }
   if((e.key==='Delete'||e.key==='Backspace')&&c?.kind){ const it=itemOf(rk); if(it&&canEdit(it)){ delete it.v?.[key]; render() } return }
   const textual=key==='title'||key==='date'||key==='source'||key==='fileName'||(c?.kind&&['text','number','date'].includes(c.kind));
+  const typeAhead=(key==='type'&&S.view==='content')||c?.kind==='choice';
+  if(typeAhead&&e.key.length===1&&e.key!==' '&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&/^[kc]:/.test(rk)){ const it=itemOf(rk); e.preventDefault();
+    if(!canEdit(it)||it.archived||it.dropped) return note(id,"You can't edit this row");
+    if(key==='type') return typeCombo(it,cell,e.key);
+    const v=it.v||(it.v={}); return choiceCombo(c,v,key,cell,e.key) }
   if(textual&&e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&/^[kc]:/.test(rk)){ const it=itemOf(rk); if(canEdit(it)&&!it.archived&&!it.dropped){ e.preventDefault(); editStart(id,e.key) } return }
   if(e.key.startsWith('Arrow')||e.key==='Tab'){ e.preventDefault(); nav(e.key==='Tab'?(e.shiftKey?'ArrowLeft':'ArrowRight'):e.key) }
 });
