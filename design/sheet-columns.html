@@ -152,7 +152,7 @@ button{font:inherit;color:inherit}
   <button class="btn primary" id="pasteBtn">Paste plan</button>
 </header>
 <div class="try" aria-label="Try it">
-  <span><b>Try it:</b> open a heading's ▾ menu</span><span>drag a heading to move it</span><span>drag its edge to resize, or double-click to fit</span><span>double-click a Hook cell to type</span><span>click a Platform pill</span><span>Alt+↓ on a cell opens its column menu</span>
+  <span><b>Try it:</b> open a heading's ▾ menu</span><span>drag a heading to move it</span><span>drag its edge to resize, or double-click to fit</span><span>double-click a Hook cell to type</span><span>click a Type, Status or Platform pill</span><span>change a column's kind: ▾ → Edit column…</span><span>Alt+↓ on a cell opens its column menu</span>
 </div>
 <div class="sum" id="sum"></div>
 <div class="scroll"><div class="grid" id="grid" role="treegrid" aria-label="Content plan"></div></div>
@@ -492,8 +492,27 @@ grid.addEventListener('click',e=>{
   const cell=e.target.closest('[data-cell]'); if(!cell||cell.querySelector('input')) return;
   S.active=cell.dataset.cell; S.editing=null; render();
   const [,key]=S.active.split('|'), c=col(key);
-  if(c?.kind&&['choice','person','checkbox'].includes(c.kind)) openCell(S.active,document.querySelector(`[data-cell="${CSS.escape(S.active)}"]`));
+  const el=document.querySelector(`[data-cell="${CSS.escape(S.active)}"]`);
+  if(c?.kind&&['choice','person','checkbox'].includes(c.kind)) openCell(S.active,el);
+  else if(key==='type'&&S.view==='content') typeMenu(S.active,el);
+  else if(key==='status') statusMenu(S.active,el);
 });
+/* Status: the same menu as the live sheet, grouped Next / Back to / Skip to (the board's move rule decides what is offered). */
+function statusMenu(id,anchor){
+  const r=sheet().rows.find(x=>x.id===id.split('|')[0]), map=S.view==='content'?STAGE:VSTAGE, order=Object.keys(map), i=order.indexOf(r.status);
+  const item=(s,cls)=>`<button class="mi" role="menuitem" data-s="${s}" ${cls||''}>${stagePill(map,s).replace(' ▾','')}</button>`;
+  const next=order[i+1], back=order.slice(0,i).reverse(), skip=order.slice(i+2);
+  const p=openPop(anchor,`<div role="menu" aria-label="Status">${next?`<div class="ph">Next</div>${item(next,'style="background:var(--lime)"')}`:''}${back.length?`<div class="ph">Back to</div>${back.map(s=>item(s)).join('')}`:''}${skip.length?`<div class="ph">Skip to</div>${skip.map(s=>item(s)).join('')}`:''}</div>`);
+  p.onclick=e=>{ const b=e.target.closest('[data-s]'); if(!b) return; r.status=b.dataset.s; closePop(); render(); toast(`Moved to ${map[r.status][0]}${r.status==='publish'?' · the live sheet asks for the published link':''}`) };
+  menuKeys(p);
+}
+/* A piece's content type: the built-in Type cell opens a menu of type pills. */
+function typeMenu(id,anchor){
+  const r=sheet().rows.find(x=>x.id===id.split('|')[0]);
+  const p=openPop(anchor,`<div role="menu" aria-label="Type">${Object.keys(TYPE).map(t=>`<button class="mi" role="menuitem" data-t="${t}"><span class="ty" style="background:${TYPE[t]}">${t}</span>${t===r.type?'<small>current</small>':''}</button>`).join('')}</div>`);
+  p.onclick=e=>{ const b=e.target.closest('[data-t]'); if(!b) return; r.type=b.dataset.t; closePop(); render(); toast(`Type set to ${r.type}`) };
+  menuKeys(p);
+}
 grid.addEventListener('dblclick',e=>{
   const rzh=e.target.closest('[data-rz]'); if(rzh){ fit(rzh.dataset.rz); return }
   const cell=e.target.closest('[data-cell]'); if(cell) openCell(cell.dataset.cell,cell);
@@ -504,6 +523,8 @@ grid.addEventListener('keydown',e=>{
   const cell=e.target.closest('[data-cell]'); if(!cell) return;
   const id=cell.dataset.cell, [,key]=id.split('|');
   if(e.altKey&&e.key==='ArrowDown'){ e.preventDefault(); colMenu(key,document.querySelector(`[data-col-menu="${key}"]`)); return }
+  if((e.key==='Enter'||e.key===' ')&&key==='type'&&S.view==='content'){ e.preventDefault(); typeMenu(id,cell); return }
+  if((e.key==='Enter'||e.key===' ')&&key==='status'){ e.preventDefault(); statusMenu(id,cell); return }
   if(e.key==='Enter'||e.key==='F2'||(e.key===' '&&col(key)?.kind==='checkbox')){ e.preventDefault(); openCell(id,cell); return }
   if((e.key==='Delete'||e.key==='Backspace')&&col(key)?.kind){ const r=sheet().rows.find(x=>x.id===id.split('|')[0]); delete r.v[key]; render(); return }
   const cols=visible().map(c=>c.key), rows=sheet().rows.filter(r=>r.id).map(r=>r.id);
