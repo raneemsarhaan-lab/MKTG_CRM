@@ -184,14 +184,14 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 10: Polish
 
-- [ ] T032 [P] Lab scenarios `cols-kbd` (everything from the keyboard: the panel, Alt+↓, the editor), `cols-rtl`, `cols-phone`, `cols-axe`.
-- [ ] T033 Run:
+- [X] T032 [P] Lab scenarios `cols-kbd` (everything from the keyboard: the panel, Alt+↓, the editor), `cols-rtl`, `cols-phone`, `cols-axe`.
+- [X] T033 Run:
   - `npm run typecheck`;
   - `bash scripts/preflight.sh`;
   - `next build`;
   - `lab:sheet`, `lab:inbox`, `lab:attachments` and `lab:brief`.
-- [ ] T034 Running-app checks (quickstart §2) with two members on local PostgreSQL. Record the results in `specs/010-sheet-custom-columns/validation.md`.
-- [ ] T035 [P] `specs/010-sheet-custom-columns/constitution-check.md` (the §III decision: every member may shape the layout), and a "Sheet columns" section in `HANDOVER.md`.
+- [X] T034 Running-app checks (quickstart §2) with two members on local PostgreSQL. Record the results in `specs/010-sheet-custom-columns/validation.md`.
+- [X] T035 [P] `specs/010-sheet-custom-columns/constitution-check.md` (the §III decision: every member may shape the layout), and a "Sheet columns" section in `HANDOVER.md`.
 
 ---
 

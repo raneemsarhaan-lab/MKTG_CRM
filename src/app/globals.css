@@ -1425,6 +1425,11 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 
 /* Content sheet (spec 009): spanning theme and pillar rows, theme editor, plan preview. */
 .fx-sheet-td.is-span { justify-content: flex-start; }
+/* A row whose title spans every column (a theme, a video): the cell itself is
+   as wide as the row, so it can't stay put when the grid scrolls sideways.
+   Its content does instead, just after the row number. */
+.fx-sheet-td.is-span.is-frozen-title { position: relative; }
+.fx-sheet-td.is-span.is-frozen-title > :first-child { position: sticky; inset-inline-start: 46px; }
 .fx-content-theme { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .fx-content-theme-name { font-family: var(--font-heading); font-weight: 700; font-size: 13px; }
 /* The Type cell: a filled pill, one colour per content type (CONTENT_TYPE_COLORS). */

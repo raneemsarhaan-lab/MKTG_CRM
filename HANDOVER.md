@@ -795,6 +795,7 @@ Run through this after the first successful deploy.
 | Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
 | Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
 | Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
+| Sheet columns: Arabic strings | Medium | `sheet.columns.*` in `messages/ar.json`; native review (spec 010) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |

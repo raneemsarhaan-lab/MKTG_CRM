@@ -503,4 +503,18 @@ export const columns = [
       t.eq(await t.axe('[data-plan-preview]'), [], 'Paste plan with Not imported and bad values')
     },
   },
+  {
+    id: 'cols-span-scroll', hash: C,
+    async run(t) {
+      // Scrolled sideways, a theme row's name stays in view (it spans the row).
+      await t.page.locator('.fx-sheet-scroll').evaluate(e => { e.scrollLeft = e.scrollWidth })
+      await t.idle(150)
+      const [name, scroll] = await t.page.evaluate(() => [
+        document.querySelector('.fx-content-theme-name').getBoundingClientRect().toJSON(),
+        document.querySelector('.fx-sheet-scroll').getBoundingClientRect().toJSON(),
+      ])
+      t.assert(scroll.width < (await t.page.locator('.fx-sheet-scroll').evaluate(e => e.scrollWidth)), 'the grid is wider than its box')
+      t.assert(name.left >= scroll.left && name.right <= scroll.left + 400, `the theme name stays at the start (${Math.round(name.left - scroll.left)}px)`)
+    },
+  },
 ]

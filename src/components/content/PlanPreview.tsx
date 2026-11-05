@@ -107,7 +107,14 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   const badValues = rows.filter(r => r.kind !== 'problem' && !fixes[r.index]?.leftOut && r.problems.some(p => p.code === 'badValue'))
   const pieces = [...fresh, ...linked.filter(r => !r.otherTheme || fixes[r.index]?.move)]
   // Pieces already in the sheet go too when they bring values: their empty cells are filled.
-  const filling = existing.filter(r => Object.keys(r.values).length)
+  // Only pieces this member may still edit: an archived one, or someone else's, takes none.
+  const admin = ctx.me.access === 'admin' || ctx.me.access === 'superuser'
+  const editable = (r: Classified) => {
+    const theme = ctx.themes.find(x => norm(x.name) === norm(r.theme))
+    const task = ctx.tasks.find(x => x.project_id === theme?.id && norm(x.name) === norm(r.title))
+    return !!task && !task.dropped_at && (admin || task.task_owner_id === ctx.me.id || task.assignee_id === ctx.me.id)
+  }
+  const filling = existing.filter(r => Object.keys(r.values).length && editable(r))
   const sending = [...pieces, ...filling]
   const valueCount = sending.reduce((n, r) => n + Object.keys(r.values).length, 0)
   const matchedNames = read.matched.map(k => columns?.values.find(c => c.key === k)?.name).filter(Boolean) as string[]
