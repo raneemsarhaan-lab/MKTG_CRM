@@ -7,4 +7,5 @@ import { us6 } from './us6.mjs'
 import { us7 } from './us7.mjs'
 import { cross } from './cross.mjs'
 import { content } from './content.mjs'
-export const SCENARIOS = [...us1, ...us2, ...us3, ...us4, ...us5, ...us6, ...us7, ...cross, ...content]
+import { columns } from './columns.mjs'
+export const SCENARIOS = [...us1, ...us2, ...us3, ...us4, ...us5, ...us6, ...us7, ...cross, ...content, ...columns]

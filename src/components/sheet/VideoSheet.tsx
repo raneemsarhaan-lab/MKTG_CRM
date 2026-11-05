@@ -17,18 +17,19 @@ import { MAX_INLINE_BYTES, MAX_UPLOAD_BYTES } from '@/lib/attachments'
 import { formatBytes } from '@/components/kanban/attachments/limits'
 import { nextFreeName, sameName } from '@/components/kanban/attachments/names'
 import { buildRows, clipsOf, videosWithClips, type SheetRow } from './rows'
-import { COLUMN_SETS, defaultColumnSet, isColumnSet } from './columns'
+import { defaultColumnSet, isColumnSet } from './columns'
 import { summarise } from './summary'
 import { formatLength, parseClipTime } from './time'
 import { SheetGrid, type ActiveCell, type GridCol } from './SheetGrid'
 import { SheetMenu, SheetPopover, type MenuItem } from './SheetMenu'
 import { statusMenuItems, useStageNames } from './StatusCell'
-import { editorMenuItems, typeMenuItems } from './EditorCell'
+import { editorMenuItems } from './EditorCell'
 import { splitFiles, hostOf, type FilesCellState } from './FilesCell'
 import { LinkPrompt } from './PublishedCell'
 import { PastePreview } from './PastePreview'
 import { cellsFromHtml, cellsFromText, looksLikeRows, type PastedCell } from './parse-clips'
 import type { VideoSheetProps } from './types'
+import { useSheetColumns } from './useSheetColumns'
 
 type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
@@ -75,7 +76,6 @@ export function VideoSheet(p: VideoSheetProps) {
   const rows = useMemo(() => buildRows(p.tasks, {
     videoId: p.videoId, mine, showDropped, me: me.id, collapsed, drafts,
   }), [p.tasks, p.videoId, mine, showDropped, me.id, collapsed, drafts])
-  const cols = COLUMN_SETS[set]
 
   const [active, setActive] = useState<ActiveCell | null>(null)
   const activeRow = active ? rows.find(r => r.key === active.key) : undefined
@@ -91,7 +91,7 @@ export function VideoSheet(p: VideoSheetProps) {
   const say = useCallback((text: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
-    toastTimer.current = setTimeout(() => setToast(null), undo ? 5000 : 3000)
+    toastTimer.current = setTimeout(() => setToast(null), undo ? 10000 : 3000)
   }, [])
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const onNote = useCallback((key: string, note: string | null) => {
@@ -114,6 +114,14 @@ export function VideoSheet(p: VideoSheetProps) {
   const canEdit = useCallback((task: Task) =>
     task.task_owner_id === me.id || task.assignee_id === me.id || me.access === 'admin' || me.access === 'superuser',
   [me])
+
+  // ── shaped columns (spec 010) ───────────────────────────────────────────
+  const cl = useSheetColumns({
+    sheet: 'video', set, bundle: p.columns, me, members: p.members,
+    defaultName: key => t(`col.${key}` as 'col.title'), canEdit, say, onNote,
+  })
+  const setType = (task: Task, label: string) =>
+    void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
 
   // ── popups ──────────────────────────────────────────────────────────────
   const [popup, setPopup] = useState<Popup | null>(null)
@@ -183,6 +191,7 @@ export function VideoSheet(p: VideoSheetProps) {
     const can = canEdit(task)
     const menu = (label: string, items: MenuItem[]) => { if (items.length) setPopup({ kind: 'menu', label, anchor, items }) }
     const pick = (fn: () => void) => () => { closePopup(true); fn() }
+    if (cl.custom.is(col)) { cl.custom.open(task, col, anchor, row.key); return }
 
     switch (col) {
       case 'rowNo': {
@@ -211,10 +220,7 @@ export function VideoSheet(p: VideoSheetProps) {
         }))
       case 'type':
         if (!can) { onNote(`${row.key}|type`, t('readOnly')); return }
-        return menu(t('typeFor', { name: task.name }), typeMenuItems(p.contentTypes, task.content_type_label, label => {
-          closePopup(true)
-          void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
-        }))
+        return cl.typeCombo(task, anchor, p.contentTypes, label => setType(task, label))
       case 'files': {
         const { links, files } = splitFiles(task.attachments)
         const items: MenuItem[] = [
@@ -271,6 +277,7 @@ export function VideoSheet(p: VideoSheetProps) {
     }
     if (row.kind !== 'clip' && row.kind !== 'video') return null
     const task = row.task
+    if (cl.custom.is(col)) return cl.custom.commit(task, col, value)
     const res = await (async () => {
       switch (col) {
         case 'title': {
@@ -374,6 +381,7 @@ export function VideoSheet(p: VideoSheetProps) {
           ))}
         </div>
         <span className="fx-sheet-bar-gap" />
+        {cl.toolbar}
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showDropped} data-show-dropped="" onClick={toggleDropped}>{t('showDropped')}</button>
         <button
@@ -409,7 +417,7 @@ export function VideoSheet(p: VideoSheetProps) {
         <div className="fx-sheet-scroll">
           <SheetGrid
             rows={rows}
-            cols={cols}
+            columns={cl}
             me={me}
             members={p.members}
             label={label}
@@ -432,9 +440,16 @@ export function VideoSheet(p: VideoSheetProps) {
             onRetry={id => { const s = filesState[id]; if (s?.kind === 'failed') void upload(id, s.file) }}
             onLinkInstead={(id, anchor) => setPopup({ kind: 'link', anchor, taskId: id, mode: 'files' })}
             onNote={onNote}
+            onTypeAhead={(row, ch, anchor) => {
+              if (row.kind !== 'clip' && row.kind !== 'video') return false
+              if (!canEdit(row.task) || row.task.dropped_at) { onNote(`${row.key}|type`, t('readOnly')); return true }
+              cl.typeCombo(row.task, anchor, p.contentTypes, label => setType(row.task, label), ch)
+              return true
+            }}
           />
         </div>
       )}
+      {cl.layer}
 
       {singleVideo && !empty && clipsOf(p.tasks, singleVideo.id).length === 0 && (
         <p className="fx-sheet-hint">{t('empty')}</p>

@@ -29,6 +29,8 @@ import { parseClipFileName, fileNameKey } from '@/lib/clip-file-name'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { MEMBERS, makeTasks, sheetsHtml } from './fixtures'
 import { ContentApp, type ContentLab } from './content-entry'
+import { useLabColumns } from './columns-stub'
+import { columnFixtures } from './column-fixtures'
 import { CONTENT_MEMBERS, referenceHtml, referenceText } from './content-fixtures'
 
 const params  = new URLSearchParams(location.hash.slice(1))
@@ -38,6 +40,7 @@ const meId    = params.get('me') ?? 'raneem'
 const video0  = params.get('video') === 'all' ? null : (params.get('video') ?? 'v1')
 const row0    = params.get('row')
 const delay   = Number(params.get('delay') ?? 60)
+export const withCols = params.get('cols') === '1'
 document.documentElement.lang = locale
 document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
 
@@ -188,12 +191,17 @@ function App() {
     },
   }
 
+  const cols = useLabColumns({
+    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : { records: [], values: {} },
+    types: ['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l })),
+  })
   return (
     <VideoSheet
       tasks={tasks}
       me={me}
       members={MEMBERS}
-      contentTypes={['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l }))}
+      contentTypes={cols.types}
+      columns={cols.bundle}
       hasStorage={storage}
       videoId={videoId}
       highlightId={rowId}

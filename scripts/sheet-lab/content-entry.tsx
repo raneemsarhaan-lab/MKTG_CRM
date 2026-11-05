@@ -13,6 +13,8 @@ import { NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { isWebLink, norm, readFrequency, readAudience, readStatus, readType, siteName, taskIdFromLink } from '@/lib/content-plan'
 import { mayAddTo } from '@/components/content/parse-plan'
+import { useLabColumns } from './columns-stub'
+import { columnFixtures } from './column-fixtures'
 import { CONTENT_MEMBERS, makeContent } from './content-fixtures'
 
 type Call = { fn: string; args: unknown[]; at: number }
@@ -206,13 +208,18 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
     },
   }
 
+  const cols = useLabColumns({
+    me, members: CONTENT_MEMBERS, lab, seed: new URLSearchParams(location.hash.slice(1)).get('cols') === '1' ? columnFixtures() : { records: [], values: {} },
+    types: ['Post', 'Video', 'Reel', 'Article', 'Report', 'Framework/Model', 'Other'].map(l => ({ id: l, label: l })),
+  })
   return (
     <ContentSheet
       tasks={tasks}
       themes={themes}
       me={me}
       members={CONTENT_MEMBERS}
-      contentTypes={['Post', 'Video', 'Reel', 'Article', 'Report', 'Framework/Model', 'Other'].map(l => ({ id: l, label: l }))}
+      contentTypes={cols.types}
+      columns={cols.bundle}
       onOpenTask={id => lab.opened.push({ id })}
       onOpenVideoSheet={id => lab.opened.push({ id, opts: { videoSheet: true } })}
       onView={v => lab.views.push(v)}

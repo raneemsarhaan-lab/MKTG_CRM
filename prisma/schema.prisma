@@ -30,14 +30,17 @@ model Member {
   /// Spec 006: Week Momentum and Daily Spark are shown on the Board.
   show_week       Boolean  @default(false)
 
-  tasks_owned    Task[]        @relation("TaskOwner")
-  tasks_assigned Task[]        @relation("TaskAssignee")
-  tasks_created  Task[]        @relation("TaskCreator")
-  comments       TaskComment[]
-  project_steps  ProjectStep[] @relation("StepAssignee")
-  themes_owned   Project[]     @relation("ThemeOwner")
-  mention_reads  MentionRead[]
-  snoozes        TaskSnooze[]
+  tasks_owned           Task[]        @relation("TaskOwner")
+  tasks_assigned        Task[]        @relation("TaskAssignee")
+  tasks_created         Task[]        @relation("TaskCreator")
+  comments              TaskComment[]
+  project_steps         ProjectStep[] @relation("StepAssignee")
+  themes_owned          Project[]     @relation("ThemeOwner")
+  mention_reads         MentionRead[]
+  snoozes               TaskSnooze[]
+  sheet_columns_created SheetColumn[] @relation("SheetColumnCreator")
+  sheet_columns_updated SheetColumn[] @relation("SheetColumnUpdater")
+  sheet_values_updated  SheetValue[]
 
   @@map("members")
 }
@@ -295,6 +298,7 @@ model Task {
   /// On a video: the details of its clips, for the one-file-name-per-video rule.
   video_clips  TaskClip[]       @relation("VideoClips")
   snoozes      TaskSnooze[]
+  sheet_values SheetValue[]
 
   @@map("tasks")
 }
@@ -532,4 +536,55 @@ model LinkPreview {
   fetched_at  DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("link_previews")
+}
+
+/// Spec 010 (R1): one column of a sheet the team has shaped, built-in or custom.
+/// A built-in column is keyed by its code key (status, fileName…); a custom one by c:<id>.
+model SheetColumn {
+  id            String    @id @default(uuid()) @db.Uuid
+  /// 'content' or 'video'
+  sheet         String
+  key           String
+  /// Null = the default, translated name (built-in only).
+  name          String?
+  position      Int
+  /// 60–600; null = default width.
+  width         Int?
+  /// True until someone hides or shows it; then shown_in lists the sets that show it.
+  shown_default Boolean   @default(true)
+  shown_in      String[]  @default([])
+  /// Custom only: text · number · date · link · person · choice · checkbox
+  kind          String?
+  /// Choice only: [{ id, name, color }]
+  options       Json      @default("[]")
+  /// Custom only: soft delete, so Undo can bring it back (R10).
+  deleted_at    DateTime? @db.Timestamptz(6)
+  created_by    String?   @db.Uuid
+  updated_by    String?   @db.Uuid
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  creator Member?      @relation("SheetColumnCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater Member?      @relation("SheetColumnUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  values  SheetValue[]
+
+  @@unique([sheet, key])
+  @@index([sheet, position])
+  @@map("sheet_columns")
+}
+
+/// Spec 010 (R3): one custom column's value for one task, normalised by its kind.
+model SheetValue {
+  column_id  String   @db.Uuid
+  task_id    String   @db.Uuid
+  value      String   @db.Text
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  column  SheetColumn @relation(fields: [column_id], references: [id], onDelete: Cascade)
+  task    Task        @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  updater Member?     @relation(fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@id([column_id, task_id])
+  @@map("sheet_values")
 }

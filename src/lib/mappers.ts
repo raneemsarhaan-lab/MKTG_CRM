@@ -165,3 +165,23 @@ export function mapTheme(p: any): import('@/types/index').ContentTheme {
       .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order),
   }
 }
+
+/** A sheet column record (spec 010), with the name of whoever changed it last. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapSheetColumn(c: any): import('@/types/index').SheetColumnRecord {
+  return {
+    id:            c.id,
+    sheet:         c.sheet,
+    key:           c.key,
+    name:          c.name ?? null,
+    position:      c.position,
+    width:         c.width ?? null,
+    shownDefault:  c.shown_default,
+    shownIn:       c.shown_in ?? [],
+    kind:          c.kind ?? null,
+    options:       Array.isArray(c.options) ? c.options : [],
+    updatedBy:     c.updated_by ?? null,
+    updatedByName: c.updater?.name ?? null,
+    updatedAt:     (c.updated_at instanceof Date ? c.updated_at : new Date(c.updated_at)).toISOString(),
+  }
+}

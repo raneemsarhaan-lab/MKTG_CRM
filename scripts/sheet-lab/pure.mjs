@@ -153,6 +153,74 @@ export async function runPure(bundle, root) {
     }
   })
 
+  // ── spec 010: sheet columns ─────────────────────────────────────────────
+  const C = h.cols
+  check('cols-layout', () => {
+    const def = C.applyLayout('content', [], 'all')
+    eq(def.map(c => c.key), C.BUILT_INS.content.map(b => b.key), 'no records: built-in defaults')
+    eq(def.every(c => c.shown), true, 'all shown on the Content sheet')
+    const vid = C.applyLayout('video', [], 'copy')
+    eq(vid.filter(c => c.shown).map(c => c.key), ['title', 'clipNo', 'type', 'status', 'editor', 'published'], 'Copy set defaults')
+    const fx = h.columnFixtures()
+    const laid = C.applyLayout('content', fx.records, 'all')
+    eq(laid[0].key, 'title', 'Title first')
+    eq(laid.find(c => c.key === 'pillar').shown, false, 'a hidden built-in')
+    eq(laid.find(c => c.key === 'status').name, 'Copy status', 'a renamed built-in')
+    eq(laid.find(c => c.key === 'c:platform').kind, 'choice', 'a custom column')
+    // A built-in added to the code later lands after its default predecessor.
+    const missing = fx.records.filter(r => !(r.sheet === 'content' && r.key === 'design'))
+    const l2 = C.applyLayout('content', missing, 'all').map(c => c.key)
+    eq(l2.indexOf('design'), l2.indexOf('doc') + 1, 'new built-in slotted after its predecessor')
+    // Only custom records: built-ins keep their default order first.
+    const only = [{ ...fx.records.find(r => r.key === 'c:hook'), position: 0 }]
+    const l3 = C.applyLayout('content', only, 'all').map(c => c.key)
+    eq(l3.slice(0, 2), ['title', 'type'], 'built-ins first')
+    eq(l3.at(-1), 'c:hook', 'custom after')
+    const v = C.applyLayout('video', fx.records, 'copy')
+    eq(v.find(c => c.key === 'c:music').shown, false, 'custom hidden in Copy')
+    eq(C.applyLayout('video', fx.records, 'editing').find(c => c.key === 'c:music').shown, true, 'shown in Editing')
+  })
+  check('cols-ops', () => {
+    const who = { id: 'samaa', name: 'Samaa' }
+    let r = C.applyOp('content', [], { op: 'rename', key: 'status', name: 'Stage' }, who)
+    eq(r.filter(x => x.sheet === 'content').length, C.BUILT_INS.content.length, 'first change writes every built-in')
+    eq(C.applyLayout('content', r, 'all').find(c => c.key === 'status').name, 'Stage', 'renamed')
+    r = C.applyOp('content', r, { op: 'move', key: 'assignee', before: 'type' }, who)
+    eq(C.applyLayout('content', r, 'all').map(c => c.key).slice(0, 3), ['title', 'assignee', 'type'], 'moved')
+    eq(C.applyOp('content', r, { op: 'move', key: 'type', before: 'title' }, who), r, 'nothing before Title')
+    r = C.applyOp('video', [], { op: 'shown', key: 'source', set: 'editing', shown: false }, who)
+    eq(C.applyLayout('video', r, 'editing').find(c => c.key === 'source').shown, false, 'hidden in Editing')
+    eq(C.applyLayout('video', r, 'full').find(c => c.key === 'source').shown, true, 'still in Full')
+    r = C.applyOp('content', r, { op: 'width', key: 'type', width: 9999 }, who)
+    eq(C.applyLayout('content', r, 'all').find(c => c.key === 'type').width, 600, 'width clamped')
+  })
+  check('cols-parse', () => {
+    const m = [{ id: 'samaa', name: 'Samaa Ali' }, { id: 'noran', name: 'Noran' }]
+    const o = [{ id: 'li', name: 'LinkedIn', color: '#1D4ED8' }]
+    eq(C.parseValue('number', '1,240'), { ok: true, value: '1240' }, 'number')
+    eq(C.parseValue('number', 'abc'), { ok: false, code: 'number' }, 'not a number')
+    eq(C.parseValue('date', '20/11/2026'), { ok: true, value: '2026-11-20' }, 'DD/MM/YYYY')
+    eq(C.parseValue('date', '2026-02-30'), { ok: false, code: 'date' }, 'no 30 February')
+    eq(C.parseValue('link', 'docs.google.com/x'), { ok: false, code: 'link' }, 'a link needs https')
+    eq(C.parseValue('person', 'samaa', { members: m }), { ok: true, value: 'samaa' }, 'person by first name')
+    eq(C.parseValue('choice', 'linkedin', { options: o }), { ok: true, value: 'li' }, 'choice by name, any case')
+    eq(C.parseValue('checkbox', 'Yes'), { ok: true, value: '1' }, 'yes')
+    eq(C.parseValue('checkbox', 'no'), { ok: true, value: '' }, 'no clears')
+    eq(C.parseValue('text', ''), { ok: true, value: '' }, 'empty clears')
+    const conv = C.convertValues('text', 'number', { a: '12', b: 'twelve' }, {}, {})
+    eq([conv.kept, conv.cleared], [{ a: '12' }, ['b']], 'kind change keeps what fits')
+  })
+  check('cols-names', () => {
+    const others = [['Copy status', 'Status'], ['Hook']]
+    eq(C.checkName('  ', others), 'empty', 'empty')
+    eq(C.checkName('x'.repeat(41), others), 'long', 'too long')
+    eq(C.checkName('status', others), 'taken', 'a default name stays its column’s')
+    eq(C.checkName('hook ', others), 'taken', 'case and spaces ignored')
+    eq(C.checkName('Angle', others), null, 'free')
+    eq(C.headingKey('copy  status', [{ key: 'status', names: ['Copy status', 'Status'] }]), 'status', 'paste heading by current name')
+    eq(C.cleanOptions([{ name: 'A' }, { name: 'a' }, { name: '' }], () => 'id').length, 1, 'options unique and named')
+  })
+
   check('tokens-only', () => {
     const bad = []
     for (const d of ['src/components/sheet', 'src/components/content']) {

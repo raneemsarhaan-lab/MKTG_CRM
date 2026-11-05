@@ -14,3 +14,5 @@ export { readPlan, classifyPlan, mayAddTo, isWarning } from '@/components/conten
 export { buildContentRows, piecesOf } from '@/components/content/rows'
 export { summariseContent, cadence, periodStart } from '@/components/content/summary'
 export { referenceText, makeContent, CONTENT_MEMBERS, LINKED } from './content-fixtures'
+export * as cols from '@/lib/sheet-columns'
+export { columnFixtures } from './column-fixtures'

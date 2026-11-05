@@ -4,7 +4,7 @@
  * supplies stubs with the same shape.
  */
 import type { BoardView, ContentTheme, LinkRole, Member, Task } from '@/types/index'
-import type { SheetApi, Result } from '@/components/sheet/types'
+import type { SheetApi, Result, ColumnsBundle } from '@/components/sheet/types'
 import type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch } from '@/actions/content'
 
 export type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch }
@@ -31,4 +31,6 @@ export interface ContentSheetProps {
   onOpenVideoSheet(videoId: string): void
   onView(view: BoardView): void
   api: ContentApi
+  /** The sheet's shaped columns and custom values (spec 010). */
+  columns: ColumnsBundle
 }
