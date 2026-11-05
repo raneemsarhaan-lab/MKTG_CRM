@@ -438,6 +438,7 @@ export function ContentSheet(p: ContentSheetProps) {
       {paste && (
         <PlanPreview
           ctx={ctx}
+          columns={{ targets: cl.pasteNames, values: cl.pasteColumns, addColumn: cl.addTextColumn }}
           onAdd={(r, o) => p.api.addPlan(r, o)}
           onClose={msg => {
             setPaste(null)

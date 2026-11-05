@@ -7,6 +7,7 @@
  */
 import type { Member, MoveTaskResult, StageId, Task, BoardView } from '@/types/index'
 import type { UploadFn } from '@/components/kanban/attachments/useUploadQueue'
+import type { PasteTarget, PasteValueColumn } from '@/lib/sheet-columns'
 
 export type Result = { success: boolean; error?: string }
 
@@ -23,8 +24,20 @@ export interface SheetClipPatch {
   out_ms?: number | null
   published_url?: string | null
 }
-export interface SheetClipRow { title: string; file_name?: string | null; link?: string | null }
-export interface AddClipsResult extends Result { created?: { id: string }[]; skipped?: string[] }
+export interface SheetClipRow {
+  title: string; file_name?: string | null; link?: string | null
+  /** Custom column values by column id (spec 010); re-parsed on the server. */
+  custom?: Record<string, string>
+}
+export interface AddClipsResult extends Result { created?: { id: string }[]; skipped?: string[]; values?: number }
+
+/** The sheet's columns, as a paste sees them (spec 010 FR-050–FR-052). */
+export interface PasteColumns {
+  targets: PasteTarget[]
+  values: PasteValueColumn[]
+  /** Adds a Text column; an error message, or null when it worked. */
+  addColumn(name: string): Promise<string | null>
+}
 
 export interface SheetApi {
   /** The board's own move: optimistic, rollback, refresh, celebration. */

@@ -148,6 +148,34 @@ export function headingKey(heading: string, columns: { key: string; names: strin
   return columns.find(c => c.names.some(n => n && same(n, h)))?.key ?? null
 }
 
+/** A sheet column a paste can fill: its key and every name it answers to (R9). */
+export interface PasteTarget { key: string; names: string[] }
+/** A custom column a paste fills, with what parseValue needs. */
+export interface PasteValueColumn { id: string; key: string; name: string; kind: ColumnKind; ctx: ValueCtx }
+export interface PastedValueProblem { column: string; code: ParseCode; text: string }
+
+/**
+ * Pasted cells for custom columns (by column key) → normalised values by
+ * column id, and the cells that don't fit their column (FR-051). A Link
+ * column takes the cell's hyperlink when it has one.
+ */
+export function readPastedValues(
+  cells: Record<string, { text: string; href: string | null }>,
+  cols: PasteValueColumn[],
+): { values: Record<string, string>; bad: PastedValueProblem[] } {
+  const values: Record<string, string> = {}
+  const bad: PastedValueProblem[] = []
+  for (const [key, cell] of Object.entries(cells)) {
+    const col = cols.find(c => c.key === key)
+    if (!col) continue
+    const raw = col.kind === 'link' ? (cell.href ?? cell.text) : cell.text
+    const p = parseValue(col.kind, raw, col.ctx)
+    if (!p.ok) bad.push({ column: col.name, code: p.code, text: raw.trim() })
+    else if (p.value) values[col.id] = p.value
+  }
+  return { values, bad }
+}
+
 // ── values ──────────────────────────────────────────────────────────────────
 
 export interface ValueCtx {

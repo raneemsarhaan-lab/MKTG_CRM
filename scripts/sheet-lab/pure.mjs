@@ -221,6 +221,40 @@ export async function runPure(bundle, root) {
     eq(C.cleanOptions([{ name: 'A' }, { name: 'a' }, { name: '' }], () => 'id').length, 1, 'options unique and named')
   })
 
+  check('cols-paste', () => {
+    const fx = h.columnFixtures()
+    const recs = fx.records.filter(r => r.sheet === 'content')
+    const laid = C.applyLayout('content', recs, 'all')
+    const name = c => c.name ?? C.builtInOf('content', c.key)?.en ?? ''
+    const targets = laid.map(c => ({ key: c.key, names: [name(c), C.builtInOf('content', c.key)?.en ?? ''].filter(Boolean) }))
+    const values = laid.filter(c => c.key.startsWith('c:')).map(c => ({ id: c.key.slice(2), key: c.key, name: name(c), kind: c.kind, ctx: { members: h.CONTENT_MEMBERS, options: c.options } }))
+    const read = h.readPlan(h.cellsFromText(h.customPlanText({ notes: true })), targets)
+    eq(read.rows.length, 18, '18 pieces')
+    eq(read.matched, ['c:hook', 'c:words', 'c:golive'], 'three custom columns matched by name')
+    eq(read.unknown, ['Notes'], 'Notes is not imported')
+    const { themes, tasks } = h.makeContent()
+    const admin = h.CONTENT_MEMBERS.find(m => m.id === 'raneem')
+    const cl = h.classifyPlan(read.rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: admin, columns: values })
+    eq(cl.reduce((n, r) => n + Object.keys(r.values).length, 0), 54, '54 values (SC-006)')
+    eq(cl[2].values, { hook: 'Hook 3', words: '103', golive: '2026-12-03' }, 'normalised by kind')
+    const bad = h.classifyPlan(h.readPlan(h.cellsFromText(h.customPlanText({ bad: true })), targets).rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: admin, columns: values })
+    const p3 = bad[0].problems.find(p => p.code === 'badValue')
+    eq([p3?.column, p3?.reason, p3?.text, bad[0].values.words, bad[0].values.hook], ['Words', 'number', 'many', undefined, 'Hook 1'], 'a bad value is a problem, never a value (FR-051)')
+    eq(h.isWarning(p3), true, 'and only a warning: the row still goes, the cell stays empty')
+    // A renamed built-in is found by its new name.
+    const renamed = h.readPlan([[{ text: 'Piece Title', href: null }, { text: 'Copy status', href: null }], [{ text: 'X', href: null }, { text: 'Published', href: null }]], targets)
+    eq(renamed.rows[0].status?.stage, 'publish', 'Copy status read as Status')
+    // Clips: a heading row with custom names fills them and stays out of the title.
+    const vrecs = fx.records.filter(r => r.sheet === 'video')
+    const vlaid = C.applyLayout('video', vrecs, 'full')
+    const vt = vlaid.map(c => ({ key: c.key, names: [c.name ?? C.builtInOf('video', c.key)?.en ?? ''].filter(Boolean) }))
+    const pv = h.parseClipRows(h.cellsFromText(h.customClipText()), [], vt)
+    eq([pv.fresh.length, pv.unmatched.length, pv.unknown, pv.matched], [3, 0, ['Notes'], ['c:vhook', 'c:music']], 'clips: heading row read, Notes not imported')
+    eq([pv.fresh[0].title, pv.fresh[0].custom['c:vhook'].text, pv.fresh[0].custom['c:music'].text], ['Pasted clip 1', 'Clip hook 1', 'yes'], 'the hook is a value, not the title')
+    const plain = h.parseClipRows(h.cellsFromText(h.customClipText()), [])
+    eq(plain.unmatched.length, 1, 'without columns, the heading row is an unmatched row as before')
+  })
+
   check('tokens-only', () => {
     const bad = []
     for (const d of ['src/components/sheet', 'src/components/content']) {

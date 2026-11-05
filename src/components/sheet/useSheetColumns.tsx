@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, formatValue, isCustomKey, normName, type LaidColumn,
+  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -447,6 +447,19 @@ export function useSheetColumns(o: UseSheetColumns) {
     sets: SHEET_SETS[sheet],
     /** The column's current names, for paste matching (R9). */
     pasteNames: laid.map(c => ({ key: c.key, kind: c.kind, names: [nameOf(c.key), c.builtIn ? o.defaultName(c.key) : '', builtInOf(sheet, c.key)?.en ?? ''].filter(Boolean) })),
+    /** Custom columns a paste can fill (FR-050, FR-051). */
+    pasteColumns: laid.filter(c => isCustomKey(c.key) && c.kind).map((c): PasteValueColumn => ({
+      id: c.key.slice(2), key: c.key, name: nameOf(c.key), kind: c.kind as ColumnKind, ctx: ctxFor(c),
+    })),
+    /** "Add as a column" for a pasted heading no column has (FR-052): a Text column at the end. */
+    addTextColumn: async (name: string): Promise<string | null> => {
+      const bad = nameError(name)
+      if (bad) return bad
+      const r = await api.add(sheet, { name, kind: 'text', set: sheet === 'video' ? set : undefined })
+      if (!r.success) return err(r.error)
+      o.say(t('added', { name: normName(name) }))
+      return null
+    },
     ctxFor,
   }
 }

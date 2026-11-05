@@ -13,7 +13,7 @@ import { NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { isWebLink, norm, readFrequency, readAudience, readStatus, readType, siteName, taskIdFromLink } from '@/lib/content-plan'
 import { mayAddTo } from '@/components/content/parse-plan'
-import { useLabColumns } from './columns-stub'
+import { labWritePasted, useLabColumns } from './columns-stub'
 import { columnFixtures } from './column-fixtures'
 import { CONTENT_MEMBERS, makeContent } from './content-fixtures'
 
@@ -85,7 +85,7 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
     async addPlan(rows: PlanRowInput[], opts) {
       record('addPlan', rows, opts)
       await delay()
-      const res = { success: true, created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[] }
+      const res = { success: true, created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0 }
       let ths = [...lab.themes]
       let ts = [...lab.tasks]
       rows.forEach((r, i) => {
@@ -128,9 +128,16 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
             attachments: [...(x.attachments ?? []), ...roleLinks(tid).filter(a => !(x.attachments ?? []).some(b => b.link_role === a.link_role))],
             ...(opts.useSheetTitleStatus ? { name: r.title, ...(status.archived ? { dropped_at: new Date().toISOString() } : { status: status.stage, stage_date: today() }) } : {}),
           }))
+          res.values += labWritePasted(tid, r.custom, !opts.useSheetTitleStatus)
           res.updated.push(tid); return
         }
-        if (ts.some(x => x.project_id === themeId && norm(x.name) === norm(r.title))) { res.skipped.push(r.title); return }
+        const same = ts.find(x => x.project_id === themeId && norm(x.name) === norm(r.title))
+        if (same) {
+          const mine = same.task_owner_id === me.id || same.assignee_id === me.id || admin
+          const n = mine && !same.dropped_at ? labWritePasted(same.id, r.custom, true) : 0
+          if (n) res.values += n; else res.skipped.push(r.title)
+          return
+        }
         const id = `new-${ts.length}-${i}`
         const owner = CONTENT_MEMBERS.find(x => norm(x.name) === norm(r.owner))?.id ?? me.id
         const base = ts.find(x => x.id === 'p1')!
@@ -140,6 +147,7 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
           task_owner_id: owner, assignee_id: null, post_url: link(r.post), published_url: link(r.published), attachments: roleLinks(id),
           created_at: new Date().toISOString(), updated_at: new Date().toISOString(), due_date: null, parent_task_id: null,
         }, ...ts]
+        res.values += labWritePasted(id, r.custom, false)
         res.created.push(id)
       })
       setThemes(() => ths); setTasks(() => ts)

@@ -12,6 +12,7 @@ import { parseClipFileName, fileNameKey } from '@/lib/clip-file-name'
 import { LINK_CONTENT_TYPE, linkLabel } from '@/lib/attachments'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { allowedStages, holdsStage } from '@/lib/stage-moves'
+import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 /**
@@ -432,6 +433,8 @@ export interface ClipRowInput {
   /** Re-read on the server; times sent by the browser are never trusted. */
   file_name?: string | null
   link?: string | null
+  /** Custom column values by column id (spec 010); re-parsed here. */
+  custom?: Record<string, string>
 }
 export interface AddedClip {
   id: string
@@ -461,7 +464,7 @@ const MAX_CLIPS_PER_ADD = 200
 export async function addClips(
   videoId: string,
   rows: ClipRowInput[],
-): Promise<{ success: boolean; created?: AddedClip[]; skipped?: string[]; error?: string }> {
+): Promise<{ success: boolean; created?: AddedClip[]; skipped?: string[]; values?: number; error?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'Nothing to add' }
@@ -481,22 +484,38 @@ export async function addClips(
     const title = (r.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
       || file
       || ''
-    return { title, file, parsed, link: link === false ? null : link }
+    return { title, file, parsed, link: link === false ? null : link, custom: r.custom }
   })
   if (clean.some(r => !r.title)) return { success: false, error: 'Task name cannot be empty' }
 
   try {
     const result = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM tasks WHERE id = ${videoId}::uuid FOR UPDATE`
-      const existing = await tx.taskClip.findMany({ where: { video_id: videoId }, select: { file_name: true } })
+      const existing = await tx.taskClip.findMany({
+        where: { video_id: videoId },
+        select: { file_name: true, task: { select: { id: true, task_owner_id: true, assignee_id: true, dropped_at: true } } },
+      })
       const seen = new Set(existing.map(e => fileNameKey(e.file_name)).filter(Boolean))
       const created: AddedClip[] = []
       const skipped: string[] = []
       const now = new Date()
+      const wantsValues = clean.some(r => r.custom && Object.keys(r.custom).length)
+      const members = wantsValues ? await tx.member.findMany({ select: { id: true, name: true } }) : []
+      const columns = wantsValues ? await pasteColumns(tx, 'video', members) : new Map()
+      const admin = member.access === 'admin' || member.access === 'superuser'
+      let values = 0
       for (const r of clean) {
         if (r.file) {
           const key = fileNameKey(r.file)
-          if (seen.has(key)) { skipped.push(r.file); continue }
+          if (seen.has(key)) {
+            skipped.push(r.file)
+            // A clip already in the sheet: its empty custom cells are filled, under the row rule (spec 010).
+            const had = existing.find(e => fileNameKey(e.file_name) === key)?.task
+            if (had && r.custom && !had.dropped_at && (admin || had.task_owner_id === member.id || had.assignee_id === member.id)) {
+              values += await writePastedValues(tx, columns, had.id, r.custom, member.id, { onlyEmpty: true })
+            }
+            continue
+          }
           seen.add(key)
         }
         const task = await tx.task.create({
@@ -537,6 +556,7 @@ export async function addClips(
               },
             })
           : null
+        values += await writePastedValues(tx, columns, task.id, r.custom, member.id, { onlyEmpty: false })
         created.push({
           id: task.id, name: task.name,
           clip: {
@@ -548,7 +568,7 @@ export async function addClips(
             : null,
         })
       }
-      return { created, skipped }
+      return { created, skipped, values }
     }, { timeout: 30_000 })
 
     revalidatePath('/board')

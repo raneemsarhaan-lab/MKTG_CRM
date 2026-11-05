@@ -4,14 +4,19 @@
  * Google Sheets copies merged cells as `rowspan`: gridFromHtml expands them,
  * which also carries Theme, Owner, Frequency, Audience and Pillar down to every
  * row they cover. Plain text has blanks instead, so readPlan carries them down
- * itself. Columns are matched by their headings. Pure: the DOMParser is passed
- * in, so the rest runs in Node.
+ * itself. Columns are matched by their headings: the sheet's current names
+ * first (spec 010 FR-050, so a renamed or custom column is found), then the
+ * reference's own headings. Pure: the DOMParser is passed in, so the rest runs
+ * in Node.
  */
 import type { AudienceKey, FrequencyPeriod, StageId, Task, Member, ContentTheme } from '@/types/index'
 import {
   readStatus, readType, readFrequency, readAudience, taskIdFromLink, isWebLink, norm,
 } from '@/lib/content-plan'
 import type { PastedCell } from '@/components/sheet/parse-clips'
+import {
+  headingKey, isCustomKey, readPastedValues, type ParseCode, type PasteTarget, type PasteValueColumn,
+} from '@/lib/sheet-columns'
 
 export type PlanColumn =
   | 'theme' | 'owner' | 'frequency' | 'audience' | 'pillar' | 'title' | 'type' | 'status'
@@ -28,6 +33,19 @@ const HEADINGS: Record<string, PlanColumn> = {
   tasklink: 'task', task: 'task', linkedinlink: 'post', linkedin: 'post', postlink: 'post', post: 'post',
   publishedlink: 'published', published: 'published', publishlink: 'published',
 }
+const PLAN_COLUMNS = new Set<string>(DEFAULT_ORDER)
+
+/** A heading → a plan column, a custom column's key (`c:…`), or null. */
+function headingOf(text: string, targets: PasteTarget[]): string | null {
+  const k = headingKey(text, targets)
+  if (k && (isCustomKey(k) || PLAN_COLUMNS.has(k))) return k
+  return HEADINGS[norm(text)] ?? null
+}
+/** A heading the sheet knows but the paste doesn't read (Assignee, Date…). */
+function knownHeading(text: string, targets: PasteTarget[]): boolean {
+  return !!headingKey(text, targets) || !!HEADINGS[norm(text)]
+}
+
 export const LINK_COLUMNS = ['doc', 'design', 'post', 'published'] as const
 export type LinkColumn = typeof LINK_COLUMNS[number]
 
@@ -67,6 +85,8 @@ export type ProblemCode =
   | { code: 'unknownOwner'; name: string }
   | { code: 'newThemeAdmin'; name: string }
   | { code: 'mayNotAdd'; theme: string }
+  /** A pasted value that doesn't fit its custom column: left empty (spec 010 FR-051). */
+  | { code: 'badValue'; column: string; reason: ParseCode; text: string }
 
 export interface PlanRow {
   /** 1-based, in paste order. */
@@ -84,22 +104,44 @@ export interface PlanRow {
   /** Cell text that wasn't a web address, per link column. */
   badLinks: Partial<Record<LinkColumn, string>>
   taskId: string | null
+  /** Cells under custom columns' headings, by column key (spec 010). */
+  custom: Record<string, PastedCell>
   problems: ProblemCode[]
 }
 
-/** The plan's rows, with columns found by their headings and merged cells carried down. */
-export function readPlan(cells: PastedCell[][]): { rows: PlanRow[]; overflow: number } {
-  const headAt = cells.findIndex(r => r.some(c => HEADINGS[norm(c.text)] === 'title'))
-  const cols: (PlanColumn | null)[] = headAt >= 0
-    ? cells[headAt].map(c => HEADINGS[norm(c.text)] ?? null)
+export interface ReadPlan {
+  rows: PlanRow[]
+  overflow: number
+  /** Pasted headings no column answers to (FR-052), in paste order. */
+  unknown: string[]
+  /** Custom column keys the paste fills. */
+  matched: string[]
+}
+
+/**
+ * The plan's rows, with columns found by their headings and merged cells
+ * carried down. `targets` are the sheet's columns and their current names.
+ */
+export function readPlan(cells: PastedCell[][], targets: PasteTarget[] = []): ReadPlan {
+  const headAt = cells.findIndex(r => r.some(c => headingOf(c.text, targets) === 'title'))
+  const cols: (string | null)[] = headAt >= 0
+    ? cells[headAt].map(c => headingOf(c.text, targets))
     : DEFAULT_ORDER
+  const unknown: string[] = []
+  if (headAt >= 0) {
+    for (const c of cells[headAt]) {
+      const h = c.text.replace(/\s+/g, ' ').trim()
+      if (h && !knownHeading(h, targets) && !unknown.some(u => norm(u) === norm(h))) unknown.push(h)
+    }
+  }
+  const matched = [...new Set(cols.filter((k): k is string => !!k && isCustomKey(k)))]
   const body = headAt >= 0 ? cells.slice(headAt + 1) : cells
   const rows: PlanRow[] = []
   let overflow = 0
   const carry = { theme: '', owner: '', frequency: '', audience: '', pillar: '' }
   for (const raw of body) {
-    const get = (k: PlanColumn): PastedCell | undefined => { const i = cols.indexOf(k); return i >= 0 ? raw[i] : undefined }
-    const text = (k: PlanColumn) => (get(k)?.text ?? '').trim()
+    const get = (k: string): PastedCell | undefined => { const i = cols.indexOf(k); return i >= 0 ? raw[i] : undefined }
+    const text = (k: string) => (get(k)?.text ?? '').trim()
     if (!raw.some(c => c.text || c.href)) continue
     const theme = text('theme')
     if (theme && norm(theme) !== norm(carry.theme)) {
@@ -112,6 +154,8 @@ export function readPlan(cells: PastedCell[][]): { rows: PlanRow[]; overflow: nu
     const title = text('title')
     // Lines with no piece on them (the audience list above the table) are not rows.
     if (!title && !LINK_COLUMNS.some(k => text(k)) && !text('status') && !text('task')) continue
+    const custom: Record<string, PastedCell> = {}
+    for (const k of matched) { const c = get(k); if (c && (c.text || c.href)) custom[k] = c }
     if (rows.length >= MAX_PLAN_ROWS) { overflow++; continue }
     const links = {} as Record<LinkColumn, string | null>
     const badLinks: Partial<Record<LinkColumn, string>> = {}
@@ -134,10 +178,10 @@ export function readPlan(cells: PastedCell[][]): { rows: PlanRow[]; overflow: nu
       theme: carry.theme, owner: carry.owner,
       frequency: readFrequency(carry.frequency), audience: readAudience(carry.audience),
       pillar: carry.pillar, title, type: readType(text('type')), status, statusText,
-      links, badLinks, taskId: taskIdFromLink(taskCell?.href ?? taskCell?.text), problems,
+      links, badLinks, taskId: taskIdFromLink(taskCell?.href ?? taskCell?.text), custom, problems,
     })
   }
-  return { rows, overflow }
+  return { rows, overflow, unknown, matched }
 }
 
 export interface PlanContext {
@@ -145,6 +189,8 @@ export interface PlanContext {
   themes: ContentTheme[]
   members: Pick<Member, 'id' | 'name'>[]
   me: Pick<Member, 'id' | 'access'>
+  /** The sheet's custom columns, to check pasted values (spec 010). */
+  columns?: PasteValueColumn[]
 }
 export type Classified = PlanRow & {
   kind: 'fresh' | 'linked' | 'existing' | 'problem'
@@ -152,11 +198,13 @@ export type Classified = PlanRow & {
   /** A matched task that sits in another theme (spec edge case). */
   otherTheme: string | null
   ownerId: string | null
+  /** Custom values that fit, by column id. */
+  values: Record<string, string>
 }
 
 /** Problems that don't stop a row: the cell is left empty, or the paster owns it. */
 export function isWarning(p: ProblemCode): boolean {
-  return p.code === 'unknownOwner' || p.code === 'badLink'
+  return p.code === 'unknownOwner' || p.code === 'badLink' || p.code === 'badValue'
 }
 
 /** Whether a member may add pieces to a theme (research R7). */
@@ -185,6 +233,8 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
   const admin = ctx.me.access === 'admin' || ctx.me.access === 'superuser'
   return rows.map(r => {
     const problems = [...r.problems]
+    const { values, bad } = readPastedValues(r.custom, ctx.columns ?? [])
+    for (const b of bad) problems.push({ code: 'badValue', column: b.column, reason: b.code, text: b.text })
     const theme = themeByName.get(norm(r.theme))
     const themeIsNew = !theme
     const ownerId = memberByName(r.owner, ctx.members)
@@ -214,6 +264,6 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
     // link is left empty: notes, not blockers. Nothing else is added unfixed.
     const blocking = problems.filter(p => !isWarning(p))
     if (blocking.length && kind !== 'existing') kind = 'problem'
-    return { ...r, problems, kind, themeIsNew, otherTheme, ownerId }
+    return { ...r, problems, kind, themeIsNew, otherTheme, ownerId, values }
   })
 }

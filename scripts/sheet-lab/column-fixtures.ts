@@ -4,6 +4,7 @@
  * with values on a few rows. Without the flag the sheets start bare.
  */
 import type { SheetColumnRecord, SheetValues } from '@/types/index'
+import { referenceText } from './content-fixtures'
 
 const POST1 = 'f51f43c9-069d-46af-95c0-04cba2f72efa'
 const POST2 = '3be798dc-ba7a-4742-a1df-d48722c2b039'
@@ -53,4 +54,32 @@ export function columnFixtures(): { records: SheetColumnRecord[]; values: SheetV
       music: { c09: '1' },
     },
   }
+}
+
+/**
+ * The reference plan (18 pieces) with three custom columns added on the
+ * right: Hook (text), Words (number), Go-live (date), so 54 values (SC-006).
+ * `bad` makes row 1's Words "many"; `notes` adds a Notes column no sheet has.
+ */
+export function customPlanText(o: { bad?: boolean; notes?: boolean } = {}): string {
+  return referenceText().split('\n').map((line, i) => {
+    const extra = i === 0
+      ? ['Hook', 'Words', 'Go-live', ...(o.notes ? ['Notes'] : [])]
+      : [`Hook ${i}`, o.bad && i === 1 ? 'many' : String(100 + i), `${String(i).padStart(2, '0')}/12/2026`, ...(o.notes ? [`Note ${i}`] : [])]
+    return [line, ...extra].join('\t')
+  }).join('\n')
+}
+
+/**
+ * Clips with a heading row and the Video sheet's Hook and Music cleared
+ * columns, plus Notes. Three new clips; `existing` adds one already in v1.
+ * `bad` makes the second clip's Music cleared "maybe".
+ */
+export function customClipText(o: { bad?: boolean; existing?: string } = {}): string {
+  const rows = [['File Name', 'Suggested Title', 'Hook', 'Music cleared', 'Notes']]
+  for (let i = 1; i <= 3; i++) {
+    rows.push([`4${i}_IMG_0300_0m0${i}.0s-0m1${i}.0s.mp4`, `Pasted clip ${i}`, `Clip hook ${i}`, o.bad && i === 2 ? 'maybe' : 'yes', `note ${i}`])
+  }
+  if (o.existing) rows.push([o.existing, 'Already here', 'Hook for an existing clip', 'yes', ''])
+  return rows.map(r => r.join('\t')).join('\n')
 }

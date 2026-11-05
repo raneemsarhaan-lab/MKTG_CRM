@@ -517,6 +517,7 @@ export function VideoSheet(p: VideoSheetProps) {
           videoName={pasteVideo.name}
           existingFileNames={existingNames}
           initialCells={paste.cells}
+          columns={{ targets: cl.pasteNames, values: cl.pasteColumns, addColumn: cl.addTextColumn }}
           onAdd={rowsIn => p.api.addClips(paste.videoId, rowsIn)}
           onClose={msg => {
             setPaste(null)

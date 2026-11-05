@@ -1509,6 +1509,11 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-col-prow label { flex: 1; min-width: 0; display: grid; cursor: pointer; }
 .fx-col-prow .fx-col-who { font-size: 11px; color: var(--sheet-muted); }
 
+/* spec 010: paste previews' Not imported list */
+.fx-col-unknown { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fx-col-unknown li { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 10px; border: 1px dashed var(--line); border-radius: 999px; font-size: 12px; }
+.fx-col-unknown .fx-sheet-btn { padding: 2px 8px; font-size: 11.5px; }
+
 /* ─── end video sheet ───────────────────────────────────────────────────────── */
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */

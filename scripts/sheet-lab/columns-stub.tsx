@@ -45,6 +45,7 @@ export function useLabColumns(opts: {
   const record = (fn: string, ...args: unknown[]) => lab.calls.push({ fn, args, at: performance.now() })
   const failed = (fn: string) => { const e = lab.failNext[fn]; if (e) { delete lab.failNext[fn]; return e } return null }
   const cur = () => window.__cols.records
+  pasteWriter = { setValues, members: opts.members }
 
   const others = (sheet: SheetId, except?: string) => {
     const keys = new Set([...BUILT_INS[sheet].map(b => b.key), ...cur().filter(r => r.sheet === sheet).map(r => r.key)])
@@ -175,3 +176,26 @@ export function useLabColumns(opts: {
   return { bundle: { records, values, api }, types }
 }
 const deleted = new Map<string, SheetColumnRecord>()
+
+let pasteWriter: { setValues(fn: (v: SheetValues) => SheetValues): void; members: Member[] } | null = null
+/**
+ * What addPlan / addClips do with a row's `custom` (src/lib/sheet-values.ts):
+ * each value parsed again by its column; `onlyEmpty` keeps cells that hold one.
+ */
+export function labWritePasted(taskId: string, custom: Record<string, string> | undefined, onlyEmpty: boolean): number {
+  if (!custom || !pasteWriter) return 0
+  const w = pasteWriter
+  let n = 0
+  const next: SheetValues = { ...window.__cols.values }
+  for (const [id, raw] of Object.entries(custom)) {
+    const col = window.__cols.records.find(r => r.id === id && r.kind)
+    if (!col || (onlyEmpty && next[id]?.[taskId])) continue
+    const p = parseValue(col.kind!, raw, { members: w.members, options: col.options })
+    if (!p.ok || !p.value) continue
+    next[id] = { ...(next[id] ?? {}), [taskId]: p.value }
+    n++
+  }
+  // Several rows in one tick: later calls read what this one wrote.
+  if (n) { window.__cols.values = next; w.setValues(() => next) }
+  return n
+}

@@ -528,7 +528,14 @@
         "addAsColumn": "Add as a column",
         "willAdd": "Will add “{name}” as a Text column",
         "values": "{n, plural, one {# value} other {# values}}",
-        "problem": "{column}: {reason}"
+        "problem": "{column}: {reason}",
+        "fills": "Fills your columns: {names}",
+        "fillExisting": "{n, plural, one {Fills the empty cells of # piece already in the sheet} other {Fills the empty cells of # pieces already in the sheet}}",
+        "fill": "{n, plural, one {Fill # value} other {Fill # values}}",
+        "filled": "{n, plural, one {# value filled} other {# values filled}}",
+        "badSection": "Values that don’t fit their column · left empty",
+        "fillExistingClips": "{n, plural, one {Fills the empty cells of # clip already in the sheet} other {Fills the empty cells of # clips already in the sheet}}",
+        "problemHead": "Problem"
       }
     }
   },

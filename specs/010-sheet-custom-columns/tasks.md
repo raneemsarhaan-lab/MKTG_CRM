@@ -40,7 +40,7 @@ description: "Task list for Sheet Columns You Can Shape"
   - the paste preview's Not imported list.
 
   Publish it as an artifact, then commit it.
-- [ ] T002 [P] Lab fixtures in `scripts/sheet-lab/column-fixtures.ts`:
+- [X] T002 [P] Lab fixtures in `scripts/sheet-lab/column-fixtures.ts`:
   - column records for both sheets: a renamed built-in, a moved built-in, a hidden built-in, and custom Text, Number, Date, Link, Person, Choice and Checkbox columns;
   - values on several pieces and clips;
   - a deleted custom column;
@@ -50,29 +50,29 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 In `prisma/schema.prisma`, add `SheetColumn` and `SheetValue` with their relations (data-model §1): `Member` updated_by and created_by, `Task` values. Run `npx prisma generate` and `bash scripts/migrate.sh`.
-- [ ] T004 [P] In `src/types/index.ts`, add `SheetId`, `ColumnKind`, `ChoiceOption`, `SheetColumnRecord` and `SheetValues`. In `src/lib/mappers.ts`, add `mapSheetColumn`.
-- [ ] T005 [P] `CHOICE_COLORS` in `src/lib/tokens.ts`: 10 colours, each with white text at AA contrast or better.
-- [ ] T006 [P] The `sheet.columns.*` strings in `messages/en.json` and `messages/ar.json`:
+- [X] T003 In `prisma/schema.prisma`, add `SheetColumn` and `SheetValue` with their relations (data-model §1): `Member` updated_by and created_by, `Task` values. Run `npx prisma generate` and `bash scripts/migrate.sh`.
+- [X] T004 [P] In `src/types/index.ts`, add `SheetId`, `ColumnKind`, `ChoiceOption`, `SheetColumnRecord` and `SheetValues`. In `src/lib/mappers.ts`, add `mapSheetColumn`.
+- [X] T005 [P] `CHOICE_COLORS` in `src/lib/tokens.ts`: 10 colours, each with white text at AA contrast or better.
+- [X] T006 [P] The `sheet.columns.*` strings in `messages/en.json` and `messages/ar.json`:
   - header menu, Columns panel, column editor, kinds and their one-line descriptions;
   - cell notes, the delete confirmation and Undo;
   - paste problems and Not imported;
   - errors (`name_taken`, `limit`…), "Changed by {name}, {when}".
-- [ ] T007 The Lib (data-model §3, research R3, R4, R12): `applyLayout`, `parseValue`, `formatValue`, `checkName`, `headingKey`, `nextChoiceColor`, plus `BUILT_IN_COLUMNS` for both sheets (keys, default widths, default sets).
-- [ ] T008 Actions per contracts/server.md:
+- [X] T007 The Lib (data-model §3, research R3, R4, R12): `applyLayout`, `parseValue`, `formatValue`, `checkName`, `headingKey`, `nextChoiceColor`, plus `BUILT_IN_COLUMNS` for both sheets (keys, default widths, default sets).
+- [X] T008 Actions per contracts/server.md:
   - the advisory lock per sheet;
   - writing built-in records on the first layout change;
   - `updated_by` on every change;
   - the row rule for values.
-- [ ] T009 Loader and host:
+- [X] T009 Loader and host:
   - `src/app/(app)/board/page.tsx` loads columns (with updater names) and values;
   - Board passes `sheetColumns` and `sheetValues`, split by sheet, plus a `ColumnsApi` (optimistic, rolled back on failure) to Video and Content.
-- [ ] T010 Apply the layout in both sheets:
+- [X] T010 Apply the layout in both sheets:
   - Video `cols` = `applyLayout(...)` for the current set, with names and widths;
   - Content the same with set `all`.
 
   Check: no records gives exactly today's columns. The existing 111 lab checks pass unchanged.
-- [ ] T011 Lab Node checks in `scripts/sheet-lab/pure.mjs`:
+- [X] T011 Lab Node checks in `scripts/sheet-lab/pure.mjs`:
   - `cols-layout` (defaults, positions, new built-in inserted, deleted hidden, Title first, Video sets);
   - `cols-parse` (every kind, both date forms, links, persons, choices);
   - `cols-names`, `cols-headings`;
@@ -85,12 +85,12 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 3: User Story 1: rename any column (P1) 🎯 MVP
 
-- [ ] T012 [US1] In the Grid core:
+- [X] T012 [US1] In the Grid core:
   - the header ▾ button (`data-col-menu`), shown on hover and focus;
   - `Alt+↓` from a cell opens its column's menu;
   - a `headerMenu(col, anchor)` model hook.
-- [ ] T013 [US1] `src/components/sheet/ColumnMenu.tsx` builds the header-menu items (contracts §3). Rename opens an inline name popover (`SheetPopover`) with `checkName` errors. Reset name is shown for renamed built-ins. Wire both sheets.
-- [ ] T014 [US1] Lab scenarios `col-1-*`:
+- [X] T013 [US1] `src/components/sheet/ColumnMenu.tsx` builds the header-menu items (contracts §3). Rename opens an inline name popover (`SheetPopover`) with `checkName` errors. Reset name is shown for renamed built-ins. Wire both sheets.
+- [X] T014 [US1] Lab scenarios `col-1-*`:
   - rename Status;
   - other members see it (stub reload);
   - built-in behaviour is unchanged;
@@ -101,18 +101,18 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 4: User Story 2: add a column of your own (P1)
 
-- [ ] T015 [US2] `src/components/sheet/ColumnEditor.tsx`:
+- [X] T015 [US2] `src/components/sheet/ColumnEditor.tsx`:
   - name and kind (radio group with icons);
   - Choice options (name, swatch, order, remove, + Option);
   - add, or insert before or after a column (from the header menu).
-- [ ] T016 [US2] `src/components/sheet/CustomCell.tsx`: render each kind (contracts §6), and the host-side edit for Link (`LinkPrompt`), Person (person menu), Choice (pill menu, Clear) and Checkbox (toggle). Text, Number and Date go through the grid's own text editing. Refused values leave a cell note.
-- [ ] T017 [US2] Wire custom cells into the Video and Content models:
+- [X] T016 [US2] `src/components/sheet/CustomCell.tsx`: render each kind (contracts §6), and the host-side edit for Link (`LinkPrompt`), Person (person menu), Choice (pill menu, Clear) and Checkbox (toggle). Text, Number and Date go through the grid's own text editing. Refused values leave a cell note.
+- [X] T017 [US2] Wire custom cells into the Video and Content models:
   - `isText`, `textValue`, `isMenu`, `onCommit`, `onOpen`, `onActivate` (checkbox), `onDelete` (clear);
   - read-only rules;
   - no custom cells on theme and pillar rows.
 
   Wire **+ Column** in both toolbars.
-- [ ] T018 [US2] Lab scenarios `col-2-*`:
+- [X] T018 [US2] Lab scenarios `col-2-*`:
   - add Text and Choice, fill them, values persist;
   - Number, Date and Link refuse bad values;
   - Person and Checkbox;
@@ -124,9 +124,9 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 5: User Story 3: rearrange columns (P1)
 
-- [ ] T019 [US3] In the Grid core: draggable headings (not Title), a drop indicator, and `onReorder(col, beforeCol)`. Right to left mirrored. No drag on touch.
-- [ ] T020 [US3] Move left and Move right in the header menu. `src/components/sheet/ColumnsPanel.tsx` lists columns in order with Move up and Move down, shown ticks, the "Changed by" description (FR-004) and + Column. Add a **Columns** button in both toolbars.
-- [ ] T021 [US3] Lab scenarios `col-3-*`:
+- [X] T019 [US3] In the Grid core: draggable headings (not Title), a drop indicator, and `onReorder(col, beforeCol)`. Right to left mirrored. No drag on touch.
+- [X] T020 [US3] Move left and Move right in the header menu. `src/components/sheet/ColumnsPanel.tsx` lists columns in order with Move up and Move down, shown ticks, the "Changed by" description (FR-004) and + Column. Add a **Columns** button in both toolbars.
+- [X] T021 [US3] Lab scenarios `col-3-*`:
   - drag Assignee after Title;
   - keyboard moves through the panel;
   - Title can't be passed;
@@ -137,9 +137,9 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 6: User Story 4: hide, show and delete (P2)
 
-- [ ] T022 [US4] Hide from the header menu, and show from the Columns panel. On Video, the change applies to the current set (`setColumnShown`).
-- [ ] T023 [US4] Delete a custom column: a confirmation with the count of values, a soft delete, and an Undo toast for 10 s (`restoreColumn`). Built-in columns offer no Delete.
-- [ ] T024 [US4] Lab scenarios `col-4-*` and `vcol-4-*`:
+- [X] T022 [US4] Hide from the header menu, and show from the Columns panel. On Video, the change applies to the current set (`setColumnShown`).
+- [X] T023 [US4] Delete a custom column: a confirmation with the count of values, a soft delete, and an Undo toast for 10 s (`restoreColumn`). Built-in columns offer no Delete.
+- [X] T024 [US4] Lab scenarios `col-4-*` and `vcol-4-*`:
   - hide Pillar for everyone;
   - show it again;
   - hide Source in Editing only;
@@ -151,30 +151,34 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 7: User Story 5: change a custom column's settings (P2)
 
-- [ ] T025 [US5] Edit column in `ColumnEditor`:
+- [X] T025 [US5] Edit column in `ColumnEditor`:
   - options: add, rename, recolour, reorder;
   - removing an option in use asks for a replacement or Clear (`replace`);
   - a kind change previews the values that won't fit, then confirms;
   - `updateColumn` converts the values in a transaction.
-- [ ] T026 [US5] Lab scenarios `col-5-*`.
+- [X] T026 [US5] Lab scenarios `col-5-*`.
 
 ---
 
 ## Phase 8: User Story 6: resize columns (P3)
 
-- [ ] T027 [US6] In the Grid core: a resize handle with pointer drag (clamped 60–600), double-click fit (`fitWidth`), and `onResize` → `resizeColumn`. Mirrored in right to left.
-- [ ] T028 [US6] Lab scenarios `col-6-*`.
+- [X] T027 [US6] In the Grid core: a resize handle with pointer drag (clamped 60–600), double-click fit (`fitWidth`), and `onResize` → `resizeColumn`. Mirrored in right to left.
+- [X] T028 [US6] Lab scenarios `col-6-*`.
 
 ---
 
+> **As built (T013, T016, T020):** the header menu items, custom cells and the Columns panel live in one hook, `src/components/sheet/useSheetColumns.tsx`, not in `ColumnMenu.tsx`, `CustomCell.tsx` and `ColumnsPanel.tsx`. Both sheets need the same popups and state, and one hook keeps them in step.
+>
+> **Added at the user's request (after the plan):** type-ahead for the Type cell and Choice cells (`src/components/sheet/SheetCombo.tsx`). Type to filter, then pick with ↑↓ and Enter. When nothing matches, the list offers to add the value: anyone may add a Choice option, but only admins may add a content type (`addContentType`, which starts with Post's deadlines). Lab scenarios: `col-type-ahead`, `col-type-user`.
+
 ## Phase 9: User Story 7: paste into custom columns (P3)
 
-- [ ] T029 [US7] Content:
+- [X] T029 [US7] Content:
   - `parse-plan.ts` matches headings by current names through `headingKey`, and reads custom values;
   - `PlanPreview.tsx` lists bad values as problems, and Not imported headings with "Add as a column";
   - `addPlan` takes `custom` per row and writes values in its transaction.
-- [ ] T030 [US7] Video: the same in `parse-clips.ts`, `PastePreview.tsx` and `addClips`.
-- [ ] T031 [US7] Lab scenarios `col-7-*` and `vcol-7-*`: 18 rows with 3 custom columns (54 values, SC-006); a bad value; Not imported → Add as a column.
+- [X] T030 [US7] Video: the same in `parse-clips.ts`, `PastePreview.tsx` and `addClips`.
+- [X] T031 [US7] Lab scenarios `col-7-*` and `vcol-7-*`: 18 rows with 3 custom columns (54 values, SC-006); a bad value; Not imported → Add as a column.
 
 ---
 

@@ -221,6 +221,12 @@ The team copies its Google Sheet, now with a "Hook" column, and uses **Paste pla
 - **FR-050**: Paste plan (Content) and Paste clips (Video) MUST match pasted headings to columns by current name, ignoring case and extra spaces, as well as by the existing built-in heading names.
 - **FR-051**: Pasted values for custom columns MUST be checked as in FR-023. Problems MUST be listed in the preview, and never stored.
 - **FR-052**: A pasted heading that matches no column MUST be listed as not imported, with an option to add it as a Text column before adding the rows.
+- **FR-053**: A row already in the sheet MUST NOT have its existing values overwritten by a paste. Only its empty cells are filled, and only under the row rule (FR-022).
+
+**Type-ahead** *(added at the user's request after planning)*
+
+- **FR-055**: Typing on a Type cell or a Choice cell MUST open a list that filters as you type. ↑ and ↓ move through it, Enter picks, and Esc closes.
+- **FR-056**: When nothing matches what was typed, the list MUST offer to add it. Anyone may add a Choice option. Only admins may add a content type, and a new type starts with Post's deadlines for every stage (constitution §II).
 
 **Language, accessibility and design**
 

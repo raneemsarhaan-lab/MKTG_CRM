@@ -17,6 +17,21 @@ async function headMenu(t, key) {
 }
 const pick = (t, item) => t.page.locator(`[data-sheet-menu] [data-menu-item="${item}"]`).click()
 const valueOf = async (t, id, task) => (await cols(t)).values[id]?.[task]
+async function openPlan(t, opts) {
+  await t.page.locator('[data-paste-plan]').click()
+  await t.page.waitForSelector('[data-plan-preview] textarea')
+  const text = await t.page.evaluate(o => window.__sheet.customPlanText(o), opts)
+  await t.page.locator('[data-plan-preview] textarea').fill(text)
+  await t.page.waitForSelector('[data-plan-counts]')
+}
+const planCounts = t => t.page.locator('[data-plan-counts]').innerText().then(s => s.trim())
+async function openClips(t, opts) {
+  await t.page.locator('[data-paste-clips]').click()
+  await t.page.waitForSelector('[data-paste-preview] textarea')
+  const text = await t.page.evaluate(o => window.__sheet.customClipText(o), opts)
+  await t.page.locator('[data-paste-preview] textarea').fill(text)
+  await t.page.waitForSelector('[data-paste-counts]')
+}
 
 export const columns = [
   // ── US1: rename ──────────────────────────────────────────────────────────
@@ -368,6 +383,124 @@ export const columns = [
       await t.page.keyboard.type('p')
       await t.page.waitForSelector('[data-sheet-combo]')
       t.eq(await t.axe('[data-sheet-combo]'), [], 'type-ahead')
+    },
+  },
+
+  // ── US7: paste into custom columns ───────────────────────────────────────
+  {
+    id: 'col-7-plan-54', hash: C,
+    async run(t) {
+      await openPlan(t, { notes: false })
+      // The two Decision Making rows have no status: give them one, so all 18 go.
+      for (const sel of await t.page.locator('[data-plan-problems] select').all()) await sel.selectOption('To Do')
+      await t.idle(100)
+      t.assert((await planCounts(t)).includes('54 values'), `54 values in the preview: ${await planCounts(t)}`)
+      t.eq(await t.page.locator('[data-plan-matched]').innerText(), 'Fills your columns: Hook, Words, Go-live', 'matched by current name (FR-050)')
+      await t.page.locator('[data-use-sheet]').check()
+      await t.page.locator('[data-plan-add]').click()
+      await t.page.waitForSelector('[data-plan-preview]', { state: 'detached' })
+      await t.idle(200)
+      t.assert((await t.toast()).includes('54 values filled'), await t.toast())
+      const titles = await t.page.evaluate(() => window.__sheet.referenceText().split('\n').slice(1).map(l => l.split('\t')[5]))
+      const tasks = await t.tasks()
+      const v = (await cols(t)).values
+      const wrong = titles.map((title, i) => {
+        const task = tasks.find(x => x.name === title && x.project_id)
+        const got = task && [v.hook?.[task.id], v.words?.[task.id], v.golive?.[task.id]]
+        const want = [`Hook ${i + 1}`, String(101 + i), `2026-12-${String(i + 1).padStart(2, '0')}`]
+        return JSON.stringify(got) === JSON.stringify(want) ? null : `${title}: ${JSON.stringify(got)}`
+      }).filter(Boolean)
+      t.eq(wrong, [], 'all 18 pieces got their three values (SC-006)')
+    },
+  },
+  {
+    id: 'col-7-fill-empty', hash: C,
+    async run(t) {
+      await openPlan(t, { notes: false })
+      await t.page.locator('[data-plan-add]').click()
+      await t.page.waitForSelector('[data-plan-preview]', { state: 'detached' })
+      await t.idle(200)
+      t.eq(await valueOf(t, 'hook', POST1), 'AI is a strategy question, not a tooling one', 'a matched piece keeps the value it had')
+      t.eq(await valueOf(t, 'golive', POST2), '2026-12-04', 'and gets the ones it lacked')
+      // Pasting again: every piece is in the sheet now, and its cells are full.
+      await openPlan(t, { notes: false })
+      t.assert((await t.page.locator('[data-plan-filling]').count()) > 0, 'pieces already in the sheet are offered to fill their empty cells')
+    },
+  },
+  {
+    id: 'col-7-bad', hash: C,
+    async run(t) {
+      await openPlan(t, { bad: true })
+      const bad = await t.page.locator('[data-plan-bad-values]').innerText()
+      t.assert(bad.includes('AI Pillar Article') && bad.includes('Words: Not a number: “many”'), `listed with its column (FR-051): ${bad}`)
+      await t.page.locator('[data-plan-add]').click()
+      await t.page.waitForSelector('[data-plan-preview]', { state: 'detached' })
+      await t.idle(200)
+      const task = (await t.tasks()).find(x => x.name === 'AI Pillar Article')
+      t.eq([await valueOf(t, 'words', task.id), await valueOf(t, 'hook', task.id)], [undefined, 'Hook 1'], 'never stored; the row’s other values are')
+    },
+  },
+  {
+    id: 'col-7-not-imported', hash: C,
+    async run(t) {
+      await openPlan(t, { notes: true })
+      t.eq(await t.page.locator('[data-not-imported] li span').allInnerTexts(), ['Notes'], 'Notes is not imported (FR-052)')
+      await t.page.locator('[data-add-as-column="Notes"]').click()
+      await t.page.waitForSelector('[data-not-imported]', { state: 'detached' })
+      const add = (await calls(t, 'col.add'))[0]
+      t.eq([add[0], add[1].name, add[1].kind], ['content', 'Notes', 'text'], 'added as a Text column')
+      t.assert((await t.page.locator('[data-plan-matched]').innerText()).includes('Notes'), 'and the paste now fills it')
+      await t.page.locator('[data-plan-add]').click()
+      await t.page.waitForSelector('[data-plan-preview]', { state: 'detached' })
+      await t.idle(200)
+      const notes = (await cols(t)).records.find(r => r.sheet === 'content' && r.name === 'Notes')
+      const task = (await t.tasks()).find(x => x.name === 'AI Pillar Article')
+      t.eq(await valueOf(t, notes.id, task.id), 'Note 1', 'filled')
+    },
+  },
+  {
+    id: 'vcol-7-clips', hash: 'cols=1',
+    async run(t) {
+      const before = await t.tasks()
+      const had = before.find(x => x.clip?.file_name?.startsWith('05_'))
+      await openClips(t, { existing: had.clip.file_name })
+      t.eq((await t.page.locator('[data-paste-counts]').innerText()).trim(), '3 new · 1 already in the sheet · 0 without a clip file name · 8 values', 'the heading row is not a clip')
+      t.eq(await t.page.locator('[data-paste-matched]').innerText(), 'Fills your columns: Hook, Music cleared', 'matched by current name')
+      const titles = await t.page.locator('[data-paste-new] tbody td:nth-child(2)').allInnerTexts()
+      t.eq(titles, ['Pasted clip 1', 'Pasted clip 2', 'Pasted clip 3'], 'the hook is not taken for the title')
+      await t.page.locator('[data-add]').click()
+      await t.page.waitForSelector('[data-paste-preview]', { state: 'detached' })
+      await t.idle(200)
+      t.assert((await t.toast()).includes('3 clips added · 8 values filled'), await t.toast())
+      const added = (await t.tasks()).filter(x => /^Pasted clip/.test(x.name))
+      const v = (await cols(t)).values
+      t.eq(added.map(x => [x.name, v.vhook?.[x.id], v.music?.[x.id]]).sort(), [1, 2, 3].map(i => [`Pasted clip ${i}`, `Clip hook ${i}`, '1']), 'each clip got its values')
+      t.eq([v.vhook?.[had.id], v.music?.[had.id]], ['Hook for an existing clip', '1'], 'a clip already there gets its empty cells filled')
+    },
+  },
+  {
+    id: 'vcol-7-bad-notes', hash: 'cols=1',
+    async run(t) {
+      await openClips(t, { bad: true })
+      const bad = await t.page.locator('[data-paste-bad-values]').innerText()
+      t.assert(bad.includes('Pasted clip 2') && bad.includes('Music cleared: Use yes or no: “maybe”'), bad)
+      await t.page.locator('[data-add-as-column="Notes"]').click()
+      await t.page.waitForSelector('[data-not-imported]', { state: 'detached' })
+      const add = (await calls(t, 'col.add'))[0]
+      t.eq([add[0], add[1].name, add[1].kind], ['video', 'Notes', 'text'], 'Notes added as a Text column')
+      await t.page.locator('[data-add]').click()
+      await t.page.waitForSelector('[data-paste-preview]', { state: 'detached' })
+      await t.idle(200)
+      const c2 = (await t.tasks()).find(x => x.name === 'Pasted clip 2')
+      const notes = (await cols(t)).records.find(r => r.sheet === 'video' && r.name === 'Notes')
+      t.eq([await valueOf(t, 'music', c2.id), await valueOf(t, 'vhook', c2.id), await valueOf(t, notes.id, c2.id)], [undefined, 'Clip hook 2', 'note 2'], 'the bad value is left empty, the rest filled')
+    },
+  },
+  {
+    id: 'col-7-axe', hash: C,
+    async run(t) {
+      await openPlan(t, { bad: true, notes: true })
+      t.eq(await t.axe('[data-plan-preview]'), [], 'Paste plan with Not imported and bad values')
     },
   },
 ]

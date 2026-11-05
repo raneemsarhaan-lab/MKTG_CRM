@@ -2,8 +2,14 @@
  * Reading rows pasted from a spreadsheet (spec 008 FR-032–FR-034,
  * contracts/paste-format.md). Pure: the HTML reader takes its DOMParser as an
  * argument, so the rest runs in Node.
+ *
+ * Spec 010 (FR-050, FR-052): when the paste starts with a heading row, a
+ * column whose heading matches a custom column's current name fills that
+ * column, and is kept out of the title guess. Headings nothing answers to are
+ * listed as not imported.
  */
 import { parseClipFileName, fileNameKey, FILE_RE } from '@/lib/clip-file-name'
+import { headingKey, isCustomKey, type PasteTarget } from '@/lib/sheet-columns'
 
 export interface PastedCell { text: string; href: string | null }
 
@@ -18,6 +24,8 @@ export interface ParsedClip {
   out_ms: number
   title: string
   link: string | null
+  /** Cells under custom columns' headings, by column key (spec 010). */
+  custom?: Record<string, PastedCell>
 }
 export interface UnmatchedRow {
   /** What was pasted, for the person to recognise the row. */
@@ -25,6 +33,7 @@ export interface UnmatchedRow {
   title: string
   file_name: string
   link: string | null
+  custom?: Record<string, PastedCell>
 }
 export interface PastePreview {
   fresh: ParsedClip[]
@@ -32,6 +41,10 @@ export interface PastePreview {
   unmatched: UnmatchedRow[]
   /** Non-empty rows past MAX_PASTE_ROWS, left out. */
   overflow: number
+  /** Pasted headings no column answers to (spec 010 FR-052). */
+  unknown: string[]
+  /** Custom column keys the paste fills. */
+  matched: string[]
 }
 
 const URL_RE = /^https?:\/\/\S+$/i
@@ -81,18 +94,65 @@ export function readRow(row: PastedCell[]): { clip: ParsedClip } | { unmatched: 
   return { clip: { file_name: fileCell.text, ...p, title: (title || fileCell.text).slice(0, 200), link } }
 }
 
+/** Headings the clip reader understands without a column of the same name. */
+const CLIP_HEADINGS = new Set([
+  'title', 'name', 'clip', 'cliptitle', 'suggestedtitle', 'filename', 'file', 'link', 'drivelink', 'drive', 'url', 'cliplink', 'files',
+])
+const hnorm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, '')
+
+interface Heading { at: number; keys: (string | null)[]; unknown: string[] }
+
+/**
+ * The paste's heading row, if it has one: the first non-empty row, holding no
+ * clip file name, with a custom column's name or two names the sheet knows.
+ */
+export function findHeading(cells: PastedCell[][], targets: PasteTarget[]): Heading | null {
+  if (!targets.length) return null
+  const at = cells.findIndex(r => r.some(c => c.text))
+  if (at < 0) return null
+  const row = cells[at]
+  if (row.some(c => parseClipFileName(c.text))) return null
+  const keys = row.map(c => headingKey(c.text, targets))
+  const known = row.filter((c, i) => c.text && (keys[i] || CLIP_HEADINGS.has(hnorm(c.text)))).length
+  if (!keys.some(k => k && isCustomKey(k)) && known < 2) return null
+  const unknown: string[] = []
+  row.forEach((c, i) => {
+    const h = c.text.replace(/\s+/g, ' ').trim()
+    if (h && !keys[i] && !CLIP_HEADINGS.has(hnorm(h)) && !unknown.some(u => hnorm(u) === hnorm(h))) unknown.push(h)
+  })
+  return { at, keys: keys.map(k => (k && isCustomKey(k) ? k : null)), unknown }
+}
+
 /**
  * Sorts pasted rows into new clips, clips already in the sheet (same file name
  * under this video, ignoring letter case) and rows without a clip file name.
  * A file name repeated within the paste counts as already there.
  */
-export function parseClipRows(cells: PastedCell[][], existingFileNames: Iterable<string>): PastePreview {
+export function parseClipRows(cells: PastedCell[][], existingFileNames: Iterable<string>, targets: PasteTarget[] = []): PastePreview {
   const have = new Set(Array.from(existingFileNames, fileNameKey))
-  const out: PastePreview = { fresh: [], existing: [], unmatched: [], overflow: 0 }
+  const head = findHeading(cells, targets)
+  const out: PastePreview = {
+    fresh: [], existing: [], unmatched: [], overflow: 0,
+    unknown: head?.unknown ?? [], matched: [...new Set((head?.keys ?? []).filter((k): k is string => !!k))],
+  }
   let taken = 0
-  for (const row of cells) {
-    const r = readRow(row)
-    if (!r) continue
+  for (const [i, full] of cells.entries()) {
+    if (head && i <= head.at) continue
+    // Custom columns' cells are values, not title candidates.
+    const custom: Record<string, PastedCell> = {}
+    const row = head
+      ? full.map((c, j) => {
+          const k = head.keys[j]
+          if (!k) return c
+          if (c.text || c.href) custom[k] = c
+          return { text: '', href: null }
+        })
+      : full
+    const read = readRow(row)
+    if (!read) continue
+    const r = Object.keys(custom).length
+      ? ('clip' in read ? { clip: { ...read.clip, custom } } : { unmatched: { ...read.unmatched, custom } })
+      : read
     if (taken >= MAX_PASTE_ROWS) { out.overflow++; continue }
     taken++
     if ('unmatched' in r) { out.unmatched.push(r.unmatched); continue }

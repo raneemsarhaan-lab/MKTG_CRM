@@ -454,7 +454,7 @@ export function KanbanBoard({
         }))
         setTasks(prev => [...added, ...prev])
         router.refresh()
-      }
+      } else if (res.success && 'values' in res && res.values) router.refresh()
       return res
     },
     async addLink(taskId, url) {
