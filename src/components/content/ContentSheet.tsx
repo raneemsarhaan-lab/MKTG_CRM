@@ -11,7 +11,7 @@ import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
 import { SheetMenu, SheetPopover, type MenuItem } from '@/components/sheet/SheetMenu'
 import { statusMenuItems, useStageNames } from '@/components/sheet/StatusCell'
-import { editorMenuItems, typeMenuItems } from '@/components/sheet/EditorCell'
+import { editorMenuItems } from '@/components/sheet/EditorCell'
 import { LinkPrompt } from '@/components/sheet/PublishedCell'
 import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/sheet/parse-clips'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
@@ -23,6 +23,7 @@ import { ThemeEditor, NamePrompt } from './ThemeEditor'
 import { PlanPreview } from './PlanPreview'
 import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
+import { useSheetColumns } from '@/components/sheet/useSheetColumns'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -96,7 +97,7 @@ export function ContentSheet(p: ContentSheetProps) {
   const say = useCallback((text: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
-    toastTimer.current = setTimeout(() => setToast(null), undo ? 5000 : 3000)
+    toastTimer.current = setTimeout(() => setToast(null), undo ? 10000 : 3000)
   }, [])
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const onNote = useCallback((key: string, note: string | null) => {
@@ -104,6 +105,14 @@ export function ContentSheet(p: ContentSheetProps) {
     if (note) setTimeout(() => setNotes(prev => (prev[key] === note ? { ...prev, [key]: undefined } : prev)), 4000)
   }, [])
   const why = (code?: string) => (code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
+
+  // ── shaped columns (spec 010) ───────────────────────────────────────────
+  const cl = useSheetColumns({
+    sheet: 'content', set: 'all', bundle: p.columns, me, members: p.members,
+    defaultName: key => t(`col.${key}` as 'col.title'), canEdit, say, onNote,
+  })
+  const setType = (task: Task, label: string) =>
+    void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
 
   // ── popups ──────────────────────────────────────────────────────────────
   const [popup, setPopup] = useState<Popup | null>(null)
@@ -187,6 +196,7 @@ export function ContentSheet(p: ContentSheetProps) {
     const task = row.task
     const can = canEdit(task)
     const isClip = row.kind === 'clip'
+    if (cl.custom.is(col)) { cl.custom.open(task, col, anchor, row.key); return }
     switch (col) {
       case 'rowNo': {
         const items: MenuItem[] = []
@@ -213,10 +223,7 @@ export function ContentSheet(p: ContentSheetProps) {
         }))
       case 'type':
         if (!can) { onNote(`${row.key}|type`, t('readOnly')); return }
-        return menu(ts('typeFor', { name: task.name }), typeMenuItems(p.contentTypes, task.content_type_label, label => {
-          closePopup(true)
-          void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
-        }))
+        return cl.typeCombo(task, anchor, p.contentTypes, label => setType(task, label))
       case 'pillar': {
         if (isClip) return
         if (!can) { onNote(`${row.key}|pillar`, t('readOnly')); return }
@@ -268,8 +275,10 @@ export function ContentSheet(p: ContentSheetProps) {
       say(t('newPiece.added'))
       return null
     }
-    if (row.kind !== 'piece') return null
+    if (row.kind !== 'piece' && row.kind !== 'clip') return null
     const task = row.task
+    if (cl.custom.is(col)) return cl.custom.commit(task, col, value)
+    if (row.kind !== 'piece') return null
     if (col === 'title') {
       if (!value.trim()) return t('err.generic')
       const r = await p.api.update(task.id, { name: value.trim() })
@@ -314,6 +323,7 @@ export function ContentSheet(p: ContentSheetProps) {
           <button type="button" aria-pressed="true">{ts('view.content')}</button>
         </div>
         <span className="fx-sheet-bar-gap" />
+        {cl.toolbar}
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showArchived} data-show-archived="" onClick={toggleArchived}>{t('showArchived')}</button>
         {admin && (
@@ -359,9 +369,17 @@ export function ContentSheet(p: ContentSheetProps) {
               onAddPiece={addPiece}
               onDelete={(row, anchor) => { if (row.kind === 'piece' && canEdit(row.task)) { if (row.task.dropped_at) void restore(row.task); else setPopup({ kind: 'archive', anchor, task: row.task }) } }}
               onPaste={onPaste}
+              columns={cl}
+              onTypeAhead={(row, ch, anchor) => {
+                if (row.kind !== 'piece' && row.kind !== 'clip') return false
+                if (!canEdit(row.task) || row.task.dropped_at) { onNote(`${row.key}|type`, t('readOnly')); return true }
+                cl.typeCombo(row.task, anchor, p.contentTypes, label => setType(row.task, label), ch)
+                return true
+              }}
             />
           </div>
         )}
+      {cl.layer}
 
       {popup?.kind === 'menu' && <SheetMenu anchor={popup.anchor} label={popup.label} items={popup.items} onClose={closePopup} />}
       {popup?.kind === 'link' && linkTask && (
@@ -420,6 +438,7 @@ export function ContentSheet(p: ContentSheetProps) {
       {paste && (
         <PlanPreview
           ctx={ctx}
+          columns={{ targets: cl.pasteNames, values: cl.pasteColumns, addColumn: cl.addTextColumn }}
           onAdd={(r, o) => p.api.addPlan(r, o)}
           onClose={msg => {
             setPaste(null)

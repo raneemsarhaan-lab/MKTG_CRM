@@ -29,6 +29,8 @@ import { parseClipFileName, fileNameKey } from '@/lib/clip-file-name'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { MEMBERS, makeTasks, sheetsHtml } from './fixtures'
 import { ContentApp, type ContentLab } from './content-entry'
+import { labWritePasted, useLabColumns } from './columns-stub'
+import { columnFixtures, customClipText, customPlanText } from './column-fixtures'
 import { CONTENT_MEMBERS, referenceHtml, referenceText } from './content-fixtures'
 
 const params  = new URLSearchParams(location.hash.slice(1))
@@ -38,6 +40,7 @@ const meId    = params.get('me') ?? 'raneem'
 const video0  = params.get('video') === 'all' ? null : (params.get('video') ?? 'v1')
 const row0    = params.get('row')
 const delay   = Number(params.get('delay') ?? 60)
+export const withCols = params.get('cols') === '1'
 document.documentElement.lang = locale
 document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
 
@@ -71,7 +74,7 @@ const lab: Lab = window.__sheet = {
   setTasks: () => {},
 }
 // The content mode's helpers, for scenarios: the reference rows as Sheets copies them.
-Object.assign(lab, { themes: [], referenceHtml, referenceText })
+Object.assign(lab, { themes: [], referenceHtml, referenceText, customPlanText, customClipText })
 
 function App() {
   const [tasks, setTasksState] = useState<Task[]>(lab.tasks)
@@ -130,11 +133,22 @@ function App() {
       const seen = new Set(lab.tasks.filter(t => t.parent_task_id === vid).map(t => fileNameKey(t.clip?.file_name)).filter(Boolean))
       const created: Task[] = [], skipped: string[] = []
       const now = new Date().toISOString()
+      let values = 0
       for (const r of rows) {
         const file = r.file_name?.trim() || null
-        if (file) { const k = fileNameKey(file); if (seen.has(k)) { skipped.push(file); continue } seen.add(k) }
+        if (file) {
+          const k = fileNameKey(file)
+          if (seen.has(k)) {
+            skipped.push(file)
+            const had = lab.tasks.find(t => t.parent_task_id === vid && fileNameKey(t.clip?.file_name) === k)
+            if (had && !had.dropped_at && canAct(had)) values += labWritePasted(had.id, r.custom, true)
+            continue
+          }
+          seen.add(k)
+        }
         const p = parseClipFileName(file)
         const id = `n${Math.random().toString(36).slice(2, 8)}`
+        values += labWritePasted(id, r.custom, false)
         created.push({
           ...find(vid)!, id, name: r.title, parent_task_id: vid, content_type_label: 'Reel', status: 'todo',
           task_owner_id: me.id, task_owner: me, assignee_id: null, assignee: undefined, created_at: now, updated_at: now,
@@ -144,7 +158,7 @@ function App() {
         })
       }
       setTasks(ts => [...created, ...ts])
-      return { success: true, created: created.map(c => ({ id: c.id })), skipped }
+      return { success: true, created: created.map(c => ({ id: c.id })), skipped, values }
     },
     async addLink(taskId, url) {
       record('addLink', taskId, url)
@@ -188,12 +202,17 @@ function App() {
     },
   }
 
+  const cols = useLabColumns({
+    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : { records: [], values: {} },
+    types: ['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l })),
+  })
   return (
     <VideoSheet
       tasks={tasks}
       me={me}
       members={MEMBERS}
-      contentTypes={['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l }))}
+      contentTypes={cols.types}
+      columns={cols.bundle}
       hasStorage={storage}
       videoId={videoId}
       highlightId={rowId}

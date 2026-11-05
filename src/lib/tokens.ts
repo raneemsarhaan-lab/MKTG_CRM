@@ -183,6 +183,11 @@ export const CONTENT_TYPE_COLORS: Record<string, string> = {
   'Email':           '#0369A1',
   'Other':           '#52525B',
 }
+/** A Choice column's option colours (spec 010), each with white text at AA or better. */
+export const CHOICE_COLORS = [
+  '#1D4ED8', '#BE185D', '#7E22CE', '#0F766E', '#B45309',
+  '#4338CA', '#C2410C', '#334155', '#A21CAF', '#0369A1',
+] as const
 export function contentTypeColor(label: string | null | undefined): string {
   if (!label) return CONTENT_TYPE_COLORS.Other
   if (CONTENT_TYPE_COLORS[label]) return CONTENT_TYPE_COLORS[label]

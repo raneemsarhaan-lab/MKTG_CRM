@@ -15,6 +15,7 @@ import { EditorContent } from './EditorCell'
 import { FilesContent, type FilesCellState } from './FilesCell'
 import { PublishedContent } from './PublishedCell'
 import { GridCore, type GridModel, type GridCol, type ActiveCell } from './GridCore'
+import type { SheetColumnsHook } from './useSheetColumns'
 
 export type { GridCol, ActiveCell }
 
@@ -23,7 +24,8 @@ const TEXT_COLS: GridCol[] = ['title', 'clipNo', 'source', 'fileName', 'in', 'ou
 
 export interface SheetGridProps {
   rows: SheetRow[]
-  cols: SheetColumn[]
+  /** The shaped layout (spec 010): columns, widths, names, custom cells. */
+  columns: SheetColumnsHook
   me: Member
   members: Member[]
   label: string
@@ -49,6 +51,8 @@ export interface SheetGridProps {
   onRetry(taskId: string): void
   onLinkInstead(taskId: string, anchor: HTMLElement): void
   onNote(cellKey: string, note: string | null): void
+  /** A letter typed on the Type cell: its type-ahead (spec 010). */
+  onTypeAhead(row: SheetRow, ch: string, anchor: HTMLElement): boolean
 }
 
 export function SheetGrid(p: SheetGridProps) {
@@ -56,8 +60,11 @@ export function SheetGrid(p: SheetGridProps) {
   const membersById = new Map(p.members.map(m => [m.id, m]))
   const rowTask = (row: SheetRow): Task | null => (row.kind === 'clip' || row.kind === 'video' ? row.task : null)
 
+  const cl = p.columns
+  const isCustom = (col: GridCol) => cl.custom.is(col)
   const isText = (row: SheetRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
+    if (isCustom(col)) return (row.kind === 'clip' || row.kind === 'video') && cl.custom.isText(row.task, col)
     if (row.kind === 'video') return col === 'title' && p.canEdit(row.task)
     if (row.kind !== 'clip' || row.task.dropped_at) return false
     return TEXT_COLS.includes(col) && p.canEdit(row.task)
@@ -65,21 +72,31 @@ export function SheetGrid(p: SheetGridProps) {
   const isMenu = (row: SheetRow, col: GridCol) => {
     if (row.kind === 'add' || row.kind === 'draft') return false
     if (col === 'rowNo') return true
+    if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'video') return ['status', 'editor', 'type', 'files'].includes(col)
     return ['status', 'editor', 'type', 'files', 'published', 'drop'].includes(col)
   }
 
   const model: GridModel<SheetRow> = {
     rows: p.rows,
-    cols: p.cols,
-    widths: COLUMN_WIDTHS,
+    cols: cl.cols,
+    widths: { ...COLUMN_WIDTHS, ...cl.widths },
     rowNoWidth: ROW_NO_WIDTH,
     label: p.label,
-    header: col => ({
-      text: col === 'drop' ? '' : t(`col.${col as SheetColumn}`),
-      label: col === 'drop' ? t('col.drop') : undefined,
-      sort: col === 'clipNo' ? 'ascending' : undefined,
-    }),
+    header: col => {
+      const named = cl.laid.find(c => c.key === col)?.name
+      return {
+        text: col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`))),
+        label: col === 'drop' && !named ? t('col.drop') : undefined,
+        sort: col === 'clipNo' ? 'ascending' : undefined,
+      }
+    },
+    ...cl.grid,
+    onTypeAhead: (row, col, ch, anchor) => {
+      if (row.kind !== 'clip' && row.kind !== 'video') return false
+      if (col === 'type') return p.onTypeAhead(row, ch, anchor)
+      return isCustom(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
+    },
     rowProps: row => {
       const task = rowTask(row)
       return {
@@ -103,6 +120,7 @@ export function SheetGrid(p: SheetGridProps) {
       if (['clipNo', 'in', 'out', 'length'].includes(col)) c.push('fx-sheet-num')
       if (['source', 'fileName'].includes(col)) c.push('fx-sheet-mono')
       if (isMenu(row, col) || row.kind === 'add') c.push('is-action')
+      if (isCustom(col)) c.push('is-custom', cl.custom.cellClass(col))
       return c.join(' ')
     },
     isText,
@@ -110,6 +128,7 @@ export function SheetGrid(p: SheetGridProps) {
     textValue: (row, col) => {
       const task = rowTask(row)
       if (!task) return ''
+      if (isCustom(col)) return cl.custom.textValue(task, col)
       switch (col) {
         case 'title':    return task.name
         case 'clipNo':   return task.clip?.clip_no == null ? '' : String(task.clip.clip_no)
@@ -122,22 +141,28 @@ export function SheetGrid(p: SheetGridProps) {
     },
     describedBy: (row, col) => (col === 'status' && row.kind !== 'add' && row.kind !== 'draft' ? `fx-tip-${row.key}` : undefined),
     isDraft: row => row.kind === 'draft',
-    inputLabel: (row, col) => (row.kind === 'draft' ? t('newClip.label') : t(`col.${col as SheetColumn}`)),
+    inputLabel: (row, col) => (row.kind === 'draft' ? t('newClip.label') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as SheetColumn}`)),
     inputPlaceholder: row => (row.kind === 'draft' ? t('newClip.placeholder') : undefined),
     inputDir: col => (['in', 'out', 'clipNo', 'fileName'].includes(col) ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       const task = rowTask(row)
+      if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
       return task && TEXT_COLS.includes(col) && !(row.kind === 'clip' && task.dropped_at) && !p.canEdit(task) ? t('readOnly') : null
     },
     onCommit: p.onCommit,
     onCancelDraft: row => p.onCancelDraft(row.key.slice(2)),
     onOpen: p.onOpen,
     onActivate: (row, col) => {
+      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) return cl.custom.activate(row.task, col, row.key)
       if (row.kind === 'add' && col === 'title') { p.onAddClip(row.video.id); return true }
       return row.kind === 'add'
     },
     onToggle: row => { if (row.kind !== 'video') return false; p.onToggle(row.task.id); return true },
-    onDelete: (row, _col, anchor) => { if (row.kind !== 'clip') return false; p.onDelete(row, anchor); return true },
+    onDelete: (row, col, anchor) => {
+      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) { cl.custom.clear(row.task, col, row.key); return true }
+      if (row.kind !== 'clip') return false
+      p.onDelete(row, anchor); return true
+    },
     onPaste: p.onPaste,
     render: (row, col, cellEl) => {
       if (row.kind === 'add') return col === 'title' ? <span className="fx-sheet-plus">{t('addClip')}</span> : null
@@ -147,6 +172,7 @@ export function SheetGrid(p: SheetGridProps) {
       const task = row.task
       const isVideo = row.kind === 'video'
       const can = p.canEdit(task)
+      if (isCustom(col)) return cl.custom.render(task, col)
       switch (col) {
         case 'rowNo': return row.n
         case 'title':

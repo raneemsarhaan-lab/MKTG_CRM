@@ -6,6 +6,12 @@
  * pieces that are new, matched by their Task Link, already in the sheet, or
  * have problems to fix in place or leave out. Nothing that isn't a web address
  * is ever sent as a link.
+ *
+ * Spec 010 (FR-050–FR-052): a pasted column whose heading matches a column's
+ * current name fills that column. Values that don't fit are listed and left
+ * empty, and headings no column has are listed as Not imported, each with
+ * "Add as a column". Rows already in the sheet are sent too when they carry
+ * values, to fill their empty cells.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -16,6 +22,7 @@ import {
   classifyPlan, gridFromHtml, readPlan, LINK_COLUMNS,
   type Classified, type LinkColumn, type PlanContext, type PlanRow, type ProblemCode,
 } from './parse-plan'
+import type { PasteColumns } from '@/components/sheet/types'
 import type { AddPlanResult, PlanRowInput } from './types'
 
 interface Fix { title?: string; status?: string; links: Partial<Record<LinkColumn, string>>; leftOut?: boolean; move?: boolean; asNew?: boolean }
@@ -51,11 +58,13 @@ function toInput(r: Classified, move: boolean): PlanRowInput {
     working_doc: r.links.doc ?? undefined, design: r.links.design ?? undefined,
     post: r.links.post ?? undefined, published: r.links.published ?? undefined,
     task_link: r.taskId ?? undefined, move,
+    custom: Object.keys(r.values).length ? r.values : undefined,
   }
 }
 
-export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
+export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCells }: {
   ctx: PlanContext
+  columns?: PasteColumns
   /** Rows already pasted into the grid, or null to start with an empty box. */
   initialCells?: PastedCell[][] | null
   onAdd(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean }): Promise<AddPlanResult>
@@ -63,6 +72,7 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
   onClose(message?: string): void
 }) {
   const t = useTranslations('content')
+  const tc = useTranslations('sheet.columns')
   const [cells, setCells] = useState<PastedCell[][]>(initialCells ?? [])
   const [text, setText] = useState('')
   const [fixes, setFixes] = useState<Record<number, Fix>>({})
@@ -73,8 +83,15 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => { boxRef.current?.focus() }, [])
 
-  const read = useMemo(() => readPlan(cells), [cells])
-  useEffect(() => { setFixes({}) }, [read])
+  // Keyed by content: the host rebuilds these lists on every render.
+  const targetsKey = JSON.stringify(columns?.targets ?? [])
+  const valuesKey = JSON.stringify(columns?.values ?? [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const read = useMemo(() => readPlan(cells, columns?.targets ?? []), [cells, targetsKey])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const ctx = useMemo(() => ({ ...baseCtx, columns: columns?.values ?? [] }), [baseCtx, valuesKey])
+  const [adding, setAdding] = useState<string | null>(null)
+  useEffect(() => { setFixes({}) }, [cells])
   const rows = useMemo(
     () => classifyPlan(read.rows.map(r => applyFix(r, fixes[r.index])), ctx),
     [read, fixes, ctx],
@@ -87,7 +104,20 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
   const problems = rows.filter(r => r.kind === 'problem')
   // Rows that will be added, but with a cell left empty: shown so they can be fixed.
   const warnings = rows.filter(r => r.kind !== 'problem' && r.kind !== 'existing' && r.problems.some(p => p.code === 'badLink'))
-  const sending = [...fresh, ...linked.filter(r => !r.otherTheme || fixes[r.index]?.move)]
+  const badValues = rows.filter(r => r.kind !== 'problem' && !fixes[r.index]?.leftOut && r.problems.some(p => p.code === 'badValue'))
+  const pieces = [...fresh, ...linked.filter(r => !r.otherTheme || fixes[r.index]?.move)]
+  // Pieces already in the sheet go too when they bring values: their empty cells are filled.
+  // Only pieces this member may still edit: an archived one, or someone else's, takes none.
+  const admin = ctx.me.access === 'admin' || ctx.me.access === 'superuser'
+  const editable = (r: Classified) => {
+    const theme = ctx.themes.find(x => norm(x.name) === norm(r.theme))
+    const task = ctx.tasks.find(x => x.project_id === theme?.id && norm(x.name) === norm(r.title))
+    return !!task && !task.dropped_at && (admin || task.task_owner_id === ctx.me.id || task.assignee_id === ctx.me.id)
+  }
+  const filling = existing.filter(r => Object.keys(r.values).length && editable(r))
+  const sending = [...pieces, ...filling]
+  const valueCount = sending.reduce((n, r) => n + Object.keys(r.values).length, 0)
+  const matchedNames = read.matched.map(k => columns?.values.find(c => c.key === k)?.name).filter(Boolean) as string[]
   const themes = [...new Map(rows.filter(r => r.theme).map(r => [norm(r.theme), { name: r.theme, isNew: r.themeIsNew }])).values()]
   const pillars = [...new Map(rows.filter(r => r.pillar).map(r => {
     const th = ctx.themes.find(x => norm(x.name) === norm(r.theme))
@@ -104,7 +134,16 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
       case 'unknownOwner': return t('problem.unknownOwner', { name: p.name })
       case 'newThemeAdmin': return t('problem.newThemeAdmin', { name: p.name })
       case 'mayNotAdd': return t('problem.mayNotAdd', { theme: p.theme })
+      case 'badValue': return tc('paste.problem', { column: p.column, reason: tc(`invalid.${p.reason}` as 'invalid.number') })
     }
+  }
+
+  async function addColumn(name: string) {
+    if (!columns || adding) return
+    setAdding(name); setError(null)
+    const fail = await columns.addColumn(name)
+    setAdding(null)
+    if (fail) setError(fail)
   }
 
   function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -125,6 +164,7 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
     if (!res.success) { setError(res.error ?? t('err.generic')); return }
     const skipped = (res.skipped?.length ?? 0) + (res.problems?.length ?? 0)
     onClose([t('paste.done', { created: res.created?.length ?? 0, updated: res.updated?.length ?? 0 }),
+      res.values ? tc('paste.filled', { n: res.values }) : '',
       skipped ? t('paste.skipped', { count: skipped }) : ''].filter(Boolean).join(' · '))
   }
 
@@ -169,8 +209,51 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
               )}
               <p className="fx-sheet-counts" role="status" data-plan-counts="">
                 {t('paste.counts', { fresh: fresh.length, linked: linked.length, existing: existing.length, problems: problems.filter(r => !fixes[r.index]?.leftOut).length })}
+                {valueCount > 0 && <> · {tc('paste.values', { n: valueCount })}</>}
               </p>
+              {matchedNames.length > 0 && <p className="fx-sheet-muted" data-plan-matched="">{tc('paste.fills', { names: matchedNames.join(', ') })}</p>}
+              {filling.length > 0 && <p className="fx-sheet-muted" data-plan-filling="">{tc('paste.fillExisting', { n: filling.length })}</p>}
             </>
+          )}
+
+          {read.unknown.length > 0 && (
+            <section aria-label={tc('paste.notImported')} data-not-imported="">
+              <div className="fx-sheet-sect">{tc('paste.notImported')}</div>
+              <ul className="fx-col-unknown">
+                {read.unknown.map(h => (
+                  <li key={h}>
+                    <span>{h}</span>
+                    {columns && (
+                      <button type="button" className="fx-sheet-btn" data-add-as-column={h} disabled={!!adding}
+                              onClick={() => void addColumn(h)}>
+                        {adding === h ? t('paste.adding') : tc('paste.addAsColumn')}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {badValues.length > 0 && (
+            <section aria-label={tc('paste.badSection')}>
+              <div className="fx-sheet-sect">{tc('paste.badSection')}</div>
+              <div className="fx-sheet-ptab-wrap">
+                <table className="fx-sheet-ptab" data-plan-bad-values="">
+                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.problem')}</th></tr></thead>
+                  <tbody>
+                    {badValues.map(r => (
+                      <tr key={r.index} data-plan-row={r.index}>
+                        <td>{r.title}</td>
+                        <td className="fx-content-problem">
+                          {r.problems.filter(p => p.code === 'badValue').map(p => `${problemText(p)}: “${(p as { text: string }).text}”`).join(' · ')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           )}
 
           {problems.length > 0 && (
@@ -274,7 +357,7 @@ export function PlanPreview({ ctx, onAdd, onClose, initialCells }: {
           </label>
           <button type="button" className="fx-sheet-btn" onClick={() => onClose()}>{t('paste.close')}</button>
           <button type="button" className="fx-sheet-btn is-primary" data-plan-add="" disabled={!sending.length || busy} onClick={() => void add()}>
-            {busy ? t('paste.adding') : t('paste.add', { count: sending.length })}
+            {busy ? t('paste.adding') : pieces.length || !valueCount ? t('paste.add', { count: pieces.length }) : tc('paste.fill', { n: valueCount })}
           </button>
         </div>
       </div>

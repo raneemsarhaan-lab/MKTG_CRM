@@ -54,6 +54,16 @@ export interface GridModel<R extends { key: string }> {
   /** Delete on a row: true when handled. */
   onDelete?(row: R, col: GridCol, anchor: HTMLElement): boolean
   onPaste(e: React.ClipboardEvent, row: R | null, col: GridCol | null): void
+  /** Spec 010: a column's header menu (▾ button, or Alt+↓ from any of its cells). */
+  headerMenu?(col: GridCol, anchor: HTMLElement): void
+  /** Spec 010: a heading dropped before another (null = at the end). Title never moves. */
+  onReorder?(col: GridCol, beforeCol: GridCol | null): void
+  /** Spec 010: a column's new width, after a drag of its edge or a double-click fit. */
+  onResize?(col: GridCol, width: number): void
+  /** Spec 010: the column's accessible name for its menu button. */
+  headerName?(col: GridCol): string
+  /** Spec 010: a letter typed on a non-text cell (Type, Choice): true when it opened a type-ahead. */
+  onTypeAhead?(row: R, col: GridCol, ch: string, anchor: HTMLElement): boolean
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -86,8 +96,43 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const pendingChar = useRef('')
   const draftPending = useRef(false)
 
+  // Spec 010: a width being dragged shows live, before it is saved.
+  const [liveWidth, setLiveWidth] = useState<{ col: GridCol; width: number } | null>(null)
+  const [dragCol, setDragCol] = useState<GridCol | null>(null)
+  const [dropBefore, setDropBefore] = useState<GridCol | null>(null)
+  const widthOf = (c: GridCol) => (liveWidth?.col === c ? liveWidth.width : m.widths[c])
   const allCols: GridCol[] = ['rowNo', ...m.cols]
-  const template = `${m.rowNoWidth}px ${m.cols.map(c => `${m.widths[c]}px`).join(' ')}`
+  const template = `${m.rowNoWidth}px ${m.cols.map(c => `${widthOf(c)}px`).join(' ')}`
+
+  /** Double-click on a column edge: fit the widest rendered cell (R5). */
+  function fitWidth(col: GridCol) {
+    let w = 60
+    gridRef.current?.querySelectorAll<HTMLElement>(`[data-col="${CSS.escape(col)}"]`).forEach(el => {
+      const inner = el.firstElementChild as HTMLElement | null
+      w = Math.max(w, (inner ? inner.scrollWidth : 0) + 28)
+    })
+    m.onResize?.(col, Math.min(600, w))
+  }
+  function startResize(col: GridCol, e: React.PointerEvent<HTMLElement>) {
+    e.preventDefault(); e.stopPropagation()
+    const startX = e.clientX, startW = m.widths[col]
+    const rtl = gridRef.current ? getComputedStyle(gridRef.current).direction === 'rtl' : false
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    let last = startW
+    const onMove = (ev: PointerEvent) => {
+      last = Math.max(60, Math.min(600, Math.round(startW + (ev.clientX - startX) * (rtl ? -1 : 1))))
+      setLiveWidth({ col, width: last })
+    }
+    const onUp = () => {
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      setLiveWidth(null)
+      if (last !== startW) m.onResize?.(col, last)
+    }
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+  }
   const colsFor = (row: R): GridCol[] => m.colsOf?.(row) ?? allCols
   /** The column a row really has for a requested one: itself, or the nearest before it. */
   const fit = (row: R, col: GridCol): GridCol => {
@@ -236,6 +281,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       if (next) { e.preventDefault(); focusCell(row, next) } else e.preventDefault()
     }
     const ctrl = e.ctrlKey || e.metaKey
+    // Alt+↓: the active column's header menu (spec 010 R6).
+    if (e.altKey && e.key === 'ArrowDown' && m.headerMenu && active.col !== 'rowNo') {
+      e.preventDefault()
+      const btn = gridRef.current?.querySelector<HTMLElement>(`[data-col-menu="${CSS.escape(active.col)}"]`)
+      m.headerMenu(active.col, btn ?? target)
+      return
+    }
     switch (e.key) {
       case 'ArrowDown':  return go(ri + 1, ci)
       case 'ArrowUp':    return go(ri - 1, ci)
@@ -247,6 +299,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       case 'PageUp':     return go(ri - 15, ci)
     }
     if (e.key === ' ' && (active.col === 'title' || active.col === 'rowNo') && m.onToggle?.(row)) {
+      e.preventDefault(); return
+    }
+    // Space on an acting cell (a checkbox) toggles it.
+    if (e.key === ' ' && active.col !== 'title' && active.col !== 'rowNo' && m.onActivate?.(row, active.col)) {
       e.preventDefault(); return
     }
     if (e.key === 'Enter' || e.key === 'F2') {
@@ -269,6 +325,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (e.key.length === 1 && !ctrl && !e.altKey && e.key !== ' ' && m.isText(row, active.col)) {
       e.preventDefault()
       startEdit(row, active.col, e.key)
+      return
+    }
+    if (e.key.length === 1 && !ctrl && !e.altKey && e.key !== ' ' && m.onTypeAhead?.(row, active.col, e.key, target)) {
+      e.preventDefault()
       return
     }
     // Typing on a "+ Clip" / "+ Piece" row starts the new row with that character.
@@ -300,10 +360,27 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
         <div role="columnheader" className="fx-sheet-th is-frozen-no" aria-label="#" />
         {m.cols.map(col => {
           const h = m.header(col)
+          const movable = !!m.onReorder && col !== 'title'
           return (
             <div key={col} role="columnheader" aria-sort={h.sort} aria-label={h.label}
-                 className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}`}>
-              {h.text}
+                 data-col-head={col}
+                 draggable={movable || undefined}
+                 className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}${dragCol === col ? ' is-dragging' : ''}${dropBefore === col && dragCol && dragCol !== col ? ' is-drop-before' : ''}`}
+                 onDragStart={movable ? e => { setDragCol(col); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', col) } : undefined}
+                 onDragOver={m.onReorder && dragCol && col !== 'title' ? e => { e.preventDefault(); if (dropBefore !== col) setDropBefore(col) } : undefined}
+                 onDrop={m.onReorder && dragCol ? e => { e.preventDefault(); const from = dragCol; setDragCol(null); setDropBefore(null); if (from !== col && col !== 'title') m.onReorder?.(from, col) } : undefined}
+                 onDragEnd={() => { setDragCol(null); setDropBefore(null) }}>
+              <span className="fx-sheet-th-name">{h.text}</span>
+              {m.headerMenu && (
+                <button type="button" className="fx-sheet-th-menu" tabIndex={-1} data-col-menu={col} aria-haspopup="menu"
+                        aria-label={m.headerName ? m.headerName(col) : undefined}
+                        onClick={e => { e.stopPropagation(); m.headerMenu?.(col, e.currentTarget) }} />
+              )}
+              {m.onResize && (
+                <span className="fx-sheet-th-rz" aria-hidden="true" data-col-resize={col}
+                      onPointerDown={e => startResize(col, e)}
+                      onDoubleClick={e => { e.stopPropagation(); fitWidth(col) }} />
+              )}
             </div>
           )
         })}

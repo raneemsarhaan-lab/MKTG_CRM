@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
-import { mapMember, mapTask, mapSlaConfig, mapTheme } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn } from '@/lib/mappers'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { configured as storageConfigured } from '@/lib/storage'
 
@@ -10,7 +10,7 @@ export default async function BoardPage() {
   if (!member) redirect('/login')
 
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -65,7 +65,12 @@ export default async function BoardPage() {
     prisma.mentionRead.findMany({ where: { member_id: member.id }, select: { comment_id: true } }),
     prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
     prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true } }),
+    // Sheet columns the team has shaped, and custom values (spec 010).
+    prisma.sheetColumn.findMany({ where: { deleted_at: null }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
+    prisma.sheetValue.findMany({ where: { column: { deleted_at: null } }, select: { column_id: true, task_id: true, value: true } }),
   ])
+  const values: Record<string, Record<string, string>> = {}
+  for (const v of sheetValues) (values[v.column_id] ??= {})[v.task_id] = v.value
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -82,6 +87,8 @@ export default async function BoardPage() {
         slaConfig={mapSlaConfig(slaRows)}
         themes={themes.map(mapTheme)}
         hasStorage={storageConfigured()}
+        sheetColumns={sheetColumns.map(mapSheetColumn)}
+        sheetValues={values}
         inbox={{
           readIds:  reads.map(r => r.comment_id),
           snoozes:  Object.fromEntries(snoozes.map(z => [z.task_id, z.until.toISOString()])),

@@ -4,6 +4,11 @@
  * Paste clips (spec 008 FR-032–FR-034, contracts/paste-format.md): rows copied
  * from Google Sheets become a preview of new clips, clips already in the sheet,
  * and rows without a clip file name, which can be fixed in place or left out.
+ *
+ * Spec 010 (FR-050–FR-052): a heading row's custom column names fill those
+ * columns; values that don't fit are listed and left empty; unknown headings
+ * are listed as Not imported with "Add as a column". Clips already in the
+ * sheet are sent too when they bring values, to fill their empty cells.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -13,12 +18,14 @@ import {
 } from './parse-clips'
 import { formatClipTime } from './time'
 import { hostOf } from './FilesCell'
-import type { AddClipsResult, SheetClipRow } from './types'
+import { readPastedValues, type PastedValueProblem } from '@/lib/sheet-columns'
+import type { AddClipsResult, PasteColumns, SheetClipRow } from './types'
 
 interface Fix { title: string; file_name: string; leftOut: boolean }
 
-export function PastePreview({ videoName, existingFileNames, initialCells, onAdd, onClose }: {
+export function PastePreview({ videoName, existingFileNames, initialCells, columns, onAdd, onClose }: {
   videoName: string
+  columns?: PasteColumns
   existingFileNames: string[]
   /** Rows already pasted into the grid, or null to start with an empty box. */
   initialCells: PastedCell[][] | null
@@ -26,6 +33,8 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
   onClose(message?: string): void
 }) {
   const t = useTranslations('sheet')
+  const tc = useTranslations('sheet.columns')
+  const [adding, setAdding] = useState<string | null>(null)
   const [cells, setCells] = useState<PastedCell[][]>(initialCells ?? [])
   const [text, setText] = useState('')
   const [fixes, setFixes] = useState<Fix[]>([])
@@ -34,11 +43,17 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
   const boxRef = useRef<HTMLTextAreaElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
 
-  const preview = useMemo(() => parseClipRows(cells, existingFileNames), [cells, existingFileNames])
+  // Keyed by content: the host rebuilds the column lists on every render.
+  const targetsKey = JSON.stringify(columns?.targets ?? [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const preview = useMemo(() => parseClipRows(cells, existingFileNames, columns?.targets ?? []), [cells, existingFileNames, targetsKey])
   // Unmatched rows start as they were pasted; a fixed file name moves the row to New.
+  // Adding a column re-reads the paste but keeps the fixes made so far.
+  const unmatchedKey = JSON.stringify(preview.unmatched.map(u => u.cells))
   useEffect(() => {
     setFixes(preview.unmatched.map(u => ({ title: u.title, file_name: u.file_name, leftOut: false })))
-  }, [preview])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unmatchedKey])
 
   useEffect(() => { (initialCells ? dialogRef.current?.querySelector<HTMLElement>('[data-add]') : boxRef.current)?.focus() }, [initialCells])
 
@@ -49,9 +64,15 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
     const f = fixes[i]
     if (!f || f.leftOut) return
     const p = parseClipFileName(f.file_name)
-    if (p) fixedClips.push({ ...p, file_name: f.file_name.trim(), title: f.title.trim() || f.file_name.trim(), link: u.link, fixed: true })
+    if (p) fixedClips.push({ ...p, file_name: f.file_name.trim(), title: f.title.trim() || f.file_name.trim(), link: u.link, custom: u.custom, fixed: true })
   })
   const fresh = [...preview.fresh, ...fixedClips]
+  const valuesOf = (c: ParsedClip) => readPastedValues(c.custom ?? {}, columns?.values ?? [])
+  const bad: (PastedValueProblem & { title: string })[] = fresh.flatMap(c => valuesOf(c).bad.map(b => ({ ...b, title: c.title })))
+  // Clips already in the sheet go too when they bring values: their empty cells are filled.
+  const filling = preview.existing.filter(c => Object.keys(valuesOf(c).values).length)
+  const valueCount = [...fresh, ...filling].reduce((n, c) => n + Object.keys(valuesOf(c).values).length, 0)
+  const matchedNames = preview.matched.map(k => columns?.values.find(c => c.key === k)?.name).filter(Boolean) as string[]
   const unmatchedLeft = preview.unmatched.filter((_, i) => !fixes[i]?.leftOut && !parseClipFileName(fixes[i]?.file_name)).length
   const count = fresh.length
 
@@ -66,15 +87,31 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
   }
 
   async function add() {
-    if (!count || busy) return
+    if ((!count && !valueCount) || busy) return
     setBusy(true); setError(null)
-    const rows: SheetClipRow[] = fresh.map(c => ({ title: c.title, file_name: c.file_name, link: c.link }))
-    const res = await onAdd(rows)
+    const row = (c: ParsedClip): SheetClipRow => {
+      const { values } = valuesOf(c)
+      return { title: c.title, file_name: c.file_name, link: c.link, ...(Object.keys(values).length ? { custom: values } : {}) }
+    }
+    const res = await onAdd([...fresh.map(row), ...filling.map(row)])
     setBusy(false)
     if (!res.success) { setError(res.error ?? t('err.generic')); return }
     const created = res.created?.length ?? 0
-    const skipped = res.skipped?.length ?? 0
-    onClose([t('paste.added', { count: created }), skipped ? t('paste.skippedOthers', { count: skipped }) : ''].filter(Boolean).join(' · '))
+    // The clips sent only to fill their cells come back as skipped: not someone else's.
+    const skipped = Math.max(0, (res.skipped?.length ?? 0) - filling.length)
+    onClose([
+      created || !res.values ? t('paste.added', { count: created }) : '',
+      res.values ? tc('paste.filled', { n: res.values }) : '',
+      skipped ? t('paste.skippedOthers', { count: skipped }) : '',
+    ].filter(Boolean).join(' · '))
+  }
+
+  async function addColumn(name: string) {
+    if (!columns || adding) return
+    setAdding(name); setError(null)
+    const fail = await columns.addColumn(name)
+    setAdding(null)
+    if (fail) setError(fail)
   }
 
   return (
@@ -115,7 +152,48 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
             <p className="fx-sheet-counts" role="status" data-paste-counts="">
               {t('paste.counts', { fresh: fresh.length, existing: preview.existing.length, unmatched: unmatchedLeft })}
               {preview.overflow > 0 && <> · {t('paste.overflow', { count: preview.overflow })}</>}
+              {valueCount > 0 && <> · {tc('paste.values', { n: valueCount })}</>}
             </p>
+          )}
+          {matchedNames.length > 0 && <p className="fx-sheet-muted" data-paste-matched="">{tc('paste.fills', { names: matchedNames.join(', ') })}</p>}
+          {filling.length > 0 && <p className="fx-sheet-muted" data-paste-filling="">{tc('paste.fillExistingClips', { n: filling.length })}</p>}
+
+          {preview.unknown.length > 0 && (
+            <section aria-label={tc('paste.notImported')} data-not-imported="">
+              <div className="fx-sheet-sect">{tc('paste.notImported')}</div>
+              <ul className="fx-col-unknown">
+                {preview.unknown.map(h => (
+                  <li key={h}>
+                    <span>{h}</span>
+                    {columns && (
+                      <button type="button" className="fx-sheet-btn" data-add-as-column={h} disabled={!!adding}
+                              onClick={() => void addColumn(h)}>
+                        {adding === h ? t('paste.adding') : tc('paste.addAsColumn')}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {bad.length > 0 && (
+            <section aria-label={tc('paste.badSection')}>
+              <div className="fx-sheet-sect">{tc('paste.badSection')}</div>
+              <div className="fx-sheet-ptab-wrap">
+                <table className="fx-sheet-ptab" data-paste-bad-values="">
+                  <thead><tr><th>{t('col.title')}</th><th>{tc('paste.problemHead')}</th></tr></thead>
+                  <tbody>
+                    {bad.map((b, i) => (
+                      <tr key={i}>
+                        <td>{b.title}</td>
+                        <td>{tc('paste.problem', { column: b.column, reason: tc(`invalid.${b.code}` as 'invalid.number') })}: “{b.text}”</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           )}
           {cells.length > 0 && !preview.fresh.length && !preview.existing.length && !preview.unmatched.length && (
             <p className="fx-sheet-counts">{t('paste.noneFound')}</p>
@@ -180,8 +258,8 @@ export function PastePreview({ videoName, existingFileNames, initialCells, onAdd
         <div className="fx-sheet-dlg-foot">
           {error && <span className="fx-sheet-note" role="alert">{error}</span>}
           <button type="button" className="fx-sheet-btn" onClick={() => onClose()}>{t('paste.close')}</button>
-          <button type="button" className="fx-sheet-btn is-primary" data-add="" disabled={!count || busy} onClick={() => void add()}>
-            {busy ? t('paste.adding') : t('paste.add', { count })}
+          <button type="button" className="fx-sheet-btn is-primary" data-add="" disabled={(!count && !valueCount) || busy} onClick={() => void add()}>
+            {busy ? t('paste.adding') : count || !valueCount ? t('paste.add', { count }) : tc('paste.fill', { n: valueCount })}
           </button>
         </div>
       </div>

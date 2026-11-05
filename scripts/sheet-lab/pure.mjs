@@ -153,6 +153,108 @@ export async function runPure(bundle, root) {
     }
   })
 
+  // ── spec 010: sheet columns ─────────────────────────────────────────────
+  const C = h.cols
+  check('cols-layout', () => {
+    const def = C.applyLayout('content', [], 'all')
+    eq(def.map(c => c.key), C.BUILT_INS.content.map(b => b.key), 'no records: built-in defaults')
+    eq(def.every(c => c.shown), true, 'all shown on the Content sheet')
+    const vid = C.applyLayout('video', [], 'copy')
+    eq(vid.filter(c => c.shown).map(c => c.key), ['title', 'clipNo', 'type', 'status', 'editor', 'published'], 'Copy set defaults')
+    const fx = h.columnFixtures()
+    const laid = C.applyLayout('content', fx.records, 'all')
+    eq(laid[0].key, 'title', 'Title first')
+    eq(laid.find(c => c.key === 'pillar').shown, false, 'a hidden built-in')
+    eq(laid.find(c => c.key === 'status').name, 'Copy status', 'a renamed built-in')
+    eq(laid.find(c => c.key === 'c:platform').kind, 'choice', 'a custom column')
+    // A built-in added to the code later lands after its default predecessor.
+    const missing = fx.records.filter(r => !(r.sheet === 'content' && r.key === 'design'))
+    const l2 = C.applyLayout('content', missing, 'all').map(c => c.key)
+    eq(l2.indexOf('design'), l2.indexOf('doc') + 1, 'new built-in slotted after its predecessor')
+    // Only custom records: built-ins keep their default order first.
+    const only = [{ ...fx.records.find(r => r.key === 'c:hook'), position: 0 }]
+    const l3 = C.applyLayout('content', only, 'all').map(c => c.key)
+    eq(l3.slice(0, 2), ['title', 'type'], 'built-ins first')
+    eq(l3.at(-1), 'c:hook', 'custom after')
+    const v = C.applyLayout('video', fx.records, 'copy')
+    eq(v.find(c => c.key === 'c:music').shown, false, 'custom hidden in Copy')
+    eq(C.applyLayout('video', fx.records, 'editing').find(c => c.key === 'c:music').shown, true, 'shown in Editing')
+  })
+  check('cols-ops', () => {
+    const who = { id: 'samaa', name: 'Samaa' }
+    let r = C.applyOp('content', [], { op: 'rename', key: 'status', name: 'Stage' }, who)
+    eq(r.filter(x => x.sheet === 'content').length, C.BUILT_INS.content.length, 'first change writes every built-in')
+    eq(C.applyLayout('content', r, 'all').find(c => c.key === 'status').name, 'Stage', 'renamed')
+    r = C.applyOp('content', r, { op: 'move', key: 'assignee', before: 'type' }, who)
+    eq(C.applyLayout('content', r, 'all').map(c => c.key).slice(0, 3), ['title', 'assignee', 'type'], 'moved')
+    eq(C.applyOp('content', r, { op: 'move', key: 'type', before: 'title' }, who), r, 'nothing before Title')
+    r = C.applyOp('video', [], { op: 'shown', key: 'source', set: 'editing', shown: false }, who)
+    eq(C.applyLayout('video', r, 'editing').find(c => c.key === 'source').shown, false, 'hidden in Editing')
+    eq(C.applyLayout('video', r, 'full').find(c => c.key === 'source').shown, true, 'still in Full')
+    r = C.applyOp('content', r, { op: 'width', key: 'type', width: 9999 }, who)
+    eq(C.applyLayout('content', r, 'all').find(c => c.key === 'type').width, 600, 'width clamped')
+  })
+  check('cols-parse', () => {
+    const m = [{ id: 'samaa', name: 'Samaa Ali' }, { id: 'noran', name: 'Noran' }]
+    const o = [{ id: 'li', name: 'LinkedIn', color: '#1D4ED8' }]
+    eq(C.parseValue('number', '1,240'), { ok: true, value: '1240' }, 'number')
+    eq(C.parseValue('number', 'abc'), { ok: false, code: 'number' }, 'not a number')
+    eq(C.parseValue('date', '20/11/2026'), { ok: true, value: '2026-11-20' }, 'DD/MM/YYYY')
+    eq(C.parseValue('date', '2026-02-30'), { ok: false, code: 'date' }, 'no 30 February')
+    eq(C.parseValue('link', 'docs.google.com/x'), { ok: false, code: 'link' }, 'a link needs https')
+    eq(C.parseValue('person', 'samaa', { members: m }), { ok: true, value: 'samaa' }, 'person by first name')
+    eq(C.parseValue('choice', 'linkedin', { options: o }), { ok: true, value: 'li' }, 'choice by name, any case')
+    eq(C.parseValue('checkbox', 'Yes'), { ok: true, value: '1' }, 'yes')
+    eq(C.parseValue('checkbox', 'no'), { ok: true, value: '' }, 'no clears')
+    eq(C.parseValue('text', ''), { ok: true, value: '' }, 'empty clears')
+    const conv = C.convertValues('text', 'number', { a: '12', b: 'twelve' }, {}, {})
+    eq([conv.kept, conv.cleared], [{ a: '12' }, ['b']], 'kind change keeps what fits')
+  })
+  check('cols-names', () => {
+    const others = [['Copy status', 'Status'], ['Hook']]
+    eq(C.checkName('  ', others), 'empty', 'empty')
+    eq(C.checkName('x'.repeat(41), others), 'long', 'too long')
+    eq(C.checkName('status', others), 'taken', 'a default name stays its column’s')
+    eq(C.checkName('hook ', others), 'taken', 'case and spaces ignored')
+    eq(C.checkName('Angle', others), null, 'free')
+    eq(C.headingKey('copy  status', [{ key: 'status', names: ['Copy status', 'Status'] }]), 'status', 'paste heading by current name')
+    eq(C.cleanOptions([{ name: 'A' }, { name: 'a' }, { name: '' }], () => 'id').length, 1, 'options unique and named')
+  })
+
+  check('cols-paste', () => {
+    const fx = h.columnFixtures()
+    const recs = fx.records.filter(r => r.sheet === 'content')
+    const laid = C.applyLayout('content', recs, 'all')
+    const name = c => c.name ?? C.builtInOf('content', c.key)?.en ?? ''
+    const targets = laid.map(c => ({ key: c.key, names: [name(c), C.builtInOf('content', c.key)?.en ?? ''].filter(Boolean) }))
+    const values = laid.filter(c => c.key.startsWith('c:')).map(c => ({ id: c.key.slice(2), key: c.key, name: name(c), kind: c.kind, ctx: { members: h.CONTENT_MEMBERS, options: c.options } }))
+    const read = h.readPlan(h.cellsFromText(h.customPlanText({ notes: true })), targets)
+    eq(read.rows.length, 18, '18 pieces')
+    eq(read.matched, ['c:hook', 'c:words', 'c:golive'], 'three custom columns matched by name')
+    eq(read.unknown, ['Notes'], 'Notes is not imported')
+    const { themes, tasks } = h.makeContent()
+    const admin = h.CONTENT_MEMBERS.find(m => m.id === 'raneem')
+    const cl = h.classifyPlan(read.rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: admin, columns: values })
+    eq(cl.reduce((n, r) => n + Object.keys(r.values).length, 0), 54, '54 values (SC-006)')
+    eq(cl[2].values, { hook: 'Hook 3', words: '103', golive: '2026-12-03' }, 'normalised by kind')
+    const bad = h.classifyPlan(h.readPlan(h.cellsFromText(h.customPlanText({ bad: true })), targets).rows, { tasks, themes, members: h.CONTENT_MEMBERS, me: admin, columns: values })
+    const p3 = bad[0].problems.find(p => p.code === 'badValue')
+    eq([p3?.column, p3?.reason, p3?.text, bad[0].values.words, bad[0].values.hook], ['Words', 'number', 'many', undefined, 'Hook 1'], 'a bad value is a problem, never a value (FR-051)')
+    eq(h.isWarning(p3), true, 'and only a warning: the row still goes, the cell stays empty')
+    // A renamed built-in is found by its new name.
+    const renamed = h.readPlan([[{ text: 'Piece Title', href: null }, { text: 'Copy status', href: null }], [{ text: 'X', href: null }, { text: 'Published', href: null }]], targets)
+    eq(renamed.rows[0].status?.stage, 'publish', 'Copy status read as Status')
+    // Clips: a heading row with custom names fills them and stays out of the title.
+    const vrecs = fx.records.filter(r => r.sheet === 'video')
+    const vlaid = C.applyLayout('video', vrecs, 'full')
+    const vt = vlaid.map(c => ({ key: c.key, names: [c.name ?? C.builtInOf('video', c.key)?.en ?? ''].filter(Boolean) }))
+    const pv = h.parseClipRows(h.cellsFromText(h.customClipText()), [], vt)
+    eq([pv.fresh.length, pv.unmatched.length, pv.unknown, pv.matched], [3, 0, ['Notes'], ['c:vhook', 'c:music']], 'clips: heading row read, Notes not imported')
+    eq([pv.fresh[0].title, pv.fresh[0].custom['c:vhook'].text, pv.fresh[0].custom['c:music'].text], ['Pasted clip 1', 'Clip hook 1', 'yes'], 'the hook is a value, not the title')
+    const plain = h.parseClipRows(h.cellsFromText(h.customClipText()), [])
+    eq(plain.unmatched.length, 1, 'without columns, the heading row is an unmatched row as before')
+  })
+
   check('tokens-only', () => {
     const bad = []
     for (const d of ['src/components/sheet', 'src/components/content']) {

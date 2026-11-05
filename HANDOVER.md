@@ -441,6 +441,32 @@ The team's content plan as a third view, **Board | Sheet | Content** (spec 009, 
   - `npm run lab:sheet -- cus content` runs the Content scenarios.
   - `npx tsx scripts/sheet-lab/seed-content.ts out.html` seeds the seven linked tasks for checks against the running app.
 
+### Sheet columns
+
+Both sheets' columns can be shaped like a spreadsheet (spec 010, `specs/010-sheet-custom-columns/`). Design: `design/sheet-columns.html`.
+
+- **Who.** Every signed-in member may rename, add, move, hide, resize and delete columns. The layout is shared, and each change records who made it and when; the Columns panel shows this as "Changed by …". Values in custom cells follow the row rule: the owner, the assignee, an admin or a superuser.
+- **Records.**
+  - `sheet_columns`: one row per column per sheet. A built-in column has its own key (`status`, `doc`…); a custom column has the key `c:<id>`. Fields:
+    - name, position, width;
+    - `shown_default` and `shown_in` (Video's sets are editing, copy and full; Content has one set, `all`);
+    - `kind` and `options`, for custom columns;
+    - `deleted_at`: delete is soft, Undo lasts 10 s, and the row is purged after a day.
+  - `sheet_values`: one normalised value per custom column per task.
+- **Pure rules.** `src/lib/sheet-columns.ts` holds the rules both the server and the browser use:
+  - `applyLayout` and `applyOp`;
+  - `parseValue` and `formatValue`, for the seven kinds: text, number, date, link, person, choice, checkbox;
+  - `convertValues` (changing a column's kind);
+  - `checkName` (no two columns share a name, built-in names included);
+  - `headingKey` and `readPastedValues`, for paste.
+- **Actions.** `src/actions/sheet-columns.ts`. Layout changes take `pg_advisory_xact_lock(hashtext('sheet-columns:'+sheet))`. The first layout change on a sheet writes a record for every built-in column, so later moves only renumber. Changing a kind converts values in the same transaction. Removing an option that rows still use requires a replacement or an explicit clear.
+- **UI.**
+  - `src/components/sheet/useSheetColumns.tsx` is the column layer both sheets use: the header menu (▾, or Alt+↓ from a cell), the Columns panel, the column editor, the delete confirmation, custom cells, and the type-ahead.
+  - `GridCore` gives drag to reorder (Title stays first), and an edge handle to resize (double-click fits the column).
+  - Typing on a Type or Choice cell opens a type-ahead list. A missing choice option can be added by anyone. A missing content type can be added by admins only (`addContentType`), and starts with Post's deadlines.
+- **Paste.** Paste plan and Paste clips match pasted headings to columns by their current names, so renamed and custom columns fill too. Values that don't fit a column are listed and never stored. Headings with no matching column are listed as Not imported, each with an **Add as a column** button. Rows already in the sheet only get their empty cells filled. The server writes the values inside the paste's transaction (`src/lib/sheet-values.ts`).
+- **Test it.** `npm run lab:sheet -- col vcol cols` runs the column scenarios. Open the lab with `#cols=1` to load the sample columns (`scripts/sheet-lab/column-fixtures.ts`).
+
 ### Board Inbox
 
 What needs you, behind one header button (spec 006, `specs/006-board-inbox/`). It replaced the bell and the four "for you" cards. Design: `design/board-inbox.html` (tab "Option B · Inbox button").
@@ -769,6 +795,7 @@ Run through this after the first successful deploy.
 | Video sheet uploads over about 5 MB | Medium | Need the bucket on Cranl (same check as spec 007 T045). Until then, full cuts go in as Drive links |
 | Content sheet: Arabic content stage names | Medium | `content.stage.*` in `messages/ar.json`; native review |
 | Content sheet: run Paste plan on Cranl | Medium | Paste the real Content Library once deployed. Samaa and Noran must exist as members for owners to match |
+| Sheet columns: Arabic strings | Medium | `sheet.columns.*` in `messages/ar.json`; native review (spec 010) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |

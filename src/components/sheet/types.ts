@@ -7,6 +7,7 @@
  */
 import type { Member, MoveTaskResult, StageId, Task, BoardView } from '@/types/index'
 import type { UploadFn } from '@/components/kanban/attachments/useUploadQueue'
+import type { PasteTarget, PasteValueColumn } from '@/lib/sheet-columns'
 
 export type Result = { success: boolean; error?: string }
 
@@ -23,8 +24,20 @@ export interface SheetClipPatch {
   out_ms?: number | null
   published_url?: string | null
 }
-export interface SheetClipRow { title: string; file_name?: string | null; link?: string | null }
-export interface AddClipsResult extends Result { created?: { id: string }[]; skipped?: string[] }
+export interface SheetClipRow {
+  title: string; file_name?: string | null; link?: string | null
+  /** Custom column values by column id (spec 010); re-parsed on the server. */
+  custom?: Record<string, string>
+}
+export interface AddClipsResult extends Result { created?: { id: string }[]; skipped?: string[]; values?: number }
+
+/** The sheet's columns, as a paste sees them (spec 010 FR-050–FR-052). */
+export interface PasteColumns {
+  targets: PasteTarget[]
+  values: PasteValueColumn[]
+  /** Adds a Text column; an error message, or null when it worked. */
+  addColumn(name: string): Promise<string | null>
+}
 
 export interface SheetApi {
   /** The board's own move: optimistic, rollback, refresh, celebration. */
@@ -54,4 +67,44 @@ export interface VideoSheetProps {
   /** The toolbar's Board | Sheet switch. */
   onView(view: BoardView): void
   api: SheetApi
+  /** The sheet's shaped columns and custom values (spec 010). */
+  columns: ColumnsBundle
+}
+
+// ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
+import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId, SheetValues } from '@/types/index'
+
+export interface ColumnInput {
+  name: string
+  kind: ColumnKind
+  options?: Partial<ChoiceOption>[]
+  before?: string
+  after?: string
+  set?: string
+}
+export interface ColumnPatch {
+  name?: string
+  kind?: ColumnKind
+  options?: Partial<ChoiceOption>[]
+  replace?: Record<string, string | null>
+}
+/** The host's column calls: optimistic where the change is known, then the server decides. */
+export interface ColumnsApi {
+  add(sheet: SheetId, input: ColumnInput): Promise<Result & { column?: SheetColumnRecord }>
+  rename(sheet: SheetId, key: string, name: string | null): Promise<Result>
+  move(sheet: SheetId, key: string, before: string | null): Promise<Result>
+  setShown(sheet: SheetId, key: string, set: string, shown: boolean): Promise<Result>
+  resize(sheet: SheetId, key: string, width: number): Promise<Result>
+  update(id: string, patch: ColumnPatch): Promise<Result & { cleared?: number }>
+  remove(id: string): Promise<Result & { values?: number }>
+  restore(id: string): Promise<Result>
+  setValue(columnId: string, taskId: string, raw: string): Promise<Result & { value?: string }>
+  /** Admins: a new content type from a Type cell, starting with Post's deadlines. */
+  addContentType(label: string): Promise<Result & { label?: string }>
+}
+/** What a sheet needs to shape its columns. */
+export interface ColumnsBundle {
+  records: SheetColumnRecord[]
+  values: SheetValues
+  api: ColumnsApi
 }

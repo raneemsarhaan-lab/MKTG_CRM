@@ -127,7 +127,7 @@ export function SheetPopover({ anchor, label, children, onClose }: {
   const ref = useRef<HTMLDivElement>(null)
   const pos = usePlacement(anchor, ref)
   useEffect(() => {
-    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('input, [data-autofocus]')?.focus())
+    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('input:not([disabled]), [data-autofocus]')?.focus())
   }, [])
   useEffect(() => {
     function onDown(e: MouseEvent) {

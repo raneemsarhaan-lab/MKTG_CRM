@@ -13,6 +13,7 @@ import { getSessionMember } from '@/lib/authz'
 import type { Prisma } from '@prisma/client'
 import type { AudienceKey, FrequencyPeriod, LinkRole, StageId } from '@/types/index'
 import { LINK_CONTENT_TYPE } from '@/lib/attachments'
+import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import { periodStart } from '@/components/content/summary'
 import {
   AUDIENCE_KEYS, KNOWN_TYPES, isWebLink, norm, readAudience, readFrequency, readStatus, readType, siteName, taskIdFromLink,
@@ -65,12 +66,16 @@ export interface PlanRowInput {
   working_doc?: string; design?: string; task_link?: string; post?: string; published?: string
   /** A matched task in another theme moves here only when this is true. */
   move?: boolean
+  /** Custom column values by column id (spec 010); re-parsed here. */
+  custom?: Record<string, string>
 }
 export interface AddPlanResult {
   success: boolean; error?: string
   created?: string[]; updated?: string[]; skipped?: string[]
   themesCreated?: string[]; pillarsCreated?: string[]
   problems?: { row: number; code: string }[]
+  /** Custom values written (spec 010). */
+  values?: number
 }
 
 /**
@@ -99,7 +104,8 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
     const out = await prisma.$transaction(async tx => {
       // $executeRaw: the lock returns void, which $queryRaw cannot read back.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
-      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[] }
+      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0 }
+      const columns = await pasteColumns(tx, 'content', members)
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
       // A piece that arrives already Published was published on a day the sheet
@@ -197,15 +203,25 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           await tx.task.update({ where: { id: taskId }, data })
           if (links.doc) await setRoleLink(tx, taskId, 'working_doc', links.doc, member.id, true)
           if (links.design) await setRoleLink(tx, taskId, 'design', links.design, member.id, true)
+          res.values += await writePastedValues(tx, columns, taskId, r.custom, member.id, { onlyEmpty: !opts.useSheetTitleStatus })
           res.updated.push(taskId)
           continue
         }
 
         // Already in this theme by title: nothing to add (FR-035).
         const same = await tx.task.findFirst({
-          where: { project_id: theme.id, name: { equals: title, mode: 'insensitive' } }, select: { id: true },
+          where: { project_id: theme.id, name: { equals: title, mode: 'insensitive' } },
+          select: { id: true, task_owner_id: true, assignee_id: true, dropped_at: true },
         })
-        if (same) { res.skipped.push(title); continue }
+        if (same) {
+          // Its empty custom cells are filled from the paste, under the row rule.
+          const n = !same.dropped_at && canAct(same, member)
+            ? await writePastedValues(tx, columns, same.id, r.custom, member.id, { onlyEmpty: true })
+            : 0
+          if (n) res.values += n
+          else res.skipped.push(title)
+          continue
+        }
 
         const owner = memberByName(r.owner) ?? member.id
         const task = await tx.task.create({
@@ -219,6 +235,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
         })
         if (links.doc) await setRoleLink(tx, task.id, 'working_doc', links.doc, member.id)
         if (links.design) await setRoleLink(tx, task.id, 'design', links.design, member.id)
+        res.values += await writePastedValues(tx, columns, task.id, r.custom, member.id, { onlyEmpty: false })
         res.created.push(task.id)
       }
       return res

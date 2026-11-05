@@ -7,7 +7,7 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { inboxModel, openingTab } from '@/lib/inbox'
@@ -33,6 +33,9 @@ import { InboxButton } from '@/components/inbox/InboxButton'
 import { InboxPanel } from '@/components/inbox/InboxPanel'
 import { ViewMenu } from '@/components/inbox/ViewMenu'
 import type { InboxApi } from '@/components/inbox/types'
+import type { ColumnsApi, ColumnsBundle } from '@/components/sheet/types'
+import { addColumn, renameColumn, moveColumn, setColumnShown, resizeColumn, updateColumn, deleteColumn, restoreColumn, setValue as setSheetValue, addContentType } from '@/actions/sheet-columns'
+import { applyOp, type LayoutOp } from '@/lib/sheet-columns'
 import { markMentionsRead, replyToMention, snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { BulkBar, type BulkPatch } from './BulkBar'
@@ -59,6 +62,9 @@ interface KanbanBoardProps {
   themes?: ContentTheme[]
   /** The signed-in member's Inbox records (spec 006). */
   inbox?: InboxState
+  /** Sheet columns the team has shaped, and custom values (spec 010). */
+  sheetColumns?: SheetColumnRecord[]
+  sheetValues?: SheetValues
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -74,6 +80,8 @@ export function KanbanBoard({
   hasStorage = false,
   themes: initialThemes = [],
   inbox: initialInbox = NO_INBOX,
+  sheetColumns: initialColumns = [],
+  sheetValues: initialValues = {},
 }: KanbanBoardProps) {
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -327,6 +335,73 @@ export function KanbanBoard({
   const ta = useTranslations('attachments')
   const patchTask = (id: string, patch: Partial<FullTask>) =>
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
+  // ── Sheet columns (spec 010): the shared layout and custom values ────────
+  const [colRecords, setColRecords] = useState<SheetColumnRecord[]>(initialColumns)
+  const [colValues, setColValues] = useState<SheetValues>(initialValues)
+  const [types, setTypes] = useState<ContentType[]>(contentTypes)
+  useEffect(() => { setColRecords(initialColumns) }, [initialColumns])
+  useEffect(() => { setColValues(initialValues) }, [initialValues])
+  useEffect(() => { setTypes(contentTypes) }, [contentTypes])
+  const who = { id: currentUser.id, name: currentUser.name }
+  /** A layout change shows now; the server decides; a refusal puts it back. */
+  async function layout(sheet: SheetId, op: LayoutOp, call: () => Promise<{ success: boolean; error?: string }>) {
+    const before = colRecords
+    setColRecords(r => applyOp(sheet, r, op, who))
+    const res = await call().catch(() => ({ success: false, error: 'generic' }))
+    if (!res.success) setColRecords(before)
+    else router.refresh()
+    return res
+  }
+  const columnsApi: ColumnsApi = {
+    async add(sheet, input) {
+      const r = await addColumn(sheet, input).catch(() => ({ success: false as const, error: 'generic' }))
+      if (r.success) { setColRecords(rs => [...rs.filter(x => x.id !== r.column.id), r.column]); router.refresh() }
+      return r
+    },
+    rename: (sheet, key, name) => layout(sheet, { op: 'rename', key, name }, () => renameColumn(sheet, key, name)),
+    move: (sheet, key, before) => layout(sheet, { op: 'move', key, before }, () => moveColumn(sheet, key, before)),
+    setShown: (sheet, key, set, shown) => layout(sheet, { op: 'shown', key, set, shown }, () => setColumnShown(sheet, key, set, shown)),
+    resize: (sheet, key, width) => layout(sheet, { op: 'width', key, width }, () => resizeColumn(sheet, key, width)),
+    async update(id, patch) {
+      const r = await updateColumn(id, patch).catch(() => ({ success: false as const, error: 'generic' }))
+      if (r.success) router.refresh()
+      return r
+    },
+    async remove(id) {
+      const before = colRecords
+      setColRecords(rs => rs.filter(x => x.id !== id))
+      const r = await deleteColumn(id).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!r.success) setColRecords(before); else router.refresh()
+      return r
+    },
+    async restore(id) {
+      const r = await restoreColumn(id).catch(() => ({ success: false as const, error: 'generic' }))
+      if (r.success) { setColRecords(rs => [...rs.filter(x => x.id !== id), r.column]); router.refresh() }
+      return r
+    },
+    async setValue(columnId, taskId, raw) {
+      const before = colValues[columnId]?.[taskId]
+      const r = await setSheetValue(columnId, taskId, raw).catch(() => ({ success: false as const, error: 'generic' }))
+      if (r.success) {
+        setColValues(vs => {
+          const col = { ...(vs[columnId] ?? {}) }
+          if (r.value) col[taskId] = r.value; else delete col[taskId]
+          return { ...vs, [columnId]: col }
+        })
+      } else if (before !== undefined) {
+        setColValues(vs => ({ ...vs, [columnId]: { ...(vs[columnId] ?? {}), [taskId]: before } }))
+      }
+      return r
+    },
+    async addContentType(label) {
+      const r = await addContentType(label).catch(() => ({ success: false as const, error: 'generic' }))
+      if (r.success && !types.some(x => x.label === r.label)) setTypes(ts => [...ts, { id: r.label, label: r.label } as ContentType])
+      if (r.success) router.refresh()
+      return r
+    },
+  }
+  const columnsBundle: ColumnsBundle = { records: colRecords, values: colValues, api: columnsApi }
+
   const sheetApi: ContentApi = {
     move: (taskId, to) => {
       const task = tasks.find(t => t.id === taskId)
@@ -379,7 +454,7 @@ export function KanbanBoard({
         }))
         setTasks(prev => [...added, ...prev])
         router.refresh()
-      }
+      } else if (res.success && 'values' in res && res.values) router.refresh()
       return res
     },
     async addLink(taskId, url) {
@@ -777,7 +852,8 @@ export function KanbanBoard({
           themes={themes}
           me={currentUser}
           members={members}
-          contentTypes={contentTypes}
+          contentTypes={types}
+          columns={columnsBundle}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}
@@ -795,7 +871,8 @@ export function KanbanBoard({
           tasks={tasks}
           me={currentUser}
           members={members}
-          contentTypes={contentTypes}
+          contentTypes={types}
+          columns={columnsBundle}
           hasStorage={hasStorage}
           videoId={sheetVideo}
           highlightId={sheetRow}

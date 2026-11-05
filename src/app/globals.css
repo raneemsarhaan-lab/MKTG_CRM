@@ -1425,6 +1425,11 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 
 /* Content sheet (spec 009): spanning theme and pillar rows, theme editor, plan preview. */
 .fx-sheet-td.is-span { justify-content: flex-start; }
+/* A row whose title spans every column (a theme, a video): the cell itself is
+   as wide as the row, so it can't stay put when the grid scrolls sideways.
+   Its content does instead, just after the row number. */
+.fx-sheet-td.is-span.is-frozen-title { position: relative; }
+.fx-sheet-td.is-span.is-frozen-title > :first-child { position: sticky; inset-inline-start: 46px; }
 .fx-content-theme { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .fx-content-theme-name { font-family: var(--font-heading); font-weight: 700; font-size: 13px; }
 /* The Type cell: a filled pill, one colour per content type (CONTENT_TYPE_COLORS). */
@@ -1457,6 +1462,63 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-content-fixes { display: flex; gap: 6px; flex-wrap: wrap; }
 .fx-content-fixes select { font: inherit; border: 1px solid var(--sheet-grid); border-radius: 4px; padding: 2px 4px; background: var(--sheet-panel); color: var(--sheet-ink); }
 .fx-content-usesheet { margin-inline-end: auto; }
+/* Spec 010: shaping columns. Header menu, drag, resize; the type-ahead box; the column editor and Columns panel. */
+.fx-sheet-th { gap: 4px; }
+.fx-sheet-th:not(.is-frozen-no):not(.is-frozen-title) { position: relative; }
+.fx-sheet-th-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-sheet-th[draggable="true"] { cursor: grab; }
+.fx-sheet-th.is-dragging { opacity: .45; }
+.fx-sheet-th.is-drop-before::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: -1px; width: 3px; background: var(--sheet-focus); z-index: 6; }
+.fx-sheet-th-menu { flex: none; width: 18px; height: 18px; border: 0; border-radius: 4px; background: transparent; color: var(--sheet-muted); cursor: pointer; padding: 0; opacity: 0; display: inline-grid; place-items: center; }
+.fx-sheet-th-menu::before { content: "▾"; font-size: 11px; }
+.fx-sheet-th:hover .fx-sheet-th-menu, .fx-sheet-th-menu:focus-visible, .fx-sheet-th-menu[aria-expanded="true"] { opacity: 1; }
+.fx-sheet-th-menu:hover { background: var(--sheet-grid); }
+@media (hover: none) { .fx-sheet-th-menu { opacity: 1; } }
+.fx-sheet-th-rz { position: absolute; inset-block: 0; inset-inline-end: -3px; width: 6px; cursor: col-resize; z-index: 4; touch-action: none; }
+.fx-sheet-th-rz:hover { background: var(--sheet-focus); }
+.fx-sheet-th-kind { flex: none; font-size: 10px; font-weight: 600; color: var(--sheet-muted); border: 1px solid var(--sheet-grid); border-radius: 4px; padding: 0 4px; }
+.fx-sheet-pill { display: inline-flex; align-items: center; height: 20px; max-width: 100%; box-sizing: border-box; padding: 0 9px; border-radius: 999px; color: var(--sheet-panel); font-weight: 600; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-sheet-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--sheet-muted); display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; box-sizing: border-box; }
+.fx-sheet-check.is-on { background: var(--sheet-focus); border-color: var(--sheet-focus); color: var(--sheet-panel); }
+.fx-sheet-tr.is-dropped .fx-sheet-pill { background: var(--sheet-gutter) !important; color: var(--sheet-dropped-ink); box-shadow: inset 0 0 0 1px var(--sheet-grid); }
+.fx-sheet-combo { display: grid; gap: 4px; min-width: 240px; }
+.fx-sheet-combo-list { display: grid; gap: 1px; max-height: 260px; overflow: auto; }
+.fx-sheet-combo-opt { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; border-radius: 6px; padding: 6px 8px; text-align: start; cursor: pointer; font: inherit; color: var(--sheet-ink); }
+.fx-sheet-combo-opt[aria-selected="true"] { background: var(--sheet-hover); box-shadow: inset 0 0 0 2px var(--sheet-focus); }
+.fx-sheet-combo-opt small { margin-inline-start: auto; color: var(--sheet-muted); font-size: 11px; }
+.fx-sheet-combo-opt.is-add { color: var(--sheet-link); font-weight: 600; }
+.fx-sheet-combo-opt:disabled { opacity: .55; cursor: default; }
+.fx-sheet-combo-opt mark { background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.fx-sheet-combo-empty { padding: 6px 8px; color: var(--sheet-muted); }
+.fx-sheet-pop-input, .fx-col-form input[type="text"] { font: inherit; font-weight: 400; border: 1px solid var(--sheet-grid); border-radius: 5px; padding: 5px 7px; background: var(--sheet-panel); color: var(--sheet-ink); width: 100%; box-sizing: border-box; }
+.fx-sheet-pop:has(.fx-col-form), .fx-sheet-pop:has(.fx-col-panel) { width: auto; max-width: min(420px, calc(100vw - 16px)); }
+.fx-sheet-pop:has(.fx-sheet-combo) { width: 340px; }
+.fx-col-form { display: grid; gap: 8px; min-width: min(340px, calc(100vw - 32px)); }
+.fx-col-label { font-weight: 600; font-size: 12px; }
+.fx-col-sub { font: 700 10px var(--font-body, system-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--sheet-muted); }
+.fx-col-err { color: var(--sheet-danger); font-weight: 600; font-size: 11.5px; min-height: 15px; }
+.fx-col-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.fx-col-kind { display: flex; gap: 7px; align-items: flex-start; border: 1px solid var(--sheet-grid); border-radius: 8px; padding: 7px; cursor: pointer; text-align: start; background: var(--sheet-panel); color: var(--sheet-ink); font: inherit; }
+.fx-col-kind[aria-checked="true"] { border-color: var(--sheet-focus); box-shadow: inset 0 0 0 1px var(--sheet-focus); }
+.fx-col-kind-ico { width: 22px; height: 22px; border-radius: 6px; background: var(--sheet-header-bg); display: grid; place-items: center; font-weight: 700; font-size: 11px; flex: none; }
+.fx-col-kind b { display: block; font-size: 12px; }
+.fx-col-kind span span { display: block; font-size: 11px; color: var(--sheet-muted); }
+.fx-col-opt { display: flex; align-items: center; gap: 6px; }
+.fx-col-swatch { width: 22px; height: 22px; border-radius: 6px; border: 0; cursor: pointer; flex: none; }
+.fx-col-ib { border: 1px solid var(--sheet-grid); background: var(--sheet-panel); color: var(--sheet-ink); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; flex: none; }
+.fx-col-ib:disabled { opacity: .4; cursor: default; }
+.fx-col-review { padding: 8px 10px; border-radius: 8px; background: var(--sheet-missing-bg); color: var(--sheet-missing); font-weight: 600; }
+.fx-col-panel { display: grid; gap: 2px; min-width: min(360px, calc(100vw - 32px)); max-height: min(480px, 70vh); overflow: auto; }
+.fx-col-prow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+.fx-col-prow:hover { background: var(--sheet-hover); }
+.fx-col-prow label { flex: 1; min-width: 0; display: grid; cursor: pointer; }
+.fx-col-prow .fx-col-who { font-size: 11px; color: var(--sheet-muted); }
+
+/* spec 010: paste previews' Not imported list */
+.fx-col-unknown { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fx-col-unknown li { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 10px; border: 1px dashed var(--line); border-radius: 999px; font-size: 12px; }
+.fx-col-unknown .fx-sheet-btn { padding: 2px 8px; font-size: 11.5px; }
+
 /* ─── end video sheet ───────────────────────────────────────────────────────── */
 
 /* ─── Utility classes ─────────────────────────────────────────────────────── */

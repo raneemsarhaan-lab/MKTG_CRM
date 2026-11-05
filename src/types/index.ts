@@ -21,6 +21,31 @@ export type AccessLevel = 'admin' | 'superuser' | 'user'
 /** The board page's two views of the same tasks (spec 008). */
 export type BoardView = 'board' | 'sheet' | 'content'
 
+// ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
+
+export type SheetId = 'content' | 'video'
+export type ColumnKind = 'text' | 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox'
+export interface ChoiceOption { id: string; name: string; color: string }
+/** One column of a sheet the team has shaped (data-model §1). */
+export interface SheetColumnRecord {
+  id: string
+  sheet: SheetId
+  /** A built-in key (status, fileName…) or c:<id>. */
+  key: string
+  name: string | null
+  position: number
+  width: number | null
+  shownDefault: boolean
+  shownIn: string[]
+  kind: ColumnKind | null
+  options: ChoiceOption[]
+  updatedBy: string | null
+  updatedByName: string | null
+  updatedAt: string
+}
+/** Custom values: column id → task id → normalised value. */
+export type SheetValues = Record<string, Record<string, string>>
+
 // ─── Board Inbox (spec 006) ──────────────────────────────────────────────────
 
 /** The Inbox panel's tabs, in order (FR-015). */
