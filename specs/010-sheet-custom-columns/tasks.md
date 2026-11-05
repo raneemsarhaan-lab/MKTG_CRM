@@ -30,7 +30,7 @@ description: "Task list for Sheet Columns You Can Shape"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create `design/sheet-columns.html` (contracts/columns-ui.md), over the Content sheet with a note for the Video sheet's sets. Show:
+- [X] T001 Create `design/sheet-columns.html` (contracts/columns-ui.md), over the Content sheet with a note for the Video sheet's sets. Show:
   - the header ▾ menu;
   - drag indicator and resize handle;
   - the Columns panel with "Changed by" tooltips;

@@ -1,0 +1,536 @@
+<title>Sheet Columns</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap">
+<!--
+  Spec 010 design file: Sheet Columns You Can Shape (specs/010-sheet-custom-columns/contracts/columns-ui.md).
+  Extends design/content-sheet.html and design/video-sheet.html (same grid, tokens and pills). Shows:
+    · the header ▾ menu: Rename, Reset name, Insert before/after, Move left/right, Hide, Edit column, Delete
+    · dragging a heading to reorder (drop bar), and the edge handle to resize (double-click fits)
+    · the Columns panel: shown ticks, Move up/down, "Changed by …" on every column (FR-004)
+    · + Column / Edit column: name, seven kinds, Choice options with colours, the kind-change review
+    · custom cells: Text, Number, Date, Link, Person, Choice, Checkbox, with refused-value notes
+    · delete confirmation with a count, then Undo for 10 s
+    · Paste plan matching custom headings, and "Not imported → Add as a column"
+    · the Video sheet: hiding applies to the current set (Editing, Copy, Full)
+  Everyone may change columns (clarified 2026-11-05). Mock data; not the live app.
+-->
+<style>
+/* Layout: the app's sheet toolbar and dense grid, with a slim "try it" strip; popovers anchor to what opened them. */
+:root{
+  --bg:#FFFFFF; --ink:#1B1A13; --muted:#5E6166; --grid:#E2E3E3; --head:#F3F4F2; --gutter:#F8F9F8;
+  --frozen:#C9CBC9; --theme:#F4F8E4; --hover:#F6F8FB; --focus:#3563E9; --link:#1F5FD1;
+  --lime:#C8F24E; --lime-ink:#1B1A13; --danger:#C81E3A; --danger-soft:#FDE7EA; --warn:#8A5300; --warn-soft:#FDF3E3;
+  --pop:#FFFFFF; --shadow:0 8px 28px rgba(17,18,20,.16); --scrim:rgba(17,18,20,.45); --dropped:#6B6E72;
+  --on-fill:#FFFFFF;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; --font-head:'Montserrat','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17181B; --ink:#E9E9E4; --muted:#A3A6AB; --grid:#2E3034; --head:#202226; --gutter:#1C1E21;
+  --frozen:#3A3D42; --theme:#22261A; --hover:#1F2328; --focus:#7C9CFF; --link:#8AB0FF;
+  --lime:#C8F24E; --lime-ink:#1B1A13; --danger:#FF7A8E; --danger-soft:#3A1C22; --warn:#F2B861; --warn-soft:#33281A;
+  --pop:#202226; --shadow:0 10px 32px rgba(0,0,0,.5); --scrim:rgba(0,0,0,.6); --dropped:#8B8E93; --on-fill:#FFFFFF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17181B; --ink:#E9E9E4; --muted:#A3A6AB; --grid:#2E3034; --head:#202226; --gutter:#1C1E21;
+  --frozen:#3A3D42; --theme:#22261A; --hover:#1F2328; --focus:#7C9CFF; --link:#8AB0FF;
+  --lime:#C8F24E; --lime-ink:#1B1A13; --danger:#FF7A8E; --danger-soft:#3A1C22; --warn:#F2B861; --warn-soft:#33281A;
+  --pop:#202226; --shadow:0 10px 32px rgba(0,0,0,.5); --scrim:rgba(0,0,0,.6); --dropped:#8B8E93; --on-fill:#FFFFFF; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--ink)}
+body{font:12.5px/1.4 var(--font-body)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--grid)}
+.seg{display:inline-flex;border:1px solid var(--grid);border-radius:999px;padding:2px;background:var(--head)}
+.seg button{border:0;background:transparent;color:var(--muted);border-radius:999px;padding:5px 12px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--lime);color:var(--lime-ink)}
+.gap{flex:1}
+.btn{border:1px solid var(--grid);background:var(--bg);border-radius:999px;padding:6px 13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
+.btn[aria-expanded="true"]{background:var(--head)}
+.try{display:flex;flex-wrap:wrap;gap:6px 16px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--head);color:var(--muted);border-bottom:1px solid var(--grid)}
+.try b{color:var(--ink)}
+.sum{display:flex;gap:16px;padding-block:7px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));color:var(--muted);border-bottom:1px solid var(--grid)}
+.sum b{color:var(--ink)}
+
+/* grid */
+.scroll{overflow:auto;max-height:calc(100vh - 170px)}
+.grid{display:grid;width:max-content;min-width:100%}
+.row{display:contents}
+.c{height:34px;padding:0 8px;border-inline-end:1px solid var(--grid);border-bottom:1px solid var(--grid);display:flex;align-items:center;gap:6px;min-width:0;background:var(--bg);position:relative;white-space:nowrap}
+.c.no{position:sticky;inset-inline-start:0;z-index:2;background:var(--gutter);color:var(--muted);justify-content:center;font-size:11px;font-variant-numeric:tabular-nums;padding:0}
+.c.ti{position:sticky;inset-inline-start:40px;z-index:2;border-inline-end:2px solid var(--frozen)}
+.th{position:sticky;top:0;z-index:3;background:var(--head);font-weight:600;cursor:grab;user-select:none}
+.th.no,.th.ti{z-index:5;cursor:default}
+.th .nm{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.th .menu-b{opacity:0;border:0;background:transparent;border-radius:4px;width:20px;height:20px;cursor:pointer;color:var(--muted);flex:none}
+.th:hover .menu-b,.th:focus-within .menu-b,.th .menu-b[aria-expanded="true"]{opacity:1}
+.th .menu-b:hover{background:var(--grid)}
+.th .rz{position:absolute;inset-block:0;inset-inline-end:-3px;width:6px;cursor:col-resize;z-index:4}
+.th .rz:hover,.th .rz.on{background:var(--focus)}
+.th.dragging{opacity:.45}
+.th.drop-before::before{content:"";position:absolute;inset-block:0;inset-inline-start:-1px;width:3px;background:var(--focus);z-index:6}
+.th .tag{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--grid);border-radius:4px;padding:0 4px}
+.row:hover>.c:not(.no){background:var(--hover)}
+.row.theme>.c{background:var(--theme);font-weight:700}
+.row.pillar>.c{background:var(--head);font-weight:600;font-size:11.5px}
+.row.dropped .txt{text-decoration:line-through;color:var(--dropped)}
+.span{grid-column:2/-1;position:sticky;inset-inline-start:40px}
+.ell{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mut{color:var(--muted)}
+.ind{display:inline-block;width:14px;flex:none}
+.c.active{box-shadow:inset 0 0 0 2px var(--focus);z-index:3}
+.c.custom{cursor:default}
+.c.custom.edit{cursor:text}
+.c input.cell-in{position:absolute;inset:0;border:0;outline:2px solid var(--focus);outline-offset:-2px;padding:0 8px;background:var(--pop);color:var(--ink);font:inherit}
+.note{position:absolute;top:calc(100% - 2px);inset-inline-start:4px;z-index:7;background:var(--danger);color:var(--on-fill);font-size:11px;font-weight:600;border-radius:4px;padding:2px 7px;white-space:nowrap}
+
+/* pills and chips */
+.st{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px 0 7px;border:1px solid var(--grid);border-radius:999px;font-weight:600;font-size:11px;background:var(--bg)}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.ty,.pill{display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:999px;color:var(--on-fill);font-weight:600;font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.person{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.av{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;color:var(--on-fill);font:700 8.5px var(--font-head);flex:none}
+.av.empty{border:1.5px dashed var(--frozen);background:transparent}
+.lnk{color:var(--link);text-decoration:underline;text-underline-offset:2px}
+.num{margin-inline-start:auto;font-variant-numeric:tabular-nums}
+.cb{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--muted);display:inline-grid;place-items:center;font-size:11px;font-weight:700}
+.cb.on{background:var(--focus);border-color:var(--focus);color:var(--on-fill)}
+
+/* popovers, menus, dialogs */
+.pop{position:fixed;z-index:40;background:var(--pop);border:1px solid var(--grid);border-radius:10px;box-shadow:var(--shadow);padding:6px;min-width:220px;max-width:min(360px,calc(100vw - 24px))}
+.mi{display:flex;width:100%;align-items:center;gap:8px;border:0;background:transparent;border-radius:6px;padding:7px 9px;text-align:start;cursor:pointer}
+.mi:hover,.mi:focus-visible{background:var(--hover);outline:none;box-shadow:inset 0 0 0 2px var(--focus)}
+.mi small{margin-inline-start:auto;color:var(--muted)}
+.mi.danger{color:var(--danger)}
+.mi[disabled]{opacity:.45;cursor:default}
+.sep{height:1px;background:var(--grid);margin:4px 2px}
+.ph{font:700 10px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 9px 2px}
+.field{display:grid;gap:4px;padding:6px 8px}
+.field label{font-weight:600}
+.in{font:inherit;border:1px solid var(--grid);border-radius:6px;padding:6px 8px;background:var(--bg);color:var(--ink);width:100%}
+.err{color:var(--danger);font-weight:600;font-size:11.5px;min-height:15px}
+.acts{display:flex;justify-content:flex-end;gap:6px;padding:6px 8px}
+.kinds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px 8px}
+.kind{display:flex;gap:7px;align-items:flex-start;border:1px solid var(--grid);border-radius:8px;padding:7px;cursor:pointer;text-align:start;background:var(--bg)}
+.kind[aria-checked="true"]{border-color:var(--focus);box-shadow:inset 0 0 0 1px var(--focus)}
+.kind .ki{width:22px;height:22px;border-radius:6px;background:var(--head);display:grid;place-items:center;font-weight:700;font-size:11px;flex:none}
+.kind b{display:block;font-size:12px}
+.kind span{display:block;font-size:11px;color:var(--muted)}
+.opt{display:flex;align-items:center;gap:6px;padding:3px 8px}
+.sw{width:22px;height:22px;border-radius:6px;border:0;cursor:pointer;flex:none}
+.ib{border:1px solid var(--grid);background:var(--bg);border-radius:6px;width:26px;height:26px;cursor:pointer;flex:none}
+.review{margin:4px 8px;padding:8px 10px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-weight:600}
+.panel-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px}
+.panel-row:hover{background:var(--hover)}
+.panel-row .who{display:block;font-size:11px;color:var(--muted)}
+.panel-row .grow{flex:1;min-width:0}
+.scrim{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:50;padding:16px}
+.dlg{background:var(--pop);border-radius:12px;box-shadow:var(--shadow);width:min(560px,100%);max-height:calc(100% - 32px);overflow:auto;padding:14px 16px;display:grid;gap:10px}
+.dlg h2{margin:0;font:800 15px var(--font-head)}
+.dlg p{margin:0;color:var(--muted)}
+.ptab{width:100%;border-collapse:collapse}
+.ptab th,.ptab td{text-align:start;padding:5px 6px;border-bottom:1px solid var(--grid);white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--grid)}
+.chip.ok{border-color:transparent;background:var(--lime);color:var(--lime-ink)}
+.chip.bad{color:var(--danger);background:var(--danger-soft);border-color:transparent}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:10px;padding:9px 14px;font-weight:600;display:flex;gap:12px;align-items:center;z-index:60;max-width:calc(100vw - 32px)}
+.toast button{border:0;background:transparent;color:var(--lime);font-weight:700;cursor:pointer;text-decoration:underline}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+
+<header class="bar" role="toolbar" aria-label="Sheet">
+  <div class="seg" role="group" aria-label="View"><button aria-pressed="false">Board</button><button aria-pressed="false" data-view="video">Sheet</button><button aria-pressed="true" data-view="content">Content</button></div>
+  <div class="seg" role="group" aria-label="Video column set" id="sets" hidden><button aria-pressed="true" data-set="editing">Editing</button><button aria-pressed="false" data-set="copy">Copy</button><button aria-pressed="false" data-set="full">Full</button></div>
+  <span class="gap"></span>
+  <button class="btn" id="colsBtn" aria-haspopup="dialog" aria-expanded="false" data-columns-button>☰ Columns</button>
+  <button class="btn" id="addBtn" data-add-column>+ Column</button>
+  <button class="btn primary" id="pasteBtn">Paste plan</button>
+</header>
+<div class="try" aria-label="Try it">
+  <span><b>Try it:</b> open a heading's ▾ menu</span><span>drag a heading to move it</span><span>drag its edge to resize, or double-click to fit</span><span>double-click a Hook cell to type</span><span>click a Platform pill</span><span>Alt+↓ on a cell opens its column menu</span>
+</div>
+<div class="sum" id="sum"></div>
+<div class="scroll"><div class="grid" id="grid" role="treegrid" aria-label="Content plan"></div></div>
+<div id="layer"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+'use strict';
+/* ---------- tokens shared with the app (CHOICE_COLORS, CONTENT_TYPE_COLORS, stage pills) ---------- */
+const CHOICE_COLORS=['#1D4ED8','#BE185D','#7E22CE','#0F766E','#B45309','#4338CA','#C2410C','#334155','#A21CAF','#0369A1'];
+const TYPE={Post:'#1D4ED8',Reel:'#BE185D',Video:'#7E22CE',Article:'#0F766E',Report:'#B45309','Framework/Model':'#4338CA'};
+const STAGE={todo:['Planned','#64748B'],'c-prog':['Writing','#3B82F6'],'d-prog':['Initial Design','#7C3AED'],'d-check':['Final Design','#5B3FB5'],'ready-publish':['Ready to Publish','#0EA5E9'],publish:['Published','#22C55E']};
+const VSTAGE={'d-prog':['Editing','#7C3AED'],'d-check':['Edit Review','#5B3FB5'],publish:['Published','#22C55E'],todo:['To Do','#64748B'],'c-final':['Script Review','#2E6FB0']};
+const PEOPLE={samaa:'Samaa',noran:'Noran',mariam:'Mariam',omar:'Omar',lina:'Lina'};
+const AVC={samaa:'#6E5BE6',noran:'#E0736A',mariam:'#3FA34D',omar:'#5B6066',lina:'#5B93F5'};
+const KINDS=[['text','Aa','Text','Any words'],['number','#','Number','Counts and amounts'],['date','▦','Date','A day, e.g. 20/11/2026'],['link','↗','Link','A web address'],['person','☺','Person','One team member'],['choice','◉','Choice','One option from a list'],['checkbox','☑','Checkbox','Yes or no']];
+const ago=m=>m<60?`${m} min ago`:`${Math.round(m/60)}h ago`;
+
+/* ---------- state ---------- */
+const S={
+  view:'content', set:'editing', active:null, editing:null, notes:{}, undo:null,
+  content:{
+    cols:[
+      {key:'title',def:'Title',w:280,builtIn:true,who:null},
+      {key:'type',def:'Type',w:120,builtIn:true,who:null},
+      {key:'status',def:'Status',name:'Copy status',w:150,builtIn:true,who:['samaa',6]},
+      {key:'assignee',def:'Assignee',w:130,builtIn:true,who:null},
+      {key:'c:hook',name:'Hook',kind:'text',w:220,who:['samaa',4]},
+      {key:'c:platform',name:'Platform',kind:'choice',w:120,who:['noran',20],options:[{id:'li',name:'LinkedIn',color:CHOICE_COLORS[0]},{id:'ig',name:'Instagram',color:CHOICE_COLORS[1]},{id:'x',name:'X',color:CHOICE_COLORS[7]}]},
+      {key:'doc',def:'Working Doc',w:120,builtIn:true,who:null},
+      {key:'design',def:'Design Link',w:110,builtIn:true,who:null},
+      {key:'c:reviewer',name:'Reviewer',kind:'person',w:120,who:['mariam',90]},
+      {key:'c:approved',name:'Approved',kind:'checkbox',w:90,who:['samaa',120]},
+      {key:'c:words',name:'Words',kind:'number',w:80,who:['noran',180]},
+      {key:'c:golive',name:'Go-live',kind:'date',w:104,who:['noran',180]},
+      {key:'task',def:'Task Link',w:100,builtIn:true,who:null},
+      {key:'post',def:'LinkedIn Link',name:'LinkedIn',w:110,builtIn:true,who:['samaa',300]},
+      {key:'published',def:'Published Link',w:124,builtIn:true,who:null},
+      {key:'pillar',def:'Pillar',w:120,builtIn:true,hidden:true,who:['mariam',40]},
+    ],
+    rows:[
+      {kind:'theme',name:'Strategy',count:4},
+      {kind:'pillar',name:'AI',count:3},
+      {id:'p1',name:'AI Pillar SM Campaign - Post 1',type:'Post',status:'publish',assignee:'mariam',doc:'Google Docs',v:{'c:hook':'AI is a strategy question, not a tooling one','c:platform':'li','c:reviewer':'samaa','c:approved':'1','c:words':'184','c:golive':'2026-11-03'},post:null,published:null},
+      {id:'p2',name:'AI Pillar SM Campaign - Post 2',type:'Post',status:'ready-publish',assignee:'mariam',doc:'Google Docs',design:'claude.ai',v:{'c:hook':'Three questions before any AI pilot','c:platform':'li','c:words':'152','c:golive':'2026-11-06'}},
+      {id:'p3',name:'AI Pillar Article',type:'Article',status:'publish',doc:'Google Docs',v:{'c:platform':'ig','c:reviewer':'samaa','c:approved':'1','c:words':'1240'},published:'forefront.consulting'},
+      {kind:'pillar',name:'Decision Making',count:1},
+      {id:'p4',name:'A CEO Guide to Say No',type:'Article',status:'todo',doc:'Google Docs',v:{}},
+    ],
+  },
+  video:{
+    cols:[
+      {key:'title',def:'Title',w:280,builtIn:true},
+      {key:'clipNo',def:'#',w:40,builtIn:true},
+      {key:'status',def:'Status',w:150,builtIn:true},
+      {key:'editor',def:'Editor',w:120,builtIn:true},
+      {key:'c:hook',name:'Hook',kind:'text',w:200,who:['lina',15],sets:['full','editing']},
+      {key:'source',def:'Source',w:92,builtIn:true,sets:['full','copy'],who:['omar',30]},
+      {key:'fileName',def:'File name',w:230,builtIn:true},
+      {key:'length',def:'Length',w:70,builtIn:true},
+      {key:'c:music',name:'Music cleared',kind:'checkbox',w:110,who:['lina',50],sets:['full','editing']},
+      {key:'published',def:'Published',w:120,builtIn:true,sets:['full','copy']},
+    ],
+    rows:[
+      {kind:'video',name:'Strategy Execution and Leadership',status:'d-prog',editor:'omar'},
+      {id:'v1',no:'04',name:'Keeping Strategy on Track',status:'publish',editor:'lina',source:'IMG_0293',file:'04_IMG_0293_2m20.2s-3m49.0s.mp4',len:'1:28.8',v:{'c:hook':'Strategy fails in the calendar','c:music':'1'}},
+      {id:'v2',no:'05',name:'Strategy Deployment: The Missing Link',status:'d-check',editor:'omar',source:'IMG_0293',file:'05_IMG_0293_3m56.1s-5m06.8s.mp4',len:'1:10.7',v:{'c:hook':'The missing link is the middle manager'}},
+      {id:'v3',no:'08',name:'The Six Cs of Strategy Deployment',status:'d-prog',editor:'lina',source:'IMG_0293',file:'08_IMG_0293_8m44.4s-9m44.7s.mp4',len:'1:00.3',v:{}},
+    ],
+  },
+};
+const sheet=()=>S[S.view];
+const nameOf=c=>c.name??c.def;
+const shown=c=>{ if(c.key==='title') return true; if(S.view==='video'){ const sets=c.sets??['full','editing','copy']; return sets.includes(S.set) } return !c.hidden };
+const visible=()=>sheet().cols.filter(shown);
+const esc=s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const $=s=>document.querySelector(s);
+
+/* ---------- cells ---------- */
+function person(id){ return id?`<span class="person"><span class="av" style="background:${AVC[id]}">${PEOPLE[id][0]}</span><span class="ell">${PEOPLE[id]}</span></span>`:`<span class="person"><span class="av empty"></span><span class="mut">Unassigned</span></span>` }
+function stagePill(map,s){ const [n,c]=map[s]; return `<span class="st" style="background:color-mix(in srgb,${c} 14%,var(--bg));border-color:color-mix(in srgb,${c} 38%,var(--bg))"><i class="dot" style="background:${c}"></i>${n} ▾</span>` }
+function customHtml(col,val){
+  if(val==null||val==='') return col.kind==='checkbox'?'<span class="cb" aria-hidden="true"></span>':'';
+  switch(col.kind){
+    case 'text': return `<span class="ell">${esc(val)}</span>`;
+    case 'number': return `<span class="num">${Number(val).toLocaleString('en')}</span>`;
+    case 'date': return new Date(val+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    case 'link': return `<span class="lnk ell">${esc(val)}</span>`;
+    case 'person': return person(val);
+    case 'choice': { const o=(col.options||[]).find(x=>x.id===val); return o?`<span class="pill" style="background:${o.color}">${esc(o.name)}</span>`:'' }
+    case 'checkbox': return '<span class="cb on" aria-hidden="true">✓</span>';
+  }
+}
+function builtInHtml(key,r){
+  if(S.view==='content') switch(key){
+    case 'type': return `<span class="ty" style="background:${TYPE[r.type]||'#52525B'}">${r.type}</span>`;
+    case 'status': return stagePill(STAGE,r.status);
+    case 'assignee': return person(r.assignee);
+    case 'doc': return r.doc?`<span class="lnk">${r.doc}</span>`:'<span class="mut">+ link</span>';
+    case 'design': return r.design?`<span class="lnk">${r.design}</span>`:'<span class="mut">+ link</span>';
+    case 'task': return '<span class="lnk">Open task</span>';
+    case 'post': return r.post?`<span class="lnk">${r.post}</span>`:'<span class="mut">+ link</span>';
+    case 'published': return r.published?`<span class="lnk">${r.published}</span>`:r.status==='publish'?'<span class="chip" style="color:var(--warn);background:var(--warn-soft);border-color:transparent">Missing link</span>':'<span class="mut">+ link</span>';
+    case 'pillar': return r.pillar??'<span class="mut">AI</span>';
+  } else switch(key){
+    case 'clipNo': return `<span class="num">${r.no}</span>`;
+    case 'status': return stagePill(VSTAGE,r.status);
+    case 'editor': return person(r.editor);
+    case 'source': return `<span style="font-family:ui-monospace,monospace">${r.source}</span>`;
+    case 'fileName': return `<span class="ell" style="font-family:ui-monospace,monospace">${r.file}</span>`;
+    case 'length': return `<span class="num">${r.len}</span>`;
+    case 'published': return r.status==='publish'?'<span class="lnk">linkedin.com</span>':'';
+  }
+  return '';
+}
+
+/* ---------- grid ---------- */
+let drag=null, rz=null;
+function render(){
+  const sh=sheet(), cols=visible();
+  const g=$('#grid');
+  g.setAttribute('aria-label',S.view==='content'?'Content plan':'Video sheet');
+  g.style.gridTemplateColumns=`40px ${cols.map(c=>c.w+'px').join(' ')}`;
+  let h=`<div class="row" role="row"><div class="c th no" role="columnheader" aria-label="#"></div>`;
+  for(const c of cols){
+    const ti=c.key==='title';
+    h+=`<div class="c th${ti?' ti':''}" role="columnheader" data-col="${c.key}" ${ti?'':'draggable="true"'} title="${esc(nameOf(c))}">
+      <span class="nm">${esc(nameOf(c))}</span>${c.kind?`<span class="tag" aria-hidden="true">${KINDS.find(k=>k[0]===c.kind)[1]}</span>`:''}
+      <button class="menu-b" data-col-menu="${c.key}" aria-haspopup="menu" aria-label="Column menu for ${esc(nameOf(c))}">▾</button>
+      <span class="rz" data-rz="${c.key}" aria-hidden="true"></span></div>`;
+  }
+  h+='</div>';
+  let n=0;
+  for(const r of sh.rows){
+    n++;
+    if(r.kind==='theme'||r.kind==='pillar'){
+      h+=`<div class="row ${r.kind}" role="row"><div class="c no">${n}</div><div class="c span">${r.kind==='theme'?'▾ ':'<span class="ind"></span>'}${esc(r.name)} <span class="mut" style="font-weight:500">· ${r.count}</span></div></div>`; continue }
+    if(r.kind==='video'){
+      h+=`<div class="row theme" role="row"><div class="c no">${n}</div>`;
+      for(const c of cols) h+=`<div class="c${c.key==='title'?' ti':''}">${c.key==='title'?'▾ '+esc(r.name):c.key==='status'?stagePill(VSTAGE,r.status):c.key==='editor'?person(r.editor):''}</div>`;
+      h+='</div>'; continue }
+    h+=`<div class="row" role="row"><div class="c no">${n}</div>`;
+    for(const c of cols){
+      const id=`${r.id}|${c.key}`, act=S.active===id?' active':'';
+      if(c.key==='title'){ h+=`<div class="c ti${act}" data-cell="${id}" tabindex="-1"><span class="ind"></span><span class="ell txt">${esc(r.name)}</span></div>`; continue }
+      if(c.kind){
+        const val=r.v[c.key];
+        const editing=S.editing===id;
+        const typed=['text','number','date','link'].includes(c.kind);
+        h+=`<div class="c custom${typed?' edit':''}${act}" data-cell="${id}" tabindex="-1" ${c.kind==='checkbox'?`role="checkbox" aria-checked="${val?'true':'false'}" aria-label="${esc(nameOf(c))}"`:''}>${editing?`<input class="cell-in" id="in-${id}" value="${esc(val||'')}" aria-label="${esc(nameOf(c))}">`:customHtml(c,val)}${S.notes[id]?`<span class="note" role="alert">${S.notes[id]}</span>`:''}</div>`;
+      } else h+=`<div class="c${act}" data-cell="${id}" tabindex="-1">${builtInHtml(c.key,r)}</div>`;
+    }
+    h+='</div>';
+  }
+  g.innerHTML=h;
+  const live=sh.rows.filter(r=>r.id).length, custom=sh.cols.filter(c=>c.kind).length, hidden=sh.cols.filter(c=>!shown(c)).length;
+  $('#sum').innerHTML=S.view==='content'?`<span><b>Content plan</b></span><span>${live} pieces</span><span>${custom} custom columns</span><span>${hidden} hidden</span>`:`<span><b>Strategy Execution and Leadership</b></span><span>${live} clips</span><span>${custom} custom columns</span><span>${hidden} hidden in ${S.set[0].toUpperCase()+S.set.slice(1)}</span>`;
+  if(S.editing){ const i=document.getElementById('in-'+S.editing); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length) } }
+  else if(S.active){ document.querySelector(`[data-cell="${CSS.escape(S.active)}"]`)?.focus({preventScroll:true}) }
+}
+
+/* ---------- popovers ---------- */
+let anchorEl=null;
+function closePop(restore=true){ $('#layer').innerHTML=''; document.querySelectorAll('[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false')); if(restore&&anchorEl?.isConnected) anchorEl.focus(); anchorEl=null }
+function openPop(anchor,html,{wide}={}){
+  closePop(false); anchorEl=anchor; anchor.setAttribute?.('aria-expanded','true');
+  const p=document.createElement('div'); p.className='pop'; p.innerHTML=html; if(wide) p.style.minWidth='320px';
+  $('#layer').appendChild(p);
+  const r=anchor.getBoundingClientRect(), rtl=getComputedStyle(document.documentElement).direction==='rtl';
+  let left=rtl?r.right-p.offsetWidth:r.left; left=Math.max(8,Math.min(left,innerWidth-p.offsetWidth-8));
+  let top=r.bottom+4; if(top+p.offsetHeight>innerHeight-8) top=Math.max(8,r.top-p.offsetHeight-4);
+  p.style.left=left+'px'; p.style.top=top+'px';
+  requestAnimationFrame(()=>p.querySelector('input,button:not([disabled])')?.focus());
+  return p;
+}
+function toast(msg,undo){
+  const t=$('#toast'); clearTimeout(toast.h); t.hidden=false;
+  t.innerHTML=`<span>${msg}</span>${undo?'<button id="undoBtn">Undo</button>':''}`;
+  if(undo) $('#undoBtn').onclick=()=>{ undo(); t.hidden=true };
+  toast.h=setTimeout(()=>{t.hidden=true;S.undo=null},undo?10000:2600);
+}
+const col=key=>sheet().cols.find(c=>c.key===key);
+const stamp=c=>{ c.who=['you',0] };
+
+function colMenu(key,anchor){
+  const c=col(key), cols=visible(), i=cols.indexOf(c), ti=key==='title';
+  const p=openPop(anchor,`<div role="menu" aria-label="Column ${esc(nameOf(c))}">
+    <button class="mi" role="menuitem" data-a="rename">Rename…</button>
+    ${c.builtIn&&c.name?'<button class="mi" role="menuitem" data-a="reset">Reset name <small>'+esc(c.def)+'</small></button>':''}
+    <div class="sep"></div>
+    ${ti?'':'<button class="mi" role="menuitem" data-a="before">Insert column before…</button>'}
+    <button class="mi" role="menuitem" data-a="after">Insert column after…</button>
+    <div class="sep"></div>
+    <button class="mi" role="menuitem" data-a="left" ${ti||i<=1?'disabled':''}>Move left</button>
+    <button class="mi" role="menuitem" data-a="right" ${ti||i===cols.length-1?'disabled':''}>Move right</button>
+    ${ti?'':`<button class="mi" role="menuitem" data-a="hide">Hide${S.view==='video'?` <small>in ${S.set[0].toUpperCase()+S.set.slice(1)}</small>`:''}</button>`}
+    ${c.kind?'<div class="sep"></div><button class="mi" role="menuitem" data-a="edit">Edit column…</button><button class="mi danger" role="menuitem" data-a="delete">Delete column…</button>':''}
+  </div>`);
+  p.onclick=e=>{ const b=e.target.closest('[data-a]'); if(!b||b.disabled) return; const a=b.dataset.a;
+    if(a==='rename') renamePop(key,anchor);
+    else if(a==='reset'){ delete c.name; stamp(c); closePop(); render(); toast(`Reset to “${c.def}”`) }
+    else if(a==='before'||a==='after') editor(null,anchor,{rel:a,key});
+    else if(a==='left'||a==='right') { move(key,a==='left'?-1:1); closePop(); render(); toast(`Moved ${nameOf(c)} ${a}`) }
+    else if(a==='hide'){ hide(c,true); closePop(); render(); toast(`${nameOf(c)} hidden. Show it from Columns.`) }
+    else if(a==='edit') editor(c,anchor);
+    else if(a==='delete') delConfirm(c);
+  };
+  menuKeys(p);
+}
+function menuKeys(p){
+  p.addEventListener('keydown',e=>{
+    const items=[...p.querySelectorAll('[role="menuitem"]:not([disabled])')], i=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(i+1)%items.length]?.focus()}
+    if(e.key==='ArrowUp'){e.preventDefault();items[(i-1+items.length)%items.length]?.focus()}
+  });
+}
+function renamePop(key,anchor){
+  const c=col(key);
+  const p=openPop(anchor,`<form class="field" id="rnF"><label for="rn">Column name</label><input class="in" id="rn" maxlength="40" value="${esc(nameOf(c))}"><span class="err" id="rnE" role="alert"></span><div class="acts"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">Rename</button></div></form>`);
+  p.querySelector('[data-x]').onclick=()=>closePop();
+  p.querySelector('#rnF').onsubmit=e=>{ e.preventDefault(); const v=p.querySelector('#rn').value.trim().replace(/\s+/g,' ');
+    const err=checkName(v,key); if(err){ p.querySelector('#rnE').textContent=err; return }
+    if(c.builtIn&&v===c.def) delete c.name; else c.name=v; stamp(c); closePop(); render(); toast(`Renamed to “${v}”`) };
+  const i=p.querySelector('#rn'); i.select();
+}
+function checkName(v,except){
+  if(!v) return 'A column needs a name.';
+  if(v.length>40) return 'Keep it to 40 characters.';
+  if(sheet().cols.some(c=>c.key!==except&&!c.deleted&&(nameOf(c).toLowerCase()===v.toLowerCase()||(c.def||'').toLowerCase()===v.toLowerCase()))) return `“${v}” is already a column here.`;
+  return '';
+}
+function move(key,d){ const cs=sheet().cols, vis=visible(), c=col(key), i=vis.indexOf(c), t=vis[i+d]; if(!t||t.key==='title') return;
+  const a=cs.indexOf(c), b=cs.indexOf(t); cs.splice(a,1); cs.splice(cs.indexOf(t)+(d>0?1:0),0,c); stamp(c) }
+function moveBefore(key,beforeKey){ const cs=sheet().cols, c=col(key); cs.splice(cs.indexOf(c),1); const at=beforeKey?cs.indexOf(col(beforeKey)):cs.length; cs.splice(Math.max(1,at),0,c); stamp(c) }
+function hide(c,h){ if(S.view==='video'){ const sets=new Set(c.sets??['full','editing','copy']); h?sets.delete(S.set):sets.add(S.set); c.sets=[...sets] } else c.hidden=h; stamp(c) }
+
+/* ---------- Columns panel ---------- */
+function panel(){
+  const anchor=$('#colsBtn'), cs=sheet().cols.filter(c=>!c.deleted);
+  const p=openPop(anchor,`<div role="dialog" aria-label="Columns" data-columns-panel><div class="ph">Columns${S.view==='video'?' · '+S.set[0].toUpperCase()+S.set.slice(1)+' set':''} · everyone sees these</div>
+    ${cs.map((c,i)=>`<div class="panel-row"><input type="checkbox" id="sh-${c.key}" data-sh="${c.key}" ${shown(c)?'checked':''} ${c.key==='title'?'disabled':''} aria-describedby="who-${c.key}">
+      <label class="grow" for="sh-${c.key}"><span class="ell" style="display:block">${esc(nameOf(c))}${c.kind?` <span class="mut">· ${KINDS.find(k=>k[0]===c.kind)[2]}</span>`:''}</span><span class="who" id="who-${c.key}">${c.who?`Changed by ${c.who[0]==='you'?'you':PEOPLE[c.who[0]]}, ${c.who[0]==='you'?'just now':ago(c.who[1])}`:'Default'}</span></label>
+      <button class="ib" data-up="${c.key}" aria-label="Move ${esc(nameOf(c))} up" ${i<=1||c.key==='title'?'disabled':''}>↑</button><button class="ib" data-down="${c.key}" aria-label="Move ${esc(nameOf(c))} down" ${c.key==='title'||i===cs.length-1?'disabled':''}>↓</button>
+      <button class="ib" data-more="${c.key}" aria-label="More for ${esc(nameOf(c))}" aria-haspopup="menu">⋯</button></div>`).join('')}
+    <div class="sep"></div><button class="mi" data-add>+ Column</button></div>`,{wide:true});
+  p.onchange=e=>{ const k=e.target.dataset.sh; if(!k) return; hide(col(k),!e.target.checked); render(); panel(); document.getElementById('sh-'+k)?.focus() };
+  p.onclick=e=>{ const b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.up||b.dataset.down){ const k=b.dataset.up||b.dataset.down, cs2=sheet().cols, c=col(k), i=cs2.indexOf(c), j=i+(b.dataset.up?-1:1); if(j<1||j>=cs2.length) return; cs2.splice(i,1); cs2.splice(j,0,c); stamp(c); render(); panel(); p.isConnected||document.querySelector(`[data-${b.dataset.up?'up':'down'}="${k}"]`)?.focus() }
+    else if(b.dataset.more) colMenu(b.dataset.more,b);
+    else if(b.hasAttribute('data-add')) editor(null,$('#addBtn'));
+  };
+}
+
+/* ---------- column editor ---------- */
+function editor(c,anchor,ins){
+  const isNew=!c, draft={name:c?nameOf(c):'',kind:c?.kind??'text',options:JSON.parse(JSON.stringify(c?.options??[{id:'o1',name:'Option 1',color:CHOICE_COLORS[0]}]))};
+  const draw=()=>{
+    const p=openPop(anchor,`<form id="edF" data-column-editor><div class="ph">${isNew?'Add a column':'Edit column'}${ins?` · ${ins.rel} ${esc(nameOf(col(ins.key)))}`:''}</div>
+      <div class="field"><label for="edN">Name</label><input class="in" id="edN" maxlength="40" value="${esc(draft.name)}" placeholder="e.g. Hook"><span class="err" id="edE" role="alert"></span></div>
+      <div class="ph">Kind</div><div class="kinds" role="radiogroup" aria-label="Kind">${KINDS.map(k=>`<button type="button" class="kind" role="radio" aria-checked="${draft.kind===k[0]}" data-k="${k[0]}"><span class="ki" aria-hidden="true">${k[1]}</span><span><b>${k[2]}</b><span>${k[3]}</span></span></button>`).join('')}</div>
+      ${draft.kind==='choice'?`<div class="ph">Options</div>${draft.options.map((o,i)=>`<div class="opt"><button type="button" class="sw" style="background:${o.color}" data-sw="${i}" aria-label="Change colour of ${esc(o.name)}"></button><input class="in" data-on="${i}" value="${esc(o.name)}" aria-label="Option ${i+1}"><button type="button" class="ib" data-rm="${i}" aria-label="Remove ${esc(o.name)}">×</button></div>`).join('')}<div class="acts" style="justify-content:flex-start"><button type="button" class="btn" data-addopt>+ Option</button></div>`:''}
+      ${!isNew&&c.kind!==draft.kind?`<div class="review" role="status">${reviewText(c,draft.kind)}</div>`:''}
+      <div class="acts"><button type="button" class="btn" data-x>Cancel</button><button class="btn primary">${isNew?'Add column':'Save'}</button></div></form>`,{wide:true});
+    p.querySelector('[data-x]').onclick=()=>closePop();
+    p.querySelector('#edN').oninput=e=>draft.name=e.target.value;
+    p.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{draft.kind=b.dataset.k;draw();document.querySelector(`[data-k="${draft.kind}"]`)?.focus()});
+    p.querySelectorAll('[data-on]').forEach(i=>i.oninput=()=>draft.options[+i.dataset.on].name=i.value);
+    p.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{const o=draft.options[+b.dataset.sw];o.color=CHOICE_COLORS[(CHOICE_COLORS.indexOf(o.color)+1)%CHOICE_COLORS.length];draw()});
+    p.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{draft.options.splice(+b.dataset.rm,1);draw()});
+    p.querySelector('[data-addopt]')?.addEventListener('click',()=>{draft.options.push({id:'o'+Date.now(),name:`Option ${draft.options.length+1}`,color:CHOICE_COLORS[draft.options.length%CHOICE_COLORS.length]});draw()});
+    p.querySelector('#edF').onsubmit=e=>{ e.preventDefault(); const v=draft.name.trim().replace(/\s+/g,' '), err=checkName(v,c?.key); if(err){p.querySelector('#edE').textContent=err;return}
+      if(isNew){ const nc={key:'c:'+Date.now(),name:v,kind:draft.kind,w:140,options:draft.kind==='choice'?draft.options:undefined,who:['you',0]}; if(S.view==='video') nc.sets=['full',S.set];
+        const cs=sheet().cols; const at=ins?cs.indexOf(col(ins.key))+(ins.rel==='after'?1:0):cs.length; cs.splice(Math.max(1,at),0,nc); closePop(); render(); toast(`Added “${v}”${S.view==='video'?` to Full and ${S.set[0].toUpperCase()+S.set.slice(1)}`:''}`) }
+      else { if(c.kind!==draft.kind) convert(c,draft.kind); c.name=v; c.kind=draft.kind; c.options=draft.kind==='choice'?draft.options:c.options; stamp(c); closePop(); render(); toast(`Saved “${v}”`) } };
+    p.querySelector('#edN').focus();
+  };
+  draw();
+}
+function fits(kind,val){ if(kind==='text') return true; if(kind==='number') return !isNaN(Number(val)); if(kind==='date') return /^\d{4}-\d{2}-\d{2}$/.test(val); if(kind==='checkbox') return val==='1'; return false }
+function reviewText(c,kind){ const vals=sheet().rows.filter(r=>r.id&&r.v[c.key]); const bad=vals.filter(r=>!fits(kind,String(r.v[c.key]))); return bad.length?`${bad.length} of ${vals.length} values won't fit ${KINDS.find(k=>k[0]===kind)[2]} and will be cleared: ${bad.slice(0,2).map(r=>`“${esc(String(r.v[c.key]).slice(0,24))}”`).join(', ')}${bad.length>2?'…':''}`:`All ${vals.length} values fit ${KINDS.find(k=>k[0]===kind)[2]}.` }
+function convert(c,kind){ for(const r of sheet().rows) if(r.id&&r.v[c.key]&&!fits(kind,String(r.v[c.key]))) delete r.v[c.key] }
+
+/* ---------- delete with Undo ---------- */
+function delConfirm(c){
+  closePop(false);
+  const count=sheet().rows.filter(r=>r.id&&r.v[c.key]).length;
+  $('#layer').innerHTML=`<div class="scrim"><div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlT"><h2 id="dlT">Delete ${esc(nameOf(c))}?</h2><p>${count} ${count===1?'row has':'rows have'} a value. This removes the column and its values for everyone.</p><div class="acts"><button class="btn" data-x>Cancel</button><button class="btn" style="background:var(--danger);color:var(--on-fill);border-color:var(--danger)" data-del>Delete column</button></div></div></div>`;
+  $('[data-del]').focus();
+  $('[data-x]').onclick=()=>{ $('#layer').innerHTML='' };
+  $('[data-del]').onclick=()=>{ c.deleted=true; const cs=sheet().cols, at=cs.indexOf(c); cs.splice(at,1); $('#layer').innerHTML=''; render();
+    toast(`${esc(nameOf(c))} deleted`,()=>{ delete c.deleted; sheet().cols.splice(at,0,c); render(); toast(`${esc(nameOf(c))} restored, with its values`) }) };
+}
+
+/* ---------- paste preview ---------- */
+function paste(){
+  $('#layer').innerHTML=`<div class="scrim"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="ppT"><h2 id="ppT">Paste plan</h2><p>18 rows · matched by the sheet's current column names.</p>
+    <table class="ptab"><thead><tr><th>Pasted heading</th><th>Fills</th><th></th></tr></thead><tbody>
+      <tr><td>Status</td><td>Copy status</td><td><span class="chip ok">18 values</span></td></tr>
+      <tr><td>Hook</td><td>Hook · Text</td><td><span class="chip ok">18 values</span></td></tr>
+      <tr><td>Platform</td><td>Platform · Choice</td><td><span class="chip ok">17 values</span> <span class="chip bad">1 problem</span></td></tr>
+      <tr><td>Words</td><td>Words · Number</td><td><span class="chip ok">18 values</span></td></tr>
+    </tbody></table>
+    <div><div class="ph" style="padding-inline:0">Problems</div><p>Row 11, Platform: “Threads” isn't an option. Fix it in the preview, or add it as an option.</p></div>
+    <div><div class="ph" style="padding-inline:0">Not imported</div><div class="panel-row" style="padding-inline:0"><span class="grow">Notes <span class="mut">· 9 values</span></span><button class="btn" id="addNotes">Add as a column</button></div></div>
+    <div class="acts"><button class="btn" data-x>Close</button><button class="btn primary" data-x>Add 18 pieces</button></div></div></div>`;
+  $('#layer').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{$('#layer').innerHTML=''});
+  $('#addNotes').onclick=e=>{ e.target.outerHTML='<span class="chip ok">Will add “Notes” · Text</span>' };
+}
+
+/* ---------- cell editing ---------- */
+function commit(id,raw){
+  const [rid,key]=id.split('|'), c=col(key), r=sheet().rows.find(x=>x.id===rid); raw=raw.trim(); delete S.notes[id];
+  if(!raw){ delete r.v[key]; return true }
+  let v=raw;
+  if(c.kind==='number'){ if(isNaN(Number(raw.replace(/,/g,'')))){ S.notes[id]='Not a number'; return false } v=String(Number(raw.replace(/,/g,''))) }
+  if(c.kind==='date'){ const m=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); v=m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:raw; if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ S.notes[id]='Not a date: use 2026-11-20 or 20/11/2026'; return false } }
+  if(c.kind==='link'&&!/^https?:\/\/\S+\.\S+/.test(raw)){ S.notes[id]='Not a link'; return false }
+  r.v[key]=v; return true;
+}
+function openCell(id,anchor){
+  const [rid,key]=id.split('|'), c=col(key); if(!c?.kind) return;
+  const r=sheet().rows.find(x=>x.id===rid);
+  if(['text','number','date','link'].includes(c.kind)){ S.editing=id; render(); return }
+  if(c.kind==='checkbox'){ r.v[key]=r.v[key]?'':'1'; if(!r.v[key]) delete r.v[key]; render(); return }
+  if(c.kind==='choice'||c.kind==='person'){
+    const items=c.kind==='choice'?c.options.map(o=>[o.id,`<span class="pill" style="background:${o.color}">${esc(o.name)}</span>`]):Object.keys(PEOPLE).map(p=>[p,person(p)]);
+    const p=openPop(anchor,`<div role="menu" aria-label="${esc(nameOf(c))}">${items.map(([v,h])=>`<button class="mi" role="menuitem" data-v="${v}">${h}</button>`).join('')}<div class="sep"></div><button class="mi" role="menuitem" data-v="">Clear</button></div>`);
+    p.onclick=e=>{ const b=e.target.closest('[data-v]'); if(!b) return; if(b.dataset.v) r.v[key]=b.dataset.v; else delete r.v[key]; closePop(); render() };
+    menuKeys(p);
+  }
+}
+
+/* ---------- events ---------- */
+const grid=$('#grid');
+grid.addEventListener('click',e=>{
+  const m=e.target.closest('[data-col-menu]'); if(m){ colMenu(m.dataset.colMenu,m); return }
+  const cell=e.target.closest('[data-cell]'); if(!cell||cell.querySelector('input')) return;
+  S.active=cell.dataset.cell; S.editing=null; render();
+  const [,key]=S.active.split('|'), c=col(key);
+  if(c?.kind&&['choice','person','checkbox'].includes(c.kind)) openCell(S.active,document.querySelector(`[data-cell="${CSS.escape(S.active)}"]`));
+});
+grid.addEventListener('dblclick',e=>{
+  const rzh=e.target.closest('[data-rz]'); if(rzh){ fit(rzh.dataset.rz); return }
+  const cell=e.target.closest('[data-cell]'); if(cell) openCell(cell.dataset.cell,cell);
+});
+grid.addEventListener('keydown',e=>{
+  const inp=e.target.closest('input.cell-in');
+  if(inp){ if(e.key==='Enter'){ e.preventDefault(); const id=S.editing; commit(id,inp.value); S.editing=null; S.active=id; render() } if(e.key==='Escape'){ S.editing=null; render() } return }
+  const cell=e.target.closest('[data-cell]'); if(!cell) return;
+  const id=cell.dataset.cell, [,key]=id.split('|');
+  if(e.altKey&&e.key==='ArrowDown'){ e.preventDefault(); colMenu(key,document.querySelector(`[data-col-menu="${key}"]`)); return }
+  if(e.key==='Enter'||e.key==='F2'||(e.key===' '&&col(key)?.kind==='checkbox')){ e.preventDefault(); openCell(id,cell); return }
+  if((e.key==='Delete'||e.key==='Backspace')&&col(key)?.kind){ const r=sheet().rows.find(x=>x.id===id.split('|')[0]); delete r.v[key]; render(); return }
+  const cols=visible().map(c=>c.key), rows=sheet().rows.filter(r=>r.id).map(r=>r.id);
+  let [rid]=id.split('|'), ci=cols.indexOf(key), ri=rows.indexOf(rid);
+  const rtl=getComputedStyle(document.documentElement).direction==='rtl';
+  if(e.key==='ArrowRight') ci=Math.min(cols.length-1,ci+(rtl?-1:1)); else if(e.key==='ArrowLeft') ci=Math.max(0,ci+(rtl?1:-1));
+  else if(e.key==='ArrowDown') ri=Math.min(rows.length-1,ri+1); else if(e.key==='ArrowUp') ri=Math.max(0,ri-1); else return;
+  e.preventDefault(); S.active=`${rows[ri]}|${cols[ci]}`; render();
+});
+grid.addEventListener('focusout',e=>{ const inp=e.target.closest?.('input.cell-in'); if(inp&&S.editing){ const id=S.editing; commit(id,inp.value); S.editing=null; render() } });
+/* drag to reorder */
+grid.addEventListener('dragstart',e=>{ const th=e.target.closest('.th[draggable]'); if(!th) return; drag=th.dataset.col; th.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',drag) });
+grid.addEventListener('dragover',e=>{ const th=e.target.closest('.th'); if(!drag||!th||th.classList.contains('ti')||th.classList.contains('no')) return; e.preventDefault(); grid.querySelectorAll('.drop-before').forEach(x=>x.classList.remove('drop-before')); th.classList.add('drop-before') });
+grid.addEventListener('drop',e=>{ const th=e.target.closest('.th'); if(!drag||!th) return; e.preventDefault(); if(th.dataset.col!==drag){ moveBefore(drag,th.dataset.col); toast(`Moved ${nameOf(col(drag))}`) } drag=null; render() });
+grid.addEventListener('dragend',()=>{ drag=null; render() });
+/* resize */
+grid.addEventListener('pointerdown',e=>{ const h=e.target.closest('[data-rz]'); if(!h) return; e.preventDefault(); const c=col(h.dataset.rz); rz={c,x:e.clientX,w:c.w,rtl:getComputedStyle(document.documentElement).direction==='rtl'}; h.classList.add('on'); h.setPointerCapture(e.pointerId) });
+grid.addEventListener('pointermove',e=>{ if(!rz) return; const d=(e.clientX-rz.x)*(rz.rtl?-1:1); rz.c.w=Math.max(60,Math.min(600,Math.round(rz.w+d))); grid.style.gridTemplateColumns=`40px ${visible().map(c=>c.w+'px').join(' ')}` });
+grid.addEventListener('pointerup',()=>{ if(!rz) return; stamp(rz.c); rz=null; render() });
+function fit(key){ const c=col(key), ix=visible().indexOf(c)+2; let w=60; grid.querySelectorAll(`.row > .c:nth-child(${ix})`).forEach(el=>{ const inner=el.firstElementChild; w=Math.max(w,(inner?inner.scrollWidth:0)+28) }); c.w=Math.min(600,w); stamp(c); render(); toast(`Fitted ${nameOf(c)} to ${c.w}px`) }
+
+$('#colsBtn').onclick=()=>$('#colsBtn').getAttribute('aria-expanded')==='true'?closePop():panel();
+$('#addBtn').onclick=e=>editor(null,e.currentTarget);
+$('#pasteBtn').onclick=paste;
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ S.view=b.dataset.view; S.active=null; S.editing=null; document.querySelectorAll('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); $('#sets').hidden=S.view!=='video'; $('#pasteBtn').textContent=S.view==='video'?'Paste clips':'Paste plan'; closePop(false); render() });
+document.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{ S.set=b.dataset.set; document.querySelectorAll('[data-set]').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); render() });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('#layer').innerHTML){ e.preventDefault(); if($('.scrim')) $('#layer').innerHTML=''; else closePop() } });
+document.addEventListener('mousedown',e=>{ const pop=$('#layer .pop'); if(pop&&!pop.contains(e.target)&&!anchorEl?.contains(e.target)&&!e.target.closest('.toast')) closePop(false) });
+render();
+</script>
