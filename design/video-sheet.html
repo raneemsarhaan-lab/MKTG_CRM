@@ -176,6 +176,14 @@ a.lk{color:var(--link);text-decoration:underline;text-underline-offset:2px}
 .toast.on{opacity:1}
 .toast button{border:0;background:transparent;color:var(--lime);font:700 .72rem var(--font-body);cursor:pointer}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* status pills and people (avatar + name) */
+.pill-st{display:inline-flex;align-items:center;gap:5px;height:20px;box-sizing:border-box;padding:0 8px 0 7px;border:1px solid color-mix(in srgb,var(--c) 40%,var(--bg));border-radius:999px;background:color-mix(in srgb,var(--c) 15%,var(--bg));color:var(--ink);font-weight:600;font-size:11px;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.person{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;white-space:nowrap}
+.av{flex:none;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font:700 8.5px var(--font-head);letter-spacing:.02em}
+.av.empty{border:1.5px dashed var(--muted);opacity:.6;box-sizing:border-box}
+tr.dropped .pill-st{background:var(--gutter);border-color:var(--grid);color:var(--muted)}
+tr.dropped .av{opacity:.45}
 </style>
 </head>
 <body>
@@ -260,6 +268,11 @@ const MEMBERS=[
   {id:'yosra',name:'Yosra',role:'Brand Director',access:'superuser'},
 ];
 const M=Object.fromEntries(MEMBERS.map(m=>[m.id,m]));
+const AV_COLORS=['#1B1D1F','#6E5BE6','#3FA34D','#5B93F5','#E0736A','#5B6066','#B4863F'];
+function avColor(n){let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))|0;return AV_COLORS[Math.abs(h)%AV_COLORS.length]}
+function initialsOf(n){return n.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}
+function personHtml(name,empty){return name?`<span class="person"><span class="av" style="background:${avColor(name)}" aria-hidden="true">${initialsOf(name)}</span><span>${name}</span></span>`:`<span class="person"><span class="av empty" aria-hidden="true"></span><span class="mut">${empty||'Unassigned'}</span></span>`}
+
 const EDIT_RE=/video|editor|motion|design/i, COPY_RE=/content|copy|writer/i;
 const defaultSet=role=>EDIT_RE.test(role)?'editing':COPY_RE.test(role)?'copy':'full';
 
@@ -297,7 +310,7 @@ clips[4].up={state:'failed',name:'11_final.mp4',err:'Connection lost'};
 
 const state={me:'raneem',set:null,mine:false,showDropped:true,rtl:false,active:{r:1,c:1},hl:'c7'};
 const COLS={
-  title:{h:'Title',w:330},n:{h:'#',w:36},type:{h:'Type',w:58},status:{h:'Status',w:140},editor:{h:'Editor',w:104},
+  title:{h:'Title',w:330},n:{h:'#',w:36},type:{h:'Type',w:58},status:{h:'Status',w:156},editor:{h:'Editor',w:104},
   src:{h:'Source',w:84},file:{h:'File name',w:250},in:{h:'In',w:58},out:{h:'Out',w:58},len:{h:'Length',w:58},
   files:{h:'Files',w:150},pub:{h:'Published',w:120},drop:{h:'',w:62}};
 const SETS={
@@ -330,7 +343,7 @@ function visibleClips(){
 function statusCell(t){
   const moves=allowedStages(t);
   const lbl=`${vname(t.status)} · ${STAGE[t.status].real}`;
-  return `<button type="button" class="st" data-status="${t.id}" ${moves.length?'aria-haspopup="menu"':'disabled'} aria-label="${esc(vname(t.status))}, ${esc(STAGE[t.status].real)}" data-tip="${esc(lbl)}"><i class="dot" style="background:${STAGE[t.status].c}"></i>${esc(vname(t.status))}${moves.length?'<span class="chev">▾</span>':''}</button>`;
+  return `<button type="button" class="st" data-status="${t.id}" ${moves.length?'aria-haspopup="menu"':'disabled'} aria-label="${esc(vname(t.status))}, ${esc(STAGE[t.status].real)}" data-tip="${esc(lbl)}"><span class="pill-st" style="--c:${STAGE[t.status].c}"><i class="dot" style="background:${STAGE[t.status].c}"></i>${esc(vname(t.status))}${moves.length?'<span class="chev">▾</span>':''}</span></button>`;
 }
 function filesCell(t){
   const u=t.up;
@@ -355,7 +368,7 @@ function cell(col,t,isVideo){
     case 'n': return `<td class="c num mut" role="gridcell">${isVideo||t.n==null?'':String(t.n).padStart(2,'0')}</td>`;
     case 'type': return `<td class="txt" role="gridcell">${t.type}</td>`;
     case 'status': return `<td role="gridcell">${statusCell(t)}</td>`;
-    case 'editor': return `<td role="gridcell">${canAct(t)?`<button type="button" class="st" data-editor="${t.id}" aria-haspopup="menu">${t.assignee?esc(M[t.assignee].name):'<span class="mut">Unassigned</span>'}<span class="chev">▾</span></button>`:(t.assignee?esc(M[t.assignee].name):'<span class="mut">Unassigned</span>')}</td>`;
+    case 'editor': return `<td role="gridcell">${canAct(t)?`<button type="button" class="st" data-editor="${t.id}" aria-haspopup="menu">${personHtml(t.assignee&&M[t.assignee].name)}<span class="chev">▾</span></button>`:personHtml(t.assignee&&M[t.assignee].name)}</td>`;
     case 'src': return `<td class="txt mono" role="gridcell">${isVideo?'':esc(t.src)}</td>`;
     case 'file': return `<td class="txt mono" role="gridcell" title="${esc(t.file||'')}">${isVideo?'':esc(t.file)}</td>`;
     case 'in': return `<td class="num" role="gridcell">${isVideo?'':fmt(t.inMs)}</td>`;
@@ -406,7 +419,7 @@ const find=id=>id===video.id?video:clips.find(c=>c.id===id);
 function statusMenu(t,from){
   const moves=allowedStages(t);if(!moves.length)return;
   const i=PATH.indexOf(t.status), next=PATH[i+1];
-  const item=(s,cls='')=>`<button type="button" role="menuitem" class="${cls}" data-move="${s}"><i class="dot" style="background:${STAGE[s].c}"></i>${esc(vname(s))}<small>${STAGE[s].real}</small></button>`;
+  const item=(s,cls='')=>`<button type="button" role="menuitem" class="${cls}" data-move="${s}"><span class="pill-st" style="--c:${STAGE[s].c}"><i class="dot" style="background:${STAGE[s].c}"></i>${esc(vname(s))}</span><small>${STAGE[s].real}</small></button>`;
   const back=moves.filter(s=>PATH.indexOf(s)<i).reverse(), skip=moves.filter(s=>PATH.indexOf(s)>i+1);
   const el=menu(from,(next&&moves.includes(next)?`<div class="grp">Next</div>${item(next,'next')}`:'')+
     (back.length?`<div class="grp">Back to</div>${back.map(s=>item(s)).join('')}`:'')+
@@ -418,7 +431,7 @@ function statusMenu(t,from){
 }
 function editorMenu(t,from){
   const sorted=[...MEMBERS].sort((a,b)=>(EDIT_RE.test(b.role)-EDIT_RE.test(a.role))||a.name.localeCompare(b.name));
-  const el=menu(from,sorted.map(m=>`<button type="button" role="menuitem" data-ed="${m.id}">${esc(m.name)}<span class="role">${esc(m.role)}</span></button>`).join('')+`<hr><button type="button" role="menuitem" data-ed="">Unassigned</button>`);
+  const el=menu(from,sorted.map(m=>`<button type="button" role="menuitem" data-ed="${m.id}">${personHtml(m.name)}<span class="role">${esc(m.role)}</span></button>`).join('')+`<hr><button type="button" role="menuitem" data-ed="">${personHtml(null)}</button>`);
   el.addEventListener('click',e=>{const b=e.target.closest('[data-ed]');if(!b)return;t.assignee=b.dataset.ed||null;closePop();render();toast(t.assignee?`Assigned to ${M[t.assignee].name}`:'Unassigned')});
 }
 function filesMenu(t,from){

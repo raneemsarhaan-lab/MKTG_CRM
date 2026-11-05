@@ -384,7 +384,9 @@ export const content = [
       t.eq(await t.active(), 'k:v1|rowNo', 'down to the video')
       for (let i = 0; i < 3; i++) await t.page.keyboard.press('ArrowRight')
       t.eq(await t.active(), 'k:v1|status', 'across to its status')
-      await t.page.keyboard.press('Enter'); await t.page.keyboard.press('Enter')
+      await t.page.keyboard.press('Enter')
+      await t.page.waitForFunction(() => document.activeElement?.matches('[data-sheet-menu] [role="menuitem"]'))
+      await t.page.keyboard.press('Enter')
       await t.idle(200)
       t.eq((await t.task('v1')).status, 'd-check', 'moved by keyboard')
     },

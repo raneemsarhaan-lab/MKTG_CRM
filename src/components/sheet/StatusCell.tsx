@@ -8,7 +8,7 @@
 import { useTranslations } from 'next-intl'
 import type { Member, StageId, Task } from '@/types/index'
 import { STAGE_META, ALL_STAGES } from '@/lib/stage-meta'
-import { STAGE_COLORS } from '@/lib/tokens'
+import { STAGE_COLORS, stageTint } from '@/lib/tokens'
 import { allowedStages, nextOnPath } from '@/lib/stage-moves'
 import type { MenuItem } from './SheetMenu'
 
@@ -28,15 +28,23 @@ export function StatusContent({ task, me, tipId, ns = 'sheet' }: { task: Task; m
   const moves = allowedStages(task, me)
   return (
     <>
-      <span className="fx-sheet-status">
-        <i className="fx-sheet-dot" style={{ background: STAGE_COLORS[status] }} aria-hidden="true" />
-        <span className="fx-sheet-ellipsis">{names.video(status)}</span>
-        {moves.length > 0 && <span className="fx-sheet-chev" aria-hidden="true">▾</span>}
-      </span>
+      <StagePill stage={status} name={names.video(status)} chevron={moves.length > 0} />
       <span className="fx-sheet-tip" id={tipId} role="tooltip">
         {t('stageTitle', { video: names.video(status), real: names.real(status) })}
       </span>
     </>
+  )
+}
+
+/** A stage as a pill: tinted in the stage's colour, with its dot. */
+export function StagePill({ stage, name, chevron }: { stage: StageId; name: string; chevron?: boolean }) {
+  const tint = stageTint(stage)
+  return (
+    <span className="fx-sheet-status" style={{ background: tint.fill, borderColor: tint.edge }}>
+      <i className="fx-sheet-dot" style={{ background: STAGE_COLORS[stage] }} aria-hidden="true" />
+      <span className="fx-sheet-ellipsis">{name}</span>
+      {chevron && <span className="fx-sheet-chev" aria-hidden="true">▾</span>}
+    </span>
   )
 }
 
@@ -52,8 +60,8 @@ export function statusMenuItems(
   const i = (s: StageId) => ALL_STAGES.indexOf(s)
   const cur = i(task.status as StageId)
   const item = (s: StageId, group: string, tone?: 'next'): MenuItem => ({
-    key: s, group, tone, dot: STAGE_COLORS[s],
-    label: names.video(s), hint: names.real(s),
+    key: s, group, tone,
+    label: <StagePill stage={s} name={names.video(s)} />, hint: names.real(s),
     text: `${names.video(s)} (${names.real(s)})`,
     onSelect: () => choose(s),
   })

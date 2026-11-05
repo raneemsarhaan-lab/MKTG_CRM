@@ -117,6 +117,20 @@ export function alpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
 }
 
+/**
+ * A status pill's fill and edge (the sheets): the stage colour mixed with
+ * white, so the dark label keeps AA contrast on every stage.
+ */
+export function stageTint(stage: string): { fill: string; edge: string } {
+  const hex = (STAGE_COLORS[stage] ?? '#64748B').replace('#', '')
+  const n = parseInt(hex, 16)
+  const mix = (a: number) => {
+    const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * a + 255 * (1 - a)))
+    return `#${c.map(v => v.toString(16).padStart(2, '0')).join('')}`
+  }
+  return { fill: mix(0.14), edge: mix(0.38) }
+}
+
 export const STAGE_COLORS: Record<string, string> = {
   'todo':         '#64748B',
   'c-prog':       '#3B82F6',

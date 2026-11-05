@@ -11,6 +11,7 @@ import type { AudienceKey, ContentTheme, Member, Task, TaskAttachment } from '@/
 import { GridCore, type ActiveCell, type GridCol, type GridModel } from '@/components/sheet/GridCore'
 import { StatusContent } from '@/components/sheet/StatusCell'
 import { EditorContent } from '@/components/sheet/EditorCell'
+import { PersonChip } from '@/components/sheet/PersonChip'
 import { siteName } from '@/lib/content-plan'
 import type { ContentRow } from './rows'
 import { cadence } from './summary'
@@ -18,7 +19,7 @@ import { cadence } from './summary'
 export const CONTENT_COLS = ['title', 'type', 'status', 'owner', 'assignee', 'pillar', 'doc', 'design', 'post', 'published', 'date', 'archive'] as const
 export type ContentCol = typeof CONTENT_COLS[number]
 const WIDTHS: Record<string, number> = {
-  title: 300, type: 112, status: 136, owner: 112, assignee: 120, pillar: 120,
+  title: 300, type: 112, status: 156, owner: 112, assignee: 120, pillar: 120,
   doc: 120, design: 110, post: 110, published: 124, date: 104, archive: 80,
 }
 export const LINK_COLS = ['doc', 'design', 'post', 'published'] as const
@@ -81,14 +82,14 @@ export function ContentGrid(p: ContentGridProps) {
   function themeLine(row: Extract<ContentRow, { kind: 'theme' }>) {
     const th = row.theme
     const c = cadence(th, row.pieces, p.now)
-    const owner = th.owner_id ? byId.get(th.owner_id)?.name : null
+    const owner = th.owner_id ? byId.get(th.owner_id) : undefined
     return (
       <span className="fx-content-theme">
         <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>
         <span className="fx-content-theme-name">{th.name}</span>
         {row.collapsed && <span className="fx-sheet-count">{t('theme.pieces', { count: row.pieces.filter(x => !x.dropped_at).length })}</span>}
-        <span className="fx-content-meta">{owner ?? t('theme.noOwner')}</span>
+        <span className="fx-content-meta"><PersonChip member={owner} empty={t('theme.noOwner')} /></span>
         <span className="fx-content-meta">
           {th.frequency_count
             ? <>
@@ -214,7 +215,7 @@ export function ContentGrid(p: ContentGridProps) {
         }
         case 'type':     return <span className="fx-sheet-ellipsis">{task.content_type_label}</span>
         case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} />
-        case 'owner':    return <span className="fx-sheet-ellipsis">{byId.get(task.task_owner_id)?.name ?? ''}</span>
+        case 'owner':    return <PersonChip member={byId.get(task.task_owner_id)} />
         case 'assignee': return <EditorContent member={task.assignee_id ? byId.get(task.assignee_id) : undefined} t={ts} />
         case 'pillar': {
           if (isClip) return null
