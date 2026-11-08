@@ -152,7 +152,8 @@
     "tocLabel": "Table of contents · built from this brief's headings",
     "tocEmpty": "Add headings and they appear here.",
     "noMatches": "No matches",
-    "videoBlock": "YouTube video"
+    "videoBlock": "YouTube video",
+    "mentionLabel": "Mention someone"
   },
   "attachments": {
     "title": "Attachments",
@@ -748,7 +749,7 @@
     "button": {
       "label": "Inbox",
       "allClear": "All clear",
-      "sr": ", {todo} to do, {unread, plural, =0 {no unread mentions} one {# unread mention} other {# unread mentions}}"
+      "sr": ", {todo} to do"
     },
     "summary": {
       "reviews": "{n, plural, one {# review waiting} other {# reviews waiting}}",
@@ -759,7 +760,7 @@
     },
     "panel": {
       "title": "Inbox",
-      "counts": "{todo} to do · {unread, plural, =0 {no unread mentions} one {# unread mention} other {# unread mentions}}",
+      "counts": "{todo} to do",
       "allClear": "All clear",
       "pin": "Keep the Inbox open beside the board",
       "unpin": "Unpin and close the Inbox",
@@ -972,7 +973,8 @@
       "iosText": "iPhone only sends alerts to apps on the Home Screen.",
       "ios1": "Tap the Share button at the bottom of Safari.",
       "ios2": "Choose “Add to Home Screen”.",
-      "ios3": "Open Momentum from the new icon, then turn alerts on here."
+      "ios3": "Open Momentum from the new icon, then turn alerts on here.",
+      "notReady": "Phone alerts aren’t set up yet."
     },
     "settingsPage": {
       "title": "Notification settings",
@@ -992,7 +994,15 @@
       "dnd": "Do not disturb",
       "dndHelp": "No pop-ups or phone alerts. Notifications are still saved, and emails still go out.",
       "device": "This device",
-      "saved": "Saved"
+      "saved": "Saved",
+      "gender": "Grammar in Arabic",
+      "genderHelp": "How Arabic notifications refer to you",
+      "genderF": "She",
+      "genderM": "He",
+      "genderNone": "Not set",
+      "language": "Language",
+      "languageHelp": "For phone alerts and emails",
+      "error": "Couldn’t save. Try again."
     },
     "history": {
       "title": "Notifications",
@@ -1000,7 +1010,10 @@
       "today": "Today",
       "week": "Last 7 days",
       "month": "Last 30 days",
-      "none": "Nothing matches these filters."
+      "none": "Nothing matches these filters.",
+      "kinds": "Kinds",
+      "dates": "Dates",
+      "clear": "Clear filters"
     },
     "email": {
       "subjectOne": "{text}",
@@ -1009,6 +1022,9 @@
       "dailyIntro": "Here’s what you haven’t read yet:",
       "footer": "You get this because of your notification settings.",
       "manage": "Change notification settings"
-    }
+    },
+    "replyingTo": "Replying to {name}",
+    "cancel": "Cancel",
+    "back": "Back to the board"
   }
 }

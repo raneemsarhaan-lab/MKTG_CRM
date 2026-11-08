@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
+import { setLocale } from '@/actions/notifications'
+import { applyLocale } from '@/lib/locale-switch'
 
 export function LangToggle() {
   const locale = useLocale()
@@ -11,10 +13,9 @@ export function LangToggle() {
 
   function toggle() {
     const next = isAr ? 'en' : 'ar'
-    document.cookie = `fluxo-locale=${next}; path=/; max-age=31536000; SameSite=Lax`
-    // Apply dir/lang immediately for zero-flash experience
-    document.documentElement.dir  = next === 'ar' ? 'rtl' : 'ltr'
-    document.documentElement.lang = next
+    applyLocale(next)
+    // Phone alerts and emails follow the member's language (spec 012 R13).
+    void setLocale(next).catch(() => {})
     router.refresh()
   }
 

@@ -214,6 +214,65 @@ export const SlashCommand = Extension.create<{ bridge: { current: SlashBridge } 
   },
 })
 
+/** A person the "@" menu offers (spec 012 R11). */
+export interface MentionPerson { id: string; name: string; role?: string; avatar_url?: string }
+export interface MentionState {
+  items: MentionPerson[]
+  rect: DOMRect | null
+  select: (p: MentionPerson) => void
+}
+export interface MentionBridge {
+  items: (query: string) => MentionPerson[]
+  show: (s: MentionState | null) => void
+  key: (event: KeyboardEvent) => boolean
+}
+
+export const mentionKey = new PluginKey('briefMention')
+
+/**
+ * Type "@" after a space for a list of people (spec 012 R11, FR-003): picking
+ * one writes "@Name" into the brief. Whoever's "@Name" is in the brief when
+ * it's saved is mentioned, and only people newly named are told.
+ */
+export const MentionCommand = Extension.create<{ bridge: { current: MentionBridge } | null }>({
+  name: 'briefMention',
+  addOptions() { return { bridge: null } },
+  addProseMirrorPlugins() {
+    const bridge = this.options.bridge
+    return [Suggestion({
+      editor: this.editor,
+      pluginKey: mentionKey,
+      char: '@',
+      allowSpaces: true,
+      allowedPrefixes: [' ', '\u00a0'],
+      items: ({ query }) => (query.length > 30 ? [] : bridge?.current.items(query) ?? []),
+      command: ({ editor, range, props }) => {
+        const p = props as MentionPerson
+        editor.chain().focus().deleteRange(range).insertContent(`@${p.name} `).run()
+      },
+      render: () => {
+        let last: SuggestionProps | null = null
+        const push = (p: SuggestionProps) => {
+          last = p
+          const items = p.items as MentionPerson[]
+          bridge?.current.show(items.length ? { items, rect: p.clientRect?.() ?? null, select: item => p.command(item) } : null)
+        }
+        return {
+          onStart: push,
+          onUpdate: push,
+          onKeyDown: ({ event }) => (last ? bridge?.current.key(event) ?? false : false),
+          onExit: () => { last = null; bridge?.current.show(null) },
+        }
+      },
+    })]
+  },
+})
+
+/** Close the "@" menu and leave what was typed. */
+export function dismissMention(editor: Editor) {
+  exitSuggestion(editor.view, mentionKey)
+}
+
 /** Close the "/" menu and leave the typed "/" where it is (Esc). */
 export function dismissSlash(editor: Editor) {
   exitSuggestion(editor.view, slashKey)

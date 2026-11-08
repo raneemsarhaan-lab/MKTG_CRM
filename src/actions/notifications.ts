@@ -148,6 +148,10 @@ export interface NotificationSettingsView {
   dnd: boolean
   emailReady: boolean
   devices: { id: string; label: string; created_at: string }[]
+  /** The language phone alerts and emails are written in (R13). */
+  locale: 'en' | 'ar'
+  /** For Arabic grammar (R6): 'f', 'm', or null for the neutral phrasing. */
+  gender: 'f' | 'm' | null
 }
 
 function deviceLabel(ua: string | null): string {
@@ -162,7 +166,7 @@ export async function getNotificationSettings(): Promise<({ success: true } & No
   if (!me) return { success: false, error: 'not_authenticated' }
   const [rows, member, devices] = await Promise.all([
     prisma.notificationSetting.findMany({ where: { member_id: me.id } }),
-    prisma.member.findUnique({ where: { id: me.id }, select: { notify_dnd: true, email_mode: true } }),
+    prisma.member.findUnique({ where: { id: me.id }, select: { notify_dnd: true, email_mode: true, locale: true, gender: true } }),
     prisma.pushSubscription.findMany({ where: { member_id: me.id }, orderBy: { created_at: 'desc' } }),
   ])
   return {
@@ -172,6 +176,8 @@ export async function getNotificationSettings(): Promise<({ success: true } & No
     dnd: !!member?.notify_dnd,
     emailReady: emailReady(),
     devices: devices.map(d => ({ id: d.id, label: deviceLabel(d.user_agent), created_at: d.created_at.toISOString() })),
+    locale: member?.locale === 'ar' ? 'ar' : 'en',
+    gender: member?.gender === 'f' || member?.gender === 'm' ? member.gender : null,
   }
 }
 
@@ -200,5 +206,14 @@ export async function setLocale(locale: 'en' | 'ar'): Promise<{ success: true } 
   if (!me) return { success: false, error: 'not_authenticated' }
   if (locale !== 'en' && locale !== 'ar') return { success: false, error: 'bad_locale' }
   await prisma.member.update({ where: { id: me.id }, data: { locale } })
+  return { success: true }
+}
+
+/** How Arabic notifications refer to the member (R6); null is the neutral phrasing. */
+export async function setGender(gender: 'f' | 'm' | null): Promise<{ success: true } | Fail> {
+  const me = await getSessionMember()
+  if (!me) return { success: false, error: 'not_authenticated' }
+  if (gender !== null && gender !== 'f' && gender !== 'm') return { success: false, error: 'bad_gender' }
+  await prisma.member.update({ where: { id: me.id }, data: { gender } })
   return { success: true }
 }

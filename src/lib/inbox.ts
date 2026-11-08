@@ -10,11 +10,6 @@ import type { AlertStatus, InboxReason, InboxState, Member, SLAConfig, StageId, 
 import { STAGE_META, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { getAlertStatus } from '@/lib/alert-status'
 
-/** Mentions this many days before `inbox_since` still count (FR-034, R5). */
-export const MENTION_WINDOW_DAYS = 7
-/** The Team tab's length (R10). */
-export const TEAM_LIMIT = 40
-
 type InboxComment = {
   id: string; body: string; created_at: string; author_id: string
   mentions?: string[]; author?: { name: string; avatar_url?: string } | Member
@@ -41,32 +36,6 @@ export interface YourRow {
   /** Days late for 'late'; 0 otherwise. */
   days: number
 }
-export interface MentionRow {
-  kind: 'mention'
-  key: string
-  comment: InboxComment
-  task: InboxTask
-  authorName: string
-  authorAvatar?: string
-  unread: boolean
-}
-export type TeamKind = 'comment' | 'file' | 'move' | 'publish'
-export interface TeamRow {
-  kind: 'team'
-  key: string
-  type: TeamKind
-  task: InboxTask
-  at: string
-  /** Date-only events (moves, publishes) are worded by day (FR-041). */
-  dateOnly: boolean
-  /** A comment's author's name. */
-  who?: string
-  /** A file's uploader (an id; the row names them from the members list). */
-  whoId?: string
-  file?: string
-  stage?: StageId
-  commentId?: string
-}
 export interface DoneRow { kind: 'done'; task: InboxTask; at: string }
 
 export interface InboxCounts {
@@ -76,10 +45,12 @@ export interface InboxCounts {
   late: number
   today: number
   undated: number
-  unread: number
   /** reviews + yours. */
   todo: number
-  /** todo + unread (FR-011). */
+  /**
+   * The button's number: the to-dos only. Mentions and the team's updates
+   * moved to the notification bell (spec 012 R12, FR-080).
+   */
   total: number
   /** A counted review or task is due today or late (FR-012). */
   urgent: boolean
@@ -90,11 +61,9 @@ export interface InboxModel {
   yours: YourRow[]
   /** Task ids put off until tomorrow that would otherwise be listed. */
   snoozed: string[]
-  mentions: MentionRow[]
-  team: TeamRow[]
   done: { week: DoneRow[]; total: number }
   counts: InboxCounts
-  /** Keys of unread mentions and urgent counted tasks, for the pulse (R9). */
+  /** Keys of urgent counted tasks, for the pulse (R9). */
   ringKeys: string[]
 }
 
@@ -153,7 +122,7 @@ const live = (t: InboxTask) => !t.dropped_at && t.status !== 'publish'
 /** Whose work it is: the board's "Only me" rule (R3). */
 export const isYours = (t: Pick<Task, 'assignee_id' | 'task_owner_id'>, memberId: string) =>
   (t.assignee_id ?? t.task_owner_id) === memberId
-/** Owned or assigned: whose updates the Team and Done tabs follow (R10, R11). */
+/** Owned or assigned: whose published work the Done tab shows (R11). */
 const onYourWork = (t: InboxTask, memberId: string) => t.task_owner_id === memberId || t.assignee_id === memberId
 
 /** The stage before the current one on the task's own path, for Send back. */
@@ -161,14 +130,6 @@ export function previousOnPath(task: Pick<Task, 'status' | 'nine_stage'>): Stage
   const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
   const i = path.indexOf(task.status)
   return i > 0 ? path[i - 1] : null
-}
-
-/** Whether a mention of this member is unread (R4, R5). */
-export function isUnreadMention(c: InboxComment, memberId: string, state: Pick<InboxState, 'readIds' | 'since'>, read?: Set<string>): boolean {
-  if (!(c.mentions ?? []).includes(memberId) || c.author_id === memberId) return false
-  if ((read ?? new Set(state.readIds)).has(c.id)) return false
-  const floor = new Date(state.since).getTime() - MENTION_WINDOW_DAYS * 86_400_000
-  return new Date(c.created_at).getTime() >= floor
 }
 
 export function inboxModel(input: {
@@ -181,7 +142,6 @@ export function inboxModel(input: {
   const { tasks, member, state, slaConfig, now } = input
   const today = localDay(now)
   const midnight = new Date(now); midnight.setHours(0, 0, 0, 0)
-  const read = new Set(state.readIds)
   const snoozedNow = new Set(Object.entries(state.snoozes).filter(([, until]) => new Date(until) > now).map(([id]) => id))
   const dueDays = (t: InboxTask) => (t.due_date ? dayDiff(today, dayOf(t.due_date)) : null)
 
@@ -213,45 +173,6 @@ export function inboxModel(input: {
   const yours = yoursAll.filter(r => !snoozedNow.has(r.task.id))
   const snoozed = yoursAll.filter(r => snoozedNow.has(r.task.id)).map(r => r.task.id)
 
-  // Mentions (R4): unread first, then read, each newest first.
-  const mentions: MentionRow[] = []
-  for (const t of tasks) {
-    if (t.dropped_at) continue
-    for (const c of t.comments ?? []) {
-      if (!(c.mentions ?? []).includes(member.id) || c.author_id === member.id) continue
-      const author = c.author as { name?: string; avatar_url?: string } | undefined
-      mentions.push({
-        kind: 'mention', key: `m:${c.id}`, comment: c, task: t,
-        authorName: author?.name ?? '', authorAvatar: author?.avatar_url,
-        unread: isUnreadMention(c, member.id, state, read),
-      })
-    }
-  }
-  mentions.sort((a, b) => Number(b.unread) - Number(a.unread) || b.comment.created_at.localeCompare(a.comment.created_at))
-
-  // Team (R10): other people's updates on your work; no mentions of you.
-  const team: TeamRow[] = []
-  for (const t of tasks) {
-    if (t.dropped_at || !onYourWork(t, member.id)) continue
-    for (const c of t.comments ?? []) {
-      if (c.author_id === member.id || (c.mentions ?? []).includes(member.id)) continue
-      team.push({ kind: 'team', key: `c:${c.id}`, type: 'comment', task: t, at: c.created_at, dateOnly: false, who: (c.author as { name?: string } | undefined)?.name ?? '', commentId: c.id })
-    }
-    for (const a of t.attachments ?? []) {
-      if (!a.uploaded_by || a.uploaded_by === member.id || !a.uploaded_at) continue
-      team.push({ kind: 'team', key: `a:${a.id}`, type: 'file', task: t, at: a.uploaded_at, dateOnly: false, whoId: a.uploaded_by, file: a.filename })
-    }
-    if (t.stage_date) {
-      team.push({
-        kind: 'team', key: `s:${t.id}`, type: t.status === 'publish' ? 'publish' : 'move', task: t,
-        at: dayOf(t.stage_date), dateOnly: true, stage: t.status,
-      })
-    }
-  }
-  // Newest first; a date-only event sorts as the end of its day's timed events.
-  const sortKey = (r: TeamRow) => (r.dateOnly ? `${r.at}T00:00:00` : new Date(r.at).toISOString().slice(0, 19))
-  team.sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
-
   // Done (R11): your published work, this week first.
   const monday = mondayOf(now)
   const published = tasks.filter(t => !t.dropped_at && t.status === 'publish' && onYourWork(t, member.id))
@@ -260,7 +181,6 @@ export function inboxModel(input: {
     .sort((a, b) => dayOf(b.stage_date).localeCompare(dayOf(a.stage_date)) || a.name.localeCompare(b.name))
     .map(t => ({ kind: 'done', task: t, at: dayOf(t.stage_date) }))
 
-  const unread = mentions.filter(m => m.unread).length
   const late = yours.filter(r => r.reason === 'late').length + reviews.filter(r => r.dueDays !== null && r.dueDays < 0).length
   const dueToday = yours.filter(r => r.reason === 'today').length + reviews.filter(r => r.dueDays === 0).length
   const counts: InboxCounts = {
@@ -269,22 +189,20 @@ export function inboxModel(input: {
     late,
     today: dueToday,
     undated: yours.filter(r => r.reason === 'undated').length,
-    unread,
     todo: reviews.length + yours.length,
-    total: reviews.length + yours.length + unread,
+    total: reviews.length + yours.length,
     urgent: late + dueToday > 0,
   }
 
   const ringKeys = [
-    ...mentions.filter(m => m.unread).map(m => m.key),
     ...reviews.filter(r => r.dueDays !== null && r.dueDays <= 0).map(r => `t:${r.task.id}`),
     ...yours.filter(r => r.reason !== 'undated').map(r => `t:${r.task.id}`),
   ]
 
-  return { reviews, yours, snoozed, mentions, team: team.slice(0, TEAM_LIMIT), done: { week, total: published.length }, counts, ringKeys }
+  return { reviews, yours, snoozed, done: { week, total: published.length }, counts, ringKeys }
 }
 
-export type SummaryPart = { key: 'reviews' | 'late' | 'today' | 'mentions' | 'todo'; n: number }
+export type SummaryPart = { key: 'reviews' | 'late' | 'today' | 'todo'; n: number }
 
 /**
  * The line under "Inbox": the two most pressing kinds, in the order a person
@@ -295,12 +213,11 @@ export function inboxSummary(c: InboxCounts): SummaryPart[] {
   if (c.reviews) parts.push({ key: 'reviews', n: c.reviews })
   if (c.late) parts.push({ key: 'late', n: c.late })
   if (c.today) parts.push({ key: 'today', n: c.today })
-  if (c.unread) parts.push({ key: 'mentions', n: c.unread })
   if (!parts.length && c.todo) parts.push({ key: 'todo', n: c.todo })
   return parts.slice(0, 2)
 }
 
-/** The tab the panel opens on (FR-016). */
-export function openingTab(c: InboxCounts): 'todo' | 'mentions' | 'team' {
-  return c.todo ? 'todo' : c.unread ? 'mentions' : 'team'
+/** The tab the panel opens on (FR-016): To do, the only tab with work in it. */
+export function openingTab(_c: InboxCounts): 'todo' {
+  return 'todo'
 }

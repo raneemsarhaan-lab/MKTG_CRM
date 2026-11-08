@@ -5,7 +5,13 @@ export const us5 = [
     id: 'h5-top', viewport: PHONE,
     async run(t) {
       t.eq(await t.page.locator('[data-header-search]').isVisible(), false, 'search folds into an icon')
-      for (const s of ['[data-tab="pipeline"]', '[data-search-open]', '[data-inbox-button]', '[data-account]']) t.assert(await t.page.locator(s).isVisible(), `${s} visible`)
+      for (const s of ['[data-tab="pipeline"]', '[data-tab="content"]', '[data-search-open]', '[data-bell]', '[data-inbox-button]', '[data-account]']) t.assert(await t.page.locator(s).isVisible(), `${s} visible`)
+      // Spec 012 T055: the bell fits beside the Inbox, all on one row, 44 px targets.
+      const boxes = await Promise.all(['[data-tab="content"]', '[data-search-open]', '[data-bell]', '[data-inbox-button]', '[data-account]'].map(s => t.box(s)))
+      t.eq(new Set(boxes.map(b => Math.round(b.y + b.height / 2))).size, 1, 'one row')
+      for (const b of boxes.slice(1)) t.assert(b.width >= 44 && b.height >= 44, `44 px targets (${b.width}×${b.height})`)
+      for (let i = 1; i < boxes.length; i++) t.assert(boxes[i].x >= boxes[i - 1].x + boxes[i - 1].width - 1, 'no overlap')
+      t.assert(boxes[boxes.length - 1].x + boxes[boxes.length - 1].width <= 390, 'inside the screen')
       const board = await t.box('[data-board]')
       t.assert(board.y <= 320, `the first column starts at ${board.y}px (≤ 320, SC-002)`)
       t.eq(await t.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways page scroll')

@@ -271,6 +271,9 @@ export const NOTIFY_UI = {
   tint:       '#F4F0FF',
   tintHover:  '#ECE5FF',
   blue:       '#2563EB',
+  /** Text on the unread tint (contrast ≥ 4.5:1). */
+  blueText:   '#1D4ED8',
+  mutedOnTint: '#4B5563',
   kinds: {
     comment:               '#2563EB',
     reply:                 '#0E7C7C',

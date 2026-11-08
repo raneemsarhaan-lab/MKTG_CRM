@@ -21,14 +21,16 @@ const model = (id = 'raneem', state = lab.state, tasks = lab.tasks) =>
   m.inboxModel({ tasks: tasks.filter(t => !t.dropped_at), member: who(id), state, slaConfig: {}, now: NOW })
 
 check('pure-counts-equal-rows', () => {
-  // SC-002: the number is exactly the rows listed in To do plus unread Mentions.
+  // SC-002: the number is exactly the rows listed in To do. Mentions moved to
+  // the notification bell (spec 012 R12), so they no longer count here.
   for (const id of ['raneem', 'yosra', 'mona', 'lina', 'sara']) {
     const x = model(id)
-    eq(x.counts.total, x.reviews.length + x.yours.length + x.mentions.filter(r => r.unread).length, `${id} total`)
+    eq(x.counts.total, x.reviews.length + x.yours.length, `${id} total`)
     eq(x.counts.todo, x.reviews.length + x.yours.length, `${id} todo`)
   }
   const r = model()
-  eq([r.counts.reviews, r.counts.yours, r.counts.unread, r.counts.total, r.counts.urgent], [2, 3, 2, 7, true], 'raneem')
+  eq([r.counts.reviews, r.counts.yours, r.counts.total, r.counts.urgent], [2, 3, 5, true], 'raneem')
+  ok(!('mentions' in r) && !('team' in r), 'no Mentions or Team lists (spec 012)')
 })
 
 check('pure-reviews-by-role', () => {
@@ -55,35 +57,11 @@ check('pure-snooze', () => {
   const r = model('raneem', { ...lab.state, snoozes: { y1: until } })
   eq(r.yours.map(x => x.task.id), ['y2', 'y3'], 'put off leaves the list')
   eq(r.snoozed, ['y1'], 'and is counted on the line')
-  eq(r.counts.total, 6, 'and the number')
+  eq(r.counts.total, 4, 'and the number')
   const back = model('raneem', { ...lab.state, snoozes: { y1: new Date(NOW.getTime() - 1000).toISOString() } })
   eq(back.yours.length, 3, 'an expired put-off comes back')
   eq(m.nextMidnight(NOW).getHours(), 0, 'midnight')
   eq(m.localDay(m.nextMidnight(NOW)), '2026-11-06', 'the next day')
-})
-
-check('pure-mentions-window', () => {
-  // SC-007 / FR-034: older than inbox_since − 7 days starts read.
-  const r = model()
-  eq(r.mentions.map(x => [x.comment.id, x.unread]), [['m2', true], ['m1', true], ['m0', false]], 'unread first, newest first')
-  const read = model('raneem', { ...lab.state, readIds: ['m2'] })
-  eq(read.counts.unread, 1, 'read state lowers the count')
-  eq(read.mentions[0].comment.id, 'm1', 'read ones go below')
-  const later = model('raneem', { ...lab.state, since: new Date(NOW.getTime() - 30 * 86400000).toISOString() })
-  eq(later.counts.unread, 3, 'a member who started earlier still sees the old one')
-})
-
-check('pure-team', () => {
-  const r = model()
-  const keys = r.team.map(x => x.key)
-  ok(keys.includes('c:c1'), 'Sara\'s comment')
-  ok(keys.includes('a:a1'), 'Sara\'s file')
-  ok(!keys.includes('c:c2'), 'not my own comment (A3)')
-  ok(!keys.includes('a:a0'), 'not my own upload (A3)')
-  ok(!keys.includes('c:m2'), 'mentions live in Mentions')
-  const move = r.team.find(x => x.key === 's:y2')
-  ok(move && move.dateOnly && move.type === 'move' && !move.who, 'a move names no one, by day (FR-041)')
-  ok(r.team.some(x => x.key === 's:d1' && x.type === 'publish'), 'a publish')
 })
 
 check('pure-done', () => {
@@ -93,13 +71,12 @@ check('pure-done', () => {
 })
 
 check('pure-summary', () => {
-  const s = c => m.inboxSummary({ reviews: 0, yours: 0, late: 0, today: 0, undated: 0, unread: 0, todo: 0, total: 0, urgent: false, ...c })
-  eq(s({ reviews: 2, late: 1, today: 1, unread: 2 }), [{ key: 'reviews', n: 2 }, { key: 'late', n: 1 }], 'the two most pressing')
-  eq(s({ today: 1, unread: 3 }), [{ key: 'today', n: 1 }, { key: 'mentions', n: 3 }], 'today, then mentions')
+  const s = c => m.inboxSummary({ reviews: 0, yours: 0, late: 0, today: 0, undated: 0, todo: 0, total: 0, urgent: false, ...c })
+  eq(s({ reviews: 2, late: 1, today: 1 }), [{ key: 'reviews', n: 2 }, { key: 'late', n: 1 }], 'the two most pressing')
+  eq(s({ today: 1 }), [{ key: 'today', n: 1 }], 'today; mentions are the bell\'s now')
   eq(s({ todo: 4, undated: 4, yours: 4 }), [{ key: 'todo', n: 4 }], 'only undated: N to do')
   eq(s({}), [], 'all clear')
-  eq(m.openingTab({ todo: 0, unread: 2 }), 'mentions', 'opens on Mentions when To do is empty')
-  eq(m.openingTab({ todo: 0, unread: 0 }), 'team', 'then Team')
+  eq(m.openingTab({ todo: 0 }), 'todo', 'always opens on To do (spec 012)')
 })
 
 check('pure-date-words', () => {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the notifications lab (spec 012): the pure modules for Node checks,
-# and (once the UI exists) a standalone page with a stub host. No database.
+# and a standalone page that mounts the real bell, panel, toasts, settings
+# and history with a stub host (entry.tsx). No database, no Next server.
 # See specs/012-notifications/quickstart.md §1.
 set -euo pipefail
 LAB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +17,8 @@ if [ -f "$LAB/entry.tsx" ]; then
   node "$LAB/gen.mjs" "$ROOT" "$OUT"
   "$ROOT/node_modules/.bin/esbuild" "$LAB/entry.tsx" \
     --bundle --outfile="$OUT/bundle.js" --jsx=automatic --format=iife \
-    --alias:@="$ROOT/src" --define:process.env.NODE_ENV='"development"' --log-level=warning
+    --alias:@="$ROOT/src" --alias:next/navigation="$LAB/stubs/navigation.ts" --alias:next/link="$LAB/stubs/link.tsx" \
+    --define:process.env.NODE_ENV='"development"' --log-level=warning
   cp "$LAB/index.html" "$OUT/index.html"
   cp "$ROOT/node_modules/axe-core/axe.min.js" "$OUT/axe.min.js"
 fi

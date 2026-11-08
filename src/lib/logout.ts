@@ -12,6 +12,11 @@
  * worse outcome of the two.
  */
 export async function logout(): Promise<void> {
+  // Phone alerts stop for this device when its person signs out (spec 012 FR-093).
+  try {
+    const { unsubscribeThisDevice } = await import('@/components/notifications/PushOffer')
+    await unsubscribeThisDevice()
+  } catch { /* sign out regardless */ }
   try {
     await fetch('/api/logout', { method: 'POST', cache: 'no-store', credentials: 'same-origin' })
   } catch { /* navigate regardless */ }

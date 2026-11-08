@@ -4,7 +4,8 @@ export const us3 = [
     id: 'h3-urgent', hash: 'inbox=urgent',
     async run(t) {
       const b = t.page.locator('[data-inbox-button]')
-      t.eq(await t.text('[data-inbox-badge]'), '8', 'badge')
+      // Mentions moved to the bell (spec 012): the Inbox counts to-dos only.
+      t.eq(await t.text('[data-inbox-badge]'), '7', 'badge')
       t.assert(await t.page.locator('[data-inbox-badge].is-urgent').count() === 1, 'urgent colour')
       const title = await b.getAttribute('title')
       t.assert(/late/.test(title) && /review/.test(title), `summary in the tooltip: ${title}`)

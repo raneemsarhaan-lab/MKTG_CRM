@@ -51,7 +51,8 @@ export type SheetValues = Record<string, Record<string, string>>
 // ─── Board Inbox (spec 006) ──────────────────────────────────────────────────
 
 /** The Inbox panel's tabs, in order (FR-015). */
-export type InboxTab = 'todo' | 'mentions' | 'team' | 'done'
+/** Spec 012 R12: Mentions and Team moved to the notification bell. */
+export type InboxTab = 'todo' | 'done'
 /** Why one of your own tasks is in To do (FR-022). */
 export type InboxReason = 'late' | 'today' | 'undated'
 
@@ -100,6 +101,10 @@ export interface Member {
   has_password?: boolean
   /** Matches a SeniorityLevel key. Optional so older callers still compile. */
   seniority?: string
+  /** Spec 012 R13: the language phone alerts and emails use. */
+  locale?: 'en' | 'ar'
+  /** Spec 012 R6: for Arabic grammar; absent is the neutral phrasing. */
+  gender?: 'f' | 'm'
 }
 
 export interface Brand {

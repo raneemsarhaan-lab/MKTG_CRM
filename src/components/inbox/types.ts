@@ -16,8 +16,6 @@ export interface InboxApi {
   setDate(taskId: string, isoDate: string): Promise<Ok>
   snooze(taskId: string, until: string): Promise<Ok>
   unsnooze(taskIds: string[]): Promise<Ok>
-  markRead(commentIds: string[]): Promise<Ok>
-  reply(commentId: string, body: string): Promise<Ok>
   setPrefs(p: { pinned?: boolean; showWeek?: boolean }): Promise<Ok>
   openTask(taskId: string, opts?: { commentId?: string }): void
 }

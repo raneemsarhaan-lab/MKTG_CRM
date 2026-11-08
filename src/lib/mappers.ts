@@ -29,6 +29,8 @@ export function mapMember(m: any): Member {
     // no password and cannot sign in until one is set, and nothing in the UI
     // said so — which is how "why can't this person log in?" happens.
     has_password:    m.password_hash != null ? true : m.password_hash === null ? false : undefined,
+    locale:          m.locale === 'ar' ? 'ar' : m.locale === 'en' ? 'en' : undefined,
+    gender:          m.gender === 'f' || m.gender === 'm' ? m.gender : undefined,
   }
 }
 

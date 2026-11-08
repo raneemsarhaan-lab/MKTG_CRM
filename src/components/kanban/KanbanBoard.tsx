@@ -31,13 +31,15 @@ import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
 import { InboxButton } from '@/components/inbox/InboxButton'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { useNotify } from '@/components/notifications/NotifyProvider'
 import { InboxPanel } from '@/components/inbox/InboxPanel'
 import { ViewMenu } from '@/components/inbox/ViewMenu'
 import type { InboxApi } from '@/components/inbox/types'
 import type { ColumnsApi, ColumnsBundle } from '@/components/sheet/types'
 import { addColumn, renameColumn, moveColumn, setColumnShown, resizeColumn, updateColumn, deleteColumn, restoreColumn, setValue as setSheetValue, addContentType } from '@/actions/sheet-columns'
 import { applyOp, type LayoutOp } from '@/lib/sheet-columns'
-import { markMentionsRead, replyToMention, snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
+import { snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
@@ -659,11 +661,56 @@ export function KanbanBoard({
     return res
   }
 
-  const markRead = (ids: string[]) =>
-    withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, ...ids])] }), () => markMentionsRead(ids))
 
   /** The task panel opens at this comment (Team and Mentions, FR-042). */
   const [commentFor, setCommentFor] = useState<{ taskId: string; commentId: string } | null>(null)
+  /** …or at its Attachments, from an attachment notification (spec 012 R14). */
+  const [sectionFor, setSectionFor] = useState<{ taskId: string; section: 'attachments' } | null>(null)
+
+  // ── Notifications (spec 012) ──────────────────────────────────────────────
+  // The bell's rows and toasts open tasks here, in place, instead of
+  // reloading the board; a task that's gone says so (R14).
+  const notify = useNotify()
+  const taskIds = useMemo(() => new Set(tasks.map(t => t.id)), [tasks])
+  const openTarget = useRef<(t: { taskId: string; commentId?: string; section?: 'attachments' }) => void>(() => {})
+  openTarget.current = target => {
+    if (!taskIds.has(target.taskId)) { notify?.showGone(); return }
+    setCommentFor(target.commentId ? { taskId: target.taskId, commentId: target.commentId } : null)
+    setSectionFor(target.section ? { taskId: target.taskId, section: target.section } : null)
+    selectTask(target.taskId)
+  }
+  useEffect(() => {
+    if (!notify) return
+    notify.setNavigator(t => openTarget.current(t))
+    return () => notify.setNavigator(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notify?.setNavigator])
+  // No toast for the task that's open (FR-037).
+  useEffect(() => { notify?.setOpenTaskId(selectedTaskId ?? null) }, [notify, selectedTaskId])
+
+  // Links from phone alerts and emails: /board?task=…&n=…&comment=…|section=attachments.
+  // Read once on arrival, then tidied out of the address.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const taskId = url.searchParams.get('task')
+    const n = url.searchParams.get('n')
+    const comment = url.searchParams.get('comment')
+    const section = url.searchParams.get('section')
+    if (!taskId && !n) return
+    if (n) void notify?.api.mark(n, true).then(() => notify?.refresh())
+    if (taskId) {
+      if (!taskIds.has(taskId)) { selectTask(null); notify?.showGone() }
+      else {
+        if (comment) setCommentFor({ taskId, commentId: comment })
+        if (section === 'attachments') setSectionFor({ taskId, section: 'attachments' })
+      }
+    }
+    if (n || comment || section) {
+      ;['n', 'comment', 'section'].forEach(k => url.searchParams.delete(k))
+      window.history.replaceState(null, '', url)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const inboxApi: InboxApi = {
     move: (taskId, to) => {
@@ -688,17 +735,8 @@ export function KanbanBoard({
       withInbox(s => ({ ...s, snoozes: { ...s.snoozes, [taskId]: until } }), () => snoozeTask(taskId, until)),
     unsnooze: ids =>
       withInbox(s => { const z = { ...s.snoozes }; ids.forEach(id => delete z[id]); return { ...s, snoozes: z } }, () => unsnoozeTasks(ids)),
-    markRead,
-    async reply(commentId, body) {
-      const res = await withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, commentId])] }), () => replyToMention(commentId, body))
-      if (res.success) router.refresh()
-      return res
-    },
     setPrefs: savePrefs,
     openTask(taskId, opts) {
-      // Opening a task from a mention reads it (FR-031).
-      const m = model.mentions.find(x => x.comment.id === opts?.commentId && x.unread)
-      if (m) void markRead([m.comment.id])
       setCommentFor(opts?.commentId ? { taskId, commentId: opts.commentId } : null)
       if (!inbox.pinned) setInboxOpen(false)
       selectTask(taskId)
@@ -837,8 +875,9 @@ export function KanbanBoard({
       hasStorage={hasStorage}
       initialPreviewId={previewFor?.taskId === selectedTask.id ? previewFor.previewId : undefined}
       initialCommentId={commentFor?.taskId === selectedTask.id ? commentFor.commentId : undefined}
+      initialSection={sectionFor?.taskId === selectedTask.id ? sectionFor.section : undefined}
       onOpenSheet={openSheet}
-      onClose={() => { setPreviewFor(null); setCommentFor(null); selectTask(null) }}
+      onClose={() => { setPreviewFor(null); setCommentFor(null); setSectionFor(null); selectTask(null) }}
     />
   )
 
@@ -850,6 +889,8 @@ export function KanbanBoard({
       search={filters.search}
       onSearch={q => setFilters(f => ({ ...f, search: q }))}
       inbox={
+        <>
+        <NotificationBell />
         <InboxButton
           ref={inboxBtn}
           variant="compact"
@@ -858,6 +899,7 @@ export function KanbanBoard({
           open={view === 'board' ? panelShown : inboxOpen}
           onToggle={() => ((view === 'board' ? panelShown : inboxOpen) ? closeInbox() : openInbox())}
         />
+        </>
       }
       account={<UserMenu member={currentUser} variant="header" />}
       canCreate={currentUser.access !== 'user'}

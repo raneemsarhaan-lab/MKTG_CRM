@@ -24,6 +24,7 @@ import { BoardToolbar } from '@/components/board/BoardToolbar'
 import { ViewPair } from '@/components/board/ViewPair'
 import { FiltersButton, EMPTY_FILTERS, activeFilterCount, type BoardFilterState } from '@/components/kanban/BoardFilters'
 import { InboxButton } from '@/components/inbox/InboxButton'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ViewMenu } from '@/components/inbox/ViewMenu'
 
 const params = new URLSearchParams(location.hash.slice(1))
@@ -48,9 +49,9 @@ const MEMBERS = [member('raneem', 'Raneem Sarhaan', 'Brand Director', 'admin'), 
 const me = params.get('me') === 'user' ? MEMBERS[1] : MEMBERS[0]
 
 const COUNTS: Record<string, InboxCounts> = {
-  urgent: { reviews: 2, yours: 5, late: 1, today: 1, undated: 0, unread: 1, todo: 7, total: 8, urgent: true },
-  normal: { reviews: 2, yours: 1, late: 0, today: 0, undated: 1, unread: 0, todo: 3, total: 3, urgent: false },
-  clear: { reviews: 0, yours: 0, late: 0, today: 0, undated: 0, unread: 0, todo: 0, total: 0, urgent: false },
+  urgent: { reviews: 2, yours: 5, late: 1, today: 1, undated: 0, todo: 7, total: 7, urgent: true },
+  normal: { reviews: 2, yours: 1, late: 0, today: 0, undated: 1, todo: 3, total: 3, urgent: false },
+  clear: { reviews: 0, yours: 0, late: 0, today: 0, undated: 0, todo: 0, total: 0, urgent: false },
 }
 const counts = COUNTS[params.get('inbox') ?? 'urgent'] ?? COUNTS.urgent
 
@@ -96,7 +97,7 @@ function Host() {
           onTab={tab => go(tab === 'content' ? 'content' : last)}
           search={filters.search}
           onSearch={q => setFilters(f => ({ ...f, search: q }))}
-          inbox={<InboxButton variant="compact" counts={counts} ringKeys={[]} open={inboxOpen} onToggle={() => setInboxOpen(o => !o)} />}
+          inbox={<><NotificationBell /><InboxButton variant="compact" counts={counts} ringKeys={[]} open={inboxOpen} onToggle={() => setInboxOpen(o => !o)} /></>}
           account={<button type="button" className="fx-hd-avatar" data-account="" aria-label={`${me.name}, ${me.role}`} title={`${me.name} · ${me.role}`}>
             <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: '50%', border: '2.5px solid #A855F7', background: '#C2410C', color: '#fff', display: 'grid', placeItems: 'center', font: '700 13px Inter, sans-serif' }}><i className="fx-hd-initials" data-initials="RS" /></span>
           </button>}

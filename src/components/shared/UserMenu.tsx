@@ -141,6 +141,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
   const isRail = variant === 'rail'
   const isHeader = variant === 'header'
   const th = useTranslations('header')
+  const tn = useTranslations('notifications')
   const roleLabel = member.access === 'admin' ? 'Admin' : member.role
 
   return (
@@ -256,6 +257,9 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
             <>
               <Row icon="✎" onClick={() => setPanel('profile')}>Edit name &amp; photo</Row>
               <Row icon="🔒" onClick={() => setPanel('password')}>Change password</Row>
+              <Link href="/notifications/settings" onClick={close} style={ROW_LINK} data-nt-settings-link="">
+                <span aria-hidden="true" style={ICON}>🔔</span> {tn('settings')}
+              </Link>
               {member.access === 'admin' && (
                 <Link href="/settings" onClick={close} style={ROW_LINK}>
                   <span aria-hidden="true" style={ICON}>⚙</span> Workspace settings

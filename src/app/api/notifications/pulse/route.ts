@@ -14,16 +14,23 @@ export async function GET(req: Request) {
   const me = await getSessionMember()
   if (!me) return NextResponse.json({ error: 'not_authenticated' }, { status: 401, headers: NO_STORE })
   const active = new URL(req.url).searchParams.get('active') === '1'
-  const [unread, latest] = await Promise.all([
+  const [unread, latest, settings] = await Promise.all([
     prisma.notification.count({ where: { recipient_id: me.id, read_at: null } }),
     prisma.notification.findMany({
       where: { recipient_id: me.id, read_at: null },
       orderBy: { last_event_at: 'desc' }, take: 5, select: { id: true, last_event_at: true },
     }),
-    active ? prisma.member.update({ where: { id: me.id }, data: { last_active_at: new Date() } }) : null,
+    active
+      ? prisma.member.update({ where: { id: me.id }, data: { last_active_at: new Date() }, select: { notify_dnd: true } })
+      : prisma.member.findUnique({ where: { id: me.id }, select: { notify_dnd: true } }),
   ])
   return NextResponse.json(
-    { unread, latest: latest.map(l => ({ id: l.id, last_event_at: l.last_event_at.toISOString() })) },
+    {
+      unread,
+      latest: latest.map(l => ({ id: l.id, last_event_at: l.last_event_at.toISOString() })),
+      // Toasts stay quiet with Do not disturb on (FR-037).
+      dnd: !!settings?.notify_dnd,
+    },
     { headers: NO_STORE },
   )
 }

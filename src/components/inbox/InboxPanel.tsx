@@ -3,7 +3,8 @@
 /**
  * The Inbox panel (spec 006 FR-015–FR-019, contracts/inbox-ui.md §3).
  *
- * Four tabs: To do, Mentions, Team, Done. Opens over the board on the
+ * Two tabs: To do and Done. Mentions and the team's updates moved to the
+ * notification bell (spec 012 R12, FR-080). Opens over the board on the
  * inline-end side, or beside it when pinned. Esc, ✕ or a click outside close
  * it (outside clicks only when not pinned), and focus goes back to the button.
  * Every row's main button opens the task; its actions sit after it.
@@ -15,13 +16,13 @@ import { STAGE_META } from '@/lib/stage-meta'
 import { allowedStages, nextOnPath } from '@/lib/stage-moves'
 import {
   ageOf, dateWords, nextMidnight, previousOnPath,
-  type InboxModel, type InboxTask, type MentionRow, type ReviewRow, type TeamRow, type YourRow,
+  type InboxModel, type InboxTask, type ReviewRow, type YourRow,
 } from '@/lib/inbox'
 import { StagePill } from '@/components/sheet/StatusCell'
 import { PersonAvatar } from '@/components/sheet/PersonChip'
 import type { InboxApi } from './types'
 
-const TABS: InboxTab[] = ['todo', 'mentions', 'team', 'done']
+const TABS: InboxTab[] = ['todo', 'done']
 
 interface Props {
   model: InboxModel
@@ -82,7 +83,6 @@ export function InboxPanel(p: Props) {
   const [note, setNote] = useState('')
   const [dateFor, setDateFor] = useState<string | null>(null)
   const [date, setDate] = useState('')
-  const [replies, setReplies] = useState<Record<string, string>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<Record<string, boolean>>({})
 
@@ -278,61 +278,6 @@ export function InboxPanel(p: Props) {
     )
   }
 
-  function mentionRow(m: MentionRow) {
-    const key = m.key
-    const draft = replies[m.comment.id] ?? ''
-    const name = first(m.authorName)
-    async function send() {
-      const ok = await act(key, () => p.api.reply(m.comment.id, draft))
-      if (ok) setReplies(r => ({ ...r, [m.comment.id]: '' }))
-    }
-    return (
-      <div key={key} role="group" aria-label={t('mention.line', { name: m.authorName })} className={`fx-inbox-row is-mention${m.unread ? ' is-unread' : ''}`}
-           data-row={`mention:${m.comment.id}`} aria-busy={busy[key] || undefined}>
-        <Main open={p.api.openTask} task={m.task} commentId={m.comment.id}>
-          <span className="fx-inbox-dot" aria-hidden="true" />
-          {m.unread && <span className="fx-sheet-sr">{t('mention.unread')}, </span>}
-          <PersonAvatar member={{ name: m.authorName || '?', avatar_url: m.authorAvatar }} />
-          <span className="fx-inbox-body">
-            <span className="fx-inbox-line"><b>{t('mention.line', { name: m.authorName })}</b> · <span className="fx-inbox-mut">{whenText(m.comment.created_at, false)}</span></span>
-            <span className="fx-inbox-target">{m.task.name}</span>
-            <span className="fx-inbox-quote">{m.comment.body}</span>
-          </span>
-        </Main>
-        <div className="fx-inbox-acts">
-          <input className="fx-inbox-input" value={draft} placeholder={t('actions.replyTo', { name })} aria-label={t('actions.replyLabel', { name })}
-                 onChange={e => setReplies(r => ({ ...r, [m.comment.id]: e.target.value }))}
-                 onKeyDown={e => { if (e.key === 'Enter' && draft.trim()) { e.preventDefault(); void send() } }} />
-          <button type="button" className="fx-inbox-act is-go" disabled={!draft.trim() || busy[key]} data-act="reply" onClick={() => void send()}>{t('actions.reply')}</button>
-          {m.unread && <button type="button" className="fx-inbox-act" disabled={busy[key]} data-act="markRead"
-                               onClick={() => void act(key, () => p.api.markRead([m.comment.id]))}>{t('actions.markRead')}</button>}
-        </div>
-        {errorOf(key)}
-      </div>
-    )
-  }
-
-  function teamRow(r: TeamRow) {
-    const icon = r.type === 'comment' ? ICONS.bubble : r.type === 'file' ? ICONS.clip : r.type === 'publish' ? ICONS.check : ICONS.arrow
-    const line = r.type === 'comment' ? t('team.comment', { name: r.who ?? '' })
-      : r.type === 'file' ? t('team.file', { name: memberName(r.whoId), file: r.file ?? '' })
-      : r.type === 'publish' ? t('team.publish')
-      : t('team.move', { stage: stageName(r.stage!) })
-    const named = r.type === 'comment' || r.type === 'file'
-    return (
-      <div key={r.key} className="fx-inbox-row is-feed" data-row={`team:${r.key}`}>
-        <Main open={p.api.openTask} task={r.task} commentId={r.commentId}>
-          <span className={`fx-inbox-fic is-${r.type}`}><Icon d={icon} /></span>
-          <span className="fx-inbox-body">
-            <span className="fx-inbox-line">{named ? <b>{line}</b> : <>{line} · <b>{r.task.name}</b></>}</span>
-            {named && <span className="fx-inbox-target">{r.task.name}</span>}
-            <span className="fx-inbox-time">{whenText(r.at, r.dateOnly)}</span>
-          </span>
-        </Main>
-      </div>
-    )
-  }
-
   // ── tabs ──────────────────────────────────────────────────────────────────
 
   function todoBody() {
@@ -352,24 +297,6 @@ export function InboxPanel(p: Props) {
           </p>
         )}
         {errorOf('unsnooze')}
-      </>
-    )
-  }
-
-  function mentionsBody() {
-    const m = p.model.mentions
-    if (!m.length) return <p className="fx-inbox-empty">{t('empty.mentions')}</p>
-    const unread = m.filter(x => x.unread).map(x => x.comment.id)
-    return (
-      <>
-        {unread.length > 0 && (
-          <p className="fx-inbox-tools-line">
-            <button type="button" className="fx-inbox-link" data-act="markAllRead" disabled={busy.all}
-                    onClick={() => void act('all', () => p.api.markRead(unread))}>{t('actions.markAllRead')}</button>
-          </p>
-        )}
-        {errorOf('all')}
-        {m.map(mentionRow)}
       </>
     )
   }
@@ -395,14 +322,10 @@ export function InboxPanel(p: Props) {
     )
   }
 
-  const body = p.tab === 'todo' ? todoBody()
-    : p.tab === 'mentions' ? mentionsBody()
-    : p.tab === 'team' ? (p.model.team.length ? p.model.team.map(teamRow) : <p className="fx-inbox-empty">{t('empty.team')}</p>)
-    : doneBody()
+  const body = p.tab === 'done' ? doneBody() : todoBody()
 
   const tabCount = (tab: InboxTab) =>
     tab === 'todo' ? <span className="fx-inbox-cnt">{c.todo}</span>
-    : tab === 'mentions' ? (c.unread ? <span className="fx-inbox-cnt is-new">{t('tabs.newCount', { n: c.unread })}</span> : null)
     : tab === 'done' ? <span className="fx-inbox-cnt">{p.model.done.week.length}</span>
     : null
 
@@ -413,7 +336,7 @@ export function InboxPanel(p: Props) {
       <div className="fx-inbox-head">
         <div>
           <h3>{t('panel.title')}</h3>
-          <p data-inbox-counts="">{c.total ? t('panel.counts', { todo: c.todo, unread: c.unread }) : t('panel.allClear')}</p>
+          <p data-inbox-counts="">{c.total ? t('summary.todo', { n: c.todo }) : t('panel.allClear')}</p>
         </div>
         <div className="fx-inbox-tools">
           <button type="button" className="fx-inbox-icon" aria-pressed={p.pinned} data-inbox-pin=""

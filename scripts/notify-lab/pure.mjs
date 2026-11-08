@@ -116,6 +116,15 @@ export async function runPure(bundle, root) {
     eq(en('task_moved_to_stage', ['n'], 1), 'Nermin moved Q4 LinkedIn Carousel to your stage: C-Review', 'EN move with stage')
     eq(h.snippet('x'.repeat(150)).length, 100, 'snippet is 100 characters')
   })
+  check('description-mentions', () => {
+    // Spec 012 R11: who a brief names, as saved.
+    const ms = [{ id: 'sam', name: 'Sam' }, { id: 'saml', name: 'Sam Lee' }, { id: 'gd', name: 'Graphic Designer' }, { id: 'ar', name: 'سلمى' }]
+    eq(h.mentionedIn('Hi @Sam Lee, see this', ms), ['saml'], 'the longest name wins, not also @Sam')
+    eq(h.mentionedIn('@Sam and @Graphic Designer.', ms).sort(), ['gd', 'sam'], 'two names, punctuation after')
+    eq(h.mentionedIn('@Samantha', ms), [], 'part of a longer word is not a mention')
+    eq(h.mentionedIn('شكرًا @سلمى!', ms), ['ar'], 'Arabic names')
+    eq(h.mentionedIn('no names', ms), [], 'none')
+  })
   check('messages-parity', () => {
     const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (typeof v === 'object' ? flat(v, `${p}${k}.`) : [`${p}${k}`]))
     const read = l => JSON.parse(fs.readFileSync(path.join(root, 'messages', `${l}.json`), 'utf8')).notifications
