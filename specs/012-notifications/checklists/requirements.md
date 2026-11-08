@@ -34,6 +34,7 @@
 - **Both clarifications were answered on 2026-11-08:**
   - FR-080: option A, a bell beside the Inbox. Mentions and Team move into the bell; the Inbox keeps its to-do lists. Compared in `design/notifications-options.html`.
   - FR-081: one-level replies, built now.
+  - Channels (FR-040, FR-090–FR-098): phone alerts and email are both in this build. Each member chooses per kind and per channel in settings.
 - **The request's own data model and endpoint list are not copied into the spec.** They stay technical inputs for `/speckit-plan`. The spec records the entities by meaning, reusing the existing ones as the request asks.
 - **"Stage owner" follows the app's existing rule**, because stage owners are roles here (FR-002). It was not asked, because the rule exists.
 - **The request text was cut off in §8.** The edge cases were completed from the rest of the request and the existing app.

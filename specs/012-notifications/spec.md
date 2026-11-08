@@ -183,16 +183,20 @@ The day before "Newsletter Draft" is due, its assignee and the stage's holders g
 
 ### User Story 8 - Choose what I'm told about (Priority: P3)
 
-In Notification settings, each member turns each kind of notification on or off, and can switch on Do not disturb. Mentions and assignments start on, and carry a note recommending they stay on.
+Notification settings is a table: one row per kind of notification, and one switch per channel: **In the app**, **Phone**, **Email**. Below it are the email choice (**Instant**, **Daily summary**, **Off**) and **Do not disturb**. Each member changes their own settings, and changes apply from the next event. Mentions and assignments carry a note recommending they stay on.
 
-**Why this priority**: It lets people tune the volume. The defaults suit most people.
+**Why this priority**: It lets people tune the volume and choose where they hear about things. The defaults suit most people.
 
-**Independent Test**: Turn "New attachment" off: attachments on a followed task no longer notify. Turn it on again: they do.
+**Independent Test**:
+- Turn "New attachment" off for the app: attachments on a followed task no longer appear in the bell.
+- Turn "Mention" off for the phone: mentions still appear in the bell but no longer buzz the phone.
+- Set email to Off: no emails at all.
 
 **Acceptance Scenarios**:
 
-1. **Given** a kind turned off, **When** such an event happens, **Then** no notification is recorded for that member.
-2. **Given** a new member, **When** they first open settings, **Then** every kind is on.
+1. **Given** a kind turned off in the app, **When** such an event happens, **Then** no notification is recorded for that member, and nothing is pushed or emailed for it.
+2. **Given** a kind on in the app but off for the phone or email, **When** such an event happens, **Then** it shows in the bell only.
+3. **Given** a new member, **When** they first open settings, **Then** they see the defaults in FR-041.
 
 ---
 
@@ -213,6 +217,51 @@ Notifications are built from the event's facts at display time, in the reader's 
 **Why this priority**: The team works in both languages. Storing finished sentences would freeze them in one language.
 
 **Independent Test**: Switch the language: every existing notification reads in the new language, with the correct grammar for counts (one, two, few, many) and the actor's gender where Arabic needs it.
+
+---
+
+### User Story 11 - Alerts on my phone when Momentum is closed (Priority: P2)
+
+Salma's phone is in her bag with Momentum closed. Raneem @mentions her in "Campaign Brief", and her phone shows "Raneem mentioned you in 'Campaign Brief'" on the lock screen. Tapping it opens Momentum at that comment.
+
+**Why this priority**: Mentions, assignments and due dates stall work when they are seen a day late. Most of the team reads them on their phones.
+
+**Independent Test**:
+- **Android (Chrome):** allow notifications once, close Momentum, then get mentioned. An alert shows on the phone within a minute, and tapping it opens the comment.
+- **iPhone:** the same, after adding Momentum to the Home Screen.
+- In both cases, with the app open and in use, there is a toast instead of a phone alert.
+
+**Acceptance Scenarios**:
+
+1. **Given** a member who hasn't allowed phone alerts, **When** they open the bell or settings, **Then** they are offered "Get alerts on this phone".
+   - On an iPhone outside the Home Screen app, they get short steps to add Momentum to the Home Screen first.
+   - The browser's own permission question appears only after they tap the offer.
+2. **Given** phone alerts are allowed and the kind is on for the phone, **When** a notification is recorded while the member isn't active in Momentum, **Then** the phone shows an alert in their language, with the same sentence as the bell.
+3. **Given** the member is active in Momentum, **When** a notification arrives, **Then** they get the toast, and no phone alert.
+4. **Given** a grouped notification gets another event, **When** it is updated, **Then** the phone shows one updated alert ("Salma, Yosra and 3 others commented…"), not a new alert per comment.
+5. **Given** Do not disturb is on, **When** notifications arrive, **Then** no phone alerts are shown, and the bell still updates.
+6. **Given** a member uses several devices, **When** they allow alerts on each, **Then** each device gets them. Signing out of a device stops alerts on that device.
+7. **Given** a phone alert is tapped, **When** Momentum opens, **Then** it follows the same deep link as the bell (FR-034), and the notification becomes read.
+
+---
+
+### User Story 12 - Notifications by email (Priority: P3)
+
+Samaa prefers email for some things. She turns email on for mentions and due dates. With **Instant**, she gets an email for each mention she hasn't seen in the app. With **Daily summary**, she gets one email each morning listing what she hasn't read. A link in each email opens the exact comment or task.
+
+**Why this priority**: Email reaches every phone and computer with nothing to install. It covers people who are away from the app for a day or more.
+
+**Independent Test**:
+- Email on for mentions, set to Instant: a mention that is still unread 10 minutes later sends one email. A mention read within 10 minutes sends none.
+- Set to Daily summary: one email arrives the next morning, listing the unread notifications for the kinds that are on.
+- Set to Off: no email at all.
+
+**Acceptance Scenarios**:
+
+1. **Given** Instant email and a kind on for email, **When** a notification is still unread 10 minutes after it was recorded, **Then** one email is sent for it, and grouped events share one email.
+2. **Given** Daily summary, **When** the morning send runs at 08:30 in the team's time zone, **Then** the member gets one email listing their unread notifications from the last day, for the kinds that are on. If there are none, nothing is sent.
+3. **Given** any notification email, **When** it is opened, **Then** it is in the member's language, shows the same sentence as the bell, has a link that opens the exact target after sign-in, and has a link to Notification settings.
+4. **Given** Do not disturb, **When** emails are due, **Then** they are still sent. Do not disturb covers on-screen interruptions only: toasts and phone alerts.
 
 ---
 
@@ -310,12 +359,57 @@ Notifications are built from the event's facts at display time, in the reader's 
 
 **Settings**
 
-- **FR-040**: Each member MUST be able to turn each kind on or off for in-app notifications, and to switch Do not disturb.
-- **FR-041**: Every kind MUST start on. Mentions and assignments MUST carry a note recommending they stay on.
+- **FR-040**: Each member MUST be able to change their own settings at any time:
+  - each kind of notification on or off, separately for each channel: **In the app**, **Phone**, **Email**;
+  - how email is sent: **Instant**, **Daily summary**, or **Off**;
+  - **Do not disturb**: no toasts and no phone alerts, while notifications are still recorded and emails still go out.
+
+  A kind that is off in the app is off everywhere: it is not recorded, so it can't be pushed or emailed.
+- **FR-041**: The defaults for a new member:
+
+  | Channel | Default |
+  |---|---|
+  | In the app | Every kind on |
+  | Phone | On for mentions, assignments, due tomorrow and overdue; off for the rest |
+  | Email | Off for every kind. Email is set to Daily summary, so turning a kind on sends a morning summary until the member changes it |
+
+  Mentions and assignments MUST carry a note recommending they stay on.
 
 **Due dates**
 
 - **FR-050**: An hourly check MUST send "due tomorrow" once per task per due date, and "overdue" once per task per due date, for live tasks that are not published or archived. Dates are read in the team's time zone. A new due date resets both.
+
+**Phone alerts**
+
+- **FR-090**: Members MUST be able to allow alerts on each phone or computer they use. The flow:
+  - Momentum offers it in the bell and in settings, and asks the browser for permission only when the member taps the offer.
+  - On iPhones it explains the Home Screen step first.
+  - The member can turn alerts off again per device.
+- **FR-091**: A phone alert MUST be sent for a notification when all of these hold:
+  - the kind is on for the phone;
+  - the member allowed alerts on that device;
+  - Do not disturb is off;
+  - the member isn't active in Momentum at that moment (FR-036's "active").
+- **FR-092**: A phone alert MUST:
+  - show the notification's sentence in the member's language;
+  - be replaced (not duplicated) when its group grows;
+  - open the same target as the bell when tapped (FR-034);
+  - mark the notification read when tapped.
+- **FR-093**: Phone alerts MUST stop for a device when the member signs out there, turns alerts off, or the browser withdraws permission.
+- **FR-094**: Phone alerts MUST NOT add any caching of pages or data on the device. The app's existing rule of no offline caching stands.
+
+**Email**
+
+- **FR-095**: With **Instant**, an email MUST be sent for a notification of a kind that is on for email, when it is still unread 10 minutes after it was recorded. A grouped notification sends one email for the group.
+- **FR-096**: With **Daily summary**, one email MUST be sent each morning at 08:30 in the team's time zone. It lists the member's unread notifications from the past day, for the kinds on for email. Nothing is sent when there are none.
+- **FR-097**: Every email MUST:
+  - be in the member's language and work right to left in Arabic;
+  - show the same sentences as the bell;
+  - link to the exact target, through sign-in if needed;
+  - link to Notification settings.
+
+  A notification already read when its email is due MUST NOT be emailed.
+- **FR-098**: Emails MUST go only to the member's own address on file. If sending fails, it MUST be retried, and it MUST never fail the action that caused the notification.
 
 **Retention**
 
@@ -359,7 +453,9 @@ Existing entities are reused, not copied: members, tasks, stages and their roles
   - the created and updated times;
   - a grouping key.
 - **Task follower**: a member who follows a task, and since when. It also records "turned off", so automatic following doesn't undo a deliberate choice.
-- **Notification setting**: per member and kind, on or off for in-app. It has room for email later. Do not disturb is per member.
+- **Notification setting**: per member and kind, on or off for each channel (in the app, phone, email). Per member: the email choice (Instant, Daily summary, Off) and Do not disturb.
+- **Alert device**: a phone or computer where a member allowed alerts, until they sign out there or turn it off.
+- **Email sent**: which notifications or daily summaries were emailed to whom, so none is sent twice.
 - **Reminder sent**: which due-date reminders went out for which task and date, so each is sent once.
 
 ## Success Criteria *(mandatory)*
@@ -374,6 +470,9 @@ Existing entities are reused, not copied: members, tasks, stages and their roles
 - **SC-006**: Every notification reads correctly in English and Arabic, including counts of 1, 2, 3, 11 and 100. The list, toasts and settings pass a right-to-left check.
 - **SC-007**: Each due-date reminder is sent once per task per due date over a week of hourly checks.
 - **SC-008**: The list opens within 1 second with 1,000 notifications in a member's history.
+- **SC-009**: With Momentum closed, a mention reaches an allowed Android phone, and an iPhone with Momentum on its Home Screen, within 1 minute in 95% of cases. Tapping the alert opens the exact comment.
+- **SC-010**: Over a week of use, no member gets both a phone alert and a toast for the same notification, or the same notification by email twice.
+- **SC-011**: Every switch in Notification settings takes effect from the next event, and a member can set up their channels in under 2 minutes.
 
 ## Assumptions
 
@@ -381,14 +480,20 @@ Existing entities are reused, not copied: members, tasks, stages and their roles
 - **"Creator"** means the member who created the task. Tasks imported without one (from ClickUp) have none. The task's owner, the accountable person, is also told about comments and attachments, as the person who asked for the work.
 - **"Anyone else in that thread"** means everyone who replied under the same comment.
 - **The team's time zone** for due dates is the one the app already uses for "today" and "late".
-- **Email notifications and digests are phase 2.** The settings keep room for them, but nothing is sent by email in this feature.
+- **Phone alerts and email are both in this build**, at the user's request (2026-11-08). The member chooses per kind and per channel (FR-040).
+- **Phone alerts use the browser's own notifications.** There's no App Store app.
+  - **Android:** they work in Chrome without installing anything.
+  - **iPhone:** they need Momentum added to the Home Screen (iOS 16.4 or later).
+  - **Desktop browsers** work too.
+- **Sending email needs an email service** connected to the deployment, with a sender address on the company's domain. This is a set-up step on Cranl, not a choice for members.
 - **"Active"** for toasts means the app is open and visible, and the member has interacted within the last few minutes.
 - **Pastes are summarised.** Paste plan and Paste clips create many tasks at once, so they notify each stage holder once per paste, not once per task.
 - **Old history is not backfilled**, with one exception: unread mentions from the last 7 days (FR-080). Other comments and events from before launch don't become notifications.
 
 ## Out of Scope
 
-- Email and digest delivery (phase 2).
-- Phone or browser push notifications outside the app.
+- An App Store or Play Store app.
+- SMS or WhatsApp messages.
+- Quiet hours or schedules beyond Do not disturb.
 - Notifications about projects, themes or settings changes.
 - Changing who may see or edit a task.
