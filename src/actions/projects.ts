@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import { getSessionMember, requireAdmin, requireTaskCreator } from '@/lib/authz'
 import { MAX_PASTED } from '@/lib/paste-list'
 
@@ -745,6 +746,10 @@ export async function createTaskInProject(
       nine_stage:     ws?.nine_stage_default ?? false,
     },
     select: { id: true },
+  })
+  await notifyAfter(async tx => {
+    await follow(tx, task.id, member.id)
+    return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
   })
 
   revalidateAll()

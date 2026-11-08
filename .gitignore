@@ -33,3 +33,5 @@ scripts/sheet-lab/out/
 scripts/inbox-lab/out/
 # Header lab build output
 scripts/header-lab/out/
+# Notifications lab build output
+scripts/notify-lab/out/

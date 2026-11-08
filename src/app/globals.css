@@ -83,6 +83,11 @@
   --inbox-blue-soft:    #E8EEFE;
   --inbox-shadow:       0 18px 50px rgba(20, 19, 60, 0.20);
   --inbox-btn-shadow:   0 8px 20px rgba(124, 58, 237, 0.32);
+  /* Notifications (spec 012): NOTIFY_UI in src/lib/tokens.ts. */
+  --nt-red:             #E5484D;
+  --nt-tint:            #F4F0FF;
+  --nt-tint-hover:      #ECE5FF;
+  --nt-blue:            #2563EB;
   /* The Board header (spec 011): PIPE in src/lib/pipeline-tokens.ts. */
   --hd-ink:             #14131A;
   --hd-text:            #1F2430;

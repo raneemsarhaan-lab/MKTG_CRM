@@ -260,3 +260,27 @@ export const BRAND_PALETTE = [
   '#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B',
   '#10B981', '#EF4444', '#6366F1', '#14B8A6',
 ]
+
+/**
+ * Notifications (spec 012, design/notifications.html). The bell's count is
+ * red so it never reads as the Inbox's purple or orange one; unread rows are
+ * tinted, with a blue dot and time. Mirrored as --nt-* in globals.css.
+ */
+export const NOTIFY_UI = {
+  red:        '#E5484D',
+  tint:       '#F4F0FF',
+  tintHover:  '#ECE5FF',
+  blue:       '#2563EB',
+  kinds: {
+    comment:               '#2563EB',
+    reply:                 '#0E7C7C',
+    attachment:            '#B45309',
+    task_created_in_stage: '#7C3AED',
+    task_moved_to_stage:   '#7C3AED',
+    assigned:              '#15803D',
+    mention:               '#D6336C',
+    due_soon:              '#C81E3A',
+    overdue:               '#C81E3A',
+  },
+} as const
+

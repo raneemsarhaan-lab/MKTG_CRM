@@ -33,6 +33,11 @@ step 900 optional "Moving stored files into the bucket" \
 step 300 optional "Checking for files to recover" \
   tsx scripts/recover-attachments.ts
 
+# Spec 012: followers for live tasks, and the last 7 days of unread mentions
+# carried into the bell. Idempotent: inserts skip what already exists.
+step 300 optional "Seeding notification followers and mentions" \
+  tsx scripts/notifications-backfill.ts
+
 step 900 optional "Importing ClickUp tasks (if an export is present)" \
   tsx scripts/import-clickup.ts
 step 600 optional "Loading the Aspiring / Focus plan" \

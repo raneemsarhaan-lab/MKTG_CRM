@@ -873,5 +873,142 @@
     "allAttached": "Every task has a project",
     "account": "{name}, {role}",
     "showing": "Showing {shown} of {total} tasks"
+  },
+  "notifications": {
+    "bell": "Notifications",
+    "bellLabel": "{n, plural, =0 {Notifications} one {Notifications, # unread} other {Notifications, # unread}}",
+    "title": "Notifications",
+    "all": "All",
+    "unread": "Unread",
+    "markAll": "Mark all as read",
+    "markRead": "Mark as read",
+    "markUnread": "Mark as unread",
+    "mute": "Turn off notifications for this task",
+    "muted": "You won’t get notifications for this task, except mentions and assignments.",
+    "more": "More actions",
+    "settings": "Notification settings",
+    "seeAll": "See all",
+    "today": "Today",
+    "earlier": "Earlier",
+    "caught": "You’re all caught up.",
+    "caughtSub": "New activity on your tasks shows up here.",
+    "gone": "This task is no longer available",
+    "goneSub": "It may have been deleted, or you no longer have access.",
+    "ok": "OK",
+    "close": "Close",
+    "andMore": "{n, plural, one {and # more} other {and # more}}",
+    "follow": "Follow",
+    "following": "Following",
+    "followHint": "Get notified about comments and files on this task",
+    "reply": "Reply",
+    "replyPlaceholder": "Write a reply… use @ to mention",
+    "replies": "{n, plural, one {# reply} other {# replies}}",
+    "time": {
+      "now": "now",
+      "m": "{n}m",
+      "h": "{n}h",
+      "yesterday": "Yesterday"
+    },
+    "kinds": {
+      "mention": "Mentions",
+      "assigned": "Assignments",
+      "comment": "Comments",
+      "reply": "Replies",
+      "attachment": "Attachments",
+      "task_created_in_stage": "New task in your stage",
+      "task_moved_to_stage": "Moved to your stage",
+      "due_soon": "Due tomorrow",
+      "overdue": "Overdue"
+    },
+    "kindHelp": {
+      "mention": "When someone @mentions you",
+      "assigned": "When a task is assigned to you",
+      "comment": "On tasks you’re on or follow",
+      "reply": "In threads you’re part of",
+      "attachment": "Files and links added to your tasks",
+      "task_created_in_stage": "When a task is created in a stage you hold",
+      "task_moved_to_stage": "When a task enters a stage you hold",
+      "due_soon": "Your tasks and your stage",
+      "overdue": "Your tasks and your stage"
+    },
+    "msg": {
+      "comment": {
+        "one": "<b>{actor}</b> commented on <t>{task}</t>",
+        "two": "<b>{actor}</b> and <b>{actor2}</b> commented on <t>{task}</t>",
+        "many": "<b>{actor}</b>, <b>{actor2}</b> and {others, plural, one {# other} other {# others}} commented on <t>{task}</t>"
+      },
+      "reply": {
+        "one": "<b>{actor}</b> replied to your comment on <t>{task}</t>",
+        "two": "<b>{actor}</b> and <b>{actor2}</b> replied to your comment on <t>{task}</t>",
+        "many": "<b>{actor}</b>, <b>{actor2}</b> and {others, plural, one {# other} other {# others}} replied to your comment on <t>{task}</t>",
+        "thread": "<b>{actor}</b> replied in a thread on <t>{task}</t>",
+        "threadMany": "<b>{actor}</b> and {others, plural, one {# other} other {# others}} replied in a thread on <t>{task}</t>"
+      },
+      "attachment": {
+        "one": "<b>{actor}</b> added {count, plural, one {an attachment} other {# attachments}} to <t>{task}</t>",
+        "many": "<b>{actor}</b> and {others, plural, one {# other} other {# others}} added {count, plural, one {an attachment} other {# attachments}} to <t>{task}</t>"
+      },
+      "task_created_in_stage": {
+        "one": "New task <t>{task}</t> was added to your stage: {stage}",
+        "paste": "<b>{actor}</b> added {count, plural, one {# task} other {# tasks}} to your stage: {stage}"
+      },
+      "task_moved_to_stage": "<b>{actor}</b> moved <t>{task}</t> to your stage: {stage}",
+      "assigned": "You were assigned to <t>{task}</t>",
+      "mention": "<b>{actor}</b> mentioned you in <t>{task}</t>",
+      "due_soon": "<t>{task}</t> is due tomorrow",
+      "overdue": "<t>{task}</t> is overdue"
+    },
+    "push": {
+      "offerTitle": "Get alerts on this phone",
+      "offerText": "Mentions, assignments and due dates, even with Momentum closed.",
+      "turnOn": "Turn on",
+      "turnOff": "Turn off",
+      "dismiss": "Not now",
+      "on": "Alerts are on for this device",
+      "off": "Alerts are off for this device",
+      "blocked": "Alerts are blocked in this browser’s settings.",
+      "unsupported": "This browser can’t show alerts.",
+      "iosTitle": "Add Momentum to your Home Screen first",
+      "iosText": "iPhone only sends alerts to apps on the Home Screen.",
+      "ios1": "Tap the Share button at the bottom of Safari.",
+      "ios2": "Choose “Add to Home Screen”.",
+      "ios3": "Open Momentum from the new icon, then turn alerts on here."
+    },
+    "settingsPage": {
+      "title": "Notification settings",
+      "notifyAbout": "Notify me about",
+      "inApp": "In the app",
+      "phone": "Phone",
+      "email": "Email",
+      "recommended": "Recommended: keep on",
+      "emailMode": "Email",
+      "instant": "Instant",
+      "daily": "Daily summary",
+      "off": "Off",
+      "instantHelp": "Only for what you haven’t seen in 10 minutes",
+      "dailyHelp": "One email at 08:30 with what’s unread",
+      "offHelp": "No emails",
+      "emailNotReady": "Email isn’t set up yet.",
+      "dnd": "Do not disturb",
+      "dndHelp": "No pop-ups or phone alerts. Notifications are still saved, and emails still go out.",
+      "device": "This device",
+      "saved": "Saved"
+    },
+    "history": {
+      "title": "Notifications",
+      "any": "Any time",
+      "today": "Today",
+      "week": "Last 7 days",
+      "month": "Last 30 days",
+      "none": "Nothing matches these filters."
+    },
+    "email": {
+      "subjectOne": "{text}",
+      "subjectDaily": "{n, plural, one {# unread notification} other {# unread notifications}} on Momentum",
+      "open": "Open in Momentum",
+      "dailyIntro": "Here’s what you haven’t read yet:",
+      "footer": "You get this because of your notification settings.",
+      "manage": "Change notification settings"
+    }
   }
 }

@@ -21,7 +21,8 @@
     "lab:attachments": "bash scripts/attachments-lab/build.sh && node scripts/attachments-lab/scenarios.mjs",
     "lab:sheet": "bash scripts/sheet-lab/build.sh && node scripts/sheet-lab/scenarios.mjs",
     "lab:inbox": "bash scripts/inbox-lab/build.sh && node scripts/inbox-lab/scenarios.mjs",
-    "lab:header": "bash scripts/header-lab/build.sh && node scripts/header-lab/scenarios.mjs"
+    "lab:header": "bash scripts/header-lab/build.sh && node scripts/header-lab/scenarios.mjs",
+    "lab:notify": "bash scripts/notify-lab/build.sh && node scripts/notify-lab/scenarios.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",
@@ -63,6 +64,7 @@
     "tailwind-merge": "^3.5.0",
     "tiptap-markdown": "^0.9.0",
     "vite": "^6.2.0",
+    "web-push": "^3.6.7",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
@@ -72,6 +74,7 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.21",
     "axe-core": "^4.14.0",
     "playwright": "^1.61.1",

@@ -29,7 +29,7 @@ description: "Task list for Task Notifications"
 
 ## Phase 1: Setup
 
-- [ ] T001 The design file `design/notifications.html`, built on the approved `design/notifications-options.html` (option A), following contracts/ui.md §1–§8. It shows:
+- [X] T001 The design file `design/notifications.html`, built on the approved `design/notifications-options.html` (option A), following contracts/ui.md §1–§8. It shows:
   - the bell and its 9+;
   - the panel's All and Unread tabs, rows for every kind, grouped rows, the ⋯ menu, Mark all and the empty state;
   - the phone-alerts offer, including the iPhone Home Screen steps;
@@ -40,7 +40,7 @@ description: "Task list for Task Notifications"
   - the 390 px layout and Arabic.
 
   Publish it as an artifact and commit it. **UI tasks start after the user approves it (§IV).**
-- [ ] T002 [P] Lab skeleton in `scripts/notify-lab/`, following `scripts/inbox-lab/`:
+- [X] T002 [P] Lab skeleton in `scripts/notify-lab/`, following `scripts/inbox-lab/`:
   - `build.sh`: esbuild bundles for `entry.tsx` (UI) and `pure-entry.ts` (Node);
   - `gen.mjs`: CSS from `globals.css`;
   - `fixtures.ts`: members in each role, with genders and locales; tasks in working and review stages; comments with replies and mentions; followers, some muted;
@@ -48,13 +48,13 @@ description: "Task list for Task Notifications"
   - `index.html`.
 
   Add `"lab:notify"` to `package.json` and `scripts/notify-lab/out/` to `.gitignore`.
-- [ ] T003 [P] Add the dependency `web-push` (plan, Complexity Tracking) to `package.json` and run `npm install`. Document `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFY_TZ`, `NOTIFY_SCHEDULER` and `NOTIFY_TICK_SECRET` in `.env.example`.
+- [X] T003 [P] Add the dependency `web-push` (plan, Complexity Tracking) to `package.json` and run `npm install`. Document `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFY_TZ`, `NOTIFY_SCHEDULER` and `NOTIFY_TICK_SECRET` in `.env.example`.
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T004 Schema in `prisma/schema.prisma` (data-model §1–§2):
+- [X] T004 Schema in `prisma/schema.prisma` (data-model §1–§2):
   - **New models:** `Notification`, `TaskFollower`, `NotificationSetting`, `PushSubscription`, `DueReminder`, `EmailDigest`, with the indexes listed;
   - **New columns:**
     - `TaskComment.parent_id`, a self relation with cascade, plus its index;
@@ -62,9 +62,9 @@ description: "Task list for Task Notifications"
     - `Member.locale`, `gender`, `notify_dnd`, `email_mode` and `last_active_at`.
 
   Run `npx prisma generate` and `bash scripts/migrate.sh` locally.
-- [ ] T005 [P] In `src/types/index.ts`, add `NotificationKind`, `NotificationChannel`, `EmailMode` and `AppNotification`. Add `notificationId`, `parentId` and `replies` to the comment type the task panel uses.
-- [ ] T006 [P] `NOTIFY_UI` in `src/lib/tokens.ts` (red badge, unread tint, unread dot and time, and an icon colour per kind) and the matching `--nt-*` variables in `src/app/globals.css`.
-- [ ] T007 [P] The `notifications.*` strings in `messages/en.json` and `messages/ar.json`:
+- [X] T005 [P] In `src/types/index.ts`, add `NotificationKind`, `NotificationChannel`, `EmailMode` and `AppNotification`. Add `notificationId`, `parentId` and `replies` to the comment type the task panel uses.
+- [X] T006 [P] `NOTIFY_UI` in `src/lib/tokens.ts` (red badge, unread tint, unread dot and time, and an icon colour per kind) and the matching `--nt-*` variables in `src/app/globals.css`.
+- [X] T007 [P] The `notifications.*` strings in `messages/en.json` and `messages/ar.json`:
   - **Sentences:** one per kind, as ICU messages:
     - `{actor}`, `{actor2}`, `{others, plural, …}`, `{count, plural, …}`, `{task}`, `{stage}`;
     - `{gender, select, f {…} m {…} other {…}}`, with a neutral noun phrasing for `other`;
@@ -73,17 +73,17 @@ description: "Task list for Task Notifications"
   - **Settings:** labels, kinds, the email modes, DND, the device and iPhone steps, "Email isn't set up yet";
   - **Relative times;**
   - **Email:** subject lines and bodies.
-- [ ] T008 [P] Pure modules in `src/lib/notify/`:
+- [X] T008 [P] Pure modules in `src/lib/notify/`:
   - `settings.ts`: `DEFAULTS` (data-model §4), and `effective(memberSettings, kind, channel)`, where off in the app means off everywhere;
   - `recipients.ts`: `stageHolders(task, members)`, built on `holdsStage` from `src/lib/stage-moves.ts`, and `resolveRecipients(event, ctx)` following data-model §5. It removes the actor, removes duplicates, drops muted followers except for mentions and assignments, and drops kinds that are off in the app;
   - `group.ts`: `groupKey(event)` and `joinOrNew(open, event, now)`, which uses the 2-hour window and the merge rules for actors and count (R5);
   - `message.ts`: `messageFor(notification, actors, locale)` → `{ key, values }` (R6), plus `relativeTime()`;
   - `days.ts`: `teamDay(now, tz)` and `dueState(task, now, tz)` → `'due_soon' | 'overdue' | null` (R9).
-- [ ] T009 The server service in `src/lib/notify/notify.ts` (R1, R3, R5):
+- [X] T009 The server service in `src/lib/notify/notify.ts` (R1, R3, R5):
   - `notify(db, event)`: resolves recipients through `recipients.ts` with the task, followers, members and settings. Then, under `pg_advisory_xact_lock(hashtext(recipient||group_key))`, it joins an open group or inserts. It returns the rows it touched, for delivery after commit;
   - `follow(db, taskId, memberId, { clearMute })` and `setMuted(db, taskId, memberId, muted)`;
   - `afterCommit(rows)`: a hook that US6 (toasts, through the pulse) and US11 (push) plug into. Until then it does nothing.
-- [ ] T010 Pure checks in `scripts/notify-lab/pure.mjs`:
+- [X] T010 Pure checks in `scripts/notify-lab/pure.mjs`:
   - **Recipients:** every kind × role from data-model §5;
   - **Grouping:** join, expiry, read starts a new group, mentions never join, and an exact count for simultaneous events (simulated);
   - **Settings:** defaults and precedence;
@@ -100,15 +100,15 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Member A comments on a task B is assigned to. Within 10 s B's bell goes up by one. Clicking the notification opens the comment, highlighted, and the count goes down. A gets nothing.
 
-- [ ] T011 [US1] Replies (R4, FR-081) in `src/actions/tasks.ts`: `addComment(taskId, body, mentions, taskRefs, parentId?)` checks that the parent is on the same task and is a top-level comment (error `bad_parent`). A "reply to a reply" stores the top comment as its parent.
-- [ ] T012 [US1] In `addComment`, inside one `prisma.$transaction`:
+- [X] T011 [US1] Replies (R4, FR-081) in `src/actions/tasks.ts`: `addComment(taskId, body, mentions, taskRefs, parentId?)` checks that the parent is on the same task and is a top-level comment (error `bad_parent`). A "reply to a reply" stores the top comment as its parent.
+- [X] T012 [US1] In `addComment`, inside one `prisma.$transaction`:
   - create the comment;
   - `follow(author, { clearMute: true })`;
   - `notify(comment | reply)`;
   - `notify(mention)` for each mentioned member, and auto-follow them.
 
   `replyToMention` in `src/actions/inbox.ts` becomes `addComment(…, parentId)`.
-- [ ] T013 [US1] In `src/actions/notifications.ts`:
+- [X] T013 [US1] In `src/actions/notifications.ts`:
   - `listNotifications` (cursor on `last_event_at`, `id`; the All and Unread tabs; actors included);
   - `markNotification`;
   - `markAllRead`;
@@ -151,11 +151,11 @@ description: "Task list for Task Notifications"
 - An assignment notifies only the new assignee.
 - A mention of a non-follower notifies them, and they now follow the task.
 
-- [ ] T020 [US2] Moves in `src/actions/tasks.ts`: `setTaskStage`, `moveTask` and `bulkUpdateTasks` (status) call `notify(task_moved_to_stage)` to the new stage's holders inside the move's transaction. The previous holders get nothing more unless they follow the task (FR-012).
-- [ ] T021 [US2] New tasks:
+- [X] T020 [US2] Moves in `src/actions/tasks.ts`: `setTaskStage`, `moveTask` and `bulkUpdateTasks` (status) call `notify(task_moved_to_stage)` to the new stage's holders inside the move's transaction. The previous holders get nothing more unless they follow the task (FR-012).
+- [X] T021 [US2] New tasks:
   - `createTask`, `createTasks` and `createSubtask` in `src/actions/tasks.ts`, `createTaskInProject` in `src/actions/projects.ts`, and `addPiece` in `src/actions/content.ts` call `notify(task_created_in_stage)`. If an assignee is set they also call `notify(assigned)`, and they follow the creator and the assignee;
   - `addClips` and `addPlan` send one notification per stage holder per paste (`meta.paste_count`, a `group_key` per paste).
-- [ ] T022 [US2] Assignments: `updateTask` and `bulkUpdateTasks` call `notify(assigned)` when `assignee_id` changes to someone else, and follow the new assignee with `clearMute`.
+- [X] T022 [US2] Assignments: `updateTask` and `bulkUpdateTasks` call `notify(assigned)` when `assignee_id` changes to someone else, and follow the new assignee with `clearMute`.
 - [ ] T023 [US2] Mentions in descriptions (R11):
   - an `@` `Suggestion` in `src/components/kanban/brief-editor/extensions.ts` with a member list, inserting `@Name` and collecting ids;
   - the description save passes `description_mentions`;
@@ -173,7 +173,7 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Five comments by three people within two hours give one unread row: "X, Y and 3 others commented…". After it is read, a sixth comment starts a new row.
 
-- [ ] T025 [US3] Attachments: `addAttachments`, `addLinkAttachment`, `setPieceLink` and the `/api/attachments` upload route call `notify(attachment)`. Several files in one action add to the count at once.
+- [X] T025 [US3] Attachments: `addAttachments`, `addLinkAttachment`, `setPieceLink` and the `/api/attachments` upload route call `notify(attachment)`. Several files in one action add to the count at once.
 - [ ] T026 [US3] Grouped rows in the panel: two stacked avatars; "{actor}, {actor2} and {others} others…"; "added {count} attachments".
 - [ ] T027 [US3] Lab: grouping across comment, reply (keyed per thread) and attachment kinds; the grouped sentences in both languages; and the running-app check of five comments by three people (quickstart §3, row 3).
 
@@ -198,7 +198,7 @@ description: "Task list for Task Notifications"
 **Independent Test**: Follow a task you have no role on: you're told about its next comment. Unfollow it: you aren't told about the one after.
 
 - [ ] T031 [US5] `setFollow` and `getFollow` in Actions, and the Follow / Following toggle in Modal's header (`data-follow`).
-- [ ] T032 [US5] Seed followers in `scripts/backfill.sh` (idempotent): for live tasks, the creator, owner, assignee and every comment author (data-model §6).
+- [X] T032 [US5] Seed followers in `scripts/backfill.sh` (idempotent): for live tasks, the creator, owner, assignee and every comment author (data-model §6).
 - [ ] T033 [US5] Lab: the toggle's state; auto-follow doesn't clear a deliberate unfollow, except for the member's own new action (FR-013).
 
 ---
@@ -224,7 +224,7 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: A task due tomorrow gives one "due tomorrow" within an hour. Running the check again sends nothing new. After the date passes, one "overdue" is sent.
 
-- [ ] T036 [US7] The scheduler in `src/lib/notify/scheduler.ts`:
+- [X] T036 [US7] The scheduler in `src/lib/notify/scheduler.ts`:
   - `startNotifyScheduler()` ticks every 60 s, and each job is guarded by `pg_try_advisory_xact_lock(hashtext('notify-scheduler:'+job))`;
   - the hourly due job uses `dueState` and keys `due_reminders` by (task, kind, due date);
   - the daily clean-up at 03:00 (FR-060).
@@ -252,8 +252,8 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: On Android, with alerts allowed and the app closed, a mention shows an alert within a minute, and tapping it opens the comment. The same on an iPhone from the Home Screen. With the app open, only a toast.
 
-- [ ] T041 [US11] The worker in `public/push-sw.js`: handles only `push` (show the notification with its title, body and `tag` = notification id, and `renotify` for group updates) and `notificationclick` (focus or open the URL). **No fetch handler.** `src/middleware.ts` lets `/push-sw.js` through without a session.
-- [ ] T042 [US11] The server side in `src/lib/notify/push.ts`:
+- [X] T041 [US11] The worker in `public/push-sw.js`: handles only `push` (show the notification with its title, body and `tag` = notification id, and `renotify` for group updates) and `notificationclick` (focus or open the URL). **No fetch handler.** `src/middleware.ts` lets `/push-sw.js` through without a session.
+- [X] T042 [US11] The server side in `src/lib/notify/push.ts`:
   - `web-push` with VAPID;
   - send to every subscription of the recipient;
   - delete a subscription on 404 or 410.
@@ -279,7 +279,7 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Turn "New attachment" off in the app: attachments no longer appear in the bell. Turn "Mention" off for the phone: mentions still appear in the bell but don't buzz the phone. Set email to Off: no emails.
 
-- [ ] T045 [US8] `getNotificationSettings` and `saveNotificationSettings` in Actions (rows only for changes from the defaults; DND; email mode).
+- [X] T045 [US8] `getNotificationSettings` and `saveNotificationSettings` in Actions (rows only for changes from the defaults; DND; email mode).
 - [ ] T046 [US8] The settings page at `src/app/(app)/notifications/settings/page.tsx` and `src/components/notifications/NotificationSettings.tsx` (contracts/ui.md §6):
   - the kinds × channels table;
   - "In the app" off switches the row off;
@@ -310,11 +310,11 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Instant: a mention unread for 10 minutes sends one email, and one read sooner sends none. Daily summary: one email the next morning, or nothing when nothing is unread.
 
-- [ ] T050 [US12] The sender in `src/lib/notify/email.ts`:
+- [X] T050 [US12] The sender in `src/lib/notify/email.ts`:
   - Resend over `fetch`;
   - `emailReady()`;
   - EN and AR HTML templates (`dir="rtl"`) with links to `/board?task=…&n=…` and to settings.
-- [ ] T051 [US12] Scheduler jobs:
+- [X] T051 [US12] Scheduler jobs:
   - **Instant** (every tick): unread, not yet emailed, older than 10 minutes, the kind on for email, mode `instant`. It sets `emailed_at`, and retries up to 5 times;
   - **Daily summary** at 08:30 `NOTIFY_TZ`: once per member per day, through `email_digests`, and nothing when nothing is unread.
 - [ ] T052 [US12] Lab: template rendering in both languages; the job selection rules with a fake clock. Then quickstart §5 with Resend configured.
@@ -328,7 +328,7 @@ description: "Task list for Task Notifications"
   - counts: `total` = `todo`, and the summary without mentions.
 
   Update `InboxTab` in the types. Update `scripts/inbox-lab` scenarios to To do and Done.
-- [ ] T054 Launch backfill in `scripts/backfill.sh`: unread mentions from the last 7 days (not in `mention_reads`) become `mention` notifications, once, keyed by comment id (data-model §6).
+- [X] T054 Launch backfill in `scripts/backfill.sh`: unread mentions from the last 7 days (not in `mention_reads`) become `mention` notifications, once, keyed by comment id (data-model §6).
 - [ ] T055 The phone top bar with both buttons: shrink the tab padding so the tabs, search icon, bell, Inbox icon and avatar fit at 390 px. Re-run `lab:header` h5 (first column ≤ 320 px, targets ≥ 44 px).
 
 ---
@@ -346,6 +346,30 @@ description: "Task list for Task Notifications"
 - [ ] T060 Commit and push. Open a PR titled "Task notifications: bell, replies, phone alerts and email (spec 012)" and ask the user before merging.
 
 ---
+
+## Progress and as-built notes (2026-11-08)
+
+**Done.** The design file, and everything that isn't a screen:
+- the schema, types, tokens and strings;
+- the pure modules and `notify()`;
+- every trigger: comments and replies, mentions in comments and descriptions (server side), moves, new tasks, pastes, assignments, attachments and links;
+- the actions and routes: pulse, push, key, tick;
+- the push-only worker;
+- the scheduler: due reminders, instant email, daily summary, clean-up;
+- the email sender and templates;
+- the launch backfill.
+
+**Partly done:**
+- **T014:** the route is done; the client hook comes with the UI.
+- **T023:** the server side (`description_mentions` in `updateTask`) is done; the `@` picker is UI.
+- **T038:** the `setLocale` action is done; `LangToggle` is UI.
+
+**Waiting for design approval:** every UI task (§IV).
+
+**As built, against the plan:**
+- **`notifyAfter()`.** Actions call it right after their own write succeeds, so notifications run in a transaction of their own instead of inside the action's. A failure is logged and never reaches the member (FR-098).
+- **Working-stage holders.** "Stage holders" uses `holdsStage` exactly. For a working stage that means the assignee **and** the owner.
+- **Pastes** (`createTasks`, `addClips`, `addPlan`) send one `task_created_in_stage` per stage holder per paste, keyed `list:` / `clips:` / `plan:`.
 
 ## Dependencies
 

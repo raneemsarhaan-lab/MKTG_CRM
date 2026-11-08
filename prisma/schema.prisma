@@ -8,39 +8,55 @@ datasource db {
 }
 
 model Member {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String    @id @default(uuid()) @db.Uuid
   name            String
-  email           String   @unique
+  email           String    @unique
   role            String
-  access          String   @default("user")
-  capacity_hrs_wk Int      @default(40)
+  access          String    @default("user")
+  capacity_hrs_wk Int       @default(40)
   /// Matches SeniorityLevel.key. A plain string rather than a relation: an
   /// unknown level resolves to the neutral rates in code, so a bad settings
   /// edit degrades to "no adjustment" instead of a page that will not render.
-  seniority       String   @default("mid")
-  status          String   @default("Available")
+  seniority       String    @default("mid")
+  status          String    @default("Available")
   color           String?
   avatar_url      String?
   password_hash   String?
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
   /// Spec 006 (R5): mentions older than this minus 7 days count as read.
-  inbox_since     DateTime @default(now()) @db.Timestamptz(6)
+  inbox_since     DateTime  @default(now()) @db.Timestamptz(6)
   /// Spec 006: the Inbox panel is pinned beside the board.
-  inbox_pinned    Boolean  @default(false)
+  inbox_pinned    Boolean   @default(false)
   /// Spec 006: Week Momentum and Daily Spark are shown on the Board.
-  show_week       Boolean  @default(false)
+  show_week       Boolean   @default(false)
+  /// Spec 012 (R13): the language push alerts and emails are written in.
+  locale          String    @default("en")
+  /// Spec 012 (R6): 'f' | 'm' | null. Arabic verbs agree with the actor; null
+  /// uses a neutral phrasing.
+  gender          String?
+  /// Spec 012: Do not disturb, no toasts and no phone alerts.
+  notify_dnd      Boolean   @default(false)
+  /// Spec 012: 'instant' | 'daily' | 'off'.
+  email_mode      String    @default("daily")
+  /// Spec 012 (R7): last time the app was open and in use, for toasts and push.
+  last_active_at  DateTime? @db.Timestamptz(6)
 
-  tasks_owned           Task[]        @relation("TaskOwner")
-  tasks_assigned        Task[]        @relation("TaskAssignee")
-  tasks_created         Task[]        @relation("TaskCreator")
+  tasks_owned           Task[]                @relation("TaskOwner")
+  tasks_assigned        Task[]                @relation("TaskAssignee")
+  tasks_created         Task[]                @relation("TaskCreator")
   comments              TaskComment[]
-  project_steps         ProjectStep[] @relation("StepAssignee")
-  themes_owned          Project[]     @relation("ThemeOwner")
+  project_steps         ProjectStep[]         @relation("StepAssignee")
+  themes_owned          Project[]             @relation("ThemeOwner")
   mention_reads         MentionRead[]
   snoozes               TaskSnooze[]
-  sheet_columns_created SheetColumn[] @relation("SheetColumnCreator")
-  sheet_columns_updated SheetColumn[] @relation("SheetColumnUpdater")
+  sheet_columns_created SheetColumn[]         @relation("SheetColumnCreator")
+  sheet_columns_updated SheetColumn[]         @relation("SheetColumnUpdater")
   sheet_values_updated  SheetValue[]
+  notifications         Notification[]
+  task_follows          TaskFollower[]
+  notification_settings NotificationSetting[]
+  push_subscriptions    PushSubscription[]
+  email_digests         EmailDigest[]
 
   @@map("members")
 }
@@ -199,15 +215,15 @@ model SlaConfig {
 }
 
 model Task {
-  id                 String    @id @default(uuid()) @db.Uuid
+  id                   String    @id @default(uuid()) @db.Uuid
   /// Source key when a task came from an external system (ClickUp import).
   /// Unique so a re-import updates rather than duplicates.
-  external_id        String?   @unique
-  name               String
-  description        String?   @db.Text
-  brand_id           String?   @db.Uuid
-  content_type_label String?
-  platform           String?
+  external_id          String?   @unique
+  name                 String
+  description          String?   @db.Text
+  brand_id             String?   @db.Uuid
+  content_type_label   String?
+  platform             String?
   /// The project this work serves.
   ///
   /// The container, not a label: a project holds many tasks, and a task needs
@@ -222,14 +238,14 @@ model Task {
   ///
   /// This replaces `campaign`, a free-text field that grouped nothing because
   /// nothing was ever typed into it — every one of the 316 tasks had it empty.
-  project_id         String?   @db.Uuid
+  project_id           String?   @db.Uuid
   /// Who is accountable for this task — usually whoever asked for it.
   ///
   /// Distinct from assignee_id below, which is who is doing it. They are the
   /// same person on most tasks and every imported one, but they are different
   /// facts: a manager owns a deliverable and hands the work to a designer.
   /// Nothing personal keys off this — see assignee_id.
-  task_owner_id      String    @db.Uuid
+  task_owner_id        String    @db.Uuid
   /// Who is doing the work.
   ///
   /// This is the one everything personal follows: My Day, Needs Your
@@ -237,14 +253,14 @@ model Task {
   /// Nullable because a task can genuinely be waiting for somebody to pick
   /// up; existing rows were backfilled from task_owner_id, which is what they
   /// meant before the two were separated.
-  assignee_id        String?   @db.Uuid
-  initiator_role     String
-  nine_stage         Boolean   @default(false)
-  status             String    @default("todo")
-  stage_date         DateTime  @default(now()) @db.Date
-  due_date           DateTime? @db.Date
-  hours_estimate     Decimal   @default(0) @db.Decimal(5, 1)
-  cover_image_url    String?
+  assignee_id          String?   @db.Uuid
+  initiator_role       String
+  nine_stage           Boolean   @default(false)
+  status               String    @default("todo")
+  stage_date           DateTime  @default(now()) @db.Date
+  due_date             DateTime? @db.Date
+  hours_estimate       Decimal   @default(0) @db.Decimal(5, 1)
+  cover_image_url      String?
   /// A small preview of the newest image uploaded to this task.
   ///
   /// The board reads every task, and an attachment's own bytes live in
@@ -254,51 +270,56 @@ model Task {
   /// itself. This is that: one thumbnail, longest edge 360px, re-encoded, a
   /// dozen kilobytes or so. It is set on upload and is not a user field —
   /// cover_image_url above is the one somebody chooses.
-  cover_thumb        String?   @db.Text
-  priority           String    @default("Medium")
-  created_by         String?   @db.Uuid
-  created_at         DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  cover_thumb          String?   @db.Text
+  priority             String    @default("Medium")
+  /// Spec 012 (R11): members @mentioned in the description, by id.
+  description_mentions String[]  @default([]) @db.Uuid
+  created_by           String?   @db.Uuid
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @default(now()) @db.Timestamptz(6)
   /// Set when this task was created as a subtask from another task's brief.
   /// A subtask is an ordinary task — its own stage, SLA and owner — that
   /// happens to know its parent, so nothing else in the pipeline changes.
-  parent_task_id     String?   @db.Uuid
+  parent_task_id       String?   @db.Uuid
   /// The live post's link, once the work is published (spec 008 FR-047).
   ///
   /// Any task may carry one; the video sheet shows it per clip and asks for it
   /// when a clip is moved to Published there.
-  published_url      String?   @db.Text
+  published_url        String?   @db.Text
   /// Set while a clip is dropped (spec 008 FR-060).
   ///
   /// A dropped task keeps its stage, files and comments but is left out of the
   /// board, the overview, capacity, projects and every count, until it is
   /// restored. The video sheet still shows it, greyed. Not a stage: the
   /// pipeline is untouched (Constitution §II).
-  dropped_at         DateTime? @db.Timestamptz(6)
+  dropped_at           DateTime? @db.Timestamptz(6)
   /// The pillar inside its theme (spec 009), e.g. "AI".
-  pillar_id          String?   @db.Uuid
+  pillar_id            String?   @db.Uuid
   /// The social post's link (LinkedIn), beside published_url (spec 009).
-  post_url           String?   @db.Text
+  post_url             String?   @db.Text
 
-  pillar       ContentPillar?   @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
-  parent       Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
-  subtasks     Task[]           @relation("Subtasks")
-  brand        Brand?           @relation(fields: [brand_id], references: [id])
-  project      Project?         @relation(fields: [project_id], references: [id], onDelete: SetNull)
-  task_owner   Member           @relation("TaskOwner", fields: [task_owner_id], references: [id])
-  assignee     Member?          @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
-  creator      Member?          @relation("TaskCreator", fields: [created_by], references: [id])
-  stage        Stage            @relation(fields: [status], references: [id])
-  content_type ContentType?     @relation("TaskContentType", fields: [content_type_label], references: [label])
-  comments     TaskComment[]
-  attachments  TaskAttachment[]
-  project_step ProjectStep?
+  pillar        ContentPillar?   @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
+  parent        Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks      Task[]           @relation("Subtasks")
+  brand         Brand?           @relation(fields: [brand_id], references: [id])
+  project       Project?         @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  task_owner    Member           @relation("TaskOwner", fields: [task_owner_id], references: [id])
+  assignee      Member?          @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  creator       Member?          @relation("TaskCreator", fields: [created_by], references: [id])
+  stage         Stage            @relation(fields: [status], references: [id])
+  content_type  ContentType?     @relation("TaskContentType", fields: [content_type_label], references: [label])
+  comments      TaskComment[]
+  attachments   TaskAttachment[]
+  project_step  ProjectStep?
   /// The clip details, when this task is a clip of a video (spec 008).
-  clip         TaskClip?        @relation("ClipDetails")
+  clip          TaskClip?        @relation("ClipDetails")
   /// On a video: the details of its clips, for the one-file-name-per-video rule.
-  video_clips  TaskClip[]       @relation("VideoClips")
-  snoozes      TaskSnooze[]
-  sheet_values SheetValue[]
+  video_clips   TaskClip[]       @relation("VideoClips")
+  snoozes       TaskSnooze[]
+  sheet_values  SheetValue[]
+  notifications Notification[]
+  followers     TaskFollower[]
+  due_reminders DueReminder[]
 
   @@map("tasks")
 }
@@ -368,12 +389,19 @@ model TaskComment {
   /// one that merely happens to quote a task's name, has nothing stored and so
   /// draws no link.
   task_refs  String[] @db.Uuid
+  /// Spec 012 (R4): the top-level comment this replies to. Threads are one
+  /// level deep: a reply to a reply stores the top comment.
+  parent_id  String?  @db.Uuid
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
-  task   Task          @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  author Member        @relation(fields: [author_id], references: [id])
-  reads  MentionRead[]
+  task          Task           @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  author        Member         @relation(fields: [author_id], references: [id])
+  reads         MentionRead[]
+  parent        TaskComment?   @relation("CommentReplies", fields: [parent_id], references: [id], onDelete: Cascade)
+  replies       TaskComment[]  @relation("CommentReplies")
+  notifications Notification[]
 
+  @@index([parent_id])
   @@map("task_comments")
 }
 
@@ -442,7 +470,8 @@ model TaskAttachment {
   /// (spec 009). One per role per task; null for files and other links.
   link_role    String?
 
-  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  task          Task           @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
   @@map("task_attachments")
 }
@@ -587,4 +616,119 @@ model SheetValue {
 
   @@id([column_id, task_id])
   @@map("sheet_values")
+}
+
+// ─── Spec 012: task notifications (specs/012-notifications/data-model.md) ───
+
+/// One notification for one member: a single event, or a group of the same
+/// kind on the same task within 2 hours (R5). Stores facts, not a sentence;
+/// the sentence is built at display time in the reader's language (R6).
+model Notification {
+  id             String    @id @default(uuid()) @db.Uuid
+  recipient_id   String    @db.Uuid
+  /// NotificationKind in src/types.
+  kind           String
+  /// Null once the task is deleted: the row stays in history.
+  task_id        String?   @db.Uuid
+  comment_id     String?   @db.Uuid
+  attachment_id  String?   @db.Uuid
+  stage_id       String?
+  /// Newest first, at most 10. Empty for due reminders.
+  actor_ids      String[]  @db.Uuid
+  count          Int       @default(1)
+  /// Null: never grouped (mentions, assignments, due reminders).
+  group_key      String?
+  first_event_at DateTime  @default(now()) @db.Timestamptz(6)
+  last_event_at  DateTime  @default(now()) @db.Timestamptz(6)
+  /// { task_name, snippet?, paste_count?, due_date? }
+  meta           Json      @default("{}")
+  read_at        DateTime? @db.Timestamptz(6)
+  pushed_at      DateTime? @db.Timestamptz(6)
+  emailed_at     DateTime? @db.Timestamptz(6)
+  email_tries    Int       @default(0)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+
+  recipient  Member          @relation(fields: [recipient_id], references: [id], onDelete: Cascade)
+  task       Task?           @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  comment    TaskComment?    @relation(fields: [comment_id], references: [id], onDelete: SetNull)
+  attachment TaskAttachment? @relation(fields: [attachment_id], references: [id], onDelete: SetNull)
+
+  @@index([recipient_id, read_at, last_event_at(sort: Desc)])
+  @@index([recipient_id, last_event_at(sort: Desc)])
+  @@index([recipient_id, group_key])
+  @@index([read_at])
+  @@map("notifications")
+}
+
+/// A member follows a task (R3). `muted` remembers a deliberate unfollow, so
+/// automatic following never undoes it.
+model TaskFollower {
+  task_id     String   @db.Uuid
+  member_id   String   @db.Uuid
+  followed_at DateTime @default(now()) @db.Timestamptz(6)
+  muted       Boolean  @default(false)
+
+  task   Task   @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, member_id])
+  @@index([member_id])
+  @@map("task_followers")
+}
+
+/// A member's choice for one kind, only where it differs from the defaults.
+model NotificationSetting {
+  member_id String  @db.Uuid
+  kind      String
+  in_app    Boolean
+  push      Boolean
+  email     Boolean
+
+  member Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@id([member_id, kind])
+  @@map("notification_settings")
+}
+
+/// A device where a member allowed phone alerts (Web Push, R8).
+model PushSubscription {
+  id         String    @id @default(uuid()) @db.Uuid
+  member_id  String    @db.Uuid
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  user_agent String?
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  last_ok_at DateTime? @db.Timestamptz(6)
+
+  member Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@index([member_id])
+  @@map("push_subscriptions")
+}
+
+/// A due reminder that went out, so each is sent once per task, kind and date.
+model DueReminder {
+  task_id  String   @db.Uuid
+  kind     String
+  due_date DateTime @db.Date
+  sent_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, kind, due_date])
+  @@map("due_reminders")
+}
+
+/// A daily summary email that went out, so it is sent once a day.
+model EmailDigest {
+  member_id String   @db.Uuid
+  day       DateTime @db.Date
+  sent_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  member Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@id([member_id, day])
+  @@map("email_digests")
 }

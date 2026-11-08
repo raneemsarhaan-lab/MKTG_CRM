@@ -11,6 +11,7 @@
  */
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { createComment } from '@/lib/comments'
 import { getSessionMember } from '@/lib/authz'
 
 type Result = { success: true } | { success: false; error: string }
@@ -61,10 +62,10 @@ export async function replyToMention(commentId: string, body: string): Promise<R
   const first = original.author.name.split(' ')[0]
   const named = text.toLowerCase().includes(`@${first.toLowerCase()}`) ? text : `@${first} ${text}`
 
+  // Spec 012: a reply under the mentioning comment, with its notifications.
+  const res = await createComment(member, { taskId: original.task_id, body: named, mentions: [original.author_id], taskRefs: [], parentId: original.id })
+  if (!res.ok) return { success: false, error: res.error }
   await prisma.$transaction([
-    prisma.taskComment.create({
-      data: { task_id: original.task_id, author_id: member.id, body: named, mentions: [original.author_id], task_refs: [] },
-    }),
     prisma.mentionRead.upsert({
       where: { member_id_comment_id: { member_id: member.id, comment_id: original.id } },
       create: { member_id: member.id, comment_id: original.id },

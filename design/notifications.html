@@ -1,0 +1,436 @@
+<title>Momentum Notifications</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a bench (screen picker, language) around one live mock of the app.
+   The app is light-only, so the mock commits to its light look; the bench
+   follows the viewer's theme. Colours are Momentum's tokens plus the new
+   notification ones: red badge, unread tint, blue dot. */
+:root {
+  --ink: #14131A; --text: #1F2430; --text2: #4A5061; --muted: #6B7280; --faint: #9096A3;
+  --line: #ECECF1; --input: #E9E9EF; --surface: #F3F3F7; --panel: #FFFFFF;
+  --lime: #C9F24E; --purple: #7C3AED; --purple-soft: #F0EBFE; --tick: #8B5CF6;
+  --nt-red: #E5484D; --nt-tint: #F4F0FF; --nt-tint-hover: #ECE5FF; --nt-blue: #2563EB; --urgent: #F59E0B;
+  --late: #C81E3A; --late-soft: #FDE7EA; --ok: #15803D;
+  --f-head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --f-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --f-ar: 'Noto Sans Arabic', 'Segoe UI', system-ui, sans-serif;
+  --b-bg: #EEEEF3; --b-fg: #1F2430; --b-muted: #5B6170; --b-card: #FFFFFF; --b-line: #DCDCE5; --b-on: #14133C; --b-on-fg: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--b-bg); color: var(--b-fg); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2.5px solid var(--purple); outline-offset: 2px; }
+
+.bench { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+.bench h1 { font: 800 22px/1.2 var(--f-head); margin: 0; }
+.lede { color: var(--b-muted); margin: 4px 0 0; max-width: 78ch; line-height: 1.5; font-size: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 10px 14px; }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--b-muted); font-weight: 600; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--b-line); border-radius: 999px; padding: 2px; }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; color: var(--b-fg); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--b-on); color: var(--b-on-fg); }
+.note { font-size: 13px; color: var(--b-muted); line-height: 1.5; max-width: 90ch; }
+
+/* app frame */
+.frame { position: relative; background: var(--panel); color: var(--text); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 12px 40px rgba(20,19,26,.10); min-height: 620px; font-family: var(--f-body); }
+.frame[dir="rtl"] { font-family: var(--f-ar); }
+.frame.phone { max-width: 390px; margin: 0 auto; border: 8px solid #14131A; border-radius: 30px; min-height: 720px; }
+.top { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 6px; flex: none; }
+.tab { font: 700 15px var(--f-head); color: var(--ink); padding: 9px 16px; border-radius: 999px; }
+[dir="rtl"] .tab, [dir="rtl"] .title, [dir="rtl"] h2 { font-family: var(--f-ar); }
+.tab.on { background: var(--purple-soft); color: var(--purple); }
+.search { flex: 1 1 220px; max-width: 420px; margin-inline: auto; height: 42px; border: 1px solid var(--input); border-radius: 999px; display: flex; align-items: center; padding-inline: 16px; color: #A2A7B4; font-size: 14px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.hbtn { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 44px; min-width: 44px; justify-content: center; padding: 0 10px; border: 0; background: none; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 15px; color: var(--ink); flex: none; }
+.hbtn:hover, .hbtn[aria-expanded="true"] { background: var(--surface); }
+.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font: 700 11.5px/20px var(--f-body); text-align: center; color: #fff; background: var(--purple); }
+.badge.red { background: var(--nt-red); position: absolute; top: 1px; inset-inline-end: -1px; box-shadow: 0 0 0 2px var(--panel); }
+.badge.urgent { background: var(--urgent); color: var(--ink); }
+.vr { width: 1px; height: 26px; background: var(--line); flex: none; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid #A855F7; background: #C2410C; color: #fff; font: 700 13px var(--f-body); display: grid; place-items: center; flex: none; }
+.titlerow { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 8px; }
+.title { margin: 0; font: 800 32px/1 var(--f-head); color: var(--ink); }
+.cta { height: 44px; padding: 0 18px; border-radius: 999px; background: var(--lime); font: 700 15px var(--f-head); color: var(--ink); display: inline-flex; align-items: center; }
+.cols { display: flex; gap: 12px; padding: 12px 22px 22px; overflow: hidden; }
+.col { flex: 0 0 210px; height: 320px; border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 12px; padding: 10px; font: 700 12px var(--f-head); color: var(--ink); background: #FDFDFE; }
+.ghost { margin-top: 10px; height: 64px; border-radius: 10px; background: var(--surface); }
+
+/* panel */
+.panel { position: absolute; top: 64px; inset-inline-end: 14px; width: min(410px, calc(100% - 28px)); max-height: calc(100% - 78px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 50px rgba(20,19,60,.20); z-index: 5; }
+.phone .panel { position: absolute; inset: 0; top: 0; width: 100%; max-height: none; border-radius: 0; border: 0; }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px 4px; }
+.phead h2 { margin: 0; font: 800 19px var(--f-head); color: var(--ink); }
+.link { border: 0; background: none; color: var(--nt-blue); font-weight: 600; font-size: 13px; cursor: pointer; padding: 6px; }
+.ptabs { display: flex; gap: 6px; padding: 6px 16px 8px; }
+.ptab { border: 0; background: none; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: var(--text2); cursor: pointer; }
+.ptab[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); }
+.offer { margin: 4px 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface); display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; line-height: 1.4; }
+.offer b { display: block; color: var(--ink); }
+.offer .go { border: 0; background: var(--ink); color: #fff; border-radius: 999px; padding: 7px 12px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.offer .x { grid-column: 3; }
+.sect { padding: 8px 16px 2px; font: 700 11px var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+[dir="rtl"] .sect { letter-spacing: 0; }
+.row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) 12px; gap: 10px; align-items: start; padding: 10px 10px; margin: 0 6px; border-radius: 10px; cursor: pointer; }
+.row:hover { background: var(--surface); }
+.row.unread { background: var(--nt-tint); }
+.row.unread:hover { background: var(--nt-tint-hover); }
+.ava { position: relative; width: 42px; height: 42px; }
+.ava i { position: absolute; width: 34px; height: 34px; border-radius: 50%; color: #fff; font: 700 12px/34px var(--f-body); text-align: center; font-style: normal; border: 2px solid var(--panel); }
+.ava i:nth-child(1) { top: 0; inset-inline-start: 0; }
+.ava i:nth-child(2) { top: 8px; inset-inline-start: 8px; }
+.ava.one i { width: 42px; height: 42px; line-height: 42px; }
+.kind { position: absolute; bottom: -3px; inset-inline-end: -3px; width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; color: #fff; border: 2px solid var(--panel); }
+.kind svg { width: 11px; height: 11px; }
+.msg { font-size: 13.5px; line-height: 1.45; color: var(--text); min-width: 0; }
+.msg b { font-weight: 700; color: var(--ink); }
+.msg q { display: block; color: var(--muted); font-size: 12.5px; quotes: none; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.msg time { display: block; font-size: 12px; color: var(--nt-blue); font-weight: 600; margin-top: 3px; }
+.row:not(.unread) .msg time { color: var(--muted); font-weight: 500; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--nt-blue); margin-top: 16px; }
+.more { position: absolute; top: 10px; inset-inline-end: 26px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); display: none; place-items: center; font-weight: 800; color: var(--text2); cursor: pointer; }
+.row:hover .more, .row.menu-open .more { display: grid; }
+.menu { position: absolute; top: 42px; inset-inline-end: 14px; z-index: 3; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(20,19,26,.16); padding: 6px; width: 250px; }
+.menu button { display: flex; width: 100%; gap: 8px; align-items: center; border: 0; background: none; padding: 8px 10px; border-radius: 8px; font-size: 13.5px; text-align: start; cursor: pointer; }
+.menu button:hover { background: var(--surface); }
+.pfoot { display: flex; justify-content: space-between; padding: 8px 14px 12px; border-top: 1px solid var(--line); margin-top: 6px; }
+.empty { padding: 34px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.empty b { display: block; font: 700 15px var(--f-head); color: var(--ink); margin-bottom: 4px; }
+.toast { position: absolute; bottom: 18px; inset-inline-end: 18px; width: min(350px, calc(100% - 36px)); background: var(--ink); color: #fff; border-radius: 14px; padding: 12px 14px; display: grid; grid-template-columns: 34px minmax(0, 1fr) 20px; gap: 10px; align-items: center; font-size: 13px; line-height: 1.4; box-shadow: 0 12px 30px rgba(20,19,26,.3); z-index: 6; }
+.toast i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; }
+.toast small { opacity: .72; display: block; }
+.toast .bar { position: absolute; inset-inline-start: 14px; bottom: 6px; height: 2px; width: 40%; background: rgba(255,255,255,.4); border-radius: 2px; }
+.phone .toast { bottom: 76px; }
+
+/* task panel */
+.task { position: absolute; inset-block: 0; inset-inline-end: 0; width: min(560px, 100%); background: var(--panel); border-inline-start: 1px solid var(--line); box-shadow: -18px 0 40px rgba(20,19,26,.12); overflow: auto; z-index: 4; }
+.thead { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.thead h2 { margin: 0; flex: 1; font: 800 18px var(--f-head); color: var(--ink); min-width: 0; }
+.follow { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 7px 12px; font-weight: 700; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.follow[aria-pressed="true"] { background: var(--purple-soft); border-color: transparent; color: var(--purple); }
+.tbody { padding: 14px 18px; display: grid; gap: 12px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px; }
+.chip { background: var(--surface); border-radius: 999px; padding: 4px 10px; font-weight: 600; }
+.cmt { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; font-size: 13.5px; line-height: 1.45; }
+.cmt i { width: 32px; height: 32px; border-radius: 50%; color: #fff; font: 700 12px/32px var(--f-body); text-align: center; font-style: normal; }
+.cmt b { color: var(--ink); }
+.cmt time { color: var(--muted); font-size: 12px; margin-inline-start: 6px; }
+.cmt .acts { display: flex; gap: 12px; margin-top: 4px; }
+.cmt .acts button { border: 0; background: none; padding: 0; color: var(--text2); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.thread { margin-inline-start: 42px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line); display: grid; gap: 10px; }
+.flash { animation: flash 1.6s ease 1; border-radius: 10px; }
+@keyframes flash { 0%, 100% { background: transparent; } 25% { background: #FFF7D6; box-shadow: 0 0 0 6px #FFF7D6; } }
+.mention { color: var(--purple); font-weight: 700; }
+.composer { border: 1px solid var(--input); border-radius: 12px; padding: 10px 12px; color: var(--muted); font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; }
+.composer .send { background: var(--ink); color: #fff; border-radius: 999px; padding: 6px 12px; font-weight: 700; font-size: 12.5px; }
+.files { display: flex; gap: 8px; flex-wrap: wrap; }
+.file { width: 92px; height: 64px; border-radius: 10px; background: linear-gradient(135deg, #E9E3FF, #F3F3F7); border: 1px solid var(--line); }
+.file.new { box-shadow: 0 0 0 2px var(--nt-blue); }
+
+/* settings + history page */
+.page { padding: 18px 22px 26px; display: grid; gap: 16px; }
+.page h2 { margin: 0; font: 800 24px var(--f-head); color: var(--ink); }
+.card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 460px; }
+th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: start; }
+th { font: 700 12px var(--f-body); color: var(--text2); background: var(--surface); }
+td.c, th.c { text-align: center; }
+td small { display: block; color: var(--muted); font-size: 12px; }
+.sw { width: 36px; height: 21px; border-radius: 999px; background: var(--line); position: relative; display: inline-block; border: 0; cursor: pointer; vertical-align: middle; }
+.sw::after { content: ""; position: absolute; top: 2.5px; inset-inline-start: 2.5px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: inset-inline-start .15s; }
+.sw[aria-checked="true"] { background: var(--purple); }
+.sw[aria-checked="true"]::after { inset-inline-start: 17.5px; }
+.sw:disabled { opacity: .35; cursor: not-allowed; }
+.opts { display: grid; gap: 12px; padding: 14px; }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13.5px; flex-wrap: wrap; }
+.opt b { display: block; color: var(--ink); }
+.opt small { color: var(--muted); }
+.pairs { display: inline-flex; border: 1px solid var(--input); border-radius: 999px; padding: 3px; }
+.pairs button { border: 0; background: none; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.pairs button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchip { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.fchip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.ios { margin: 8px 12px; border-radius: 14px; border: 1px solid var(--line); padding: 14px; font-size: 13.5px; line-height: 1.5; }
+.ios ol { margin: 8px 0 0; padding-inline-start: 20px; }
+.tabbar { position: absolute; inset: auto 0 0; height: 62px; border-top: 1px solid var(--line); background: var(--panel); display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: var(--muted); font-weight: 600; z-index: 4; }
+.unavail { position: absolute; inset: 0; background: rgba(20,19,26,.35); display: grid; place-items: center; z-index: 7; }
+.unavail div { background: var(--panel); border-radius: 16px; padding: 22px; width: min(360px, 90%); text-align: center; display: grid; gap: 10px; }
+.unavail b { font: 800 17px var(--f-head); color: var(--ink); }
+.unavail button { justify-self: center; border: 0; background: var(--ink); color: #fff; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
+
+@media (max-width: 760px) {
+  .search { display: none; }
+  .hbtn .word { display: none; }
+  .top { padding: 10px 12px; gap: 4px; }
+  .tab { padding: 8px 11px; font-size: 14px; }
+  .titlerow { padding: 14px 12px 4px; } .title { font-size: 26px; }
+  .page { padding: 14px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+</style>
+
+<div class="bench">
+  <div>
+    <h1>Notifications: the full design</h1>
+    <p class="lede">Spec 012, option A: the bell sits beside the Inbox. Pick a screen and a language. Everything in the mock responds to clicks: rows, tabs, ⋯ menus, switches and Follow. Task names and people are examples.</p>
+  </div>
+  <div class="controls">
+    <div class="ctl">Screen <span class="seg" data-ctl="screen">
+      <button data-v="panel" aria-pressed="true">Bell panel</button><button data-v="toast" aria-pressed="false">Toast</button><button data-v="task" aria-pressed="false">Task: comment</button><button data-v="files" aria-pressed="false">Task: attachments</button><button data-v="gone" aria-pressed="false">Task gone</button><button data-v="settings" aria-pressed="false">Settings</button><button data-v="history" aria-pressed="false">History page</button></span></div>
+    <div class="ctl">Device <span class="seg" data-ctl="device"><button data-v="desktop" aria-pressed="true">Desktop</button><button data-v="phone" aria-pressed="false">Phone</button><button data-v="iphone" aria-pressed="false">iPhone in Safari</button></span></div>
+    <div class="ctl">Language <span class="seg" data-ctl="lang"><button data-v="en" aria-pressed="true">English</button><button data-v="ar" aria-pressed="false">العربية</button></span></div>
+  </div>
+  <div class="frame" id="frame"></div>
+  <p class="note" id="explain"></p>
+</div>
+
+<script>
+(() => {
+  const ICON = {
+    comment: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+    reply: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
+    attachment: '<path d="m21 11-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.3 3.3 0 0 1 4.7 4.7l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4L15 7.5"/>',
+    move: '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+    created: '<path d="M12 5v14M5 12h14"/>',
+    assigned: '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4"/>',
+    mention: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+    due: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/>',
+  }
+  const KC = { comment: '#2563EB', reply: '#0E7C7C', attachment: '#B45309', move: '#7C3AED', created: '#7C3AED', assigned: '#15803D', mention: '#D6336C', due: '#C81E3A' }
+  const P = { Salma: '#0E7C7B', Yosra: '#7C3AED', Samaa: '#B4322F', Nermin: '#1E293B', Raneem: '#C2410C' }
+  const AR = { Salma: 'سلمى', Yosra: 'يسرا', Samaa: 'سماء', Nermin: 'نرمين', Raneem: 'رنيم' }
+  const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`
+
+  const T = {
+    en: {
+      pipeline: 'Pipeline', content: 'Content', search: 'Search tasks, campaigns, assets…', inbox: 'Inbox', newTask: '+ New task',
+      notifications: 'Notifications', all: 'All', unread: 'Unread', markAll: 'Mark all as read', settings: 'Notification settings', seeAll: 'See all',
+      caught: "You're all caught up.", caughtSub: 'New activity on your tasks shows up here.',
+      offerT: 'Get alerts on this phone', offerS: 'Mentions, assignments and due dates, even with Momentum closed.', allow: 'Turn on',
+      today: 'Today', earlier: 'Earlier', markRead: 'Mark as read', markUnread: 'Mark as unread', mute: 'Turn off notifications for this task',
+      follow: 'Follow', following: 'Following', reply: 'Reply', like: 'Copy link', write: 'Write a reply… use @ to mention', send: 'Reply',
+      gone: 'This task is no longer available', goneSub: 'It may have been deleted, or you no longer have access.', ok: 'OK',
+      settingsT: 'Notification settings', kind: 'Notify me about', inApp: 'In the app', phone: 'Phone', email: 'Email', rec: 'Recommended: keep on',
+      emailHow: 'Email', emailHowS: 'How emails are sent', instant: 'Instant', daily: 'Daily summary', off: 'Off', instantS: 'Only for what you haven’t seen in 10 minutes', dailyS: 'One email at 08:30 with what’s unread',
+      dnd: 'Do not disturb', dndS: 'No pop-ups or phone alerts. Notifications are still saved, and emails still go out.',
+      device: 'This device', deviceS: 'Alerts are on for this phone', turnOff: 'Turn off',
+      kinds: [['Mentions', 'When someone @mentions you'], ['Assignments', 'When a task is assigned to you'], ['Comments', 'On tasks you’re on or follow'], ['Replies', 'In threads you’re part of'], ['Attachments', 'Files and links added to your tasks'], ['New task in your stage', 'When a task is created in a stage you hold'], ['Moved to your stage', 'When a task enters a stage you hold'], ['Due tomorrow', 'Your tasks and your stage'], ['Overdue', 'Your tasks and your stage']],
+      historyT: 'Notifications', kindsF: ['Comments', 'Replies', 'Mentions', 'Assignments', 'Moves', 'Attachments', 'Due dates'], dates: ['Today', 'Last 7 days', 'Last 30 days', 'Custom'],
+      iosT: 'Add Momentum to your Home Screen first', iosS: 'iPhone only sends alerts to apps on the Home Screen.', ios: ['Tap the Share button at the bottom of Safari.', 'Choose “Add to Home Screen”.', 'Open Momentum from the new icon, then tap “Turn on” here.'],
+      toastMore: 'and 2 more',
+      task1: 'Q4 LinkedIn Carousel', taskBrief: 'Campaign Brief',
+      rows: {
+        g: n => `<b>Salma</b>, <b>Yosra</b> and ${n} others commented on <b>Q4 LinkedIn Carousel</b>`,
+        move: '<b>Nermin</b> moved <b>Manifesto Post</b> to your stage: Review',
+        mention: '<b>Raneem</b> mentioned you in <b>Campaign Brief</b>',
+        assigned: 'You were assigned to <b>Omnisight Launch Teaser</b>',
+        created: 'New task <b>Event Recap Video</b> was added to your stage: Design',
+        attach: '<b>Samaa</b> added 5 attachments to <b>Website Hero Visual</b>',
+        reply: '<b>Yosra</b> replied to your comment on <b>Retreat Banner</b>',
+        due: '<b>Newsletter Draft</b> is due tomorrow',
+        overdue: '<b>Event Teaser</b> is overdue',
+        toast: '<b>Salma</b> commented on <b>Retreat Banner</b>',
+      },
+      snips: { g: 'Love the second frame. Can we try the lime background?', mention: '@Yosra can you check the hook before Thursday?', reply: 'Agreed, I’ll swap the photo.' },
+      times: ['5m', '22m', '1h', '2h', '3h', 'Yesterday', 'Yesterday', 'Mon', 'Mon'],
+      explain: {
+        panel: 'The bell (red count) sits beside the Inbox (purple or orange count). Rows: avatar or stacked avatars, a kind icon, the sentence with bold names and task, a quoted snippet, the time, and a blue dot plus tint when unread. Click a row to toggle read; hover it for ⋯. The offer to turn on phone alerts shows until it’s accepted or dismissed.',
+        toast: 'A toast shows in the bottom corner for 5 seconds while you’re active. It never shows for the task you have open, or while Do not disturb is on. When several arrive at once, one toast says “and N more”.',
+        task: 'Clicking a comment notification opens the task, scrolls to that comment and flashes it. Replies sit under their comment, one level deep. Follow / Following is in the task’s header; following is automatic when you create, are assigned, comment or are mentioned.',
+        files: 'An attachment notification opens the task on its Attachments section, with the new files marked.',
+        gone: 'If the task was deleted or you lost access, clicking a notification shows this instead of an error.',
+        settings: 'One row per kind, one switch per channel. Turning “In the app” off turns the row off everywhere. Phone defaults to mentions, assignments and due dates; email is off until you switch a kind on. Every change saves at once.',
+        history: 'The full history, filtered by kind and date. It has the same rows and actions as the bell, and keeps loading as you scroll.',
+      },
+    },
+    ar: {
+      pipeline: 'خط الإنتاج', content: 'المحتوى', search: 'ابحث في المهام والحملات والملفات…', inbox: 'الوارد', newTask: '+ مهمة جديدة',
+      notifications: 'الإشعارات', all: 'الكل', unread: 'غير المقروءة', markAll: 'تعليم الكل كمقروء', settings: 'إعدادات الإشعارات', seeAll: 'عرض الكل',
+      caught: 'لا جديد عليك.', caughtSub: 'سيظهر هنا كل نشاط جديد على مهامك.',
+      offerT: 'تنبيهات على هذا الهاتف', offerS: 'الإشارات والإسنادات والمواعيد، حتى ومومنتم مغلق.', allow: 'تفعيل',
+      today: 'اليوم', earlier: 'قبل ذلك', markRead: 'تعليم كمقروء', markUnread: 'تعليم كغير مقروء', mute: 'إيقاف إشعارات هذه المهمة',
+      follow: 'متابعة', following: 'تتابعها', reply: 'رد', like: 'نسخ الرابط', write: 'اكتب ردًا… استخدم @ للإشارة', send: 'رد',
+      gone: 'هذه المهمة لم تعد متاحة', goneSub: 'ربما حُذفت، أو لم يعد لديك وصول إليها.', ok: 'حسنًا',
+      settingsT: 'إعدادات الإشعارات', kind: 'أبلغني عن', inApp: 'في التطبيق', phone: 'الهاتف', email: 'البريد', rec: 'يُنصح بإبقائه مفعّلًا',
+      emailHow: 'البريد', emailHowS: 'طريقة إرسال الرسائل', instant: 'فوري', daily: 'ملخص يومي', off: 'إيقاف', instantS: 'فقط لما لم تره خلال ١٠ دقائق', dailyS: 'رسالة واحدة الساعة ٨:٣٠ بما لم يُقرأ',
+      dnd: 'عدم الإزعاج', dndS: 'بلا نوافذ منبثقة أو تنبيهات هاتف. تُحفظ الإشعارات وتُرسل الرسائل كالمعتاد.',
+      device: 'هذا الجهاز', deviceS: 'التنبيهات مفعّلة على هذا الهاتف', turnOff: 'إيقاف',
+      kinds: [['الإشارات', 'عندما يشير إليك أحد بـ@'], ['الإسنادات', 'عندما تُسند إليك مهمة'], ['التعليقات', 'على مهامك أو ما تتابعه'], ['الردود', 'في النقاشات التي شاركت فيها'], ['المرفقات', 'ملفات وروابط أُضيفت لمهامك'], ['مهمة جديدة في مرحلتك', 'عند إنشاء مهمة في مرحلة تتولاها'], ['نُقلت إلى مرحلتك', 'عند دخول مهمة مرحلة تتولاها'], ['موعدها غدًا', 'مهامك ومرحلتك'], ['متأخرة', 'مهامك ومرحلتك']],
+      historyT: 'الإشعارات', kindsF: ['التعليقات', 'الردود', 'الإشارات', 'الإسنادات', 'النقل', 'المرفقات', 'المواعيد'], dates: ['اليوم', 'آخر ٧ أيام', 'آخر ٣٠ يومًا', 'مخصص'],
+      iosT: 'أضف مومنتم إلى الشاشة الرئيسية أولًا', iosS: 'يرسل الآيفون التنبيهات فقط للتطبيقات على الشاشة الرئيسية.', ios: ['اضغط زر المشاركة أسفل سفاري.', 'اختر «إضافة إلى الشاشة الرئيسية».', 'افتح مومنتم من الأيقونة الجديدة ثم اضغط «تفعيل» هنا.'],
+      toastMore: 'و٢ غيرها',
+      task1: 'Q4 LinkedIn Carousel', taskBrief: 'Campaign Brief',
+      rows: {
+        g: n => `علّقت <b>سلمى</b> و<b>يسرا</b> و${n} آخرون على مهمة <b>Q4 LinkedIn Carousel</b>`,
+        move: 'نقلت <b>نرمين</b> مهمة <b>Manifesto Post</b> إلى مرحلتك: المراجعة',
+        mention: 'أشارت إليك <b>رنيم</b> في <b>Campaign Brief</b>',
+        assigned: 'أُسندت إليك مهمة <b>Omnisight Launch Teaser</b>',
+        created: 'أُضيفت مهمة جديدة <b>Event Recap Video</b> إلى مرحلتك: التصميم',
+        attach: 'أضافت <b>سماء</b> ٥ مرفقات إلى مهمة <b>Website Hero Visual</b>',
+        reply: 'ردّت <b>يسرا</b> على تعليقك في <b>Retreat Banner</b>',
+        due: 'موعد مهمة <b>Newsletter Draft</b> غدًا',
+        overdue: 'مهمة <b>Event Teaser</b> متأخرة',
+        toast: 'علّقت <b>سلمى</b> على مهمة <b>Retreat Banner</b>',
+      },
+      snips: { g: 'Love the second frame. Can we try the lime background?', mention: '@Yosra can you check the hook before Thursday?', reply: 'Agreed, I’ll swap the photo.' },
+      times: ['٥ د', '٢٢ د', '١ س', '٢ س', '٣ س', 'أمس', 'أمس', 'الإثنين', 'الإثنين'],
+      explain: {},
+    },
+  }
+
+  const S = { screen: 'panel', device: 'desktop', lang: 'en', tab: 'all', menu: null, read: {}, follow: true, offer: true,
+    set: { 0: [1, 1, 0], 1: [1, 1, 0], 2: [1, 0, 0], 3: [1, 0, 0], 4: [1, 0, 0], 5: [1, 0, 0], 6: [1, 0, 0], 7: [1, 1, 0], 8: [1, 1, 0] }, emailMode: 'daily', dnd: false,
+    hkinds: ['Mentions'], hdate: 1 }
+  const L = () => T[S.lang]
+  const nm = n => (S.lang === 'ar' ? AR[n] : n)
+
+  const ROWS = () => [
+    { id: 'g', k: 'comment', a: ['Salma', 'Yosra'], html: L().rows.g(S.lang === 'ar' ? '٣' : 3), snip: L().snips.g, t: 0, u: true, sec: 'today' },
+    { id: 'move', k: 'move', a: ['Nermin'], html: L().rows.move, t: 1, u: true, sec: 'today' },
+    { id: 'mention', k: 'mention', a: ['Raneem'], html: L().rows.mention, snip: L().snips.mention, t: 2, u: true, sec: 'today' },
+    { id: 'assigned', k: 'assigned', a: ['Raneem'], html: L().rows.assigned, t: 3, u: true, sec: 'today' },
+    { id: 'created', k: 'created', a: ['Nermin'], html: L().rows.created, t: 4, u: false, sec: 'today' },
+    { id: 'attach', k: 'attachment', a: ['Samaa'], html: L().rows.attach, t: 5, u: false, sec: 'earlier' },
+    { id: 'reply', k: 'reply', a: ['Yosra'], html: L().rows.reply, snip: L().snips.reply, t: 6, u: false, sec: 'earlier' },
+    { id: 'due', k: 'due', a: [], html: L().rows.due, t: 7, u: false, sec: 'earlier' },
+    { id: 'overdue', k: 'due', a: [], html: L().rows.overdue, t: 8, u: false, sec: 'earlier' },
+  ]
+  const isUnread = r => (r.id in S.read ? !S.read[r.id] : r.u)
+  const unreadCount = () => ROWS().filter(isUnread).length
+
+  const ava = r => r.a.length
+    ? `<span class="ava${r.a.length === 1 ? ' one' : ''}">${r.a.map(a => `<i style="background:${P[a]}">${nm(a)[0]}</i>`).join('')}<span class="kind" style="background:${KC[r.k]}">${svg(r.k)}</span></span>`
+    : `<span class="ava one"><i style="background:#FDE7EA;color:#C81E3A;display:grid;place-items:center">${svg('due').replace('#fff', '#C81E3A')}</i></span>`
+
+  function rowHtml(r) {
+    const u = isUnread(r)
+    return `<div class="row${u ? ' unread' : ''}${S.menu === r.id ? ' menu-open' : ''}" data-row="${r.id}" role="button" tabindex="0">
+      ${ava(r)}<span class="msg">${r.html}${r.snip ? `<q>“${r.snip}”</q>` : ''}<time>${L().times[r.t]}</time></span>
+      ${u ? '<span class="dot"></span>' : '<span></span>'}
+      <button class="more" data-menu="${r.id}" aria-label="More">⋯</button>
+      ${S.menu === r.id ? `<div class="menu"><button data-toggle="${r.id}">${u ? '✓ ' + L().markRead : '● ' + L().markUnread}</button><button data-close>🔕 ${L().mute}</button></div>` : ''}
+    </div>`
+  }
+
+  function header() {
+    const n = unreadCount()
+    return `<div class="top"><div class="tabs"><span class="tab on">${L().pipeline}</span><span class="tab">${L().content}</span></div>
+      <div class="search">${L().search}</div>
+      <button class="hbtn" data-go="panel" aria-expanded="${S.screen === 'panel'}" aria-label="${L().notifications}, ${n}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14131A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        ${n ? `<span class="badge red">${n > 9 ? '9+' : n}</span>` : ''}</button>
+      <button class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14131A" stroke-width="1.9" stroke-linejoin="round"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 4h9.2a2 2 0 0 1 1.9 1.5L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg><span class="word">${L().inbox}</span><span class="badge urgent">5</span></button>
+      <span class="vr"></span><span class="avatar">RS</span></div>
+      <div class="titlerow"><h2 class="title">${L().pipeline}</h2><span class="cta">${L().newTask}</span></div>
+      <div class="cols">${['#8B5CF6', '#2563EB', '#7C3AED', '#EA580C', '#16A34A'].map((c, i) => `<div class="col" style="--c:${c}">${['TO DO', 'C-IN PROGRESS', 'C-REVIEW', 'D-IN PROGRESS', 'READY'][i]}<div class="ghost"></div><div class="ghost"></div></div>`).join('')}</div>`
+  }
+
+  function panel() {
+    const rows = ROWS().filter(r => S.tab === 'all' || isUnread(r))
+    const body = rows.length
+      ? ['today', 'earlier'].map(sec => { const rs = rows.filter(r => r.sec === sec); return rs.length ? `<div class="sect">${L()[sec]}</div>${rs.map(rowHtml).join('')}` : '' }).join('')
+      : `<div class="empty"><b>${L().caught}</b>${L().caughtSub}</div>`
+    const offer = S.device === 'iphone'
+      ? `<div class="ios"><b>${L().iosT}</b><br><span style="color:var(--muted)">${L().iosS}</span><ol>${L().ios.map(x => `<li>${x}</li>`).join('')}</ol></div>`
+      : S.offer ? `<div class="offer"><span style="font-size:22px">📱</span><span><b>${L().offerT}</b>${L().offerS}</span><span style="display:flex;gap:6px"><button class="go" data-offer>${L().allow}</button><button class="link" data-offer aria-label="Dismiss">✕</button></span></div>` : ''
+    return `<div class="panel" role="dialog" aria-label="${L().notifications}">
+      <div class="phead"><h2>${L().notifications}</h2><span>${S.device !== 'desktop' ? '<button class="link" data-go="board">✕</button>' : ''}<button class="link" data-markall>${L().markAll}</button></span></div>
+      <div class="ptabs" role="tablist"><button class="ptab" data-tab="all" aria-selected="${S.tab === 'all'}">${L().all}</button><button class="ptab" data-tab="unread" aria-selected="${S.tab === 'unread'}">${L().unread}</button></div>
+      ${offer}${body}
+      <div class="pfoot"><button class="link" data-go="settings">⚙ ${L().settings}</button><button class="link" data-go="history">${L().seeAll}</button></div></div>`
+  }
+
+  function taskPanel(files) {
+    const c = (who, text, time, cls = '') => `<div class="cmt ${cls}"><i style="background:${P[who]}">${nm(who)[0]}</i><div><b>${nm(who)}</b><time>${time}</time><div>${text}</div><div class="acts"><button>${L().reply}</button><button>${L().like}</button></div></div></div>`
+    return `<div class="task"><div class="thead"><h2>${L().task1}</h2>
+      <button class="follow" data-follow aria-pressed="${S.follow}">${S.follow ? '✓ ' + L().following : '＋ ' + L().follow}</button><span style="font-size:20px;color:var(--muted)">✕</span></div>
+      <div class="tbody"><div class="meta"><span class="chip">C-Review</span><span class="chip">Post · LinkedIn</span><span class="chip">${nm('Yosra')}</span></div>
+      ${files ? `<div class="sect" style="padding:0">Attachments · 5</div><div class="files">${[1, 2, 3, 4, 5].map(i => `<span class="file${i > 0 ? ' new' : ''}"></span>`).join('')}</div>` : ''}
+      <div class="sect" style="padding:0">Comments</div>
+      ${c('Raneem', 'Draft is up, please review the first three frames.', '2h')}
+      ${c('Salma', 'Love the second frame. Can we try the lime background?', '5m', files ? '' : 'flash')}
+      <div class="thread">${c('Yosra', '<span class="mention">@Salma</span> trying it now, will post in 10.', '3m')}${c('Samaa', 'Lime works with the logo too.', '1m')}
+        <div class="composer"><span>${L().write}</span><span class="send">${L().send}</span></div></div>
+      </div></div>`
+  }
+
+  function settings() {
+    const k = L().kinds
+    return `<div class="page"><h2>${L().settingsT}</h2>
+      <div class="card"><div class="scroll"><table><thead><tr><th>${L().kind}</th><th class="c">${L().inApp}</th><th class="c">${L().phone}</th><th class="c">${L().email}</th></tr></thead><tbody>
+      ${k.map(([n, s], i) => `<tr><td><b>${n}</b>${i < 2 ? ` <span class="chip" style="font-size:11px">${L().rec}</span>` : ''}<small>${s}</small></td>${[0, 1, 2].map(ch => `<td class="c"><button class="sw" role="switch" aria-label="${n} · ${[L().inApp, L().phone, L().email][ch]}" aria-checked="${!!S.set[i][ch]}" data-sw="${i}:${ch}" ${ch && !S.set[i][0] ? 'disabled' : ''}></button></td>`).join('')}</tr>`).join('')}
+      </tbody></table></div></div>
+      <div class="card opts">
+        <div class="opt"><span><b>${L().emailHow}</b><small>${S.emailMode === 'instant' ? L().instantS : S.emailMode === 'daily' ? L().dailyS : L().emailHowS}</small></span><span class="pairs">${['instant', 'daily', 'off'].map(m => `<button data-email="${m}" aria-pressed="${S.emailMode === m}">${L()[m]}</button>`).join('')}</span></div>
+        <div class="opt"><span><b>${L().dnd}</b><small>${L().dndS}</small></span><button class="sw" role="switch" aria-checked="${S.dnd}" data-dnd aria-label="${L().dnd}"></button></div>
+        <div class="opt"><span><b>${L().device}</b><small>${L().deviceS}</small></span><button class="follow">${L().turnOff}</button></div>
+      </div></div>`
+  }
+
+  function history() {
+    const rows = ROWS().filter(r => !S.hkinds.length || S.hkinds.some(k => ({ Mentions: 'mention', Comments: 'comment', Replies: 'reply', Assignments: 'assigned', Moves: 'move', Attachments: 'attachment', 'Due dates': 'due' })[T.en.kindsF[L().kindsF.indexOf(k)] ?? k] === r.k))
+    return `<div class="page"><h2>${L().historyT}</h2>
+      <div class="chips">${L().kindsF.map(k => `<button class="fchip" data-hk="${k}" aria-pressed="${S.hkinds.includes(k)}">${k}</button>`).join('')}</div>
+      <div class="chips">${L().dates.map((d, i) => `<button class="fchip" data-hd="${i}" aria-pressed="${S.hdate === i}">${d}</button>`).join('')}</div>
+      <div class="card" style="padding:6px 0">${rows.length ? rows.map(rowHtml).join('') : `<div class="empty">${L().caught}</div>`}</div></div>`
+  }
+
+  const frame = document.getElementById('frame')
+  function render() {
+    document.querySelectorAll('.seg').forEach(seg => seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(S[seg.dataset.ctl] === b.dataset.v))))
+    frame.className = 'frame' + (S.device !== 'desktop' ? ' phone' : '')
+    frame.dir = S.lang === 'ar' ? 'rtl' : 'ltr'
+    frame.lang = S.lang
+    let h = ''
+    if (S.screen === 'settings') h = settings()
+    else if (S.screen === 'history') h = history()
+    else {
+      h = header()
+      if (S.screen === 'panel') h += panel()
+      if (S.screen === 'toast') h += `<div class="toast" role="status"><i style="background:${P.Salma}">${nm('Salma')[0]}</i><span>${L().rows.toast}<small>“Can we try it with the team photo?” · ${L().toastMore}</small></span><span style="opacity:.7">✕</span><span class="bar"></span></div>`
+      if (S.screen === 'task') h += taskPanel(false)
+      if (S.screen === 'files') h += taskPanel(true)
+      if (S.screen === 'gone') h += `<div class="unavail"><div><b>${L().gone}</b><span style="color:var(--muted);font-size:13.5px">${L().goneSub}</span><button data-go="panel">${L().ok}</button></div></div>`
+    }
+    if (S.device !== 'desktop') h += `<nav class="tabbar"><span>My Day</span><span style="color:var(--ink)">Board</span><span>Projects</span><span>Team</span><span>More</span></nav>`
+    frame.innerHTML = h
+    document.getElementById('explain').textContent = T.en.explain[S.screen] ?? ''
+  }
+
+  document.querySelector('.controls').addEventListener('click', e => {
+    const b = e.target.closest('button[data-v]'); if (!b) return
+    S[b.closest('.seg').dataset.ctl] = b.dataset.v; S.menu = null
+    if (b.closest('.seg').dataset.ctl === 'device' && b.dataset.v === 'iphone') S.screen = 'panel'
+    render()
+  })
+  frame.addEventListener('click', e => {
+    const t = e.target
+    const m = t.closest('[data-menu]'); if (m) { e.stopPropagation(); S.menu = S.menu === m.dataset.menu ? null : m.dataset.menu; render(); return }
+    const tg = t.closest('[data-toggle]'); if (tg) { const r = ROWS().find(x => x.id === tg.dataset.toggle); S.read[r.id] = isUnread(r); S.menu = null; render(); return }
+    if (t.closest('[data-close]')) { S.menu = null; render(); return }
+    const r = t.closest('[data-row]'); if (r) { const row = ROWS().find(x => x.id === r.dataset.row); S.read[row.id] = true; S.screen = row.k === 'attachment' ? 'files' : row.k === 'comment' || row.k === 'mention' || row.k === 'reply' ? 'task' : 'panel'; render(); return }
+    const g = t.closest('[data-go]'); if (g) { S.screen = g.dataset.go === 'board' ? 'toast' : g.dataset.go; render(); return }
+    const tab = t.closest('[data-tab]'); if (tab) { S.tab = tab.dataset.tab; render(); return }
+    if (t.closest('[data-markall]')) { ROWS().forEach(x => { S.read[x.id] = true }); render(); return }
+    if (t.closest('[data-offer]')) { S.offer = false; render(); return }
+    if (t.closest('[data-follow]')) { S.follow = !S.follow; render(); return }
+    const sw = t.closest('[data-sw]'); if (sw) { const [i, ch] = sw.dataset.sw.split(':').map(Number); S.set[i][ch] = S.set[i][ch] ? 0 : 1; if (ch === 0 && !S.set[i][0]) S.set[i] = [0, 0, 0]; render(); return }
+    const em = t.closest('[data-email]'); if (em) { S.emailMode = em.dataset.email; render(); return }
+    if (t.closest('[data-dnd]')) { S.dnd = !S.dnd; render(); return }
+    const hk = t.closest('[data-hk]'); if (hk) { const k = hk.dataset.hk; S.hkinds = S.hkinds.includes(k) ? S.hkinds.filter(x => x !== k) : [...S.hkinds, k]; render(); return }
+    const hd = t.closest('[data-hd]'); if (hd) { S.hdate = +hd.dataset.hd; render(); return }
+    if (S.menu) { S.menu = null; render() }
+  })
+  frame.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-row]')) { e.preventDefault(); e.target.click() } if (e.key === 'Escape' && S.menu) { S.menu = null; render() } })
+  render()
+})()
+</script>
