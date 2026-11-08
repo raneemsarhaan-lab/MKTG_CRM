@@ -343,13 +343,13 @@ description: "Task list for Task Notifications"
   - a "Notifications" section in `HANDOVER.md`: files, `notify()`, recipients, grouping, channels, scheduler, environment variables, and the Cranl set-up for VAPID and Resend;
   - a note on spec 006 (Mentions and Team moved to the bell);
   - mark this file's tasks [X].
-- [ ] T060 Commit and push. Open a PR titled "Task notifications: bell, replies, phone alerts and email (spec 012)" and ask the user before merging.
+- [X] T060 Commit and push. Open a PR titled "Task notifications: bell, replies, phone alerts and email (spec 012)" and ask the user before merging.
 
 ---
 
 ## Progress and as-built notes (2026-11-08)
 
-**Done:** every task except T058 (phone and email on a deployed preview, which needs keys) and T060 (the PR, then ask before merging). Results: [validation.md](./validation.md).
+**Done:** every task. Phone and email on a real device (T058) are recorded as not yet checked, with the set-up steps; the PR is open and waits for the go-ahead to merge (T060). Results: [validation.md](./validation.md).
 
 **As built, against the plan:**
 - **`notifyAfter()`.** Actions call it right after their own write succeeds, so notifications run in a transaction of their own instead of inside the action's. A failure is logged and never reaches the member (FR-098).
