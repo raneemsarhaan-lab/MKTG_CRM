@@ -48,7 +48,7 @@ This feature adds what the Inbox doesn't do:
 - **per-person settings**;
 - **live arrival**, with toasts.
 
-How it should sit next to the Inbox is the first question below.
+It sits beside the Inbox as a bell (FR-080): the bell says what happened, and the Inbox keeps what you need to act on.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -327,9 +327,20 @@ Notifications are built from the event's facts at display time, in the reader's 
 - **FR-071**: A member MUST only see notifications about tasks they can see.
 - **FR-072**: Everything MUST be usable with the keyboard alone, and the bell's accessible name MUST include the unread count.
 
-**Questions for the user**
+**Decisions (clarified with the user)**
 
-- **FR-080**: [NEEDS CLARIFICATION: How does the bell sit next to the Inbox (spec 006), which replaced the old bell and already shows mentions and team activity? (A) The bell is added beside the Inbox. The bell takes over "what happened" (its Mentions and Team tabs move into the bell), and the Inbox keeps "what you need to act on" (reviews, your tasks, done). (B) The bell replaces the Inbox, and the Inbox's to-do lists move into the bell. (C) No bell: notifications become a new tab inside the Inbox, and the Inbox button shows their count.]
+- **FR-080**: *(Clarified 2026-11-08: option A, a bell beside the Inbox. Design comparison: `design/notifications-options.html`.)* The header MUST show the bell beside the Inbox button.
+  - **The bell holds "what happened"**: every notification in this spec.
+  - **The Inbox keeps "what you need to act on"**: Reviews waiting, Your tasks, and Done.
+  - **The Inbox's Mentions and Team tabs move into the bell.** Mentions become "mention" notifications. Team activity becomes comment, reply and attachment notifications on the member's tasks.
+  - **The Inbox's count covers its to-do lists only.** It no longer counts unread mentions.
+  - **The two counts look different.** The bell's is red. The Inbox's stays purple, or orange when something is urgent (spec 006).
+  - **This replaces parts of spec 006:**
+    - the Mentions and Team tabs (US3–US4);
+    - mentions in the Inbox count (FR-011);
+    - the mention read-state;
+    - the rest of spec 006 stands.
+  - **Unread mentions carry over.** Those made in the last 7 days become unread "mention" notifications at launch, so nothing waiting is lost.
 - **FR-081**: *(Clarified 2026-11-08: one-level replies, built now.)* A member MUST be able to reply under any comment. Replies show under their comment, as a thread one level deep: a reply can't be replied to, though "Reply" on a reply adds to the same thread. Replies may mention people and add followers like comments do. The "reply" notification (FR-001) goes to the parent comment's author, everyone else who replied in that thread, and the task's followers.
 
 ### Key Entities
@@ -373,7 +384,7 @@ Existing entities are reused, not copied: members, tasks, stages and their roles
 - **Email notifications and digests are phase 2.** The settings keep room for them, but nothing is sent by email in this feature.
 - **"Active"** for toasts means the app is open and visible, and the member has interacted within the last few minutes.
 - **Pastes are summarised.** Paste plan and Paste clips create many tasks at once, so they notify each stage holder once per paste, not once per task.
-- **Old history is not backfilled.** The existing mentions and comments from before launch don't become notifications. Only events after launch do.
+- **Old history is not backfilled**, with one exception: unread mentions from the last 7 days (FR-080). Other comments and events from before launch don't become notifications.
 
 ## Out of Scope
 

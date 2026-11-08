@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,9 +31,9 @@
 
 ## Notes
 
-- **Two clarifications are open, both of scope.** They are asked before planning:
-  - FR-080: how the bell sits next to the existing Inbox;
-  - FR-081: whether to add comment replies.
+- **Both clarifications were answered on 2026-11-08:**
+  - FR-080: option A, a bell beside the Inbox. Mentions and Team move into the bell; the Inbox keeps its to-do lists. Compared in `design/notifications-options.html`.
+  - FR-081: one-level replies, built now.
 - **The request's own data model and endpoint list are not copied into the spec.** They stay technical inputs for `/speckit-plan`. The spec records the entities by meaning, reusing the existing ones as the request asks.
 - **"Stage owner" follows the app's existing rule**, because stage owners are roles here (FR-002). It was not asked, because the rule exists.
 - **The request text was cut off in §8.** The edge cases were completed from the rest of the request and the existing app.
