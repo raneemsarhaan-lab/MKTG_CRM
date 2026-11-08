@@ -516,7 +516,9 @@ export function TaskModal({
         el.classList.add('fx-comment-flash')
         window.setTimeout(() => el.classList.remove('fx-comment-flash'), 1600)
       }
-      if (el || ++tries > 40) clearInterval(timer)
+      // Up to 10 s: from a notification the comment may still be on its way
+      // in with the board's refresh.
+      if (el || ++tries > 100) clearInterval(timer)
     }, 100)
     return () => clearInterval(timer)
   }, [initialCommentId, task.id])

@@ -510,9 +510,8 @@ What needs you, behind one header button (spec 006, `specs/006-board-inbox/`). I
 - **One model.** `src/lib/inbox.ts` (`inboxModel`) works out every list from the tasks the board already holds. The button's number and the panel come from the same call, so they cannot disagree.
   - **Reviews:** a live task in a review stage whose `owner_role` is your role. The same rule as `holdsStage`.
   - **Your tasks:** `(assignee ?? owner) = you`, in a working stage, late, due today or undated.
-  - **Mentions:** comments whose `mentions` include you.
-  - **Team:** other people's comments and files on tasks you own or are assigned, plus the current stage entry. No names on moves, because there is no event log.
   - **Done:** your Published tasks this week, plus the all-time total.
+  - **Mentions and Team moved to the notification bell** (spec 012 R12). The Inbox has To do and Done, and its number counts to-dos only. `mention_reads` is kept: the launch backfill reads it.
 - **Records.**
   - `mention_reads` (read state, per member and comment);
   - `task_snoozes` (Tomorrow, until the next local midnight, capped at 36 h);
@@ -521,7 +520,29 @@ What needs you, behind one header button (spec 006, `specs/006-board-inbox/`). I
   - Actions are in `src/actions/inbox.ts`. They act only for the signed-in member.
 - **Moves.** Approve, Send back and Move on go through the board's `moveTo` (`setTaskStage`), so the rule and the celebration are the board's. The Send back note is `addComment`, naming the owner. Set date is `updateTask`.
 - **Browser storage.** Only the pulse's "seen" list (`momentum.inbox.seen`), and the existing `momentum.board.upstream` for Columns before design.
-- **Test it.** `npm run lab:inbox`: 11 Node checks and 38 browser scenarios, no database.
+- **Test it.** `npm run lab:inbox`: 9 Node checks and 30 browser scenarios, no database.
+
+### Notifications
+
+What happened on your tasks, behind the bell beside the Inbox (spec 012, `specs/012-notifications/`). Design: `design/notifications.html`.
+
+- **One place makes them.** `notify(tx, event)` in `src/lib/notify/notify.ts`. Actions call it through `notifyAfter()`, after their own write, in a transaction of its own, so a notification failure never fails the move, comment or upload.
+  - **Who:** `resolveRecipients` (`recipients.ts`, pure). Assignee, owner, creator and followers; for stage events, the stage's holders (`holdsStage`). Never the actor; one row per person; muted followers skipped except for mentions and assignments; kinds turned off in the app dropped.
+  - **Grouping** (`group.ts`): comments, replies (per thread) and attachments on one task join an unread group for 2 hours, under a per-recipient advisory lock. Mentions and assignments never group.
+  - **Following** (`task_followers`): automatic on create, assign, comment, mention; the Follow / Following button in the task panel; "Turn off notifications for this task" sets `muted`.
+- **Triggers** live in the actions: comments and replies (`src/lib/comments.ts`), moves (`setTaskStage`, `moveTask`, bulk), new tasks (and one summary per paste), assignments, `@` in comments and in the brief (`description_mentions`), attachments and links, due soon / overdue (scheduler).
+- **The screen.** `src/components/notifications/`. `NotifyProvider` (in `AppShell`) polls `GET /api/notifications/pulse` every 8 s visible, 60 s hidden, and owns toasts and opening. `NotificationBell` and its panel, `NotificationList` rows, `NotificationsPage` (`/notifications`), `NotificationSettings` (`/notifications/settings`), `PushOffer`. Sentences are built at display time from `notifications.msg.*` (EN/AR, ICU plural and gender select) with `messageFor()`.
+- **Opening.** `openNotification` marks it read and returns the target. On the Board it opens the task in place, at the comment (highlighted) or at Attachments; elsewhere it goes to `/board?task=…&comment=…`. A deleted task shows "This task is no longer available".
+- **Replies.** One level: `task_comments.parent_id`. A reply to a reply joins the top comment's thread. `ReplyComposer` under each comment.
+- **Phone and email.** Web Push (`web-push`, `public/push-sw.js`, push-only, no fetch handler) when the kind is on for the phone, DND is off and the member hasn't been active for 60 s. Email through Resend: instant (unread after 10 minutes) or a daily summary at 08:30 `NOTIFY_TZ`. Text in the member's stored `locale`.
+- **Scheduler.** `src/instrumentation.ts` starts `src/lib/notify/scheduler.ts` on the one `next start` process (`NOTIFY_SCHEDULER=0` turns it off): every minute instant emails; hourly due reminders (`due_reminders` keeps it to once); 08:30 daily summaries; 03:00 clean-up of notifications older than 90 days. `POST /api/notifications/tick` with `x-notify-secret: $NOTIFY_TICK_SECRET` is the fallback.
+- **Environment on Cranl.**
+  - Phone alerts: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `npx web-push generate-vapid-keys`), `VAPID_SUBJECT` (`mailto:` address).
+  - Email: `RESEND_API_KEY`, `EMAIL_FROM` (a sender verified in Resend), and `APP_URL` (or `NEXTAUTH_URL`) for links.
+  - Optional: `NOTIFY_TZ` (default `Africa/Cairo`), `NOTIFY_SCHEDULER`, `NOTIFY_TICK_SECRET`.
+  - Without the keys, the bell, toasts and settings still work; the device row says alerts aren't set up and settings say email isn't.
+- **Launch backfill.** `scripts/notifications-backfill.ts`, run by `scripts/backfill.sh`: followers for live tasks, and unread mentions from the last 7 days as notifications. Safe to run twice.
+- **Test it.** `npm run lab:notify` (11 Node checks and 35 browser scenarios with a stub server). Against a running production build: `node scripts/notify-lab/realapp/run.cjs <dir>` (36 checks, quickstart §3).
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 

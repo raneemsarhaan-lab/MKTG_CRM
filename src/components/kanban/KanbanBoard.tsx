@@ -679,6 +679,19 @@ export function KanbanBoard({
     setSectionFor(target.section ? { taskId: target.taskId, section: target.section } : null)
     selectTask(target.taskId)
   }
+  // A notification is about something newer than this page's copy of the
+  // board. Until the comment it points at is here, fetch the board again (a
+  // few times: a refresh that races the panel's own address change is
+  // dropped), so the panel can show it and scroll to it.
+  useEffect(() => {
+    if (!commentFor) return
+    const has = () => tasks.find(x => x.id === commentFor.taskId)?.comments.some(c => c.id === commentFor.commentId)
+    if (has()) return
+    let n = 0
+    const id = window.setInterval(() => { router.refresh(); if (++n >= 5) window.clearInterval(id) }, 1200)
+    const first = window.setTimeout(() => router.refresh(), 150)
+    return () => { window.clearInterval(id); window.clearTimeout(first) }
+  }, [commentFor, tasks, router])
   useEffect(() => {
     if (!notify) return
     notify.setNavigator(t => openTarget.current(t))

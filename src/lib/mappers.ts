@@ -60,6 +60,8 @@ export function mapComment(c: any): TaskComment & { author?: Member } {
     body:       c.body,
     mentions:   c.mentions ?? [],
     task_refs:  c.task_refs ?? [],
+    // Spec 012 R4: which comment this replies to, so the panel threads it.
+    parent_id:  c.parent_id ?? null,
     created_at: toIsoStr(c.created_at),
   }
 }

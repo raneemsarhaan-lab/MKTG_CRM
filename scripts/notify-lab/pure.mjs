@@ -10,6 +10,7 @@ export async function runPure(bundle, root) {
   const { IntlMessageFormat } = require('intl-messageformat')
   const results = []
   const check = (id, fn) => { try { fn(); results.push({ id, ok: true }) } catch (e) { results.push({ id, ok: false, error: e.message }) } }
+  const ok = (c, msg) => { if (!c) throw new Error(msg) }
   const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`) }
 
   // Members: two Marketing Managers (the C-Review holders), a writer, a designer, an admin.
@@ -124,6 +125,21 @@ export async function runPure(bundle, root) {
     eq(h.mentionedIn('@Samantha', ms), [], 'part of a longer word is not a mention')
     eq(h.mentionedIn('شكرًا @سلمى!', ms), ['ar'], 'Arabic names')
     eq(h.mentionedIn('no names', ms), [], 'none')
+  })
+  check('email-and-push-text', () => {
+    // Spec 012 T052: what phone alerts and emails say, in each language.
+    const n = { kind: 'comment', actorIds: ['s'], count: 1, meta: { task_name: 'Q4 <Carousel>' }, stageId: null }
+    const actors = new Map([['s', { id: 's', name: 'Salma', gender: 'f' }]])
+    const en = h.renderNotification(n, actors, 'en'), ar = h.renderNotification(n, actors, 'ar')
+    eq(en.text, 'Salma commented on Q4 <Carousel>', 'EN text')
+    eq(en.html, '<b>Salma</b> commented on <b>Q4 &lt;Carousel&gt;</b>', 'EN html, escaped')
+    eq(ar.text, 'علّقت Salma على مهمة Q4 <Carousel>', 'AR text')
+    const html = h.emailHtml('ar', [{ html: ar.html, url: 'https://x/board?task=t', snippet: 'hi' }])
+    ok(/dir="rtl"/.test(html) && /lang="ar"/.test(html), 'Arabic email is right to left')
+    ok(/https:\/\/x\/board\?task=t/.test(html), 'links to the task')
+    ok(!/dir="rtl"/.test(h.emailHtml('en', [{ html: en.html, url: 'u' }])), 'English email is left to right')
+    eq(h.targetPath({ id: 'n1', kind: 'attachment', task_id: 't1', comment_id: null }), '/board?task=t1&n=n1&section=attachments', 'attachment link')
+    eq(h.targetPath({ id: 'n2', kind: 'reply', task_id: 't1', comment_id: 'c9' }), '/board?task=t1&n=n2&comment=c9', 'comment link')
   })
   check('messages-parity', () => {
     const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (typeof v === 'object' ? flat(v, `${p}${k}.`) : [`${p}${k}`]))

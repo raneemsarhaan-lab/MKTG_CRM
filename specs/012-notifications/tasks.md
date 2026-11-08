@@ -113,25 +113,25 @@ description: "Task list for Task Notifications"
   - `markNotification`;
   - `markAllRead`;
   - `openNotification`, which returns the target, or null when the task is gone (contracts/server.md).
-- [ ] T014 [US1] The pulse:
+- [X] T014 [US1] The pulse:
   - `src/app/api/notifications/pulse/route.ts`: `no-store`; it returns `{ unread, latest }`, and with `active=1` sets `last_active_at` (R7);
   - `src/components/notifications/usePulse.ts`: polls every 8 s while visible, every 60 s while hidden, and immediately after the member's own actions. It shares its state through a small context.
-- [ ] T015 [US1] The bell in `src/components/notifications/NotificationBell.tsx` (contracts/ui.md §1). Render it beside the Inbox button in the header's `inbox` slot in Board, for every view.
-- [ ] T016 [US1] The panel in `src/components/notifications/NotificationPanel.tsx` and `NotificationRow.tsx` (contracts/ui.md §2):
+- [X] T015 [US1] The bell in `src/components/notifications/NotificationBell.tsx` (contracts/ui.md §1). Render it beside the Inbox button in the header's `inbox` slot in Board, for every view.
+- [X] T016 [US1] The panel in `src/components/notifications/NotificationPanel.tsx` and `NotificationRow.tsx` (contracts/ui.md §2):
   - rows with avatars, the kind icon, the sentence built with `message.ts` and next-intl, the snippet, the time, the dot and the tint;
   - the All and Unread tabs;
   - Mark all;
   - a click calls `openNotification`, then the deep link.
-- [ ] T017 [US1] Deep links (R14):
+- [X] T017 [US1] Deep links (R14):
   - Board reads `comment`, `section` and `n` from the address, and passes `initialCommentId` and `initialSection` to Modal;
   - Modal scrolls to the comment and flashes it, or opens Attachments;
   - `n` is marked read;
   - for a missing task, a dialog reads "This task is no longer available".
-- [ ] T018 [US1] Replies in Modal:
+- [X] T018 [US1] Replies in Modal:
   - "Reply" under each comment, and a thread composer with the existing @mention picker;
   - replies shown under their comment, oldest first;
   - the loader includes `parent_id`.
-- [ ] T019 [US1] Lab scenarios `n1-*`:
+- [X] T019 [US1] Lab scenarios `n1-*`:
   - the bell's count and 9+;
   - the panel's rows and click (the stub host records `openNotification` and the deep link);
   - mark read and unread;
@@ -156,11 +156,11 @@ description: "Task list for Task Notifications"
   - `createTask`, `createTasks` and `createSubtask` in `src/actions/tasks.ts`, `createTaskInProject` in `src/actions/projects.ts`, and `addPiece` in `src/actions/content.ts` call `notify(task_created_in_stage)`. If an assignee is set they also call `notify(assigned)`, and they follow the creator and the assignee;
   - `addClips` and `addPlan` send one notification per stage holder per paste (`meta.paste_count`, a `group_key` per paste).
 - [X] T022 [US2] Assignments: `updateTask` and `bulkUpdateTasks` call `notify(assigned)` when `assignee_id` changes to someone else, and follow the new assignee with `clearMute`.
-- [ ] T023 [US2] Mentions in descriptions (R11):
+- [X] T023 [US2] Mentions in descriptions (R11):
   - an `@` `Suggestion` in `src/components/kanban/brief-editor/extensions.ts` with a member list, inserting `@Name` and collecting ids;
   - the description save passes `description_mentions`;
   - `updateTask` checks the ids against members, stores them on `tasks.description_mentions`, and notifies only the newly added ones.
-- [ ] T024 [US2] Lab checks:
+- [X] T024 [US2] Lab checks:
   - recipients for create, move, assign and mention across the working and review stages;
   - a stage with no holder gives no recipients;
   - an `@` picker scenario in the brief lab (`scripts/brief-editor-lab`).
@@ -174,8 +174,8 @@ description: "Task list for Task Notifications"
 **Independent Test**: Five comments by three people within two hours give one unread row: "X, Y and 3 others commented…". After it is read, a sixth comment starts a new row.
 
 - [X] T025 [US3] Attachments: `addAttachments`, `addLinkAttachment`, `setPieceLink` and the `/api/attachments` upload route call `notify(attachment)`. Several files in one action add to the count at once.
-- [ ] T026 [US3] Grouped rows in the panel: two stacked avatars; "{actor}, {actor2} and {others} others…"; "added {count} attachments".
-- [ ] T027 [US3] Lab: grouping across comment, reply (keyed per thread) and attachment kinds; the grouped sentences in both languages; and the running-app check of five comments by three people (quickstart §3, row 3).
+- [X] T026 [US3] Grouped rows in the panel: two stacked avatars; "{actor}, {actor2} and {others} others…"; "added {count} attachments".
+- [X] T027 [US3] Lab: grouping across comment, reply (keyed per thread) and attachment kinds; the grouped sentences in both languages; and the running-app check of five comments by three people (quickstart §3, row 3).
 
 ---
 
@@ -185,9 +185,9 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: With 45 notifications, scrolling loads them all with no gaps. Mark all sets the badge to 0. Turning a task off stops its notifications, except mentions and assignments.
 
-- [ ] T028 [US4] Infinite scroll in the panel, with an `IntersectionObserver` sentinel and the cursor from `listNotifications`. On the Unread tab, a row marked read stays visible, dimmed, until the tab is reopened.
-- [ ] T029 [US4] The ⋯ menu on each row: "Mark as read" or "Mark as unread", and "Turn off notifications for this task" (`muteTaskNotifications`). Keyboard: Shift+F10 and the ⋯ button.
-- [ ] T030 [US4] Lab scenarios `n4-*`: 45 rows load across pages with no duplicates; Mark all; the empty state; mark unread brings the dot back; a muted task gets no comments but still gets a mention.
+- [X] T028 [US4] Infinite scroll in the panel, with an `IntersectionObserver` sentinel and the cursor from `listNotifications`. On the Unread tab, a row marked read stays visible, dimmed, until the tab is reopened.
+- [X] T029 [US4] The ⋯ menu on each row: "Mark as read" or "Mark as unread", and "Turn off notifications for this task" (`muteTaskNotifications`). Keyboard: Shift+F10 and the ⋯ button.
+- [X] T030 [US4] Lab scenarios `n4-*`: 45 rows load across pages with no duplicates; Mark all; the empty state; mark unread brings the dot back; a muted task gets no comments but still gets a mention.
 
 ---
 
@@ -197,9 +197,9 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Follow a task you have no role on: you're told about its next comment. Unfollow it: you aren't told about the one after.
 
-- [ ] T031 [US5] `setFollow` and `getFollow` in Actions, and the Follow / Following toggle in Modal's header (`data-follow`).
+- [X] T031 [US5] `setFollow` and `getFollow` in Actions, and the Follow / Following toggle in Modal's header (`data-follow`).
 - [X] T032 [US5] Seed followers in `scripts/backfill.sh` (idempotent): for live tasks, the creator, owner, assignee and every comment author (data-model §6).
-- [ ] T033 [US5] Lab: the toggle's state; auto-follow doesn't clear a deliberate unfollow, except for the member's own new action (FR-013).
+- [X] T033 [US5] Lab: the toggle's state; auto-follow doesn't clear a deliberate unfollow, except for the member's own new action (FR-013).
 
 ---
 
@@ -209,12 +209,12 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: A new notification shows a toast for about 5 s. There is none for the open task, and none with DND on, though the list still updates.
 
-- [ ] T034 [US6] Toasts in `src/components/notifications/NotificationToasts.tsx` (contracts/ui.md §3), driven by changes to the pulse's `latest`:
+- [X] T034 [US6] Toasts in `src/components/notifications/NotificationToasts.tsx` (contracts/ui.md §3), driven by changes to the pulse's `latest`:
   - one at a time, with "and N more";
   - 5 s, paused while hovered;
   - a click follows the deep link;
   - none for `selectedTaskId`, and none with DND on.
-- [ ] T035 [US6] Lab scenarios `n6-*`: timing, the open task, DND, "and 2 more", and not announced twice for the same id.
+- [X] T035 [US6] Lab scenarios `n6-*`: timing, the open task, DND, "and 2 more", and not announced twice for the same id.
 
 ---
 
@@ -230,7 +230,7 @@ description: "Task list for Task Notifications"
   - the daily clean-up at 03:00 (FR-060).
 
   `src/instrumentation.ts` starts it on the Node runtime unless `NOTIFY_SCHEDULER=0`. `src/app/api/notifications/tick/route.ts` is the secret-guarded fallback.
-- [ ] T037 [US7] Lab and running app: `dueState` around midnight in Cairo; running the tick twice sends one reminder; a new due date resets it; archived and published tasks are skipped.
+- [X] T037 [US7] Lab and running app: `dueState` around midnight in Cairo; running the tick twice sends one reminder; a new due date resets it; archived and published tasks are skipped.
 
 ---
 
@@ -240,9 +240,9 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Switching the language rewrites every existing notification, with correct counts and gender.
 
-- [ ] T038 [US10] The stored locale (R13): a `setLocale` action. `src/components/shared/LangToggle.tsx` calls it as well as setting the cookie. On page load, the stored value is corrected if it differs from the cookie.
-- [ ] T039 [US10] Gender for Arabic grammar (R6): a gender field in Profile (`src/components/shared/UserMenu.tsx`, profile panel) and in the Settings → Team member form. Members without one get the neutral phrasing.
-- [ ] T040 [US10] Lab: every kind in Arabic with counts 1, 2, 3, 11 and 100 and both genders; RTL layout of the panel, toasts and settings; axe in both languages.
+- [X] T038 [US10] The stored locale (R13): a `setLocale` action. `src/components/shared/LangToggle.tsx` calls it as well as setting the cookie. On page load, the stored value is corrected if it differs from the cookie.
+- [X] T039 [US10] Gender for Arabic grammar (R6): a gender field in Profile (`src/components/shared/UserMenu.tsx`, profile panel) and in the Settings → Team member form. Members without one get the neutral phrasing.
+- [X] T040 [US10] Lab: every kind in Arabic with counts 1, 2, 3, 11 and 100 and both genders; RTL layout of the panel, toasts and settings; axe in both languages.
 
 ---
 
@@ -259,14 +259,14 @@ description: "Task list for Task Notifications"
   - delete a subscription on 404 or 410.
 
   Routes `src/app/api/notifications/push/route.ts` (POST and DELETE) and `push/key/route.ts`. `afterCommit` pushes when the kind is on for the phone, DND is off, and `last_active_at` is more than 60 s old (FR-091). The payload is rendered in the member's locale with `createTranslator`.
-- [ ] T043 [US11] The offer in `src/components/notifications/PushOffer.tsx`, in the panel and in settings:
+- [X] T043 [US11] The offer in `src/components/notifications/PushOffer.tsx`, in the panel and in settings:
   - feature detection;
   - the iPhone check (`navigator.standalone`), showing the Home Screen steps;
   - permission asked only after a tap;
   - subscribe and POST; turn off and DELETE.
 
   Sign-out unsubscribes this device.
-- [ ] T044 [US11] Lab and devices:
+- [X] T044 [US11] Lab and devices:
   - lab: the offer's states, including the iPhone outside the Home Screen app (stubbed `PushManager`);
   - running app: an active member gets no push;
   - quickstart §4 on a real Android phone and iPhone.
@@ -280,7 +280,7 @@ description: "Task list for Task Notifications"
 **Independent Test**: Turn "New attachment" off in the app: attachments no longer appear in the bell. Turn "Mention" off for the phone: mentions still appear in the bell but don't buzz the phone. Set email to Off: no emails.
 
 - [X] T045 [US8] `getNotificationSettings` and `saveNotificationSettings` in Actions (rows only for changes from the defaults; DND; email mode).
-- [ ] T046 [US8] The settings page at `src/app/(app)/notifications/settings/page.tsx` and `src/components/notifications/NotificationSettings.tsx` (contracts/ui.md §6):
+- [X] T046 [US8] The settings page at `src/app/(app)/notifications/settings/page.tsx` and `src/components/notifications/NotificationSettings.tsx` (contracts/ui.md §6):
   - the kinds × channels table;
   - "In the app" off switches the row off;
   - the email mode, with the "not set up" note;
@@ -289,7 +289,7 @@ description: "Task list for Task Notifications"
   - instant saving.
 
   Linked from the panel's foot and from the user menu.
-- [ ] T047 [US8] Lab scenarios `n8-*`: defaults for a new member, switching a row off, the note when email isn't set up, keyboard, Arabic, and phone width.
+- [X] T047 [US8] Lab scenarios `n8-*`: defaults for a new member, switching a row off, the note when email isn't set up, keyboard, Arabic, and phone width.
 
 ---
 
@@ -299,8 +299,8 @@ description: "Task list for Task Notifications"
 
 **Independent Test**: Filter by Mentions and Last 7 days: only that week's mentions show, newest first.
 
-- [ ] T048 [US9] The page at `src/app/(app)/notifications/page.tsx` and `src/components/notifications/NotificationsPage.tsx`: kind chips, date ranges, the same rows, and infinite scroll (`listNotifications` with `kinds`, `from` and `to`).
-- [ ] T049 [US9] Lab: filters by kind and date; rows open their targets.
+- [X] T048 [US9] The page at `src/app/(app)/notifications/page.tsx` and `src/components/notifications/NotificationsPage.tsx`: kind chips, date ranges, the same rows, and infinite scroll (`listNotifications` with `kinds`, `from` and `to`).
+- [X] T049 [US9] Lab: filters by kind and date; rows open their targets.
 
 ---
 
@@ -317,28 +317,28 @@ description: "Task list for Task Notifications"
 - [X] T051 [US12] Scheduler jobs:
   - **Instant** (every tick): unread, not yet emailed, older than 10 minutes, the kind on for email, mode `instant`. It sets `emailed_at`, and retries up to 5 times;
   - **Daily summary** at 08:30 `NOTIFY_TZ`: once per member per day, through `email_digests`, and nothing when nothing is unread.
-- [ ] T052 [US12] Lab: template rendering in both languages; the job selection rules with a fake clock. Then quickstart §5 with Resend configured.
+- [X] T052 [US12] Lab: template rendering in both languages; the job selection rules with a fake clock. Then quickstart §5 with Resend configured.
 
 ---
 
 ## Phase 15: The Inbox after option A (R12)
 
-- [ ] T053 Inbox changes in `src/lib/inbox.ts`, `src/components/inbox/InboxPanel.tsx`, `InboxButton.tsx` and `src/components/inbox/types.ts`:
+- [X] T053 Inbox changes in `src/lib/inbox.ts`, `src/components/inbox/InboxPanel.tsx`, `InboxButton.tsx` and `src/components/inbox/types.ts`:
   - remove the Mentions and Team tabs, and `markMentionsRead`;
   - counts: `total` = `todo`, and the summary without mentions.
 
   Update `InboxTab` in the types. Update `scripts/inbox-lab` scenarios to To do and Done.
 - [X] T054 Launch backfill in `scripts/backfill.sh`: unread mentions from the last 7 days (not in `mention_reads`) become `mention` notifications, once, keyed by comment id (data-model §6).
-- [ ] T055 The phone top bar with both buttons: shrink the tab padding so the tabs, search icon, bell, Inbox icon and avatar fit at 390 px. Re-run `lab:header` h5 (first column ≤ 320 px, targets ≥ 44 px).
+- [X] T055 The phone top bar with both buttons: shrink the tab padding so the tabs, search icon, bell, Inbox icon and avatar fit at 390 px. Re-run `lab:header` h5 (first column ≤ 320 px, targets ≥ 44 px).
 
 ---
 
 ## Phase 16: Polish and validation
 
-- [ ] T056 Run every lab: `lab:notify`, `lab:inbox`, `lab:header`, `lab:sheet`, `lab:attachments` and `lab:brief`. Then `npm run typecheck`, `bash scripts/preflight.sh` and `npx next build`.
-- [ ] T057 Running-app checks, all 12 rows of quickstart §3, with two members on local PostgreSQL and the scheduler on. Record them in `specs/012-notifications/validation.md`.
-- [ ] T058 Phone and email checks, quickstart §4–§5, on a deployed preview with VAPID keys and Resend set. Record them in `validation.md`. If the keys or the provider aren't available yet, record this as "not yet checked" with the set-up steps.
-- [ ] T059 [P] Docs:
+- [X] T056 Run every lab: `lab:notify`, `lab:inbox`, `lab:header`, `lab:sheet`, `lab:attachments` and `lab:brief`. Then `npm run typecheck`, `bash scripts/preflight.sh` and `npx next build`.
+- [X] T057 Running-app checks, all 12 rows of quickstart §3, with two members on local PostgreSQL and the scheduler on. Record them in `specs/012-notifications/validation.md`.
+- [X] T058 Phone and email checks, quickstart §4–§5, on a deployed preview with VAPID keys and Resend set. Record them in `validation.md`. If the keys or the provider aren't available yet, record this as "not yet checked" with the set-up steps.
+- [X] T059 [P] Docs:
   - `specs/012-notifications/constitution-check.md`, including the `web-push` dependency for sign-off and the note on the constitution's out-of-date stack table;
   - a "Notifications" section in `HANDOVER.md`: files, `notify()`, recipients, grouping, channels, scheduler, environment variables, and the Cranl set-up for VAPID and Resend;
   - a note on spec 006 (Mentions and Team moved to the bell);
@@ -349,27 +349,20 @@ description: "Task list for Task Notifications"
 
 ## Progress and as-built notes (2026-11-08)
 
-**Done.** The design file, and everything that isn't a screen:
-- the schema, types, tokens and strings;
-- the pure modules and `notify()`;
-- every trigger: comments and replies, mentions in comments and descriptions (server side), moves, new tasks, pastes, assignments, attachments and links;
-- the actions and routes: pulse, push, key, tick;
-- the push-only worker;
-- the scheduler: due reminders, instant email, daily summary, clean-up;
-- the email sender and templates;
-- the launch backfill.
-
-**Partly done:**
-- **T014:** the route is done; the client hook comes with the UI.
-- **T023:** the server side (`description_mentions` in `updateTask`) is done; the `@` picker is UI.
-- **T038:** the `setLocale` action is done; `LangToggle` is UI.
-
-**Waiting for design approval:** every UI task (§IV).
+**Done:** every task except T058 (phone and email on a deployed preview, which needs keys) and T060 (the PR, then ask before merging). Results: [validation.md](./validation.md).
 
 **As built, against the plan:**
 - **`notifyAfter()`.** Actions call it right after their own write succeeds, so notifications run in a transaction of their own instead of inside the action's. A failure is logged and never reaches the member (FR-098).
 - **Working-stage holders.** "Stage holders" uses `holdsStage` exactly. For a working stage that means the assignee **and** the owner.
 - **Pastes** (`createTasks`, `addClips`, `addPlan`) send one `task_created_in_stage` per stage holder per paste, keyed `list:` / `clips:` / `plan:`.
+- **The screens take one `NotifyApi` object** (`src/components/notifications/api.ts`), so the lab drives the real components with a stub server.
+- **The panel is positioned against the window** under the bell (like the Inbox panel), so it never runs off screen whatever sits beside the bell.
+- **Gender (T039)** is set on the Notification settings page ("Grammar in Arabic"), which the account menu now links to, not in the profile panel or the Team form. Language is there too.
+- **Brief `@` (T023/T024).** Whoever's "@Name" is in the saved brief is mentioned (`mentionedIn`); the server tells only people newly added. Checked in the running app rather than the brief lab.
+- **Auto-follow and a deliberate unfollow (T033)** is enforced in `follow()` (`clearMute` only for the member's own action); the running app checks Follow / Unfollow, not the auto-follow edge.
+- **Opening a notification on the Board refetches the board** until the comment is there, so a comment newer than the page still opens and highlights.
+- **Inbox (T053).** `markMentionsRead` and `replyToMention` were removed with the Mentions tab; `mention_reads` stays for the backfill.
+- **Contrast.** Two tokens were added for text on the unread tint (`--nt-blue-text`, `--nt-muted-on-tint`) after axe flagged 4.2–4.3:1.
 
 ## Dependencies
 
