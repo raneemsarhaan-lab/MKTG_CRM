@@ -32,7 +32,7 @@ What the app has now, from the data model and the Board Inbox (spec 006):
   - The working stages belong to whoever holds the task: its assignee, or its owner when there is no assignee.
   - The app already has one rule for "who holds this stage". This spec uses it wherever the request says "stage owner".
 - **Comments.**
-  - Comments are flat: **there are no replies today.**
+  - Comments are flat: **there are no replies today.** This feature adds them (FR-081).
   - Each comment already records whom it @mentions, and the Inbox already tracks which mentions each person has read.
 - **Attachments.** Files and links, each recorded with who added it.
 - **The Board Inbox (spec 006).**
@@ -330,7 +330,7 @@ Notifications are built from the event's facts at display time, in the reader's 
 **Questions for the user**
 
 - **FR-080**: [NEEDS CLARIFICATION: How does the bell sit next to the Inbox (spec 006), which replaced the old bell and already shows mentions and team activity? (A) The bell is added beside the Inbox. The bell takes over "what happened" (its Mentions and Team tabs move into the bell), and the Inbox keeps "what you need to act on" (reviews, your tasks, done). (B) The bell replaces the Inbox, and the Inbox's to-do lists move into the bell. (C) No bell: notifications become a new tab inside the Inbox, and the Inbox button shows their count.]
-- **FR-081**: [NEEDS CLARIFICATION: Comments have no replies today. Should this feature add replies? (A) Yes, one level: reply under a comment, shown as a thread, with the "reply" notification. (B) Not now: build every other event, and add replies with their notification later.]
+- **FR-081**: *(Clarified 2026-11-08: one-level replies, built now.)* A member MUST be able to reply under any comment. Replies show under their comment, as a thread one level deep: a reply can't be replied to, though "Reply" on a reply adds to the same thread. Replies may mention people and add followers like comments do. The "reply" notification (FR-001) goes to the parent comment's author, everyone else who replied in that thread, and the task's followers.
 
 ### Key Entities
 
