@@ -555,7 +555,8 @@ Spreadsheet editing and Excel-style sheet tabs (spec 013, `specs/013-spreadsheet
 - **Linked sheets.** `useLinkedEditing` gives the Video and Content grids ranges, paste, clear, cut and undo. Each cell goes through the sheet's own single-cell save. Clip lists, plans and single links still open their previews (`pasteAsRows`). Team columns are open to any member on a live task (R8).
 - **Server.** `src/actions/sheets.ts`: folders, sheets, `applySheetChanges` (one transaction; refuses on protection or limits; skips gone rows and columns), and the tab actions. Backfill: `scripts/sheets-backfill.ts`.
 - **Clipboard.** `src/lib/sheet-clipboard.ts` reads HTML tables and Excel-quoted TSV, and writes both.
-- **Checks.** `node scripts/spreadsheet-lab/realapp/run.cjs` (running app), `npm run lab:spreadsheet` (pure), `npm run lab:sheet` (linked grids), and the smoke test in `scripts/spreadsheet-lab/smoke/`. Open items are in `specs/013-spreadsheet-editing/validation.md`.
+- **Linked menus.** `useLinkedMenu`: the Video and Content sheets' cell, row and heading menus (new clip or piece, drop or archive with Undo, insert column, delete team columns), and row heights shared by the team (`setLinkedRowHeights`, loaded by `loadBoardData`).
+- **Checks.** `node scripts/spreadsheet-lab/realapp/run.cjs` (running app), `perf-axe.cjs` (5,000-row speed and axe), `npm run lab:spreadsheet` (pure), `npm run lab:sheet` (linked grids), and the smoke test in `scripts/spreadsheet-lab/smoke/`. Open items are in `specs/013-spreadsheet-editing/validation.md`.
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
