@@ -427,3 +427,49 @@ export type TaskCellField =
   | 'clip.in' | 'clip.out' | 'clip.file' | 'clip.source'
   | `col:${string}`
 export interface TaskCellEntry { taskId: string; field: TaskCellField; value: string }
+
+// ─── Daily working hours (spec 014) ──────────────────────────────────────────
+
+/** One member's day: hours worked, a day off, or (as null) nothing logged. `date` is 'YYYY-MM-DD', the member's own calendar day. */
+export interface WorkDayEntry {
+  date: string
+  hours: number | null
+  off: boolean
+}
+
+/** What My Day and the reminder need for the member (contracts/server.md `hoursStatus`). */
+export interface HoursStatus {
+  localDate: string
+  /** The last working day before today, when it has no entry and the account existed. */
+  remindDay: string | null
+  /** Other working days in the last 30 with no entry, newest first (for "Add another day"). */
+  missing: string[]
+  /** The reminder already opened or was put off today. */
+  prompted: boolean
+  /** The last 7 days, oldest first, today last. */
+  recent: (WorkDayEntry | { date: string; hours: null; off: false; missing: boolean })[]
+  /** This week (Sunday to today). */
+  weekTotal: number
+  capacity: number
+  /** The first day this member can be asked about (their account's creation day). */
+  since: string
+}
+
+export interface HoursWeekRow {
+  memberId: string
+  name: string
+  capacity: number
+  days: Record<string, WorkDayEntry | null>
+  total: number
+  /** Every working day of the week (up to today) has an entry. */
+  complete: boolean
+}
+
+export interface HoursWeekReport {
+  weekStart: string
+  /** Sunday to Saturday. */
+  days: string[]
+  rows: HoursWeekRow[]
+  dayTotals: Record<string, number>
+  completeCount: number
+}

@@ -6,6 +6,7 @@ import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { NotifyProvider } from '@/components/notifications/NotifyProvider'
 import { notifyApi } from '@/components/notifications/api'
+import { HoursReminderApp } from '@/components/hours/pages'
 
 interface AppShellProps {
   member: Member
@@ -50,6 +51,9 @@ export function AppShell({ member, pins = [], children }: AppShellProps) {
 
       {/* Rendered always, shown only at phone widths. */}
       <TabBar member={member} />
+
+      {/* The forgotten-day hours reminder (spec 014), once for the app. */}
+      <HoursReminderApp />
 
       {/* Celebration overlay — global, mounts once */}
       <CelebrationOverlay />

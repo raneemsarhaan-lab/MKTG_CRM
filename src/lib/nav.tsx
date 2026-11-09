@@ -28,6 +28,8 @@ export const NAV: readonly NavItem[] = [
   { href: '/projects', key: 'projects', adminOnly: false },
   { href: '/team',     key: 'team',     adminOnly: false },
   { href: '/capacity', key: 'capacity', adminOnly: true  },
+  // Spec 014: the weekly hours report, admins only.
+  { href: '/hours',    key: 'hours',    adminOnly: true  },
   { href: '/settings', key: 'settings', adminOnly: true  },
 ] as const
 
@@ -77,6 +79,9 @@ export const NAV_ICON: Record<string, React.ReactNode> = {
     <line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" />
     <line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" />
     <line x1="16" x2="16" y1="18" y2="22" />
+  </>),
+  hours: (<>
+    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
   </>),
   more: (<>
     <circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" />

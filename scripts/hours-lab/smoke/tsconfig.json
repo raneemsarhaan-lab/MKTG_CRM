@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../..",
+    "paths": {
+      "@/lib/authz": ["scripts/hours-lab/smoke/authz-stub.ts"],
+      "@/*": ["src/*"]
+    }
+  }
+}

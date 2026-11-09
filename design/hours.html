@@ -1,0 +1,374 @@
+<title>Momentum Daily Hours</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (screen, device, language) over one app frame —
+   sidebar + My Day. The reminder opens over the frame; the report is the
+   admin's Hours page. Momentum's own tokens (design/sheets.html). */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #5F6472;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --head: #F8F8FB;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --purple-deep: #6D28D9; --lime: #C9F24E; --lime-soft: #F4FBD6;
+  --miss: #9A5B02; --miss-bg: #FFF3E0; --ok: #15803D; --bad: #C81E3A; --bad-bg: #FDE7EA; --off: #4B5563; --off-bg: #EEF0F3;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif;
+  --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #A2A2B0; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --head: #1C1C24; --purple: #A78BFA; --purple-soft: #2A2145; --purple-deep: #C4B5FD; --lime-soft: #26300F;
+  --miss: #F5C46B; --miss-bg: #3A2A0E; --bad: #FF8FA3; --bad-bg: #3A1520; --off: #C9CDD6; --off-bg: #2A2D35; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #A2A2B0; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --head: #1C1C24; --purple: #A78BFA; --purple-soft: #2A2145; --purple-deep: #C4B5FD; --lime-soft: #26300F;
+  --miss: #F5C46B; --miss-bg: #3A2A0E; --bad: #FF8FA3; --bad-bg: #3A1520; --off: #C9CDD6; --off-bg: #2A2D35; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple-deep); }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+.frame { position: relative; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10);
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 700px; }
+.frame[dir="rtl"], .frame[dir="rtl"] button, .frame[dir="rtl"] input { font-family: var(--f-ar); }
+.frame.phone { grid-template-columns: minmax(0, 1fr); max-width: 390px; width: 100%; margin: 0 auto; min-height: 820px; display: flex; flex-direction: column; }
+.frame.phone .side { display: none; }
+.side { border-inline-end: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 14px; }
+.word { font: 800 21px var(--f-head); color: var(--ink); padding-inline: 6px; }
+.nav { display: grid; gap: 2px; }
+.nav span { display: flex; align-items: center; gap: 10px; border-radius: 10px; padding: 9px 10px; font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.nav span.on { background: var(--lime-soft); color: var(--ink); font-weight: 700; }
+.main { min-width: 0; padding: 30px 36px 40px; display: grid; gap: 20px; align-content: start; }
+.frame.phone .main { padding: 18px 16px 90px; flex: 1; }
+.greet { font: 800 26px var(--f-head); color: var(--ink); margin: 0; }
+.frame[dir="rtl"] .greet, .frame[dir="rtl"] .card h2, .frame[dir="rtl"] .dlg h2, .frame[dir="rtl"] .rep h2 { font-family: var(--f-ar); }
+.sub { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+
+/* Today's hours */
+.card { border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; display: grid; gap: 14px; background: var(--panel); }
+.card-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.card h2 { margin: 0; font: 800 18px var(--f-head); color: var(--ink); }
+.card .date { color: var(--muted); font-size: 13.5px; }
+.week { margin-inline-start: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.week b { color: var(--ink); }
+.entry { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.field { display: flex; align-items: center; border: 1.5px solid var(--input); border-radius: 12px; background: var(--panel); padding-inline: 12px 10px; height: 46px; }
+.field:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px var(--purple-soft); }
+.field.bad { border-color: var(--bad); }
+.field input { border: 0; outline: 0; background: none; width: 70px; font: 700 20px var(--f-body); color: var(--ink); font-variant-numeric: tabular-nums; }
+.field span { color: var(--muted); font-size: 13px; font-weight: 600; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 0 14px; height: 38px; cursor: pointer; font-weight: 600; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.chip:hover { background: var(--surface); }
+.chip.off { color: var(--off); }
+.save { border: 0; background: var(--ink); color: var(--panel); border-radius: 999px; padding: 0 20px; height: 42px; font-weight: 700; cursor: pointer; }
+.status { font-size: 13px; color: var(--ok); font-weight: 600; min-height: 18px; }
+.status.err { color: var(--bad); }
+.strip { display: grid; grid-template-columns: repeat(7, minmax(64px, 1fr)); gap: 6px; overflow-x: auto; }
+.day { border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; text-align: center; display: grid; gap: 3px; background: var(--panel); cursor: pointer; min-height: 64px; }
+.day small { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.day b { font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.day.today { border-color: var(--purple); box-shadow: inset 0 0 0 1px var(--purple); }
+.day.miss { background: var(--miss-bg); border-color: transparent; }
+.day.miss b { color: var(--miss); font-size: 12.5px; }
+.day.off b { color: var(--off); font-size: 12.5px; }
+.day.wk { opacity: .55; }
+.card-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.link { border: 0; background: none; color: var(--purple-deep); font-weight: 700; cursor: pointer; padding: 6px 0; font-size: 13.5px; }
+.ghost { color: var(--muted); font-size: 13px; }
+.rest { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; opacity: .45; }
+.rest div { height: 88px; border-radius: 16px; background: var(--surface); }
+
+/* reminder */
+.scrim { position: absolute; inset: 0; background: rgba(20,19,26,.38); display: grid; place-items: center; z-index: 20; padding: 16px; }
+.dlg { background: var(--panel); border-radius: 18px; width: min(460px, 100%); padding: 20px; display: grid; gap: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.28); }
+.frame.phone .scrim { place-items: end stretch; padding: 0; }
+.frame.phone .dlg { border-radius: 20px 20px 0 0; width: 100%; padding-bottom: 26px; }
+.dlg h2 { margin: 0; font: 800 19px/1.3 var(--f-head); color: var(--ink); text-wrap: balance; }
+.dlg p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.lines { display: grid; gap: 8px; }
+.line { display: grid; grid-template-columns: minmax(0,1fr) auto auto 34px; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 12px; background: var(--surface); }
+.line label { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+.line .field { height: 42px; }
+.line .field input { width: 56px; font-size: 17px; }
+.tog { border: 1px solid var(--input); background: var(--panel); border-radius: 10px; height: 42px; padding: 0 12px; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--off); }
+.tog[aria-pressed="true"] { background: var(--off-bg); border-color: var(--off); color: var(--ink); }
+.rm { border: 0; background: none; width: 34px; height: 42px; border-radius: 10px; cursor: pointer; color: var(--muted); font-size: 18px; }
+.rm:hover { background: var(--panel); }
+.lerr { grid-column: 1 / -1; color: var(--bad); font-size: 12.5px; font-weight: 600; }
+.more { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 700; color: var(--miss); background: var(--miss-bg); border-radius: 999px; padding: 4px 10px; }
+.acts { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.acts .later { border: 0; background: none; color: var(--muted); font-weight: 600; cursor: pointer; margin-inline-end: auto; padding: 8px 4px; }
+.frame.phone .tog, .frame.phone .chip, .frame.phone .save, .frame.phone .line .field { min-height: 44px; }
+
+/* report */
+.rep { display: grid; gap: 14px; }
+.rep-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rep h2 { margin: 0; font: 800 24px var(--f-head); color: var(--ink); }
+.wk-nav { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--input); border-radius: 999px; padding: 3px; }
+.wk-nav button { border: 0; background: none; width: 30px; height: 30px; border-radius: 999px; cursor: pointer; }
+.wk-nav span { font-weight: 700; font-size: 13.5px; padding-inline: 6px; font-variant-numeric: tabular-nums; }
+.dl { margin-inline-start: auto; border: 0; background: var(--lime); color: #14131A; border-radius: 999px; padding: 9px 16px; font: 700 13.5px var(--f-head); cursor: pointer; }
+.sum { font-size: 13.5px; color: var(--muted); }
+.sum b { color: var(--ink); }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+caption { text-align: start; padding: 10px 14px; color: var(--muted); font-size: 12.5px; }
+th, td { padding: 10px 12px; border-top: 1px solid var(--line); text-align: center; white-space: nowrap; }
+thead th { background: var(--head); color: var(--muted); font-size: 12px; font-weight: 700; border-top: 0; }
+th[scope="row"], thead th:first-child { text-align: start; position: sticky; inset-inline-start: 0; background: var(--panel); color: var(--ink); font-weight: 600; z-index: 1; }
+thead th:first-child { background: var(--head); }
+td.miss { color: var(--miss); background: var(--miss-bg); font-weight: 600; font-size: 12.5px; }
+td.off { color: var(--off); font-size: 12.5px; }
+td.tot { font-weight: 700; color: var(--ink); }
+td.tot small { color: var(--muted); font-weight: 500; }
+tfoot td, tfoot th { background: var(--head); font-weight: 700; }
+
+.notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+.note h3 { margin: 0 0 6px; font: 700 14px var(--f-head); color: var(--ink); }
+.note ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 3px; }
+.ph-nav { display: none; }
+.frame.phone .ph-nav { display: flex; justify-content: space-around; border-top: 1px solid var(--line); min-height: 58px; align-items: center; font-size: 11px; color: var(--muted); font-weight: 600; }
+.ph-nav span.on { color: var(--ink); }
+@media (max-width: 900px) {
+  .frame { grid-template-columns: 1fr; }
+  .frame:not(.phone) .side { display: none; }
+  .main { padding: 20px 16px 30px; }
+  .notes { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Daily hours</h1>
+    <p class="lede">The design for spec 014. Members log the hours they worked today on My Day. If they forget, a small window asks about their last working day the next time they open Momentum, and they can add more days and fill them together. Admins see a weekly report. Everything here is clickable.</p>
+  </header>
+  <div class="ctl">
+    <span>Screen</span>
+    <span class="seg" role="group" aria-label="Screen">
+      <button data-screen="myday">My Day</button><button data-screen="remind">Reminder</button><button data-screen="remind3">Reminder, 3 days</button><button data-screen="error">A refused line</button><button data-screen="report">Report (admin)</button>
+    </span>
+    <span>Device</span>
+    <span class="seg" role="group" aria-label="Device"><button data-dev="desktop">Computer</button><button data-dev="phone">Phone 390</button></span>
+    <span>Language</span>
+    <span class="seg" role="group" aria-label="Language"><button data-lang="en">English</button><button data-lang="ar">العربية</button></span>
+  </div>
+  <p class="hint" id="hint"></p>
+  <div id="frame" class="frame"></div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+  // Today is Sunday 15 Nov 2026; the working week is Sunday to Thursday.
+  const DAYS = ['2026-11-09','2026-11-10','2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-15']
+  const T = {
+    en: {
+      nav: ['My Day', 'Board', 'Sheets', 'Projects', 'Team', 'Capacity', 'Hours'], hi: 'Good morning, Sara', sub: 'Sunday, 15 November',
+      today: "Today's hours", h: 'h', save: 'Save', saved: 'Saved', off: 'Off', iwasoff: 'I was off', missing: 'Missing',
+      week: (a, b) => `<b>${a}</b> of ${b} h this week`, several: 'Log several days', last7: 'Last 7 days',
+      remindT: d => `How many hours did you work on ${d}?`, remindP: 'You didn’t log it yet. It takes a few seconds.',
+      add: '＋ Add another day', moreMissing: n => `${n} more ${n === 1 ? 'day' : 'days'} missing`, same: 'Same for all', later: 'Later', remove: 'Remove',
+      bad: 'Hours go from 0 to 24.', notSaved: 'Nothing was saved. Fix the marked line and save again.',
+      rep: 'Hours', weekSpan: '8 – 12 Nov', dl: 'Download (.csv)', complete: (a, b) => `<b>${a} of ${b}</b> logged every working day`,
+      cap: 'Hours by member and day, week of 8 November. Missing days are marked.', member: 'Member', total: 'Total', dayTotal: 'Day total',
+      dname: d => new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(new Date(d + 'T12:00')),
+      dlong: d => new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).format(new Date(d + 'T12:00')),
+      dshort: d => new Intl.DateTimeFormat('en-GB', { day: 'numeric' }).format(new Date(d + 'T12:00')),
+      n: v => String(v),
+      notes: [
+        ['Logging today', ['One field on My Day: type 7.5, 7,5 or 7:30, or tap 4 · 6 · 8 · Off. Enter saves.', 'Hours go from 0 to 24 in quarter hours. "Saved" is read aloud.', 'The strip shows the last 7 days: hours, Off, or Missing in amber. Tap a day to fix it.']],
+        ['The reminder', ['Opens once a day, the first time you open Momentum, if your last working day is empty.', 'Sunday asks about Thursday. Friday and Saturday are never asked about.', '“Add another day” and “Same for all” fill several days in one save. Later puts it off until tomorrow.']],
+        ['The report', ['Admins only. One row per member, Sunday to Thursday, totals against capacity.', 'Missing days stand out in amber with their word, not only colour.', 'Download gives a CSV that opens in Excel and Google Sheets, Arabic names included.']],
+      ],
+      hints: { myday: 'Try: type a number and press Enter · tap 8 or Off · tap a day in the strip · Log several days', remind: 'The first visit on Sunday: Thursday is empty. Try Add another day, then Same for all.', remind3: 'Back after a few days away: three lines, filled with Same for all.', error: 'One line is out of range: nothing is saved, the line says why, and every value stays.', report: 'The admin’s weekly report. Try the week arrows and Download.' },
+    },
+    ar: {
+      nav: ['يومي', 'اللوح', 'الجداول', 'المشاريع', 'الفريق', 'الطاقة', 'الساعات'], hi: 'صباح الخير يا سارة', sub: 'الأحد، 15 نوفمبر',
+      today: 'ساعات اليوم', h: 'س', save: 'حفظ', saved: 'تم الحفظ', off: 'إجازة', iwasoff: 'كنت في إجازة', missing: 'لم تُسجَّل',
+      week: (a, b) => `<b>${a}</b> من ${b} ساعة هذا الأسبوع`, several: 'تسجيل عدة أيام', last7: 'آخر 7 أيام',
+      remindT: d => `كم ساعة عملت يوم ${d}؟`, remindP: 'لم تسجّلها بعد. لن يستغرق ذلك سوى ثوانٍ.',
+      add: '＋ إضافة يوم آخر', moreMissing: n => `${n === 1 ? 'يوم آخر' : n === 2 ? 'يومان آخران' : n + ' أيام أخرى'} بلا تسجيل`, same: 'نفس القيمة للكل', later: 'لاحقًا', remove: 'إزالة',
+      bad: 'الساعات من 0 إلى 24.', notSaved: 'لم يُحفظ شيء. صحّح السطر المحدد ثم احفظ مجددًا.',
+      rep: 'الساعات', weekSpan: '8 – 12 نوفمبر', dl: 'تنزيل (.csv)', complete: (a, b) => `<b>${a} من ${b}</b> سجّلوا كل أيام العمل`,
+      cap: 'الساعات حسب العضو واليوم، أسبوع 8 نوفمبر. الأيام غير المسجّلة محددة.', member: 'العضو', total: 'المجموع', dayTotal: 'مجموع اليوم',
+      dname: d => new Intl.DateTimeFormat('ar-EG', { weekday: 'short' }).format(new Date(d + 'T12:00')),
+      dlong: d => new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(d + 'T12:00')),
+      dshort: d => new Intl.DateTimeFormat('ar-EG', { day: 'numeric' }).format(new Date(d + 'T12:00')),
+      n: v => new Intl.NumberFormat('ar-EG').format(v),
+      notes: [
+        ['تسجيل اليوم', ['حقل واحد في «يومي»: اكتب 7.5 أو 7:30، أو اختر 4 · 6 · 8 · إجازة. Enter يحفظ.', 'الساعات من 0 إلى 24 بأرباع الساعة. تُقرأ «تم الحفظ» بصوت عالٍ.', 'يعرض الشريط آخر 7 أيام. اضغط يومًا لتصحيحه.']],
+        ['التذكير', ['يظهر مرة واحدة يوميًا عند أول فتح لـ Momentum إذا كان آخر يوم عمل فارغًا.', 'يسأل الأحد عن الخميس. لا يُسأل عن الجمعة والسبت.', '«إضافة يوم آخر» و«نفس القيمة للكل» يملآن عدة أيام بحفظ واحد.']],
+        ['التقرير', ['للمشرفين فقط. صف لكل عضو، من الأحد إلى الخميس، مع المجموع مقابل الطاقة.', 'الأيام غير المسجّلة بارزة بلونها وبكلمتها.', 'التنزيل ملف CSV يفتح في Excel وGoogle Sheets مع الأسماء العربية.']],
+      ],
+      hints: {},
+    },
+  }
+  const S = { screen: 'myday', dev: 'desktop', lang: 'en',
+    entries: { '2026-11-09': 8, '2026-11-10': 7.5, '2026-11-11': 'off', '2026-11-13': null, '2026-11-14': null },
+    today: '', status: '', lines: [], err: null }
+  const frame = document.getElementById('frame')
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const isWork = d => { const g = new Date(d + 'T12:00').getDay(); return g <= 4 }
+  const parse = v => { const s = String(v).trim().replace(',', '.').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)); if (!s) return null; const m = s.match(/^(\d{1,2}):(\d{2})$/); const n = m ? +m[1] + +m[2] / 60 : Number(s); return Number.isFinite(n) && n >= 0 && n <= 24 ? n : NaN }
+  const t = () => T[S.lang]
+
+  function setScreen(s) {
+    S.screen = s; S.err = null; S.status = ''
+    if (s === 'remind') S.lines = [{ d: '2026-11-12', v: '', off: false, first: true }]
+    if (s === 'remind3') S.lines = [{ d: '2026-11-12', v: '8', off: false, first: true }, { d: '2026-11-11', v: '8', off: false }, { d: '2026-11-10', v: '8', off: false }]
+    if (s === 'error') S.lines = [{ d: '2026-11-12', v: '8', off: false, first: true }, { d: '2026-11-11', v: '30', off: false }]
+    if (s === 'error') S.err = '2026-11-11'
+    render()
+  }
+
+  function myDay() {
+    const L = t()
+    const weekTotal = DAYS.filter(d => d >= '2026-11-15').reduce((a, d) => a + (typeof S.entries[d] === 'number' ? S.entries[d] : 0), 0)
+    const todayVal = S.entries['2026-11-15']
+    const strip = DAYS.map(d => {
+      const v = S.entries[d], wk = !isWork(d)
+      const cls = d === '2026-11-15' ? 'today' : v === 'off' ? 'off' : typeof v === 'number' ? '' : wk ? 'wk' : 'miss'
+      const isToday = d === '2026-11-15'
+      const shown = v === 'off' ? L.off : typeof v === 'number' ? L.n(v) : wk || isToday ? '–' : L.missing
+      return `<button class="day ${cls}" data-day="${d}" aria-label="${esc(L.dlong(d))}: ${esc(shown)}"><small>${esc(L.dname(d))} ${esc(L.dshort(d))}</small><b>${esc(shown)}</b></button>`
+    }).join('')
+    return `
+      <div><p class="greet">${esc(L.hi)}</p><p class="sub">${esc(L.sub)}</p></div>
+      <section class="card" aria-labelledby="th">
+        <div class="card-top"><h2 id="th">${esc(L.today)}</h2><span class="date">${esc(L.sub)}</span><span class="week">${L.week(L.n(weekTotal), L.n(40))}</span></div>
+        <div class="entry">
+          <label class="field${S.err === 'today' ? ' bad' : ''}"><input id="today" inputmode="decimal" aria-label="${esc(L.today)}" value="${esc(S.today || (typeof todayVal === 'number' ? todayVal : ''))}" placeholder="0"><span>${esc(L.h)}</span></label>
+          <div class="quick">${[4, 6, 8].map(n => `<button class="chip" data-quick="${n}">${L.n(n)} ${esc(L.h)}</button>`).join('')}<button class="chip off" data-quick="off">${esc(L.off)}</button></div>
+          <button class="save" data-save-today>${esc(L.save)}</button>
+        </div>
+        <div class="status${S.err === 'today' ? ' err' : ''}" role="status">${esc(S.status)}</div>
+        <div><small class="ghost">${esc(L.last7)}</small></div>
+        <div class="strip">${strip}</div>
+        <div class="card-foot"><button class="link" data-several>${esc(L.several)}</button></div>
+      </section>
+      <div class="rest" aria-hidden="true"><div></div><div></div><div></div><div></div></div>`
+  }
+
+  function reminder() {
+    const L = t()
+    const first = S.lines[0]
+    const missingLeft = ['2026-11-11', '2026-11-10'].filter(d => !S.lines.some(l => l.d === d)).length
+    const lines = S.lines.map((l, i) => `
+      <div class="line" data-line="${l.d}">
+        <label for="l-${l.d}">${esc(L.dlong(l.d))}</label>
+        <span class="field${S.err === l.d ? ' bad' : ''}"><input id="l-${l.d}" inputmode="decimal" value="${esc(l.off ? '' : l.v)}" ${l.off ? 'disabled' : ''} aria-invalid="${S.err === l.d}" aria-describedby="${S.err === l.d ? 'e-' + l.d : ''}"><span>${esc(L.h)}</span></span>
+        <button class="tog" aria-pressed="${l.off}" data-off="${i}">${esc(L.off)}</button>
+        ${l.first ? '<span></span>' : `<button class="rm" data-rm="${i}" aria-label="${esc(L.remove)}">×</button>`}
+        ${S.err === l.d ? `<span class="lerr" id="e-${l.d}">${esc(L.bad)}</span>` : ''}
+      </div>`).join('')
+    return `<div class="scrim"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="rt">
+      <h2 id="rt">${esc(L.remindT(L.dlong(first.d)))}</h2>
+      <p>${esc(S.err ? L.notSaved : L.remindP)}</p>
+      <div class="lines">${lines}</div>
+      <div class="more">${missingLeft ? `<button class="link" data-add>${esc(L.add)}</button><span class="pill">${esc(L.moreMissing(missingLeft))}</span>` : ''}${S.lines.length > 1 ? `<button class="chip" data-same>${esc(L.same)}</button>` : ''}</div>
+      <div class="acts"><button class="later" data-later>${esc(L.later)}</button>${S.lines.length === 1 ? `<button class="chip off" data-iwasoff>${esc(L.iwasoff)}</button>` : ''}<button class="save" data-save-lines>${esc(L.save)}</button></div>
+    </div></div>`
+  }
+
+  function report() {
+    const L = t()
+    const week = ['2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12']
+    const rows = [
+      ['Sara Adel', 40, [8, 8, 7.5, 'off', 8]], ['Omar Hany', 40, [9, 8, null, 8, 7]], ['Layla Nabil', 30, [6, 6, 6, 6, 6]],
+      ['Rana Saeed', 40, [8, null, null, 8, 8]], ['Youssef Ali', 40, [8, 8, 8, 8, 8.5]],
+    ]
+    const num = v => typeof v === 'number' ? v : 0
+    const body = rows.map(([n, cap, v]) => {
+      const tot = v.reduce((a, x) => a + num(x), 0)
+      return `<tr><th scope="row">${esc(n)}</th>${v.map(x => x === null ? `<td class="miss">⚠ ${esc(L.missing)}</td>` : x === 'off' ? `<td class="off">${esc(L.off)}</td>` : `<td>${L.n(x)}</td>`).join('')}<td class="tot">${L.n(tot)} <small>/ ${L.n(cap)}</small></td></tr>`
+    }).join('')
+    const dayTot = week.map((_, i) => rows.reduce((a, r) => a + num(r[2][i]), 0))
+    const complete = rows.filter(r => !r[2].includes(null)).length
+    return `<section class="rep">
+      <div class="rep-head"><h2>${esc(L.rep)}</h2><span class="wk-nav"><button aria-label="Previous week">‹</button><span>${esc(L.weekSpan)}</span><button aria-label="Next week">›</button></span><button class="dl">${esc(L.dl)}</button></div>
+      <p class="sum">${L.complete(L.n(complete), L.n(rows.length))}</p>
+      <div class="tbl"><table><caption>${esc(L.cap)}</caption>
+        <thead><tr><th scope="col">${esc(L.member)}</th>${week.map(d => `<th scope="col">${esc(L.dname(d))} ${esc(L.dshort(d))}</th>`).join('')}<th scope="col">${esc(L.total)}</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><th scope="row">${esc(L.dayTotal)}</th>${dayTot.map(x => `<td>${L.n(x)}</td>`).join('')}<td>${L.n(dayTot.reduce((a, b) => a + b, 0))}</td></tr></tfoot>
+      </table></div></section>`
+  }
+
+  function render() {
+    const L = t()
+    frame.className = `frame${S.dev === 'phone' ? ' phone' : ''}`
+    frame.dir = S.lang === 'ar' ? 'rtl' : 'ltr'
+    frame.lang = S.lang
+    const navOn = S.screen === 'report' ? 6 : 0
+    const nav = L.nav.map((n, i) => `<span class="${i === navOn ? 'on' : ''}">${esc(n)}</span>`).join('')
+    const main = S.screen === 'report' ? report() : myDay()
+    const overlay = ['remind', 'remind3', 'error'].includes(S.screen) ? reminder() : ''
+    frame.innerHTML = `<aside class="side"><div class="word">momentum</div><nav class="nav">${nav}</nav></aside>
+      <main class="main">${main}</main>
+      <nav class="ph-nav">${L.nav.slice(0, 4).map((n, i) => `<span class="${i === navOn ? 'on' : ''}">${esc(n)}</span>`).join('')}<span>⋯</span></nav>${overlay}`
+    document.querySelectorAll('[data-screen]').forEach(b => b.setAttribute('aria-pressed', b.dataset.screen === S.screen))
+    document.querySelectorAll('[data-dev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.dev === S.dev))
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === S.lang))
+    document.getElementById('hint').textContent = T.en.hints[S.screen]
+    document.getElementById('notes').innerHTML = L.notes.map(([h, items]) => `<div class="note" dir="${S.lang === 'ar' ? 'rtl' : 'ltr'}"><h3>${esc(h)}</h3><ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')
+    const first = frame.querySelector('.dlg input:not([disabled])')
+    if (first) first.focus({ preventScroll: true })
+  }
+
+  function saveToday(raw) {
+    const L = t()
+    if (raw === 'off') { S.entries['2026-11-15'] = 'off'; S.today = ''; S.status = L.saved; S.err = null; return render() }
+    const v = parse(raw)
+    if (v === null) return
+    if (Number.isNaN(v) || Math.round(v * 4) !== v * 4) { S.err = 'today'; S.status = L.bad; S.today = raw; return render() }
+    S.entries['2026-11-15'] = v; S.today = ''; S.err = null; S.status = L.saved; render()
+  }
+  function readLines() { frame.querySelectorAll('.line').forEach((el, i) => { const inp = el.querySelector('input'); if (S.lines[i] && !S.lines[i].off) S.lines[i].v = inp.value }) }
+
+  document.querySelector('.ctl').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return
+    if (b.dataset.screen) setScreen(b.dataset.screen)
+    if (b.dataset.dev) { S.dev = b.dataset.dev; render() }
+    if (b.dataset.lang) { S.lang = b.dataset.lang; S.status = ''; render() }
+  })
+  frame.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'today') { e.preventDefault(); saveToday(e.target.value) }
+    if (e.key === 'Escape' && frame.querySelector('.dlg')) { S.screen = 'myday'; render() }
+  })
+  frame.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return
+    const L = t()
+    if (b.dataset.quick) saveToday(b.dataset.quick === 'off' ? 'off' : b.dataset.quick)
+    else if (b.hasAttribute('data-save-today')) saveToday(frame.querySelector('#today').value)
+    else if (b.dataset.day) { S.screen = 'remind'; S.lines = [{ d: b.dataset.day, v: typeof S.entries[b.dataset.day] === 'number' ? String(S.entries[b.dataset.day]) : '', off: S.entries[b.dataset.day] === 'off', first: true }]; S.err = null; render() }
+    else if (b.hasAttribute('data-several')) { S.screen = 'remind3'; S.lines = [{ d: '2026-11-12', v: '', off: false, first: true }, { d: '2026-11-11', v: '', off: false }]; S.err = null; render() }
+    else if (b.hasAttribute('data-add')) { readLines(); const next = ['2026-11-11', '2026-11-10'].find(d => !S.lines.some(l => l.d === d)); if (next) S.lines.push({ d: next, v: '', off: false }); render() }
+    else if (b.hasAttribute('data-same')) { readLines(); const src = S.lines.find(l => !l.off && l.v); if (src) S.lines.forEach(l => { if (!l.off && !l.v) l.v = src.v }); render() }
+    else if (b.dataset.off) { readLines(); const l = S.lines[+b.dataset.off]; l.off = !l.off; render() }
+    else if (b.dataset.rm) { readLines(); S.lines.splice(+b.dataset.rm, 1); render() }
+    else if (b.hasAttribute('data-later')) { S.screen = 'myday'; render() }
+    else if (b.hasAttribute('data-iwasoff')) { S.entries[S.lines[0].d] = 'off'; S.screen = 'myday'; S.status = L.saved; render() }
+    else if (b.hasAttribute('data-save-lines')) {
+      readLines()
+      const bad = S.lines.find(l => !l.off && (Number.isNaN(parse(l.v)) || parse(l.v) === null))
+      if (bad) { S.err = bad.d; S.screen = 'error'; return render() }
+      S.lines.forEach(l => { S.entries[l.d] = l.off ? 'off' : parse(l.v) })
+      S.err = null; S.screen = 'myday'; S.status = L.saved; render()
+    }
+  })
+  setScreen('myday')
+})()
+</script>

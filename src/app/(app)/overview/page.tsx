@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { MyBoard } from '@/components/myboard/MyBoard'
+import { TodayHoursApp } from '@/components/hours/pages'
+import { hoursStatus } from '@/actions/hours'
 import type { PanelTask } from '@/components/myboard/BoardTaskPanel'
 import type { BreachRow } from '@/components/myboard/SlaBreachedPanel'
 import { typeEmoji, weekStart, weekSpan, COLUMN_ROWS } from '@/lib/myboard'
@@ -163,8 +165,13 @@ export default async function OverviewPage({
       breachedByDays: r.stageDays - r.slaDays,
     }))
 
+  // Spec 014: the server's day first; the card checks the device's on load.
+  const hoursRes = teamView ? null : await hoursStatus(new Date().toISOString().slice(0, 10))
+  const hoursInitial = hoursRes && hoursRes.success ? hoursRes : null
+
   return (
     <MyBoard
+      hours={teamView ? undefined : <TodayHoursApp initial={hoursInitial} />}
       firstName={member.name.split(' ')[0]}
       canSeeTeam={canSeeTeam}
       teamView={teamView}

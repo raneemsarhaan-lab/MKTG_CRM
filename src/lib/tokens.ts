@@ -312,3 +312,19 @@ export const NOTIFY_UI = {
   },
 } as const
 
+
+/**
+ * Daily working hours (spec 014, design/hours.html). Existing colours only:
+ * Missing uses the app's warning amber, Off a neutral grey. Mirrored as the
+ * `--hr-*` variables in globals.css.
+ */
+export const HOURS_UI = {
+  missInk:  '#9A5B02',
+  missFill: '#FFF3E0',
+  offInk:   '#4B5563',
+  offFill:  '#EEF0F3',
+  today:    '#7C3AED',
+  focus:    '#F0EBFE',
+  bad:      '#C81E3A',
+  ok:       '#15803D',
+} as const
