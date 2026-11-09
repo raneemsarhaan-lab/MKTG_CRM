@@ -152,7 +152,12 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
         onClick={() => (open ? close() : setOpen(true))}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={isHeader ? th('account', { name: member.name, role: roleLabel }) : 'Account menu'}
+        // The name starts with what the row shows (name, then role), so a voice
+        // user can say what they see (WCAG 2.5.3, axe label-content-name-mismatch).
+        // The header's avatar shows no text, so it carries just name and role.
+        aria-label={isHeader
+          ? th('account', { name: member.name, role: roleLabel })
+          : th('accountMenu', { name: member.name, role: roleLabel })}
         title={isHeader ? `${member.name} · ${roleLabel}` : undefined}
         data-account={isHeader ? '' : undefined}
         className={isHeader ? 'fx-hd-avatar' : undefined}
@@ -166,7 +171,8 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
           fontFamily: 'inherit', textAlign: 'start',
         }}
       >
-        <span aria-hidden={isHeader ? true : undefined} style={{
+        {/* Decorative: the button's name carries who this is. */}
+        <span aria-hidden="true" style={{
           width: isRail ? 40 : 40, height: isRail ? 40 : 40, borderRadius: '50%',
           flexShrink: 0, overflow: 'hidden', boxSizing: 'border-box',
           border: isHeader ? '2.5px solid #A855F7' : isRail ? '2px solid #34383B' : '2px solid #E9D5FF',
@@ -178,9 +184,10 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
             src={member.avatar_url}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            // In the header the initials are drawn by CSS (data-initials), so
-            // the button's name is just the member's name and role (label in name).
-            fallback={isHeader ? <i className="fx-hd-initials" data-initials={initials(member.name)} /> : <>{initials(member.name)}</>}
+            // Initials are drawn by CSS (data-initials), not as text: axe counts
+            // text in aria-hidden nodes as visible, and "R" + "Raneem" would no
+            // longer match the button's name (label in name, WCAG 2.5.3).
+            fallback={<i className="fx-hd-initials" data-initials={initials(member.name)} />}
           />
         </span>
 
@@ -193,8 +200,11 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
               }}>
                 {member.name}
               </span>
-              <span style={{ display: 'block', fontWeight: 500, fontSize: 11.5, color: PIPE.textFaint }}>
-                {member.access === 'admin' ? 'Admin' : member.role}
+              {/* A real space, so the row's text reads "Raneem Admin", not "RaneemAdmin". */}
+              {' '}
+              {/* textSecondary, not textFaint: 4.5:1 on white and on the open row's #F4F4F2. */}
+              <span style={{ display: 'block', fontWeight: 500, fontSize: 11.5, color: PIPE.textSecondary }}>
+                {roleLabel}
               </span>
             </span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PIPE.textFaint}

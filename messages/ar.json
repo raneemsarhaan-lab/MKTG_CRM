@@ -874,6 +874,7 @@
     "noProject": "{n, plural, one {مهمة واحدة بلا مشروع} two {مهمتان بلا مشروع} few {# مهام بلا مشروع} many {# مهمة بلا مشروع} other {# مهمة بلا مشروع}}",
     "allAttached": "كل المهام لها مشروع",
     "account": "{name}، {role}",
+    "accountMenu": "{name}، {role}، قائمة الحساب",
     "showing": "يظهر {shown} من {total} مهمة"
   },
   "notifications": {

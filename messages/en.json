@@ -874,6 +874,7 @@
     "noProject": "{n, plural, one {# no project assigned} other {# no project assigned}}",
     "allAttached": "Every task has a project",
     "account": "{name}, {role}",
+    "accountMenu": "{name}, {role}, account menu",
     "showing": "Showing {shown} of {total} tasks"
   },
   "notifications": {
