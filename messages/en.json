@@ -6,7 +6,8 @@
     "settings": "Settings",
     "toggleLanguage": "Switch to Arabic",
     "projects": "Projects",
-    "team": "Team"
+    "team": "Team",
+    "sheets": "Sheets"
   },
   "greeting": {
     "morning": "Good morning",
@@ -1026,5 +1027,187 @@
     "replyingTo": "Replying to {name}",
     "cancel": "Cancel",
     "back": "Back to the board"
+  },
+  "sheets": {
+    "nav": "Sheets",
+    "pinned": "Pinned folders",
+    "new": "New",
+    "home": {
+      "title": "Sheets",
+      "linked": "Linked to the board",
+      "team": "Team folders",
+      "newFolder": "New folder",
+      "folderName": "Folder name",
+      "create": "Create",
+      "cancel": "Cancel",
+      "sheets": "{n, plural, one {# sheet} other {# sheets}}",
+      "edited": "Edited {time} by {name}",
+      "editedNoName": "Edited {time}",
+      "linkedBadge": "Linked",
+      "empty": "No team folders yet. Make one for anything that isn't on the board."
+    },
+    "folder": {
+      "content": "Content",
+      "video": "Video",
+      "menu": "Folder actions",
+      "pin": "Pin to sidebar",
+      "unpin": "Unpin",
+      "rename": "Rename",
+      "delete": "Delete folder",
+      "deleted": "“{name}” deleted",
+      "undo": "Undo",
+      "deleteNote": "Deletes {n, plural, one {its # sheet} other {its # sheets}} for everyone. You can undo for 10 seconds.",
+      "linkedNoRename": "Content and Video are linked to the board and keep their names.",
+      "linkedNoDelete": "Content and Video can't be deleted."
+    },
+    "sheet": {
+      "content": "Content library",
+      "video": "Clips",
+      "defaultName": "Sheet {n}",
+      "copyName": "{name} ({n})",
+      "linkedTitle": "Linked to the board",
+      "protected": "Protected"
+    },
+    "crumb": "Sheets",
+    "status": {
+      "saving": "Saving…",
+      "saved": "Saved",
+      "retrying": "Not saved, retrying ({n})",
+      "offline": "You're offline. Your edits stay here and save when the connection is back.",
+      "leave": "Some changes aren't saved yet. Leave anyway?"
+    },
+    "toolbar": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "undoKey": "Undo (Ctrl+Z)",
+      "redoKey": "Redo (Ctrl+Shift+Z)",
+      "selected": "{n, plural, one {# cell selected} other {# cells selected}}",
+      "blankHint": "Click a cell and type",
+      "linkedHint": "Rows are tasks on the board"
+    },
+    "grid": {
+      "label": "{name}, {rows} rows, {cols} columns",
+      "active": "{cell}",
+      "activeRange": "{cell}, {n} cells selected",
+      "pasteHint": "Your browser doesn't allow pasting from a menu. Use Ctrl+V (⌘V on a Mac).",
+      "skipped": "{n, plural, one {# cell wasn't changed} other {# cells weren't changed}}: {reasons}",
+      "reason": {
+        "not_authorized": "{n, plural, one {you can't edit # task} other {you can't edit # tasks}}",
+        "archived": "{n, plural, one {# is archived} other {# are archived}}",
+        "no_match": "{n, plural, one {# value didn't match} other {# values didn't match}}",
+        "read_only": "{n, plural, one {# cell is read-only} other {# cells are read-only}}",
+        "protected": "the sheet is protected",
+        "gone": "{n, plural, one {# row or column was removed} other {# rows or columns were removed}}",
+        "invalid": "{n, plural, one {# value isn't valid} other {# values aren't valid}}"
+      }
+    },
+    "menu": {
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "clear": "Clear",
+      "insertRowAbove": "Insert row above",
+      "insertRowBelow": "Insert row below",
+      "insertColLeft": "Insert column left",
+      "insertColRight": "Insert column right",
+      "deleteRow": "{n, plural, one {Delete row} other {Delete # rows}}",
+      "deleteCol": "{n, plural, one {Delete column} other {Delete # columns}}",
+      "resizeRow": "Resize row…",
+      "resizeCol": "Resize column…",
+      "selectRange": "Select range",
+      "pipelineCol": "Pipeline columns can't be deleted.",
+      "deleteRowsTitle": "{n, plural, one {Drop this row?} other {Drop # rows?}}",
+      "deleteRowsNote": "Dropped tasks leave the board and can be brought back with Show dropped or Undo.",
+      "drop": "Drop"
+    },
+    "tabs": {
+      "label": "Sheets in {folder}",
+      "new": "New sheet (Shift+F11)",
+      "all": "All sheets",
+      "scrollStart": "Scroll tabs back",
+      "scrollEnd": "Scroll tabs forward",
+      "rename": "Sheet name"
+    },
+    "tabMenu": {
+      "label": "Sheet actions",
+      "insert": "Insert",
+      "delete": "Delete",
+      "rename": "Rename",
+      "moveCopy": "Move or Copy…",
+      "protect": "Protect Sheet…",
+      "unprotect": "Unprotect Sheet",
+      "color": "Tab Color",
+      "noColor": "No Color",
+      "hide": "Hide",
+      "unhide": "Unhide…",
+      "selectAll": "Select All Sheets",
+      "colors": {
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "green": "Green",
+        "teal": "Teal",
+        "blue": "Blue",
+        "purple": "Purple",
+        "pink": "Pink",
+        "gray": "Gray",
+        "black": "Black"
+      },
+      "why": {
+        "linked": "The linked sheet can't be deleted, renamed, hidden or protected.",
+        "lastVisible": "A folder keeps one visible sheet.",
+        "noHidden": "No hidden sheets.",
+        "notProtector": "Only the person who protected it, or an admin, can unprotect it."
+      }
+    },
+    "moveCopy": {
+      "title": "Move or Copy",
+      "toFolder": "Move selected sheets to folder:",
+      "before": "Before sheet:",
+      "toEnd": "(move to end)",
+      "copy": "Create a copy",
+      "linkedNote": "The linked sheet can only be copied, as a blank sheet with its text.",
+      "ok": "OK",
+      "cancel": "Cancel"
+    },
+    "unhide": {
+      "title": "Unhide",
+      "prompt": "Unhide sheet:",
+      "ok": "OK",
+      "cancel": "Cancel"
+    },
+    "deleteSheet": {
+      "title": "{n, plural, one {Delete “{name}”?} other {Delete # sheets?}}",
+      "body": "Everything in it is deleted for everyone. This can't be undone.",
+      "ok": "Delete",
+      "cancel": "Cancel"
+    },
+    "protect": {
+      "title": "Protect “{name}”?",
+      "body": "Only you and admins will be able to change its cells, rows, columns and sizes. Everyone can still open and copy it.",
+      "ok": "Protect",
+      "cancel": "Cancel",
+      "blocked": "This sheet is protected. Ask {name} or an admin to unprotect it."
+    },
+    "gone": {
+      "title": "This sheet was deleted",
+      "body": "Someone deleted it while you had it open. Copy what you see into a new sheet?",
+      "copy": "Copy to a new sheet",
+      "close": "Close"
+    },
+    "err": {
+      "name_empty": "Give it a name.",
+      "name_taken": "That name is already used in this folder.",
+      "name_chars": "Names can't contain \\ / ? * [ ] or :",
+      "name_long": "Names can be up to {max} characters.",
+      "linked": "The linked sheet can't be changed that way.",
+      "last_visible": "A folder keeps one visible sheet.",
+      "protected": "This sheet is protected.",
+      "too_many_rows": "A sheet can have up to 5,000 rows.",
+      "too_many_cols": "A sheet can have up to 200 columns.",
+      "too_long": "A cell can hold up to 50,000 characters.",
+      "gone": "That sheet or folder no longer exists.",
+      "generic": "That didn't work. Try again."
+    }
   }
 }

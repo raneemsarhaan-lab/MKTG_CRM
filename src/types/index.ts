@@ -357,3 +357,65 @@ export interface AppNotification {
   lastEventAt: string
 }
 
+
+// ─── Spec 013: Sheets (specs/013-spreadsheet-editing/data-model.md) ─────────
+
+/** A folder in the Sheets section. */
+export type SheetFolderKind = 'content' | 'video' | 'team'
+/** A tab in a folder: one of the two linked sheets, or a blank sheet. */
+export type SheetKind = 'linked_content' | 'linked_video' | 'blank'
+/** Excel-style tab colours (FR-059a), stored as keys, drawn from SHEETS_UI.tabs. */
+export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray', 'black'] as const
+export type TabColor = typeof TAB_COLORS[number]
+
+export interface FolderSummary {
+  id: string
+  kind: SheetFolderKind
+  /** Null for linked folders: the name comes from the translations. */
+  name: string | null
+  sheetCount: number
+  updatedAt: string
+  updatedBy: string | null
+}
+
+export interface SheetSummary {
+  id: string
+  folderId: string
+  kind: SheetKind
+  /** Null for linked sheets: the name comes from the translations. */
+  name: string | null
+  position: number
+  color: TabColor | null
+  hidden: boolean
+  protectedBy: string | null
+  rowCount: number
+  colCount: number
+}
+
+/** A blank sheet as the client holds it (data-model §4). */
+export interface SheetDoc {
+  id: string
+  updatedAt: string
+  rows: { id: string; position: number; height: number | null }[]
+  cols: { id: string; position: number; width: number | null }[]
+  /** Filled cells only: rowId → colId → text. */
+  cells: Record<string, Record<string, string>>
+}
+
+/** One saved batch of changes to a blank sheet (contracts/server.md). */
+export interface SheetChanges {
+  cells?: { rowId: string; colId: string; value: string }[]
+  insertRows?: { id: string; position: number; height?: number | null }[]
+  deleteRows?: string[]
+  insertCols?: { id: string; position: number; width?: number | null }[]
+  deleteCols?: string[]
+  rowHeights?: { id: string; height: number | null }[]
+  colWidths?: { id: string; width: number | null }[]
+}
+
+/** A linked-sheet cell write (contracts/server.md `writeTaskCells`). */
+export type TaskCellField =
+  | 'title' | 'status' | 'assignee' | 'owner' | 'due_date' | 'priority' | 'content_type'
+  | 'clip.in' | 'clip.out' | 'clip.file' | 'clip.source'
+  | `col:${string}`
+export interface TaskCellEntry { taskId: string; field: TaskCellField; value: string }

@@ -84,6 +84,23 @@
   --inbox-shadow:       0 18px 50px rgba(20, 19, 60, 0.20);
   --inbox-btn-shadow:   0 8px 20px rgba(124, 58, 237, 0.32);
   /* Notifications (spec 012): NOTIFY_UI in src/lib/tokens.ts. */
+  /* Sheets (spec 013): selection, tab bar, Excel tab colours. Mirrors SHEETS_UI. */
+  --sh-sel:             rgba(124, 58, 237, 0.10);
+  --sh-edge:            #7C3AED;
+  --sh-head-sel:        #E9E2FD;
+  --sh-tab-active:      #7C3AED;
+  --sh-tab-grouped:     #F0EBFE;
+  --sh-resize:          #7C3AED;
+  --sh-red:             #E5484D;
+  --sh-orange:          #F59E0B;
+  --sh-yellow:          #EAB308;
+  --sh-green:           #16A34A;
+  --sh-teal:            #0E7C7C;
+  --sh-blue:            #2563EB;
+  --sh-purple:          #7C3AED;
+  --sh-pink:            #DB2777;
+  --sh-gray:            #6B7280;
+  --sh-black:           #14131A;
   --nt-red:             #E5484D;
   --nt-tint:            #F4F0FF;
   --nt-tint-hover:      #ECE5FF;

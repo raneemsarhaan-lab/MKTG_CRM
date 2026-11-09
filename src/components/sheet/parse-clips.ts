@@ -10,6 +10,7 @@
  */
 import { parseClipFileName, fileNameKey, FILE_RE } from '@/lib/clip-file-name'
 import { headingKey, isCustomKey, type PasteTarget } from '@/lib/sheet-columns'
+import { parseHtmlTable, parseTsv } from '@/lib/sheet-clipboard'
 
 export interface PastedCell { text: string; href: string | null }
 
@@ -50,22 +51,19 @@ export interface PastePreview {
 const URL_RE = /^https?:\/\/\S+$/i
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-/** text/html from Google Sheets (or any table): rows of cells, each with its first link. */
+/**
+ * text/html from Google Sheets (or any table): rows of cells, each with its
+ * first link. Read by the sheets' clipboard (spec 013 R4); here each cell's
+ * spaces and line breaks are collapsed, as a clip or plan row wants.
+ */
 export function cellsFromHtml(html: string, parser: { parseFromString(s: string, type: 'text/html'): Document }): PastedCell[][] {
-  const doc = parser.parseFromString(html, 'text/html')
-  doc.querySelectorAll('style, script').forEach(n => n.remove())
-  return Array.from(doc.querySelectorAll('tr')).map(tr =>
-    Array.from(tr.querySelectorAll('td, th')).map(td => {
-      const a = td.querySelector('a[href]') as HTMLAnchorElement | null
-      const href = a?.getAttribute('href') ?? null
-      return { text: clean(td.textContent ?? ''), href: href && /^https?:/i.test(href) ? href : null }
-    }))
+  return parseHtmlTable(html, parser).map(r => r.map(c => ({ text: clean(c.text), href: c.href })))
 }
 
-/** text/plain: rows on new lines, cells on tabs. A cell that is a bare link is that row's link. */
+/** text/plain: rows on new lines, cells on tabs, with Excel's quoting. A cell that is a bare link is that row's link. */
 export function cellsFromText(text: string): PastedCell[][] {
-  return text.split(/\r?\n/).map(line => line.split('\t').map(c => {
-    const t = clean(c)
+  return parseTsv(text).map(r => r.map(c => {
+    const t = clean(c.text)
     return { text: t, href: URL_RE.test(t) ? t : null }
   }))
 }

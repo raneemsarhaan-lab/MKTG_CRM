@@ -52,6 +52,15 @@ model Member {
   sheet_columns_created SheetColumn[]         @relation("SheetColumnCreator")
   sheet_columns_updated SheetColumn[]         @relation("SheetColumnUpdater")
   sheet_values_updated  SheetValue[]
+  /// Spec 013 R10: pinned Sheets folders, in order. Read only when sheet_pins_set; before that, the default (Content, then Video).
+  sheet_pins            String[]              @db.Uuid
+  sheet_pins_set        Boolean               @default(false)
+  sheet_folders_created SheetFolder[]         @relation("SheetFolderCreator")
+  sheet_folders_updated SheetFolder[]         @relation("SheetFolderUpdater")
+  sheets_created        Sheet[]               @relation("SheetCreator")
+  sheets_updated        Sheet[]               @relation("SheetUpdater")
+  sheets_protected      Sheet[]               @relation("SheetProtector")
+  sheet_cells_updated   SheetCell[]
   notifications         Notification[]
   task_follows          TaskFollower[]
   notification_settings NotificationSetting[]
@@ -298,28 +307,30 @@ model Task {
   /// The social post's link (LinkedIn), beside published_url (spec 009).
   post_url             String?   @db.Text
 
-  pillar        ContentPillar?   @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
-  parent        Task?            @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
-  subtasks      Task[]           @relation("Subtasks")
-  brand         Brand?           @relation(fields: [brand_id], references: [id])
-  project       Project?         @relation(fields: [project_id], references: [id], onDelete: SetNull)
-  task_owner    Member           @relation("TaskOwner", fields: [task_owner_id], references: [id])
-  assignee      Member?          @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
-  creator       Member?          @relation("TaskCreator", fields: [created_by], references: [id])
-  stage         Stage            @relation(fields: [status], references: [id])
-  content_type  ContentType?     @relation("TaskContentType", fields: [content_type_label], references: [label])
-  comments      TaskComment[]
-  attachments   TaskAttachment[]
-  project_step  ProjectStep?
+  pillar             ContentPillar?    @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
+  parent             Task?             @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks           Task[]            @relation("Subtasks")
+  brand              Brand?            @relation(fields: [brand_id], references: [id])
+  project            Project?          @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  task_owner         Member            @relation("TaskOwner", fields: [task_owner_id], references: [id])
+  assignee           Member?           @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  creator            Member?           @relation("TaskCreator", fields: [created_by], references: [id])
+  stage              Stage             @relation(fields: [status], references: [id])
+  content_type       ContentType?      @relation("TaskContentType", fields: [content_type_label], references: [label])
+  comments           TaskComment[]
+  attachments        TaskAttachment[]
+  project_step       ProjectStep?
   /// The clip details, when this task is a clip of a video (spec 008).
-  clip          TaskClip?        @relation("ClipDetails")
+  clip               TaskClip?         @relation("ClipDetails")
   /// On a video: the details of its clips, for the one-file-name-per-video rule.
-  video_clips   TaskClip[]       @relation("VideoClips")
-  snoozes       TaskSnooze[]
-  sheet_values  SheetValue[]
-  notifications Notification[]
-  followers     TaskFollower[]
-  due_reminders DueReminder[]
+  video_clips        TaskClip[]        @relation("VideoClips")
+  snoozes            TaskSnooze[]
+  sheet_values       SheetValue[]
+  /// Spec 013: row heights on the linked sheets.
+  linked_row_heights LinkedRowHeight[]
+  notifications      Notification[]
+  followers          TaskFollower[]
+  due_reminders      DueReminder[]
 
   @@map("tasks")
 }
@@ -731,4 +742,125 @@ model EmailDigest {
 
   @@id([member_id, day])
   @@map("email_digests")
+}
+
+// ─── Spec 013: Sheets (specs/013-spreadsheet-editing/data-model.md) ─────────
+
+/// A folder in the Sheets section: the linked Content or Video folder, or a
+/// team folder of blank sheets. Opened as one workbook.
+model SheetFolder {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// 'content' · 'video' · 'team'
+  kind       String
+  /// 'content' or 'video' for the two linked folders, null for team folders: one of each (R11).
+  linked_key String?  @unique
+  /// Team folders only; linked folders take their name from the translations.
+  name       String?
+  created_by String?  @db.Uuid
+  updated_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  creator Member? @relation("SheetFolderCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater Member? @relation("SheetFolderUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  sheets  Sheet[]
+
+  @@map("sheet_folders")
+}
+
+/// One tab in a folder: the linked Content or Video sheet, or a blank sheet.
+model Sheet {
+  id           String   @id @default(uuid()) @db.Uuid
+  folder_id    String   @db.Uuid
+  /// 'linked_content' · 'linked_video' · 'blank'
+  kind         String
+  /// 'linked_content' or 'linked_video' for the two linked sheets, null for blank ones.
+  linked_key   String?  @unique
+  /// Blank only: unique in the folder; linked sheets take their name from the translations.
+  name         String?
+  position     Int      @default(0)
+  /// A palette key (red, orange, yellow, green, teal, blue, purple, pink, gray, black); null = no colour.
+  tab_color    String?
+  hidden       Boolean  @default(false)
+  /// Set = protected: only this member and admins may edit.
+  protected_by String?  @db.Uuid
+  row_count    Int      @default(0)
+  col_count    Int      @default(0)
+  created_by   String?  @db.Uuid
+  updated_by   String?  @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  folder    SheetFolder @relation(fields: [folder_id], references: [id], onDelete: Cascade)
+  creator   Member?     @relation("SheetCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater   Member?     @relation("SheetUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  protector Member?     @relation("SheetProtector", fields: [protected_by], references: [id], onDelete: SetNull)
+  rows      SheetRow[]
+  cols      SheetCol[]
+  cells     SheetCell[]
+
+  @@index([folder_id, position])
+  @@map("sheets")
+}
+
+/// A blank sheet's row: a stable id and a sortable position (R3).
+model SheetRow {
+  id       String @id @db.Uuid
+  sheet_id String @db.Uuid
+  position Float
+  /// 21–400 px; null = the default.
+  height   Int?
+
+  sheet Sheet       @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  cells SheetCell[]
+
+  @@index([sheet_id, position])
+  @@map("sheet_rows")
+}
+
+/// A blank sheet's column: a stable id and a sortable position (R3).
+model SheetCol {
+  id       String @id @db.Uuid
+  sheet_id String @db.Uuid
+  position Float
+  /// 40–600 px; null = the default.
+  width    Int?
+
+  sheet Sheet       @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  cells SheetCell[]
+
+  @@index([sheet_id, position])
+  @@map("sheet_cols")
+}
+
+/// One filled cell of a blank sheet. Empty cells aren't stored.
+model SheetCell {
+  sheet_id   String   @db.Uuid
+  row_id     String   @db.Uuid
+  col_id     String   @db.Uuid
+  value      String   @db.Text
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  sheet   Sheet    @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  row     SheetRow @relation(fields: [row_id], references: [id], onDelete: Cascade)
+  col     SheetCol @relation(fields: [col_id], references: [id], onDelete: Cascade)
+  updater Member?  @relation(fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@id([row_id, col_id])
+  @@index([sheet_id])
+  @@map("sheet_cells")
+}
+
+/// A row height on a linked sheet, shared by the team (FR-045).
+model LinkedRowHeight {
+  /// 'linked_content' · 'linked_video'
+  sheet_kind String
+  task_id    String @db.Uuid
+  height     Int
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@id([sheet_kind, task_id])
+  @@map("linked_row_heights")
 }
