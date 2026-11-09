@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — 3 open: how far back the pop-up asks, the working days, who sees the report
+- [x] No [NEEDS CLARIFICATION] markers remain (resolved 2026-11-09: last working day only; Sunday–Thursday; admins only)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
+- All items pass. Ready for `/speckit-plan` (or `/speckit-clarify` for more detail).

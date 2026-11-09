@@ -17,6 +17,14 @@ This feature adds one number a day: the hours a member worked. It has to stay sm
 - reachable from where they already start their day (My Day);
 - a reminder that comes to them when they forget, instead of a page they have to remember to visit.
 
+## Clarifications
+
+### Session 2026-11-09
+
+- Q: How far back should the pop-up ask? → A: Only the last working day. Older gaps show as "Missing" on My Day, where they can be filled in.
+- Q: Which days are working days? → A: Sunday to Thursday, for everyone. Friday and Saturday are never asked about or expected.
+- Q: Who can see other people's hours? → A: Admins only. Every member sees their own hours.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Log today's hours in a few seconds (Priority: P1)
@@ -51,8 +59,8 @@ A member forgot to log yesterday. The first time they open Momentum today, a sma
 2. **Given** the window, **When** they enter hours and save, **Then** the day is logged and the window closes for good.
 3. **Given** the window, **When** they choose "I was off that day", **Then** the day is recorded as a day off and they aren't asked about it again.
 4. **Given** the window, **When** they choose "Later" or press Esc, **Then** it closes. My Day keeps showing the missing day, and the window opens again the next time they open the app on a later day.
-5. **Given** more than one working day is missing (e.g. back from three days away), **When** the window opens, **Then** it lists each missing day, up to [NEEDS CLARIFICATION: how far back should the pop-up ask? only the last working day, or every missing day in the last week?], in one window, each with its own field and "Off".
-6. **Given** yesterday wasn't a working day ([NEEDS CLARIFICATION: which days are working days: Sunday–Thursday, Monday–Friday, or chosen per member?]), **When** the member opens the app, **Then** they're asked about the last working day, not about the weekend.
+5. **Given** more than one working day is missing (e.g. back from three days away), **When** the window opens, **Then** it asks only about the last working day. The older missing days show as "Missing" on My Day, where they can be filled in.
+6. **Given** it's Sunday and Thursday has no entry, **When** the member opens the app, **Then** they're asked about Thursday. Working days are Sunday to Thursday, so Friday and Saturday are never asked about.
 7. **Given** a phone, **When** the window opens, **Then** it fills the bottom of the screen, its targets are at least 44 px, and the number keyboard opens.
 
 ---
@@ -83,10 +91,10 @@ A manager opens a report of worked hours: one row per member, one column per day
 
 **Acceptance Scenarios**:
 
-1. **Given** logged days, **When** someone allowed to see the report opens it ([NEEDS CLARIFICATION: who can see other people's hours: admins only, admins and team leads, or everyone?]), **Then** they see each member's hours by day for this week, and the totals.
+1. **Given** logged days, **When** an admin opens the report, **Then** they see each member's hours by day for this week, and the totals.
 2. **Given** the report, **When** they go to the previous or next week, **Then** the figures change to that week.
 3. **Given** the report, **When** they download it, **Then** they get a spreadsheet file with the same rows, columns and totals.
-4. **Given** a member who isn't allowed to see the report, **When** they look for it, **Then** they can't reach it, and they only ever see their own hours.
+4. **Given** a member who isn't an admin (including superusers), **When** they look for the report, **Then** it isn't in their navigation, opening its address directly is refused, and they only ever see their own hours.
 
 ---
 
@@ -117,12 +125,12 @@ A manager opens a report of worked hours: one row per member, one column per day
 
 **Reminder pop-up**
 
-- **FR-010**: The first time a member opens the app on a day, if their most recent working day before today has no entry, the app MUST open the reminder window.
-- **FR-011**: The window MUST name each day it asks about by weekday and date, in the member's language. It MUST offer a hours field and "I was off" for each day, plus "Later".
-- **FR-012**: Answering every listed day MUST close the window. "Later", Esc or closing it MUST dismiss it until the next day the member opens the app. The missing days MUST stay visible on My Day.
+- **FR-010**: The first time a member opens the app on a day, if their most recent working day before today has no entry, the app MUST open the reminder window. It asks about that one day only; older missing days are left to My Day.
+- **FR-011**: The window MUST name the day by weekday and date, in the member's language. It MUST offer an hours field, "I was off" and "Later".
+- **FR-012**: Answering MUST close the window. "Later", Esc or closing it MUST dismiss it until the next day the member opens the app. The missing days MUST stay visible on My Day.
 - **FR-013**: The window MUST NOT open over another open dialog or an unsaved form. It MUST wait until that closes.
 - **FR-014**: The window MUST put focus in its first field when it opens, keep focus inside while it is open, and return focus to where it was when it closes.
-- **FR-015**: Days before the member's account was created, and non-working days, MUST NOT be asked about.
+- **FR-015**: Working days are Sunday to Thursday for everyone. Friday, Saturday and days before the member's account was created MUST NOT be asked about, and MUST NOT count as Missing.
 
 **My recent days**
 
@@ -132,11 +140,11 @@ A manager opens a report of worked hours: one row per member, one column per day
 
 **Report**
 
-- **FR-030**: People allowed to see the report MUST see, for a chosen week, one row per active member and one column per day, with each cell showing hours, Off or Missing, plus a total per member and per day.
+- **FR-030**: Admins MUST see, for a chosen week, one row per active member and one column per day, with each cell showing hours, Off or Missing, plus a total per member and per day.
 - **FR-031**: Each member's total MUST be shown against their weekly capacity.
 - **FR-032**: Missing days MUST stand out, and the report MUST show how many members logged every working day of the week.
 - **FR-033**: The report MUST move by week, and MUST be downloadable as a spreadsheet file with the same content.
-- **FR-034**: Members MUST only ever see their own hours, unless they are allowed to see the report.
+- **FR-034**: Only admins MAY see other members' hours. Everyone else, superusers included, MUST only ever see their own. The server MUST enforce this, not just the screen.
 
 **Access and language**
 
@@ -147,7 +155,7 @@ A manager opens a report of worked hours: one row per member, one column per day
 ### Key Entities
 
 - **Day entry**: one member's record for one calendar day. It holds the member, the date, and either the hours worked or "off". It also records who last changed it and when.
-- **Working week**: which days of the week count as working days. Used to decide which missing days to ask about, and which days the report expects.
+- **Working week**: Sunday to Thursday, the same for everyone. It decides which day the reminder asks about, which days show as Missing, and which days the report expects.
 - **Reminder state**: per member, the last day the reminder window was shown or dismissed, so that "Later" waits for the next day.
 
 ## Success Criteria *(mandatory)*
@@ -169,4 +177,6 @@ A manager opens a report of worked hours: one row per member, one column per day
 - The reminder is shown inside the app only. Email or phone alerts for missed days are out of scope here (spec 012's notifications could add them later).
 - "Today" uses the member's device calendar.
 - Weekly capacity is the existing per-member figure (40 hours by default).
+- Public holidays aren't known to the app. A member marks them "Off".
+- A member who works on a Friday or Saturday can still log it from My Day. Those days are never reminded about or counted as Missing.
 - Overtime rules, pay, leave balances and approvals are out of scope.
