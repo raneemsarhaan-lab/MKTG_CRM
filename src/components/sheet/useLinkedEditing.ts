@@ -11,7 +11,7 @@
  * paths"). A cell that can't be written is counted, with why, and the rest go
  * on. Undo replays a step's earlier values through the same saves.
  */
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CellWrite, GridCol, WriteResult, WriteWhy } from './GridCore'
 import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type LinkedChange, type Stack } from '@/lib/sheet-undo'
 
@@ -29,7 +29,18 @@ export interface LinkedEditingInput<R extends { key: string }> {
   /** Only these rows hold cells (a task row, not a group or "+ Clip" row). */
   isCellRow(row: R): boolean
   onSkipped?(skipped: Partial<Record<string, number>>): void
+  /** Drop (Video) or archive (Content) a task, and bring it back: true when it worked. */
+  drop?(taskId: string): Promise<boolean>
+  restore?(taskId: string): Promise<boolean>
 }
+
+/**
+ * The workbook's toolbar and the linked grid talk through two document events,
+ * since the board's sheet is rendered by the page, not by the workbook:
+ * `momentum:sheet-history` says what can be undone, `momentum:sheet-undo` asks.
+ */
+export const HISTORY_EVENT = 'momentum:sheet-history'
+export const UNDO_EVENT = 'momentum:sheet-undo'
 
 type Cell = { rowKey: string; col: GridCol; before: string; after: string }
 
@@ -104,19 +115,56 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
     if (!r) return
     stack.current = r.stack
     setTick(t => t + 1)
-    const change = r.step.forward[0]
-    if (!change || change.kind !== 'taskCells') return
-    const cells = change.cells.map(c => ({ rowKey: c.taskId, col: c.field, before: c.before, after: c.after }))
-    const res = await save(cells, dir === 'redo')
-    if (Object.keys(res.skipped).length) ref.current.onSkipped?.(res.skipped)
+    // The backward changes already hold the earlier values; replay them forwards.
+    const skipped: Partial<Record<string, number>> = {}
+    for (const change of dir === 'undo' ? r.step.backward : r.step.forward) {
+      if (change.kind === 'taskCells') {
+        const res = await save(change.cells.map(c => ({ rowKey: c.taskId, col: c.field, before: c.before, after: c.after })), true)
+        for (const [k, n] of Object.entries(res.skipped)) skipped[k] = (skipped[k] ?? 0) + (n ?? 0)
+      } else if (change.kind === 'dropRows' || change.kind === 'restoreRows') {
+        const fn = change.kind === 'dropRows' ? ref.current.drop : ref.current.restore
+        if (!fn) continue
+        await pool(change.taskIds, async id => { if (!(await fn(id))) skipped.invalid = (skipped.invalid ?? 0) + 1 })
+      }
+    }
+    if (Object.keys(skipped).length) ref.current.onSkipped?.(skipped)
   }, [save])
+
+  /** Drop or archive tasks (the row menu's Delete), as one undoable step. */
+  const dropRows = useCallback(async (taskIds: string[]) => {
+    const fn = ref.current.drop
+    if (!fn) return
+    const done: string[] = []
+    let failed = 0
+    await pool(taskIds, async id => { if (await fn(id)) done.push(id); else failed++ })
+    if (done.length) {
+      stack.current = push(stack.current, makeStep('dropRows', [{ kind: 'dropRows', taskIds: done }]))
+      setTick(t => t + 1)
+    }
+    if (failed) ref.current.onSkipped?.({ invalid: failed })
+  }, [])
+
+  // The workbook's toolbar (spec 013): say what can be undone, and listen for its buttons.
+  const canUndo = stack.current.done.length > 0, canRedo = stack.current.undone.length > 0
+  useEffect(() => {
+    document.dispatchEvent(new CustomEvent(HISTORY_EVENT, { detail: { canUndo, canRedo } }))
+  }, [canUndo, canRedo])
+  useEffect(() => {
+    const on = (e: Event) => { void apply((e as CustomEvent<'undo' | 'redo'>).detail) }
+    document.addEventListener(UNDO_EVENT, on)
+    return () => {
+      document.removeEventListener(UNDO_EVENT, on)
+      document.dispatchEvent(new CustomEvent(HISTORY_EVENT, { detail: { canUndo: false, canRedo: false } }))
+    }
+  }, [apply])
 
   return {
     onCommit,
     writeCells,
     onUndo: useCallback(() => { void apply('undo') }, [apply]),
     onRedo: useCallback(() => { void apply('redo') }, [apply]),
-    canUndo: stack.current.done.length > 0,
-    canRedo: stack.current.undone.length > 0,
+    dropRows,
+    canUndo,
+    canRedo,
   }
 }

@@ -13,7 +13,7 @@ type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz')
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -71,7 +71,11 @@ export async function loadBoardData(member: SessionMember) {
     // Sheet columns the team has shaped, and custom values (spec 010).
     prisma.sheetColumn.findMany({ where: { deleted_at: null }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
     prisma.sheetValue.findMany({ where: { column: { deleted_at: null } }, select: { column_id: true, task_id: true, value: true } }),
+    // Row heights on the linked sheets (spec 013 FR-045), shared by the team.
+    prisma.linkedRowHeight.findMany({ select: { sheet_kind: true, task_id: true, height: true } }),
   ])
+  const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
+  for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
   const values: Record<string, Record<string, string>> = {}
   for (const v of sheetValues) (values[v.column_id] ??= {})[v.task_id] = v.value
 
@@ -90,6 +94,7 @@ export async function loadBoardData(member: SessionMember) {
     hasStorage: storageConfigured(),
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
+    linkedRowHeights,
     inbox: {
       readIds:  reads.map(r => r.comment_id),
       snoozes:  Object.fromEntries(snoozes.map(z => [z.task_id, z.until.toISOString()])),

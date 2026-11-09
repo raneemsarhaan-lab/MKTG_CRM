@@ -531,3 +531,29 @@ export async function reorderSheets(folderId: string, ids: string[]): Promise<{ 
   touched()
   return { success: true }
 }
+
+// ─── linked sheets ──────────────────────────────────────────────────────────
+
+/**
+ * Row heights on the Content and Video sheets (FR-044, FR-045): shared by the
+ * team, one per task and sheet. Null puts a row back to the default. Any
+ * member, like the column widths of spec 010.
+ */
+export async function setLinkedRowHeights(kind: 'linked_content' | 'linked_video', entries: { taskId: string; height: number | null }[]): Promise<{ success: true } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  if (kind !== 'linked_content' && kind !== 'linked_video') return fail('invalid')
+  const list = entries.slice(0, 500)
+  await prisma.$transaction(async tx => {
+    for (const e of list) {
+      const h = clampOrNull(e.height, { min: 21, max: 400 })
+      if (h === null) await tx.linkedRowHeight.deleteMany({ where: { sheet_kind: kind, task_id: e.taskId } })
+      else await tx.linkedRowHeight.upsert({
+        where: { sheet_kind_task_id: { sheet_kind: kind, task_id: e.taskId } },
+        create: { sheet_kind: kind, task_id: e.taskId, height: h },
+        update: { height: h },
+      })
+    }
+  })
+  return { success: true }
+}

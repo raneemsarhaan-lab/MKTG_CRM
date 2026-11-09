@@ -21,6 +21,7 @@ import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
+import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
 
 export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
 export type ContentCol = typeof CONTENT_COLS[number]
@@ -73,6 +74,15 @@ export interface ContentGridProps {
   pasteAsRows?(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean
   /** Spec 013: what a paste, clear or undo didn't change, by reason. */
   onSkipped?(skipped: Partial<Record<string, number>>): void
+  /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
+  linked?: {
+    drop(taskId: string): Promise<boolean>
+    restore(taskId: string): Promise<boolean>
+    insertRow(row: ContentRow): boolean
+    heights?: Record<string, number>
+    saveHeights?(entries: { taskId: string; height: number | null }[]): Promise<{ success: boolean }>
+    say(text: string): void
+  }
 }
 
 export function ContentGrid(p: ContentGridProps) {
@@ -286,14 +296,28 @@ export function ContentGrid(p: ContentGridProps) {
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
     onSkipped: p.onSkipped,
+    drop: p.linked?.drop, restore: p.linked?.restore,
+  })
+  const lm = useLinkedMenu<ContentRow>({
+    rows: p.rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'archive',
+    taskOf,
+    canRemove: row => row.kind === 'piece' && !row.task.dropped_at && p.canEdit(row.task),
+    insertRow: row => p.linked?.insertRow(row) ?? false,
+    writeCells: le.writeCells, dropRows: le.dropRows, onSkipped: p.onSkipped,
+    say: text => p.linked?.say(text),
+    heights: p.linked?.heights, saveHeights: p.linked?.saveHeights,
   })
   Object.assign(model, {
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
+    ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<ContentRow>>)
 
   return (
+    <>
     <GridCore model={model} active={p.active} setActive={p.setActive}
               editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote} />
+    {lm.node}
+    </>
   )
 }

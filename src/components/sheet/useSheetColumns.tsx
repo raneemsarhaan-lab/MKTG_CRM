@@ -295,6 +295,18 @@ export function useSheetColumns(o: UseSheetColumns) {
     onReorder: (col: string, before: string | null) => { void run(api.move(sheet, col, before), t('movedCol', { name: nameOf(col) })) },
     onResize: (col: string, width: number) => { void run(api.resize(sheet, col, width)) },
     headerName: (col: string) => t('menuButton', { name: nameOf(col) || o.defaultName(col) }),
+    // Spec 013 (FR-042): the grid's own menus reach spec 010's add and delete flows.
+    /** Insert column: the add-column form, beside this column. Title has nothing before it. */
+    insertColumn: (rel: 'before' | 'after', at: string, anchor: HTMLElement) => {
+      if (laid.filter(c => c.kind).length >= MAX_CUSTOM_COLUMNS) { o.say(t('err.limit')); return }
+      setPopup({ kind: 'editor', anchor, rel: at === 'title' ? 'after' : rel, at })
+    },
+    /** Only the team's own columns can be deleted. */
+    isTeamColumn: (key: string) => !!byKey.get(key)?.kind,
+    deleteColumn: (key: string, anchor: HTMLElement) => {
+      const c = byKey.get(key)
+      if (c?.kind) setPopup({ kind: 'delete', anchor, col: c })
+    },
   }
   const header = (key: string) => {
     const c = byKey.get(key)
