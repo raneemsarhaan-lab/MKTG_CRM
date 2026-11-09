@@ -254,6 +254,7 @@ export function BlankSheet(p: BlankSheetProps) {
     onPaste: () => {},
     onResize: (col, w) => { if (!ro) setWidths([col], w) },
     selection: true,
+    spreadsheet: true,
     multiline: true,
     writeCells,
     onUndo: p.onUndo,

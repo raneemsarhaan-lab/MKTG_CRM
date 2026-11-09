@@ -29,6 +29,8 @@ import { splitFiles, hostOf, type FilesCellState } from './FilesCell'
 import { LinkPrompt } from './PublishedCell'
 import { PastePreview } from './PastePreview'
 import { cellsFromHtml, cellsFromText, looksLikeRows, type PastedCell } from './parse-clips'
+import { FILE_RE } from '@/lib/clip-file-name'
+import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
 
@@ -350,6 +352,19 @@ export function VideoSheet(p: VideoSheetProps) {
       setPaste({ videoId, cells })
     }
   }
+  /**
+   * Spec 013 FR-026: a clip list (it names clip files) or a paste onto a video's
+   * "+ Clip" row opens Paste clips, and one link into Files or Published attaches
+   * it; anything else fills the cells.
+   */
+  function pasteAsRows(grid: string[][], row: SheetRow | null, col: GridCol | null): boolean {
+    if (!row || (row.kind !== 'clip' && row.kind !== 'video')) return true
+    const flat = grid.flat().filter(Boolean)
+    if (flat.length === 1 && (col === 'files' || col === 'published')) return true
+    return flat.some(v => FILE_RE.test(v))
+  }
+  const skipText = useSkipText()
+  const onSkipped = (s: Partial<Record<string, number>>) => { const m = skipText(s); if (m) say(m) }
   const pasteVideo = paste ? p.tasks.find(x => x.id === paste.videoId) : undefined
   const existingNames = useMemo(
     () => (paste ? clipsOf(p.tasks, paste.videoId).map(c => c.clip?.file_name ?? '').filter(Boolean) : []),
@@ -438,6 +453,8 @@ export function VideoSheet(p: VideoSheetProps) {
             onOpenVideo={id => p.onOpenVideo(id)}
             onDelete={(row, anchor) => { if (row.kind === 'clip' && canEdit(row.task)) { if (row.task.dropped_at) void restore(row.task); else setPopup({ kind: 'drop', anchor, task: row.task }) } }}
             onPaste={onPaste}
+            pasteAsRows={pasteAsRows}
+            onSkipped={onSkipped}
             onRetry={id => { const s = filesState[id]; if (s?.kind === 'failed') void upload(id, s.file) }}
             onLinkInstead={(id, anchor) => setPopup({ kind: 'link', anchor, taskId: id, mode: 'files' })}
             onNote={onNote}

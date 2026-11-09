@@ -362,7 +362,7 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
   for (const e of list) {
     const t = tasks.find(x => x.id === e.taskId)
     if (!t) { refused.push({ taskId: e.taskId, code: 'not_found' }); continue }
-    if (!canAct(t, me)) { refused.push({ taskId: e.taskId, code: 'not_authorized' }); continue }
+    // Spec 013 R8 (FR-060): team columns are open to any member on a live task.
     if (t.dropped_at) { refused.push({ taskId: e.taskId, code: 'archived' }); continue }
     const p = parseValue(vc.kind, e.raw, vc.ctx)
     if (!p.ok) { refused.push({ taskId: e.taskId, code: `invalid_${p.code}` }); continue }

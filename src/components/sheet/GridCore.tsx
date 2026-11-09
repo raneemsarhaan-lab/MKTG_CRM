@@ -95,12 +95,18 @@ export interface GridModel<R extends { key: string }> {
   // ── spec 013 ──
   /** Range selection by drag, Shift and the headers. */
   selection?: boolean
+  /**
+   * A blank sheet's conventions: a row number selects its row (never takes
+   * focus), Home goes to column A, and Tab just moves. The linked sheets keep
+   * their row-number menu, Home onto the number, and Tab into the next field.
+   */
+  spreadsheet?: boolean
   /** The text a copy takes from a cell (default: `textValue`, or the cell's shown text). */
   copyText?(row: R, col: GridCol): string
   /** Write many cells at once: paste, clear, cut. Indexes may run past the end on sheets that grow. */
   writeCells?(writes: CellWrite[], why: WriteWhy): Promise<WriteResult>
   /** A paste the sheet wants to read as new rows instead of filling cells (FR-026). */
-  pasteAsRows?(grid: string[][]): boolean
+  pasteAsRows?(grid: string[][], row: R | null, col: GridCol | null): boolean
   onUndo?(): void
   onRedo?(): void
   /** The cell, row-number and heading menus. */
@@ -420,7 +426,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
         focusCell(row, cc)
         // Linked sheets: arriving by Tab selects the cell's text, like a form field.
         // Blank sheets: Tab just moves, as in a spreadsheet; typing replaces.
-        if (!m.selection) setEditing({ key: row.key, col: cc, value: m.textValue(row, cc), select: true })
+        if (!m.spreadsheet) setEditing({ key: row.key, col: cc, value: m.textValue(row, cc), select: true })
         return
       }
     }
@@ -471,7 +477,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const html = e.clipboardData.getData('text/html'), text = e.clipboardData.getData('text/plain')
       const g = toGrid(parseClipboard({ html, text }, new DOMParser()))
       if (!g.length) return
-      if (m.pasteAsRows?.(g)) { m.onPaste(e, row, col); return }
+      if (m.pasteAsRows?.(g, row, col)) { m.onPaste(e, row, col); return }
       e.preventDefault()
       const plan = pastePlan(g, q)
       const list: CellWrite[] = []
@@ -603,13 +609,15 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (arrow && m.selection) {
       const dir = e.key === 'ArrowDown' ? 'down' : e.key === 'ArrowUp' ? 'up'
         : (e.key === 'ArrowRight') !== rtl ? 'right' : 'left'
-      const from = e.shiftKey && fi !== undefined && fc >= 0 ? { r: fi, c: fc } : { r: ri, c: Math.max(0, m.cols.indexOf(active.col)) }
+      const from = e.shiftKey && fi !== undefined && fc >= 0 ? { r: fi, c: fc } : { r: ri, c: m.cols.indexOf(active.col) }
       const filled = (r: number, c: number) => { const rw = m.rows[r]; return !!rw && readText(rw, m.cols[c]) !== '' }
       const dr = dir === 'down' ? 1 : dir === 'up' ? -1 : 0, dc = dir === 'right' ? 1 : dir === 'left' ? -1 : 0
       // Ctrl/Cmd+arrow: the edge of the data (FR-004).
-      const to = ctrl ? dataEdge(from, dir, m.rows.length, m.cols.length, filled) : { r: from.r + dr, c: from.c + dc }
-      if (e.shiftKey) { extendTo(to.r, to.c); return }
+      const to = ctrl ? dataEdge({ r: from.r, c: Math.max(0, from.c) }, dir, m.rows.length, m.cols.length, filled) : { r: from.r + dr, c: from.c + dc }
+      if (e.shiftKey) { extendTo(to.r, Math.max(0, to.c)); return }
       if (active.col === 'rowNo' && dir === 'left') { e.preventDefault(); return }
+      // A blank sheet's row numbers aren't cells: Left stops at column A.
+      if (m.spreadsheet && to.c < 0) { e.preventDefault(); return }
       return go(to.r, to.c + 1)
     }
     switch (e.key) {
@@ -617,7 +625,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       case 'ArrowUp':    return go(ri - 1, ci)
       case 'ArrowRight': return colsFor(row) === allCols ? go(ri, ci + (rtl ? -1 : 1)) : sideways(rtl ? -1 : 1)
       case 'ArrowLeft':  return colsFor(row) === allCols ? go(ri, ci + (rtl ? 1 : -1)) : sideways(rtl ? 1 : -1)
-      case 'Home':       return ctrl ? go(0, 0) : go(ri, m.selection ? 1 : 0)
+      case 'Home':       return ctrl ? go(0, m.spreadsheet ? 1 : 0) : go(ri, m.spreadsheet ? 1 : 0)
       case 'End':        return ctrl ? go(m.rows.length - 1, allCols.length - 1) : go(ri, allCols.length - 1)
       case 'PageDown': {
         const page = Math.max(1, Math.floor((scroller()?.clientHeight ?? 400) / ROW_H) - 1)
@@ -644,7 +652,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       return
     }
     // Delete or Backspace over a selection clears it in one step (FR-005).
-    if ((e.key === 'Delete' || e.key === 'Backspace') && m.writeCells && (multi || m.selection) && active.col !== 'rowNo') {
+    // On a linked sheet, Delete on a title or a non-text cell keeps its own meaning (drop a clip, clear a choice).
+    const ownDelete = !!m.onDelete && (active.col === 'title' || !m.isText(row, active.col))
+    if ((e.key === 'Delete' || e.key === 'Backspace') && m.writeCells && active.col !== 'rowNo' && (multi || (m.selection && !ownDelete))) {
       e.preventDefault()
       void clearRange()
       return
@@ -832,6 +842,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   onFocus={() => { if (!isActive) setActive({ key: row.key, col }) }}
                   onPointerDown={m.selection ? e => {
                     if (isEditing || e.button !== 0 || (e.target as HTMLElement).closest('[data-row-resize], a, button')) return
+                    if (isNo && !m.spreadsheet) return
                     if (isNo) {
                       // A row number selects its row; Shift extends from the active row (FR-010).
                       e.preventDefault()
@@ -846,7 +857,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   } : undefined}
                   onClick={e => {
                     if (isEditing) return
-                    if (m.selection && (e.shiftKey || isNo)) return
+                    if (m.selection && (e.shiftKey || (isNo && m.spreadsheet))) return
                     if (!isActive) setActive({ key: row.key, col })
                     if (activate(row, col)) return
                     if (menu) m.onOpen(row, col, e.currentTarget)

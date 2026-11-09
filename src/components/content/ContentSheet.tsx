@@ -14,6 +14,7 @@ import { statusMenuItems, useStageNames } from '@/components/sheet/StatusCell'
 import { editorMenuItems } from '@/components/sheet/EditorCell'
 import { LinkPrompt } from '@/components/sheet/PublishedCell'
 import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/sheet/parse-clips'
+import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
 import { buildContentRows, piecesOf, type ContentRow } from './rows'
@@ -294,6 +295,19 @@ export function ContentSheet(p: ContentSheetProps) {
   }
 
   // ── pasting ─────────────────────────────────────────────────────────────
+  /**
+   * Spec 013 FR-026: a paste onto a theme, pillar or "+ Piece" row is a plan
+   * (Paste plan), and one value into a link column goes through the link rules; anything else fills
+   * the cells.
+   */
+  function pasteAsRows(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean {
+    if (!row || (row.kind !== 'piece' && row.kind !== 'clip')) return true
+    const flat = grid.flat().filter(Boolean)
+    // One value into a link column: the link rules (attach it, or say it isn't a link).
+    return flat.length === 1 && !!col && (LINK_COLS as readonly string[]).includes(col)
+  }
+  const skipText = useSkipText()
+  const onSkipped = (s: Partial<Record<string, number>>) => { const m = skipText(s); if (m) say(m) }
   const [paste, setPaste] = useState<{ cells: PastedCell[][] | null } | null>(null)
   function onPaste(e: React.ClipboardEvent, row: ContentRow | null, col: GridCol | null) {
     const html = e.clipboardData.getData('text/html')
@@ -366,6 +380,8 @@ export function ContentSheet(p: ContentSheetProps) {
               onAddPiece={addPiece}
               onDelete={(row, anchor) => { if (row.kind === 'piece' && canEdit(row.task)) { if (row.task.dropped_at) void restore(row.task); else setPopup({ kind: 'archive', anchor, task: row.task }) } }}
               onPaste={onPaste}
+              pasteAsRows={pasteAsRows}
+              onSkipped={onSkipped}
               columns={cl}
               onTypeAhead={(row, ch, anchor) => {
                 if (row.kind !== 'piece' && row.kind !== 'clip') return false

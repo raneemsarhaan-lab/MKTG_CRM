@@ -125,26 +125,26 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: Open Sheets: Content and Video are there and pinned. Create "Campaign planning": it opens with "Sheet 1". Pin it, then reload: all as left.
 
-- [ ] T012 [US3] Navigation:
+- [X] T012 [US3] Navigation:
   - **`src/lib/nav.tsx`:** add `{ href: '/sheets', key: 'sheets' }` after Board, with a `sheets` icon.
   - **`src/components/shared/Sidebar.tsx` and `NavRail.tsx`:** the item, with the member's pinned folders under it (`data-pinned-folder`), each with a ⋯ menu (Unpin; Rename and Delete for team folders).
   - **`src/components/shared/TabBar.tsx`:** Sheets third, and Team into More (R13).
 
   Pins come from a small server read in `src/app/(app)/layout.tsx`, passed into `AppShell`.
-- [ ] T013 [US3] The home page: `src/app/(app)/sheets/page.tsx` (`listFolders`) and `src/components/sheets/SheetsHome.tsx` (contracts/ui.md §2):
+- [X] T013 [US3] The home page: `src/app/(app)/sheets/page.tsx` (`listFolders`) and `src/components/sheets/SheetsHome.tsx` (contracts/ui.md §2):
   - linked cards first;
   - team cards by name;
   - New folder inline, then opening the folder;
   - each card's menu: Pin / Unpin, Rename, Delete;
   - Delete with a 10-second Undo through `src/lib/pending-deletes.ts` (R12).
-- [ ] T014 [US3] The workbook route: `src/app/(app)/sheets/[folderId]/page.tsx` loads the folder, `listSheets` and, for a linked folder, `loadBoardData`. `src/components/sheets/Workbook.tsx` draws:
+- [X] T014 [US3] The workbook route: `src/app/(app)/sheets/[folderId]/page.tsx` loads the folder, `listSheets` and, for a linked folder, `loadBoardData`. `src/components/sheets/Workbook.tsx` draws:
   - the breadcrumb (`data-crumb`) and 🔗 Linked;
   - the toolbar shell (undo, redo, save status);
   - the open sheet: `?sheet=`, else `localStorage` `momentum.sheets.last.<folderId>` (R10), else the first visible sheet;
   - a basic tab bar (click to switch, "+");
   - and remembers the last tab.
-- [ ] T015 [US3] The linked tab: a `surface="sheets"` prop on `src/components/kanban/KanbanBoard.tsx` draws only the Content sheet or the Video sheet, with no board header, toolbar or board, and keeps every API, the task panel, uploads and celebrations (R2). Use it from `Workbook` for the linked tab.
-- [ ] T016 [US3] A first `BlankSheet` (`src/components/sheets/BlankSheet.tsx` and `blank/model.ts`) draws a `SheetDoc` on `GridCore`: letter headings, numbered rows, text cells, and single-cell edits saved through `applySheetChanges`. This is enough for the independent test; US1 and US5 complete it.
+- [X] T015 [US3] The linked tab: a `surface="sheets"` prop on `src/components/kanban/KanbanBoard.tsx` draws only the Content sheet or the Video sheet, with no board header, toolbar or board, and keeps every API, the task panel, uploads and celebrations (R2). Use it from `Workbook` for the linked tab.
+- [X] T016 [US3] A first `BlankSheet` (`src/components/sheets/BlankSheet.tsx` and `blank/model.ts`) draws a `SheetDoc` on `GridCore`: letter headings, numbered rows, text cells, and single-cell edits saved through `applySheetChanges`. This is enough for the independent test; US1 and US5 complete it.
 - [ ] T017 [US3] Lab scenarios `s3-*` in `scripts/spreadsheet-lab/scenarios/index.mjs`:
   - home order;
   - New folder;
@@ -166,7 +166,7 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: In a blank sheet and in the Content sheet: type, double-click-edit, move with the keys, clear. All changes show at once and survive a reload.
 
-- [ ] T018 [US1] Grid editing changes (FR-001–FR-006):
+- [X] T018 [US1] Grid editing changes (FR-001–FR-006):
   - a double-click edits with the caret at the click point (`caretPositionFromPoint`, with a fallback);
   - the editor becomes an auto-growing textarea, with Alt+Enter for a line break;
   - Shift+Enter and Shift+Tab move back;
@@ -175,7 +175,7 @@ Then the P2 stories: US6, US7 and US8.
   - arrows inside an editor move the caret.
 
   Existing menu, link and checkbox cells keep their behaviour.
-- [ ] T019 [US1] Row windowing in the Grid (R7):
+- [X] T019 [US1] Row windowing in the Grid (R7):
   - only visible rows, plus 10 above and below, inside a full-height spacer;
   - offsets from a prefix sum of row heights;
   - the active row always rendered;
@@ -183,7 +183,7 @@ Then the P2 stories: US6, US7 and US8.
   - column windowing above 40 columns.
 
   Confirm the linked sheets' scroll-to-row (`?row=`) still works.
-- [ ] T020 [US1] Complete `BlankSheet`'s model: `isText` everywhere, `textValue` and `onCommit` through the outbox (US5's T024 replaces the direct call), the letter headings (A…Z, AA…), row numbers, and 120 px default widths.
+- [X] T020 [US1] Complete `BlankSheet`'s model: `isText` everywhere, `textValue` and `onCommit` through the outbox (US5's T024 replaces the direct call), the letter headings (A…Z, AA…), row numbers, and 120 px default widths.
 - [ ] T021 [US1] Lab:
   - scenarios `s1-*`: type, double-click caret, Alt+Enter, every navigation key, mirrored in Arabic, Delete;
   - `lab:sheet` additions: double-click edit and Shift+Tab on the Content and Video sheets.
@@ -198,7 +198,7 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: Make one change of each kind, wait for "Saved", reload: everything is as it was, on this device and another.
 
-- [ ] T022 [US5] `src/components/sheets/useOutbox.ts` (R6):
+- [X] T022 [US5] `src/components/sheets/useOutbox.ts` (R6):
   - a per-workbook queue of change sets, applied on screen at once;
   - flushes 400 ms after the last change, or on blur, tab switch or `pagehide`;
   - chunks of 2,000 cells;
@@ -206,8 +206,8 @@ Then the P2 stories: US6, US7 and US8.
   - a `beforeunload` guard;
   - the status `saving · saved · retrying(N)`;
   - refusals roll the cell back to the server's value and set a note.
-- [ ] T023 [US5] Save status in `Workbook` (`data-save-status`, read aloud politely), and the "This sheet was deleted…" state with Copy and Close when the server says `gone` for the open sheet.
-- [ ] T024 [US5] Wire every blank-sheet change through the outbox: cell edits, and (after US7) inserts, deletes and sizes. Wire the sheet-level changes through the same queue in order.
+- [X] T023 [US5] Save status in `Workbook` (`data-save-status`, read aloud politely), and the "This sheet was deleted…" state with Copy and Close when the server says `gone` for the open sheet.
+- [X] T024 [US5] Wire every blank-sheet change through the outbox: cell edits, and (after US7) inserts, deletes and sizes. Wire the sheet-level changes through the same queue in order.
 - [ ] T025 [US5] Lab scenarios `s5-*`:
   - the status sequence;
   - offline, retrying, then recovering;
@@ -223,7 +223,7 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: Paste a 5 × 3 table from Google Sheets into a blank sheet: the 15 values land right. Copy a block out to Google Sheets: the same block arrives.
 
-- [ ] T026 [US2] Selection in the Grid (FR-010–FR-012):
+- [X] T026 [US2] Selection in the Grid (FR-010–FR-012):
   - anchor and focus;
   - drag with pointer capture and auto-scroll at the edges;
   - Shift+click and Shift+arrows;
@@ -232,7 +232,7 @@ Then the P2 stories: US6, US7 and US8.
   - `.is-selected` and a range frame;
   - "N cells selected" in the toolbar;
   - the announcement of the active cell and range size.
-- [ ] T027 [US2] Clipboard in the Grid (FR-020–FR-026):
+- [X] T027 [US2] Clipboard in the Grid (FR-020–FR-026):
   - **copy:** `serialise` → `clipboardData` (`text/html`, `text/plain`);
   - **cut:** copy plus a pending clear, applied on paste, dropped on Esc or a new copy;
   - **paste:** `parseClipboard` from the active cell or the selection's top-left; fill for a single value; the pasted block becomes the selection;
@@ -240,7 +240,7 @@ Then the P2 stories: US6, US7 and US8.
   - **menu items:** through `navigator.clipboard`, with the "use Ctrl/Cmd+V" message where reading is refused.
 
   The grid asks the model through new optional hooks: `readCells(range)`, `writeCells(changes)` → `{ skipped }`, `canWrite(row, col)`. Delete and Backspace over a range clear it in one change set.
-- [ ] T028 [US2] Blank sheets: `readCells` and `writeCells` in `blank/model.ts`. A paste larger than the sheet adds rows and columns up to the limits.
+- [X] T028 [US2] Blank sheets: `readCells` and `writeCells` in `blank/model.ts`. A paste larger than the sheet adds rows and columns up to the limits.
 - [ ] T029 [US2] Linked sheets:
   - `writeTaskCells` in `src/actions/sheets.ts` (contracts/server.md): grouped per task, today's paths for each field, stage moves through `setTaskStage`'s rule, people matched by name, team columns through `setValues`;
   - `setValues` in `src/actions/sheet-columns.ts` opened to any member on a live task (R8, FR-060);
@@ -259,7 +259,7 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: In a team folder: "+" twice, rename, colour, Move or Copy as a copy to the front, protect, hide and unhide, delete the copy, then reload: all as left. The last visible sheet can't be deleted or hidden.
 
-- [ ] T031 [US4] The remaining tab actions in `src/actions/sheets.ts` (contracts/server.md, R9):
+- [X] T031 [US4] The remaining tab actions in `src/actions/sheets.ts` (contracts/server.md, R9):
   - `renameSheet`;
   - `deleteSheets`;
   - `moveSheets`, with copy duplicating rows, columns and cells with new ids in one statement;
@@ -268,7 +268,7 @@ Then the P2 stories: US6, US7 and US8.
   - `hideSheets`.
 
   Each enforces the linked and last-visible guards. `applySheetChanges` refuses edits on protected sheets for anyone but the protector and admins.
-- [ ] T032 [US4] `src/components/sheets/TabBar.tsx` (contracts/ui.md §5):
+- [X] T032 [US4] `src/components/sheets/TabBar.tsx` (contracts/ui.md §5):
   - ARIA tabs with the keyboard model;
   - colour stripes, 🔒 and 🔗;
   - the open tab clearly raised;
@@ -277,7 +277,7 @@ Then the P2 stories: US6, US7 and US8.
   - overflow scroll arrows at the start, as in Excel (right-click lists the sheets);
   - the ≡ list;
   - Ctrl+Page Up/Down and Shift+F11 from anywhere in the workbook.
-- [ ] T033 [US4] Excel's tab menu in `TabBar` (`data-tab-menu`), in Excel's order, with disabled reasons:
+- [X] T033 [US4] Excel's tab menu in `TabBar` (`data-tab-menu`), in Excel's order, with disabled reasons:
   - Insert;
   - Delete (confirm);
   - Rename;
@@ -289,13 +289,13 @@ Then the P2 stories: US6, US7 and US8.
   - Select All Sheets, with Ctrl/Shift+click grouping and `.is-grouped`.
 
   The group actions are Delete, Move or Copy, Tab Color and Hide. Ending a group: a click on a single tab.
-- [ ] T034 [P] [US4] The dialogs:
+- [X] T034 [P] [US4] The dialogs:
   - `src/components/sheets/MoveCopyDialog.tsx`: to folder, before sheet or "(move to end)", ☐ Create a copy. A linked sheet is copy-only, and the client pastes its visible text into the new blank sheet (R11);
   - `UnhideDialog.tsx`;
   - the Delete and Protect confirmations.
 
   Each is a `role="dialog"` with focus trapped and Esc to close.
-- [ ] T035 [US4] Grouping and protection on screen:
+- [X] T035 [US4] Grouping and protection on screen:
   - a protected sheet's cells refuse edits with the reason for everyone but the protector and admins;
   - the menu shows Unprotect only to them.
 - [ ] T036 [US4] Lab scenarios `s4-*`:
@@ -317,7 +317,7 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: Paste 10 × 4, clear a column, undo twice: exactly as before. Redo twice: back again.
 
-- [ ] T037 [US6] `src/components/sheets/useUndo.ts`: one `sheet-undo` stack per sheet id in the workbook, surviving tab switches. Every change set from the Grid, `BlankSheet` and the linked models pushes its inverse. Undo and redo send through the outbox (FR-032). Refused steps are reported and dropped.
+- [X] T037 [US6] `src/components/sheets/useUndo.ts`: one `sheet-undo` stack per sheet id in the workbook, surviving tab switches. Every change set from the Grid, `BlankSheet` and the linked models pushes its inverse. Undo and redo send through the outbox (FR-032). Refused steps are reported and dropped.
 - [ ] T038 [US6] Keys and buttons: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y in the Grid; `data-undo` and `data-redo` in the toolbar, disabled when empty. For linked sheets, inverses go through `writeTaskCells`, and a deleted row's inverse is `restoreTask`.
 - [ ] T039 [US6] Lab:
   - scenarios `s6-*`: paste, clear, cut, insert and delete undone and redone exactly; one step per action; a new edit clears redo; per-sheet history; a refused undo reported;
@@ -331,8 +331,8 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: Insert two rows above row 3, delete column C, drag row 5 taller and column A wider, then reload: all as left.
 
-- [ ] T040 [US7] The Grid's row-number and heading menus (contracts/ui.md §4), on right-click, ⋯ or Shift+F10, with disabled reasons. A row resize handle on the row number's bottom edge (`data-row-resize`) has a live drag and a double-click to reset. Taller rows wrap their text.
-- [ ] T041 [US7] Blank sheets: insert and delete rows and columns with ids made on the client and positions from `between` (R3); sizes through `rowHeights` and `colWidths`; all through the outbox and undo.
+- [X] T040 [US7] The Grid's row-number and heading menus (contracts/ui.md §4), on right-click, ⋯ or Shift+F10, with disabled reasons. A row resize handle on the row number's bottom edge (`data-row-resize`) has a live drag and a double-click to reset. Taller rows wrap their text.
+- [X] T041 [US7] Blank sheets: insert and delete rows and columns with ids made on the client and positions from `between` (R3); sizes through `rowHeights` and `colWidths`; all through the outbox and undo.
 - [ ] T042 [US7] Linked sheets (FR-042):
   - Insert row starts a draft clip or piece in that group, as "+ Clip" and "+ Piece" do;
   - Delete rows confirms with the count, then drops or archives through today's API;

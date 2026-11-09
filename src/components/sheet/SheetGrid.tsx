@@ -16,6 +16,7 @@ import { FilesContent, type FilesCellState } from './FilesCell'
 import { PublishedContent } from './PublishedCell'
 import { GridCore, type GridModel, type GridCol, type ActiveCell } from './GridCore'
 import type { SheetColumnsHook } from './useSheetColumns'
+import { useLinkedEditing } from './useLinkedEditing'
 
 export type { GridCol, ActiveCell }
 
@@ -53,6 +54,10 @@ export interface SheetGridProps {
   onNote(cellKey: string, note: string | null): void
   /** A letter typed on the Type cell: its type-ahead (spec 010). */
   onTypeAhead(row: SheetRow, ch: string, anchor: HTMLElement): boolean
+  /** Spec 013: whether a paste is new clips (Paste clips) rather than cells to fill. */
+  pasteAsRows?(grid: string[][], row: SheetRow | null, col: GridCol | null): boolean
+  /** Spec 013: what a paste, clear or undo didn't change, by reason. */
+  onSkipped?(skipped: Partial<Record<string, number>>): void
 }
 
 export function SheetGrid(p: SheetGridProps) {
@@ -209,6 +214,18 @@ export function SheetGrid(p: SheetGridProps) {
       return null
     },
   }
+
+  // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
+  const le = useLinkedEditing<SheetRow>({
+    rows: p.rows, cols: model.cols, isText, textValue: model.textValue, commit: p.onCommit,
+    readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
+    isCellRow: row => row.kind === 'clip' || row.kind === 'video',
+    onSkipped: p.onSkipped,
+  })
+  Object.assign(model, {
+    selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
+    pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
+  } satisfies Partial<GridModel<SheetRow>>)
 
   return (
     <GridCore
