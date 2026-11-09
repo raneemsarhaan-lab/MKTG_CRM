@@ -21,7 +21,7 @@ This feature adds one number a day: the hours a member worked. It has to stay sm
 
 ### Session 2026-11-09
 
-- Q: How far back should the pop-up ask? → A: Only the last working day. Older gaps show as "Missing" on My Day, where they can be filled in.
+- Q: How far back should the pop-up ask? → A: It opens on the last working day, and lets the member add more days and fill them together if they need to ("Add another day"). Older gaps also show as "Missing" on My Day.
 - Q: Which days are working days? → A: Sunday to Thursday, for everyone. Friday and Saturday are never asked about or expected.
 - Q: Who can see other people's hours? → A: Admins only. Every member sees their own hours.
 
@@ -59,9 +59,12 @@ A member forgot to log yesterday. The first time they open Momentum today, a sma
 2. **Given** the window, **When** they enter hours and save, **Then** the day is logged and the window closes for good.
 3. **Given** the window, **When** they choose "I was off that day", **Then** the day is recorded as a day off and they aren't asked about it again.
 4. **Given** the window, **When** they choose "Later" or press Esc, **Then** it closes. My Day keeps showing the missing day, and the window opens again the next time they open the app on a later day.
-5. **Given** more than one working day is missing (e.g. back from three days away), **When** the window opens, **Then** it asks only about the last working day. The older missing days show as "Missing" on My Day, where they can be filled in.
-6. **Given** it's Sunday and Thursday has no entry, **When** the member opens the app, **Then** they're asked about Thursday. Working days are Sunday to Thursday, so Friday and Saturday are never asked about.
-7. **Given** a phone, **When** the window opens, **Then** it fills the bottom of the screen, its targets are at least 44 px, and the number keyboard opens.
+5. **Given** more than one working day is missing (e.g. back from three days away), **When** the window opens, **Then** it asks about the last working day, and offers "Add another day" with the number of other missing days ("2 more days missing").
+6. **Given** the window, **When** the member chooses "Add another day", **Then** the next missing working day is added as another line, with its own hours field and "Off". They can add any missing or past day within the last 30 days, and remove a line they added.
+7. **Given** several lines, **When** the member enters hours on one and chooses "Same for all", **Then** every line without a value gets those hours. One Save records every line together.
+8. **Given** several lines, **When** one of them is refused (e.g. 30 hours), **Then** nothing is saved, that line says why, and the others keep what was typed.
+9. **Given** it's Sunday and Thursday has no entry, **When** the member opens the app, **Then** they're asked about Thursday. Working days are Sunday to Thursday, so Friday and Saturday are never asked about.
+10. **Given** a phone, **When** the window opens, **Then** it fills the bottom of the screen, its targets are at least 44 px, and the number keyboard opens.
 
 ---
 
@@ -125,11 +128,14 @@ A manager opens a report of worked hours: one row per member, one column per day
 
 **Reminder pop-up**
 
-- **FR-010**: The first time a member opens the app on a day, if their most recent working day before today has no entry, the app MUST open the reminder window. It asks about that one day only; older missing days are left to My Day.
-- **FR-011**: The window MUST name the day by weekday and date, in the member's language. It MUST offer an hours field, "I was off" and "Later".
-- **FR-012**: Answering MUST close the window. "Later", Esc or closing it MUST dismiss it until the next day the member opens the app. The missing days MUST stay visible on My Day.
+- **FR-010**: The first time a member opens the app on a day, if their most recent working day before today has no entry, the app MUST open the reminder window, starting with that day.
+- **FR-011**: The window MUST name each day by weekday and date, in the member's language. Each day MUST have an hours field and "I was off". The window MUST offer "Later".
+- **FR-012**: Saving MUST record every line in the window together, and close it. "Later", Esc or closing it MUST dismiss it until the next day the member opens the app. The missing days MUST stay visible on My Day.
 - **FR-013**: The window MUST NOT open over another open dialog or an unsaved form. It MUST wait until that closes.
 - **FR-014**: The window MUST put focus in its first field when it opens, keep focus inside while it is open, and return focus to where it was when it closes.
+- **FR-016**: The window MUST let the member add more days ("Add another day"). The next missing working day is offered first, and any past day within the last 30 days can be chosen. It MUST say how many other working days are missing, let the member remove a line they added, and offer "Same for all" to copy one line's value to every empty line.
+- **FR-017**: A save of several days MUST be all or nothing. If any line is refused, nothing is saved, that line says why, and every value typed is kept.
+- **FR-018**: My Day MUST offer the same multi-day entry ("Log several days") without waiting for the reminder.
 - **FR-015**: Working days are Sunday to Thursday for everyone. Friday, Saturday and days before the member's account was created MUST NOT be asked about, and MUST NOT count as Missing.
 
 **My recent days**
@@ -163,7 +169,7 @@ A manager opens a report of worked hours: one row per member, one column per day
 ### Measurable Outcomes
 
 - **SC-001**: A member can log today's hours in under 10 seconds, in three actions or fewer, from opening My Day.
-- **SC-002**: A member can answer the reminder window for one missed day in under 10 seconds, with the keyboard alone or by touch.
+- **SC-002**: A member can answer the reminder window for one missed day in under 10 seconds, with the keyboard alone or by touch, and fill five missed days with the same hours in under 20 seconds.
 - **SC-003**: After four weeks, at least 90% of members' working days have an entry (hours or Off).
 - **SC-004**: The reminder window appears at most once per member per day, and never for a day that already has an entry.
 - **SC-005**: The weekly report's totals match the sum of the entries exactly, and the downloaded file matches the screen.

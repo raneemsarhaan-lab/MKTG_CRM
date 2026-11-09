@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain (resolved 2026-11-09: last working day only; Sunday–Thursday; admins only)
+- [x] No [NEEDS CLARIFICATION] markers remain (resolved 2026-11-09: opens on the last working day, with more days addable; Sunday–Thursday; admins only)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
