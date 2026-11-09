@@ -713,7 +713,8 @@ html {
 }
 .fx-brief a { color: #3563E9; font-weight: 500; text-decoration: none; }
 .fx-brief a:hover { text-decoration: underline; }
-.fx-brief img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5em 0; }
+/* Fit to a height, not the panel's width: a wide banner or a tall screenshot stays a preview. */
+.fx-brief img { display: block; max-width: 100%; max-height: 320px; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 0.5em 0; }
 .fx-brief hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
 .fx-brief code {
   background: #F4F4F2; border-radius: 4px; padding: 0.1em 0.35em;

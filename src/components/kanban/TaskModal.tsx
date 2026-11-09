@@ -16,7 +16,6 @@ import { BriefEditor, type UploadResult } from './BriefEditor'
 import { anchorFromPoint, type ReadAnchor } from './brief-editor/readAnchor'
 import { COLORS, alpha } from '@/lib/tokens'
 import { Brief } from '@/components/shared/Brief'
-import { coverImageFor } from '@/lib/attachments'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { shortName } from '@/lib/attachments'
 import { makeUploader, uploadToStorage, shrinkImage } from '@/lib/attachment-upload'
@@ -627,7 +626,6 @@ export function TaskModal({
     router.push(`/board?${q}`)
   }
 
-  const cover     = coverImageFor(task)
   const stageMeta = STAGE_META[task.status]
   const nextStage = nextStageId(task.status, task.nine_stage)
   const nextMeta  = nextStage ? STAGE_META[nextStage] : null
@@ -1815,20 +1813,6 @@ export function TaskModal({
               <div style={{ height: 1, background: CU.line, margin: '22px 0 18px' }} />
 
               {/* ── Description ──────────────────────────────────────────── */}
-              {cover && !editingBrief && (
-                <div style={{
-                  position: 'relative', borderRadius: 10, overflow: 'hidden',
-                  maxHeight: briefOpen ? 'none' : 232, marginBottom: 14,
-                }}>
-                  <ImageWithFallback
-                    src={cover}
-                    alt=""
-                    style={{ display: 'block', width: '100%', maxWidth: 560, objectFit: 'cover' }}
-                    fallback={null}
-                  />
-                </div>
-              )}
-
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}

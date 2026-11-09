@@ -176,7 +176,7 @@ export function TabBar({ member }: { member: Member }) {
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 minHeight: 48, justifyContent: 'center', textDecoration: 'none',
-                color: active ? PIPE.ink : PIPE.textFaint,
+                color: active ? PIPE.ink : PIPE.textMuted,
                 fontSize: 10.5, fontWeight: active ? 700 : 600,
               }}
             >
@@ -205,7 +205,7 @@ export function TabBar({ member }: { member: Member }) {
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               minHeight: 48, justifyContent: 'center', border: 'none', background: 'none',
               cursor: 'pointer', fontFamily: 'inherit', padding: 0,
-              color: moreOpen || inMore ? PIPE.ink : PIPE.textFaint,
+              color: moreOpen || inMore ? PIPE.ink : PIPE.textMuted,
               fontSize: 10.5, fontWeight: moreOpen || inMore ? 700 : 600,
             }}
           >

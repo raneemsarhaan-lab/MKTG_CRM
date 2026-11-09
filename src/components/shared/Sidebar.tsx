@@ -147,7 +147,7 @@ export function Sidebar({ member, pins = [] }: { member: Member; pins?: PinnedFo
           aria-label="Collapse sidebar"
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            padding: 4, color: PIPE.textFaint, lineHeight: 0, flexShrink: 0,
+            padding: 4, color: PIPE.textMuted, lineHeight: 0, flexShrink: 0,
           }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
