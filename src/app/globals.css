@@ -101,6 +101,15 @@
   --sh-pink:            #DB2777;
   --sh-gray:            #6B7280;
   --sh-black:           #14131A;
+  /* Daily hours (spec 014): HOURS_UI in src/lib/tokens.ts. */
+  --hr-miss-ink:        #9A5B02;
+  --hr-miss-fill:       #FFF3E0;
+  --hr-off-ink:         #4B5563;
+  --hr-off-fill:        #EEF0F3;
+  --hr-today:           #7C3AED;
+  --hr-focus:           #F0EBFE;
+  --hr-bad:             #C81E3A;
+  --hr-ok:              #15803D;
   --nt-red:             #E5484D;
   --nt-tint:            #F4F0FF;
   --nt-tint-hover:      #ECE5FF;

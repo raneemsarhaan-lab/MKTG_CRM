@@ -55,6 +55,8 @@ model Member {
   /// Spec 013 R10: pinned Sheets folders, in order. Read only when sheet_pins_set; before that, the default (Content, then Video).
   sheet_pins            String[]              @db.Uuid
   sheet_pins_set        Boolean               @default(false)
+  /// Spec 014 R2: the last local date the hours reminder opened or was put off, so it shows at most once a day.
+  hours_prompted_on     DateTime?             @db.Date
   sheet_folders_created SheetFolder[]         @relation("SheetFolderCreator")
   sheet_folders_updated SheetFolder[]         @relation("SheetFolderUpdater")
   sheets_created        Sheet[]               @relation("SheetCreator")
@@ -66,6 +68,9 @@ model Member {
   notification_settings NotificationSetting[]
   push_subscriptions    PushSubscription[]
   email_digests         EmailDigest[]
+
+  work_days             WorkDay[]             @relation("WorkDayMember")
+  work_days_updated     WorkDay[]             @relation("WorkDayUpdater")
 
   @@map("members")
 }
@@ -863,4 +868,23 @@ model LinkedRowHeight {
 
   @@id([sheet_kind, task_id])
   @@map("linked_row_heights")
+}
+
+/// Spec 014: one member's hours for one calendar day (theirs, not the server's).
+/// No row means Missing; `off` means a day off; otherwise `hours` (0–24, quarter hours).
+model WorkDay {
+  member_id  String   @db.Uuid
+  date       DateTime @db.Date
+  hours      Decimal? @db.Decimal(4, 2)
+  off        Boolean  @default(false)
+  updated_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  member  Member  @relation("WorkDayMember", fields: [member_id], references: [id], onDelete: Cascade)
+  updater Member? @relation("WorkDayUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@id([member_id, date])
+  @@index([date])
+  @@map("work_days")
 }

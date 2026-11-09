@@ -23,7 +23,8 @@
     "lab:inbox": "bash scripts/inbox-lab/build.sh && node scripts/inbox-lab/scenarios.mjs",
     "lab:header": "bash scripts/header-lab/build.sh && node scripts/header-lab/scenarios.mjs",
     "lab:notify": "bash scripts/notify-lab/build.sh && node scripts/notify-lab/scenarios.mjs",
-    "lab:spreadsheet": "bash scripts/spreadsheet-lab/build.sh && node scripts/spreadsheet-lab/scenarios.mjs"
+    "lab:spreadsheet": "bash scripts/spreadsheet-lab/build.sh && node scripts/spreadsheet-lab/scenarios.mjs",
+    "lab:hours": "bash scripts/hours-lab/build.sh && node scripts/hours-lab/scenarios.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1114.0",

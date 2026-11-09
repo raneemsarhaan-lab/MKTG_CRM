@@ -7,7 +7,8 @@
     "toggleLanguage": "Switch to Arabic",
     "projects": "Projects",
     "team": "Team",
-    "sheets": "Sheets"
+    "sheets": "Sheets",
+    "hours": "Hours"
   },
   "greeting": {
     "morning": "Good morning",
@@ -1232,6 +1233,64 @@
       "reset": "Default size",
       "cancel": "Cancel",
       "ok": "OK"
+    }
+  },
+  "hours": {
+    "today": "Today's hours",
+    "unit": "h",
+    "field": "Hours worked today",
+    "fieldDay": "Hours worked on {day}",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "cleared": "Cleared",
+    "off": "Off",
+    "iWasOff": "I was off",
+    "missing": "Missing",
+    "notYet": "–",
+    "quick": "{n} h",
+    "clear": "Clear",
+    "week": "{total} of {capacity} h this week",
+    "last7": "Last 7 days",
+    "several": "Log several days",
+    "dayLabel": "{day}: {state}",
+    "remind": {
+      "title": "How many hours did you work on {day}?",
+      "body": "You didn't log it yet. It takes a few seconds.",
+      "later": "Later",
+      "add": "Add another day",
+      "addPick": "Pick a day",
+      "more": "{n, plural, one {# more day missing} other {# more days missing}}",
+      "same": "Same for all",
+      "remove": "Remove {day}",
+      "notSaved": "Nothing was saved. Fix the marked line and save again.",
+      "severalTitle": "Log several days",
+      "close": "Close"
+    },
+    "report": {
+      "title": "Hours",
+      "prev": "Previous week",
+      "next": "Next week",
+      "download": "Download (.csv)",
+      "complete": "{done} of {all} logged every working day",
+      "caption": "Hours by member and day, week of {week}. Missing days are marked.",
+      "member": "Member",
+      "total": "Total",
+      "capacity": "Capacity",
+      "dayTotal": "Day total",
+      "of": "of {capacity}",
+      "empty": "No members yet."
+    },
+    "err": {
+      "bad_hours": "Hours go from 0 to 24.",
+      "bad_step": "Use quarter hours, like 7.25, 7.5 or 7:45.",
+      "future": "You can't log a day that hasn't happened yet.",
+      "too_old": "Days more than 30 days ago can only be changed by an admin.",
+      "duplicate": "That day is listed twice.",
+      "bad_date": "That isn't a valid day.",
+      "not_authorized": "Only admins can see other people's hours.",
+      "network": "Not saved: check your connection and try again.",
+      "generic": "That didn't work. Try again."
     }
   }
 }

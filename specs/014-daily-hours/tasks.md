@@ -30,7 +30,7 @@ description: "Task list for Daily Working Hours (spec 014)"
   - a line that was refused, with its reason;
   - the admin `/hours` report with Missing cells, totals and Download;
   - a 390 px phone (bottom sheet) and Arabic (RTL).
-- [ ] T002 [P] Create the lab skeleton in `scripts/hours-lab/`:
+- [X] T002 [P] Create the lab skeleton in `scripts/hours-lab/`:
   - `build.sh`, `pure-entry.ts`, `pure.mjs`, `entry.tsx`, `index.html`, `scenarios.mjs` and `scenarios/`;
   - add `"lab:hours"` to `package.json`;
   - add `scripts/hours-lab/out/` to `.gitignore`.
@@ -41,21 +41,21 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Purpose**: Schema, types, pure logic, strings and the server actions every story uses.
 
-- [ ] T003 Add the schema in `prisma/schema.prisma` (data-model §1–§2):
+- [X] T003 Add the schema in `prisma/schema.prisma` (data-model §1–§2):
   - the `WorkDay` model, mapped to `work_days`, with primary key `(member_id, date)`, an index on `date`, and `hours Decimal? @db.Decimal(4,2)`, `off Boolean @default(false)`, `updated_by`, `created_at`, `updated_at`;
   - `hours_prompted_on DateTime? @db.Date` on `Member`, plus the relations;
   - apply it with `bash scripts/migrate.sh`.
-- [ ] T004 [P] Add `WorkDayEntry`, `HoursStatus`, `HoursWeekRow` and `HoursWeekReport` to `src/types/index.ts` (data-model §4).
-- [ ] T005 [P] Write the pure module `src/lib/hours.ts` (research R1, R5; data-model §3):
+- [X] T004 [P] Add `WorkDayEntry`, `HoursStatus`, `HoursWeekRow` and `HoursWeekReport` to `src/types/index.ts` (data-model §4).
+- [X] T005 [P] Write the pure module `src/lib/hours.ts` (research R1, R5; data-model §3):
   - `isWorkingDay` (Sunday–Thursday), `lastWorkingDayBefore`, `missingDays`, `weekOf` (reuse `weekStart` from `src/lib/myboard.ts`) and date-string helpers (`toISODate`, `addDays`);
   - `parseHours`, accepting `7.5`, `7,5`, `7:30` and Arabic digits; 0–24; quarter hours; error codes `bad_hours` and `bad_step`;
   - `validateLines(entries, { today, admin })`, returning per-line errors (`future`, `too_old`, `duplicate`, `bad_date`);
   - `weekTotals` and `toCsv` (a BOM, CRLF line endings, Excel quoting).
-- [ ] T006 [P] Add `HOURS_UI` to `src/lib/tokens.ts` and the matching `--hr-*` variables to `src/app/globals.css`, using existing colours only (§I).
-- [ ] T007 [P] Add the `hours` namespace (about 60 keys: card, strip, form, reminder, report, errors, plurals) to `messages/en.json` and `messages/ar.json`, with ICU plurals and Arabic plural forms.
-- [ ] T008 Write the server actions in `src/actions/hours.ts` (contracts/server.md): `hoursStatus`, `myHours`, `saveDays` (all or nothing in one transaction; `opts.memberId` admin-only), `dismissReminder` and `teamHours` (admin). Every action checks the session member, and `teamHours` and other members' days are admin-only (R7).
-- [ ] T009 [P] Write the injected API in `src/components/hours/types.ts` and `src/components/hours/api.ts` (`HoursApi`, wrapping the actions; a thrown error becomes `network`, as in `src/components/sheets/api.ts`).
-- [ ] T010 Lab: write the pure checks in `scripts/hours-lab/pure.mjs` for `parseHours` (including Arabic digits and `7:30`), working days (a Sunday asks about Thursday), `missingDays` (accounts created mid-week), `validateLines`, `weekTotals` and the CSV round trip (BOM, quotes, Arabic). Also write a server smoke test in `scripts/hours-lab/smoke/run.ts` for `saveDays` all-or-nothing, the 30-day limit, admin-only `teamHours` and `dismissReminder`.
+- [X] T006 [P] Add `HOURS_UI` to `src/lib/tokens.ts` and the matching `--hr-*` variables to `src/app/globals.css`, using existing colours only (§I).
+- [X] T007 [P] Add the `hours` namespace (about 60 keys: card, strip, form, reminder, report, errors, plurals) to `messages/en.json` and `messages/ar.json`, with ICU plurals and Arabic plural forms.
+- [X] T008 Write the server actions in `src/actions/hours.ts` (contracts/server.md): `hoursStatus`, `myHours`, `saveDays` (all or nothing in one transaction; `opts.memberId` admin-only), `dismissReminder` and `teamHours` (admin). Every action checks the session member, and `teamHours` and other members' days are admin-only (R7).
+- [X] T009 [P] Write the injected API in `src/components/hours/types.ts` and `src/components/hours/api.ts` (`HoursApi`, wrapping the actions; a thrown error becomes `network`, as in `src/components/sheets/api.ts`).
+- [X] T010 Lab: write the pure checks in `scripts/hours-lab/pure.mjs` for `parseHours` (including Arabic digits and `7:30`), working days (a Sunday asks about Thursday), `missingDays` (accounts created mid-week), `validateLines`, `weekTotals` and the CSV round trip (BOM, quotes, Arabic). Also write a server smoke test in `scripts/hours-lab/smoke/run.ts` for `saveDays` all-or-nothing, the 30-day limit, admin-only `teamHours` and `dismissReminder`.
 
 **Checkpoint**: schema applied, `lab:hours` pure checks and the smoke test pass, and the typecheck is clean.
 
@@ -223,3 +223,13 @@ description: "Task list for Daily Working Hours (spec 014)"
 - **MVP:** Phases 1–4 (US1 and US2). Members log today and are reminded about a missed day, including several days at once. That is everything the user asked for in the first sentence.
 - **Then:** US3 (recent days and corrections), then US4 (the admin report and download).
 - **Each checkpoint:** run `lab:hours` and the typecheck, and commit.
+
+## Progress
+
+- **T001:** `design/hours.html`, published at https://claude.ai/artifact/RWRxwhYs4YE2enUCYPGSg9. **Waiting for the user's approval.** No UI work until then (§IV).
+- **T002–T010 done.**
+  - The schema is applied: `work_days` and `members.hours_prompted_on`.
+  - `src/lib/hours.ts`, the types, `HOURS_UI` and `--hr-*`, and the `hours` namespace in English and Arabic.
+  - `src/actions/hours.ts` and the `HoursApi` wrapper.
+  - `lab:hours`: 8/8 pure checks. Smoke test: 20/20 against PostgreSQL.
+  - As built, `teamHours` takes an optional `localDate`, so "logged every working day" counts only days up to the member's today.
