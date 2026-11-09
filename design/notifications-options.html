@@ -1,0 +1,265 @@
+<title>Bell and Inbox Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a bench (option picker, notes) around one live mock of the Board
+   header from spec 011, so each option is seen in the real header. The app
+   is light-only, so the mock commits to its light look; the bench follows
+   the viewer's theme. App colours are Momentum's tokens (PIPE, INBOX_UI). */
+:root {
+  --ink: #14131A; --text: #1F2430; --text2: #4A5061; --muted: #6B7280; --faint: #9096A3;
+  --line: #ECECF1; --input: #E9E9EF; --surface: #F3F3F7; --panel: #FFFFFF; --tint: #F4F0FF;
+  --lime: #C9F24E; --purple: #7C3AED; --purple-soft: #F0EBFE; --tick: #8B5CF6;
+  --urgent: #F59E0B; --red: #E5484D; --blue: #2563EB; --late: #C81E3A; --late-soft: #FDE7EA; --ok: #15803D;
+  --f-head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --f-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --b-bg: #EEEEF3; --b-fg: #1F2430; --b-muted: #5B6170; --b-card: #FFFFFF; --b-line: #DCDCE5; --b-on: #14133C; --b-on-fg: #FFFFFF; --b-good: #15803D; --b-warn: #B45309;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; --b-good: #4ADE80; --b-warn: #FBBF24; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; --b-good: #4ADE80; --b-warn: #FBBF24; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--b-bg); color: var(--b-fg); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2.5px solid var(--purple); outline-offset: 2px; }
+
+.bench { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+.bench h1 { font: 800 22px/1.2 var(--f-head); margin: 0; text-wrap: balance; }
+.lede { color: var(--b-muted); margin: 6px 0 0; max-width: 75ch; line-height: 1.5; font-size: 14px; }
+.picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pick { text-align: start; background: var(--b-card); border: 1.5px solid var(--b-line); border-radius: 14px; padding: 12px 14px; cursor: pointer; display: grid; gap: 4px; }
+.pick[aria-pressed="true"] { border-color: var(--b-on); box-shadow: 0 0 0 1.5px var(--b-on) inset; }
+.pick b { font: 800 15px var(--f-head); }
+.pick span { font-size: 13px; color: var(--b-muted); line-height: 1.4; }
+.pick .rec { justify-self: start; font: 700 11px var(--f-body); letter-spacing: .04em; text-transform: uppercase; color: var(--b-good); }
+.notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; min-width: 0; }
+.note h3 { margin: 0 0 6px; font: 700 12px var(--f-head); letter-spacing: .05em; text-transform: uppercase; }
+.note ul { margin: 0; padding-inline-start: 18px; color: var(--b-muted); }
+.note li { margin: 3px 0; }
+.note.good h3 { color: var(--b-good); } .note.warn h3 { color: var(--b-warn); }
+
+/* the mock */
+.frame { position: relative; background: var(--panel); color: var(--text); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 12px 40px rgba(20,19,26,.10); min-height: 560px; }
+.top { display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 6px; flex: none; }
+.tab { border: 0; background: none; font: 700 15px var(--f-head); color: var(--ink); padding: 9px 16px; border-radius: 999px; }
+.tab.on { background: var(--purple-soft); color: var(--purple); }
+.search { flex: 1 1 260px; max-width: 440px; margin-inline: auto; height: 42px; border: 1px solid var(--input); border-radius: 999px; display: flex; align-items: center; gap: 10px; padding-inline: 16px; color: #A2A7B4; font-size: 14px; min-width: 0; }
+.search span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hbtn { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; border: 0; background: none; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 15px; color: var(--ink); flex: none; }
+.hbtn:hover, .hbtn[aria-expanded="true"] { background: var(--surface); }
+.hbtn.icon { width: 44px; padding: 0; justify-content: center; }
+.badge { min-width: 21px; height: 21px; padding: 0 6px; border-radius: 999px; font: 700 11.5px/21px var(--f-body); text-align: center; color: #fff; background: var(--purple); }
+.badge.urgent { background: var(--urgent); color: var(--ink); }
+.badge.red { background: var(--red); }
+.hbtn.icon .badge { position: absolute; top: 2px; inset-inline-end: -2px; box-shadow: 0 0 0 2px var(--panel); }
+.vr { width: 1px; height: 26px; background: var(--line); flex: none; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; border: 2.5px solid #A855F7; background: #C2410C; color: #fff; font: 700 13px var(--f-body); display: grid; place-items: center; flex: none; }
+.titlerow { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 8px; }
+.title { margin: 0; font: 800 34px/1 var(--f-head); color: var(--ink); letter-spacing: -.02em; display: flex; gap: 6px; }
+.cta { height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--lime); font: 700 15px var(--f-head); color: var(--ink); }
+.cols { display: flex; gap: 12px; padding: 14px 24px 24px; overflow: hidden; }
+.col { flex: 0 0 220px; height: 300px; border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 12px; padding: 10px; font: 700 12px var(--f-head); color: var(--ink); background: #FDFDFE; }
+.ghost { margin-top: 10px; height: 64px; border-radius: 10px; background: var(--surface); }
+
+.panel { position: absolute; top: 64px; inset-inline-end: 16px; width: min(400px, calc(100% - 32px)); max-height: calc(100% - 80px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 50px rgba(20,19,60,.20); z-index: 5; }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px 6px; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+.phead h2 { margin: 0; font: 800 18px var(--f-head); color: var(--ink); }
+.link { border: 0; background: none; color: var(--blue); font-weight: 600; font-size: 13px; cursor: pointer; padding: 4px; }
+.ptabs { display: flex; gap: 6px; padding: 4px 16px 8px; position: sticky; top: 46px; background: var(--panel); z-index: 1; flex-wrap: wrap; }
+.ptab { border: 0; background: none; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13px; color: var(--text2); cursor: pointer; }
+.ptab[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); }
+.ptab .n { margin-inline-start: 4px; font-size: 11px; background: var(--surface); border-radius: 999px; padding: 1px 6px; color: var(--muted); }
+.sect { padding: 8px 16px 2px; font: 700 11px var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.row { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) 14px; gap: 10px; align-items: start; padding: 10px 12px; margin: 0 6px; border-radius: 10px; cursor: pointer; }
+.row:hover { background: var(--surface); }
+.row.unread { background: var(--tint); }
+.row.unread:hover { background: #ECE5FF; }
+.ava { position: relative; width: 40px; height: 40px; }
+.ava i { position: absolute; width: 34px; height: 34px; border-radius: 50%; color: #fff; font: 700 12px/34px var(--f-body); text-align: center; font-style: normal; border: 2px solid var(--panel); }
+.ava i:nth-child(1) { top: 0; inset-inline-start: 0; }
+.ava i:nth-child(2) { top: 8px; inset-inline-start: 8px; }
+.ava.one i { width: 40px; height: 40px; line-height: 40px; }
+.kind { position: absolute; bottom: -4px; inset-inline-end: -4px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 10px; border: 2px solid var(--panel); }
+.msg { font-size: 13.5px; line-height: 1.4; color: var(--text); min-width: 0; }
+.msg b { font-weight: 700; color: var(--ink); }
+.msg q { display: block; color: var(--muted); font-size: 12.5px; quotes: none; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.msg time { display: block; font-size: 12px; color: var(--blue); font-weight: 600; margin-top: 3px; }
+.row:not(.unread) .msg time { color: var(--muted); font-weight: 500; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); margin-top: 16px; }
+.more { position: absolute; top: 8px; inset-inline-end: 30px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); display: none; place-items: center; font-weight: 800; color: var(--text2); cursor: pointer; }
+.row:hover .more { display: grid; }
+.todo { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 9px 12px; margin: 0 6px; border-radius: 10px; font-size: 13.5px; }
+.todo:hover { background: var(--surface); }
+.todo small { display: block; color: var(--muted); font-size: 12px; }
+.pill { font: 700 11px var(--f-body); border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+.pill.late { background: var(--late-soft); color: var(--late); }
+.pill.today { background: #FFF3E6; color: #B45309; }
+.pill.review { background: var(--purple-soft); color: var(--purple); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.pfoot { display: flex; justify-content: space-between; padding: 8px 16px 12px; border-top: 1px solid var(--line); margin-top: 6px; }
+.toast { position: absolute; bottom: 16px; inset-inline-end: 16px; width: min(340px, calc(100% - 32px)); background: var(--ink); color: #fff; border-radius: 14px; padding: 12px 14px; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; line-height: 1.4; box-shadow: 0 12px 30px rgba(20,19,26,.3); z-index: 6; cursor: pointer; }
+.toast i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; }
+.simulate { justify-self: start; border: 1px solid var(--b-line); background: var(--b-card); color: var(--b-fg); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.cap { font-size: 12.5px; color: var(--b-muted); }
+
+@media (max-width: 860px) {
+  .picker, .notes { grid-template-columns: minmax(0, 1fr); }
+  .search { display: none; }
+  .top { padding: 10px 12px; gap: 6px; }
+  .hbtn .word { display: none; }
+  .tab { padding: 8px 12px; font-size: 14px; }
+  .titlerow { padding: 14px 12px 4px; } .title { font-size: 26px; } .cta { padding: 0 14px; }
+  .cols { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="bench">
+  <div>
+    <h1>Where should notifications live?</h1>
+    <p class="lede">Today the Board header has one Inbox button (spec 006). It replaced the old bell and holds what needs you (reviews and your tasks), mentions, team activity and what you published. Spec 012 adds a record of every event: comments, replies, moves into your stage, attachments, assignments, mentions and due dates, with read state and grouping. Pick an option below, then click the header buttons in the mock. The task names and people are examples.</p>
+  </div>
+
+  <div class="picker" role="group" aria-label="Options">
+    <button class="pick" data-opt="a" aria-pressed="true"><span class="rec">Recommended</span><b>A · Bell beside the Inbox</b><span>The bell says what happened. The Inbox keeps what you have to act on.</span></button>
+    <button class="pick" data-opt="b" aria-pressed="false"><b>B · The bell replaces the Inbox</b><span>One button. Its panel holds both the events and your to-do lists.</span></button>
+    <button class="pick" data-opt="c" aria-pressed="false"><b>C · A tab inside the Inbox</b><span>No bell. The Inbox gets a Notifications tab and counts it too.</span></button>
+  </div>
+
+  <div class="frame" id="frame" aria-live="polite"></div>
+  <button class="simulate" id="simulate" type="button">Simulate: Salma comments on “Retreat Banner”</button>
+  <span class="cap">A toast appears in the corner for 5 seconds, and the count goes up. Toasts are off while Do not disturb is on, and for the task you have open.</span>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+  const C = { comment: '#2563EB', reply: '#0E7C7C', move: '#7C3AED', mention: '#D6336C', assign: '#15803D', attach: '#B45309', due: '#C81E3A' }
+  const ICON = { comment: '💬', reply: '↩', move: '➜', mention: '@', assign: '✓', attach: '📎', due: '⏰' }
+  const P = { Salma: '#0E7C7B', Yosra: '#7C3AED', Samaa: '#B4322F', Nermin: '#1E293B', Raneem: '#C2410C', System: '#6B7280' }
+  const seed = () => [
+    { id: 1, kind: 'comment', actors: ['Salma', 'Yosra'], others: 3, html: '<b>Salma</b>, <b>Yosra</b> and 3 others commented on <b>Q4 LinkedIn Carousel</b>', snip: 'Love the second frame. Can we try the lime background?', time: '5m', unread: true },
+    { id: 2, kind: 'move', actors: ['Nermin'], html: '<b>Nermin</b> moved <b>Manifesto Post</b> to your stage: Review', time: '22m', unread: true },
+    { id: 3, kind: 'mention', actors: ['Raneem'], html: '<b>Raneem</b> mentioned you in <b>Campaign Brief</b>', snip: '@Yosra can you check the hook before Thursday?', time: '1h', unread: true },
+    { id: 4, kind: 'assign', actors: ['Raneem'], html: 'You were assigned to <b>Omnisight Launch Teaser</b>', time: '2h', unread: true },
+    { id: 5, kind: 'attach', actors: ['Samaa'], html: '<b>Samaa</b> added 5 attachments to <b>Website Hero Visual</b>', time: '3h', unread: false },
+    { id: 6, kind: 'reply', actors: ['Yosra'], html: '<b>Yosra</b> replied to your comment on <b>Retreat Banner</b>', snip: 'Agreed, I’ll swap the photo.', time: 'Yesterday', unread: false },
+    { id: 7, kind: 'due', actors: ['System'], html: '<b>Newsletter Draft</b> is due tomorrow', time: 'Yesterday', unread: false },
+  ]
+  const TODO = {
+    reviews: [['AI Pillar SM Campaign – Post 2', 'Content review · Marketing Manager', 'review', 'Review'], ['Suez Canal Report', 'Final check', 'review', 'Review']],
+    yours: [['Founder Interview', 'Editing', 'late', '1 day late'], ['Strategy Is a Daily Habit', 'Writing', 'today', 'Due today'], ['What Gets Measured Gets Done', 'Writing', '', '']],
+    done: [['Sugar Tax Report', 'Published Mon'], ['AI Pillar Article', 'Published Tue']],
+  }
+  const S = { opt: 'a', open: null, tab: 'all', inboxTab: 'todo', items: seed(), toast: null }
+  const unread = () => S.items.filter(i => i.unread).length
+  const todoCount = TODO.reviews.length + TODO.yours.length
+  const cap9 = n => (n > 9 ? '9+' : String(n))
+
+  const bell = (n, label = 'Notifications') => `<button class="hbtn icon" data-open="bell" aria-expanded="${S.open === 'bell'}" aria-label="${label}, ${n} unread">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14131A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      ${n ? `<span class="badge red">${cap9(n)}</span>` : ''}</button>`
+  const inbox = (n, urgent) => `<button class="hbtn" data-open="inbox" aria-expanded="${S.open === 'inbox'}">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14131A" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 4h9.2a2 2 0 0 1 1.9 1.5L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></svg>
+      <span class="word">Inbox</span>${n ? `<span class="badge${urgent ? ' urgent' : ''}">${cap9(n)}</span>` : ''}</button>`
+
+  function rows(list) {
+    if (!list.length) return `<div class="empty">You’re all caught up.</div>`
+    return list.map(i => `<div class="row${i.unread ? ' unread' : ''}" data-read="${i.id}" role="button" tabindex="0">
+      <span class="ava${i.actors.length === 1 ? ' one' : ''}">${i.actors.map(a => `<i style="background:${P[a]}">${a === 'System' ? '⏰' : a[0]}</i>`).join('')}<span class="kind" style="background:${C[i.kind]}">${ICON[i.kind]}</span></span>
+      <span class="msg">${i.html}${i.snip ? `<q>“${i.snip}”</q>` : ''}<time>${i.time}</time></span>
+      ${i.unread ? '<span class="dot" aria-label="Unread"></span>' : '<span></span>'}
+      <span class="more" title="Mark as read or unread · Turn off notifications for this task">⋯</span>
+    </div>`).join('')
+  }
+  function todoRows(withDone) {
+    let h = `<div class="sect">Reviews waiting</div>` + TODO.reviews.map(([n, s, k, l]) => `<div class="todo"><span>${n}<small>${s}</small></span><span class="pill ${k}">${l}</span></div>`).join('')
+    h += `<div class="sect">Your tasks</div>` + TODO.yours.map(([n, s, k, l]) => `<div class="todo"><span>${n}<small>${s}</small></span>${l ? `<span class="pill ${k}">${l}</span>` : '<span></span>'}</div>`).join('')
+    if (withDone) h += `<div class="sect">Done this week</div>` + TODO.done.map(([n, s]) => `<div class="todo"><span>${n}<small>${s}</small></span><span></span></div>`).join('')
+    return h
+  }
+  function feed(head = true) {
+    const list = S.tab === 'unread' ? S.items.filter(i => i.unread) : S.items
+    return `${head ? `<div class="phead"><h2>Notifications</h2><button class="link" data-act="all">Mark all as read</button></div>` : ''}
+      <div class="ptabs" role="tablist"><button class="ptab" role="tab" data-tab="all" aria-selected="${S.tab === 'all'}">All</button><button class="ptab" role="tab" data-tab="unread" aria-selected="${S.tab === 'unread'}">Unread<span class="n">${unread()}</span></button></div>
+      ${rows(list)}
+      <div class="pfoot"><button class="link">Notification settings</button><button class="link">See all</button></div>`
+  }
+
+  function panel() {
+    if (!S.open) return ''
+    if (S.opt === 'a') {
+      if (S.open === 'bell') return `<div class="panel" role="dialog" aria-label="Notifications">${feed()}</div>`
+      return `<div class="panel" role="dialog" aria-label="Inbox"><div class="phead"><h2>Inbox</h2><span class="cap" style="color:var(--muted)">What needs you</span></div>${todoRows(true)}</div>`
+    }
+    if (S.opt === 'b') {
+      const t = S.inboxTab === 'todo' ? 'todo' : 'feed'
+      return `<div class="panel" role="dialog" aria-label="Notifications"><div class="phead"><h2>Notifications</h2>${t === 'feed' ? '<button class="link" data-act="all">Mark all as read</button>' : ''}</div>
+        <div class="ptabs" role="tablist"><button class="ptab" role="tab" data-itab="feed" aria-selected="${t === 'feed'}">Activity<span class="n">${unread()}</span></button><button class="ptab" role="tab" data-itab="todo" aria-selected="${t === 'todo'}">To do<span class="n">${todoCount}</span></button></div>
+        ${t === 'feed' ? feed(false).replace('<div class="ptabs"', '<div class="ptabs" style="top:92px"') : todoRows(true)}</div>`
+    }
+    const t = S.inboxTab
+    return `<div class="panel" role="dialog" aria-label="Inbox"><div class="phead"><h2>Inbox</h2>${t === 'feed' ? '<button class="link" data-act="all">Mark all as read</button>' : ''}</div>
+      <div class="ptabs" role="tablist"><button class="ptab" role="tab" data-itab="todo" aria-selected="${t === 'todo'}">To do<span class="n">${todoCount}</span></button><button class="ptab" role="tab" data-itab="feed" aria-selected="${t === 'feed'}">Notifications<span class="n">${unread()}</span></button><button class="ptab" role="tab" data-itab="done" aria-selected="${t === 'done'}">Done</button></div>
+      ${t === 'todo' ? todoRows(false) : t === 'done' ? `<div class="sect">Done this week</div>` + TODO.done.map(([n, s]) => `<div class="todo"><span>${n}<small>${s}</small></span><span></span></div>`).join('') : feed(false).replace('<div class="ptabs"', '<div class="ptabs" style="top:92px"')}</div>`
+  }
+
+  function header() {
+    const n = unread()
+    const right = S.opt === 'a' ? `${bell(n)}${inbox(todoCount, true)}`
+      : S.opt === 'b' ? bell(n + todoCount)
+      : inbox(n + todoCount, true)
+    return `<div class="top"><div class="tabs"><span class="tab on">Pipeline</span><span class="tab">Content</span></div>
+      <div class="search">🔍 <span>Search tasks, campaigns, assets…</span></div>${right}<span class="vr"></span><span class="avatar">RS</span></div>
+      <div class="titlerow"><h2 class="title">Pipeline <span style="color:var(--tick)">⚡</span></h2><span class="cta">+ New task</span></div>
+      <div class="cols">${['#8B5CF6', '#2563EB', '#7C3AED', '#EA580C', '#16A34A'].map((c, i) => `<div class="col" style="--c:${c}">${['TO DO', 'C-IN PROGRESS', 'C-REVIEW', 'D-IN PROGRESS', 'READY TO PUBLISH'][i]}<div class="ghost"></div><div class="ghost"></div></div>`).join('')}</div>`
+  }
+
+  const NOTES = {
+    a: [['good', 'What works', ['Each button has one job: the bell is “what happened”, the Inbox is “what you have to do”.', 'It matches Facebook’s bell, as asked: a red count and the All and Unread tabs.', 'Spec 006 stays almost as it is. Mentions and Team move from the Inbox into the bell, where they get read state, grouping and history.']],
+        ['warn', 'Watch for', ['Two counts in the header. They count different things, so they need to look different: red for the bell, purple or orange for the Inbox.', 'The header gains one 44 px button. The spec 011 top bar has room for it.']],
+        ['', 'What moves', ['Inbox → bell: the Mentions and Team tabs.', 'The Inbox keeps Reviews waiting, Your tasks and Done.', 'Toasts come from the bell.']]],
+    b: [['good', 'What works', ['One button, one count, as on Facebook.', 'The header stays as calm as it is today.']],
+        ['warn', 'Watch for', ['The count mixes events with work you have to do, so it never gets to zero while you have tasks open.', '“Mark all as read” can’t clear the To do list, which makes the badge harder to trust.', 'It undoes the Inbox you approved in spec 006, along with its summary line and pinning.']],
+        ['', 'What moves', ['The Inbox’s lists move into the bell as a “To do” tab.', 'The Inbox button is removed.']]],
+    c: [['good', 'What works', ['No new header button.', 'Everything stays in one familiar panel.']],
+        ['warn', 'Watch for', ['It isn’t the Facebook pattern you asked for: there’s no bell.', 'One count again mixes events with tasks.', 'Notifications sit one tab deep, so new events are easier to miss.']],
+        ['', 'What moves', ['Mentions and Team merge into a Notifications tab.', 'The Inbox count adds unread notifications.']]],
+  }
+
+  const frame = document.getElementById('frame'), notesEl = document.getElementById('notes')
+  function render() {
+    document.querySelectorAll('.pick').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.opt === S.opt)))
+    frame.innerHTML = header() + panel() + (S.toast ? `<div class="toast" data-act="toast" role="status"><i style="background:${P.Salma}">S</i><span><b>Salma</b> commented on <b>Retreat Banner</b><br><span style="opacity:.75">“Can we try it with the team photo?” · now</span></span></div>` : '')
+    notesEl.innerHTML = NOTES[S.opt].map(([k, h, li]) => `<div class="note ${k}"><h3>${h}</h3><ul>${li.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')
+  }
+  document.querySelector('.picker').addEventListener('click', e => {
+    const b = e.target.closest('.pick'); if (!b) return
+    S.opt = b.dataset.opt; S.open = S.opt === 'a' ? 'bell' : S.opt === 'b' ? 'bell' : 'inbox'; S.inboxTab = S.opt === 'c' ? 'feed' : 'feed'; render()
+  })
+  frame.addEventListener('click', e => {
+    const o = e.target.closest('[data-open]'); if (o) { S.open = S.open === o.dataset.open ? null : o.dataset.open; render(); return }
+    const t = e.target.closest('[data-tab]'); if (t) { S.tab = t.dataset.tab; render(); return }
+    const it = e.target.closest('[data-itab]'); if (it) { S.inboxTab = it.dataset.itab; render(); return }
+    if (e.target.closest('[data-act="all"]')) { S.items.forEach(i => { i.unread = false }); render(); return }
+    if (e.target.closest('[data-act="toast"]')) { S.toast = null; S.open = S.opt === 'c' ? 'inbox' : 'bell'; S.inboxTab = 'feed'; render(); return }
+    const r = e.target.closest('[data-read]'); if (r) { const i = S.items.find(x => x.id === +r.dataset.read); i.unread = !i.unread; render(); return }
+    if (!e.target.closest('.panel')) { S.open = null; render() }
+  })
+  frame.addEventListener('keydown', e => { if (e.key === 'Escape' && S.open) { S.open = null; render() } if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-read]')) { e.preventDefault(); e.target.click() } })
+  let timer
+  document.getElementById('simulate').addEventListener('click', () => {
+    if (!S.items.some(i => i.id === 99)) S.items.unshift({ id: 99, kind: 'comment', actors: ['Salma'], html: '<b>Salma</b> commented on <b>Retreat Banner</b>', snip: 'Can we try it with the team photo?', time: 'now', unread: true })
+    S.toast = true; render(); clearTimeout(timer); timer = setTimeout(() => { S.toast = null; render() }, 5000)
+  })
+  S.open = 'bell'
+  render()
+})()
+</script>

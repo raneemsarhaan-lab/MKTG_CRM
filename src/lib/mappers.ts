@@ -29,6 +29,8 @@ export function mapMember(m: any): Member {
     // no password and cannot sign in until one is set, and nothing in the UI
     // said so — which is how "why can't this person log in?" happens.
     has_password:    m.password_hash != null ? true : m.password_hash === null ? false : undefined,
+    locale:          m.locale === 'ar' ? 'ar' : m.locale === 'en' ? 'en' : undefined,
+    gender:          m.gender === 'f' || m.gender === 'm' ? m.gender : undefined,
   }
 }
 
@@ -58,6 +60,8 @@ export function mapComment(c: any): TaskComment & { author?: Member } {
     body:       c.body,
     mentions:   c.mentions ?? [],
     task_refs:  c.task_refs ?? [],
+    // Spec 012 R4: which comment this replies to, so the panel threads it.
+    parent_id:  c.parent_id ?? null,
     created_at: toIsoStr(c.created_at),
   }
 }

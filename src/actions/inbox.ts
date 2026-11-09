@@ -1,8 +1,9 @@
 'use server'
 
 /**
- * The Board Inbox's own records (spec 006 contracts/server.md): mention read
- * state, put-off tasks and the member's two Inbox preferences.
+ * The Board Inbox's own records (spec 006 contracts/server.md): put-off tasks
+ * and the member's two Inbox preferences. Mentions moved to the notification
+ * bell (spec 012 R12), so their read state and the in-place reply went too.
  *
  * Every action acts for the signed-in member only and never takes a member id
  * (§III): one member's read state or snoozes are nobody else's to change.
@@ -18,63 +19,6 @@ type Result = { success: true } | { success: false; error: string }
 const MAX_IDS = 500
 /** A put-off task comes back by the next local midnight; never more than this (R6). */
 const MAX_SNOOZE_MS = 36 * 60 * 60 * 1000
-const MAX_REPLY = 4000
-
-/** Mark mentions of the member read (FR-031). Ids that are not their mentions are ignored. */
-export async function markMentionsRead(commentIds: string[]): Promise<Result> {
-  const member = await getSessionMember()
-  if (!member) return { success: false, error: 'not_authenticated' }
-  const ids = [...new Set(commentIds)].slice(0, MAX_IDS)
-  if (!ids.length) return { success: true }
-  const mine = await prisma.taskComment.findMany({
-    where: { id: { in: ids }, mentions: { has: member.id } },
-    select: { id: true },
-  })
-  if (mine.length) {
-    await prisma.mentionRead.createMany({
-      data: mine.map(c => ({ member_id: member.id, comment_id: c.id })),
-      skipDuplicates: true,
-    })
-  }
-  revalidatePath('/board')
-  return { success: true }
-}
-
-/**
- * Reply to a mention in place (FR-032): a comment on the same task naming the
- * author, and the mention marked read, together.
- */
-export async function replyToMention(commentId: string, body: string): Promise<Result> {
-  const member = await getSessionMember()
-  if (!member) return { success: false, error: 'not_authenticated' }
-  const text = body.trim()
-  if (!text) return { success: false, error: 'empty' }
-  if (text.length > MAX_REPLY) return { success: false, error: 'too_long' }
-
-  const original = await prisma.taskComment.findUnique({
-    where: { id: commentId },
-    select: { id: true, task_id: true, author_id: true, mentions: true, author: { select: { name: true } } },
-  })
-  if (!original || !original.mentions.includes(member.id)) return { success: false, error: 'not_found' }
-
-  // Name the author at the start, as the composer would, unless already named.
-  const first = original.author.name.split(' ')[0]
-  const named = text.toLowerCase().includes(`@${first.toLowerCase()}`) ? text : `@${first} ${text}`
-
-  await prisma.$transaction([
-    prisma.taskComment.create({
-      data: { task_id: original.task_id, author_id: member.id, body: named, mentions: [original.author_id], task_refs: [] },
-    }),
-    prisma.mentionRead.upsert({
-      where: { member_id_comment_id: { member_id: member.id, comment_id: original.id } },
-      create: { member_id: member.id, comment_id: original.id },
-      update: {},
-    }),
-  ])
-  revalidatePath('/board')
-  revalidatePath('/overview')
-  return { success: true }
-}
 
 /** Put a task off until `until` (the member's next local midnight), at most 36 h ahead (FR-027). */
 export async function snoozeTask(taskId: string, until: string): Promise<Result> {

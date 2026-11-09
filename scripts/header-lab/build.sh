@@ -14,6 +14,7 @@ node "$LAB/gen.mjs" "$ROOT" "$OUT"
 "$ROOT/node_modules/.bin/esbuild" "$LAB/entry.tsx" \
   --bundle --outfile="$OUT/bundle.js" --jsx=automatic --format=iife \
   --alias:@="$ROOT/src" \
+  --alias:next/navigation="$ROOT/scripts/notify-lab/stubs/navigation.ts" --alias:next/link="$ROOT/scripts/notify-lab/stubs/link.tsx" \
   --define:process.env.NODE_ENV='"development"' \
   --log-level=warning
 

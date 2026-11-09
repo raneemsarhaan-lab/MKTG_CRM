@@ -13,6 +13,7 @@ import { getSessionMember } from '@/lib/authz'
 import type { Prisma } from '@prisma/client'
 import type { AudienceKey, FrequencyPeriod, LinkRole, StageId } from '@/types/index'
 import { LINK_CONTENT_TYPE } from '@/lib/attachments'
+import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import { periodStart } from '@/components/content/summary'
 import {
@@ -240,6 +241,17 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
       }
       return res
     }, { timeout: 60_000 })
+    // Spec 012: one notification per stage holder for the whole paste; owners follow their pieces.
+    if (out.created.length) {
+      const created = out.created
+      await notifyAfter(async tx => {
+        const owners = await tx.task.findMany({ where: { id: { in: created } }, select: { id: true, task_owner_id: true } })
+        await tx.taskFollower.createMany({ data: owners.map(t => ({ task_id: t.id, member_id: t.task_owner_id })), skipDuplicates: true })
+        return notify(tx, created.length === 1
+          ? { kind: 'task_created_in_stage', actorId: member.id, taskId: created[0] }
+          : { kind: 'task_created_in_stage', actorId: member.id, taskId: created[0], pasteId: `plan:${created[0]}`, pasteCount: created.length })
+      })
+    }
     done()
     return { success: true, ...out }
   } catch (e: unknown) {
@@ -278,6 +290,13 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
       task_owner_id: owner, assignee_id: assignee, initiator_role: member.role, status: 'todo', stage_date: new Date(),
       hours_estimate: 0, priority: 'Medium', created_by: member.id,
     },
+  })
+  // Spec 012: the theme's people follow it; the stage holders and a new assignee hear about it.
+  await notifyAfter(async tx => {
+    for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
+    const ids = await notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
+    if (task.assignee_id && task.assignee_id !== member.id) ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId: task.id, assigneeId: task.assignee_id }))
+    return ids
   })
   done()
   return { success: true, id: task.id }
@@ -333,6 +352,7 @@ export async function setPieceLink(taskId: string, role: LinkRole, url: string):
   const v = (url ?? '').trim()
   if (v && !isWebLink(v)) return { success: false, error: 'bad_link' }
   const row = await setRoleLink(prisma, taskId, role, v || null, member.id)
+  if (row && v) await notifyAfter(tx => notify(tx, { kind: 'attachment', actorId: member.id, taskId, attachmentId: row.id, count: 1 }))
   done(['/board'])
   return { success: true, row: row ? { id: row.id, filename: row.filename, url: row.url ?? v, link_role: role, uploaded_at: row.uploaded_at.toISOString() } : null }
 }

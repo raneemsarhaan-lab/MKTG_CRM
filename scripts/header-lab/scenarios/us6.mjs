@@ -18,18 +18,18 @@ export const us6 = [
     async run(t) {
       await t.page.locator('body').click({ position: { x: 5, y: 5 } })
       const order = []
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 13; i++) {
         await t.page.keyboard.press('Tab')
         order.push(await t.page.evaluate(() => {
           const e = document.activeElement
-          return e?.getAttribute('data-tab') ? 'tab' : e?.hasAttribute('data-header-search') ? 'search' : e?.hasAttribute('data-inbox-button') ? 'inbox'
+          return e?.getAttribute('data-tab') ? 'tab' : e?.hasAttribute('data-header-search') ? 'search' : e?.hasAttribute('data-bell') ? 'bell' : e?.hasAttribute('data-inbox-button') ? 'inbox'
             : e?.hasAttribute('data-account') ? 'account' : e?.hasAttribute('data-new-task') ? 'new' : e?.getAttribute('data-scope') ? 'scope'
             : e?.hasAttribute('data-brand-menu') ? 'brands' : e?.hasAttribute('data-filters') ? 'filters' : e?.closest('[data-view-pair]') ? 'pair'
             : e?.hasAttribute('data-display-options') ? 'display' : e?.tagName
         }))
       }
       const seen = order.filter((x, i) => order.indexOf(x) === i)
-      t.eq(seen.slice(0, 10), ['tab', 'search', 'inbox', 'account', 'new', 'scope', 'brands', 'filters', 'pair', 'display'], 'screen order')
+      t.eq(seen.slice(0, 11), ['tab', 'search', 'bell', 'inbox', 'account', 'new', 'scope', 'brands', 'filters', 'pair', 'display'], 'screen order (the bell before the Inbox, spec 012)')
     },
   },
   {
@@ -37,6 +37,7 @@ export const us6 = [
     async run(t) {
       await t.page.locator('[data-tab="pipeline"]').focus()
       await t.page.keyboard.press('ArrowRight')
+      await t.page.waitForTimeout(80) // focus moves on the next frame
       t.eq((await t.host()).view, 'content', '→ moves to Content')
       t.eq(await t.page.evaluate(() => document.activeElement?.getAttribute('data-tab')), 'content', 'focus follows')
     },

@@ -1,18 +1,19 @@
 // Inbox lab scenarios (spec 006): one or more per acceptance scenario, then
 // keyboard, right to left, phone, axe and speed. Raneem's starting Inbox is in
 // fixtures.ts: reviews r1 r2, yours y1 (late) y2 (today) y3 (undated),
-// unread mentions m2 m1, total 7.
+// total 5. Mentions and Team moved to the notification bell (spec 012 R12):
+// the Inbox has To do and Done, and its number counts the to-dos only.
 
 export const SCENARIOS = [
   // ── US1: see how much needs me, open it in one click ─────────────────────
   {
     id: 'us1-1',
     async run(t) {
-      t.eq(await t.count(), 7, 'the number: 2 reviews + 3 tasks + 2 mentions')
+      t.eq(await t.count(), 5, 'the number: 2 reviews + 3 tasks (mentions are in the bell)')
       t.eq((await t.summary()).trim(), '2 reviews waiting · 1 late', 'the two most pressing kinds')
-      t.eq(await t.page.locator('[data-inbox-badge]').innerText(), '7', 'badge')
+      t.eq(await t.page.locator('[data-inbox-badge]').innerText(), '5', 'badge')
       t.assert(await t.page.locator('[data-inbox-badge].is-urgent').count() === 1, 'urgent colour (due today and late)')
-      t.eq(await t.page.getByRole('button', { name: /^Inbox\s*2 reviews waiting · 1 late\s*, 5 to do, 2 unread mentions$/ }).count(), 1, 'visible words, then the counts in words (FR-013)')
+      t.eq(await t.page.getByRole('button', { name: /^Inbox\s*2 reviews waiting · 1 late\s*, 5 to do$/ }).count(), 1, 'visible words, then the counts in words (FR-013)')
       t.eq(await t.button().getAttribute('aria-expanded'), 'false', 'collapsed')
       t.assert(!(await t.panelOpen()), 'hidden by default')
     },
@@ -25,12 +26,11 @@ export const SCENARIOS = [
       t.eq(await t.selectedTab(), 'todo', 'opens on To do')
       t.eq(await t.rows('review'), ['r1', 'r2'], 'reviews')
       t.eq(await t.rows('yours'), ['y1', 'y2', 'y3'], 'your tasks')
-      t.eq((await t.page.locator('[data-inbox-counts]').innerText()).trim(), '5 to do · 2 unread mentions', 'heading')
+      t.eq((await t.page.locator('[data-inbox-counts]').innerText()).trim(), '5 to do', 'heading')
       // The same items the number counts (SC-002).
       const listed = (await t.rows('review')).length + (await t.rows('yours')).length
-      await t.tab('mentions')
-      const unread = await t.page.locator('[data-row^="mention:"].is-unread').count()
-      t.eq(listed + unread, await t.count(), 'number equals listed items')
+      t.eq(listed, await t.count(), 'number equals listed items')
+      t.eq(await t.page.$$eval('[data-inbox-panel] [role="tab"]', ts => ts.map(x => x.getAttribute('data-tab'))), ['todo', 'done'], 'two tabs: To do and Done (spec 012)')
     },
   },
   {
@@ -65,7 +65,7 @@ export const SCENARIOS = [
       t.eq(await t.page.getByRole('button', { name: /^Inbox\s*All clear$/ }).count(), 1, 'name')
       await t.openInbox()
       t.eq((await t.page.locator('[data-inbox-counts]').innerText()).trim(), 'All clear', 'the panel says All clear')
-      t.eq(await t.selectedTab(), 'team', 'To do and Mentions empty: opens on Team (FR-016)')
+      t.eq(await t.selectedTab(), 'todo', 'opens on To do (FR-016, spec 012)')
     },
   },
   {
@@ -127,7 +127,7 @@ export const SCENARIOS = [
       t.eq(await t.calls('move'), [['r1', 'r-design']], 'moved to the next stage')
       t.eq((await t.lab()).celebrations.map(c => c.stage), ['r-design'], 'celebrates: her own stage, forward')
       t.eq(await t.rows('review'), ['r2'], 'the row leaves')
-      t.eq(await t.count(), 6, 'the number drops')
+      t.eq(await t.count(), 4, 'the number drops')
     },
   },
   {
@@ -186,7 +186,7 @@ export const SCENARIOS = [
       t.eq(id, 'y1', 'put off')
       t.eq(new Date(until).getTime(), new Date('2026-11-06T00:00').getTime(), 'until the next local midnight')
       t.eq(await t.rows('yours'), ['y2', 'y3'], 'the row leaves')
-      t.eq(await t.count(), 6, 'and the number')
+      t.eq(await t.count(), 4, 'and the number')
       t.assert(/Put off until tomorrow · 1/.test(await t.page.locator('[data-inbox-snoozed]').innerText()), 'the Put off line')
       await t.page.locator('[data-inbox-snoozed] button').click()
       await t.idle(250)
@@ -204,7 +204,7 @@ export const SCENARIOS = [
       await t.idle(250)
       t.eq(await t.calls('setDate'), [['y3', '2026-11-10']], 'saved')
       t.eq(await t.rows('yours'), ['y1', 'y2'], 'no longer needs a decision today')
-      t.eq(await t.count(), 6, 'the number drops')
+      t.eq(await t.count(), 4, 'the number drops')
     },
   },
   {
@@ -228,99 +228,7 @@ export const SCENARIOS = [
     },
   },
 
-  // ── US4: mentions ────────────────────────────────────────────────────────
-  {
-    id: 'us4-1',
-    async run(t) {
-      await t.openInbox()
-      t.eq((await t.page.locator('[data-tab="mentions"]').innerText()).replace(/\s+/g, ' ').trim(), 'Mentions 2 new', 'tab shows new')
-      await t.tab('mentions')
-      t.eq(await t.rows('mention'), ['m2', 'm1', 'm0'], 'unread first, newest first')
-      t.eq(await t.page.locator('[data-row="mention:m0"].is-unread').count(), 0, 'older than the launch window: read (FR-034)')
-      const m1 = await t.row('mention:m1').innerText()
-      t.assert(/Yosra Eltopgy mentioned you/.test(m1) && /Suez Canal/.test(m1) && /headline before 3pm/.test(m1) && /1d ago/.test(m1), 'author, task, text, age')
-    },
-  },
-  {
-    id: 'us4-2',
-    async run(t) {
-      await t.openInbox(); await t.tab('mentions')
-      await t.act('mention:m2', 'markRead').click()
-      await t.idle(200)
-      t.eq(await t.calls('markRead'), [[['m2']]], 'marked read')
-      t.eq(await t.count(), 6, 'number drops')
-      t.eq(await t.rows('mention'), ['m1', 'm2', 'm0'], 'read ones go below')
-    },
-  },
-  {
-    id: 'us4-3',
-    async run(t) {
-      await t.openInbox(); await t.tab('mentions')
-      await t.page.locator('[data-row="mention:m1"] input').fill('Version B. Shorter.')
-      await t.act('mention:m1', 'reply').click()
-      await t.idle(200)
-      t.eq(await t.calls('reply'), [['m1', 'Version B. Shorter.']], 'reply in place')
-      t.eq(await t.count(), 6, 'replying reads it')
-      t.eq(await t.page.locator('[data-row="mention:m1"] input').inputValue(), '', 'box cleared')
-    },
-  },
-  {
-    id: 'us4-4',
-    async run(t) {
-      await t.openInbox(); await t.tab('mentions')
-      await t.page.locator('[data-act="markAllRead"]').click()
-      await t.idle(200)
-      t.eq(await t.calls('markRead'), [[['m2', 'm1']]], 'all unread')
-      t.eq(await t.count(), 5, 'only To do left')
-      t.eq((await t.page.locator('[data-tab="mentions"]').innerText()).trim(), 'Mentions', 'no new count')
-    },
-  },
-  {
-    id: 'us4-5',
-    async run(t) {
-      await t.openInbox(); await t.tab('mentions'); await t.tab('team'); await t.tab('mentions')
-      await t.page.keyboard.press('Escape'); await t.idle()
-      t.eq(await t.calls('markRead'), [], 'looking marks nothing read (FR-031)')
-      t.eq(await t.count(), 7, 'number unchanged')
-      await t.openInbox(); await t.tab('mentions')
-      await t.row('mention:m1').locator('.fx-inbox-main').click()
-      await t.idle(200)
-      t.eq(await t.calls('markRead'), [[['m1']]], 'opening the task from the mention reads it')
-      t.eq((await t.lab()).opened, [{ id: 'r1', opts: { commentId: 'm1' } }], 'at that comment')
-    },
-  },
-
-  // ── US5: Team ────────────────────────────────────────────────────────────
-  {
-    id: 'us5-1',
-    async run(t) {
-      await t.openInbox(); await t.tab('team')
-      const keys = await t.rows('team')
-      t.assert(keys.includes('c:c1') && keys.includes('a:a1'), `others' comment and file (${keys})`)
-      t.assert(!keys.includes('c:c2') && !keys.includes('a:a0'), 'not my own')
-      t.assert(!keys.some(k => k.startsWith('c:m')), 'mentions live in Mentions')
-      t.assert(/Sara Nabil added cover_v3.png/.test(await t.row('team:a:a1').innerText()), 'names the uploader')
-    },
-  },
-  {
-    id: 'us5-2',
-    async run(t) {
-      await t.openInbox(); await t.tab('team')
-      const move = await t.row('team:s:y2').innerText()
-      t.assert(/Moved to D-In Progress/.test(move) && /yesterday/.test(move), `stage and day (${move})`)
-      t.assert(!/Raneem|Sara|just now/.test(move), 'no name, never "just now" (FR-041)')
-      t.eq(await t.row('team:s:y2').locator('.fx-person-av').count(), 0, 'no avatar')
-    },
-  },
-  {
-    id: 'us5-3',
-    async run(t) {
-      await t.openInbox(); await t.tab('team')
-      await t.row('team:c:c1').locator('.fx-inbox-main').click()
-      await t.idle()
-      t.eq((await t.lab()).opened, [{ id: 'y1', opts: { commentId: 'c1' } }], 'opens the task at the comment')
-    },
-  },
+  // ── US4 and US5 (Mentions, Team) moved to the notification bell: lab:notify ──
 
   // ── US6: Done ────────────────────────────────────────────────────────────
   {
@@ -409,8 +317,8 @@ export const SCENARIOS = [
       await t.idle(200)
       t.eq(await t.focused(), 'tab:todo', 'focus on the selected tab')
       await t.page.keyboard.press('ArrowRight'); await t.idle(60)
-      t.eq(await t.focused(), 'tab:mentions', 'arrows move between tabs')
-      t.eq(await t.selectedTab(), 'mentions', 'and select')
+      t.eq(await t.focused(), 'tab:done', 'arrows move between tabs')
+      t.eq(await t.selectedTab(), 'done', 'and select')
       await t.page.keyboard.press('End'); await t.idle(60)
       t.eq(await t.focused(), 'tab:done', 'End')
       await t.page.keyboard.press('Home'); await t.idle(60)
@@ -434,14 +342,14 @@ export const SCENARIOS = [
       t.assert(box.x < 40, `opens from the left (${box.x})`)
       t.eq((await t.page.locator('[data-tab="todo"]').innerText()).replace(/\s+/g, ' ').trim(), 'للإنجاز 5', 'Arabic tabs')
       t.assert(/\d/.test(await t.page.locator('[data-inbox-badge]').innerText()), 'digits')
-      for (const tab of ['mentions', 'team', 'done']) await t.tab(tab)
+      await t.tab('done')
     },
   },
   {
     id: 'inbox-phone', viewport: { width: 390, height: 844 }, touch: true,
     async run(t) {
       t.assert(!(await t.page.locator('[data-inbox-summary]').isVisible()), 'no summary line on a phone')
-      t.eq(await t.page.locator('[data-inbox-badge]').innerText(), '7', 'keeps the number')
+      t.eq(await t.page.locator('[data-inbox-badge]').innerText(), '5', 'keeps the number')
       await t.openInbox()
       const box = await t.page.locator('[data-inbox-panel]').boundingBox()
       t.eq([Math.round(box.x), Math.round(box.width)], [0, 390], 'full width')
@@ -458,7 +366,7 @@ export const SCENARIOS = [
       const closed = await t.axe('[data-inbox-button]')
       t.eq(closed, [], 'button')
       await t.openInbox()
-      for (const tab of ['todo', 'mentions', 'team', 'done']) {
+      for (const tab of ['todo', 'done']) {
         await t.tab(tab)
         t.eq(await t.axe('[data-inbox-panel]'), [], `panel, ${tab}`)
       }

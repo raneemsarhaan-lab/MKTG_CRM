@@ -51,7 +51,8 @@ export type SheetValues = Record<string, Record<string, string>>
 // ─── Board Inbox (spec 006) ──────────────────────────────────────────────────
 
 /** The Inbox panel's tabs, in order (FR-015). */
-export type InboxTab = 'todo' | 'mentions' | 'team' | 'done'
+/** Spec 012 R12: Mentions and Team moved to the notification bell. */
+export type InboxTab = 'todo' | 'done'
 /** Why one of your own tasks is in To do (FR-022). */
 export type InboxReason = 'late' | 'today' | 'undated'
 
@@ -100,6 +101,10 @@ export interface Member {
   has_password?: boolean
   /** Matches a SeniorityLevel key. Optional so older callers still compile. */
   seniority?: string
+  /** Spec 012 R13: the language phone alerts and emails use. */
+  locale?: 'en' | 'ar'
+  /** Spec 012 R6: for Arabic grammar; absent is the neutral phrasing. */
+  gender?: 'f' | 'm'
 }
 
 export interface Brand {
@@ -212,6 +217,8 @@ export interface TaskComment {
   mentions?: string[]
   /** Task ids linked with # in the body. */
   task_refs?: string[]
+  /** Spec 012: the top-level comment this replies to; null for a top-level comment. */
+  parent_id?: string | null
   created_at: string
 }
 
@@ -310,3 +317,43 @@ export interface WorkspaceSettings {
   nine_stage_default: boolean
   updated_at: string
 }
+
+// ─── Spec 012: task notifications ────────────────────────────────────────────
+
+/** What happened. The sentence is built at display time from these facts. */
+export type NotificationKind =
+  | 'comment' | 'reply' | 'attachment' | 'task_created_in_stage' | 'task_moved_to_stage'
+  | 'assigned' | 'mention' | 'due_soon' | 'overdue'
+export const NOTIFICATION_KINDS: NotificationKind[] = [
+  'mention', 'assigned', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
+]
+/** Where a member hears about it. */
+export type NotificationChannel = 'in_app' | 'push' | 'email'
+export type EmailMode = 'instant' | 'daily' | 'off'
+
+export interface NotificationMeta {
+  /** The task's name when the event happened, so a deleted task still reads. */
+  task_name: string
+  /** Up to 100 characters of the comment or reply. */
+  snippet?: string
+  /** Tasks added by one paste (Paste plan, Paste clips). */
+  paste_count?: number
+  due_date?: string
+}
+
+/** A notification as the browser sees it. */
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  taskId: string | null
+  commentId: string | null
+  attachmentId: string | null
+  stageId: string | null
+  /** Newest first. */
+  actorIds: string[]
+  count: number
+  meta: NotificationMeta
+  read: boolean
+  lastEventAt: string
+}
+

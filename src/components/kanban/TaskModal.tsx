@@ -32,6 +32,9 @@ import { URL_RE, trimUrl, hrefFor, hostOf, prettyPath } from '@/lib/links'
 import { useUIStore } from '@/store/useUIStore'
 import { unlinkStepFromTask } from '@/actions/projects'
 import { ProjectPicker } from '@/components/shared/ProjectPicker'
+import { useNotify } from '@/components/notifications/NotifyProvider'
+import { ReplyComposer } from './ReplyComposer'
+import { mentionedIn } from '@/lib/notify/mentions'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -100,6 +103,8 @@ interface TaskModalProps {
   initialPreviewId?: string
   /** Scroll to this comment and flash it, from the Inbox (spec 006 FR-042). */
   initialCommentId?: string
+  /** Open at Attachments, from an attachment notification (spec 012 R14). */
+  initialSection?: 'attachments'
   /**
    * "Open sheet" on a video or a clip (spec 008). The board passes its own
    * switch; elsewhere the button navigates to the board's sheet.
@@ -465,7 +470,7 @@ const fmtTime = (d: string | Date) =>
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
-  initialPreviewId, initialCommentId, onOpenSheet,
+  initialPreviewId, initialCommentId, initialSection, onOpenSheet,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -511,7 +516,9 @@ export function TaskModal({
         el.classList.add('fx-comment-flash')
         window.setTimeout(() => el.classList.remove('fx-comment-flash'), 1600)
       }
-      if (el || ++tries > 40) clearInterval(timer)
+      // Up to 10 s: from a notification the comment may still be on its way
+      // in with the board's refresh.
+      if (el || ++tries > 100) clearInterval(timer)
     }, 100)
     return () => clearInterval(timer)
   }, [initialCommentId, task.id])
@@ -544,6 +551,53 @@ export function TaskModal({
   const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
+
+  // From an attachment notification: open Attachments and bring it into view.
+  useEffect(() => {
+    if (initialSection !== 'attachments') return
+    let tries = 0
+    const timer = setInterval(() => {
+      const ready = document.querySelector('[data-att-count]')
+      if (ready) sectionRef.current?.reveal()
+      if (ready || ++tries > 40) clearInterval(timer)
+    }, 150)
+    return () => clearInterval(timer)
+  }, [initialSection, task.id])
+
+  /* Follow / Following (spec 012 US5, FR-011): read when the panel opens. */
+  const notify = useNotify()
+  const tn = useTranslations('notifications')
+  const [following, setFollowing] = useState<boolean | null>(null)
+  const [followBusy, setFollowBusy] = useState(false)
+  useEffect(() => {
+    if (!notify) return
+    let cancelled = false
+    setFollowing(null)
+    void notify.api.getFollow(task.id).then(r => { if (!cancelled && r.success) setFollowing(r.following) })
+    return () => { cancelled = true }
+  }, [notify, task.id])
+  async function toggleFollow() {
+    if (!notify || following === null) return
+    const next = !following
+    setFollowing(next); setFollowBusy(true)
+    const r = await notify.api.setFollow(task.id, next)
+    setFollowBusy(false)
+    if (!r.success) setFollowing(!next)
+  }
+
+  /* Replies (spec 012 R4): the thread being answered. */
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  useEffect(() => { setReplyTo(null) }, [task.id])
+  async function sendReply(parentId: string, body: string, mentions: string[]) {
+    const r = await addComment(task.id, body, mentions, [], parentId)
+    if (r.success) {
+      setReplyTo(null)
+      setFollowing(true)
+      router.refresh()
+      notify?.refresh()
+    }
+    return r
+  }
 
   // From a sheet's Files cell: open that file's preview once the files have loaded.
   useEffect(() => {
@@ -1201,6 +1255,54 @@ export function TaskModal({
    * entered the stage it is in, and every comment since. Nothing is inferred:
    * we do not keep a per-move history, so the log does not claim one.
    */
+  /* Top-level comments, and each one's replies (spec 012 R4). A reply whose
+     comment is gone shows on its own rather than vanishing. */
+  const { topComments, repliesOf } = useMemo(() => {
+    const ids = new Set(task.comments.map(c => c.id))
+    const tops: typeof task.comments = []
+    const by = new Map<string, typeof task.comments>()
+    for (const c of task.comments) {
+      if (c.parent_id && ids.has(c.parent_id)) by.set(c.parent_id, [...(by.get(c.parent_id) ?? []), c])
+      else tops.push(c)
+    }
+    for (const list of by.values()) list.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return { topComments: tops, repliesOf: by }
+  }, [task.comments])
+
+  /** A comment's text in its bubble: names, task links, files and link cards. */
+  function commentBody(c: TaskComment & { author?: Member }, atMe: boolean) {
+    // A comment that is nothing but a pasted link is fully represented by
+    // the rich preview card below it — showing the same address again as
+    // shortened inline text would just be the raw URL twice over.
+    const bodyUrls = urlsIn(c.body)
+    const onlyLinks = bodyUrls.length > 0 &&
+      !bodyUrls.reduce((acc, u) => acc.split(u).join(''), c.body).trim()
+    return (
+      <span style={{
+        display: 'block', marginTop: 6, padding: onlyLinks ? 0 : '8px 11px', borderRadius: 9,
+        background: onlyLinks ? 'transparent' : '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+        border: onlyLinks ? 'none' : `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
+        // A pasted URL is one unbroken word and will happily run out
+        // of the bubble and off the panel unless it is allowed to
+        // break mid-word.
+        overflowWrap: 'anywhere', minWidth: 0,
+      }}>
+        {!onlyLinks && withRefs(
+          c.body,
+          members,
+          (c.task_refs ?? [])
+            .map(id => allTasks.find(t => t.id === id))
+            .filter((t): t is TaskRef => !!t),
+          selectTask,
+          { list: attachments, open: id => { sectionRef.current?.openPreview(id) } },
+        )}
+        {/* Two cards at most: a comment that is a list of links should
+            stay a comment, not become a page of thumbnails. */}
+        {bodyUrls.slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
+      </span>
+    )
+  }
+
   const activity = useMemo(() => {
     const items: { id: string; when: Date; dot: string; node: React.ReactNode }[] = [
       {
@@ -1211,14 +1313,9 @@ export function TaskModal({
         id: 'stage', when: new Date(task.stage_date), dot: CU.green,
         node: <>Moved to <strong style={{ fontWeight: 600 }}>{stageMeta.label_en}</strong></>,
       },
-      ...task.comments.map(c => {
+      ...topComments.map(c => {
         const atMe = (c.mentions ?? []).includes(currentUser.id)
-        // A comment that is nothing but a pasted link is fully represented by
-        // the rich preview card below it — showing the same address again as
-        // shortened inline text would just be the raw URL twice over.
-        const bodyUrls = urlsIn(c.body)
-        const onlyLinks = bodyUrls.length > 0 &&
-          !bodyUrls.reduce((s, u) => s.split(u).join(''), c.body).trim()
+        const replies = repliesOf.get(c.id) ?? []
         return {
           id: c.id, when: new Date(c.created_at), dot: CU.blue,
           node: (
@@ -1232,36 +1329,47 @@ export function TaskModal({
                   mentioned you
                 </span>
               )}
-              <span style={{
-                display: 'block', marginTop: 6, padding: onlyLinks ? 0 : '8px 11px', borderRadius: 9,
-                background: onlyLinks ? 'transparent' : '#FFFFFF', color: CU.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-                border: onlyLinks ? 'none' : `1px solid ${atMe ? '#C9D9FF' : CU.line}`,
-                // A pasted URL is one unbroken word and will happily run out
-                // of the bubble and off the panel unless it is allowed to
-                // break mid-word.
-                overflowWrap: 'anywhere', minWidth: 0,
-              }}>
-                {!onlyLinks && withRefs(
-                  c.body,
-                  members,
-                  (c.task_refs ?? [])
-                    .map(id => allTasks.find(t => t.id === id))
-                    .filter((t): t is TaskRef => !!t),
-                  selectTask,
-                  { list: attachments, open: id => { sectionRef.current?.openPreview(id) } },
-                )}
-                {/* Two cards at most: a comment that is a list of links should
-                    stay a comment, not become a page of thumbnails. */}
-                {bodyUrls.slice(0, 2).map(u => <LinkCard key={u} url={u} />)}
-              </span>
+              {commentBody(c, atMe)}
+              {/* Replies (spec 012 R4): one level, oldest first, under their comment. */}
+              <button type="button" className="fx-nt-reply-btn" data-reply={c.id}
+                      onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}>
+                {tn('reply')}{replies.length > 0 && ` · ${tn('replies', { n: replies.length })}`}
+              </button>
+              {(replies.length > 0 || replyTo === c.id) && (
+                <div className="fx-nt-thread" data-thread={c.id}>
+                  {replies.map(r => (
+                    <div key={r.id} className="fx-nt-reply" data-comment-id={r.id} data-reply-of={c.id}>
+                      <span className="fx-nt-reply-head">
+                        <strong style={{ fontWeight: 600 }}>{r.author?.name ?? 'Someone'}</strong>
+                        <time dateTime={r.created_at}>{fmtTime(r.created_at)}</time>
+                      </span>
+                      {commentBody(r, (r.mentions ?? []).includes(currentUser.id))}
+                      <button type="button" className="fx-nt-reply-btn" data-reply={r.id}
+                              onClick={() => setReplyTo(c.id)}>
+                        {tn('reply')}
+                      </button>
+                    </div>
+                  ))}
+                  {replyTo === c.id && (
+                    <ReplyComposer
+                      members={members}
+                      meId={currentUser.id}
+                      replyingTo={c.author?.name ?? ''}
+                      onSend={(body, mentions) => sendReply(c.id, body, mentions)}
+                      onCancel={() => setReplyTo(null)}
+                    />
+                  )}
+                </div>
+              )}
             </>
           ),
         }
       }),
     ]
     return items.sort((a, b) => a.when.getTime() - b.when.getTime())
-  }, [task.created_at, task.stage_date, task.comments, task.task_owner.name,
-      stageMeta.label_en, members, currentUser.id, allTasks, selectTask])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.created_at, task.stage_date, topComments, repliesOf, task.task_owner.name,
+      stageMeta.label_en, members, currentUser.id, allTasks, selectTask, replyTo, attachments, tn])
 
   // ClickUp shows the first couple and hides the rest behind "Show more".
   const HEAD = 1
@@ -1344,7 +1452,16 @@ export function TaskModal({
             )}
           </div>
 
-          <span style={{ fontSize: 14, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
+          {notify && following !== null && (
+            <button type="button" className="fx-nt-follow" data-follow="" aria-pressed={following}
+                    disabled={followBusy} title={tn('followHint')} onClick={() => void toggleFollow()}>
+              <span aria-hidden="true">{following ? '✓' : '＋'}</span>
+              {/* Hidden visually on a phone, still the button's name. */}
+              <span className="fx-nt-follow-lbl">{following ? tn('following') : tn('follow')}</span>
+            </button>
+          )}
+
+          <span className="fx-tm-created" style={{ fontSize: 14, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
             Created {fmtShort(task.created_at)}
           </span>
 
@@ -1715,7 +1832,8 @@ export function TaskModal({
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}
-                  onSave={next => applyPatch({ description: next })}
+                  onSave={next => applyPatch({ description: next, description_mentions: mentionedIn(next, members.filter(m => m.id !== currentUser.id)) })}
+                  people={members.filter(m => m.id !== currentUser.id).map(m => ({ id: m.id, name: m.name, role: m.role, avatar_url: m.avatar_url }))}
                   onSaveStateChange={(state, pending) => { briefState.current = { state, pending } }}
                   onUploadImages={canEdit && hasStorage ? async file => {
                     const r = await uploadOne(file)

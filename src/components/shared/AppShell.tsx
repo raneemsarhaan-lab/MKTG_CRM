@@ -4,6 +4,8 @@ import type { Member } from '@/types/index'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
+import { NotifyProvider } from '@/components/notifications/NotifyProvider'
+import { notifyApi } from '@/components/notifications/api'
 
 interface AppShellProps {
   member: Member
@@ -31,6 +33,8 @@ interface AppShellProps {
  */
 export function AppShell({ member, children }: AppShellProps) {
   return (
+    // The notifications' pulse, toasts and opening (spec 012), once for the app.
+    <NotifyProvider api={notifyApi} meId={member.id} storedLocale={member.locale}>
     <div className="fx-shell" style={{
       // dvh, not vh: on a phone `100vh` is the window *without* the browser's
       // own bars, so a full-height page sits taller than the screen and the
@@ -48,5 +52,6 @@ export function AppShell({ member, children }: AppShellProps) {
       {/* Celebration overlay — global, mounts once */}
       <CelebrationOverlay />
     </div>
+    </NotifyProvider>
   )
 }

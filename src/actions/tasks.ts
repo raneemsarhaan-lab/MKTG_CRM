@@ -13,6 +13,8 @@ import { LINK_CONTENT_TYPE, linkLabel } from '@/lib/attachments'
 import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { allowedStages, holdsStage } from '@/lib/stage-moves'
 import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
+import { createComment } from '@/lib/comments'
+import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import type { StageId, MoveTaskResult } from '@/types/index'
 
 /**
@@ -60,6 +62,7 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
     where: { id: taskId },
     data:  { status: nextStage, stage_date: new Date(), updated_at: new Date() },
   })
+  await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -108,6 +111,7 @@ export async function setTaskStage(
     where: { id: taskId },
     data:  { status: stageId, stage_date: new Date(), updated_at: new Date() },
   })
+  await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -132,7 +136,9 @@ export async function addComment(
   body: string,
   mentions: string[] = [],
   taskRefs: string[] = [],
-): Promise<{ success: boolean; error?: string }> {
+  /** Spec 012 (R4): reply under this comment; a reply to a reply joins its thread. */
+  parentId?: string | null,
+): Promise<{ success: boolean; error?: string; id?: string }> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
@@ -157,16 +163,13 @@ export async function addComment(
     linked = rows.map(r => r.id)
   }
 
-  await prisma.taskComment.create({
-    data: {
-      task_id: taskId, author_id: member.id, body: text,
-      mentions: named, task_refs: linked,
-    },
-  })
+  // Spec 012: the comment, the author following the task, and its notifications.
+  const res = await createComment(member, { taskId, body: text, mentions: named, taskRefs: linked, parentId })
+  if (!res.ok) return { success: false, error: res.error }
 
   revalidatePath('/board')
   revalidatePath('/overview')
-  return { success: true }
+  return { success: true, id: res.id }
 }
 
 // ─── updateTask ─────────────────────────────────────────────────────────────
@@ -204,6 +207,8 @@ export interface TaskPatch {
   hours_estimate?:     number
   priority?:           'Low' | 'Medium' | 'High'
   cover_image_url?:    string
+  /** Spec 012 (R11): members @mentioned in the description, by id. */
+  description_mentions?: string[]
 }
 
 export async function updateTask(
@@ -248,7 +253,33 @@ export async function updateTask(
     data.hours_estimate = h
   }
 
+  // Spec 012 (R11): description mentions, checked against members; only new ones notify.
+  let newlyMentioned: string[] = []
+  if (patch.description_mentions !== undefined) {
+    const ids = [...new Set(patch.description_mentions)]
+    const real = ids.length ? (await prisma.member.findMany({ where: { id: { in: ids } }, select: { id: true } })).map(m => m.id) : []
+    data.description_mentions = real
+    newlyMentioned = real.filter(id => !task.description_mentions.includes(id) && id !== member.id)
+  }
+
   await prisma.task.update({ where: { id: taskId }, data })
+
+  // Spec 012: a new assignee hears about it and follows; new mentions too.
+  const newAssignee = patch.assignee_id !== undefined && patch.assignee_id && patch.assignee_id !== task.assignee_id ? patch.assignee_id : null
+  if (newAssignee || newlyMentioned.length) {
+    await notifyAfter(async tx => {
+      const ids: string[] = []
+      if (newAssignee) {
+        await follow(tx, taskId, newAssignee, { clearMute: true })
+        ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId, assigneeId: newAssignee }))
+      }
+      if (newlyMentioned.length) {
+        for (const m of newlyMentioned) await follow(tx, taskId, m, { clearMute: true })
+        ids.push(...await notify(tx, { kind: 'mention', actorId: member.id, taskId, commentId: null, mentionedIds: newlyMentioned }))
+      }
+      return ids
+    })
+  }
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -309,6 +340,10 @@ export async function createSubtask(
       priority:           parent.priority,
       created_by:         member.id,
     },
+  })
+  await notifyAfter(async tx => {
+    for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
+    return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
   })
 
   revalidatePath('/board')
@@ -571,6 +606,17 @@ export async function addClips(
       return { created, skipped, values }
     }, { timeout: 30_000 })
 
+    // Spec 012: one notification per stage holder for the whole paste; the adder follows each clip.
+    const created = result.created.map(c => c.id)
+    if (created.length) {
+      await notifyAfter(async tx => {
+        await tx.taskFollower.createMany({ data: created.map(id => ({ task_id: id, member_id: member.id })), skipDuplicates: true })
+        return notify(tx, created.length === 1
+          ? { kind: 'task_created_in_stage', actorId: member.id, taskId: created[0] }
+          : { kind: 'task_created_in_stage', actorId: member.id, taskId: created[0], pasteId: `clips:${created[0]}`, pasteCount: created.length })
+      })
+    }
+
     revalidatePath('/board')
     revalidatePath('/overview')
     return { success: true, ...result }
@@ -609,6 +655,7 @@ export async function addLinkAttachment(
   const row = await prisma.taskAttachment.create({
     data: { task_id: taskId, filename: linkLabel(link), url: link, content_type: LINK_CONTENT_TYPE, uploaded_by: member.id },
   })
+  await notifyAfter(tx => notify(tx, { kind: 'attachment', actorId: member.id, taskId, attachmentId: row.id, count: 1 }))
   revalidatePath('/board')
   return { success: true, row: shape(row) }
 }
@@ -742,6 +789,20 @@ export async function bulkUpdateTasks(
     if (Object.keys(data).length === 1) continue   // nothing but updated_at
     await prisma.task.update({ where: { id: task.id }, data })
     changed++
+    // Spec 012: each task's move and new assignee, as if done one by one.
+    const moved = data.status !== undefined
+    const assignee = data.assignee_id && data.assignee_id !== task.assignee_id ? data.assignee_id as string : null
+    if (moved || assignee) {
+      await notifyAfter(async tx => {
+        const ids: string[] = []
+        if (assignee) {
+          await follow(tx, task.id, assignee, { clearMute: true })
+          ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId: task.id, assigneeId: assignee }))
+        }
+        if (moved) ids.push(...await notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId: task.id }))
+        return ids
+      })
+    }
   }
 
   revalidatePath('/board')
@@ -827,6 +888,15 @@ export async function createTask(
       created_by:         member.id,
     },
   })
+  // Spec 012: the people on it follow; the stage's holders and a new assignee hear about it.
+  await notifyAfter(async tx => {
+    for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
+    const ids = await notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
+    if (task.assignee_id && task.assignee_id !== member.id) {
+      ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId: task.id, assigneeId: task.assignee_id }))
+    }
+    return ids
+  })
 
   revalidatePath('/board')
   return { success: true, id: task.id }
@@ -864,8 +934,10 @@ export async function createTasks(
   const due = new Date(shared.due_date)
 
   try {
+    const ids = clean.map(() => crypto.randomUUID())
     const result = await prisma.task.createMany({
-      data: clean.map(name => ({
+      data: clean.map((name, i) => ({
+        id: ids[i],
         name,
         description:        shared.description?.trim() || null,
         brand_id:           shared.brand_id,
@@ -884,6 +956,13 @@ export async function createTasks(
         cover_image_url:    shared.cover_image_url ?? null,
         created_by:         member.id,
       })),
+    })
+
+    // Spec 012: a pasted list is one notification per stage holder, not one per task.
+    await notifyAfter(async tx => {
+      const people = [...new Set([member.id, shared.task_owner_id, shared.assignee_id ?? shared.task_owner_id].filter((x): x is string => !!x))]
+      await tx.taskFollower.createMany({ data: ids.flatMap(t => people.map(m => ({ task_id: t, member_id: m }))), skipDuplicates: true })
+      return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: ids[0], pasteId: `list:${ids[0]}`, pasteCount: ids.length })
     })
 
     revalidatePath('/board')
@@ -956,7 +1035,7 @@ export async function addAttachments(
   try {
     // One row at a time so each comes back with its id; the size and type are
     // read off the data URL, which is the file exactly as picked.
-    const rows = []
+    const rows: { id: string; filename: string; uploaded_by: string | null; uploaded_at: string; size_bytes: number | null; content_type: string | null }[] = []
     for (const f of clean) {
       const comma = f.data.indexOf(',')
       const meta  = f.data.slice(5, comma)                  // "image/png;base64"
@@ -978,6 +1057,7 @@ export async function addAttachments(
     if (thumb && thumb.startsWith('data:') && thumb.length <= MAX_THUMB_CHARS) {
       await prisma.task.update({ where: { id: taskId }, data: { cover_thumb: thumb } })
     }
+    await notifyAfter(tx => notify(tx, { kind: 'attachment', actorId: member.id, taskId, attachmentId: (rows[rows.length - 1] as { id: string } | undefined)?.id ?? null, count: rows.length }))
 
     revalidatePath('/board')
     revalidatePath('/overview')

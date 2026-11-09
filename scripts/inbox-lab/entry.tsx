@@ -131,12 +131,8 @@ function Host() {
     },
     snooze: (taskId, until) => withInbox(s => ({ ...s, snoozes: { ...s.snoozes, [taskId]: until } }), () => call('snooze', [taskId, until], () => ({ success: true }))),
     unsnooze: ids => withInbox(s => { const z = { ...s.snoozes }; ids.forEach(id => delete z[id]); return { ...s, snoozes: z } }, () => call('unsnooze', [ids], () => ({ success: true }))),
-    markRead: ids => withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, ...ids])] }), () => call('markRead', [ids], () => ({ success: true }))),
-    reply: (commentId, body) => withInbox(s => ({ ...s, readIds: [...new Set([...s.readIds, commentId])] }), () => call('reply', [commentId, body], () => ({ success: true }))),
     setPrefs: savePrefs,
     openTask(taskId, opts) {
-      const m = model.mentions.find(x => x.comment.id === opts?.commentId && x.unread)
-      if (m) void api.markRead([m.comment.id])
       lab.opened.push({ id: taskId, opts })
       if (!inbox.pinned) setOpen(false)
     },

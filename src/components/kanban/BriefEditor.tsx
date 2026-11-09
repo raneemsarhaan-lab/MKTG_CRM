@@ -12,10 +12,11 @@ import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { TaskAttachment } from '@/types/index'
-import { Toggle, LinkShortcut, BriefImage, SlashCommand, Youtube, Toc, dismissSlash, getMarkdown, type SlashBridge, type SlashState } from './brief-editor/extensions'
+import { Toggle, LinkShortcut, BriefImage, SlashCommand, MentionCommand, Youtube, Toc, dismissSlash, dismissMention, getMarkdown, type SlashBridge, type SlashState, type MentionBridge, type MentionState, type MentionPerson } from './brief-editor/extensions'
 import { BriefTable, TableResize } from './brief-editor/tableEdges'
 import { TableMenu } from './brief-editor/TableMenu'
 import { SlashMenu } from './brief-editor/SlashMenu'
+import { MentionMenu } from './brief-editor/MentionMenu'
 import { blockItems, filterBlocks, insertYoutube, type BlockContext, type BlockItem } from './brief-editor/blocks'
 import { ImageUpload, insertImageBlock, blockSlot, type ImageUploadContext, type UploadResult, type UploadUnavailableReason } from './brief-editor/imageUpload'
 import { LinkCard } from './brief-editor/LinkCard'
@@ -84,6 +85,8 @@ interface BriefEditorProps {
    */
   onUploadImages?: (file: File) => Promise<UploadResult>
   uploadUnavailableReason?: UploadUnavailableReason
+  /** Who "@" offers (spec 012 R11). Absent → typing "@" opens nothing. */
+  people?: MentionPerson[]
 }
 
 export type { UploadResult, UploadUnavailableReason }
@@ -101,7 +104,7 @@ const STYLE_SAMPLE: Record<string, React.CSSProperties> = {
 
 export function BriefEditor({
   value, onSave, onSaveStateChange, onDone, initialCursor, attachments = [], onCreateSubtask,
-  onUploadImages, uploadUnavailableReason = 'not-created',
+  onUploadImages, uploadUnavailableReason = 'not-created', people = [],
 }: BriefEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   // A phone: one toolbar row that scrolls sideways, rarer actions in ⋯ (FR-071).
@@ -187,6 +190,33 @@ export function BriefEditor({
     },
   }
 
+  // The "@" menu (spec 012 R11), driven the same way as "/".
+  const [mention, setMention] = useState<MentionState | null>(null)
+  const [mentionActive, setMentionActive] = useState(0)
+  const mentionRef = useRef<{ state: MentionState | null; active: number }>({ state: null, active: 0 })
+  mentionRef.current = { state: mention, active: mentionActive }
+  const mentionBridge = useRef<MentionBridge>(null as unknown as MentionBridge)
+  mentionBridge.current = {
+    items: query => {
+      const q = query.trim().toLowerCase()
+      return people
+        .filter(p => !q || p.name.toLowerCase().includes(q) || (p.role ?? '').toLowerCase().includes(q))
+        .slice(0, 8)
+    },
+    show: state => {
+      setMention(state)
+      setMentionActive(a => (state && a < state.items.length ? a : 0))
+    },
+    key: event => {
+      const { state, active } = mentionRef.current
+      if (!state || !state.items.length) return false
+      if (event.key === 'ArrowDown') { setMentionActive((active + 1) % state.items.length); return true }
+      if (event.key === 'ArrowUp') { setMentionActive((active - 1 + state.items.length) % state.items.length); return true }
+      if (event.key === 'Enter' || event.key === 'Tab') { state.select(state.items[active]); return true }
+      return false
+    },
+  }
+
   // The size badge while a table is being resized (FR-067).
   const [badge, setBadge] = useState<{ text: string; x: number; y: number } | null>(null)
   const sizeBadge = useRef((text: string, x: number, y: number) => setBadge(text ? { text, x, y } : null))
@@ -226,6 +256,7 @@ export function BriefEditor({
       }),
       LinkShortcut.configure({ open: () => openLinkRef.current() }),
       SlashCommand.configure({ bridge: slashBridge }),
+      MentionCommand.configure({ bridge: mentionBridge }),
       TaskList,
       TaskItem.configure({ nested: true }),
       // allowBase64: an image picked from an older attachment stored in the
@@ -415,11 +446,14 @@ export function BriefEditor({
     if (slash && slash.items[slashActive]) {
       dom.setAttribute('aria-controls', 'brief-slash-menu')
       dom.setAttribute('aria-activedescendant', `brief-slash-${slash.items[slashActive].id}`)
+    } else if (mention && mention.items[mentionActive]) {
+      dom.setAttribute('aria-controls', 'brief-mention-menu')
+      dom.setAttribute('aria-activedescendant', `brief-mention-${mention.items[mentionActive].id}`)
     } else {
       dom.removeAttribute('aria-controls')
       dom.removeAttribute('aria-activedescendant')
     }
-  }, [editor, slash, slashActive])
+  }, [editor, slash, slashActive, mention, mentionActive])
 
   if (!editor) return null
 
@@ -610,6 +644,9 @@ export function BriefEditor({
 
         {slash && (
           <SlashMenu state={slash} active={slashActive} onClose={() => dismissSlash(editor)} />
+        )}
+        {mention && (
+          <MentionMenu state={mention} active={mentionActive} onClose={() => dismissMention(editor)} />
         )}
 
         <TableMenu editor={editor} />

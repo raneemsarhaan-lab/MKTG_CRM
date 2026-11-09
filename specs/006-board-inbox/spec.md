@@ -6,6 +6,8 @@
 
 **Status**: Draft
 
+> **Changed by spec 012 (Task Notifications, R12, FR-080).** The Mentions and Team tabs moved to the notification bell beside the Inbox. The Inbox now has To do and Done, and its number counts to-dos only. FR-030 to FR-034 (Mentions) and FR-040 to FR-042 (Team) are superseded by spec 012. The rest of this spec stands.
+
 **Input**: User description: "Option B (Inbox), with a few enhancements: make it hidden by default, and the inbox is a button with a notification number; when you click it, it shows the details." Chosen from the Board "for you" analysis and the interactive preview "Board For-You Options" (tab "Option B · Inbox button").
 
 ## Context

@@ -90,12 +90,12 @@ export const InboxButton = forwardRef<HTMLButtonElement, {
       </span>
       {/* The visible words start the accessible name; the counts in words
           follow for screen readers (FR-013), e.g. "Inbox, 2 reviews waiting ·
-          1 late, 5 to do, 2 unread mentions". */}
+          1 late, 5 to do". Mentions moved to the bell (spec 012). */}
       <span className="fx-inbox-txt">
         <b>{t('button.label')}</b>
         <small data-inbox-summary="" className={variant === 'compact' ? 'fx-sheet-sr' : undefined}>{summary}</small>
       </span>
-      {!zero && <span className="fx-sheet-sr">{t('button.sr', { todo: counts.todo, unread: counts.unread })}</span>}
+      {!zero && <span className="fx-sheet-sr">{t('button.sr', { todo: counts.todo })}</span>}
     </button>
   )
 })

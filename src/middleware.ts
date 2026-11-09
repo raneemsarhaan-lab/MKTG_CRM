@@ -46,6 +46,6 @@ export default async function middleware(req: NextRequest) {
    at build time, so it cannot be split across concatenated lines. */
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg|apple-icon.png|icon-192.png|icon-512.png|icon-maskable-512.png|api/auth|api/login|api/logout|api/session-check|login).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|push-sw.js|icon.svg|apple-icon.png|icon-192.png|icon-512.png|icon-maskable-512.png|api/auth|api/login|api/logout|api/session-check|login).*)',
   ],
 }

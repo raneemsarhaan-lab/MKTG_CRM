@@ -152,7 +152,8 @@
     "tocLabel": "جدول المحتويات · من عناوين هذا الوصف",
     "tocEmpty": "أضف عناوين وستظهر هنا.",
     "noMatches": "لا نتائج",
-    "videoBlock": "فيديو يوتيوب"
+    "videoBlock": "فيديو يوتيوب",
+    "mentionLabel": "أشِر إلى شخص"
   },
   "attachments": {
     "title": "المرفقات",
@@ -748,7 +749,7 @@
     "button": {
       "label": "الوارد",
       "allClear": "لا شيء بانتظارك",
-      "sr": "، {todo} للإنجاز، {unread, plural, =0 {لا إشارات غير مقروءة} one {إشارة واحدة غير مقروءة} two {إشارتان غير مقروءتين} few {# إشارات غير مقروءة} many {# إشارة غير مقروءة} other {# إشارة غير مقروءة}}"
+      "sr": "، {todo} للإنجاز"
     },
     "summary": {
       "reviews": "{n, plural, one {مراجعة واحدة بانتظارك} two {مراجعتان بانتظارك} few {# مراجعات بانتظارك} many {# مراجعة بانتظارك} other {# مراجعة بانتظارك}}",
@@ -759,7 +760,7 @@
     },
     "panel": {
       "title": "الوارد",
-      "counts": "{todo} للإنجاز · {unread, plural, =0 {لا إشارات غير مقروءة} one {إشارة واحدة غير مقروءة} two {إشارتان غير مقروءتين} few {# إشارات غير مقروءة} many {# إشارة غير مقروءة} other {# إشارة غير مقروءة}}",
+      "counts": "{todo} للإنجاز",
       "allClear": "لا شيء بانتظارك",
       "pin": "إبقاء الوارد مفتوحًا بجانب اللوحة",
       "unpin": "إلغاء التثبيت وإغلاق الوارد",
@@ -873,5 +874,157 @@
     "allAttached": "كل المهام لها مشروع",
     "account": "{name}، {role}",
     "showing": "يظهر {shown} من {total} مهمة"
+  },
+  "notifications": {
+    "bell": "الإشعارات",
+    "bellLabel": "{n, plural, =0 {الإشعارات} one {الإشعارات، واحد غير مقروء} two {الإشعارات، اثنان غير مقروءين} few {الإشعارات، # غير مقروءة} many {الإشعارات، # غير مقروء} other {الإشعارات، # غير مقروء}}",
+    "title": "الإشعارات",
+    "all": "الكل",
+    "unread": "غير المقروءة",
+    "markAll": "تعليم الكل كمقروء",
+    "markRead": "تعليم كمقروء",
+    "markUnread": "تعليم كغير مقروء",
+    "mute": "إيقاف إشعارات هذه المهمة",
+    "muted": "لن تصلك إشعارات هذه المهمة، عدا الإشارات والإسنادات.",
+    "more": "إجراءات أخرى",
+    "settings": "إعدادات الإشعارات",
+    "seeAll": "عرض الكل",
+    "today": "اليوم",
+    "earlier": "قبل ذلك",
+    "caught": "لا جديد عليك.",
+    "caughtSub": "سيظهر هنا كل نشاط جديد على مهامك.",
+    "gone": "هذه المهمة لم تعد متاحة",
+    "goneSub": "ربما حُذفت، أو لم يعد لديك وصول إليها.",
+    "ok": "حسنًا",
+    "close": "إغلاق",
+    "andMore": "{n, plural, one {وواحد آخر} two {واثنان آخران} few {و# أخرى} many {و# أخرى} other {و# أخرى}}",
+    "follow": "متابعة",
+    "following": "تتابعها",
+    "followHint": "تصلك إشعارات التعليقات والملفات على هذه المهمة",
+    "reply": "رد",
+    "replyPlaceholder": "اكتب ردًا… استخدم @ للإشارة",
+    "replies": "{n, plural, one {رد واحد} two {ردّان} few {# ردود} many {# ردًا} other {# رد}}",
+    "time": {
+      "now": "الآن",
+      "m": "{n} د",
+      "h": "{n} س",
+      "yesterday": "أمس"
+    },
+    "kinds": {
+      "mention": "الإشارات",
+      "assigned": "الإسنادات",
+      "comment": "التعليقات",
+      "reply": "الردود",
+      "attachment": "المرفقات",
+      "task_created_in_stage": "مهمة جديدة في مرحلتك",
+      "task_moved_to_stage": "نُقلت إلى مرحلتك",
+      "due_soon": "موعدها غدًا",
+      "overdue": "متأخرة"
+    },
+    "kindHelp": {
+      "mention": "عندما يشير إليك أحد بـ@",
+      "assigned": "عندما تُسند إليك مهمة",
+      "comment": "على مهامك أو ما تتابعه",
+      "reply": "في النقاشات التي شاركت فيها",
+      "attachment": "ملفات وروابط أُضيفت لمهامك",
+      "task_created_in_stage": "عند إنشاء مهمة في مرحلة تتولاها",
+      "task_moved_to_stage": "عند دخول مهمة مرحلة تتولاها",
+      "due_soon": "مهامك ومرحلتك",
+      "overdue": "مهامك ومرحلتك"
+    },
+    "msg": {
+      "comment": {
+        "one": "{gender, select, f {علّقت <b>{actor}</b> على مهمة <t>{task}</t>} m {علّق <b>{actor}</b> على مهمة <t>{task}</t>} other {تعليق جديد من <b>{actor}</b> على مهمة <t>{task}</t>}}",
+        "two": "{gender, select, f {علّقت <b>{actor}</b> و<b>{actor2}</b> على مهمة <t>{task}</t>} m {علّق <b>{actor}</b> و<b>{actor2}</b> على مهمة <t>{task}</t>} other {تعليقات جديدة من <b>{actor}</b> و<b>{actor2}</b> على مهمة <t>{task}</t>}}",
+        "many": "{gender, select, f {علّقت <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على مهمة <t>{task}</t>} m {علّق <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على مهمة <t>{task}</t>} other {تعليقات جديدة من <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على مهمة <t>{task}</t>}}"
+      },
+      "reply": {
+        "one": "{gender, select, f {ردّت <b>{actor}</b> على تعليقك في <t>{task}</t>} m {ردّ <b>{actor}</b> على تعليقك في <t>{task}</t>} other {رد جديد من <b>{actor}</b> على تعليقك في <t>{task}</t>}}",
+        "two": "{gender, select, f {ردّت <b>{actor}</b> و<b>{actor2}</b> على تعليقك في <t>{task}</t>} m {ردّ <b>{actor}</b> و<b>{actor2}</b> على تعليقك في <t>{task}</t>} other {ردود جديدة من <b>{actor}</b> و<b>{actor2}</b> على تعليقك في <t>{task}</t>}}",
+        "many": "{gender, select, f {ردّت <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على تعليقك في <t>{task}</t>} m {ردّ <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على تعليقك في <t>{task}</t>} other {ردود جديدة من <b>{actor}</b> و<b>{actor2}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على تعليقك في <t>{task}</t>}}",
+        "thread": "{gender, select, f {ردّت <b>{actor}</b> في نقاش على <t>{task}</t>} m {ردّ <b>{actor}</b> في نقاش على <t>{task}</t>} other {رد جديد من <b>{actor}</b> في نقاش على <t>{task}</t>}}",
+        "threadMany": "{gender, select, f {ردّت <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} في نقاش على <t>{task}</t>} m {ردّ <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} في نقاش على <t>{task}</t>} other {ردود جديدة من <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} في نقاش على <t>{task}</t>}}"
+      },
+      "attachment": {
+        "one": "{gender, select, f {أضافت <b>{actor}</b> {count, plural, one {مرفقًا} two {مرفقين} few {# مرفقات} many {# مرفقًا} other {# مرفق}} إلى مهمة <t>{task}</t>} m {أضاف <b>{actor}</b> {count, plural, one {مرفقًا} two {مرفقين} few {# مرفقات} many {# مرفقًا} other {# مرفق}} إلى مهمة <t>{task}</t>} other {مرفقات جديدة من <b>{actor}</b> على مهمة <t>{task}</t>}}",
+        "many": "{gender, select, f {أضافت <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} {count, plural, one {مرفقًا} two {مرفقين} few {# مرفقات} many {# مرفقًا} other {# مرفق}} إلى مهمة <t>{task}</t>} m {أضاف <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} {count, plural, one {مرفقًا} two {مرفقين} few {# مرفقات} many {# مرفقًا} other {# مرفق}} إلى مهمة <t>{task}</t>} other {مرفقات جديدة من <b>{actor}</b> و{others, plural, one {شخص آخر} two {شخصان آخران} few {# آخرين} many {# آخرين} other {# آخرين}} على مهمة <t>{task}</t>}}"
+      },
+      "task_created_in_stage": {
+        "one": "أُضيفت مهمة جديدة <t>{task}</t> إلى مرحلتك: {stage}",
+        "paste": "{gender, select, f {أضافت <b>{actor}</b> {count, plural, one {مهمة واحدة} two {مهمتين} few {# مهام} many {# مهمة} other {# مهمة}} إلى مرحلتك: {stage}} m {أضاف <b>{actor}</b> {count, plural, one {مهمة واحدة} two {مهمتين} few {# مهام} many {# مهمة} other {# مهمة}} إلى مرحلتك: {stage}} other {{count, plural, one {مهمة جديدة} two {مهمتان جديدتان} few {# مهام جديدة} many {# مهمة جديدة} other {# مهمة جديدة}} من <b>{actor}</b> في مرحلتك: {stage}}}"
+      },
+      "task_moved_to_stage": "{gender, select, f {نقلت <b>{actor}</b> مهمة <t>{task}</t> إلى مرحلتك: {stage}} m {نقل <b>{actor}</b> مهمة <t>{task}</t> إلى مرحلتك: {stage}} other {نُقلت مهمة <t>{task}</t> إلى مرحلتك: {stage}، بواسطة <b>{actor}</b>}}",
+      "assigned": "أُسندت إليك مهمة <t>{task}</t>",
+      "mention": "{gender, select, f {أشارت إليك <b>{actor}</b> في <t>{task}</t>} m {أشار إليك <b>{actor}</b> في <t>{task}</t>} other {إشارة إليك من <b>{actor}</b> في <t>{task}</t>}}",
+      "due_soon": "موعد مهمة <t>{task}</t> غدًا",
+      "overdue": "مهمة <t>{task}</t> متأخرة"
+    },
+    "push": {
+      "offerTitle": "تنبيهات على هذا الهاتف",
+      "offerText": "الإشارات والإسنادات والمواعيد، حتى ومومنتم مغلق.",
+      "turnOn": "تفعيل",
+      "turnOff": "إيقاف",
+      "dismiss": "ليس الآن",
+      "on": "التنبيهات مفعّلة على هذا الجهاز",
+      "off": "التنبيهات متوقفة على هذا الجهاز",
+      "blocked": "التنبيهات محظورة في إعدادات هذا المتصفح.",
+      "unsupported": "هذا المتصفح لا يدعم التنبيهات.",
+      "iosTitle": "أضف مومنتم إلى الشاشة الرئيسية أولًا",
+      "iosText": "يرسل الآيفون التنبيهات فقط للتطبيقات على الشاشة الرئيسية.",
+      "ios1": "اضغط زر المشاركة أسفل سفاري.",
+      "ios2": "اختر «إضافة إلى الشاشة الرئيسية».",
+      "ios3": "افتح مومنتم من الأيقونة الجديدة ثم فعّل التنبيهات هنا.",
+      "notReady": "تنبيهات الهاتف غير مُعدّة بعد."
+    },
+    "settingsPage": {
+      "title": "إعدادات الإشعارات",
+      "notifyAbout": "أبلغني عن",
+      "inApp": "في التطبيق",
+      "phone": "الهاتف",
+      "email": "البريد",
+      "recommended": "يُنصح بإبقائه مفعّلًا",
+      "emailMode": "البريد",
+      "instant": "فوري",
+      "daily": "ملخص يومي",
+      "off": "إيقاف",
+      "instantHelp": "فقط لما لم تره خلال ١٠ دقائق",
+      "dailyHelp": "رسالة واحدة الساعة ٨:٣٠ بما لم يُقرأ",
+      "offHelp": "بلا رسائل بريد",
+      "emailNotReady": "البريد غير مُعدّ بعد.",
+      "dnd": "عدم الإزعاج",
+      "dndHelp": "بلا نوافذ منبثقة أو تنبيهات هاتف. تُحفظ الإشعارات وتُرسل الرسائل كالمعتاد.",
+      "device": "هذا الجهاز",
+      "saved": "تم الحفظ",
+      "gender": "صيغة المخاطبة بالعربية",
+      "genderHelp": "كيف تشير إليك الإشعارات العربية",
+      "genderF": "هي",
+      "genderM": "هو",
+      "genderNone": "غير محدد",
+      "language": "اللغة",
+      "languageHelp": "لتنبيهات الهاتف والبريد الإلكتروني",
+      "error": "تعذّر الحفظ. حاول مرة أخرى."
+    },
+    "history": {
+      "title": "الإشعارات",
+      "any": "أي وقت",
+      "today": "اليوم",
+      "week": "آخر ٧ أيام",
+      "month": "آخر ٣٠ يومًا",
+      "none": "لا شيء يطابق هذه الفلاتر.",
+      "kinds": "الأنواع",
+      "dates": "التاريخ",
+      "clear": "مسح عوامل التصفية"
+    },
+    "email": {
+      "subjectOne": "{text}",
+      "subjectDaily": "{n, plural, one {إشعار واحد غير مقروء} two {إشعاران غير مقروءين} few {# إشعارات غير مقروءة} many {# إشعارًا غير مقروء} other {# إشعار غير مقروء}} على مومنتم",
+      "open": "افتح في مومنتم",
+      "dailyIntro": "هذا ما لم تقرأه بعد:",
+      "footer": "تصلك هذه الرسالة بحسب إعدادات الإشعارات.",
+      "manage": "تغيير إعدادات الإشعارات"
+    },
+    "replyingTo": "ردًّا على {name}",
+    "cancel": "إلغاء",
+    "back": "العودة إلى اللوحة"
   }
 }
