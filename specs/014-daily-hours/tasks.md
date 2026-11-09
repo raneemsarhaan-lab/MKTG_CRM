@@ -24,7 +24,7 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Purpose**: The design gate and the lab skeleton.
 
-- [ ] T001 Write `design/hours.html` (constitution §IV), publish it as an artifact and get the user's approval **before any UI task**. It shows:
+- [X] T001 Write `design/hours.html` (constitution §IV), publish it as an artifact and get the user's approval **before any UI task**. It shows:
   - the My Day "Today's hours" card: field, quick choices, Save, status, 7-day strip, week total, "Log several days";
   - the reminder window with one day, and with three days after "Add another day" and "Same for all";
   - a line that was refused, with its reason;
@@ -67,15 +67,15 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Independent Test**: Open My Day, enter 7.5 and press Enter, then reload: 7.5 is still there and marked saved. 30 and "abc" are refused.
 
-- [ ] T011 [US1] Build `src/components/hours/TodayHours.tsx` (contracts/ui.md §1, the top part):
+- [X] T011 [US1] Build `src/components/hours/TodayHours.tsx` (contracts/ui.md §1, the top part):
   - the heading with today's date in the member's locale;
   - the field (`data-hours-input`, `inputmode="decimal"`, labelled), where Enter saves;
   - quick choices 4, 6, 8 and Off (`data-hours-quick`), each saving in one tap;
   - Save (`data-hours-save`) and a polite `role="status"` line ("Saved" or the reason);
   - if the save fails, keep what was typed.
-- [ ] T012 [US1] Place `TodayHours` under the greeting in `src/components/myboard/MyBoard.tsx`, not in the admin team view. Load the initial `HoursStatus` in `src/app/(app)/overview/page.tsx`, using the server date, and correct it on the client with the device date.
-- [ ] T013 [P] [US1] Add the card's styles to `src/app/globals.css`: logical properties, so it mirrors in Arabic; 44 px targets on phones; visible focus.
-- [ ] T014 [US1] Lab scenarios `s1-*` in `scripts/hours-lab/scenarios/`:
+- [X] T012 [US1] Place `TodayHours` under the greeting in `src/components/myboard/MyBoard.tsx`, not in the admin team view. Load the initial `HoursStatus` in `src/app/(app)/overview/page.tsx`, using the server date, and correct it on the client with the device date.
+- [X] T013 [P] [US1] Add the card's styles to `src/app/globals.css`: logical properties, so it mirrors in Arabic; 44 px targets on phones; visible focus.
+- [X] T014 [US1] Lab scenarios `s1-*` in `scripts/hours-lab/scenarios/`:
   - type and save;
   - a quick choice;
   - changing a saved value;
@@ -97,21 +97,21 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Independent Test**: Leave Thursday empty and open the app on Sunday. The window names Thursday and opens once. Add two days, use "Same for all", and Save. All three are saved and the window doesn't come back that day, on any device.
 
-- [ ] T015 [US2] Build `src/components/hours/DaysForm.tsx` (contracts/ui.md §2), shared by the window and "Log several days":
+- [X] T015 [US2] Build `src/components/hours/DaysForm.tsx` (contracts/ui.md §2), shared by the window and "Log several days":
   - lines with a label, an hours field, an Off toggle, and remove (on added lines);
   - "Add another day" (`data-add-day`): the next missing working day, then a date field limited to the last 30 days, with "N more days missing";
   - "Same for all" (`data-same-all`);
   - one Save, with per-line errors from `saveDays`, keeping every value typed.
-- [ ] T016 [US2] Build `src/components/hours/HoursReminder.tsx` (contracts/ui.md §3, research R2):
+- [X] T016 [US2] Build `src/components/hours/HoursReminder.tsx` (contracts/ui.md §3, research R2):
   - after the page is idle, call `hoursStatus(localDate)`;
   - open only when `remindDay` is set and `prompted` is false, and never over another `[role="dialog"]` or the task form (watch with a MutationObserver until they close);
   - on open, call `dismissReminder(localDate)`;
   - the title names the day; "I was off"; Save; "Later" (`data-hours-later`); Esc means Later;
   - focus starts in the first field, is trapped, and is restored on close;
   - bottom sheet on phones.
-- [ ] T017 [US2] Mount `HoursReminder` once in `src/components/shared/AppShell.tsx`, and pass `sheetsApi`-style injection through `src/components/hours/api.ts`.
-- [ ] T018 [P] [US2] Add the styles for the form and the window to `src/app/globals.css`: modal, bottom sheet under 767 px, lines, the error per line, mirrored in Arabic.
-- [ ] T019 [US2] Lab scenarios `s2-*` in `scripts/hours-lab/scenarios/index.mjs`:
+- [X] T017 [US2] Mount `HoursReminder` once in `src/components/shared/AppShell.tsx`, and pass `sheetsApi`-style injection through `src/components/hours/api.ts`.
+- [X] T018 [P] [US2] Add the styles for the form and the window to `src/app/globals.css`: modal, bottom sheet under 767 px, lines, the error per line, mirrored in Arabic.
+- [X] T019 [US2] Lab scenarios `s2-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - opens on Sunday for Thursday;
   - doesn't open when the day is logged, already prompted, before the account existed, or on Friday/Saturday;
   - waits for another dialog;
@@ -134,12 +134,12 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Independent Test**: Log three days, open My Day, and check the strip and total. Correct one day: the total updates.
 
-- [ ] T020 [US3] Add the 7-day strip (`data-hours-day`) to `src/components/hours/TodayHours.tsx`:
+- [X] T020 [US3] Add the 7-day strip (`data-hours-day`) to `src/components/hours/TodayHours.tsx`:
   - each day shows Hours, Off or Missing (amber, with an icon); today is marked; Fri/Sat are muted;
   - a click opens a popover with the field, Off and Clear (Clear calls `saveDays` with `hours: null, off: false`);
   - members can't edit days older than 30 days or in the future.
-- [ ] T021 [US3] Add the week total (`data-hours-week`, "31.5 of 40 h this week", using `capacity_hrs_wk`) and "Log several days" (`data-hours-several`) to `TodayHours.tsx`. "Log several days" opens `DaysForm` in a dialog, pre-filled with this week's missing days.
-- [ ] T022 [US3] Lab scenarios `s3-*` in `scripts/hours-lab/scenarios/index.mjs`:
+- [X] T021 [US3] Add the week total (`data-hours-week`, "31.5 of 40 h this week", using `capacity_hrs_wk`) and "Log several days" (`data-hours-several`) to `TodayHours.tsx`. "Log several days" opens `DaysForm` in a dialog, pre-filled with this week's missing days.
+- [X] T022 [US3] Lab scenarios `s3-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - the strip shows hours, Off and Missing;
   - editing a past day;
   - Clear makes it Missing;
@@ -160,8 +160,8 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 **Independent Test**: Two members log a few days. An admin opens `/hours`, checks the numbers and totals, and downloads the CSV. A non-admin is refused.
 
-- [ ] T023 [US4] Build the admin page `src/app/(app)/hours/page.tsx`: redirect non-admins to `/overview`; read `?week=` (a Sunday); call `teamHours`.
-- [ ] T024 [US4] Build `src/components/hours/HoursReport.tsx` (contracts/ui.md §4):
+- [X] T023 [US4] Build the admin page `src/app/(app)/hours/page.tsx`: redirect non-admins to `/overview`; read `?week=` (a Sunday); call `teamHours`.
+- [X] T024 [US4] Build `src/components/hours/HoursReport.tsx` (contracts/ui.md §4):
   - a `<table>` with a caption;
   - a member row, Sun–Thu columns, and Fri/Sat columns only when used;
   - Missing in amber with an icon; Off;
@@ -170,9 +170,9 @@ description: "Task list for Daily Working Hours (spec 014)"
   - previous and next week (`data-week-prev`, `data-week-next`);
   - Download (`data-hours-export`);
   - a sticky name column on phones.
-- [ ] T025 [US4] Write the CSV route `src/app/(app)/hours/export/route.ts`: admin-only (403 otherwise); `text/csv; charset=utf-8` with a BOM; file name `hours-<week>.csv`; the same rows, columns and totals as the page, via `toCsv`.
-- [ ] T026 [P] [US4] Add "Hours" for admins after Capacity in `src/lib/nav.tsx` (with an icon and `nav.hours` in both languages), and add the report's styles to `src/app/globals.css`.
-- [ ] T027 [US4] Lab scenarios `s4-*` in `scripts/hours-lab/scenarios/index.mjs`:
+- [X] T025 [US4] Write the CSV route `src/app/(app)/hours/export/route.ts`: admin-only (403 otherwise); `text/csv; charset=utf-8` with a BOM; file name `hours-<week>.csv`; the same rows, columns and totals as the page, via `toCsv`.
+- [X] T026 [P] [US4] Add "Hours" for admins after Capacity in `src/lib/nav.tsx` (with an icon and `nav.hours` in both languages), and add the report's styles to `src/app/globals.css`.
+- [X] T027 [US4] Lab scenarios `s4-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - the report's numbers and totals;
   - Missing marked;
   - moving between weeks;
@@ -189,13 +189,13 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T028 [P] Docs in `specs/014-daily-hours/` and `HANDOVER.md`:
+- [X] T028 [P] Docs in `specs/014-daily-hours/` and `HANDOVER.md`:
   - `specs/014-daily-hours/constitution-check.md`;
   - a "Daily hours" section in `HANDOVER.md` (routes, the date model, the reminder rule, the actions, the lab);
   - mark the tasks here [X].
-- [ ] T029 Run every lab: `lab:hours`, `lab:sheet`, `lab:spreadsheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then the typecheck, `bash scripts/preflight.sh` and `npx next build`.
-- [ ] T030 Running-app checks: every row of `quickstart.md` with two members on a production build, written as `scripts/hours-lab/realapp/run.cjs`. Record the results in `specs/014-daily-hours/validation.md`.
-- [ ] T031 Commit and push branch `claude/nice-noether-x4rgei` (with `specs/014-daily-hours/validation.md`). Open a PR titled "Daily working hours: My Day entry, reminder and admin report (spec 014)", and ask the user before merging.
+- [X] T029 Run every lab: `lab:hours`, `lab:sheet`, `lab:spreadsheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then the typecheck, `bash scripts/preflight.sh` and `npx next build`.
+- [X] T030 Running-app checks: every row of `quickstart.md` with two members on a production build, written as `scripts/hours-lab/realapp/run.cjs`. Record the results in `specs/014-daily-hours/validation.md`.
+- [X] T031 Commit and push branch `claude/nice-noether-x4rgei` (with `specs/014-daily-hours/validation.md`). Open a PR titled "Daily working hours: My Day entry, reminder and admin report (spec 014)", and ask the user before merging.
 
 ---
 
@@ -226,10 +226,11 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 ## Progress
 
-- **T001:** `design/hours.html`, published at https://claude.ai/artifact/RWRxwhYs4YE2enUCYPGSg9. **Waiting for the user's approval.** No UI work until then (§IV).
+- **T001:** `design/hours.html` (https://claude.ai/artifact/RWRxwhYs4YE2enUCYPGSg9). Approved by the user ("approved, build the UI").
 - **T002–T010 done.**
   - The schema is applied: `work_days` and `members.hours_prompted_on`.
   - `src/lib/hours.ts`, the types, `HOURS_UI` and `--hr-*`, and the `hours` namespace in English and Arabic.
   - `src/actions/hours.ts` and the `HoursApi` wrapper.
   - `lab:hours`: 8/8 pure checks. Smoke test: 20/20 against PostgreSQL.
   - As built, `teamHours` takes an optional `localDate`, so "logged every working day" counts only days up to the member's today.
+- **T011–T031 done** (UI round). For the running-app results and the as-built notes, see `validation.md`. The UI lab scenarios are covered by `scripts/hours-lab/realapp/run.cjs` (39 checks, axe included).

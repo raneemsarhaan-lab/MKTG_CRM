@@ -19,6 +19,8 @@ import type { PlanTask } from '@/lib/day-plan'
  */
 
 export interface MyBoardProps {
+  /** Spec 014: "Today's hours", under the greeting (not in the team view). */
+  hours?: React.ReactNode
   firstName: string
   /** Whether to offer the Mine / Team switch at all. Admins only. */
   canSeeTeam: boolean
@@ -45,7 +47,7 @@ export interface MyBoardProps {
 
 export function MyBoard({
   firstName, canSeeTeam, teamView, stats, myDayPlan, today, thisWeek, lastWeek,
-  thisWeekSpan, lastWeekSpan, breaches,
+  thisWeekSpan, lastWeekSpan, breaches, hours,
 }: MyBoardProps) {
   return (
     <div className="fx-myboard" style={{ padding: '36px 44px 44px' }}>
@@ -53,6 +55,8 @@ export function MyBoard({
         firstName={firstName}
         toggle={canSeeTeam ? <ScopeToggle teamView={teamView} /> : undefined}
       />
+
+      {!teamView && hours}
 
       <StatCards
         today={stats.today}

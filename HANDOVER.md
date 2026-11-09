@@ -558,6 +558,29 @@ Spreadsheet editing and Excel-style sheet tabs (spec 013, `specs/013-spreadsheet
 - **Linked menus.** `useLinkedMenu`: the Video and Content sheets' cell, row and heading menus (new clip or piece, drop or archive with Undo, insert column, delete team columns), and row heights shared by the team (`setLinkedRowHeights`, loaded by `loadBoardData`).
 - **Checks.** `node scripts/spreadsheet-lab/realapp/run.cjs` (running app), `perf-axe.cjs` (5,000-row speed and axe), `npm run lab:spreadsheet` (pure), `npm run lab:sheet` (linked grids), and the smoke test in `scripts/spreadsheet-lab/smoke/`. Open items are in `specs/013-spreadsheet-editing/validation.md`.
 
+### Daily hours
+
+Each member logs the hours they worked each day (spec 014, `specs/014-daily-hours/`). Design: `design/hours.html`.
+
+- **Data.** `work_days` holds one row per member and calendar day: `hours` (0–24, quarter hours) or `off`. No row means Missing. `members.hours_prompted_on` is the last day the reminder opened. Dates are the member's own calendar day, sent by the browser as `YYYY-MM-DD`; the server allows one day ahead for time zones.
+- **Rules.** `src/lib/hours.ts` (pure):
+  - the working week is Sunday to Thursday;
+  - it parses what members type: `7.5`, `7,5`, `7:30` and Arabic digits;
+  - it validates lines: future, more than 30 days back for members, duplicates;
+  - it works out totals and writes the CSV.
+- **Server.** `src/actions/hours.ts`:
+  - `hoursStatus`, `myHours`, `saveDays` (all or nothing; admins can pass `memberId`) and `dismissReminder`;
+  - `teamHours`, admins only.
+- **Screens.**
+  - `TodayHours` on My Day (not in the team view), with the 7-day strip, the week total and "Log several days".
+  - `HoursReminder`, mounted in `AppShell`: it opens once a day, never over another dialog.
+  - `DaysForm`, shared by both.
+  - `/hours` and `/hours/export` (CSV, admins only), with "Hours" in the admin nav.
+- **Checks.**
+  - `npm run lab:hours` (pure);
+  - `scripts/hours-lab/smoke/run.ts` (actions on PostgreSQL);
+  - `node scripts/hours-lab/realapp/run.cjs` (running app, two members, axe).
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
