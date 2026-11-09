@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Three open questions: FR-060 (who may edit cells on tasks; touches constitution §III), FR-070 (where the tabs live relative to the Video and Content sheets), FR-071 (who sees a blank sheet). Everything else passes.
+- 2026-11-09: the three open questions are answered (see Clarifications in spec.md): the Sheets section with folders (design option C), team-wide folders, and today's edit rule kept for pipeline fields only. Excel's sheet-tab menu was added at the user's request (US4, FR-054–FR-059e). All items pass.
 - Scope boundaries are stated in Context (no formulas, styling, merged cells, charts, filters or live co-editing) and Assumptions.

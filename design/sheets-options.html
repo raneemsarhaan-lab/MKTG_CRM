@@ -126,6 +126,7 @@ table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-wid
 .tabs .plus, .tabs .all { width: 40px; justify-content: center; font-size: 18px; color: var(--text); padding: 0; }
 .tabs .lk { font-size: 11px; color: var(--purple); }
 .tabs .caret { font-size: 10px; opacity: .7; }
+.tabs .tb.grouped { background: var(--purple-soft); }
 
 /* tab menu */
 .menu { position: absolute; z-index: 5; width: 230px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(20,19,26,.18); padding: 6px; }
@@ -181,7 +182,7 @@ table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-wid
   <div class="ctl">
     <span>View</span>
     <span class="seg" role="group" aria-label="Device"><button data-dev="desktop">Computer</button><button data-dev="phone">Phone</button></span>
-    <span style="margin-inline-start:8px">Try: open a folder · click tabs · press + · right-click a tab · select cells by dragging</span>
+    <span style="margin-inline-start:8px">Try: open a folder · click tabs · press + · right-click a tab for Excel’s menu (Insert, Delete, Rename, Move or Copy, Protect, Tab Color, Hide, Unhide, Select All) · drag across cells</span>
   </div>
 
   <div id="frame" class="frame"></div>
@@ -296,7 +297,7 @@ table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-wid
         <div class="tabs" role="tablist" aria-label="Sheets in ${f.name}">
           <button class="tb plus" data-plus aria-label="New sheet" title="New sheet">＋</button>
           <button class="tb all" data-all aria-label="All sheets" title="All sheets">≡</button>
-          ${f.tabs.map((t, i) => `<button class="tb" role="tab" data-tab="${i}" aria-selected="${i === S.tab}">${t.linked ? '<span class="lk" title="Linked to the board">🔗</span>' : ''}${t.name}<span class="caret" data-tabmenu="${i}" aria-hidden="true">▾</span></button>`).join('')}
+          ${f.tabs.map((t, i) => t.hidden ? '' : `<button class="tb${t.grouped ? ' grouped' : ''}" role="tab" data-tab="${i}" aria-selected="${i === S.tab}" style="${t.color ? `box-shadow:inset 0 -4px 0 ${t.color};` : ''}">${t.linked ? '<span class="lk" title="Linked to the board">🔗</span>' : ''}${t.locked ? '<span title="Protected" aria-label="Protected">🔒</span>' : ''}${t.name}<span class="caret" data-tabmenu="${i}" aria-hidden="true">▾</span></button>`).join('')}
         </div>
       </div>`
   }
@@ -337,24 +338,70 @@ table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-wid
     $('#notes').innerHTML = N.map(([h, items]) => `<div class="note"><h4>${h}</h4><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('')
   }
 
+  const COLORS = ['', '#E5484D', '#F59E0B', '#EAB308', '#16A34A', '#0E7C7C', '#2563EB', '#7C3AED', '#DB2777', '#6B7280', '#14131A']
   function openMenu() {
     const f = FOLDERS[S.folder], t = f.tabs[S.menu]
     const anchor = frame.querySelector(`[data-tab="${S.menu}"]`)
     if (!anchor) return
     const r = anchor.getBoundingClientRect(), fr = frame.getBoundingClientRect()
-    const onlyOne = f.tabs.length === 1
+    const visible = f.tabs.filter(x => !x.hidden).length
+    const hidden = f.tabs.filter(x => x.hidden).length
+    const lk = !!t.linked
+    const why = (cond, msg) => (cond ? ` disabled title="${msg}"` : '')
     const m = document.createElement('div')
-    m.className = 'menu'; m.setAttribute('role', 'menu')
-    m.innerHTML = `<button role="menuitem" data-act="rename" ${t.linked ? 'disabled' : ''}>Rename</button>${t.linked ? '<small>The linked sheet keeps its name.</small>' : ''}
-      <button role="menuitem" data-act="dup">Duplicate${t.linked ? ' as a blank copy' : ''}</button>
-      <button role="menuitem" data-act="left" ${S.menu === 0 || t.linked || f.tabs[S.menu - 1]?.linked ? 'disabled' : ''}>Move left</button>
-      <button role="menuitem" data-act="right" ${S.menu === f.tabs.length - 1 || t.linked ? 'disabled' : ''}>Move right</button><hr>
-      <button role="menuitem" data-act="del" ${t.linked || onlyOne ? 'disabled' : ''}>Delete</button>${t.linked ? '<small>Linked sheets can\'t be deleted.</small>' : onlyOne ? '<small>A folder keeps at least one sheet.</small>' : ''}`
-    m.style.left = `${Math.min(r.left - fr.left, fr.width - 240)}px`
-    m.style.top = `${r.top - fr.top - 8 - 230}px`
+    m.className = 'menu'; m.setAttribute('role', 'menu'); m.style.width = '250px'
+    m.innerHTML = `
+      <button role="menuitem" data-act="insert">Insert</button>
+      <button role="menuitem" data-act="del"${why(lk || visible <= 1, lk ? 'Linked sheets can’t be deleted' : 'A folder keeps one visible sheet')}>Delete</button>
+      <button role="menuitem" data-act="rename"${why(lk, 'The linked sheet keeps its name')}>Rename</button>
+      <button role="menuitem" data-act="move">Move or Copy…</button>
+      <button role="menuitem" data-act="protect"${why(lk, 'Linked sheets follow the board’s rules')}>${t.locked ? 'Unprotect Sheet' : 'Protect Sheet…'}</button>
+      <div role="group" aria-label="Tab Color" style="padding:6px 10px 4px"><div style="font-size:13.5px;margin-bottom:6px">Tab Color</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${COLORS.map(c => `<button data-color="${c}" aria-label="${c || 'No Color'}" title="${c || 'No Color'}" style="width:18px;height:18px;min-height:0;padding:0;border-radius:4px;border:1px solid var(--line);background:${c || 'var(--panel)'};${c ? '' : 'background-image:linear-gradient(135deg,transparent 45%,#E5484D 45%,#E5484D 55%,transparent 55%)'}"></button>`).join('')}</div></div>
+      <hr>
+      <button role="menuitem" data-act="hide"${why(lk || visible <= 1, lk ? 'The linked sheet stays visible' : 'A folder keeps one visible sheet')}>Hide</button>
+      <button role="menuitem" data-act="unhide"${why(!hidden, 'No hidden sheets')}>Unhide…${hidden ? ` (${hidden})` : ''}</button>
+      <hr>
+      <button role="menuitem" data-act="all">Select All Sheets</button>
+      ${lk ? '<small>The linked sheet can’t be deleted, renamed, hidden or protected.</small>' : ''}`
+    m.style.left = `${Math.max(8, Math.min(r.left - fr.left, fr.width - 260))}px`
+    m.style.top = `${Math.max(8, r.top - fr.top - 8 - 420)}px`
     frame.style.position = 'relative'
     frame.appendChild(m)
     m.querySelector('button:not(:disabled)')?.focus()
+  }
+
+  function moveDialog(i) {
+    const f = FOLDERS[S.folder], t = f.tabs[i]
+    const d = document.createElement('div')
+    d.className = 'menu'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Move or Copy')
+    d.style.cssText = 'width:300px;left:50%;top:120px;transform:translateX(-50%);padding:14px;display:grid;gap:8px;font-size:13.5px'
+    d.innerHTML = `<b style="font:700 15px var(--f-head);color:var(--ink)">Move or Copy</b>
+      <label for="mc-folder">Move selected sheets to folder:</label>
+      <select id="mc-folder" style="padding:6px;border-radius:8px;border:1px solid var(--input);background:var(--panel);color:var(--text)">${ORDER.map(k => `<option value="${k}" ${k === S.folder ? 'selected' : ''}>${FOLDERS[k].name}</option>`).join('')}</select>
+      <label for="mc-before">Before sheet:</label>
+      <select id="mc-before" size="5" style="border-radius:8px;border:1px solid var(--input);background:var(--panel);color:var(--text)">${f.tabs.map((x, k) => `<option value="${k}">${x.name}</option>`).join('')}<option value="end" selected>(move to end)</option></select>
+      <label style="display:flex;gap:6px;align-items:center"><input id="mc-copy" type="checkbox" ${t.linked ? 'checked disabled' : ''}> Create a copy</label>
+      ${t.linked ? '<small style="padding:0">The linked sheet can only be copied, as a blank sheet with its text.</small>' : ''}
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button data-mc="cancel" style="width:auto">Cancel</button><button data-mc="ok" style="width:auto;background:var(--ink);color:var(--panel);border-radius:999px;padding:6px 16px">OK</button></div>`
+    frame.style.position = 'relative'; frame.appendChild(d)
+    d.querySelector('#mc-folder').focus()
+    d.addEventListener('click', e => {
+      const b = e.target.closest('[data-mc]'); if (!b) return
+      e.stopPropagation()
+      if (b.dataset.mc === 'ok') {
+        const to = FOLDERS[d.querySelector('#mc-folder').value], before = d.querySelector('#mc-before').value
+        const copy = d.querySelector('#mc-copy').checked
+        let name = t.name
+        if (copy || to !== f) { let k = 2; while (to.tabs.some(x => x.name.toLowerCase() === name.toLowerCase())) name = `${t.name} (${k++})` }
+        const item = { ...t, name, linked: false }
+        if (!copy) f.tabs.splice(i, 1)
+        const at = before === 'end' || to !== f ? to.tabs.length : Math.min(Number(before), to.tabs.length)
+        to.tabs.splice(at, 0, copy ? item : { ...t, name })
+        if (to === f) S.tab = at
+      }
+      d.remove(); render()
+    })
   }
 
   const nextName = f => { let n = 1; while (f.tabs.some(t => t.name.toLowerCase() === `sheet ${n}`)) n++; return `Sheet ${n}` }
@@ -376,15 +423,28 @@ table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-wid
     if (b.dataset.tab !== undefined) { S.tab = Number(b.dataset.tab); S.sel = null; S.menu = null; render(); return }
     if (b.dataset.plus !== undefined) { const f = FOLDERS[S.folder]; f.tabs.push({ name: nextName(f) }); S.tab = f.tabs.length - 1; S.sel = null; render(); return }
     if (b.dataset.all !== undefined) { S.menu = null; alertList(); return }
+    if (b.dataset.color !== undefined && S.menu !== null) { FOLDERS[S.folder].tabs[S.menu].color = b.dataset.color; S.menu = null; render(); return }
+    if (b.dataset.unhide !== undefined) { const f = FOLDERS[S.folder]; f.tabs[+b.dataset.unhide].hidden = false; S.tab = +b.dataset.unhide; S.menu = null; render(); return }
     if (b.dataset.act) {
       const f = FOLDERS[S.folder], i = S.menu, t = f.tabs[i]
-      if (b.dataset.act === 'dup') { let name = `Copy of ${t.name}`, k = 2; while (f.tabs.some(x => x.name === name)) name = `Copy of ${t.name} ${k++}`; f.tabs.splice(i + 1, 0, { name }); S.tab = i + 1 }
-      if (b.dataset.act === 'del') { f.tabs.splice(i, 1); S.tab = Math.max(0, i - 1) }
-      if (b.dataset.act === 'left') { [f.tabs[i - 1], f.tabs[i]] = [f.tabs[i], f.tabs[i - 1]]; S.tab = i - 1 }
-      if (b.dataset.act === 'right') { [f.tabs[i + 1], f.tabs[i]] = [f.tabs[i], f.tabs[i + 1]]; S.tab = i + 1 }
-      if (b.dataset.act === 'rename') { const tabEl = frame.querySelector(`[data-tab="${i}"]`); S.menu = null; render(); renameInline(i); return }
+      const vis = k => f.tabs.findIndex((x, n) => n !== k && !x.hidden)
+      if (b.dataset.act === 'insert') { f.tabs.splice(i, 0, { name: nextName(f) }); S.tab = i }
+      if (b.dataset.act === 'del') { f.tabs.splice(i, 1); S.tab = Math.max(0, Math.min(i, f.tabs.length - 1)); while (f.tabs[S.tab]?.hidden) S.tab = vis(-1) }
+      if (b.dataset.act === 'protect') { t.locked = !t.locked }
+      if (b.dataset.act === 'hide') { t.hidden = true; S.tab = vis(i) }
+      if (b.dataset.act === 'all') { f.tabs.forEach(x => { x.grouped = true }) }
+      if (b.dataset.act === 'rename') { S.menu = null; render(); renameInline(i); return }
+      if (b.dataset.act === 'move') { S.menu = null; render(); moveDialog(i); return }
+      if (b.dataset.act === 'unhide') {
+        S.menu = null; render()
+        const d = document.createElement('div'); d.className = 'menu'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Unhide')
+        d.style.cssText = 'width:260px;left:50%;top:160px;transform:translateX(-50%)'
+        d.innerHTML = `<small style="padding:6px 10px">Unhide sheet:</small>${f.tabs.map((x, k) => x.hidden ? `<button data-unhide="${k}">${x.name}</button>` : '').join('')}`
+        frame.style.position = 'relative'; frame.appendChild(d); return
+      }
       S.menu = null; render(); return
     }
+    if (b.dataset.tab !== undefined && FOLDERS[S.folder].tabs.some(x => x.grouped)) { FOLDERS[S.folder].tabs.forEach(x => { x.grouped = false }) }
   })
   document.addEventListener('contextmenu', e => {
     const tb = e.target.closest('[data-tab]')
