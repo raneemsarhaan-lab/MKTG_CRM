@@ -49,6 +49,8 @@ export interface SheetApi {
   upload(taskId: string): UploadFn
   drop(taskId: string): Promise<Result>
   restore(taskId: string): Promise<Result>
+  /** Spec 013 FR-044: a row's height on a linked sheet, shared by the team (null: the default). */
+  setRowHeights?(kind: 'linked_content' | 'linked_video', entries: { taskId: string; height: number | null }[]): Promise<Result>
 }
 
 export interface VideoSheetProps {
@@ -71,6 +73,8 @@ export interface VideoSheetProps {
   api: SheetApi
   /** The sheet's shaped columns and custom values (spec 010). */
   columns: ColumnsBundle
+  /** Spec 013: saved row heights by task id. */
+  rowHeights?: Record<string, number>
 }
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────

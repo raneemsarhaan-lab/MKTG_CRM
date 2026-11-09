@@ -25,6 +25,7 @@ import { BlankSheet } from './BlankSheet'
 import { TabBar } from './TabBar'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
+import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -172,6 +173,15 @@ export function Workbook(p: WorkbookProps) {
     setStacks(s => ({ ...s, [id]: r.stack }))
     outbox.enqueue(id, toServer(fwd))
   }, [outbox])
+
+  // The linked tab's history, from its grid (it lives in the board's sheet, not here).
+  const [linkedHist, setLinkedHist] = useState({ canUndo: false, canRedo: false })
+  useEffect(() => {
+    const on = (e: Event) => setLinkedHist((e as CustomEvent<{ canUndo: boolean; canRedo: boolean }>).detail)
+    document.addEventListener(HISTORY_EVENT, on)
+    return () => document.removeEventListener(HISTORY_EVENT, on)
+  }, [])
+  const linkedUndo = (dir: 'undo' | 'redo') => document.dispatchEvent(new CustomEvent(UNDO_EVENT, { detail: dir }))
 
   // ── toolbar state ───────────────────────────────────────────────────────
   const [sel, setSel] = useState<{ cell: string; count: number } | null>(null)
@@ -465,9 +475,11 @@ export function Workbook(p: WorkbookProps) {
       </div>
       <div className="fx-sh-tools" role="toolbar" aria-label={folderName}>
         <button type="button" className="fx-sh-ib" data-undo="" aria-label={t('toolbar.undoKey')} title={t('toolbar.undoKey')}
-                disabled={!openBlank || !stack || !canUndo(stack)} onClick={doUndo}>↶</button>
+                disabled={openBlank ? !stack || !canUndo(stack) : !linkedHist.canUndo}
+                onClick={() => (openBlank ? doUndo() : linkedUndo('undo'))}>↶</button>
         <button type="button" className="fx-sh-ib" data-redo="" aria-label={t('toolbar.redoKey')} title={t('toolbar.redoKey')}
-                disabled={!openBlank || !stack || !canRedo(stack)} onClick={doRedo}>↷</button>
+                disabled={openBlank ? !stack || !canRedo(stack) : !linkedHist.canRedo}
+                onClick={() => (openBlank ? doRedo() : linkedUndo('redo'))}>↷</button>
         <span className="fx-sh-sep" aria-hidden="true" />
         <span className="fx-sh-lbl" data-selection="" aria-live="polite">
           {openBlank

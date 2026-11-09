@@ -2198,7 +2198,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sh-card-body { display: grid; gap: 5px; min-width: 0; }
 .fx-sh-card-body b { font: 700 15px var(--font-heading); color: #14131A; overflow-wrap: anywhere; }
 [dir="rtl"] .fx-sh-card-body b { font-family: inherit; }
-.fx-sh-card-body small { color: var(--inbox-muted); font-size: 12.5px; line-height: 1.4; }
+.fx-sh-card-body small { color: #5A5F6C; font-size: 12.5px; line-height: 1.4; } /* 4.5:1 on the hovered card too (axe) */
 .fx-sh-card-menu { position: absolute; top: 10px; inset-inline-end: 8px; width: 32px; height: 32px; border-radius: 8px; border: 0; background: none; cursor: pointer; font-weight: 800; color: var(--inbox-muted); font-size: 16px; }
 .fx-sh-card-menu:hover, .fx-sh-card-menu:focus-visible { background: var(--inbox-panel); color: #14131A; }
 .fx-sh-pinned { position: absolute; bottom: 10px; inset-inline-end: 12px; font-size: 12px; }

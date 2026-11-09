@@ -35,4 +35,6 @@ export interface ContentSheetProps {
   api: ContentApi
   /** The sheet's shaped columns and custom values (spec 010). */
   columns: ColumnsBundle
+  /** Spec 013: saved row heights by task id. */
+  rowHeights?: Record<string, number>
 }

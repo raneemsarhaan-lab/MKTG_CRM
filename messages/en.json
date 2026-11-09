@@ -1122,7 +1122,18 @@
       "deleteRowsNote": "Dropped tasks leave the board and can be brought back with Show dropped or Undo.",
       "drop": "Drop",
       "keepOneRow": "A sheet keeps at least one row.",
-      "keepOneCol": "A sheet keeps at least one column."
+      "keepOneCol": "A sheet keeps at least one column.",
+      "dropRows": "{n, plural, one {Drop row} other {Drop # rows}}",
+      "archiveRows": "{n, plural, one {Archive row} other {Archive # rows}}",
+      "cantRemove": "You can't drop or archive these rows.",
+      "noTask": "Only task rows can be resized.",
+      "titleFirst": "The title stays the first column.",
+      "oneColumn": "Delete one team column at a time.",
+      "archiveRowsTitle": "{n, plural, one {Archive this row?} other {Archive # rows?}}",
+      "archiveRowsNote": "Archived pieces leave the board and can be brought back with Show archived or Undo.",
+      "archive": "Archive",
+      "newClip": "New clip in this video",
+      "newPiece": "New piece in this theme"
     },
     "tabs": {
       "label": "Sheets in {folder}",

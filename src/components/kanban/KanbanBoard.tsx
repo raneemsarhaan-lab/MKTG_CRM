@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
 import type { ContentApi } from '@/components/content/types'
+import { setLinkedRowHeights } from '@/actions/sheets'
 import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
 import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
@@ -75,6 +76,8 @@ interface KanbanBoardProps {
   surface?: 'board' | 'sheets'
   /** With surface 'sheets': the Content sheet or the video sheet. */
   sheetsView?: 'content' | 'sheet'
+  /** Spec 013: the linked sheets' saved row heights, by task id. */
+  linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -94,6 +97,7 @@ export function KanbanBoard({
   sheetValues: initialValues = {},
   surface = 'board',
   sheetsView = 'content',
+  linkedRowHeights,
 }: KanbanBoardProps) {
   const embedded = surface === 'sheets'
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
@@ -520,6 +524,9 @@ export function KanbanBoard({
         router.refresh()
       }
       return res
+    },
+    async setRowHeights(kind, entries) {
+      return setLinkedRowHeights(kind, entries).catch(() => ({ success: false as const, error: 'generic' }))
     },
     // ── the Content sheet (spec 009) ──
     async addPlan(rows, opts) {
@@ -971,6 +978,7 @@ export function KanbanBoard({
           members={members}
           contentTypes={types}
           columns={columnsBundle}
+          rowHeights={linkedRowHeights?.content}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}
@@ -994,6 +1002,7 @@ export function KanbanBoard({
           members={members}
           contentTypes={types}
           columns={columnsBundle}
+          rowHeights={linkedRowHeights?.video}
           hasStorage={hasStorage}
           videoId={sheetVideo}
           highlightId={sheetRow}

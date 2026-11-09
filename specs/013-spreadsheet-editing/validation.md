@@ -38,9 +38,42 @@ Two members: an admin (Marketing Manager) and a content creator.
 
 Screens were checked by eye on desktop, a 390 px phone and in Arabic.
 
-## Not built in this PR
+## Follow-up round (after PR #88)
 
-- **Linked sheets' row and column structure (T042):** insert row as a draft, delete rows (drop or archive), Insert column, and row heights (`setLinkedRowHeights`) from the grid menus. Rows still come from "+ Clip" / "+ Piece" and the drop and archive cells, as before.
-- **The workbook toolbar's Undo/Redo on the linked tab:** Ctrl+Z / Ctrl+Shift+Z work in the grid. The buttons are disabled there.
-- **`writeTaskCells`:** not added. Linked pastes, clears and undos save each cell through the sheet's existing single-cell save (same permissions and notifications) in parallel batches of 4, rather than one grouped server call.
-- **The UI lab (`scripts/spreadsheet-lab` entry, s1–s7, phone, axe and perf scenarios, T017–T047):** the running-app script covers the flows above. A 5,000-row speed run and axe checks are still to do.
+### Running app (`run.cjs`): 56/56
+
+Adds to the checks above:
+- The Content sheet's row menu offers New piece, Archive row and Resize row.
+- Archive row archives the task, and the workbook's Undo button brings it back.
+- Pipeline columns can't be deleted. Insert column opens spec 010's add-column form.
+- Dragging a row's edge saves its height for the team, and the height survives a reload.
+
+### Speed and accessibility (`perf-axe.cjs`): 18/18
+
+On a 5,000 × 26 sheet with 20,000 filled cells:
+
+| Check | Result |
+|---|---|
+| The sheet opens | 0.7–1.4 s; about 40 rows in the page (windowed) |
+| Arrow keys (SC-005, under 100 ms) | median 33 ms, p95 34 ms |
+| Ctrl+End to row 5,000 | under 100 ms |
+| Switching back to a cached tab | about 75 ms, including Playwright's round trip |
+| A 1,000 × 20 paste (SC-001, under 3 s) | shown in about 0.1 s; all 20,000 cells saved in about 1.5 s |
+
+Accessibility:
+- **axe:** no serious or critical violations on the Sheets home, the workbook, the tab menu, Move or Copy, the cell menu, the linked Content sheet, the workbook in Arabic, and the workbook on a phone.
+- **Phone:** the tab bar's targets are 44 px.
+- **Fixed in this round:** the folder card's grey text measured 4.36:1 on a hovered card; it now passes 4.5:1.
+
+### Outside this spec (seen by axe, not changed)
+
+The app's shared shell was excluded from these axe runs and has three findings:
+- The sidebar's account button: its accessible name doesn't match its visible text (`label-content-name-mismatch`).
+- The sidebar's role text is under 4.5:1.
+- The phone bar's inactive labels are under 4.5:1.
+
+### As built
+
+- **No `writeTaskCells`.** Linked pastes, clears and undos save each cell through the sheet's existing single-cell save (same permissions and notifications), in parallel batches of 4.
+- **Linked Insert row** adds a new clip or piece at the end of that row's video or theme, like "+ Clip" / "+ Piece". A linked row is a task, so it can't be placed between two others.
+- **Linked row-height changes** are saved for the team but are not on the undo stack. On blank sheets they are.

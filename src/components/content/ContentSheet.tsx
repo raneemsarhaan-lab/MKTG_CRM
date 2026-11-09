@@ -382,6 +382,20 @@ export function ContentSheet(p: ContentSheetProps) {
               onPaste={onPaste}
               pasteAsRows={pasteAsRows}
               onSkipped={onSkipped}
+              linked={{
+                drop: id => p.api.drop(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
+                restore: id => p.api.restore(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
+                insertRow: row => {
+                  if (row.kind === 'pillar') addPiece(row.theme, row.pillar.id)
+                  else if (row.kind === 'piece') addPiece(row.theme, row.task.pillar_id ?? null)
+                  else if (row.kind === 'draft') addPiece(row.theme, row.pillarId)
+                  else addPiece(row.theme, null)
+                  return true
+                },
+                heights: p.rowHeights,
+                saveHeights: p.api.setRowHeights ? e => p.api.setRowHeights!('linked_content', e) : undefined,
+                say: text => say(text),
+              }}
               columns={cl}
               onTypeAhead={(row, ch, anchor) => {
                 if (row.kind !== 'piece' && row.kind !== 'clip') return false

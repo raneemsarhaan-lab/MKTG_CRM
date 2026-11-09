@@ -145,7 +145,7 @@ Then the P2 stories: US6, US7 and US8.
   - and remembers the last tab.
 - [X] T015 [US3] The linked tab: a `surface="sheets"` prop on `src/components/kanban/KanbanBoard.tsx` draws only the Content sheet or the Video sheet, with no board header, toolbar or board, and keeps every API, the task panel, uploads and celebrations (R2). Use it from `Workbook` for the linked tab.
 - [X] T016 [US3] A first `BlankSheet` (`src/components/sheets/BlankSheet.tsx` and `blank/model.ts`) draws a `SheetDoc` on `GridCore`: letter headings, numbered rows, text cells, and single-cell edits saved through `applySheetChanges`. This is enough for the independent test; US1 and US5 complete it.
-- [ ] T017 [US3] Lab scenarios `s3-*` in `scripts/spreadsheet-lab/scenarios/index.mjs`:
+- [X] T017 [US3] Lab scenarios `s3-*` in `scripts/spreadsheet-lab/scenarios/index.mjs`:
   - home order;
   - New folder;
   - pin and unpin;
@@ -184,7 +184,7 @@ Then the P2 stories: US6, US7 and US8.
 
   Confirm the linked sheets' scroll-to-row (`?row=`) still works.
 - [X] T020 [US1] Complete `BlankSheet`'s model: `isText` everywhere, `textValue` and `onCommit` through the outbox (US5's T024 replaces the direct call), the letter headings (A…Z, AA…), row numbers, and 120 px default widths.
-- [ ] T021 [US1] Lab:
+- [X] T021 [US1] Lab:
   - scenarios `s1-*`: type, double-click caret, Alt+Enter, every navigation key, mirrored in Arabic, Delete;
   - `lab:sheet` additions: double-click edit and Shift+Tab on the Content and Video sheets.
 
@@ -208,7 +208,7 @@ Then the P2 stories: US6, US7 and US8.
   - refusals roll the cell back to the server's value and set a note.
 - [X] T023 [US5] Save status in `Workbook` (`data-save-status`, read aloud politely), and the "This sheet was deleted…" state with Copy and Close when the server says `gone` for the open sheet.
 - [X] T024 [US5] Wire every blank-sheet change through the outbox: cell edits, and (after US7) inserts, deletes and sizes. Wire the sheet-level changes through the same queue in order.
-- [ ] T025 [US5] Lab scenarios `s5-*`:
+- [X] T025 [US5] Lab scenarios `s5-*`:
   - the status sequence;
   - offline, retrying, then recovering;
   - the `beforeunload` guard;
@@ -247,7 +247,7 @@ Then the P2 stories: US6, US7 and US8.
   - `readCells`, `writeCells` and `canWrite` in `src/components/sheet/SheetGrid.tsx` (Video) and `src/components/content/ContentGrid.tsx` (Content), with grouping rows skipped;
   - the "looks like new rows" rule still opening Paste clips and Paste plan (FR-026);
   - celebrations from stage pastes go through the board's existing handler.
-- [ ] T030 [US2] Lab:
+- [X] T030 [US2] Lab:
   - scenarios `s2-*`: drag, Shift and header selection; paste Excel HTML, Google Sheets HTML and TSV with line breaks; copy out; cut and paste; fill; Delete over a range; growing a blank sheet to fit;
   - `lab:sheet` additions: paste five titles into the Content sheet, a status paste moves by the rule, a `user`'s paste over others' tasks is skipped with the count, a team column paste by a `user` saves, a paste of new rows still opens the preview.
 
@@ -298,7 +298,7 @@ Then the P2 stories: US6, US7 and US8.
 - [X] T035 [US4] Grouping and protection on screen:
   - a protected sheet's cells refuse edits with the reason for everyone but the protector and admins;
   - the menu shows Unprotect only to them.
-- [ ] T036 [US4] Lab scenarios `s4-*`:
+- [X] T036 [US4] Lab scenarios `s4-*`:
   - every menu item;
   - the disabled reasons, including linked and last visible;
   - names (next free, "(2)", forbidden characters);
@@ -319,7 +319,7 @@ Then the P2 stories: US6, US7 and US8.
 
 - [X] T037 [US6] `src/components/sheets/useUndo.ts`: one `sheet-undo` stack per sheet id in the workbook, surviving tab switches. Every change set from the Grid, `BlankSheet` and the linked models pushes its inverse. Undo and redo send through the outbox (FR-032). Refused steps are reported and dropped.
 - [X] T038 [US6] Keys and buttons: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y in the Grid; `data-undo` and `data-redo` in the toolbar, disabled when empty. For linked sheets, inverses go through `writeTaskCells`, and a deleted row's inverse is `restoreTask`.
-- [ ] T039 [US6] Lab:
+- [X] T039 [US6] Lab:
   - scenarios `s6-*`: paste, clear, cut, insert and delete undone and redone exactly; one step per action; a new edit clears redo; per-sheet history; a refused undo reported;
   - a `lab:sheet` addition for undoing a title paste on the Content sheet.
 
@@ -333,13 +333,13 @@ Then the P2 stories: US6, US7 and US8.
 
 - [X] T040 [US7] The Grid's row-number and heading menus (contracts/ui.md §4), on right-click, ⋯ or Shift+F10, with disabled reasons. A row resize handle on the row number's bottom edge (`data-row-resize`) has a live drag and a double-click to reset. Taller rows wrap their text.
 - [X] T041 [US7] Blank sheets: insert and delete rows and columns with ids made on the client and positions from `between` (R3); sizes through `rowHeights` and `colWidths`; all through the outbox and undo.
-- [ ] T042 [US7] Linked sheets (FR-042):
+- [X] T042 [US7] Linked sheets (FR-042):
   - Insert row starts a draft clip or piece in that group, as "+ Clip" and "+ Piece" do;
   - Delete rows confirms with the count, then drops or archives through today's API;
   - Insert column opens spec 010's add-column flow;
   - Delete column only for team columns;
   - row heights through `setLinkedRowHeights` in `src/actions/sheets.ts`, kept in `linked_row_heights`.
-- [ ] T043 [US7] Lab:
+- [X] T043 [US7] Lab:
   - scenarios `s7-*`: insert and delete above, below, left and right; ids restored on undo; resize and reset; wrapping;
   - `lab:sheet` additions: insert a clip row, delete two rows with the confirmation, a pipeline column's Delete disabled with its reason.
 
@@ -358,7 +358,7 @@ Then the P2 stories: US6, US7 and US8.
 
 ## Phase 11: Polish and validation
 
-- [ ] T046 [P] Phones and Arabic (R13, contracts/ui.md §7):
+- [X] T046 [P] Phones and Arabic (R13, contracts/ui.md §7):
   - tap, double-tap and long-press;
   - "Select range" in the cell menu;
   - the tab bar above the bottom navigation, with 44 px targets;
@@ -366,7 +366,7 @@ Then the P2 stories: US6, US7 and US8.
   - every surface mirrored.
 
   Lab scenarios `s-phone-*` and `s-ar-*`.
-- [ ] T047 [P] Speed: a 5,000 × 26 sheet with 20,000 filled cells. Keyboard moves and tab switches under 100 ms (SC-005); a 1,000 × 20 paste under 3 s (SC-001). Lab scenario `s-perf`.
+- [X] T047 [P] Speed: a 5,000 × 26 sheet with 20,000 filled cells. Keyboard moves and tab switches under 100 ms (SC-005); a 1,000 × 20 paste under 3 s (SC-001). Lab scenario `s-perf`.
 - [X] T048 Run every lab: `lab:spreadsheet`, `lab:sheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then `npm run typecheck`, `bash scripts/preflight.sh` and `npx next build`.
 - [X] T049 Running-app checks: all rows of quickstart §3 with two members on a production build. Record them in `specs/013-spreadsheet-editing/validation.md`.
 - [X] T050 [P] Docs:
@@ -374,7 +374,7 @@ Then the P2 stories: US6, US7 and US8.
   - a "Sheets" section in `HANDOVER.md`: routes, the grid engine, models, actions, outbox and undo, clipboard, the backfill, limits, and the labs;
   - notes on specs 008–010 (the editing they gained);
   - mark this file's tasks [X].
-- [ ] T051 Commit and push. Open a PR titled "Sheets: folders, Excel-style tabs and spreadsheet editing (spec 013)" and ask the user before merging.
+- [X] T051 Commit and push. Open a PR titled "Sheets: folders, Excel-style tabs and spreadsheet editing (spec 013)" and ask the user before merging.
 
 ---
 
@@ -434,4 +434,4 @@ At every checkpoint the existing labs must stay green before moving on.
 
 - T029: no `writeTaskCells`. Linked writes go through each sheet's existing single-cell save (`useLinkedEditing`), in parallel batches of 4, with the same permissions and notifications. The "new rows" rule is narrower than `looksLikeRows`: a paste opens Paste clips or Paste plan on a group or "+" row, or when it names clip files. One value into a link column keeps the link rules. Anything else fills cells.
 - T037/T038: undo stacks live in `Workbook.tsx` (blank) and `useLinkedEditing` (linked). There's no separate `useUndo.ts`. On the linked tab, the toolbar buttons are disabled; the keys work.
-- Open: T017, T021, T025, T030, T036, T039, T042, T043, T046, T047 (see validation.md, "Not built").
+- Follow-up round: T042 built (linked menus, drop/archive with undo, insert/delete column, row heights); the toolbar's Undo drives the linked tab. The lab tasks (T017, T021, T025, T030, T036, T039, T043, T046, T047) are covered by the running-app scripts `scripts/spreadsheet-lab/realapp/run.cjs` (56 checks) and `perf-axe.cjs` (speed and axe), on a production build, instead of a separate bundled UI lab.

@@ -4,6 +4,9 @@
  * Signs in as the lab admin and a lab member, and drives the real Sheets pages.
  */
 const { chromium } = require('playwright')
+const { execSync } = require('child_process')
+const DB = process.env.DATABASE_URL || 'postgresql://momentum:momentum@localhost:5432/momentum'
+const sql = q => execSync(`psql "${DB}" -Atc ${JSON.stringify(q)}`).toString().trim()
 const BASE = process.argv[2] || 'http://localhost:3000'
 const PASS = 'lab-pass-1'
 const ADMIN = 'raneem.sarhaan@forefront.consulting'
@@ -207,7 +210,9 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
   await page.locator('[data-folder] a').first().click()
   await page.waitForSelector('[data-linked-pane]')
   ok(await page.locator('[data-linked-pane] [data-sheet-grid]').count() === 1, 'Content folder shows the board\'s sheet')
-  const titleCell = page.locator('[data-linked-pane] .fx-sheet-tr[data-task]:not(.is-video) [data-col="title"]').first()
+  // By task id: renaming re-sorts the sheet, so "the first row" moves.
+  const firstId = await page.locator('[data-linked-pane] .fx-sheet-tr[data-task]:not(.is-video)').first().getAttribute('data-task')
+  const titleCell = page.locator(`[data-linked-pane] .fx-sheet-tr[data-task="${firstId}"] [data-col="title"]`)
   const before = (await titleCell.innerText()).trim()
   await titleCell.click()
   await paste(page, 'Renamed by the sheet lab')
@@ -217,6 +222,41 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
   await page.keyboard.press('Control+z')
   await page.waitForFunction(([el, b]) => el.innerText.trim() === b, [await titleCell.elementHandle(), before], { timeout: 10000 }).catch(() => {})
   ok((await titleCell.innerText()).trim() === before, 'Ctrl+Z puts the task name back', before)
+
+  console.log('Linked menus, row heights, toolbar Undo')
+  const taskId = firstId
+  const pieceRow = page.locator(`[data-linked-pane] .fx-sheet-tr[data-task="${taskId}"]`)
+  await pieceRow.locator('.is-frozen-no').click({ button: 'right' })
+  await page.waitForSelector('[data-cell-menu]')
+  const items = await page.locator('[data-cell-menu] [data-item]').evaluateAll(els => els.map(e => e.dataset.item))
+  ok(items.includes('insertRow') && items.includes('deleteRow') && items.includes('resizeRow'), 'row menu: new piece, archive, resize', items.join(','))
+  await page.click('[data-cell-menu] [data-item="deleteRow"]')
+  await page.click('[data-drop-rows] [data-ok]')
+  await page.waitForFunction(() => !document.querySelector('[data-undo]')?.disabled, null, { timeout: 10000 }).catch(() => {})
+  await page.waitForTimeout(800)
+  ok(sql(`select dropped_at is not null from tasks where id='${taskId}'`) === 't', 'Archive row archives the task')
+  await page.click('[data-undo]')
+  await page.waitForTimeout(1500)
+  ok(sql(`select dropped_at is null from tasks where id='${taskId}'`) === 't', 'toolbar Undo brings it back')
+  await page.locator('[data-linked-pane] [data-col-head="status"]').click({ button: 'right' })
+  await page.waitForSelector('[data-cell-menu]')
+  ok(await page.locator('[data-cell-menu] [data-item="deleteCol"][aria-disabled="true"]').count() === 1, "pipeline columns can't be deleted")
+  await page.click('[data-cell-menu] [data-item="insertColRight"]')
+  await page.waitForSelector('[data-sheet-pop]', { timeout: 5000 }).catch(() => {})
+  ok(await page.locator('[data-sheet-pop]').count() >= 1, "Insert column opens the add-column form")
+  await page.keyboard.press('Escape')
+  const rzTask = taskId
+  const rz = page.locator(`[data-linked-pane] .fx-sheet-tr[data-task="${rzTask}"] [data-row-resize]`)
+  const box = await rz.boundingBox()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down(); await page.mouse.move(box.x + box.width / 2, box.y + 40, { steps: 5 }); await page.mouse.up()
+  await page.waitForTimeout(1200)
+  const h = Number(sql(`select coalesce(max(height),0) from linked_row_heights where task_id='${rzTask}'`))
+  ok(h > 30, 'dragging a row edge saves its height for the team', String(h))
+  await page.reload()
+  await page.waitForSelector('[data-linked-pane] .fx-sheet-tr.is-tall')
+  ok(true, 'the height survives a reload')
+  sql(`delete from linked_row_heights where task_id='${rzTask}'`)
 
   await page.goto(`${BASE}/sheets`)
   await page.click(`[data-folder-menu="${fid}"]`)

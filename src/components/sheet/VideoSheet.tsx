@@ -455,6 +455,14 @@ export function VideoSheet(p: VideoSheetProps) {
             onPaste={onPaste}
             pasteAsRows={pasteAsRows}
             onSkipped={onSkipped}
+            linked={{
+              drop: id => p.api.drop(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
+              restore: id => p.api.restore(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
+              insertRow: row => { addClip(row.kind === 'video' ? row.task.id : row.video.id); return true },
+              heights: p.rowHeights,
+              saveHeights: p.api.setRowHeights ? e => p.api.setRowHeights!('linked_video', e) : undefined,
+              say: text => say(text),
+            }}
             onRetry={id => { const s = filesState[id]; if (s?.kind === 'failed') void upload(id, s.file) }}
             onLinkInstead={(id, anchor) => setPopup({ kind: 'link', anchor, taskId: id, mode: 'files' })}
             onNote={onNote}

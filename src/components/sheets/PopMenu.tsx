@@ -62,7 +62,9 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
 
   useEffect(() => {
     const down = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close(false) }
-    const scroll = (e: Event) => { if (ref.current && !ref.current.contains(e.target as Node)) close(false) }
+    // Opening can scroll the grid (selecting a whole column brings its cell into view): ignore that.
+    const opened = Date.now()
+    const scroll = (e: Event) => { if (Date.now() - opened > 400 && ref.current && !ref.current.contains(e.target as Node)) close(false) }
     document.addEventListener('pointerdown', down, true)
     window.addEventListener('resize', () => close(false))
     document.addEventListener('scroll', scroll, true)
