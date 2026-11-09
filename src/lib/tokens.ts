@@ -266,6 +266,31 @@ export const BRAND_PALETTE = [
  * red so it never reads as the Inbox's purple or orange one; unread rows are
  * tinted, with a blue dot and time. Mirrored as --nt-* in globals.css.
  */
+/**
+ * Sheets (spec 013): the tab bar, selection and Excel-style tab colours. The
+ * same values are the --sh-* variables in globals.css.
+ */
+export const SHEETS_UI = {
+  selFill:    'rgba(124, 58, 237, 0.10)',
+  selEdge:    '#7C3AED',
+  headSel:    '#E9E2FD',
+  tabActive:  '#7C3AED',
+  tabGrouped: '#F0EBFE',
+  resize:     '#7C3AED',
+  tabs: {
+    red:    '#E5484D',
+    orange: '#F59E0B',
+    yellow: '#EAB308',
+    green:  '#16A34A',
+    teal:   '#0E7C7C',
+    blue:   '#2563EB',
+    purple: '#7C3AED',
+    pink:   '#DB2777',
+    gray:   '#6B7280',
+    black:  '#14131A',
+  },
+} as const
+
 export const NOTIFY_UI = {
   red:        '#E5484D',
   tint:       '#F4F0FF',

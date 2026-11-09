@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../..",
+    "paths": {
+      "@/lib/authz": ["scripts/spreadsheet-lab/smoke/authz-stub.ts"],
+      "next/cache": ["scripts/spreadsheet-lab/smoke/next-cache-stub.ts"],
+      "@/*": ["src/*"]
+    }
+  }
+}

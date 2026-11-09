@@ -68,6 +68,13 @@ interface KanbanBoardProps {
   /** Sheet columns the team has shaped, and custom values (spec 010). */
   sheetColumns?: SheetColumnRecord[]
   sheetValues?: SheetValues
+  /**
+   * Spec 013 R2: 'sheets' shows only one sheet, inside a Sheets folder's
+   * workbook — no board header, no Inbox, and the address is the folder's.
+   */
+  surface?: 'board' | 'sheets'
+  /** With surface 'sheets': the Content sheet or the video sheet. */
+  sheetsView?: 'content' | 'sheet'
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -85,7 +92,10 @@ export function KanbanBoard({
   inbox: initialInbox = NO_INBOX,
   sheetColumns: initialColumns = [],
   sheetValues: initialValues = {},
+  surface = 'board',
+  sheetsView = 'content',
 }: KanbanBoardProps) {
+  const embedded = surface === 'sheets'
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
@@ -126,17 +136,21 @@ export function KanbanBoard({
    * to highlight a clip. Written with the history API, like ?task below, so
    * switching never refetches the board.
    */
-  const [view, setView] = useState<BoardView>(() => {
+  const [view, setViewState] = useState<BoardView>(() => {
+    if (embedded) return sheetsView
     const v = searchParams.get('view')
     return v === 'sheet' || v === 'content' ? v : 'board'
   })
   // The Pipeline tab returns to the pipeline view last shown (spec 011 R10).
   const [lastPipelineView, setLastPipelineView] = useState<'board' | 'sheet'>(() =>
     searchParams.get('view') === 'sheet' ? 'sheet' : 'board')
+  // Inside a Sheets folder, "Board" leaves for the board itself.
+  const setView = (v: BoardView) => { if (embedded && v === 'board') router.push('/board'); else setViewState(v) }
   useEffect(() => { if (view !== 'content') setLastPipelineView(view) }, [view])
   const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
   const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
   useEffect(() => {
+    if (embedded) return
     const url = new URL(window.location.href)
     const want: Record<string, string | null> = {
       view: view === 'board' ? null : view,
@@ -948,8 +962,8 @@ export function KanbanBoard({
 
   if (view === 'content') {
     return (
-      <div className="fx-board-page is-sheet">
-        {header}
+      <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
+        {!embedded && header}
         <ContentSheet
           tasks={tasks}
           themes={themes}
@@ -964,7 +978,7 @@ export function KanbanBoard({
           api={sheetApi}
         />
         {taskPanel}
-        {inboxOpen && inboxPanel(false)}
+        {!embedded && inboxOpen && inboxPanel(false)}
         {taskForm}
       </div>
     )
@@ -972,8 +986,8 @@ export function KanbanBoard({
 
   if (view === 'sheet') {
     return (
-      <div className="fx-board-page is-sheet">
-        {header}
+      <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
+        {!embedded && header}
         <VideoSheet
           tasks={tasks}
           me={currentUser}
@@ -990,7 +1004,7 @@ export function KanbanBoard({
           api={sheetApi}
         />
         {taskPanel}
-        {inboxOpen && inboxPanel(false)}
+        {!embedded && inboxOpen && inboxPanel(false)}
         {taskForm}
       </div>
     )

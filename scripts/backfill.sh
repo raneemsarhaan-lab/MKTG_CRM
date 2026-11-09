@@ -38,6 +38,11 @@ step 300 optional "Checking for files to recover" \
 step 300 optional "Seeding notification followers and mentions" \
   tsx scripts/notifications-backfill.ts
 
+# Spec 013: the Content and Video folders in Sheets, each with its linked
+# sheet. Idempotent; the app also makes them on demand.
+step 60 optional "Creating the Sheets folders" \
+  tsx scripts/sheets-backfill.ts
+
 step 900 optional "Importing ClickUp tasks (if an export is present)" \
   tsx scripts/import-clickup.ts
 step 600 optional "Loading the Aspiring / Focus plan" \

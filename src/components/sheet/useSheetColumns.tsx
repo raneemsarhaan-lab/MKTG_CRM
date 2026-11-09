@@ -164,12 +164,13 @@ export function useSheetColumns(o: UseSheetColumns) {
     is: (key: string) => isCustomKey(key) && byKey.has(key),
     isText: (task: Task, key: string) => {
       const c = byKey.get(key)
-      return !!c && ['text', 'number', 'date'].includes(c.kind ?? '') && o.canEdit(task) && !gone(task)
+      // Spec 013 R8 (FR-060): team columns are open to every member on a live task.
+      return !!c && ['text', 'number', 'date'].includes(c.kind ?? '') && !gone(task)
     },
     isMenu: (key: string) => ['link', 'person', 'choice'].includes(byKey.get(key)?.kind ?? ''),
     textValue: (task: Task, key: string) => valueOf(task, key),
     cellClass: (key: string) => (byKey.get(key)?.kind === 'number' ? 'fx-sheet-num' : ''),
-    readOnlyNote: (task: Task, key: string) => (!o.canEdit(task) ? t('err.not_authorized') : gone(task) ? t('err.archived') : null),
+    readOnlyNote: (task: Task, key: string) => (gone(task) ? t('err.archived') : null),
     render: (task: Task, key: string): ReactNode => {
       const c = byKey.get(key)
       if (!c?.kind) return null

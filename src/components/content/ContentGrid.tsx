@@ -20,6 +20,7 @@ import type { ContentRow } from './rows'
 import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
+import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 
 export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
 export type ContentCol = typeof CONTENT_COLS[number]
@@ -68,6 +69,10 @@ export interface ContentGridProps {
   columns: SheetColumnsHook
   /** A letter typed on the Type cell: its type-ahead (spec 010). */
   onTypeAhead(row: ContentRow, ch: string, anchor: HTMLElement): boolean
+  /** Spec 013: whether a paste is a content plan (Paste plan) rather than cells to fill. */
+  pasteAsRows?(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean
+  /** Spec 013: what a paste, clear or undo didn't change, by reason. */
+  onSkipped?(skipped: Partial<Record<string, number>>): void
 }
 
 export function ContentGrid(p: ContentGridProps) {
@@ -274,6 +279,18 @@ export function ContentGrid(p: ContentGridProps) {
       return null
     },
   }
+
+  // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
+  const le = useLinkedEditing<ContentRow>({
+    rows: p.rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: p.onCommit,
+    readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
+    isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
+    onSkipped: p.onSkipped,
+  })
+  Object.assign(model, {
+    selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
+    pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
+  } satisfies Partial<GridModel<ContentRow>>)
 
   return (
     <GridCore model={model} active={p.active} setActive={p.setActive}

@@ -1,6 +1,6 @@
 'use client'
 
-import type { Member } from '@/types/index'
+import type { Member, PinnedFolder } from '@/types/index'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
@@ -9,6 +9,8 @@ import { notifyApi } from '@/components/notifications/api'
 
 interface AppShellProps {
   member: Member
+  /** Folders pinned under Sheets (spec 013). */
+  pins?: PinnedFolder[]
   children: React.ReactNode
 }
 
@@ -31,7 +33,7 @@ interface AppShellProps {
  * Per-screen padding lives on the screen, not here: My Board specifies
  * 36px 44px 44px, which other screens do not share.
  */
-export function AppShell({ member, children }: AppShellProps) {
+export function AppShell({ member, pins = [], children }: AppShellProps) {
   return (
     // The notifications' pulse, toasts and opening (spec 012), once for the app.
     <NotifyProvider api={notifyApi} meId={member.id} storedLocale={member.locale}>
@@ -42,7 +44,7 @@ export function AppShell({ member, children }: AppShellProps) {
       minHeight: '100dvh',
       display: 'flex', background: '#FFFFFF',
     }}>
-      <Sidebar member={member} />
+      <Sidebar member={member} pins={pins} />
 
       <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
 

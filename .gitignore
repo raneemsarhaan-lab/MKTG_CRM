@@ -35,3 +35,6 @@ scripts/inbox-lab/out/
 scripts/header-lab/out/
 # Notifications lab build output
 scripts/notify-lab/out/
+
+# Spec 013 lab build output
+scripts/spreadsheet-lab/out/

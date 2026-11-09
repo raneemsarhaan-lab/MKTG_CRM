@@ -175,11 +175,13 @@ export const columns = [
   {
     id: 'col-2-readonly', hash: `${C}&me=sara`,
     async run(t) {
+      // Spec 013 R8 (FR-060): team columns are open to every member on a live task.
       await t.focusCell(`k:${POST1}`, 'c:hook')
       await t.page.keyboard.press('Enter')
+      await t.page.keyboard.type('Sara was here')
+      await t.page.keyboard.press('Enter')
       await t.idle(150)
-      t.assert(/can't edit/.test(await t.text(`k:${POST1}`, 'c:hook')), 'a row the member may not edit is read-only (FR-024)')
-      t.eq((await calls(t, 'col.value')).length, 0, 'nothing sent')
+      t.eq((await calls(t, 'col.value')).length, 1, 'a member who may not edit the task can still fill a team column (spec 013 R8)')
       // But anyone may shape the columns (FR-003).
       await headMenu(t, 'c:hook')
       t.assert((await t.menuItems()).includes('rename'), 'the column menu is open to everyone')
