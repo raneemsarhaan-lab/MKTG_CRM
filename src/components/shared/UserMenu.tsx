@@ -152,7 +152,9 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
         onClick={() => (open ? close() : setOpen(true))}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={isHeader ? th('account', { name: member.name, role: roleLabel }) : 'Account menu'}
+        // The sidebar's button is named by what it shows (name and role); the
+        // icon-only forms need a label. Either way it starts with the name.
+        aria-label={isHeader ? th('account', { name: member.name, role: roleLabel }) : isRail ? `${member.name}, ${roleLabel}` : undefined}
         title={isHeader ? `${member.name} · ${roleLabel}` : undefined}
         data-account={isHeader ? '' : undefined}
         className={isHeader ? 'fx-hd-avatar' : undefined}
@@ -166,7 +168,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
           fontFamily: 'inherit', textAlign: 'start',
         }}
       >
-        <span aria-hidden={isHeader ? true : undefined} style={{
+        <span aria-hidden="true" style={{
           width: isRail ? 40 : 40, height: isRail ? 40 : 40, borderRadius: '50%',
           flexShrink: 0, overflow: 'hidden', boxSizing: 'border-box',
           border: isHeader ? '2.5px solid #A855F7' : isRail ? '2px solid #34383B' : '2px solid #E9D5FF',
@@ -193,7 +195,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
               }}>
                 {member.name}
               </span>
-              <span style={{ display: 'block', fontWeight: 500, fontSize: 11.5, color: PIPE.textFaint }}>
+              <span style={{ display: 'block', fontWeight: 500, fontSize: 11.5, color: PIPE.textMuted }}>
                 {member.access === 'admin' ? 'Admin' : member.role}
               </span>
             </span>
@@ -242,7 +244,7 @@ export function UserMenu({ member, variant = 'sidebar' }: Props) {
                 {member.name}
               </span>
               <span style={{
-                display: 'block', fontSize: 11.5, color: PIPE.textFaint,
+                display: 'block', fontSize: 11.5, color: PIPE.textMuted,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {member.email}
@@ -375,7 +377,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <label style={{ display: 'grid', gap: 4 }}>
       <span style={{
         fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
-        textTransform: 'uppercase', color: PIPE.textFaint,
+        textTransform: 'uppercase', color: PIPE.textMuted,
       }}>
         {label}
       </span>
