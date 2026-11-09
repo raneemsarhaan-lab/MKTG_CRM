@@ -1058,7 +1058,8 @@
       "undo": "Undo",
       "deleteNote": "Deletes {n, plural, one {its # sheet} other {its # sheets}} for everyone. You can undo for 10 seconds.",
       "linkedNoRename": "Content and Video are linked to the board and keep their names.",
-      "linkedNoDelete": "Content and Video can't be deleted."
+      "linkedNoDelete": "Content and Video can't be deleted.",
+      "deleteNoteNow": "Deletes {n, plural, one {its # sheet} other {its # sheets}} for everyone. This can't be undone."
     },
     "sheet": {
       "content": "Content library",
@@ -1098,7 +1099,8 @@
         "read_only": "{n, plural, one {# cell is read-only} other {# cells are read-only}}",
         "protected": "the sheet is protected",
         "gone": "{n, plural, one {# row or column was removed} other {# rows or columns were removed}}",
-        "invalid": "{n, plural, one {# value isn't valid} other {# values aren't valid}}"
+        "invalid": "{n, plural, one {# value isn't valid} other {# values aren't valid}}",
+        "limit": "{n, plural, one {# cell was past the sheet's size limit} other {# cells were past the sheet's size limit}}"
       }
     },
     "menu": {
@@ -1118,7 +1120,9 @@
       "pipelineCol": "Pipeline columns can't be deleted.",
       "deleteRowsTitle": "{n, plural, one {Drop this row?} other {Drop # rows?}}",
       "deleteRowsNote": "Dropped tasks leave the board and can be brought back with Show dropped or Undo.",
-      "drop": "Drop"
+      "drop": "Drop",
+      "keepOneRow": "A sheet keeps at least one row.",
+      "keepOneCol": "A sheet keeps at least one column."
     },
     "tabs": {
       "label": "Sheets in {folder}",
@@ -1208,6 +1212,15 @@
       "too_long": "A cell can hold up to 50,000 characters.",
       "gone": "That sheet or folder no longer exists.",
       "generic": "That didn't work. Try again."
+    },
+    "resize": {
+      "rowTitle": "Resize rows",
+      "colTitle": "Resize columns",
+      "height": "Height in pixels ({min}–{max})",
+      "width": "Width in pixels ({min}–{max})",
+      "reset": "Default size",
+      "cancel": "Cancel",
+      "ok": "OK"
     }
   }
 }

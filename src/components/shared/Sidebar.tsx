@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import type { Member } from '@/types/index'
+import type { Member, PinnedFolder } from '@/types/index'
+import { PinnedFolders } from '@/components/sheets/PinnedFolders'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { NavRail } from './NavRail'
 import { UserMenu } from './UserMenu'
@@ -28,7 +29,7 @@ import { NAV_ICON, navFor } from '@/lib/nav'
 
 const STORAGE_KEY = 'fluxo.sidebar.expanded'
 
-export function Sidebar({ member }: { member: Member }) {
+export function Sidebar({ member, pins = [] }: { member: Member; pins?: PinnedFolder[] }) {
   // Expanded is the handoff's default. The stored preference is read after
   // mount, never during render — reading localStorage while rendering would
   // make the server and client disagree and mismatch the whole tree.
@@ -76,7 +77,7 @@ export function Sidebar({ member }: { member: Member }) {
       <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.map(({ href, key }) => {
           const active = pathname.startsWith(href)
-          return (
+          const link = (
             <Link
               key={href}
               href={href}
@@ -97,6 +98,9 @@ export function Sidebar({ member }: { member: Member }) {
               {t(key)}
             </Link>
           )
+          // Spec 013: the pinned folders sit under Sheets.
+          if (key !== 'sheets' || !pins.length) return link
+          return <div key={href}>{link}<PinnedFolders pins={pins} pathname={pathname} /></div>
         })}
       </nav>
 

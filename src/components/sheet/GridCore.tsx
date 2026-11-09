@@ -755,7 +755,15 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                  draggable={movable || undefined}
                  className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}${dragCol === col ? ' is-dragging' : ''}${dropBefore === col && dragCol && dragCol !== col ? ' is-drop-before' : ''}${on ? ' is-sel-head' : ''}`}
                  onClick={e => headerClick(col, e)}
-                 onContextMenu={m.contextMenu ? e => { e.preventDefault(); const cc = m.cols.indexOf(col); if (!inRect(rect.r0, cc) || rect.r1 - rect.r0 + 1 < m.rows.length) selectBlock({ r0: 0, c0: cc, r1: Math.max(0, m.rows.length - 1), c1: cc }); openMenu({ kind: 'col', c: cc, rect }, e.currentTarget, { x: e.clientX, y: e.clientY }) } : undefined}
+                 onContextMenu={m.contextMenu ? e => {
+                   e.preventDefault()
+                   const cc = m.cols.indexOf(col)
+                   // Inside whole selected columns, the menu acts on them all; otherwise on this one.
+                   const whole = cc >= rect.c0 && cc <= rect.c1 && rect.r0 === 0 && rect.r1 - rect.r0 + 1 >= m.rows.length
+                   const q = whole ? rect : { r0: 0, c0: cc, r1: Math.max(0, m.rows.length - 1), c1: cc }
+                   if (!whole) selectBlock(q)
+                   openMenu({ kind: 'col', c: cc, rect: q }, e.currentTarget, { x: e.clientX, y: e.clientY })
+                 } : undefined}
                  onDragStart={movable ? e => { setDragCol(col); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', col) } : undefined}
                  onDragOver={m.onReorder && dragCol && col !== 'title' ? e => { e.preventDefault(); if (dropBefore !== col) setDropBefore(col) } : undefined}
                  onDrop={m.onReorder && dragCol ? e => { e.preventDefault(); const from = dragCol; setDragCol(null); setDropBefore(null); if (from !== col && col !== 'title') m.onReorder?.(from, col) } : undefined}
@@ -845,7 +853,14 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   }}
                   onContextMenu={m.contextMenu ? e => {
                     e.preventDefault()
-                    if (isNo) { if (!(rowOn && rect.c0 === 0 && rect.c1 === m.cols.length - 1)) selectBlock({ r0: i, c0: 0, r1: i, c1: m.cols.length - 1 }); openMenu({ kind: 'row', r: i, rect: rectRef.current }, e.currentTarget, { x: e.clientX, y: e.clientY }); return }
+                    if (isNo) {
+                      // Inside whole selected rows, the menu acts on them all; otherwise on this one.
+                      const whole = i >= rect.r0 && i <= rect.r1 && rect.c0 === 0 && rect.c1 === m.cols.length - 1
+                      const q = whole ? rect : { r0: i, c0: 0, r1: i, c1: Math.max(0, m.cols.length - 1) }
+                      if (!whole) selectBlock(q)
+                      openMenu({ kind: 'row', r: i, rect: q }, e.currentTarget, { x: e.clientX, y: e.clientY })
+                      return
+                    }
                     if (c >= 0 && !inRect(i, c)) { setFocusEnd(null); setActive({ key: row.key, col }) }
                     openMenu({ kind: 'cell', r: i, c, rect: inRect(i, c) ? rectRef.current : { r0: i, c0: c, r1: i, c1: c } }, e.currentTarget, { x: e.clientX, y: e.clientY })
                   } : undefined}

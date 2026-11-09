@@ -378,6 +378,14 @@ export interface FolderSummary {
   updatedBy: string | null
 }
 
+/** A folder pinned under Sheets in the sidebar. */
+export interface PinnedFolder {
+  id: string
+  kind: SheetFolderKind
+  name: string | null
+  sheetCount: number
+}
+
 export interface SheetSummary {
   id: string
   folderId: string
