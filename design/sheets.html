@@ -1,0 +1,554 @@
+<title>Momentum Sheets Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (screen, device, language) over one app frame.
+   The frame is the real app's shape: sidebar + page. A folder opens as a
+   workbook: breadcrumb, toolbar, grid, and Excel's tab bar along the bottom. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --lime: #C9F24E; --link: #1D4ED8;
+  --sh-sel: rgba(124, 58, 237, .10); --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --bad: #C81E3A;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif;
+  --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.hint { font-size: 12.5px; color: var(--muted); }
+
+/* the app frame */
+.frame { position: relative; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10);
+  display: grid; grid-template-columns: 212px minmax(0, 1fr); height: 720px; }
+.frame[dir="rtl"], .frame[dir="rtl"] button, .frame[dir="rtl"] input { font-family: var(--f-ar); }
+.frame.phone { grid-template-columns: minmax(0, 1fr); max-width: 390px; width: 100%; margin: 0 auto; height: 800px; }
+.frame.phone .side { display: none; }
+.side { border-inline-end: 1px solid var(--line); padding: 22px 14px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+.word { font: 800 21px var(--f-head); color: var(--ink); padding-inline: 6px; }
+.pill { align-self: flex-start; margin-inline: 6px; background: var(--lime); color: #14131A; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
+.nav { display: grid; gap: 2px; }
+.nav button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: start; font-size: 14px; font-weight: 600; min-height: 38px; }
+.nav button:hover { background: var(--surface); }
+.nav button[aria-current="page"] { background: var(--purple-soft); color: var(--purple); }
+.pins { display: grid; gap: 1px; margin-inline-start: 18px; padding-inline-start: 10px; border-inline-start: 1.5px solid var(--line); }
+.pins button { font-weight: 500; font-size: 13.5px; min-height: 34px; padding: 6px 8px; }
+.pins .more { margin-inline-start: auto; opacity: 0; font-weight: 800; color: var(--muted); }
+.pins button:hover .more { opacity: 1; }
+.main { min-width: 0; display: flex; flex-direction: column; height: 100%; }
+
+/* page top */
+.top { display: flex; align-items: center; gap: 12px; padding: 14px 22px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+.crumbs button { border: 0; background: none; padding: 4px 6px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; }
+.crumbs b { color: var(--ink); font: 800 20px var(--f-head); }
+.frame[dir="rtl"] .crumbs b { font-family: var(--f-ar); }
+.linked { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 8px; background: var(--purple-soft); color: var(--purple); }
+.status { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.status.is-saving::before { background: var(--purple); animation: pulse 1s infinite; }
+.status.is-retrying { color: var(--warn); background: var(--warn-bg); padding: 4px 10px; border-radius: 999px; }
+.status.is-retrying::before { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .3; } }
+.cta { border: 0; background: var(--lime); color: #14131A; border-radius: 999px; padding: 9px 16px; font: 700 14px var(--f-head); cursor: pointer; }
+
+/* home */
+.home { padding: 18px 22px 24px; display: grid; gap: 16px; align-content: start; overflow: auto; }
+.home h3 { margin: 0; font: 700 12px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.frame[dir="rtl"] .home h3 { letter-spacing: 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.card { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--panel); text-align: start; cursor: pointer; display: grid; gap: 7px; }
+.card:hover { background: var(--surface); }
+.card .fi { display: flex; align-items: center; gap: 10px; }
+.card .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.card b { font: 700 15px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .card b { font-family: var(--f-ar); }
+.card small { color: var(--muted); font-size: 12.5px; }
+.card .menu-btn { position: absolute; top: 10px; inset-inline-end: 10px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: none; cursor: pointer; font-weight: 800; color: var(--muted); }
+.card .menu-btn:hover { background: var(--panel); }
+.card.add { border-style: dashed; place-items: center; text-align: center; color: var(--muted); font-weight: 600; min-height: 112px; }
+.undo-toast { position: absolute; bottom: 18px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--ink); color: var(--panel); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 13.5px; z-index: 8; }
+.frame[dir="rtl"] .undo-toast { transform: translateX(50%); }
+.undo-toast button { border: 0; background: none; color: var(--lime); font-weight: 700; cursor: pointer; }
+
+/* workbook */
+.tools { display: flex; align-items: center; gap: 6px; padding: 7px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; min-height: 46px; }
+.ib { width: 32px; height: 32px; border: 1px solid var(--input); background: var(--panel); border-radius: 8px; cursor: pointer; display: grid; place-items: center; font-size: 16px; }
+.ib:disabled { opacity: .4; cursor: default; }
+.tools .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+.tools .lbl { font-size: 12.5px; color: var(--muted); }
+.skip { margin-inline-start: auto; font-size: 12.5px; background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 4px 10px; }
+.gridwrap { flex: 1; overflow: auto; position: relative; min-height: 0; }
+.g { display: grid; font-size: 13px; min-width: max-content; }
+.g .c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 6px 8px; min-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel); position: relative; cursor: cell; line-height: 1.35; }
+.g .c.tall { white-space: normal; overflow-wrap: anywhere; }
+.g .h, .g .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; text-align: center; position: sticky; z-index: 2; cursor: default; user-select: none; }
+.g .h { top: 0; }
+.g .rn { inset-inline-start: 0; z-index: 1; }
+.g .corner { position: sticky; top: 0; inset-inline-start: 0; z-index: 3; background: var(--grid-head); }
+.g .h.on, .g .rn.on { background: var(--sh-head-sel); color: var(--purple); }
+.g .c.sel { background: var(--sh-sel); }
+.g .c.act { box-shadow: inset 0 0 0 2px var(--sh-edge); background: var(--panel); }
+.g .c.edit { box-shadow: inset 0 0 0 2px var(--sh-edge), 0 4px 14px rgba(20,19,26,.15); white-space: pre-wrap; z-index: 4; overflow: visible; }
+.g .c.grp { background: var(--surface); font-weight: 700; color: var(--ink); grid-column: 2 / -1; }
+.g .c.ro { color: var(--muted); }
+.rz { position: absolute; inset-inline-end: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; }
+.rz-row { position: absolute; inset-inline: 0; bottom: -3px; height: 6px; cursor: row-resize; }
+.rz:hover, .rz-row:hover { background: var(--purple); }
+.stage { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; }
+.g a { color: var(--link); text-decoration: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 700 9px var(--f-body); font-style: normal; }
+
+/* the tab bar, as in Excel */
+.tabs { display: flex; align-items: stretch; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 44px; position: relative; }
+.tabs .fixed { display: flex; align-items: center; gap: 2px; padding-inline: 6px; border-inline-end: 1px solid var(--line); flex: none; }
+.tabs .fixed button { width: 32px; height: 32px; border: 0; background: none; border-radius: 8px; cursor: pointer; font-size: 17px; color: var(--text); }
+.tabs .fixed button:hover { background: var(--surface); }
+.tabs .fixed button.arrow { width: 24px; font-size: 13px; color: var(--muted); }
+.tabs .list { display: flex; align-items: stretch; overflow: hidden; min-width: 0; flex: 1; padding-inline-start: 4px; }
+.tb { position: relative; border: 0; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; min-height: 44px; border-inline-end: 1px solid var(--line); }
+.tb:hover { background: var(--surface); color: var(--ink); }
+.tb[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
+.tb .stripe { position: absolute; inset-inline: 6px; bottom: 0; height: 4px; border-radius: 2px 2px 0 0; }
+.tb[aria-selected="true"] .stripe { inset-inline: 0; bottom: 0; height: 3px; border-radius: 0; }
+.tb.grouped { background: var(--purple-soft); color: var(--purple); }
+.tb .caret { font-size: 10px; opacity: 0; }
+.tb:hover .caret, .tb:focus-visible .caret, .tb[aria-selected="true"] .caret { opacity: .7; }
+.tb input { width: 120px; font-weight: 600; font-size: 13px; border: 1px solid var(--purple); border-radius: 6px; padding: 3px 6px; background: var(--panel); }
+.drop-mark { width: 2px; background: var(--purple); margin-block: 6px; }
+
+/* menus and dialogs */
+.menu { position: absolute; z-index: 10; width: 248px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13.5px; }
+.menu button { display: flex; width: 100%; gap: 8px; align-items: center; justify-content: space-between; border: 0; background: none; border-radius: 8px; padding: 7px 10px; text-align: start; cursor: pointer; min-height: 34px; }
+.menu button:hover:not(:disabled) { background: var(--surface); }
+.menu button:disabled { color: var(--muted); cursor: not-allowed; }
+.menu kbd { font: 500 11.5px var(--f-body); color: var(--muted); }
+.menu .why { display: block; color: var(--muted); font-size: 11.5px; padding: 0 10px 6px; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 10px 8px; }
+.swatches button { width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 5px; border: 1px solid var(--line); }
+.scrim { position: absolute; inset: 0; background: rgba(20,19,26,.35); display: grid; place-items: center; z-index: 20; padding: 16px; }
+.dialog { background: var(--panel); border-radius: 16px; padding: 18px; width: min(360px, 100%); display: grid; gap: 10px; font-size: 13.5px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+.dialog h2 { margin: 0; font: 800 17px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .dialog h2 { font-family: var(--f-ar); }
+.dialog p { margin: 0; color: var(--muted); line-height: 1.5; }
+.dialog select, .dialog .lb { width: 100%; border: 1px solid var(--input); border-radius: 10px; padding: 7px 9px; background: var(--panel); }
+.dialog .lb { padding: 4px; max-height: 150px; overflow: auto; display: grid; gap: 1px; }
+.dialog .lb button { border: 0; background: none; text-align: start; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.dialog .lb button[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); font-weight: 600; }
+.dialog .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.dialog .row button { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 7px 16px; font-weight: 700; cursor: pointer; }
+.dialog .row .go { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.dialog .row .danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.dialog label { display: flex; gap: 8px; align-items: center; }
+
+/* notes */
+.notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+.note h4 { margin: 0 0 6px; font: 700 14px var(--f-head); color: var(--ink); }
+.note ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 3px; }
+
+/* phone */
+.ph-nav { display: none; }
+.frame.phone .ph-nav { display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--line); background: var(--panel); min-height: 58px; font-size: 11px; color: var(--muted); font-weight: 600; flex: none; }
+.ph-nav span { display: grid; justify-items: center; gap: 2px; }
+.ph-nav span.on { color: var(--purple); }
+.frame.phone .main { height: auto; flex: 1; min-height: 0; }
+.frame.phone { display: flex; flex-direction: column; }
+.frame.phone .top { padding: 12px 14px 8px; }
+.frame.phone .tools { padding: 6px 12px; }
+.frame.phone .tb { min-height: 44px; padding: 0 12px; }
+.frame.phone .cards { grid-template-columns: 1fr; }
+.frame.phone .menu { inset-inline: 8px !important; width: auto; bottom: 106px; top: auto !important; }
+
+@media (max-width: 900px) {
+  .frame { grid-template-columns: 1fr; height: 760px; }
+  .frame:not(.phone) .side { display: none; }
+  .notes { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Sheets</h1>
+    <p class="lede">The full design for spec 013. Sheets in the sidebar opens a home page of folders; pinned folders sit under it. A folder opens as a workbook: edit cells like Google Sheets, and manage sheets with Excel's tab bar along the bottom. Everything here is clickable.</p>
+  </header>
+
+  <div class="ctl">
+    <span>Screen</span>
+    <span class="seg" role="group" aria-label="Screen">
+      <button data-screen="home">Sheets home</button><button data-screen="blank">Blank sheet</button><button data-screen="content">Content (linked)</button><button data-screen="menus">Tab menu &amp; dialogs</button><button data-screen="offline">Offline</button>
+    </span>
+    <span>Device</span>
+    <span class="seg" role="group" aria-label="Device"><button data-dev="desktop">Computer</button><button data-dev="phone">Phone 390</button></span>
+    <span>Language</span>
+    <span class="seg" role="group" aria-label="Language"><button data-lang="en">English</button><button data-lang="ar">العربية</button></span>
+  </div>
+  <p class="hint" id="hint"></p>
+
+  <div id="frame" class="frame"></div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+  const T = {
+    en: {
+      nav: ['Overview', 'Board', 'Sheets', 'Projects', 'Team'], newb: 'New', pinned: 'Pinned',
+      sheets: 'Sheets', newFolder: '＋ New folder', linkedH: 'Linked to the board', teamH: 'Team folders',
+      linked: '🔗 Linked', sheetsN: n => `${n} sheets`, edited: (t, w) => `Edited ${t} by ${w}`,
+      cardMenu: ['Pin to sidebar', 'Unpin', 'Rename', 'Delete folder'], deleted: n => `“${n}” deleted`, undo: 'Undo',
+      saved: 'Saved', saving: 'Saving…', retrying: n => `Not saved, retrying (${n})`,
+      undoT: 'Undo (Ctrl+Z)', redoT: 'Redo (Ctrl+Shift+Z)', selN: n => `${n} cells selected`,
+      blankHint: 'A blank sheet: click a cell and type', linkedHint: 'Rows are tasks on the board',
+      skip: '3 cells weren’t changed: you can’t edit 2 tasks, 1 is archived',
+      cellMenu: [['Cut', 'Ctrl+X'], ['Copy', 'Ctrl+C'], ['Paste', 'Ctrl+V'], ['Clear', 'Delete'], '-', ['Insert row above'], ['Insert row below'], ['Insert column left'], ['Insert column right'], '-', ['Delete row'], ['Delete column']],
+      rowMenu: [['Insert 1 row above'], ['Insert 1 row below'], '-', ['Delete rows 3–5'], ['Resize row…']],
+      colMenu: [['Insert 1 column left'], ['Insert 1 column right'], '-', ['Delete column C'], ['Resize column…']],
+      tabMenu: { insert: 'Insert', del: 'Delete', rename: 'Rename', move: 'Move or Copy…', protect: 'Protect Sheet…', unprotect: 'Unprotect Sheet', color: 'Tab Color', noColor: 'No Color', hide: 'Hide', unhide: 'Unhide…', all: 'Select All Sheets' },
+      why: { linked: 'The linked sheet can’t be deleted, renamed, hidden or protected.', last: 'A folder keeps one visible sheet.', none: 'No hidden sheets' },
+      mc: { t: 'Move or Copy', to: 'Move selected sheets to folder:', before: 'Before sheet:', end: '(move to end)', copy: 'Create a copy', ok: 'OK', cancel: 'Cancel', linked: 'The linked sheet can only be copied, as a blank sheet with its text.' },
+      uh: { t: 'Unhide', p: 'Unhide sheet:' },
+      del: { t: n => `Delete “${n}”?`, p: 'The sheet and everything in it will be deleted for everyone. This can’t be undone.', go: 'Delete' },
+      pr: { t: n => `Protect “${n}”?`, p: 'Only you and admins will be able to change its cells, rows, columns and sizes. Everyone can still open and copy it.', go: 'Protect' },
+      offline: 'You’re offline. Your edits stay here and save when the connection is back.',
+      sheetN: n => `Sheet ${n}`, copyOf: (n, k) => `${n} (${k})`,
+      notes: [
+        ['Editing', ['Click a cell and type to replace; double-click to edit inside; Alt+Enter for a new line.', 'Enter ↓, Tab →, Shift goes back; arrows move; Ctrl+arrows jump to the edge of the data.', 'Drag, Shift+click or click a row number or letter to select. Delete clears. Ctrl+C / X / V work with Excel and Google Sheets.', 'Right-click a cell, a row number or a column letter for its menu. Drag edges to resize.']],
+        ['Tabs, as in Excel', ['+ adds “Sheet N”; ≡ lists every sheet; arrows scroll when tabs overflow.', 'Right-click a tab: Insert, Delete, Rename, Move or Copy, Protect, Tab Color, Hide, Unhide, Select All Sheets.', 'Drag to reorder; Ctrl+drag to copy. Ctrl+Page Up/Down switches; Shift+F11 adds a sheet.', 'The linked tab (🔗) can’t be deleted, renamed, hidden or protected.']],
+        ['Saving and safety', ['Every change saves on its own: “Saving…”, then “Saved”.', 'Offline: “Not saved, retrying”; edits stay on screen; leaving asks first.', 'Undo / Redo per sheet (Ctrl+Z, Ctrl+Shift+Z).', 'Cells you can’t edit (others’ tasks, archived) are skipped and counted.']],
+      ],
+      hints: { home: 'Try: open a folder · ⋯ on a card · New folder · delete a team folder and Undo', blank: 'Try: drag across cells · double-click a cell · right-click a cell, a row number or a column letter · + · right-click a tab', content: 'The Content folder’s first tab is today’s Content sheet: pills, people and links stay as they are, with the new editing.', menus: 'Excel’s tab menu is open. Try each item: Move or Copy, Unhide, Delete and Protect open their dialogs.', offline: 'The connection dropped: the status says so, and edits stay on the page.' },
+    },
+    ar: {
+      nav: ['نظرة عامة', 'اللوحة', 'الجداول', 'المشاريع', 'الفريق'], newb: 'جديد', pinned: 'المثبّتة',
+      sheets: 'الجداول', newFolder: '＋ مجلد جديد', linkedH: 'مرتبطة باللوحة', teamH: 'مجلدات الفريق',
+      linked: '🔗 مرتبط', sheetsN: n => `${n} أوراق`, edited: (t, w) => `عُدّل ${t} بواسطة ${w}`,
+      cardMenu: ['تثبيت في الشريط الجانبي', 'إلغاء التثبيت', 'إعادة تسمية', 'حذف المجلد'], deleted: n => `حُذف «${n}»`, undo: 'تراجع',
+      saved: 'تم الحفظ', saving: 'جارٍ الحفظ…', retrying: n => `لم يُحفظ، جارٍ إعادة المحاولة (${n})`,
+      undoT: 'تراجع (Ctrl+Z)', redoT: 'إعادة (Ctrl+Shift+Z)', selN: n => `${n} خلية محددة`,
+      blankHint: 'ورقة فارغة: انقر على خلية واكتب', linkedHint: 'الصفوف هي مهام على اللوحة',
+      skip: 'لم تتغير 3 خلايا: لا يمكنك تعديل مهمتين، وواحدة مؤرشفة',
+      cellMenu: [['قص', 'Ctrl+X'], ['نسخ', 'Ctrl+C'], ['لصق', 'Ctrl+V'], ['مسح', 'Delete'], '-', ['إدراج صف أعلاه'], ['إدراج صف أسفله'], ['إدراج عمود قبله'], ['إدراج عمود بعده'], '-', ['حذف الصف'], ['حذف العمود']],
+      rowMenu: [['إدراج صف أعلاه'], ['إدراج صف أسفله'], '-', ['حذف الصفوف 3–5'], ['تغيير ارتفاع الصف…']],
+      colMenu: [['إدراج عمود قبله'], ['إدراج عمود بعده'], '-', ['حذف العمود C'], ['تغيير عرض العمود…']],
+      tabMenu: { insert: 'إدراج', del: 'حذف', rename: 'إعادة تسمية', move: 'نقل أو نسخ…', protect: 'حماية الورقة…', unprotect: 'إلغاء حماية الورقة', color: 'لون علامة التبويب', noColor: 'بلا لون', hide: 'إخفاء', unhide: 'إظهار…', all: 'تحديد كل الأوراق' },
+      why: { linked: 'لا يمكن حذف الورقة المرتبطة أو إعادة تسميتها أو إخفاؤها أو حمايتها.', last: 'يحتفظ المجلد بورقة ظاهرة واحدة على الأقل.', none: 'لا توجد أوراق مخفية' },
+      mc: { t: 'نقل أو نسخ', to: 'نقل الأوراق المحددة إلى المجلد:', before: 'قبل الورقة:', end: '(نقل إلى النهاية)', copy: 'إنشاء نسخة', ok: 'موافق', cancel: 'إلغاء', linked: 'يمكن نسخ الورقة المرتبطة فقط، كورقة فارغة تحمل نصها.' },
+      uh: { t: 'إظهار', p: 'إظهار الورقة:' },
+      del: { t: n => `حذف «${n}»؟`, p: 'ستُحذف الورقة وكل ما فيها للجميع. لا يمكن التراجع عن ذلك.', go: 'حذف' },
+      pr: { t: n => `حماية «${n}»؟`, p: 'لن يتمكن من تعديل خلاياها وصفوفها وأعمدتها وأحجامها إلا أنت والمسؤولون. يستطيع الجميع فتحها ونسخها.', go: 'حماية' },
+      offline: 'أنت غير متصل. تبقى تعديلاتك هنا وتُحفظ عند عودة الاتصال.',
+      sheetN: n => `ورقة ${n}`, copyOf: (n, k) => `${n} (${k})`,
+      notes: [
+        ['التحرير', ['انقر على خلية واكتب للاستبدال؛ انقر مرتين للتعديل داخلها؛ Alt+Enter لسطر جديد.', 'Enter للأسفل، Tab للتالي، ومع Shift للرجوع؛ الأسهم تتحرك كما تراها.', 'اسحب أو Shift+نقر أو انقر رقم صف أو حرف عمود للتحديد. Delete يمسح. النسخ واللصق يعملان مع Excel وGoogle Sheets.', 'انقر بالزر الأيمن على خلية أو رقم صف أو حرف عمود لقائمته. اسحب الحواف لتغيير الحجم.']],
+        ['علامات التبويب كما في Excel', ['＋ يضيف «ورقة N»؛ ≡ يعرض كل الأوراق؛ الأسهم للتمرير عند الامتلاء.', 'زر أيمن على علامة: إدراج، حذف، إعادة تسمية، نقل أو نسخ، حماية، اللون، إخفاء، إظهار، تحديد الكل.', 'اسحب لإعادة الترتيب؛ Ctrl+سحب للنسخ.', 'لا يمكن حذف علامة 🔗 المرتبطة أو إعادة تسميتها أو إخفاؤها أو حمايتها.']],
+        ['الحفظ والأمان', ['كل تغيير يُحفظ وحده: «جارٍ الحفظ…» ثم «تم الحفظ».', 'دون اتصال: «لم يُحفظ، جارٍ إعادة المحاولة»؛ تبقى التعديلات؛ ويُسأل قبل المغادرة.', 'تراجع وإعادة لكل ورقة.', 'الخلايا التي لا يمكنك تعديلها تُتخطى وتُحسب.']],
+      ],
+      hints: { home: 'جرّب: افتح مجلدًا · ⋯ على بطاقة · مجلد جديد · احذف مجلد فريق ثم تراجع', blank: 'جرّب: اسحب عبر الخلايا · انقر مرتين · زر أيمن على خلية أو رقم صف أو حرف عمود · ＋ · زر أيمن على علامة', content: 'أول علامة في مجلد المحتوى هي جدول المحتوى الحالي، مع التحرير الجديد.', menus: 'قائمة علامة التبويب كما في Excel مفتوحة. جرّب كل عنصر.', offline: 'انقطع الاتصال: الحالة توضح ذلك، والتعديلات باقية.' },
+    },
+  }
+  const COLORS = { red: '#E5484D', orange: '#F59E0B', yellow: '#EAB308', green: '#16A34A', teal: '#0E7C7C', blue: '#2563EB', purple: '#7C3AED', pink: '#DB2777', gray: '#6B7280', black: '#14131A' }
+  const S = { screen: 'blank', dev: 'desktop', lang: 'en', sel: { r0: 1, c0: 1, r1: 3, c1: 3 }, edit: null, menu: null, dialog: null, status: 'saved', toast: null, grouped: false, folder: 'campaign', tab: 0, drop: null }
+  const L = () => T[S.lang]
+  const FOLDERS = {
+    content: { name: { en: 'Content', ar: 'المحتوى' }, linked: true, color: '#7C3AED', count: 3, edited: { en: ['12 min ago', 'Samaa'], ar: ['قبل 12 دقيقة', 'سماء'] },
+      tabs: [{ name: { en: 'Content library', ar: 'مكتبة المحتوى' }, linked: true }, { name: 'Q1 ideas', color: 'green' }, { name: 'Sheet 1' }] },
+    video: { name: { en: 'Video', ar: 'الفيديو' }, linked: true, color: '#0E7C7C', count: 2, edited: { en: ['1 h ago', 'Omar'], ar: ['قبل ساعة', 'عمر'] }, tabs: [{ name: { en: 'Clips', ar: 'المقاطع' }, linked: true }, { name: 'Shot ideas' }] },
+    campaign: { name: { en: 'Campaign planning', ar: 'تخطيط الحملات' }, color: '#B45309', count: 9, edited: { en: ['yesterday', 'Raneem'], ar: ['أمس', 'رنيم'] },
+      tabs: [{ name: 'Budget split', color: 'green' }, { name: 'Channels', color: 'blue' }, { name: 'Launch checklist', locked: true }, { name: 'KPIs' }, { name: 'Q3 archive', hidden: true }, { name: 'Agencies', color: 'orange' }, { name: 'Timeline' }, { name: 'Risks', color: 'red' }, { name: 'Sheet 1' }] },
+    events: { name: { en: 'Event logistics', ar: 'لوجستيات الفعاليات' }, color: '#1E293B', count: 2, edited: { en: ['Monday', 'Nermin'], ar: ['الإثنين', 'نرمين'] }, tabs: [{ name: 'Venues' }, { name: 'Speakers' }] },
+  }
+  const ORDER = ['content', 'video', 'campaign', 'events']
+  const nm = o => (typeof o === 'string' ? o : o[S.lang])
+  const $ = s => document.querySelector(s)
+  const frame = $('#frame')
+
+  const ICON = {
+    overview: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+    board: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    sheets: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+    projects: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+    team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  }
+  const svg = (k, s = 18, c = 'currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`
+
+  // ── sidebar ──
+  function side() {
+    const keys = ['overview', 'board', 'sheets', 'projects', 'team']
+    const onSheets = true
+    return `<aside class="side"><div class="word">momentum</div><span class="pill">Creative Ops</span><nav class="nav" aria-label="Main navigation">${keys.map((k, i) => `
+      <button data-go="${k === 'sheets' ? 'home' : ''}" ${k === 'sheets' && S.screen === 'home' ? 'aria-current="page"' : ''}>${svg(k)}<span>${L().nav[i]}</span>${k === 'sheets' ? `<span class="linked" style="margin-inline-start:auto;background:var(--lime);color:#14131A">${L().newb}</span>` : ''}</button>
+      ${k === 'sheets' && onSheets ? `<div class="pins" aria-label="${L().pinned}">${['content', 'video', 'campaign'].map(f => `<button data-open="${f}" ${S.screen !== 'home' && curFolder() === f ? 'aria-current="page"' : ''}>${svg('folder', 15, FOLDERS[f].color)}<span>${nm(FOLDERS[f].name)}</span><span class="more" aria-hidden="true">⋯</span></button>`).join('')}</div>` : ''}`).join('')}</nav></aside>`
+  }
+  const curFolder = () => (S.screen === 'content' ? 'content' : S.folder)
+
+  // ── home ──
+  function home() {
+    const card = k => { const f = FOLDERS[k]
+      return `<button class="card" data-open="${k}"><span class="fi"><span class="ic" style="background:${f.color}22">${svg('folder', 20, f.color)}</span><b>${nm(f.name)}</b></span>
+        <small>${L().sheetsN(f.count)}</small><small>${L().edited(...f.edited[S.lang])}</small>${f.linked ? `<span class="linked" style="justify-self:start">${L().linked}</span>` : ''}
+        <span class="menu-btn" role="button" tabindex="0" data-card-menu="${k}" aria-label="⋯">⋯</span></button>` }
+    const team = ORDER.filter(k => !FOLDERS[k].linked && !FOLDERS[k].gone)
+    return `<div class="top"><div class="crumbs"><b>${L().sheets}</b></div><span style="margin-inline-start:auto"></span><button class="cta" data-new-folder>${L().newFolder}</button></div>
+      <div class="home"><h3>${L().linkedH}</h3><div class="cards">${['content', 'video'].map(card).join('')}</div>
+      <h3>${L().teamH}</h3><div class="cards">${team.map(card).join('')}<button class="card add" data-new-folder>${L().newFolder}</button></div></div>
+      ${S.toast ? `<div class="undo-toast" role="status">${L().deleted(S.toast)} <button data-undo-folder>${L().undo}</button></div>` : ''}`
+  }
+
+  // ── grids ──
+  const LETTERS = 'ABCDEFGH'.split('')
+  const BLANK = [['Channel', 'Q1 budget', 'Q2 budget', 'Owner', 'Notes'], ['LinkedIn', '40%', '35%', 'Samaa', 'Carousel-heavy in Q2'], ['Events', '30%', '35%', 'Nermin', 'Summit in May: venue, speakers and the run of show are in the Event logistics folder'], ['Video', '30%', '30%', 'Omar', ''], ['', '', '', '', ''], ['Total', '100%', '100%', '', ''], ['', '', '', '', '']]
+  function blankGrid() {
+    const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+    const widths = [140, 110, 110, 120, 260, 110, 110]
+    const tmpl = `44px ${widths.map(w => `${w}px`).join(' ')}`
+    const inSel = (r, c) => r >= Math.min(S.sel.r0, S.sel.r1) && r <= Math.max(S.sel.r0, S.sel.r1) && c >= Math.min(S.sel.c0, S.sel.c1) && c <= Math.max(S.sel.c0, S.sel.c1)
+    const colOn = c => c >= Math.min(S.sel.c0, S.sel.c1) && c <= Math.max(S.sel.c0, S.sel.c1)
+    const rowOn = r => r >= Math.min(S.sel.r0, S.sel.r1) && r <= Math.max(S.sel.r0, S.sel.r1)
+    let h = `<div class="g" role="grid" aria-label="Budget split" aria-rowcount="101" aria-colcount="27" style="grid-template-columns:${tmpl}"><div class="c corner" role="columnheader" aria-label="#"></div>`
+    h += cols.map((l, c) => `<div class="c h${colOn(c) ? ' on' : ''}" role="columnheader" data-colh="${c}">${l}<span class="rz" aria-hidden="true"></span></div>`).join('')
+    for (let r = 0; r < 14; r++) {
+      const tall = r === 2
+      h += `<div class="c rn${rowOn(r) ? ' on' : ''}" role="rowheader" data-rowh="${r}" style="${tall ? 'height:62px' : ''}">${r + 1}<span class="rz-row" aria-hidden="true"></span></div>`
+      h += cols.map((_, c) => {
+        const v = BLANK[r]?.[c] ?? ''
+        const act = S.sel.r0 === r && S.sel.c0 === c
+        const editing = S.edit && S.edit.r === r && S.edit.c === c
+        return `<div class="c${tall ? ' tall' : ''}${editing ? ' edit' : act ? ' act' : inSel(r, c) ? ' sel' : ''}" role="gridcell" data-r="${r}" data-c="${c}" ${editing ? 'contenteditable="true"' : ''} style="${tall ? 'height:62px' : ''}${c === 1 || c === 2 ? ';text-align:end' : ''}">${v}</div>`
+      }).join('')
+    }
+    return h + '</div>'
+  }
+  const STAGE = { 'Writing': ['#DBEAFE', '#1E40AF'], 'Content Review': ['#E0E7FF', '#3730A3'], 'Designing': ['#EDE9FE', '#6D28D9'], 'Published': ['#DCFCE7', '#166534'] }
+  const pill = s => `<span class="stage" style="background:${STAGE[s][0]};color:${STAGE[s][1]}">${s}</span>`
+  const person = (n, c) => `<span class="chip"><i style="background:${c}">${n[0]}</i>${n}</span>`
+  function contentGrid() {
+    const head = ['Piece', 'Type', 'Status', 'Owner', 'Working doc', 'Hook']
+    const widths = [230, 110, 140, 120, 110, 220]
+    const rows = [{ grp: 'Strategy · AI' }, ['The AI operating model', 'Article', pill('Writing'), person('Samaa', '#B4322F'), '<a>doc</a>', 'Most AI pilots die in month 3'],
+      ['Decision rights in 2027', 'Framework', pill('Content Review'), person('Samaa', '#B4322F'), '<a>doc</a>', ''], { grp: 'Newsjacking' },
+      ['Budget season takeaways', 'Social post', pill('Published'), person('Noran', '#0E7C7B'), '<a>doc</a>', 'Three lines from the CFO panel'],
+      ['What the merger means', 'Article', pill('Designing'), person('Noran', '#0E7C7B'), '', '']]
+    let h = `<div class="g" role="grid" aria-label="Content library" style="grid-template-columns:44px ${widths.map(w => `${w}px`).join(' ')}"><div class="c corner"></div>${head.map((x, c) => `<div class="c h${c === 0 ? ' on' : ''}" role="columnheader" style="text-align:start">${x}<span class="rz"></span></div>`).join('')}`
+    let n = 0
+    for (const r of rows) {
+      if (r.grp) { h += `<div class="c rn"></div><div class="c grp">${r.grp}</div>`; continue }
+      const rr = n++
+      h += `<div class="c rn${rr <= 2 ? ' on' : ''}">${rr + 1}</div>` + r.map((v, c) => `<div class="c${c === 0 && rr === 0 ? ' act' : c === 0 && rr <= 2 ? ' sel' : ''}${c > 0 && c < 4 && rr === 2 ? ' ro' : ''}" role="gridcell">${v}</div>`).join('')
+    }
+    return h + '</div>'
+  }
+
+  // ── workbook ──
+  function workbook() {
+    const fk = curFolder(), f = FOLDERS[fk]
+    const tabs = f.tabs
+    const t = tabs[S.tab] ?? tabs[0]
+    const linkedTab = !!t.linked
+    const status = S.screen === 'offline' ? 'retrying' : S.status
+    const statusTxt = status === 'retrying' ? L().retrying(4) : status === 'saving' ? L().saving : L().saved
+    const nSel = (Math.abs(S.sel.r1 - S.sel.r0) + 1) * (Math.abs(S.sel.c1 - S.sel.c0) + 1)
+    const visible = tabs.map((x, i) => [x, i]).filter(([x]) => !x.hidden)
+    return `<div class="top"><div class="crumbs"><button data-go="home">${L().sheets}</button><span aria-hidden="true">${S.lang === 'ar' ? '‹' : '›'}</span><b>${nm(f.name)}</b>${f.linked ? `<span class="linked">${L().linked}</span>` : ''}</div>
+        <span class="status ${status === 'retrying' ? 'is-retrying' : status === 'saving' ? 'is-saving' : ''}" role="status" aria-live="polite" data-save-status="${status}">${statusTxt}</span></div>
+      <div class="tools"><button class="ib" aria-label="${L().undoT}" title="${L().undoT}">↶</button><button class="ib" aria-label="${L().redoT}" title="${L().redoT}" disabled>↷</button><span class="sep"></span>
+        <span class="lbl">${linkedTab ? L().linkedHint : nSel > 1 ? L().selN(nSel) : L().blankHint}</span>${linkedTab ? `<span class="skip" data-skip-note>${L().skip}</span>` : ''}</div>
+      ${S.screen === 'offline' ? `<div class="skip" style="margin:8px 22px 0;margin-inline-start:22px" role="note">${L().offline}</div>` : ''}
+      <div class="gridwrap">${linkedTab ? contentGrid() : blankGrid()}</div>
+      <div class="tabs" role="presentation">
+        <div class="fixed">${fk === 'campaign' ? `<button class="arrow" aria-label="Scroll tabs" data-tabs-scroll="start">${S.lang === 'ar' ? '▶' : '◀'}</button><button class="arrow" aria-label="Scroll tabs" data-tabs-scroll="end">${S.lang === 'ar' ? '◀' : '▶'}</button>` : ''}
+          <button data-new-sheet aria-label="New sheet (Shift+F11)" title="New sheet (Shift+F11)">＋</button><button data-all-sheets aria-label="All sheets" title="All sheets">≡</button></div>
+        <div class="list" role="tablist" aria-label="${nm(f.name)}">${visible.map(([x, i]) => `${S.drop === i ? '<span class="drop-mark" aria-hidden="true"></span>' : ''}<button class="tb${S.grouped ? ' grouped' : ''}" role="tab" draggable="true" data-tab="${i}" aria-selected="${i === S.tab}" ${x.renaming ? '' : ''}>
+          ${x.linked ? '<span title="Linked to the board" aria-label="Linked">🔗</span>' : ''}${x.locked ? '<span title="Protected" aria-label="Protected">🔒</span>' : ''}${x.renaming ? `<input id="tab-rename" value="${nm(x.name)}" aria-label="Sheet name">` : nm(x.name)}<span class="caret" data-tab-caret="${i}" aria-hidden="true">▾</span>
+          ${x.color ? `<span class="stripe" style="background:${COLORS[x.color]}"></span>` : ''}</button>`).join('')}</div>
+      </div>`
+  }
+
+  function phoneNav() {
+    return `<div class="ph-nav"><span>${svg('overview', 20)}${L().nav[0]}</span><span>${svg('board', 20)}${L().nav[1]}</span><span class="on">${svg('sheets', 20)}${L().nav[2]}</span><span>${svg('projects', 20)}${L().nav[3]}</span><span>⋯<br>More</span></div>`
+  }
+
+  // ── menus & dialogs ──
+  function tabMenuHtml(i) {
+    const f = FOLDERS[curFolder()], t = f.tabs[i], M = L().tabMenu, W = L().why
+    const visible = f.tabs.filter(x => !x.hidden).length, hidden = f.tabs.filter(x => x.hidden).length, lk = !!t.linked
+    const item = (act, label, dis, why) => `<button role="menuitem" data-act="${act}" ${dis ? 'disabled' : ''} ${dis && why ? `aria-description="${why}" title="${why}"` : ''}>${label}</button>`
+    return `<div class="menu" role="menu" data-tab-menu style="bottom:52px;inset-inline-start:${Math.min(80 + i * 60, 520)}px">
+      ${item('insert', M.insert)}
+      ${item('del', M.del, lk || visible <= 1, lk ? W.linked : W.last)}
+      ${item('rename', M.rename, lk, W.linked)}
+      ${item('move', M.move)}
+      ${item('protect', t.locked ? M.unprotect : M.protect, lk, W.linked)}
+      <div role="group" aria-label="${M.color}"><span class="why" style="padding-top:6px;color:var(--text);font-size:13.5px">${M.color}</span><div class="swatches">
+        <button data-color="" aria-label="${M.noColor}" title="${M.noColor}" style="background:var(--panel);background-image:linear-gradient(135deg,transparent 45%,#E5484D 45%,#E5484D 55%,transparent 55%)"></button>
+        ${Object.entries(COLORS).map(([k, c]) => `<button data-color="${k}" aria-label="${k}" title="${k}" style="background:${c}"></button>`).join('')}</div></div>
+      <hr>${item('hide', M.hide, lk || visible <= 1, lk ? W.linked : W.last)}${item('unhide', M.unhide + (hidden ? ` (${hidden})` : ''), !hidden, W.none)}
+      <hr>${item('all', M.all)}${lk ? `<span class="why">${W.linked}</span>` : ''}</div>`
+  }
+  function gridMenuHtml(kind, x, y) {
+    const list = kind === 'row' ? L().rowMenu : kind === 'col' ? L().colMenu : L().cellMenu
+    return `<div class="menu" role="menu" style="left:${x}px;top:${y}px">${list.map(it => it === '-' ? '<hr>' : `<button role="menuitem">${it[0]}${it[1] ? `<kbd>${it[1]}</kbd>` : ''}</button>`).join('')}</div>`
+  }
+  function dialogHtml() {
+    const f = FOLDERS[curFolder()], t = f.tabs[S.menuTab ?? S.tab]
+    if (S.dialog === 'move') return `<div class="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-t" data-move-copy><h2 id="dlg-t">${L().mc.t}</h2>
+      <label for="mc-f" style="display:block">${L().mc.to}</label><select id="mc-f">${ORDER.filter(k => !FOLDERS[k].gone).map(k => `<option ${k === curFolder() ? 'selected' : ''}>${nm(FOLDERS[k].name)}</option>`).join('')}</select>
+      <span>${L().mc.before}</span><div class="lb" role="listbox" aria-label="${L().mc.before}">${f.tabs.map((x, i) => `<button role="option" aria-selected="false" data-before="${i}">${nm(x.name)}</button>`).join('')}<button role="option" aria-selected="true" data-before="end">${L().mc.end}</button></div>
+      <label><input type="checkbox" id="mc-copy" ${t.linked ? 'checked disabled' : ''}> ${L().mc.copy}</label>${t.linked ? `<p>${L().mc.linked}</p>` : ''}
+      <div class="row"><button data-dlg="cancel">${L().mc.cancel}</button><button class="go" data-dlg="move-ok">${L().mc.ok}</button></div></div></div>`
+    if (S.dialog === 'unhide') return `<div class="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-t" data-unhide><h2 id="dlg-t">${L().uh.t}</h2><span>${L().uh.p}</span>
+      <div class="lb" role="listbox">${f.tabs.map((x, i) => x.hidden ? `<button role="option" aria-selected="true" data-unhide-i="${i}">${nm(x.name)}</button>` : '').join('')}</div>
+      <div class="row"><button data-dlg="cancel">${L().mc.cancel}</button><button class="go" data-dlg="unhide-ok">${L().mc.ok}</button></div></div></div>`
+    if (S.dialog === 'del') return `<div class="scrim"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">${L().del.t(nm(t.name))}</h2><p>${L().del.p}</p>
+      <div class="row"><button data-dlg="cancel">${L().mc.cancel}</button><button class="danger" data-dlg="del-ok">${L().del.go}</button></div></div></div>`
+    if (S.dialog === 'protect') return `<div class="scrim"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t"><h2 id="dlg-t">${L().pr.t(nm(t.name))}</h2><p>${L().pr.p}</p>
+      <div class="row"><button data-dlg="cancel">${L().mc.cancel}</button><button class="go" data-dlg="protect-ok">🔒 ${L().pr.go}</button></div></div></div>`
+    return ''
+  }
+
+  // ── render ──
+  function render() {
+    document.querySelectorAll('[data-screen]').forEach(b => b.setAttribute('aria-pressed', b.dataset.screen === S.screen))
+    document.querySelectorAll('[data-dev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.dev === S.dev))
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === S.lang))
+    frame.className = `frame${S.dev === 'phone' ? ' phone' : ''}`
+    frame.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr'); frame.setAttribute('lang', S.lang)
+    const body = S.screen === 'home' ? home() : workbook()
+    frame.innerHTML = side() + `<div class="main">${body}</div>` + phoneNav()
+      + (S.menu?.kind === 'tab' ? tabMenuHtml(S.menu.i) : S.menu ? gridMenuHtml(S.menu.kind, S.menu.x, S.menu.y) : '')
+      + (S.dialog ? dialogHtml() : '')
+    $('#hint').textContent = L().hints[S.screen]
+    $('#notes').innerHTML = L().notes.map(([h, items]) => `<div class="note"><h4>${h}</h4><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('')
+    const rn = frame.querySelector('#tab-rename'); if (rn) { rn.focus(); rn.select() }
+    const ed = frame.querySelector('[contenteditable]'); if (ed) { ed.focus(); placeCaretEnd(ed) }
+    frame.querySelector('.menu button:not(:disabled)')?.focus({ preventScroll: true })
+    frame.querySelector('.dialog .go, .dialog .danger')?.focus()
+  }
+  function placeCaretEnd(el) { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r) }
+  function flashSaved() { S.status = 'saving'; render(); setTimeout(() => { S.status = 'saved'; render() }, 700) }
+
+  // ── interactions ──
+  const nextName = f => { let n = 1; while (f.tabs.some(t => nm(t.name).toLowerCase() === L().sheetN(n).toLowerCase())) n++; return L().sheetN(n) }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button, [data-card-menu], [data-r]')
+    if (!b) { if (S.menu) { S.menu = null; render() } return }
+    if (b.dataset.screen) { S.screen = b.dataset.screen; S.menu = S.screen === 'menus' ? { kind: 'tab', i: 1 } : null; S.dialog = null; S.edit = null; if (S.screen === 'menus') S.folder = 'campaign'; S.tab = S.screen === 'content' ? 0 : S.tab; render(); return }
+    if (b.dataset.dev) { S.dev = b.dataset.dev; render(); return }
+    if (b.dataset.lang) { S.lang = b.dataset.lang; render(); return }
+    if (!frame.contains(b)) return
+    if (b.dataset.cardMenu) { e.stopPropagation(); S.menu = null; S.toast = null; const k = b.dataset.cardMenu
+      if (!FOLDERS[k].linked) { FOLDERS[k].gone = true; S.toast = nm(FOLDERS[k].name); S.toastKey = k; render(); setTimeout(() => { S.toast = null; render() }, 10000) }
+      return }
+    if (b.dataset.undoFolder !== undefined) { FOLDERS[S.toastKey].gone = false; S.toast = null; render(); return }
+    if (b.dataset.go === 'home') { S.screen = 'home'; S.menu = null; render(); return }
+    if (b.dataset.open) { S.folder = b.dataset.open === 'content' ? 'campaign' : b.dataset.open; S.screen = b.dataset.open === 'content' ? 'content' : 'blank'; S.tab = 0; S.menu = null; render(); return }
+    if (b.dataset.newFolder !== undefined) { let n = 1; while (FOLDERS[`n${n}`]) n++; const name = `New folder ${n}`
+      FOLDERS[`n${n}`] = { name: { en: name, ar: `مجلد جديد ${n}` }, color: '#2563EB', count: 1, edited: { en: ['just now', 'you'], ar: ['الآن', 'أنت'] }, tabs: [{ name: L().sheetN(1) }] }
+      ORDER.push(`n${n}`); S.folder = `n${n}`; S.screen = 'blank'; S.tab = 0; render(); return }
+    if (b.dataset.newSheet !== undefined) { const f = FOLDERS[curFolder()]; f.tabs.splice(S.tab + 1, 0, { name: nextName(f) }); S.tab += 1; flashSaved(); return }
+    if (b.dataset.allSheets !== undefined || b.dataset.tabsScroll) { const f = FOLDERS[curFolder()]
+      frame.insertAdjacentHTML('beforeend', `<div class="menu" role="menu" style="bottom:52px;inset-inline-start:40px">${f.tabs.map((x, i) => x.hidden ? '' : `<button role="menuitem" data-tab="${i}">${i === S.tab ? '✓ ' : ''}${nm(x.name)}</button>`).join('')}</div>`)
+      frame.querySelector('.menu button')?.focus(); return }
+    if (e.target.dataset.tabCaret !== undefined) { e.stopPropagation(); S.tab = +e.target.dataset.tabCaret; S.menu = { kind: 'tab', i: S.tab }; S.menuTab = S.tab; render(); return }
+    if (b.dataset.tab !== undefined && !b.querySelector('input')) {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) { S.grouped = true; render(); return }
+      S.grouped = false; S.tab = +b.dataset.tab; S.menu = null; S.edit = null; render(); return }
+    if (b.dataset.color !== undefined) { const f = FOLDERS[curFolder()]; const ids = S.grouped ? f.tabs : [f.tabs[S.menu.i]]; ids.forEach(x => { x.color = b.dataset.color || null }); S.menu = null; flashSaved(); return }
+    if (b.dataset.act) { const f = FOLDERS[curFolder()], i = S.menu.i, t = f.tabs[i]; S.menuTab = i
+      if (b.dataset.act === 'insert') { f.tabs.splice(i, 0, { name: nextName(f) }); S.tab = i; S.menu = null; flashSaved(); return }
+      if (b.dataset.act === 'rename') { t.renaming = true; S.menu = null; render(); return }
+      if (b.dataset.act === 'all') { S.grouped = true; S.menu = null; render(); return }
+      if (b.dataset.act === 'hide') { (S.grouped ? f.tabs.filter(x => !x.linked) : [t]).forEach(x => { x.hidden = true }); if (f.tabs.every(x => x.hidden)) f.tabs[i].hidden = false; S.tab = f.tabs.findIndex(x => !x.hidden); S.menu = null; S.grouped = false; flashSaved(); return }
+      S.dialog = { del: 'del', move: 'move', unhide: 'unhide', protect: t.locked ? null : 'protect' }[b.dataset.act]
+      if (b.dataset.act === 'protect' && t.locked) { t.locked = false; S.menu = null; flashSaved(); return }
+      S.menu = null; render(); return }
+    if (b.dataset.dlg) { const f = FOLDERS[curFolder()], i = S.menuTab ?? S.tab, t = f.tabs[i]
+      if (b.dataset.dlg === 'del-ok') { f.tabs.splice(i, 1); S.tab = Math.max(0, Math.min(i, f.tabs.length - 1)); while (f.tabs[S.tab]?.hidden) S.tab++ }
+      if (b.dataset.dlg === 'protect-ok') t.locked = true
+      if (b.dataset.dlg === 'unhide-ok') { const k = f.tabs.findIndex(x => x.hidden); if (k >= 0) { f.tabs[k].hidden = false; S.tab = k } }
+      if (b.dataset.dlg === 'move-ok') { const copy = frame.querySelector('#mc-copy').checked; let k = 2; const base = nm(t.name); let name = base; while (f.tabs.some(x => nm(x.name) === name)) name = L().copyOf(base, k++)
+        if (copy) { f.tabs.unshift({ name, color: t.color }); S.tab = 0 } else { f.tabs.splice(i, 1); f.tabs.push(t); S.tab = f.tabs.length - 1 } }
+      S.dialog = null; if (b.dataset.dlg !== 'cancel') flashSaved(); else render(); return }
+    if (b.dataset.before !== undefined || b.dataset.unhideI !== undefined) { b.parentElement.querySelectorAll('[role="option"]').forEach(o => o.setAttribute('aria-selected', o === b)); return }
+  })
+  document.addEventListener('contextmenu', e => {
+    if (!frame.contains(e.target)) return
+    const fr = frame.getBoundingClientRect()
+    const tab = e.target.closest('[data-tab]')
+    if (tab) { e.preventDefault(); S.tab = +tab.dataset.tab; S.menu = { kind: 'tab', i: S.tab }; S.menuTab = S.tab; render(); return }
+    const pos = { x: Math.min(e.clientX - fr.left, fr.width - 260), y: Math.min(e.clientY - fr.top, fr.height - 360) }
+    if (e.target.closest('[data-rowh]')) { e.preventDefault(); S.menu = { kind: 'row', ...pos }; render(); return }
+    if (e.target.closest('[data-colh]')) { e.preventDefault(); S.menu = { kind: 'col', ...pos }; render(); return }
+    if (e.target.closest('[data-r]')) { e.preventDefault(); S.menu = { kind: 'cell', ...pos }; render() }
+  })
+  document.addEventListener('dblclick', e => {
+    const tab = e.target.closest('[data-tab]')
+    if (tab && frame.contains(tab)) { const t = FOLDERS[curFolder()].tabs[+tab.dataset.tab]; if (!t.linked) { t.renaming = true; render() } return }
+    const c = e.target.closest('[data-r]'); if (!c || !frame.contains(c)) return
+    S.sel = { r0: +c.dataset.r, c0: +c.dataset.c, r1: +c.dataset.r, c1: +c.dataset.c }; S.edit = { r: +c.dataset.r, c: +c.dataset.c }; render()
+  })
+  document.addEventListener('keydown', e => {
+    const rn = e.target.closest?.('#tab-rename')
+    if (rn) { if (e.key === 'Enter' || e.key === 'Escape') { const f = FOLDERS[curFolder()], t = f.tabs.find(x => x.renaming); const v = rn.value.trim()
+      if (e.key === 'Enter' && v && !/[\\/?*[\]:]/.test(v) && !f.tabs.some(x => x !== t && nm(x.name).toLowerCase() === v.toLowerCase())) t.name = v.slice(0, 50)
+      t.renaming = false; e.key === 'Enter' ? flashSaved() : render() } return }
+    if (S.edit && (e.key === 'Enter' && !e.altKey || e.key === 'Escape')) { e.preventDefault(); const el = frame.querySelector('[contenteditable]')
+      if (e.key === 'Enter' && el) { (BLANK[S.edit.r] ??= [])[S.edit.c] = el.innerText; S.sel = { r0: S.edit.r + 1, c0: S.edit.c, r1: S.edit.r + 1, c1: S.edit.c } }
+      S.edit = null; e.key === 'Enter' ? flashSaved() : render(); return }
+    if (e.key === 'Escape' && (S.menu || S.dialog)) { S.menu = null; S.dialog = null; render() }
+  })
+  // drag-select, updating highlights in place (no redraw under the pointer)
+  let dragging = false
+  function paint() {
+    const q = S.sel, lo = Math.min, hi = Math.max
+    frame.querySelectorAll('[data-r]').forEach(el => { const r = +el.dataset.r, c = +el.dataset.c
+      const inside = r >= lo(q.r0, q.r1) && r <= hi(q.r0, q.r1) && c >= lo(q.c0, q.c1) && c <= hi(q.c0, q.c1)
+      el.classList.toggle('act', r === q.r0 && c === q.c0); el.classList.toggle('sel', inside && !(r === q.r0 && c === q.c0)) })
+    frame.querySelectorAll('[data-colh]').forEach(el => el.classList.toggle('on', +el.dataset.colh >= lo(q.c0, q.c1) && +el.dataset.colh <= hi(q.c0, q.c1)))
+    frame.querySelectorAll('[data-rowh]').forEach(el => el.classList.toggle('on', +el.dataset.rowh >= lo(q.r0, q.r1) && +el.dataset.rowh <= hi(q.r0, q.r1)))
+    const n = (Math.abs(q.r1 - q.r0) + 1) * (Math.abs(q.c1 - q.c0) + 1), lbl = frame.querySelector('.tools .lbl'); if (lbl) lbl.textContent = n > 1 ? L().selN(n) : L().blankHint
+  }
+  frame.addEventListener('mousedown', e => {
+    const c = e.target.closest('[data-r]'); if (!c || S.edit || e.button !== 0) return
+    e.preventDefault(); dragging = true; const r = +c.dataset.r, cc = +c.dataset.c
+    S.sel = e.shiftKey ? { ...S.sel, r1: r, c1: cc } : { r0: r, c0: cc, r1: r, c1: cc }; paint()
+  })
+  frame.addEventListener('mouseover', e => { if (!dragging) return; const c = e.target.closest('[data-r]'); if (!c) return; S.sel = { ...S.sel, r1: +c.dataset.r, c1: +c.dataset.c }; paint() })
+  document.addEventListener('mouseup', () => { dragging = false })
+  // tab drag to reorder (Ctrl/Option copies)
+  frame.addEventListener('dragstart', e => { const t = e.target.closest('[data-tab]'); if (t) { S.dragTab = +t.dataset.tab; e.dataTransfer.effectAllowed = 'copyMove' } })
+  frame.addEventListener('dragover', e => { const t = e.target.closest('[data-tab]'); if (t && S.dragTab !== undefined) { e.preventDefault(); if (S.drop !== +t.dataset.tab) { S.drop = +t.dataset.tab; render() } } })
+  frame.addEventListener('drop', e => { const f = FOLDERS[curFolder()]; if (S.dragTab === undefined || S.drop === null) return; e.preventDefault()
+    const src = f.tabs[S.dragTab]; if (e.ctrlKey || e.altKey || e.metaKey) { let k = 2, name; do name = L().copyOf(nm(src.name), k++); while (f.tabs.some(x => nm(x.name) === name)); f.tabs.splice(S.drop, 0, { name, color: src.color }) }
+    else { f.tabs.splice(S.dragTab, 1); f.tabs.splice(S.drop > S.dragTab ? S.drop - 1 : S.drop, 0, src) }
+    S.tab = S.drop; S.drop = null; S.dragTab = undefined; flashSaved() })
+  frame.addEventListener('dragend', () => { S.drop = null; S.dragTab = undefined; render() })
+
+  render()
+})()
+</script>

@@ -41,7 +41,7 @@ Then the P2 stories: US6, US7 and US8.
 
 ## Phase 1: Setup
 
-- [ ] T001 The design file `design/sheets.html`, built on the approved `design/sheets-options.html` (option C) and following contracts/ui.md §1–§7. It shows:
+- [X] T001 The design file `design/sheets.html`, built on the approved `design/sheets-options.html` (option C) and following contracts/ui.md §1–§7. It shows:
   - the sidebar with Sheets and pinned folders;
   - the Sheets home: linked and team cards, New folder, a card's menu, delete with Undo;
   - a workbook: breadcrumb, toolbar with undo and redo and the save status, a blank sheet with a range selected, row and column menus, a resized row with wrapped text, the skip note;
