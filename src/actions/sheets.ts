@@ -340,3 +340,194 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
 class Refuse extends Error {
   constructor(public code: string) { super(code) }
 }
+
+// ─── tab actions: Excel's sheet-tab menu (R9, FR-054–FR-059d) ───────────────
+
+const isLinkedKind = (k: string) => k !== 'blank'
+
+/** Rename (FR-056): blank sheets only; Excel's rules; unique in the folder. */
+export async function renameSheet(id: string, name: string): Promise<{ success: true; name: string } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const sheet = await prisma.sheet.findUnique({ where: { id } })
+  if (!sheet) return fail('gone')
+  if (isLinkedKind(sheet.kind)) return fail('linked')
+  const others = await prisma.sheet.findMany({ where: { folder_id: sheet.folder_id, NOT: { id } }, select: { name: true } })
+  const { validateSheetName } = await import('@/lib/sheet-names')
+  const v = validateSheetName(name, others.map(o => o.name ?? ''))
+  if (!v.ok) return fail(v.error)
+  await prisma.$transaction(async tx => {
+    await tx.sheet.update({ where: { id }, data: { name: v.name, updated_by: m.id, updated_at: new Date() } })
+    await bumpFolder(tx, sheet.folder_id, m.id)
+  })
+  touched()
+  return { success: true, name: v.name }
+}
+
+/** The folder's sheets in order, renumbered 0…n after a change. */
+async function renumberFolder(tx: Tx, folderId: string, order?: string[]) {
+  const ids = order ?? (await tx.sheet.findMany({ where: { folder_id: folderId }, orderBy: { position: 'asc' }, select: { id: true } })).map(s => s.id)
+  for (let i = 0; i < ids.length; i++) await tx.sheet.update({ where: { id: ids[i] }, data: { position: i } })
+}
+
+/** Delete (FR-057): never a linked sheet; never the folder's last visible sheet. */
+export async function deleteSheets(ids: string[]): Promise<{ success: true; deleted: string[] } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const list = await prisma.sheet.findMany({ where: { id: { in: ids } } })
+  if (!list.length) return { success: true, deleted: [] }
+  if (list.some(s => isLinkedKind(s.kind))) return fail('linked')
+  if (list.some(s => s.protected_by && s.protected_by !== m.id && !isAdmin(m))) return fail('protected')
+  const folderId = list[0].folder_id
+  if (list.some(s => s.folder_id !== folderId)) return fail('generic')
+  try {
+    await prisma.$transaction(async tx => {
+      await tx.sheet.deleteMany({ where: { id: { in: list.map(s => s.id) } } })
+      const visible = await tx.sheet.count({ where: { folder_id: folderId, hidden: false } })
+      if (!visible) throw new Refuse('last_visible')
+      await renumberFolder(tx, folderId)
+      await bumpFolder(tx, folderId, m.id)
+    })
+  } catch (e) {
+    if (e instanceof Refuse) return fail(e.code)
+    throw e
+  }
+  touched()
+  return { success: true, deleted: list.map(s => s.id) }
+}
+
+/**
+ * Move or Copy (FR-058, FR-059): to a folder (this one or another), before a
+ * sheet or at the end, as a copy or not. A copy duplicates rows, columns and
+ * cells with new ids. A linked sheet can only be copied: the copy is a new
+ * blank sheet, and the client pastes the linked sheet's visible text into it.
+ */
+export async function moveSheets(ids: string[], folderId: string, beforeId: string | null, copy: boolean, opts: { pattern?: string } = {}): Promise<{ success: true; sheets: SheetSummary[] } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const [list, dest] = await Promise.all([
+    prisma.sheet.findMany({ where: { id: { in: ids } }, orderBy: { position: 'asc' } }),
+    prisma.sheetFolder.findUnique({ where: { id: folderId }, select: { id: true } }),
+  ])
+  if (!list.length || !dest) return fail('gone')
+  if (!copy && list.some(s => isLinkedKind(s.kind) && s.folder_id !== folderId)) return fail('linked')
+  const { uniqueName } = await import('@/lib/sheet-names')
+  try {
+    const made = await prisma.$transaction(async tx => {
+      const out: string[] = []
+      const destTabs = await tx.sheet.findMany({ where: { folder_id: folderId }, orderBy: { position: 'asc' }, select: { id: true, name: true } })
+      const names = destTabs.map(t => t.name ?? '')
+      for (const s of list) {
+        if (copy) {
+          const base = s.name ?? (s.kind === 'linked_content' ? 'Content library' : s.kind === 'linked_video' ? 'Clips' : 'Sheet')
+          const name = uniqueName(base, names)
+          names.push(name)
+          const c = await tx.sheet.create({
+            data: { folder_id: folderId, kind: 'blank', name, position: 9999, tab_color: s.tab_color, row_count: s.row_count, col_count: s.col_count, created_by: m.id, updated_by: m.id },
+          })
+          if (s.kind === 'blank') {
+            // Rows and columns with new ids, then the cells mapped onto them, all in SQL.
+            await tx.$executeRaw`CREATE TEMP TABLE IF NOT EXISTS _map (old uuid PRIMARY KEY, new uuid) ON COMMIT DROP`
+            await tx.$executeRaw`DELETE FROM _map`
+            await tx.$executeRaw`INSERT INTO _map SELECT id, gen_random_uuid() FROM sheet_rows WHERE sheet_id = ${s.id}::uuid`
+            await tx.$executeRaw`INSERT INTO _map SELECT id, gen_random_uuid() FROM sheet_cols WHERE sheet_id = ${s.id}::uuid`
+            await tx.$executeRaw`INSERT INTO sheet_rows (id, sheet_id, position, height) SELECT m.new, ${c.id}::uuid, r.position, r.height FROM sheet_rows r JOIN _map m ON m.old = r.id WHERE r.sheet_id = ${s.id}::uuid`
+            await tx.$executeRaw`INSERT INTO sheet_cols (id, sheet_id, position, width) SELECT m.new, ${c.id}::uuid, k.position, k.width FROM sheet_cols k JOIN _map m ON m.old = k.id WHERE k.sheet_id = ${s.id}::uuid`
+            await tx.$executeRaw`INSERT INTO sheet_cells (sheet_id, row_id, col_id, value, updated_by, updated_at)
+              SELECT ${c.id}::uuid, mr.new, mc.new, x.value, ${m.id}::uuid, now() FROM sheet_cells x
+              JOIN _map mr ON mr.old = x.row_id JOIN _map mc ON mc.old = x.col_id WHERE x.sheet_id = ${s.id}::uuid`
+          } else {
+            await seedGrid(tx, c.id)
+          }
+          out.push(c.id)
+        } else {
+          if (s.folder_id !== folderId) {
+            const name = uniqueName(s.name ?? 'Sheet', names)
+            names.push(name)
+            await tx.sheet.update({ where: { id: s.id }, data: { folder_id: folderId, name, updated_by: m.id, updated_at: new Date() } })
+          }
+          out.push(s.id)
+        }
+      }
+      // Place the moved or new sheets before `beforeId` (or at the end), in their order.
+      const rest = destTabs.map(t => t.id).filter(id => !out.includes(id))
+      const at = beforeId ? Math.max(0, rest.indexOf(beforeId)) : rest.length
+      const order = beforeId && rest.includes(beforeId) ? [...rest.slice(0, at), ...out, ...rest.slice(at)] : [...rest, ...out]
+      await renumberFolder(tx, folderId, order)
+      // The folders the sheets left keep a visible sheet, and their order closes up.
+      for (const from of new Set(list.map(s => s.folder_id))) {
+        if (from === folderId || copy) continue
+        if (!(await tx.sheet.count({ where: { folder_id: from, hidden: false } }))) throw new Refuse('last_visible')
+        await renumberFolder(tx, from)
+        await bumpFolder(tx, from, m.id)
+      }
+      await bumpFolder(tx, folderId, m.id)
+      return tx.sheet.findMany({ where: { id: { in: out } }, orderBy: { position: 'asc' } })
+    }, { timeout: 60_000 })
+    touched()
+    return { success: true, sheets: made.map(summary) }
+  } catch (e) {
+    if (e instanceof Refuse) return fail(e.code)
+    throw e
+  }
+}
+
+/** Tab Color (FR-059a): a palette key, or null for No Color. */
+export async function colorSheets(ids: string[], color: TabColor | null): Promise<{ success: true } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  if (color !== null && !(TAB_COLORS as readonly string[]).includes(color)) return fail('generic')
+  await prisma.sheet.updateMany({ where: { id: { in: ids } }, data: { tab_color: color, updated_by: m.id } })
+  touched()
+  return { success: true }
+}
+
+/** Protect / Unprotect (FR-059b): blank sheets; unprotect by the protector or an admin. */
+export async function protectSheet(id: string, on: boolean): Promise<{ success: true; protectedBy: string | null } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const s = await prisma.sheet.findUnique({ where: { id } })
+  if (!s) return fail('gone')
+  if (isLinkedKind(s.kind)) return fail('linked')
+  if (!on && s.protected_by && s.protected_by !== m.id && !isAdmin(m)) return fail('protected')
+  if (on && s.protected_by && s.protected_by !== m.id && !isAdmin(m)) return fail('protected')
+  const protectedBy = on ? (s.protected_by ?? m.id) : null
+  await prisma.sheet.update({ where: { id }, data: { protected_by: protectedBy, updated_by: m.id } })
+  touched()
+  return { success: true, protectedBy }
+}
+
+/** Hide / Unhide (FR-059c): never linked; never every visible sheet of a folder. */
+export async function hideSheets(ids: string[], hidden: boolean): Promise<{ success: true } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const list = await prisma.sheet.findMany({ where: { id: { in: ids } } })
+  if (!list.length) return fail('gone')
+  if (hidden && list.some(s => isLinkedKind(s.kind))) return fail('linked')
+  try {
+    await prisma.$transaction(async tx => {
+      await tx.sheet.updateMany({ where: { id: { in: list.map(s => s.id) } }, data: { hidden, updated_by: m.id } })
+      for (const f of new Set(list.map(s => s.folder_id))) {
+        if (hidden && !(await tx.sheet.count({ where: { folder_id: f, hidden: false } }))) throw new Refuse('last_visible')
+        await bumpFolder(tx, f, m.id)
+      }
+    })
+  } catch (e) {
+    if (e instanceof Refuse) return fail(e.code)
+    throw e
+  }
+  touched()
+  return { success: true }
+}
+
+/** Reorder by drag (FR-059): the folder's sheets in their new order. */
+export async function reorderSheets(folderId: string, ids: string[]): Promise<{ success: true } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const tabs = await prisma.sheet.findMany({ where: { folder_id: folderId }, select: { id: true } })
+  const have = new Set(tabs.map(t => t.id))
+  const order = [...ids.filter(id => have.has(id)), ...tabs.map(t => t.id).filter(id => !ids.includes(id))]
+  await prisma.$transaction(async tx => { await renumberFolder(tx, folderId, order); await bumpFolder(tx, folderId, m.id) })
+  touched()
+  return { success: true }
+}

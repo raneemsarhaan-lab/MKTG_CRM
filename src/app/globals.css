@@ -2045,3 +2045,21 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
   .fx-hd-top .fx-hd-tab { padding: 0 11px; }
 }
 .fx-hd-inbox { gap: 4px; }
+
+/* ─── spreadsheet editing (spec 013, design/sheets.html) ─────────────────────
+   Range selection, cut marks, row heights, the multi-line editor, windowing
+   spacers, and the row-number resize handle. On every sheet that opts in. */
+.fx-sheet-grid.is-selectable .fx-sheet-td { cursor: cell; user-select: none; }
+.fx-sheet-grid.is-selectable .fx-sheet-td.is-frozen-no { cursor: e-resize; }
+.fx-sheet-td.is-selected { background: var(--sh-sel) !important; }
+.fx-sheet-td.is-anchor { box-shadow: inset 0 0 0 2px var(--sh-edge); }
+.fx-sheet-td.is-cut { outline: 1.5px dashed var(--sh-edge); outline-offset: -2px; }
+.fx-sheet-th.is-sel-head, .fx-sheet-td.is-frozen-no.is-sel-head { background: var(--sh-head-sel) !important; color: var(--sh-edge); }
+.fx-sheet-tr.is-tall > .fx-sheet-td { height: var(--row-h); align-items: flex-start; padding-block: 4px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; }
+.fx-sheet-tr.is-tall > .fx-sheet-td.is-frozen-no { align-items: center; }
+.fx-sheet-spacer { width: 1px; }
+.fx-sheet-row-rz { position: absolute; inset-inline: 0; bottom: -3px; height: 6px; cursor: row-resize; z-index: 3; }
+.fx-sheet-row-rz:hover { background: var(--sh-resize); }
+.fx-sheet-input.is-multi { resize: none; min-height: 100%; height: auto; bottom: auto; padding-block: 3px; line-height: 1.35; white-space: pre-wrap; overflow: hidden; box-shadow: 0 6px 18px rgba(20, 19, 26, .18); }
+.fx-sheet-cell-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-sheet-tr.is-tall .fx-sheet-cell-text { white-space: pre-wrap; text-overflow: clip; }
