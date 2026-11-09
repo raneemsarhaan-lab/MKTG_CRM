@@ -52,7 +52,7 @@ Then the P2 stories: US6, US7 and US8.
   - the 390 px layout and Arabic.
 
   Publish it as an artifact and commit it. **UI tasks (Phase 3 on) start only after the user approves it (§IV).**
-- [ ] T002 [P] Lab skeleton in `scripts/spreadsheet-lab/`, following `scripts/notify-lab/`:
+- [X] T002 [P] Lab skeleton in `scripts/spreadsheet-lab/`, following `scripts/notify-lab/`:
   - `build.sh`: esbuild bundles for `entry.tsx` (UI) and `pure-entry.ts` (Node), with aliases to `scripts/notify-lab/stubs/` for `next/navigation` and `next/link`;
   - `gen.mjs`: CSS from `globals.css`, the sheet block plus the new sheets block;
   - `fixtures.ts`: folders (linked and team), sheets with colours, hidden and protected ones, a 5,000 × 26 sheet, members (an admin and a `user`);
@@ -65,15 +65,15 @@ Then the P2 stories: US6, US7 and US8.
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T003 Schema in `prisma/schema.prisma` (data-model §1–§2):
+- [X] T003 Schema in `prisma/schema.prisma` (data-model §1–§2):
   - **New models:** `SheetFolder`, `Sheet`, `SheetRow`, `SheetCol`, `SheetCell`, `LinkedRowHeight`, with their indexes;
   - **New column:** `Member.sheet_pins String[]? @db.Uuid`;
   - **Partial unique indexes** for one `content` folder, one `video` folder and one sheet of each linked kind, added through a raw SQL step in `scripts/migrate.sh` after `db push`.
 
   Run `npx prisma generate` and `bash scripts/migrate.sh` locally.
-- [ ] T004 [P] Types in `src/types/index.ts`: `SheetFolderKind`, `SheetKind`, `TabColor`, `SheetSummary`, `FolderSummary`, `SheetDoc`, `CellChange`, `SheetChanges`, `TaskCellEntry`.
-- [ ] T005 [P] Tokens: `SHEETS_UI` in `src/lib/tokens.ts` (tab palette, selection fill and edge, tab highlight, row-resize handle) and the matching `--sh-*` variables in `src/app/globals.css`.
-- [ ] T006 [P] The `sheets.*` strings in `messages/en.json` and `messages/ar.json`. They cover:
+- [X] T004 [P] Types in `src/types/index.ts`: `SheetFolderKind`, `SheetKind`, `TabColor`, `SheetSummary`, `FolderSummary`, `SheetDoc`, `CellChange`, `SheetChanges`, `TaskCellEntry`.
+- [X] T005 [P] Tokens: `SHEETS_UI` in `src/lib/tokens.ts` (tab palette, selection fill and edge, tab highlight, row-resize handle) and the matching `--sh-*` variables in `src/app/globals.css`.
+- [X] T006 [P] The `sheets.*` strings in `messages/en.json` and `messages/ar.json`. They cover:
   - navigation;
   - the home page;
   - the breadcrumb;
@@ -88,7 +88,7 @@ Then the P2 stories: US6, US7 and US8.
   - the deleted-sheet message.
 
   The Arabic names stay as written for Excel ("ورقة {n}").
-- [ ] T007 [P] Pure modules in `src/lib/`:
+- [X] T007 [P] Pure modules in `src/lib/`:
   - `sheet-clipboard.ts` (R4): `parseClipboard({ html, text })` → `string[][]`, Excel and Google Sheets HTML, TSV with Excel quoting; `serialise(cells)` → `{ html, text }`;
   - `sheet-selection.ts`: `Range`, `extend`, `edge(direction)` for Ctrl+arrow, `rowRange`, `colRange`, `size`, `fillTargets`;
   - `sheet-undo.ts` (R5): `ChangeSet`, `invert`, a 100-step `Stack`, `push`, `undo`, `redo`;
@@ -96,7 +96,7 @@ Then the P2 stories: US6, US7 and US8.
   - `sheet-names.ts`: `nextSheetName`, `uniqueName`, `validateName` (forbidden characters, 1–50 characters, case-blind uniqueness).
 
   Then make `src/components/sheet/parse-clips.ts` re-export `cellsFromHtml` and `cellsFromText` from `sheet-clipboard.ts`.
-- [ ] T008 Node checks in `scripts/spreadsheet-lab/pure.mjs` for every module in T007 (quickstart §1):
+- [X] T008 Node checks in `scripts/spreadsheet-lab/pure.mjs` for every module in T007 (quickstart §1):
   - clipboard round trips: Excel HTML, Google Sheets HTML, TSV with quoted line breaks and tabs;
   - fill;
   - selection maths and edges;
@@ -106,14 +106,14 @@ Then the P2 stories: US6, US7 and US8.
   - EN/AR parity of `sheets.*`.
 
   Run `node scripts/sheet-lab/scenarios.mjs pure` afterwards to confirm Paste clips still parses.
-- [ ] T009 Server actions in `src/actions/sheets.ts` (contracts/server.md):
+- [X] T009 Server actions in `src/actions/sheets.ts` (contracts/server.md):
   - `listFolders`, `createFolder`, `renameFolder`, `deleteFolder`, `setPins`;
   - `listSheets`, `createSheet`, `loadSheet`;
   - `applySheetChanges`, with limits, protection, `gone` skips, renumbering, and bumping `updated_at` and `updated_by`.
 
   Each checks the session member and the linked guards (data-model §3).
-- [ ] T010 [P] Backfill: `scripts/sheets-backfill.ts`, safe to run twice, creates the Content and Video folders with their linked sheets (data-model §5). Add a step for it to `scripts/backfill.sh`.
-- [ ] T011 [P] Move the board's data loading from `src/app/(app)/board/page.tsx` into `loadBoardData(member)` in `src/lib/board-data.ts`, and call it from the board page with no change in behaviour (R2). Confirm with `lab:header` and a `/board` load.
+- [X] T010 [P] Backfill: `scripts/sheets-backfill.ts`, safe to run twice, creates the Content and Video folders with their linked sheets (data-model §5). Add a step for it to `scripts/backfill.sh`.
+- [X] T011 [P] Move the board's data loading from `src/app/(app)/board/page.tsx` into `loadBoardData(member)` in `src/lib/board-data.ts`, and call it from the board page with no change in behaviour (R2). Confirm with `lab:header` and a `/board` load.
 
 **Checkpoint**: the schema is applied, the pure modules are green in the lab, the actions answer, and the existing labs still pass.
 
@@ -408,3 +408,24 @@ Then the P2 stories: US6, US7 and US8.
 5. **Last, US8:** sweep the linked sheets, then polish, validation and the PR.
 
 At every checkpoint the existing labs must stay green before moving on.
+
+## Progress and as-built notes (2026-11-09)
+
+**Done:**
+- **T001:** the full design, `design/sheets.html` (published for approval).
+- **T002–T011:** the foundation, with no UI. Schema, types, tokens and strings; the pure modules and the lab (`npm run lab:spreadsheet`: 11 checks, including the HTML clipboard in Chromium); the folder, tab-list, new-sheet, load and save actions; the backfill; the shared board loader.
+
+**Checked:**
+- `scripts/spreadsheet-lab/smoke/run.ts`: 27 checks of the actions against local PostgreSQL. It covers folders, names, positions and renumbering, cell writes with line breaks, gone rows, limits, protection, linked guards and pins.
+- `lab:sheet`: 150/150 after the paste parsers moved onto `sheet-clipboard`.
+- `next build` passes, and `/board` loads through `loadBoardData`.
+
+**Waiting:** everything from Phase 3 on is UI and waits for the design's approval (§IV). T002's UI half (`entry.tsx`, `gen.mjs`, fixtures and scenarios) comes with the first UI story.
+
+**As built, against the plan:**
+- **One Content and one Video folder** (and one linked sheet of each) are enforced by a nullable unique `linked_key`, not a raw partial index. `prisma db push` drops indexes it doesn't know about, while a `@unique` it does know survives every deploy.
+- **Pins:** Prisma lists can't be null, so `members.sheet_pins` is paired with `sheet_pins_set`. Before the first change, the default (Content, then Video) applies; afterwards the saved list, even an empty one.
+- **`listFolders` creates the two linked folders on demand** (`ensureLinked`), so the Sheets home never depends on the backfill having run.
+- **New sheets' names** use the client's language: actions take a `pattern` such as "ورقة {n}"; it defaults to "Sheet {n}".
+- **`applySheetChanges` returns the new positions** when it renumbers, so the client can adopt them.
+- **The size constants** in `src/actions/sheets.ts` aren't exported, because a `'use server'` file may export only async functions.

@@ -11,7 +11,8 @@ Everything is additive and applied with `db push` (`scripts/migrate.sh`). Names 
 | Field | Type | Rules |
 |---|---|---|
 | `id` | uuid, primary key | |
-| `kind` | text | `content` · `video` · `team`. One `content` and one `video` folder at most (partial unique index), created by the backfill (R11) |
+| `kind` | text | `content` · `video` · `team` |
+| `linked_key` | text, unique, null | `content` or `video` for the two linked folders; null for team folders. Makes "one of each" a constraint that survives `db push` (R11) |
 | `name` | text | Team folders: 1–60 characters, unique among live folders, ignoring case and surrounding spaces. Linked folders: null, so the name comes from the translations ("Content", "Video") |
 | `created_by` | uuid → members, null on delete | |
 | `created_at` | timestamptz | |
@@ -26,7 +27,8 @@ Linked folders can't be renamed or deleted (FR-074, FR-077). Deleting a team fol
 |---|---|---|
 | `id` | uuid, primary key | |
 | `folder_id` | uuid → sheet_folders, cascade | |
-| `kind` | text | `linked_content` · `linked_video` · `blank`. One sheet of each linked kind (partial unique index), always in its own folder kind |
+| `kind` | text | `linked_content` · `linked_video` · `blank` |
+| `linked_key` | text, unique, null | The linked kind for the two linked sheets; null for blank sheets. Always in its own folder kind |
 | `name` | text | Blank: 1–50 characters, unique in the folder ignoring case and surrounding spaces, without `\ / ? * [ ] :`. Linked: null, so the name comes from the translations ("Content library", "Clips") |
 | `position` | integer | Order in the folder, 0…n−1, rewritten for the folder on every reorder |
 | `tab_color` | text, null | A palette key: `red` · `orange` · `yellow` · `green` · `teal` · `blue` · `purple` · `pink` · `gray` · `black`. Null means no colour |
@@ -78,7 +80,7 @@ Primary key `(sheet_kind, task_id)`. Shared by the team, like spec 010's column 
 
 | Table | Change | Why |
 |---|---|---|
-| `members` | `sheet_pins uuid[]`, null | The member's pinned folders, in order. Null means the default (Content, then Video) (R10) |
+| `members` | `sheet_pins uuid[]` and `sheet_pins_set boolean` | The member's pinned folders, in order. Until `sheet_pins_set`, the default (Content, then Video) applies (R10) |
 | `sheet_values` (spec 010) | No schema change. `setValues` now allows any member on a live task (R8) | FR-060 |
 
 The linked sheets' column records (`sheet_columns`, spec 010) are unchanged. Their `width` is the linked sheet's column width.
