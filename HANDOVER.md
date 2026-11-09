@@ -544,6 +544,19 @@ What happened on your tasks, behind the bell beside the Inbox (spec 012, `specs/
 - **Launch backfill.** `scripts/notifications-backfill.ts`, run by `scripts/backfill.sh`: followers for live tasks, and unread mentions from the last 7 days as notifications. Safe to run twice.
 - **Test it.** `npm run lab:notify` (11 Node checks and 35 browser scenarios with a stub server). Against a running production build: `node scripts/notify-lab/realapp/run.cjs <dir>` (36 checks, quickstart §3).
 
+### Sheets
+
+Spreadsheet editing and Excel-style sheet tabs (spec 013, `specs/013-spreadsheet-editing/`). Design: `design/sheets.html`.
+
+- **Routes.** `/sheets` is the home page (folder cards, pins, New folder, a 10-second Undo on delete). `/sheets/[folderId]` opens a folder as a workbook. Content and Video are linked folders: their first tab is the board's own sheet (`KanbanBoard surface="sheets"`, data from `loadBoardData` in `src/lib/board-data.ts`, shared with `/board`). Sheets is third in the nav. Pinned folders show under it in the sidebar (`loadPinnedFolders`, `PinnedFolders`).
+- **Grid engine.** One engine for every sheet: `src/components/sheet/GridCore.tsx`. Spreadsheet features are optional model hooks: `selection`, `writeCells`, `pasteAsRows`, `onUndo`/`onRedo`, `contextMenu`, `rowHeight`, `multiline`. The `spreadsheet` flag adds blank-sheet conventions: a row number selects its row, Home goes to column A, and Tab just moves. Above 150 rows, rows are windowed.
+- **Blank sheets.** `src/components/sheets/BlankSheet.tsx` over a `SheetDoc` (`src/lib/sheet-doc.ts`). Rows and columns have client-made ids and double-precision positions (`sheet-positions.ts`). Only filled cells are stored. Limits: 5,000 rows, 200 columns, 50,000 characters per cell.
+- **Workbook.** `Workbook.tsx` keeps each sheet's document, undo stack (`sheet-undo.ts`, 100 steps) and outbox (`useOutbox.ts`). The outbox batches every 400 ms, sends at most 2,000 cells per call, and retries at 2/4/8/16 s, then every 30 s. `TabBar.tsx` and the menus (`PopMenu.tsx`) follow Excel's order. Dialogs are in `Dialogs.tsx`.
+- **Linked sheets.** `useLinkedEditing` gives the Video and Content grids ranges, paste, clear, cut and undo. Each cell goes through the sheet's own single-cell save. Clip lists, plans and single links still open their previews (`pasteAsRows`). Team columns are open to any member on a live task (R8).
+- **Server.** `src/actions/sheets.ts`: folders, sheets, `applySheetChanges` (one transaction; refuses on protection or limits; skips gone rows and columns), and the tab actions. Backfill: `scripts/sheets-backfill.ts`.
+- **Clipboard.** `src/lib/sheet-clipboard.ts` reads HTML tables and Excel-quoted TSV, and writes both.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/run.cjs` (running app), `npm run lab:spreadsheet` (pure), `npm run lab:sheet` (linked grids), and the smoke test in `scripts/spreadsheet-lab/smoke/`. Open items are in `specs/013-spreadsheet-editing/validation.md`.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.

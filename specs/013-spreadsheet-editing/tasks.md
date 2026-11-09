@@ -241,7 +241,7 @@ Then the P2 stories: US6, US7 and US8.
 
   The grid asks the model through new optional hooks: `readCells(range)`, `writeCells(changes)` → `{ skipped }`, `canWrite(row, col)`. Delete and Backspace over a range clear it in one change set.
 - [X] T028 [US2] Blank sheets: `readCells` and `writeCells` in `blank/model.ts`. A paste larger than the sheet adds rows and columns up to the limits.
-- [ ] T029 [US2] Linked sheets:
+- [X] T029 [US2] Linked sheets:
   - `writeTaskCells` in `src/actions/sheets.ts` (contracts/server.md): grouped per task, today's paths for each field, stage moves through `setTaskStage`'s rule, people matched by name, team columns through `setValues`;
   - `setValues` in `src/actions/sheet-columns.ts` opened to any member on a live task (R8, FR-060);
   - `readCells`, `writeCells` and `canWrite` in `src/components/sheet/SheetGrid.tsx` (Video) and `src/components/content/ContentGrid.tsx` (Content), with grouping rows skipped;
@@ -318,7 +318,7 @@ Then the P2 stories: US6, US7 and US8.
 **Independent Test**: Paste 10 × 4, clear a column, undo twice: exactly as before. Redo twice: back again.
 
 - [X] T037 [US6] `src/components/sheets/useUndo.ts`: one `sheet-undo` stack per sheet id in the workbook, surviving tab switches. Every change set from the Grid, `BlankSheet` and the linked models pushes its inverse. Undo and redo send through the outbox (FR-032). Refused steps are reported and dropped.
-- [ ] T038 [US6] Keys and buttons: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y in the Grid; `data-undo` and `data-redo` in the toolbar, disabled when empty. For linked sheets, inverses go through `writeTaskCells`, and a deleted row's inverse is `restoreTask`.
+- [X] T038 [US6] Keys and buttons: Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl+Y in the Grid; `data-undo` and `data-redo` in the toolbar, disabled when empty. For linked sheets, inverses go through `writeTaskCells`, and a deleted row's inverse is `restoreTask`.
 - [ ] T039 [US6] Lab:
   - scenarios `s6-*`: paste, clear, cut, insert and delete undone and redone exactly; one step per action; a new edit clears redo; per-sheet history; a refused undo reported;
   - a `lab:sheet` addition for undoing a title paste on the Content sheet.
@@ -351,8 +351,8 @@ Then the P2 stories: US6, US7 and US8.
 
 **Independent Test**: The full `lab:sheet` passes unchanged. In Sheets › Content, paste five titles over five pieces: renamed on the board.
 
-- [ ] T044 [US8] Run the full `lab:sheet` and fix any regression in the grown Grid. Confirm in the running app that the Board's Content tab and Sheet view use the same editing as Sheets › Content and Sheets › Video (FR-078).
-- [ ] T045 [US8] Running-app checks for the linked sheets (quickstart §3, rows 7–11), recorded in `specs/013-spreadsheet-editing/validation.md`.
+- [X] T044 [US8] Run the full `lab:sheet` and fix any regression in the grown Grid. Confirm in the running app that the Board's Content tab and Sheet view use the same editing as Sheets › Content and Sheets › Video (FR-078).
+- [X] T045 [US8] Running-app checks for the linked sheets (quickstart §3, rows 7–11), recorded in `specs/013-spreadsheet-editing/validation.md`.
 
 ---
 
@@ -367,9 +367,9 @@ Then the P2 stories: US6, US7 and US8.
 
   Lab scenarios `s-phone-*` and `s-ar-*`.
 - [ ] T047 [P] Speed: a 5,000 × 26 sheet with 20,000 filled cells. Keyboard moves and tab switches under 100 ms (SC-005); a 1,000 × 20 paste under 3 s (SC-001). Lab scenario `s-perf`.
-- [ ] T048 Run every lab: `lab:spreadsheet`, `lab:sheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then `npm run typecheck`, `bash scripts/preflight.sh` and `npx next build`.
-- [ ] T049 Running-app checks: all rows of quickstart §3 with two members on a production build. Record them in `specs/013-spreadsheet-editing/validation.md`.
-- [ ] T050 [P] Docs:
+- [X] T048 Run every lab: `lab:spreadsheet`, `lab:sheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then `npm run typecheck`, `bash scripts/preflight.sh` and `npx next build`.
+- [X] T049 Running-app checks: all rows of quickstart §3 with two members on a production build. Record them in `specs/013-spreadsheet-editing/validation.md`.
+- [X] T050 [P] Docs:
   - `specs/013-spreadsheet-editing/constitution-check.md`, including the team-column widening for sign-off;
   - a "Sheets" section in `HANDOVER.md`: routes, the grid engine, models, actions, outbox and undo, clipboard, the backfill, limits, and the labs;
   - notes on specs 008–010 (the editing they gained);
@@ -429,3 +429,9 @@ At every checkpoint the existing labs must stay green before moving on.
 - **New sheets' names** use the client's language: actions take a `pattern` such as "ورقة {n}"; it defaults to "Sheet {n}".
 - **`applySheetChanges` returns the new positions** when it renumbers, so the client can adopt them.
 - **The size constants** in `src/actions/sheets.ts` aren't exported, because a `'use server'` file may export only async functions.
+
+## As-built notes (UI round)
+
+- T029: no `writeTaskCells`. Linked writes go through each sheet's existing single-cell save (`useLinkedEditing`), in parallel batches of 4, with the same permissions and notifications. The "new rows" rule is narrower than `looksLikeRows`: a paste opens Paste clips or Paste plan on a group or "+" row, or when it names clip files. One value into a link column keeps the link rules. Anything else fills cells.
+- T037/T038: undo stacks live in `Workbook.tsx` (blank) and `useLinkedEditing` (linked). There's no separate `useUndo.ts`. On the linked tab, the toolbar buttons are disabled; the keys work.
+- Open: T017, T021, T025, T030, T036, T039, T042, T043, T046, T047 (see validation.md, "Not built").
