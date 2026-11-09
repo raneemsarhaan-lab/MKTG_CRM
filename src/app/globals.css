@@ -713,8 +713,10 @@ html {
 }
 .fx-brief a { color: #3563E9; font-weight: 500; text-decoration: none; }
 .fx-brief a:hover { text-decoration: underline; }
-/* Fit to a height, not the panel's width: a wide banner or a tall screenshot stays a preview. */
-.fx-brief img { display: block; max-width: 100%; max-height: 320px; width: auto; height: auto; object-fit: contain; border-radius: 8px; margin: 0.5em 0; }
+/* Each image at its own size: a small one stays small, a large one shrinks to
+   the panel's width, and a very tall one stops at 60% of the window. The
+   proportions never change. Shared by the description and its editor. */
+.fx-brief img { display: block; width: auto; height: auto; max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; margin: 0.5em 0; }
 .fx-brief hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
 .fx-brief code {
   background: #F4F4F2; border-radius: 4px; padding: 0.1em 0.35em;
