@@ -111,7 +111,7 @@ description: "Task list for Daily Working Hours (spec 014)"
   - bottom sheet on phones.
 - [ ] T017 [US2] Mount `HoursReminder` once in `src/components/shared/AppShell.tsx`, and pass `sheetsApi`-style injection through `src/components/hours/api.ts`.
 - [ ] T018 [P] [US2] Add the styles for the form and the window to `src/app/globals.css`: modal, bottom sheet under 767 px, lines, the error per line, mirrored in Arabic.
-- [ ] T019 [US2] Lab scenarios `s2-*`:
+- [ ] T019 [US2] Lab scenarios `s2-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - opens on Sunday for Thursday;
   - doesn't open when the day is logged, already prompted, before the account existed, or on Friday/Saturday;
   - waits for another dialog;
@@ -139,7 +139,7 @@ description: "Task list for Daily Working Hours (spec 014)"
   - a click opens a popover with the field, Off and Clear (Clear calls `saveDays` with `hours: null, off: false`);
   - members can't edit days older than 30 days or in the future.
 - [ ] T021 [US3] Add the week total (`data-hours-week`, "31.5 of 40 h this week", using `capacity_hrs_wk`) and "Log several days" (`data-hours-several`) to `TodayHours.tsx`. "Log several days" opens `DaysForm` in a dialog, pre-filled with this week's missing days.
-- [ ] T022 [US3] Lab scenarios `s3-*`:
+- [ ] T022 [US3] Lab scenarios `s3-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - the strip shows hours, Off and Missing;
   - editing a past day;
   - Clear makes it Missing;
@@ -172,7 +172,7 @@ description: "Task list for Daily Working Hours (spec 014)"
   - a sticky name column on phones.
 - [ ] T025 [US4] Write the CSV route `src/app/(app)/hours/export/route.ts`: admin-only (403 otherwise); `text/csv; charset=utf-8` with a BOM; file name `hours-<week>.csv`; the same rows, columns and totals as the page, via `toCsv`.
 - [ ] T026 [P] [US4] Add "Hours" for admins after Capacity in `src/lib/nav.tsx` (with an icon and `nav.hours` in both languages), and add the report's styles to `src/app/globals.css`.
-- [ ] T027 [US4] Lab scenarios `s4-*`:
+- [ ] T027 [US4] Lab scenarios `s4-*` in `scripts/hours-lab/scenarios/index.mjs`:
   - the report's numbers and totals;
   - Missing marked;
   - moving between weeks;
@@ -189,13 +189,13 @@ description: "Task list for Daily Working Hours (spec 014)"
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T028 [P] Docs:
+- [ ] T028 [P] Docs in `specs/014-daily-hours/` and `HANDOVER.md`:
   - `specs/014-daily-hours/constitution-check.md`;
   - a "Daily hours" section in `HANDOVER.md` (routes, the date model, the reminder rule, the actions, the lab);
   - mark the tasks here [X].
 - [ ] T029 Run every lab: `lab:hours`, `lab:sheet`, `lab:spreadsheet`, `lab:header`, `lab:inbox`, `lab:notify`, `lab:brief` and `lab:attachments`. Then the typecheck, `bash scripts/preflight.sh` and `npx next build`.
 - [ ] T030 Running-app checks: every row of `quickstart.md` with two members on a production build, written as `scripts/hours-lab/realapp/run.cjs`. Record the results in `specs/014-daily-hours/validation.md`.
-- [ ] T031 Commit and push. Open a PR titled "Daily working hours: My Day entry, reminder and admin report (spec 014)", and ask the user before merging.
+- [ ] T031 Commit and push branch `claude/nice-noether-x4rgei` (with `specs/014-daily-hours/validation.md`). Open a PR titled "Daily working hours: My Day entry, reminder and admin report (spec 014)", and ask the user before merging.
 
 ---
 
