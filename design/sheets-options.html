@@ -1,0 +1,450 @@
+<title>Sheets Access Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap">
+<style>
+/* Layout: an options strip on top, then one app frame (sidebar + page) that
+   changes with the chosen option; the open folder shows as a workbook with
+   tabs along its bottom edge, as in Google Sheets. */
+:root {
+  --page: #F3F3F7;        /* outside the frame */
+  --panel: #FFFFFF;
+  --ink: #14131A;
+  --text: #1F2430;
+  --muted: #6B7280;
+  --line: #ECECF1;
+  --input: #E3E3EA;
+  --surface: #F6F6F9;
+  --purple: #7C3AED;
+  --purple-soft: #F0EBFE;
+  --lime: #C9F24E;
+  --link-blue: #1D4ED8;
+  --sel: rgba(124, 58, 237, .10);
+  --sel-edge: #7C3AED;
+  --grid-head: #F8F8FB;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif;
+  --f-body: Inter, "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --purple: #A78BFA; --purple-soft: #2A2145; --lime: #C9F24E; --link-blue: #93B4FF;
+  --sel: rgba(167, 139, 250, .16); --sel-edge: #A78BFA; --grid-head: #1C1C24; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --purple: #A78BFA; --purple-soft: #2A2145; --lime: #C9F24E; --link-blue: #93B4FF;
+  --sel: rgba(167, 139, 250, .16); --sel-edge: #A78BFA; --grid-head: #1C1C24; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 78ch; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+
+/* the options strip */
+.opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.opt { text-align: start; border: 1.5px solid var(--line); background: var(--panel); border-radius: 14px; padding: 12px 14px; cursor: pointer; display: grid; gap: 4px; }
+.opt[aria-pressed="true"] { border-color: var(--purple); box-shadow: 0 0 0 3px var(--purple-soft); }
+.opt b { font: 700 14.5px var(--f-head); color: var(--ink); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.opt span { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.rec { font: 700 10.5px var(--f-body); letter-spacing: .05em; text-transform: uppercase; background: var(--lime); color: #14131A; border-radius: 999px; padding: 2px 8px; }
+.ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 12px; font-weight: 600; font-size: 12.5px; cursor: pointer; color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+
+/* the app frame */
+.frame { background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10);
+  display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 640px; }
+.frame.phone { grid-template-columns: minmax(0, 1fr); max-width: 390px; margin: 0 auto; width: 100%; min-height: 760px; position: relative; }
+.side { border-inline-end: 1px solid var(--line); padding: 22px 14px; display: flex; flex-direction: column; gap: 14px; }
+.word { font: 800 21px var(--f-head); color: var(--ink); padding-inline: 6px; }
+.pill { justify-self: start; align-self: flex-start; margin-inline: 6px; background: var(--lime); color: #14131A; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
+.nav { display: grid; gap: 2px; }
+.nav button, .nav .sub button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: start; font-size: 14px; font-weight: 600; color: var(--text); min-height: 38px; }
+.nav button:hover { background: var(--surface); }
+.nav button[aria-current="page"] { background: var(--purple-soft); color: var(--purple); }
+.nav svg { flex: none; }
+.nav .new { margin-inline-start: auto; font: 700 10px var(--f-body); background: var(--lime); color: #14131A; border-radius: 999px; padding: 2px 6px; }
+.sub { display: grid; gap: 1px; padding-inline-start: 18px; margin-inline-start: 18px; border-inline-start: 1.5px solid var(--line); }
+.sub button { font-weight: 500 !important; font-size: 13.5px !important; min-height: 34px !important; padding: 6px 8px !important; }
+.sub button[aria-current="page"] { background: var(--purple-soft); color: var(--purple); font-weight: 700 !important; }
+.sub .muted { color: var(--muted); }
+.sub small { margin-inline-start: auto; color: var(--muted); font-size: 11.5px; }
+.side-label { font: 700 10.5px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 6px 10px 2px; }
+.main { min-width: 0; display: flex; flex-direction: column; }
+
+/* top of a page */
+.top { display: flex; align-items: center; gap: 12px; padding: 16px 22px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+.crumbs button { border: 0; background: none; padding: 4px 6px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 600; }
+.crumbs button:hover { background: var(--surface); color: var(--ink); }
+.crumbs b { color: var(--ink); font: 800 20px var(--f-head); }
+.saved { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #16A34A; }
+.ibtn { width: 34px; height: 34px; border: 1px solid var(--input); background: var(--panel); border-radius: 9px; cursor: pointer; display: grid; place-items: center; color: var(--text); }
+.ibtn:disabled { opacity: .4; cursor: default; }
+.cta { border: 0; background: var(--lime); color: #14131A; border-radius: 999px; padding: 9px 16px; font: 700 14px var(--f-head); cursor: pointer; }
+
+/* sheets home */
+.home { padding: 18px 22px 24px; display: grid; gap: 18px; align-content: start; }
+.home h3 { margin: 0; font: 700 12px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.folder { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--panel); text-align: start; cursor: pointer; display: grid; gap: 8px; }
+.folder:hover { border-color: var(--input); background: var(--surface); }
+.folder .fi { display: flex; align-items: center; gap: 10px; }
+.folder .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.folder b { font: 700 15px var(--f-head); color: var(--ink); }
+.folder small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.chip { justify-self: start; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 8px; background: var(--purple-soft); color: var(--purple); }
+.chip.team { background: var(--surface); color: var(--muted); }
+.folder.add { border-style: dashed; place-items: center; text-align: center; color: var(--muted); font-weight: 600; min-height: 116px; }
+
+/* workbook: toolbar, grid, tabs */
+.wb { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.tools { display: flex; align-items: center; gap: 6px; padding: 8px 22px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tools .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+.tools .lbl { font-size: 12.5px; color: var(--muted); }
+.gridwrap { flex: 1; overflow: auto; min-height: 300px; }
+table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 100%; }
+.g th, .g td { border-bottom: 1px solid var(--line); border-inline-end: 1px solid var(--line); padding: 0 8px; height: 30px; white-space: nowrap; text-align: start; }
+.g thead th { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; position: sticky; top: 0; z-index: 1; }
+.g tbody th { background: var(--grid-head); color: var(--muted); font-weight: 500; font-size: 12px; width: 44px; text-align: center; position: sticky; inset-inline-start: 0; }
+.g td { min-width: 110px; color: var(--text); cursor: cell; }
+.g td.sel { background: var(--sel); }
+.g td.act { box-shadow: inset 0 0 0 2px var(--sel-edge); background: var(--panel); }
+.g tr.grp td { background: var(--surface); font-weight: 700; color: var(--ink); }
+.g .stage { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; }
+.g a { color: var(--link-blue); text-decoration: none; }
+
+.tabs { display: flex; align-items: stretch; gap: 2px; border-top: 1px solid var(--line); background: var(--grid-head); padding: 0 8px; min-height: 44px; overflow-x: auto; }
+.tabs .tb { border: 0; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--muted); border-top: 3px solid transparent; white-space: nowrap; min-height: 44px; }
+.tabs .tb:hover { background: var(--surface); color: var(--ink); }
+.tabs .tb[aria-selected="true"] { background: var(--panel); color: var(--purple); border-top-color: var(--purple); }
+.tabs .plus, .tabs .all { width: 40px; justify-content: center; font-size: 18px; color: var(--text); padding: 0; }
+.tabs .lk { font-size: 11px; color: var(--purple); }
+.tabs .caret { font-size: 10px; opacity: .7; }
+
+/* tab menu */
+.menu { position: absolute; z-index: 5; width: 230px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(20,19,26,.18); padding: 6px; }
+.menu button { display: flex; width: 100%; gap: 8px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 8px 10px; text-align: start; cursor: pointer; font-size: 13.5px; color: var(--text); min-height: 36px; }
+.menu button:hover:not(:disabled) { background: var(--surface); }
+.menu button:disabled { color: var(--muted); cursor: not-allowed; }
+.menu small { display: block; color: var(--muted); font-size: 11.5px; padding: 0 10px 6px; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+
+/* notes beside the frame */
+.notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--panel); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; border: 1px solid var(--line); }
+.note h4 { margin: 0 0 6px; font: 700 14px var(--f-head); color: var(--ink); }
+.note ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+.note .pro { color: #15803D; font-weight: 700; }
+.note .con { color: #B45309; font-weight: 700; }
+.qs { background: var(--panel); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--line); display: grid; gap: 10px; }
+.qs h2 { margin: 0; font: 800 17px var(--f-head); color: var(--ink); }
+.qs ol { margin: 0; padding-inline-start: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; }
+.qs b { color: var(--ink); }
+
+/* phone bits */
+.ph-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.ph-top b { font: 800 18px var(--f-head); color: var(--ink); }
+.ph-tabbar { position: absolute; inset: auto 0 0; display: flex; justify-content: space-around; border-top: 1px solid var(--line); background: var(--panel); min-height: 58px; align-items: center; font-size: 11px; color: var(--muted); font-weight: 600; }
+.ph-tabbar span { display: grid; justify-items: center; gap: 3px; }
+.ph-tabbar span.on { color: var(--purple); }
+.frame.phone .tabs { position: absolute; inset: auto 0 58px; }
+.frame.phone .wb { padding-bottom: 102px; }
+.frame.phone .home { padding-bottom: 80px; }
+.frame.phone .folders { grid-template-columns: 1fr; }
+
+@media (max-width: 900px) {
+  .opts, .notes { grid-template-columns: 1fr; }
+  .frame { grid-template-columns: 1fr; }
+  .frame:not(.phone) .side { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Where the Sheets live</h1>
+    <p class="lede">A new <b>Sheets</b> section in the sidebar. Inside it, folders: <b>Content</b> and <b>Video</b> (the two sheets that are linked to the board) and any folder the team makes. A folder opens like one Google Sheets file, with its sheets as tabs along the bottom. Pick how the folders open; everything is clickable.</p>
+  </header>
+
+  <div class="opts" role="group" aria-label="Options">
+    <button class="opt" data-opt="A"><b>A · Folders in the sidebar</b><span>Sheets expands into a folder list right in the sidebar. One click opens a folder.</span></button>
+    <button class="opt" data-opt="B"><b>B · A Sheets home</b><span>Sheets opens a page of folder cards, like Google Drive. Room for owners, counts and last edits.</span></button>
+    <button class="opt" data-opt="C"><b>C · Home + pinned folders <span class="rec">Recommended</span></b><span>Sheets opens the home page, and the folders you pin (Content and Video by default) sit under it in the sidebar.</span></button>
+  </div>
+
+  <div class="ctl">
+    <span>View</span>
+    <span class="seg" role="group" aria-label="Device"><button data-dev="desktop">Computer</button><button data-dev="phone">Phone</button></span>
+    <span style="margin-inline-start:8px">Try: open a folder · click tabs · press + · right-click a tab · select cells by dragging</span>
+  </div>
+
+  <div id="frame" class="frame"></div>
+
+  <div class="notes" id="notes"></div>
+
+  <section class="qs">
+    <h2>How this answers the three open questions</h2>
+    <ol>
+      <li><b>Where the tabs live.</b> Each folder is one workbook with its own tabs. The Content folder's first tab is the Content sheet and the Video folder's is the Video sheet; both are linked to the board (🔗), can't be deleted, and are always first. Next to them, and in any team folder, the team adds blank sheets with +.</li>
+      <li><b>Who sees what.</b> Suggested: folders are shared with the whole team, and anyone can add, rename and reorder sheets in them. A folder's menu could also offer <i>Only me</i> for private scratch folders, if you want that.</li>
+      <li><b>Who can edit cells on tasks.</b> Suggested: blank sheets are open to everyone. On the linked tabs, the team's own columns are open to everyone, while pipeline fields (title, stage, assignee) keep today's rule (the task's owner, assignee, admins and superusers).</li>
+      <li><b>The Board header.</b> Suggested: its Content tab and Sheet view stay, as shortcuts that open the same linked sheets, so nobody's habit breaks.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  const S = { opt: 'C', dev: 'desktop', screen: 'home', folder: 'content', tab: 0, menu: null, sel: null, pins: ['content', 'video'] }
+  const ICON = {
+    overview: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+    board: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    sheets: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+    projects: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+    team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6.5 6.5 0 0 0-2.5-5.1"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  }
+  const svg = (k, s = 18, c = 'currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`
+
+  const FOLDERS = {
+    content: { name: 'Content', linked: true, color: '#7C3AED', who: 'Linked to the board · Samaa, Noran', edited: 'Edited 12 min ago',
+      tabs: [{ name: 'Content library', linked: true }, { name: 'Q1 ideas' }, { name: 'Sheet 1' }] },
+    video: { name: 'Video', linked: true, color: '#0E7C7C', who: 'Linked to the board · Video team', edited: 'Edited 1 h ago',
+      tabs: [{ name: 'Clips', linked: true }, { name: 'Shot ideas' }] },
+    campaign: { name: 'Campaign planning', color: '#B45309', who: 'Team folder · Raneem', edited: 'Edited yesterday',
+      tabs: [{ name: 'Budget split' }, { name: 'Channels' }, { name: 'Launch checklist' }, { name: 'Sheet 1' }] },
+    events: { name: 'Event logistics', color: '#1E293B', who: 'Team folder · Nermin', edited: 'Edited Monday',
+      tabs: [{ name: 'Venues' }, { name: 'Speakers' }] },
+  }
+  const ORDER = ['content', 'video', 'campaign', 'events']
+
+  const $ = s => document.querySelector(s)
+  const frame = $('#frame')
+
+  function navHtml() {
+    const items = [['overview', 'Overview'], ['board', 'Board'], ['sheets', 'Sheets'], ['projects', 'Projects'], ['team', 'Team']]
+    const onSheets = S.screen !== 'board'
+    let sub = ''
+    if (S.opt === 'A' && onSheets) {
+      sub = `<div class="sub">${ORDER.map(k => `<button data-folder="${k}" ${S.screen === 'wb' && S.folder === k ? 'aria-current="page"' : ''}>${svg('folder', 15, FOLDERS[k].color)}<span>${FOLDERS[k].name}</span>${FOLDERS[k].linked ? '<small>🔗</small>' : ''}</button>`).join('')}
+        <button class="muted" data-newfolder>＋ New folder</button></div>`
+    }
+    if (S.opt === 'C') {
+      sub = `<div class="side-label">Pinned</div><div class="sub">${S.pins.map(k => `<button data-folder="${k}" ${S.screen === 'wb' && S.folder === k ? 'aria-current="page"' : ''}>${svg('folder', 15, FOLDERS[k].color)}<span>${FOLDERS[k].name}</span></button>`).join('')}</div>`
+    }
+    return `<aside class="side"><div class="word">momentum</div><span class="pill">Creative Ops</span>
+      <nav class="nav" aria-label="Main navigation">${items.map(([k, l]) => {
+        const cur = k === 'sheets' ? (onSheets && (S.opt !== 'A' || S.screen === 'home') && !(S.opt === 'C' && S.screen === 'wb' && S.pins.includes(S.folder)) && !(S.opt === 'A' && S.screen === 'wb')) || (S.opt === 'B' && onSheets) : k === 'board' && S.screen === 'board'
+        return `<button data-nav="${k}" ${cur ? 'aria-current="page"' : ''}>${svg(k)}<span>${l}</span>${k === 'sheets' ? '<span class="new">New</span>' : ''}</button>${k === 'sheets' ? sub : ''}`
+      }).join('')}</nav></aside>`
+  }
+
+  function homeHtml() {
+    const card = k => { const f = FOLDERS[k]
+      return `<button class="folder" data-folder="${k}"><span class="fi"><span class="ic" style="background:${f.color}22">${svg('folder', 20, f.color)}</span><b>${f.name}</b></span>
+        <small>${f.tabs.length} sheets · ${f.edited}</small><span class="chip${f.linked ? '' : ' team'}">${f.linked ? '🔗 Linked to the board' : f.who}</span></button>` }
+    return `<div class="top"><div class="crumbs"><b>Sheets</b></div><span style="margin-inline-start:auto"></span><button class="cta" data-newfolder>＋ New folder</button></div>
+      <div class="home"><h3>Linked to the board</h3><div class="folders">${['content', 'video'].map(card).join('')}</div>
+      <h3>Team folders</h3><div class="folders">${['campaign', 'events'].map(card).join('')}<button class="folder add" data-newfolder>＋ New folder</button></div></div>`
+  }
+
+  // sample data for the grids
+  const STAGE = { 'Initial Design': ['#EDE9FE', '#6D28D9'], 'In review': ['#FEF3C7', '#92400E'], 'Published': ['#DCFCE7', '#166534'], 'Editing': ['#DBEAFE', '#1E40AF'], 'Ready': ['#DCFCE7', '#166534'] }
+  const pill = s => `<span class="stage" style="background:${STAGE[s][0]};color:${STAGE[s][1]}">${s}</span>`
+  function gridRows() {
+    const f = FOLDERS[S.folder], t = f.tabs[S.tab]
+    if (t.linked && S.folder === 'content') return { head: ['Piece', 'Type', 'Status', 'Owner', 'Working doc', 'Hook'], rows: [
+      { grp: 'Strategy · AI' }, ['The AI operating model', 'Article', pill('Initial Design'), 'Samaa', '<a>doc</a>', 'Most AI pilots die in month 3'],
+      ['Decision rights in 2027', 'Framework', pill('In review'), 'Samaa', '<a>doc</a>', ''], { grp: 'Newsjacking' },
+      ['Budget season takeaways', 'Social post', pill('Published'), 'Noran', '<a>doc</a>', 'Three lines from the CFO panel'],
+      ['What the merger means', 'Article', pill('Initial Design'), 'Noran', '', ''] ] }
+    if (t.linked && S.folder === 'video') return { head: ['Clip', 'Status', 'Editor', 'In', 'Out', 'Drive'], rows: [
+      { grp: 'AI Summit keynote · 6 clips' }, ['Opening hook', pill('Editing'), 'Omar', '00:42', '01:10', '<a>link</a>'],
+      ['The three questions', pill('Ready'), 'Omar', '03:05', '03:58', '<a>link</a>'], ['Audience Q&amp;A', pill('Editing'), 'Kai', '41:12', '42:01', ''],
+      { grp: 'Leadership podcast ep. 4 · 3 clips' }, ['Cold open', pill('Published'), 'Kai', '00:00', '00:35', '<a>link</a>'] ] }
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F']
+    const data = {
+      'Budget split': [['Channel', 'Q1', 'Q2', 'Owner'], ['LinkedIn', '40%', '35%', 'Samaa'], ['Events', '30%', '35%', 'Nermin'], ['Video', '30%', '30%', 'Omar']],
+      'Q1 ideas': [['Idea', 'Pillar', 'Why now'], ['AI budgets post', 'AI', 'Planning season'], ['CFO interview', 'Decision making', 'Year end']],
+      'Shot ideas': [['Scene', 'Where', 'Notes'], ['Walk-and-talk', 'Office', 'Natural light, 10:00'], ['B-roll of the stage', 'Venue', '']],
+    }[t.name] ?? []
+    return { head: letters, letters: true, rows: Array.from({ length: 9 }, (_, i) => letters.map((_, c) => data[i]?.[c] ?? '')) }
+  }
+
+  function wbHtml() {
+    const f = FOLDERS[S.folder], g = gridRows()
+    const isSel = (r, c) => S.sel && r >= Math.min(S.sel.r0, S.sel.r1) && r <= Math.max(S.sel.r0, S.sel.r1) && c >= Math.min(S.sel.c0, S.sel.c1) && c <= Math.max(S.sel.c0, S.sel.c1)
+    let ri = 0
+    const body = g.rows.map(row => {
+      if (row.grp) return `<tr class="grp"><th></th><td colspan="${g.head.length}">${row.grp}</td></tr>`
+      const r = ri++
+      return `<tr><th>${r + 1}</th>${row.map((v, c) => `<td data-r="${r}" data-c="${c}" class="${S.sel && r === S.sel.r0 && c === S.sel.c0 ? 'act' : isSel(r, c) ? 'sel' : ''}">${v}</td>`).join('')}</tr>`
+    }).join('')
+    const nSel = S.sel ? (Math.abs(S.sel.r1 - S.sel.r0) + 1) * (Math.abs(S.sel.c1 - S.sel.c0) + 1) : 0
+    const crumbs = `<div class="crumbs"><button data-nav="sheets">Sheets</button><span aria-hidden="true">›</span><b>${f.name}</b>${f.linked ? '<span class="chip" style="margin-inline-start:6px">🔗 Linked</span>' : ''}</div>`
+    return `<div class="top">${crumbs}<span class="saved">Saved</span></div>
+      <div class="wb">
+        <div class="tools"><button class="ibtn" aria-label="Undo" title="Undo (Ctrl+Z)">↶</button><button class="ibtn" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
+          <span class="sep"></span><span class="lbl">${nSel > 1 ? `${nSel} cells selected · Ctrl+C to copy` : f.tabs[S.tab].linked ? 'Rows are tasks on the board' : 'A blank sheet: type anywhere'}</span></div>
+        <div class="gridwrap"><table class="g" aria-label="${f.tabs[S.tab].name}"><thead><tr><th></th>${g.head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+        <div class="tabs" role="tablist" aria-label="Sheets in ${f.name}">
+          <button class="tb plus" data-plus aria-label="New sheet" title="New sheet">＋</button>
+          <button class="tb all" data-all aria-label="All sheets" title="All sheets">≡</button>
+          ${f.tabs.map((t, i) => `<button class="tb" role="tab" data-tab="${i}" aria-selected="${i === S.tab}">${t.linked ? '<span class="lk" title="Linked to the board">🔗</span>' : ''}${t.name}<span class="caret" data-tabmenu="${i}" aria-hidden="true">▾</span></button>`).join('')}
+        </div>
+      </div>`
+  }
+
+  function boardHtml() {
+    return `<div class="top"><div class="crumbs"><b>Pipeline</b></div></div><div class="home"><p style="color:var(--muted)">The Board, unchanged. Its Content tab and Sheet view open the same linked sheets as Sheets › Content and Sheets › Video.</p></div>`
+  }
+
+  function phoneHtml() {
+    const body = S.screen === 'wb' ? wbHtml() : homeHtml()
+    return `<div class="main">${body}</div><div class="ph-tabbar"><span>${svg('board', 20)}Board</span><span class="on">${svg('sheets', 20)}Sheets</span><span>${svg('projects', 20)}Projects</span><span>${svg('team', 20)}Team</span><span>⋯<br>More</span></div>`
+  }
+
+  function render() {
+    document.querySelectorAll('[data-opt]').forEach(b => b.setAttribute('aria-pressed', b.dataset.opt === S.opt))
+    document.querySelectorAll('[data-dev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.dev === S.dev))
+    frame.className = `frame${S.dev === 'phone' ? ' phone' : ''}`
+    if (S.dev === 'phone') frame.innerHTML = phoneHtml()
+    else frame.innerHTML = navHtml() + `<div class="main">${S.screen === 'wb' ? wbHtml() : S.screen === 'board' ? boardHtml() : (S.opt === 'A' ? wbOrHint() : homeHtml())}</div>`
+    if (S.menu !== null) openMenu()
+    notes()
+  }
+  // Option A has no home page: Sheets opens the last folder.
+  function wbOrHint() { S.screen = 'wb'; return wbHtml() }
+
+  function notes() {
+    const N = {
+      A: [['How it works', ['Sheets in the sidebar expands into every folder.', 'A folder opens straight to its last tab.', '＋ New folder at the end of the list.']],
+          ['Good', ['<span class="pro">One click</span> from anywhere to any folder.', 'Feels like a file tree.']],
+          ['Watch out', ['<span class="con">The sidebar grows</span> with every folder; 200 px cuts long names.', 'No room for owners or last edits.', 'Phones need a separate list anyway.']]],
+      B: [['How it works', ['Sheets opens a home page of folder cards: linked folders first, then team folders.', 'Each card shows its sheets, owner and last edit.', 'Breadcrumb Sheets › Folder to go back.']],
+          ['Good', ['<span class="pro">Room to grow</span>: search, owners, recent edits.', 'The same page works on a phone.', 'The sidebar stays short.']],
+          ['Watch out', ['<span class="con">One extra click</span> to reach Content or Video every time.']]],
+      C: [['How it works', ['Sheets opens the home page (as B).', 'Pinned folders sit under Sheets in the sidebar: Content and Video by default; pin or unpin from a folder\'s menu.', 'On a phone, Sheets is a bottom tab that opens the home page.']],
+          ['Good', ['<span class="pro">One click</span> to the folders you use daily.', 'Home page for everything else.', 'The sidebar stays short.']],
+          ['Watch out', ['<span class="con">Two ways in</span> to the same folder (pin and card), which is normal in Drive and Notion.']]],
+    }[S.opt]
+    $('#notes').innerHTML = N.map(([h, items]) => `<div class="note"><h4>${h}</h4><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('')
+  }
+
+  function openMenu() {
+    const f = FOLDERS[S.folder], t = f.tabs[S.menu]
+    const anchor = frame.querySelector(`[data-tab="${S.menu}"]`)
+    if (!anchor) return
+    const r = anchor.getBoundingClientRect(), fr = frame.getBoundingClientRect()
+    const onlyOne = f.tabs.length === 1
+    const m = document.createElement('div')
+    m.className = 'menu'; m.setAttribute('role', 'menu')
+    m.innerHTML = `<button role="menuitem" data-act="rename" ${t.linked ? 'disabled' : ''}>Rename</button>${t.linked ? '<small>The linked sheet keeps its name.</small>' : ''}
+      <button role="menuitem" data-act="dup">Duplicate${t.linked ? ' as a blank copy' : ''}</button>
+      <button role="menuitem" data-act="left" ${S.menu === 0 || t.linked || f.tabs[S.menu - 1]?.linked ? 'disabled' : ''}>Move left</button>
+      <button role="menuitem" data-act="right" ${S.menu === f.tabs.length - 1 || t.linked ? 'disabled' : ''}>Move right</button><hr>
+      <button role="menuitem" data-act="del" ${t.linked || onlyOne ? 'disabled' : ''}>Delete</button>${t.linked ? '<small>Linked sheets can\'t be deleted.</small>' : onlyOne ? '<small>A folder keeps at least one sheet.</small>' : ''}`
+    m.style.left = `${Math.min(r.left - fr.left, fr.width - 240)}px`
+    m.style.top = `${r.top - fr.top - 8 - 230}px`
+    frame.style.position = 'relative'
+    frame.appendChild(m)
+    m.querySelector('button:not(:disabled)')?.focus()
+  }
+
+  const nextName = f => { let n = 1; while (f.tabs.some(t => t.name.toLowerCase() === `sheet ${n}`)) n++; return `Sheet ${n}` }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button, td')
+    if (!b) { if (S.menu !== null) { S.menu = null; render() } return }
+    if (b.dataset.opt) { S.opt = b.dataset.opt; S.screen = S.opt === 'A' ? 'wb' : 'home'; S.menu = null; S.sel = null; render(); return }
+    if (b.dataset.dev) { S.dev = b.dataset.dev; S.menu = null; render(); return }
+    if (!frame.contains(b)) return
+    if (b.dataset.nav) { S.screen = b.dataset.nav === 'board' ? 'board' : b.dataset.nav === 'sheets' ? (S.opt === 'A' ? 'wb' : 'home') : S.screen; S.menu = null; render(); return }
+    if (b.dataset.folder) { S.folder = b.dataset.folder; S.tab = 0; S.screen = 'wb'; S.sel = null; S.menu = null; render(); return }
+    if (b.dataset.newfolder !== undefined) {
+      let n = 1; while (FOLDERS[`new${n}`]) n++
+      FOLDERS[`new${n}`] = { name: `New folder ${n}`, color: '#2563EB', who: 'Team folder · you', edited: 'Just now', tabs: [{ name: 'Sheet 1' }] }
+      ORDER.push(`new${n}`); S.folder = `new${n}`; S.tab = 0; S.screen = 'wb'; S.sel = null; render(); return
+    }
+    if (b.dataset.tabmenu !== undefined || (e.button === 0 && e.target.classList.contains('caret'))) { S.tab = Number(e.target.dataset.tabmenu ?? S.tab); S.menu = S.tab; render(); return }
+    if (b.dataset.tab !== undefined) { S.tab = Number(b.dataset.tab); S.sel = null; S.menu = null; render(); return }
+    if (b.dataset.plus !== undefined) { const f = FOLDERS[S.folder]; f.tabs.push({ name: nextName(f) }); S.tab = f.tabs.length - 1; S.sel = null; render(); return }
+    if (b.dataset.all !== undefined) { S.menu = null; alertList(); return }
+    if (b.dataset.act) {
+      const f = FOLDERS[S.folder], i = S.menu, t = f.tabs[i]
+      if (b.dataset.act === 'dup') { let name = `Copy of ${t.name}`, k = 2; while (f.tabs.some(x => x.name === name)) name = `Copy of ${t.name} ${k++}`; f.tabs.splice(i + 1, 0, { name }); S.tab = i + 1 }
+      if (b.dataset.act === 'del') { f.tabs.splice(i, 1); S.tab = Math.max(0, i - 1) }
+      if (b.dataset.act === 'left') { [f.tabs[i - 1], f.tabs[i]] = [f.tabs[i], f.tabs[i - 1]]; S.tab = i - 1 }
+      if (b.dataset.act === 'right') { [f.tabs[i + 1], f.tabs[i]] = [f.tabs[i], f.tabs[i + 1]]; S.tab = i + 1 }
+      if (b.dataset.act === 'rename') { const tabEl = frame.querySelector(`[data-tab="${i}"]`); S.menu = null; render(); renameInline(i); return }
+      S.menu = null; render(); return
+    }
+  })
+  document.addEventListener('contextmenu', e => {
+    const tb = e.target.closest('[data-tab]')
+    if (!tb || !frame.contains(tb)) return
+    e.preventDefault(); S.tab = Number(tb.dataset.tab); S.menu = S.tab; render()
+  })
+  document.addEventListener('dblclick', e => {
+    const tb = e.target.closest('[data-tab]')
+    if (tb && frame.contains(tb) && !FOLDERS[S.folder].tabs[Number(tb.dataset.tab)].linked) renameInline(Number(tb.dataset.tab))
+  })
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.menu !== null) { S.menu = null; render() } })
+
+  function renameInline(i) {
+    const tb = frame.querySelector(`[data-tab="${i}"]`)
+    if (!tb) return
+    const f = FOLDERS[S.folder]
+    const input = document.createElement('input')
+    input.value = f.tabs[i].name; input.setAttribute('aria-label', 'Sheet name'); input.id = 'rename-tab'
+    input.style.cssText = 'width:120px;font:600 13px var(--f-body);border:1px solid var(--purple);border-radius:6px;padding:4px 6px;background:var(--panel);color:var(--ink)'
+    tb.replaceChildren(input); input.focus(); input.select()
+    const done = ok => { const v = input.value.trim(); if (ok && v && !f.tabs.some((t, j) => j !== i && t.name.toLowerCase() === v.toLowerCase())) f.tabs[i].name = v.slice(0, 50); render() }
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); e.stopPropagation() })
+    input.addEventListener('blur', () => done(true))
+  }
+
+  function alertList() {
+    const f = FOLDERS[S.folder]
+    const all = frame.querySelector('[data-all]'), fr = frame.getBoundingClientRect(), r = all.getBoundingClientRect()
+    const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu')
+    m.innerHTML = f.tabs.map((t, i) => `<button role="menuitem" data-tab="${i}">${i === S.tab ? '✓ ' : ''}${t.name}</button>`).join('')
+    m.style.left = `${r.left - fr.left}px`; m.style.top = `${r.top - fr.top - 12 - f.tabs.length * 37}px`
+    frame.style.position = 'relative'; frame.appendChild(m)
+  }
+
+  // drag to select in the grid: highlights change in place, nothing is re-drawn
+  let dragging = false
+  function paintSel() {
+    const lo = (a, b) => Math.min(a, b), hi = (a, b) => Math.max(a, b)
+    frame.querySelectorAll('td[data-r]').forEach(td => {
+      const r = +td.dataset.r, c = +td.dataset.c, q = S.sel
+      const inside = q && r >= lo(q.r0, q.r1) && r <= hi(q.r0, q.r1) && c >= lo(q.c0, q.c1) && c <= hi(q.c0, q.c1)
+      td.className = q && r === q.r0 && c === q.c0 ? 'act' : inside ? 'sel' : ''
+    })
+    const n = S.sel ? (Math.abs(S.sel.r1 - S.sel.r0) + 1) * (Math.abs(S.sel.c1 - S.sel.c0) + 1) : 0
+    const lbl = frame.querySelector('.tools .lbl')
+    if (lbl && n > 1) lbl.textContent = `${n} cells selected · Ctrl+C to copy`
+  }
+  frame.addEventListener('mousedown', e => {
+    const td = e.target.closest('td[data-r]'); if (!td) return
+    e.preventDefault()
+    dragging = true; const r = +td.dataset.r, c = +td.dataset.c
+    S.sel = e.shiftKey && S.sel ? { ...S.sel, r1: r, c1: c } : { r0: r, c0: c, r1: r, c1: c }; paintSel()
+  })
+  frame.addEventListener('mouseover', e => {
+    if (!dragging) return
+    const td = e.target.closest('td[data-r]'); if (!td) return
+    S.sel = { ...S.sel, r1: +td.dataset.r, c1: +td.dataset.c }; paintSel()
+  })
+  document.addEventListener('mouseup', () => { dragging = false })
+
+  render()
+})()
+</script>
