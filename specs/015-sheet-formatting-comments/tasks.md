@@ -141,7 +141,7 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
 
 - [X] T036 Run `npm run lab:spreadsheet`, `npm run lab:sheet`, `npm run lab:notify`, the typecheck and `npx next build`; fix any regressions.
 - [X] T037 Running-app checks on `next build` + `next start` with Playwright (`scripts/spreadsheet-lab/realapp/run.cjs` and `perf-axe.cjs`): quickstart rows 1–14, including 10,000-cell format under 1 s (SC-002), the mention notification within 1 minute (SC-004), axe with no serious or critical issues in EN and AR (SC-006). Record results in `specs/015-sheet-formatting-comments/validation.md`.
-- [ ] T038 Update `HANDOVER.md` (a "Sheet formatting and comments" section: tables, keys, actions, notification kinds) and write `specs/015-sheet-formatting-comments/constitution-check.md`; open the stage 1 PR and ask before merging.
+- [X] T038 Update `HANDOVER.md` (a "Sheet formatting and comments" section: tables, keys, actions, notification kinds) and write `specs/015-sheet-formatting-comments/constitution-check.md`; open the stage 1 PR and ask before merging.
 
 ---
 
