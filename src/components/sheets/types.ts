@@ -26,6 +26,6 @@ export interface SheetsApi {
   hideSheets(ids: string[], hidden: boolean): Promise<Ok>
   reorderSheets(folderId: string, ids: string[]): Promise<Ok>
   // ── spec 015 ──
-  loadLinkedSheetExtras(sheetId: string): Promise<Ok<{ extras: SheetExtras }>>
+  loadLinkedSheetExtras(sheetId: string): Promise<Ok<{ extras: SheetExtras; sheetId: string }>>
   applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[] }): Promise<Ok<{ updatedAt: string }>>
 }

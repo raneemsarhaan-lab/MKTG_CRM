@@ -27,7 +27,7 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
 
 **Purpose**: The design gate and the lab skeleton.
 
-- [ ] T001 Write `design/sheet-formatting.html` (constitution §IV), publish it as an artifact and get the user's approval **before any UI task**. It shows, with `SHEETS_UI` / `--sh-*` tokens:
+- [X] T001 Write `design/sheet-formatting.html` (constitution §IV), publish it as an artifact and get the user's approval **before any UI task**. It shows, with `SHEETS_UI` / `--sh-*` tokens:
   - the format toolbar in Excel's Home-tab order (contracts/ui.md §1), with the stage 2 and 3 controls drawn but marked as later;
   - the colour picker (theme × tints, standard, recent, More colours) and the border picker (13 presets, line style, colour);
   - Format Cells with its five tabs (Number, Alignment, Font, Border, Fill) and the live preview;

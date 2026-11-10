@@ -26,6 +26,10 @@ import { TabBar } from './TabBar'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
 import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
+import { FORMAT_STATE, type FormatSource, type FormatState } from './format/bus'
+import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
+import { FormatCellsDialog } from './format/FormatCellsDialog'
+import { FormatSheet } from './format/FormatSheet'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -182,6 +186,27 @@ export function Workbook(p: WorkbookProps) {
     return () => document.removeEventListener(HISTORY_EVENT, on)
   }, [])
   const linkedUndo = (dir: 'undo' | 'redo') => document.dispatchEvent(new CustomEvent(UNDO_EVENT, { detail: dir }))
+
+  // ── spec 015: the format toolbar ────────────────────────────────────────
+  const [fmt, setFmt] = useState<Partial<Record<FormatSource, FormatState>>>({})
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<FormatState | { source: FormatSource; gone: true }>).detail
+      setFmt(f => { const n = { ...f }; if ('gone' in d) delete n[d.source]; else n[d.source] = d; return n })
+    }
+    document.addEventListener(FORMAT_STATE, on)
+    return () => document.removeEventListener(FORMAT_STATE, on)
+  }, [])
+  const [formatCells, setFormatCells] = useState(false)
+  const [phoneFormat, setPhoneFormat] = useState(false)
+  const [phone, setPhone] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const on = () => setPhone(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
 
   // ── toolbar state ───────────────────────────────────────────────────────
   const [sel, setSel] = useState<{ cell: string; count: number } | null>(null)
@@ -406,6 +431,12 @@ export function Workbook(p: WorkbookProps) {
   // Ctrl+Page Up/Down switches sheets; Shift+F11 adds one (FR-054).
   function onKeyDownCapture(e: React.KeyboardEvent) {
     const ctrl = e.ctrlKey || e.metaKey
+    // Spec 015: Ctrl+B, I, U, 5, Ctrl+Shift+$ % # !, Ctrl+1, Ctrl+Alt+M on the grid (not while typing in a cell).
+    const el = e.target as HTMLElement
+    if (ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select, [contenteditable="true"]')) {
+      const target: FormatSource = open?.kind === 'blank' ? 'blank' : 'linked'
+      if (formatShortcut(e, target, fmt[target] ?? null, () => setFormatCells(true))) { e.preventDefault(); e.stopPropagation(); return }
+    }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
       e.preventDefault(); e.stopPropagation()
       const i = visible.findIndex(s => s.id === openRef.current)
@@ -451,6 +482,8 @@ export function Workbook(p: WorkbookProps) {
   }
 
   // ── render ──────────────────────────────────────────────────────────────
+  const fmtTarget: FormatSource = openBlank ? 'blank' : 'linked'
+  const fmtState = fmt[fmtTarget] ?? null
   const doc = open && openBlank ? docs[open.id] : undefined
   const stack = stacks[openId]
   const readOnly = open?.protectedBy && open.protectedBy !== p.me.id && !p.me.admin
@@ -488,7 +521,11 @@ export function Workbook(p: WorkbookProps) {
         </span>
         {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
         {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
+        {phone && fmtState && (
+          <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
+        )}
       </div>
+      {!phone && fmtState && <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)} />}
 
       <div className="fx-sh-panel" id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
         {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane="">{p.linked}</div>}
@@ -516,6 +553,9 @@ export function Workbook(p: WorkbookProps) {
         onRename={onRename}
         onDrop={(id, before, copy) => void onDrop(id, before, copy)}
       />
+
+      {formatCells && fmtState && <FormatCellsDialog state={fmtState} target={fmtTarget} onClose={() => setFormatCells(false)} />}
+      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} />}
 
       {tabMenu && <PopMenu at={tabMenu.at} items={tabMenu.items} label={tabMenu.label} returnTo={tabMenu.anchor} attr={tabMenu.attr} onClose={() => setTabMenu(null)} />}
 

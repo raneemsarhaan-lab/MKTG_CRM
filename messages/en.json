@@ -1467,7 +1467,8 @@
         "preview": "Preview",
         "numNote": "Number formats change only how the value looks. Editing and copying use the value you typed.",
         "ok": "OK",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "date": "Date"
       },
       "phone": {
         "open": "Format",

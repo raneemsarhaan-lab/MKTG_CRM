@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CellWrite, GridCol, WriteResult, WriteWhy } from './GridCore'
-import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type LinkedChange, type Stack } from '@/lib/sheet-undo'
+import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type FormatsChange, type LinkedChange, type Stack } from '@/lib/sheet-undo'
 
 const POOL = 4
 
@@ -32,6 +32,8 @@ export interface LinkedEditingInput<R extends { key: string }> {
   /** Drop (Video) or archive (Content) a task, and bring it back: true when it worked. */
   drop?(taskId: string): Promise<boolean>
   restore?(taskId: string): Promise<boolean>
+  /** Spec 015: put format records to these looks (undo and redo of formatting); false when not saved. */
+  applyFormats?(items: FormatsChange['items']): Promise<boolean>
 }
 
 /**
@@ -121,6 +123,8 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
       if (change.kind === 'taskCells') {
         const res = await save(change.cells.map(c => ({ rowKey: c.taskId, col: c.field, before: c.before, after: c.after })), true)
         for (const [k, n] of Object.entries(res.skipped)) skipped[k] = (skipped[k] ?? 0) + (n ?? 0)
+      } else if (change.kind === 'formats') {
+        if (ref.current.applyFormats && !(await ref.current.applyFormats(change.items))) skipped.invalid = (skipped.invalid ?? 0) + change.items.length
       } else if (change.kind === 'dropRows' || change.kind === 'restoreRows') {
         const fn = change.kind === 'dropRows' ? ref.current.drop : ref.current.restore
         if (!fn) continue
@@ -158,9 +162,17 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
     }
   }, [apply])
 
+  /** Spec 015: a formatting change already applied and saved, remembered as one undo step. */
+  const recordFormats = useCallback((label: string, items: FormatsChange['items']) => {
+    if (!items.length) return
+    stack.current = push(stack.current, makeStep(label, [{ kind: 'formats', items }]))
+    setTick(t => t + 1)
+  }, [])
+
   return {
     onCommit,
     writeCells,
+    recordFormats,
     onUndo: useCallback(() => { void apply('undo') }, [apply]),
     onRedo: useCallback(() => { void apply('redo') }, [apply]),
     dropRows,

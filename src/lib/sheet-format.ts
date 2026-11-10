@@ -95,8 +95,9 @@ export function validateStyle(input: unknown): CellStyle | null {
   const s: CellStyle = {}
   const font = knownFont(typeof input.font === 'string' ? input.font : null); if (font) s.font = font
   const size = int(input.size, 6, 72); if (size !== undefined) s.size = size
-  for (const k of ['b', 'i', 's', 'wrap'] as const) if (input[k] === true) s[k] = true
-  if (input.u === 'single' || input.u === 'double') s.u = input.u
+  // false is kept: it turns Bold (etc.) off over a row, column or sheet that sets it.
+  for (const k of ['b', 'i', 's', 'wrap'] as const) if (typeof input[k] === 'boolean') s[k] = input[k] as boolean
+  if (input.u === 'single' || input.u === 'double' || input.u === 'none') s.u = input.u
   for (const k of ['color', 'fill'] as const) { const c = input[k]; if (typeof c === 'string' && HEX.test(c)) s[k] = c.toUpperCase() }
   for (const k of ['bt', 'br', 'bb', 'bl'] as const) { const b = border(input[k]); if (b) s[k] = b }
   if (oneOf(HA, input.ha) && input.ha !== 'general') s.ha = input.ha
@@ -111,14 +112,15 @@ export function validateStyle(input: unknown): CellStyle | null {
 // ─── layers ─────────────────────────────────────────────────────────────────
 
 /**
- * Lay `patch` over `base`. A field set to null in the patch is removed (the
- * toolbar's "turn Bold off", "No fill", "No border"); undefined leaves it.
+ * Lay `patch` over `base`. A field set to null in the patch is removed ("No
+ * fill", "No border"); undefined leaves it; false is kept (Bold off over a
+ * bold row — planFormat drops it again when nothing below needs it).
  */
 export function mergeStyle(base: CellStyle | null | undefined, patch: Partial<Record<keyof CellStyle, unknown>> | null | undefined): CellStyle {
   const out: Record<string, unknown> = { ...(base ?? {}) }
   for (const [k, v] of Object.entries(patch ?? {})) {
     if (v === undefined) continue
-    if (v === null || v === false) delete out[k]
+    if (v === null) delete out[k]
     else out[k] = v
   }
   return out as CellStyle
@@ -136,6 +138,7 @@ export function diffStyle(a: CellStyle | null | undefined, b: CellStyle | null |
 
 const SEP = '\u0001'
 export const formatKey = (rowKey: string, colKey: string) => `${rowKey}${SEP}${colKey}`
+export const splitFormatKey = (k: string): [string, string] => { const i = k.indexOf(SEP); return [k.slice(0, i), k.slice(i + 1)] }
 export type FormatIndex = Map<string, CellStyle>
 export function indexFormats(records: SheetFormatRecord[]): FormatIndex {
   return new Map(records.map(r => [formatKey(r.rowKey, r.colKey), r.style]))
@@ -147,6 +150,71 @@ export function resolveStyle(index: FormatIndex, rowKey: string, colKey: string)
   let out: CellStyle | null = null
   for (const l of layers) if (l) out = { ...(out ?? {}), ...l }
   return out
+}
+
+export type StylePatch = Partial<Record<keyof CellStyle, unknown>>
+export interface FormatItem { rowKey: string; colKey: string; before: CellStyle | null; after: CellStyle | null }
+const LOWER = (r: string, c: string): [string, string][] =>
+  r && c ? [['', ''], ['', c], [r, '']] : r || c ? [['', '']] : []
+
+/**
+ * What a toolbar action changes (research R1): the patch laid over each
+ * target record, and over `alsoKeys` (more specific records inside a whole
+ * row, column or sheet, so the new look isn't hidden under them). A `false`
+ * that no lower layer needs to override is dropped, so turning Bold off on a
+ * plain sheet leaves no record behind. Unchanged records drop out.
+ */
+export function planFormat(index: FormatIndex, targets: [string, string][], patch: StylePatch, alsoKeys: [string, string][] = []): FormatItem[] {
+  const seen = new Set<string>()
+  const out: FormatItem[] = []
+  for (const [r, c] of [...targets, ...alsoKeys]) {
+    const k = formatKey(r, c)
+    if (seen.has(k)) continue
+    seen.add(k)
+    const before = index.get(k) ?? null
+    const merged = mergeStyle(before, patch) as Record<string, unknown>
+    for (const f of ['b', 'i', 's', 'wrap'] as const) {
+      if (merged[f] !== false) continue
+      const lowerOn = LOWER(r, c).some(([lr, lc]) => (index.get(formatKey(lr, lc)) as Record<string, unknown> | undefined)?.[f] === true)
+      if (!lowerOn) delete merged[f]
+    }
+    if (merged.u === 'none' && !LOWER(r, c).some(([lr, lc]) => { const u = index.get(formatKey(lr, lc))?.u; return u === 'single' || u === 'double' })) delete merged.u
+    const after = validateStyle(merged)
+    if (styleKey(before) === styleKey(after)) continue
+    out.push({ rowKey: r, colKey: c, before, after })
+  }
+  return out
+}
+
+export type BorderPreset = 'bottom' | 'top' | 'left' | 'right' | 'none' | 'all' | 'outside' | 'thickOut' | 'dblBottom' | 'thickBottom' | 'topBottom' | 'topThick' | 'inside'
+export const BORDER_PRESETS: BorderPreset[] = ['bottom', 'top', 'left', 'right', 'none', 'all', 'outside', 'thickOut', 'dblBottom', 'thickBottom', 'topBottom', 'topThick', 'inside']
+
+/**
+ * Excel's border presets over a block (FR-011): the sides each cell gets, as
+ * a patch. Neighbouring cells don't both draw a shared edge: "all" and
+ * "inside" give each cell its bottom and end sides, plus the block's top and
+ * start edges.
+ */
+export function bordersFor(preset: BorderPreset, rect: { r0: number; c0: number; r1: number; c1: number }, line: BorderSide, r: number, c: number): StylePatch | null {
+  const T = r === rect.r0, B = r === rect.r1, S = c === rect.c0, E = c === rect.c1
+  const thick: BorderSide = { w: 'thick', c: line.c }, dbl: BorderSide = { w: 'double', c: line.c }
+  const p: StylePatch = {}
+  switch (preset) {
+    case 'bottom': if (B) p.bb = line; break
+    case 'top': if (T) p.bt = line; break
+    case 'left': if (S) p.bl = line; break
+    case 'right': if (E) p.br = line; break
+    case 'none': p.bt = null; p.bb = null; p.bl = null; p.br = null; break
+    case 'all': p.bb = line; p.br = line; if (T) p.bt = line; if (S) p.bl = line; break
+    case 'inside': if (!B) p.bb = line; if (!E) p.br = line; break
+    case 'outside': if (T) p.bt = line; if (B) p.bb = line; if (S) p.bl = line; if (E) p.br = line; break
+    case 'thickOut': if (T) p.bt = thick; if (B) p.bb = thick; if (S) p.bl = thick; if (E) p.br = thick; break
+    case 'dblBottom': if (B) p.bb = dbl; break
+    case 'thickBottom': if (B) p.bb = thick; break
+    case 'topBottom': if (T) p.bt = line; if (B) p.bb = line; break
+    case 'topThick': if (T) p.bt = line; if (B) p.bb = thick; break
+  }
+  return Object.keys(p).length ? p : null
 }
 
 /** A stable key for a style: equal looks share one key, and one CSS object. */
@@ -187,10 +255,11 @@ export function toCss(s: CellStyle | null | undefined): CellCss {
   if (s) {
     if (s.font) cell.fontFamily = (FONTS.find(f => f.name === s.font) ?? FONTS[0]).stack
     if (s.size) cell.fontSize = `${s.size}pt`
-    if (s.b) cell.fontWeight = 700
-    if (s.i) cell.fontStyle = 'italic'
-    const deco = [s.u ? 'underline' : '', s.s ? 'line-through' : ''].filter(Boolean).join(' ')
+    if (s.b !== undefined) cell.fontWeight = s.b ? 700 : 400
+    if (s.i !== undefined) cell.fontStyle = s.i ? 'italic' : 'normal'
+    const deco = [s.u && s.u !== 'none' ? 'underline' : '', s.s ? 'line-through' : ''].filter(Boolean).join(' ')
     if (deco) cell.textDecorationLine = deco
+    else if (s.u === 'none' || s.s === false) cell.textDecorationLine = 'none'
     if (s.u === 'double') cell.textDecorationStyle = 'double'
     if (s.fill) cell.backgroundColor = s.fill
     if (s.color) cell.color = s.color
@@ -201,6 +270,7 @@ export function toCss(s: CellStyle | null | undefined): CellCss {
     }
     if (s.va) cell.alignItems = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[s.va]
     if (s.wrap) { cell.whiteSpace = 'pre-wrap'; cell.overflowWrap = 'anywhere' }
+    else if (s.wrap === false) cell.whiteSpace = 'nowrap'
     if (s.indent) cell.paddingInlineStart = `${8 + s.indent * 12}px`
     if (s.rot === 'vertical') { text.writingMode = 'vertical-rl'; text.textOrientation = 'upright' }
     else if (typeof s.rot === 'number' && s.rot) { text.display = 'inline-block'; text.transform = `rotate(${-s.rot}deg)` }
@@ -336,6 +406,10 @@ export function numFromExcel(code: string | null | undefined): NumberFormat | un
   const c = code.replace(/\\/g, '').replace(/"/g, '').trim()
   const dp = (c.match(/0\.(0+)/)?.[1].length) ?? 0
   if (/^@$/.test(c)) return { kind: 'text' }
+  if (/^short date$/i.test(c)) return { kind: 'date' }
+  if (/^long date$/i.test(c)) return { kind: 'date', long: true }
+  if (/^(short|long|medium) time$/i.test(c)) return { kind: 'time' }
+  if (/^general$/i.test(c)) return undefined
   if (/%/.test(c)) return { kind: 'percent', dp }
   if (/E\+/i.test(c)) return { kind: 'scientific', dp }
   const cur = CURRENCIES.find(x => c.includes(x)) ?? (c.includes('$') ? 'USD' : c.includes('€') ? 'EUR' : c.includes('£') ? 'GBP' : undefined)
@@ -344,4 +418,176 @@ export function numFromExcel(code: string | null | undefined): NumberFormat | un
   if (/h{1,2}:mm/i.test(c)) return { kind: 'time' }
   if (/#,##0|0/.test(c)) return { kind: 'number', dp, sep: c.includes(',') }
   return undefined
+}
+
+// ─── the clipboard (research R6, SC-003) ────────────────────────────────────
+
+const NAMED: Record<string, string> = { black: '#000000', white: '#FFFFFF', red: '#FF0000', green: '#008000', blue: '#0000FF', yellow: '#FFFF00', windowtext: '#000000', gray: '#808080', grey: '#808080', silver: '#C0C0C0', purple: '#800080', orange: '#FFA500', navy: '#000080', maroon: '#800000', teal: '#008080' }
+/** A CSS colour as '#RRGGBB', or null (transparent, gradients, pictures). */
+export function cssColor(v: string | undefined | null): string | null {
+  if (!v) return null
+  const t = v.trim().toLowerCase()
+  if (/url\(|gradient|transparent|inherit|initial|^auto$|^none$/.test(t)) return null
+  let m = /^#([0-9a-f]{6})$/.exec(t)
+  if (m) return `#${m[1].toUpperCase()}`
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(t)
+  if (m) return `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`.toUpperCase()
+  m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+))?\s*\)$/.exec(t)
+  if (m) { if (m[4] !== undefined && Number(m[4]) === 0) return null; return '#' + [m[1], m[2], m[3]].map(x => Math.min(255, +x).toString(16).padStart(2, '0')).join('').toUpperCase() }
+  return NAMED[t] ?? null
+}
+const toPx = (v: string) => { const m = /([\d.]+)\s*(pt|px)?/.exec(v); if (!m) return 0; return m[2] === 'pt' ? +m[1] * 4 / 3 : +m[1] }
+function cssBorder(v: string | undefined): BorderSide | null | undefined {
+  if (v === undefined) return undefined
+  const t = v.trim().toLowerCase()
+  if (!t || t === 'none' || /^0(px|pt)?\b/.test(t) || t.includes('hidden')) return null
+  const style = /double/.test(t) ? 'double' : /dashed/.test(t) ? 'dashed' : /dotted/.test(t) ? 'dotted' : 'solid'
+  const px = toPx(t)
+  const c = cssColor(t.replace(/^[\d.]+(pt|px)?\s*/, '').replace(/\b(solid|double|dashed|dotted)\b/, '').trim()) ?? '#000000'
+  const w = style === 'solid' ? (px >= 2.5 ? 'thick' : px >= 1.5 ? 'medium' : 'thin') : style
+  return { w: w as BorderSide['w'], c }
+}
+/** Declarations from a style attribute or a rule body. */
+export function parseCssDecls(text: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const part of text.split(';')) {
+    const i = part.indexOf(':')
+    if (i < 0) continue
+    const k = part.slice(0, i).trim().toLowerCase(), v = part.slice(i + 1).trim()
+    if (k) out[k] = v
+  }
+  return out
+}
+/** Class rules from Excel's <style> block (`.xl65 { … }`). Element rules (`td { … }`) are Excel's defaults and are left out. */
+export function parseCssClasses(css: string): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {}
+  const clean = css.replace(/<!--|-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+  const re = /\.([A-Za-z0-9_-]+)\s*\{([^}]*)\}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(clean))) out[m[1]] = { ...(out[m[1]] ?? {}), ...parseCssDecls(m[2]) }
+  return out
+}
+/** A pasted cell's CSS as a CellStyle; what Momentum can't show is dropped. */
+export function styleFromCss(d: Record<string, string>): CellStyle | null {
+  const s: Record<string, unknown> = {}
+  const fw = d['font-weight']; if (fw) s.b = fw === 'bold' || fw === 'bolder' || +fw >= 600
+  const fs = d['font-style']; if (fs) s.i = fs === 'italic' || fs === 'oblique'
+  const td = `${d['text-decoration'] ?? ''} ${d['text-decoration-line'] ?? ''}`
+  if (/underline/.test(td)) s.u = /double/.test(`${d['text-underline-style'] ?? ''} ${d['text-decoration-style'] ?? ''}`) ? 'double' : 'single'
+  if (/line-through/.test(td)) s.s = true
+  const color = cssColor(d.color); if (color && color !== '#000000') s.color = color
+  const fill = cssColor(d['background-color'] ?? d.background); if (fill && fill !== '#FFFFFF') s.fill = fill
+  const ta = d['text-align']; if (ta === 'left' || ta === 'center' || ta === 'right' || ta === 'justify') s.ha = ta
+  const va = d['vertical-align']; if (va === 'top' || va === 'bottom') s.va = va; else if (va === 'middle' || va === 'center') s.va = 'middle'
+  if (/normal|pre-wrap|break-spaces/.test(d['white-space'] ?? '') || /break-word|anywhere/.test(d['overflow-wrap'] ?? d['word-wrap'] ?? '')) s.wrap = true
+  const ff = d['font-family']; if (ff) { const f = knownFont(ff.split(',')[0]); if (f) s.font = f }
+  const size = d['font-size']; if (size) { const px = toPx(size); if (px) s.size = Math.round(/pt/.test(size) ? parseFloat(size) : px * 0.75) }
+  const all = cssBorder(d.border)
+  const side = (k: string) => { const v = cssBorder(d[`border-${k}`]); return v === undefined ? all : v }
+  for (const [k, css] of [['bt', 'top'], ['br', 'right'], ['bb', 'bottom'], ['bl', 'left']] as const) { const b = side(css); if (b) s[k] = b }
+  const num = numFromExcel(d['mso-number-format']); if (num && num.kind !== 'general') s.num = num
+  const st = validateStyle(s)
+  if (!st) return null
+  // A plain "Calibri 11" from Excel is its default, not a choice.
+  if (st.font === 'Calibri' && (st.size === 11 || !st.size)) { delete st.font; if (st.size === 11) delete st.size }
+  return Object.keys(st).length ? st : null
+}
+/** A style as inline CSS that Excel and Google Sheets read on paste. */
+export function cssForClipboard(s: CellStyle | null | undefined): string {
+  if (!s) return ''
+  const o: string[] = []
+  if (s.font) o.push(`font-family:${(FONTS.find(f => f.name === s.font) ?? FONTS[0]).stack.replace(/"/g, "'")}`)
+  if (s.size) o.push(`font-size:${s.size}pt`)
+  if (s.b) o.push('font-weight:bold')
+  if (s.i) o.push('font-style:italic')
+  const deco = [s.u && s.u !== 'none' ? 'underline' : '', s.s ? 'line-through' : ''].filter(Boolean).join(' ')
+  if (deco) o.push(`text-decoration:${deco}`)
+  if (s.color) o.push(`color:${s.color}`)
+  if (s.fill) o.push(`background-color:${s.fill}`)
+  if (s.ha) o.push(`text-align:${s.ha}`)
+  if (s.va) o.push(`vertical-align:${s.va === 'middle' ? 'middle' : s.va}`)
+  if (s.wrap) o.push('white-space:normal')
+  const W = { thin: '1px solid', medium: '2px solid', thick: '3px solid', dashed: '1px dashed', dotted: '1px dotted', double: '3px double' } as const
+  for (const [k, css] of [['bt', 'top'], ['br', 'right'], ['bb', 'bottom'], ['bl', 'left']] as const) { const b = s[k]; if (b) o.push(`border-${css}:${W[b.w]} ${b.c}`) }
+  return o.join(';')
+}
+
+/** Excel's day serial (1900 system) as an ISO date. */
+export function excelSerialDate(serial: number): string | null {
+  if (!Number.isFinite(serial) || serial < 1 || serial > 2958465) return null
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000)
+  return d.toISOString().slice(0, 10)
+}
+
+// ─── a selection → format records (research R1) ─────────────────────────────
+
+export interface FmtRect { r0: number; c0: number; r1: number; c1: number }
+export const MAX_FORMAT_ITEMS = 20_000
+
+/**
+ * The records a toolbar action writes for a selected block. Whole columns,
+ * whole rows and Ctrl+A become one record each; records inside them that set
+ * the same fields are updated too, and a row's own style crossing a formatted
+ * column gets a cell record, so the new look shows everywhere it was asked
+ * for, as in Excel. `rk` and `ck` give a row's and a column's key (null: a row
+ * that holds no cells, such as a group heading).
+ */
+export function planRect(index: FormatIndex, q: FmtRect, size: { rows: number; cols: number },
+  rk: (r: number) => string | null, ck: (c: number) => string | null, patch: StylePatch): FormatItem[] | null {
+  const fields = Object.keys(patch)
+  const sets = (st: CellStyle | undefined) => !!st && fields.some(f => (st as Record<string, unknown>)[f] !== undefined)
+  const wholeCols = q.r0 === 0 && q.r1 >= size.rows - 1
+  const wholeRows = q.c0 === 0 && q.c1 >= size.cols - 1
+  const recs = [...index.entries()].map(([k, st]) => { const [r, c] = splitFormatKey(k); return { r, c, st } })
+  const targets: [string, string][] = [], also: [string, string][] = []
+  const range = (a: number, b: number, f: (i: number) => string | null) => { const out: string[] = []; for (let i = a; i <= b; i++) { const k = f(i); if (k !== null) out.push(k) } return out }
+  if (wholeCols && wholeRows) {
+    targets.push(['', ''])
+    for (const x of recs) if ((x.r || x.c) && sets(x.st)) also.push([x.r, x.c])
+  } else if (wholeCols) {
+    const cols = range(q.c0, q.c1, ck), set = new Set(cols)
+    for (const c of cols) targets.push(['', c])
+    for (const x of recs) {
+      if (x.r && set.has(x.c) && sets(x.st)) also.push([x.r, x.c])
+      if (x.r && !x.c && sets(x.st)) for (const c of cols) also.push([x.r, c])
+    }
+  } else if (wholeRows) {
+    const rows = range(q.r0, q.r1, rk), set = new Set(rows)
+    for (const r of rows) targets.push([r, ''])
+    for (const x of recs) if (x.c && set.has(x.r) && sets(x.st)) also.push([x.r, x.c])
+  } else {
+    const rows = range(q.r0, q.r1, rk), cols = range(q.c0, q.c1, ck)
+    if (rows.length * cols.length > MAX_FORMAT_ITEMS) return null
+    for (const r of rows) for (const c of cols) targets.push([r, c])
+  }
+  if (targets.length + also.length > MAX_FORMAT_ITEMS) return null
+  return planFormat(index, targets, patch, also)
+}
+
+/** Border presets over a block, cell by cell; a very large block takes "all" or "none" as one record per layer. */
+export function planBorders(index: FormatIndex, q: FmtRect, size: { rows: number; cols: number },
+  rk: (r: number) => string | null, ck: (c: number) => string | null, preset: BorderPreset, line: BorderSide): FormatItem[] | null {
+  const n = (q.r1 - q.r0 + 1) * (q.c1 - q.c0 + 1)
+  if (n > MAX_FORMAT_ITEMS) {
+    if (preset === 'none') return planRect(index, q, size, rk, ck, { bt: null, bb: null, bl: null, br: null })
+    if (preset === 'all' || preset === 'inside') return planRect(index, q, size, rk, ck, { bb: line, br: line })
+    return null
+  }
+  const out: FormatItem[] = []
+  let idx = index
+  for (let r = q.r0; r <= q.r1; r++) {
+    const rowKey = rk(r)
+    if (rowKey === null) continue
+    for (let c = q.c0; c <= q.c1; c++) {
+      const colKey = ck(c)
+      if (colKey === null) continue
+      const p = bordersFor(preset, q, line, r, c)
+      if (!p) continue
+      const items = planFormat(idx, [[rowKey, colKey]], p)
+      out.push(...items)
+      if (items.length && idx === index) idx = new Map(index)
+      for (const it of items) { if (it.after) idx.set(formatKey(it.rowKey, it.colKey), it.after); else idx.delete(formatKey(it.rowKey, it.colKey)) }
+    }
+  }
+  return out
 }

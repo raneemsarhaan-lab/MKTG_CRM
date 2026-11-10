@@ -141,8 +141,9 @@ export async function runPure(lab, root) {
   await check('fmt-validate', () => {
     const v = h.validateStyle({ b: true, i: false, size: 99, font: 'arial', fill: '#ff0000', color: 'red', junk: 1, ha: 'general', va: 'middle',
       bt: { w: 'thick', c: '#000000' }, bb: { w: 'wavy', c: '#000000' }, indent: 40, rot: 200, num: { kind: 'currency', cur: 'XYZ', dp: 20, pattern: '<script>' } })
-    eq(v, { font: 'Arial', size: 72, b: true, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
-    eq(h.validateStyle({ junk: true, b: false, num: { kind: 'general' } }), null, 'nothing left is null (the record is deleted)')
+    eq(v, { font: 'Arial', size: 72, b: true, i: false, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
+    eq(h.validateStyle({ junk: true, num: { kind: 'general' } }), null, 'nothing left is null (the record is deleted)')
+    eq(h.validateStyle({ b: false }), { b: false }, 'an explicit off is kept (it turns a row or column layer off)')
     eq(h.validateStyle('bold'), null, 'not an object')
     eq(h.knownFont('"Times New Roman"'), 'Times New Roman', 'quoted font names')
     eq(h.knownFont('Wingdings'), null, 'a font outside the list falls back')
@@ -201,6 +202,32 @@ export async function runPure(lab, root) {
     eq(h.numFromExcel('"EGP"\\ #,##0.00'), { kind: 'currency', cur: 'EGP', dp: 2 }, 'Excel currency code')
     eq(h.numFromExcel('0.0%'), { kind: 'percent', dp: 1 }, 'Excel percent code')
   })
+  await check('fmt-plan', () => {
+    const idx = h.indexFormats([{ rowKey: 'r1', colKey: '', style: { fill: '#FF0000', b: true } }, { rowKey: 'r2', colKey: 'B', style: { i: true } }])
+    const rk = r => ['r0', 'r1', 'r2', 'r3'][r] ?? null, ck = c => ['A', 'B', 'C'][c] ?? null
+    const size = { rows: 4, cols: 3 }
+    const cells = h.planRect(idx, { r0: 0, c0: 0, r1: 1, c1: 1 }, size, rk, ck, { b: true })
+    eq(cells.map(x => `${x.rowKey}:${x.colKey}`), ['r0:A', 'r0:B', 'r1:A', 'r1:B'], 'a block writes cell records')
+    const col = h.planRect(idx, { r0: 0, c0: 1, r1: 3, c1: 1 }, size, rk, ck, { fill: '#00FF00' })
+    eq(col.map(x => `${x.rowKey}:${x.colKey}`), [':B', 'r1:B'], 'a whole column is one record, plus a cell where a row fill would cover it')
+    const all = h.planRect(idx, { r0: 0, c0: 0, r1: 3, c1: 2 }, size, rk, ck, { i: false })
+    eq(all.map(x => `${x.rowKey}:${x.colKey}:${JSON.stringify(x.after)}`), ['r2:B:null'], 'Ctrl+A: italic off clears the cell that set it; nothing to record for the sheet')
+    const off = h.planRect(idx, { r0: 1, c0: 0, r1: 1, c1: 0 }, size, rk, ck, { b: false })
+    eq(off[0].after, { b: false }, 'Bold off over a bold row keeps an explicit off on the cell')
+    const bd = h.planBorders(h.indexFormats([]), { r0: 0, c0: 0, r1: 1, c1: 1 }, size, rk, ck, 'outside', { w: 'thin', c: '#000000' })
+    eq(bd.map(x => Object.keys(x.after).sort().join('')), ['blbt', 'brbt', 'bbbl', 'bbbr'], 'outside borders on a 2×2 block')
+    eq(h.bordersFor('all', { r0: 0, c0: 0, r1: 1, c1: 1 }, { w: 'thin', c: '#000000' }, 1, 1), { bb: { w: 'thin', c: '#000000' }, br: { w: 'thin', c: '#000000' } }, 'all borders: inner cells draw only bottom and end')
+  })
+  await check('fmt-clip-css', () => {
+    const c = h.parseCssClasses('<!--td {color:black} .xl65 {color:white; font-weight:700; background:#7030A0; border-bottom:2.0pt solid #3B0F5C;} .xl67 {mso-number-format:"\\0022EGP\\0022\\\\ \\#\\,\\#\\#0\\.00";}-->')
+    eq(h.styleFromCss(c.xl65), { b: true, color: '#FFFFFF', fill: '#7030A0', bb: { w: 'thick', c: '#3B0F5C' } }, 'an Excel class rule')
+    eq(h.styleFromCss({ 'font-family': 'Calibri, sans-serif', 'font-size': '11.0pt' }), null, "Excel's default Calibri 11 is no choice")
+    eq(h.styleFromCss({ background: 'url("cid:image001.png")', 'font-family': 'Wingdings' }), null, 'pictures and unknown fonts dropped')
+    eq(h.cssColor('rgb(103, 78, 167)'), '#674EA7', 'rgb colours')
+    ok(h.cssForClipboard({ b: true, fill: '#FFC000', bb: { w: 'double', c: '#000000' }, ha: 'center' }).includes('border-bottom:3px double #000000'), 'copy-out inline CSS')
+    eq(h.excelSerialDate(46342), '2026-11-16', "Excel's date serial")
+    eq(h.numFromExcel('Short Date'), { kind: 'date' }, "Excel's named Short Date")
+  })
   await check('fmt-undo', () => {
     const doc = { id: 's', updatedAt: '', rows: [], cols: [], cells: {} }
     const ch = { kind: 'formats', items: [{ rowKey: 'r1', colKey: '', before: null, after: { b: true } }, { rowKey: '', colKey: 'c1', before: { i: true }, after: null }] }
@@ -245,6 +272,19 @@ export async function runPure(lab, root) {
       const mine = await page.evaluate(() => { const g = [['A', 'two\nlines'], ['<x>', '']]; return SheetPure.parseHtmlTable(SheetPure.serialise(g).html, new DOMParser()).map(r => r.map(c => c.text)) })
       eq(mine, [['A', 'two\nlines'], ['<x>', '']], 'round trip through our own HTML')
       eq(await page.evaluate(() => SheetPure.parseClipboard({ html: '<p>no table</p>', text: 'a\tb' }, new DOMParser()).map(r => r.map(c => c.text))), [['a', 'b']], 'HTML without a table falls back to text')
+      // Spec 015: styles from real Excel and Google Sheets clips (SC-003: at least 95% of styled cells keep their look).
+      const styled = name => page.evaluate(html => SheetPure.parseHtmlTable(html, new DOMParser()).map(r => r.map(c => ({ text: c.text, style: c.style }))), fs.readFileSync(path.join(lab, 'fixtures', name), 'utf8'))
+      const xl2 = await styled('excel-styled.html')
+      eq(xl2[0][0].style, { b: true, color: '#FFFFFF', fill: '#7030A0', bb: { w: 'thick', c: '#3B0F5C' }, ha: 'center', va: 'middle' }, 'Excel header: class rule')
+      eq([xl2[1][1].text, xl2[1][1].style.num], ['12500', { kind: 'currency', dp: 2, cur: 'EGP' }], 'Excel currency keeps the value and the format')
+      eq([xl2[2][1].text, xl2[2][1].style.num], ['2026-11-16', { kind: 'date' }], "Excel date: the serial becomes the date")
+      eq(xl2[2][0].style, { font: 'Times New Roman', size: 14, s: true, wrap: true }, 'font, size, strikethrough, wrap')
+      eq(xl2[2][3].style, null, 'gradients, pictures and unknown fonts are dropped silently')
+      const gs2 = await styled('gsheets-styled.html')
+      eq(gs2[0][0].style, { font: 'Montserrat', b: true, color: '#FFFFFF', fill: '#674EA7', ha: 'center', va: 'bottom' }, 'Google Sheets inline styles')
+      eq([gs2[1][1].text, gs2[1][1].style.num?.kind], ['40', 'percent'], 'Google Sheets number value and format')
+      const expected = [[xl2, 11], [gs2, 6]]
+      for (const [g, n] of expected) { const kept = g.flat().filter(c => c.style).length; ok(kept / n >= 0.95, `styled cells kept: ${kept}/${n}`) }
     } finally { await browser.close() }
   })
   return results

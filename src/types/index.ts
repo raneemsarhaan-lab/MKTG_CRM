@@ -465,7 +465,8 @@ export interface CellStyle {
   b?: boolean
   i?: boolean
   s?: boolean
-  u?: 'single' | 'double'
+  /** 'none' turns a lower layer's underline off. */
+  u?: 'single' | 'double' | 'none'
   /** '#RRGGBB'. */
   color?: string
   fill?: string

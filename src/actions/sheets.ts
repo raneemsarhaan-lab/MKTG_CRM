@@ -670,14 +670,17 @@ export async function setLinkedRowHeights(kind: 'linked_content' | 'linked_video
  * Formatting and comment markers on the Content or Video sheet (spec 015
  * FR-070–FR-075): keyed by task id and column key, so they follow the task.
  */
-export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success: true; extras: SheetExtras } | Fail> {
+/** A linked sheet by id, or by its key ('linked_content', 'linked_video'), as the board's grids know it. */
+const linkedWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKey === 'linked_video' ? { linked_key: idOrKey } : { id: idOrKey })
+
+export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success: true; extras: SheetExtras; sheetId: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
-  const sheet = await prisma.sheet.findUnique({ where: { id: sheetId }, select: { kind: true } })
+  const sheet = await prisma.sheet.findUnique({ where: linkedWhere(sheetId), select: { id: true, kind: true } })
   if (!sheet) return fail('gone')
   if (!isLinkedKind(sheet.kind)) return fail('not_linked')
-  const extras = await loadExtras(sheetId)
-  return { success: true, extras: { ...extras, merges: [] } }
+  const extras = await loadExtras(sheet.id)
+  return { success: true, sheetId: sheet.id, extras: { ...extras, merges: [] } }
 }
 
 /**
@@ -691,12 +694,12 @@ export async function applyLinkedFormats(sheetId: string, changes: { formats?: F
   if (changes.merges) return fail('linked')
   const formats = changes.formats ?? []
   if (formats.length > MAX_FORMATS_PER_CALL) return fail('too_many_formats')
-  const sheet = await prisma.sheet.findUnique({ where: { id: sheetId }, select: { kind: true, folder_id: true } })
+  const sheet = await prisma.sheet.findUnique({ where: linkedWhere(sheetId), select: { id: true, kind: true, folder_id: true } })
   if (!sheet) return fail('gone')
   if (!isLinkedKind(sheet.kind)) return fail('not_linked')
   const now = new Date()
   await prisma.$transaction(async tx => {
-    if (formats.length) await writeFormats(tx, sheetId, m.id, formats)
+    if (formats.length) await writeFormats(tx, sheet.id, m.id, formats)
     await bumpFolder(tx, sheet.folder_id, m.id)
   }, { timeout: 30_000 })
   return { success: true, updatedAt: now.toISOString() }
