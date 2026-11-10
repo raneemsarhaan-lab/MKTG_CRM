@@ -15,7 +15,7 @@
 import type { Prisma } from '@prisma/client'
 import { resolveRecipients, type NotifyEvent, type RFollower } from './recipients'
 import { groupKey, joins, merged } from './group'
-import { mergeSettings, type KindSettings } from './settings'
+import { effective, mergeSettings, type KindSettings } from './settings'
 import type { NotificationMeta } from '@/types/index'
 
 type Tx = Prisma.TransactionClient
@@ -96,6 +96,55 @@ export async function notify(db: Tx, event: NotifyEvent, extra: NotifyExtra = {}
         recipient_id: recipient, kind: event.kind, task_id: task.id, comment_id: commentId, attachment_id: attachmentId,
         stage_id: stageId, actor_ids: event.actorId ? [event.actorId] : [], count: add, group_key: key,
         first_event_at: now, last_event_at: now, meta: meta as unknown as Prisma.InputJsonValue,
+      },
+    })
+    ids.push(row.id)
+  }
+  return ids
+}
+
+/**
+ * Spec 015: notifications for sheet comments. They name a cell, not a task
+ * (`task_id` null); `meta` carries where the cell is, so the bell, the phone
+ * and the email open the sheet there. A reply groups per thread for two
+ * hours, like task replies; each mention stands alone. The actor, unknown
+ * people and anyone who turned the kind off in the app are left out.
+ */
+export async function notifySheet(db: Tx, ev: {
+  kind: 'sheet_mention' | 'sheet_reply'
+  actorId: string
+  recipients: string[]
+  threadId: string
+  meta: NotificationMeta
+}): Promise<string[]> {
+  const members = await db.member.findMany({ select: { id: true } })
+  const known = new Set(members.map(m => m.id))
+  const wanted = [...new Set(ev.recipients)].filter(id => known.has(id) && id !== ev.actorId)
+  if (!wanted.length) return []
+  const settingsOf = await settingsLoader(db, wanted)
+  const recipients = wanted.filter(id => effective(settingsOf(id), ev.kind, 'in_app'))
+  const now = new Date()
+  const key = ev.kind === 'sheet_reply' ? `sheet_reply:${ev.threadId}` : null
+  const ids: string[] = []
+  for (const recipient of recipients) {
+    if (key) {
+      await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`notify:${recipient}:${key}`}))`
+      const open = await db.notification.findFirst({ where: { recipient_id: recipient, group_key: key, read_at: null }, orderBy: { first_event_at: 'desc' } })
+      if (joins(open, now)) {
+        const next = merged(open, ev.actorId, 1)
+        const row = await db.notification.update({
+          where: { id: open.id },
+          data: { actor_ids: next.actor_ids, count: next.count, last_event_at: now, updated_at: now, meta: { ...(open.meta as object), ...ev.meta } as unknown as Prisma.InputJsonValue, pushed_at: null },
+        })
+        ids.push(row.id)
+        continue
+      }
+    }
+    const row = await db.notification.create({
+      data: {
+        recipient_id: recipient, kind: ev.kind, task_id: null, comment_id: null, attachment_id: null, stage_id: null,
+        actor_ids: [ev.actorId], count: 1, group_key: key, first_event_at: now, last_event_at: now,
+        meta: ev.meta as unknown as Prisma.InputJsonValue,
       },
     })
     ids.push(row.id)

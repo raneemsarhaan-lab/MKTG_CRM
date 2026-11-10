@@ -23,9 +23,11 @@ export function WorkbookPage(p: {
   names: Record<string, string>
   linked?: ReactNode
   sheetId?: string | null
+  /** Spec 015: a notification's cell, `rowKey:colKey`. */
+  cell?: string | null
 }) {
   return (
     <Workbook api={sheetsApi} folder={p.folder} folders={p.folders} initialSheets={p.sheets}
-              me={p.me} names={p.names} linked={p.linked} initialSheetId={p.sheetId} />
+              me={p.me} names={p.names} linked={p.linked} initialSheetId={p.sheetId} initialCell={p.cell ?? null} />
   )
 }

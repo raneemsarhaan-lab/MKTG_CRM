@@ -15,12 +15,12 @@ export const dynamic = 'force-dynamic'
  */
 export default async function FolderPage({ params, searchParams }: {
   params: Promise<{ folderId: string }>
-  searchParams: Promise<{ sheet?: string }>
+  searchParams: Promise<{ sheet?: string; cell?: string }>
 }) {
   const member = await getSessionMember()
   if (!member) redirect('/login')
   const { folderId } = await params
-  const { sheet } = await searchParams
+  const { sheet, cell } = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(folderId)) notFound()
 
   const [folders, sheets] = await Promise.all([listFolders(), listSheets(folderId)])
@@ -42,6 +42,7 @@ export default async function FolderPage({ params, searchParams }: {
       me={{ id: member.id, admin: member.access === 'admin' }}
       names={names}
       sheetId={sheet ?? null}
+      cell={cell && cell.length < 200 ? cell : null}
       linked={board && linkedKind ? <KanbanBoard {...board} surface="sheets" sheetsView={linkedKind} /> : undefined}
     />
   )

@@ -144,6 +144,8 @@ export interface GridModel<R extends { key: string }> {
    * `{ width, height }` in px; the cells under it are 'covered'.
    */
   cellSpan?(row: R, col: GridCol): { width: number; height: number } | 'covered' | null
+  /** The cell has open comments: a corner marker; hovering it shows the thread. */
+  marked?(row: R, col: GridCol): boolean
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -991,6 +993,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                       : fx?.text ? <span style={fx.text}>{m.render(row, col, () => cells.current.get(key))}</span>
                       : m.render(row, col, () => cells.current.get(key)))}
                   {fx?.border && !isEditing && <span className="fx-cell-bd" aria-hidden="true" style={fx.border} />}
+                  {!isNo && m.marked?.(row, col) && <b className="fx-cmt-mark" data-comment-marker={key} aria-hidden="true" />}
                   {isNo && m.onRowResize && (
                     <span className="fx-sheet-row-rz" aria-hidden="true" data-row-resize={row.key}
                           onPointerDown={e => startRowResize(row, e)}

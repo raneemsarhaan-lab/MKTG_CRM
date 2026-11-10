@@ -14,7 +14,7 @@ import type { BorderSide, CellStyle, NumberFormat } from '@/types/index'
 import { CURRENCIES } from '@/types/index'
 import { DEFAULT_FONT, DEFAULT_SIZE, FONTS, FONT_SIZES, bumpDecimals, display, type BorderPreset, type StylePatch } from '@/lib/sheet-format'
 import { PopMenu, type PopItem } from '../PopMenu'
-import { sendFormat, type FormatSource, type FormatState, type MergeMode } from './bus'
+import { askComment, sendFormat, type FormatSource, type FormatState, type MergeMode } from './bus'
 import { ColorPicker } from './ColorPicker'
 import { BorderPicker } from './BorderPicker'
 
@@ -72,7 +72,7 @@ export function useFormatActions(target: FormatSource, state: FormatState | null
     decimals: (d: 1 | -1) => patch({ num: bumpDecimals(st.num, d, state?.value ?? '') }, 'number'),
     borders: (preset: BorderPreset, line: BorderSide) => sendFormat(target, { kind: 'borders', preset, line }),
     merge: (mode: MergeMode) => sendFormat(target, { kind: 'merge', mode }),
-    comment: () => sendFormat(target, { kind: 'comment' }),
+    comment: () => askComment(),
   }
 }
 
@@ -201,7 +201,7 @@ export function formatShortcut(e: KeyboardEvent | React.KeyboardEvent, target: F
     if (state.readOnly) return
     sendFormat(target, { kind: 'patch', patch, label })
   }
-  if (e.altKey && (k === 'm' || e.code === 'KeyM')) { sendFormat(target, { kind: 'comment' }); return true }
+  if (e.altKey && (k === 'm' || e.code === 'KeyM' || k === 'µ')) { askComment(); return true }
   if (e.altKey) return false
   if (!e.shiftKey && (k === 'b' || k === 'i')) { send({ [k]: st[k] ? false : true }, k); return true }
   if (!e.shiftKey && k === 'u') { send({ u: st.u && st.u !== 'none' ? 'none' : 'single' }, 'u'); return true }

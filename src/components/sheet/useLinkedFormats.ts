@@ -13,12 +13,12 @@
  *   team's own text columns only; the built-in columns show what they show.
  * - Undo and redo go through the sheet's own stack (useLinkedEditing).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CellStyle, SheetFormatRecord } from '@/types/index'
-import { loadLinkedSheetExtras, applyLinkedFormats } from '@/actions/sheets'
+import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { formatKey, indexFormats, planBorders, planRect, resolveStyle, toCss, type FormatItem } from '@/lib/sheet-format'
-import { useFormatBridge, type FormatCmd, type FormatState } from '@/components/sheets/format/bus'
+import { useCommentBridge, useFormatBridge, type FormatCmd, type FormatState } from '@/components/sheets/format/bus'
 import type { ActiveCell, GridCol, GridRect } from './GridCore'
 
 export interface LinkedFormatsInput<R extends { key: string }> {
@@ -35,12 +35,16 @@ export interface LinkedFormatsInput<R extends { key: string }> {
   textValue(row: R, col: GridCol): string
   recordFormats(label: string, items: FormatItem[]): void
   say(text: string): void
-  /** Spec 015 comments: a new comment on this cell. */
-  onComment?(cell: { rowKey: string; colKey: string; name: string }): void
+  /** Select a task's cell (the comments panel, a notification's link). */
+  select?(taskId: string, col: GridCol): void
 }
 
 export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInput<R>) {
   const t = useTranslations('sheets.format')
+  const api = useContext(LinkedFormatsContext)
+  p = { ...p, enabled: p.enabled && !!api }
+  const apiRef = useRef(api)
+  apiRef.current = api
   const ref = useRef(p)
   ref.current = p
   const [formats, setFormats] = useState<SheetFormatRecord[]>([])
@@ -52,7 +56,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
   useEffect(() => {
     if (!p.enabled) return
     let live = true
-    void loadLinkedSheetExtras(p.sheetKey).then(r => { if (live && r.success) setFormats(r.extras.formats) }).catch(() => {})
+    void apiRef.current?.loadLinkedSheetExtras(p.sheetKey).then(r => { if (live && r.success) setFormats(r.extras.formats) })
     return () => { live = false }
   }, [p.enabled, p.sheetKey])
 
@@ -69,7 +73,9 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       return [...map.values()]
     }
     setFormats(f => apply(f, look))
-    const res = await applyLinkedFormats(ref.current.sheetKey, { formats: items.map(it => ({ rowKey: it.rowKey, colKey: it.colKey, style: it[look], mode: 'set' as const })) }).catch(() => ({ success: false as const, error: 'network' }))
+    const res = apiRef.current
+      ? await apiRef.current.applyLinkedFormats(ref.current.sheetKey, { formats: items.map(it => ({ rowKey: it.rowKey, colKey: it.colKey, style: it[look], mode: 'set' as const })) })
+      : { success: false as const, error: 'generic' }
     if (!res.success) {
       setFormats(f => apply(f, look === 'after' ? 'before' : 'after'))
       ref.current.say(t('err.generic'))
@@ -85,11 +91,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
   const run = (cmd: FormatCmd) => {
     const q = rect.current
     if (cmd.kind === 'merge') { p.say(t('merge.why')); return }
-    if (cmd.kind === 'comment') {
-      const row = p.rows[q.r0], col = p.cols[q.c0], task = row ? p.taskOf(row) : null
-      if (row && col && task) p.onComment?.({ rowKey: task, colKey: col, name: p.cellName(row, col) })
-      return
-    }
+    if (cmd.kind === 'comment') return
     const items = cmd.kind === 'patch'
       ? planRect(index, q, size, rk, ck, cmd.patch)
       : planBorders(index, q, size, rk, ck, cmd.preset, cmd.line)
@@ -98,19 +100,22 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     void put(items).then(ok => { if (ok) ref.current.recordFormats(cmd.kind === 'patch' ? cmd.label : 'borders', items) })
   }
 
-  const activeRow = p.active ? p.rows.find(r => r.key === p.active!.key) : undefined
+  const activeRow = p.enabled && p.active && p.active.col !== 'rowNo' ? p.rows.find(r => r.key === p.active!.key) : undefined
   const activeTask = activeRow ? p.taskOf(activeRow) : null
   const state: FormatState | null = p.active && activeRow ? {
     source: 'linked',
     style: activeTask ? resolveStyle(index, activeTask, p.active.col) : null,
     value: p.textValue(activeRow, p.active.col),
     cell: p.cellName(activeRow, p.active.col),
+    rowKey: activeTask ?? '',
+    colKey: p.active.col,
     readOnly: activeTask ? null : t('merge.why'),
     mergeOff: t('merge.why'),
     merged: false,
     multi: rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1,
   } : null
   useFormatBridge('linked', p.enabled, state, run)
+  const marks = useCommentBridge('linked', p.enabled, (taskId, col) => ref.current.select?.(taskId, col))
 
   return {
     /** For the grid: a task cell's look. */
@@ -120,6 +125,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       const st = task ? resolveStyle(index, task, col) : null
       return st ? toCss(st) : null
     },
+    marked: (row: R, col: GridCol) => { const task = p.enabled ? p.taskOf(row) : null; return !!task && marks.has(`${task}|${col}`) },
     styleOf: (row: R, col: GridCol): CellStyle | null => { const task = p.taskOf(row); return task ? resolveStyle(index, task, col) : null },
     onSelect: (q: GridRect) => { rect.current = q; setTick(x => x + 1) },
     /** For undo and redo (useLinkedEditing): put records to the given looks. */

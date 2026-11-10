@@ -231,6 +231,7 @@ export function SheetGrid(p: SheetGridProps) {
   // Spec 015: formatting by task and column; undo through the sheet's own stack.
   const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void } | null>(null)
   const cellName = (row: SheetRow, col: GridCol) => {
+    if (col === 'rowNo') return ''
     const h = model.header(col)
     const colName = h.label ?? (typeof h.text === 'string' ? h.text : col)
     const task = rowTask(row)
@@ -241,6 +242,10 @@ export function SheetGrid(p: SheetGridProps) {
     taskOf: row => rowTask(row)?.id ?? null, cellName, textValue: model.textValue,
     recordFormats: (label, items) => leRef.current?.recordFormats(label, items),
     say: text => p.linked?.say(text),
+    select: (taskId, col) => {
+      const row = p.rows.find(r => rowTask(r)?.id === taskId)
+      if (row) { p.setActive({ key: row.key, col }); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cell="${row.key}|${col}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })) }
+    },
   })
   const le = useLinkedEditing<SheetRow>({
     applyFormats: lf.applyFormats,
@@ -261,7 +266,7 @@ export function SheetGrid(p: SheetGridProps) {
   })
   leRef.current = le
   Object.assign(model, {
-    cellStyle: lf.cellStyle, onSelect: lf.onSelect,
+    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),

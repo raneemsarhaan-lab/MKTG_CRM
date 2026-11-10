@@ -5,6 +5,7 @@
  * the signed-in member, on their own notifications, follows and settings.
  */
 import { prisma } from '@/lib/prisma'
+import { sheetTarget } from '@/lib/notify/render'
 import { getSessionMember } from '@/lib/authz'
 import type { AppNotification, EmailMode, NotificationKind, NotificationMeta } from '@/types/index'
 import { NOTIFICATION_KINDS } from '@/types/index'
@@ -101,12 +102,19 @@ export async function markAllRead(): Promise<{ success: true; unread: 0 } | Fail
  * Open a notification: mark it read and return where it points (FR-034).
  * `target: null` means the task is gone ("This task is no longer available").
  */
-export async function openNotification(id: string): Promise<{ success: true; target: { taskId: string; commentId?: string; section?: 'attachments' } | null } | Fail> {
+export async function openNotification(id: string): Promise<{ success: true; target: { taskId: string; commentId?: string; section?: 'attachments' } | null; href?: string } | Fail> {
   const me = await getSessionMember()
   if (!me) return { success: false, error: 'not_authenticated' }
   const n = await prisma.notification.findFirst({ where: { id, recipient_id: me.id } })
   if (!n) return { success: false, error: 'not_found' }
   if (!n.read_at) await prisma.notification.update({ where: { id }, data: { read_at: new Date() } })
+  // Spec 015: a sheet comment opens the sheet at the cell, if the sheet is still there.
+  const sheet = sheetTarget(n)
+  if (sheet) {
+    const sid = (n.meta as { sheet_id?: string } | null)?.sheet_id
+    const live = sid ? await prisma.sheet.findUnique({ where: { id: sid }, select: { id: true } }) : null
+    return live ? { success: true, target: null, href: sheet } : { success: true, target: null }
+  }
   if (!n.task_id) return { success: true, target: null }
   const task = await prisma.task.findUnique({ where: { id: n.task_id }, select: { id: true } })
   if (!task) return { success: true, target: null }

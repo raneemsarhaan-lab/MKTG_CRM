@@ -18,7 +18,7 @@ import type { CellStyle, SheetDoc, SheetMergeRecord } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
 import { display, formatKey, indexFormats, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
-import { useFormatBridge, type FormatCmd, type FormatState, type MergeMode } from './format/bus'
+import { askComment, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode } from './format/bus'
 import { fitHeight } from './format/fit'
 import { cellName, colLetters } from '@/lib/sheet-selection'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
@@ -44,10 +44,6 @@ export interface BlankSheetProps {
   /** A short message for the workbook's toast (a menu Paste the browser refused). */
   onNotice(text: string): void
   newId(): string
-  /** Spec 015: a new comment on this cell (the comments layer opens its box). */
-  onComment?(cell: { rowId: string; colId: string; name: string }): void
-  /** Spec 015: the open threads' cells, for the corner markers. */
-  marked?: Set<string>
 }
 
 export function BlankSheet(p: BlankSheetProps) {
@@ -266,6 +262,7 @@ export function BlankSheet(p: BlankSheetProps) {
     const delRow: PopItem = { key: 'deleteRow', label: t('menu.deleteRow', { n: nr }), danger: true, ...lock, ...(ro ? {} : allRows), onSelect: () => deleteRows(q.r0, q.r1) }
     const delCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: nc }), danger: true, ...lock, ...(ro ? {} : allCols), onSelect: () => deleteCols(q.c0, q.c1) }
     const clearItem: PopItem = { key: 'clear', label: t('menu.clear'), kbd: 'Delete', ...lock, onSelect: () => clear(q) }
+    const commentItem: PopItem = { key: 'comment', label: t('comments.new'), kbd: mac ? '⌘⌥M' : 'Ctrl+Alt+M', onSelect: () => askComment() }
     let items: PopItem[]
     if (target.kind === 'row') {
       const ids = doc.rows.slice(q.r0, q.r1 + 1).map(r => r.id)
@@ -276,7 +273,7 @@ export function BlankSheet(p: BlankSheetProps) {
       items = [...clip, { kind: 'sep', key: 's1' }, ...colItems, delCol, clearItem, { kind: 'sep', key: 's2' },
         { key: 'resizeCol', label: t('menu.resizeCol'), ...lock, onSelect: () => setResize({ kind: 'col', ids, value: doc.cols[q.c0]?.width ?? DEFAULT_COL_W }) }]
     } else {
-      items = [...clip, { kind: 'sep', key: 's1' }, clearItem, { kind: 'sep', key: 's2' }, ...rowItems, ...colItems, { kind: 'sep', key: 's3' }, delRow, delCol]
+      items = [...clip, { kind: 'sep', key: 's1' }, commentItem, clearItem, { kind: 'sep', key: 's2' }, ...rowItems, ...colItems, { kind: 'sep', key: 's3' }, delRow, delCol]
     }
     setMenu({ at, items, anchor })
   }
@@ -298,11 +295,10 @@ export function BlankSheet(p: BlankSheetProps) {
     render: (row, col) => {
       if (col === 'rowNo') return null
       const v = value(row.id, col)
-      const marker = p.marked?.has(`${row.id}|${col}`) ? <b className="fx-cmt-mark" data-comment-marker="" aria-hidden="true" /> : null
-      if (!v) return marker
+      if (!v) return null
       const st = styleOf(row.id, col)
       const shown = st?.num ? display(v, st.num, locale) : v
-      return <><span className="fx-sheet-cell-text" style={showsRed(v, st?.num) ? { color: '#C00000' } : undefined}>{shown}</span>{marker}</>
+      return <span className="fx-sheet-cell-text" style={showsRed(v, st?.num) ? { color: '#C00000' } : undefined}>{shown}</span>
     },
     cellStyle: (row, col) => {
       const st = styleOf(row.id, col)
@@ -310,6 +306,7 @@ export function BlankSheet(p: BlankSheetProps) {
     },
     copyStyle: (row, col) => styleOf(row.id, col),
     copyShown: (row, col) => { const v = value(row.id, col), st = styleOf(row.id, col); return st?.num ? display(v, st.num, locale) : v },
+    marked: (row, col) => marks.has(`${row.id}|${col}`),
     cellSpan: (row, col) => {
       const k = `${row.id}|${col}`
       if (spans.covered.has(k)) return 'covered'
@@ -410,10 +407,6 @@ export function BlankSheet(p: BlankSheetProps) {
     if (cmd.kind === 'patch') applyItems(cmd.label, planRect(index, q, size, rk, ck, cmd.patch))
     else if (cmd.kind === 'borders') applyItems('borders', planBorders(index, q, size, rk, ck, cmd.preset, cmd.line))
     else if (cmd.kind === 'merge') merge(cmd.mode)
-    else if (cmd.kind === 'comment') {
-      const row = doc.rows[q.r0], col = doc.cols[q.c0]
-      if (row && col) p.onComment?.({ rowId: row.id, colId: col.id, name: cellName(q.r0, q.c0) })
-    }
     focusActive()
   }
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
@@ -422,12 +415,20 @@ export function BlankSheet(p: BlankSheetProps) {
     style: styleOf(active.key, active.col),
     value: value(active.key, active.col),
     cell: cellName(activeRow, activeCol),
+    rowKey: active.key,
+    colKey: active.col,
     readOnly: ro,
     mergeOff: null,
     merged: spans.anchor.has(`${active.key}|${active.col}`),
     multi: rectRef.current.r0 !== rectRef.current.r1 || rectRef.current.c0 !== rectRef.current.c1,
-  } : { source: 'blank', style: null, value: '', cell: 'A1', readOnly: ro, mergeOff: null, merged: false, multi: false }
+  } : null
   useFormatBridge('blank', true, fmtState, runFormat)
+  // Spec 015 comments: corner markers, and selecting a cell from the panel or a link.
+  const marks = useCommentBridge('blank', true, (rowKey, colKey) => {
+    if (!rowIndex.has(rowKey) || !colIndex.has(colKey)) return
+    setActive({ key: rowKey, col: colKey })
+    requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(`[data-cell="${rowKey}|${colKey}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+  })
 
   return (
     <div ref={rootRef} className="fx-sheet-scroll fx-sh-blank" data-blank-sheet={doc.id} data-protected={ro ? '' : undefined}>

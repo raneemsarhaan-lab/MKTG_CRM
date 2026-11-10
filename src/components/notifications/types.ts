@@ -53,7 +53,8 @@ export interface NotifyApi {
   list(q: ListQuery): Promise<ListPage | Fail>
   mark(id: string, read: boolean): Promise<{ success: true; unread: number } | Fail>
   markAll(): Promise<{ success: true; unread: 0 } | Fail>
-  open(id: string): Promise<{ success: true; target: OpenTarget | null } | Fail>
+  /** `href` (spec 015): a sheet comment, opened at its cell. */
+  open(id: string): Promise<{ success: true; target: OpenTarget | null; href?: string } | Fail>
   mute(taskId: string): Promise<{ success: true } | Fail>
   getFollow(taskId: string): Promise<{ success: true; following: boolean } | Fail>
   setFollow(taskId: string, following: boolean): Promise<{ success: true; following: boolean } | Fail>

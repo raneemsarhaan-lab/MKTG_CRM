@@ -4,6 +4,8 @@
  */
 import { randomUUID } from 'node:crypto'
 import * as A from '@/actions/sheets'
+import * as C from '@/actions/sheet-comments'
+import { openNotification } from '@/actions/notifications'
 import { prisma } from '@/lib/prisma'
 
 let failed = 0
@@ -111,6 +113,52 @@ async function main() {
   const fBlocked = await A.applySheetChanges(f.sheetId, { formats: [{ rowKey: '', colKey: '', style: { b: true }, mode: 'set' }] })
   ok(!fBlocked.success && fBlocked.error === 'protected', 'formatting a protected sheet is refused for another member')
   process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+
+  // Spec 015 comments (contracts/server.md "Comments"), on the protected sheet.
+  const contentM = await prisma.member.findFirst({ where: { email: 'content@forefront.consulting' } })
+  const adminM = await prisma.member.findFirst({ where: { email: 'raneem.sarhaan@forefront.consulting' } })
+  const started = new Date()
+  const c1r = await C.addComment(f.sheetId, { rowKey: r1.id, colKey: c1.id, body: `@${contentM!.name} is this the final budget?`, cell: 'A1' })
+  ok(c1r.success && c1r.thread.comments[0].mentions.includes(contentM!.id), 'add a comment; the @mention is read from the text')
+  if (!c1r.success) return
+  const tid = c1r.thread.id
+  await new Promise(r => setTimeout(r, 300))
+  const nMention = await prisma.notification.findFirst({ where: { recipient_id: contentM!.id, kind: 'sheet_mention', created_at: { gte: started } } })
+  const nm = nMention?.meta as { folder_id?: string; sheet_id?: string; row_key?: string; cell?: string } | undefined
+  ok(!!nMention && nMention.task_id === null && nm?.folder_id === f.folderId && nm?.sheet_id === f.sheetId && nm?.row_key === r1.id && nm?.cell === 'A1', 'the mentioned member gets sheet_mention with the cell in meta')
+  ok(!(await C.addComment(f.sheetId, { rowKey: r1.id, colKey: c1.id, body: '   ' })).success, 'an empty comment is refused')
+  const long = await C.addComment(f.sheetId, { rowKey: r1.id, colKey: c1.id, body: 'x'.repeat(5001) })
+  ok(!long.success && long.error === 'too_long', 'over 5,000 characters is refused')
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+  const onProtected = await C.addComment(f.sheetId, { rowKey: r2.id, colKey: c1.id, body: 'Commenting on a protected sheet' })
+  ok(onProtected.success, 'another member may comment on a protected sheet')
+  process.env.SMOKE_MEMBER = 'content@forefront.consulting'
+  const rep = await C.replyComment(tid, { body: 'Yes, signed off.', cell: 'A1' })
+  ok(rep.success && rep.thread.comments.length === 2, 'reply')
+  const edOther = await C.editComment(tid, 'changed')
+  ok(!edOther.success && edOther.error === 'not_author', 'only the author edits a comment')
+  const delOther = await C.deleteComment(tid)
+  ok(!delOther.success && delOther.error === 'not_author', 'a member can\'t delete someone else\'s comment')
+  if (nMention) {
+    const op = await openNotification(nMention.id)
+    ok(op.success && !!op.href && op.href.includes(`/sheets/${f.folderId}?sheet=${f.sheetId}`) && op.href.includes(encodeURIComponent(`${r1.id}:${c1.id}`)), 'opening the notification leads to the sheet at the cell')
+  }
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+  await new Promise(r => setTimeout(r, 300))
+  const nReply = await prisma.notification.findFirst({ where: { recipient_id: adminM!.id, kind: 'sheet_reply', created_at: { gte: started } } })
+  ok(!!nReply, 'the thread\'s earlier author gets sheet_reply')
+  const repId = rep.success ? rep.thread.comments[1].id : ''
+  const adminDel = await C.deleteComment(repId)
+  ok(adminDel.success && adminDel.thread?.comments[1].deleted === true, 'an admin may delete any comment (soft delete)')
+  const res = await C.resolveThread(tid)
+  ok(res.success && !!res.thread.resolved, 'resolve')
+  const re = await C.reopenThread(tid)
+  ok(re.success && !re.thread.resolved, 'reopen')
+  const list = await C.listThreads(f.sheetId)
+  ok(list.success && list.threads.length === 2, 'list threads on the sheet')
+  const sum = await A.loadSheet(f.sheetId)
+  ok(sum.success && sum.doc.extras?.threads.some(x => x.id === tid && x.count === 1), 'loadSheet carries thread summaries (deleted comments not counted)')
+  await prisma.notification.deleteMany({ where: { kind: { in: ['sheet_mention', 'sheet_reply'] }, created_at: { gte: started } } })
 
   // Spec 015 on the Content sheet: any member, never a task change.
   const lc = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
