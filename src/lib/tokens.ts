@@ -309,6 +309,8 @@ export const NOTIFY_UI = {
     mention:               '#D6336C',
     due_soon:              '#C81E3A',
     overdue:               '#C81E3A',
+    sheet_mention:         '#D6336C',
+    sheet_reply:           '#0E7C7C',
   },
 } as const
 
@@ -327,4 +329,21 @@ export const HOURS_UI = {
   focus:    '#F0EBFE',
   bad:      '#C81E3A',
   ok:       '#15803D',
+} as const
+
+/**
+ * Sheet formatting and comments (spec 015, design/sheet-formatting.html).
+ * The toolbar, pickers, comment marker and panel use existing colours only;
+ * the colours a member picks for cells are content (PALETTE in
+ * src/lib/sheet-format.ts), not UI tokens. Mirrored as `--fx-*` in globals.css.
+ */
+export const FORMAT_UI = {
+  barBg:     '#F8F8FB',
+  pressed:   '#F0EBFE',
+  pressedInk: '#7C3AED',
+  marker:    '#7C3AED',
+  mentionBg: '#F0EBFE',
+  frozen:    '#A1A1AE',
+  whyInk:    '#9A5B02',
+  whyBg:     '#FFF3E0',
 } as const

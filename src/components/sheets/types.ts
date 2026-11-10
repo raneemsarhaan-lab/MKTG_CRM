@@ -3,7 +3,7 @@
  * as one object. The app passes the real actions (`api.ts`); the lab passes a
  * stub, so every screen can be checked without a database.
  */
-import type { FolderSummary, SheetChanges, SheetDoc, SheetSummary, TabColor } from '@/types/index'
+import type { FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetSummary, TabColor } from '@/types/index'
 
 export type Fail = { success: false; error: string }
 export type Ok<T = object> = ({ success: true } & T) | Fail
@@ -25,4 +25,7 @@ export interface SheetsApi {
   protectSheet(id: string, on: boolean): Promise<Ok<{ protectedBy: string | null }>>
   hideSheets(ids: string[], hidden: boolean): Promise<Ok>
   reorderSheets(folderId: string, ids: string[]): Promise<Ok>
+  // ── spec 015 ──
+  loadLinkedSheetExtras(sheetId: string): Promise<Ok<{ extras: SheetExtras }>>
+  applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[] }): Promise<Ok<{ updatedAt: string }>>
 }

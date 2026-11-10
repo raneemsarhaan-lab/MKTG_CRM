@@ -26,4 +26,6 @@ export const sheetsApi: SheetsApi = {
   protectSheet: safe(A.protectSheet),
   hideSheets: safe(A.hideSheets),
   reorderSheets: safe(A.reorderSheets),
+  loadLinkedSheetExtras: safe(A.loadLinkedSheetExtras),
+  applyLinkedFormats: safe(A.applyLinkedFormats),
 } as SheetsApi

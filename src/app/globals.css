@@ -110,6 +110,15 @@
   --hr-focus:           #F0EBFE;
   --hr-bad:             #C81E3A;
   --hr-ok:              #15803D;
+  /* Spec 015: sheet formatting and comments (FORMAT_UI in src/lib/tokens.ts) */
+  --fx-bar-bg:          #F8F8FB;
+  --fx-pressed:         #F0EBFE;
+  --fx-pressed-ink:     #7C3AED;
+  --fx-marker:          #7C3AED;
+  --fx-mention-bg:      #F0EBFE;
+  --fx-frozen:          #A1A1AE;
+  --fx-why-ink:         #9A5B02;
+  --fx-why-bg:          #FFF3E0;
   --nt-red:             #E5484D;
   --nt-tint:            #F4F0FF;
   --nt-tint-hover:      #ECE5FF;
@@ -2392,3 +2401,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
   .fx-hr-page { padding: 18px 16px 90px; }
   .fx-hr-weeknav a, .fx-hr-weeknav .is-dim { width: 44px; height: 44px; }
 }
+
+/* ─── Spec 015: sheet formatting and comments (design/sheet-formatting.html) ─── */
+/* A cell's borders, drawn over it with their real line styles (toCss → border). */
+.fx-cell-bd { position: absolute; inset: 0; pointer-events: none; z-index: 1; }

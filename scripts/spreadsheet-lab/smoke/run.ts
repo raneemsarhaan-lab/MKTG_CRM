@@ -75,6 +75,60 @@ async function main() {
   ok(!blocked2.success && blocked2.error === 'protected', 'another member is refused on a protected sheet')
   process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
 
+  // Spec 015: formatting and merges (contracts/server.md).
+  const fr = await A.applySheetChanges(f.sheetId, { formats: [
+    { rowKey: r1.id, colKey: '', style: { b: true, fill: '#7030a0', junk: 1 } as never, mode: 'set' },
+    { rowKey: r1.id, colKey: c1.id, style: { i: true }, mode: 'set' },
+    { rowKey: '', colKey: c2.id, style: { num: { kind: 'currency', cur: 'EGP', dp: 2 } }, mode: 'set' },
+  ] })
+  ok(fr.success, 'formats saved: a row, a cell, a column')
+  await A.applySheetChanges(f.sheetId, { formats: [{ rowKey: r1.id, colKey: c1.id, style: { fill: '#FFC000' }, mode: 'merge' }] })
+  let fx = await A.loadSheet(f.sheetId)
+  const fmt = (r: string, c: string) => fx.success ? fx.doc.extras?.formats.find(x => x.rowKey === r && x.colKey === c)?.style : undefined
+  ok(JSON.stringify(fmt(r1.id, '')) === JSON.stringify({ b: true, fill: '#7030A0' }), 'unknown fields dropped, colours upper-cased')
+  ok(JSON.stringify(fmt(r1.id, c1.id)) === JSON.stringify({ i: true, fill: '#FFC000' }), 'merge lays a fill over the stored italic')
+  await A.applySheetChanges(f.sheetId, { formats: [{ rowKey: r1.id, colKey: c1.id, style: null, mode: 'set' }, { rowKey: '', colKey: c2.id, style: { junk: true } as never, mode: 'set' }] })
+  fx = await A.loadSheet(f.sheetId)
+  ok(fmt(r1.id, c1.id) === undefined && fmt('', c2.id) === undefined, 'null or an empty style deletes the record')
+  const many = Array.from({ length: 10_000 }, (_, i) => ({ rowKey: `r${i}`, colKey: c1.id, style: { b: true }, mode: 'set' as const }))
+  const t0 = Date.now()
+  const bulk = await A.applySheetChanges(f.sheetId, { formats: many })
+  const ms = Date.now() - t0
+  ok(bulk.success && ms < 1000, `10,000 cell formats in one call under a second (${ms} ms)`)
+  ok(!(await A.applySheetChanges(f.sheetId, { formats: [...many, ...many, { rowKey: 'x', colKey: 'y', style: { b: true }, mode: 'set' }] })).success, 'more than 20,000 formats in one call is refused')
+  await prisma.sheetFormat.deleteMany({ where: { sheet_id: f.sheetId, row_key: { startsWith: 'r' }, NOT: { row_key: r1.id } } })
+  const rowsNow = (await A.loadSheet(f.sheetId)) as { success: true; doc: { rows: { id: string }[]; cols: { id: string }[] } }
+  const [ra, rb, rc] = rowsNow.doc.rows, [ca, cb, cc] = rowsNow.doc.cols
+  const mid = randomUUID()
+  ok((await A.applySheetChanges(f.sheetId, { merges: { add: [{ id: mid, top: ra.id, left: ca.id, bottom: ra.id, right: cc.id }] } })).success, 'merge A1:C1')
+  const over = await A.applySheetChanges(f.sheetId, { merges: { add: [{ id: randomUUID(), top: ra.id, left: cb.id, bottom: rb.id, right: cb.id }] } })
+  ok(!over.success && over.error === 'merge_overlap', 'an overlapping merge is refused')
+  ok((await A.applySheetChanges(f.sheetId, { merges: { add: [{ id: randomUUID(), top: rb.id, left: ca.id, bottom: rc.id, right: ca.id }] } })).success, 'a merge next to it is fine')
+  await A.applySheetChanges(f.sheetId, { merges: { remove: [mid] } })
+  fx = await A.loadSheet(f.sheetId)
+  ok(fx.success && fx.doc.extras?.merges.length === 1 && !fx.doc.extras.merges.some(m => m.id === mid), 'unmerge removes it')
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+  const fBlocked = await A.applySheetChanges(f.sheetId, { formats: [{ rowKey: '', colKey: '', style: { b: true }, mode: 'set' }] })
+  ok(!fBlocked.success && fBlocked.error === 'protected', 'formatting a protected sheet is refused for another member')
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+
+  // Spec 015 on the Content sheet: any member, never a task change.
+  const lc = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
+  const task = await prisma.task.findFirst({ select: { id: true, updated_at: true, name: true } })
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+  const lf = await A.applyLinkedFormats(lc!.id, { formats: [{ rowKey: task?.id ?? 'smoke-task', colKey: 'title', style: { fill: '#FFEB9C' }, mode: 'set' }] })
+  ok(lf.success, 'any member may format the Content sheet')
+  ok(!(await A.applyLinkedFormats(lc!.id, { merges: { add: [] } })).success, 'merges refused on the Content sheet (linked)')
+  ok(!(await A.applyLinkedFormats(f.sheetId, { formats: [] })).success, 'applyLinkedFormats refuses a blank sheet')
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+  const lx = await A.loadLinkedSheetExtras(lc!.id)
+  ok(lx.success && lx.extras.formats.some(x => x.rowKey === (task?.id ?? 'smoke-task') && x.style.fill === '#FFEB9C'), 'the Content sheet loads its formatting by task id')
+  if (task) {
+    const after = await prisma.task.findUnique({ where: { id: task.id }, select: { updated_at: true, name: true } })
+    ok(after?.updated_at.getTime() === task.updated_at.getTime() && after?.name === task.name, 'formatting never touches the task')
+  }
+  await prisma.sheetFormat.deleteMany({ where: { sheet_id: lc!.id, row_key: task?.id ?? 'smoke-task', col_key: 'title' } })
+
   // Linked guards and pins.
   const linked = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
   ok(!(await A.applySheetChanges(linked!.id, { cells: [] })).success, 'blank-sheet writes refused on a linked sheet')

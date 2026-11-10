@@ -36,10 +36,10 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
   - the Content sheet with a filled task row around a status pill, and Merge disabled with its reason;
   - stage 2 dialogs (Find & Replace, Paste Special) and frozen and hidden headings; stage 3 (Sort, New rule, Manage rules, a table with banding and filter buttons);
   - a 390 px phone (bottom-sheet Format tabs, full-screen thread) and Arabic (RTL).
-- [ ] T002 [P] Extend the lab in `scripts/spreadsheet-lab/`:
+- [X] T002 [P] Extend the lab in `scripts/spreadsheet-lab/`:
   - add `format` and `comments` sections to `pure-entry.ts` and `pure.mjs`;
   - add fixtures for a real Excel HTML clip with a `<style>` block (`scripts/spreadsheet-lab/fixtures/excel-styled.html`) and a Google Sheets clip with inline styles (`scripts/spreadsheet-lab/fixtures/gsheets-styled.html`);
-  - add `scripts/spreadsheet-lab/scenarios/format.mjs` and `scenarios/comments.mjs`, registered in `scenarios/index.mjs`.
+  - the browser scenarios live where the sheet UI lab already runs: `scripts/sheet-lab/scenarios/format.mjs` and `comments.mjs`, registered in its `scenarios/index.mjs` (added with the UI tasks).
 
 ---
 
@@ -49,30 +49,30 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
 
 **⚠️ No story work starts until this phase is done.**
 
-- [ ] T003 Add the stage 1 schema to `prisma/schema.prisma` (data-model §1):
+- [X] T003 Add the stage 1 schema to `prisma/schema.prisma` (data-model §1):
   - `SheetFormat` → `sheet_formats`, primary key `(sheet_id, row_key, col_key)`, `style Json`, `updated_by` (set null on delete), `updated_at`, cascade from `Sheet`;
   - `SheetMerge` → `sheet_merges` (`id`, `sheet_id`, `top_row`, `bottom_row`, `left_col`, `right_col`), cascade from `Sheet`;
   - `SheetComment` → `sheet_comments` with `root_id` self-relation, `author_id` (set null), `mentions String[] @db.Uuid`, `created_at`, `edited_at`, `deleted_at`, `resolved_at`, `resolved_by`; indexes `(sheet_id, row_key, col_key)` and `(root_id)`;
   - apply with `bash scripts/migrate.sh`.
-- [ ] T004 [P] Add the types to `src/types/index.ts` (data-model §3): `CellStyle`, `BorderSide`, `NumberFormat`, `SheetFormatRecord`, `SheetMergeRecord`, `SheetCommentThread`, `SheetCommentItem`, `SheetThreadSummary`, `SheetView`; extend `SheetDoc` with `formats`, `merges`, `view` and `threads`; add `'sheet_mention' | 'sheet_reply'` to `NotificationKind` and its list (around line 326).
-- [ ] T005 [P] Write the pure module `src/lib/sheet-format.ts` (research R1–R3):
+- [X] T004 [P] Add the types to `src/types/index.ts` (data-model §3): `CellStyle`, `BorderSide`, `NumberFormat`, `SheetFormatRecord`, `SheetMergeRecord`, `SheetCommentThread`, `SheetCommentItem`, `SheetThreadSummary`, `SheetView`; extend `SheetDoc` with `formats`, `merges`, `view` and `threads`; add `'sheet_mention' | 'sheet_reply'` to `NotificationKind` and its list (around line 326).
+- [X] T005 [P] Write the pure module `src/lib/sheet-format.ts` (research R1–R3):
   - `FONTS` (Inter, Montserrat, IBM Plex Sans Arabic, Caveat, Calibri→Carlito/Arial, Arial, Georgia, Times New Roman, Courier New, Verdana, Tahoma, Trebuchet MS) and `PALETTE` (10 theme colours × 5 tints, 10 standard colours);
   - `validateStyle(input)`: keeps only known fields in range (size 6–72, indent 0–15, dp 0–10, `#RRGGBB` colours, known enums), returns `null` when empty;
   - `mergeStyle(base, patch)`, `diffStyle`, `resolveStyle(formats, rowKey, colKey)` layering sheet → column → row → cell;
   - `styleKey(style)` and `toCss(style, { rtl })`: inline CSS, borders as inset box-shadows, mirrored `left`/`right` in RTL, cached by key;
   - `display(text, num, locale)`: reads numbers (`12500`, `1,250.5`, `12.5%`, Arabic digits) and dates (ISO, `16/11/2026`, `16 Nov 2026`); formats with `Intl` or a custom pattern (`dd/mm/yyyy`, `ddd d mmm`, `yyyy-mm-dd`); returns the text as typed when it can't be read;
   - `bumpDecimals(num, ±1)`.
-- [ ] T006 [P] Add `FORMAT_UI` (toolbar, picker, panel and marker colours from existing tokens only) to `src/lib/tokens.ts` and matching `--fx-*`/`--sh-*` variables to `src/app/globals.css` (§I).
-- [ ] T007 [P] Add the `sheets.format` and `sheets.comments` namespaces (about 180 keys: toolbar groups and controls with shortcuts, picker labels, Format Cells tabs, number-format names, merge warnings, comment UI, errors `protected`, `merge_overlap`, `linked`, `not_author`, `too_long`, `empty`, ICU plurals) to `messages/en.json` and `messages/ar.json`, plus the notification strings for `sheet_mention` and `sheet_reply`. Keys stay flat where `messages-parity` needs it.
-- [ ] T008 Extend undo and the doc in `src/lib/sheet-undo.ts` and `src/lib/sheet-doc.ts` (research R6): new change kinds `formats` (`{ rowKey, colKey, before, after }[]`), `merges` (`add` / `remove`) and `view`; `invert`, `inverseSteps` and `applyChange` handle them; a whole-column or Ctrl+A format is one record and one step.
-- [ ] T009 Extend the server in `src/actions/sheets.ts` (contracts/server.md):
+- [X] T006 [P] Add `FORMAT_UI` (toolbar, picker, panel and marker colours from existing tokens only) to `src/lib/tokens.ts` and matching `--fx-*`/`--sh-*` variables to `src/app/globals.css` (§I).
+- [X] T007 [P] Add the `sheets.format` and `sheets.comments` namespaces (about 180 keys: toolbar groups and controls with shortcuts, picker labels, Format Cells tabs, number-format names, merge warnings, comment UI, errors `protected`, `merge_overlap`, `linked`, `not_author`, `too_long`, `empty`, ICU plurals) to `messages/en.json` and `messages/ar.json`, plus the notification strings for `sheet_mention` and `sheet_reply`. Keys stay flat where `messages-parity` needs it.
+- [X] T008 Extend undo and the doc in `src/lib/sheet-undo.ts` and `src/lib/sheet-doc.ts` (research R6): new change kinds `formats` (`{ rowKey, colKey, before, after }[]`), `merges` (`add` / `remove`) and `view`; `invert`, `inverseSteps` and `applyChange` handle them; a whole-column or Ctrl+A format is one record and one step.
+- [X] T009 Extend the server in `src/actions/sheets.ts` (contracts/server.md):
   - `loadSheet` returns `formats`, `merges`, `view` and thread summaries;
   - `applySheetChanges` accepts `formats` (`set` / `merge`, validated with `validateStyle`, at most 20,000 records, empty style deletes), `merges` (refuses overlaps with `merge_overlap`) and `view`;
   - formats and merges are refused on a protected sheet unless the member is the protector or an admin (`protected`);
   - new `loadLinkedSheetExtras(sheetId)` and `applyLinkedFormats(sheetId, { formats, view })` for the Content and Video sheets: any member, never touches tasks, `merges` refused with `linked`.
-- [ ] T010 [P] Extend the injected API in `src/components/sheets/types.ts` and `src/components/sheets/api.ts` with `loadLinkedSheetExtras`, `applyLinkedFormats` and the comment actions (T029); and teach `src/components/sheets/useOutbox.ts` to queue `formats`, `merges` and `view` with the cell changes.
-- [ ] T011 Add the style hook to `src/components/sheet/GridCore.tsx`: `GridModel` gains optional `cellStyle(row, col): CSSProperties | undefined` and `display(row, col, text): string`; cells render the resolved style and the display text while the editor keeps the raw text; wrapped cells let the row grow (reuse `rowHeight` / `onRowResize`).
-- [ ] T012 Lab: pure checks in `scripts/spreadsheet-lab/pure.mjs` for `validateStyle` (drops unknown and out-of-range fields), `resolveStyle` layering, `toCss` (borders, RTL mirroring, cache), undo of `formats` / `merges` / `view`, and a server smoke test in `scripts/spreadsheet-lab/smoke/run.ts` for `applySheetChanges` formats (protected refusal, 20,000 cap, empty style deletes) and `applyLinkedFormats` (no task change, merges refused).
+- [X] T010 [P] Extend the injected API in `src/components/sheets/types.ts` and `src/components/sheets/api.ts` with `loadLinkedSheetExtras`, `applyLinkedFormats` and the comment actions (T029); and teach `src/components/sheets/useOutbox.ts` to queue `formats`, `merges` and `view` with the cell changes.
+- [X] T011 Add the style hook to `src/components/sheet/GridCore.tsx`: `GridModel` gains optional `cellStyle(row, col): CellCss | null` (from `toCss`: the cell's style, rotated text and a border overlay with real line styles). The shown text (number formats) comes from each model's own `render`, so the editor keeps the raw text; wrapped rows growing is wired in T018 (reuse `rowHeight` / `onRowResize`).
+- [X] T012 Lab: pure checks in `scripts/spreadsheet-lab/pure.mjs` for `validateStyle` (drops unknown and out-of-range fields), `resolveStyle` layering, `toCss` (borders, RTL mirroring, cache), undo of `formats` / `merges` / `view`, and a server smoke test in `scripts/spreadsheet-lab/smoke/run.ts` for `applySheetChanges` formats (protected refusal, 20,000 cap, empty style deletes) and `applyLinkedFormats` (no task change, merges refused).
 
 **Checkpoint**: schema applied, `lab:spreadsheet` pure checks and the smoke test pass, typecheck clean. **T001 approved** before Phase 3.
 

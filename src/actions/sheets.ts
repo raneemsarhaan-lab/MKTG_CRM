@@ -16,7 +16,8 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
-import type { FolderSummary, SheetChanges, SheetDoc, SheetKind, SheetSummary, TabColor } from '@/types/index'
+import { mergeStyle, validateStyle } from '@/lib/sheet-format'
+import type { CellStyle, FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetThreadSummary, TabColor } from '@/types/index'
 import { TAB_COLORS } from '@/types/index'
 
 type Fail = { success: false; error: string }
@@ -28,6 +29,7 @@ const MAX_ROWS = 5000
 const MAX_COLS = 200
 const MAX_CELL = 50_000
 const MAX_CELLS_PER_CALL = 2000
+const MAX_FORMATS_PER_CALL = 20_000
 const ROW_H = { min: 21, max: 400 }
 const COL_W = { min: 40, max: 600 }
 
@@ -216,7 +218,108 @@ export async function loadSheet(id: string): Promise<{ success: true; doc: Sheet
   ])
   const map: SheetDoc['cells'] = {}
   for (const c of cells) (map[c.row_id] ??= {})[c.col_id] = c.value
-  return { success: true, sheet: summary(sheet), doc: { id, updatedAt: sheet.updated_at.toISOString(), rows, cols, cells: map } }
+  const extras = await loadExtras(id)
+  return { success: true, sheet: summary(sheet), doc: { id, updatedAt: sheet.updated_at.toISOString(), rows, cols, cells: map, extras } }
+}
+
+// ─── spec 015: formatting, merges and comment markers ───────────────────────
+
+/** A sheet's formatting, merges and thread summaries (contracts/server.md "Loading"). */
+async function loadExtras(sheetId: string): Promise<SheetExtras> {
+  const [formats, merges, threads] = await Promise.all([
+    prisma.sheetFormat.findMany({ where: { sheet_id: sheetId }, select: { row_key: true, col_key: true, style: true } }),
+    prisma.sheetMerge.findMany({ where: { sheet_id: sheetId } }),
+    threadSummaries(sheetId),
+  ])
+  return {
+    formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
+    merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
+    view: { frozenRows: 0, frozenCols: 0 },
+    threads,
+  }
+}
+
+/** Threads with at least one comment left, for the corner markers and the panel's counts. */
+async function threadSummaries(sheetId: string): Promise<SheetThreadSummary[]> {
+  const rows = await prisma.$queryRaw<{ id: string; row_key: string; col_key: string; resolved: boolean; n: bigint }[]>`
+    SELECT r.id, r.row_key, r.col_key, r.resolved_at IS NOT NULL AS resolved,
+           (CASE WHEN r.deleted_at IS NULL THEN 1 ELSE 0 END) + count(c.id) AS n
+    FROM sheet_comments r LEFT JOIN sheet_comments c ON c.root_id = r.id AND c.deleted_at IS NULL
+    WHERE r.sheet_id = ${sheetId}::uuid AND r.root_id IS NULL
+    GROUP BY r.id`
+  return rows.filter(r => Number(r.n) > 0).map(r => ({ id: r.id, rowKey: r.row_key, colKey: r.col_key, count: Number(r.n), resolved: r.resolved }))
+}
+
+/**
+ * Save format records (research R1, R6). `set` replaces a record's style;
+ * `merge` lays the fields over what is stored. Every style is validated and
+ * an empty one deletes the record. One statement each for the deletes and
+ * the upserts, so a whole column or Ctrl+A is quick.
+ */
+async function writeFormats(tx: Tx, sheetId: string, memberId: string, writes: FormatWrite[]) {
+  const key = (r: string, c: string) => `${r}\u0001${c}`
+  const last = new Map<string, FormatWrite>()
+  for (const w of writes) {
+    if (typeof w.rowKey !== 'string' || typeof w.colKey !== 'string' || w.rowKey.length > 80 || w.colKey.length > 80) continue
+    last.delete(key(w.rowKey, w.colKey)); last.set(key(w.rowKey, w.colKey), w)
+  }
+  const list = [...last.values()]
+  const merging = list.filter(w => w.mode === 'merge' && w.style)
+  const stored = new Map<string, CellStyle>()
+  if (merging.length) {
+    const have = await tx.$queryRaw<{ row_key: string; col_key: string; style: CellStyle }[]>`
+      SELECT row_key, col_key, style FROM sheet_formats WHERE sheet_id = ${sheetId}::uuid AND (row_key, col_key) IN (
+        SELECT * FROM unnest(${merging.map(w => w.rowKey)}::text[], ${merging.map(w => w.colKey)}::text[]))`
+    for (const h of have) stored.set(key(h.row_key, h.col_key), h.style)
+  }
+  const put: { r: string; c: string; s: CellStyle }[] = [], del: { r: string; c: string }[] = []
+  for (const w of list) {
+    const next = w.mode === 'merge' ? mergeStyle(stored.get(key(w.rowKey, w.colKey)), w.style as Record<string, unknown> | null) : w.style
+    const clean = validateStyle(next)
+    if (clean) put.push({ r: w.rowKey, c: w.colKey, s: clean }); else del.push({ r: w.rowKey, c: w.colKey })
+  }
+  if (del.length) {
+    await tx.$executeRaw`DELETE FROM sheet_formats WHERE sheet_id = ${sheetId}::uuid AND (row_key, col_key) IN (
+      SELECT * FROM unnest(${del.map(d => d.r)}::text[], ${del.map(d => d.c)}::text[]))`
+  }
+  if (put.length) {
+    await tx.$executeRaw`INSERT INTO sheet_formats (sheet_id, row_key, col_key, style, updated_by, updated_at)
+      SELECT ${sheetId}::uuid, r, c, s::jsonb, ${memberId}::uuid, now()
+      FROM unnest(${put.map(p => p.r)}::text[], ${put.map(p => p.c)}::text[], ${put.map(p => JSON.stringify(p.s))}::text[]) AS t(r, c, s)
+      ON CONFLICT (sheet_id, row_key, col_key) DO UPDATE SET style = EXCLUDED.style, updated_by = EXCLUDED.updated_by, updated_at = now()`
+  }
+}
+
+/**
+ * Merges on a blank sheet (research R4): removes first, then adds. A merge
+ * whose edges no longer exist is skipped; one that would overlap another is
+ * refused (`merge_overlap`), and the whole call with it.
+ */
+async function writeMerges(tx: Tx, sheetId: string, merges: NonNullable<SheetChanges['merges']>) {
+  if (merges.remove?.length) await tx.sheetMerge.deleteMany({ where: { sheet_id: sheetId, id: { in: merges.remove } } })
+  const add = (merges.add ?? []).slice(0, 1000)
+  if (!add.length) return
+  const [rows, cols, existing] = await Promise.all([
+    tx.sheetRow.findMany({ where: { sheet_id: sheetId }, select: { id: true, position: true } }),
+    tx.sheetCol.findMany({ where: { sheet_id: sheetId }, select: { id: true, position: true } }),
+    tx.sheetMerge.findMany({ where: { sheet_id: sheetId } }),
+  ])
+  const rp = new Map(rows.map(r => [r.id, r.position])), cp = new Map(cols.map(c => [c.id, c.position]))
+  type Box = { id: string; r0: number; r1: number; c0: number; c1: number }
+  const box = (m: SheetMergeRecord): Box | null => {
+    const t = rp.get(m.top), b = rp.get(m.bottom), l = cp.get(m.left), r = cp.get(m.right)
+    if (t === undefined || b === undefined || l === undefined || r === undefined) return null
+    return { id: m.id, r0: Math.min(t, b), r1: Math.max(t, b), c0: Math.min(l, r), c1: Math.max(l, r) }
+  }
+  const boxes: Box[] = existing.map(x => box({ id: x.id, top: x.top_row, bottom: x.bottom_row, left: x.left_col, right: x.right_col })).filter((x): x is Box => !!x)
+  const fresh: SheetMergeRecord[] = []
+  for (const m of add) {
+    const b = box(m)
+    if (!b || (b.r0 === b.r1 && b.c0 === b.c1)) continue
+    if (boxes.some(o => o.id !== b.id && o.r0 <= b.r1 && b.r0 <= o.r1 && o.c0 <= b.c1 && b.c0 <= o.c1)) throw new Refuse('merge_overlap')
+    boxes.push(b); fresh.push(m)
+  }
+  if (fresh.length) await tx.sheetMerge.createMany({ data: fresh.map(m => ({ id: m.id, sheet_id: sheetId, top_row: m.top, bottom_row: m.bottom, left_col: m.left, right_col: m.right })), skipDuplicates: true })
 }
 
 // ─── blank-sheet content ────────────────────────────────────────────────────
@@ -245,6 +348,7 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
   const cells = changes.cells ?? []
   if (cells.length > MAX_CELLS_PER_CALL) return fail('too_many_cells')
   if (cells.some(c => c.value.length > MAX_CELL)) return fail('too_long')
+  if ((changes.formats?.length ?? 0) > MAX_FORMATS_PER_CALL) return fail('too_many_formats')
 
   try {
     return await prisma.$transaction(async tx => {
@@ -305,6 +409,10 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
             ON CONFLICT (row_id, col_id) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`
         }
       }
+
+      // Spec 015: formatting and merges, after the structure they refer to.
+      if (changes.formats?.length) await writeFormats(tx, sheetId, m.id, changes.formats)
+      if (changes.merges) await writeMerges(tx, sheetId, changes.merges)
 
       // Room for the next insert: renumber when two neighbours got too close.
       const positions: { rows?: { id: string; position: number }[]; cols?: { id: string; position: number }[] } = {}
@@ -556,4 +664,40 @@ export async function setLinkedRowHeights(kind: 'linked_content' | 'linked_video
     }
   })
   return { success: true }
+}
+
+/**
+ * Formatting and comment markers on the Content or Video sheet (spec 015
+ * FR-070–FR-075): keyed by task id and column key, so they follow the task.
+ */
+export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success: true; extras: SheetExtras } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const sheet = await prisma.sheet.findUnique({ where: { id: sheetId }, select: { kind: true } })
+  if (!sheet) return fail('gone')
+  if (!isLinkedKind(sheet.kind)) return fail('not_linked')
+  const extras = await loadExtras(sheetId)
+  return { success: true, extras: { ...extras, merges: [] } }
+}
+
+/**
+ * Save formatting on the Content or Video sheet (FR-072): any member, like the
+ * team's own columns, and never a change to the tasks. Merges aren't offered
+ * there (FR-074), so a call with merges is refused as `linked`.
+ */
+export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  if (changes.merges) return fail('linked')
+  const formats = changes.formats ?? []
+  if (formats.length > MAX_FORMATS_PER_CALL) return fail('too_many_formats')
+  const sheet = await prisma.sheet.findUnique({ where: { id: sheetId }, select: { kind: true, folder_id: true } })
+  if (!sheet) return fail('gone')
+  if (!isLinkedKind(sheet.kind)) return fail('not_linked')
+  const now = new Date()
+  await prisma.$transaction(async tx => {
+    if (formats.length) await writeFormats(tx, sheetId, m.id, formats)
+    await bumpFolder(tx, sheet.folder_id, m.id)
+  }, { timeout: 30_000 })
+  return { success: true, updatedAt: now.toISOString() }
 }

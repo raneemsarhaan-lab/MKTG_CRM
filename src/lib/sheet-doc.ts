@@ -6,7 +6,7 @@
  * change set for the outbox. The same function applies a step backwards on
  * undo, so the screen, the server and the history can't disagree.
  */
-import type { SheetChanges, SheetDoc } from '@/types/index'
+import type { FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { betweenMany } from '@/lib/sheet-positions'
 
@@ -15,6 +15,10 @@ export const BLANK_COL_LIMIT = 200
 export const DEFAULT_COL_W = 120
 
 const byPos = <T extends { position: number }>(a: T, b: T) => a.position - b.position
+
+/** Spec 015: a sheet with no formatting, merges or comments yet. */
+export const emptyExtras = (): SheetExtras => ({ formats: [], merges: [], view: { frozenRows: 0, frozenCols: 0 }, threads: [] })
+const fk = (r: string, c: string) => `${r}\u0001${c}`
 
 /** The document after a change. */
 export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
@@ -60,6 +64,26 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const w = new Map(ch.cols.map(c => [c.id, c.after]))
       return { ...doc, cols: doc.cols.map(c => (w.has(c.id) ? { ...c, width: w.get(c.id) ?? null } : c)) }
     }
+    case 'formats': {
+      const ex = doc.extras ?? emptyExtras()
+      const map = new Map(ex.formats.map(f => [fk(f.rowKey, f.colKey), f]))
+      for (const x of ch.items) {
+        const k = fk(x.rowKey, x.colKey)
+        if (x.after && Object.keys(x.after).length) map.set(k, { rowKey: x.rowKey, colKey: x.colKey, style: x.after }); else map.delete(k)
+      }
+      return { ...doc, extras: { ...ex, formats: [...map.values()] } }
+    }
+    case 'merges': {
+      const ex = doc.extras ?? emptyExtras()
+      const gone = new Set(ch.remove.map(m => m.id))
+      const kept = ex.merges.filter(m => !gone.has(m.id))
+      const have = new Set(kept.map(m => m.id))
+      return { ...doc, extras: { ...ex, merges: [...kept, ...ch.add.filter(m => !have.has(m.id))] } }
+    }
+    case 'view': {
+      const ex = doc.extras ?? emptyExtras()
+      return { ...doc, extras: { ...ex, view: { ...ex.view, ...ch.after } } }
+    }
   }
 }
 
@@ -80,6 +104,11 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'deleteCols': push('deleteCols', ch.cols.map(c => c.id)); break
       case 'rowHeights': push('rowHeights', ch.rows.map(r => ({ id: r.id, height: r.after }))); break
       case 'colWidths': push('colWidths', ch.cols.map(c => ({ id: c.id, width: c.after }))); break
+      case 'formats': push('formats', ch.items.map((x): FormatWrite => ({ rowKey: x.rowKey, colKey: x.colKey, style: x.after, mode: 'set' }))); break
+      case 'merges':
+        out.merges = netMerges([...opsOf(out.merges), ...ch.remove.map(x => ({ remove: x.id })), ...ch.add.map(x => ({ add: x }))])
+        break
+      case 'view': break // stage 2 (T039) saves view settings
     }
   }
   return out
@@ -96,6 +125,8 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     insertRows: cat(a.insertRows, b.insertRows), deleteRows: cat(a.deleteRows, b.deleteRows),
     insertCols: cat(a.insertCols, b.insertCols), deleteCols: cat(a.deleteCols, b.deleteCols),
     rowHeights: cat(a.rowHeights, b.rowHeights), colWidths: cat(a.colWidths, b.colWidths), cells,
+    formats: lastFormats(cat(a.formats, b.formats)),
+    merges: a.merges || b.merges ? mergeMerges(a.merges, b.merges) : undefined,
   }
   // A row inserted and deleted in the same batch never needs to reach the server.
   for (const [ins, del] of [['insertRows', 'deleteRows'], ['insertCols', 'deleteCols']] as const) {
@@ -111,8 +142,46 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     for (const c of cells) { const k = `${c.rowId}|${c.colId}`; last.delete(k); last.set(k, c) }
     out.cells = [...last.values()]
   }
-  for (const k of Object.keys(out) as (keyof SheetChanges)[]) if (!out[k] || !(out[k] as unknown[]).length) delete out[k]
+  for (const k of Object.keys(out) as (keyof SheetChanges)[]) {
+    const v = out[k]
+    if (!v || (Array.isArray(v) && !v.length) || (k === 'merges' && !out.merges?.add?.length && !out.merges?.remove?.length)) delete out[k]
+  }
   return out
+}
+
+/** For a format record, the last write wins (`set` replaces; a later `merge` lays over a queued `set`). */
+function lastFormats(list?: FormatWrite[]): FormatWrite[] | undefined {
+  if (!list) return undefined
+  const last = new Map<string, FormatWrite>()
+  for (const f of list) {
+    const k = fk(f.rowKey, f.colKey), prev = last.get(k)
+    last.delete(k)
+    last.set(k, prev && f.mode === 'merge' && prev.mode === 'set' && prev.style ? { ...f, mode: 'set', style: { ...prev.style, ...(f.style ?? {}) } } : f)
+  }
+  return [...last.values()]
+}
+
+/**
+ * Merges queued in order, reduced to the last thing done to each merge. The
+ * server removes first, then adds, so an add is also sent as a remove: that
+ * makes it a replace whatever the server holds.
+ */
+export function netMerges(ops: ({ add: SheetMergeRecord } | { remove: string })[]): SheetChanges['merges'] {
+  const last = new Map<string, SheetMergeRecord | null>()
+  for (const o of ops) {
+    const id = 'add' in o ? o.add.id : o.remove
+    last.delete(id)
+    last.set(id, 'add' in o ? o.add : null)
+  }
+  const add = [...last.values()].filter((m): m is SheetMergeRecord => !!m)
+  return { add, remove: [...last.keys()] }
+}
+const opsOf = (m?: SheetChanges['merges']) => [
+  ...(m?.remove ?? []).filter(id => !(m?.add ?? []).some(x => x.id === id)).map(id => ({ remove: id })),
+  ...(m?.add ?? []).map(x => ({ add: x })),
+]
+function mergeMerges(a?: SheetChanges['merges'], b?: SheetChanges['merges']): SheetChanges['merges'] {
+  return netMerges([...opsOf(a), ...opsOf(b)])
 }
 
 /** The number of cells in a change set, for chunking (2,000 per call). */

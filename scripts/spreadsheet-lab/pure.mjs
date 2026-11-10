@@ -137,6 +137,90 @@ export async function runPure(lab, root) {
     eq([1, 2, 3, 11, 100].map(n => t.format({ n })), ['خلية واحدة محددة', 'خليتان محددتان', '3 خلايا محددة', '11 خلية محددة', '100 خلية محددة'], 'Arabic plurals')
   })
 
+  // ── spec 015: formatting ─────────────────────────────────────────────────
+  await check('fmt-validate', () => {
+    const v = h.validateStyle({ b: true, i: false, size: 99, font: 'arial', fill: '#ff0000', color: 'red', junk: 1, ha: 'general', va: 'middle',
+      bt: { w: 'thick', c: '#000000' }, bb: { w: 'wavy', c: '#000000' }, indent: 40, rot: 200, num: { kind: 'currency', cur: 'XYZ', dp: 20, pattern: '<script>' } })
+    eq(v, { font: 'Arial', size: 72, b: true, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
+    eq(h.validateStyle({ junk: true, b: false, num: { kind: 'general' } }), null, 'nothing left is null (the record is deleted)')
+    eq(h.validateStyle('bold'), null, 'not an object')
+    eq(h.knownFont('"Times New Roman"'), 'Times New Roman', 'quoted font names')
+    eq(h.knownFont('Wingdings'), null, 'a font outside the list falls back')
+  })
+  await check('fmt-layers', () => {
+    const idx = h.indexFormats([
+      { rowKey: '', colKey: '', style: { font: 'Arial', size: 11 } },
+      { rowKey: '', colKey: 'B', style: { num: { kind: 'currency', cur: 'EGP', dp: 2 }, ha: 'right' } },
+      { rowKey: 'r1', colKey: '', style: { b: true, fill: '#7030A0', ha: 'center' } },
+      { rowKey: 'r1', colKey: 'B', style: { fill: '#FFC000' } },
+    ])
+    eq(h.resolveStyle(idx, 'r1', 'B'), { font: 'Arial', size: 11, num: { kind: 'currency', cur: 'EGP', dp: 2 }, ha: 'center', b: true, fill: '#FFC000' }, 'sheet → column → row → cell')
+    eq(h.resolveStyle(idx, 'r2', 'A'), { font: 'Arial', size: 11 }, 'only the sheet layer')
+    eq(h.resolveStyle(h.indexFormats([]), 'r', 'c'), null, 'no formatting')
+    eq(h.mergeStyle({ b: true, fill: '#FF0000' }, { b: null, i: true, fill: undefined }), { fill: '#FF0000', i: true }, 'null removes, undefined keeps')
+    eq(h.diffStyle({ b: true, fill: '#FF0000' }, { fill: '#00FF00', i: true }), { b: null, fill: '#00FF00', i: true }, 'diff as a patch')
+    eq(h.styleKey({ i: true, b: true }), h.styleKey({ b: true, i: true }), 'key ignores field order')
+  })
+  await check('fmt-css', () => {
+    const a = h.toCss({ b: true, fill: '#7030A0', ha: 'right', bl: { w: 'double', c: '#000000' }, bb: { w: 'dashed', c: '#FF0000' }, rot: 45, indent: 2, u: 'double', s: true })
+    eq(a.cell.color, '#FFFFFF', 'automatic white text on a dark fill')
+    eq(h.toCss({ fill: '#FFF2CC' }).cell.color, '#14131A', 'automatic ink on a light fill')
+    eq([a.cell.textAlign, a.cell.justifyContent], ['end', 'flex-end'], 'right is the logical end, so it mirrors in Arabic')
+    eq([a.border.borderInlineStart, a.border.borderBottom], ['3px double #000000', '1px dashed #FF0000'], 'borders keep their line styles, left is inline-start')
+    eq([a.cell.textDecorationLine, a.cell.textDecorationStyle, a.cell.paddingInlineStart], ['underline line-through', 'double', '32px'], 'double underline, strike, indent')
+    eq(a.text, { display: 'inline-block', transform: 'rotate(-45deg)' }, 'rotated text')
+    ok(h.toCss({ b: true, fill: '#7030A0', ha: 'right', bl: { w: 'double', c: '#000000' }, bb: { w: 'dashed', c: '#FF0000' }, rot: 45, indent: 2, u: 'double', s: true }) === a, 'the same look is cached')
+    eq(h.toCss(null), { cell: {}, text: null, border: null }, 'no style')
+  })
+  await check('fmt-display', () => {
+    const sp = x => x.replace(/[\u00A0\u202F]/g, ' ')
+    const en = (t, n) => sp(h.display(t, n, 'en')), ar = (t, n) => h.display(t, n, 'ar')
+    eq(en('12500', { kind: 'currency', cur: 'EGP', dp: 2 }), 'EGP 12,500.00', 'currency')
+    eq(en('-1234.1', { kind: 'number', dp: 2, neg: 'paren-red' }), '(1,234.10)', 'negative in brackets')
+    ok(h.showsRed('-1234.1', { kind: 'number', neg: 'paren-red' }) && !h.showsRed('5', { kind: 'number', neg: 'red' }), 'red negatives')
+    eq(en('1234.5', { kind: 'number', dp: 0, sep: false }), '1235', 'no separator, rounded')
+    eq(en('0.125', { kind: 'percent', dp: 1 }), '12.5%', 'percent of a fraction')
+    eq(en('12.5%', { kind: 'percent', dp: 1 }), '12.5%', 'typed percent')
+    eq(en('12500', { kind: 'scientific', dp: 2 }), '1.25E+04', 'scientific')
+    eq(en('2026-11-16', { kind: 'date', long: true }), 'Mon, 16 Nov 2026', 'long date')
+    eq(en('16/11/2026', { kind: 'date' }), '16/11/2026', 'short date, day first')
+    eq(en('16 Nov 2026', { kind: 'date', pattern: 'ddd d mmm' }), 'Mon 16 Nov', 'custom pattern')
+    eq(en('2026-11-16', { kind: 'date', pattern: 'dd/mm/yyyy' }), '16/11/2026', 'dd/mm/yyyy')
+    eq(en('14:30', { kind: 'time' }), '14:30', 'time')
+    eq(en('hello', { kind: 'currency', cur: 'EGP' }), 'hello', 'text in a Currency cell shows as typed')
+    eq(en('31/02/2026', { kind: 'date' }), '31/02/2026', 'an impossible date shows as typed')
+    eq(en('12500', { kind: 'text' }), '12500', 'Text format')
+    eq(en('١٢٥٠٠', { kind: 'number', dp: 0 }), '12,500', 'Arabic digits are read')
+    eq(ar('12500', { kind: 'number', dp: 0 }), '١٢٬٥٠٠', 'Arabic display follows the language')
+    ok(ar('2026-11-16', { kind: 'date', long: true }).includes('نوفمبر'), 'Arabic month names')
+    eq(h.parseNumber('(1,234)'), -1234, 'accounting negatives read back')
+    eq(h.parseNumber('1,23'), null, 'a bad grouping is text')
+    eq(h.bumpDecimals({ kind: 'currency', cur: 'EGP', dp: 2 }, 1), { kind: 'currency', cur: 'EGP', dp: 3 }, 'increase decimal')
+    eq(h.bumpDecimals(null, -1, '12.345'), { kind: 'number', dp: 2, sep: false }, 'General becomes Number with the typed decimals')
+    eq(h.bumpDecimals({ kind: 'number', dp: 0 }, -1), { kind: 'number', dp: 0 }, 'never below 0')
+    eq(h.numFromExcel('"EGP"\\ #,##0.00'), { kind: 'currency', cur: 'EGP', dp: 2 }, 'Excel currency code')
+    eq(h.numFromExcel('0.0%'), { kind: 'percent', dp: 1 }, 'Excel percent code')
+  })
+  await check('fmt-undo', () => {
+    const doc = { id: 's', updatedAt: '', rows: [], cols: [], cells: {} }
+    const ch = { kind: 'formats', items: [{ rowKey: 'r1', colKey: '', before: null, after: { b: true } }, { rowKey: '', colKey: 'c1', before: { i: true }, after: null }] }
+    const d1 = h.applyChange({ ...doc, extras: { ...h.emptyExtras(), formats: [{ rowKey: '', colKey: 'c1', style: { i: true } }] } }, ch)
+    eq(d1.extras.formats, [{ rowKey: 'r1', colKey: '', style: { b: true } }], 'apply: a row format added, a column format removed')
+    const d2 = h.applyChange(d1, h.invert(ch))
+    eq(d2.extras.formats, [{ rowKey: '', colKey: 'c1', style: { i: true } }], 'undo restores both')
+    eq(h.toServer([ch]).formats, [{ rowKey: 'r1', colKey: '', style: { b: true }, mode: 'set' }, { rowKey: '', colKey: 'c1', style: null, mode: 'set' }], 'saved as set records')
+    const step = h.makeStep('Bold', [ch])
+    eq(step.backward.length, 1, 'one undo step for a whole column')
+    const M = { id: 'm1', top: 'r1', left: 'c1', bottom: 'r1', right: 'c4' }
+    const mg = { kind: 'merges', add: [M], remove: [] }
+    eq(h.applyChange(doc, mg).extras.merges, [M], 'merge applied')
+    eq(h.applyChange(h.applyChange(doc, mg), h.invert(mg)).extras.merges, [], 'unmerge on undo')
+    eq(h.toServer([mg, h.invert(mg)]).merges, { add: [], remove: ['m1'] }, 'merged then undone: the server just removes it')
+    eq(h.toServer([h.invert(mg), mg]).merges, { add: [M], remove: ['m1'] }, 'unmerged then redone: a replace')
+    const q = h.mergeServer({ formats: [{ rowKey: 'r', colKey: 'c', style: { b: true }, mode: 'set' }] }, { formats: [{ rowKey: 'r', colKey: 'c', style: { i: true }, mode: 'merge' }] })
+    eq(q.formats, [{ rowKey: 'r', colKey: 'c', style: { b: true, i: true }, mode: 'set' }], 'queued set then merge collapse into one set')
+  })
+
   // ── the HTML clipboard, in Chromium ───────────────────────────────────────
   await check('clip-html', async () => {
     const { chromium } = require('playwright')

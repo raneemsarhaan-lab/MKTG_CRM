@@ -29,6 +29,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { parseClipboard, pastePlan, serialise, toGrid } from '@/lib/sheet-clipboard'
 import { edge as dataEdge } from '@/lib/sheet-selection'
+import type { CellCss } from '@/lib/sheet-format'
 
 export type GridCol = string
 export interface ActiveCell { key: string; col: GridCol }
@@ -122,6 +123,14 @@ export interface GridModel<R extends { key: string }> {
   onSelect?(rect: GridRect): void
   /** Row-number labels, when they aren't 1, 2, 3 (the linked sheets show clip numbers). */
   rowLabel?(row: R, index: number): ReactNode
+
+  // ── spec 015 ──
+  /**
+   * A cell's formatting, as `toCss` gives it (cached per style): the cell's
+   * font, colours and alignment, rotated text, and a border overlay. The
+   * value the model renders stays its own (number formats are applied there).
+   */
+  cellStyle?(row: R, col: GridCol): CellCss | null
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -824,6 +833,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const c = m.cols.indexOf(col)
               const selected = m.selection && multi && c >= 0 && inRect(i, c)
               const isNo = col === 'rowNo'
+              const fx = !isNo && m.cellStyle ? m.cellStyle(row, col) : null
+              const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` } : undefined
               return (
                 <div
                   key={col}
@@ -831,7 +842,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
                   className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}`}
-                  style={span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` } : undefined}
+                  style={fx ? { ...spanStyle, ...fx.cell } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
                   data-col={col}
@@ -938,7 +949,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           }}
                         />
                       ))
-                    : (isNo && m.rowLabel ? m.rowLabel(row, i) : m.render(row, col, () => cells.current.get(key)))}
+                    : (isNo && m.rowLabel ? m.rowLabel(row, i)
+                      : fx?.text ? <span style={fx.text}>{m.render(row, col, () => cells.current.get(key))}</span>
+                      : m.render(row, col, () => cells.current.get(key)))}
+                  {fx?.border && !isEditing && <span className="fx-cell-bd" aria-hidden="true" style={fx.border} />}
                   {isNo && m.onRowResize && (
                     <span className="fx-sheet-row-rz" aria-hidden="true" data-row-resize={row.key}
                           onPointerDown={e => startRowResize(row, e)}
