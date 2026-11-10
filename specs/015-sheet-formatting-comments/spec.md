@@ -38,6 +38,14 @@ The groups, in Excel's terms:
   - hide and unhide rows and columns.
 - **Comments**: threaded comments on a cell, with replies, @mentions, Resolve, and a marker in the cell's corner.
 
+## Clarifications
+
+### Session 2026-11-10
+
+- Q: Content and Video sheets? → A: **Everything everywhere.** Blank sheets and the linked Content and Video sheets both get formatting, editing tools and comments. The linked sheets have a few rules of their own, because their rows are tasks (FR-070–FR-075).
+- Q: One release or stages? → A: **In stages.** Stage 1 is stories 1–3: formatting, number formats and comments. Stage 2 is story 4, the editing tools. Stage 3 is story 5: sort, filter, styles, tables and conditional formatting. Each stage ships on its own.
+- Q: Who sees comments? → A: **Everyone who can open the sheet**, as in Excel and Google Sheets.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Make cells look the way I want (Priority: P1)
@@ -147,7 +155,11 @@ A member turns the plan into a table with **Format as Table**, which gives bande
 
 ### Edge Cases
 
-- **Linked sheets:** formatting and comments on the Content and Video sheets [NEEDS CLARIFICATION: Should formatting and comments also work on the Content and Video sheets (their rows are tasks), or only on blank sheets?].
+- **Linked sheets (Content and Video):**
+  - formatting belongs to the task's cell in that sheet, so it follows the task when rows are regrouped or re-sorted;
+  - a task that leaves the sheet (dropped, archived, deleted) takes its formatting and comments with it, and they come back if it does;
+  - built-in coloured cells (status, editor, type and choice pills) keep their own colours, and a fill shows around them;
+  - merged cells aren't offered there, because each row is a task.
 - **Protected sheets:** only the protector and admins may change formatting. Everyone may still comment, as in Excel, where comments can be allowed on a protected sheet.
 - **Merged cells and other actions:**
   - selecting a merged cell selects the whole merge;
@@ -224,7 +236,7 @@ A member turns the plan into a table with **Format as Table**, which gives bande
 
 - **FR-050**: Any member who can open a sheet MUST be able to add a threaded comment to a cell, reply, edit or delete their own, and resolve or reopen a thread.
 - **FR-051**: Cells with open threads MUST show a marker in the corner. Hovering or selecting MUST show the thread.
-- **FR-052**: @mentions in a comment MUST notify the member (spec 012), and the notification MUST open the sheet at that cell.
+- **FR-052**: @mentions in a comment MUST notify the member (spec 012), and the notification MUST open the sheet at that cell. Comments are visible to everyone who can open the sheet.
 - **FR-053**: Each sheet MUST have a comments panel listing open and resolved threads, newest first. Choosing a thread MUST select its cell.
 - **FR-054**: Comments MUST move with their cell when rows or columns are inserted, deleted, sorted or moved. Deleting a cell's row or column MUST delete its threads, and undo MUST restore them.
 
@@ -233,6 +245,15 @@ A member turns the plan into a table with **Format as Table**, which gives bande
 - **FR-060**: Formatting MUST survive reloads, and MUST be seen by every member.
 - **FR-061**: On a protected sheet, only its protector and admins MAY change formatting. Comments MUST stay open to everyone.
 - **FR-062**: Every control, menu, dialog and comment MUST work with the keyboard and a screen reader, and MUST be available in English and Arabic, with right-to-left mirroring.
+
+**Content and Video sheets**
+
+- **FR-070**: Formatting and comments MUST work on the Content and Video sheets as on blank sheets, with the exceptions below.
+- **FR-071**: There, formatting and comments MUST belong to the task's cell in that sheet. They MUST follow the task through regrouping, sorting and filtering, and leave and return with it when it's dropped or archived and restored.
+- **FR-072**: Formatting on those sheets MUST be open to every member, like the team's own columns (spec 013 R8). It MUST NOT change the task's data, and editing the task's fields keeps today's rule.
+- **FR-073**: Built-in coloured cells (status, editor, type and choice pills) MUST keep their own colours. A fill shows around them, not instead of them.
+- **FR-074**: Merge is not offered on those sheets, and the Merge controls say why.
+- **FR-075**: On those sheets, sort and filter MUST work within their groups (a video's clips, a theme's pieces) and MUST NOT change the board's own order. Fill Down and Find and Replace MUST change task fields through the same rules as typing, and skip, with a count, the cells a member can't edit.
 
 ### Key Entities
 
@@ -248,7 +269,7 @@ A member turns the plan into a table with **Format as Table**, which gives bande
 - **Table**: a range with a header row, banded rows, a colour style and filters.
 - **Conditional format rule**: a range, a condition, and a look, in an order.
 - **Sheet view settings**: frozen rows and columns, hidden rows and columns, the active filter.
-- **Comment thread**: a cell, open or resolved, and a list of comments (author, time, text, mentions, edited).
+- **Comment thread**: a cell, open or resolved, and a list of comments (author, time, text, mentions, edited). On a blank sheet the cell is a row and column; on the Content and Video sheets it is a task and column.
 
 ## Success Criteria *(mandatory)*
 
@@ -263,9 +284,12 @@ A member turns the plan into a table with **Format as Table**, which gives bande
 
 ## Assumptions
 
-- **Blank sheets** (spec 013) get every part of this feature. What the linked Content and Video sheets get depends on the open question above.
-- **Delivery:** all five stories in one go, or in stages [NEEDS CLARIFICATION: Ship everything together, or first Font/Fill/Borders/Alignment, Number formats and Comments (stories 1–3), then the editing tools, then sort/filter/styles/conditional formatting?].
-- **Comment visibility:** comments are visible to everyone who can open the sheet [NEEDS CLARIFICATION: Should comments be visible to the whole team, like the sheet itself, or only to people mentioned in the thread and its author?].
+- **Every sheet** gets this feature: blank sheets fully, and the Content and Video sheets with the rules in FR-070–FR-075.
+- **Delivery in three stages**, each independently usable:
+  1. stories 1–3: font, fill, borders, alignment, number formats, comments;
+  2. story 4: the editing tools;
+  3. story 5: sort, filter, cell styles, tables, conditional formatting.
+- **Comments are visible to everyone who can open the sheet**, as in Excel and Google Sheets. Only the author can edit a comment; the author and admins can delete it.
 - **No formulas or calculation**, as in spec 013. So there's no AutoSum, no "Total" row maths and no formula-based conditional rules. Number formats change only how a value looks.
 - **Comments follow Excel's modern threaded comments**, not old-style Notes. "Note" in Excel maps to a comment here.
 - **Fonts** are a set list of about 12 widely available faces (including Arial, Calibri-like, Inter, Montserrat and an Arabic face), because a browser can't use a member's installed fonts reliably.
