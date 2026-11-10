@@ -235,7 +235,12 @@
     "takeOff": "Take {name} off this comment",
     "openFile": "Open {name}",
     "link": "Link",
-    "openLink": "Open link"
+    "openLink": "Open link",
+    "zoomBar": "Zoom",
+    "zoomInBtn": "Zoom in (+)",
+    "zoomOutBtn": "Zoom out (−)",
+    "zoomFit": "Fit to screen (0)",
+    "zoomWidth": "Fit to width"
   },
   "sheet": {
     "view": {
