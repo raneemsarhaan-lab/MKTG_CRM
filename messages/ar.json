@@ -235,7 +235,12 @@
     "takeOff": "إزالة {name} من هذا التعليق",
     "openFile": "فتح {name}",
     "link": "رابط",
-    "openLink": "فتح الرابط"
+    "openLink": "فتح الرابط",
+    "zoomBar": "التكبير",
+    "zoomInBtn": "تكبير (+)",
+    "zoomOutBtn": "تصغير (−)",
+    "zoomFit": "ملاءمة الشاشة (0)",
+    "zoomWidth": "ملاءمة العرض"
   },
   "sheet": {
     "view": {

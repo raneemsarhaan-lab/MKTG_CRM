@@ -1204,16 +1204,39 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 }
 .fx-att-pv-btn.is-icon { padding: 0; width: 34px; }
 .fx-att-pv-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-/* Fitted: the full height of the preview area, the width following its
-   proportions (narrower only when the image is too wide for the screen);
-   sized in AttachmentPreview. Zoomed: the image at its real size (one image
-   pixel per screen pixel), scrolled to where it was clicked; drag to look around. */
-.fx-att-pv-body { min-height: 0; height: 100%; display: grid; place-items: center; overflow: hidden; }
-.fx-att-pv-body > img { max-width: none; max-height: none; object-fit: contain; border-radius: 6px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); }
+/* Fitted (100%): the full height of the preview area, the width following its
+   proportions (narrower only when the image is too wide for the screen); sized
+   in AttachmentPreview. Zoomed: the area scrolls, drag to look around. The zoom
+   bar floats at the bottom centre, as in ClickUp. */
+.fx-att-pv-stage { position: relative; }
+.fx-att-pv-body { min-height: 0; height: 100%; display: flex; overflow: auto; overscroll-behavior: contain; position: relative; scrollbar-width: none; }
+.fx-att-pv-body::-webkit-scrollbar { display: none; }
+.fx-att-pv-body:not(.is-zoomed) { overflow: hidden; }
+.fx-att-pv-body > :not(img) { margin: auto; }
+.fx-att-pv-body > img { flex: none; margin: auto; max-width: none; max-height: none; object-fit: contain; border-radius: 6px; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); }
 .fx-att-pv-body > img.can-zoom { cursor: zoom-in; }
-.fx-att-pv-body.is-zoomed { display: flex; overflow: auto; overscroll-behavior: contain; }
-.fx-att-pv-body.is-zoomed > img { flex: none; margin: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none; cursor: grab; }
+.fx-att-pv-body.is-zoomed > img { cursor: grab; }
 .fx-att-pv-body.is-zoomed > img.is-dragging { cursor: grabbing; }
+.fx-att-pv-zoom {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 3;
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 14px;
+  background: rgba(32, 32, 36, .94); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  color: #fff; font-variant-numeric: tabular-nums;
+}
+.fx-att-pv-zoom button {
+  height: 32px; min-width: 32px; padding: 0 6px; border: 0; border-radius: 8px; background: none; color: #fff;
+  display: inline-grid; place-items: center; cursor: pointer; font: 600 14px var(--font-body);
+}
+.fx-att-pv-zoom button:hover:not(:disabled) { background: rgba(255, 255, 255, .12); }
+.fx-att-pv-zoom button:disabled { opacity: .35; cursor: default; }
+.fx-att-pv-zoom button:focus-visible, .fx-att-pv-zoom input:focus-visible { outline: 2px solid #A78BFA; outline-offset: 2px; }
+.fx-att-pv-zoom .fx-att-pv-pct { min-width: 56px; }
+.fx-att-pv-zoom input[type="range"] { width: 150px; accent-color: #8B5CF6; cursor: pointer; }
+[dir="rtl"] .fx-att-pv-zoom { transform: translateX(50%); left: auto; right: 50%; }
+@media (max-width: 480px) {
+  .fx-att-pv-zoom input[type="range"] { display: none; }
+  .fx-att-pv-zoom button { min-width: 40px; height: 40px; }
+}
 .fx-att-pv-nav {
   width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
   background: var(--att-on-dark-soft); color: var(--panel);
