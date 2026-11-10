@@ -104,13 +104,13 @@ export function FormatToolbar({ state, target, onFormatCells }: {
     const disabled = opts.disabled ?? (off ? why ?? '' : null)
     const tip = `${label}${opts.kbd ? ` (${keyName(opts.kbd)})` : ''}${disabled ? ` · ${disabled}` : ''}`
     return (
-      <button type="button" key={key} className={`fx-fmt-b${opts.cls ? ` ${opts.cls}` : ''}`} data-fmt={key} aria-label={label} title={tip}
+      <button type="button" key={key} className={`fx-fmt-b${opts.cls ? ` ${opts.cls}` : ''}`} data-fmt={key} title={tip}
               aria-disabled={disabled !== null ? true : undefined}
               aria-pressed={opts.pressed}
               aria-haspopup={opts.menu ? (opts.menu === 'color' || opts.menu === 'fill' || opts.menu === 'borders' ? 'dialog' : 'menu') : undefined}
               aria-expanded={opts.menu ? open?.k === opts.menu : undefined}
               onClick={e => { if (disabled !== null) return; onClick(e) }}>
-        {inner}{opts.menu && <span className="fx-fmt-car" aria-hidden="true">▾</span>}
+        {inner}<span className="sr-only">{label}</span>{opts.menu && <span className="fx-fmt-car" aria-hidden="true">▾</span>}
       </button>
     )
   }

@@ -21,8 +21,8 @@ export function FormatSheet({ state, target, onClose, onFormatCells }: { state: 
   const [tab, setTab] = useState<typeof TABS[number]>('text')
   const off = !state || !!state.readOnly
   const b = (key: string, label: string, inner: React.ReactNode, on: () => void, pressed?: boolean, wide?: boolean) => (
-    <button key={key} type="button" className={`fx-fmt-b${wide ? ' is-wide' : ''}`} data-fmt={key} aria-label={label} title={label} aria-pressed={pressed}
-            aria-disabled={off || undefined} onClick={() => { if (!off) on() }}>{inner}</button>
+    <button key={key} type="button" className={`fx-fmt-b${wide ? ' is-wide' : ''}`} data-fmt={key} title={label} aria-pressed={pressed}
+            aria-disabled={off || undefined} onClick={() => { if (!off) on() }}>{inner}{inner !== label && <span className="sr-only">{label}</span>}</button>
   )
   const swatch = (k: 'color' | 'fill', c: string) => (
     <button key={k + c} type="button" className={`fx-fmt-sw is-big${(k === 'fill' ? st.fill : st.color) === c ? ' is-cur' : ''}`} style={{ background: c }}

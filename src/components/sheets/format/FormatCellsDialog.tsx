@@ -23,6 +23,9 @@ const NEG: NonNullable<NumberFormat['neg']>[] = ['minus', 'red', 'paren', 'paren
 const DATE_TYPES: NumberFormat[] = [{ kind: 'date' }, { kind: 'date', long: true }, { kind: 'date', pattern: 'dd/mm/yyyy' }, { kind: 'date', pattern: 'ddd d mmm' }, { kind: 'date', pattern: 'd mmmm yyyy' }]
 const LINES: BorderSide['w'][] = ['thin', 'medium', 'thick', 'dashed', 'dotted', 'double']
 
+/** An id from a label (Arabic labels have spaces, which would split aria-labelledby). */
+const idOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)
+
 function catNum(cat: typeof CATS[number], prev: NumberFormat | undefined): NumberFormat | undefined {
   const dp = prev?.dp ?? 2
   switch (cat) {
@@ -63,8 +66,8 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
   }
   const fld = (label: string, input: React.ReactNode) => <label className="fx-fc-fld"><span>{label}</span>{input}</label>
   const lb = <T extends string | number>(label: string, list: readonly T[], cur: T, name: (x: T) => string, pick: (x: T) => void, style?: (x: T) => React.CSSProperties | undefined) => (
-    <div className="fx-fc-fld"><span id={`${uid}-${label}`}>{label}</span>
-      <div className="fx-fc-lb" role="listbox" aria-labelledby={`${uid}-${label}`}>
+    <div className="fx-fc-fld"><span id={`${uid}-${idOf(label)}`}>{label}</span>
+      <div className="fx-fc-lb" role="listbox" aria-labelledby={`${uid}-${idOf(label)}`}>
         {list.map(x => <button key={String(x)} type="button" role="option" aria-selected={cur === x} style={style?.(x)} onClick={() => pick(x)}>{name(x)}</button>)}
       </div>
     </div>

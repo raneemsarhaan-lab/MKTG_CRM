@@ -2481,7 +2481,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-fc-lb button[aria-selected="true"] { background: var(--fx-pressed); color: var(--inbox-purple-deep); font-weight: 600; }
 .fx-fc-chk { display: flex; gap: 8px; align-items: center; }
 .fx-fc-sample { border: 1px solid var(--inbox-border); border-radius: 10px; padding: 10px 12px; background: var(--inbox-surface); }
-.fx-fc-sample small { display: block; color: var(--inbox-muted); font-size: 11.5px; margin-bottom: 4px; }
+.fx-fc-sample small { display: block; color: #4B5563; font-size: 11.5px; margin-bottom: 4px; }
 .fx-fc-pv { min-height: 34px; display: flex; align-items: center; padding: 4px 8px; background: var(--inbox-panel); border: 1px solid var(--sheet-grid); font-size: 14px; overflow: hidden; }
 .fx-fc-pv.is-tall { height: 56px; }
 .fx-fc-pv.is-center { justify-content: center; }
@@ -2501,7 +2501,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 @media (max-width: 640px) { .fx-fc-two, .fx-fc-three { grid-template-columns: 1fr; } }
 
 /* Formatting on a phone: a bottom sheet with tabs, 44 px targets */
-.fx-fmt-sheet { position: fixed; inset-inline: 0; bottom: 0; z-index: 55; background: var(--inbox-panel); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(20, 19, 26, .2); display: grid; gap: 10px; padding: 8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); max-height: 60vh; overflow: auto; color: var(--inbox-text); }
+.fx-fmt-sheet { position: fixed; inset-inline: 0; bottom: 0; z-index: 75; background: var(--inbox-panel); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(20, 19, 26, .2); display: grid; gap: 10px; padding: 8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); max-height: 60vh; overflow: auto; color: var(--inbox-text); }
 .fx-fmt-grab { width: 40px; height: 4px; border-radius: 2px; background: #E3E3EA; justify-self: center; }
 .fx-fmt-why { margin: 0; font-size: 12.5px; color: var(--fx-why-ink); background: var(--fx-why-bg); border-radius: 8px; padding: 6px 10px; }
 .fx-fmt-stabs { display: flex; gap: 4px; overflow-x: auto; }
@@ -2580,3 +2580,6 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-cmt-thread.is-full, .fx-cmt-panel.is-full { position: fixed; inset: 0; width: auto; max-height: none; border-radius: 0; border: 0; z-index: 70; padding-bottom: env(safe-area-inset-bottom, 0px); }
 .fx-cmt-thread.is-full .fx-cmt-items { flex: 1; }
 .fx-cmt-thread.is-full .fx-cmt-ico, .fx-cmt-panel.is-full .fx-cmt-ico { width: 44px; height: 44px; }
+/* A filled cell's quiet text (placeholders, "—") takes the cell's own text colour, so it stays readable on the fill. */
+.fx-sheet-td.has-fill .fx-sheet-muted { color: inherit; }
+.fx-sheet-td.has-fill .fx-sheet-link, .fx-sheet-td.has-fill .fx-sheet-dropb { color: inherit; text-decoration: underline; }

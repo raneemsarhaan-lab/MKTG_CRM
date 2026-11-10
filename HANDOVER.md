@@ -581,6 +581,33 @@ Each member logs the hours they worked each day (spec 014, `specs/014-daily-hour
   - `scripts/hours-lab/smoke/run.ts` (actions on PostgreSQL);
   - `node scripts/hours-lab/realapp/run.cjs` (running app, two members, axe).
 
+### Sheet formatting and comments
+
+Excel's Home tab and threaded comments on every sheet (spec 015, `specs/015-sheet-formatting-comments/`). Design: `design/sheet-formatting.html`. Stage 1 (formatting, number formats, comments) is built; stage 2 (editing tools) and stage 3 (sort, filter, styles, tables, conditional formatting) are still to come.
+
+- **Data.**
+  - `sheet_formats(sheet_id, row_key, col_key, style)`: a style for a cell, a whole row (`col_key ''`), a whole column (`row_key ''`) or the sheet (both `''`). Keys are a blank sheet's row and column ids, or a task id and column key on the Content and Video sheets. They are not foreign keys, so undoing a row delete, or restoring a task, brings formatting back.
+  - `sheet_merges`: blank sheets only, by the row and column ids at the edges.
+  - `sheet_comments`: a thread is its first comment (`root_id` null) plus replies; resolve is kept on the root; delete is soft.
+- **Rules.** `src/lib/sheet-format.ts` (pure): the `CellStyle` validator, layering (sheet → column → row → cell), cached CSS (`toCss`), number and date display through `Intl` (values stay as typed), the selection and border planners, and the clipboard's CSS reading and writing.
+- **Server.**
+  - `src/actions/sheets.ts`: `applySheetChanges` takes `formats` and `merges` (protected sheets refuse others' formatting); `loadLinkedSheetExtras` and `applyLinkedFormats` serve the Content and Video sheets (any member, never a task change, no merges).
+  - `src/actions/sheet-comments.ts`: list, add, reply, edit (author), delete (author or admin), resolve, reopen. Mentions are read from the `@Name`s in the text.
+  - Notifications `sheet_mention` and `sheet_reply` (`notifySheet` in `src/lib/notify/notify.ts`) have `task_id` null and carry the cell in `meta`; `sheetTarget` turns that into `/sheets/<folder>?sheet=<id>&cell=<row>:<col>`.
+- **Screens.**
+  - The toolbar, pickers, Format Cells and the phone bottom sheet live in `src/components/sheets/format/`.
+  - They talk to the open sheet over document events (`format/bus.ts`), because the Content and Video sheets are rendered by the board's page.
+  - `BlankSheet` handles formats, merges, autofit rows and styled copy and paste.
+  - `useLinkedFormats` does the same for the Content and Video grids; their server calls come from the workbook through `LinkedFormatsContext`.
+  - Comments: `src/components/sheets/comments/SheetComments.tsx`.
+- **Know before you change it.**
+  - Ctrl+1 is Chrome's own tab key, so Format Cells opens from the toolbar button or "More number formats…" there.
+  - The outbox waits 400 ms before saving, as for cell edits.
+- **Checks.**
+  - `npm run lab:spreadsheet` (pure, plus Excel and Google Sheets clipboard fixtures in Chromium);
+  - `scripts/spreadsheet-lab/smoke/run.ts` (actions on PostgreSQL);
+  - `node scripts/spreadsheet-lab/realapp/format.cjs` (running app: two members, the Content sheet, Arabic, a phone, axe).
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.

@@ -881,7 +881,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}`}
+                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}`}
                   style={fx ? { ...spanStyle, ...fx.cell } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}

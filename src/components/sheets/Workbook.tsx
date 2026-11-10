@@ -535,10 +535,10 @@ export function Workbook(p: WorkbookProps) {
         {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
         {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
         <button type="button" className="fx-sh-ib is-text fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
-                aria-label={t('comments.button', { n: openThreads })} title={t('comments.title')} onClick={() => setCommentsOpen(v => !v)}>
+                title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
-          {!phone && <span>{t('comments.title')}</span>}
-          {openThreads > 0 && <span className="fx-cmt-badge" aria-hidden="true">{openThreads}</span>}
+          <span className={phone ? 'sr-only' : undefined}>{t('comments.title')}</span>
+          {openThreads > 0 && <span className="fx-cmt-badge">{openThreads}</span>}
         </button>
         {phone && fmtState && (
           <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
