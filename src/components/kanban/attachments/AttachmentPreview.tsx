@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Member, TaskAttachment } from '@/types/index'
 import { attachmentKind, attachmentSrc, extensionOf, isImageAttachment } from '@/lib/attachments'
@@ -57,7 +57,64 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
   const closeRef = useRef<HTMLButtonElement>(null)
   const swipe    = useRef<{ x: number; y: number } | null>(null)
 
-  useEffect(() => { setZoom(false) }, [index])
+  const bodyRef  = useRef<HTMLDivElement>(null)
+  const imgRef   = useRef<HTMLImageElement>(null)
+  /** The image is shown smaller than its real size, so a click can zoom it. */
+  const [canZoom, setCanZoom] = useState(false)
+  /** Where the click landed, as a fraction of the image: the zoom centres there. */
+  const zoomAt = useRef({ fx: 0.5, fy: 0.5 })
+  /** A drag to look around the zoomed image (mouse). */
+  const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null)
+  const [dragging, setDragging] = useState(false)
+
+  useEffect(() => { setZoom(false); setCanZoom(false) }, [index])
+
+  /** Fitted: is the image smaller on screen than its real size? */
+  function measure() {
+    const i = imgRef.current
+    if (!i || zoom || !i.naturalWidth) return
+    const r = i.getBoundingClientRect()
+    setCanZoom(i.naturalWidth > r.width + 1 || i.naturalHeight > r.height + 1)
+  }
+  useEffect(() => {
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  })
+  // Zoomed: real size, with the clicked spot in the middle of the screen.
+  useLayoutEffect(() => {
+    const body = bodyRef.current, i = imgRef.current
+    if (!zoom || !body || !i) return
+    body.scrollLeft = zoomAt.current.fx * i.naturalWidth - body.clientWidth / 2
+    body.scrollTop = zoomAt.current.fy * i.naturalHeight - body.clientHeight / 2
+  }, [zoom])
+
+  function onImageClick(e: React.MouseEvent<HTMLImageElement>) {
+    // The end of a drag isn't a click.
+    if (drag.current?.moved) { drag.current = null; return }
+    drag.current = null
+    if (zoom) { setZoom(false); return }
+    if (!canZoom) return
+    const r = e.currentTarget.getBoundingClientRect()
+    zoomAt.current = { fx: (e.clientX - r.left) / r.width, fy: (e.clientY - r.top) / r.height }
+    setZoom(true)
+  }
+  function onImagePointerDown(e: React.PointerEvent<HTMLImageElement>) {
+    if (!zoom || e.pointerType !== 'mouse' || e.button !== 0) return
+    const body = bodyRef.current
+    if (!body) return
+    e.preventDefault()
+    drag.current = { x: e.clientX, y: e.clientY, left: body.scrollLeft, top: body.scrollTop, moved: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(true)
+  }
+  function onImagePointerMove(e: React.PointerEvent<HTMLImageElement>) {
+    const d = drag.current, body = bodyRef.current
+    if (!d || !body) return
+    const dx = e.clientX - d.x, dy = e.clientY - d.y
+    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true
+    body.scrollLeft = d.left - dx
+    body.scrollTop = d.top - dy
+  }
   useEffect(() => { closeRef.current?.focus() }, [])
 
   const rtl = typeof document !== 'undefined' && getComputedStyle(document.documentElement).direction === 'rtl'
@@ -71,7 +128,7 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
       const forward = rtl ? 'ArrowLeft' : 'ArrowRight'
       const back    = rtl ? 'ArrowRight' : 'ArrowLeft'
       let handled = true
-      if (e.key === 'Escape') onClose(a.id)
+      if (e.key === 'Escape') { if (zoom) setZoom(false); else onClose(a.id) }
       else if (e.key === forward) go(index + 1)
       else if (e.key === back) go(index - 1)
       else if (e.key === 'Home') go(0)
@@ -155,11 +212,21 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
           <AttIcon name="left" size={22} />
         </button>
 
-        <div className={`fx-att-pv-body${zoom && image ? ' is-zoomed' : ''}`}>
+        <div ref={bodyRef} className={`fx-att-pv-body${zoom && image ? ' is-zoomed' : ''}`}>
           {image ? (
+            // Fitted inside the screen, never larger than the file; a click
+            // shows it at its real size, centred on the spot clicked.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={src ?? ''} alt={a.filename} title={zoom ? t('zoomOut') : t('zoomIn')}
-                 onClick={() => setZoom(z => !z)} />
+            <img ref={imgRef} src={src ?? ''} alt={a.filename} draggable={false}
+                 className={`${canZoom || zoom ? 'can-zoom' : ''}${dragging ? ' is-dragging' : ''}`}
+                 title={zoom ? t('zoomOut') : canZoom ? t('zoomIn') : t('fullSize')}
+                 style={zoom && imgRef.current ? { width: imgRef.current.naturalWidth, height: imgRef.current.naturalHeight } : undefined}
+                 onLoad={measure}
+                 onClick={onImageClick}
+                 onPointerDown={onImagePointerDown}
+                 onPointerMove={onImagePointerMove}
+                 onPointerUp={() => setDragging(false)}
+                 onPointerCancel={() => { drag.current = null; setDragging(false) }} />
           ) : isPdf && src ? (
             // Chrome's PDF viewer: no fixed-width toolbar, fit to width (see the old preview's notes).
             <iframe src={`${src}#toolbar=0&navpanes=0&view=FitH`} title={a.filename}

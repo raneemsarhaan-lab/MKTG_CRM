@@ -46,15 +46,27 @@ export const us2 = [
   {
     id: 'us2-3',
     async run(t) {
+      // A 400 × 500 poster already at full size: nothing to zoom.
+      const size = t.page.viewportSize()
       await openOn(t, 'Post v1')
       const img = t.page.locator('.fx-att-pv-body img')
       await img.click()
+      t.assert(await t.page.locator('.fx-att-pv-body.is-zoomed').count() === 0, 'an image shown at its own size doesn’t zoom')
+      // A short window shows it smaller; a click shows its real size, 400 × 500.
+      await t.page.setViewportSize({ width: size.width, height: 460 })
+      await t.page.waitForTimeout(150)
+      const fitted = await img.boundingBox()
+      t.assert(fitted.height < 500, `fitted smaller than the file (${Math.round(fitted.height)})`)
+      await img.click()
       t.assert(await t.page.locator('.fx-att-pv-body.is-zoomed').count() === 1, 'zoomed in')
+      const real = await img.boundingBox()
+      t.eq([Math.round(real.width), Math.round(real.height)], [400, 500], 'zoom shows the real size')
       await t.page.locator('.fx-att-pv-body img').click()
       t.assert(await t.page.locator('.fx-att-pv-body.is-zoomed').count() === 0, 'fitted again')
       await t.page.locator('.fx-att-pv-body img').click()
       await t.page.keyboard.press('ArrowRight')
       t.assert(await t.page.locator('.fx-att-pv-body.is-zoomed').count() === 0, 'zoom resets on another file')
+      await t.page.setViewportSize(size)
     },
   },
   {
