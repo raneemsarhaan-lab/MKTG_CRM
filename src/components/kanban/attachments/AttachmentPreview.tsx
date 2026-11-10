@@ -67,18 +67,29 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
   const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null)
   const [dragging, setDragging] = useState(false)
 
-  useEffect(() => { setZoom(false); setCanZoom(false) }, [index])
+  /** Fitted size: the full height of the preview area, the width following; narrower when the image is too wide for the screen. */
+  const [fit, setFit] = useState<{ w: number; h: number } | null>(null)
 
-  /** Fitted: is the image smaller on screen than its real size? */
+  useEffect(() => { setZoom(false); setCanZoom(false); setFit(null) }, [index])
+
   function measure() {
-    const i = imgRef.current
-    if (!i || zoom || !i.naturalWidth) return
-    const r = i.getBoundingClientRect()
-    setCanZoom(i.naturalWidth > r.width + 1 || i.naturalHeight > r.height + 1)
+    const i = imgRef.current, body = bodyRef.current
+    if (!i || !body || !i.naturalWidth || !i.naturalHeight) return
+    const W = body.clientWidth, H = body.clientHeight
+    if (!W || !H) return
+    const scale = Math.min(H / i.naturalHeight, W / i.naturalWidth)
+    const w = Math.round(i.naturalWidth * scale), h = Math.round(i.naturalHeight * scale)
+    setFit(f => (f && f.w === w && f.h === h ? f : { w, h }))
+    // Zoom only helps when the fitted image is smaller than the file.
+    setCanZoom(i.naturalWidth > w + 1 || i.naturalHeight > h + 1)
   }
+  // Refit when the window or the preview area changes size.
   useEffect(() => {
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    const body = bodyRef.current
+    if (!body) return
+    const ro = new ResizeObserver(() => { if (!zoom) measure() })
+    ro.observe(body)
+    return () => ro.disconnect()
   })
   // Zoomed: real size, with the clicked spot in the middle of the screen.
   useLayoutEffect(() => {
@@ -219,8 +230,10 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
             // eslint-disable-next-line @next/next/no-img-element
             <img ref={imgRef} src={src ?? ''} alt={a.filename} draggable={false}
                  className={`${canZoom || zoom ? 'can-zoom' : ''}${dragging ? ' is-dragging' : ''}`}
-                 title={zoom ? t('zoomOut') : canZoom ? t('zoomIn') : t('fullSize')}
-                 style={zoom && imgRef.current ? { width: imgRef.current.naturalWidth, height: imgRef.current.naturalHeight } : undefined}
+                 title={zoom ? t('zoomOut') : canZoom ? t('zoomIn') : undefined}
+                 style={zoom && imgRef.current
+                   ? { width: imgRef.current.naturalWidth, height: imgRef.current.naturalHeight }
+                   : fit ? { width: fit.w, height: fit.h } : { visibility: 'hidden' }}
                  onLoad={measure}
                  onClick={onImageClick}
                  onPointerDown={onImagePointerDown}

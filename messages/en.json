@@ -235,8 +235,7 @@
     "takeOff": "Take {name} off this comment",
     "openFile": "Open {name}",
     "link": "Link",
-    "openLink": "Open link",
-    "fullSize": "Shown at full size"
+    "openLink": "Open link"
   },
   "sheet": {
     "view": {

@@ -235,8 +235,7 @@
     "takeOff": "إزالة {name} من هذا التعليق",
     "openFile": "فتح {name}",
     "link": "رابط",
-    "openLink": "فتح الرابط",
-    "fullSize": "معروضة بحجمها الكامل"
+    "openLink": "فتح الرابط"
   },
   "sheet": {
     "view": {
