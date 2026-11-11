@@ -181,3 +181,23 @@ async function setResolved(id: string, on: boolean): Promise<{ success: true; th
 }
 export async function resolveThread(id: string) { return setResolved(id, true) }
 export async function reopenThread(id: string) { return setResolved(id, false) }
+
+/**
+ * Clear › Comments (spec 015 FR-042): the comments on these cells, soft
+ * deleted. Members clear their own; admins clear all. What someone else
+ * wrote is left and counted. Not on the undo stack, as in Excel (R6).
+ */
+export async function clearCellComments(sheet: string, keys: string[]): Promise<{ success: true; cleared: number; skipped: number } | Fail> {
+  const me = await getSessionMember()
+  if (!me) return fail('not_authenticated')
+  const s = await prisma.sheet.findUnique({ where: sheetWhere(sheet), select: { id: true } })
+  if (!s) return fail('gone')
+  const pairs = keys.slice(0, 20_000).map(k => { const i = k.lastIndexOf('|'); return i > 0 ? [k.slice(0, i), k.slice(i + 1)] : null }).filter((x): x is string[] => !!x)
+  if (!pairs.length) return { success: true, cleared: 0, skipped: 0 }
+  const rows = await prisma.$queryRaw<{ id: string; author_id: string | null }[]>`
+    SELECT id, author_id FROM sheet_comments WHERE sheet_id = ${s.id}::uuid AND deleted_at IS NULL AND (row_key, col_key) IN (
+      SELECT * FROM unnest(${pairs.map(p => p[0])}::text[], ${pairs.map(p => p[1])}::text[]))`
+  const mine = rows.filter(r => me.access === 'admin' || r.author_id === me.id).map(r => r.id)
+  if (mine.length) await prisma.sheetComment.updateMany({ where: { id: { in: mine } }, data: { deleted_at: new Date() } })
+  return { success: true, cleared: mine.length, skipped: rows.length - mine.length }
+}

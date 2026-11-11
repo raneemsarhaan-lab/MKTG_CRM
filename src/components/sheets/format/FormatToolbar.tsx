@@ -14,7 +14,7 @@ import type { BorderSide, CellStyle, NumberFormat } from '@/types/index'
 import { CURRENCIES } from '@/types/index'
 import { DEFAULT_FONT, DEFAULT_SIZE, FONTS, FONT_SIZES, bumpDecimals, display, type BorderPreset, type StylePatch } from '@/lib/sheet-format'
 import { PopMenu, type PopItem } from '../PopMenu'
-import { askComment, sendFormat, type FormatSource, type FormatState, type MergeMode } from './bus'
+import { askComment, sendFormat, type ClearWhat, type FormatSource, type FormatState, type MergeMode, type ViewOp } from './bus'
 import { ColorPicker } from './ColorPicker'
 import { BorderPicker } from './BorderPicker'
 
@@ -28,6 +28,13 @@ const P: Record<string, ReactNode> = {
   pct: <><path d="M6 18L18 6" /><circle cx="7" cy="7" r="2" /><circle cx="17" cy="17" r="2" /></>,
   fmtCells: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M9 9v11" /></>,
   comment: <path d="M4 5h16v11H9l-5 4z" />,
+  paste: <><rect x="6" y="5" width="12" height="16" rx="2" /><path d="M9 5V3h6v2" /></>,
+  painter: <><rect x="4" y="3" width="13" height="6" rx="1" /><path d="M17 6h3v5h-8v4M12 15v6" /></>,
+  fmt: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 10h18M3 16h18" /></>,
+  clear: <><path d="M14 4l6 6-9 9H7l-3-3z" /><path d="M10 8l6 6" /></>,
+  fillDn: <><path d="M12 4v14M7 13l5 5 5-5" /><path d="M5 21h14" /></>,
+  find: <><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5" /></>,
+  freeze: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 9h18M8 4v16" strokeWidth="2.6" /></>,
 }
 const Icon = ({ k }: { k: string }) => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[k]}</svg>
@@ -76,12 +83,18 @@ export function useFormatActions(target: FormatSource, state: FormatState | null
   }
 }
 
-type Open = { k: 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merge' | 'num' | 'cur'; el: HTMLElement } | null
+type Open = { k: 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merge' | 'num' | 'cur' | 'paste' | 'fmt' | 'clear' | 'fillDn' | 'find' | 'freeze'; el: HTMLElement } | null
 
-export function FormatToolbar({ state, target, onFormatCells }: {
+export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind }: {
   state: FormatState | null
   target: FormatSource
   onFormatCells(): void
+  /** Stage 2: Format Painter is on (sticky after a double-click). */
+  painter: boolean
+  onPainter(sticky: boolean): void
+  onPaste(mode: 'all' | 'values' | 'formats'): void
+  onPasteSpecial(): void
+  onFind(replace: boolean): void
 }) {
   const t = useTranslations('sheets.format')
   const tc = useTranslations('sheets.comments')
@@ -135,10 +148,53 @@ export function FormatToolbar({ state, target, onFormatCells }: {
     { kind: 'sep', key: 's' },
     { key: 'more', label: t('num.more'), kbd: keyName('Ctrl+1'), onSelect: onFormatCells },
   ] }
+  // Stage 2 menus (FR-040–FR-047).
+  const e = (k: string) => t(`edit.${k}`)
+  const c = { paste: t('ctl.paste'), fmt: t('ctl.format'), clear: t('ctl.clear'), fillDown: t('ctl.fillDown'), find: t('ctl.find'), freeze: t('ctl.freeze') }
+  const viewOff = state?.viewOff ?? null
+  const cmd = (c: Parameters<typeof sendFormat>[1]) => () => sendFormat(target, c)
+  const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
+  if (open?.k === 'paste') menu = { label: c.paste, attr: 'data-paste-menu', items: [
+    { key: 'all', label: e('paste'), kbd: keyName('Ctrl+V'), onSelect: () => onPaste('all') },
+    { key: 'values', label: e('pasteValues'), onSelect: () => onPaste('values') },
+    { key: 'formats', label: e('pasteFormats'), onSelect: () => onPaste('formats') },
+    { kind: 'sep', key: 's' },
+    { key: 'special', label: e('pasteSpecial'), kbd: keyName('Ctrl+Shift+V'), onSelect: onPasteSpecial },
+  ] }
+  if (open?.k === 'fmt') menu = { label: c.fmt, attr: 'data-cells-menu', items: [
+    { key: 'rowHeight', label: e('rowHeight'), disabled: !!viewOff, why: viewOff ?? undefined, onSelect: cmd({ kind: 'resize', what: 'row' }) },
+    { key: 'colWidth', label: e('colWidth'), disabled: !!viewOff, onSelect: cmd({ kind: 'resize', what: 'col' }) },
+    { kind: 'sep', key: 's' },
+    vItem('hideRows', 'hideRows'), vItem('hideCols', 'hideCols'), vItem('unhideRows', 'unhideRows'), vItem('unhideCols', 'unhideCols'),
+  ] }
+  if (open?.k === 'clear') menu = { label: c.clear, attr: 'data-clear-menu', items: (['all', 'formats', 'contents', 'comments'] as ClearWhat[]).map(w => ({
+    key: w, label: e(`clear${w[0].toUpperCase()}${w.slice(1)}`), ...(w === 'contents' ? { kbd: 'Delete' } : {}), onSelect: cmd({ kind: 'clear', what: w }),
+  })) }
+  if (open?.k === 'fillDn') menu = { label: c.fillDown, attr: 'data-fill-menu', items: [
+    { key: 'down', label: e('fillDown'), kbd: keyName('Ctrl+D'), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
+    { key: 'right', label: e('fillRight'), kbd: keyName('Ctrl+R'), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
+  ] }
+  if (open?.k === 'find') menu = { label: c.find, attr: 'data-find-menu', items: [
+    { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
+    { key: 'replace', label: e('replace'), kbd: keyName('Ctrl+H'), onSelect: () => onFind(true) },
+  ] }
+  if (open?.k === 'freeze') {
+    const fz = state?.frozen ?? { rows: 0, cols: 0 }
+    menu = { label: c.freeze, attr: 'data-freeze-menu', items: [
+      vItem('freezeTop', 'freezeTop', fz.rows === 1 && fz.cols === 0, true), vItem('freezeFirst', 'freezeFirst', fz.rows === 0 && fz.cols === 1),
+      vItem('freezeHere', 'freezeHere', (fz.rows > 1 || fz.cols > 1) || (fz.rows === 1 && fz.cols === 1)), vItem('unfreeze', 'unfreeze'),
+    ] }
+  }
   if (open?.k === 'cur') menu = { label: t('ctl.currency'), attr: 'data-cur-menu', items: CURRENCIES.map(c => ({ key: c, label: t(`cur.${c}`), checked: st.num?.cur === c && st.num.kind === 'currency', onSelect: () => a.num({ kind: 'currency', cur: c, dp: st.num?.dp ?? 2 }) })) }
 
   return (
     <div className="fx-fmt-bar" role="toolbar" aria-label={t('bar')} data-format-bar="">
+      <div className="fx-fmt-g" role="group" aria-label={t('groups.clipboard')}>
+        {btn('paste', t('ctl.paste'), <Icon k="paste" />, ev => toggleOpen('paste', ev.currentTarget), { menu: 'paste' })}
+        <span onDoubleClick={() => { if (!off) onPainter(true) }}>
+          {btn('painter', t('ctl.painter'), <Icon k="painter" />, () => onPainter(false), { pressed: painter })}
+        </span>
+      </div>
       <div className="fx-fmt-g" role="group" aria-label={t('groups.font')}>
         {btn('font', t('ctl.font'), <span className="fx-fmt-sel is-font" style={{ fontFamily: FONTS.find(f => f.name === font)?.stack }}>{font}</span>, e => toggleOpen('font', e.currentTarget), { menu: 'font', cls: 'is-sel' })}
         {btn('size', t('ctl.size'), <span className="fx-fmt-sel is-size">{size}</span>, e => toggleOpen('size', e.currentTarget), { menu: 'size', cls: 'is-sel' })}
@@ -171,6 +227,15 @@ export function FormatToolbar({ state, target, onFormatCells }: {
         {btn('decUp', t('ctl.decUp'), <span className="fx-fmt-dec">.0<small>→.00</small></span>, () => a.decimals(1))}
         {btn('decDn', t('ctl.decDown'), <span className="fx-fmt-dec">.00<small>→.0</small></span>, () => a.decimals(-1))}
         {btn('fmtCells', t('ctl.formatCells'), <Icon k="fmtCells" />, () => onFormatCells(), { kbd: 'Ctrl+1' })}
+      </div>
+      <div className="fx-fmt-g" role="group" aria-label={t('groups.cells')}>
+        {btn('fmt', t('ctl.format'), <Icon k="fmt" />, ev => toggleOpen('fmt', ev.currentTarget), { menu: 'fmt' })}
+      </div>
+      <div className="fx-fmt-g" role="group" aria-label={t('groups.editing')}>
+        {btn('clear', t('ctl.clear'), <Icon k="clear" />, ev => toggleOpen('clear', ev.currentTarget), { menu: 'clear' })}
+        {btn('fillDn', t('ctl.fillDown'), <Icon k="fillDn" />, ev => toggleOpen('fillDn', ev.currentTarget), { menu: 'fillDn' })}
+        {btn('find', t('ctl.find'), <Icon k="find" />, ev => toggleOpen('find', ev.currentTarget), { menu: 'find', disabled: state ? null : '' })}
+        {btn('freeze', t('ctl.freeze'), <Icon k="freeze" />, ev => toggleOpen('freeze', ev.currentTarget), { menu: 'freeze' })}
       </div>
       <div className="fx-fmt-g" role="group" aria-label={tc('title')}>
         {btn('comment', tc('new'), <><Icon k="comment" /><span aria-hidden="true">＋</span></>, () => a.comment(), { kbd: 'Ctrl+Alt+M', disabled: state ? null : '' })}

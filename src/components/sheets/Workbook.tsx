@@ -26,7 +26,9 @@ import { TabBar } from './TabBar'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
 import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
-import { FORMAT_STATE, type FormatSource, type FormatState } from './format/bus'
+import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatState } from './format/bus'
+import { FindPanel, PasteSpecialDialog, readClipboard } from './format/EditTools'
+import type { CellStyle } from '@/types/index'
 import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
 import { FormatCellsDialog } from './format/FormatCellsDialog'
 import { FormatSheet } from './format/FormatSheet'
@@ -200,10 +202,34 @@ export function Workbook(p: WorkbookProps) {
       setFmt(f => { const n = { ...f }; if ('gone' in d) delete n[d.source]; else n[d.source] = d; return n })
     }
     document.addEventListener(FORMAT_STATE, on)
+    // A sheet may have announced itself before this listener was there (its effects run first).
+    document.dispatchEvent(new Event(FORMAT_ASK))
     return () => document.removeEventListener(FORMAT_STATE, on)
   }, [])
+  // Stage 2: Format Painter, Find and Replace, Paste Special.
+  const [painter, setPainter] = useState<{ style: CellStyle | null; sticky: boolean } | null>(null)
+  const painterRef = useRef(painter)
+  painterRef.current = painter
+  const [find, setFind] = useState<{ replace: boolean } | null>(null)
+  const [pasteSpecial, setPasteSpecial] = useState(false)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [openThreads, setOpenThreads] = useState(0)
+  // Format Painter: the next selection in the sheet takes the look (FR-040). Once, or until Esc after a double-click.
+  useEffect(() => {
+    if (!painter) return
+    const up = (e: PointerEvent) => {
+      const el = e.target as HTMLElement
+      if (!el.closest('.fx-sh-panel [data-cell]')) return
+      requestAnimationFrame(() => {
+        const cur = painterRef.current
+        if (!cur) return
+        sendFormat(openRef.current && sheets.find(x => x.id === openRef.current)?.kind === 'blank' ? 'blank' : 'linked', { kind: 'paint', style: cur.style })
+        if (!cur.sticky) setPainter(null)
+      })
+    }
+    document.addEventListener('pointerup', up, true)
+    return () => document.removeEventListener('pointerup', up, true)
+  }, [painter, sheets])
   const initialCell = useMemo(() => {
     const c = p.initialCell
     if (!c) return null
@@ -446,9 +472,16 @@ export function Workbook(p: WorkbookProps) {
     const ctrl = e.ctrlKey || e.metaKey
     // Spec 015: Ctrl+B, I, U, 5, Ctrl+Shift+$ % # !, Ctrl+1, Ctrl+Alt+M on the grid (not while typing in a cell).
     const el = e.target as HTMLElement
+    if (e.key === 'Escape' && painterRef.current) { setPainter(null); return }
     if (ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select, [contenteditable="true"]')) {
       const target: FormatSource = open?.kind === 'blank' ? 'blank' : 'linked'
       if (formatShortcut(e, target, fmt[target] ?? null, () => setFormatCells(true))) { e.preventDefault(); e.stopPropagation(); return }
+      // Stage 2: Paste Special, Fill Down and Right, Find and Replace (FR-003).
+      const k = e.key.toLowerCase()
+      const stop = () => { e.preventDefault(); e.stopPropagation() }
+      if (e.shiftKey && !e.altKey && k === 'v') { stop(); setPasteSpecial(true); return }
+      if (!e.shiftKey && !e.altKey && (k === 'd' || k === 'r')) { stop(); sendFormat(target, { kind: 'fill', dir: k === 'd' ? 'down' : 'right' }); return }
+      if (!e.shiftKey && !e.altKey && (k === 'f' || k === 'h')) { stop(); setFind({ replace: k === 'h' }); return }
     }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
       e.preventDefault(); e.stopPropagation()
@@ -544,9 +577,21 @@ export function Workbook(p: WorkbookProps) {
           <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
         )}
       </div>
-      {!phone && open && (!openBlank || doc) && <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)} />}
+      {!phone && open && (!openBlank || doc) && (
+        <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)}
+          painter={!!painter}
+          onPainter={sticky => setPainter(pt => (pt && !sticky ? null : { style: fmtState?.style ?? null, sticky }))}
+          onPaste={async mode => {
+            const clip = await readClipboard()
+            if (!clip || !clip.grid.length) { say(t('format.edit.noClip')); return }
+            sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles })
+          }}
+          onPasteSpecial={() => setPasteSpecial(true)}
+          onFind={replace => setFind({ replace })} />
+      )}
+      {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 
-      <div className="fx-sh-panel" id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
+      <div className={`fx-sh-panel${painter ? ' is-painting' : ''}`} id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
         {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
         {openBlank && (doc
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
@@ -598,8 +643,10 @@ export function Workbook(p: WorkbookProps) {
           onCount={setOpenThreads}
         />
       )}
+      {find && <FindPanel target={fmtTarget} replace={find.replace} onClose={() => setFind(null)} />}
+      {pasteSpecial && <PasteSpecialDialog target={fmtTarget} say={say} onClose={() => setPasteSpecial(false)} />}
       {formatCells && fmtState && <FormatCellsDialog state={fmtState} target={fmtTarget} onClose={() => setFormatCells(false)} />}
-      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} />}
+      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} onFind={replace => setFind({ replace })} />}
 
       {tabMenu && <PopMenu at={tabMenu.at} items={tabMenu.items} label={tabMenu.label} returnTo={tabMenu.anchor} attr={tabMenu.attr} onClose={() => setTabMenu(null)} />}
 

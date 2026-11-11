@@ -435,6 +435,16 @@ export interface SheetChanges {
   /** Spec 015 (contracts/server.md). */
   formats?: FormatWrite[]
   merges?: { add?: SheetMergeRecord[]; remove?: string[] }
+  /** Spec 015 stage 2: frozen panes and hidden rows and columns. */
+  view?: ViewWrite
+}
+export interface ViewWrite {
+  frozenRows?: number
+  frozenCols?: number
+  hideRows?: string[]
+  showRows?: string[]
+  hideCols?: string[]
+  showCols?: string[]
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─

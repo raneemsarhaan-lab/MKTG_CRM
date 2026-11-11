@@ -10,11 +10,11 @@ import { useTranslations } from 'next-intl'
 import { BORDER_PRESETS, FONTS, FONT_SIZES, DEFAULT_FONT, DEFAULT_SIZE, STANDARD_COLORS, THEME_COLORS } from '@/lib/sheet-format'
 import { useFormatActions, DEFAULT_LINE, NUM_MENU, numKey } from './FormatToolbar'
 import { PresetIcon } from './BorderPicker'
-import type { FormatSource, FormatState } from './bus'
+import { sendFormat, type FormatSource, type FormatState } from './bus'
 
-const TABS = ['text', 'fill', 'borders', 'align', 'number'] as const
+const TABS = ['text', 'fill', 'borders', 'align', 'number', 'edit'] as const
 
-export function FormatSheet({ state, target, onClose, onFormatCells }: { state: FormatState | null; target: FormatSource; onClose(): void; onFormatCells(): void }) {
+export function FormatSheet({ state, target, onClose, onFormatCells, onFind }: { state: FormatState | null; target: FormatSource; onClose(): void; onFormatCells(): void; onFind(replace: boolean): void }) {
   const t = useTranslations('sheets.format')
   const a = useFormatActions(target, state)
   const st = a.st
@@ -34,7 +34,7 @@ export function FormatSheet({ state, target, onClose, onFormatCells }: { state: 
       <span className="fx-fmt-grab" aria-hidden="true" />
       {off && state?.readOnly && <p className="fx-fmt-why">{state.readOnly}</p>}
       <div className="fx-fmt-stabs" role="tablist">
-        {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{t(`phone.tabs.${x}`)}</button>)}
+        {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{x === 'edit' ? t('groups.editing') : t(`phone.tabs.${x}`)}</button>)}
       </div>
       <div className="fx-fmt-sbody">
         {tab === 'text' && (
@@ -84,6 +84,16 @@ export function FormatSheet({ state, target, onClose, onFormatCells }: { state: 
             {b('decUp', t('ctl.decUp'), '.0→.00', () => a.decimals(1), undefined, true)}
             {b('decDn', t('ctl.decDown'), '.00→.0', () => a.decimals(-1), undefined, true)}
             {b('fmtCells', t('ctl.formatCells'), t('ctl.formatCells'), onFormatCells, undefined, true)}
+          </div>
+        )}
+        {tab === 'edit' && (
+          <div className="fx-fmt-row is-wrap">
+            {b('clearContents', t('edit.clearContents'), t('edit.clearContents'), () => sendFormat(target, { kind: 'clear', what: 'contents' }), undefined, true)}
+            {b('clearFormats', t('edit.clearFormats'), t('edit.clearFormats'), () => sendFormat(target, { kind: 'clear', what: 'formats' }), undefined, true)}
+            {b('fillDown', `${t('ctl.fillDown')} · ${t('edit.fillDown')}`, `${t('ctl.fillDown')} · ${t('edit.fillDown')}`, () => sendFormat(target, { kind: 'fill', dir: 'down' }), undefined, true)}
+            {b('findPh', t('edit.find'), t('edit.find'), () => { onClose(); onFind(false) }, undefined, true)}
+            {!state?.viewOff && b('freezeTop', t('edit.freezeTop'), t('edit.freezeTop'), () => sendFormat(target, { kind: 'view', op: (state?.frozen?.rows ?? 0) > 0 ? 'unfreeze' : 'freezeTop' }), (state?.frozen?.rows ?? 0) > 0, true)}
+            {!state?.viewOff && b('hideRowsPh', t('edit.hideRows'), t('edit.hideRows'), () => sendFormat(target, { kind: 'view', op: 'hideRows' }), undefined, true)}
           </div>
         )}
       </div>

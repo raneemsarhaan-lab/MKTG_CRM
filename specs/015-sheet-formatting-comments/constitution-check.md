@@ -10,3 +10,17 @@
 | **§VI State Architecture** | Types first (`CellStyle`, `NumberFormat`, `SheetFormatRecord`, `SheetCommentThread`…). Formats, merges and comments are server state. The open pickers, the Format Painter state and recent colours (per device) are UI-only. |
 | **Tech Stack** | No new dependency: the colour picker is native plus a palette, and number and date display use `Intl`. |
 | **Schema** | Additive only (`sheet_formats`, `sheet_merges`, `sheet_comments`), applied with `scripts/migrate.sh`. No backfill. |
+
+
+# Constitution Check: spec 015 stage 2 (for the PR description)
+
+| Principle | How this PR meets it |
+|---|---|
+| **§I Design System Fidelity** | The new menus, Find panel, Paste Special dialog, painter note and frozen and hidden markers use the existing `--sh-*` / `--fx-*` tokens and follow the Stage 2 boards in `design/sheet-formatting.html`. |
+| **§II Workflow Pipeline Integrity** | On the Content and Video sheets, Fill, Replace, Clear contents and Paste values go through each task's existing save (`useLinkedEditing.writeCells`), with the same rules as typing. Cells a member can't edit are skipped and counted. Stages, moves and SLAs are unchanged. Hide and Freeze are off on these sheets. |
+| **§III Role-Based Feature Access** | Hide, unhide and freeze are refused on another member's protected sheet (`applySheetChanges`). Clear Comments only removes your own comments; an admin's removes all (`clearCellComments`). |
+| **§IV Design-Driven Development** | The stage 2 tools were in the approved `design/sheet-formatting.html` before any UI code. |
+| **§V Cultural UX** | `sheets.format.edit.*` is in English and Arabic. Find matches Arabic text, and the panel and markers mirror in Arabic. The phone gets an Editing tab with 44 px targets. |
+| **§VI State Architecture** | Types first (`ViewWrite`, the new `FormatCmd` kinds). Hidden and frozen state is server state, with undo through the outbox. The painter, Find query and open dialogs are UI-only. |
+| **Tech Stack** | No new dependency. |
+| **Schema** | Additive only (`sheets.frozen_rows`, `frozen_cols`, `view`; `sheet_rows.hidden`, `sheet_cols.hidden`, all with defaults), applied with `scripts/migrate.sh`. No backfill. |

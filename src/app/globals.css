@@ -2583,3 +2583,31 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 /* A filled cell's quiet text (placeholders, "—") takes the cell's own text colour, so it stays readable on the fill. */
 .fx-sheet-td.has-fill .fx-sheet-muted { color: inherit; }
 .fx-sheet-td.has-fill .fx-sheet-link, .fx-sheet-td.has-fill .fx-sheet-dropb { color: inherit; text-decoration: underline; }
+
+/* Stage 2 (spec 015 US4): frozen panes, hidden markers, Format Painter, Find and Replace, Paste Special */
+.fx-sheet-tr.is-frozen-row > .fx-sheet-td { background-color: var(--sheet-panel); }
+.fx-sheet-tr.is-frozen-edge > .fx-sheet-td { border-bottom: 2px solid var(--fx-frozen); }
+.fx-sheet-td.is-frozen-edge-col, .fx-sheet-th.is-frozen-edge-col { border-inline-end: 2px solid var(--fx-frozen); }
+.fx-sheet-td.is-frozen-cell.is-selected, .fx-sheet-tr.is-frozen-row > .fx-sheet-td.is-selected { background: linear-gradient(var(--sh-sel), var(--sh-sel)), var(--sheet-panel) !important; }
+.fx-sheet-th.is-after-hidden { box-shadow: inset 3px 0 0 var(--sheet-header-bg), inset 4px 0 0 var(--sheet-muted); }
+[dir="rtl"] .fx-sheet-th.is-after-hidden { box-shadow: inset -3px 0 0 var(--sheet-header-bg), inset -4px 0 0 var(--sheet-muted); }
+.fx-sheet-tr.is-after-hidden > .fx-sheet-td.is-frozen-no { box-shadow: inset 0 3px 0 var(--sheet-gutter), inset 0 4px 0 var(--sheet-muted); }
+.fx-hid-mark { position: absolute; inset-inline-start: 2px; top: 3px; bottom: 3px; width: 10px; border: 0; padding: 0; background: transparent; cursor: pointer; z-index: 2; border-radius: 3px; }
+.fx-hid-mark.is-row { inset-inline: 3px; top: 2px; bottom: auto; width: auto; height: 8px; }
+.fx-hid-mark:hover, .fx-hid-mark:focus-visible { background: var(--fx-pressed); outline: 1px solid var(--fx-pressed-ink); }
+.fx-sh-panel.is-painting .fx-sheet-td { cursor: copy; }
+.fx-painter-note { margin: 0; padding: 6px 16px; font-size: 12.5px; color: var(--fx-pressed-ink); background: var(--fx-pressed); border-bottom: 1px solid var(--inbox-border); }
+.fx-find { position: fixed; z-index: 57; top: 156px; inset-inline-end: 24px; width: 340px; max-width: calc(100vw - 32px); display: grid; gap: 10px; padding: 12px 14px 14px; background: var(--inbox-panel); border: 1px solid var(--inbox-border); border-radius: 14px; box-shadow: 0 14px 34px rgba(20, 19, 26, .2); color: var(--inbox-text); font-size: 13.5px; }
+.fx-find header { display: flex; align-items: center; gap: 8px; }
+.fx-find h2 { margin: 0; font: 700 15px var(--font-heading); color: #14131A; margin-inline-end: auto; }
+[dir="rtl"] .fx-find h2 { font-family: inherit; }
+.fx-find .fx-fc-fld { grid-template-columns: 1fr; }
+.fx-find-status { margin: 0; min-height: 18px; font-size: 12.5px; color: #4B5563; }
+.fx-find-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.fx-find-row button { border: 1px solid #E3E3EA; background: var(--inbox-panel); border-radius: 999px; padding: 0 12px; min-height: 32px; font: 600 12.5px var(--font-body); cursor: pointer; color: inherit; }
+.fx-find-row button.is-go { background: #14131A; color: #fff; border-color: #14131A; }
+.fx-find-row button:disabled { opacity: .4; cursor: default; }
+.fx-ps-opt { padding: 6px 8px; border-radius: 6px; }
+.fx-ps-opt.is-off { color: var(--inbox-muted); }
+.fx-ps-why { padding: 0 8px 4px 34px; }
+@media (max-width: 640px) { .fx-find { top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); inset-inline: 12px; width: auto; z-index: 76; } }

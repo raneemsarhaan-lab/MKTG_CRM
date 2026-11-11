@@ -6,7 +6,7 @@
  * change set for the outbox. The same function applies a step backwards on
  * undo, so the screen, the server and the history can't disagree.
  */
-import type { FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord } from '@/types/index'
+import type { FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord, SheetView, ViewWrite } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { betweenMany } from '@/lib/sheet-positions'
 
@@ -108,7 +108,7 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'merges':
         out.merges = netMerges([...opsOf(out.merges), ...ch.remove.map(x => ({ remove: x.id })), ...ch.add.map(x => ({ add: x }))])
         break
-      case 'view': break // stage 2 (T039) saves view settings
+      case 'view': out.view = mergeView(out.view, viewWrite(ch.before, ch.after)); break
     }
   }
   return out
@@ -127,6 +127,7 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     rowHeights: cat(a.rowHeights, b.rowHeights), colWidths: cat(a.colWidths, b.colWidths), cells,
     formats: lastFormats(cat(a.formats, b.formats)),
     merges: a.merges || b.merges ? mergeMerges(a.merges, b.merges) : undefined,
+    view: a.view || b.view ? mergeView(a.view, b.view) : undefined,
   }
   // A row inserted and deleted in the same batch never needs to reach the server.
   for (const [ins, del] of [['insertRows', 'deleteRows'], ['insertCols', 'deleteCols']] as const) {
@@ -227,5 +228,36 @@ export function cellsOfCols(doc: SheetDoc, colIds: string[]): { rowId: string; c
   const ids = new Set(colIds)
   const out: { rowId: string; colId: string; value: string }[] = []
   for (const [rowId, row] of Object.entries(doc.cells)) for (const [colId, value] of Object.entries(row)) if (ids.has(colId)) out.push({ rowId, colId, value })
+  return out
+}
+
+/** A view change as the server takes it: frozen counts, and the rows and columns to hide or show. */
+export function viewWrite(before: Partial<SheetView>, after: Partial<SheetView>): ViewWrite {
+  const out: ViewWrite = {}
+  if (after.frozenRows !== undefined && after.frozenRows !== before.frozenRows) out.frozenRows = after.frozenRows
+  if (after.frozenCols !== undefined && after.frozenCols !== before.frozenCols) out.frozenCols = after.frozenCols
+  const diff = (a?: string[], b?: string[]) => { const A = new Set(a ?? []), B = new Set(b ?? []); return { add: [...B].filter(x => !A.has(x)), drop: [...A].filter(x => !B.has(x)) } }
+  if (after.hiddenRows) { const d = diff(before.hiddenRows, after.hiddenRows); if (d.add.length) out.hideRows = d.add; if (d.drop.length) out.showRows = d.drop }
+  if (after.hiddenCols) { const d = diff(before.hiddenCols, after.hiddenCols); if (d.add.length) out.hideCols = d.add; if (d.drop.length) out.showCols = d.drop }
+  return out
+}
+
+/** Two queued view writes as one, in order: the later frozen counts win, and a show undoes an earlier hide. */
+export function mergeView(a: ViewWrite | undefined, b: ViewWrite | undefined): ViewWrite | undefined {
+  if (!a) return b
+  if (!b) return a
+  const fold = (hideA?: string[], showA?: string[], hideB?: string[], showB?: string[]) => {
+    const hide = new Set(hideA ?? []), show = new Set(showA ?? [])
+    for (const x of hideB ?? []) { hide.add(x); show.delete(x) }
+    for (const x of showB ?? []) { show.add(x); hide.delete(x) }
+    return { hide: [...hide], show: [...show] }
+  }
+  const r = fold(a.hideRows, a.showRows, b.hideRows, b.showRows), c = fold(a.hideCols, a.showCols, b.hideCols, b.showCols)
+  const out: ViewWrite = { frozenRows: b.frozenRows ?? a.frozenRows, frozenCols: b.frozenCols ?? a.frozenCols }
+  if (r.hide.length) out.hideRows = r.hide
+  if (r.show.length) out.showRows = r.show
+  if (c.hide.length) out.hideCols = c.hide
+  if (c.show.length) out.showCols = c.show
+  for (const k of Object.keys(out) as (keyof ViewWrite)[]) if (out[k] === undefined) delete out[k]
   return out
 }

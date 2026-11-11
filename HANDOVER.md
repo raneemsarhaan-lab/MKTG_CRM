@@ -583,12 +583,13 @@ Each member logs the hours they worked each day (spec 014, `specs/014-daily-hour
 
 ### Sheet formatting and comments
 
-Excel's Home tab and threaded comments on every sheet (spec 015, `specs/015-sheet-formatting-comments/`). Design: `design/sheet-formatting.html`. Stage 1 (formatting, number formats, comments) is built; stage 2 (editing tools) and stage 3 (sort, filter, styles, tables, conditional formatting) are still to come.
+Excel's Home tab and threaded comments on every sheet (spec 015, `specs/015-sheet-formatting-comments/`). Design: `design/sheet-formatting.html`. Stage 1 (formatting, number formats, comments) and stage 2 (Format Painter, Paste Special, Clear, Fill, Find & Replace, hide and unhide, Freeze Panes) are built; stage 3 (sort, filter, styles, tables, conditional formatting) is still to come.
 
 - **Data.**
   - `sheet_formats(sheet_id, row_key, col_key, style)`: a style for a cell, a whole row (`col_key ''`), a whole column (`row_key ''`) or the sheet (both `''`). Keys are a blank sheet's row and column ids, or a task id and column key on the Content and Video sheets. They are not foreign keys, so undoing a row delete, or restoring a task, brings formatting back.
   - `sheet_merges`: blank sheets only, by the row and column ids at the edges.
   - `sheet_comments`: a thread is its first comment (`root_id` null) plus replies; resolve is kept on the root; delete is soft.
+  - Stage 2: `sheets.frozen_rows`, `frozen_cols` (and `view`, kept for later); `sheet_rows.hidden` and `sheet_cols.hidden`. These are saved as a `view` change through `applySheetChanges`, with undo like any other change.
 - **Rules.** `src/lib/sheet-format.ts` (pure): the `CellStyle` validator, layering (sheet → column → row → cell), cached CSS (`toCss`), number and date display through `Intl` (values stay as typed), the selection and border planners, and the clipboard's CSS reading and writing.
 - **Server.**
   - `src/actions/sheets.ts`: `applySheetChanges` takes `formats` and `merges` (protected sheets refuse others' formatting); `loadLinkedSheetExtras` and `applyLinkedFormats` serve the Content and Video sheets (any member, never a task change, no merges).
@@ -600,13 +601,18 @@ Excel's Home tab and threaded comments on every sheet (spec 015, `specs/015-shee
   - `BlankSheet` handles formats, merges, autofit rows and styled copy and paste.
   - `useLinkedFormats` does the same for the Content and Video grids; their server calls come from the workbook through `LinkedFormatsContext`.
   - Comments: `src/components/sheets/comments/SheetComments.tsx`.
+  - Stage 2: the tools' pure parts (find, replace, transpose, painter and clear patches) are in `src/lib/sheet-tools.ts`. Find & Replace and Paste Special are in `format/EditTools.tsx`. The painter lives in `Workbook.tsx`. Each tool is a `FormatCmd` on the bus, so the blank and linked sheets each carry it out.
+  - Hidden rows and columns are filtered out of a blank sheet's grid. Grid positions count visible rows only, but names and numbers use the row's real place, so hiding row 5 leaves row 6 numbered 6. Frozen rows and columns are sticky in `GridCore`.
+  - On the Content and Video sheets, Fill, Replace, Clear contents and Paste values go through each task's own save, and cells the person can't edit are counted. Hide and Freeze are off there, with the reason shown.
 - **Know before you change it.**
   - Ctrl+1 is Chrome's own tab key, so Format Cells opens from the toolbar button or "More number formats…" there.
   - The outbox waits 400 ms before saving, as for cell edits.
+  - Clear Comments only removes your own comments (an admin's: all). Paste Special can't paste comments, because they don't travel on the clipboard.
 - **Checks.**
   - `npm run lab:spreadsheet` (pure, plus Excel and Google Sheets clipboard fixtures in Chromium);
   - `scripts/spreadsheet-lab/smoke/run.ts` (actions on PostgreSQL);
   - `node scripts/spreadsheet-lab/realapp/format.cjs` (running app: two members, the Content sheet, Arabic, a phone, axe).
+  - `node scripts/spreadsheet-lab/realapp/editing.cjs` (stage 2 on the running app).
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 

@@ -229,7 +229,7 @@ export function SheetGrid(p: SheetGridProps) {
 
   // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
   // Spec 015: formatting by task and column; undo through the sheet's own stack.
-  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void } | null>(null)
+  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
   const cellName = (row: SheetRow, col: GridCol) => {
     if (col === 'rowNo') return ''
     const h = model.header(col)
@@ -241,6 +241,7 @@ export function SheetGrid(p: SheetGridProps) {
     enabled: !!p.linked, sheetKey: 'linked_video', rows: p.rows, cols: model.cols, active: p.active,
     taskOf: row => rowTask(row)?.id ?? null, cellName, textValue: model.textValue,
     recordFormats: (label, items) => leRef.current?.recordFormats(label, items),
+    writeCells: (w, why) => leRef.current?.writeCells(w, why) ?? Promise.resolve(null),
     say: text => p.linked?.say(text),
     select: (taskId, col) => {
       const row = p.rows.find(r => rowTask(r)?.id === taskId)
