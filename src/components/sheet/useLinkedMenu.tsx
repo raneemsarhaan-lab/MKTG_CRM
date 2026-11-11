@@ -13,13 +13,15 @@
  *   columns can be deleted.
  * - Row heights are shared by the team (`setLinkedRowHeights`).
  */
-import { useState, type ReactNode } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CellWrite, GridCol, GridRect, MenuTarget, WriteResult, WriteWhy } from './GridCore'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
 import { PopMenu, type PopItem } from '@/components/sheets/PopMenu'
 import { ConfirmDialog, ResizeDialog } from '@/components/sheets/Dialogs'
 import type { SheetColumnsHook } from './useSheetColumns'
+import { LinkedFormatsContext } from '@/components/sheets/format/context'
+import { askComment } from '@/components/sheets/format/bus'
 
 export interface LinkedMenuInput<R extends { key: string }> {
   rows: R[]
@@ -96,6 +98,7 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
     void p.saveHeights?.(ids.map(taskId => ({ taskId, height: h }))).then(r => { if (!r.success) { setHeights(before); p.say(t('err.generic')) } })
   }
 
+  const inWorkbook = !!useContext(LinkedFormatsContext)
   function contextMenu(target: MenuTarget, at: { x: number; y: number }, anchor: HTMLElement) {
     const q = target.rect
     const sel = p.rows.slice(q.r0, q.r1 + 1)
@@ -111,6 +114,8 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
       { key: 'copy', label: t('menu.copy'), kbd: k('C'), onSelect: () => clipboardCommand('copy', anchor) },
       { key: 'paste', label: t('menu.paste'), kbd: k('V'), onSelect: () => void menuPaste(q) },
       { key: 'clear', label: t('menu.clear'), kbd: 'Delete', onSelect: () => void clear(q) },
+      // Spec 015: comments, where the workbook hosts them.
+      ...(inWorkbook && target.kind === 'cell' ? [{ key: 'comment', label: t('comments.new'), kbd: mac ? '⌘⌥M' : 'Ctrl+Alt+M', onSelect: () => askComment() } as PopItem] : []),
     ]
     const insertRow: PopItem = { key: 'insertRow', label: p.removal === 'drop' ? t('menu.newClip') : t('menu.newPiece'), onSelect: () => { if (here && !p.insertRow(here)) p.say(t('err.generic')) } }
     const removeRows: PopItem = {

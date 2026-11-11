@@ -32,6 +32,8 @@ const PATHS: Record<NotificationKind, ReactNode> = {
   mention: <><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></>,
   due_soon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /></>,
   overdue: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /></>,
+  sheet_mention: <><circle cx="12" cy="12" r="4" /><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></>,
+  sheet_reply: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 6 6v4" /></>,
 }
 
 export function KindIcon({ kind, color = '#fff', size = 11 }: { kind: NotificationKind; color?: string; size?: number }) {

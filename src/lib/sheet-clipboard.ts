@@ -10,11 +10,20 @@
  * formulas arrive as the value Excel or Sheets put on the clipboard.
  */
 
+import type { CellStyle } from '@/types/index'
+import { cssForClipboard, excelSerialDate, parseCssClasses, parseCssDecls, styleFromCss } from '@/lib/sheet-format'
+
 export interface ClipCell {
   /** The cell's text, exactly: line breaks and inner spaces kept. */
   text: string
   /** The cell's first http(s) link, when the source had one. */
   href: string | null
+  /**
+   * Spec 015: the cell's formatting from an HTML table (Excel's classes,
+   * inline styles), null when it had none. Absent for plain text, so a text
+   * paste never touches formatting.
+   */
+  style?: CellStyle | null
 }
 
 type Parser = { parseFromString(s: string, type: 'text/html'): Document }
@@ -52,15 +61,39 @@ export function parseHtmlTable(html: string, parser: Parser): ClipCell[][] {
   const doc = parser.parseFromString(html, 'text/html')
   const table = doc.querySelector('table')
   const rows = Array.from((table ?? doc).querySelectorAll('tr'))
+  // Excel puts its formatting in class rules; Google Sheets and Momentum inline it.
+  const classes = parseCssClasses(Array.from(doc.querySelectorAll('style')).map(el => el.textContent ?? '').join('\n'))
   return rows.map(tr => {
     const out: ClipCell[] = []
     for (const td of Array.from(tr.children)) {
       if (td.tagName !== 'TD' && td.tagName !== 'TH') continue
       const a = td.querySelector('a[href]')
       const href = a?.getAttribute('href') ?? null
-      out.push({ text: cellText(td), href: href && /^https?:/i.test(href) ? href : null })
+      const decls: Record<string, string> = {}
+      for (const c of (td.getAttribute('class') ?? '').split(/\s+/)) if (classes[c]) Object.assign(decls, classes[c])
+      // The cell's own markup: <b>, <i>, <u>, <s>, <font color>, as Google Docs and some apps write it.
+      if (td.querySelector('b, strong')?.textContent === td.textContent && td.textContent) decls['font-weight'] ??= 'bold'
+      if (td.querySelector('i, em')?.textContent === td.textContent && td.textContent) decls['font-style'] ??= 'italic'
+      Object.assign(decls, parseCssDecls(td.getAttribute('style') ?? ''))
+      const gsFmt = td.getAttribute('data-sheets-numberformat')
+      if (gsFmt && !decls['mso-number-format']) { try { const f = JSON.parse(gsFmt) as Record<string, unknown>; if (typeof f['2'] === 'string') decls['mso-number-format'] = f['2'] } catch { /* not ours */ } }
+      const style = styleFromCss(decls)
+      let text = cellText(td)
+      // A number Excel or Sheets formatted: keep the value, not the shown text, so the format can show it.
+      const kind = style?.num?.kind
+      if (kind && kind !== 'text') {
+        const xnum = td.getAttribute('x:num')
+        let raw: string | null = xnum && xnum !== '' ? xnum : null
+        const gsVal = td.getAttribute('data-sheets-value')
+        if (!raw && gsVal) { try { const v = JSON.parse(gsVal) as Record<string, unknown>; if (typeof v['3'] === 'number') raw = String(v['3']) } catch { /* not ours */ } }
+        if (raw !== null && Number.isFinite(Number(raw))) {
+          if (kind === 'date') { const iso = excelSerialDate(Number(raw)); if (iso) text = iso }
+          else if (kind !== 'time') text = raw
+        }
+      }
+      out.push({ text, href: href && /^https?:/i.test(href) ? href : null, style })
       const span = Math.min(200, Number(td.getAttribute('colspan') ?? 1) || 1)
-      for (let i = 1; i < span; i++) out.push({ text: '', href: null })
+      for (let i = 1; i < span; i++) out.push({ text: '', href: null, style: null })
     }
     return out
   })
@@ -127,10 +160,26 @@ export function toGrid(cells: ClipCell[][]): string[][] {
 const escHtml = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 const quoteTsv = (s: string) => (/[\t\n\r"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
 
-/** Cells → what goes on the clipboard: an HTML table and Excel-quoted tab-separated text. */
-export function serialise(grid: string[][]): { html: string; text: string } {
+/** The styles of a paste, row by row; null when the clipboard had no HTML table. */
+export function toStyles(cells: ClipCell[][]): (CellStyle | null)[][] | null {
+  if (!cells.some(r => r.some(c => c.style !== undefined))) return null
+  return cells.map(r => r.map(c => c.style ?? null))
+}
+
+/**
+ * Cells → what goes on the clipboard: an HTML table and Excel-quoted
+ * tab-separated text. With spec 015's `styles` and `shown`, the HTML carries
+ * each cell's look and the text as formatted (EGP 12,500.00), as Google
+ * Sheets does; the tab-separated text keeps the values as typed (12500).
+ */
+export function serialise(grid: string[][], opts: { styles?: (CellStyle | null)[][]; shown?: string[][] } = {}): { html: string; text: string } {
   const text = grid.map(r => r.map(quoteTsv).join('\t')).join('\n')
-  const body = grid.map(r => `<tr>${r.map(c => `<td>${escHtml(c).replace(/\r?\n/g, '<br>')}</td>`).join('')}</tr>`).join('')
+  const td = (r: number, c: number, v: string) => {
+    const css = cssForClipboard(opts.styles?.[r]?.[c])
+    const shown = opts.shown?.[r]?.[c] ?? v
+    return `<td${css ? ` style="${escHtml(css)}"` : ''}>${escHtml(shown).replace(/\r?\n/g, '<br>')}</td>`
+  }
+  const body = grid.map((row, r) => `<tr>${row.map((c, ci) => td(r, ci, c)).join('')}</tr>`).join('')
   const html = `<meta charset="utf-8"><table><tbody>${body}</tbody></table>`
   return { html, text }
 }

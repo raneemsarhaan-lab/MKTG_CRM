@@ -1,0 +1,1060 @@
+<title>Sheet Formatting and Comments</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Caveat:wght@500&display=swap">
+<style>
+/* Layout: a control strip (screen, device, language) over one workbook frame
+   in Momentum's own look (spec 013): crumbs, workbook toolbar, the new format
+   toolbar in Excel's Home-tab order, the grid, Excel's tab bar. Cell colours
+   the member picks are content, not UI tokens. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --lime: #C9F24E; --link: #1D4ED8;
+  --sh-sel: rgba(124, 58, 237, .10); --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --bad: #C81E3A;
+  --cmt: #7C3AED; --mention-bg: #F0EBFE; --frozen: #A1A1AE; --scrim: rgba(20,19,26,.35);
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif;
+  --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --cmt: #A78BFA; --mention-bg: #2E2650; --frozen: #5A5A68; --scrim: rgba(0,0,0,.55); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --cmt: #A78BFA; --mention-bg: #2E2650; --frozen: #5A5A68; --scrim: rgba(0,0,0,.55); color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.page-wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+/* frame */
+.frame { position: relative; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10);
+  display: flex; flex-direction: column; height: 740px; }
+.frame[dir="rtl"], .frame[dir="rtl"] button, .frame[dir="rtl"] input, .frame[dir="rtl"] textarea, .frame[dir="rtl"] select { font-family: var(--f-ar); }
+.frame.phone { max-width: 390px; width: 100%; margin: 0 auto; height: 800px; }
+.top { display: flex; align-items: center; gap: 10px; padding: 12px 18px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+.crumbs b { color: var(--ink); font: 800 19px var(--f-head); }
+.frame[dir="rtl"] .crumbs b { font-family: var(--f-ar); }
+.linked { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 8px; background: var(--purple-soft); color: var(--purple); }
+.status { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* workbook toolbar (spec 013) */
+.tools { display: flex; align-items: center; gap: 6px; padding: 6px 18px; border-bottom: 1px solid var(--line); min-height: 44px; flex-wrap: wrap; }
+.ib { min-width: 32px; height: 32px; border: 1px solid var(--input); background: var(--panel); border-radius: 8px; cursor: pointer; display: inline-grid; place-items: center; font-size: 13px; padding: 0 8px; gap: 6px; grid-auto-flow: column; font-weight: 600; }
+.ib:disabled { opacity: .4; cursor: default; }
+.ib[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); border-color: transparent; }
+.tools .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 2px; }
+.tools .lbl { font-size: 12.5px; color: var(--muted); }
+.tools .push { margin-inline-start: auto; }
+.badge { background: var(--cmt); color: #fff; border-radius: 999px; font-size: 10.5px; padding: 1px 6px; font-weight: 700; }
+
+/* the format toolbar */
+.fbar { display: flex; align-items: stretch; gap: 0; padding: 4px 12px; border-bottom: 1px solid var(--line); background: var(--grid-head); overflow: hidden; min-height: 46px; }
+.fg { display: flex; align-items: center; gap: 2px; padding-inline: 6px; border-inline-end: 1px solid var(--line); flex: none; }
+.fg:last-child { border-inline-end: 0; }
+.fb { position: relative; height: 32px; min-width: 30px; border: 0; background: none; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0 5px; color: var(--text); font-size: 13px; }
+.fb:hover:not([aria-disabled="true"]) { background: var(--surface); }
+.fb[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.fb[aria-expanded="true"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--input); }
+.fb[aria-disabled="true"] { opacity: .38; cursor: not-allowed; }
+.fb.later { opacity: .45; }
+.fb.later::after { content: attr(data-stage); position: absolute; top: 1px; inset-inline-end: 1px; font: 700 8.5px var(--f-body); color: var(--muted); }
+.fb .car { font-size: 9px; opacity: .6; }
+.fb.sel { border: 1px solid var(--input); background: var(--panel); justify-content: space-between; padding: 0 7px; font-size: 12.5px; }
+.fb.sel.font { width: 132px; } .fb.sel.size { width: 52px; } .fb.sel.num { width: 104px; }
+.fb .bar { position: absolute; inset-inline: 7px; bottom: 4px; height: 3px; border-radius: 1px; }
+.fb b, .fb i, .fb u, .fb s { font-size: 14px; font-family: Georgia, "Times New Roman", serif; }
+.fb .more { font-weight: 700; }
+.fbar .fold { display: none; }
+@media (max-width: 1240px) { .frame:not(.phone) .fbar .fg.opt { display: none; } .frame:not(.phone) .fbar .fold { display: flex; } }
+
+/* grid */
+.body { flex: 1; min-height: 0; display: flex; position: relative; }
+.gridwrap { flex: 1; overflow: auto; position: relative; min-width: 0; }
+.g { display: grid; font-size: 13px; min-width: max-content; grid-auto-rows: minmax(30px, auto); }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel); position: relative; cursor: cell; line-height: 1.35; display: flex; align-items: flex-end; min-width: 0; user-select: none; }
+.c > .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.c.wrap { white-space: normal; overflow-wrap: anywhere; }
+.c .bd { position: absolute; inset: 0; pointer-events: none; }
+.h, .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; justify-content: center; align-items: center; position: sticky; z-index: 3; cursor: default; }
+.h { top: 0; }
+.rn { inset-inline-start: 0; z-index: 2; }
+.corner { position: sticky; top: 0; inset-inline-start: 0; z-index: 5; background: var(--grid-head); }
+.h.on, .rn.on { background: var(--sh-head-sel); color: var(--purple); }
+.c.sel::before { content: ""; position: absolute; inset: 0; background: var(--sh-sel); pointer-events: none; }
+.c.act::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--sh-edge); pointer-events: none; z-index: 2; }
+.c.merged { z-index: 1; }
+.cm { position: absolute; top: 0; inset-inline-end: 0; width: 0; height: 0; border-top: 8px solid var(--cmt); border-inline-start: 8px solid transparent; z-index: 3; }
+.c.hid-after { box-shadow: inset -3px 0 0 var(--panel), inset -4px 0 0 var(--muted); }
+.frame[dir="rtl"] .c.hid-after { box-shadow: inset 3px 0 0 var(--panel), inset 4px 0 0 var(--muted); }
+.h .hidmark { position: absolute; inset-inline-end: -4px; top: 4px; bottom: 4px; width: 6px; border-inline: 1.5px solid var(--muted); background: var(--grid-head); cursor: pointer; z-index: 4; border-radius: 1px; }
+.fz-r { position: sticky; z-index: 2; }
+.fz-edge-b { box-shadow: 0 2px 0 var(--frozen); }
+.fz-edge-e { box-shadow: 2px 0 0 var(--frozen); }
+.frame[dir="rtl"] .fz-edge-e { box-shadow: -2px 0 0 var(--frozen); }
+.flt { margin-inline-start: auto; width: 18px; height: 18px; border: 1px solid currentColor; border-radius: 4px; display: inline-grid; place-items: center; font-size: 9px; background: transparent; cursor: pointer; flex: none; color: inherit; opacity: .85; padding: 0; }
+.flt.on { background: #fff; color: #7030A0; opacity: 1; }
+.dbar { position: absolute; inset-block: 5px; inset-inline-start: 4px; border-radius: 2px; opacity: .55; pointer-events: none; }
+
+/* linked (Content) sheet */
+.grp { background: var(--surface); font-weight: 700; color: var(--ink); grid-column: 2 / -1; align-items: center; }
+.pill { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 700 9px var(--f-body); font-style: normal; }
+.c a { color: var(--link); text-decoration: none; }
+
+/* tab bar */
+.tabs { display: flex; align-items: stretch; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 42px; }
+.tabs .fixed { display: flex; align-items: center; padding-inline: 6px; border-inline-end: 1px solid var(--line); gap: 2px; }
+.tabs .fixed span { width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px; }
+.tb { border: 0; background: none; display: inline-flex; align-items: center; padding: 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); border-inline-end: 1px solid var(--line); }
+.tb[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
+
+/* menus, pickers */
+.menu { position: absolute; z-index: 30; min-width: 200px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13px; max-height: 470px; overflow: auto; }
+.menu .mi { display: flex; width: 100%; gap: 10px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 6px 10px; text-align: start; cursor: pointer; min-height: 32px; }
+.menu .mi:hover:not(:disabled) { background: var(--surface); }
+.menu .mi:disabled { color: var(--muted); cursor: not-allowed; }
+.menu .mi .k { margin-inline-start: auto; color: var(--muted); font-size: 11.5px; }
+.menu .mi .ck { width: 14px; color: var(--purple); font-weight: 700; }
+.menu .why { display: block; color: var(--warn); background: var(--warn-bg); border-radius: 8px; font-size: 12px; padding: 7px 10px; margin: 2px 4px 6px; line-height: 1.45; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.menu h5 { margin: 6px 10px 4px; font: 700 11px var(--f-body); color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.frame[dir="rtl"] .menu h5 { letter-spacing: 0; }
+.cp { width: 268px; padding: 8px; }
+.cp .auto { display: flex; gap: 8px; align-items: center; width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 8px; cursor: pointer; margin-bottom: 6px; }
+.cp .auto i { width: 18px; height: 18px; border: 1px solid var(--input); border-radius: 4px; display: inline-block; }
+.sw-grid { display: grid; grid-template-columns: repeat(10, 22px); gap: 3px 2px; justify-content: space-between; }
+.sw-grid.tints { gap: 0 2px; } .sw-grid.tints .sw { border-radius: 0; }
+.sw { width: 22px; height: 18px; border: 1px solid rgba(20,19,26,.12); border-radius: 3px; cursor: pointer; padding: 0; }
+.sw:hover, .sw:focus-visible { outline: 2px solid var(--purple); outline-offset: 1px; position: relative; z-index: 1; }
+.sw.cur { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cp .more { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; border-radius: 8px; padding: 6px 4px; cursor: pointer; margin-top: 6px; }
+.cp .more input { width: 26px; height: 22px; border: 0; padding: 0; background: none; }
+.bp { width: 290px; }
+.bp .presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
+.bp .mi svg { flex: none; }
+.bp .ls { display: flex; gap: 4px; padding: 4px 6px; flex-wrap: wrap; }
+.bp .ls button { width: 40px; height: 26px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; display: grid; place-items: center; padding: 0 6px; }
+.bp .ls button[aria-pressed="true"] { border-color: var(--purple); background: var(--purple-soft); }
+.bp .ls i { display: block; width: 100%; }
+.fontlist .mi { font-size: 14px; }
+
+/* dialogs */
+.scrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 40; padding: 16px; }
+.dialog { background: var(--panel); border-radius: 16px; padding: 18px; width: min(380px, 100%); display: grid; gap: 12px; font-size: 13.5px; box-shadow: 0 20px 50px rgba(0,0,0,.25); max-height: 100%; overflow: auto; }
+.dialog.wide { width: min(620px, 100%); }
+.dialog h2 { margin: 0; font: 800 17px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .dialog h2 { font-family: var(--f-ar); }
+.dialog p { margin: 0; color: var(--muted); line-height: 1.5; }
+.dialog .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.btn { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 7px 16px; font-weight: 700; cursor: pointer; }
+.btn.go { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.sm { padding: 5px 12px; font-size: 12.5px; }
+.dtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.dtabs button { border: 0; background: none; padding: 8px 12px; font-weight: 600; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.dtabs button[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
+.fc { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; min-height: 250px; }
+.lb { border: 1px solid var(--input); border-radius: 10px; padding: 4px; display: grid; gap: 1px; align-content: start; max-height: 260px; overflow: auto; }
+.lb button { border: 0; background: none; text-align: start; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.lb button[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); font-weight: 600; }
+.fld { display: grid; gap: 4px; }
+.fld > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.fld select, .fld input[type="text"], .fld input[type="number"] { border: 1px solid var(--input); border-radius: 8px; padding: 6px 8px; background: var(--panel); width: 100%; }
+.fld.inline { grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
+.chk { display: flex; gap: 8px; align-items: center; }
+.sample { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.sample small { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+.sample .pv { min-height: 34px; display: flex; align-items: center; padding: 4px 8px; background: var(--panel); border: 1px solid var(--grid-line); font-size: 14px; }
+.stack { display: grid; gap: 10px; align-content: start; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.neg button { font-variant-numeric: tabular-nums; }
+.dial { width: 92px; height: 92px; border: 1px solid var(--input); border-radius: 50%; position: relative; }
+.dial i { position: absolute; inset-inline-start: 50%; top: 50%; width: 40px; height: 2px; background: var(--purple); transform-origin: 0 50%; }
+.bbox { width: 150px; height: 90px; border: 1px dashed var(--input); position: relative; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.bbox button { position: absolute; border: 0; background: none; cursor: pointer; padding: 0; }
+
+/* comments */
+.thread { position: absolute; z-index: 25; width: 300px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px rgba(20,19,26,.22); display: grid; font-size: 13px; }
+.thread header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.thread header b { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.thread header .sp { margin-inline-start: auto; display: flex; gap: 4px; }
+.ico { width: 30px; height: 30px; border: 0; background: none; border-radius: 8px; cursor: pointer; display: grid; place-items: center; color: var(--text); }
+.ico:hover { background: var(--surface); }
+.cmt { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 8px; padding: 10px 12px; position: relative; }
+.cmt + .cmt { border-top: 1px solid var(--line); }
+.av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 11px; }
+.cmt .who { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.cmt .who b { color: var(--ink); }
+.cmt .who small { color: var(--muted); font-size: 11.5px; }
+.cmt p { margin: 0; line-height: 1.5; grid-column: 2; overflow-wrap: anywhere; }
+.cmt .dots { position: absolute; top: 6px; inset-inline-end: 6px; }
+.cmt.gone p { color: var(--muted); font-style: italic; }
+.men { background: var(--mention-bg); color: var(--purple); border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.reply { padding: 10px 12px; border-top: 1px solid var(--line); display: grid; gap: 8px; position: relative; }
+.reply textarea { width: 100%; min-height: 56px; border: 1px solid var(--input); border-radius: 10px; padding: 8px 10px; resize: vertical; background: var(--panel); }
+.reply .row { display: flex; gap: 8px; align-items: center; }
+.reply .row small { color: var(--muted); font-size: 11.5px; margin-inline-end: auto; }
+.mpick { position: absolute; inset-inline: 12px; bottom: calc(100% - 6px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 26px rgba(20,19,26,.18); padding: 4px; }
+.mpick button { display: flex; gap: 8px; align-items: center; width: 100%; border: 0; background: none; border-radius: 8px; padding: 6px 8px; cursor: pointer; text-align: start; }
+.mpick button[aria-selected="true"] { background: var(--purple-soft); }
+.mpick small { color: var(--muted); margin-inline-start: auto; font-size: 11.5px; }
+.panel { width: 300px; flex: none; border-inline-start: 1px solid var(--line); display: flex; flex-direction: column; background: var(--panel); min-height: 0; }
+.panel header { display: flex; align-items: center; padding: 10px 12px; gap: 8px; }
+.panel header h3 { margin: 0; font: 700 15px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .panel header h3 { font-family: var(--f-ar); }
+.panel .list { overflow: auto; padding: 8px; display: grid; gap: 8px; align-content: start; }
+.pitem { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; text-align: start; background: var(--panel); cursor: pointer; display: grid; gap: 4px; width: 100%; }
+.pitem:hover { background: var(--surface); }
+.pitem .ref { font-size: 11.5px; font-weight: 700; color: var(--purple); }
+.pitem p { margin: 0; font-size: 13px; line-height: 1.45; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pitem small { color: var(--muted); font-size: 11.5px; }
+.empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 12px; }
+
+/* phone */
+.sheet { position: absolute; inset-inline: 0; bottom: 0; z-index: 35; background: var(--panel); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(20,19,26,.2); display: grid; gap: 10px; padding: 8px 14px calc(14px + env(safe-area-inset-bottom, 0px)); }
+.sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--input); justify-self: center; }
+.sheet .stabs { display: flex; gap: 4px; overflow-x: auto; }
+.sheet .stabs button { border: 0; background: var(--surface); border-radius: 999px; padding: 0 14px; min-height: 36px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sheet .stabs button[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); }
+.sheet .big { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheet .big .fb { min-width: 44px; height: 44px; border: 1px solid var(--line); font-size: 15px; }
+.sheet .big .fb.wide { min-width: 0; flex: 1 1 140px; justify-content: flex-start; padding-inline: 12px; gap: 8px; }
+.full { position: absolute; inset: 0; z-index: 45; background: var(--panel); display: flex; flex-direction: column; }
+.full .thread { position: static; width: auto; border: 0; box-shadow: none; border-radius: 0; flex: 1; align-content: start; overflow: auto; }
+
+/* notes */
+.notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; min-width: 0; }
+.note h4 { margin: 0 0 6px; font: 700 14px var(--f-head); color: var(--ink); }
+.note ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 3px; }
+.note kbd { font: 600 11.5px var(--f-body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+@media (max-width: 900px) { .notes { grid-template-columns: 1fr; } .frame { height: 760px; } .panel { width: 260px; } }
+@media (max-width: 640px) { .frame:not(.phone) .panel { position: absolute; inset-block: 0; inset-inline-end: 0; z-index: 20; box-shadow: -10px 0 30px rgba(20,19,26,.18); } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="page-wrap">
+  <header>
+    <h1>Sheet formatting and comments</h1>
+    <p class="lede">The design for spec 015. Excel’s Home tab comes to every sheet: fonts, colours, borders, alignment, merges and number formats in stage 1, with threaded comments. The editing tools follow in stage 2, and sort, filter, styles, tables and conditional formatting in stage 3. Everything here is clickable: select cells and use the toolbar.</p>
+  </header>
+  <div class="ctl">
+    <span>Screen</span>
+    <span class="seg" role="group" aria-label="Screen" id="scr"></span>
+    <span>Device</span>
+    <span class="seg" role="group" aria-label="Device"><button data-dev="desktop">Computer</button><button data-dev="phone">Phone 390</button></span>
+    <span>Language</span>
+    <span class="seg" role="group" aria-label="Language"><button data-lang="en">English</button><button data-lang="ar">العربية</button></span>
+  </div>
+  <div class="ctl" id="sub"></div>
+  <p class="hint" id="hint"></p>
+  <div id="frame" class="frame"></div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+  const SCREENS = [['format', 'Formatting'], ['pickers', 'Colour & borders'], ['dialog', 'Format Cells'], ['comments', 'Comments'], ['content', 'Content sheet'], ['stage2', 'Stage 2 tools'], ['stage3', 'Stage 3 tools']]
+  const T = {
+    en: {
+      crumbs: ['Sheets', 'Campaigns'], wb: 'Q4 plan', saved: 'Saved', undo: 'Undo (Ctrl+Z)', redo: 'Redo (Ctrl+Y)', sel: n => n > 1 ? `${n} cells` : '1 cell',
+      comments: 'Comments', format: 'Format', newCmt: 'New comment',
+      groups: { clipboard: 'Clipboard', font: 'Font', align: 'Alignment', number: 'Number', styles: 'Styles', cells: 'Cells', editing: 'Editing' },
+      c: { paste: 'Paste', painter: 'Format Painter', font: 'Font', size: 'Font size', b: 'Bold', i: 'Italic', u: 'Underline', s: 'Strikethrough', color: 'Text colour', fill: 'Fill colour', borders: 'Borders',
+        left: 'Align left', center: 'Centre', right: 'Align right', top: 'Top align', middle: 'Middle align', bottom: 'Bottom align', wrap: 'Wrap text', outdent: 'Decrease indent', indent: 'Increase indent', rotate: 'Orientation', merge: 'Merge & Centre',
+        num: 'Number format', cur: 'Accounting number format', pct: 'Percent style', sep: 'Comma style', decUp: 'Increase decimal', decDn: 'Decrease decimal', fmtCells: 'Format Cells',
+        cellStyles: 'Cell Styles', table: 'Format as Table', cond: 'Conditional Formatting', fmt: 'Format', clear: 'Clear', fillDn: 'Fill', sort: 'Sort & Filter', find: 'Find & Select', freeze: 'Freeze Panes', more: 'More' },
+      later: s => `Coming in stage ${s}`,
+      auto: 'Automatic', noFill: 'No fill', theme: 'Theme colours', std: 'Standard colours', recent: 'Recent colours', moreCol: 'More colours…',
+      themeNames: ['White, Background 1', 'Black, Text 1', 'Grey, Background 2', 'Blue-grey, Text 2', 'Blue, Accent 1', 'Orange, Accent 2', 'Grey, Accent 3', 'Gold, Accent 4', 'Blue, Accent 5', 'Green, Accent 6'],
+      tintNames: ['', 'Lighter 80%', 'Lighter 60%', 'Lighter 40%', 'Darker 25%', 'Darker 50%'],
+      stdNames: ['Dark red', 'Red', 'Orange', 'Yellow', 'Light green', 'Green', 'Light blue', 'Blue', 'Dark blue', 'Purple'],
+      bp: { title: 'Borders', presets: ['Bottom border', 'Top border', 'Left border', 'Right border', 'No border', 'All borders', 'Outside borders', 'Thick outside borders', 'Bottom double border', 'Thick bottom border', 'Top and bottom border', 'Top and thick bottom border', 'Inside borders'], style: 'Line style', colour: 'Line colour' },
+      lines: { thin: 'Thin', medium: 'Medium', thick: 'Thick', dashed: 'Dashed', dotted: 'Dotted', double: 'Double' },
+      merge: ['Merge & Centre', 'Merge Across', 'Merge Cells', 'Unmerge Cells'], mergeWhy: 'Each row here is a task, so cells can’t be merged. Formatting and comments still work.',
+      mergeWarn: { t: 'Merge cells?', p: 'Merging keeps only the top-left value (“Campaign”). The other values are removed. Undo brings them back.', go: 'Merge', cancel: 'Cancel' },
+      rot: ['Horizontal', 'Angle counterclockwise', 'Angle clockwise', 'Vertical text', 'Rotate text up', 'Rotate text down'],
+      nums: { general: 'General', number: 'Number', currency: 'Currency', accounting: 'Accounting', date: 'Short date', ldate: 'Long date', time: 'Time', percent: 'Percentage', scientific: 'Scientific', text: 'Text', more: 'More number formats…' },
+      curs: { EGP: 'EGP Egyptian pound', USD: 'USD US dollar', EUR: 'EUR Euro', GBP: 'GBP British pound', SAR: 'SAR Saudi riyal', AED: 'AED UAE dirham' },
+      cellMenu: [['Cut', 'Ctrl+X'], ['Copy', 'Ctrl+C'], ['Paste', 'Ctrl+V'], '-', ['New comment', 'Ctrl+Alt+M'], ['Format Cells…', 'Ctrl+1'], '-', ['Insert row above'], ['Delete row']],
+      fc: { t: 'Format Cells', tabs: ['Number', 'Alignment', 'Font', 'Border', 'Fill'], cat: 'Category', sample: 'Sample', dp: 'Decimal places', sym: 'Symbol', thou: 'Use 1000 separator (,)', neg: 'Negative numbers', type: 'Type', custom: 'Custom', pattern: 'Pattern', patternHint: 'd, dd, ddd, dddd · m, mm, mmm, mmmm · yy, yyyy',
+        h: 'Horizontal', v: 'Vertical', indent: 'Indent', wrap: 'Wrap text', mergeC: 'Merge cells', orient: 'Orientation', deg: 'Degrees',
+        hs: ['General', 'Left', 'Centre', 'Right', 'Justify'], vs: ['Top', 'Middle', 'Bottom'],
+        fontL: 'Font', styleL: 'Font style', sizeL: 'Size', styles: ['Regular', 'Italic', 'Bold', 'Bold Italic'], ul: 'Underline', uls: ['None', 'Single', 'Double'], colourL: 'Colour', strike: 'Strikethrough',
+        presets: 'Presets', none: 'None', outline: 'Outline', inside: 'Inside', clickSide: 'Click a side to add or remove it', bg: 'Background colour', preview: 'Preview', ok: 'OK', cancel: 'Cancel', descNum: 'Number formats change only how the value looks. Editing and copying use the value you typed.' },
+      th: { cell: (r) => r, open: 'Open', resolved: 'Resolved', resolve: 'Resolve', reopen: 'Reopen', reply: 'Reply…', send: 'Reply', sendKey: 'Ctrl+Enter to send', edit: 'Edit', del: 'Delete', edited: 'edited', delMsg: 'Comment deleted', close: 'Close', new: 'Add a comment… type @ to mention', panelEmpty: 'No resolved threads yet', more: 'More actions', back: 'Back to sheet', replies: n => n === 1 ? '1 reply' : `${n} replies` },
+      ago: { m: n => `${n} min ago`, h: n => `${n} h ago`, d: n => `${n} d ago` },
+      link: '🔗 Linked',
+      find: { t: 'Find and Replace', f: 'Find', r: 'Replace', what: 'Find what', with: 'Replace with', mc: 'Match case', wc: 'Match entire cell contents', next: 'Find next', prev: 'Find previous', one: 'Replace', all: 'Replace all', count: '3 of 4 · “Q4” in A1, A3, G4, G7', close: 'Close' },
+      ps: { t: 'Paste Special', items: ['All', 'Values only', 'Formats only', 'Comments only'], tr: 'Transpose', ok: 'Paste', cancel: 'Cancel', p: 'From the 6 cells you copied in A2:C3.' },
+      menus2: { clear: ['Clear all', 'Clear formats', 'Clear contents', 'Clear comments'], fill: [['Down', 'Ctrl+D'], ['Right', 'Ctrl+R']], find: [['Find…', 'Ctrl+F'], ['Replace…', 'Ctrl+H']], freeze: ['Freeze top row', 'Freeze first column', 'Freeze panes at selection', 'Unfreeze panes'], fmt: ['Row height…', 'Column width…', 'Hide rows', 'Hide columns', 'Unhide rows', 'Unhide column C'], paste: [['Paste', 'Ctrl+V'], ['Values only'], ['Formats only'], ['Paste Special…', 'Ctrl+Shift+V']] },
+      menus3: { sort: [['Sort A to Z'], ['Sort Z to A'], ['Custom sort…'], '-', ['Filter', 'Ctrl+Shift+L'], ['Clear filter']], styles: ['Normal', 'Good', 'Bad', 'Neutral', 'Title', 'Heading 1', 'Heading 2', 'Heading 3', 'Heading 4', 'Total', 'Note', 'Input', 'Output', 'Accent 1', 'Accent 2', 'Accent 3'], table: ['Light', 'Medium', 'Dark'], cond: [['Highlight cells rules ▸'], ['Top/bottom rules ▸'], ['Data bars ▸'], ['Colour scales ▸'], '-', ['New rule…'], ['Clear rules'], ['Manage rules…']] },
+      filter: { t: 'Status', az: 'Sort A to Z', za: 'Sort Z to A', byColour: 'Filter by colour', cond: 'Text filters ▸', search: 'Search', all: '(Select all)', ok: 'OK', clear: 'Clear filter from “Status”' },
+      sortD: { t: 'Sort', by: 'Sort by', then: 'Then by', on: 'Sort on', order: 'Order', vals: 'Cell values', oldNew: 'Oldest to newest', az: 'A to Z', header: 'My data has headers', add: '＋ Add level', ok: 'OK', cancel: 'Cancel' },
+      rule: { t: 'New formatting rule', kind: 'Format cells where', kinds: ['Value is greater than', 'Value is less than', 'Value is between', 'Value equals', 'Text contains', 'Date is before today', 'Duplicate values', 'Top 10', 'Data bar', 'Colour scale'], val: 'Value', look: 'Look', looks: ['Light red fill with dark red text', 'Yellow fill with dark yellow text', 'Green fill with dark green text', 'Custom format…'], applies: 'Applies to', ok: 'OK', cancel: 'Cancel' },
+      rules: { t: 'Manage rules', cols: ['Rule (in order)', 'Look', 'Applies to'], list: [['Date is before today', 'E3:E6'], ['Data bar', 'D3:D6'], ['Text contains “Late”', 'F3:F6']], add: 'New rule…', edit: 'Edit', del: 'Delete', up: 'Move up', down: 'Move down', ok: 'OK' },
+      sub: { stage2: [['find', 'Find and Replace'], ['paste', 'Paste Special'], ['none', 'Frozen and hidden']], stage3: [['filter', 'Filter menu'], ['sort', 'Sort'], ['rule', 'New rule'], ['rules', 'Manage rules']] },
+      phoneTabs: ['Text', 'Fill', 'Borders', 'Align', 'Number'],
+      hints: {
+        format: 'Select cells and try the toolbar: B, I, U, S, colours, borders, alignment, wrap, Merge ▾ and the number formats. Ctrl+B, I, U, 5 and Ctrl+1 work too. Undo is one step per action.',
+        pickers: 'The fill colour and border pickers are open. Pick a colour or a border preset: it applies to the selection.',
+        dialog: 'Format Cells (Ctrl+1) has every option in one place, with a live preview of the active cell.',
+        comments: 'The thread on F5 is open and the comments panel is on. Hover a purple corner, reply, type @, resolve, or pick a thread in the panel.',
+        content: 'On the Content sheet rows are tasks: the formatting follows the task, pills keep their own colours with the fill around them, and Merge says why it’s off.',
+        stage2: 'Stage 2: rows 1–2 and column A are frozen (thicker edge), column C is hidden (double line, click to unhide). Switch between the two dialogs above.',
+        stage3: 'Stage 3: A2:G6 is formatted as a table with banded rows and filter buttons. Budget has data bars; a rule fills past launch dates red.'
+      },
+      notes: [
+        ['Stage 1: formatting', ['Excel’s Home-tab order: Clipboard · Font · Alignment · Number · Styles · Cells · Editing. Stage 2 and 3 controls show dimmed with their stage until they ship.', 'Every control shows the active cell’s state (Bold pressed on a bold cell) and has a label and a tooltip with its shortcut.', 'A whole column, a whole row or Ctrl+A is one saved record and one undo step, so 10,000 cells take under a second.', 'Number formats change only what’s shown. The editor and copying use the value as typed.']],
+        ['Comments', ['New comment from the cell menu, <kbd>Ctrl+Alt+M</kbd> or the toolbar. A purple corner marks open threads.', 'Replies, @mentions with a notification that opens the cell, edit and delete your own, Resolve and Reopen.', 'Everyone who can open the sheet sees them. Comments stay open on a protected sheet.', 'Deleting a commented row removes its threads; Undo brings them back.']],
+        ['Content and Video sheets', ['Formatting and comments belong to the task’s cell, so they follow it through regrouping, dropping and restoring.', 'Status, editor, type and choice pills keep their colours. A fill shows around them.', 'Merge is off, with the reason. Formatting never changes the task.']],
+        ['Phones and Arabic', ['On a phone, the Format button opens a bottom sheet with tabs: Text, Fill, Borders, Align, Number. Threads open full screen. Targets are 44 px.', 'In Arabic, left and right mirror as in Excel’s right-to-left sheets, and numbers and dates follow the language.']],
+      ],
+    },
+    ar: {
+      crumbs: ['الجداول', 'الحملات'], wb: 'خطة الربع الرابع', saved: 'تم الحفظ', undo: 'تراجع (Ctrl+Z)', redo: 'إعادة (Ctrl+Y)', sel: n => n > 1 ? `${n} خلايا` : 'خلية واحدة',
+      comments: 'التعليقات', format: 'تنسيق', newCmt: 'تعليق جديد',
+      groups: { clipboard: 'الحافظة', font: 'الخط', align: 'المحاذاة', number: 'الرقم', styles: 'الأنماط', cells: 'الخلايا', editing: 'التحرير' },
+      c: { paste: 'لصق', painter: 'نسخ التنسيق', font: 'الخط', size: 'حجم الخط', b: 'غامق', i: 'مائل', u: 'تسطير', s: 'يتوسطه خط', color: 'لون الخط', fill: 'لون التعبئة', borders: 'الحدود',
+        left: 'محاذاة لليسار', center: 'توسيط', right: 'محاذاة لليمين', top: 'محاذاة للأعلى', middle: 'توسيط عمودي', bottom: 'محاذاة للأسفل', wrap: 'التفاف النص', outdent: 'إنقاص المسافة البادئة', indent: 'زيادة المسافة البادئة', rotate: 'الاتجاه', merge: 'دمج وتوسيط',
+        num: 'تنسيق الأرقام', cur: 'تنسيق العملة', pct: 'نسبة مئوية', sep: 'فاصل الآلاف', decUp: 'زيادة المنازل العشرية', decDn: 'إنقاص المنازل العشرية', fmtCells: 'تنسيق الخلايا',
+        cellStyles: 'أنماط الخلايا', table: 'التنسيق كجدول', cond: 'التنسيق الشرطي', fmt: 'تنسيق', clear: 'مسح', fillDn: 'تعبئة', sort: 'فرز وتصفية', find: 'بحث وتحديد', freeze: 'تجميد الأجزاء', more: 'المزيد' },
+      later: s => `في المرحلة ${s}`,
+      auto: 'تلقائي', noFill: 'بلا تعبئة', theme: 'ألوان النسق', std: 'الألوان القياسية', recent: 'الألوان الأخيرة', moreCol: 'ألوان إضافية…',
+      themeNames: ['أبيض، خلفية 1', 'أسود، نص 1', 'رمادي، خلفية 2', 'أزرق رمادي، نص 2', 'أزرق، تمييز 1', 'برتقالي، تمييز 2', 'رمادي، تمييز 3', 'ذهبي، تمييز 4', 'أزرق، تمييز 5', 'أخضر، تمييز 6'],
+      tintNames: ['', 'أفتح 80%', 'أفتح 60%', 'أفتح 40%', 'أغمق 25%', 'أغمق 50%'],
+      stdNames: ['أحمر داكن', 'أحمر', 'برتقالي', 'أصفر', 'أخضر فاتح', 'أخضر', 'أزرق فاتح', 'أزرق', 'أزرق داكن', 'بنفسجي'],
+      bp: { title: 'الحدود', presets: ['حد سفلي', 'حد علوي', 'حد أيسر', 'حد أيمن', 'بلا حدود', 'كل الحدود', 'حدود خارجية', 'حدود خارجية سميكة', 'حد سفلي مزدوج', 'حد سفلي سميك', 'حد علوي وسفلي', 'حد علوي وسفلي سميك', 'حدود داخلية'], style: 'نمط الخط', colour: 'لون الخط' },
+      lines: { thin: 'رفيع', medium: 'متوسط', thick: 'سميك', dashed: 'متقطع', dotted: 'منقط', double: 'مزدوج' },
+      merge: ['دمج وتوسيط', 'دمج عبر', 'دمج الخلايا', 'إلغاء دمج الخلايا'], mergeWhy: 'كل صف هنا مهمة، لذلك لا يمكن دمج الخلايا. التنسيق والتعليقات تعمل كالمعتاد.',
+      mergeWarn: { t: 'دمج الخلايا؟', p: 'الدمج يحتفظ بالقيمة العلوية اليسرى فقط («الحملة») ويحذف القيم الأخرى. يمكنك التراجع لاستعادتها.', go: 'دمج', cancel: 'إلغاء' },
+      rot: ['أفقي', 'زاوية عكس عقارب الساعة', 'زاوية مع عقارب الساعة', 'نص عمودي', 'تدوير النص لأعلى', 'تدوير النص لأسفل'],
+      nums: { general: 'عام', number: 'رقم', currency: 'عملة', accounting: 'محاسبة', date: 'تاريخ قصير', ldate: 'تاريخ طويل', time: 'وقت', percent: 'نسبة مئوية', scientific: 'علمي', text: 'نص', more: 'تنسيقات أرقام إضافية…' },
+      curs: { EGP: 'EGP جنيه مصري', USD: 'USD دولار أمريكي', EUR: 'EUR يورو', GBP: 'GBP جنيه إسترليني', SAR: 'SAR ريال سعودي', AED: 'AED درهم إماراتي' },
+      cellMenu: [['قص', 'Ctrl+X'], ['نسخ', 'Ctrl+C'], ['لصق', 'Ctrl+V'], '-', ['تعليق جديد', 'Ctrl+Alt+M'], ['تنسيق الخلايا…', 'Ctrl+1'], '-', ['إدراج صف أعلاه'], ['حذف الصف']],
+      fc: { t: 'تنسيق الخلايا', tabs: ['رقم', 'محاذاة', 'خط', 'حدود', 'تعبئة'], cat: 'الفئة', sample: 'عينة', dp: 'المنازل العشرية', sym: 'الرمز', thou: 'استخدام فاصل الآلاف (,)', neg: 'الأرقام السالبة', type: 'النوع', custom: 'مخصص', pattern: 'النمط', patternHint: 'd, dd, ddd, dddd · m, mm, mmm, mmmm · yy, yyyy',
+        h: 'أفقي', v: 'عمودي', indent: 'المسافة البادئة', wrap: 'التفاف النص', mergeC: 'دمج الخلايا', orient: 'الاتجاه', deg: 'درجات',
+        hs: ['عام', 'يسار', 'توسيط', 'يمين', 'ضبط'], vs: ['أعلى', 'وسط', 'أسفل'],
+        fontL: 'الخط', styleL: 'نمط الخط', sizeL: 'الحجم', styles: ['عادي', 'مائل', 'غامق', 'غامق مائل'], ul: 'التسطير', uls: ['بلا', 'مفرد', 'مزدوج'], colourL: 'اللون', strike: 'يتوسطه خط',
+        presets: 'إعدادات جاهزة', none: 'بلا', outline: 'خارجي', inside: 'داخلي', clickSide: 'انقر على جانب لإضافته أو إزالته', bg: 'لون الخلفية', preview: 'معاينة', ok: 'موافق', cancel: 'إلغاء', descNum: 'تنسيق الأرقام يغيّر طريقة العرض فقط. التحرير والنسخ يستخدمان القيمة كما كتبتها.' },
+      th: { cell: (r) => r, open: 'مفتوحة', resolved: 'محلولة', resolve: 'تم الحل', reopen: 'إعادة فتح', reply: 'رد…', send: 'رد', sendKey: 'Ctrl+Enter للإرسال', edit: 'تعديل', del: 'حذف', edited: 'معدّل', delMsg: 'تم حذف التعليق', close: 'إغلاق', new: 'أضف تعليقًا… اكتب @ للإشارة', panelEmpty: 'لا توجد سلاسل محلولة بعد', more: 'إجراءات أخرى', back: 'العودة إلى الورقة', replies: n => n === 1 ? 'رد واحد' : `${n} ردود` },
+      ago: { m: n => `منذ ${n} د`, h: n => `منذ ${n} س`, d: n => `منذ ${n} يوم` },
+      link: '🔗 مرتبط',
+      find: { t: 'بحث واستبدال', f: 'بحث', r: 'استبدال', what: 'البحث عن', with: 'الاستبدال بـ', mc: 'مطابقة حالة الأحرف', wc: 'مطابقة محتويات الخلية بالكامل', next: 'التالي', prev: 'السابق', one: 'استبدال', all: 'استبدال الكل', count: '3 من 4 · «Q4» في A1 وA3 وG4 وG7', close: 'إغلاق' },
+      ps: { t: 'لصق خاص', items: ['الكل', 'القيم فقط', 'التنسيقات فقط', 'التعليقات فقط'], tr: 'تبديل الصفوف والأعمدة', ok: 'لصق', cancel: 'إلغاء', p: 'من الخلايا الست التي نسختها في A2:C3.' },
+      menus2: { clear: ['مسح الكل', 'مسح التنسيقات', 'مسح المحتويات', 'مسح التعليقات'], fill: [['لأسفل', 'Ctrl+D'], ['لليمين', 'Ctrl+R']], find: [['بحث…', 'Ctrl+F'], ['استبدال…', 'Ctrl+H']], freeze: ['تجميد الصف العلوي', 'تجميد العمود الأول', 'تجميد الأجزاء عند التحديد', 'إلغاء التجميد'], fmt: ['ارتفاع الصف…', 'عرض العمود…', 'إخفاء الصفوف', 'إخفاء الأعمدة', 'إظهار الصفوف', 'إظهار العمود C'], paste: [['لصق', 'Ctrl+V'], ['القيم فقط'], ['التنسيقات فقط'], ['لصق خاص…', 'Ctrl+Shift+V']] },
+      menus3: { sort: [['فرز من أ إلى ي'], ['فرز من ي إلى أ'], ['فرز مخصص…'], '-', ['تصفية', 'Ctrl+Shift+L'], ['مسح التصفية']], styles: ['عادي', 'جيد', 'سيئ', 'محايد', 'عنوان', 'عنوان 1', 'عنوان 2', 'عنوان 3', 'عنوان 4', 'إجمالي', 'ملاحظة', 'إدخال', 'إخراج', 'تمييز 1', 'تمييز 2', 'تمييز 3'], table: ['فاتح', 'متوسط', 'داكن'], cond: [['قواعد تمييز الخلايا ◂'], ['قواعد الأعلى والأدنى ◂'], ['أشرطة البيانات ◂'], ['تدرجات الألوان ◂'], '-', ['قاعدة جديدة…'], ['مسح القواعد'], ['إدارة القواعد…']] },
+      filter: { t: 'الحالة', az: 'فرز من أ إلى ي', za: 'فرز من ي إلى أ', byColour: 'تصفية حسب اللون', cond: 'عوامل تصفية النص ◂', search: 'بحث', all: '(تحديد الكل)', ok: 'موافق', clear: 'مسح التصفية من «الحالة»' },
+      sortD: { t: 'فرز', by: 'فرز حسب', then: 'ثم حسب', on: 'الفرز على', order: 'الترتيب', vals: 'قيم الخلايا', oldNew: 'من الأقدم إلى الأحدث', az: 'من أ إلى ي', header: 'بياناتي تحتوي على رؤوس', add: '＋ إضافة مستوى', ok: 'موافق', cancel: 'إلغاء' },
+      rule: { t: 'قاعدة تنسيق جديدة', kind: 'تنسيق الخلايا حيث', kinds: ['القيمة أكبر من', 'القيمة أقل من', 'القيمة بين', 'القيمة تساوي', 'النص يحتوي على', 'التاريخ قبل اليوم', 'القيم المكررة', 'أعلى 10', 'شريط بيانات', 'تدرج ألوان'], val: 'القيمة', look: 'المظهر', looks: ['تعبئة حمراء فاتحة مع نص أحمر داكن', 'تعبئة صفراء مع نص أصفر داكن', 'تعبئة خضراء مع نص أخضر داكن', 'تنسيق مخصص…'], applies: 'ينطبق على', ok: 'موافق', cancel: 'إلغاء' },
+      rules: { t: 'إدارة القواعد', cols: ['القاعدة (بالترتيب)', 'المظهر', 'ينطبق على'], list: [['التاريخ قبل اليوم', 'E3:E6'], ['شريط بيانات', 'D3:D6'], ['النص يحتوي على «متأخر»', 'F3:F6']], add: 'قاعدة جديدة…', edit: 'تعديل', del: 'حذف', up: 'نقل لأعلى', down: 'نقل لأسفل', ok: 'موافق' },
+      sub: { stage2: [['find', 'بحث واستبدال'], ['paste', 'لصق خاص'], ['none', 'تجميد وإخفاء']], stage3: [['filter', 'قائمة التصفية'], ['sort', 'فرز'], ['rule', 'قاعدة جديدة'], ['rules', 'إدارة القواعد']] },
+      phoneTabs: ['النص', 'التعبئة', 'الحدود', 'المحاذاة', 'الرقم'],
+      hints: {}, notes: null,
+    },
+  }
+  const L = () => T[S.lang]
+
+  // ── state ──
+  const S = { screen: 'format', dev: 'desktop', lang: 'en', sub: { stage2: 'find', stage3: 'filter' }, act: { r: 1, c: 0 }, anc: { r: 1, c: 0 }, menu: null, dlg: null, fcTab: 0, draft: null,
+    panel: false, thread: null, mention: false, phoneSheet: false, phoneTab: 0, recent: ['#7030A0', '#C6EFCE', '#FFC000'], line: { w: 'thin', c: '#14131A' }, drag: false }
+  const DATA = {
+    en: [['Q4 campaign plan'], ['Campaign', 'Channel', 'Owner', 'Budget', 'Launch', 'Status', 'Notes'],
+      ['Ramadan teaser', 'LinkedIn', 'Samaa', '12500', '2026-11-16', 'On track', 'Carousel, 5 frames. Copy approved, waiting for the final export from design.'],
+      ['Summit recap video', 'YouTube', 'Omar', '48000', '2026-11-24', 'At risk', 'Needs B-roll from day 2'],
+      ['Customer story: Nile Bank', 'Website', 'Nermin', '9000', '2026-11-05', 'Late', 'Legal review pending'],
+      ['Year in review', 'Instagram', 'Rana', '15750.5', '2026-12-20', 'On track', ''],
+      ['Total', '', '', '85250.5'], [], []],
+    ar: [['خطة حملات الربع الرابع'], ['الحملة', 'القناة', 'المسؤول', 'الميزانية', 'الإطلاق', 'الحالة', 'ملاحظات'],
+      ['تشويقة رمضان', 'LinkedIn', 'سماء', '12500', '2026-11-16', 'في الموعد', 'كاروسيل من 5 إطارات. النص معتمد، بانتظار التصدير النهائي من التصميم.'],
+      ['فيديو ملخص القمة', 'YouTube', 'عمر', '48000', '2026-11-24', 'معرّض للتأخير', 'يحتاج لقطات إضافية من اليوم الثاني'],
+      ['قصة عميل: بنك النيل', 'الموقع', 'نرمين', '9000', '2026-11-05', 'متأخر', 'بانتظار المراجعة القانونية'],
+      ['حصاد العام', 'Instagram', 'رنا', '15750.5', '2026-12-20', 'في الموعد', ''],
+      ['الإجمالي', '', '', '85250.5'], [], []],
+  }
+  const COLS = 8, ROWS = 9, WIDTHS = [200, 104, 96, 132, 150, 120, 250, 90]
+  const LET = 'ABCDEFGH'
+  const ref = (r, c) => `${LET[c]}${r + 1}`
+  const val = (r, c) => (DATA[S.lang][r] || [])[c] || ''
+  const GOOD = { fill: '#C6EFCE', color: '#006100' }, NEUT = { fill: '#FFEB9C', color: '#9C5700' }, BAD = { fill: '#FFC7CE', color: '#9C0006' }
+  function seedStyles() {
+    const st = {}
+    const set = (r, c, o) => { st[`${r},${c}`] = { ...(st[`${r},${c}`] || {}), ...o } }
+    set(0, 0, { b: true, size: 16, ha: 'center', va: 'middle', color: '#7030A0', font: 'Montserrat' })
+    for (let c = 0; c < 7; c++) set(1, c, { b: true, color: '#FFFFFF', fill: '#7030A0', ha: 'center', va: 'middle', bb: { w: 'thick', c: '#3B0F5C' } })
+    for (let r = 2; r <= 6; r++) { set(r, 3, { num: { kind: 'currency', cur: 'EGP', dp: 2, sep: true }, ha: 'right' }); if (r < 6) set(r, 4, { num: { kind: 'date', long: true } }); set(r, 6, { wrap: true, va: 'top' }) }
+    set(2, 5, GOOD); set(3, 5, NEUT); set(4, 5, BAD); set(5, 5, GOOD)
+    for (let c = 0; c < 7; c++) set(6, c, { b: true, bt: { w: 'double', c: '#7030A0' } })
+    return st
+  }
+  let DOC = { st: seedStyles(), merges: [{ r0: 0, c0: 0, r1: 0, c1: 6 }] }
+  const HIST = [], FUT = []
+  const snap = () => JSON.parse(JSON.stringify(DOC))
+  const commit = fn => { HIST.push(snap()); FUT.length = 0; fn(); render() }
+  const THREADS = () => [
+    { id: 't1', r: 4, c: 5, resolved: false, items: [
+      { who: 'Rana', col: '#DB2777', t: { m: 0, h: 2 }, text: S.lang === 'ar' ? '@عمر هل ما زالت متوقفة على المراجعة القانونية؟' : '@Omar is this still blocked on legal?', men: S.lang === 'ar' ? '@عمر' : '@Omar' },
+      { who: 'Omar', col: '#2563EB', t: { m: 40 }, text: S.lang === 'ar' ? 'نعم، القانونية تقول الخميس. سأحدّث التاريخ بعدها.' : 'Yes, legal says Thursday. I’ll move the date after that.', edited: true }] },
+    { id: 't2', r: 3, c: 3, resolved: false, items: [
+      { who: 'Nermin', col: '#0E7C7C', t: { d: 1 }, text: S.lang === 'ar' ? 'هل هذا يشمل أجر المصور؟' : 'Does this include the videographer’s fee?' }] },
+    { id: 't3', r: 2, c: 0, resolved: true, items: [
+      { who: 'Samaa', col: '#B45309', t: { d: 3 }, text: S.lang === 'ar' ? 'هل هذا العنوان النهائي؟' : 'Is this the final headline?' },
+      { who: 'Rana', col: '#DB2777', t: { d: 2 }, text: S.lang === 'ar' ? 'نعم، اعتمدناه.' : 'Yes, approved.' }] },
+  ]
+  let threads = THREADS()
+  const ME = 'Rana'
+  const MEMBERS = [['Omar', 'Video editor', '#2563EB'], ['Nermin', 'Content creator', '#0E7C7C'], ['Samaa', 'Designer', '#B45309']]
+
+  // ── formatting model, as in src/lib/sheet-format.ts ──
+  const FONTS = [['Inter', 'Inter, Arial, sans-serif'], ['Montserrat', 'Montserrat, Arial, sans-serif'], ['IBM Plex Sans Arabic', '"IBM Plex Sans Arabic", Tahoma, sans-serif'], ['Caveat', 'Caveat, cursive'], ['Calibri', 'Calibri, Carlito, Arial, sans-serif'], ['Arial', 'Arial, sans-serif'], ['Georgia', 'Georgia, serif'], ['Times New Roman', '"Times New Roman", serif'], ['Courier New', '"Courier New", monospace'], ['Verdana', 'Verdana, sans-serif'], ['Tahoma', 'Tahoma, sans-serif'], ['Trebuchet MS', '"Trebuchet MS", sans-serif']]
+  const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72]
+  const THEME = ['#FFFFFF', '#000000', '#E7E6E6', '#44546A', '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47']
+  const STD = ['#C00000', '#FF0000', '#FFC000', '#FFFF00', '#92D050', '#00B050', '#00B0F0', '#0070C0', '#002060', '#7030A0']
+  const mix = (hex, f) => { const n = parseInt(hex.slice(1), 16); let rgb = [n >> 16, (n >> 8) & 255, n & 255]; rgb = rgb.map(v => Math.round(f >= 0 ? v + (255 - v) * f : v * (1 + f))); return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase() }
+  const tintsFor = (hex, i) => i === 0 ? [-.05, -.15, -.25, -.35, -.5] : i === 1 ? [.5, .35, .25, .15, .05] : [.8, .6, .4, -.25, -.5]
+  const lum = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
+  const BW = { thin: 1, medium: 2, thick: 3, dashed: 1, dotted: 1, double: 3 }
+  const BS = { thin: 'solid', medium: 'solid', thick: 'solid', dashed: 'dashed', dotted: 'dotted', double: 'double' }
+  function css(st, { noFill } = {}) {
+    if (!st) return ''
+    const o = []
+    if (st.font) o.push(`font-family:${(FONTS.find(f => f[0] === st.font) || [, ''])[1]}`)
+    if (st.size) o.push(`font-size:${Math.round(st.size * 1.333)}px`)
+    if (st.b) o.push('font-weight:700'); if (st.i) o.push('font-style:italic')
+    const dec = [st.u ? 'underline' : '', st.s ? 'line-through' : ''].filter(Boolean).join(' ')
+    if (dec) o.push(`text-decoration:${dec}${st.u === 'double' ? ';text-decoration-style:double' : ''}`)
+    if (st.fill && !noFill) o.push(`background:${st.fill}`)
+    const auto = st.fill && !st.color ? (lum(st.fill) < .5 ? '#FFFFFF' : '#14131A') : null
+    if (st.color || auto) o.push(`color:${st.color || auto}`)
+    if (st.ha && st.ha !== 'general') o.push(`justify-content:${{ left: 'flex-start', center: 'center', right: 'flex-end', justify: 'flex-start' }[st.ha]};text-align:${{ left: 'start', center: 'center', right: 'end', justify: 'justify' }[st.ha]}`)
+    if (st.va) o.push(`align-items:${{ top: 'flex-start', middle: 'center', bottom: 'flex-end' }[st.va]}`)
+    if (st.indent) o.push(`padding-inline-start:${8 + st.indent * 12}px`)
+    return o.join(';')
+  }
+  const bordersCss = st => !st ? '' : [['bt', 'top'], ['bb', 'bottom'], ['bl', 'inline-start'], ['br', 'inline-end']].filter(([k]) => st[k]).map(([k, side]) => `border-${side}:${BW[st[k].w]}px ${BS[st[k].w]} ${st[k].c}`).join(';')
+  const numParse = v => { if (v == null || v === '') return null; const t = String(v).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/,/g, '').trim(); if (/^-?\d+(\.\d+)?%$/.test(t)) return parseFloat(t) / 100; return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null }
+  const loc = () => (S.lang === 'ar' ? 'ar-EG' : 'en-GB')
+  function display(v, num) {
+    if (!num || num.kind === 'general' || num.kind === 'text' || v === '') return v
+    if (num.kind === 'date' || num.kind === 'time') {
+      if (!/^\d{4}-\d{2}-\d{2}/.test(v)) return v
+      const d = new Date(`${v}T12:00:00`)
+      if (num.pattern) return pattern(d, num.pattern)
+      return num.kind === 'time' ? new Intl.DateTimeFormat(loc(), { hour: '2-digit', minute: '2-digit' }).format(d)
+        : new Intl.DateTimeFormat(loc(), num.long ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
+    }
+    const n = numParse(v); if (n == null) return v
+    const dp = num.dp ?? 2
+    const o = { minimumFractionDigits: dp, maximumFractionDigits: dp, useGrouping: num.sep !== false }
+    let s
+    if (num.kind === 'currency' || num.kind === 'accounting') s = new Intl.NumberFormat(loc(), { ...o, style: 'currency', currency: num.cur || 'EGP', currencyDisplay: 'code' }).format(Math.abs(n))
+    else if (num.kind === 'percent') s = new Intl.NumberFormat(loc(), { ...o, style: 'percent' }).format(Math.abs(n))
+    else if (num.kind === 'scientific') s = Math.abs(n).toExponential(dp).toUpperCase().replace(/E\+?/, 'E+').replace('E+-', 'E-')
+    else s = new Intl.NumberFormat(loc(), o).format(Math.abs(n))
+    if (n < 0) s = (num.neg || '').includes('paren') ? `(${s})` : `−${s}`
+    return s
+  }
+  function pattern(d, p) {
+    const f = o => new Intl.DateTimeFormat(loc(), o).format(d)
+    return p.replace(/dddd|ddd|dd|d|mmmm|mmm|mm|m|yyyy|yy/g, t => ({ dddd: f({ weekday: 'long' }), ddd: f({ weekday: 'short' }), dd: f({ day: '2-digit' }), d: f({ day: 'numeric' }), mmmm: f({ month: 'long' }), mmm: f({ month: 'short' }), mm: f({ month: '2-digit' }), m: f({ month: 'numeric' }), yyyy: f({ year: 'numeric' }), yy: f({ year: '2-digit' }) }[t]))
+  }
+  const negRed = (v, num) => num && (num.neg || '').includes('red') && (numParse(v) ?? 0) < 0
+
+  // ── selection ──
+  const rect = () => ({ r0: Math.min(S.anc.r, S.act.r), r1: Math.max(S.anc.r, S.act.r), c0: Math.min(S.anc.c, S.act.c), c1: Math.max(S.anc.c, S.act.c) })
+  const mergeAt = (r, c) => DOC.merges.find(m => r >= m.r0 && r <= m.r1 && c >= m.c0 && c <= m.c1)
+  function selRect() { let R = rect(); let grew = true; while (grew) { grew = false; for (const m of DOC.merges) { if (m.r1 >= R.r0 && m.r0 <= R.r1 && m.c1 >= R.c0 && m.c0 <= R.c1) { const n = { r0: Math.min(R.r0, m.r0), r1: Math.max(R.r1, m.r1), c0: Math.min(R.c0, m.c0), c1: Math.max(R.c1, m.c1) }; if (JSON.stringify(n) !== JSON.stringify(R)) { R = n; grew = true } } } } return R }
+  const each = fn => { const R = selRect(); for (let r = R.r0; r <= R.r1; r++) for (let c = R.c0; c <= R.c1; c++) fn(r, c, R) }
+  const cur = () => DOC.st[`${S.act.r},${S.act.c}`] || {}
+  const patch = (o) => commit(() => each((r, c) => { const k = `${r},${c}`; DOC.st[k] = { ...(DOC.st[k] || {}), ...o }; for (const x in DOC.st[k]) if (DOC.st[k][x] == null || DOC.st[k][x] === false) delete DOC.st[k][x] }))
+  const toggle = k => patch({ [k]: cur()[k] ? null : (k === 'u' ? 'single' : true) })
+  function borders(preset) {
+    const line = { ...S.line }, thick = { w: 'thick', c: S.line.c }, dbl = { w: 'double', c: S.line.c }
+    commit(() => each((r, c, R) => {
+      const k = `${r},${c}`, s = { ...(DOC.st[k] || {}) }
+      const T = r === R.r0, B = r === R.r1, Lf = c === R.c0, Rt = c === R.c1
+      const p = { bottom: () => B && (s.bb = line), top: () => T && (s.bt = line), left: () => Lf && (s.bl = line), right: () => Rt && (s.br = line),
+        none: () => { delete s.bt; delete s.bb; delete s.bl; delete s.br }, all: () => Object.assign(s, { bt: line, bb: line, bl: line, br: line }),
+        outside: () => { T && (s.bt = line); B && (s.bb = line); Lf && (s.bl = line); Rt && (s.br = line) }, thickOut: () => { T && (s.bt = thick); B && (s.bb = thick); Lf && (s.bl = thick); Rt && (s.br = thick) },
+        dblBottom: () => B && (s.bb = dbl), thickBottom: () => B && (s.bb = thick), topBottom: () => { T && (s.bt = line); B && (s.bb = line) }, topThick: () => { T && (s.bt = line); B && (s.bb = thick) },
+        inside: () => { !B && (s.bb = line); !Rt && (s.br = line) } }
+      p[preset](); DOC.st[k] = s
+    }))
+  }
+  const PRESETS = ['bottom', 'top', 'left', 'right', 'none', 'all', 'outside', 'thickOut', 'dblBottom', 'thickBottom', 'topBottom', 'topThick', 'inside']
+  function doMerge(kind) {
+    const R = selRect()
+    if (kind === 3) return commit(() => { DOC.merges = DOC.merges.filter(m => !(m.r0 >= R.r0 && m.r1 <= R.r1 && m.c0 >= R.c0 && m.c1 <= R.c1)) })
+    let n = 0; for (let r = R.r0; r <= R.r1; r++) for (let c = R.c0; c <= R.c1; c++) if (val(r, c)) n++
+    const go = () => commit(() => { DOC.merges = DOC.merges.filter(m => !(m.r1 >= R.r0 && m.r0 <= R.r1 && m.c1 >= R.c0 && m.c0 <= R.c1)); if (kind === 1) { for (let r = R.r0; r <= R.r1; r++) DOC.merges.push({ r0: r, r1: r, c0: R.c0, c1: R.c1 }) } else DOC.merges.push(R); if (kind === 0) { const k = `${R.r0},${R.c0}`; DOC.st[k] = { ...(DOC.st[k] || {}), ha: 'center' } } })
+    if (n > 1) { S.dlg = 'mergeWarn'; S.pending = go; render() } else go()
+  }
+
+  // ── icons ──
+  const P = {
+    left: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>', center: '<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>', right: '<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>',
+    top: '<path d="M5 4h14M12 8v12M8 12l4-4 4 4"/>', middle: '<path d="M5 12h14M12 3v5M12 16v5M9 6l3 2 3-2M9 18l3-2 3 2"/>', bottom: '<path d="M5 20h14M12 4v12M8 12l4 4 4-4"/>',
+    wrap: '<path d="M4 6h16M4 12h13a3 3 0 0 1 0 6h-4M15 16l-2 2 2 2M4 18h6"/>', outdent: '<path d="M10 6h10M10 12h10M10 18h10M7 9l-3 3 3 3"/>', indent: '<path d="M10 6h10M10 12h10M10 18h10M4 9l3 3-3 3"/>',
+    rotate: '<path d="M6 18L16 6M13 6h3v3"/><text x="4" y="12" font-size="7" fill="currentColor" stroke="none">ab</text>', merge: '<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M8 12h8M6 12l2-2v4zM18 12l-2-2v4z"/>',
+    borders: '<rect x="4" y="4" width="16" height="16" stroke-dasharray="2 2"/><path d="M4 20h16" stroke-width="2.6"/>', fill: '<path d="M5 13l7-7 6 6-7 7z"/><path d="M19 15s2 2.3 2 3.5a2 2 0 0 1-4 0c0-1.2 2-3.5 2-3.5z"/>',
+    paste: '<rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V3h6v2"/>', painter: '<rect x="4" y="3" width="13" height="6" rx="1"/><path d="M17 6h3v5h-8v4M12 15v6"/>',
+    comment: '<path d="M4 5h16v11H9l-5 4z"/>', pct: '<path d="M6 18L18 6"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>',
+    decUp: '<text x="2" y="15" font-size="9" fill="currentColor" stroke="none">.0</text><path d="M14 9h7M18 6l3 3-3 3"/><text x="13" y="21" font-size="7" fill="currentColor" stroke="none">.00</text>',
+    decDn: '<text x="2" y="15" font-size="9" fill="currentColor" stroke="none">.00</text><path d="M21 19h-6M18 16l-3 3 3 3"/>',
+    fmtCells: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/>', styles: '<rect x="3" y="5" width="8" height="6"/><rect x="13" y="5" width="8" height="6" fill="currentColor"/><rect x="3" y="13" width="8" height="6" fill="currentColor" opacity=".4"/><rect x="13" y="13" width="8" height="6"/>',
+    table: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14h18M10 4v16"/>', cond: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M6 8h4v8H6zM12 11h6" /><path d="M12 15h4"/>',
+    fmt: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M3 16h18"/>', clear: '<path d="M14 4l6 6-9 9H7l-3-3z"/><path d="M10 8l6 6"/>', fillDn: '<path d="M12 4v14M7 13l5 5 5-5"/><path d="M5 21h14"/>',
+    sort: '<path d="M7 4v16M4 17l3 3 3-3M14 6h7M14 11h5M14 16h3"/>', find: '<circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/>', freeze: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M8 4v16" stroke-width="2.6"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>', redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>', check: '<path d="M5 12l5 5 9-10"/>', dots: '<circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>', back: '<path d="M15 6l-6 6 6 6"/>', reopen: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/>',
+  }
+  const ic = (k, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]))
+  const KEYS = { b: 'Ctrl+B', i: 'Ctrl+I', u: 'Ctrl+U', s: 'Ctrl+5', fmtCells: 'Ctrl+1', pct: 'Ctrl+Shift+%', cur: 'Ctrl+Shift+$', fillDn: 'Ctrl+D', find: 'Ctrl+F', paste: 'Ctrl+V' }
+
+  // ── format toolbar ──
+  const stageOf = { paste: 2, painter: 2, cellStyles: 3, table: 3, cond: 3, fmt: 2, clear: 2, fillDn: 2, sort: 3, find: 2, freeze: 2 }
+  function fbtn(k, inner, { menu, pressed, label } = {}) {
+    const c = L().c, st = stageOf[k], later = st && !(S.screen === 'stage2' && st === 2) && !(S.screen === 'stage3')
+    const linkedOff = S.screen === 'content' && k === 'merge'
+    const lab = label || c[k], tip = `${lab}${KEYS[k] ? ` (${KEYS[k]})` : ''}${later ? ` · ${L().later(st)}` : ''}${linkedOff ? ` · ${L().mergeWhy}` : ''}`
+    return `<button class="fb${later ? ' later' : ''}" data-fmt="${k}" ${later ? `data-stage="${st}" aria-disabled="true"` : ''}${linkedOff ? 'aria-disabled="true"' : ''} aria-label="${esc(lab)}" title="${esc(tip)}"${pressed != null ? ` aria-pressed="${pressed}"` : ''}${menu ? ` aria-haspopup="menu" aria-expanded="${S.menu?.k === k}"` : ''}>${inner}${menu ? '<span class="car">▾</span>' : ''}</button>`
+  }
+  function fbar() {
+    const c = L().c, st = cur(), G = L().groups
+    const num = st.num?.kind ? (st.num.kind === 'date' && st.num.long ? L().nums.ldate : L().nums[st.num.kind]) : L().nums.general
+    const g = (k, items, opt) => `<div class="fg${opt ? ' opt' : ''}" role="group" aria-label="${G[k]}">${items}</div>`
+    return `<div class="fbar" data-format-bar role="toolbar" aria-label="${L().format}">
+      ${g('clipboard', fbtn('paste', ic('paste'), { menu: 1 }) + fbtn('painter', ic('painter'), { pressed: false }))}
+      ${g('font', `<button class="fb sel font" data-fmt="font" aria-label="${c.font}" title="${c.font}" aria-haspopup="listbox" aria-expanded="${S.menu?.k === 'font'}" style="font-family:${(FONTS.find(f => f[0] === (st.font || 'Inter')) || FONTS[0])[1]}"><span>${st.font || 'Inter'}</span><span class="car">▾</span></button>
+        <button class="fb sel size" data-fmt="size" aria-label="${c.size}" title="${c.size}" aria-haspopup="listbox" aria-expanded="${S.menu?.k === 'size'}"><span>${st.size || 10}</span><span class="car">▾</span></button>
+        ${fbtn('b', '<b>B</b>', { pressed: !!st.b })}${fbtn('i', '<i>I</i>', { pressed: !!st.i })}${fbtn('u', '<u>U</u>', { pressed: !!st.u })}${fbtn('s', '<s>S</s>', { pressed: !!st.s })}
+        ${fbtn('color', `<span style="font:700 15px Georgia,serif">A</span><span class="bar" style="background:${st.color || '#C00000'}"></span>`, { menu: 1 })}
+        ${fbtn('fill', `${ic('fill', 17)}<span class="bar" style="background:${st.fill || '#FFC000'}"></span>`, { menu: 1 })}
+        ${fbtn('borders', ic('borders'), { menu: 1 })}`)}
+      ${g('align', ['left', 'center', 'right'].map(k => fbtn(k, ic(k), { pressed: st.ha === k })).join('') + ['top', 'middle', 'bottom'].map(k => fbtn(k, ic(k), { pressed: (st.va || 'bottom') === k })).join('') +
+        fbtn('wrap', ic('wrap'), { pressed: !!st.wrap }) + fbtn('outdent', ic('outdent')) + fbtn('indent', ic('indent')) + fbtn('rotate', ic('rotate'), { menu: 1 }) + fbtn('merge', ic('merge'), { menu: 1 }))}
+      ${g('number', `<button class="fb sel num" data-fmt="num" aria-label="${c.num}" title="${c.num}" aria-haspopup="menu" aria-expanded="${S.menu?.k === 'num'}"><span>${num}</span><span class="car">▾</span></button>` +
+        fbtn('cur', `<span style="font-weight:700;font-size:11px">EGP</span>`, { menu: 1 }) + fbtn('pct', ic('pct')) + fbtn('sep', '<b style="font-family:inherit">,</b>', { pressed: st.num?.sep === true && st.num?.kind === 'number' }) + fbtn('decUp', ic('decUp', 20)) + fbtn('decDn', ic('decDn', 20)) + fbtn('fmtCells', ic('fmtCells')))}
+      ${g('styles', fbtn('cellStyles', ic('styles'), { menu: 1 }) + fbtn('table', ic('table'), { menu: 1 }) + fbtn('cond', ic('cond'), { menu: 1 }), true)}
+      ${g('cells', fbtn('fmt', ic('fmt'), { menu: 1 }), true)}
+      ${g('editing', fbtn('clear', ic('clear'), { menu: 1 }) + fbtn('fillDn', ic('fillDn'), { menu: 1 }) + fbtn('sort', ic('sort'), { menu: 1 }) + fbtn('find', ic('find'), { menu: 1 }) + fbtn('freeze', ic('freeze'), { menu: 1 }), true)}
+      <div class="fg fold">${fbtn('more', `<span class="more">⋯</span>`, { menu: 1, label: c.more })}</div>
+    </div>`
+  }
+
+  // ── grids ──
+  const STAGE3 = () => S.screen === 'stage3'
+  function cellInner(r, c, st) {
+    const v = val(r, c), shown = display(v, st?.num)
+    let extra = ''
+    if (STAGE3() && r === 1 && c < 7) extra = `<button class="flt${c === 5 ? ' on' : ''}" data-flt="${c}" aria-label="${esc(v)}: filter" aria-haspopup="menu">${c === 5 ? '▼' : '▾'}</button>`
+    if (STAGE3() && c === 3 && r >= 2 && r <= 5) { const n = numParse(v); extra = `<i class="dbar" style="width:calc(${Math.round(n / 48000 * 100)}% - 8px);background:#5B9BD5"></i>` }
+    return `<span class="v"${negRed(v, st?.num) ? ' style="color:#C00000"' : ''}>${esc(shown)}</span>${extra}`
+  }
+  function stage3Style(r, c, st) {
+    if (!STAGE3() || r < 1 || r > 5 || c > 6) return st
+    const o = { ...(st || {}) }
+    if (r === 1) Object.assign(o, { fill: '#4472C4', color: '#FFFFFF', bb: null })
+    else if (c !== 5 && !(c === 4 && val(r, c) < '2026-11-10')) o.fill = r % 2 ? '#D9E1F2' : '#FFFFFF'
+    if (c === 4 && r >= 2 && val(r, c) && val(r, c) < '2026-11-10') Object.assign(o, BAD)
+    return o
+  }
+  function blankGrid() {
+    const s2 = S.screen === 'stage2', hiddenC = s2 ? [2] : [], frozenR = s2 ? 2 : 0, frozenC = s2 ? 1 : 0
+    const cols = [...Array(COLS).keys()].filter(c => !hiddenC.includes(c))
+    const tmpl = `44px ${cols.map(c => WIDTHS[c] + 'px').join(' ')}`
+    const R = selRect(), inSel = (r, c) => r >= R.r0 && r <= R.r1 && c >= R.c0 && c <= R.c1
+    const gc = c => cols.indexOf(c) + 2
+    const ROWH = [44, 34]
+    const topOf = r => 30 + ROWH.slice(0, r).reduce((a, b) => a + b, 0)
+    let h = `<div class="g" style="grid-template-columns:${tmpl};grid-template-rows:30px ${s2 ? '44px 34px' : ''}">`
+    h += `<div class="c corner" style="grid-row:1;grid-column:1"></div>`
+    for (const c of cols) {
+      const hid = hiddenC.includes(c + 1)
+      h += `<div class="c h${c >= R.c0 && c <= R.c1 ? ' on' : ''}" style="grid-row:1;grid-column:${gc(c)}${frozenC && c < frozenC ? ';inset-inline-start:44px;z-index:6' : ''}">${LET[c]}${hid ? `<button class="hidmark" data-unhide="${c + 1}" aria-label="Column ${LET[c + 1]} is hidden. Unhide" title="Column ${LET[c + 1]} is hidden. Click to unhide"></button>` : ''}</div>`
+    }
+    const th = new Set(threads.filter(t => !t.resolved).map(t => `${t.r},${t.c}`))
+    for (let r = 0; r < ROWS; r++) {
+      const fr = r < frozenR, frs = fr ? `;top:${topOf(r)}px` : ''
+      h += `<div class="c rn${r >= R.r0 && r <= R.r1 ? ' on' : ''}${fr ? ' fz-r' : ''}${fr && r === frozenR - 1 ? ' fz-edge-b' : ''}" style="grid-row:${r + 2};grid-column:1${frs};z-index:${fr ? 4 : 2}">${r + 1}</div>`
+      for (const c of cols) {
+        const m = mergeAt(r, c)
+        if (m && (m.r0 !== r || m.c0 !== c)) continue
+        let st = DOC.st[`${r},${c}`]; st = stage3Style(r, c, st)
+        const span = m ? `;grid-column:${gc(c)} / span ${cols.filter(x => x >= m.c0 && x <= m.c1).length};grid-row:${r + 2} / span ${m.r1 - m.r0 + 1}` : `;grid-column:${gc(c)};grid-row:${r + 2}`
+        const fz = []
+        if (fr) fz.push(`position:sticky;top:${topOf(r)}px;z-index:${c < frozenC ? 3 : 2}`)
+        if (c < frozenC) fz.push(`position:sticky;inset-inline-start:44px;z-index:${fr ? 3 : 1}`)
+        const cls = ['c', st?.wrap ? 'wrap' : '', inSel(r, c) ? 'sel' : '', S.act.r === r && S.act.c === c ? 'act' : '', m ? 'merged' : '', fr && r === frozenR - 1 ? 'fz-edge-b' : '', c < frozenC ? 'fz-edge-e' : '', hiddenC.includes(c + 1) ? 'hid-after' : ''].filter(Boolean).join(' ')
+        h += `<div class="${cls}" data-cell="${r},${c}" role="gridcell" aria-label="${ref(r, c)} ${esc(display(val(r, c), st?.num))}" style="${css(st)}${span}${fz.length ? ';' + fz.join(';') : ''}${!st?.fill && (fr || c < frozenC) ? ';background:var(--panel)' : ''}">${cellInner(r, c, st)}${st && bordersCss(st) ? `<i class="bd" style="${bordersCss(st)}"></i>` : ''}${th.has(`${r},${c}`) ? `<b class="cm" data-comment-marker aria-label="${L().comments}"></b>` : ''}</div>`
+      }
+    }
+    return h + '</div>'
+  }
+  function contentGrid() {
+    const ar = S.lang === 'ar'
+    const cols = ar ? ['العنوان', 'الحالة', 'المحرر', 'النوع', 'الاستحقاق', 'الرابط'] : ['Title', 'Status', 'Editor', 'Type', 'Due', 'Link']
+    const W = [250, 130, 140, 100, 110, 140]
+    const ST = { ar: { draft: 'مسودة', review: 'مراجعة', ready: 'جاهز للنشر' }, en: { draft: 'Draft', review: 'In review', ready: 'Ready to post' } }[S.lang]
+    const PILL = { draft: ['#EEF0F3', '#4B5563'], review: ['#FEF3C7', '#92400E'], ready: ['#DCFCE7', '#166534'] }
+    const rows = [
+      { g: ar ? 'أسبوع 16 نوفمبر · 3 مهام' : 'Week of 16 Nov · 3 tasks' },
+      { t: ar ? 'كاروسيل تشويقة رمضان' : 'Ramadan teaser carousel', s: 'review', e: ['Samaa', '#B45309'], ty: ar ? 'منشور' : 'Post', d: '2026-11-16', fill: '#FFEB9C', cmt: true },
+      { t: ar ? 'ريل قصة العميل' : 'Customer story reel', s: 'draft', e: ['Omar', '#2563EB'], ty: ar ? 'ريل' : 'Reel', d: '2026-11-18', b: true },
+      { t: ar ? 'نص الملخص الأسبوعي' : 'Weekly recap copy', s: 'ready', e: ['Nermin', '#0E7C7C'], ty: ar ? 'نص' : 'Copy', d: '2026-11-19' },
+      { g: ar ? 'أسبوع 23 نوفمبر · 2 مهام' : 'Week of 23 Nov · 2 tasks' },
+      { t: ar ? 'فيديو ملخص القمة' : 'Summit recap video', s: 'draft', e: ['Omar', '#2563EB'], ty: ar ? 'فيديو' : 'Video', d: '2026-11-24', fill: '#DDEBF7' },
+      { t: ar ? 'إنفوجرافيك حصاد العام' : 'Year in review infographic', s: 'review', e: ['Samaa', '#B45309'], ty: ar ? 'منشور' : 'Post', d: '2026-11-26' },
+    ]
+    let h = `<div class="g" style="grid-template-columns:44px ${W.map(w => w + 'px').join(' ')}"><div class="c corner"></div>${cols.map((n, i) => `<div class="c h${i === 0 ? ' on' : ''}">${n}</div>`).join('')}`
+    rows.forEach((x, r) => {
+      h += `<div class="c rn${r === 1 ? ' on' : ''}">${r + 1}</div>`
+      if (x.g) { h += `<div class="c grp">${x.g}</div>`; return }
+      const st = x.fill ? `background:${x.fill}` : ''
+      const c0 = r === 1
+      h += `<div class="c${c0 ? ' sel act' : ''}" style="${st}${x.b ? ';font-weight:700' : ''}"><span class="v">${x.t}</span>${x.cmt ? '<b class="cm" data-comment-marker></b>' : ''}</div>`
+      h += `<div class="c${c0 ? ' sel' : ''}" style="${st}"><span class="pill" style="background:${PILL[x.s][0]};color:${PILL[x.s][1]}">${ST[x.s]}</span></div>`
+      h += `<div class="c${c0 ? ' sel' : ''}" style="${st}"><span class="chip"><i style="background:${x.e[1]}">${x.e[0][0]}</i>${x.e[0]}</span></div>`
+      h += `<div class="c${c0 ? ' sel' : ''}" style="${st}">${x.ty}</div>`
+      h += `<div class="c${c0 ? ' sel' : ''}" style="${st}">${display(x.d, { kind: 'date', long: true })}</div>`
+      h += `<div class="c${c0 ? ' sel' : ''}" style="${st}"><a href="#" tabindex="-1">drive.google.com/…</a></div>`
+    })
+    return h + '</div>'
+  }
+
+  // ── menus ──
+  function swatches(kind, cur) {
+    const tl = L()
+    let h = `<div class="cp menu" role="dialog" aria-label="${tl.c[kind]}" data-color-picker style="${S.menu.pos}">
+      <button class="auto" data-pick="" data-k="${kind}"><i style="${kind === 'fill' ? 'background:linear-gradient(135deg,transparent 45%,#C00000 46%,#C00000 54%,transparent 55%)' : 'background:#14131A'}"></i>${kind === 'fill' ? tl.noFill : tl.auto}</button>
+      <h5>${tl.theme}</h5><div class="sw-grid" role="grid">`
+    THEME.forEach((c, i) => { h += `<button class="sw${cur === c ? ' cur' : ''}" data-pick="${c}" data-k="${kind}" style="background:${c}" aria-label="${tl.themeNames[i]}" title="${tl.themeNames[i]}"></button>` })
+    h += `</div><div class="sw-grid tints" style="margin-top:4px">`
+    for (let t = 0; t < 5; t++) THEME.forEach((c, i) => { const f = tintsFor(c, i)[t], x = mix(c, f), nm = `${tl.themeNames[i]}, ${i < 2 ? (f < 0 ? `${S.lang === 'ar' ? 'أغمق' : 'Darker'} ${Math.round(-f * 100)}%` : `${S.lang === 'ar' ? 'أفتح' : 'Lighter'} ${Math.round(f * 100)}%`) : tl.tintNames[t + 1]}`; h += `<button class="sw${cur === x ? ' cur' : ''}" data-pick="${x}" data-k="${kind}" style="background:${x}" aria-label="${nm}" title="${nm}"></button>` })
+    h += `</div><h5>${tl.std}</h5><div class="sw-grid">${STD.map((c, i) => `<button class="sw${cur === c ? ' cur' : ''}" data-pick="${c}" data-k="${kind}" style="background:${c}" aria-label="${tl.stdNames[i]}" title="${tl.stdNames[i]}"></button>`).join('')}</div>
+      <h5>${tl.recent}</h5><div class="sw-grid">${S.recent.map(c => `<button class="sw" data-pick="${c}" data-k="${kind}" style="background:${c}" aria-label="${c}" title="${c}"></button>`).join('')}</div>
+      <label class="more"><input type="color" id="more-${kind}" data-more="${kind}" value="${cur || '#7030A0'}" aria-label="${tl.moreCol}">${tl.moreCol}</label></div>`
+    return h
+  }
+  const PRE_ICON = { bottom: [0, 0, 1, 0], top: [1, 0, 0, 0], left: [0, 0, 0, 1], right: [0, 1, 0, 0], none: [0, 0, 0, 0], all: [1, 1, 1, 1, 'in'], outside: [1, 1, 1, 1], thickOut: [3, 3, 3, 3], dblBottom: [0, 0, 'd', 0], thickBottom: [0, 0, 3, 0], topBottom: [1, 0, 1, 0], topThick: [1, 0, 3, 0], inside: [0, 0, 0, 0, 'in'] }
+  function preIcon(k) {
+    const [t, r, b, l, inn] = PRE_ICON[k], w = v => v === 3 ? 2.6 : 1.4
+    const ln = (on, d) => on ? `<path d="${d}" stroke-width="${on === 'd' ? 1 : w(on)}"/>${on === 'd' ? '<path d="M3 18.5h18" stroke-width="1"/>' : ''}` : ''
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="3" y="3" width="18" height="18" stroke-dasharray="1.5 2" stroke-width="1" opacity=".5"/>${ln(t, 'M3 3h18')}${ln(r, 'M21 3v18')}${ln(b, 'M3 21h18')}${ln(l, 'M3 3v18')}${inn ? '<path d="M12 3v18M3 12h18" stroke-width="1.4"/>' : ''}</svg>`
+  }
+  function borderPicker() {
+    const tl = L()
+    return `<div class="menu bp" role="menu" aria-label="${tl.bp.title}" data-border-picker style="${S.menu.pos}">
+      <div class="presets">${PRESETS.map((k, i) => `<button class="mi" role="menuitem" data-border="${k}">${preIcon(k)}<span>${tl.bp.presets[i]}</span></button>`).join('')}</div><hr>
+      <h5>${tl.bp.style}</h5><div class="ls" role="group" aria-label="${tl.bp.style}">${Object.keys(BW).map(w => `<button data-line="${w}" aria-pressed="${S.line.w === w}" aria-label="${tl.lines[w]}" title="${tl.lines[w]}"><i style="border-top:${BW[w]}px ${BS[w]} currentColor${w === 'double' ? ';height:3px' : ''}"></i></button>`).join('')}</div>
+      <h5>${tl.bp.colour}</h5><div class="sw-grid" style="padding:2px 6px 6px">${['#14131A', ...STD.slice(0, 9)].map((c, i) => `<button class="sw${S.line.c === c ? ' cur' : ''}" data-linec="${c}" style="background:${c}" aria-label="${i ? tl.stdNames[i - 1] : tl.auto}"></button>`).join('')}</div></div>`
+  }
+  function listMenu(items, attr = 'data-mi', aria = '') {
+    return `<div class="menu" role="menu" aria-label="${esc(aria)}" style="${S.menu.pos}">${items.map((it, i) => it === '-' ? '<hr>' : typeof it === 'string' && it.startsWith('<') ? it : `<button class="mi" role="menuitem" ${attr}="${i}"${Array.isArray(it) && it[2] ? ' disabled' : ''}><span class="ck">${Array.isArray(it) && it[3] ? '✓' : ''}</span><span>${Array.isArray(it) ? it[0] : it}</span>${Array.isArray(it) && it[1] ? `<span class="k">${it[1]}</span>` : ''}</button>`).join('')}</div>`
+  }
+  function menuHtml() {
+    if (!S.menu) return ''
+    const tl = L(), st = cur(), k = S.menu.k
+    if (k === 'color') return swatches('color', st.color)
+    if (k === 'fill') return swatches('fill', st.fill)
+    if (k === 'borders') return borderPicker()
+    if (k === 'font') return `<div class="menu fontlist" role="listbox" aria-label="${tl.c.font}" style="${S.menu.pos}">${FONTS.map(([n, f]) => `<button class="mi" role="option" aria-selected="${(st.font || 'Inter') === n}" data-font="${n}" style="font-family:${f}"><span class="ck">${(st.font || 'Inter') === n ? '✓' : ''}</span>${n}</button>`).join('')}</div>`
+    if (k === 'size') return `<div class="menu" role="listbox" aria-label="${tl.c.size}" style="${S.menu.pos};min-width:90px">${SIZES.map(n => `<button class="mi" role="option" aria-selected="${(st.size || 10) === n}" data-size="${n}"><span class="ck">${(st.size || 10) === n ? '✓' : ''}</span>${n}</button>`).join('')}</div>`
+    if (k === 'merge') {
+      const linked = S.screen === 'content'
+      return `<div class="menu" role="menu" aria-label="${tl.c.merge}" style="${S.menu.pos};width:260px">${linked ? `<span class="why" role="note">${tl.mergeWhy}</span>` : ''}${tl.merge.map((m, i) => `<button class="mi" role="menuitem" data-merge="${i}"${linked ? ' disabled' : ''}>${m}</button>`).join('')}</div>`
+    }
+    if (k === 'rotate') return listMenu(tl.rot.map((r, i) => [r, '', 0, i === 0]), 'data-rot', tl.c.rotate)
+    if (k === 'num') {
+      const v = val(S.act.r, S.act.c) || '12500'
+      const kinds = [['general'], ['number', { kind: 'number', dp: 2, sep: true }], ['currency', { kind: 'currency', cur: 'EGP', dp: 2 }], ['accounting', { kind: 'accounting', cur: 'EGP', dp: 2 }], ['date', { kind: 'date' }], ['ldate', { kind: 'date', long: true }], ['time', { kind: 'time' }], ['percent', { kind: 'percent', dp: 2 }], ['scientific', { kind: 'scientific', dp: 2 }], ['text', { kind: 'text' }]]
+      const sample = n => { const x = n ? display(/^\d{4}-/.test(v) && n.kind !== 'date' && n.kind !== 'time' ? '12500' : (!/^\d{4}-/.test(v) && (n.kind === 'date' || n.kind === 'time') ? '2026-11-16' : v), n) : v; return x }
+      return `<div class="menu" role="menu" aria-label="${tl.c.num}" style="${S.menu.pos};width:280px">${kinds.map(([kk, n], i) => `<button class="mi" role="menuitem" data-num="${i}"><span><b style="font-weight:600">${tl.nums[kk]}</b><br><small style="color:var(--muted)">${esc(sample(n))}</small></span></button>`).join('')}<hr><button class="mi" role="menuitem" data-open-fc>${tl.nums.more}</button></div>`
+    }
+    if (k === 'cur') return listMenu(Object.keys(tl.curs).map(c => [tl.curs[c], '', 0, st.num?.cur === c]), 'data-cur', tl.c.cur)
+    if (k === 'cell') return listMenu(tl.cellMenu, 'data-cellmenu', 'Cell')
+    const m2 = tl.menus2, m3 = tl.menus3
+    const map = { paste: m2.paste, clear: m2.clear, fillDn: m2.fill, find: m2.find, freeze: m2.freeze.map((x, i) => [x, '', 0, S.screen === 'stage2' && i === 2]), fmt: m2.fmt, sort: m3.sort, cond: m3.cond }
+    if (map[k]) return listMenu(map[k], 'data-stage-mi', tl.c[k])
+    if (k === 'cellStyles') {
+      const LOOK = [{}, GOOD, BAD, NEUT, { b: true, size: 18, color: '#44546A' }, { b: true, size: 15, color: '#44546A', bb: 1 }, { b: true, size: 13, color: '#44546A' }, { b: true, color: '#44546A' }, { b: true, color: '#44546A' }, { b: true }, { fill: '#FFFFCC' }, { fill: '#FFCC99', color: '#3F3F76' }, { fill: '#F2F2F2', color: '#3F3F3F', b: true }, { fill: '#4472C4', color: '#FFFFFF' }, { fill: '#ED7D31', color: '#FFFFFF' }, { fill: '#A5A5A5', color: '#FFFFFF' }]
+      return `<div class="menu" role="menu" aria-label="${tl.c.cellStyles}" style="${S.menu.pos};width:360px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">${m3.styles.map((n, i) => `<button class="mi" role="menuitem" style="border:1px solid var(--line);justify-content:center;${css({ ...LOOK[i], size: null })};${LOOK[i].bb ? 'box-shadow:inset 0 -2px 0 #4472C4' : ''}">${n}</button>`).join('')}</div></div>`
+    }
+    if (k === 'table') {
+      const base = ['#4472C4', '#ED7D31', '#70AD47', '#7030A0', '#A5A5A5', '#FFC000']
+      return `<div class="menu" role="menu" aria-label="${tl.c.table}" style="${S.menu.pos};width:330px">${m3.table.map((lvl, li) => `<h5>${lvl}</h5><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:0 6px 6px">${base.map(b => `<button class="mi" role="menuitem" aria-label="${lvl} ${b}" style="padding:0;min-height:0;display:grid;height:34px;border:1px solid var(--line);overflow:hidden">${[0, 1, 2, 3].map(r => `<i style="display:block;height:25%;background:${r === 0 ? mix(b, li === 0 ? 0 : li === 1 ? 0 : -.25) : r % 2 ? mix(b, li === 2 ? .2 : .8) : (li === 2 ? mix(b, .5) : '#FFFFFF')}"></i>`).join('')}</button>`).join('')}</div>`).join('')}</div>`
+    }
+    if (k === 'more') return `<div class="menu" role="menu" style="${S.menu.pos}">${['cellStyles', 'table', 'cond', 'fmt', 'clear', 'fillDn', 'sort', 'find', 'freeze'].map(x => `<button class="mi" role="menuitem" data-fold="${x}">${ic({ cellStyles: 'styles' }[x] || x, 16)}<span>${tl.c[x]}</span><span class="k">${stageOf[x] ? (S.lang === 'ar' ? `م${stageOf[x]}` : `S${stageOf[x]}`) : ''}</span></button>`).join('')}</div>`
+    if (k === 'filter') return filterMenu()
+    return ''
+  }
+  function filterMenu() {
+    const f = L().filter, vals = S.lang === 'ar' ? ['في الموعد', 'معرّض للتأخير', 'متأخر'] : ['On track', 'At risk', 'Late']
+    return `<div class="menu" role="dialog" aria-label="${f.t}" style="${S.menu.pos};width:260px"><button class="mi">${f.az}</button><button class="mi">${f.za}</button><hr>
+      <button class="mi">${f.byColour} <span class="k" style="display:inline-flex;gap:3px">${[GOOD, NEUT, BAD].map(x => `<i style="width:12px;height:12px;border-radius:3px;display:inline-block;background:${x.fill}"></i>`).join('')}</span></button><button class="mi">${f.cond}</button><hr>
+      <div style="padding:4px 8px;display:grid;gap:6px"><input type="search" id="flt-search" placeholder="${f.search}" aria-label="${f.search}" style="border:1px solid var(--input);border-radius:8px;padding:6px 8px;background:var(--panel)">
+      <label class="chk"><input type="checkbox" id="flt-all"> ${f.all}</label>${vals.map((v, i) => `<label class="chk"><input type="checkbox" id="flt-${i}" ${i === 2 ? 'checked' : ''}> ${v}</label>`).join('')}
+      <div class="row" style="display:flex;gap:8px;justify-content:space-between;margin-top:4px"><button class="btn sm">${f.clear}</button><button class="btn sm go" data-close>${f.ok}</button></div></div></div>`
+  }
+
+  // ── dialogs ──
+  function dialogHtml() {
+    if (!S.dlg) return ''
+    const tl = L()
+    if (S.dlg === 'mergeWarn') return `<div class="scrim"><div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="mw-t"><h2 id="mw-t">${tl.mergeWarn.t}</h2><p>${tl.mergeWarn.p}</p><div class="row"><button class="btn" data-close>${tl.mergeWarn.cancel}</button><button class="btn go" data-merge-go>${tl.mergeWarn.go}</button></div></div></div>`
+    if (S.dlg === 'fc') return formatCells()
+    if (S.dlg === 'find') { const f = tl.find; return `<div class="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="fr-t" style="width:min(440px,100%)"><h2 id="fr-t">${f.t}</h2>
+      <div class="dtabs" role="tablist"><button role="tab" aria-selected="false">${f.f}</button><button role="tab" aria-selected="true">${f.r}</button></div>
+      <label class="fld inline"><span>${f.what}</span><input type="text" id="fr-what" value="Q4"></label><label class="fld inline"><span>${f.with}</span><input type="text" id="fr-with" value="Q1"></label>
+      <div class="two"><label class="chk"><input type="checkbox" id="fr-mc" checked> ${f.mc}</label><label class="chk"><input type="checkbox" id="fr-wc"> ${f.wc}</label></div>
+      <p role="status">${f.count}</p>
+      <div class="row" style="justify-content:space-between"><span style="display:flex;gap:6px"><button class="btn sm">${f.prev}</button><button class="btn sm">${f.next}</button></span><span style="display:flex;gap:6px"><button class="btn sm">${f.one}</button><button class="btn sm go">${f.all}</button></span></div></div></div>` }
+    if (S.dlg === 'paste') { const p = tl.ps; return `<div class="scrim"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ps-t"><h2 id="ps-t">${p.t}</h2><p>${p.p}</p><div class="lb" role="radiogroup">${p.items.map((x, i) => `<label class="chk" style="padding:5px 8px"><input type="radio" name="ps" id="ps-${i}" ${i === 1 ? 'checked' : ''}> ${x}</label>`).join('')}</div><label class="chk"><input type="checkbox" id="ps-tr"> ${p.tr}</label><div class="row"><button class="btn" data-close>${p.cancel}</button><button class="btn go" data-close>${p.ok}</button></div></div></div>` }
+    if (S.dlg === 'sort') { const s = tl.sortD, colN = DATA[S.lang][1]; return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="so-t"><h2 id="so-t">${s.t}</h2>
+      <div style="display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:8px;align-items:end">${[[s.by, colN[4], s.oldNew], [s.then, colN[0], s.az]].map(([lab, c, o], i) => `<span style="font-size:12px;font-weight:600;color:var(--muted);padding-bottom:8px">${lab}</span><label class="fld"><span>${i ? '' : tl.sortD.by}</span><select id="so-c${i}"><option>${c}</option></select></label><label class="fld"><span>${i ? '' : s.on}</span><select id="so-o${i}"><option>${s.vals}</option></select></label><label class="fld"><span>${i ? '' : s.order}</span><select id="so-d${i}"><option>${o}</option></select></label>`).join('')}</div>
+      <div class="row" style="justify-content:space-between"><span style="display:flex;gap:10px;align-items:center"><button class="btn sm">${s.add}</button><label class="chk"><input type="checkbox" id="so-h" checked> ${s.header}</label></span><span style="display:flex;gap:8px"><button class="btn" data-close>${s.cancel}</button><button class="btn go" data-close>${s.ok}</button></span></div></div></div>` }
+    if (S.dlg === 'rule') { const r = tl.rule; return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="ru-t"><h2 id="ru-t">${r.t}</h2>
+      <div class="fc" style="min-height:0"><div class="fld"><span>${r.kind}</span><div class="lb" role="listbox">${r.kinds.map((k, i) => `<button role="option" aria-selected="${i === 5}">${k}</button>`).join('')}</div></div>
+      <div class="stack"><label class="fld"><span>${r.look}</span><select id="ru-look">${r.looks.map(x => `<option>${x}</option>`).join('')}</select></label><label class="fld"><span>${r.applies}</span><input type="text" id="ru-range" value="=E3:E6"></label>
+      <div class="sample"><small>${tl.fc.preview}</small><div class="pv" style="${css(BAD)}">${display('2026-11-05', { kind: 'date', long: true })}</div></div></div></div>
+      <div class="row"><button class="btn" data-close>${r.cancel}</button><button class="btn go" data-close>${r.ok}</button></div></div></div>` }
+    if (S.dlg === 'rules') { const r = tl.rules; return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="mr-t"><h2 id="mr-t">${r.t}</h2>
+      <div class="row" style="justify-content:flex-start"><button class="btn sm">${r.add}</button><button class="btn sm">${r.edit}</button><button class="btn sm">${r.del}</button><button class="btn sm" aria-label="${r.up}">↑</button><button class="btn sm" aria-label="${r.down}">↓</button></div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${r.cols.map(c => `<th style="text-align:start;padding:6px 8px;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)">${c}</th>`).join('')}</tr></thead><tbody>${r.list.map(([n, a], i) => `<tr style="${i === 0 ? 'background:var(--purple-soft)' : ''}"><td style="padding:8px">${n}</td><td style="padding:8px"><span style="display:inline-block;padding:2px 10px;border-radius:4px;${i === 1 ? 'background:linear-gradient(90deg,#5B9BD5 60%,transparent 60%);color:var(--text)' : css(i === 0 ? BAD : NEUT)}">AaBbCc</span></td><td style="padding:8px;font-variant-numeric:tabular-nums">${a}</td></tr>`).join('')}</tbody></table></div>
+      <div class="row"><button class="btn go" data-close>${r.ok}</button></div></div></div>` }
+    return ''
+  }
+  function formatCells() {
+    const f = L().fc, d = S.draft, v = val(S.act.r, S.act.c) || '12500'
+    const tabs = `<div class="dtabs" role="tablist">${f.tabs.map((t, i) => `<button role="tab" aria-selected="${S.fcTab === i}" data-fctab="${i}">${t}</button>`).join('')}</div>`
+    let body = ''
+    if (S.fcTab === 0) {
+      const cats = ['general', 'number', 'currency', 'accounting', 'date', 'time', 'percent', 'scientific', 'text', 'custom']
+      const k = d.num?.pattern ? 'custom' : (d.num?.kind || 'general')
+      const showDp = ['number', 'currency', 'accounting', 'percent', 'scientific'].includes(k)
+      const negs = ['minus', 'red', 'paren', 'paren-red']
+      body = `<div class="fc"><div class="fld"><span>${f.cat}</span><div class="lb" role="listbox" aria-label="${f.cat}">${cats.map(c => `<button role="option" aria-selected="${k === c}" data-fccat="${c}">${c === 'custom' ? f.custom : L().nums[c]}</button>`).join('')}</div></div>
+        <div class="stack"><div class="sample"><small>${f.sample}</small><div class="pv" style="${css({ ...d, num: null })}${negRed(v, d.num) ? ';color:#C00000' : ''}">${esc(display(k === 'date' || k === 'time' || k === 'custom' ? (/^\d{4}-/.test(v) ? v : '2026-11-16') : (/^\d{4}-/.test(v) ? '12500' : v), d.num))}</div></div>
+        ${showDp ? `<div class="two"><label class="fld"><span>${f.dp}</span><input type="number" id="fc-dp" min="0" max="10" value="${d.num.dp ?? 2}" data-fcdp></label>${k === 'currency' || k === 'accounting' ? `<label class="fld"><span>${f.sym}</span><select id="fc-sym" data-fcsym>${Object.keys(L().curs).map(c => `<option ${d.num.cur === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>` : ''}</div>` : ''}
+        ${k === 'number' ? `<label class="chk"><input type="checkbox" id="fc-sep" data-fcsep ${d.num.sep !== false ? 'checked' : ''}> ${f.thou}</label>` : ''}
+        ${['number', 'currency'].includes(k) ? `<div class="fld"><span>${f.neg}</span><div class="lb neg" role="listbox" aria-label="${f.neg}">${negs.map(n => `<button role="option" aria-selected="${(d.num.neg || 'minus') === n}" data-fcneg="${n}" style="${n.includes('red') ? 'color:#C00000' : ''}">${display('-1234.1', { ...d.num, neg: n })}</button>`).join('')}</div></div>` : ''}
+        ${k === 'date' ? `<div class="fld"><span>${f.type}</span><div class="lb" role="listbox">${[[{ kind: 'date' }], [{ kind: 'date', long: true }], [{ kind: 'date', pattern: 'dd/mm/yyyy' }], [{ kind: 'date', pattern: 'ddd d mmm' }]].map(([n]) => `<button role="option" aria-selected="${JSON.stringify(n) === JSON.stringify(d.num)}" data-fcdate='${JSON.stringify(n)}'>${display('2026-11-16', n)}</button>`).join('')}</div></div>` : ''}
+        ${k === 'custom' ? `<label class="fld"><span>${f.pattern}</span><input type="text" id="fc-pat" data-fcpat value="${esc(d.num.pattern || 'ddd d mmm yyyy')}"><small style="color:var(--muted);font-size:11.5px">${f.patternHint}</small></label>` : ''}
+        <p style="font-size:12.5px">${f.descNum}</p></div></div>`
+    } else if (S.fcTab === 1) {
+      const hk = ['general', 'left', 'center', 'right', 'justify'], vk = ['top', 'middle', 'bottom']
+      body = `<div class="fc" style="grid-template-columns:minmax(0,1fr) 150px"><div class="stack"><div class="two"><label class="fld"><span>${f.h}</span><select id="fc-h" data-fch>${hk.map((h, i) => `<option value="${h}" ${(d.ha || 'general') === h ? 'selected' : ''}>${f.hs[i]}</option>`).join('')}</select></label>
+        <label class="fld"><span>${f.v}</span><select id="fc-v" data-fcv>${vk.map((h, i) => `<option value="${h}" ${(d.va || 'bottom') === h ? 'selected' : ''}>${f.vs[i]}</option>`).join('')}</select></label></div>
+        <label class="fld"><span>${f.indent}</span><input type="number" id="fc-ind" min="0" max="15" value="${d.indent || 0}" data-fcind style="width:90px"></label>
+        <label class="chk"><input type="checkbox" id="fc-wrap" data-fcwrap ${d.wrap ? 'checked' : ''}> ${f.wrap}</label><label class="chk"><input type="checkbox" id="fc-merge"> ${f.mergeC}</label>
+        <div class="sample"><small>${f.preview}</small><div class="pv" style="${css({ ...d, num: null })};height:52px;${d.wrap ? 'white-space:normal' : 'white-space:nowrap;overflow:hidden'}">${esc(display(v, d.num))}</div></div></div>
+        <div class="stack"><span style="font-size:12px;font-weight:600;color:var(--muted)">${f.orient}</span><div class="dial" aria-hidden="true"><i style="transform:rotate(-${d.rot || 0}deg)"></i></div><label class="fld inline"><input type="number" id="fc-rot" min="-90" max="90" value="${d.rot || 0}" style="width:70px"><span>${f.deg}</span></label></div></div>`
+    } else if (S.fcTab === 2) {
+      const sty = (d.b ? 2 : 0) + (d.i ? 1 : 0)
+      body = `<div class="stack"><div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) 80px;gap:10px">
+        <div class="fld"><span>${f.fontL}</span><div class="lb" role="listbox" style="max-height:170px">${FONTS.map(([n, ff]) => `<button role="option" aria-selected="${(d.font || 'Inter') === n}" data-fcfont="${n}" style="font-family:${ff}">${n}</button>`).join('')}</div></div>
+        <div class="fld"><span>${f.styleL}</span><div class="lb" role="listbox">${f.styles.map((n, i) => `<button role="option" aria-selected="${sty === [0, 1, 2, 3][i]}" data-fcsty="${i}">${n}</button>`).join('')}</div></div>
+        <div class="fld"><span>${f.sizeL}</span><div class="lb" role="listbox" style="max-height:170px">${SIZES.map(n => `<button role="option" aria-selected="${(d.size || 10) === n}" data-fcsize="${n}">${n}</button>`).join('')}</div></div></div>
+        <div class="two"><label class="fld"><span>${f.ul}</span><select id="fc-ul" data-fcul>${['', 'single', 'double'].map((u, i) => `<option value="${u}" ${(d.u || '') === u ? 'selected' : ''}>${f.uls[i]}</option>`).join('')}</select></label><label class="fld"><span>${f.colourL}</span><input type="color" id="fc-col" data-fccol value="${d.color || '#14131A'}" style="width:100%;height:32px;border:1px solid var(--input);border-radius:8px;background:var(--panel)"></label></div>
+        <label class="chk"><input type="checkbox" id="fc-st" data-fcst ${d.s ? 'checked' : ''}> ${f.strike}</label>
+        <div class="sample"><small>${f.preview}</small><div class="pv" style="${css({ ...d, num: null, fill: null })};justify-content:center">AaBbYyZz · أبجد</div></div></div>`
+    } else if (S.fcTab === 3) {
+      const side = (k, s) => `<button data-fcside="${k}" aria-label="${k}" aria-pressed="${!!d[k]}" style="${s};${d[k] ? `background:${d[k].c}` : 'background:var(--input);opacity:.5'}"></button>`
+      body = `<div class="fc" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="stack"><span style="font-size:12px;font-weight:600;color:var(--muted)">${f.presets}</span><div style="display:flex;gap:8px"><button class="btn sm" data-fcpre="none">${f.none}</button><button class="btn sm" data-fcpre="outline">${f.outline}</button><button class="btn sm" disabled>${f.inside}</button></div>
+        <div class="bbox">${side('bt', 'top:-2px;left:8px;right:8px;height:4px')}${side('bb', 'bottom:-2px;left:8px;right:8px;height:4px')}${side('bl', 'left:-2px;top:8px;bottom:8px;width:4px')}${side('br', 'right:-2px;top:8px;bottom:8px;width:4px')}${f.clickSide}</div></div>
+        <div class="stack"><span style="font-size:12px;font-weight:600;color:var(--muted)">${L().bp.style}</span><div class="ls" style="display:grid;gap:4px">${Object.keys(BW).map(w => `<button class="btn sm" data-line="${w}" aria-pressed="${S.line.w === w}" style="${S.line.w === w ? 'border-color:var(--purple);background:var(--purple-soft)' : ''};display:flex;gap:10px;align-items:center"><i style="flex:1;border-top:${BW[w]}px ${BS[w]} currentColor${w === 'double' ? ';height:3px' : ''}"></i>${L().lines[w]}</button>`).join('')}</div></div></div>`
+    } else {
+      body = `<div class="stack"><span style="font-size:12px;font-weight:600;color:var(--muted)">${f.bg}</span><button class="btn sm" data-fcfill="" style="justify-self:start">${L().noFill}</button>
+        <div class="sw-grid" style="max-width:260px">${THEME.map(c => `<button class="sw" data-fcfill="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}</div><div class="sw-grid" style="max-width:260px">${STD.map((c, i) => `<button class="sw" data-fcfill="${c}" style="background:${c}" aria-label="${L().stdNames[i]}"></button>`).join('')}</div>
+        <div class="sample"><small>${f.sample}</small><div class="pv" style="${css({ fill: d.fill })};height:44px"></div></div></div>`
+    }
+    return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="fc-t" data-format-dialog><h2 id="fc-t">${f.t} · ${ref(S.act.r, S.act.c)}</h2>${tabs}${body}<div class="row"><button class="btn" data-close>${f.cancel}</button><button class="btn go" data-fc-ok>${f.ok}</button></div></div></div>`
+  }
+
+  // ── comments ──
+  const ago = t => { const a = L().ago; return t.d ? a.d(t.d) : t.h ? a.h(t.h) : a.m(t.m) }
+  const withMen = (text, men) => men ? esc(text).replace(esc(men), `<span class="men">${esc(men)}</span>`) : esc(text)
+  function threadHtml(t, { full } = {}) {
+    const th = L().th, colN = DATA[S.lang][1]
+    const name = `${ref(t.r, t.c)} · ${colN[t.c] || ''}`
+    return `<div class="thread" role="dialog" aria-label="${L().comments} ${name}" data-comment-thread ${full ? '' : `style="${S.threadPos || ''}"`}>
+      <header>${full ? `<button class="ico" data-thread-close aria-label="${th.back}">${ic('back')}</button>` : ''}<b>${name}</b><span class="sp">
+        <button class="ico" data-resolve="${t.id}" aria-label="${t.resolved ? th.reopen : th.resolve}" title="${t.resolved ? th.reopen : th.resolve}">${ic(t.resolved ? 'reopen' : 'check')}</button>
+        ${full ? '' : `<button class="ico" data-thread-close aria-label="${th.close}">${ic('x', 16)}</button>`}</span></header>
+      ${t.items.map(it => `<div class="cmt${it.gone ? ' gone' : ''}"><span class="av" style="background:${it.col}" aria-hidden="true">${it.who[0]}</span><div class="who"><b>${it.who}</b><small>${ago(it.t)}${it.edited ? ` · ${th.edited}` : ''}</small></div><p>${it.gone ? th.delMsg : withMen(it.text, it.men)}</p>${it.who === ME && !it.gone ? `<button class="ico dots" aria-label="${th.more}" title="${th.edit} · ${th.del}">${ic('dots', 16)}</button>` : ''}</div>`).join('')}
+      <div class="reply">${S.mention ? `<div class="mpick" role="listbox" aria-label="@">${MEMBERS.map(([n, role, c], i) => `<button role="option" aria-selected="${i === 0}" data-mention="${n}"><span class="av" style="background:${c};width:24px;height:24px;font-size:10px">${n[0]}</span>${n}<small>${role}</small></button>`).join('')}</div>` : ''}
+        <textarea id="reply-${t.id}" aria-label="${th.reply}" placeholder="${th.reply}" data-reply="${t.id}">${S.mention ? '@' : ''}</textarea>
+        <div class="row"><small>${th.sendKey}</small><button class="btn sm go" data-send="${t.id}">${th.send}</button></div></div></div>`
+  }
+  function panelHtml() {
+    const th = L().th, colN = DATA[S.lang][1], tab = S.panelTab || 'open'
+    const list = threads.filter(t => (tab === 'open') !== t.resolved)
+    return `<aside class="panel" data-comments-panel aria-label="${L().comments}"><header><h3>${L().comments}</h3><span style="margin-inline-start:auto"></span><button class="ico" data-panel-close aria-label="${th.close}">${ic('x', 16)}</button></header>
+      <div class="dtabs" role="tablist" style="padding-inline:8px">${['open', 'resolved'].map(k => `<button role="tab" aria-selected="${tab === k}" data-ptab="${k}">${th[k]} (${threads.filter(t => (k === 'open') !== t.resolved).length})</button>`).join('')}</div>
+      <div class="list">${list.length ? list.map(t => `<button class="pitem" data-goto="${t.id}"><span class="ref">${ref(t.r, t.c)} · ${colN[t.c]}</span><p>${esc(t.items[0].text)}</p><small>${t.items[0].who} · ${ago(t.items[t.items.length - 1].t)} · ${th.replies(t.items.length - 1)}</small></button>`).join('') : `<p class="empty">${th.panelEmpty}</p>`}</div></aside>`
+  }
+
+  // ── phone bottom sheet ──
+  function phoneSheet() {
+    const tl = L(), st = cur(), t = S.phoneTab
+    let body = ''
+    if (t === 0) body = `<div class="big">${fbtn('b', '<b>B</b>', { pressed: !!st.b })}${fbtn('i', '<i>I</i>', { pressed: !!st.i })}${fbtn('u', '<u>U</u>', { pressed: !!st.u })}${fbtn('s', '<s>S</s>', { pressed: !!st.s })}<button class="fb wide" data-fmt="font">${st.font || 'Inter'} ▾</button><button class="fb wide" data-fmt="size">${st.size || 10} pt ▾</button></div><div class="sw-grid">${STD.map((c, i) => `<button class="sw" style="height:28px;width:28px" data-pick="${c}" data-k="color" aria-label="${tl.c.color}: ${tl.stdNames[i]}"></button>`).join('').replace(/<button class="sw" style="height:28px;width:28px" data-pick="(#\w+)"/g, '<button class="sw" style="height:28px;width:28px;background:$1" data-pick="$1"')}</div>`
+    else if (t === 1) body = `<div class="sw-grid">${[...THEME, ...STD].map(c => `<button class="sw" style="height:28px;width:28px;background:${c}" data-pick="${c}" data-k="fill" aria-label="${tl.c.fill} ${c}"></button>`).join('')}</div><button class="fb wide" data-pick="" data-k="fill" style="border:1px solid var(--line)">${tl.noFill}</button>`
+    else if (t === 2) body = `<div class="big">${PRESETS.slice(0, 8).map((k, i) => `<button class="fb" data-border="${k}" aria-label="${tl.bp.presets[i]}" title="${tl.bp.presets[i]}">${preIcon(k)}</button>`).join('')}</div>`
+    else if (t === 3) body = `<div class="big">${['left', 'center', 'right', 'top', 'middle', 'bottom'].map(k => fbtn(k, ic(k), { pressed: st.ha === k || st.va === k })).join('')}${fbtn('wrap', ic('wrap'), { pressed: !!st.wrap })}${fbtn('merge', ic('merge'), { menu: 1 })}</div>`
+    else body = `<div class="big">${['general', 'number', 'currency', 'percent', 'ldate', 'text'].map((k, i) => `<button class="fb wide" data-num="${[0, 1, 2, 7, 5, 9][i]}">${tl.nums[k]}</button>`).join('')}${fbtn('decUp', ic('decUp', 20))}${fbtn('decDn', ic('decDn', 20))}</div>`
+    return `<div class="sheet" role="dialog" aria-label="${tl.format}"><span class="grab" aria-hidden="true"></span><div class="stabs" role="tablist">${tl.phoneTabs.map((n, i) => `<button role="tab" aria-selected="${t === i}" data-ptabf="${i}">${n}</button>`).join('')}</div>${body}<button class="btn go" data-psheet-close style="justify-self:end">${S.lang === 'ar' ? 'تم' : 'Done'}</button></div>`
+  }
+
+  // ── render ──
+  const frame = document.getElementById('frame')
+  function render() {
+    const tl = L(), phone = S.dev === 'phone', ar = S.lang === 'ar'
+    frame.className = 'frame' + (phone ? ' phone' : '')
+    frame.dir = ar ? 'rtl' : 'ltr'; frame.lang = ar ? 'ar' : 'en'
+    const content = S.screen === 'content'
+    const R = selRect(), n = (R.r1 - R.r0 + 1) * (R.c1 - R.c0 + 1)
+    const open = threads.filter(t => !t.resolved).length
+    let h = `<div class="top"><span class="crumbs">${tl.crumbs[0]} › <b>${content ? (ar ? 'المحتوى' : 'Content') : tl.crumbs[1]}</b></span>${content ? `<span class="linked">${tl.link}</span>` : ''}<span class="status">${tl.saved}</span></div>
+      <div class="tools"><button class="ib" data-undo aria-label="${tl.undo}" title="${tl.undo}" ${HIST.length ? '' : 'disabled'}>${ic('undo', 16)}</button><button class="ib" data-redo aria-label="${tl.redo}" title="${tl.redo}" ${FUT.length ? '' : 'disabled'}>${ic('redo', 16)}</button><span class="sep"></span>
+      ${phone ? `<button class="ib" data-psheet aria-expanded="${S.phoneSheet}">${ic('fmt', 16)}${tl.format}</button>` : `<span class="lbl">${tl.sel(n)}</span>`}
+      <span class="push"></span><button class="ib" data-newcmt title="${tl.newCmt} (Ctrl+Alt+M)" aria-label="${tl.newCmt}">${ic('comment', 16)}＋</button><button class="ib" data-panel aria-pressed="${S.panel}" aria-label="${tl.comments}">${ic('comment', 16)}${phone ? '' : tl.comments}<span class="badge">${open}</span></button></div>
+      ${phone ? '' : fbar()}
+      <div class="body"><div class="gridwrap" role="grid" aria-label="${tl.wb}">${content ? contentGrid() : blankGrid()}</div>${S.panel && !phone ? panelHtml() : ''}</div>
+      <div class="tabs"><div class="fixed"><span aria-hidden="true">＋</span><span aria-hidden="true">≡</span></div>${(content ? [ar ? 'المحتوى 🔗' : 'Content 🔗', ar ? 'نوفمبر' : 'November'] : [tl.wb, ar ? 'الميزانية' : 'Budget', ar ? 'ورقة 3' : 'Sheet 3']).map((x, i) => `<span class="tb" aria-selected="${i === 0}">${x}</span>`).join('')}</div>`
+    const t = threads.find(x => x.id === S.thread)
+    if (t && !phone) h += threadHtml(t)
+    if (t && phone) h += `<div class="full">${threadHtml(t, { full: true })}</div>`
+    if (S.panel && phone) h += `<div class="full">${panelHtml()}</div>`
+    if (phone && S.phoneSheet) h += phoneSheet()
+    h += menuHtml() + dialogHtml()
+    frame.innerHTML = h
+    if (t && !phone) placeThread(t)
+    document.querySelectorAll('[data-screen]').forEach(b => b.setAttribute('aria-pressed', b.dataset.screen === S.screen))
+    document.querySelectorAll('[data-dev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.dev === S.dev))
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === S.lang))
+    const subs = T.en.sub[S.screen], sub = document.getElementById('sub')
+    sub.innerHTML = subs ? `<span>Open</span><span class="seg" role="group" aria-label="Open">${(T[S.lang].sub[S.screen]).map(([k, n]) => `<button data-sub="${k}" aria-pressed="${S.sub[S.screen] === k}">${n}</button>`).join('')}</span>` : ''
+    document.getElementById('hint').textContent = T.en.hints[S.screen]
+  }
+  function placeThread(t) {
+    const el = frame.querySelector(`[data-cell="${t.r},${t.c}"]`), th = frame.querySelector('[data-comment-thread]')
+    if (!el || !th) return
+    const f = frame.getBoundingClientRect(), r = el.getBoundingClientRect(), rtl = S.lang === 'ar'
+    const gw = frame.querySelector('.gridwrap').getBoundingClientRect(), lo = gw.left - f.left + 8, hi = gw.right - f.left - 8
+    let x = rtl ? r.left - f.left - 308 : r.right - f.left + 8
+    if (x + 300 > hi || x < lo) x = rtl ? r.right - f.left + 8 : r.left - f.left - 308
+    if (x + 300 > hi || x < lo) x = Math.max(lo, Math.min(hi - 300, r.left - f.left))
+    const y = Math.max(8, Math.min(f.height - th.offsetHeight - 8, r.top - f.top))
+    th.style.left = x + 'px'; th.style.top = y + 'px'
+  }
+  function openMenu(k, btn, extra = {}) {
+    if (S.menu?.k === k && !extra.force) { S.menu = null; return render() }
+    const f = frame.getBoundingClientRect(), r = btn.getBoundingClientRect(), rtl = S.lang === 'ar'
+    const W = { color: 268, fill: 268, borders: 290, num: 280, merge: 260, cellStyles: 360, table: 330, filter: 260 }[k] || 220
+    let x = rtl ? f.right - r.right : r.left - f.left
+    x = Math.max(8, Math.min(x, f.width - W - 8))
+    const y = r.bottom - f.top + 4
+    S.menu = { k, pos: `${rtl ? 'right' : 'left'}:${x}px;top:${Math.min(y, f.height - 120)}px` }
+    render()
+  }
+
+  // ── events ──
+  document.getElementById('scr').innerHTML = SCREENS.map(([k, n]) => `<button data-screen="${k}">${n}</button>`).join('')
+  function setScreen(k) {
+    S.screen = k; S.menu = null; S.dlg = null; S.thread = null; S.panel = false; S.mention = false; S.phoneSheet = false
+    if (k === 'format') { S.anc = { r: 1, c: 0 }; S.act = { r: 1, c: 0 } }
+    if (k === 'pickers' || k === 'dialog') { S.anc = { r: 2, c: 3 }; S.act = { r: 5, c: 3 } }
+    if (k === 'comments') { S.anc = S.act = { r: 4, c: 5 }; S.thread = 't1'; S.panel = S.dev === 'desktop' }
+    if (k === 'stage2') { S.anc = S.act = { r: 3, c: 0 }; S.dlg = S.sub.stage2 === 'none' ? null : S.sub.stage2 }
+    if (k === 'stage3') { S.anc = S.act = { r: 4, c: 4 }; S.dlg = ['sort', 'rule', 'rules'].includes(S.sub.stage3) ? S.sub.stage3 : null }
+    if (k === 'dialog') { S.draft = JSON.parse(JSON.stringify(cur())); if (!S.draft.num) S.draft.num = { kind: 'currency', cur: 'EGP', dp: 2 }; S.fcTab = 0; S.dlg = 'fc' }
+    if (S.dev === 'phone' && k === 'format') S.phoneSheet = true
+    render()
+    if (k === 'pickers' && S.dev === 'desktop') { const b = frame.querySelector('[data-fmt="fill"]'); b && openMenu('fill', b, { force: 1 }) }
+    if (k === 'content' && S.dev === 'desktop') { const b = frame.querySelector('[data-fmt="merge"]'); b && openMenu('merge', b, { force: 1 }) }
+    if (k === 'stage3' && S.sub.stage3 === 'filter') { const b = frame.querySelector('[data-flt="5"]'); b && openMenu('filter', b, { force: 1 }) }
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button,[data-cell]'); if (!b) return
+    const d = b.dataset
+    if (d.screen) return setScreen(d.screen)
+    if (d.dev) { S.dev = d.dev; return setScreen(S.screen) }
+    if (d.lang) { S.lang = d.lang; threads = THREADS(); return setScreen(S.screen) }
+    if (d.sub) { S.sub[S.screen] = d.sub; return setScreen(S.screen) }
+    if (!frame.contains(b)) return
+    if (b.getAttribute('aria-disabled') === 'true' && d.fmt !== 'merge') return
+    const keep = S.menu
+    if (d.fmt) {
+      const k = d.fmt, menuKeys = ['font', 'size', 'color', 'fill', 'borders', 'rotate', 'merge', 'num', 'cur', 'paste', 'clear', 'fillDn', 'sort', 'find', 'freeze', 'fmt', 'cellStyles', 'table', 'cond', 'more']
+      if (menuKeys.includes(k)) return openMenu(k, b)
+      S.menu = null
+      if (['b', 'i', 'u', 's'].includes(k)) return toggle(k)
+      if (['left', 'center', 'right'].includes(k)) return patch({ ha: cur().ha === k ? null : k })
+      if (['top', 'middle', 'bottom'].includes(k)) return patch({ va: k })
+      if (k === 'wrap') return patch({ wrap: !cur().wrap })
+      if (k === 'indent' || k === 'outdent') return patch({ indent: Math.max(0, Math.min(15, (cur().indent || 0) + (k === 'indent' ? 1 : -1))) || null })
+      if (k === 'pct') return patch({ num: { kind: 'percent', dp: 0 } })
+      if (k === 'sep') return patch({ num: { kind: 'number', dp: 2, sep: true } })
+      if (k === 'decUp' || k === 'decDn') { const n = cur().num || { kind: 'number', dp: 0 }; return patch({ num: { ...n, kind: n.kind === 'general' ? 'number' : n.kind, dp: Math.max(0, Math.min(10, (n.dp ?? 2) + (k === 'decUp' ? 1 : -1))) } }) }
+      if (k === 'fmtCells') { S.draft = JSON.parse(JSON.stringify(cur())); S.draft.num = S.draft.num || { kind: 'general' }; S.fcTab = 0; S.dlg = 'fc'; return render() }
+      return
+    }
+    if ('pick' in d) { const k = d.k; if (d.pick) S.recent = [d.pick, ...S.recent.filter(c => c !== d.pick)].slice(0, 5); S.menu = null; return patch({ [k]: d.pick || null }) }
+    if (d.border) { S.menu = null; return borders(d.border) }
+    if (d.line) { S.line.w = d.line; if (S.dlg === 'fc') return render(); return openMenu('borders', frame.querySelector('[data-fmt="borders"]'), { force: 1 }) }
+    if (d.linec) { S.line.c = d.linec; return openMenu('borders', frame.querySelector('[data-fmt="borders"]'), { force: 1 }) }
+    if (d.font) { S.menu = null; return patch({ font: d.font === 'Inter' ? null : d.font }) }
+    if (d.size) { S.menu = null; return patch({ size: +d.size === 10 ? null : +d.size }) }
+    if (d.merge) { S.menu = null; return doMerge(+d.merge) }
+    if ('mergeGo' in d) { S.dlg = null; const go = S.pending; S.pending = null; return go() }
+    if (d.rot) { S.menu = null; return patch({ rot: [0, 45, -45, 'vertical', 90, -90][+d.rot] || null }) }
+    if (d.num) { S.menu = null; S.phoneSheet = S.dev === 'phone' && S.phoneSheet; const N = [null, { kind: 'number', dp: 2, sep: true }, { kind: 'currency', cur: 'EGP', dp: 2 }, { kind: 'accounting', cur: 'EGP', dp: 2 }, { kind: 'date' }, { kind: 'date', long: true }, { kind: 'time' }, { kind: 'percent', dp: 2 }, { kind: 'scientific', dp: 2 }, { kind: 'text' }][+d.num]; return patch({ num: N }) }
+    if (d.cur) { S.menu = null; return patch({ num: { kind: 'currency', dp: 2, cur: Object.keys(L().curs)[+d.cur] } }) }
+    if ('openFc' in d) { S.menu = null; S.draft = JSON.parse(JSON.stringify(cur())); S.draft.num = S.draft.num || { kind: 'general' }; S.fcTab = 0; S.dlg = 'fc'; return render() }
+    if (d.fold) { const real = frame.querySelector(`[data-fmt="${d.fold}"]`); return openMenu(d.fold, frame.querySelector('[data-fmt="more"]'), { force: 1 }) }
+    if (d.cellmenu) { S.menu = null; if (+d.cellmenu === 4) { newComment(); return } if (+d.cellmenu === 5) { S.draft = JSON.parse(JSON.stringify(cur())); S.draft.num = S.draft.num || { kind: 'general' }; S.dlg = 'fc'; S.fcTab = 0 } return render() }
+    if (d.stageMi) { S.menu = null; return render() }
+    if ('close' in d) { S.dlg = null; S.menu = null; return render() }
+    if (d.fctab) { S.fcTab = +d.fctab; return render() }
+    if (d.fccat) { const k = d.fccat; S.draft.num = k === 'custom' ? { kind: 'date', pattern: 'ddd d mmm yyyy' } : k === 'general' || k === 'text' ? { kind: k } : k === 'date' ? { kind: 'date', long: true } : k === 'time' ? { kind: 'time' } : { kind: k, dp: 2, sep: true, cur: 'EGP' }; return render() }
+    if (d.fcneg) { S.draft.num.neg = d.fcneg; return render() }
+    if (d.fcdate) { S.draft.num = JSON.parse(d.fcdate); return render() }
+    if (d.fcfont) { S.draft.font = d.fcfont === 'Inter' ? undefined : d.fcfont; return render() }
+    if (d.fcsty) { const i = +d.fcsty; S.draft.b = i >= 2; S.draft.i = i % 2 === 1; return render() }
+    if (d.fcsize) { S.draft.size = +d.fcsize; return render() }
+    if (d.fcside) { const k = d.fcside; S.draft[k] = S.draft[k] ? null : { ...S.line }; return render() }
+    if (d.fcpre) { for (const k of ['bt', 'bb', 'bl', 'br']) S.draft[k] = d.fcpre === 'none' ? null : { ...S.line }; return render() }
+    if ('fcfill' in d) { S.draft.fill = d.fcfill || null; return render() }
+    if ('fcOk' in d) { const dr = S.draft; S.dlg = null; return commit(() => each((r, c) => { DOC.st[`${r},${c}`] = JSON.parse(JSON.stringify(dr)) })) }
+    if ('undo' in d) { if (HIST.length) { FUT.push(snap()); DOC = HIST.pop() } return render() }
+    if ('redo' in d) { if (FUT.length) { HIST.push(snap()); DOC = FUT.pop() } return render() }
+    if ('panel' in d) { S.panel = !S.panel; return render() }
+    if ('panelClose' in d) { S.panel = false; return render() }
+    if (d.ptab) { S.panelTab = d.ptab; return render() }
+    if (d.goto) { const t = threads.find(x => x.id === d.goto); S.anc = S.act = { r: t.r, c: t.c }; S.thread = t.id; if (S.dev === 'phone') S.panel = false; return render() }
+    if ('threadClose' in d) { S.thread = null; S.mention = false; return render() }
+    if (d.resolve) { const t = threads.find(x => x.id === d.resolve); t.resolved = !t.resolved; if (t.resolved) S.thread = null; return render() }
+    if (d.send) { sendReply(d.send); return }
+    if (d.mention) { S.mention = false; const t = threads.find(x => x.id === S.thread); render(); const ta = frame.querySelector('[data-reply]'); if (ta) { ta.value = `@${d.mention} `; ta.focus() } return }
+    if ('newcmt' in d) return newComment()
+    if ('psheet' in d) { S.phoneSheet = !S.phoneSheet; return render() }
+    if ('psheetClose' in d) { S.phoneSheet = false; return render() }
+    if (d.ptabf) { S.phoneTab = +d.ptabf; return render() }
+    if (d.unhide) return
+    if (d.flt) return openMenu('filter', b)
+    if (keep && !b.closest('.menu')) { S.menu = null; render() }
+  })
+  function newComment() {
+    S.menu = null
+    let t = threads.find(x => x.r === S.act.r && x.c === S.act.c && !x.resolved)
+    if (!t) { t = { id: 'n' + Date.now(), r: S.act.r, c: S.act.c, resolved: false, items: [] }; threads.push(t) }
+    S.thread = t.id; render(); frame.querySelector('[data-reply]')?.focus()
+  }
+  function sendReply(id) {
+    const ta = frame.querySelector(`[data-reply="${id}"]`), text = ta?.value.trim(); if (!text) return
+    const t = threads.find(x => x.id === id), men = (text.match(/@\S+/) || [])[0]
+    t.items.push({ who: ME, col: '#DB2777', t: { m: 0 }, text, men }); S.mention = false; render()
+  }
+  frame.addEventListener('mousedown', e => {
+    const c = e.target.closest('[data-cell]'); if (!c || e.button !== 0) return
+    const [r, cc] = c.dataset.cell.split(',').map(Number)
+    S.act = { r, c: cc }; if (!e.shiftKey) S.anc = { r, c: cc }
+    S.drag = true; S.menu = null
+    const t = threads.find(x => x.r === r && x.c === cc && !x.resolved)
+    S.thread = t ? t.id : (S.thread && threads.find(x => x.id === S.thread)?.items.length === 0 ? null : (t ? t.id : null))
+    render()
+  })
+  frame.addEventListener('mouseover', e => {
+    const c = e.target.closest('[data-cell]'); if (!c) return
+    const [r, cc] = c.dataset.cell.split(',').map(Number)
+    if (S.drag) { if (S.act.r !== r || S.act.c !== cc) { S.act = { r, c: cc }; render() } return }
+    if (e.target.closest('.cm') && S.dev === 'desktop') { const t = threads.find(x => x.r === r && x.c === cc && !x.resolved); if (t && S.thread !== t.id) { S.thread = t.id; render() } }
+  })
+  document.addEventListener('mouseup', () => { S.drag = false })
+  frame.addEventListener('contextmenu', e => {
+    const c = e.target.closest('[data-cell]'); if (!c) return
+    e.preventDefault()
+    const [r, cc] = c.dataset.cell.split(',').map(Number)
+    if (!(r >= selRect().r0 && r <= selRect().r1 && cc >= selRect().c0 && cc <= selRect().c1)) { S.act = S.anc = { r, c: cc } }
+    const f = frame.getBoundingClientRect(), rtl = S.lang === 'ar'
+    const x = Math.max(8, Math.min(rtl ? f.right - e.clientX : e.clientX - f.left, f.width - 230))
+    S.menu = { k: 'cell', pos: `${rtl ? 'right' : 'left'}:${x}px;top:${Math.min(e.clientY - f.top, f.height - 330)}px` }; render()
+  })
+  frame.addEventListener('input', e => {
+    const d = e.target.dataset
+    if (d.reply != null) { const v = e.target.value; const on = /(^|\s)@\w*$/.test(v); if (on !== S.mention) { S.mention = on; const pos = v; render(); const ta = frame.querySelector('[data-reply]'); ta.value = pos; ta.focus() } return }
+    if (d.more) { const v = e.target.value.toUpperCase(); S.recent = [v, ...S.recent.filter(c => c !== v)].slice(0, 5); return }
+    if (!S.draft) return
+    if (d.fcdp != null) { S.draft.num.dp = Math.max(0, Math.min(10, +e.target.value || 0)); rerenderKeep(e.target.id) }
+    if (d.fcpat != null) { S.draft.num.pattern = e.target.value; rerenderKeep(e.target.id) }
+    if (d.fcind != null) { S.draft.indent = Math.max(0, Math.min(15, +e.target.value || 0)); rerenderKeep(e.target.id) }
+  })
+  frame.addEventListener('change', e => {
+    const d = e.target.dataset
+    if (d.more) { S.menu = null; return patch({ [d.more]: e.target.value.toUpperCase() }) }
+    if (!S.draft) return
+    if (d.fcsym != null) S.draft.num.cur = e.target.value
+    if (d.fcsep != null) S.draft.num.sep = e.target.checked
+    if (d.fch != null) S.draft.ha = e.target.value
+    if (d.fcv != null) S.draft.va = e.target.value
+    if (d.fcwrap != null) S.draft.wrap = e.target.checked
+    if (d.fcul != null) S.draft.u = e.target.value || null
+    if (d.fccol != null) S.draft.color = e.target.value.toUpperCase()
+    if (d.fcst != null) S.draft.s = e.target.checked
+    render()
+  })
+  function rerenderKeep(id) { const el = document.getElementById(id), pos = el.selectionStart; render(); const n = document.getElementById(id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos) } catch {} } }
+  frame.addEventListener('keydown', e => {
+    if (e.target.matches('[data-reply]') && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); return sendReply(e.target.dataset.reply) }
+    const grid = frame.querySelector('.sw-grid')
+    if (e.target.classList.contains('sw') && e.key.startsWith('Arrow')) {
+      const all = [...e.target.closest('.menu,.sheet,.dialog').querySelectorAll('.sw')], i = all.indexOf(e.target), rtl = S.lang === 'ar'
+      const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, ArrowDown: 10, ArrowUp: -10 }[e.key]
+      all[Math.max(0, Math.min(all.length - 1, i + step))]?.focus(); e.preventDefault()
+    }
+  })
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { if (S.menu || S.dlg || S.thread || S.phoneSheet) { S.menu = null; S.dlg = null; S.thread = null; S.mention = false; S.phoneSheet = false; render() } return }
+    if (e.target.matches('input,textarea,select')) return
+    const mod = e.ctrlKey || e.metaKey
+    if (mod && e.altKey && e.key.toLowerCase() === 'm') { e.preventDefault(); return newComment() }
+    if (mod && !e.altKey) {
+      const k = e.key.toLowerCase()
+      if (['b', 'i', 'u', '5'].includes(k)) { e.preventDefault(); return toggle(k === '5' ? 's' : k) }
+      if (k === '1') { e.preventDefault(); S.draft = JSON.parse(JSON.stringify(cur())); S.draft.num = S.draft.num || { kind: 'general' }; S.fcTab = 0; S.dlg = 'fc'; return render() }
+      if (k === 'z') { e.preventDefault(); frame.querySelector('[data-undo]')?.click(); return }
+      if (k === 'y') { e.preventDefault(); frame.querySelector('[data-redo]')?.click(); return }
+    }
+    if (e.key.startsWith('Arrow') && !S.dlg && !S.menu && frame.querySelector('[data-cell]')) {
+      e.preventDefault(); const rtl = S.lang === 'ar'
+      const dr = { ArrowDown: 1, ArrowUp: -1 }[e.key] || 0, dc = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key] || 0
+      S.act = { r: Math.max(0, Math.min(ROWS - 1, S.act.r + dr)), c: Math.max(0, Math.min(COLS - 1, S.act.c + dc)) }; if (!e.shiftKey) S.anc = { ...S.act }; render()
+    }
+  })
+
+  const N = T.en.notes
+  document.getElementById('notes').innerHTML = N.map(([t, items]) => `<section class="note"><h4>${t}</h4><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul></section>`).join('')
+  window.addEventListener('resize', () => { if (S.thread) render() })
+  setScreen('format')
+})()
+</script>

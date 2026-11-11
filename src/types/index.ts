@@ -324,8 +324,11 @@ export interface WorkspaceSettings {
 export type NotificationKind =
   | 'comment' | 'reply' | 'attachment' | 'task_created_in_stage' | 'task_moved_to_stage'
   | 'assigned' | 'mention' | 'due_soon' | 'overdue'
+  /** Spec 015: a sheet comment mentions you, or someone replies in a thread you're in. */
+  | 'sheet_mention' | 'sheet_reply'
 export const NOTIFICATION_KINDS: NotificationKind[] = [
   'mention', 'assigned', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
+  'sheet_mention', 'sheet_reply',
 ]
 /** Where a member hears about it. */
 export type NotificationChannel = 'in_app' | 'push' | 'email'
@@ -339,6 +342,14 @@ export interface NotificationMeta {
   /** Tasks added by one paste (Paste plan, Paste clips). */
   paste_count?: number
   due_date?: string
+  /** Spec 015: sheet comments carry where the cell is, so the link opens it. */
+  sheet_id?: string
+  folder_id?: string
+  sheet_name?: string
+  /** The cell as people read it: "B4", or "Ramadan teaser · Status". */
+  cell?: string
+  row_key?: string
+  col_key?: string
 }
 
 /** A notification as the browser sees it. */
@@ -408,6 +419,8 @@ export interface SheetDoc {
   cols: { id: string; position: number; width: number | null }[]
   /** Filled cells only: rowId → colId → text. */
   cells: Record<string, Record<string, string>>
+  /** Spec 015: formatting, merges, view and comment markers. */
+  extras?: SheetExtras
 }
 
 /** One saved batch of changes to a blank sheet (contracts/server.md). */
@@ -419,7 +432,99 @@ export interface SheetChanges {
   deleteCols?: string[]
   rowHeights?: { id: string; height: number | null }[]
   colWidths?: { id: string; width: number | null }[]
+  /** Spec 015 (contracts/server.md). */
+  formats?: FormatWrite[]
+  merges?: { add?: SheetMergeRecord[]; remove?: string[] }
 }
+
+// ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─
+
+/** One side of a cell's border (research R3). */
+export interface BorderSide { w: 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double'; c: string }
+export const CURRENCIES = ['EGP', 'USD', 'EUR', 'GBP', 'SAR', 'AED'] as const
+export type Currency = typeof CURRENCIES[number]
+/** How a cell's text is shown. Values stay as typed (R2). */
+export interface NumberFormat {
+  kind: 'general' | 'number' | 'currency' | 'accounting' | 'percent' | 'scientific' | 'date' | 'time' | 'text'
+  /** Decimal places, 0–10. */
+  dp?: number
+  /** Thousands separator. */
+  sep?: boolean
+  cur?: Currency
+  neg?: 'minus' | 'paren' | 'red' | 'paren-red'
+  /** Dates: the long form (Mon, 16 Nov 2026) rather than the short one. */
+  long?: boolean
+  /** A custom date pattern: d, dd, ddd, dddd, m, mm, mmm, mmmm, yy, yyyy. */
+  pattern?: string
+}
+/** A cell's look (research R3). Every field is optional; layers override field by field. */
+export interface CellStyle {
+  font?: string
+  /** Points, 6–72. */
+  size?: number
+  b?: boolean
+  i?: boolean
+  s?: boolean
+  /** 'none' turns a lower layer's underline off. */
+  u?: 'single' | 'double' | 'none'
+  /** '#RRGGBB'. */
+  color?: string
+  fill?: string
+  bt?: BorderSide | null
+  br?: BorderSide | null
+  bb?: BorderSide | null
+  bl?: BorderSide | null
+  ha?: 'general' | 'left' | 'center' | 'right' | 'justify'
+  va?: 'top' | 'middle' | 'bottom'
+  wrap?: boolean
+  /** 0–15 levels. */
+  indent?: number
+  /** Degrees, −90…90, or vertical stacked text. */
+  rot?: number | 'vertical'
+  num?: NumberFormat
+}
+/** A style on a cell, a row (colKey ''), a column (rowKey '') or the sheet (both ''). */
+export interface SheetFormatRecord { rowKey: string; colKey: string; style: CellStyle }
+/** Merged cells, by the row and column ids at the edges (R4). */
+export interface SheetMergeRecord { id: string; top: string; left: string; bottom: string; right: string }
+export interface SheetCommentItem {
+  id: string
+  authorId: string | null
+  body: string
+  mentions: string[]
+  createdAt: string
+  editedAt: string | null
+  /** Soft-deleted: the body is gone and the item reads "Comment deleted". */
+  deleted: boolean
+}
+export interface SheetCommentThread {
+  id: string
+  rowKey: string
+  colKey: string
+  resolved: { at: string; by: string | null } | null
+  /** The first comment, then the replies, oldest first. */
+  comments: SheetCommentItem[]
+}
+/** What the grid needs to draw markers and the panel's counts. */
+export interface SheetThreadSummary { id: string; rowKey: string; colKey: string; count: number; resolved: boolean }
+/** Frozen panes, hidden rows and columns and the filter (stage 2–3). */
+export interface SheetView {
+  frozenRows: number
+  frozenCols: number
+  filter?: Record<string, { values?: string[]; color?: string; condition?: { op: string; value: string } }>
+  sort?: { colKey: string; dir: 'asc' | 'desc' }[]
+  hiddenRows?: string[]
+  hiddenCols?: string[]
+}
+/** Formatting, merges, view and thread summaries for one sheet (blank or linked). */
+export interface SheetExtras {
+  formats: SheetFormatRecord[]
+  merges: SheetMergeRecord[]
+  view: SheetView
+  threads: SheetThreadSummary[]
+}
+/** A format write: `set` replaces the record's style, `merge` lays the fields over it; null clears it. */
+export interface FormatWrite { rowKey: string; colKey: string; style: CellStyle | null; mode: 'set' | 'merge' }
 
 /** A linked-sheet cell write (contracts/server.md `writeTaskCells`). */
 export type TaskCellField =

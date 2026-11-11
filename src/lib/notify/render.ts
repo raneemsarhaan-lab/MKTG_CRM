@@ -34,10 +34,21 @@ export function renderNotification(
 }
 
 /** Where a notification leads: the board with the task open, and the notification to mark read. */
-export function targetPath(n: { id: string; kind: string; task_id: string | null; comment_id: string | null }): string {
+export function targetPath(n: { id: string; kind: string; task_id: string | null; comment_id: string | null; meta?: unknown }): string {
+  const sheet = sheetTarget(n)
+  if (sheet) return `${sheet}&n=${n.id}`
   if (!n.task_id) return `/board?n=${n.id}`
   const q = new URLSearchParams({ task: n.task_id, n: n.id })
   if (n.kind === 'attachment') q.set('section', 'attachments')
   else if (n.comment_id) q.set('comment', n.comment_id)
   return `/board?${q.toString()}`
+}
+
+/** Spec 015: a sheet comment's notification opens the sheet at the cell, with its thread. */
+export function sheetTarget(n: { kind: string; meta?: unknown }): string | null {
+  if (n.kind !== 'sheet_mention' && n.kind !== 'sheet_reply') return null
+  const m = (n.meta ?? {}) as { folder_id?: string; sheet_id?: string; row_key?: string; col_key?: string }
+  if (!m.folder_id || !m.sheet_id) return null
+  const q = new URLSearchParams({ sheet: m.sheet_id, cell: `${m.row_key ?? ''}:${m.col_key ?? ''}` })
+  return `/sheets/${m.folder_id}?${q.toString()}`
 }

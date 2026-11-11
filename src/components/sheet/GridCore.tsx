@@ -27,14 +27,20 @@
  * clips, pieces, themes or blank sheets.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { parseClipboard, pastePlan, serialise, toGrid } from '@/lib/sheet-clipboard'
+import { parseClipboard, pastePlan, serialise, toGrid, toStyles } from '@/lib/sheet-clipboard'
 import { edge as dataEdge } from '@/lib/sheet-selection'
+import type { CellCss } from '@/lib/sheet-format'
+import type { CellStyle } from '@/types/index'
 
 export type GridCol = string
 export interface ActiveCell { key: string; col: GridCol }
 
 /** One cell a write touches: a row index into `rows`, a column index into `cols`. */
-export interface CellWrite { r: number; c: number; value: string }
+export interface CellWrite {
+  r: number; c: number; value: string
+  /** Spec 015: the pasted cell's look (null = none); absent for a text paste, which leaves formatting alone. */
+  style?: CellStyle | null
+}
 export type WriteWhy = 'paste' | 'clear' | 'cut'
 /** What a write didn't change, by reason (shown under the toolbar, FR-025). */
 export type WriteResult = { skipped: Partial<Record<string, number>> } | null
@@ -122,6 +128,24 @@ export interface GridModel<R extends { key: string }> {
   onSelect?(rect: GridRect): void
   /** Row-number labels, when they aren't 1, 2, 3 (the linked sheets show clip numbers). */
   rowLabel?(row: R, index: number): ReactNode
+
+  // ── spec 015 ──
+  /**
+   * A cell's formatting, as `toCss` gives it (cached per style): the cell's
+   * font, colours and alignment, rotated text, and a border overlay. The
+   * value the model renders stays its own (number formats are applied there).
+   */
+  cellStyle?(row: R, col: GridCol): CellCss | null
+  /** The look a copy carries to Excel and Google Sheets, and the text as shown (EGP 12,500.00). */
+  copyStyle?(row: R, col: GridCol): CellStyle | null
+  copyShown?(row: R, col: GridCol): string
+  /**
+   * Merged cells (blank sheets): the top-left cell is drawn over the area,
+   * `{ width, height }` in px; the cells under it are 'covered'.
+   */
+  cellSpan?(row: R, col: GridCol): { width: number; height: number } | 'covered' | null
+  /** The cell has open comments: a corner marker; hovering it shows the thread. */
+  marked?(row: R, col: GridCol): boolean
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -461,7 +485,20 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     function onCopy(e: ClipboardEvent, cut: boolean) {
       if (!gridHasFocus() || editingRef.current || !e.clipboardData) return
       const q = rectRef.current
-      const { html, text } = serialise(gridOf(q))
+      const each = <T,>(fn: (row: R, col: GridCol) => T, empty: T): T[][] => {
+        const out: T[][] = []
+        for (let r = q.r0; r <= q.r1; r++) {
+          const row = m.rows[r], own = row ? colsFor(row) : []
+          const line: T[] = []
+          for (let c = q.c0; c <= q.c1; c++) line.push(row && own.includes(m.cols[c]) ? fn(row, m.cols[c]) : empty)
+          out.push(line)
+        }
+        return out
+      }
+      const { html, text } = serialise(gridOf(q), {
+        styles: m.copyStyle ? each(m.copyStyle, null) : undefined,
+        shown: m.copyShown ? each(m.copyShown, '') : undefined,
+      })
       e.clipboardData.setData('text/plain', text)
       e.clipboardData.setData('text/html', html)
       e.preventDefault()
@@ -475,13 +512,20 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const row = m.rows[q.r0] ?? null, col = m.cols[q.c0] ?? null
       if (!writes.current) { m.onPaste(e, row, col); return }
       const html = e.clipboardData.getData('text/html'), text = e.clipboardData.getData('text/plain')
-      const g = toGrid(parseClipboard({ html, text }, new DOMParser()))
+      const clip = parseClipboard({ html, text }, new DOMParser())
+      const g = toGrid(clip)
       if (!g.length) return
       if (m.pasteAsRows?.(g, row, col)) { m.onPaste(e, row, col); return }
       e.preventDefault()
       const plan = pastePlan(g, q)
+      const styles = toStyles(clip)
+      const one = g.length === 1 && g[0].length === 1
       const list: CellWrite[] = []
-      for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) list.push({ r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) })
+      for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+        const w: CellWrite = { r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) }
+        if (styles) w.style = (one ? styles[0]?.[0] : styles[r]?.[c]) ?? null
+        list.push(w)
+      }
       const res = await writes.current(list, 'paste')
       reportSkips(res)
       // A cut's source empties once its paste lands (FR-021).
@@ -824,14 +868,21 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const c = m.cols.indexOf(col)
               const selected = m.selection && multi && c >= 0 && inRect(i, c)
               const isNo = col === 'rowNo'
+              const fx = !isNo && m.cellStyle ? m.cellStyle(row, col) : null
+              const merge = !isNo && m.cellSpan ? m.cellSpan(row, col) : null
+              const covered = merge === 'covered'
+              const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` }
+                : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2 }
+                : undefined
+              if (covered) return <div key={col} className="fx-sheet-td is-covered" aria-hidden="true" data-covered={key} />
               return (
                 <div
                   key={col}
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}`}
-                  style={span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` } : undefined}
+                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}`}
+                  style={fx ? { ...spanStyle, ...fx.cell } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
                   data-col={col}
@@ -938,7 +989,11 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           }}
                         />
                       ))
-                    : (isNo && m.rowLabel ? m.rowLabel(row, i) : m.render(row, col, () => cells.current.get(key)))}
+                    : (isNo && m.rowLabel ? m.rowLabel(row, i)
+                      : fx?.text ? <span style={fx.text}>{m.render(row, col, () => cells.current.get(key))}</span>
+                      : m.render(row, col, () => cells.current.get(key)))}
+                  {fx?.border && !isEditing && <span className="fx-cell-bd" aria-hidden="true" style={fx.border} />}
+                  {!isNo && m.marked?.(row, col) && <b className="fx-cmt-mark" data-comment-marker={key} aria-hidden="true" />}
                   {isNo && m.onRowResize && (
                     <span className="fx-sheet-row-rz" aria-hidden="true" data-row-resize={row.key}
                           onPointerDown={e => startRowResize(row, e)}

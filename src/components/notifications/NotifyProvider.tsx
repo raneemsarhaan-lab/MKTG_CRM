@@ -141,6 +141,7 @@ export function NotifyProvider({ api, meId, storedLocale, children }: {
     const r = await api.open(id)
     void poll()
     if (!r.success) return
+    if (r.href) { router.push(r.href); return }
     if (!r.target) { setGone(true); return }
     if (navigator.current) navigator.current(r.target)
     else router.push(boardHref(r.target))

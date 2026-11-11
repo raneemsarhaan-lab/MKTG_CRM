@@ -41,36 +41,40 @@ model Member {
   /// Spec 012 (R7): last time the app was open and in use, for toasts and push.
   last_active_at  DateTime? @db.Timestamptz(6)
 
-  tasks_owned           Task[]                @relation("TaskOwner")
-  tasks_assigned        Task[]                @relation("TaskAssignee")
-  tasks_created         Task[]                @relation("TaskCreator")
-  comments              TaskComment[]
-  project_steps         ProjectStep[]         @relation("StepAssignee")
-  themes_owned          Project[]             @relation("ThemeOwner")
-  mention_reads         MentionRead[]
-  snoozes               TaskSnooze[]
-  sheet_columns_created SheetColumn[]         @relation("SheetColumnCreator")
-  sheet_columns_updated SheetColumn[]         @relation("SheetColumnUpdater")
-  sheet_values_updated  SheetValue[]
+  tasks_owned             Task[]                @relation("TaskOwner")
+  tasks_assigned          Task[]                @relation("TaskAssignee")
+  tasks_created           Task[]                @relation("TaskCreator")
+  comments                TaskComment[]
+  project_steps           ProjectStep[]         @relation("StepAssignee")
+  themes_owned            Project[]             @relation("ThemeOwner")
+  mention_reads           MentionRead[]
+  snoozes                 TaskSnooze[]
+  sheet_columns_created   SheetColumn[]         @relation("SheetColumnCreator")
+  sheet_columns_updated   SheetColumn[]         @relation("SheetColumnUpdater")
+  sheet_values_updated    SheetValue[]
   /// Spec 013 R10: pinned Sheets folders, in order. Read only when sheet_pins_set; before that, the default (Content, then Video).
-  sheet_pins            String[]              @db.Uuid
-  sheet_pins_set        Boolean               @default(false)
+  sheet_pins              String[]              @db.Uuid
+  sheet_pins_set          Boolean               @default(false)
   /// Spec 014 R2: the last local date the hours reminder opened or was put off, so it shows at most once a day.
-  hours_prompted_on     DateTime?             @db.Date
-  sheet_folders_created SheetFolder[]         @relation("SheetFolderCreator")
-  sheet_folders_updated SheetFolder[]         @relation("SheetFolderUpdater")
-  sheets_created        Sheet[]               @relation("SheetCreator")
-  sheets_updated        Sheet[]               @relation("SheetUpdater")
-  sheets_protected      Sheet[]               @relation("SheetProtector")
-  sheet_cells_updated   SheetCell[]
-  notifications         Notification[]
-  task_follows          TaskFollower[]
-  notification_settings NotificationSetting[]
-  push_subscriptions    PushSubscription[]
-  email_digests         EmailDigest[]
+  hours_prompted_on       DateTime?             @db.Date
+  sheet_folders_created   SheetFolder[]         @relation("SheetFolderCreator")
+  sheet_folders_updated   SheetFolder[]         @relation("SheetFolderUpdater")
+  sheets_created          Sheet[]               @relation("SheetCreator")
+  sheets_updated          Sheet[]               @relation("SheetUpdater")
+  sheets_protected        Sheet[]               @relation("SheetProtector")
+  sheet_cells_updated     SheetCell[]
+  /// Spec 015: who last formatted a cell, and comments on cells.
+  sheet_formats_updated   SheetFormat[]
+  sheet_comments          SheetComment[]        @relation("SheetCommentAuthor")
+  sheet_comments_resolved SheetComment[]        @relation("SheetCommentResolver")
+  notifications           Notification[]
+  task_follows            TaskFollower[]
+  notification_settings   NotificationSetting[]
+  push_subscriptions      PushSubscription[]
+  email_digests           EmailDigest[]
 
-  work_days             WorkDay[]             @relation("WorkDayMember")
-  work_days_updated     WorkDay[]             @relation("WorkDayUpdater")
+  work_days         WorkDay[] @relation("WorkDayMember")
+  work_days_updated WorkDay[] @relation("WorkDayUpdater")
 
   @@map("members")
 }
@@ -796,13 +800,16 @@ model Sheet {
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @default(now()) @db.Timestamptz(6)
 
-  folder    SheetFolder @relation(fields: [folder_id], references: [id], onDelete: Cascade)
-  creator   Member?     @relation("SheetCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  updater   Member?     @relation("SheetUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
-  protector Member?     @relation("SheetProtector", fields: [protected_by], references: [id], onDelete: SetNull)
+  folder    SheetFolder    @relation(fields: [folder_id], references: [id], onDelete: Cascade)
+  creator   Member?        @relation("SheetCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater   Member?        @relation("SheetUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  protector Member?        @relation("SheetProtector", fields: [protected_by], references: [id], onDelete: SetNull)
   rows      SheetRow[]
   cols      SheetCol[]
   cells     SheetCell[]
+  formats   SheetFormat[]
+  merges    SheetMerge[]
+  comments  SheetComment[]
 
   @@index([folder_id, position])
   @@map("sheets")
@@ -855,6 +862,69 @@ model SheetCell {
   @@id([row_id, col_id])
   @@index([sheet_id])
   @@map("sheet_cells")
+}
+
+/// Spec 015 R1: a style for one cell, a whole row, a whole column or the whole
+/// sheet. Keys are a blank sheet's row and column ids, or on the Content and
+/// Video sheets a task id and a column key; '' means "every". Not foreign keys,
+/// so undoing a row delete, or restoring a task, brings the formatting back.
+model SheetFormat {
+  sheet_id   String   @db.Uuid
+  row_key    String
+  col_key    String
+  /// A CellStyle (research R3), validated by src/lib/sheet-format.ts.
+  style      Json
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  sheet   Sheet   @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  updater Member? @relation(fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@id([sheet_id, row_key, col_key])
+  @@map("sheet_formats")
+}
+
+/// Spec 015 R4: merged cells on a blank sheet, by the row and column ids at its edges.
+model SheetMerge {
+  id         String @id @db.Uuid
+  sheet_id   String @db.Uuid
+  top_row    String @db.Uuid
+  bottom_row String @db.Uuid
+  left_col   String @db.Uuid
+  right_col  String @db.Uuid
+
+  sheet Sheet @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+
+  @@index([sheet_id])
+  @@map("sheet_merges")
+}
+
+/// Spec 015 R5: threaded comments on a cell. A thread is its first comment
+/// (root_id null) and its replies; Resolve is kept on the root.
+model SheetComment {
+  id          String    @id @default(uuid()) @db.Uuid
+  sheet_id    String    @db.Uuid
+  row_key     String
+  col_key     String
+  root_id     String?   @db.Uuid
+  author_id   String?   @db.Uuid
+  body        String    @db.Text
+  mentions    String[]  @default([]) @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  edited_at   DateTime? @db.Timestamptz(6)
+  deleted_at  DateTime? @db.Timestamptz(6)
+  resolved_at DateTime? @db.Timestamptz(6)
+  resolved_by String?   @db.Uuid
+
+  sheet    Sheet          @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  root     SheetComment?  @relation("SheetCommentThread", fields: [root_id], references: [id], onDelete: Cascade)
+  replies  SheetComment[] @relation("SheetCommentThread")
+  author   Member?        @relation("SheetCommentAuthor", fields: [author_id], references: [id], onDelete: SetNull)
+  resolver Member?        @relation("SheetCommentResolver", fields: [resolved_by], references: [id], onDelete: SetNull)
+
+  @@index([sheet_id, row_key, col_key])
+  @@index([root_id])
+  @@map("sheet_comments")
 }
 
 /// A row height on a linked sheet, shared by the team (FR-045).

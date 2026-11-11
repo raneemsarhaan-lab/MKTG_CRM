@@ -21,6 +21,8 @@ import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
+import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
+import { useRef } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
 
 export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
@@ -291,7 +293,27 @@ export function ContentGrid(p: ContentGridProps) {
   }
 
   // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
+  // Spec 015: formatting by task and column; undo through the sheet's own stack.
+  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void } | null>(null)
+  const cellName = (row: ContentRow, col: GridCol) => {
+    if (col === 'rowNo') return ''
+    const h = model.header(col)
+    const colName = h.label ?? (typeof h.text === 'string' ? h.text : col)
+    const task = taskOf(row)
+    return task ? `${task.name} · ${colName}` : colName
+  }
+  const lf = useLinkedFormats<ContentRow>({
+    enabled: !!p.linked, sheetKey: 'linked_content', rows: p.rows, cols: model.cols, active: p.active,
+    taskOf: row => taskOf(row)?.id ?? null, cellName, textValue: model.textValue,
+    recordFormats: (label, items) => leRef.current?.recordFormats(label, items),
+    say: text => p.linked?.say(text),
+    select: (taskId, col) => {
+      const row = p.rows.find(r => taskOf(r)?.id === taskId)
+      if (row) { p.setActive({ key: row.key, col }); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cell="${row.key}|${col}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })) }
+    },
+  })
   const le = useLinkedEditing<ContentRow>({
+    applyFormats: lf.applyFormats,
     rows: p.rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: p.onCommit,
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
@@ -307,7 +329,9 @@ export function ContentGrid(p: ContentGridProps) {
     say: text => p.linked?.say(text),
     heights: p.linked?.heights, saveHeights: p.linked?.saveHeights,
   })
+  leRef.current = le
   Object.assign(model, {
+    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),

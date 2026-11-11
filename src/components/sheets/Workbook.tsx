@@ -26,6 +26,13 @@ import { TabBar } from './TabBar'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
 import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
+import { FORMAT_STATE, type FormatSource, type FormatState } from './format/bus'
+import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
+import { FormatCellsDialog } from './format/FormatCellsDialog'
+import { FormatSheet } from './format/FormatSheet'
+import { SheetComments } from './comments/SheetComments'
+import { LinkedFormatsContext } from './format/context'
+import { cellName as blankCellName } from '@/lib/sheet-selection'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -39,6 +46,8 @@ export interface WorkbookProps {
   /** The board's sheet, for a linked folder's linked tab. */
   linked?: ReactNode
   initialSheetId?: string | null
+  /** Spec 015: a notification's cell to open, `rowKey:colKey`. */
+  initialCell?: string | null
 }
 
 type Dialog =
@@ -182,6 +191,35 @@ export function Workbook(p: WorkbookProps) {
     return () => document.removeEventListener(HISTORY_EVENT, on)
   }, [])
   const linkedUndo = (dir: 'undo' | 'redo') => document.dispatchEvent(new CustomEvent(UNDO_EVENT, { detail: dir }))
+
+  // ── spec 015: the format toolbar ────────────────────────────────────────
+  const [fmt, setFmt] = useState<Partial<Record<FormatSource, FormatState>>>({})
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<FormatState | { source: FormatSource; gone: true }>).detail
+      setFmt(f => { const n = { ...f }; if ('gone' in d) delete n[d.source]; else n[d.source] = d; return n })
+    }
+    document.addEventListener(FORMAT_STATE, on)
+    return () => document.removeEventListener(FORMAT_STATE, on)
+  }, [])
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [openThreads, setOpenThreads] = useState(0)
+  const initialCell = useMemo(() => {
+    const c = p.initialCell
+    if (!c) return null
+    const i = c.lastIndexOf(':')
+    return i > 0 ? { rowKey: c.slice(0, i), colKey: c.slice(i + 1) } : null
+  }, [p.initialCell])
+  const [formatCells, setFormatCells] = useState(false)
+  const [phoneFormat, setPhoneFormat] = useState(false)
+  const [phone, setPhone] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const on = () => setPhone(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
 
   // ── toolbar state ───────────────────────────────────────────────────────
   const [sel, setSel] = useState<{ cell: string; count: number } | null>(null)
@@ -406,6 +444,12 @@ export function Workbook(p: WorkbookProps) {
   // Ctrl+Page Up/Down switches sheets; Shift+F11 adds one (FR-054).
   function onKeyDownCapture(e: React.KeyboardEvent) {
     const ctrl = e.ctrlKey || e.metaKey
+    // Spec 015: Ctrl+B, I, U, 5, Ctrl+Shift+$ % # !, Ctrl+1, Ctrl+Alt+M on the grid (not while typing in a cell).
+    const el = e.target as HTMLElement
+    if (ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select, [contenteditable="true"]')) {
+      const target: FormatSource = open?.kind === 'blank' ? 'blank' : 'linked'
+      if (formatShortcut(e, target, fmt[target] ?? null, () => setFormatCells(true))) { e.preventDefault(); e.stopPropagation(); return }
+    }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
       e.preventDefault(); e.stopPropagation()
       const i = visible.findIndex(s => s.id === openRef.current)
@@ -451,6 +495,8 @@ export function Workbook(p: WorkbookProps) {
   }
 
   // ── render ──────────────────────────────────────────────────────────────
+  const fmtTarget: FormatSource = openBlank ? 'blank' : 'linked'
+  const fmtState = fmt[fmtTarget] ?? null
   const doc = open && openBlank ? docs[open.id] : undefined
   const stack = stacks[openId]
   const readOnly = open?.protectedBy && open.protectedBy !== p.me.id && !p.me.admin
@@ -488,10 +534,20 @@ export function Workbook(p: WorkbookProps) {
         </span>
         {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
         {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
+        <button type="button" className="fx-sh-ib is-text fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
+                title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
+          <span className={phone ? 'sr-only' : undefined}>{t('comments.title')}</span>
+          {openThreads > 0 && <span className="fx-cmt-badge">{openThreads}</span>}
+        </button>
+        {phone && fmtState && (
+          <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
+        )}
       </div>
+      {!phone && open && (!openBlank || doc) && <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)} />}
 
       <div className="fx-sh-panel" id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
-        {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane="">{p.linked}</div>}
+        {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
         {openBlank && (doc
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
@@ -516,6 +572,34 @@ export function Workbook(p: WorkbookProps) {
         onRename={onRename}
         onDrop={(id, before, copy) => void onDrop(id, before, copy)}
       />
+
+      {open && (
+        <SheetComments
+          sheetRef={openBlank ? open.id : open.kind === 'linked_video' ? 'linked_video' : 'linked_content'}
+          source={fmtTarget}
+          state={fmtState}
+          names={p.names}
+          me={p.me}
+          panelOpen={commentsOpen}
+          setPanelOpen={setCommentsOpen}
+          initialCell={initialCell && open.id === p.initialSheetId ? initialCell : null}
+          live={openBlank && doc ? (r, c) => doc.rows.some(x => x.id === r) && doc.cols.some(x => x.id === c) : undefined}
+          cellName={(r, c) => {
+            if (openBlank && doc) {
+              const ri = doc.rows.findIndex(x => x.id === r), ci = doc.cols.findIndex(x => x.id === c)
+              return ri >= 0 && ci >= 0 ? blankCellName(ri, ci) : null
+            }
+            const title = document.querySelector<HTMLElement>(`[data-linked-pane] .fx-sheet-tr[data-task="${CSS.escape(r)}"] [data-col="title"]`)?.innerText.trim()
+            const head = document.querySelector<HTMLElement>(`[data-linked-pane] [data-col-head="${CSS.escape(c)}"]`)?.innerText.trim()
+            return title ? `${title}${head ? ` · ${head}` : ''}` : null
+          }}
+          phone={phone}
+          say={say}
+          onCount={setOpenThreads}
+        />
+      )}
+      {formatCells && fmtState && <FormatCellsDialog state={fmtState} target={fmtTarget} onClose={() => setFormatCells(false)} />}
+      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} />}
 
       {tabMenu && <PopMenu at={tabMenu.at} items={tabMenu.items} label={tabMenu.label} returnTo={tabMenu.anchor} attr={tabMenu.attr} onClose={() => setTabMenu(null)} />}
 

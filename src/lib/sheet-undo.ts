@@ -4,7 +4,19 @@
  * A step holds what it did and what undoes it, both as change sets the sheet
  * already knows how to apply and save. One step per action, however large: a
  * paste of 1,000 cells is one step. The stack is per sheet and per visit.
+ *
+ * Spec 015 adds formatting (`formats`: each record's style before and after),
+ * merges and view settings. A whole column or Ctrl+A is one record, so one
+ * step however many cells it covers.
  */
+import type { CellStyle, SheetMergeRecord, SheetView } from '@/types/index'
+
+/** Formatting, on any sheet: rowKey and colKey as in sheet_formats ('' = every). */
+export type FormatsChange = { kind: 'formats'; items: { rowKey: string; colKey: string; before: CellStyle | null; after: CellStyle | null }[] }
+/** Merged cells added and removed (blank sheets only). */
+export type MergesChange = { kind: 'merges'; add: SheetMergeRecord[]; remove: SheetMergeRecord[] }
+/** Frozen panes, hidden rows and columns, the filter (stage 2–3). */
+export type ViewChange = { kind: 'view'; before: Partial<SheetView>; after: Partial<SheetView> }
 
 /** A blank sheet's change, with enough to reverse it. */
 export type BlankChange =
@@ -15,12 +27,17 @@ export type BlankChange =
   | { kind: 'deleteCols'; cols: { id: string; position: number; width: number | null }[]; cells: { rowId: string; colId: string; value: string }[] }
   | { kind: 'rowHeights'; rows: { id: string; before: number | null; after: number | null }[] }
   | { kind: 'colWidths'; cols: { id: string; before: number | null; after: number | null }[] }
+  | FormatsChange
+  | MergesChange
+  | ViewChange
 
 /** A linked sheet's change: task fields and team columns, before and after. */
 export type LinkedChange =
   | { kind: 'taskCells'; cells: { taskId: string; field: string; before: string; after: string }[] }
   | { kind: 'dropRows'; taskIds: string[] }
   | { kind: 'restoreRows'; taskIds: string[] }
+  | FormatsChange
+  | ViewChange
 
 export type Change = BlankChange | LinkedChange
 
@@ -37,6 +54,9 @@ export function invert(ch: Change): Change {
     case 'taskCells': return { kind: 'taskCells', cells: ch.cells.map(x => ({ ...x, before: x.after, after: x.before })) }
     case 'dropRows': return { kind: 'restoreRows', taskIds: ch.taskIds }
     case 'restoreRows': return { kind: 'dropRows', taskIds: ch.taskIds }
+    case 'formats': return { kind: 'formats', items: ch.items.map(x => ({ ...x, before: x.after, after: x.before })) }
+    case 'merges': return { kind: 'merges', add: ch.remove, remove: ch.add }
+    case 'view': return { kind: 'view', before: ch.after, after: ch.before }
   }
 }
 

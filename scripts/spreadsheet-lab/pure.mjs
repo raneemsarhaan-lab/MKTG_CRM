@@ -137,6 +137,117 @@ export async function runPure(lab, root) {
     eq([1, 2, 3, 11, 100].map(n => t.format({ n })), ['خلية واحدة محددة', 'خليتان محددتان', '3 خلايا محددة', '11 خلية محددة', '100 خلية محددة'], 'Arabic plurals')
   })
 
+  // ── spec 015: formatting ─────────────────────────────────────────────────
+  await check('fmt-validate', () => {
+    const v = h.validateStyle({ b: true, i: false, size: 99, font: 'arial', fill: '#ff0000', color: 'red', junk: 1, ha: 'general', va: 'middle',
+      bt: { w: 'thick', c: '#000000' }, bb: { w: 'wavy', c: '#000000' }, indent: 40, rot: 200, num: { kind: 'currency', cur: 'XYZ', dp: 20, pattern: '<script>' } })
+    eq(v, { font: 'Arial', size: 72, b: true, i: false, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
+    eq(h.validateStyle({ junk: true, num: { kind: 'general' } }), null, 'nothing left is null (the record is deleted)')
+    eq(h.validateStyle({ b: false }), { b: false }, 'an explicit off is kept (it turns a row or column layer off)')
+    eq(h.validateStyle('bold'), null, 'not an object')
+    eq(h.knownFont('"Times New Roman"'), 'Times New Roman', 'quoted font names')
+    eq(h.knownFont('Wingdings'), null, 'a font outside the list falls back')
+  })
+  await check('fmt-layers', () => {
+    const idx = h.indexFormats([
+      { rowKey: '', colKey: '', style: { font: 'Arial', size: 11 } },
+      { rowKey: '', colKey: 'B', style: { num: { kind: 'currency', cur: 'EGP', dp: 2 }, ha: 'right' } },
+      { rowKey: 'r1', colKey: '', style: { b: true, fill: '#7030A0', ha: 'center' } },
+      { rowKey: 'r1', colKey: 'B', style: { fill: '#FFC000' } },
+    ])
+    eq(h.resolveStyle(idx, 'r1', 'B'), { font: 'Arial', size: 11, num: { kind: 'currency', cur: 'EGP', dp: 2 }, ha: 'center', b: true, fill: '#FFC000' }, 'sheet → column → row → cell')
+    eq(h.resolveStyle(idx, 'r2', 'A'), { font: 'Arial', size: 11 }, 'only the sheet layer')
+    eq(h.resolveStyle(h.indexFormats([]), 'r', 'c'), null, 'no formatting')
+    eq(h.mergeStyle({ b: true, fill: '#FF0000' }, { b: null, i: true, fill: undefined }), { fill: '#FF0000', i: true }, 'null removes, undefined keeps')
+    eq(h.diffStyle({ b: true, fill: '#FF0000' }, { fill: '#00FF00', i: true }), { b: null, fill: '#00FF00', i: true }, 'diff as a patch')
+    eq(h.styleKey({ i: true, b: true }), h.styleKey({ b: true, i: true }), 'key ignores field order')
+  })
+  await check('fmt-css', () => {
+    const a = h.toCss({ b: true, fill: '#7030A0', ha: 'right', bl: { w: 'double', c: '#000000' }, bb: { w: 'dashed', c: '#FF0000' }, rot: 45, indent: 2, u: 'double', s: true })
+    eq(a.cell.color, '#FFFFFF', 'automatic white text on a dark fill')
+    eq(h.toCss({ fill: '#FFF2CC' }).cell.color, '#14131A', 'automatic ink on a light fill')
+    eq([a.cell.textAlign, a.cell.justifyContent], ['end', 'flex-end'], 'right is the logical end, so it mirrors in Arabic')
+    eq([a.border.borderInlineStart, a.border.borderBottom], ['3px double #000000', '1px dashed #FF0000'], 'borders keep their line styles, left is inline-start')
+    eq([a.cell.textDecorationLine, a.cell.textDecorationStyle, a.cell.paddingInlineStart], ['underline line-through', 'double', '32px'], 'double underline, strike, indent')
+    eq(a.text, { display: 'inline-block', transform: 'rotate(-45deg)' }, 'rotated text')
+    ok(h.toCss({ b: true, fill: '#7030A0', ha: 'right', bl: { w: 'double', c: '#000000' }, bb: { w: 'dashed', c: '#FF0000' }, rot: 45, indent: 2, u: 'double', s: true }) === a, 'the same look is cached')
+    eq(h.toCss(null), { cell: {}, text: null, border: null }, 'no style')
+  })
+  await check('fmt-display', () => {
+    const sp = x => x.replace(/[\u00A0\u202F]/g, ' ')
+    const en = (t, n) => sp(h.display(t, n, 'en')), ar = (t, n) => h.display(t, n, 'ar')
+    eq(en('12500', { kind: 'currency', cur: 'EGP', dp: 2 }), 'EGP 12,500.00', 'currency')
+    eq(en('-1234.1', { kind: 'number', dp: 2, neg: 'paren-red' }), '(1,234.10)', 'negative in brackets')
+    ok(h.showsRed('-1234.1', { kind: 'number', neg: 'paren-red' }) && !h.showsRed('5', { kind: 'number', neg: 'red' }), 'red negatives')
+    eq(en('1234.5', { kind: 'number', dp: 0, sep: false }), '1235', 'no separator, rounded')
+    eq(en('0.125', { kind: 'percent', dp: 1 }), '12.5%', 'percent of a fraction')
+    eq(en('12.5%', { kind: 'percent', dp: 1 }), '12.5%', 'typed percent')
+    eq(en('12500', { kind: 'scientific', dp: 2 }), '1.25E+04', 'scientific')
+    eq(en('2026-11-16', { kind: 'date', long: true }), 'Mon, 16 Nov 2026', 'long date')
+    eq(en('16/11/2026', { kind: 'date' }), '16/11/2026', 'short date, day first')
+    eq(en('16 Nov 2026', { kind: 'date', pattern: 'ddd d mmm' }), 'Mon 16 Nov', 'custom pattern')
+    eq(en('2026-11-16', { kind: 'date', pattern: 'dd/mm/yyyy' }), '16/11/2026', 'dd/mm/yyyy')
+    eq(en('14:30', { kind: 'time' }), '14:30', 'time')
+    eq(en('hello', { kind: 'currency', cur: 'EGP' }), 'hello', 'text in a Currency cell shows as typed')
+    eq(en('31/02/2026', { kind: 'date' }), '31/02/2026', 'an impossible date shows as typed')
+    eq(en('12500', { kind: 'text' }), '12500', 'Text format')
+    eq(en('١٢٥٠٠', { kind: 'number', dp: 0 }), '12,500', 'Arabic digits are read')
+    eq(ar('12500', { kind: 'number', dp: 0 }), '١٢٬٥٠٠', 'Arabic display follows the language')
+    ok(ar('2026-11-16', { kind: 'date', long: true }).includes('نوفمبر'), 'Arabic month names')
+    eq(h.parseNumber('(1,234)'), -1234, 'accounting negatives read back')
+    eq(h.parseNumber('1,23'), null, 'a bad grouping is text')
+    eq(h.bumpDecimals({ kind: 'currency', cur: 'EGP', dp: 2 }, 1), { kind: 'currency', cur: 'EGP', dp: 3 }, 'increase decimal')
+    eq(h.bumpDecimals(null, -1, '12.345'), { kind: 'number', dp: 2, sep: false }, 'General becomes Number with the typed decimals')
+    eq(h.bumpDecimals({ kind: 'number', dp: 0 }, -1), { kind: 'number', dp: 0 }, 'never below 0')
+    eq(h.numFromExcel('"EGP"\\ #,##0.00'), { kind: 'currency', cur: 'EGP', dp: 2 }, 'Excel currency code')
+    eq(h.numFromExcel('0.0%'), { kind: 'percent', dp: 1 }, 'Excel percent code')
+  })
+  await check('fmt-plan', () => {
+    const idx = h.indexFormats([{ rowKey: 'r1', colKey: '', style: { fill: '#FF0000', b: true } }, { rowKey: 'r2', colKey: 'B', style: { i: true } }])
+    const rk = r => ['r0', 'r1', 'r2', 'r3'][r] ?? null, ck = c => ['A', 'B', 'C'][c] ?? null
+    const size = { rows: 4, cols: 3 }
+    const cells = h.planRect(idx, { r0: 0, c0: 0, r1: 1, c1: 1 }, size, rk, ck, { b: true })
+    eq(cells.map(x => `${x.rowKey}:${x.colKey}`), ['r0:A', 'r0:B', 'r1:A', 'r1:B'], 'a block writes cell records')
+    const col = h.planRect(idx, { r0: 0, c0: 1, r1: 3, c1: 1 }, size, rk, ck, { fill: '#00FF00' })
+    eq(col.map(x => `${x.rowKey}:${x.colKey}`), [':B', 'r1:B'], 'a whole column is one record, plus a cell where a row fill would cover it')
+    const all = h.planRect(idx, { r0: 0, c0: 0, r1: 3, c1: 2 }, size, rk, ck, { i: false })
+    eq(all.map(x => `${x.rowKey}:${x.colKey}:${JSON.stringify(x.after)}`), ['r2:B:null'], 'Ctrl+A: italic off clears the cell that set it; nothing to record for the sheet')
+    const off = h.planRect(idx, { r0: 1, c0: 0, r1: 1, c1: 0 }, size, rk, ck, { b: false })
+    eq(off[0].after, { b: false }, 'Bold off over a bold row keeps an explicit off on the cell')
+    const bd = h.planBorders(h.indexFormats([]), { r0: 0, c0: 0, r1: 1, c1: 1 }, size, rk, ck, 'outside', { w: 'thin', c: '#000000' })
+    eq(bd.map(x => Object.keys(x.after).sort().join('')), ['blbt', 'brbt', 'bbbl', 'bbbr'], 'outside borders on a 2×2 block')
+    eq(h.bordersFor('all', { r0: 0, c0: 0, r1: 1, c1: 1 }, { w: 'thin', c: '#000000' }, 1, 1), { bb: { w: 'thin', c: '#000000' }, br: { w: 'thin', c: '#000000' } }, 'all borders: inner cells draw only bottom and end')
+  })
+  await check('fmt-clip-css', () => {
+    const c = h.parseCssClasses('<!--td {color:black} .xl65 {color:white; font-weight:700; background:#7030A0; border-bottom:2.0pt solid #3B0F5C;} .xl67 {mso-number-format:"\\0022EGP\\0022\\\\ \\#\\,\\#\\#0\\.00";}-->')
+    eq(h.styleFromCss(c.xl65), { b: true, color: '#FFFFFF', fill: '#7030A0', bb: { w: 'thick', c: '#3B0F5C' } }, 'an Excel class rule')
+    eq(h.styleFromCss({ 'font-family': 'Calibri, sans-serif', 'font-size': '11.0pt' }), null, "Excel's default Calibri 11 is no choice")
+    eq(h.styleFromCss({ background: 'url("cid:image001.png")', 'font-family': 'Wingdings' }), null, 'pictures and unknown fonts dropped')
+    eq(h.cssColor('rgb(103, 78, 167)'), '#674EA7', 'rgb colours')
+    ok(h.cssForClipboard({ b: true, fill: '#FFC000', bb: { w: 'double', c: '#000000' }, ha: 'center' }).includes('border-bottom:3px double #000000'), 'copy-out inline CSS')
+    eq(h.excelSerialDate(46342), '2026-11-16', "Excel's date serial")
+    eq(h.numFromExcel('Short Date'), { kind: 'date' }, "Excel's named Short Date")
+  })
+  await check('fmt-undo', () => {
+    const doc = { id: 's', updatedAt: '', rows: [], cols: [], cells: {} }
+    const ch = { kind: 'formats', items: [{ rowKey: 'r1', colKey: '', before: null, after: { b: true } }, { rowKey: '', colKey: 'c1', before: { i: true }, after: null }] }
+    const d1 = h.applyChange({ ...doc, extras: { ...h.emptyExtras(), formats: [{ rowKey: '', colKey: 'c1', style: { i: true } }] } }, ch)
+    eq(d1.extras.formats, [{ rowKey: 'r1', colKey: '', style: { b: true } }], 'apply: a row format added, a column format removed')
+    const d2 = h.applyChange(d1, h.invert(ch))
+    eq(d2.extras.formats, [{ rowKey: '', colKey: 'c1', style: { i: true } }], 'undo restores both')
+    eq(h.toServer([ch]).formats, [{ rowKey: 'r1', colKey: '', style: { b: true }, mode: 'set' }, { rowKey: '', colKey: 'c1', style: null, mode: 'set' }], 'saved as set records')
+    const step = h.makeStep('Bold', [ch])
+    eq(step.backward.length, 1, 'one undo step for a whole column')
+    const M = { id: 'm1', top: 'r1', left: 'c1', bottom: 'r1', right: 'c4' }
+    const mg = { kind: 'merges', add: [M], remove: [] }
+    eq(h.applyChange(doc, mg).extras.merges, [M], 'merge applied')
+    eq(h.applyChange(h.applyChange(doc, mg), h.invert(mg)).extras.merges, [], 'unmerge on undo')
+    eq(h.toServer([mg, h.invert(mg)]).merges, { add: [], remove: ['m1'] }, 'merged then undone: the server just removes it')
+    eq(h.toServer([h.invert(mg), mg]).merges, { add: [M], remove: ['m1'] }, 'unmerged then redone: a replace')
+    const q = h.mergeServer({ formats: [{ rowKey: 'r', colKey: 'c', style: { b: true }, mode: 'set' }] }, { formats: [{ rowKey: 'r', colKey: 'c', style: { i: true }, mode: 'merge' }] })
+    eq(q.formats, [{ rowKey: 'r', colKey: 'c', style: { b: true, i: true }, mode: 'set' }], 'queued set then merge collapse into one set')
+  })
+
   // ── the HTML clipboard, in Chromium ───────────────────────────────────────
   await check('clip-html', async () => {
     const { chromium } = require('playwright')
@@ -161,6 +272,19 @@ export async function runPure(lab, root) {
       const mine = await page.evaluate(() => { const g = [['A', 'two\nlines'], ['<x>', '']]; return SheetPure.parseHtmlTable(SheetPure.serialise(g).html, new DOMParser()).map(r => r.map(c => c.text)) })
       eq(mine, [['A', 'two\nlines'], ['<x>', '']], 'round trip through our own HTML')
       eq(await page.evaluate(() => SheetPure.parseClipboard({ html: '<p>no table</p>', text: 'a\tb' }, new DOMParser()).map(r => r.map(c => c.text))), [['a', 'b']], 'HTML without a table falls back to text')
+      // Spec 015: styles from real Excel and Google Sheets clips (SC-003: at least 95% of styled cells keep their look).
+      const styled = name => page.evaluate(html => SheetPure.parseHtmlTable(html, new DOMParser()).map(r => r.map(c => ({ text: c.text, style: c.style }))), fs.readFileSync(path.join(lab, 'fixtures', name), 'utf8'))
+      const xl2 = await styled('excel-styled.html')
+      eq(xl2[0][0].style, { b: true, color: '#FFFFFF', fill: '#7030A0', bb: { w: 'thick', c: '#3B0F5C' }, ha: 'center', va: 'middle' }, 'Excel header: class rule')
+      eq([xl2[1][1].text, xl2[1][1].style.num], ['12500', { kind: 'currency', dp: 2, cur: 'EGP' }], 'Excel currency keeps the value and the format')
+      eq([xl2[2][1].text, xl2[2][1].style.num], ['2026-11-16', { kind: 'date' }], "Excel date: the serial becomes the date")
+      eq(xl2[2][0].style, { font: 'Times New Roman', size: 14, s: true, wrap: true }, 'font, size, strikethrough, wrap')
+      eq(xl2[2][3].style, null, 'gradients, pictures and unknown fonts are dropped silently')
+      const gs2 = await styled('gsheets-styled.html')
+      eq(gs2[0][0].style, { font: 'Montserrat', b: true, color: '#FFFFFF', fill: '#674EA7', ha: 'center', va: 'bottom' }, 'Google Sheets inline styles')
+      eq([gs2[1][1].text, gs2[1][1].style.num?.kind], ['40', 'percent'], 'Google Sheets number value and format')
+      const expected = [[xl2, 11], [gs2, 6]]
+      for (const [g, n] of expected) { const kept = g.flat().filter(c => c.style).length; ok(kept / n >= 0.95, `styled cells kept: ${kept}/${n}`) }
     } finally { await browser.close() }
   })
   return results
