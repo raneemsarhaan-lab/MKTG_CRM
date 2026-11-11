@@ -19,11 +19,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { GridCore, type ActiveCell, type CellWrite, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
-import type { CellStyle, SheetDoc, SheetMergeRecord, SheetView } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
 import { display, formatKey, indexFormats, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
+import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
+import { FilterMenu } from './format/StyleTools'
 import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
 import { cellName, colLetters } from '@/lib/sheet-selection'
@@ -65,10 +67,30 @@ export function BlankSheet(p: BlankSheetProps) {
 
   const extras = doc.extras ?? emptyExtras()
   const view = extras.view
+  const index = useMemo(() => indexFormats(extras.formats), [extras.formats])
+  const styleOf = useCallback((rowId: string, colId: string) => resolveStyle(index, rowId, colId), [index])
   // Stage 2: what's hidden is left out of the grid; indexes from the grid are over what's visible.
   const hiddenR = useMemo(() => new Set(view.hiddenRows ?? []), [view.hiddenRows])
   const hiddenC = useMemo(() => new Set(view.hiddenCols ?? []), [view.hiddenCols])
-  const vRows = useMemo(() => doc.rows.filter(r => !hiddenR.has(r.id)), [doc.rows, hiddenR])
+  // Stage 3 (FR-046): rows the filter leaves out are hidden the same way, until it's cleared.
+  const fArea = view.filterArea ?? null
+  const filter = useMemo(() => view.filter ?? {}, [view.filter])
+  const cellView = useCallback((rowId: string, col: string): CellView => ({ text: doc.cells[rowId]?.[col] ?? '', style: resolveStyle(index, rowId, col) }), [doc.cells, index])
+  /** The rows under the filter's header row, to its last row or the sheet's end. */
+  const filterScope = useMemo(() => {
+    if (!fArea) return [] as string[]
+    const h = fArea.header ? doc.rows.findIndex(r => r.id === fArea.header) : -1
+    const e = fArea.last ? doc.rows.findIndex(r => r.id === fArea.last) : -1
+    return doc.rows.slice(h + 1, e >= 0 ? e + 1 : doc.rows.length).map(r => r.id)
+  }, [fArea, doc.rows])
+  const filteredOut = useMemo(() => {
+    const out = new Set<string>()
+    if (!fArea || !Object.values(filter).some(filterOn)) return out
+    const keep = new Set(filterRows(filterScope, filter, cellView))
+    for (const id of filterScope) if (!keep.has(id)) out.add(id)
+    return out
+  }, [fArea, filter, filterScope, cellView])
+  const vRows = useMemo(() => doc.rows.filter(r => !hiddenR.has(r.id) && !filteredOut.has(r.id)), [doc.rows, hiddenR, filteredOut])
   const vCols = useMemo(() => doc.cols.filter(c => !hiddenC.has(c.id)), [doc.cols, hiddenC])
   /** The grid shows its first cell as active before anything is clicked; the toolbar must agree. */
   const active: ActiveCell | null = picked && vRows.some(r => r.id === picked.key) ? picked
@@ -84,8 +106,6 @@ export function BlankSheet(p: BlankSheetProps) {
   const locale = useLocale()
 
   // ── spec 015: formatting, merges ────────────────────────────────────────
-  const index = useMemo(() => indexFormats(extras.formats), [extras.formats])
-  const styleOf = useCallback((rowId: string, colId: string) => resolveStyle(index, rowId, colId), [index])
   /** Rows grow to fit wrapped text and large type, unless someone set their height (as Excel's autofit). */
   const autoH = useMemo(() => {
     const out = new Map<string, number>()
@@ -195,13 +215,34 @@ export function BlankSheet(p: BlankSheetProps) {
     p.apply('insertCols', [{ kind: 'insertCols', cols: made.map(c => ({ ...c, width: null })) }])
     setSelectRect({ r0: 0, c0: at, r1: Math.max(0, vRows.length - 1), c1: at + n - 1 })
   }
+  /** Stage 3: a table whose edge row or column is deleted keeps its other rows and columns; one fully deleted goes. */
+  function tablesAfter(kind: 'rows' | 'cols', goneIds: Set<string>): BlankChange[] {
+    const list = extras.tables ?? []
+    if (!list.length) return []
+    const all = kind === 'rows' ? doc.rows : doc.cols, idx = kind === 'rows' ? rowIndex : colIndex
+    const [a, b] = kind === 'rows' ? ['top', 'bottom'] as const : ['left', 'right'] as const
+    let changed = false
+    const after = list.flatMap(tb => {
+      if (!goneIds.has(tb[a]) && !goneIds.has(tb[b])) return [tb]
+      const i0 = idx.get(tb[a]) ?? 0, i1 = idx.get(tb[b]) ?? 0
+      const kept = all.slice(Math.min(i0, i1), Math.max(i0, i1) + 1).filter(x => !goneIds.has(x.id))
+      changed = true
+      return kept.length ? [{ ...tb, [a]: kept[0].id, [b]: kept[kept.length - 1].id }] : []
+    })
+    const out: BlankChange[] = changed ? [{ kind: 'tables', before: list, after }] : []
+    const area = view.filterArea
+    if (area && ((kind === 'rows' && area.header && goneIds.has(area.header)) || (kind === 'cols' && area.cols.every(c => goneIds.has(c))))) {
+      out.push({ kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: null, filter: {} } })
+    }
+    return out
+  }
   function deleteRows(r0: number, r1: number) {
     const gone = vRows.slice(r0, r1 + 1)
-    p.apply('deleteRows', [{ kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
+    p.apply('deleteRows', [...tablesAfter('rows', new Set(gone.map(r => r.id))), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
   }
   function deleteCols(c0: number, c1: number) {
     const gone = vCols.slice(c0, c1 + 1)
-    p.apply('deleteCols', [{ kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
+    p.apply('deleteCols', [...tablesAfter('cols', new Set(gone.map(c => c.id))), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
   }
   function setHeights(ids: string[], h: number | null) {
     const list = doc.rows.filter(r => ids.includes(r.id) && r.height !== h).map(r => ({ id: r.id, before: r.height, after: h }))
@@ -335,15 +376,20 @@ export function BlankSheet(p: BlankSheetProps) {
     render: (row, col) => {
       if (col === 'rowNo') return null
       const v = value(row.id, col)
-      if (!v) return null
+      // Stage 3: the filter buttons sit in the filter's header row.
+      const fb = fArea && fArea.header === row.id && fArea.cols.includes(col)
+        ? <button type="button" className={`fx-flt-btn${filterOn(filter[col]) ? ' is-on' : ''}`} data-filter-btn={col} tabIndex={-1}
+                  aria-label={sheetT('filterOf', { col: v || colLetters(colIndex.get(col) ?? 0) })} aria-haspopup="dialog"
+                  onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); setFilterUi({ col, anchor: ev.currentTarget }) }}>
+            {filterOn(filter[col]) ? '▼' : '▾'}</button>
+        : null
+      if (!v) return fb
       const st = styleOf(row.id, col)
       const shown = st?.num ? display(v, st.num, locale) : v
-      return <span className="fx-sheet-cell-text" style={showsRed(v, st?.num) ? { color: '#C00000' } : undefined}>{shown}</span>
+      const text = <span className="fx-sheet-cell-text" style={showsRed(v, st?.num) ? { color: '#C00000' } : undefined}>{shown}</span>
+      return fb ? <>{text}{fb}</> : text
     },
-    cellStyle: (row, col) => {
-      const st = styleOf(row.id, col)
-      return st ? toCss(st) : null
-    },
+    cellStyle: (row, col) => lookCss(row.id, col),
     copyStyle: (row, col) => styleOf(row.id, col),
     copyShown: (row, col) => { const v = value(row.id, col), st = styleOf(row.id, col); return st?.num ? display(v, st.num, locale) : v },
     marked: (row, col) => marks.has(`${row.id}|${col}`),
@@ -453,7 +499,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (clears.length) setMergeAsk({ value: keep, run }); else run()
   }
   // ── stage 2: hide, unhide, freeze (FR-047) ──────────────────────────────
-  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [] })
+  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {} })
   function setView(label: string, after: Partial<SheetView>) {
     if (ro) { p.onNotice(ro); return }
     p.apply(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
@@ -621,6 +667,164 @@ export function BlankSheet(p: BlankSheetProps) {
     if (!cmd.all) requestAnimationFrame(() => find({ kind: 'find', q: cmd.q, dir: 1 }))
   }
 
+  // ── stage 3: cell styles, tables, sort, filter, conditional formatting ─
+  const tables = useMemo(() => extras.tables ?? [], [extras.tables])
+  const rules = useMemo(() => extras.rules ?? [], [extras.rules])
+  const sheetT = (k: string, v?: Record<string, string | number>) => t(`format.st3.${k}`, v)
+  /** A table's rows and columns as they show now (filtered rows drop out of the banding, as in Excel). */
+  const tableBoxes = useMemo(() => tables.map(tb => {
+    const r0 = rowIndex.get(tb.top), r1 = rowIndex.get(tb.bottom), c0 = colIndex.get(tb.left), c1 = colIndex.get(tb.right)
+    if (r0 === undefined || r1 === undefined || c0 === undefined || c1 === undefined) return null
+    const rowsIn = vRows.filter(r => { const i = rowIndex.get(r.id) ?? -1; return i >= Math.min(r0, r1) && i <= Math.max(r0, r1) })
+    const colsIn = new Set(vCols.filter(c => { const i = colIndex.get(c.id) ?? -1; return i >= Math.min(c0, c1) && i <= Math.max(c0, c1) }).map(c => c.id))
+    return { tb, pos: new Map(rowsIn.map((r, i) => [r.id, i])), cols: colsIn, rows: rowsIn.length, dr: [Math.min(r0, r1), Math.max(r0, r1)], dc: [Math.min(c0, c1), Math.max(c0, c1)] }
+  }).filter((x): x is NonNullable<typeof x> => !!x), [tables, rowIndex, colIndex, vRows, vCols])
+  const tableLookAt = (rowId: string, colId: string): CellStyle | null => {
+    for (const b of tableBoxes) { const r = b.pos.get(rowId); if (r !== undefined && b.cols.has(colId)) return tableLook(b.tb, r, 0, b.rows) }
+    return null
+  }
+  const tableAt = (rowId: string, colId: string): SheetTableRecord | null => {
+    const r = rowIndex.get(rowId) ?? -1, c = colIndex.get(colId) ?? -1
+    return tableBoxes.find(b => r >= b.dr[0] && r <= b.dr[1] && c >= b.dc[0] && c <= b.dc[1])?.tb ?? null
+  }
+  /** Conditional formatting over the rows on screen (R8). */
+  const ruleLooks = useMemo(() => evalRules(rules, vRows.map(r => r.id), colIds, (r, c) => doc.cells[r]?.[c] ?? ''), [rules, vRows, colIds, doc.cells])
+  const rtl = locale.startsWith('ar')
+  const lookCss = (rowId: string, colId: string) => {
+    const own = styleOf(rowId, colId)
+    const tl = tableBoxes.length ? tableLookAt(rowId, colId) : null
+    const rl = ruleLooks.size ? ruleLooks.get(`${rowId}|${colId}`) : undefined
+    if (!tl && !rl) return own ? toCss(own) : null
+    let st: CellStyle = { ...(tl ?? {}), ...(own ?? {}) }
+    if (rl?.style) st = { ...st, ...rl.style }
+    if (rl?.scale) st = { ...st, fill: rl.scale }
+    const css = toCss(st)
+    if (!rl?.bar) return css
+    return { ...css, cell: { ...css.cell, ...barCss(rl.bar, rtl) } }
+  }
+  /** The block of filled cells around a cell, as Excel's "current region". */
+  function region(r: number, c: number): GridRect {
+    let r0 = r, r1 = r, c0 = c, c1 = c, grew = true
+    const rowHas = (rr: number, a: number, b: number) => { for (let x = a; x <= b; x++) if (value(vRows[rr].id, vCols[x].id)) return true; return false }
+    const colHas = (cc: number, a: number, b: number) => { for (let x = a; x <= b; x++) if (value(vRows[x].id, vCols[cc].id)) return true; return false }
+    while (grew) {
+      grew = false
+      if (r0 > 0 && rowHas(r0 - 1, c0, c1)) { r0--; grew = true }
+      if (r1 < vRows.length - 1 && rowHas(r1 + 1, c0, c1)) { r1++; grew = true }
+      if (c0 > 0 && colHas(c0 - 1, r0, r1)) { c0--; grew = true }
+      if (c1 < vCols.length - 1 && colHas(c1 + 1, r0, r1)) { c1++; grew = true }
+    }
+    return { r0, c0, r1, c1 }
+  }
+  const activeAt = () => ({ r: active ? vRowIndex.get(active.key) ?? 0 : 0, c: active ? vColIndex.get(active.col) ?? 0 : 0 })
+  const multi = () => { const q = rectRef.current; return q.r0 !== q.r1 || q.c0 !== q.c1 }
+  /** What Sort works on: the selection, the table, the filter's rows, or the block around the active cell; and whether it has a header row. */
+  function sortScope(fromFilter = false): { rows: typeof vRows; header: boolean | null } {
+    const q = rectRef.current
+    if (fromFilter && fArea?.header) { const h = vRows.find(r => r.id === fArea.header); const inScope = new Set(filterScope); return { rows: [...(h ? [h] : []), ...vRows.filter(r => inScope.has(r.id))], header: !!h } }
+    if (q.r0 !== q.r1) return { rows: vRows.slice(q.r0, q.r1 + 1), header: null }
+    const tb = active ? tableAt(active.key, active.col) : null
+    if (tb) { const b = tableBoxes.find(x => x.tb.id === tb.id)!; return { rows: vRows.filter(r => b.pos.has(r.id)), header: tb.header } }
+    if (fArea?.header) { const h = vRows.find(r => r.id === fArea.header); const inScope = new Set(filterScope); return { rows: [...(h ? [h] : []), ...vRows.filter(r => inScope.has(r.id))], header: !!h } }
+    const a = activeAt(), g = region(a.r, a.c)
+    return { rows: vRows.slice(g.r0, g.r1 + 1), header: null }
+  }
+  function sortBy(keys: SortKey[], header: boolean | null, fromFilter = false) {
+    if (ro) { p.onNotice(ro); return }
+    if (!keys.length) return
+    const sc = sortScope(fromFilter)
+    const hdr = header ?? sc.header ?? looksLikeHeader(colIds.map(c => cellView(sc.rows[0]?.id ?? '', c)), sc.rows[1] ? colIds.map(c => cellView(sc.rows[1].id, c)) : undefined)
+    const body = hdr ? sc.rows.slice(1) : sc.rows
+    if (body.length < 2) return
+    const first = vRowIndex.get(body[0].id) ?? 0, last = vRowIndex.get(body[body.length - 1].id) ?? 0
+    if (boxes.some(b => b.r1 >= first && b.r0 <= last)) { p.onNotice(sheetT('sortMerged')); return }
+    const ordered = sortRows(body, keys, (r, col) => cellView(r.id, col))
+    const slots = body.map(r => r.position).sort((x, y) => x - y)
+    const moved = ordered.map((r, i) => ({ id: r.id, before: r.position, after: slots[i] })).filter(x => x.before !== x.after)
+    if (moved.length) p.apply('sort', [{ kind: 'rowOrder', rows: moved }])
+  }
+  function formatAsTable(style: string) {
+    if (ro) { p.onNotice(ro); return }
+    const cur = active ? tableAt(active.key, active.col) : null
+    if (cur) { p.apply('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
+    const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
+    const d0 = rowIndex.get(vRows[q.r0].id) ?? 0, d1 = rowIndex.get(vRows[q.r1].id) ?? 0, e0 = colIndex.get(vCols[q.c0].id) ?? 0, e1 = colIndex.get(vCols[q.c1].id) ?? 0
+    if (tableBoxes.some(b => b.dr[0] <= d1 && d0 <= b.dr[1] && b.dc[0] <= e1 && e0 <= b.dc[1])) { p.onNotice(sheetT('tableOverlap')); return }
+    if (boxes.some(b => b.r0 <= q.r1 && q.r0 <= b.r1 && b.c0 <= q.c1 && q.c0 <= b.c1)) { p.onNotice(sheetT('tableMerged')); return }
+    const rec: SheetTableRecord = { id: p.newId(), top: vRows[q.r0].id, bottom: vRows[q.r1].id, left: vCols[q.c0].id, right: vCols[q.c1].id, style, header: true, banded: true }
+    p.apply('table', [
+      { kind: 'tables', before: tables, after: [...tables, rec] },
+      { kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: { header: rec.top, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: rec.bottom }, filter: {} } },
+    ])
+    setSelectRect(q)
+  }
+  function tableOff() {
+    if (ro) { p.onNotice(ro); return }
+    const cur = active ? tableAt(active.key, active.col) : null
+    if (!cur) return
+    const forward: BlankChange[] = [{ kind: 'tables', before: tables, after: tables.filter(x => x.id !== cur.id) }]
+    if (fArea?.header === cur.top) forward.push({ kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: null, filter: {} } })
+    p.apply('tableOff', forward)
+  }
+  function filterCmd(op: 'toggle' | 'clear' | 'reapply') {
+    if (op === 'clear') { if (Object.keys(filter).length) setView('filterClear', { filter: {} }); return }
+    if (op === 'reapply') return
+    if (fArea) { setView('filterOff', { filterArea: null, filter: {} }); return }
+    const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
+    setView('filterOn', { filterArea: { header: vRows[q.r0].id, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: null }, filter: {} })
+  }
+  function filterCol(col: string, f: ColFilter | null) {
+    const next = { ...filter }
+    if (f && filterOn(f)) next[col] = f; else delete next[col]
+    setView('filter', { filter: next })
+  }
+  const [filterUi, setFilterUi] = useState<{ col: string; anchor: HTMLElement } | null>(null)
+  /** "E3:E6", or "E:G" for whole columns: where a rule applies. */
+  function whereOf(r: ConditionalRule): string {
+    const cs = r.range.cols.map(c => colIndex.get(c)).filter((x): x is number => x !== undefined)
+    if (!cs.length) return ''
+    const a = colLetters(Math.min(...cs)), b = colLetters(Math.max(...cs))
+    if (r.range.rows === 'all') return `${a}:${b}`
+    const rs = r.range.rows.map(x => rowIndex.get(x)).filter((x): x is number => x !== undefined)
+    if (!rs.length) return `${a}:${b}`
+    return `${a}${Math.min(...rs) + 1}:${b}${Math.max(...rs) + 1}`
+  }
+  function setRules(label: string, after: ConditionalRule[]) {
+    if (ro) { p.onNotice(ro); return }
+    p.apply(label, [{ kind: 'rules', before: rules, after }])
+  }
+  function ruleNew(rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'>) {
+    const q = rectRef.current
+    const range: ConditionalRule['range'] = {
+      rows: q.r0 === 0 && q.r1 === vRows.length - 1 && !Object.keys(filter).length ? 'all' : vRows.slice(q.r0, q.r1 + 1).map(r => r.id),
+      cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id),
+    }
+    setRules('rule', [{ id: p.newId(), range, ...rule, priority: 0 }, ...[...rules].sort((x, y) => x.priority - y.priority).map((r, i) => ({ ...r, priority: i + 1 }))])
+  }
+  function rulesClear(where: 'selection' | 'sheet') {
+    if (where === 'sheet') { if (rules.length) setRules('rulesClear', []); return }
+    const q = rectRef.current
+    const rs = new Set(vRows.slice(q.r0, q.r1 + 1).map(r => r.id)), cs = new Set(vCols.slice(q.c0, q.c1 + 1).map(c => c.id))
+    const kept = rules.filter(r => !(r.range.cols.some(c => cs.has(c)) && (r.range.rows === 'all' || r.range.rows.some(x => rs.has(x)))))
+    if (kept.length !== rules.length) setRules('rulesClear', kept)
+  }
+  /** Sort's columns, named by the header row when there is one. */
+  const usedCols = useMemo(() => { const u = new Set<string>(); for (const row of Object.values(doc.cells)) for (const c of Object.keys(row)) u.add(c); return vCols.filter(c => u.has(c.id)).map(c => c.id) }, [doc.cells, vCols])
+  function sortInfo(): { cols: { key: string; name: string }[]; header: boolean | null } {
+    const q = rectRef.current
+    const tb = active ? tableAt(active.key, active.col) : null
+    let cols: string[], headRow: string | null, header: boolean | null
+    if (multi()) { cols = vCols.slice(q.c0, q.c1 + 1).map(c => c.id); headRow = vRows[q.r0]?.id ?? null; header = null }
+    else if (tb) { cols = vCols.filter(c => tableBoxes.find(b => b.tb.id === tb.id)?.cols.has(c.id)).map(c => c.id); headRow = tb.header ? tb.top : null; header = tb.header }
+    else if (fArea) { cols = fArea.cols.filter(c => vColIndex.has(c)); headRow = fArea.header; header = true }
+    else { cols = usedCols.length ? usedCols : colIds.slice(0, 1); headRow = vRows[0]?.id ?? null; header = null }
+    if (header === null && headRow) {
+      const i = vRowIndex.get(headRow) ?? 0
+      header = vRows[i + 1] ? looksLikeHeader(cols.map(c => cellView(headRow!, c)), cols.map(c => cellView(vRows[i + 1].id, c))) : false
+    }
+    return { cols: cols.map(c => ({ key: c, name: (header && headRow ? value(headRow, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })), header }
+  }
+
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
     if (cmd.kind === 'patch') applyItems(cmd.label, planRect(index, q, size, rk, ck, cmd.patch))
@@ -639,6 +843,15 @@ export function BlankSheet(p: BlankSheetProps) {
     else if (cmd.kind === 'pasteSpecial') void pasteSpecial(cmd)
     else if (cmd.kind === 'find') { find(cmd); return }
     else if (cmd.kind === 'replace') { replace(cmd); return }
+    else if (cmd.kind === 'cellStyle') { const patch = cellStylePatch(cmd.key); if (patch) applyItems('cellStyle', planRect(index, q, size, rk, ck, patch)) }
+    else if (cmd.kind === 'table') formatAsTable(cmd.style)
+    else if (cmd.kind === 'tableOff') tableOff()
+    else if (cmd.kind === 'sort') sortBy(cmd.keys, cmd.header)
+    else if (cmd.kind === 'filter') filterCmd(cmd.op)
+    else if (cmd.kind === 'filterCol') filterCol(cmd.col, cmd.f)
+    else if (cmd.kind === 'ruleNew') ruleNew(cmd.rule)
+    else if (cmd.kind === 'rulesSet') setRules('rules', cmd.rules)
+    else if (cmd.kind === 'rulesClear') rulesClear(cmd.where)
     focusActive()
   }
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
@@ -655,6 +868,11 @@ export function BlankSheet(p: BlankSheetProps) {
     multi: rectRef.current.r0 !== rectRef.current.r1 || rectRef.current.c0 !== rectRef.current.c1,
     viewOff: null,
     frozen: { rows: view.frozenRows ?? 0, cols: view.frozenCols ?? 0 },
+    table: (() => { const tb = tableAt(active.key, active.col); return tb ? { style: tb.style } : null })(),
+    tableOff: null,
+    filter: { on: !!fArea, cols: Object.values(filter).filter(filterOn).length },
+    ...(() => { const si = sortInfo(); return { sortCols: si.cols, sortHeader: si.header } })(),
+    rules: [...rules].sort((x, y) => x.priority - y.priority).map(r => ({ ...r, where: whereOf(r) })),
   } : null
   useFormatBridge('blank', true, fmtState, runFormat)
   // Spec 015 comments: corner markers, and selecting a cell from the panel or a link.
@@ -677,6 +895,17 @@ export function BlankSheet(p: BlankSheetProps) {
         <PopMenu at={menu.at} items={menu.items} label={t('tabMenu.label')} attr="data-cell-menu"
                  onClose={() => { setMenu(null); focusActive() }} />
       )}
+      {filterUi && (() => {
+        const others = { ...filter }
+        delete others[filterUi.col]
+        const rowsIn = filterRows(filterScope, others, cellView).filter(id => !hiddenR.has(id))
+        const cv = columnValues(rowsIn, filterUi.col, cellView)
+        const title = (fArea?.header ? value(fArea.header, filterUi.col) : '') || colLetters(colIndex.get(filterUi.col) ?? 0)
+        const close = () => { setFilterUi(null); focusActive() }
+        return <FilterMenu anchor={filterUi.anchor} title={title} values={cv.values} fills={cv.fills} current={filter[filterUi.col]}
+                           onSort={dir => { sortBy([{ col: filterUi.col, dir }], true, true); close() }}
+                           onApply={f => { filterCol(filterUi.col, f); close() }} onClose={close} />
+      })()}
       {resize && (
         <ResizeDialog kind={resize.kind} value={resize.value} onCancel={() => { setResize(null); focusActive() }}
                       onOk={v => { if (resize.kind === 'row') setHeights(resize.ids, v); else setWidths(resize.ids, v); setResize(null); focusActive() }} />

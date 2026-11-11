@@ -196,3 +196,104 @@ Run on 2026-11-11 against a production build (`next build` + `next start`) and l
 - **Format Painter** applies the look to the next drag or click, as in Excel. A double-click keeps it on until Esc.
 - **Dev server timing.** On `next dev`, `run.cjs` (Ctrl+Z right after a linked paste) and `perf-axe.cjs` (arrow keys p95 211 ms) can fail because compiles are slow. Both pass on the production build above.
 - **Lab data.** Section 8 renames real task titles as an admin and undoes them. The script checks that undo puts every title back, and a backup comparison found 0 differences afterwards.
+
+
+---
+
+# Validation: spec 015 stage 3 (styles, tables, sort, filter, conditional formatting)
+
+Run on 2026-11-11 against a production build (`next build` + `next start`) and local PostgreSQL.
+
+## Labs and server checks
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npx next build` | builds |
+| `npm run lab:spreadsheet` (adds `rules-highlight`, `rules-sort-filter`, `rules-groups`, `styles-tables`) | 25/25 |
+| `scripts/spreadsheet-lab/smoke/run.ts` (adds rules, tables, Sort's row positions and the filter on a blank sheet; cleaning, protection and the 100-rule cap; rules, sort and filter on the Content sheet, which never change a task) | all passed |
+| `npm run lab:sheet` | 150/150 |
+| `npm run lab:notify` | 46/46 |
+| `scripts/spreadsheet-lab/realapp/run.cjs` (spec 013) | 56/56 |
+| `scripts/spreadsheet-lab/realapp/perf-axe.cjs` | 18/18; arrow keys median 33 ms, p95 38 ms |
+| `scripts/spreadsheet-lab/realapp/format.cjs` (stage 1) | 52/52 |
+| `scripts/spreadsheet-lab/realapp/editing.cjs` (stage 2) | 50/50 |
+
+## Running-app checks (US5)
+
+`node scripts/spreadsheet-lab/realapp/styles.cjs`: **54 passed, 0 failed.**
+
+```
+1. Cell styles (FR-030)
+  ✓ axe: Cell Styles gallery 
+  ✓ Good: green fill, dark green text 
+  ✓ Normal clears the look 
+  ✓ each one undoes in one step 
+2. Format as Table (FR-031)
+  ✓ axe: Format as Table gallery 
+  ✓ the block around the cell becomes a table: a blue header row 
+  ✓ banded rows rgb(218, 227, 243) / rgb(255, 255, 255)
+  ✓ filter buttons on the four headings 
+  ✓ it stops at the end of the data 
+  ✓ still a table after a reload 
+  ✓ another style changes the table, not a second one 
+3. Sort (FR-045)
+  ✓ axe: Sort & Filter menu 
+  ✓ A to Z on Budget: the heading stays, numbers in order 
+  ✓ whole rows move, with their formatting 
+  ✓ axe: Sort dialog 
+  ✓ Custom sort: Status Z to A, then Task ["Task","Launch post","Newsletter","Carousel","Teaser","Recap video"]
+  ✓ undo puts the rows back ["Task","Teaser","Launch post","Recap video","Carousel","Newsletter"]
+  ✓ the order is saved 
+4. Filter (FR-046)
+  ✓ axe: filter menu 
+  ✓ only the Late rows show ["Task","Teaser","Carousel"]
+  ✓ rows keep their own numbers 
+  ✓ the filtered heading shows it 
+  ✓ still filtered after a reload 
+  ✓ and Budget greater than 1,000 
+  ✓ Clear filter brings every row back; the buttons stay 
+  ✓ Ctrl+Shift+L turns the filter buttons off 
+  ✓ undo brings the filter back 
+  ✓ Convert to range removes the table and its buttons 
+5. Conditional formatting (FR-032)
+  ✓ axe: Conditional Formatting menu 
+  ✓ axe: New rule dialog 
+  ✓ past dates turn red [true,false,true,false,true]
+  ✓ the rule follows an edit 
+  ✓ data bars: the largest is full, the smallest short 
+  ✓ rules are kept after a reload 
+  ✓ axe: Manage rules dialog 
+  ✓ Manage rules lists both, newest first, with where they apply 
+  ✓ reorder and delete: the date rule is gone, the bars stay 
+  ✓ undo brings the deleted rule back 
+  ✓ Clear rules from the entire sheet 
+6. The Content sheet (FR-075)
+  ✓ Z to A sorts the pieces inside each group 3 groups
+  ✓ no task changed: the board keeps its order 
+  ✓ tables are off here, and say why 
+  ✓ filter buttons on the headings 
+  ✓ axe: filter menu on the Content sheet 
+  ✓ filtered inside groups 3 of 19
+  ✓ the sort and filter are kept with the sheet 
+  ✓ still no task changed 
+  ✓ cell styles work on a task cell 
+7. Arabic and a phone
+  ✓ axe: New rule in Arabic 
+  ✓ axe: Sort in Arabic 
+  ✓ phone: the Styles tab, 44 px targets 
+  ✓ axe: Styles tab on a phone 
+  ✓ phone: a cell style applies 
+  ✓ no page errors 
+
+54 passed, 0 failed
+```
+
+## Notes
+
+- **One filter area per sheet.** As in Excel, a blank sheet has one filter area: a table's own, or one set with Filter (Ctrl/Cmd+Shift+L) on the selection or the block around the active cell. Filtered rows are hidden like hidden rows and keep their numbers. Conditional formatting counts only the rows on screen, so a filtered-out duplicate isn't a duplicate.
+- **Sort** moves whole rows, with their formatting and comments, by giving them new positions. It is one undo step. It works on the selection, the table, the filter area, or the block of filled cells around the active cell, and it detects a heading row. Sorting across merged cells is refused, with a reason.
+- **Tables** draw their header and banded rows under the cells' own formatting. Convert to range removes the table and its filter buttons. Deleting a table's first or last row or column moves that edge.
+- **Content and Video sheets.** Cell styles and conditional formatting work as on blank sheets; rules cover whole columns there. Sort and filter work inside each group (a theme's pieces, a video's clips) and are saved with the sheet. The board's order and the tasks never change. They read what a cell shows, such as a status pill's label. Tables are off there, with the reason shown.
+- **Accent cell styles** use dark text where white text on Excel's colour wouldn't be readable (Accent 2, 3, 5 and 6).
+- **Dev server note.** During this run, `next dev` served a stale stylesheet until `.next/dev` was cleared. Production builds aren't affected.

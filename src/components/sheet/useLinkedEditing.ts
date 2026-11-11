@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CellWrite, GridCol, WriteResult, WriteWhy } from './GridCore'
-import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type FormatsChange, type LinkedChange, type Stack } from '@/lib/sheet-undo'
+import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type FormatsChange, type LinkedChange, type RulesChange, type Stack, type ViewChange } from '@/lib/sheet-undo'
 
 const POOL = 4
 
@@ -34,6 +34,8 @@ export interface LinkedEditingInput<R extends { key: string }> {
   restore?(taskId: string): Promise<boolean>
   /** Spec 015: put format records to these looks (undo and redo of formatting); false when not saved. */
   applyFormats?(items: FormatsChange['items']): Promise<boolean>
+  /** Spec 015 stage 3: put the sheet's rules, or its sort and filter, back (undo and redo). */
+  applyExtra?(change: RulesChange | ViewChange): Promise<boolean>
 }
 
 /**
@@ -125,6 +127,8 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
         for (const [k, n] of Object.entries(res.skipped)) skipped[k] = (skipped[k] ?? 0) + (n ?? 0)
       } else if (change.kind === 'formats') {
         if (ref.current.applyFormats && !(await ref.current.applyFormats(change.items))) skipped.invalid = (skipped.invalid ?? 0) + change.items.length
+      } else if (change.kind === 'rules' || change.kind === 'view') {
+        if (ref.current.applyExtra && !(await ref.current.applyExtra(change))) skipped.invalid = (skipped.invalid ?? 0) + 1
       } else if (change.kind === 'dropRows' || change.kind === 'restoreRows') {
         const fn = change.kind === 'dropRows' ? ref.current.drop : ref.current.restore
         if (!fn) continue
@@ -169,10 +173,18 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
     setTick(t => t + 1)
   }, [])
 
+  /** Stage 3: rules or the view, already applied and saved, as one undo step. */
+  const recordChanges = useCallback((label: string, changes: LinkedChange[]) => {
+    if (!changes.length) return
+    stack.current = push(stack.current, makeStep(label, changes))
+    setTick(t => t + 1)
+  }, [])
+
   return {
     onCommit,
     writeCells,
     recordFormats,
+    record: recordChanges,
     onUndo: useCallback(() => { void apply('undo') }, [apply]),
     onRedo: useCallback(() => { void apply('redo') }, [apply]),
     dropRows,

@@ -13,9 +13,14 @@
  *   team's own text columns only; the built-in columns show what they show.
  * - Undo and redo go through the sheet's own stack (useLinkedEditing).
  */
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
-import type { CellStyle, SheetFormatRecord } from '@/types/index'
+import { useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createElement } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import type { CellStyle, ColFilter, ConditionalRule, SheetFormatRecord } from '@/types/index'
+import type { LinkedChange } from '@/lib/sheet-undo'
+import { barCss, cellStylePatch, columnValues, filterOn, filterRows, type RuleLook } from '@/lib/sheet-rules'
+import { FilterMenu } from '@/components/sheets/format/StyleTools'
+import type { LinkedStore } from './useLinkedView'
 import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { formatKey, indexFormats, planBorders, planRect, resolveStyle, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
@@ -43,6 +48,16 @@ export interface LinkedFormatsInput<R extends { key: string }> {
   writeCells?(writes: CellWrite[], why: WriteWhy): Promise<WriteResult>
   /** Stage 2: select a block after a tool (Find's match). */
   selectBlock?(rect: GridRect): void
+  /** Stage 3: the sheet's settings (useLinkedView), the rules' looks, a column's name, and undo for rules and the view. */
+  store: LinkedStore
+  ruleLooks: Map<string, RuleLook>
+  colName(col: GridCol): string
+  record?(label: string, changes: LinkedChange[]): void
+  /** What a cell shows, for the filter list (a pill's label when the cell has no text). */
+  shownText(row: R, col: GridCol): string
+  /** The rows before this sheet's filter, and which of them sort and filter (for the filter list). */
+  rawRows: R[]
+  isItem(row: R): boolean
 }
 
 export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInput<R>) {
@@ -53,20 +68,13 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
   apiRef.current = api
   const ref = useRef(p)
   ref.current = p
-  const [formats, setFormats] = useState<SheetFormatRecord[]>([])
+  const { formats, setFormats, index } = p.store
   const formatsRef = useRef(formats)
   formatsRef.current = formats
   const rect = useRef<GridRect>({ r0: 0, c0: 0, r1: 0, c1: 0 })
   const [, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!p.enabled) return
-    let live = true
-    void apiRef.current?.loadLinkedSheetExtras(p.sheetKey).then(r => { if (live && r.success) setFormats(r.extras.formats) })
-    return () => { live = false }
-  }, [p.enabled, p.sheetKey])
-
-  const index = useMemo(() => indexFormats(formats), [formats])
+  const locale = useLocale()
+  const [filterUi, setFilterUi] = useState<{ col: GridCol; anchor: HTMLElement } | null>(null)
 
   /** Show the new looks at once, then save; on a refusal, put the old ones back. */
   const put = useCallback(async (items: FormatItem[], look: 'after' | 'before' = 'after') => {
@@ -178,6 +186,40 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
         }
         return
       }
+      // Stage 3 (FR-030–FR-032, FR-045, FR-046, FR-075): cell styles and rules by task and column;
+      // sort and filter inside each group, saved with the sheet and never on the board; no tables.
+      case 'cellStyle': { const patch = cellStylePatch(cmd.key); if (patch) commit('cellStyle', planRect(index, q, size, rk, ck, patch)); return }
+      case 'table': case 'tableOff': p.say(t('st3.tablesLinked')); return
+      case 'sort': {
+        const keys = cmd.keys.filter(k => p.cols.includes(k.col) && k.col !== 'rowNo')
+        if (!keys.length) return
+        setLinkedView('sort', { ...p.store.view, sort: keys })
+        p.say(t('st3.sortedLinked'))
+        return
+      }
+      case 'filter': {
+        const v = p.store.view
+        if (cmd.op === 'clear') { if (Object.keys(v.filter ?? {}).length) setLinkedView('filterClear', { ...v, filter: {} }); return }
+        if (cmd.op === 'toggle') setLinkedView(v.filterArea ? 'filterOff' : 'filterOn', v.filterArea ? { ...v, filterArea: null, filter: {} } : { ...v, filterArea: { header: null, cols: [] } })
+        return
+      }
+      case 'filterCol': setFilter(cmd.col, cmd.f); return
+      case 'ruleNew': {
+        const cols = p.cols.slice(q.c0, q.c1 + 1).filter(c => c !== 'rowNo')
+        if (!cols.length) return
+        const id = crypto.randomUUID()
+        setLinkedRules('rule', [{ id, range: { rows: 'all', cols }, ...cmd.rule, priority: 0 }, ...sortedRules().map((r, i) => ({ ...r, priority: i + 1 }))])
+        return
+      }
+      case 'rulesSet': setLinkedRules('rules', cmd.rules); return
+      case 'rulesClear': {
+        const rules = p.store.rules
+        if (cmd.where === 'sheet') { if (rules.length) setLinkedRules('rulesClear', []); return }
+        const cs = new Set(p.cols.slice(q.c0, q.c1 + 1))
+        const kept = rules.filter(r => !r.range.cols.some(c => cs.has(c)))
+        if (kept.length !== rules.length) setLinkedRules('rulesClear', kept)
+        return
+      }
       case 'find': {
         const all = texts(), count = all.filter(x => matches(x.text, cmd.q.query, cmd.q)).length
         const i = nextMatch(all, at(), cmd.q.query, cmd.q, cmd.dir)
@@ -208,6 +250,51 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     }
   }
 
+  // ── stage 3 helpers ──
+  const sortedRules = () => [...p.store.rules].sort((a, b) => a.priority - b.priority)
+  function setLinkedView(label: string, after: typeof p.store.view) {
+    const before = p.store.view
+    void p.store.saveView(after).then(ok => { if (ok) ref.current.record?.(label, [{ kind: 'view', before: before as never, after: after as never }]) })
+  }
+  function setLinkedRules(label: string, after: ConditionalRule[]) {
+    const before = p.store.rules
+    void p.store.saveRules(after).then(ok => { if (ok) ref.current.record?.(label, [{ kind: 'rules', before, after }]) })
+  }
+  function setFilter(col: GridCol, f: ColFilter | null) {
+    const next = { ...(p.store.view.filter ?? {}) }
+    if (f && filterOn(f)) next[col] = f; else delete next[col]
+    setLinkedView('filter', { ...p.store.view, filter: next })
+  }
+  /** "Status, Due" or "Status": where a rule applies on this sheet (whole columns). */
+  const whereOf = (r: ConditionalRule) => r.range.cols.map(c => p.colName(c)).join(', ')
+  const filterBtn = (col: GridCol): ReactNode => {
+    if (!p.enabled || !p.store.view.filterArea || col === 'rowNo') return null
+    const on = filterOn(p.store.view.filter?.[col])
+    return createElement('button', {
+      type: 'button', className: `fx-flt-btn${on ? ' is-on' : ''}`, 'data-filter-btn': col, tabIndex: -1, 'aria-haspopup': 'dialog',
+      'aria-label': t('st3.filterOf', { col: p.colName(col) }),
+      onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); setFilterUi({ col, anchor: e.currentTarget }) },
+    }, on ? '▼' : '▾')
+  }
+  let filterNode: ReactNode = null
+  if (filterUi && p.enabled) {
+    const all = p.store.view.filter ?? {}
+    const others = { ...all }
+    delete others[filterUi.col]
+    const items = p.rawRows.filter(r => p.isItem(r))
+    const rowsIn = filterRows(items, others, (r, c) => ({ text: p.shownText(r, c), style: (() => { const task = p.taskOf(r); return task ? resolveStyle(index, task, c) : null })() }))
+    const cv = columnValues(rowsIn, filterUi.col, (r, c) => ({ text: p.shownText(r, c), style: (() => { const task = p.taskOf(r); return task ? resolveStyle(index, task, c) : null })() }))
+    const close = () => setFilterUi(null)
+    filterNode = createElement(FilterMenu, {
+      anchor: filterUi.anchor, title: p.colName(filterUi.col), values: cv.values, fills: cv.fills, current: all[filterUi.col],
+      onSort: dir => { run({ kind: 'sort', keys: [{ col: filterUi.col, dir }], header: false }); close() },
+      onApply: f => { setFilter(filterUi.col, f); close() },
+      onClose: close,
+    })
+  }
+  const rtl = locale.startsWith('ar')
+
   const activeRow = p.enabled && p.active && p.active.col !== 'rowNo' ? p.rows.find(r => r.key === p.active!.key) : undefined
   const activeTask = activeRow ? p.taskOf(activeRow) : null
   const state: FormatState | null = p.active && activeRow ? {
@@ -222,6 +309,12 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     merged: false,
     multi: rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1,
     viewOff: t('edit.viewOff'),
+    table: null,
+    tableOff: t('st3.tablesLinked'),
+    filter: { on: !!p.store.view.filterArea, cols: Object.values(p.store.view.filter ?? {}).filter(filterOn).length },
+    sortCols: p.cols.filter(c => c !== 'rowNo').map(c => ({ key: c, name: p.colName(c) })),
+    sortHeader: false,
+    rules: sortedRules().map(r => ({ ...r, where: whereOf(r) })),
   } : null
   useFormatBridge('linked', p.enabled, state, run)
   const marks = useCommentBridge('linked', p.enabled, (taskId, col) => ref.current.select?.(taskId, col))
@@ -232,8 +325,17 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       if (!p.enabled || col === 'rowNo') return null
       const task = p.taskOf(row)
       const st = task ? resolveStyle(index, task, col) : null
-      return st ? toCss(st) : null
+      const rl = task && p.ruleLooks.size ? p.ruleLooks.get(`${task}|${col}`) : undefined
+      if (!rl) return st ? toCss(st) : null
+      let look: CellStyle = { ...(st ?? {}), ...(rl.style ?? {}) }
+      if (rl.scale) look = { ...look, fill: rl.scale }
+      const css = toCss(look)
+      if (!rl.bar) return css
+      return { ...css, cell: { ...css.cell, ...barCss(rl.bar, rtl) } }
     },
+    /** Stage 3: the filter buttons on the headings, and the open filter menu. */
+    headerExtra: filterBtn,
+    node: filterNode,
     marked: (row: R, col: GridCol) => { const task = p.enabled ? p.taskOf(row) : null; return !!task && marks.has(`${task}|${col}`) },
     styleOf: (row: R, col: GridCol): CellStyle | null => { const task = p.taskOf(row); return task ? resolveStyle(index, task, col) : null },
     onSelect: (q: GridRect) => { rect.current = q; setTick(x => x + 1) },

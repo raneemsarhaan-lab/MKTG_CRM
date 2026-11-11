@@ -12,9 +12,9 @@ import { useFormatActions, DEFAULT_LINE, NUM_MENU, numKey } from './FormatToolba
 import { PresetIcon } from './BorderPicker'
 import { sendFormat, type FormatSource, type FormatState } from './bus'
 
-const TABS = ['text', 'fill', 'borders', 'align', 'number', 'edit'] as const
+const TABS = ['text', 'fill', 'borders', 'align', 'number', 'edit', 'styles'] as const
 
-export function FormatSheet({ state, target, onClose, onFormatCells, onFind }: { state: FormatState | null; target: FormatSource; onClose(): void; onFormatCells(): void; onFind(replace: boolean): void }) {
+export function FormatSheet({ state, target, onClose, onFormatCells, onFind, onRule, onManageRules, onSortDialog }: { state: FormatState | null; target: FormatSource; onClose(): void; onFormatCells(): void; onFind(replace: boolean): void; onRule(): void; onManageRules(): void; onSortDialog(): void }) {
   const t = useTranslations('sheets.format')
   const a = useFormatActions(target, state)
   const st = a.st
@@ -34,7 +34,7 @@ export function FormatSheet({ state, target, onClose, onFormatCells, onFind }: {
       <span className="fx-fmt-grab" aria-hidden="true" />
       {off && state?.readOnly && <p className="fx-fmt-why">{state.readOnly}</p>}
       <div className="fx-fmt-stabs" role="tablist">
-        {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{x === 'edit' ? t('groups.editing') : t(`phone.tabs.${x}`)}</button>)}
+        {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} data-phone-tab={x} onClick={() => setTab(x)}>{x === 'edit' ? t('groups.editing') : x === 'styles' ? t('groups.styles') : t(`phone.tabs.${x}`)}</button>)}
       </div>
       <div className="fx-fmt-sbody">
         {tab === 'text' && (
@@ -94,6 +94,18 @@ export function FormatSheet({ state, target, onClose, onFormatCells, onFind }: {
             {b('findPh', t('edit.find'), t('edit.find'), () => { onClose(); onFind(false) }, undefined, true)}
             {!state?.viewOff && b('freezeTop', t('edit.freezeTop'), t('edit.freezeTop'), () => sendFormat(target, { kind: 'view', op: (state?.frozen?.rows ?? 0) > 0 ? 'unfreeze' : 'freezeTop' }), (state?.frozen?.rows ?? 0) > 0, true)}
             {!state?.viewOff && b('hideRowsPh', t('edit.hideRows'), t('edit.hideRows'), () => sendFormat(target, { kind: 'view', op: 'hideRows' }), undefined, true)}
+          </div>
+        )}
+        {tab === 'styles' && (
+          <div className="fx-fmt-row is-wrap">
+            {(['good', 'bad', 'neutral', 'title', 'h1', 'total'] as const).map(k => b(`cs-${k}`, t(`st3.styles.${k}`), t(`st3.styles.${k}`), () => sendFormat(target, { kind: 'cellStyle', key: k }), undefined, true))}
+            {!state?.tableOff && b('tablePh', t('ctl.table'), t('ctl.table'), () => sendFormat(target, { kind: state?.table ? 'tableOff' : 'table', ...(state?.table ? {} : { style: 'medium-0' }) } as never), !!state?.table, true)}
+            {b('sortAz', t('st3.sortAZ'), t('st3.sortAZ'), () => sendFormat(target, { kind: 'sort', keys: [{ col: state?.colKey ?? '', dir: 'asc' }], header: null }), undefined, true)}
+            {b('sortZa', t('st3.sortZA'), t('st3.sortZA'), () => sendFormat(target, { kind: 'sort', keys: [{ col: state?.colKey ?? '', dir: 'desc' }], header: null }), undefined, true)}
+            {b('sortCustom', t('st3.customSort'), `${t('st3.customSort')}…`, () => { onClose(); onSortDialog() }, undefined, true)}
+            {b('filterPh', t('st3.filter'), t('st3.filter'), () => sendFormat(target, { kind: 'filter', op: 'toggle' }), !!state?.filter?.on, true)}
+            {b('rulePh', t('st3.newRule'), `${t('st3.newRule')}…`, () => { onClose(); onRule() }, undefined, true)}
+            {b('rulesPh', t('st3.manage'), `${t('st3.manage')}…`, () => { onClose(); onManageRules() }, undefined, true)}
           </div>
         )}
       </div>

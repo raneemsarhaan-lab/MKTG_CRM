@@ -6,7 +6,7 @@
  * change set for the outbox. The same function applies a step backwards on
  * undo, so the screen, the server and the history can't disagree.
  */
-import type { FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord, SheetView, ViewWrite } from '@/types/index'
+import type { ConditionalRule, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord, SheetTableRecord, SheetView, ViewWrite } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { betweenMany } from '@/lib/sheet-positions'
 
@@ -84,7 +84,37 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, view: { ...ex.view, ...ch.after } } }
     }
+    case 'rules': {
+      const ex = doc.extras ?? emptyExtras()
+      return { ...doc, extras: { ...ex, rules: ch.after } }
+    }
+    case 'tables': {
+      const ex = doc.extras ?? emptyExtras()
+      return { ...doc, extras: { ...ex, tables: ch.after } }
+    }
+    case 'rowOrder': {
+      const pos = new Map(ch.rows.map(r => [r.id, r.after]))
+      return { ...doc, rows: doc.rows.map(r => (pos.has(r.id) ? { ...r, position: pos.get(r.id)! } : r)).sort(byPos) }
+    }
   }
+}
+
+/** Stage 3: rules or tables as the server takes them, from a list before and after. */
+export function listWrite<T extends { id: string }>(before: T[], after: T[]): { put: T[]; remove: string[] } {
+  const was = new Map(before.map(x => [x.id, JSON.stringify(x)]))
+  const now = new Set(after.map(x => x.id))
+  return { put: after.filter(x => was.get(x.id) !== JSON.stringify(x)), remove: before.filter(x => !now.has(x.id)).map(x => x.id) }
+}
+/** Two list writes in a row: the later one wins for each id. */
+export function mergeLists<T extends { id: string }>(a: { put?: T[]; remove?: string[] } | undefined, b: { put?: T[]; remove?: string[] } | undefined): { put: T[]; remove: string[] } | undefined {
+  if (!a && !b) return undefined
+  const put = new Map<string, T>(), remove = new Set<string>()
+  for (const w of [a, b]) {
+    if (!w) continue
+    for (const id of w.remove ?? []) { put.delete(id); remove.add(id) }
+    for (const x of w.put ?? []) { remove.delete(x.id); put.set(x.id, x) }
+  }
+  return { put: [...put.values()], remove: [...remove] }
 }
 
 export const applyAll = (doc: SheetDoc, chs: BlankChange[]) => chs.reduce(applyChange, doc)
@@ -109,6 +139,9 @@ export function toServer(chs: BlankChange[]): SheetChanges {
         out.merges = netMerges([...opsOf(out.merges), ...ch.remove.map(x => ({ remove: x.id })), ...ch.add.map(x => ({ add: x }))])
         break
       case 'view': out.view = mergeView(out.view, viewWrite(ch.before, ch.after)); break
+      case 'rules': out.rules = mergeLists<ConditionalRule>(out.rules, listWrite(ch.before, ch.after)); break
+      case 'tables': out.tables = mergeLists<SheetTableRecord>(out.tables, listWrite(ch.before, ch.after)); break
+      case 'rowOrder': push('rowPositions', ch.rows.map(r => ({ id: r.id, position: r.after }))); break
     }
   }
   return out
@@ -128,6 +161,9 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     formats: lastFormats(cat(a.formats, b.formats)),
     merges: a.merges || b.merges ? mergeMerges(a.merges, b.merges) : undefined,
     view: a.view || b.view ? mergeView(a.view, b.view) : undefined,
+    rules: mergeLists(a.rules, b.rules),
+    tables: mergeLists(a.tables, b.tables),
+    rowPositions: lastById(cat(a.rowPositions, b.rowPositions)),
   }
   // A row inserted and deleted in the same batch never needs to reach the server.
   for (const [ins, del] of [['insertRows', 'deleteRows'], ['insertCols', 'deleteCols']] as const) {
@@ -151,6 +187,12 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
 }
 
 /** For a format record, the last write wins (`set` replaces; a later `merge` lays over a queued `set`). */
+function lastById<T extends { id: string }>(list?: T[]): T[] | undefined {
+  if (!list) return undefined
+  const last = new Map<string, T>()
+  for (const x of list) { last.delete(x.id); last.set(x.id, x) }
+  return [...last.values()]
+}
 function lastFormats(list?: FormatWrite[]): FormatWrite[] | undefined {
   if (!list) return undefined
   const last = new Map<string, FormatWrite>()
@@ -239,6 +281,10 @@ export function viewWrite(before: Partial<SheetView>, after: Partial<SheetView>)
   const diff = (a?: string[], b?: string[]) => { const A = new Set(a ?? []), B = new Set(b ?? []); return { add: [...B].filter(x => !A.has(x)), drop: [...A].filter(x => !B.has(x)) } }
   if (after.hiddenRows) { const d = diff(before.hiddenRows, after.hiddenRows); if (d.add.length) out.hideRows = d.add; if (d.drop.length) out.showRows = d.drop }
   if (after.hiddenCols) { const d = diff(before.hiddenCols, after.hiddenCols); if (d.add.length) out.hideCols = d.add; if (d.drop.length) out.showCols = d.drop }
+  // Stage 3: the filter and the linked sheets' sort are sent whole (null = none).
+  if ('filterArea' in after && JSON.stringify(after.filterArea ?? null) !== JSON.stringify(before.filterArea ?? null)) out.filterArea = after.filterArea ?? null
+  if ('filter' in after && JSON.stringify(after.filter ?? null) !== JSON.stringify(before.filter ?? null)) out.filter = after.filter ?? null
+  if ('sort' in after && JSON.stringify(after.sort ?? null) !== JSON.stringify(before.sort ?? null)) out.sort = after.sort ?? null
   return out
 }
 
@@ -258,6 +304,7 @@ export function mergeView(a: ViewWrite | undefined, b: ViewWrite | undefined): V
   if (r.show.length) out.showRows = r.show
   if (c.hide.length) out.hideCols = c.hide
   if (c.show.length) out.showCols = c.show
+  for (const k of ['filterArea', 'filter', 'sort'] as const) if (k in b) (out as Record<string, unknown>)[k] = b[k]; else if (k in a) (out as Record<string, unknown>)[k] = a[k]
   for (const k of Object.keys(out) as (keyof ViewWrite)[]) if (out[k] === undefined) delete out[k]
   return out
 }

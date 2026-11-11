@@ -28,7 +28,8 @@ import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
 import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
 import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatState } from './format/bus'
 import { FindPanel, PasteSpecialDialog, readClipboard } from './format/EditTools'
-import type { CellStyle } from '@/types/index'
+import { ManageRulesDialog, RuleDialog, SortDialog } from './format/StyleTools'
+import type { CellStyle, RuleKind } from '@/types/index'
 import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
 import { FormatCellsDialog } from './format/FormatCellsDialog'
 import { FormatSheet } from './format/FormatSheet'
@@ -212,6 +213,8 @@ export function Workbook(p: WorkbookProps) {
   painterRef.current = painter
   const [find, setFind] = useState<{ replace: boolean } | null>(null)
   const [pasteSpecial, setPasteSpecial] = useState(false)
+  // Stage 3: Sort, New rule, Manage rules.
+  const [styleDlg, setStyleDlg] = useState<{ k: 'sort' } | { k: 'rule'; kind?: RuleKind } | { k: 'rules' } | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [openThreads, setOpenThreads] = useState(0)
   // Format Painter: the next selection in the sheet takes the look (FR-040). Once, or until Esc after a double-click.
@@ -482,6 +485,8 @@ export function Workbook(p: WorkbookProps) {
       if (e.shiftKey && !e.altKey && k === 'v') { stop(); setPasteSpecial(true); return }
       if (!e.shiftKey && !e.altKey && (k === 'd' || k === 'r')) { stop(); sendFormat(target, { kind: 'fill', dir: k === 'd' ? 'down' : 'right' }); return }
       if (!e.shiftKey && !e.altKey && (k === 'f' || k === 'h')) { stop(); setFind({ replace: k === 'h' }); return }
+      // Stage 3: Filter on and off (FR-046).
+      if (e.shiftKey && !e.altKey && k === 'l') { stop(); sendFormat(target, { kind: 'filter', op: 'toggle' }); return }
     }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
       e.preventDefault(); e.stopPropagation()
@@ -587,7 +592,8 @@ export function Workbook(p: WorkbookProps) {
             sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles })
           }}
           onPasteSpecial={() => setPasteSpecial(true)}
-          onFind={replace => setFind({ replace })} />
+          onFind={replace => setFind({ replace })}
+          onRule={kind => setStyleDlg({ k: 'rule', kind })} onManageRules={() => setStyleDlg({ k: 'rules' })} onSortDialog={() => setStyleDlg({ k: 'sort' })} />
       )}
       {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 
@@ -645,8 +651,12 @@ export function Workbook(p: WorkbookProps) {
       )}
       {find && <FindPanel target={fmtTarget} replace={find.replace} onClose={() => setFind(null)} />}
       {pasteSpecial && <PasteSpecialDialog target={fmtTarget} say={say} onClose={() => setPasteSpecial(false)} />}
+      {styleDlg?.k === 'sort' && fmtState && <SortDialog state={fmtState} target={fmtTarget} onClose={() => setStyleDlg(null)} />}
+      {styleDlg?.k === 'rule' && fmtState && <RuleDialog state={fmtState} target={fmtTarget} start={styleDlg.kind} onClose={() => setStyleDlg(null)} />}
+      {styleDlg?.k === 'rules' && fmtState && <ManageRulesDialog state={fmtState} target={fmtTarget} onNew={() => setStyleDlg({ k: 'rule' })} onClose={() => setStyleDlg(null)} />}
       {formatCells && fmtState && <FormatCellsDialog state={fmtState} target={fmtTarget} onClose={() => setFormatCells(false)} />}
-      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} onFind={replace => setFind({ replace })} />}
+      {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} onFind={replace => setFind({ replace })}
+        onRule={() => setStyleDlg({ k: 'rule' })} onManageRules={() => setStyleDlg({ k: 'rules' })} onSortDialog={() => setStyleDlg({ k: 'sort' })} />}
 
       {tabMenu && <PopMenu at={tabMenu.at} items={tabMenu.items} label={tabMenu.label} returnTo={tabMenu.anchor} attr={tabMenu.attr} onClose={() => setTabMenu(null)} />}
 

@@ -40,7 +40,7 @@ export function useOutbox(api: SheetsApi, handlers: {
   const h = useRef(handlers)
   h.current = handlers
 
-  const count = () => { let n = 0; for (const c of queue.current.values()) n += (c.cells?.length ?? 0) + (c.insertRows?.length ?? 0) + (c.deleteRows?.length ?? 0) + (c.insertCols?.length ?? 0) + (c.deleteCols?.length ?? 0) + (c.rowHeights?.length ?? 0) + (c.colWidths?.length ?? 0) + (c.formats?.length ?? 0) + (c.merges?.add?.length ?? 0) + (c.merges?.remove?.length ?? 0) + (c.view ? 1 : 0); return n }
+  const count = () => { let n = 0; for (const c of queue.current.values()) n += (c.cells?.length ?? 0) + (c.insertRows?.length ?? 0) + (c.deleteRows?.length ?? 0) + (c.insertCols?.length ?? 0) + (c.deleteCols?.length ?? 0) + (c.rowHeights?.length ?? 0) + (c.colWidths?.length ?? 0) + (c.formats?.length ?? 0) + (c.merges?.add?.length ?? 0) + (c.merges?.remove?.length ?? 0) + (c.view ? 1 : 0) + (c.rules ? 1 : 0) + (c.tables ? 1 : 0) + (c.rowPositions?.length ? 1 : 0); return n }
 
   const flush = useCallback(async () => {
     window.clearTimeout(timer.current)

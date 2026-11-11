@@ -24,3 +24,17 @@
 | **§VI State Architecture** | Types first (`ViewWrite`, the new `FormatCmd` kinds). Hidden and frozen state is server state, with undo through the outbox. The painter, Find query and open dialogs are UI-only. |
 | **Tech Stack** | No new dependency. |
 | **Schema** | Additive only (`sheets.frozen_rows`, `frozen_cols`, `view`; `sheet_rows.hidden`, `sheet_cols.hidden`, all with defaults), applied with `scripts/migrate.sh`. No backfill. |
+
+
+# Constitution Check: spec 015 stage 3 (for the PR description)
+
+| Principle | How this PR meets it |
+|---|---|
+| **§I Design System Fidelity** | The Styles group, Sort & Filter menu, galleries, filter menu and dialogs use the existing `--sh-*` / `--fx-*` tokens and follow the Stage 3 boards in `design/sheet-formatting.html`. Cell, table, rule and bar colours are content, kept in `src/lib/sheet-rules.ts`, not UI tokens. The sheet lab's token check passes. |
+| **§II Workflow Pipeline Integrity** | Sort and filter on the Content and Video sheets live in `sheets.view` and work inside each group. They never change a task, a stage or the board's order (checked in the smoke test and on the running app). Tables are off there. |
+| **§III Role-Based Feature Access** | Rules, tables, sort and filter are refused on another member's protected sheet (`applySheetChanges`). On the Content and Video sheets they are open to every member, like formatting (FR-072), and never touch task data. |
+| **§IV Design-Driven Development** | The stage 3 tools were in the approved `design/sheet-formatting.html` before any UI code. |
+| **§V Cultural UX** | `sheets.format.st3.*` is in English and Arabic. Data bars and filter menus mirror in Arabic. The phone gets a Styles tab with 44 px targets. |
+| **§VI State Architecture** | Types first (`ConditionalRule`, `SheetTableRecord`, `ColFilter`, `SortKey`, `FilterArea`). Rules, tables, the filter and the linked sort are server state, with undo. Open menus and dialogs are UI-only. |
+| **Tech Stack** | No new dependency. |
+| **Schema** | Additive only: `sheet_rules` and `sheet_tables`, cascading from `sheets`. Applied with `scripts/migrate.sh`. No backfill. |
