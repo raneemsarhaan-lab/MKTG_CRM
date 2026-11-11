@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain (3 open: FR-006, FR-030, FR-044)
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Waiting on the three clarifications before `/speckit-plan`.
+- Clarified 2026-11-11 (Q1: any pipeline task; Q2: plain board tasks in the first stage; Q3: no automatic rows). Ready for `/speckit-plan`.
