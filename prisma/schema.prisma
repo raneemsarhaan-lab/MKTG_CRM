@@ -795,6 +795,11 @@ model Sheet {
   protected_by String?  @db.Uuid
   row_count    Int      @default(0)
   col_count    Int      @default(0)
+  /// Spec 015 stage 2: frozen panes, counted from the top and the start (blank sheets).
+  frozen_rows  Int      @default(0)
+  frozen_cols  Int      @default(0)
+  /// Spec 015: per-sheet view settings that aren't rows or columns (stage 3's filter).
+  view         Json     @default("{}")
   created_by   String?  @db.Uuid
   updated_by   String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
@@ -817,11 +822,13 @@ model Sheet {
 
 /// A blank sheet's row: a stable id and a sortable position (R3).
 model SheetRow {
-  id       String @id @db.Uuid
-  sheet_id String @db.Uuid
+  id       String  @id @db.Uuid
+  sheet_id String  @db.Uuid
   position Float
   /// 21–400 px; null = the default.
   height   Int?
+  /// Spec 015 stage 2: hidden with Hide rows; Unhide brings it back.
+  hidden   Boolean @default(false)
 
   sheet Sheet       @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
   cells SheetCell[]
@@ -832,11 +839,13 @@ model SheetRow {
 
 /// A blank sheet's column: a stable id and a sortable position (R3).
 model SheetCol {
-  id       String @id @db.Uuid
-  sheet_id String @db.Uuid
+  id       String  @id @db.Uuid
+  sheet_id String  @db.Uuid
   position Float
   /// 40–600 px; null = the default.
   width    Int?
+  /// Spec 015 stage 2: hidden with Hide columns.
+  hidden   Boolean @default(false)
 
   sheet Sheet       @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
   cells SheetCell[]

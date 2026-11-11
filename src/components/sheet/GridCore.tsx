@@ -146,6 +146,9 @@ export interface GridModel<R extends { key: string }> {
   cellSpan?(row: R, col: GridCol): { width: number; height: number } | 'covered' | null
   /** The cell has open comments: a corner marker; hovering it shows the thread. */
   marked?(row: R, col: GridCol): boolean
+  /** Spec 015 stage 2: Freeze Panes. The first N rows and columns stay in view while scrolling. */
+  frozenRows?: number
+  frozenCols?: number
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -780,7 +783,21 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     selectBlock({ r0: 0, c0: c, r1: m.rows.length - 1, c1: c })
   }
 
-  const visibleRows = m.rows.slice(first, last)
+  // Frozen panes (spec 015 stage 2): the first rows always render and stick under the
+  // headings; the first columns stick after the row numbers. Offsets add up the sizes before.
+  const F = Math.min(m.frozenRows ?? 0, m.rows.length)
+  const FC = Math.min(m.frozenCols ?? 0, m.cols.length)
+  const frozenTop: number[] = []
+  for (let i = 0, y = 26; i < F; i++) { frozenTop.push(y); y += heightOf(m.rows[i]) ?? ROW_H }
+  const frozenStart: number[] = []
+  for (let c = 0, x = m.rowNoWidth; c < FC; c++) { frozenStart.push(x); x += widthOf(m.cols[c]) }
+  const firstW = Math.max(first, F)
+  const items: ({ row: R; i: number } | { spacer: number; key: string })[] = []
+  for (let i = 0; i < F; i++) items.push({ row: m.rows[i], i })
+  if (windowed && tops && tops[firstW] - tops[F] > 0) items.push({ spacer: tops[firstW] - tops[F], key: 'sp-top' })
+  for (let i = firstW; i < last; i++) items.push({ row: m.rows[i], i })
+  const frozenCell = (c: number): React.CSSProperties | undefined =>
+    c >= 0 && c < FC ? { position: 'sticky', insetInlineStart: frozenStart[c], zIndex: 2 } : undefined
 
   return (
     <div
@@ -806,8 +823,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
           return (
             <div key={col} role="columnheader" aria-sort={h.sort} aria-label={h.label}
                  data-col-head={col}
+                 style={c < FC ? { position: 'sticky', insetInlineStart: frozenStart[c], zIndex: 5 } : undefined}
                  draggable={movable || undefined}
-                 className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}${dragCol === col ? ' is-dragging' : ''}${dropBefore === col && dragCol && dragCol !== col ? ' is-drop-before' : ''}${on ? ' is-sel-head' : ''}`}
+                 className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}${dragCol === col ? ' is-dragging' : ''}${dropBefore === col && dragCol && dragCol !== col ? ' is-drop-before' : ''}${on ? ' is-sel-head' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
                  onClick={e => headerClick(col, e)}
                  onContextMenu={m.contextMenu ? e => {
                    e.preventDefault()
@@ -838,9 +856,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
           )
         })}
       </div>
-      {windowed && tops && first > 0 && <div className="fx-sheet-spacer" aria-hidden="true" style={{ height: tops[first] }} />}
-      {visibleRows.map((row, vi) => {
-        const i = first + vi
+      {items.map(item => {
+        if ('spacer' in item) return <div key={item.key} className="fx-sheet-spacer" aria-hidden="true" style={{ height: item.spacer }} />
+        const { row, i } = item
         const rp = m.rowProps(row, i)
         const own = colsFor(row)
         const spans = own !== allCols && own.length < allCols.length
@@ -853,10 +871,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             aria-rowindex={i + 2}
             aria-level={rp.level}
             aria-expanded={rp.expanded}
-            className={`fx-sheet-tr ${rp.className}${active?.key === row.key ? ' is-active-row' : ''}${h ? ' is-tall' : ''}`}
+            className={`fx-sheet-tr ${rp.className}${active?.key === row.key ? ' is-active-row' : ''}${h ? ' is-tall' : ''}${i < F ? ' is-frozen-row' : ''}${i === F - 1 ? ' is-frozen-edge' : ''}`}
             data-row={row.key}
             data-task={rp.taskId}
-            style={h ? ({ ['--row-h' as string]: `${h}px` }) : undefined}
+            style={{ ...(h ? { ['--row-h' as string]: `${h}px` } : {}), ...(i < F ? { position: 'sticky', top: frozenTop[i], zIndex: 3 } : {}) }}
           >
             {own.map((col, ci) => {
               const key = cellKey(row.key, col)
@@ -871,6 +889,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const fx = !isNo && m.cellStyle ? m.cellStyle(row, col) : null
               const merge = !isNo && m.cellSpan ? m.cellSpan(row, col) : null
               const covered = merge === 'covered'
+              const freezeStyle = frozenCell(c)
               const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` }
                 : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2 }
                 : undefined
@@ -881,8 +900,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}`}
-                  style={fx ? { ...spanStyle, ...fx.cell } : spanStyle}
+                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
+                  style={fx || freezeStyle ? { ...spanStyle, ...fx?.cell, ...freezeStyle } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
                   data-col={col}

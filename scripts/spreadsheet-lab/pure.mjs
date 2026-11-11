@@ -228,6 +228,40 @@ export async function runPure(lab, root) {
     eq(h.excelSerialDate(46342), '2026-11-16', "Excel's date serial")
     eq(h.numFromExcel('Short Date'), { kind: 'date' }, "Excel's named Short Date")
   })
+  // ── spec 015 stage 2: editing tools ───────────────────────────────────────
+  await check('tools-find', () => {
+    const o = (matchCase, whole) => ({ matchCase, whole })
+    ok(h.matches('Q4 plan', 'q4', o(false, false)) && !h.matches('Q4 plan', 'q4', o(true, false)), 'match case')
+    ok(h.matches(' Q4 ', 'q4', o(false, true)) && !h.matches('Q4 plan', 'Q4', o(false, true)), 'whole cell')
+    eq(h.replaceIn('q4 and Q4', 'Q4', 'Q1', o(false, false)), 'Q1 and Q1', 'replace every match, any case')
+    eq(h.replaceIn('q4 and Q4', 'Q4', 'Q1', o(true, false)), 'q4 and Q1', 'replace with match case')
+    eq(h.replaceIn('Q4', 'q4', 'Q1 plan', o(false, true)), 'Q1 plan', 'whole cell replaces the cell')
+    eq(h.replaceIn('a.b', '.', '-', o(false, false)), 'a-b', 'the query is text, not a pattern')
+    const cells = [{ r: 0, c: 0, text: 'Q4' }, { r: 0, c: 2, text: 'x' }, { r: 2, c: 1, text: 'q4' }, { r: 1, c: 3, text: 'Q4 too' }]
+    eq(h.nextMatch(cells, null, 'q4', o(false, false)), 0, 'first match in reading order')
+    eq(cells[h.nextMatch(cells, { r: 0, c: 0 }, 'q4', o(false, false))], cells[3], 'next match after the cell')
+    eq(cells[h.nextMatch(cells, { r: 2, c: 1 }, 'q4', o(false, false))], cells[0], 'wraps round')
+    eq(cells[h.nextMatch(cells, { r: 1, c: 3 }, 'q4', o(false, false), -1)], cells[0], 'previous')
+    eq(h.nextMatch(cells, null, 'zzz', o(false, false)), -1, 'no match')
+  })
+  await check('tools-paste', () => {
+    eq(h.transpose([['a', 'b', 'c'], ['d']], ''), [['a', 'd'], ['b', ''], ['c', '']], 'transpose, ragged rows padded')
+    const p = h.paintPatch({ b: true, fill: '#FFC000' })
+    ok(p.b === true && p.fill === '#FFC000' && p.i === null && p.num === null && p.bt === null, 'Format Painter: the source’s fields, nulls for the rest')
+    eq(h.mergeStyle({ i: true, color: '#FF0000', bb: { w: 'thin', c: '#000000' } }, p), { b: true, fill: '#FFC000' }, 'painting replaces the look')
+    ok(Object.values(h.clearPatch()).every(v => v === null), 'Clear formats removes every field')
+  })
+  await check('view-batch', () => {
+    eq(h.viewWrite({ frozenRows: 0, hiddenRows: ['a'] }, { frozenRows: 1, hiddenRows: ['a', 'b'] }), { frozenRows: 1, hideRows: ['b'] }, 'a change as hide and freeze writes')
+    eq(h.viewWrite({ hiddenCols: ['x', 'y'] }, { hiddenCols: ['y'] }), { showCols: ['x'] }, 'unhide as a show')
+    eq(h.mergeView({ hideRows: ['a'], frozenRows: 1 }, { showRows: ['a'], frozenCols: 2 }), { frozenRows: 1, frozenCols: 2, showRows: ['a'] }, 'hidden then shown in one batch: shown; later frozen counts win')
+    const doc = { id: 's', updatedAt: '', rows: [], cols: [], cells: {} }
+    const ch = { kind: 'view', before: { frozenRows: 0, hiddenRows: [] }, after: { frozenRows: 2, hiddenRows: ['r1'] } }
+    eq(h.applyChange(doc, ch).extras.view.hiddenRows, ['r1'], 'applied to the document')
+    eq(h.applyChange(h.applyChange(doc, ch), h.invert(ch)).extras.view, { frozenRows: 0, frozenCols: 0, hiddenRows: [] }, 'undone')
+    eq(h.toServer([ch]).view, { frozenRows: 2, hideRows: ['r1'] }, 'saved as a view write')
+  })
+
   await check('fmt-undo', () => {
     const doc = { id: 's', updatedAt: '', rows: [], cols: [], cells: {} }
     const ch = { kind: 'formats', items: [{ rowKey: 'r1', colKey: '', before: null, after: { b: true } }, { rowKey: '', colKey: 'c1', before: { i: true }, after: null }] }

@@ -226,15 +226,21 @@ export async function loadSheet(id: string): Promise<{ success: true; doc: Sheet
 
 /** A sheet's formatting, merges and thread summaries (contracts/server.md "Loading"). */
 async function loadExtras(sheetId: string): Promise<SheetExtras> {
-  const [formats, merges, threads] = await Promise.all([
+  const [formats, merges, threads, sheet, hiddenRows, hiddenCols] = await Promise.all([
     prisma.sheetFormat.findMany({ where: { sheet_id: sheetId }, select: { row_key: true, col_key: true, style: true } }),
     prisma.sheetMerge.findMany({ where: { sheet_id: sheetId } }),
     threadSummaries(sheetId),
+    prisma.sheet.findUnique({ where: { id: sheetId }, select: { frozen_rows: true, frozen_cols: true } }),
+    prisma.sheetRow.findMany({ where: { sheet_id: sheetId, hidden: true }, select: { id: true } }),
+    prisma.sheetCol.findMany({ where: { sheet_id: sheetId, hidden: true }, select: { id: true } }),
   ])
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
-    view: { frozenRows: 0, frozenCols: 0 },
+    view: {
+      frozenRows: sheet?.frozen_rows ?? 0, frozenCols: sheet?.frozen_cols ?? 0,
+      hiddenRows: hiddenRows.map(r => r.id), hiddenCols: hiddenCols.map(c => c.id),
+    },
     threads,
   }
 }
@@ -413,6 +419,19 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       // Spec 015: formatting and merges, after the structure they refer to.
       if (changes.formats?.length) await writeFormats(tx, sheetId, m.id, changes.formats)
       if (changes.merges) await writeMerges(tx, sheetId, changes.merges)
+      // Stage 2: frozen panes and hidden rows and columns.
+      const v = changes.view
+      if (v) {
+        const ids = (x?: string[]) => (Array.isArray(x) ? x.filter(id => typeof id === 'string').slice(0, MAX_ROWS) : [])
+        if (ids(v.hideRows).length) await tx.sheetRow.updateMany({ where: { sheet_id: sheetId, id: { in: ids(v.hideRows) } }, data: { hidden: true } })
+        if (ids(v.showRows).length) await tx.sheetRow.updateMany({ where: { sheet_id: sheetId, id: { in: ids(v.showRows) } }, data: { hidden: false } })
+        if (ids(v.hideCols).length) await tx.sheetCol.updateMany({ where: { sheet_id: sheetId, id: { in: ids(v.hideCols) } }, data: { hidden: true } })
+        if (ids(v.showCols).length) await tx.sheetCol.updateMany({ where: { sheet_id: sheetId, id: { in: ids(v.showCols) } }, data: { hidden: false } })
+        const frozen: { frozen_rows?: number; frozen_cols?: number } = {}
+        if (typeof v.frozenRows === 'number') frozen.frozen_rows = Math.max(0, Math.min(rowCount, 100, Math.round(v.frozenRows)))
+        if (typeof v.frozenCols === 'number') frozen.frozen_cols = Math.max(0, Math.min(colCount, 26, Math.round(v.frozenCols)))
+        if (Object.keys(frozen).length) await tx.sheet.update({ where: { id: sheetId }, data: frozen })
+      }
 
       // Room for the next insert: renumber when two neighbours got too close.
       const positions: { rows?: { id: string; position: number }[]; cols?: { id: string; position: number }[] } = {}

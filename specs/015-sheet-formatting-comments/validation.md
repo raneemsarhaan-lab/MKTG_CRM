@@ -97,3 +97,102 @@ SC-003 (styles kept on paste): every styled cell in both clipboard fixtures kept
 - **Ctrl+1.** Chrome keeps Ctrl+1 (Cmd+1 on a Mac) for switching to the first browser tab, so a page never receives it there. Format Cells opens from the toolbar button and from "More number formats…". The other shortcuts (Ctrl+B, I, U, 5; Ctrl+Shift+$ % # !; Ctrl+Alt+M) work.
 - **Leaving before a save.** As in spec 013, leaving with changes still waiting asks first. The script waits for "Saved" before it moves on.
 - **UI scenarios.** Formatting and comments are checked on the running app above, not in the component labs. The labs bundle the grids without a server, and the sheet lab confirms they still work with no formatting context (150/150).
+
+
+---
+
+# Validation: spec 015 stage 2 (editing tools)
+
+Run on 2026-11-11 against a production build (`next build` + `next start`) and local PostgreSQL.
+
+## Labs and server checks
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npx next build` | builds |
+| `npm run lab:spreadsheet` (adds `tools-find`, `tools-paste`, `view-batch`) | 21/21 |
+| `scripts/spreadsheet-lab/smoke/run.ts` (adds `view` saves: hide, unhide, freeze clamps, protected refusal; `clearCellComments`) | all passed |
+| `npm run lab:sheet` | 150/150 |
+| `npm run lab:notify` | 46/46 |
+| `scripts/spreadsheet-lab/realapp/run.cjs` (spec 013) | 56/56 |
+| `scripts/spreadsheet-lab/realapp/perf-axe.cjs` (spec 013 speed and axe) | 18/18; arrow keys p95 34 ms on 5,000 rows with the new frozen-pane code |
+| `scripts/spreadsheet-lab/realapp/format.cjs` (stage 1) | 52/52 |
+
+## Running-app checks (US4)
+
+`node scripts/spreadsheet-lab/realapp/editing.cjs`: **50 passed, 0 failed.**
+
+```
+1. Format Painter (FR-040)
+  ✓ the painter is on and says so 
+  ✓ the target takes the look 
+  ✓ one use, then off 
+  ✓ undo in one step 
+  ✓ a double-click keeps it on 
+  ✓ Esc stops it 
+2. Paste Special (FR-041)
+  ✓ axe: Paste Special 
+  ✓ values only, transposed: no formatting 
+  ✓ formats only: the look without the value 
+  ✓ each one undoes in one step 
+3. Fill Down and Right (FR-043)
+  ✓ Ctrl+D copies the value and the look down 
+  ✓ undo puts every cell back 
+  ✓ Ctrl+R fills right 
+4. Clear (FR-042)
+  ✓ Clear formats keeps the value 
+  ✓ Clear contents keeps the look 
+  ✓ Clear comments removes the thread only 
+5. Find and Replace (FR-044)
+  ✓ axe: Find and Replace 
+  ✓ finds 4 matches, any case 1 of 4 · A1
+  ✓ steps to the next one, selecting it 
+  ✓ match case: 3 
+  ✓ whole cell: 1 
+  ✓ Replace all: 4 cells, one step 
+  ✓ undo puts all 4 back 
+6. Hide and unhide (FR-047)
+  ✓ the row is gone from view 
+  ✓ the next row is still numbered 3 
+  ✓ a marker shows where it is 
+  ✓ column B hidden: C follows A 
+  ✓ still hidden after a reload 
+  ✓ the markers unhide them 
+  ✓ undo hides it again 
+7. Freeze Panes on 5,000 rows (FR-047)
+  ✓ row 1 stays under the headings, far down the sheet 
+  ✓ column A stays at the start while scrolling sideways 
+  ✓ still frozen after a reload 
+  ✓ Unfreeze 
+8. The Content sheet (FR-075)
+  ✓ Find steps through task titles 1 of 10 · Suez Canal Report · Title
+  ✓ Replace all goes through each task’s own save; cells the member can’t edit are counted 0 replaced; 10 not changed (you can’t edit them)
+  ✓ the member’s titles are as they were 
+  ✓ an admin’s Replace all changes the titles 9 replaced; 1 not changed (you can’t edit them)
+  ✓ undo puts every title back 
+  ✓ Freeze and Hide are off here, and say why 
+9. Arabic and a phone
+  ✓ axe: Find and Replace in Arabic 
+  ✓ axe: Clear menu in Arabic 
+  ✓ phone: the Edit tab, 44 px targets 
+  ✓ phone: Find fits the screen 
+  ✓ axe: Find on a phone 
+10. Accessibility
+  ✓ axe: paste menu 
+  ✓ axe: fmt menu 
+  ✓ axe: fillDn menu 
+  ✓ axe: freeze menu 
+  ✓ no page errors 
+
+50 passed, 0 failed
+```
+
+## Notes
+
+- **Content and Video sheets.** Fill, Replace, Clear contents and Paste values go through each task's own save, as typing does. Cells the person can't edit are counted ("10 not changed (you can't edit them)") and nothing else changes. Hide and Freeze are off on these sheets, with the reason shown: their rows are the board's tasks, and the title column is already frozen.
+- **Comments only** in Paste Special is shown disabled, with its reason: comments don't travel on the clipboard.
+- **Clear Comments** removes your own comments; an admin's removes all. Others' comments are counted as skipped.
+- **Format Painter** applies the look to the next drag or click, as in Excel. A double-click keeps it on until Esc.
+- **Dev server timing.** On `next dev`, `run.cjs` (Ctrl+Z right after a linked paste) and `perf-axe.cjs` (arrow keys p95 211 ms) can fail because compiles are slow. Both pass on the production build above.
+- **Lab data.** Section 8 renames real task titles as an admin and undoes them. The script checks that undo puts every title back, and a backup comparison found 0 differences afterwards.

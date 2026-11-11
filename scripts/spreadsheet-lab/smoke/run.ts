@@ -160,6 +160,26 @@ async function main() {
   ok(sum.success && sum.doc.extras?.threads.some(x => x.id === tid && x.count === 1), 'loadSheet carries thread summaries (deleted comments not counted)')
   await prisma.notification.deleteMany({ where: { kind: { in: ['sheet_mention', 'sheet_reply'] }, created_at: { gte: started } } })
 
+  // Spec 015 stage 2: hidden rows and columns, frozen panes, Clear › Comments.
+  const v1 = await A.applySheetChanges(f.sheetId, { view: { hideRows: [rb.id], hideCols: [cb.id], frozenRows: 2, frozenCols: 1 } })
+  ok(v1.success, 'hide a row and a column, freeze 2 rows and 1 column')
+  let vv = await A.loadSheet(f.sheetId)
+  ok(vv.success && vv.doc.extras?.view.hiddenRows?.includes(rb.id) && vv.doc.extras?.view.hiddenCols?.includes(cb.id) && vv.doc.extras.view.frozenRows === 2 && vv.doc.extras.view.frozenCols === 1, 'the view comes back on load')
+  await A.applySheetChanges(f.sheetId, { view: { showRows: [rb.id], showCols: [cb.id], frozenRows: 9999, frozenCols: -3 } })
+  vv = await A.loadSheet(f.sheetId)
+  ok(vv.success && !vv.doc.extras?.view.hiddenRows?.length && vv.doc.extras?.view.frozenRows === 100 && vv.doc.extras.view.frozenCols === 0, 'unhide; frozen counts are kept in range')
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+  const vBlocked = await A.applySheetChanges(f.sheetId, { view: { hideRows: [rb.id] } })
+  ok(!vBlocked.success && vBlocked.error === 'protected', 'hiding on a protected sheet is refused for another member')
+  const theirs = await C.addComment(f.sheetId, { rowKey: rc.id, colKey: cc.id, body: 'Mine, not yours' })
+  process.env.SMOKE_MEMBER = 'content@forefront.consulting'
+  const mineToo = await C.addComment(f.sheetId, { rowKey: rc.id, colKey: cc.id, body: 'And this one is mine' })
+  const cl = await C.clearCellComments(f.sheetId, [`${rc.id}|${cc.id}`])
+  ok(theirs.success && mineToo.success && cl.success && cl.cleared === 1 && cl.skipped === 1, 'Clear › Comments: a member clears their own and leaves others')
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+  const cl2 = await C.clearCellComments(f.sheetId, [`${rc.id}|${cc.id}`])
+  ok(cl2.success && cl2.cleared === 1 && cl2.skipped === 0, 'an admin clears the rest')
+
   // Spec 015 on the Content sheet: any member, never a task change.
   const lc = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
   const task = await prisma.task.findFirst({ select: { id: true, updated_at: true, name: true } })

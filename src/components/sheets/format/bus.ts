@@ -40,15 +40,33 @@ export interface FormatState {
   merged: boolean
   /** More than one cell is selected. */
   multi: boolean
+  /** Stage 2: why Hide and Freeze are off here (the Content and Video sheets), or null. */
+  viewOff?: string | null
+  /** Stage 2: the sheet's frozen panes, for the Freeze menu's tick. */
+  frozen?: { rows: number; cols: number }
 }
 
 export type MergeMode = 'center' | 'across' | 'cells' | 'unmerge'
+export type ViewOp = 'hideRows' | 'hideCols' | 'unhideRows' | 'unhideCols' | 'freezeTop' | 'freezeFirst' | 'freezeHere' | 'unfreeze'
+export type ClearWhat = 'all' | 'formats' | 'contents' | 'comments'
+export interface FindQuery { query: string; matchCase: boolean; whole: boolean }
 export type FormatCmd =
   | { kind: 'patch'; patch: StylePatch; label: string }
   | { kind: 'borders'; preset: BorderPreset; line: BorderSide }
   | { kind: 'merge'; mode: MergeMode }
   | { kind: 'comment' }
+  // Stage 2: the editing tools (FR-040–FR-047).
+  | { kind: 'view'; op: ViewOp }
+  | { kind: 'resize'; what: 'row' | 'col' }
+  | { kind: 'paint'; style: CellStyle | null }
+  | { kind: 'clear'; what: ClearWhat }
+  | { kind: 'fill'; dir: 'down' | 'right' }
+  | { kind: 'pasteSpecial'; mode: 'all' | 'values' | 'formats'; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null }
+  | { kind: 'find'; q: FindQuery; dir: 1 | -1 }
+  | { kind: 'replace'; q: FindQuery; by: string; all: boolean }
 
+/** The toolbar started listening after a sheet announced itself: sheets announce again. */
+export const FORMAT_ASK = 'momentum:format-ask'
 export const announceFormat = (s: FormatState | { source: FormatSource; gone: true }) =>
   document.dispatchEvent(new CustomEvent(FORMAT_STATE, { detail: s }))
 export const sendFormat = (target: FormatSource, cmd: FormatCmd) =>
@@ -63,9 +81,17 @@ export function useFormatBridge(source: FormatSource, enabled: boolean, state: F
   const runRef = useRef(run)
   runRef.current = run
   const key = state ? JSON.stringify(state) : ''
+  const stateRef = useRef(state)
+  stateRef.current = state
   useEffect(() => {
     if (enabled && state) announceFormat(state)
   }, [enabled, key]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!enabled) return
+    const ask = () => { if (stateRef.current) announceFormat(stateRef.current) }
+    document.addEventListener(FORMAT_ASK, ask)
+    return () => document.removeEventListener(FORMAT_ASK, ask)
+  }, [enabled])
   useEffect(() => {
     if (!enabled) return
     const on = (e: Event) => {
@@ -109,3 +135,14 @@ export function useCommentBridge(source: FormatSource, enabled: boolean, onSelec
   }, [enabled, source])
   return marks
 }
+
+// ─── stage 2: find and replace, clearing comments ────────────────────────────
+
+/** The sheet's answer to Find or Replace: how many matches, which one is selected, how many changed. */
+export const FIND_RESULT = 'momentum:find-result'
+export interface FindResult { source: FormatSource; count: number; at: number; cell: string | null; replaced?: number; skipped?: number }
+export const announceFind = (r: FindResult) => document.dispatchEvent(new CustomEvent(FIND_RESULT, { detail: r }))
+/** Clear › Comments: the cells whose threads to clear, `rowKey|colKey`. */
+export const COMMENTS_CLEAR = 'momentum:comments-clear'
+export const clearComments = (source: FormatSource, keys: string[]) =>
+  document.dispatchEvent(new CustomEvent(COMMENTS_CLEAR, { detail: { source, keys } }))

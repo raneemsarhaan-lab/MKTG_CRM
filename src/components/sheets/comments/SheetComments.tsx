@@ -17,8 +17,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { SheetCommentThread } from '@/types/index'
-import { addComment, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
-import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, selectCell, type FormatSource, type FormatState } from '../format/bus'
+import { addComment, clearCellComments, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
+import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, selectCell, type FormatSource, type FormatState } from '../format/bus'
 import { relativeTime } from '@/lib/notify/message'
 
 const AVATAR = ['#DB2777', '#2563EB', '#0E7C7C', '#B45309', '#7C3AED', '#15803D', '#C81E3A', '#4B5563']
@@ -27,7 +27,7 @@ const net = { success: false as const, error: 'network' }
 const safe = <A extends unknown[], R>(fn: (...a: A) => Promise<R>) => (...a: A) => fn(...a).catch(() => net)
 const api = {
   list: safe(listThreads), add: safe(addComment), reply: safe(replyComment), edit: safe(editComment),
-  del: safe(deleteComment), resolve: safe(resolveThread), reopen: safe(reopenThread),
+  del: safe(deleteComment), resolve: safe(resolveThread), reopen: safe(reopenThread), clear: safe(clearCellComments),
 }
 const keyOf = (t: { rowKey: string; colKey: string }) => `${t.rowKey}|${t.colKey}`
 
@@ -111,6 +111,22 @@ export function SheetComments(p: SheetCommentsProps) {
     document.addEventListener(COMMENT_NEW, on)
     return () => document.removeEventListener(COMMENT_NEW, on)
   }, [])
+
+  // Clear › Comments (stage 2): the threads on the selected cells.
+  useEffect(() => {
+    const on = async (e: Event) => {
+      const d = (e as CustomEvent<{ source: FormatSource; keys: string[] }>).detail
+      const cur = ref.current
+      if (d.source !== cur.source || !cur.sheetRef || !d.keys.length) return
+      const r = await api.clear(cur.sheetRef, d.keys)
+      if (!r.success) { cur.say(errText(r.error)); return }
+      if (r.skipped) cur.say(t('clearSkipped', { n: r.skipped }))
+      setOpen(null)
+      void load()
+    }
+    document.addEventListener(COMMENTS_CLEAR, on)
+    return () => document.removeEventListener(COMMENTS_CLEAR, on)
+  }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hovering a corner marker shows its thread.
   useEffect(() => {
