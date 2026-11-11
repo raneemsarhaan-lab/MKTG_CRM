@@ -13,7 +13,8 @@
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, Member, Task, TaskAttachment } from '@/types/index'
 import { GridCore, type ActiveCell, type GridCol, type GridModel } from '@/components/sheet/GridCore'
-import { StatusContent } from '@/components/sheet/StatusCell'
+import { StatusContent, useStageNames } from '@/components/sheet/StatusCell'
+import type { StageId } from '@/types/index'
 import { EditorContent } from '@/components/sheet/EditorCell'
 import { siteName } from '@/lib/content-plan'
 import type { ContentRow } from './rows'
@@ -21,6 +22,7 @@ import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
+import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
 import { useRef } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
@@ -90,6 +92,7 @@ export interface ContentGridProps {
 export function ContentGrid(p: ContentGridProps) {
   const t = useTranslations('content')
   const ts = useTranslations('sheet')
+  const stageNames = useStageNames('content')
   const byId = new Map(p.members.map(m => [m.id, m]))
   const taskOf = (row: ContentRow): Task | null => (row.kind === 'piece' || row.kind === 'clip' ? row.task : null)
 
@@ -294,7 +297,31 @@ export function ContentGrid(p: ContentGridProps) {
 
   // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
   // Spec 015: formatting by task and column; undo through the sheet's own stack.
-  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
+  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; record(label: string, changes: import('@/lib/sheet-undo').LinkedChange[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
+  // Stage 3: the sheet's sort and filter (inside each group) and its rules; the grid shows the arranged rows.
+  // They read what a cell shows: its text, or a pill's label.
+  const shownText = (row: ContentRow, col: GridCol) => {
+    const task = taskOf(row)
+    if (task && !isCustom(col)) {
+      switch (col) {
+        case 'status': return stageNames.video(task.status as StageId)
+        case 'assignee': return task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''
+        case 'type': return task.content_type_label ?? ''
+        case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find(x => x.id === task.pillar_id)?.name ?? '' : ''
+        case 'doc': case 'design': case 'post': case 'published': return pieceLink(task, col) ?? ''
+        case 'date': return task.status === 'publish' ? task.stage_date ?? '' : task.due_date ?? ''
+      }
+    }
+    return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())
+  }
+  const lv = useLinkedView<ContentRow>({
+    enabled: !!p.linked, sheetKey: 'linked_content', rows: p.rows,
+    kind: row => (row.kind === 'piece' ? 'item' : row.kind === 'clip' ? 'child' : 'fixed'),
+    taskOf: row => taskOf(row)?.id ?? null, textValue: shownText, say: text => p.linked?.say(text),
+  })
+  const rows = lv.rows
+  model.rows = rows
+  const colName = (col: GridCol) => { const h = model.header(col); return h.label ?? (typeof h.text === 'string' ? h.text : col) }
   const cellName = (row: ContentRow, col: GridCol) => {
     if (col === 'rowNo') return ''
     const h = model.header(col)
@@ -303,26 +330,29 @@ export function ContentGrid(p: ContentGridProps) {
     return task ? `${task.name} · ${colName}` : colName
   }
   const lf = useLinkedFormats<ContentRow>({
-    enabled: !!p.linked, sheetKey: 'linked_content', rows: p.rows, cols: model.cols, active: p.active,
+    enabled: !!p.linked, sheetKey: 'linked_content', rows, cols: model.cols, active: p.active,
+    store: lv.store, ruleLooks: lv.ruleLooks, colName, shownText, rawRows: p.rows, isItem: row => row.kind === 'piece',
+    record: (label, changes) => leRef.current?.record(label, changes),
     taskOf: row => taskOf(row)?.id ?? null, cellName, textValue: model.textValue,
     recordFormats: (label, items) => leRef.current?.recordFormats(label, items),
     writeCells: (w, why) => leRef.current?.writeCells(w, why) ?? Promise.resolve(null),
     say: text => p.linked?.say(text),
     select: (taskId, col) => {
-      const row = p.rows.find(r => taskOf(r)?.id === taskId)
+      const row = rows.find(r => taskOf(r)?.id === taskId)
       if (row) { p.setActive({ key: row.key, col }); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cell="${row.key}|${col}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })) }
     },
   })
   const le = useLinkedEditing<ContentRow>({
     applyFormats: lf.applyFormats,
-    rows: p.rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: p.onCommit,
+    applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
+    rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: p.onCommit,
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
     onSkipped: p.onSkipped,
     drop: p.linked?.drop, restore: p.linked?.restore,
   })
   const lm = useLinkedMenu<ContentRow>({
-    rows: p.rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'archive',
+    rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'archive',
     taskOf,
     canRemove: row => row.kind === 'piece' && !row.task.dropped_at && p.canEdit(row.task),
     insertRow: row => p.linked?.insertRow(row) ?? false,
@@ -332,7 +362,7 @@ export function ContentGrid(p: ContentGridProps) {
   })
   leRef.current = le
   Object.assign(model, {
-    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked,
+    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
@@ -343,6 +373,7 @@ export function ContentGrid(p: ContentGridProps) {
     <GridCore model={model} active={p.active} setActive={p.setActive}
               editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote} />
     {lm.node}
+    {lf.node}
     </>
   )
 }

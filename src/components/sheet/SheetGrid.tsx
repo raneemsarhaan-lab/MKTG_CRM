@@ -10,13 +10,15 @@ import type { Member, SheetColumn, Task } from '@/types/index'
 import { COLUMN_WIDTHS, ROW_NO_WIDTH } from './columns'
 import type { SheetRow } from './rows'
 import { clipLength, formatClipTime } from './time'
-import { StatusContent } from './StatusCell'
+import { StatusContent, useStageNames } from './StatusCell'
+import type { StageId } from '@/types/index'
 import { EditorContent } from './EditorCell'
 import { FilesContent, type FilesCellState } from './FilesCell'
 import { PublishedContent } from './PublishedCell'
 import { GridCore, type GridModel, type GridCol, type ActiveCell } from './GridCore'
 import type { SheetColumnsHook } from './useSheetColumns'
 import { useLinkedEditing } from './useLinkedEditing'
+import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useLinkedFormats } from './useLinkedFormats'
 import { useRef } from 'react'
 import { useLinkedMenu } from './useLinkedMenu'
@@ -74,6 +76,7 @@ export interface SheetGridProps {
 
 export function SheetGrid(p: SheetGridProps) {
   const t = useTranslations('sheet')
+  const stageNames = useStageNames('sheet')
   const membersById = new Map(p.members.map(m => [m.id, m]))
   const rowTask = (row: SheetRow): Task | null => (row.kind === 'clip' || row.kind === 'video' ? row.task : null)
 
@@ -229,7 +232,29 @@ export function SheetGrid(p: SheetGridProps) {
 
   // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
   // Spec 015: formatting by task and column; undo through the sheet's own stack.
-  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
+  const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; record(label: string, changes: import('@/lib/sheet-undo').LinkedChange[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
+  // Stage 3: the sheet's sort and filter (inside each group) and its rules; the grid shows the arranged rows.
+  // They read what a cell shows: its text, or a pill's label.
+  const shownText = (row: SheetRow, col: GridCol) => {
+    const task = rowTask(row)
+    if (task && !cl.custom.is(col)) {
+      switch (col) {
+        case 'status': return stageNames.video(task.status as StageId)
+        case 'editor': return task.assignee_id ? membersById.get(task.assignee_id)?.name ?? '' : ''
+        case 'type': return task.content_type_label ?? ''
+        case 'length': return formatClipTime(clipLength(task.clip?.in_ms, task.clip?.out_ms))
+      }
+    }
+    return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())
+  }
+  const lv = useLinkedView<SheetRow>({
+    enabled: !!p.linked, sheetKey: 'linked_video', rows: p.rows,
+    kind: row => (row.kind === 'video' ? 'item' : 'child'),
+    taskOf: row => rowTask(row)?.id ?? null, textValue: shownText, say: text => p.linked?.say(text),
+  })
+  const rows = lv.rows
+  model.rows = rows
+  const colName = (col: GridCol) => { const h = model.header(col); return h.label ?? (typeof h.text === 'string' ? h.text : col) }
   const cellName = (row: SheetRow, col: GridCol) => {
     if (col === 'rowNo') return ''
     const h = model.header(col)
@@ -238,26 +263,29 @@ export function SheetGrid(p: SheetGridProps) {
     return task ? `${task.name} · ${colName}` : colName
   }
   const lf = useLinkedFormats<SheetRow>({
-    enabled: !!p.linked, sheetKey: 'linked_video', rows: p.rows, cols: model.cols, active: p.active,
+    enabled: !!p.linked, sheetKey: 'linked_video', rows, cols: model.cols, active: p.active,
+    store: lv.store, ruleLooks: lv.ruleLooks, colName, shownText, rawRows: p.rows, isItem: row => row.kind === 'video',
+    record: (label, changes) => leRef.current?.record(label, changes),
     taskOf: row => rowTask(row)?.id ?? null, cellName, textValue: model.textValue,
     recordFormats: (label, items) => leRef.current?.recordFormats(label, items),
     writeCells: (w, why) => leRef.current?.writeCells(w, why) ?? Promise.resolve(null),
     say: text => p.linked?.say(text),
     select: (taskId, col) => {
-      const row = p.rows.find(r => rowTask(r)?.id === taskId)
+      const row = rows.find(r => rowTask(r)?.id === taskId)
       if (row) { p.setActive({ key: row.key, col }); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-cell="${row.key}|${col}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })) }
     },
   })
   const le = useLinkedEditing<SheetRow>({
     applyFormats: lf.applyFormats,
-    rows: p.rows, cols: model.cols, isText, textValue: model.textValue, commit: p.onCommit,
+    applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
+    rows, cols: model.cols, isText, textValue: model.textValue, commit: p.onCommit,
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'clip' || row.kind === 'video',
     onSkipped: p.onSkipped,
     drop: p.linked?.drop, restore: p.linked?.restore,
   })
   const lm = useLinkedMenu<SheetRow>({
-    rows: p.rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'drop',
+    rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'drop',
     taskOf: rowTask,
     canRemove: row => row.kind === 'clip' && !row.task.dropped_at && p.canEdit(row.task),
     insertRow: row => p.linked?.insertRow(row) ?? false,
@@ -267,7 +295,7 @@ export function SheetGrid(p: SheetGridProps) {
   })
   leRef.current = le
   Object.assign(model, {
-    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked,
+    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
@@ -284,6 +312,7 @@ export function SheetGrid(p: SheetGridProps) {
       onNote={p.onNote}
     />
     {lm.node}
+    {lf.node}
     </>
   )
 }

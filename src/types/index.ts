@@ -437,6 +437,11 @@ export interface SheetChanges {
   merges?: { add?: SheetMergeRecord[]; remove?: string[] }
   /** Spec 015 stage 2: frozen panes and hidden rows and columns. */
   view?: ViewWrite
+  /** Stage 3: conditional formatting rules put (whole records) or removed; tables likewise (blank sheets only). */
+  rules?: { put?: ConditionalRule[]; remove?: string[] }
+  tables?: { put?: SheetTableRecord[]; remove?: string[] }
+  /** Stage 3: Sort moves rows by rewriting their positions. */
+  rowPositions?: { id: string; position: number }[]
 }
 export interface ViewWrite {
   frozenRows?: number
@@ -445,6 +450,10 @@ export interface ViewWrite {
   showRows?: string[]
   hideCols?: string[]
   showCols?: string[]
+  /** Stage 3: null removes them. */
+  filterArea?: FilterArea | null
+  filter?: Record<string, ColFilter> | null
+  sort?: SortKey[] | null
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─
@@ -521,17 +530,71 @@ export interface SheetThreadSummary { id: string; rowKey: string; colKey: string
 export interface SheetView {
   frozenRows: number
   frozenCols: number
-  filter?: Record<string, { values?: string[]; color?: string; condition?: { op: string; value: string } }>
-  sort?: { colKey: string; dir: 'asc' | 'desc' }[]
+  /** Stage 3: the filter buttons' area (blank sheets: a header row and columns; linked sheets: every column). */
+  filterArea?: FilterArea | null
+  /** Stage 3: what each filtered column keeps, by column key. */
+  filter?: Record<string, ColFilter>
+  /** Stage 3, linked sheets only: the sort applied within each group (blank sheets move the rows instead). */
+  sort?: SortKey[]
   hiddenRows?: string[]
   hiddenCols?: string[]
 }
+
+// ─── Spec 015 stage 3: sort, filter, tables, conditional formatting ─────────
+
+/** Where the filter buttons are: the header row (blank sheets) and the columns; rows below it are filtered. */
+export interface FilterArea { header: string | null; cols: string[]; last?: string | null }
+export type FilterOp = 'contains' | 'notContains' | 'begins' | 'ends' | 'eq' | 'neq' | 'gt' | 'lt' | 'between' | 'before' | 'after' | 'blank' | 'notBlank'
+/** A column's filter: ticked values, a fill or text colour, or a condition. Every part set must match. */
+export interface ColFilter {
+  values?: string[]
+  /** '#RRGGBB' the cell's fill (or text colour, with `on: 'color'`) must be; '' = no fill. */
+  color?: string
+  on?: 'fill' | 'color'
+  cond?: { op: FilterOp; a?: string; b?: string }
+}
+export interface SortKey {
+  col: string
+  dir: 'asc' | 'desc'
+  /** Sort on the values (default), or put cells with this fill / text colour first. */
+  on?: 'value' | 'fill' | 'color'
+  color?: string
+}
+export const RULE_KINDS = ['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup', 'unique', 'top', 'bottom', 'bar', 'scale'] as const
+export type RuleKind = typeof RULE_KINDS[number]
+export interface RuleArgs {
+  /** The value (gt, lt, eq, contains) or the low end (between). */
+  a?: string
+  /** The high end (between). */
+  b?: string
+  /** date: which dates match. */
+  when?: 'past' | 'today' | 'future' | 'yesterday' | 'tomorrow' | 'last7' | 'next7'
+  /** top, bottom: how many, or what percent with `percent`. */
+  n?: number
+  percent?: boolean
+  /** bar: the bar's colour; scale: low, middle, high colours (middle may be ''). */
+  colors?: string[]
+}
+export interface ConditionalRule {
+  id: string
+  /** Blank sheets: row and column ids; linked sheets: 'all' rows and column keys. */
+  range: { rows: string[] | 'all'; cols: string[] }
+  kind: RuleKind
+  args: RuleArgs
+  /** The look for highlight and top/bottom rules; bars and scales have none. */
+  style: CellStyle | null
+  priority: number
+}
+export interface SheetTableRecord { id: string; top: string; left: string; bottom: string; right: string; style: string; header: boolean; banded: boolean }
 /** Formatting, merges, view and thread summaries for one sheet (blank or linked). */
 export interface SheetExtras {
   formats: SheetFormatRecord[]
   merges: SheetMergeRecord[]
   view: SheetView
   threads: SheetThreadSummary[]
+  /** Stage 3. */
+  rules?: ConditionalRule[]
+  tables?: SheetTableRecord[]
 }
 /** A format write: `set` replaces the record's style, `merge` lays the fields over it; null clears it. */
 export interface FormatWrite { rowKey: string; colKey: string; style: CellStyle | null; mode: 'set' | 'merge' }

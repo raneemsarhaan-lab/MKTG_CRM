@@ -9,7 +9,7 @@
  * merges and view settings. A whole column or Ctrl+A is one record, so one
  * step however many cells it covers.
  */
-import type { CellStyle, SheetMergeRecord, SheetView } from '@/types/index'
+import type { CellStyle, ConditionalRule, SheetMergeRecord, SheetTableRecord, SheetView } from '@/types/index'
 
 /** Formatting, on any sheet: rowKey and colKey as in sheet_formats ('' = every). */
 export type FormatsChange = { kind: 'formats'; items: { rowKey: string; colKey: string; before: CellStyle | null; after: CellStyle | null }[] }
@@ -17,6 +17,12 @@ export type FormatsChange = { kind: 'formats'; items: { rowKey: string; colKey: 
 export type MergesChange = { kind: 'merges'; add: SheetMergeRecord[]; remove: SheetMergeRecord[] }
 /** Frozen panes, hidden rows and columns, the filter (stage 2–3). */
 export type ViewChange = { kind: 'view'; before: Partial<SheetView>; after: Partial<SheetView> }
+/** Stage 3: the sheet's conditional formatting rules, the whole list before and after (any sheet). */
+export type RulesChange = { kind: 'rules'; before: ConditionalRule[]; after: ConditionalRule[] }
+/** Stage 3: Format as Table and Convert to range, the whole list before and after (blank sheets). */
+export type TablesChange = { kind: 'tables'; before: SheetTableRecord[]; after: SheetTableRecord[] }
+/** Stage 3: Sort moves rows by changing their positions (blank sheets). */
+export type RowOrderChange = { kind: 'rowOrder'; rows: { id: string; before: number; after: number }[] }
 
 /** A blank sheet's change, with enough to reverse it. */
 export type BlankChange =
@@ -30,6 +36,9 @@ export type BlankChange =
   | FormatsChange
   | MergesChange
   | ViewChange
+  | RulesChange
+  | TablesChange
+  | RowOrderChange
 
 /** A linked sheet's change: task fields and team columns, before and after. */
 export type LinkedChange =
@@ -38,6 +47,7 @@ export type LinkedChange =
   | { kind: 'restoreRows'; taskIds: string[] }
   | FormatsChange
   | ViewChange
+  | RulesChange
 
 export type Change = BlankChange | LinkedChange
 
@@ -57,6 +67,9 @@ export function invert(ch: Change): Change {
     case 'formats': return { kind: 'formats', items: ch.items.map(x => ({ ...x, before: x.after, after: x.before })) }
     case 'merges': return { kind: 'merges', add: ch.remove, remove: ch.add }
     case 'view': return { kind: 'view', before: ch.after, after: ch.before }
+    case 'rules': return { kind: 'rules', before: ch.after, after: ch.before }
+    case 'tables': return { kind: 'tables', before: ch.after, after: ch.before }
+    case 'rowOrder': return { kind: 'rowOrder', rows: ch.rows.map(x => ({ id: x.id, before: x.after, after: x.before })) }
   }
 }
 

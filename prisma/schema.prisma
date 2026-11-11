@@ -815,6 +815,8 @@ model Sheet {
   formats   SheetFormat[]
   merges    SheetMerge[]
   comments  SheetComment[]
+  rules     SheetRule[]
+  tables    SheetTable[]
 
   @@index([folder_id, position])
   @@map("sheets")
@@ -906,6 +908,43 @@ model SheetMerge {
 
   @@index([sheet_id])
   @@map("sheet_merges")
+}
+
+/// Spec 015 stage 3 (R8): conditional formatting. `range` is { rows: rowKey[] | 'all', cols: colKey[] };
+/// `kind` is gt · lt · between · eq · contains · date · dup · unique · top · bottom · bar · scale.
+/// Priority 0 is applied first; the first rule that sets a property wins.
+model SheetRule {
+  id       String @id @db.Uuid
+  sheet_id String @db.Uuid
+  range    Json
+  kind     String
+  args     Json   @default("{}")
+  style    Json?
+  priority Int    @default(0)
+
+  sheet Sheet @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+
+  @@index([sheet_id])
+  @@map("sheet_rules")
+}
+
+/// Spec 015 stage 3 (R8): Format as Table on a blank sheet, by the row and column ids at its corners.
+/// The header and banding are drawn at render, not stored per cell.
+model SheetTable {
+  id         String  @id @db.Uuid
+  sheet_id   String  @db.Uuid
+  top_row    String  @db.Uuid
+  bottom_row String  @db.Uuid
+  left_col   String  @db.Uuid
+  right_col  String  @db.Uuid
+  style      String
+  header     Boolean @default(true)
+  banded     Boolean @default(true)
+
+  sheet Sheet @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+
+  @@index([sheet_id])
+  @@map("sheet_tables")
 }
 
 /// Spec 015 R5: threaded comments on a cell. A thread is its first comment

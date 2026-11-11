@@ -10,13 +10,15 @@
  */
 import { useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { BorderSide, CellStyle, NumberFormat } from '@/types/index'
+import type { BorderSide, CellStyle, NumberFormat, RuleKind } from '@/types/index'
 import { CURRENCIES } from '@/types/index'
 import { DEFAULT_FONT, DEFAULT_SIZE, FONTS, FONT_SIZES, bumpDecimals, display, type BorderPreset, type StylePatch } from '@/lib/sheet-format'
 import { PopMenu, type PopItem } from '../PopMenu'
 import { askComment, sendFormat, type ClearWhat, type FormatSource, type FormatState, type MergeMode, type ViewOp } from './bus'
 import { ColorPicker } from './ColorPicker'
 import { BorderPicker } from './BorderPicker'
+import { CellStylesMenu, TableMenu } from './StyleTools'
+import { DEFAULT_BAR, DEFAULT_SCALE } from '@/lib/sheet-rules'
 
 const P: Record<string, ReactNode> = {
   left: <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />, center: <path d="M4 6h16M7 10h10M4 14h16M7 18h10" />, right: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" />,
@@ -35,6 +37,10 @@ const P: Record<string, ReactNode> = {
   fillDn: <><path d="M12 4v14M7 13l5 5 5-5" /><path d="M5 21h14" /></>,
   find: <><circle cx="10" cy="10" r="6" /><path d="M15 15l5 5" /></>,
   freeze: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 9h18M8 4v16" strokeWidth="2.6" /></>,
+  styles: <><rect x="3" y="5" width="8" height="6" rx="1" /><rect x="13" y="5" width="8" height="6" rx="1" /><rect x="3" y="13" width="8" height="6" rx="1" /><rect x="13" y="13" width="8" height="6" rx="1" /></>,
+  table: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 9h18M3 14h18M10 4v16" /></>,
+  cond: <><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M6 8h4v8H6zM12 11h6M12 15h4" /></>,
+  sort: <path d="M7 4v16M4 17l3 3 3-3M14 6h7M14 11h5M14 16h3" />,
 }
 const Icon = ({ k }: { k: string }) => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[k]}</svg>
@@ -83,9 +89,9 @@ export function useFormatActions(target: FormatSource, state: FormatState | null
   }
 }
 
-type Open = { k: 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merge' | 'num' | 'cur' | 'paste' | 'fmt' | 'clear' | 'fillDn' | 'find' | 'freeze'; el: HTMLElement } | null
+type Open = { k: 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merge' | 'num' | 'cur' | 'paste' | 'fmt' | 'clear' | 'fillDn' | 'find' | 'freeze' | 'cellStyles' | 'table' | 'cond' | 'sort'; el: HTMLElement } | null
 
-export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind }: {
+export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog }: {
   state: FormatState | null
   target: FormatSource
   onFormatCells(): void
@@ -95,6 +101,10 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   onPaste(mode: 'all' | 'values' | 'formats'): void
   onPasteSpecial(): void
   onFind(replace: boolean): void
+  /** Stage 3: New rule (a kind picked from the menu), Manage rules, Custom sort. */
+  onRule(kind?: RuleKind): void
+  onManageRules(): void
+  onSortDialog(): void
 }) {
   const t = useTranslations('sheets.format')
   const tc = useTranslations('sheets.comments')
@@ -185,6 +195,35 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       vItem('freezeHere', 'freezeHere', (fz.rows > 1 || fz.cols > 1) || (fz.rows === 1 && fz.cols === 1)), vItem('unfreeze', 'unfreeze'),
     ] }
   }
+  // Stage 3 menus (FR-032, FR-045, FR-046).
+  const s3 = (k: string, v?: Record<string, string | number>) => t(`st3.${k}`, v)
+  const head = (key: string, text: string): PopItem => ({ kind: 'node', key, node: <div role="presentation" className="fx-st-h">{text}</div> })
+  if (open?.k === 'cond') menu = { label: t('ctl.cond'), attr: 'data-cond-menu', items: [
+    head('hHi', s3('highlight')),
+    ...(['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup'] as RuleKind[]).map(k => ({ key: k, label: `${s3(`kinds.${k}`)}…`, onSelect: () => onRule(k) })),
+    head('hTop', s3('topBottom')),
+    ...(['top', 'bottom'] as RuleKind[]).map(k => ({ key: k, label: `${s3(`kinds.${k}`)}…`, onSelect: () => onRule(k) })),
+    { kind: 'sep', key: 's1' },
+    { key: 'bar', label: s3('kinds.bar'), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'bar', args: { colors: [DEFAULT_BAR] }, style: null } }) },
+    { key: 'scale', label: s3('kinds.scale'), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'scale', args: { colors: DEFAULT_SCALE }, style: null } }) },
+    { kind: 'sep', key: 's2' },
+    { key: 'new', label: `${s3('newRule')}…`, onSelect: () => onRule() },
+    { key: 'clearSel', label: s3('clearSel'), onSelect: cmd({ kind: 'rulesClear', where: 'selection' }) },
+    { key: 'clearAll', label: s3('clearAll'), disabled: !state?.rules?.length, onSelect: cmd({ kind: 'rulesClear', where: 'sheet' }) },
+    { key: 'manage', label: `${s3('manage')}…`, onSelect: onManageRules },
+  ] }
+  if (open?.k === 'sort') {
+    const fl = state?.filter ?? { on: false, cols: 0 }
+    const col = state?.colKey ?? ''
+    menu = { label: t('ctl.sort'), attr: 'data-sort-menu', items: [
+      { key: 'az', label: s3('sortAZ'), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'asc' }], header: null }) },
+      { key: 'za', label: s3('sortZA'), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'desc' }], header: null }) },
+      { key: 'custom', label: `${s3('customSort')}…`, onSelect: onSortDialog },
+      { kind: 'sep', key: 's' },
+      { key: 'filter', label: s3('filter'), kbd: keyName('Ctrl+Shift+L'), checked: fl.on, onSelect: cmd({ kind: 'filter', op: 'toggle' }) },
+      { key: 'clearFilter', label: s3('clearFilter'), disabled: !fl.cols, onSelect: cmd({ kind: 'filter', op: 'clear' }) },
+    ] }
+  }
   if (open?.k === 'cur') menu = { label: t('ctl.currency'), attr: 'data-cur-menu', items: CURRENCIES.map(c => ({ key: c, label: t(`cur.${c}`), checked: st.num?.cur === c && st.num.kind === 'currency', onSelect: () => a.num({ kind: 'currency', cur: c, dp: st.num?.dp ?? 2 }) })) }
 
   return (
@@ -228,12 +267,18 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         {btn('decDn', t('ctl.decDown'), <span className="fx-fmt-dec">.00<small>→.0</small></span>, () => a.decimals(-1))}
         {btn('fmtCells', t('ctl.formatCells'), <Icon k="fmtCells" />, () => onFormatCells(), { kbd: 'Ctrl+1' })}
       </div>
+      <div className="fx-fmt-g" role="group" aria-label={t('groups.styles')}>
+        {btn('cellStyles', t('ctl.cellStyles'), <Icon k="styles" />, ev => toggleOpen('cellStyles', ev.currentTarget), { menu: 'cellStyles' })}
+        {btn('table', t('ctl.table'), <Icon k="table" />, ev => toggleOpen('table', ev.currentTarget), { menu: 'table' })}
+        {btn('cond', t('ctl.cond'), <Icon k="cond" />, ev => toggleOpen('cond', ev.currentTarget), { menu: 'cond' })}
+      </div>
       <div className="fx-fmt-g" role="group" aria-label={t('groups.cells')}>
         {btn('fmt', t('ctl.format'), <Icon k="fmt" />, ev => toggleOpen('fmt', ev.currentTarget), { menu: 'fmt' })}
       </div>
       <div className="fx-fmt-g" role="group" aria-label={t('groups.editing')}>
         {btn('clear', t('ctl.clear'), <Icon k="clear" />, ev => toggleOpen('clear', ev.currentTarget), { menu: 'clear' })}
         {btn('fillDn', t('ctl.fillDown'), <Icon k="fillDn" />, ev => toggleOpen('fillDn', ev.currentTarget), { menu: 'fillDn' })}
+        {btn('sort', t('ctl.sort'), <Icon k="sort" />, ev => toggleOpen('sort', ev.currentTarget), { menu: 'sort' })}
         {btn('find', t('ctl.find'), <Icon k="find" />, ev => toggleOpen('find', ev.currentTarget), { menu: 'find', disabled: state ? null : '' })}
         {btn('freeze', t('ctl.freeze'), <Icon k="freeze" />, ev => toggleOpen('freeze', ev.currentTarget), { menu: 'freeze' })}
       </div>
@@ -246,6 +291,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         <ColorPicker anchor={open.el} kind={open.k} current={(open.k === 'fill' ? st.fill : st.color) ?? null}
                      onPick={c => a.patch({ [open.k]: c }, open.k)} onClose={() => setOpen(null)} />
       )}
+      {open?.k === 'cellStyles' && <CellStylesMenu anchor={open.el} target={target} onClose={() => setOpen(null)} />}
+      {open?.k === 'table' && <TableMenu anchor={open.el} target={target} state={state} onClose={() => setOpen(null)} />}
       {open?.k === 'borders' && (
         <BorderPicker anchor={open.el} line={line} onLine={setLine} onPick={p => a.borders(p, line)} onClose={() => setOpen(null)} />
       )}

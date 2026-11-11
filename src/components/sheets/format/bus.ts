@@ -13,7 +13,7 @@
  *   one undo step, and saves it.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { BorderSide, CellStyle } from '@/types/index'
+import type { BorderSide, CellStyle, ColFilter, ConditionalRule, SortKey } from '@/types/index'
 import type { BorderPreset, StylePatch } from '@/lib/sheet-format'
 
 export const FORMAT_STATE = 'momentum:format-state'
@@ -44,6 +44,16 @@ export interface FormatState {
   viewOff?: string | null
   /** Stage 2: the sheet's frozen panes, for the Freeze menu's tick. */
   frozen?: { rows: number; cols: number }
+  /** Stage 3: the table the active cell is in, or null; why tables are off here (linked sheets), or null. */
+  table?: { style: string } | null
+  tableOff?: string | null
+  /** Stage 3: the filter buttons are showing; how many columns are filtered. */
+  filter?: { on: boolean; cols: number }
+  /** Stage 3: the columns Sort would use (the selection, the table or the filter area), and whether its first row reads as headings. */
+  sortCols?: { key: string; name: string }[]
+  sortHeader?: boolean | null
+  /** Stage 3: the sheet's conditional formatting rules, in order, with where each applies ("E3:E6", "Status"). */
+  rules?: (ConditionalRule & { where: string })[]
 }
 
 export type MergeMode = 'center' | 'across' | 'cells' | 'unmerge'
@@ -64,6 +74,16 @@ export type FormatCmd =
   | { kind: 'pasteSpecial'; mode: 'all' | 'values' | 'formats'; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null }
   | { kind: 'find'; q: FindQuery; dir: 1 | -1 }
   | { kind: 'replace'; q: FindQuery; by: string; all: boolean }
+  // Stage 3: Styles, Sort & Filter (FR-030–FR-032, FR-045, FR-046).
+  | { kind: 'cellStyle'; key: string }
+  | { kind: 'table'; style: string }
+  | { kind: 'tableOff' }
+  | { kind: 'sort'; keys: SortKey[]; header: boolean | null }
+  | { kind: 'filter'; op: 'toggle' | 'clear' | 'reapply' }
+  | { kind: 'filterCol'; col: string; f: ColFilter | null }
+  | { kind: 'ruleNew'; rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'> }
+  | { kind: 'rulesSet'; rules: ConditionalRule[] }
+  | { kind: 'rulesClear'; where: 'selection' | 'sheet' }
 
 /** The toolbar started listening after a sheet announced itself: sheets announce again. */
 export const FORMAT_ASK = 'momentum:format-ask'

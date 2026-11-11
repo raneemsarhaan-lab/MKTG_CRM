@@ -17,8 +17,9 @@ import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
 import { mergeStyle, validateStyle } from '@/lib/sheet-format'
-import type { CellStyle, FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetThreadSummary, TabColor } from '@/types/index'
-import { TAB_COLORS } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SortKey, TabColor, ViewWrite } from '@/types/index'
+import { RULE_KINDS, TAB_COLORS } from '@/types/index'
+import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
 
 type Fail = { success: false; error: string }
 type Tx = Prisma.TransactionClient
@@ -226,23 +227,122 @@ export async function loadSheet(id: string): Promise<{ success: true; doc: Sheet
 
 /** A sheet's formatting, merges and thread summaries (contracts/server.md "Loading"). */
 async function loadExtras(sheetId: string): Promise<SheetExtras> {
-  const [formats, merges, threads, sheet, hiddenRows, hiddenCols] = await Promise.all([
+  const [formats, merges, threads, sheet, hiddenRows, hiddenCols, rules, tables] = await Promise.all([
     prisma.sheetFormat.findMany({ where: { sheet_id: sheetId }, select: { row_key: true, col_key: true, style: true } }),
     prisma.sheetMerge.findMany({ where: { sheet_id: sheetId } }),
     threadSummaries(sheetId),
-    prisma.sheet.findUnique({ where: { id: sheetId }, select: { frozen_rows: true, frozen_cols: true } }),
+    prisma.sheet.findUnique({ where: { id: sheetId }, select: { frozen_rows: true, frozen_cols: true, view: true } }),
     prisma.sheetRow.findMany({ where: { sheet_id: sheetId, hidden: true }, select: { id: true } }),
     prisma.sheetCol.findMany({ where: { sheet_id: sheetId, hidden: true }, select: { id: true } }),
+    prisma.sheetRule.findMany({ where: { sheet_id: sheetId }, orderBy: { priority: 'asc' } }),
+    prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
   ])
+  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[] }
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
     view: {
       frozenRows: sheet?.frozen_rows ?? 0, frozenCols: sheet?.frozen_cols ?? 0,
       hiddenRows: hiddenRows.map(r => r.id), hiddenCols: hiddenCols.map(c => c.id),
+      ...(stored.filterArea ? { filterArea: stored.filterArea } : {}),
+      ...(stored.filter ? { filter: stored.filter } : {}),
+      ...(stored.sort ? { sort: stored.sort } : {}),
     },
     threads,
+    rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
+    tables: tables.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col, style: x.style, header: x.header, banded: x.banded })),
   }
+}
+
+// ─── stage 3: rules, tables, the filter and sort (research R8) ──────────────
+
+const MAX_RULES = 100
+const MAX_TABLES = 50
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const HEX = /^#[0-9A-F]{6}$/i
+const str = (x: unknown, max = 200) => (typeof x === 'string' ? x.slice(0, max) : undefined)
+const keys = (x: unknown, max: number) => (Array.isArray(x) ? x.filter((k): k is string => typeof k === 'string' && k.length <= 80).slice(0, max) : [])
+
+/** A rule as sent, checked field by field; null when it can't be kept. */
+function cleanRule(x: unknown): ConditionalRule | null {
+  const r = x as Partial<ConditionalRule> | null
+  if (!r || typeof r.id !== 'string' || !UUID.test(r.id) || !RULE_KINDS.includes(r.kind as never)) return null
+  const rows = r.range?.rows === 'all' ? 'all' as const : keys(r.range?.rows, 5000)
+  const cols = keys(r.range?.cols, 200)
+  if (!cols.length || (rows !== 'all' && !rows.length)) return null
+  const a = (r.args ?? {}) as ConditionalRule['args']
+  const args: ConditionalRule['args'] = {}
+  if (str(a.a) !== undefined) args.a = str(a.a)
+  if (str(a.b) !== undefined) args.b = str(a.b)
+  if (['past', 'today', 'future', 'yesterday', 'tomorrow', 'last7', 'next7'].includes(a.when as string)) args.when = a.when
+  if (typeof a.n === 'number' && Number.isFinite(a.n)) args.n = Math.max(1, Math.min(1000, Math.round(a.n)))
+  if (a.percent) args.percent = true
+  if (Array.isArray(a.colors)) args.colors = a.colors.slice(0, 3).map(c => (typeof c === 'string' && (c === '' || HEX.test(c)) ? c.toUpperCase() : ''))
+  const style = r.kind === 'bar' || r.kind === 'scale' ? null : validateStyle(r.style)
+  return { id: r.id, range: { rows, cols }, kind: r.kind as ConditionalRule['kind'], args, style, priority: typeof r.priority === 'number' ? Math.max(0, Math.min(10_000, Math.round(r.priority))) : 0 }
+}
+function cleanTable(x: unknown): SheetTableRecord | null {
+  const t = x as Partial<SheetTableRecord> | null
+  if (!t || ![t.id, t.top, t.left, t.bottom, t.right].every(v => typeof v === 'string' && UUID.test(v))) return null
+  return { id: t.id!, top: t.top!, left: t.left!, bottom: t.bottom!, right: t.right!, style: TABLE_STYLES.some(s => s.key === t.style) ? t.style! : 'medium-0', header: t.header !== false, banded: t.banded !== false }
+}
+function cleanFilter(x: unknown): Record<string, ColFilter> {
+  const out: Record<string, ColFilter> = {}
+  if (!x || typeof x !== 'object') return out
+  for (const [col, f] of Object.entries(x as Record<string, ColFilter>).slice(0, 200)) {
+    if (col.length > 80 || !f || typeof f !== 'object') continue
+    const c: ColFilter = {}
+    if (Array.isArray(f.values)) c.values = f.values.filter(v => typeof v === 'string').slice(0, 2000).map(v => v.slice(0, 500))
+    if (typeof f.color === 'string' && (f.color === '' || HEX.test(f.color))) { c.color = f.color.toUpperCase(); c.on = f.on === 'color' ? 'color' : 'fill' }
+    if (f.cond && FILTER_OPS.includes(f.cond.op)) c.cond = { op: f.cond.op, a: str(f.cond.a), b: str(f.cond.b) }
+    if (Object.keys(c).length) out[col] = c
+  }
+  return out
+}
+function cleanSort(x: unknown): SortKey[] {
+  if (!Array.isArray(x)) return []
+  return x.slice(0, 10).filter(k => k && typeof k.col === 'string' && k.col.length <= 80).map(k => ({
+    col: k.col, dir: k.dir === 'desc' ? 'desc' as const : 'asc' as const,
+    ...(k.on === 'fill' || k.on === 'color' ? { on: k.on, color: typeof k.color === 'string' && HEX.test(k.color) ? k.color.toUpperCase() : '' } : {}),
+  }))
+}
+/** The filter area, filter and sort kept in `sheets.view` (null clears one). */
+async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v)) return
+  const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
+  const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
+  if ('filterArea' in v) {
+    const a = v.filterArea
+    if (a && typeof a === 'object') next.filterArea = { header: typeof a.header === 'string' ? a.header : null, cols: keys(a.cols, 200), last: typeof a.last === 'string' ? a.last : null }
+    else delete next.filterArea
+  }
+  if ('filter' in v) { const f = cleanFilter(v.filter); if (Object.keys(f).length) next.filter = f; else delete next.filter }
+  if ('sort' in v) { const k = cleanSort(v.sort); if (k.length) next.sort = k; else delete next.sort }
+  await tx.sheet.update({ where: { id: sheetId }, data: { view: next as Prisma.InputJsonValue } })
+}
+async function writeRules(tx: Tx, sheetId: string, w: NonNullable<SheetChanges['rules']>) {
+  if (w.remove?.length) await tx.sheetRule.deleteMany({ where: { sheet_id: sheetId, id: { in: keys(w.remove, MAX_RULES * 2) } } })
+  if ((w.put?.length ?? 0) > MAX_RULES) throw new Refuse('too_many_rules')
+  const put = (w.put ?? []).map(cleanRule).filter((r): r is ConditionalRule => !!r)
+  for (const r of put) {
+    const data = { range: r.range as unknown as Prisma.InputJsonValue, kind: r.kind, args: r.args as Prisma.InputJsonValue, style: (r.style ?? Prisma.DbNull) as Prisma.InputJsonValue, priority: r.priority }
+    const own = await tx.sheetRule.findUnique({ where: { id: r.id }, select: { sheet_id: true } })
+    if (own && own.sheet_id !== sheetId) continue
+    await tx.sheetRule.upsert({ where: { id: r.id }, create: { id: r.id, sheet_id: sheetId, ...data }, update: data })
+  }
+  if (await tx.sheetRule.count({ where: { sheet_id: sheetId } }) > MAX_RULES) throw new Refuse('too_many_rules')
+}
+async function writeTables(tx: Tx, sheetId: string, w: NonNullable<SheetChanges['tables']>) {
+  if (w.remove?.length) await tx.sheetTable.deleteMany({ where: { sheet_id: sheetId, id: { in: keys(w.remove, MAX_TABLES * 2) } } })
+  if ((w.put?.length ?? 0) > MAX_TABLES) throw new Refuse('too_many_tables')
+  for (const t of (w.put ?? []).map(cleanTable)) {
+    if (!t) continue
+    const data = { top_row: t.top, left_col: t.left, bottom_row: t.bottom, right_col: t.right, style: t.style, header: t.header, banded: t.banded }
+    const own = await tx.sheetTable.findUnique({ where: { id: t.id }, select: { sheet_id: true } })
+    if (own && own.sheet_id !== sheetId) continue
+    await tx.sheetTable.upsert({ where: { id: t.id }, create: { id: t.id, sheet_id: sheetId, ...data }, update: data })
+  }
+  if (await tx.sheetTable.count({ where: { sheet_id: sheetId } }) > MAX_TABLES) throw new Refuse('too_many_tables')
 }
 
 /** Threads with at least one comment left, for the corner markers and the panel's counts. */
@@ -431,7 +531,16 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
         if (typeof v.frozenRows === 'number') frozen.frozen_rows = Math.max(0, Math.min(rowCount, 100, Math.round(v.frozenRows)))
         if (typeof v.frozenCols === 'number') frozen.frozen_cols = Math.max(0, Math.min(colCount, 26, Math.round(v.frozenCols)))
         if (Object.keys(frozen).length) await tx.sheet.update({ where: { id: sheetId }, data: frozen })
+        await writeViewJson(tx, sheetId, v)
       }
+      // Stage 3: Sort's new row positions, rules and tables.
+      const moved = (changes.rowPositions ?? []).filter(r => typeof r.id === 'string' && Number.isFinite(r.position)).slice(0, MAX_ROWS)
+      if (moved.length) {
+        await tx.$executeRaw`UPDATE sheet_rows s SET position = t.p FROM unnest(${moved.map(r => r.id)}::uuid[], ${moved.map(r => r.position)}::float8[]) AS t(id, p)
+          WHERE s.id = t.id AND s.sheet_id = ${sheetId}::uuid`
+      }
+      if (changes.rules) await writeRules(tx, sheetId, changes.rules)
+      if (changes.tables) await writeTables(tx, sheetId, changes.tables)
 
       // Room for the next insert: renumber when two neighbours got too close.
       const positions: { rows?: { id: string; position: number }[]; cols?: { id: string; position: number }[] } = {}
@@ -707,19 +816,24 @@ export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success:
  * team's own columns, and never a change to the tasks. Merges aren't offered
  * there (FR-074), so a call with merges is refused as `linked`.
  */
-export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
+export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
-  if (changes.merges) return fail('linked')
+  if (changes.merges || changes.tables) return fail('linked')
   const formats = changes.formats ?? []
   if (formats.length > MAX_FORMATS_PER_CALL) return fail('too_many_formats')
   const sheet = await prisma.sheet.findUnique({ where: linkedWhere(sheetId), select: { id: true, kind: true, folder_id: true } })
   if (!sheet) return fail('gone')
   if (!isLinkedKind(sheet.kind)) return fail('not_linked')
   const now = new Date()
-  await prisma.$transaction(async tx => {
+  const refused = await prisma.$transaction(async tx => {
     if (formats.length) await writeFormats(tx, sheet.id, m.id, formats)
+    // Stage 3 (FR-075): rules over whole columns, and a sort and filter that live in the sheet, never on the board.
+    if (changes.rules) await writeRules(tx, sheet.id, { put: changes.rules.put?.map(r => ({ ...r, range: { rows: 'all', cols: r.range?.cols ?? [] } })), remove: changes.rules.remove })
+    if (changes.view) await writeViewJson(tx, sheet.id, { ...('filter' in changes.view ? { filter: changes.view.filter } : {}), ...('sort' in changes.view ? { sort: changes.view.sort } : {}), ...('filterArea' in changes.view ? { filterArea: changes.view.filterArea ? { header: null, cols: [] } : null } : {}) })
     await bumpFolder(tx, sheet.folder_id, m.id)
-  }, { timeout: 30_000 })
+    return null
+  }, { timeout: 30_000 }).catch(e => { if (e instanceof Refuse) return e; throw e })
+  if (refused) return fail(refused.code)
   return { success: true, updatedAt: now.toISOString() }
 }

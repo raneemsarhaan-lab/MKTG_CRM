@@ -60,6 +60,8 @@ export interface GridModel<R extends { key: string }> {
   rowNoWidth: number
   label: string
   header(col: GridCol): { text: ReactNode; label?: string; className?: string; sort?: 'ascending' }
+  /** Spec 015 stage 3: something after a heading's name (the linked sheets' filter button). */
+  headerExtra?(col: GridCol): ReactNode
   /** Columns a row actually has; null = every column. A two-entry list spans its last cell. */
   colsOf?(row: R): GridCol[] | null
   rowProps(row: R, index: number): { className: string; level: number; expanded?: boolean; taskId?: string }
@@ -841,6 +843,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                  onDrop={m.onReorder && dragCol ? e => { e.preventDefault(); const from = dragCol; setDragCol(null); setDropBefore(null); if (from !== col && col !== 'title') m.onReorder?.(from, col) } : undefined}
                  onDragEnd={() => { setDragCol(null); setDropBefore(null) }}>
               <span className="fx-sheet-th-name">{h.text}</span>
+              {m.headerExtra?.(col)}
               {m.headerMenu && (
                 <button type="button" className="fx-sheet-th-menu" tabIndex={-1} data-col-menu={col} aria-haspopup="menu"
                         aria-label={m.headerName ? m.headerName(col) : undefined}

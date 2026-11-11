@@ -180,6 +180,41 @@ async function main() {
   const cl2 = await C.clearCellComments(f.sheetId, [`${rc.id}|${cc.id}`])
   ok(cl2.success && cl2.cleared === 1 && cl2.skipped === 0, 'an admin clears the rest')
 
+  // Spec 015 stage 3: rules, tables, Sort's row positions, the filter (blank sheets).
+  const ruleId = randomUUID(), tableId = randomUUID()
+  const s3 = await A.applySheetChanges(f.sheetId, {
+    rules: { put: [
+      { id: ruleId, range: { rows: [rb.id, rc.id], cols: [cb.id] }, kind: 'gt', args: { a: '100', junk: 'x' } as never, style: { fill: '#FFC7CE', bogus: 1 } as never, priority: 0 },
+      { id: 'not-a-uuid', range: { rows: 'all', cols: [cb.id] }, kind: 'gt', args: {}, style: null, priority: 1 },
+      { id: randomUUID(), range: { rows: 'all', cols: [cb.id] }, kind: 'nonsense' as never, args: {}, style: null, priority: 2 },
+    ] },
+    tables: { put: [{ id: tableId, top: rb.id, bottom: rc.id, left: cb.id, right: cc.id, style: 'dark-3', header: true, banded: false }] },
+    view: { filterArea: { header: rb.id, cols: [cb.id, cc.id], last: rc.id }, filter: { [cb.id]: { values: ['a', 'b'], cond: { op: 'gt', a: '5' } }, [cc.id]: { cond: { op: 'nope' as never } } } },
+  })
+  ok(s3.success, 'rules, a table and a filter save together')
+  let x3 = await A.loadSheet(f.sheetId)
+  const ex3 = x3.success ? x3.doc.extras : undefined
+  ok(ex3?.rules?.length === 1 && ex3.rules[0].id === ruleId && ex3.rules[0].args.a === '100' && !('junk' in ex3.rules[0].args) && JSON.stringify(ex3.rules[0].style) === JSON.stringify({ fill: '#FFC7CE' }), 'a rule comes back cleaned; bad ids and kinds are dropped')
+  ok(ex3?.tables?.length === 1 && ex3.tables[0].style === 'dark-3' && ex3.tables[0].banded === false, 'the table comes back with its style and banding')
+  ok(!!ex3?.view.filterArea && ex3.view.filterArea.header === rb.id && ex3.view.filter?.[cb.id]?.values?.length === 2 && !ex3.view.filter?.[cc.id], 'the filter comes back; an unknown condition is dropped')
+  const before3 = await prisma.sheetRow.findMany({ where: { sheet_id: f.sheetId, id: { in: [rb.id, rc.id] } }, select: { id: true, position: true } })
+  const pb = before3.find(r => r.id === rb.id)!.position, pc = before3.find(r => r.id === rc.id)!.position
+  ok((await A.applySheetChanges(f.sheetId, { rowPositions: [{ id: rb.id, position: pc }, { id: rc.id, position: pb }] })).success, 'Sort saves new row positions')
+  const after3 = await prisma.sheetRow.findMany({ where: { sheet_id: f.sheetId, id: { in: [rb.id, rc.id] } }, select: { id: true, position: true } })
+  ok(after3.find(r => r.id === rb.id)!.position === pc && after3.find(r => r.id === rc.id)!.position === pb, 'the rows swapped places')
+  await A.applySheetChanges(f.sheetId, { rowPositions: [{ id: rb.id, position: pb }, { id: rc.id, position: pc }] })
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+  const r3blocked = await A.applySheetChanges(f.sheetId, { rules: { remove: [ruleId] } })
+  ok(!r3blocked.success && r3blocked.error === 'protected', 'rules on a protected sheet are refused for another member')
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+  ok((await A.applySheetChanges(f.sheetId, { rules: { remove: [ruleId] }, tables: { remove: [tableId] }, view: { filterArea: null, filter: null } })).success, 'remove the rule, the table and the filter')
+  x3 = await A.loadSheet(f.sheetId)
+  ok(x3.success && !x3.doc.extras?.rules?.length && !x3.doc.extras?.tables?.length && !x3.doc.extras?.view.filterArea && !x3.doc.extras?.view.filter, 'all gone after reload')
+  const manyRules = Array.from({ length: 101 }, (_, i) => ({ id: randomUUID(), range: { rows: 'all' as const, cols: [cb.id] }, kind: 'dup' as const, args: {}, style: { b: true }, priority: i }))
+  const tooManyRules = await A.applySheetChanges(f.sheetId, { rules: { put: manyRules } })
+  ok(!tooManyRules.success, 'more than 100 rules are refused')
+  ok((await prisma.sheetRule.count({ where: { sheet_id: f.sheetId } })) === 0, 'and nothing of the refused call is kept')
+
   // Spec 015 on the Content sheet: any member, never a task change.
   const lc = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
   const task = await prisma.task.findFirst({ select: { id: true, updated_at: true, name: true } })
@@ -196,6 +231,20 @@ async function main() {
     ok(after?.updated_at.getTime() === task.updated_at.getTime() && after?.name === task.name, 'formatting never touches the task')
   }
   await prisma.sheetFormat.deleteMany({ where: { sheet_id: lc!.id, row_key: task?.id ?? 'smoke-task', col_key: 'title' } })
+  // Stage 3 on the Content sheet: rules over whole columns, a sort and filter kept in the sheet; no tables.
+  process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+
+  const lr = randomUUID()
+  ok((await A.applyLinkedFormats(lc!.id, { rules: { put: [{ id: lr, range: { rows: [task?.id ?? 'x'], cols: ['title'] }, kind: 'contains', args: { a: 'Q4' }, style: { fill: '#FFEB9C' }, priority: 0 }] }, view: { sort: [{ col: 'title', dir: 'desc' }], filter: { status: { values: ['todo'] } }, filterArea: { header: null, cols: [] } } })).success, 'any member may add a rule, a sort and a filter on the Content sheet')
+  const lx3 = await A.loadLinkedSheetExtras(lc!.id)
+  ok(lx3.success && lx3.extras.rules?.[0]?.range.rows === 'all' && lx3.extras.view.sort?.[0]?.dir === 'desc' && !!lx3.extras.view.filterArea && lx3.extras.view.filter?.status?.values?.[0] === 'todo', 'they come back; a linked rule covers whole columns')
+  ok(!(await A.applyLinkedFormats(lc!.id, { tables: { put: [] } } as never)).success, 'tables refused on the Content sheet (linked)')
+  if (task) {
+    const after = await prisma.task.findUnique({ where: { id: task.id }, select: { updated_at: true, name: true } })
+    ok(after?.updated_at.getTime() === task.updated_at.getTime(), 'sorting and filtering the sheet never touches a task')
+  }
+  ok((await A.applyLinkedFormats(lc!.id, { rules: { remove: [lr] }, view: { sort: null, filter: null, filterArea: null } })).success, 'and they can be removed')
+  process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
 
   // Linked guards and pins.
   const linked = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
