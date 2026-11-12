@@ -1,0 +1,559 @@
+<title>Sheet Task Links</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (screen, device, language) over one workbook frame in
+   Momentum's own look (spec 013/015): crumbs, workbook toolbar with Board ▾, a
+   linked blank sheet, the tab bar, and the dialogs over it. Stage colours are
+   the board's content colours, not UI tokens. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --lime: #C9F24E; --link: #1D4ED8;
+  --sh-sel: rgba(124, 58, 237, .10); --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --bad: #C81E3A;
+  --cmt: #7C3AED; --mention-bg: #F0EBFE; --frozen: #A1A1AE; --scrim: rgba(20,19,26,.35);
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif;
+  --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --cmt: #A78BFA; --mention-bg: #2E2650; --frozen: #5A5A68; --scrim: rgba(0,0,0,.55); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --cmt: #A78BFA; --mention-bg: #2E2650; --frozen: #5A5A68; --scrim: rgba(0,0,0,.55); color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.page-wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+/* frame */
+.frame { position: relative; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10);
+  display: flex; flex-direction: column; height: 740px; }
+.frame[dir="rtl"], .frame[dir="rtl"] button, .frame[dir="rtl"] input, .frame[dir="rtl"] textarea, .frame[dir="rtl"] select { font-family: var(--f-ar); }
+.frame.phone { max-width: 390px; width: 100%; margin: 0 auto; height: 800px; }
+.top { display: flex; align-items: center; gap: 10px; padding: 12px 18px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+.crumbs b { color: var(--ink); font: 800 19px var(--f-head); }
+.frame[dir="rtl"] .crumbs b { font-family: var(--f-ar); }
+.linked { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 8px; background: var(--purple-soft); color: var(--purple); }
+.status { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* workbook toolbar (spec 013) */
+.tools { display: flex; align-items: center; gap: 6px; padding: 6px 18px; border-bottom: 1px solid var(--line); min-height: 44px; flex-wrap: wrap; }
+.ib { min-width: 32px; height: 32px; border: 1px solid var(--input); background: var(--panel); border-radius: 8px; cursor: pointer; display: inline-grid; place-items: center; font-size: 13px; padding: 0 8px; gap: 6px; grid-auto-flow: column; font-weight: 600; }
+.ib:disabled { opacity: .4; cursor: default; }
+.ib[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); border-color: transparent; }
+.tools .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 2px; }
+.tools .lbl { font-size: 12.5px; color: var(--muted); }
+.tools .push { margin-inline-start: auto; }
+.badge { background: var(--cmt); color: #fff; border-radius: 999px; font-size: 10.5px; padding: 1px 6px; font-weight: 700; }
+
+/* grid */
+.body { flex: 1; min-height: 0; display: flex; position: relative; }
+.gridwrap { flex: 1; overflow: auto; position: relative; min-width: 0; }
+.g { display: grid; font-size: 13px; min-width: max-content; grid-auto-rows: minmax(30px, auto); }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel); position: relative; cursor: cell; line-height: 1.35; display: flex; align-items: flex-end; min-width: 0; user-select: none; }
+.c > .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.c.wrap { white-space: normal; overflow-wrap: anywhere; }
+.c .bd { position: absolute; inset: 0; pointer-events: none; }
+.h, .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; justify-content: center; align-items: center; position: sticky; z-index: 3; cursor: default; }
+.h { top: 0; }
+.rn { inset-inline-start: 0; z-index: 2; }
+.corner { position: sticky; top: 0; inset-inline-start: 0; z-index: 5; background: var(--grid-head); }
+.h.on, .rn.on { background: var(--sh-head-sel); color: var(--purple); }
+.c.sel::before { content: ""; position: absolute; inset: 0; background: var(--sh-sel); pointer-events: none; }
+.c.act::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--sh-edge); pointer-events: none; z-index: 2; }
+.c.merged { z-index: 1; }
+.cm { position: absolute; top: 0; inset-inline-end: 0; width: 0; height: 0; border-top: 8px solid var(--cmt); border-inline-start: 8px solid transparent; z-index: 3; }
+.c.hid-after { box-shadow: inset -3px 0 0 var(--panel), inset -4px 0 0 var(--muted); }
+.frame[dir="rtl"] .c.hid-after { box-shadow: inset 3px 0 0 var(--panel), inset 4px 0 0 var(--muted); }
+.h .hidmark { position: absolute; inset-inline-end: -4px; top: 4px; bottom: 4px; width: 6px; border-inline: 1.5px solid var(--muted); background: var(--grid-head); cursor: pointer; z-index: 4; border-radius: 1px; }
+.fz-r { position: sticky; z-index: 2; }
+.fz-edge-b { box-shadow: 0 2px 0 var(--frozen); }
+.fz-edge-e { box-shadow: 2px 0 0 var(--frozen); }
+.frame[dir="rtl"] .fz-edge-e { box-shadow: -2px 0 0 var(--frozen); }
+.flt { margin-inline-start: auto; width: 18px; height: 18px; border: 1px solid currentColor; border-radius: 4px; display: inline-grid; place-items: center; font-size: 9px; background: transparent; cursor: pointer; flex: none; color: inherit; opacity: .85; padding: 0; }
+.flt.on { background: #fff; color: #7030A0; opacity: 1; }
+.dbar { position: absolute; inset-block: 5px; inset-inline-start: 4px; border-radius: 2px; opacity: .55; pointer-events: none; }
+
+/* linked (Content) sheet */
+.grp { background: var(--surface); font-weight: 700; color: var(--ink); grid-column: 2 / -1; align-items: center; }
+.pill { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 700 9px var(--f-body); font-style: normal; }
+.c a { color: var(--link); text-decoration: none; }
+
+/* tab bar */
+.tabs { display: flex; align-items: stretch; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 42px; }
+.tabs .fixed { display: flex; align-items: center; padding-inline: 6px; border-inline-end: 1px solid var(--line); gap: 2px; }
+.tabs .fixed span { width: 30px; height: 30px; display: grid; place-items: center; font-size: 16px; }
+.tb { border: 0; background: none; display: inline-flex; align-items: center; padding: 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); border-inline-end: 1px solid var(--line); }
+.tb[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
+
+/* menus, pickers */
+.menu { position: absolute; z-index: 30; min-width: 200px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13px; max-height: 470px; overflow: auto; }
+.menu .mi { display: flex; width: 100%; gap: 10px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 6px 10px; text-align: start; cursor: pointer; min-height: 32px; }
+.menu .mi:hover:not(:disabled) { background: var(--surface); }
+.menu .mi:disabled { color: var(--muted); cursor: not-allowed; }
+.menu .mi .k { margin-inline-start: auto; color: var(--muted); font-size: 11.5px; }
+.menu .mi .ck { width: 14px; color: var(--purple); font-weight: 700; }
+.menu .why { display: block; color: var(--warn); background: var(--warn-bg); border-radius: 8px; font-size: 12px; padding: 7px 10px; margin: 2px 4px 6px; line-height: 1.45; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.menu h5 { margin: 6px 10px 4px; font: 700 11px var(--f-body); color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.frame[dir="rtl"] .menu h5 { letter-spacing: 0; }
+/* dialogs */
+.scrim { position: absolute; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 40; padding: 16px; }
+.dialog { background: var(--panel); border-radius: 16px; padding: 18px; width: min(380px, 100%); display: grid; gap: 12px; font-size: 13.5px; box-shadow: 0 20px 50px rgba(0,0,0,.25); max-height: 100%; overflow: auto; }
+.dialog.wide { width: min(620px, 100%); }
+.dialog h2 { margin: 0; font: 800 17px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .dialog h2 { font-family: var(--f-ar); }
+.dialog p { margin: 0; color: var(--muted); line-height: 1.5; }
+.dialog .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.btn { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 7px 16px; font-weight: 700; cursor: pointer; }
+.btn.go { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.sm { padding: 5px 12px; font-size: 12.5px; }
+.dtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.dtabs button { border: 0; background: none; padding: 8px 12px; font-weight: 600; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.dtabs button[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
+.lb { border: 1px solid var(--input); border-radius: 10px; padding: 4px; display: grid; gap: 1px; align-content: start; max-height: 260px; overflow: auto; }
+.lb button { border: 0; background: none; text-align: start; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.lb button[aria-selected="true"] { background: var(--purple-soft); color: var(--purple); font-weight: 600; }
+.fld { display: grid; gap: 4px; }
+.fld > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.fld select, .fld input[type="text"], .fld input[type="number"] { border: 1px solid var(--input); border-radius: 8px; padding: 6px 8px; background: var(--panel); width: 100%; }
+.fld.inline { grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
+.chk { display: flex; gap: 8px; align-items: center; }
+.sample { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.sample small { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; }
+.sample .pv { min-height: 34px; display: flex; align-items: center; padding: 4px 8px; background: var(--panel); border: 1px solid var(--grid-line); font-size: 14px; }
+.stack { display: grid; gap: 10px; align-content: start; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* notes */
+.notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; min-width: 0; }
+.note h4 { margin: 0 0 6px; font: 700 14px var(--f-head); color: var(--ink); }
+.note ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 3px; }
+.note kbd { font: 600 11.5px var(--f-body); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+@media (max-width: 900px) { .notes { grid-template-columns: 1fr; } .frame { height: 760px; } .panel { width: 260px; } }
+@media (max-width: 640px) { .frame:not(.phone) .panel { position: absolute; inset-block: 0; inset-inline-end: 0; z-index: 20; box-shadow: -10px 0 30px rgba(20,19,26,.18); } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+/* ── spec 016: sheet task links ─────────────────────────────────────────── */
+:root { --linked: #F6F2FF; --linked-edge: #DCCFFB; --na: #F4F4F7; --task: #7C3AED; --toast: #14131A; --toast-fg: #FFFFFF; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --linked: #1E1A2C; --linked-edge: #3B3260; --na: #1B1B22; --task: #A78BFA; --toast: #F4F4F7; --toast-fg: #14131A; } }
+:root[data-theme="dark"] { --linked: #1E1A2C; --linked-edge: #3B3260; --na: #1B1B22; --task: #A78BFA; --toast: #F4F4F7; --toast-fg: #14131A; }
+
+.c.lk { background: linear-gradient(var(--linked), var(--linked)); }
+.c.na { background: var(--na); color: var(--muted); font-style: italic; }
+.c.mono { font-variant-numeric: tabular-nums; }
+.h .fb-badge { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 6px; padding: 1px 6px; border-radius: 999px; background: var(--purple-soft); color: var(--purple); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.h .fb-badge::before { content: ""; width: 8px; height: 8px; border-radius: 2px; border: 1.5px solid currentColor; border-inline-end-color: transparent; transform: rotate(-45deg); }
+.h.task-col { color: var(--ink); }
+.h .tc { margin-inline-start: 6px; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: var(--ink); color: var(--panel); font-weight: 700; }
+.rn { gap: 4px; }
+.mk { width: 16px; height: 16px; border-radius: 4px; border: 0; background: var(--task); color: #fff; display: inline-grid; place-items: center; font-size: 9px; font-weight: 800; cursor: pointer; padding: 0; }
+.note-chip { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 6px; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; border: 0; cursor: pointer; white-space: nowrap; }
+.note-chip.warn { background: var(--warn-bg); color: var(--warn); }
+.note-chip.bad { background: var(--surface); color: var(--muted); border: 1px dashed var(--input); }
+.note-chip.drop { background: var(--surface); color: var(--muted); }
+.tl { color: var(--link); }
+.cellnote { position: absolute; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 26px rgba(20,19,26,.18); padding: 8px 10px; font-size: 12.5px; max-width: 260px; line-height: 1.45; }
+.cellnote b { display: block; color: var(--bad); margin-bottom: 2px; }
+.c.refused::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--bad); pointer-events: none; z-index: 2; }
+.toast { position: absolute; z-index: 50; inset-inline-start: 50%; bottom: 56px; transform: translateX(-50%); background: var(--toast); color: var(--toast-fg); border-radius: 12px; padding: 10px 14px; font-size: 13px; display: flex; gap: 14px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.25); white-space: nowrap; max-width: calc(100% - 24px); }
+.frame[dir="rtl"] .toast { transform: translateX(50%); }
+.toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
+.steps { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); font-weight: 600; }
+.steps i { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-style: normal; background: var(--surface); color: var(--muted); font-size: 11px; }
+.steps .on i { background: var(--purple); color: #fff; }
+.steps .on { color: var(--ink); }
+.colpick { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+.colpick label { display: grid; grid-template-columns: auto 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+.colpick label:has(input:checked) { border-color: var(--purple); background: var(--purple-soft); }
+.colpick .lt { font-weight: 700; color: var(--muted); font-size: 12px; text-align: center; }
+.colpick small { color: var(--muted); font-size: 11.5px; }
+.maprow { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 190px); gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.maprow .lt { font-weight: 700; color: var(--muted); font-size: 12px; text-align: center; }
+.maprow select { border: 1px solid var(--input); border-radius: 8px; padding: 6px 8px; background: var(--panel); width: 100%; }
+.maprow select.set { border-color: var(--purple); color: var(--purple); font-weight: 600; }
+.result { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.result div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.result b { font: 800 22px var(--f-head); color: var(--ink); font-variant-numeric: tabular-nums; }
+.result small { color: var(--muted); font-size: 12px; }
+.result .warn b { color: var(--warn); }
+.tasklist { display: grid; gap: 4px; max-height: 300px; overflow: auto; }
+.trow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: start; background: var(--panel); width: 100%; }
+.trow:hover { background: var(--surface); }
+.trow[aria-checked="true"], .trow[aria-selected="true"] { border-color: var(--purple); background: var(--purple-soft); }
+.trow .tt { display: grid; gap: 2px; min-width: 0; }
+.trow .tt b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow .tt small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tick { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--input); display: grid; place-items: center; font-size: 11px; color: transparent; }
+.trow[aria-checked="true"] .tick { background: var(--purple); border-color: var(--purple); color: #fff; }
+.radio { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--input); }
+.trow[aria-selected="true"] .radio { border: 5px solid var(--purple); }
+.search { display: flex; gap: 8px; flex-wrap: wrap; }
+.search input { flex: 1 1 200px; border: 1px solid var(--input); border-radius: 10px; padding: 8px 10px; background: var(--panel); min-width: 0; }
+.search select { border: 1px solid var(--input); border-radius: 10px; padding: 7px 8px; background: var(--panel); }
+.prev { width: 100%; border-collapse: collapse; font-size: 13px; }
+.prev th { text-align: start; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pill { white-space: nowrap; }
+.prev td.mono { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prev td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.prev input { border: 1px solid var(--input); border-radius: 8px; padding: 5px 8px; background: var(--panel); width: 100%; min-width: 110px; }
+.prev input[aria-invalid="true"] { border-color: var(--bad); }
+.prev .err { color: var(--bad); font-size: 11.5px; font-weight: 600; display: block; margin-top: 2px; }
+.prev tr.out td { opacity: .45; text-decoration: line-through; }
+.prev .lnk { border: 0; background: none; color: var(--link); cursor: pointer; font-weight: 600; padding: 0; }
+.sec { font: 700 12px var(--f-body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 4px 0 0; }
+.frame[dir="rtl"] .sec { letter-spacing: 0; }
+.due { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--surface); border-radius: 10px; padding: 8px 10px; }
+.due input { border: 1px solid var(--input); border-radius: 8px; padding: 5px 8px; background: var(--panel); }
+.wrapx { overflow-x: auto; }
+.frame.phone .dialog { width: 100%; height: 100%; max-height: none; border-radius: 0; align-content: start; }
+.frame.phone .scrim { padding: 0; }
+.frame.phone .btn, .frame.phone .trow, .frame.phone .maprow select { min-height: 44px; }
+.frame.phone .colpick label { min-height: 48px; }
+.frame.phone .result { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 640px) { .result { grid-template-columns: 1fr; } .maprow { grid-template-columns: 30px minmax(0, 1fr); } .maprow select { grid-column: 1 / -1; } }
+</style>
+
+<div class="page-wrap">
+  <header>
+    <h1 id="h-title">Link a sheet to the board</h1>
+    <p class="lede" id="h-lede"></p>
+  </header>
+  <div class="ctl" role="group" aria-label="Preview controls">
+    <span id="l-screen">Screen</span><div class="seg" id="seg-screen"></div>
+    <span id="l-dev">Device</span><div class="seg" id="seg-dev"></div>
+    <span id="l-lang">Language</span><div class="seg" id="seg-lang"></div>
+  </div>
+  <p class="hint" id="hint"></p>
+  <div id="frame-host"></div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+(() => {
+  const S = { screen: 'sheet', dev: 'desktop', lang: 'en', menu: false, note: null, toast: true, step: 1, taskCol: 'A', map: { B: 'title', C: 'stage', D: 'due', E: 'assignee', F: 'link:design', G: 'theme' }, choose: 'c1', ticks: new Set(['t2', 't4', 't5']), out: new Set(), fix: {} }
+
+  const T = {
+    en: {
+      title: 'Link a sheet to the board', lede: 'The design for spec 016. A blank sheet keeps its own layout, and chosen columns follow board tasks. One column names each row’s task; mapped columns show the task’s values and save to it under the board’s rules. Everything here is clickable.',
+      screens: [['sheet', 'Linked sheet'], ['link', 'Link to board'], ['choose', 'Choose a task'], ['add', 'Add tasks'], ['create', 'Create tasks']],
+      devs: [['desktop', 'Desktop'], ['phone', 'Phone 390']], langs: [['en', 'English'], ['ar', 'العربية']],
+      lScreen: 'Screen', lDev: 'Device', lLang: 'Language',
+      hints: {
+        sheet: 'Column A is the Task column. Mapped headings carry a badge. Click a row’s purple marker to open its task, a note to fix a row, a red-outlined cell to see why an edit was refused, and Board ▾ for the menu.',
+        link: 'Step 1 picks the Task column, step 2 maps columns to fields, then the result. Use Next and Back.',
+        choose: 'Row 5’s title matches two tasks. Pick one; the Task cell then holds its link.',
+        add: 'Tick board tasks to add them as linked rows below the selection.',
+        create: 'Unlinked rows become plain board tasks in To do. Fix a problem in place, or leave the row out.',
+      },
+      crumbs: 'Sheets', folder: 'Marketing', sheet: 'May plan', saved: 'Saved', undo: 'Undo', redo: 'Redo', comments: 'Comments',
+      board: 'Board', boardMenu: { link: 'Change link and fields…', add: 'Add tasks…', create: 'Create tasks for rows…', refresh: 'Refresh from the board', unlink: 'Unlink sheet…', why: 'Members who can only view tasks can’t create them.' },
+      cols: { A: 'Task', B: 'Title', C: 'Stage', D: 'Due', E: 'Assignee', F: 'Design', G: 'Theme', H: 'Notes', I: 'Budget' },
+      taskCol: 'Task column',
+      fields: { title: 'Title', stage: 'Stage', due: 'Due date', assignee: 'Assignee', owner: 'Owner', priority: 'Priority', platform: 'Platform', type: 'Content type', theme: 'Theme', pillar: 'Pillar', 'link:doc': 'Working doc link', 'link:design': 'Design link', 'link:post': 'Post link', 'link:published': 'Published link', none: 'Not linked (sheet only)' },
+      stages: { todo: 'To do', planned: 'Planned', design: 'Final Design', ready: 'Ready to Publish', pub: 'Published', script: 'Script' },
+      na: 'Not applicable', notes: { notLinked: 'Not linked', two: '2 tasks have this title', removed: 'Task removed', dropped: 'Dropped' },
+      marker: 'Open task', refusedTitle: 'Not changed', refused: 'Only Mona (owner) or Ahmed (assignee) can move this task. Ask them, or an admin.',
+      toast: '2 not changed (you can’t edit them)', toastMore: 'Show', tabs: ['May plan', 'Ideas'],
+      linkT: 'Link to board', step1: 'Task column', step2: 'Fields', step3: 'Result', next: 'Next', back: 'Back', done: 'Done', cancel: 'Cancel', review: 'Review rows',
+      s1: 'Which column names each row’s task? A task link (Copy link on the board) or the task’s exact title both work.',
+      sample: 'e.g.', s2: 'Which columns should follow the task? Leave a column as “Not linked” to keep it a sheet column. Each field can be used once.',
+      s3: 'Rows linked to their tasks. Mapped cells now show each task’s values; edits save to the task.',
+      linked: 'linked', notFound: 'not found', toChoose: 'to choose',
+      used: 'used by', chooseT: 'Choose a task', chooseP: '“Carousel” matches 2 tasks. Pick the one row 5 is about.', search: 'Search all tasks', pick: 'Link row 5',
+      addT: 'Add tasks', addP: 'Each task you tick becomes a linked row below row 7.', allStages: 'Any stage', anyone: 'Anyone', anyProject: 'Any project', addBtn: n => `Add ${n} rows`, selected: n => `${n} selected`,
+      createT: 'Create tasks for rows', createP: 'Each row becomes a board task in To do, with no theme or pillar. You’ll own it unless the row names an owner.',
+      toCreate: 'To create', problems: 'Needs a fix', leftOut: 'Left out', colTitle: 'Title', colDue: 'Due', colAssignee: 'Assignee', colStage: 'Stage',
+      noTitle: 'A task needs a title', unknown: 'No member called “Samah”. Pick someone, or leave it empty.', leave: 'Leave out', bringBack: 'Bring back',
+      sharedDue: 'Due date for rows without one', createBtn: n => `Create ${n} tasks`, undoNote: 'Undo unlinks these rows. The tasks stay on the board.',
+      pickMember: 'Pick a member',
+      notesT: [
+        ['A sheet that follows the board', ['One column (Task) names each row’s task by link or exact title.', 'Other columns can stand for task fields. A badge on the heading says which.', 'Columns without a badge stay ordinary sheet cells: notes, budgets, anything.', 'Formatting, comments, sort, filter and the other sheet tools keep working.']],
+        ['Edits go through the board’s rules', ['Title, dates, people and links save to the task, as if edited on the board.', 'A stage the move rules don’t allow is refused with the board’s reason. A move into your own stage celebrates.', 'Cells you can’t edit are skipped and counted: “2 not changed (you can’t edit them)”.', 'Board changes show here when you come back to the tab, and every 60 seconds.']],
+        ['When rows don’t match', ['Not linked: fix the link or title, or create a task for the row.', '2 tasks have this title: choose one; the cell then holds its link.', 'Task removed: the task was deleted. The row keeps its last values as plain text.', 'Theme and Pillar are Content-only, so a video row shows “Not applicable”.']],
+        ['Nothing on the board is lost', ['Deleting rows, columns or the sheet never changes a task.', 'Unmapping a column keeps its values as plain text.', 'Create tasks for rows makes plain board tasks in To do; undo unlinks them and keeps the tasks.', 'Add tasks… picks tasks into new rows. The sheet never adds rows on its own.']],
+      ],
+    },
+    ar: {
+      title: 'ربط ورقة باللوحة', lede: 'تصميم المواصفة 016. تحتفظ الورقة الفارغة بتنسيقها، وتتبع أعمدة مختارة مهام اللوحة. عمود واحد يحدد مهمة كل صف، والأعمدة المربوطة تعرض قيم المهمة وتحفظ فيها وفق قواعد اللوحة. كل شيء هنا قابل للنقر.',
+      screens: [['sheet', 'الورقة المربوطة'], ['link', 'الربط باللوحة'], ['choose', 'اختيار مهمة'], ['add', 'إضافة مهام'], ['create', 'إنشاء مهام']],
+      devs: [['desktop', 'سطح المكتب'], ['phone', 'هاتف 390']], langs: [['en', 'English'], ['ar', 'العربية']],
+      lScreen: 'الشاشة', lDev: 'الجهاز', lLang: 'اللغة',
+      hints: {
+        sheet: 'العمود A هو عمود المهمة. تحمل العناوين المربوطة شارة. انقر العلامة البنفسجية لفتح المهمة، أو الملاحظة لإصلاح صف، أو الخلية ذات الإطار الأحمر لمعرفة سبب رفض التعديل، أو «اللوحة ▾» للقائمة.',
+        link: 'الخطوة 1 تختار عمود المهمة، والخطوة 2 تربط الأعمدة بالحقول، ثم النتيجة.',
+        choose: 'عنوان الصف 5 يطابق مهمتين. اختر واحدة، فتحتوي خلية المهمة على رابطها.',
+        add: 'حدد مهام من اللوحة لإضافتها صفوفًا مربوطة تحت التحديد.',
+        create: 'تصبح الصفوف غير المربوطة مهامًا عادية في «للتنفيذ». أصلح المشكلة في مكانها أو استبعد الصف.',
+      },
+      crumbs: 'الأوراق', folder: 'التسويق', sheet: 'خطة مايو', saved: 'تم الحفظ', undo: 'تراجع', redo: 'إعادة', comments: 'التعليقات',
+      board: 'اللوحة', boardMenu: { link: 'تغيير الربط والحقول…', add: 'إضافة مهام…', create: 'إنشاء مهام للصفوف…', refresh: 'التحديث من اللوحة', unlink: 'إلغاء ربط الورقة…', why: 'لا يمكن لمن يملك صلاحية العرض فقط إنشاء مهام.' },
+      cols: { A: 'المهمة', B: 'العنوان', C: 'المرحلة', D: 'الاستحقاق', E: 'المسؤول', F: 'التصميم', G: 'المحور', H: 'ملاحظات', I: 'الميزانية' },
+      taskCol: 'عمود المهمة',
+      fields: { title: 'العنوان', stage: 'المرحلة', due: 'تاريخ الاستحقاق', assignee: 'المسؤول', owner: 'المالك', priority: 'الأولوية', platform: 'المنصة', type: 'نوع المحتوى', theme: 'المحور', pillar: 'الركيزة', 'link:doc': 'رابط مستند العمل', 'link:design': 'رابط التصميم', 'link:post': 'رابط المنشور', 'link:published': 'رابط النشر', none: 'غير مربوط (للورقة فقط)' },
+      stages: { todo: 'للتنفيذ', planned: 'مخطط', design: 'التصميم النهائي', ready: 'جاهز للنشر', pub: 'منشور', script: 'السيناريو' },
+      na: 'لا ينطبق', notes: { notLinked: 'غير مربوط', two: 'مهمتان بهذا العنوان', removed: 'حُذفت المهمة', dropped: 'متوقفة' },
+      marker: 'فتح المهمة', refusedTitle: 'لم يتغيّر', refused: 'لا يحرّك هذه المهمة إلا منى (المالكة) أو أحمد (المسؤول). اطلب منهما أو من مشرف.',
+      toast: 'لم تتغيّر خليتان (لا يمكنك تعديلهما)', toastMore: 'عرض', tabs: ['خطة مايو', 'أفكار'],
+      linkT: 'الربط باللوحة', step1: 'عمود المهمة', step2: 'الحقول', step3: 'النتيجة', next: 'التالي', back: 'رجوع', done: 'تم', cancel: 'إلغاء', review: 'مراجعة الصفوف',
+      s1: 'أي عمود يحدد مهمة كل صف؟ يصلح رابط المهمة (نسخ الرابط من اللوحة) أو عنوانها الدقيق.',
+      sample: 'مثل', s2: 'أي الأعمدة تتبع المهمة؟ اترك العمود «غير مربوط» ليبقى عمودًا في الورقة. يُستخدم كل حقل مرة واحدة.',
+      s3: 'رُبطت الصفوف بمهامها. تعرض الخلايا المربوطة الآن قيم كل مهمة، والتعديلات تُحفظ في المهمة.',
+      linked: 'مربوط', notFound: 'غير موجود', toChoose: 'للاختيار',
+      used: 'يستخدمه', chooseT: 'اختيار مهمة', chooseP: '«Carousel» يطابق مهمتين. اختر المهمة التي يقصدها الصف 5.', search: 'البحث في كل المهام', pick: 'ربط الصف 5',
+      addT: 'إضافة مهام', addP: 'كل مهمة تحددها تصبح صفًا مربوطًا تحت الصف 7.', allStages: 'أي مرحلة', anyone: 'أي شخص', anyProject: 'أي مشروع', addBtn: n => `إضافة ${n} صفوف`, selected: n => `تم تحديد ${n}`,
+      createT: 'إنشاء مهام للصفوف', createP: 'يصبح كل صف مهمة في اللوحة في «للتنفيذ» بلا محور أو ركيزة. ستكون مالكها ما لم يحدد الصف مالكًا.',
+      toCreate: 'للإنشاء', problems: 'تحتاج إصلاحًا', leftOut: 'مستبعدة', colTitle: 'العنوان', colDue: 'الاستحقاق', colAssignee: 'المسؤول', colStage: 'المرحلة',
+      noTitle: 'المهمة تحتاج عنوانًا', unknown: 'لا يوجد عضو باسم «Samah». اختر شخصًا أو اترك الحقل فارغًا.', leave: 'استبعاد', bringBack: 'إرجاع',
+      sharedDue: 'تاريخ الاستحقاق للصفوف التي بلا تاريخ', createBtn: n => `إنشاء ${n} مهام`, undoNote: 'التراجع يلغي ربط هذه الصفوف، وتبقى المهام في اللوحة.',
+      pickMember: 'اختر عضوًا',
+      notesT: [
+        ['ورقة تتبع اللوحة', ['عمود واحد (المهمة) يحدد مهمة كل صف برابطها أو عنوانها الدقيق.', 'يمكن لأعمدة أخرى أن تمثل حقول المهمة، وتوضح الشارة على العنوان أيها.', 'الأعمدة بلا شارة تبقى خلايا عادية في الورقة: ملاحظات أو ميزانيات أو غير ذلك.', 'التنسيق والتعليقات والفرز والتصفية وبقية أدوات الورقة تعمل كما هي.']],
+        ['التعديلات تتبع قواعد اللوحة', ['العنوان والتواريخ والأشخاص والروابط تُحفظ في المهمة كأنها عُدّلت في اللوحة.', 'المرحلة التي لا تسمح بها قواعد النقل تُرفض مع سبب اللوحة، والنقل إلى مرحلتك يحتفل.', 'تُتخطى الخلايا التي لا يمكنك تعديلها وتُحصى.', 'تظهر تغييرات اللوحة عند عودتك إلى التبويب وكل 60 ثانية.']],
+        ['عندما لا تتطابق الصفوف', ['غير مربوط: أصلح الرابط أو العنوان، أو أنشئ مهمة للصف.', 'مهمتان بهذا العنوان: اختر واحدة فتحتوي الخلية على رابطها.', 'حُذفت المهمة: يحتفظ الصف بآخر قيمه نصًا عاديًا.', 'المحور والركيزة للمحتوى فقط، فيعرض صف الفيديو «لا ينطبق».']],
+        ['لا يضيع شيء من اللوحة', ['حذف الصفوف أو الأعمدة أو الورقة لا يغيّر أي مهمة.', 'إلغاء ربط عمود يُبقي قيمه نصًا عاديًا.', 'إنشاء مهام للصفوف يضيف مهام عادية في «للتنفيذ»، والتراجع يلغي الربط ويُبقي المهام.', 'إضافة مهام… تضع المهام في صفوف جديدة، ولا تضيف الورقة صفوفًا بنفسها.']],
+      ],
+    },
+  }
+  const L = () => T[S.lang]
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+  // Stage pills (the board's own colours are content here).
+  const PILL = { todo: ['#EEF0F4', '#3A4150'], planned: ['#E7EEFF', '#2643A6'], script: ['#FFF1D6', '#8A5300'], design: ['#F1E6FF', '#5B2A9E'], ready: ['#DDF6EA', '#0F6B45'], pub: ['#14131A', '#FFFFFF'] }
+  const pill = k => `<span class="pill" style="background:${PILL[k][0]};color:${PILL[k][1]}">${esc(L().stages[k])}</span>`
+  const AV = { Samaa: '#7C3AED', Ahmed: '#0E7490', Mona: '#B4235A', Omar: '#4D7C0F' }
+  const chip = n => n ? `<span class="chip"><i style="background:${AV[n]}">${n[0]}</i>${n}</span>` : ''
+
+  const ROWS = [
+    { id: 1, task: 'momentum.app/board?task=7f3a…', title: 'Ramadan teaser reel', stage: 'design', due: '2026-05-12', who: 'Samaa', design: 'canva.com/d/rt-…', theme: 'Ramadan', notes: 'Hook in the first 3 s', budget: '12,500' },
+    { id: 2, task: 'momentum.app/board?task=91c0…', title: 'Launch post: Suez report', stage: 'ready', due: '2026-05-14', who: 'Ahmed', design: 'canva.com/d/sz-…', theme: 'Reports', notes: 'Needs legal OK', budget: '4,000', refused: 'C' },
+    { id: 3, task: 'Recap video: Q1', video: true, title: 'Recap video: Q1', stage: 'script', due: '2026-05-20', who: 'Omar', design: '', theme: null, notes: '', budget: '30,000' },
+    { id: 4, task: 'momentum.app/board?task=2b88…', title: 'Founders Q&A', stage: 'planned', due: '2026-05-22', who: 'Mona', design: '', theme: 'Leadership', notes: '', budget: '900' },
+    { id: 5, task: 'Carousel', note: 'two', title: 'Carousel', notes: 'Which one?', budget: '' },
+    { id: 6, task: 'Eid giveaway', note: 'notLinked', title: 'Eid giveaway', notes: 'New idea', budget: '7,000' },
+    { id: 7, task: 'Old brief', note: 'removed', title: 'Old brief', stageText: 'Planned', due: '2026-04-02', who: 'Ahmed', notes: '', budget: '' },
+  ]
+  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+  const W = { A: 220, B: 200, C: 140, D: 104, E: 120, F: 140, G: 110, H: 160, I: 90 }
+  const fieldOf = col => S.map[col]
+
+  function cellHtml(r, col, ri) {
+    const t = L(), mapped = !!fieldOf(col), linked = !r.note
+    let cls = 'c', v = ''
+    if (col === 'A') {
+      const isLink = r.task.startsWith('momentum')
+      v = `<span class="v ${isLink ? 'tl' : ''}">${esc(r.task)}</span>` + (r.note ? `<button class="note-chip ${r.note === 'two' ? 'warn' : r.note === 'removed' ? 'drop' : 'bad'}" data-rnote="${r.note}">${esc(t.notes[r.note])}</button>` : '')
+    } else if (col === 'H') v = `<span class="v">${esc(r.notes || '')}</span>`
+    else if (col === 'I') { v = `<span class="v">${esc(r.budget || '')}</span>`; cls += ' mono' }
+    else if (mapped && linked) {
+      cls += ' lk'
+      if (col === 'B') v = `<span class="v">${esc(r.title)}</span>`
+      if (col === 'C') v = pill(r.stage)
+      if (col === 'D') { v = `<span class="v">${esc(r.due)}</span>`; cls += ' mono' }
+      if (col === 'E') v = chip(r.who)
+      if (col === 'F') v = r.design ? `<a class="v" href="#" tabindex="-1">${esc(r.design)}</a>` : ''
+      if (col === 'G') { if (r.video) { cls = 'c na'; v = `<span class="v">${esc(t.na)}</span>` } else v = `<span class="v">${esc(r.theme)}</span>` }
+      if (r.refused === col) cls += ' refused'
+    } else {
+      // Not linked or removed: the last value the sheet showed, as plain text.
+      if (col === 'B') v = `<span class="v">${esc(r.title || '')}</span>`
+      if (col === 'C' && r.stageText) v = `<span class="v">${esc(r.stageText)}</span>`
+      if (col === 'D' && r.due) { v = `<span class="v">${esc(r.due)}</span>`; cls += ' mono' }
+      if (col === 'E' && r.who) v = `<span class="v">${esc(r.who)}</span>`
+    }
+    return `<div class="${cls}" data-r="${ri}" data-c="${col}">${v}</div>`
+  }
+
+  function sheetHtml() {
+    const t = L()
+    const cols = S.dev === 'phone' ? ['A', 'B', 'C', 'D'] : COLS
+    const tpl = `46px ${cols.map(c => `${S.dev === 'phone' ? Math.min(W[c], 130) : W[c]}px`).join(' ')}`
+    let h = `<div class="g" style="grid-template-columns:${tpl}"><div class="c corner"></div>`
+    for (const c of cols) {
+      const f = fieldOf(c)
+      h += `<div class="c h${c === 'A' ? ' task-col' : ''}" title="${f ? esc(t.fields[f]) : ''}">${c}${c === 'A' ? `<span class="tc">${esc(t.taskCol)}</span>` : f ? `<span class="fb-badge" data-field-badge>${esc(t.fields[f])}</span>` : ''}</div>`
+    }
+    h += `<div class="c rn">1</div>` + cols.map(c => `<div class="c" style="font-weight:700;color:var(--ink)">${esc(t.cols[c])}</div>`).join('')
+    ROWS.forEach((r, i) => {
+      h += `<div class="c rn">${!r.note ? `<button class="mk" data-task-marker aria-label="${esc(t.marker)}: ${esc(r.title)}" title="${esc(t.marker)}">↗</button>` : ''}${i + 2}</div>`
+      h += cols.map(c => cellHtml(r, c, i)).join('')
+    })
+    for (let i = 9; i <= 18; i++) h += `<div class="c rn">${i}</div>` + cols.map(() => '<div class="c"></div>').join('')
+    return h + '</div>'
+  }
+
+  function boardMenu() {
+    const m = L().boardMenu
+    return `<div class="menu" role="menu" aria-label="${esc(L().board)}" style="top:94px;inset-inline-end:16px">
+      <button class="mi" role="menuitem" data-go="link">${esc(m.link)}</button>
+      <button class="mi" role="menuitem" data-go="add">${esc(m.add)}</button>
+      <button class="mi" role="menuitem" data-go="create">${esc(m.create)}</button>
+      <button class="mi" role="menuitem">${esc(m.refresh)}</button><hr>
+      <button class="mi" role="menuitem">${esc(m.unlink)}</button></div>`
+  }
+
+  function linkDialog() {
+    const t = L(), steps = [t.step1, t.step2, t.step3]
+    const head = `<div class="steps">${steps.map((s, i) => `<span class="${S.step === i + 1 ? 'on' : ''}" style="display:inline-flex;gap:6px;align-items:center"><i>${i + 1}</i>${esc(s)}</span>${i < 2 ? '<span aria-hidden="true">›</span>' : ''}`).join('')}</div>`
+    let body = ''
+    if (S.step === 1) {
+      body = `<p>${esc(t.s1)}</p><div class="colpick" role="radiogroup" aria-label="${esc(t.step1)}">${COLS.map(c => `<label><input type="radio" name="tc" value="${c}" ${S.taskCol === c ? 'checked' : ''} data-tc="${c}"><span class="lt">${c}</span><span>${esc(t.cols[c])}<br><small>${esc(t.sample)} ${esc(ROWS[0][{ A: 'task', B: 'title', C: 'stage', D: 'due', E: 'who', F: 'design', G: 'theme', H: 'notes', I: 'budget' }[c]] ?? '')}</small></span></label>`).join('')}</div>`
+    } else if (S.step === 2) {
+      const all = Object.keys(t.fields).filter(f => f !== 'none')
+      body = `<p>${esc(t.s2)}</p><div>${COLS.filter(c => c !== S.taskCol).map(c => {
+        const cur = S.map[c] || ''
+        return `<div class="maprow"><span class="lt">${c}</span><span>${esc(t.cols[c])}</span><select data-map="${c}" aria-label="${esc(t.cols[c])}" class="${cur ? 'set' : ''}"><option value="">${esc(t.fields.none)}</option>${all.map(f => { const by = Object.entries(S.map).find(([k, v]) => v === f && k !== c); return `<option value="${f}" ${cur === f ? 'selected' : ''}>${esc(t.fields[f])}${by ? ` · ${esc(t.used)} ${by[0]}` : ''}</option>` }).join('')}</select></div>`
+      }).join('')}</div>`
+    } else {
+      body = `<p>${esc(t.s3)}</p><div class="result"><div><b>4</b><small>${esc(t.linked)}</small></div><div class="warn"><b>1</b><small>${esc(t.toChoose)}</small></div><div class="warn"><b>2</b><small>${esc(t.notFound)}</small></div></div>`
+    }
+    const row = S.step === 3
+      ? `<button class="btn" data-go="choose">${esc(t.review)}</button><button class="btn go" data-go="sheet">${esc(t.done)}</button>`
+      : `${S.step > 1 ? `<button class="btn" data-step="${S.step - 1}">${esc(t.back)}</button>` : `<button class="btn" data-go="sheet">${esc(t.cancel)}</button>`}<button class="btn go" data-step="${S.step + 1}">${esc(t.next)}</button>`
+    return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="lk-t" data-link-board><h2 id="lk-t">${esc(t.linkT)}</h2>${head}${body}<div class="row">${row}</div></div></div>`
+  }
+
+  const TASKS = [
+    { id: 'c1', name: 'Carousel', meta: ['ready', 'Reports · Samaa'] },
+    { id: 'c2', name: 'Carousel', meta: ['planned', 'Ramadan · Mona'] },
+    { id: 't1', name: 'Carousel: hiring', meta: ['todo', 'Careers · Ahmed'] },
+  ]
+  const PICK = [
+    { id: 't2', name: 'Annual report launch', meta: ['design', 'Reports · Samaa'] },
+    { id: 't3', name: 'Ramadan iftar reel', meta: ['script', 'Ramadan · Omar'] },
+    { id: 't4', name: 'Sustainability explainer (video)', meta: ['planned', 'Video · Omar'] },
+    { id: 't5', name: 'CEO interview clips', meta: ['ready', 'Leadership · Mona'] },
+    { id: 't6', name: 'Newsletter: May', meta: ['pub', 'Newsletter · Ahmed'] },
+  ]
+  const trow = (x, mode) => `<button class="trow" role="${mode === 'radio' ? 'radio' : 'checkbox'}" ${mode === 'radio' ? `aria-checked="${S.choose === x.id}" aria-selected="${S.choose === x.id}"` : `aria-checked="${S.ticks.has(x.id)}"`} data-${mode}="${x.id}">
+      ${mode === 'radio' ? '<span class="radio" aria-hidden="true"></span>' : '<span class="tick" aria-hidden="true">✓</span>'}
+      <span class="tt"><b>${esc(x.name)}</b><small>${esc(x.meta[1])}</small></span>${pill(x.meta[0])}</button>`
+
+  function chooseDialog() {
+    const t = L()
+    return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="ch-t" data-choose-task><h2 id="ch-t">${esc(t.chooseT)}</h2><p>${esc(t.chooseP)}</p>
+      <div class="search"><input type="search" id="ch-q" value="Carousel" aria-label="${esc(t.search)}" placeholder="${esc(t.search)}"></div>
+      <div class="tasklist" role="radiogroup" aria-label="${esc(t.chooseT)}">${TASKS.map(x => trow(x, 'radio')).join('')}</div>
+      <div class="row"><button class="btn" data-go="sheet">${esc(t.cancel)}</button><button class="btn go" data-go="sheet">${esc(t.pick)}</button></div></div></div>`
+  }
+
+  function addDialog() {
+    const t = L()
+    return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="ad-t" data-add-tasks><h2 id="ad-t">${esc(t.addT)}</h2><p>${esc(t.addP)}</p>
+      <div class="search"><input type="search" id="ad-q" aria-label="${esc(t.search)}" placeholder="${esc(t.search)}">
+        <select id="ad-s" aria-label="${esc(t.allStages)}"><option>${esc(t.allStages)}</option>${Object.keys(PILL).map(k => `<option>${esc(t.stages[k])}</option>`).join('')}</select>
+        <select id="ad-p" aria-label="${esc(t.anyone)}"><option>${esc(t.anyone)}</option>${Object.keys(AV).map(n => `<option>${n}</option>`).join('')}</select>
+        <select id="ad-j" aria-label="${esc(t.anyProject)}"><option>${esc(t.anyProject)}</option><option>Reports</option><option>Ramadan</option><option>Video</option></select></div>
+      <div class="tasklist" role="group" aria-label="${esc(t.addT)}">${PICK.map(x => trow(x, 'tick')).join('')}</div>
+      <div class="row" style="justify-content:space-between;align-items:center"><span class="hint">${esc(t.selected(S.ticks.size))}</span><span style="display:flex;gap:8px"><button class="btn" data-go="sheet">${esc(t.cancel)}</button><button class="btn go" data-go="sheet" ${S.ticks.size ? '' : 'disabled'}>${esc(t.addBtn(S.ticks.size))}</button></span></div></div></div>`
+  }
+
+  function createDialog() {
+    const t = L()
+    const rows = [
+      { id: 'r6', n: 6, title: 'Eid giveaway', due: '', who: 'Samaa' },
+      { id: 'r8', n: 8, title: 'Behind the scenes: shoot day', due: '2026-05-28', who: '' },
+      { id: 'r9', n: 9, title: '', due: '2026-05-30', who: 'Omar', err: 'noTitle' },
+      { id: 'r10', n: 10, title: 'Team spotlight', due: '', who: 'Samah', err: 'unknown' },
+    ]
+    const live = rows.filter(r => !S.out.has(r.id))
+    const fixed = r => (r.err === 'noTitle' && (S.fix[r.id] || '').trim()) || (r.err === 'unknown' && S.fix[r.id])
+    const bad = live.filter(r => r.err && !fixed(r))
+    const n = live.length - bad.length
+    const tr = r => {
+      const out = S.out.has(r.id)
+      const title = r.err === 'noTitle' ? `<input type="text" id="fx-${r.id}" data-fix="${r.id}" value="${esc(S.fix[r.id] || '')}" aria-invalid="${!fixed(r)}" aria-label="${esc(t.colTitle)}, row ${r.n}">${!fixed(r) && !out ? `<span class="err">${esc(t.noTitle)}</span>` : ''}` : esc(r.title)
+      const who = r.err === 'unknown' ? `<select id="fx-${r.id}" data-fix="${r.id}" aria-label="${esc(t.colAssignee)}, row ${r.n}"><option value="">${esc(t.pickMember)}</option>${Object.keys(AV).map(m => `<option ${S.fix[r.id] === m ? 'selected' : ''}>${m}</option>`).join('')}</select>${!fixed(r) && !out ? `<span class="err">${esc(t.unknown)}</span>` : ''}` : chip(r.who)
+      return `<tr class="${out ? 'out' : ''}"><td class="mono">${r.n}</td><td>${title}</td><td class="mono">${esc(r.due || '2026-05-18 *')}</td><td>${who}</td><td>${pill('todo')}</td><td><button class="lnk" data-out="${r.id}">${esc(out ? t.bringBack : t.leave)}</button></td></tr>`
+    }
+    return `<div class="scrim"><div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="cr-t" data-create-tasks style="width:min(720px,100%)"><h2 id="cr-t">${esc(t.createT)}</h2><p>${esc(t.createP)}</p>
+      <div class="result"><div><b>${n}</b><small>${esc(t.toCreate)}</small></div><div class="warn"><b>${bad.length}</b><small>${esc(t.problems)}</small></div><div><b>${S.out.size}</b><small>${esc(t.leftOut)}</small></div></div>
+      <div class="wrapx"><table class="prev"><thead><tr><th>#</th><th>${esc(t.colTitle)}</th><th>${esc(t.colDue)}</th><th>${esc(t.colAssignee)}</th><th>${esc(t.colStage)}</th><th></th></tr></thead><tbody>${rows.map(tr).join('')}</tbody></table></div>
+      <label class="due" for="cr-due"><span>* ${esc(t.sharedDue)}</span><input type="date" id="cr-due" value="2026-05-18"></label>
+      <p class="hint">${esc(t.undoNote)}</p>
+      <div class="row"><button class="btn" data-go="sheet">${esc(t.cancel)}</button><button class="btn go" data-go="sheet" ${n && !bad.length ? '' : 'disabled'}>${esc(t.createBtn(n))}</button></div></div></div>`
+  }
+
+  function frame() {
+    const t = L()
+    const dlg = S.screen === 'link' ? linkDialog() : S.screen === 'choose' ? chooseDialog() : S.screen === 'add' ? addDialog() : S.screen === 'create' ? createDialog() : ''
+    const note = S.note ? `<div class="cellnote" role="status" style="top:${S.note.y}px;left:${S.note.x}px"><b>${esc(t.refusedTitle)}</b>${esc(t.refused)}</div>` : ''
+    return `<div class="frame${S.dev === 'phone' ? ' phone' : ''}" dir="${S.lang === 'ar' ? 'rtl' : 'ltr'}" lang="${S.lang}">
+      <div class="top"><div class="crumbs">${esc(t.crumbs)} › ${esc(t.folder)} › <b>${esc(t.sheet)}</b></div><span class="status">${esc(t.saved)}</span></div>
+      <div class="tools"><button class="ib" aria-label="${esc(t.undo)}">↶</button><button class="ib" aria-label="${esc(t.redo)}" disabled>↷</button><span class="sep"></span><span class="lbl">B3</span>
+        <button class="ib push" aria-haspopup="menu" aria-expanded="${S.menu}" data-board-menu>${esc(t.board)} ▾</button><button class="ib">${esc(t.comments)}</button></div>
+      <div class="body"><div class="gridwrap">${sheetHtml()}</div></div>
+      <div class="tabs"><div class="fixed"><span aria-hidden="true">＋</span><span aria-hidden="true">≡</span></div>${t.tabs.map((x, i) => `<button class="tb" role="tab" aria-selected="${i === 0}">${esc(x)}</button>`).join('')}</div>
+      ${S.screen === 'sheet' && S.toast ? `<div class="toast" role="status">${esc(t.toast)}<button data-toast>${esc(t.toastMore)}</button></div>` : ''}
+      ${S.menu ? boardMenu() : ''}${note}${dlg}</div>`
+  }
+
+  const seg = (id, list, key) => { document.getElementById(id).innerHTML = list.map(([k, l]) => `<button type="button" aria-pressed="${S[key] === k}" data-${key}="${k}">${esc(l)}</button>`).join('') }
+  function render() {
+    const t = L()
+    document.getElementById('h-title').textContent = t.title
+    document.getElementById('h-lede').textContent = t.lede
+    document.getElementById('l-screen').textContent = t.lScreen; document.getElementById('l-dev').textContent = t.lDev; document.getElementById('l-lang').textContent = t.lLang
+    seg('seg-screen', t.screens, 'screen'); seg('seg-dev', t.devs, 'dev'); seg('seg-lang', t.langs, 'lang')
+    document.getElementById('hint').textContent = t.hints[S.screen]
+    document.getElementById('frame-host').innerHTML = frame()
+    document.getElementById('notes').innerHTML = t.notesT.map(([h, items]) => `<div class="note"><h4>${esc(h)}</h4><ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')
+    document.documentElement.lang = S.lang
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button, [data-r]')
+    if (!b) { if (S.menu || S.note) { S.menu = false; S.note = null; render() } return }
+    const d = b.dataset
+    if (d.screen) { S.screen = d.screen; S.step = 1; S.menu = false; S.note = null; return render() }
+    if (d.dev) { S.dev = d.dev; return render() }
+    if (d.lang) { S.lang = d.lang; return render() }
+    if ('boardMenu' in d) { S.menu = !S.menu; return render() }
+    if (d.go) { S.screen = d.go; S.step = 1; S.menu = false; return render() }
+    if (d.step) { S.step = Math.max(1, Math.min(3, +d.step)); return render() }
+    if (d.rnote) { S.screen = d.rnote === 'two' ? 'choose' : d.rnote === 'notLinked' ? 'create' : 'sheet'; return render() }
+    if (d.radio) { S.choose = d.radio; return render() }
+    if (d.tick) { S.ticks.has(d.tick) ? S.ticks.delete(d.tick) : S.ticks.add(d.tick); return render() }
+    if (d.out) { S.out.has(d.out) ? S.out.delete(d.out) : S.out.add(d.out); return render() }
+    if ('toast' in d) { S.toast = false; return render() }
+    if ('taskMarker' in d) { b.blur(); return }
+    if (b.classList.contains('refused')) {
+      const host = document.querySelector('.frame').getBoundingClientRect(), r = b.getBoundingClientRect()
+      S.note = { x: Math.max(8, Math.min(r.left - host.left, host.width - 270)), y: r.bottom - host.top + 4 }; return render()
+    }
+    if (S.menu || S.note) { S.menu = false; S.note = null; render() }
+  })
+  document.addEventListener('change', e => {
+    const el = e.target
+    if (el.dataset.tc) { S.taskCol = el.dataset.tc; delete S.map[S.taskCol]; return render() }
+    if (el.dataset.map) { const f = el.value; for (const k of Object.keys(S.map)) if (S.map[k] === f) delete S.map[k]; if (f) S.map[el.dataset.map] = f; else delete S.map[el.dataset.map]; return render() }
+    if (el.dataset.fix && el.tagName === 'SELECT') { S.fix[el.dataset.fix] = el.value; return render() }
+  })
+  document.addEventListener('input', e => {
+    const el = e.target
+    if (el.dataset.fix && el.tagName === 'INPUT') { S.fix[el.dataset.fix] = el.value; const id = el.id, pos = el.selectionStart; render(); const n = document.getElementById(id); if (n) { n.focus(); n.setSelectionRange(pos, pos) } }
+  })
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && (S.menu || S.note || S.screen !== 'sheet')) { S.menu = false; S.note = null; S.screen = 'sheet'; render() } })
+  render()
+})()
+</script>

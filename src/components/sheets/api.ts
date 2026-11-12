@@ -4,6 +4,7 @@
  * the outbox retries; a refusal from the server keeps its own code.
  */
 import * as A from '@/actions/sheets'
+import * as Lk from '@/actions/sheet-links'
 import type { SheetsApi } from './types'
 
 const net = { success: false as const, error: 'network' }
@@ -28,4 +29,13 @@ export const sheetsApi: SheetsApi = {
   reorderSheets: safe(A.reorderSheets),
   loadLinkedSheetExtras: safe(A.loadLinkedSheetExtras),
   applyLinkedFormats: safe(A.applyLinkedFormats),
+  // spec 016
+  linkColumn: safe(Lk.linkColumn),
+  resolveTaskCells: safe(Lk.resolveTaskCells),
+  writeTaskFields: safe(Lk.writeTaskFields),
+  refreshTaskFields: safe(Lk.refreshTaskFields),
+  taskValues: safe(Lk.taskValues),
+  searchTasks: safe(Lk.searchTasks),
+  linkChoices: safe(Lk.linkChoices),
+  createTasksForRows: safe(Lk.createTasksForRows),
 } as SheetsApi

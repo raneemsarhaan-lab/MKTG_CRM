@@ -19,6 +19,14 @@ Teams already plan in blank sheets with their own layout: extra columns, notes, 
 
 This feature lets a blank sheet keep its own layout while chosen columns stay in step with the board.
 
+## Clarifications
+
+### Session 2026-11-11
+
+- Q: Which tasks can a sheet row link to? → A: **Any task in the pipeline** (Content pieces, Video tasks and clips, project tasks).
+- Q: Where do tasks created from unlinked rows go? → A: **Plain board tasks in the first stage**, with no theme or pillar.
+- Q: Should a sheet fill itself with tasks automatically? → A: **No.** Rows are only added by people (typing, pasting, inserting, or Add tasks…).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Connect rows to their tasks (Priority: P1)
@@ -72,7 +80,7 @@ Some rows are new ideas with no task yet. The member selects them and chooses **
 
 **Acceptance Scenarios**:
 
-1. **Given** 3 unlinked rows with a title, **When** the member confirms the preview, **Then** 3 tasks are created where FR-030 says, and the rows are linked.
+1. **Given** 3 unlinked rows with a title, **When** the member confirms the preview, **Then** 3 tasks are created on the board in the first stage, and the rows are linked.
 2. **Given** a row with a problem, **When** the preview opens, **Then** it is shown with its reason and can be fixed in place or left out.
 3. **Given** tasks were just created, **When** the member presses undo, **Then** the rows are unlinked. The tasks are kept, and the message says so, as Paste plan does today.
 
@@ -103,7 +111,7 @@ The linked sheet is still a blank sheet. Row and column insert, delete and move;
 - **A field doesn't fit the cell's value** (a date column receives "next week", a stage name is misspelt). The cell is refused with the reason, and pastes count it as skipped.
 - **A Task column cell is cleared.** The row is unlinked. Mapped cells keep their values as plain text, and undo re-links.
 - **A large sheet.** Linking 2,000 rows reports the result in one message. Rows load their task values without slowing scrolling.
-- **A video task.** Fields that only content pieces have (pillar/theme) are shown as not applicable on that row.
+- **A task that isn't a content piece** (a video, a clip, a project task). Fields only content pieces have (Theme, Pillar) show as "Not applicable" on that row.
 - **Two columns mapped to the same field.** Not allowed: mapping a field already in use moves it to the new column, after a confirmation.
 
 ## Requirements *(mandatory)*
@@ -117,7 +125,7 @@ The linked sheet is still a blank sheet. Row and column insert, delete and move;
 - **FR-003**: Linking MUST report how many rows were linked, how many matched no task, and how many need a choice. Unmatched rows MUST be marked "Not linked".
 - **FR-004**: A linked row MUST show a task marker in its row number. Clicking it opens the task.
 - **FR-005**: Changing, clearing or pasting into a Task cell MUST re-link or unlink the row as one undoable step.
-- **FR-006**: Which tasks a row may link to: [NEEDS CLARIFICATION: any board task (content, video and project tasks), only Content pieces, or Content pieces and Video tasks?]
+- **FR-006**: A row MAY link to any task in the pipeline: Content pieces, Video tasks and their clips, and project tasks. Fields a task doesn't have (Theme and Pillar on a non-content task, for example) show as "Not applicable" on that row, and edits there are refused with that reason.
 
 **Mapping columns**
 
@@ -141,7 +149,7 @@ The linked sheet is still a blank sheet. Row and column insert, delete and move;
 
 **Creating tasks**
 
-- **FR-030**: **Create tasks for rows…** MUST open a preview, as Paste plan does: tasks to create, rows with problems (fixable in place or left out), and rows left out. On confirm, the tasks are created from the mapped columns and the rows are linked. [NEEDS CLARIFICATION: where do new tasks go? As Content pieces under the mapped Theme and Pillar (asked in the preview when missing), as plain board tasks in the first stage, or chosen in the preview?]
+- **FR-030**: **Create tasks for rows…** MUST open a preview, as Paste plan does: tasks to create, rows with problems (fixable in place or left out), and rows left out. On confirm, the tasks are created from the mapped columns and the rows are linked. New tasks are plain board tasks in the pipeline's first stage. They have no theme or pillar, so they don't appear on the Content sheet until someone puts them in one. The member creating them becomes each task's owner, unless an Owner column is mapped.
 - **FR-031**: Undoing a creation MUST unlink the rows and keep the tasks, saying so.
 
 **Sheet behaviour**
@@ -150,7 +158,7 @@ The linked sheet is still a blank sheet. Row and column insert, delete and move;
 - **FR-041**: Deleting a row or a sheet MUST never delete or change a task.
 - **FR-042**: Moving, hiding or resizing a mapped column MUST keep its mapping. Deleting it removes the mapping, and undo restores both.
 - **FR-043**: On a protected sheet, mapped cells MUST follow both rules. The member must be allowed to edit the sheet and the task.
-- **FR-044**: Rows MUST only be added by members: by typing, pasting, inserting, or **Add tasks…**, which picks board tasks to add as linked rows. [NEEDS CLARIFICATION: should a sheet also be able to keep itself filled automatically, e.g. "every task of theme X" added as a row when it is created on the board?]
+- **FR-044**: Rows MUST only be added by members: by typing, pasting, inserting, or **Add tasks…**, which picks board tasks to add as linked rows. A sheet never adds rows by itself when tasks are created on the board.
 - **FR-045**: Every new string MUST be in English and Arabic. The link dialog, the preview and the badges MUST work in Arabic and on a 390 px phone, with 44 px targets, and with no serious or critical axe issues.
 
 ### Key Entities

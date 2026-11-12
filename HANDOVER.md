@@ -618,6 +618,34 @@ Excel's Home tab and threaded comments on every sheet (spec 015, `specs/015-shee
   - `node scripts/spreadsheet-lab/realapp/editing.cjs` (stage 2 on the running app).
   - `node scripts/spreadsheet-lab/realapp/styles.cjs` (stage 3 on the running app).
 
+### Sheet task links
+
+A blank sheet's columns can follow board tasks (spec 016, `specs/016-sheet-task-links/`). Design: `design/sheet-task-links.html`.
+
+- **Data.**
+  - `sheet_rows.task_id`: a row's task, set null when the task is deleted.
+  - `sheets.task_map`: `{ taskCol, fields: { colId: TaskField } }`.
+  - A mapped cell keeps a snapshot of the last value the sheet showed, in `sheet_cells`.
+- **Rules.**
+  - `src/lib/sheet-links.ts` (pure): reading Task cells (links, ids, titles), matching, cleaning a mapping, which fields a task has, and reading typed members, stages, priorities and dates.
+  - `src/lib/sheet-links-server.ts`: values per field, two-query matching, snapshots.
+- **Server.** `src/actions/sheet-links.ts` has `resolveTaskCells`, `linkColumn`, `writeTaskFields`, `refreshTaskFields`, `taskValues`, `searchTasks`, `linkChoices` and `createTasksForRows`.
+  - Every task change calls the board's own actions, so the rules, notifications and celebrations are the board's.
+  - `applySheetChanges` saves `taskMap` and `rowTasks` through the outbox.
+- **Screens.**
+  - `src/components/sheets/links/useTaskLinks.tsx`, whose `applyRouted` sits in front of BlankSheet's `apply`.
+  - `links/LinkDialogs.tsx`: Link to board, Choose a task, Add tasks, Create tasks.
+  - The workbook's Board ▾ menu, beside Comments.
+- **Know before you change it.**
+  - The first row counts as headings unless it holds a task link.
+  - Undo of mapped cells replays through `writeTaskFields` (`replayTaskFields` in the workbook).
+  - The Content and Video sheets can't be linked this way.
+- **Checks.**
+  - `npm run lab:spreadsheet`;
+  - `scripts/spreadsheet-lab/smoke/run.ts`;
+  - `scripts/spreadsheet-lab/smoke/links-perf.ts`;
+  - `node scripts/spreadsheet-lab/realapp/links.cjs`.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.

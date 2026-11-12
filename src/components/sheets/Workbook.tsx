@@ -29,6 +29,8 @@ import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
 import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatState } from './format/bus'
 import { FindPanel, PasteSpecialDialog, readClipboard } from './format/EditTools'
 import { ManageRulesDialog, RuleDialog, SortDialog } from './format/StyleTools'
+import { LINKS_STATE, openLinks, replayTaskFields, type LinksState } from './links/useTaskLinks'
+import type { TaskFieldsChange } from '@/lib/sheet-undo'
 import type { CellStyle, RuleKind } from '@/types/index'
 import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
 import { FormatCellsDialog } from './format/FormatCellsDialog'
@@ -160,6 +162,13 @@ export function Workbook(p: WorkbookProps) {
     })
   }, [open, openBlank, api])
 
+  /** Spec 016: a doc change that isn't an undo step (values from the board). */
+  const patchDoc = useCallback((id: string, fn: (d: SheetDoc) => SheetDoc) => setDocs(d => (d[id] ? { ...d, [id]: fn(d[id]) } : d)), [])
+  /** Spec 016: undo and redo of mapped cells go back through the board's rules (R5). */
+  const tl = useTranslations('sheets.links')
+  function replayFields(id: string, changes: BlankChange[]) {
+    for (const ch of changes) if (ch.kind === 'taskFields') void replayTaskFields(api, id, ch as TaskFieldsChange, fn => patchDoc(id, fn), say, (k, v) => tl(k, v))
+  }
   const apply = useCallback((id: string, label: string, forward: BlankChange[]) => {
     if (!docsRef.current[id]) return
     setDocs(d => ({ ...d, [id]: applyAll(d[id], forward) }))
@@ -175,7 +184,8 @@ export function Workbook(p: WorkbookProps) {
     setDocs(d => ({ ...d, [id]: applyAll(d[id], back) }))
     setStacks(s => ({ ...s, [id]: u.stack }))
     outbox.enqueue(id, toServer(back))
-  }, [outbox])
+    replayFields(id, back)
+  }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
   const doRedo = useCallback(() => {
     const id = openRef.current
     const r = stacksRef.current[id] && redo(stacksRef.current[id])
@@ -184,7 +194,8 @@ export function Workbook(p: WorkbookProps) {
     setDocs(d => ({ ...d, [id]: applyAll(d[id], fwd) }))
     setStacks(s => ({ ...s, [id]: r.stack }))
     outbox.enqueue(id, toServer(fwd))
-  }, [outbox])
+    replayFields(id, fwd)
+  }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The linked tab's history, from its grid (it lives in the board's sheet, not here).
   const [linkedHist, setLinkedHist] = useState({ canUndo: false, canRedo: false })
@@ -216,6 +227,14 @@ export function Workbook(p: WorkbookProps) {
   // Stage 3: Sort, New rule, Manage rules.
   const [styleDlg, setStyleDlg] = useState<{ k: 'sort' } | { k: 'rule'; kind?: RuleKind } | { k: 'rules' } | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
+  // Spec 016: the Board ▾ menu, and what the open blank sheet can offer in it.
+  const [boardMenu, setBoardMenu] = useState<{ x: number; y: number; el: HTMLElement } | null>(null)
+  const [links, setLinks] = useState<LinksState | null>(null)
+  useEffect(() => {
+    const on = (e: Event) => setLinks((e as CustomEvent<LinksState | null>).detail)
+    document.addEventListener(LINKS_STATE, on)
+    return () => document.removeEventListener(LINKS_STATE, on)
+  }, [])
   const [openThreads, setOpenThreads] = useState(0)
   // Format Painter: the next selection in the sheet takes the look (FR-040). Once, or until Esc after a double-click.
   useEffect(() => {
@@ -572,6 +591,12 @@ export function Workbook(p: WorkbookProps) {
         </span>
         {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
         {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
+        {openBlank && doc && (
+          <button type="button" className="fx-sh-ib is-text" data-board-menu="" aria-haspopup="menu" aria-expanded={!!boardMenu}
+                  title={tl('boardTip')} onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(), x = getComputedStyle(el).direction === 'rtl' ? r.left : r.right; setBoardMenu(m => (m ? null : { x, y: r.bottom + 4, el })) }}>
+            {tl('board')} <span aria-hidden="true">▾</span>
+          </button>
+        )}
         <button type="button" className="fx-sh-ib is-text fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
                 title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
@@ -602,7 +627,8 @@ export function Workbook(p: WorkbookProps) {
         {openBlank && (doc
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
-                        onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId} />
+                        onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId}
+                        links={api} patch={fn => patchDoc(doc.id, fn)} />
           : loadError[openId]
             ? <div className="fx-sh-empty" role="alert">{errText(loadError[openId])}</div>
             : <div className="fx-sh-skeleton" data-sheet-loading="" aria-busy="true" />)}
@@ -658,6 +684,16 @@ export function Workbook(p: WorkbookProps) {
       {phone && phoneFormat && fmtState && <FormatSheet state={fmtState} target={fmtTarget} onClose={() => setPhoneFormat(false)} onFormatCells={() => setFormatCells(true)} onFind={replace => setFind({ replace })}
         onRule={() => setStyleDlg({ k: 'rule' })} onManageRules={() => setStyleDlg({ k: 'rules' })} onSortDialog={() => setStyleDlg({ k: 'sort' })} />}
 
+      {boardMenu && (
+        <PopMenu at={{ x: boardMenu.x, y: boardMenu.y }} label={tl('board')} attr="data-board-items" returnTo={boardMenu.el} onClose={() => setBoardMenu(null)}
+          items={[
+            { key: 'link', label: links?.linked ? tl('menu.change') : tl('menu.link'), disabled: !!links?.readOnly, why: links?.readOnly ?? undefined, onSelect: () => openLinks('link') },
+            { key: 'add', label: tl('menu.add'), disabled: !links?.linked || !!links?.readOnly, onSelect: () => openLinks('add') },
+            { key: 'create', label: tl('menu.create'), disabled: !links?.linked || !links?.canCreate || !links?.unlinkedSelected || !!links?.readOnly,
+              why: links?.linked && !links?.canCreate ? tl('menu.cantCreate') : links?.linked && !links?.unlinkedSelected ? tl('menu.noUnlinked') : undefined, onSelect: () => openLinks('create') },
+            { key: 'refresh', label: tl('menu.refresh'), disabled: !links?.linked, onSelect: () => openLinks('refresh') },
+          ]} />
+      )}
       {tabMenu && <PopMenu at={tabMenu.at} items={tabMenu.items} label={tabMenu.label} returnTo={tabMenu.anchor} attr={tabMenu.attr} onClose={() => setTabMenu(null)} />}
 
       {dialog?.kind === 'delete' && (

@@ -335,6 +335,7 @@ model Task {
   video_clips        TaskClip[]        @relation("VideoClips")
   snoozes            TaskSnooze[]
   sheet_values       SheetValue[]
+  sheet_rows         SheetRow[]
   /// Spec 013: row heights on the linked sheets.
   linked_row_heights LinkedRowHeight[]
   notifications      Notification[]
@@ -800,6 +801,8 @@ model Sheet {
   frozen_cols  Int      @default(0)
   /// Spec 015: per-sheet view settings that aren't rows or columns (stage 3's filter).
   view         Json     @default("{}")
+  /// Spec 016 (R2): which column names each row's task, and which columns stand for task fields. Blank sheets only.
+  task_map     Json?
   created_by   String?  @db.Uuid
   updated_by   String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
@@ -831,11 +834,15 @@ model SheetRow {
   height   Int?
   /// Spec 015 stage 2: hidden with Hide rows; Unhide brings it back.
   hidden   Boolean @default(false)
+  /// Spec 016 (R1): the board task this row is about, from the sheet's Task column; null = not linked.
+  task_id  String? @db.Uuid
 
   sheet Sheet       @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+  task  Task?       @relation(fields: [task_id], references: [id], onDelete: SetNull)
   cells SheetCell[]
 
   @@index([sheet_id, position])
+  @@index([task_id])
   @@map("sheet_rows")
 }
 

@@ -9,7 +9,7 @@
  * merges and view settings. A whole column or Ctrl+A is one record, so one
  * step however many cells it covers.
  */
-import type { CellStyle, ConditionalRule, SheetMergeRecord, SheetTableRecord, SheetView } from '@/types/index'
+import type { CellStyle, ConditionalRule, SheetMergeRecord, SheetTableRecord, SheetTaskMap, SheetView, TaskField } from '@/types/index'
 
 /** Formatting, on any sheet: rowKey and colKey as in sheet_formats ('' = every). */
 export type FormatsChange = { kind: 'formats'; items: { rowKey: string; colKey: string; before: CellStyle | null; after: CellStyle | null }[] }
@@ -21,6 +21,12 @@ export type ViewChange = { kind: 'view'; before: Partial<SheetView>; after: Part
 export type RulesChange = { kind: 'rules'; before: ConditionalRule[]; after: ConditionalRule[] }
 /** Stage 3: Format as Table and Convert to range, the whole list before and after (blank sheets). */
 export type TablesChange = { kind: 'tables'; before: SheetTableRecord[]; after: SheetTableRecord[] }
+/** Spec 016: the sheet's column mapping before and after. */
+export type TaskMapChange = { kind: 'taskMap'; before: SheetTaskMap | null; after: SheetTaskMap | null }
+/** Spec 016: rows' tasks before and after (null = not linked). */
+export type RowTasksChange = { kind: 'rowTasks'; rows: { rowId: string; before: string | null; after: string | null }[] }
+/** Spec 016: mapped cells written to tasks, before and after. Saved through writeTaskFields, not the outbox. */
+export type TaskFieldsChange = { kind: 'taskFields'; cells: { rowId: string; field: TaskField; before: string; after: string }[] }
 /** Stage 3: Sort moves rows by changing their positions (blank sheets). */
 export type RowOrderChange = { kind: 'rowOrder'; rows: { id: string; before: number; after: number }[] }
 
@@ -39,6 +45,9 @@ export type BlankChange =
   | RulesChange
   | TablesChange
   | RowOrderChange
+  | TaskMapChange
+  | RowTasksChange
+  | TaskFieldsChange
 
 /** A linked sheet's change: task fields and team columns, before and after. */
 export type LinkedChange =
@@ -70,6 +79,9 @@ export function invert(ch: Change): Change {
     case 'rules': return { kind: 'rules', before: ch.after, after: ch.before }
     case 'tables': return { kind: 'tables', before: ch.after, after: ch.before }
     case 'rowOrder': return { kind: 'rowOrder', rows: ch.rows.map(x => ({ id: x.id, before: x.after, after: x.before })) }
+    case 'taskMap': return { kind: 'taskMap', before: ch.after, after: ch.before }
+    case 'rowTasks': return { kind: 'rowTasks', rows: ch.rows.map(x => ({ rowId: x.rowId, before: x.after, after: x.before })) }
+    case 'taskFields': return { kind: 'taskFields', cells: ch.cells.map(x => ({ ...x, before: x.after, after: x.before })) }
   }
 }
 
