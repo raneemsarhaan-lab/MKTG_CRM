@@ -26,6 +26,8 @@ import { display, formatKey, indexFormats, planBorders, planFormat, planRect, re
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
 import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
 import { FilterMenu } from './format/StyleTools'
+import { useTaskLinks, type LinksApi } from './links/useTaskLinks'
+import { StagePill } from './links/LinkDialogs'
 import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
 import { cellName, colLetters } from '@/lib/sheet-selection'
@@ -52,10 +54,14 @@ export interface BlankSheetProps {
   /** A short message for the workbook's toast (a menu Paste the browser refused). */
   onNotice(text: string): void
   newId(): string
+  /** Spec 016: the link actions, and a change to the doc that isn't an undo step (values from the board). */
+  links?: LinksApi
+  patch?(fn: (doc: SheetDoc) => SheetDoc): void
 }
 
 export function BlankSheet(p: BlankSheetProps) {
   const t = useTranslations('sheets')
+  const tl = useTranslations('sheets.links')
   const { doc } = p
   const [picked, setActive] = useState<ActiveCell | null>(null)
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
@@ -157,6 +163,20 @@ export function BlankSheet(p: BlankSheetProps) {
     if (note) noteTimers.current.set(key, window.setTimeout(() => setNotes(n => ({ ...n, [key]: undefined })), 4000))
   }, [])
 
+  // ── spec 016: columns linked to board tasks ─────────────────────────────
+  const noLinks = useMemo<LinksApi>(() => {
+    const no = async () => ({ success: false as const, error: 'generic' })
+    return { resolveTaskCells: no, writeTaskFields: no, refreshTaskFields: no, taskValues: no, searchTasks: no, linkChoices: no, createTasksForRows: no } as unknown as LinksApi
+  }, [])
+  const lk = useTaskLinks({
+    doc, api: p.links ?? noLinks, ro: p.readOnly, vRows, vCols, rowIndex, colIndex,
+    value: (r, c) => doc.cells[r]?.[c] ?? '',
+    apply: p.apply, patch: fn => p.patch?.(fn), rect: () => rectRef.current, say: p.onNotice, onNote,
+    makeRows: (at, n) => insertAt(doc.rows, at < vRows.length ? rowIndex.get(vRows[at].id) ?? doc.rows.length : doc.rows.length, n, p.newId),
+  })
+  /** Every change goes through the link router: mapped cells to their tasks, the rest as before (spec 016 R5). */
+  const applyR = (label: string, changes: BlankChange[]) => { void lk.applyRouted(label, changes) }
+
   /** Cells to change, with what they held; unchanged ones drop out. */
   function cellChange(list: { rowId: string; colId: string; value: string }[]): BlankChange | null {
     const cells = list
@@ -197,7 +217,7 @@ export function BlankSheet(p: BlankSheetProps) {
       if (JSON.stringify(before) !== JSON.stringify(after)) items.push({ rowKey: r.id, colKey: c.id, before, after })
     }
     if (items.length) forward.push({ kind: 'formats', items })
-    if (forward.length) p.apply(why, forward)
+    if (forward.length) applyR(why, forward)
     return { skipped }
   }
 
@@ -207,12 +227,12 @@ export function BlankSheet(p: BlankSheetProps) {
   const docCol = (at: number) => (at < vCols.length ? colIndex.get(vCols[at].id) ?? doc.cols.length : doc.cols.length)
   function insertRows(at: number, n: number) {
     const made = insertAt(doc.rows, docRow(at), n, p.newId)
-    p.apply('insertRows', [{ kind: 'insertRows', rows: made.map(r => ({ ...r, height: null })) }])
+    applyR('insertRows', [{ kind: 'insertRows', rows: made.map(r => ({ ...r, height: null })) }])
     setSelectRect({ r0: at, c0: 0, r1: at + n - 1, c1: Math.max(0, vCols.length - 1) })
   }
   function insertCols(at: number, n: number) {
     const made = insertAt(doc.cols, docCol(at), n, p.newId)
-    p.apply('insertCols', [{ kind: 'insertCols', cols: made.map(c => ({ ...c, width: null })) }])
+    applyR('insertCols', [{ kind: 'insertCols', cols: made.map(c => ({ ...c, width: null })) }])
     setSelectRect({ r0: 0, c0: at, r1: Math.max(0, vRows.length - 1), c1: at + n - 1 })
   }
   /** Stage 3: a table whose edge row or column is deleted keeps its other rows and columns; one fully deleted goes. */
@@ -238,19 +258,19 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function deleteRows(r0: number, r1: number) {
     const gone = vRows.slice(r0, r1 + 1)
-    p.apply('deleteRows', [...tablesAfter('rows', new Set(gone.map(r => r.id))), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
+    applyR('deleteRows', [...tablesAfter('rows', new Set(gone.map(r => r.id))), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
   }
   function deleteCols(c0: number, c1: number) {
     const gone = vCols.slice(c0, c1 + 1)
-    p.apply('deleteCols', [...tablesAfter('cols', new Set(gone.map(c => c.id))), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
+    applyR('deleteCols', [...tablesAfter('cols', new Set(gone.map(c => c.id))), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
   }
   function setHeights(ids: string[], h: number | null) {
     const list = doc.rows.filter(r => ids.includes(r.id) && r.height !== h).map(r => ({ id: r.id, before: r.height, after: h }))
-    if (list.length) p.apply('rowHeights', [{ kind: 'rowHeights', rows: list }])
+    if (list.length) applyR('rowHeights', [{ kind: 'rowHeights', rows: list }])
   }
   function setWidths(ids: string[], w: number | null) {
     const list = doc.cols.filter(c => ids.includes(c.id) && c.width !== w).map(c => ({ id: c.id, before: c.width, after: w }))
-    if (list.length) p.apply('colWidths', [{ kind: 'colWidths', cols: list }])
+    if (list.length) applyR('colWidths', [{ kind: 'colWidths', cols: list }])
   }
   function clear(q: GridRect) {
     const list: { rowId: string; colId: string; value: string }[] = []
@@ -259,7 +279,7 @@ export function BlankSheet(p: BlankSheetProps) {
       if (row && col && value(row.id, col.id)) list.push({ rowId: row.id, colId: col.id, value: '' })
     }
     const ch = cellChange(list)
-    if (ch) p.apply('clear', [ch])
+    if (ch) applyR('clear', [ch])
   }
 
   /** Back to the grid after a menu or dialog, so the keys (Ctrl+Z…) keep working. */
@@ -366,15 +386,45 @@ export function BlankSheet(p: BlankSheetProps) {
         className: `is-letter${before ? ' is-after-hidden' : ''}`,
       }
     },
+    // Spec 016: the Task column and mapped columns say so on their heading.
+    headerExtra: col => {
+      if (!lk.map) return null
+      if (col === lk.map.taskCol) return <span className="fx-lk-tc" data-task-col-badge="">{tl('taskCol')}</span>
+      const f = lk.map.fields[col]
+      if (!f) return null
+      const name = f.startsWith('col:') ? tl('teamCol', { name: lk.teamCols.find(c => c.id === f.slice(4))?.name ?? '' }) : tl(`fields.${f}`)
+      return <span className="fx-lk-badge" data-field-badge={f} title={tl('badgeTip', { field: name })}>{name}</span>
+    },
     rowProps: row => ({ className: `is-blank${(rowIndex.get(row.id) ?? 0) > 0 && hiddenR.has(doc.rows[(rowIndex.get(row.id) ?? 1) - 1].id) ? ' is-after-hidden' : ''}`, level: 1 }),
     cellRole: () => 'gridcell',
-    cellClass: (_row, col) => (col === 'rowNo' ? 'fx-sheet-td is-frozen-no' : 'fx-sheet-td is-blank-cell'),
-    isText: (_row, col) => col !== 'rowNo' && !ro,
-    textValue: (row, col) => value(row.id, col),
-    copyText: (row, col) => value(row.id, col),
+    cellClass: (row, col) => {
+      if (col === 'rowNo') return 'fx-sheet-td is-frozen-no'
+      const sh = lk.shown(row.id, col)
+      return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : ' is-lk') : ''}`
+    },
+    isText: (row, col) => col !== 'rowNo' && !ro && !lk.shown(row.id, col)?.na,
+    textValue: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
+    copyText: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     isMenu: () => false,
     render: (row, col) => {
       if (col === 'rowNo') return null
+      // Spec 016: a mapped cell on a linked row shows its task's value; the Task cell shows its note.
+      const sh = lk.shown(row.id, col)
+      if (sh) {
+        if (sh.na) return <span className="fx-sheet-cell-text fx-lk-na">{sh.text}</span>
+        if (sh.field === 'stage' && sh.raw) return <StagePill stage={sh.raw} />
+        if (sh.field.startsWith('link:') && sh.raw) return <a className="fx-sheet-link fx-sheet-ellipsis" href={sh.raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} onClick={e => e.stopPropagation()}>{sh.raw.replace(/^https?:\/\//, '')}</a>
+        return <span className="fx-sheet-cell-text" dir="auto">{sh.text}</span>
+      }
+      if (lk.map && col === lk.map.taskCol) {
+        const note = lk.noteOfRow(row.id), v = value(row.id, col), linked = !!lk.taskOfRow(row.id)
+        return <>
+          <span className={`fx-sheet-cell-text${linked ? ' fx-lk-link' : ''}`} dir="auto">{v}</span>
+          {note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
+                           onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); if (note !== 'dropped') void lk.openChoose(row.id) }}>
+            {note === 'choose' ? tl('notes.choose', { n: 2 }) : tl(`notes.${note}`)}</button>}
+        </>
+      }
       const v = value(row.id, col)
       // Stage 3: the filter buttons sit in the filter's header row.
       const fb = fArea && fArea.header === row.id && fArea.cols.includes(col)
@@ -400,6 +450,11 @@ export function BlankSheet(p: BlankSheetProps) {
     },
     rowLabel: row => {
       const i = rowIndex.get(row.id) ?? 0
+      const tk = lk.taskOfRow(row.id)
+      const marker = tk ? <a className="fx-lk-mk" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" data-task-marker={tk.id}
+                             aria-label={tl('marker', { name: tk.name })} title={tl('marker', { name: tk.name })}
+                             onPointerDown={ev => ev.stopPropagation()} onClick={ev => ev.stopPropagation()}>↗</a> : null
+      if (marker) return <>{marker}{i + 1}</>
       if (i > 0 && hiddenR.has(doc.rows[i - 1].id)) {
         return <>{i + 1}<button type="button" className="fx-hid-mark is-row" data-unhide-row={row.id} title={t('format.edit.unhideRows')} aria-label={t('format.edit.unhideRows')}
                                 onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); unhideBefore('rows', i) }} /></>
@@ -409,12 +464,19 @@ export function BlankSheet(p: BlankSheetProps) {
     isDraft: () => false,
     inputLabel: (row, col) => cellName(rowIndex.get(row.id) ?? 0, colIndex.get(col) ?? 0),
     inputDir: () => undefined,
-    readOnlyNote: (_row, col) => (col === 'rowNo' ? null : ro),
+    readOnlyNote: (row, col) => {
+      if (col === 'rowNo') return null
+      if (ro) return ro
+      const sh = lk.shown(row.id, col)
+      if (sh?.na) return tl('naWhy', { field: tl(`fields.${sh.field.startsWith('col:') ? 'none' : sh.field}`) })
+      if (sh && !sh.editable) return lk.taskOfRow(row.id)?.dropped ? tl('why.dropped') : tl('why.not_authorized')
+      return null
+    },
     onCommit: async (row, col, v) => {
       if (ro) return ro
       if (v.length > MAX_CELL) return t('err.too_long')
       const ch = cellChange([{ rowId: row.id, colId: col, value: v }])
-      if (ch) p.apply('edit', [ch])
+      if (ch) applyR('edit', [ch])
       return null
     },
     onCancelDraft: () => {},
@@ -467,13 +529,13 @@ export function BlankSheet(p: BlankSheetProps) {
   function applyItems(label: string, items: FormatItem[] | null) {
     if (ro) { p.onNotice(ro); return }
     if (!items) { p.onNotice(t('format.err.too_many_formats')); return }
-    if (items.length) p.apply(label, [{ kind: 'formats', items }])
+    if (items.length) applyR(label, [{ kind: 'formats', items }])
   }
   function merge(mode: MergeMode) {
     if (ro) { p.onNotice(ro); return }
     const q = rectRef.current
     const hit = boxes.filter(b => b.r0 <= q.r1 && q.r0 <= b.r1 && b.c0 <= q.c1 && q.c0 <= b.c1).map(b => b.m)
-    if (mode === 'unmerge') { if (hit.length) p.apply('unmerge', [{ kind: 'merges', add: [], remove: hit }]); return }
+    if (mode === 'unmerge') { if (hit.length) applyR('unmerge', [{ kind: 'merges', add: [], remove: hit }]); return }
     const groups = mode === 'across' ? Array.from({ length: q.r1 - q.r0 + 1 }, (_, i) => ({ r0: q.r0 + i, r1: q.r0 + i, c0: q.c0, c1: q.c1 })) : [q]
     if (groups.every(g => g.r0 === g.r1 && g.c0 === g.c1)) return
     const clears: { rowId: string; colId: string; value: string }[] = []
@@ -494,7 +556,7 @@ export function BlankSheet(p: BlankSheetProps) {
         const items = planFormat(index, groups.map(g => [vRows[g.r0].id, vCols[g.c0].id] as [string, string]), { ha: 'center' })
         if (items.length) forward.push({ kind: 'formats', items })
       }
-      p.apply('merge', forward)
+      applyR('merge', forward)
     }
     if (clears.length) setMergeAsk({ value: keep, run }); else run()
   }
@@ -502,7 +564,7 @@ export function BlankSheet(p: BlankSheetProps) {
   const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {} })
   function setView(label: string, after: Partial<SheetView>) {
     if (ro) { p.onNotice(ro); return }
-    p.apply(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
+    applyR(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
   }
   /** Hidden rows or columns in or next to the selection (what Unhide brings back). */
   function hiddenNear(kind: 'rows' | 'cols', q: GridRect): string[] {
@@ -571,7 +633,7 @@ export function BlankSheet(p: BlankSheetProps) {
       cellsIn(q, (rid, cid) => { if (marks.has(`${rid}|${cid}`)) keys.push(`${rid}|${cid}`) })
       if (keys.length) clearComments('blank', keys)
     }
-    if (forward.length) p.apply(`clear-${what}`, forward)
+    if (forward.length) applyR(`clear-${what}`, forward)
   }
   /** Fill Down / Right (FR-043): the first row or column's values and look, into the rest. */
   function fill(dir: 'down' | 'right') {
@@ -595,7 +657,7 @@ export function BlankSheet(p: BlankSheetProps) {
       if (JSON.stringify(before) !== JSON.stringify(after)) items.push({ rowKey: x.rowId, colKey: x.colId, before, after })
     }
     if (items.length) forward.push({ kind: 'formats', items })
-    if (forward.length) p.apply(`fill-${dir}`, forward)
+    if (forward.length) applyR(`fill-${dir}`, forward)
   }
   /** Paste Special (FR-041): values only, formats only, or both; optionally transposed. */
   async function pasteSpecial(cmd: Extract<FormatCmd, { kind: 'pasteSpecial' }>) {
@@ -616,7 +678,7 @@ export function BlankSheet(p: BlankSheetProps) {
         const before = index.get(formatKey(row.id, col.id)) ?? null, after = validateStyle(st)
         if (JSON.stringify(before) !== JSON.stringify(after)) items.push({ rowKey: row.id, colKey: col.id, before, after })
       }
-      if (items.length) p.apply('pasteFormats', [{ kind: 'formats', items }])
+      if (items.length) applyR('pasteFormats', [{ kind: 'formats', items }])
     } else {
       const list: CellWrite[] = []
       for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
@@ -660,7 +722,7 @@ export function BlankSheet(p: BlankSheetProps) {
     }
     const list = targets.map(x => ({ rowId: vRows[x.r].id, colId: vCols[x.c].id, value: replaceIn(x.text, cmd.q.query, cmd.by, cmd.q) }))
     const ch = cellChange(list)
-    if (ch) p.apply(cmd.all ? 'replaceAll' : 'replace', [ch])
+    if (ch) applyR(cmd.all ? 'replaceAll' : 'replace', [ch])
     const replaced = ch?.kind === 'cells' ? ch.cells.length : 0
     const total = all.filter(x => matches(x.text, cmd.q.query, cmd.q)).length
     announceFind({ source: 'blank', count: Math.max(0, total - replaced), at: 0, cell: null, replaced, skipped: 0 })
@@ -741,18 +803,18 @@ export function BlankSheet(p: BlankSheetProps) {
     const ordered = sortRows(body, keys, (r, col) => cellView(r.id, col))
     const slots = body.map(r => r.position).sort((x, y) => x - y)
     const moved = ordered.map((r, i) => ({ id: r.id, before: r.position, after: slots[i] })).filter(x => x.before !== x.after)
-    if (moved.length) p.apply('sort', [{ kind: 'rowOrder', rows: moved }])
+    if (moved.length) applyR('sort', [{ kind: 'rowOrder', rows: moved }])
   }
   function formatAsTable(style: string) {
     if (ro) { p.onNotice(ro); return }
     const cur = active ? tableAt(active.key, active.col) : null
-    if (cur) { p.apply('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
+    if (cur) { applyR('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
     const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
     const d0 = rowIndex.get(vRows[q.r0].id) ?? 0, d1 = rowIndex.get(vRows[q.r1].id) ?? 0, e0 = colIndex.get(vCols[q.c0].id) ?? 0, e1 = colIndex.get(vCols[q.c1].id) ?? 0
     if (tableBoxes.some(b => b.dr[0] <= d1 && d0 <= b.dr[1] && b.dc[0] <= e1 && e0 <= b.dc[1])) { p.onNotice(sheetT('tableOverlap')); return }
     if (boxes.some(b => b.r0 <= q.r1 && q.r0 <= b.r1 && b.c0 <= q.c1 && q.c0 <= b.c1)) { p.onNotice(sheetT('tableMerged')); return }
     const rec: SheetTableRecord = { id: p.newId(), top: vRows[q.r0].id, bottom: vRows[q.r1].id, left: vCols[q.c0].id, right: vCols[q.c1].id, style, header: true, banded: true }
-    p.apply('table', [
+    applyR('table', [
       { kind: 'tables', before: tables, after: [...tables, rec] },
       { kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: { header: rec.top, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: rec.bottom }, filter: {} } },
     ])
@@ -764,7 +826,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (!cur) return
     const forward: BlankChange[] = [{ kind: 'tables', before: tables, after: tables.filter(x => x.id !== cur.id) }]
     if (fArea?.header === cur.top) forward.push({ kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: null, filter: {} } })
-    p.apply('tableOff', forward)
+    applyR('tableOff', forward)
   }
   function filterCmd(op: 'toggle' | 'clear' | 'reapply') {
     if (op === 'clear') { if (Object.keys(filter).length) setView('filterClear', { filter: {} }); return }
@@ -791,7 +853,7 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function setRules(label: string, after: ConditionalRule[]) {
     if (ro) { p.onNotice(ro); return }
-    p.apply(label, [{ kind: 'rules', before: rules, after }])
+    applyR(label, [{ kind: 'rules', before: rules, after }])
   }
   function ruleNew(rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'>) {
     const q = rectRef.current
@@ -895,6 +957,7 @@ export function BlankSheet(p: BlankSheetProps) {
         <PopMenu at={menu.at} items={menu.items} label={t('tabMenu.label')} attr="data-cell-menu"
                  onClose={() => { setMenu(null); focusActive() }} />
       )}
+      {lk.node}
       {filterUi && (() => {
         const others = { ...filter }
         delete others[filterUi.col]

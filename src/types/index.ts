@@ -442,6 +442,9 @@ export interface SheetChanges {
   tables?: { put?: SheetTableRecord[]; remove?: string[] }
   /** Stage 3: Sort moves rows by rewriting their positions. */
   rowPositions?: { id: string; position: number }[]
+  /** Spec 016: the column mapping (null unlinks the sheet), and rows' tasks (null unlinks a row). */
+  taskMap?: SheetTaskMap | null
+  rowTasks?: { rowId: string; taskId: string | null }[]
 }
 export interface ViewWrite {
   frozenRows?: number
@@ -585,6 +588,29 @@ export interface ConditionalRule {
   style: CellStyle | null
   priority: number
 }
+// ─── Spec 016: a blank sheet's columns linked to board tasks ────────────────
+
+export const TASK_FIELDS = ['title', 'stage', 'due', 'assignee', 'owner', 'priority', 'platform', 'type', 'theme', 'pillar', 'link:doc', 'link:design', 'link:post', 'link:published'] as const
+/** A task field a column can stand for; `col:<id>` is one of the team's own Content columns (spec 010). */
+export type TaskField = typeof TASK_FIELDS[number] | `col:${string}`
+export interface SheetTaskMap { taskCol: string; fields: Record<string, TaskField> }
+export type TaskFieldValues = Partial<Record<TaskField, string>>
+/** A linked task as a sheet sees it: the shown text of each mapped field. */
+export interface LinkedTask {
+  id: string
+  name: string
+  values: TaskFieldValues
+  /** Raw values for display: the stage id, member ids. */
+  stage: string
+  dropped: boolean
+  /** This member may change the task's fields (owner, assignee, admin, superuser). */
+  editable: boolean
+  /** The fields this task has (a video has no theme or pillar). */
+  applies: TaskField[]
+}
+export interface TaskFieldWrite { rowId: string; field: TaskField; value: string }
+export interface TaskFieldResult { rowId: string; field: TaskField; ok: boolean; reason?: string; shown?: string; celebrate?: boolean; stageLabel?: string }
+
 export interface SheetTableRecord { id: string; top: string; left: string; bottom: string; right: string; style: string; header: boolean; banded: boolean }
 /** Formatting, merges, view and thread summaries for one sheet (blank or linked). */
 export interface SheetExtras {
@@ -595,6 +621,10 @@ export interface SheetExtras {
   /** Stage 3. */
   rules?: ConditionalRule[]
   tables?: SheetTableRecord[]
+  /** Spec 016: the column mapping, each linked row's task, and those tasks' values. */
+  taskMap?: SheetTaskMap | null
+  rowTasks?: Record<string, string>
+  tasks?: Record<string, LinkedTask>
 }
 /** A format write: `set` replaces the record's style, `merge` lays the fields over it; null clears it. */
 export interface FormatWrite { rowKey: string; colKey: string; style: CellStyle | null; mode: 'set' | 'merge' }

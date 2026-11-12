@@ -323,6 +323,56 @@ export async function runPure(lab, root) {
     eq(h.toServer([{ kind: 'rowOrder', rows: [{ id: 'r1', before: 1, after: 2 }] }]).rowPositions, [{ id: 'r1', position: 2 }], 'and saves the positions')
     eq(h.viewWrite({ filter: {} }, { filter: { c: { values: ['a'] } } }), { filter: { c: { values: ['a'] } } }, 'the filter is saved whole')
   })
+  // ── spec 016: links to board tasks ─────────────────────────────────────────
+  await check('links-match', () => {
+    const id = '7f3a2b1c-1111-4222-8333-944455556666'
+    eq(h.taskIdFrom(`https://app.example/board?task=${id}`), id, 'a board link')
+    eq(h.taskIdFrom(`/board?task=${id.toUpperCase()}&x=1`), id, 'a relative link, any case')
+    eq(h.taskIdFrom(` ${id} `), id, 'a bare id')
+    eq(h.taskIdFrom('Ramadan teaser'), null, 'a title is not an id')
+    eq(h.normTitle('  Ramadan   Teaser '), 'ramadan teaser', 'titles ignore case and spaces')
+    const byTitle = new Map([['ramadan teaser', ['a']], ['carousel', ['b', 'c']]])
+    const r = h.matchCells([
+      { rowId: 'r1', text: `/board?task=${id}` }, { rowId: 'r2', text: 'Ramadan  teaser' }, { rowId: 'r3', text: 'Carousel' },
+      { rowId: 'r4', text: 'Nope' }, { rowId: 'r5', text: '' }, { rowId: 'r6', text: '/board?task=00000000-0000-4000-8000-000000000000' },
+    ], new Set([id]), byTitle)
+    eq(r.linked, [{ rowId: 'r1', taskId: id }, { rowId: 'r2', taskId: 'a' }], 'links and unique titles link')
+    eq(r.ambiguous, [{ rowId: 'r3', text: 'Carousel', choices: ['b', 'c'] }], 'a shared title asks')
+    eq(r.unmatched.map(x => x.rowId), ['r4', 'r6'], 'unknown titles and links are not found')
+    eq(r.empty, ['r5'], 'empty cells are left alone')
+  })
+  await check('links-map', () => {
+    const cols = new Set(['A', 'B', 'C', 'D']), team = new Set(['t1'])
+    eq(h.cleanMap({ taskCol: 'A', fields: { A: 'title', B: 'title', C: 'title', D: 'col:t1', E: 'stage' } }, cols, team), { taskCol: 'A', fields: { B: 'title', D: 'col:t1' } }, 'the Task column, a repeated field and unknown columns are dropped')
+    eq(h.cleanMap({ taskCol: 'Z', fields: {} }, cols, team), null, 'an unknown Task column unlinks')
+    eq(h.cleanMap({ taskCol: 'A', fields: { B: 'col:nope', C: 'bogus' } }, cols, team), { taskCol: 'A', fields: {} }, 'unknown fields are dropped')
+    const piece = { piece: true, video: false, clip: false }, video = { piece: false, video: true, clip: false }, plain = { piece: false, video: false, clip: false }
+    ok(h.fieldApplies(piece, 'theme') && !h.fieldApplies(video, 'theme') && !h.fieldApplies(plain, 'pillar'), 'theme and pillar are for content pieces')
+    ok(h.fieldApplies(video, 'link:design') && !h.fieldApplies(plain, 'link:design'), 'links are for pieces and videos')
+    ok(h.fieldApplies(plain, 'stage') && h.fieldApplies(plain, 'due'), 'every task has a stage and a due date')
+    const people = [{ id: '1', name: 'Samaa Ali' }, { id: '2', name: 'Ahmed Omar' }, { id: '3', name: 'Ahmed Saleh' }]
+    eq(h.matchMember('samaa ali', people), { id: '1' }, 'a full name, any case')
+    eq(h.matchMember('Samaa', people), { id: '1' }, 'a first name only one member has')
+    eq(h.matchMember('Ahmed', people), 'ambiguous', 'a first name two members share')
+    eq(h.matchMember('Mona', people), 'none', 'nobody')
+    eq(h.matchStage('ready to publish', [{ id: 'ready-publish', names: ['Ready to Publish', 'جاهز للنشر'] }]), 'ready-publish', 'a stage by its name')
+    eq(h.matchStage('جاهز للنشر', [{ id: 'ready-publish', names: ['Ready to Publish', 'جاهز للنشر'] }]), 'ready-publish', 'or its Arabic name')
+    eq(h.matchPriority('HIGH'), 'High', 'priorities')
+    eq(h.readDay('16/11/2026'), '2026-11-16', 'dates as typed')
+  })
+  await check('links-undo', () => {
+    const map = { taskCol: 'A', fields: { B: 'title' } }
+    eq(h.invert({ kind: 'taskMap', before: null, after: map }), { kind: 'taskMap', before: map, after: null }, 'mapping undo')
+    eq(h.invert({ kind: 'rowTasks', rows: [{ rowId: 'r', before: null, after: 't' }] }).rows, [{ rowId: 'r', before: 't', after: null }], 'row link undo')
+    eq(h.invert({ kind: 'taskFields', cells: [{ rowId: 'r', field: 'title', before: 'a', after: 'b' }] }).cells[0].after, 'a', 'field undo')
+    const s = h.toServer([{ kind: 'taskMap', before: null, after: map }, { kind: 'rowTasks', rows: [{ rowId: 'r', before: null, after: 't' }, { rowId: 'r', before: 't', after: null }] }, { kind: 'taskFields', cells: [] }])
+    eq(s.taskMap, map, 'the mapping is saved')
+    eq(s.rowTasks, [{ rowId: 'r', taskId: null }], 'the last link per row is saved')
+    ok(!('taskFields' in s), 'task fields are not sent through the outbox')
+    const doc = { id: 's', rows: [], cols: [], cells: {}, extras: { formats: [], merges: [], view: { frozenRows: 0, frozenCols: 0 }, threads: [], taskMap: map, rowTasks: { r: 't' }, tasks: { t: { id: 't', name: 'n', values: { title: 'a' }, stage: 'todo', dropped: false, editable: true, applies: ['title'] } } } }
+    const d2 = h.applyChange(doc, { kind: 'taskFields', cells: [{ rowId: 'r', field: 'title', before: 'a', after: 'b' }] })
+    eq([d2.cells.r.B, d2.extras.tasks.t.values.title], ['b', 'b'], 'on screen: the snapshot cell and the task value')
+  })
   await check('view-batch', () => {
     eq(h.viewWrite({ frozenRows: 0, hiddenRows: ['a'] }, { frozenRows: 1, hiddenRows: ['a', 'b'] }), { frozenRows: 1, hideRows: ['b'] }, 'a change as hide and freeze writes')
     eq(h.viewWrite({ hiddenCols: ['x', 'y'] }, { hiddenCols: ['y'] }), { showCols: ['x'] }, 'unhide as a show')

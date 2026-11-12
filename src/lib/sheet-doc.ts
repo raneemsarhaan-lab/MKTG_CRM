@@ -96,6 +96,32 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const pos = new Map(ch.rows.map(r => [r.id, r.after]))
       return { ...doc, rows: doc.rows.map(r => (pos.has(r.id) ? { ...r, position: pos.get(r.id)! } : r)).sort(byPos) }
     }
+    case 'taskMap': {
+      const ex = doc.extras ?? emptyExtras()
+      return { ...doc, extras: { ...ex, taskMap: ch.after } }
+    }
+    case 'rowTasks': {
+      const ex = doc.extras ?? emptyExtras()
+      const rowTasks = { ...(ex.rowTasks ?? {}) }
+      for (const r of ch.rows) { if (r.after) rowTasks[r.rowId] = r.after; else delete rowTasks[r.rowId] }
+      return { ...doc, extras: { ...ex, rowTasks } }
+    }
+    case 'taskFields': {
+      // On screen only: the task's values come back from writeTaskFields; the snapshot cell shows the new value meanwhile.
+      const ex = doc.extras ?? emptyExtras()
+      const map = ex.taskMap
+      if (!map) return doc
+      const colOf = new Map(Object.entries(map.fields).map(([c, f]) => [f, c]))
+      const cells = { ...doc.cells }
+      const tasks = { ...(ex.tasks ?? {}) }
+      for (const x of ch.cells) {
+        const col = colOf.get(x.field)
+        if (col) { const row = { ...(cells[x.rowId] ?? {}) }; if (x.after) row[col] = x.after; else delete row[col]; cells[x.rowId] = row }
+        const tid = ex.rowTasks?.[x.rowId]
+        if (tid && tasks[tid]) tasks[tid] = { ...tasks[tid], values: { ...tasks[tid].values, [x.field]: x.after } }
+      }
+      return { ...doc, cells, extras: { ...ex, tasks } }
+    }
   }
 }
 
@@ -142,6 +168,9 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'rules': out.rules = mergeLists<ConditionalRule>(out.rules, listWrite(ch.before, ch.after)); break
       case 'tables': out.tables = mergeLists<SheetTableRecord>(out.tables, listWrite(ch.before, ch.after)); break
       case 'rowOrder': push('rowPositions', ch.rows.map(r => ({ id: r.id, position: r.after }))); break
+      case 'taskMap': out.taskMap = ch.after; break
+      case 'rowTasks': out.rowTasks = lastByRow([...(out.rowTasks ?? []), ...ch.rows.map(r => ({ rowId: r.rowId, taskId: r.after }))]); break
+      case 'taskFields': break
     }
   }
   return out
@@ -164,6 +193,8 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     rules: mergeLists(a.rules, b.rules),
     tables: mergeLists(a.tables, b.tables),
     rowPositions: lastById(cat(a.rowPositions, b.rowPositions)),
+    ...('taskMap' in b ? { taskMap: b.taskMap } : 'taskMap' in a ? { taskMap: a.taskMap } : {}),
+    rowTasks: a.rowTasks || b.rowTasks ? lastByRow([...(a.rowTasks ?? []), ...(b.rowTasks ?? [])]) : undefined,
   }
   // A row inserted and deleted in the same batch never needs to reach the server.
   for (const [ins, del] of [['insertRows', 'deleteRows'], ['insertCols', 'deleteCols']] as const) {
@@ -187,6 +218,11 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
 }
 
 /** For a format record, the last write wins (`set` replaces; a later `merge` lays over a queued `set`). */
+function lastByRow(list: { rowId: string; taskId: string | null }[]) {
+  const last = new Map<string, { rowId: string; taskId: string | null }>()
+  for (const x of list) { last.delete(x.rowId); last.set(x.rowId, x) }
+  return [...last.values()]
+}
 function lastById<T extends { id: string }>(list?: T[]): T[] | undefined {
   if (!list) return undefined
   const last = new Map<string, T>()

@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto'
 import * as A from '@/actions/sheets'
 import * as C from '@/actions/sheet-comments'
+import * as L from '@/actions/sheet-links'
 import { openNotification } from '@/actions/notifications'
 import { prisma } from '@/lib/prisma'
 
@@ -245,6 +246,74 @@ async function main() {
   }
   ok((await A.applyLinkedFormats(lc!.id, { rules: { remove: [lr] }, view: { sort: null, filter: null, filterArea: null } })).success, 'and they can be removed')
   process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+
+  // Spec 016: a blank sheet's columns linked to board tasks.
+  {
+    process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+    const admin = await prisma.member.findFirst({ where: { email: 'raneem.sarhaan@forefront.consulting' } })
+    const member = await prisma.member.findFirst({ where: { email: 'content@forefront.consulting' } })
+    const fld = await prisma.sheetFolder.create({ data: { name: `Links smoke ${Date.now()}`, kind: 'team' } })
+    const sh = await prisma.sheet.create({ data: { folder_id: fld.id, kind: 'blank', name: 'Links', position: 0, row_count: 6, col_count: 4 } })
+    const rows = await Promise.all([1, 2, 3, 4, 5, 6].map(i => prisma.sheetRow.create({ data: { id: randomUUID(), sheet_id: sh.id, position: i } })))
+    const cols = await Promise.all([1, 2, 3, 4].map(i => prisma.sheetCol.create({ data: { id: randomUUID(), sheet_id: sh.id, position: i } })))
+    const mk = (name: string, owner: string, status = 'todo') => prisma.task.create({ data: { name, task_owner_id: owner, initiator_role: 'admin', status, due_date: new Date('2027-01-10') } })
+    const tA = await mk(`Smoke link A ${Date.now()}`, admin!.id), tB = await mk(`Smoke link B ${Date.now()}`, member!.id)
+    const twin = `Smoke twin ${Date.now()}`
+    const tw1 = await mk(twin, admin!.id), tw2 = await mk(twin, admin!.id)
+    const tasksBefore = async () => (await prisma.$queryRaw<{ s: string }[]>`select md5(string_agg(id::text || name || status || coalesce(due_date::text,''), '|' order by id)) s from tasks`)[0].s
+    const r = await L.resolveTaskCells(sh.id, [
+      { rowId: rows[0].id, text: `https://x/board?task=${tA.id}` }, { rowId: rows[1].id, text: tB.name.toUpperCase() },
+      { rowId: rows[2].id, text: twin }, { rowId: rows[3].id, text: 'Nothing called this' }, { rowId: 'not-a-row', text: tA.name },
+    ])
+    ok(r.success && r.linked.length === 2 && r.ambiguous.length === 1 && r.ambiguous[0].choices.length === 2 && r.unmatched.length === 1, 'resolveTaskCells: link, title (any case), a shared title, a miss; other sheets\' rows ignored')
+    ok((await prisma.sheetRow.count({ where: { sheet_id: sh.id, task_id: { not: null } } })) === 2, 'linked rows are saved')
+    const map = { taskCol: cols[0].id, fields: { [cols[1].id]: 'title' as const, [cols[2].id]: 'stage' as const, [cols[3].id]: 'theme' as const } }
+    ok((await A.applySheetChanges(sh.id, { taskMap: { ...map, fields: { ...map.fields, [cols[0].id]: 'due' as never, 'nope': 'title' as never } } })).success, 'save a mapping')
+    const saved = (await prisma.sheet.findUnique({ where: { id: sh.id }, select: { task_map: true } }))?.task_map as { fields: Record<string, string> }
+    ok(Object.keys(saved.fields).length === 3 && !saved.fields[cols[0].id], 'the mapping is cleaned (Task column and unknown columns dropped)')
+    const ld = await A.loadSheet(sh.id)
+    ok(ld.success && ld.doc.extras?.rowTasks?.[rows[0].id] === tA.id && ld.doc.extras?.tasks?.[tA.id]?.values.title === tA.name && !ld.doc.extras?.tasks?.[tA.id]?.applies.includes('theme'), 'loadSheet carries links and values; a plain task has no theme')
+    const w = await L.writeTaskFields(sh.id, [
+      { rowId: rows[0].id, field: 'title', value: `${tA.name} (renamed)` },
+      { rowId: rows[0].id, field: 'theme', value: 'Anything' },
+      { rowId: rows[3].id, field: 'title', value: 'x' },
+    ])
+    ok(w.success && w.results[0].ok && w.results[1].reason === 'not_applicable' && w.results[2].reason === 'not_linked', 'writeTaskFields: saves, not applicable, not linked')
+    ok((await prisma.task.findUnique({ where: { id: tA.id } }))?.name === `${tA.name} (renamed)`, 'the task is renamed')
+    const snapCell = await prisma.sheetCell.findFirst({ where: { sheet_id: sh.id, row_id: rows[0].id, col_id: cols[1].id } })
+    ok(snapCell?.value === `${tA.name} (renamed)`, 'the cell keeps a snapshot')
+    const st = await L.writeTaskFields(sh.id, [{ rowId: rows[0].id, field: 'stage', value: 'Published' }, { rowId: rows[0].id, field: 'stage', value: 'Nowhere' }])
+    ok(st.success && st.results[1].reason === 'bad_stage', 'an unknown stage name is refused')
+    process.env.SMOKE_MEMBER = 'content@forefront.consulting'
+    const mw = await L.writeTaskFields(sh.id, [{ rowId: rows[0].id, field: 'title', value: 'member was here' }, { rowId: rows[1].id, field: 'title', value: `${tB.name} (mine)` }])
+    ok(mw.success && mw.results[0].reason === 'not_authorized' && mw.results[1].ok, 'a member can change their own task, not another\'s')
+    const mv = await L.writeTaskFields(sh.id, [{ rowId: rows[0].id, field: 'stage', value: 'To Do' }])
+    ok(mv.success && !mv.results[0].ok, 'a stage move the rules don\'t allow is refused')
+    const mc = await L.createTasksForRows(sh.id, [{ rowId: rows[3].id, values: { title: 'Smoke new task' } }], { due: '2027-02-01' })
+    ok(!mc.success && mc.error === 'not_authorized', 'a member with view access can\'t create tasks')
+    process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+    const cr = await L.createTasksForRows(sh.id, [{ rowId: rows[3].id, values: { title: 'Smoke new task', assignee: 'Nobody Here' } }, { rowId: rows[4].id, values: { title: 'Smoke new task' } }, { rowId: rows[5].id, values: {} }], { due: '2027-02-01' })
+    const made = cr.success ? cr.created : []
+    const newTask = made[0] ? await prisma.task.findUnique({ where: { id: made[0].taskId } }) : null
+    ok(cr.success && made.length === 1 && cr.problems.length === 2 && newTask?.status === 'todo' && newTask.project_id === null && newTask.task_owner_id === admin!.id, 'createTasksForRows: To do, no project, owned by the creator; problems counted')
+    ok((await prisma.sheetRow.findUnique({ where: { id: rows[4].id } }))?.task_id === made[0]?.taskId, 'and the row is linked')
+    const sig = await tasksBefore()
+    ok((await A.applySheetChanges(sh.id, { rowTasks: [{ rowId: rows[0].id, taskId: null }], deleteRows: [rows[1].id] })).success, 'unlink a row and delete a linked row')
+    ok(await tasksBefore() === sig, 'no task changed')
+    const rf = await L.refreshTaskFields(sh.id)
+    ok(rf.success && !rf.rowTasks[rows[0].id] && !!rf.rowTasks[rows[4].id], 'refreshTaskFields reads the links as saved')
+    process.env.SMOKE_MEMBER = 'design@forefront.consulting'
+    await prisma.sheet.update({ where: { id: sh.id }, data: { protected_by: admin!.id } })
+    const pw = await L.writeTaskFields(sh.id, [{ rowId: rows[4].id, field: 'title', value: 'x' }])
+    ok(!pw.success && pw.error === 'protected', 'a protected sheet refuses another member\'s mapped edits')
+    process.env.SMOKE_MEMBER = 'raneem.sarhaan@forefront.consulting'
+    const lc2 = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })
+    ok(!(await L.resolveTaskCells(lc2!.id, [])).success, 'the Content sheet can\'t be linked this way')
+    const sr = await L.searchTasks(twin, {})
+    ok(sr.success && sr.tasks.filter(x => x.name === twin).length === 2, 'searchTasks finds both twins')
+    await prisma.sheetFolder.delete({ where: { id: fld.id } })
+    await prisma.task.deleteMany({ where: { id: { in: [tA.id, tB.id, tw1.id, tw2.id, ...made.map(m => m.taskId)] } } })
+  }
 
   // Linked guards and pins.
   const linked = await prisma.sheet.findUnique({ where: { linked_key: 'linked_content' } })

@@ -28,4 +28,13 @@ export interface SheetsApi {
   // ── spec 015 ──
   loadLinkedSheetExtras(sheetId: string): Promise<Ok<{ extras: SheetExtras; sheetId: string }>>
   applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea'> }): Promise<Ok<{ updatedAt: string }>>
+  // ── spec 016 ──
+  linkColumn: typeof import('@/actions/sheet-links').linkColumn
+  resolveTaskCells: typeof import('@/actions/sheet-links').resolveTaskCells
+  writeTaskFields: typeof import('@/actions/sheet-links').writeTaskFields
+  refreshTaskFields: typeof import('@/actions/sheet-links').refreshTaskFields
+  taskValues: typeof import('@/actions/sheet-links').taskValues
+  searchTasks: typeof import('@/actions/sheet-links').searchTasks
+  linkChoices: typeof import('@/actions/sheet-links').linkChoices
+  createTasksForRows: typeof import('@/actions/sheet-links').createTasksForRows
 }

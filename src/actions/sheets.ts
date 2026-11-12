@@ -20,6 +20,9 @@ import { mergeStyle, validateStyle } from '@/lib/sheet-format'
 import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SortKey, TabColor, ViewWrite } from '@/types/index'
 import { RULE_KINDS, TAB_COLORS } from '@/types/index'
 import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
+import { cleanMap } from '@/lib/sheet-links'
+import { linkedTasks, teamColumns } from '@/lib/sheet-links-server'
+import type { SheetTaskMap } from '@/types/index'
 
 type Fail = { success: false; error: string }
 type Tx = Prisma.TransactionClient
@@ -220,6 +223,12 @@ export async function loadSheet(id: string): Promise<{ success: true; doc: Sheet
   const map: SheetDoc['cells'] = {}
   for (const c of cells) (map[c.row_id] ??= {})[c.col_id] = c.value
   const extras = await loadExtras(id)
+  // Spec 016: the column mapping, linked rows and their tasks' values.
+  const taskMap = (sheet.task_map ?? null) as SheetTaskMap | null
+  const linkedRows = await prisma.sheetRow.findMany({ where: { sheet_id: id, task_id: { not: null } }, select: { id: true, task_id: true } })
+  extras.taskMap = taskMap
+  extras.rowTasks = Object.fromEntries(linkedRows.map(r => [r.id, r.task_id!]))
+  extras.tasks = taskMap ? await linkedTasks(linkedRows.map(r => r.task_id!), taskMap, m) : {}
   return { success: true, sheet: summary(sheet), doc: { id, updatedAt: sheet.updated_at.toISOString(), rows, cols, cells: map, extras } }
 }
 
@@ -541,6 +550,25 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       }
       if (changes.rules) await writeRules(tx, sheetId, changes.rules)
       if (changes.tables) await writeTables(tx, sheetId, changes.tables)
+      // Spec 016: the column mapping and rows' tasks (cleaned; unknown rows and tasks are skipped).
+      if ('taskMap' in changes) {
+        let map: SheetTaskMap | null = null
+        if (changes.taskMap) {
+          const [colRows, team] = await Promise.all([tx.sheetCol.findMany({ where: { sheet_id: sheetId }, select: { id: true } }), teamColumns()])
+          map = cleanMap(changes.taskMap, new Set(colRows.map(c => c.id)), new Set(team.map(c => c.id)))
+        }
+        await tx.sheet.update({ where: { id: sheetId }, data: { task_map: map ? (map as unknown as Prisma.InputJsonValue) : Prisma.DbNull } })
+      }
+      const rt = (changes.rowTasks ?? []).filter(x => typeof x.rowId === 'string' && UUID.test(x.rowId) && (x.taskId === null || (typeof x.taskId === 'string' && UUID.test(x.taskId)))).slice(0, MAX_ROWS)
+      if (rt.length) {
+        const real = new Set((await tx.task.findMany({ where: { id: { in: rt.map(x => x.taskId).filter((x): x is string => !!x) } }, select: { id: true } })).map(t => t.id))
+        const ok = rt.filter(x => x.taskId === null || real.has(x.taskId))
+        for (const x of rt) if (x.taskId && !real.has(x.taskId)) skipped.push({ rowId: x.rowId, reason: 'gone' })
+        if (ok.length) {
+          await tx.$executeRaw`UPDATE sheet_rows s SET task_id = t.tid FROM unnest(${ok.map(x => x.rowId)}::uuid[], ${ok.map(x => x.taskId)}::text[]::uuid[]) AS t(rid, tid)
+            WHERE s.id = t.rid AND s.sheet_id = ${sheetId}::uuid`
+        }
+      }
 
       // Room for the next insert: renumber when two neighbours got too close.
       const positions: { rows?: { id: string; position: number }[]; cols?: { id: string; position: number }[] } = {}
