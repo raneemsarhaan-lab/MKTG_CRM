@@ -27,6 +27,7 @@ import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from
 import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
 import { FilterMenu } from './format/StyleTools'
 import { useTaskLinks, type LinksApi } from './links/useTaskLinks'
+import { taskIdFrom } from '@/lib/sheet-links'
 import { StagePill } from './links/LinkDialogs'
 import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
@@ -417,9 +418,14 @@ export function BlankSheet(p: BlankSheetProps) {
         return <span className="fx-sheet-cell-text" dir="auto">{sh.text}</span>
       }
       if (lk.map && col === lk.map.taskCol) {
-        const note = lk.noteOfRow(row.id), v = value(row.id, col), linked = !!lk.taskOfRow(row.id)
+        const note = lk.noteOfRow(row.id), v = value(row.id, col), tk = lk.taskOfRow(row.id)
+        // As on the Content sheet: a linked row's Task cell opens its task. A pasted link reads "Open task" instead of the URL.
+        const open = tk ? <a className="fx-lk-open" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task={tk.id}
+                             aria-label={tl('marker', { name: tk.name })} onPointerDown={ev => ev.stopPropagation()} onClick={ev => ev.stopPropagation()}>{tl('openTask')} ↗</a> : null
+        if (tk && taskIdFrom(v)) return open
         return <>
-          <span className={`fx-sheet-cell-text${linked ? ' fx-lk-link' : ''}`} dir="auto">{v}</span>
+          <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{v}</span>
+          {open}
           {note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
                            onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); if (note !== 'dropped') void lk.openChoose(row.id) }}>
             {note === 'choose' ? tl('notes.choose', { n: 2 }) : tl(`notes.${note}`)}</button>}
