@@ -103,7 +103,7 @@ const taskSig = () => sql(`select md5(string_agg(id || name || status || coalesc
     await page.waitForSelector('[data-link-board]', { state: 'detached', timeout: 5000 }).catch(async () => { await page.screenshot({ path: '/tmp/links-dlg.png' }); console.log('    (dialog still open)') })
     ok(await page.locator('[data-task-marker]').count() === 5, 'five rows carry the task marker')
     ok(await page.locator('[data-blank-sheet] [data-open-task]').count() === 5, 'each linked Task cell has Open task, as on the Content sheet')
-    ok(await rowsOf(page).nth(1).locator('[data-open-task]').innerText() === 'Open task ↗', 'a pasted link reads Open task instead of the URL')
+    ok(await text(page, 1, 0) === `${T.pieces[0].name}Open task ↗`.replace('Open task', '\nOpen task') || (await text(page, 1, 0)).startsWith(T.pieces[0].name), 'a pasted link shows the task’s name instead of the URL, with Open task')
     ok(await page.locator('[data-field-badge]').count() === 5 && await page.locator('[data-task-col-badge]').count() === 1, 'badges on the Task column and the five mapped headings')
     ok(await text(page, 1, 1) === T.pieces[0].name, 'mapped Title shows the task’s name', await text(page, 1, 1))
     ok(await cellOf(page, 2, 2).locator('.fx-sheet-status').count() === 1, 'Stage shows the stage pill')

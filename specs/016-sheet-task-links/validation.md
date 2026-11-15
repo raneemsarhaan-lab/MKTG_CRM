@@ -84,4 +84,4 @@ Run on 2026-11-12 against a production build (`next build` + `next start`) and l
 
 ## Follow-up (2026-11-15): Open task in the Task cell
 
-As on the Content sheet, a linked row's Task cell has an **Open task ↗** link that opens the task on the board, in a new tab so the sheet stays open. A cell holding a pasted board link reads "Open task" instead of the URL. `realapp/links.cjs`: **40 passed, 0 failed** (two new checks). `lab:sheet` 150/150, `styles.cjs` 54/54.
+As on the Content sheet, a linked row's Task cell has an **Open task ↗** link that opens the task on the board, in a new tab so the sheet stays open. A cell holding a pasted board link shows the task's name instead of the URL, followed by Open task. `realapp/links.cjs`: **40 passed, 0 failed** (two new checks). `lab:sheet` 150/150, `styles.cjs` 54/54.

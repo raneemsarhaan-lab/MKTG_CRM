@@ -419,12 +419,11 @@ export function BlankSheet(p: BlankSheetProps) {
       }
       if (lk.map && col === lk.map.taskCol) {
         const note = lk.noteOfRow(row.id), v = value(row.id, col), tk = lk.taskOfRow(row.id)
-        // As on the Content sheet: a linked row's Task cell opens its task. A pasted link reads "Open task" instead of the URL.
+        // As on the Content sheet: a linked row's Task cell opens its task. A pasted link shows the task's name instead of the URL.
         const open = tk ? <a className="fx-lk-open" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task={tk.id}
                              aria-label={tl('marker', { name: tk.name })} onPointerDown={ev => ev.stopPropagation()} onClick={ev => ev.stopPropagation()}>{tl('openTask')} ↗</a> : null
-        if (tk && taskIdFrom(v)) return open
         return <>
-          <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{v}</span>
+          <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{tk && taskIdFrom(v) ? tk.name : v}</span>
           {open}
           {note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
                            onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); if (note !== 'dropped') void lk.openChoose(row.id) }}>
