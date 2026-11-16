@@ -1,0 +1,504 @@
+<title>Ctrl+Click Selection</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip over one live workbook frame in Momentum's own look
+   (spec 013/015 tokens), then two reference cards: how to select, and what
+   each tool does with several areas. The grid is a working prototype. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --link: #1D4ED8;
+  --sh-sel: rgba(124, 58, 237, .10); --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD; --sh-cut: #C81E3A;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --bad: #C81E3A;
+  --fill-a: #FEF3C7; --fill-b: #DCFCE7; --toast: #14131A; --toast-ink: #FFFFFF;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif;
+  --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --sh-cut: #F87171; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --fill-a: #4A3A0C; --fill-b: #12391F; --toast: #F4F4F7; --toast-ink: #14131A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145; --link: #93B4FF;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --sh-cut: #F87171; --warn-bg: #3A2A0E; --warn: #F5C46B;
+  --fill-a: #4A3A0C; --fill-b: #12391F; --toast: #F4F4F7; --toast-ink: #14131A; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.page-wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+kbd { font: 600 11.5px var(--f-body); border: 1px solid var(--input); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: var(--panel); color: var(--ink); white-space: nowrap; }
+
+/* frame */
+.frame { position: relative; background: var(--panel); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10); display: flex; flex-direction: column; }
+.frame[dir="rtl"], .frame[dir="rtl"] button { font-family: var(--f-ar); }
+.top { display: flex; align-items: center; gap: 10px; padding: 12px 18px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); min-width: 0; }
+.crumbs b { color: var(--ink); font: 800 19px var(--f-head); }
+.frame[dir="rtl"] .crumbs b { font-family: var(--f-ar); }
+.saved { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.tools { display: flex; align-items: center; gap: 6px; padding: 6px 18px; border-bottom: 1px solid var(--line); min-height: 44px; flex-wrap: wrap; position: relative; }
+.ib { min-width: 32px; height: 32px; border: 1px solid var(--input); background: var(--panel); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; padding: 0 8px; gap: 6px; font-weight: 600; }
+.ib:disabled { opacity: .4; cursor: default; }
+.ib .sw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--input); }
+.tools .sep { width: 1px; height: 22px; background: var(--line); margin-inline: 2px; }
+.selinfo { margin-inline-start: auto; font-size: 12.5px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; font-variant-numeric: tabular-nums; min-width: 0; }
+.selinfo b { color: var(--ink); font-weight: 600; }
+.addpill { background: var(--purple-soft); color: var(--purple); border-radius: 999px; padding: 2px 9px; font-weight: 700; font-size: 11.5px; }
+
+/* grid */
+.gridwrap { overflow: auto; position: relative; max-height: 470px; outline: none; }
+.g { display: grid; grid-template-columns: 44px 170px 110px 110px 100px 110px 150px 120px; font-size: 13px; min-width: max-content; grid-auto-rows: 30px; position: relative; }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--panel); cursor: cell; line-height: 1.35; user-select: none; }
+.c.b { font-weight: 700; }
+.c.fa { background: var(--fill-a); } .c.fb { background: var(--fill-b); }
+.h, .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; text-align: center; position: sticky; z-index: 3; cursor: pointer; padding-inline: 0; }
+.h { top: 0; } .rn { inset-inline-start: 0; z-index: 2; }
+.corner { position: sticky; top: 0; inset-inline-start: 0; z-index: 5; background: var(--grid-head); border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); }
+.h.on, .rn.on { background: var(--sh-head-sel); color: var(--purple); }
+.layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.area { position: absolute; background: var(--sh-sel); box-shadow: inset 0 0 0 1px var(--sh-edge); }
+.area.last { box-shadow: inset 0 0 0 1.5px var(--sh-edge); }
+.actc { position: absolute; box-shadow: inset 0 0 0 2px var(--sh-edge); background: var(--panel); mix-blend-mode: normal; opacity: 0; }
+.actbox { position: absolute; box-shadow: inset 0 0 0 2px var(--sh-edge); }
+.rmv { position: absolute; border: 1.5px dashed var(--sh-cut); background: color-mix(in srgb, var(--sh-cut) 8%, transparent); }
+.ed { position: absolute; z-index: 4; border: 2px solid var(--sh-edge); background: var(--panel); font: inherit; padding: 4px 7px; outline: none; color: var(--ink); }
+
+/* tab bar */
+.tabs { display: flex; align-items: stretch; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 40px; }
+.tb { border: 0; background: none; display: inline-flex; align-items: center; padding: 0 14px; font-size: 13px; font-weight: 600; color: var(--muted); border-inline-end: 1px solid var(--line); }
+.tb[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
+
+/* menu, toast */
+.menu { position: absolute; z-index: 30; min-width: 230px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13px; }
+.menu .mi { display: flex; width: 100%; gap: 10px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 6px 10px; text-align: start; cursor: pointer; min-height: 32px; }
+.menu .mi:hover:not(:disabled) { background: var(--surface); }
+.menu .mi:disabled { color: var(--muted); cursor: not-allowed; }
+.menu .mi .k { margin-inline-start: auto; color: var(--muted); font-size: 11.5px; }
+.menu .why { display: block; color: var(--warn); background: var(--warn-bg); border-radius: 8px; font-size: 12px; padding: 7px 10px; margin: 2px 4px 6px; line-height: 1.45; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.toast { position: absolute; inset-inline: 0; bottom: 54px; margin-inline: auto; width: max-content; max-width: calc(100% - 32px); background: var(--toast); color: var(--toast-ink); border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.45; z-index: 40; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+
+/* reference cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border-radius: 16px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h2 { margin: 0; font: 800 16px var(--f-head); color: var(--ink); }
+.card ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+.groups { display: grid; gap: 12px; font-size: 13.5px; line-height: 1.5; }
+.groups h3 { margin: 0 0 4px; font: 700 12px var(--f-body); letter-spacing: .05em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.groups h3 i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.groups p { margin: 0; color: var(--muted); }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; line-height: 1.5; }
+@media (max-width: 560px) { .selinfo { margin-inline-start: 0; width: 100%; } }
+@media (prefers-reduced-motion: no-preference) { .toast { animation: up .18s ease-out; } @keyframes up { from { transform: translateY(6px); opacity: 0; } } }
+</style>
+
+<div class="page-wrap">
+  <header>
+    <h1>Select separate cells with Ctrl+click</h1>
+    <p class="lede">Spec 017 design. This sheet works: hold <kbd>Ctrl</kbd> (<kbd>⌘</kbd> on a Mac) and click or drag to add areas, then try Bold, a fill colour, <kbd>Delete</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd>, or a right-click. The same selection comes to blank sheets and the Content and Video sheets.</p>
+  </header>
+
+  <div class="ctl">
+    <span>Language</span>
+    <div class="seg" id="lang"><button type="button" data-v="en" aria-pressed="true">English</button><button type="button" data-v="ar" aria-pressed="false">العربية</button></div>
+    <span>Computer</span>
+    <div class="seg" id="os"><button type="button" data-v="win" aria-pressed="true">Windows (Ctrl)</button><button type="button" data-v="mac" aria-pressed="false">Mac (⌘)</button></div>
+    <button type="button" class="ib" id="sample">Show an example selection</button>
+  </div>
+
+  <div class="frame" id="frame" dir="ltr">
+    <div class="top">
+      <div class="crumbs"><span data-t="sheets">Sheets</span><span>›</span><b data-t="plan">March plan</b></div>
+      <span class="saved" data-t="saved">Saved</span>
+    </div>
+    <div class="tools" id="tools">
+      <button type="button" class="ib" data-cmd="undo" aria-label="Undo">↶</button>
+      <button type="button" class="ib" data-cmd="redo" aria-label="Redo">↷</button>
+      <span class="sep"></span>
+      <button type="button" class="ib" data-cmd="bold" aria-label="Bold"><b>B</b></button>
+      <button type="button" class="ib" data-cmd="fa" aria-label="Yellow fill"><span class="sw" style="background:var(--fill-a)"></span></button>
+      <button type="button" class="ib" data-cmd="fb" aria-label="Green fill"><span class="sw" style="background:var(--fill-b)"></span></button>
+      <button type="button" class="ib" data-cmd="nofill" data-t="noFill">No fill</button>
+      <span class="sep"></span>
+      <button type="button" class="ib" data-cmd="merge" data-t="merge">Merge ▾</button>
+      <button type="button" class="ib" data-cmd="sortmenu" data-t="sortFilter">Sort &amp; Filter ▾</button>
+      <span class="selinfo" id="selinfo" aria-live="polite"></span>
+    </div>
+    <div class="gridwrap" id="gw" tabindex="0" role="grid" aria-label="March plan">
+      <div class="g" id="g"></div>
+    </div>
+    <div class="tabs"><button type="button" class="tb" aria-selected="true" data-t="plan">March plan</button><button type="button" class="tb" aria-selected="false" data-t="ideas">Ideas</button><button type="button" class="tb" aria-selected="false">+</button></div>
+  </div>
+
+  <div class="cards">
+    <section class="card">
+      <h2>How to select</h2>
+      <ul>
+        <li><kbd class="mod">Ctrl</kbd> + click a cell: adds it. It becomes the active cell.</li>
+        <li><kbd class="mod">Ctrl</kbd> + drag: adds a block.</li>
+        <li><kbd class="mod">Ctrl</kbd> + click a column letter or row number: adds the whole column or row.</li>
+        <li><kbd class="mod">Ctrl</kbd> + click a selected cell: removes just that cell. <kbd class="mod">Ctrl</kbd> + drag over selected cells removes the block.</li>
+        <li><kbd>Shift</kbd> + click or <kbd>Shift</kbd> + arrows: resizes the newest area only.</li>
+        <li>Click without <kbd class="mod">Ctrl</kbd>, or an arrow key: back to one cell.</li>
+        <li>Keyboard only: <kbd>Shift</kbd>+<kbd>F8</kbd> turns on <em>Add to selection</em>. Arrows move, <kbd>Shift</kbd>+arrows add a new area. <kbd>Esc</kbd> ends it.</li>
+        <li>Type, then <kbd class="mod">Ctrl</kbd>+<kbd>Enter</kbd>: the value goes into every selected cell.</li>
+      </ul>
+      <p class="note">Phones and tablets keep today's touch selection.</p>
+    </section>
+    <section class="card">
+      <h2>What tools do with several areas</h2>
+      <div class="groups">
+        <div><h3><i style="background:var(--ok)"></i>Every area, one undo</h3><p>All cell formats, cell styles, borders (each area outlined on its own), Format Painter, Delete, Clear contents / formats / all / comments, Clear rules in selection, Ctrl+Enter, and pasting one copied cell.</p></div>
+        <div><h3><i style="background:var(--purple)"></i>When the areas line up</h3><p>Copy works when every area covers the same rows (placed side by side) or the same columns (stacked). Hide, Resize and Delete rows or columns work when every area is whole rows, or every area is whole columns.</p></div>
+        <div><h3><i style="background:var(--warn)"></i>One area only</h3><p>Cut, pasting a block, Merge, Sort, Filter, Format as Table, Fill Down / Right, Paste Special, New rule, Insert rows / columns, and Board ▾ Create tasks for rows. They are disabled and say why: “Works on one area. Click a cell without Ctrl to start again.”</p></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const S = {
+    en: { sheets: 'Sheets', plan: 'March plan', ideas: 'Ideas', saved: 'Saved', noFill: 'No fill', merge: 'Merge ▾', sortFilter: 'Sort & Filter ▾',
+      areas: n => `${n} areas`, cells: n => n === 1 ? '1 cell' : `${n} cells`, more: n => `+${n} more`, add: 'Add to selection',
+      oneArea: 'Works on one area. Click a cell without Ctrl to start again.', someOne: 'Some items work on one area. Click a cell without Ctrl to start again.',
+      cantCopy: 'These areas can’t be copied together. Pick areas that share the same rows or the same columns.',
+      cantCut: 'Cut works on one area. Click a cell without Ctrl to start again.',
+      copied: (n, r, c) => n > 1 ? `Copied ${n} areas as one block (${r} × ${c}).` : `Copied ${r} × ${c}.`,
+      pasteBlock: 'A block pastes into one area. Select one area, or copy a single cell to fill them all.',
+      pastedAll: n => `Pasted into ${n} cells.`, cleared: n => `Cleared ${n} cells.`, filled: n => `Filled ${n} cells.`, max: 'You can select up to 100 areas.',
+      cut: 'Cut', copy: 'Copy', paste: 'Paste', clear: 'Clear contents', mergeCells: 'Merge cells', sortAZ: 'Sort A → Z', sortZA: 'Sort Z → A', filter: 'Filter',
+      table: 'Format as Table', insRow: 'Insert row above', delRows: n => n === 1 ? 'Delete row' : `Delete ${n} rows`, delRowsAny: 'Delete rows', hideRows: 'Hide rows', fillDown: 'Fill down', newRule: 'New rule…', mergeAll: 'Merge all', unmerge: 'Unmerge',
+      wholeRowsOnly: 'Select whole rows to delete them.',
+      head: ['Post', 'Channel', 'Owner', 'Due', 'Stage', 'Notes', 'Budget'],
+      rows: [['Spring launch teaser', 'Instagram', 'Roaa', '3 Mar', 'Design', 'Reel, 15s', 'EGP 4,000'], ['Founder Q&A', 'LinkedIn', 'Omar', '5 Mar', 'Writing', 'Needs quotes', 'EGP 0'], ['Ramadan greeting', 'All', 'Laila', '10 Mar', 'Brief', 'Arabic first', 'EGP 2,500'], ['Behind the scenes', 'TikTok', 'Roaa', '12 Mar', 'Shooting', '', 'EGP 6,000'], ['Product tips #4', 'Instagram', 'Nour', '14 Mar', 'Review', 'Carousel', 'EGP 1,200'], ['Case study: Atlas', 'Blog', 'Omar', '18 Mar', 'Writing', 'Client OK?', 'EGP 0'], ['Iftar giveaway', 'Instagram', 'Laila', '20 Mar', 'Brief', 'Legal check', 'EGP 9,000'], ['Team spotlight', 'LinkedIn', 'Nour', '24 Mar', 'Design', '', 'EGP 800'], ['Eid campaign', 'All', 'Roaa', '28 Mar', 'Brief', 'Big one', 'EGP 25,000'], ['Monthly recap', 'Newsletter', 'Omar', '31 Mar', 'Idea', '', 'EGP 0'], ['', '', '', '', '', '', ''], ['', '', '', '', '', '', '']] },
+    ar: { sheets: 'الجداول', plan: 'خطة مارس', ideas: 'أفكار', saved: 'تم الحفظ', noFill: 'بلا تعبئة', merge: 'دمج ▾', sortFilter: 'فرز وتصفية ▾',
+      areas: n => `${n} نطاقات`, cells: n => n === 1 ? 'خلية واحدة' : `${n} خلايا`, more: n => `+${n} أخرى`, add: 'إضافة إلى التحديد',
+      oneArea: 'يعمل على نطاق واحد. انقر خلية بدون Ctrl للبدء من جديد.', someOne: 'بعض العناصر تعمل على نطاق واحد. انقر خلية بدون Ctrl للبدء من جديد.',
+      cantCopy: 'لا يمكن نسخ هذه النطاقات معًا. اختر نطاقات في نفس الصفوف أو نفس الأعمدة.',
+      cantCut: 'القص يعمل على نطاق واحد. انقر خلية بدون Ctrl للبدء من جديد.',
+      copied: (n, r, c) => n > 1 ? `تم نسخ ${n} نطاقات ككتلة واحدة (${r} × ${c}).` : `تم نسخ ${r} × ${c}.`,
+      pasteBlock: 'الكتلة تُلصق في نطاق واحد. اختر نطاقًا واحدًا، أو انسخ خلية واحدة لتعبئة الكل.',
+      pastedAll: n => `تم اللصق في ${n} خلايا.`, cleared: n => `تم مسح ${n} خلايا.`, filled: n => `تمت تعبئة ${n} خلايا.`, max: 'يمكنك تحديد 100 نطاق كحد أقصى.',
+      cut: 'قص', copy: 'نسخ', paste: 'لصق', clear: 'مسح المحتوى', mergeCells: 'دمج الخلايا', sortAZ: 'فرز أ ← ي', sortZA: 'فرز ي ← أ', filter: 'تصفية',
+      table: 'تنسيق كجدول', insRow: 'إدراج صف أعلى', delRows: n => n === 1 ? 'حذف الصف' : `حذف ${n} صفوف`, delRowsAny: 'حذف الصفوف', hideRows: 'إخفاء الصفوف', fillDown: 'تعبئة لأسفل', newRule: 'قاعدة جديدة…', mergeAll: 'دمج الكل', unmerge: 'إلغاء الدمج',
+      wholeRowsOnly: 'حدد صفوفًا كاملة لحذفها.',
+      head: ['المنشور', 'القناة', 'المسؤول', 'الموعد', 'المرحلة', 'ملاحظات', 'الميزانية'],
+      rows: null },
+  }
+  let lang = 'en', mac = false
+  const t = k => S[lang][k] ?? S.en[k]
+  const R = 13, C = 7, L = 'ABCDEFG'
+  let vals = [S.en.head, ...S.en.rows].map(r => r.slice())
+  let bold = new Set(['0,0', '0,1', '0,2', '0,3', '0,4', '0,5', '0,6']), fill = new Map()
+  let areas = [{ r0: 1, c0: 0, r1: 1, c1: 0 }], act = { r: 1, c: 0 }, anchor = { r: 1, c: 0 }, fe = { r: 1, c: 0 }
+  let addMode = false, pending = false, drag = null, rmv = null, editing = null, clip = null
+  const undo = [], redo = []
+
+  const frame = document.getElementById('frame'), g = document.getElementById('g'), gw = document.getElementById('gw')
+  const info = document.getElementById('selinfo'), tools = document.getElementById('tools')
+  const name = (r, c) => `${L[c]}${r + 1}`
+  const rect = (a, b) => ({ r0: Math.min(a.r, b.r), c0: Math.min(a.c, b.c), r1: Math.max(a.r, b.r), c1: Math.max(a.c, b.c) })
+  const inA = (q, r, c) => r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1
+  const selected = (r, c) => areas.some(q => inA(q, r, c))
+  const multi = () => areas.length > 1
+  const cellsSel = () => { const s = new Set(); for (const q of areas) for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) s.add(`${r},${c}`); return s }
+  const areaName = q => q.r0 === 0 && q.r1 === R - 1 ? (q.c0 === q.c1 ? `${L[q.c0]}:${L[q.c0]}` : `${L[q.c0]}:${L[q.c1]}`)
+    : q.c0 === 0 && q.c1 === C - 1 ? `${q.r0 + 1}:${q.r1 + 1}` : (q.r0 === q.r1 && q.c0 === q.c1 ? name(q.r0, q.c0) : `${name(q.r0, q.c0)}:${name(q.r1, q.c1)}`)
+
+  // Build the grid once; classes and the overlay change after.
+  const cellEl = []
+  function build() {
+    g.innerHTML = ''
+    const corner = document.createElement('div'); corner.className = 'corner'; g.appendChild(corner)
+    for (let c = 0; c < C; c++) { const h = document.createElement('div'); h.className = 'c h'; h.textContent = L[c]; h.dataset.col = c; g.appendChild(h) }
+    for (let r = 0; r < R; r++) {
+      const rn = document.createElement('div'); rn.className = 'c rn'; rn.textContent = r + 1; rn.dataset.row = r; g.appendChild(rn)
+      cellEl[r] = []
+      for (let c = 0; c < C; c++) { const d = document.createElement('div'); d.className = 'c'; d.dataset.r = r; d.dataset.c = c; d.setAttribute('role', 'gridcell'); g.appendChild(d); cellEl[r][c] = d }
+    }
+    const layer = document.createElement('div'); layer.className = 'layer'; layer.id = 'layer'; g.appendChild(layer)
+  }
+  function box(q, cls) {
+    const a = cellEl[q.r0][q.c0], b = cellEl[q.r1][q.c1], d = document.createElement('div'), rtl = frame.dir === 'rtl'
+    const left = rtl ? b.offsetLeft : a.offsetLeft, right = rtl ? a.offsetLeft + a.offsetWidth : b.offsetLeft + b.offsetWidth
+    d.className = cls; d.style.left = left + 'px'; d.style.top = a.offsetTop + 'px'; d.style.width = (right - left) + 'px'; d.style.height = (b.offsetTop + b.offsetHeight - a.offsetTop) + 'px'
+    return d
+  }
+  function render() {
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      const d = cellEl[r][c], k = `${r},${c}`
+      d.textContent = vals[r][c]; d.dir = 'auto'
+      d.className = 'c' + (bold.has(k) ? ' b' : '') + (fill.get(k) === 'fa' ? ' fa' : fill.get(k) === 'fb' ? ' fb' : '')
+      d.setAttribute('aria-selected', selected(r, c) ? 'true' : 'false')
+    }
+    g.querySelectorAll('.h').forEach(h => h.classList.toggle('on', areas.some(q => +h.dataset.col >= q.c0 && +h.dataset.col <= q.c1)))
+    g.querySelectorAll('.rn').forEach(h => h.classList.toggle('on', areas.some(q => +h.dataset.row >= q.r0 && +h.dataset.row <= q.r1)))
+    const layer = document.getElementById('layer'); layer.innerHTML = ''
+    const one = areas.length === 1 && areas[0].r0 === areas[0].r1 && areas[0].c0 === areas[0].c1
+    if (!one) areas.forEach((q, i) => layer.appendChild(box(q, 'area' + (i === areas.length - 1 ? ' last' : ''))))
+    layer.appendChild(box({ r0: act.r, c0: act.c, r1: act.r, c1: act.c }, 'actbox'))
+    if (rmv) layer.appendChild(box(rmv, 'rmv'))
+    // Status: the areas by name (3, then "+N more"), the area and cell counts.
+    const n = cellsSel().size, names = areas.map(areaName)
+    const shown = names.length > 3 ? `${names.slice(0, 3).join(', ')} ${t('more')(names.length - 3)}` : names.join(', ')
+    info.innerHTML = `<b dir="ltr">${shown}</b>${multi() || n > 1 ? `<span>· ${multi() ? t('areas')(areas.length) + ', ' : ''}${t('cells')(n)}</span>` : ''}${addMode ? `<span class="addpill">${t('add')}</span>` : ''}`
+    tools.querySelector('[data-cmd="merge"]').disabled = multi()
+    tools.querySelector('[data-cmd="merge"]').title = multi() ? t('oneArea') : ''
+  }
+
+  // Undo/redo: whole-sheet snapshots are enough for a prototype.
+  const snap = () => ({ vals: vals.map(r => r.slice()), bold: new Set(bold), fill: new Map(fill) })
+  const restore = s => { vals = s.vals; bold = s.bold; fill = s.fill }
+  function change(fn) { undo.push(snap()); redo.length = 0; fn(); render() }
+
+  let toastTimer = 0
+  function toast(msg) {
+    frame.querySelector('.toast')?.remove(); clearTimeout(toastTimer)
+    const d = document.createElement('div'); d.className = 'toast'; d.setAttribute('role', 'status'); d.textContent = msg; frame.appendChild(d)
+    toastTimer = setTimeout(() => d.remove(), 3600)
+  }
+  function closeMenu() { frame.querySelector('.menu')?.remove() }
+
+  // Ctrl+click on a selected cell, or Ctrl+drag over selected cells: take that block out of every area.
+  function subtract(cut) {
+    const out = []
+    for (const q of areas) {
+      if (cut.r1 < q.r0 || cut.r0 > q.r1 || cut.c1 < q.c0 || cut.c0 > q.c1) { out.push(q); continue }
+      if (q.r0 < cut.r0) out.push({ ...q, r1: cut.r0 - 1 })
+      if (q.r1 > cut.r1) out.push({ ...q, r0: cut.r1 + 1 })
+      const r0 = Math.max(q.r0, cut.r0), r1 = Math.min(q.r1, cut.r1)
+      if (q.c0 < cut.c0) out.push({ r0, r1, c0: q.c0, c1: cut.c0 - 1 })
+      if (q.c1 > cut.c1) out.push({ r0, r1, c0: cut.c1 + 1, c1: q.c1 })
+    }
+    return out
+  }
+  function addArea(q, at) {
+    if (areas.length >= 100) { toast(t('max')); return false }
+    areas.push(q); act = at; anchor = at; fe = at; return true
+  }
+
+  const modKey = e => (mac ? e.metaKey : e.ctrlKey) || (!mac && e.metaKey)
+  g.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target === editing) return
+    closeMenu(); commitEdit(false)
+    const h = e.target.closest('.h'), rn = e.target.closest('.rn'), cell = e.target.closest('[data-r]')
+    const add = modKey(e) || addMode
+    if (h || rn) {
+      const q = h ? { r0: 0, c0: +h.dataset.col, r1: R - 1, c1: +h.dataset.col } : { r0: +rn.dataset.row, c0: 0, r1: +rn.dataset.row, c1: C - 1 }
+      if (e.shiftKey) areas[areas.length - 1] = h ? { r0: 0, r1: R - 1, c0: Math.min(anchor.c, q.c0), c1: Math.max(anchor.c, q.c0) } : { c0: 0, c1: C - 1, r0: Math.min(anchor.r, q.r0), r1: Math.max(anchor.r, q.r0) }
+      else if (add) addArea(q, { r: q.r0, c: q.c0 })
+      else { areas = [q]; act = anchor = fe = { r: q.r0, c: q.c0 } }
+      e.preventDefault(); gw.focus(); render(); return
+    }
+    if (!cell) return
+    const at = { r: +cell.dataset.r, c: +cell.dataset.c }
+    e.preventDefault(); gw.focus()
+    if (e.shiftKey) { areas[areas.length - 1] = rect(anchor, at); fe = at }
+    else if (add && selected(at.r, at.c) && !addMode) { drag = { mode: 'remove', from: at }; rmv = rect(at, at) }
+    else if (add) { if (addArea(rect(at, at), at)) drag = { mode: 'add' } }
+    else { areas = [rect(at, at)]; act = anchor = fe = at; drag = { mode: 'add' } }
+    pending = false
+    render()
+  })
+  document.addEventListener('pointermove', e => {
+    if (!drag) return
+    const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-r]')
+    if (!cell || !g.contains(cell)) return
+    const at = { r: +cell.dataset.r, c: +cell.dataset.c }
+    if (drag.mode === 'remove') rmv = rect(drag.from, at)
+    else { areas[areas.length - 1] = rect(anchor, at); fe = at }
+    render()
+  })
+  document.addEventListener('pointerup', () => {
+    if (drag?.mode === 'remove' && rmv) {
+      const left = subtract(rmv)
+      if (left.length) { areas = left; const last = left[left.length - 1]; if (!selected(act.r, act.c)) { act = anchor = fe = { r: last.r0, c: last.c0 } } }
+      else { areas = [rect(drag.from, drag.from)]; act = anchor = fe = drag.from }
+      rmv = null
+    }
+    drag = null; render()
+  })
+
+  // Copy: one block when every area covers the same rows (side by side) or the same columns (stacked).
+  function copyPlan() {
+    if (!multi()) { const q = areas[0]; return { n: 1, rows: q.r1 - q.r0 + 1, cols: q.c1 - q.c0 + 1, cells: grab(q) } }
+    const sameRows = areas.every(q => q.r0 === areas[0].r0 && q.r1 === areas[0].r1)
+    const sameCols = areas.every(q => q.c0 === areas[0].c0 && q.c1 === areas[0].c1)
+    if (sameRows) { const qs = [...areas].sort((a, b) => a.c0 - b.c0); const rows = qs[0].r1 - qs[0].r0 + 1; return { n: qs.length, rows, cols: qs.reduce((s, q) => s + q.c1 - q.c0 + 1, 0) } }
+    if (sameCols) { const qs = [...areas].sort((a, b) => a.r0 - b.r0); return { n: qs.length, rows: qs.reduce((s, q) => s + q.r1 - q.r0 + 1, 0), cols: qs[0].c1 - qs[0].c0 + 1 } }
+    return null
+  }
+  const grab = q => vals.slice(q.r0, q.r1 + 1).map(r => r.slice(q.c0, q.c1 + 1))
+  function doCopy() {
+    const p = copyPlan()
+    if (!p) { toast(t('cantCopy')); return }
+    clip = { one: p.rows === 1 && p.cols === 1, v: vals[areas[0].r0][areas[0].c0], k: `${areas[0].r0},${areas[0].c0}` }
+    toast(t('copied')(p.n, p.rows, p.cols))
+  }
+  function doPaste() {
+    if (!clip) return
+    if (multi() && !clip.one) { toast(t('pasteBlock')); return }
+    const all = cellsSel()
+    change(() => { for (const k of all) { const [r, c] = k.split(',').map(Number); vals[r][c] = clip.v; if (bold.has(clip.k)) bold.add(k); else bold.delete(k) } })
+    if (multi() || all.size > 1) toast(t('pastedAll')(all.size))
+  }
+  function clearSel() { const all = cellsSel(); change(() => { for (const k of all) { const [r, c] = k.split(',').map(Number); vals[r][c] = '' } }); if (multi()) toast(t('cleared')(all.size)) }
+  function format(cmd) {
+    const all = cellsSel()
+    if (cmd === 'bold') { const on = ![...all].every(k => bold.has(k)); change(() => all.forEach(k => on ? bold.add(k) : bold.delete(k))) }
+    else if (cmd === 'fa' || cmd === 'fb') change(() => all.forEach(k => fill.set(k, cmd)))
+    else if (cmd === 'nofill') change(() => all.forEach(k => fill.delete(k)))
+  }
+
+  // Typing edits the active cell; Enter writes it there, Ctrl+Enter writes it into every selected cell.
+  function startEdit(ch) {
+    const d = cellEl[act.r][act.c], inp = document.createElement('input')
+    inp.className = 'ed'; inp.value = ch ?? vals[act.r][act.c]; inp.dir = 'auto'
+    inp.style.left = d.offsetLeft + 'px'; inp.style.top = d.offsetTop + 'px'; inp.style.width = Math.max(d.offsetWidth, 140) + 'px'; inp.style.height = d.offsetHeight + 'px'
+    g.appendChild(inp); inp.focus(); editing = inp
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); commitEdit(true, e.ctrlKey || e.metaKey) }
+      else if (e.key === 'Escape') { e.preventDefault(); inp.remove(); editing = null; gw.focus() }
+    })
+  }
+  function commitEdit(keep, all) {
+    if (!editing) return
+    const v = editing.value; editing.remove(); editing = null
+    if (all) { const s = cellsSel(); change(() => s.forEach(k => { const [r, c] = k.split(',').map(Number); vals[r][c] = v })); toast(t('filled')(s.size)) }
+    else change(() => { vals[act.r][act.c] = v })
+    if (keep) gw.focus()
+  }
+
+  gw.addEventListener('keydown', e => {
+    if (editing) return
+    const ctrl = e.ctrlKey || e.metaKey, k = e.key
+    const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, frame.dir === 'rtl' ? 1 : -1], ArrowRight: [0, frame.dir === 'rtl' ? -1 : 1] }
+    if (k === 'F8' && e.shiftKey) { e.preventDefault(); addMode = !addMode; pending = addMode; render(); return }
+    if (k === 'Escape') { if (addMode) { addMode = false; render() } closeMenu(); return }
+    if (arrows[k]) {
+      e.preventDefault(); const [dr, dc] = arrows[k]
+      if (e.shiftKey) {
+        if (addMode && pending) { if (!addArea(rect(act, act), { ...act })) return; pending = false }
+        fe = { r: Math.max(0, Math.min(R - 1, fe.r + dr)), c: Math.max(0, Math.min(C - 1, fe.c + dc)) }
+        areas[areas.length - 1] = rect(anchor, fe)
+      } else {
+        act = { r: Math.max(0, Math.min(R - 1, act.r + dr)), c: Math.max(0, Math.min(C - 1, act.c + dc)) }
+        if (addMode) pending = true; else { areas = [rect(act, act)]; anchor = fe = act }
+      }
+      render(); return
+    }
+    if (ctrl && (k === 'a' || k === 'A')) { e.preventDefault(); areas = [{ r0: 0, c0: 0, r1: R - 1, c1: C - 1 }]; act = anchor = { r: 0, c: 0 }; fe = { r: R - 1, c: C - 1 }; render(); return }
+    if (ctrl && (k === 'b' || k === 'B')) { e.preventDefault(); format('bold'); return }
+    if (ctrl && (k === 'z' || k === 'Z')) { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return }
+    if (ctrl && (k === 'y' || k === 'Y')) { e.preventDefault(); doRedo(); return }
+    if (ctrl && (k === 'c' || k === 'C')) { e.preventDefault(); doCopy(); return }
+    if (ctrl && (k === 'x' || k === 'X')) { e.preventDefault(); if (multi()) toast(t('cantCut')); else doCopy(); return }
+    if (ctrl && (k === 'v' || k === 'V')) { e.preventDefault(); doPaste(); return }
+    if (ctrl && (k === 'd' || k === 'D' || k === 'r' || k === 'R' || (e.shiftKey && (k === 'l' || k === 'L')))) { e.preventDefault(); if (multi()) toast(t('oneArea')); return }
+    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); clearSel(); return }
+    if (k === 'Enter' || k === 'F2') { e.preventDefault(); startEdit(); return }
+    if (k.length === 1 && !ctrl && !e.altKey) { e.preventDefault(); startEdit(k) }
+  })
+  function doUndo() { if (undo.length) { redo.push(snap()); restore(undo.pop()); render() } }
+  function doRedo() { if (redo.length) { undo.push(snap()); restore(redo.pop()); render() } }
+
+  // Menus: tools that need one area are disabled, with one line that says why.
+  function menu(items, x, y) {
+    closeMenu()
+    const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu')
+    if (multi() && items.some(i => i.one)) { const w = document.createElement('span'); w.className = 'why'; w.textContent = t('someOne'); m.appendChild(w) }
+    for (const it of items) {
+      if (it === '-') { m.appendChild(document.createElement('hr')); continue }
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem')
+      b.innerHTML = `<span>${it.label}</span>${it.k ? `<span class="k">${it.k}</span>` : ''}`
+      const off = (it.one && multi()) || it.off
+      b.disabled = !!off; if (off) b.title = it.offWhy ?? t('oneArea')
+      b.addEventListener('click', () => { closeMenu(); it.run?.(); gw.focus() })
+      m.appendChild(b)
+    }
+    frame.appendChild(m)
+    const fb = frame.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight
+    m.style.left = Math.max(8, Math.min(x - fb.left, fb.width - mw - 8)) + 'px'
+    m.style.top = Math.max(8, Math.min(y - fb.top, fb.height - mh - 8)) + 'px'
+    m.querySelector('.mi:not(:disabled)')?.focus()
+  }
+  const kk = l => (mac ? '⌘' : 'Ctrl+') + l
+  g.addEventListener('contextmenu', e => {
+    const cell = e.target.closest('[data-r]'); if (!cell) return
+    e.preventDefault()
+    const at = { r: +cell.dataset.r, c: +cell.dataset.c }
+    if (!selected(at.r, at.c)) { areas = [rect(at, at)]; act = anchor = fe = at; render() }
+    const rowsOnly = areas.every(q => q.c0 === 0 && q.c1 === C - 1)
+    const nRows = new Set(areas.flatMap(q => Array.from({ length: q.r1 - q.r0 + 1 }, (_, i) => q.r0 + i))).size
+    menu([
+      { label: t('cut'), k: kk('X'), one: true, run: () => doCopy() },
+      { label: t('copy'), k: kk('C'), run: doCopy },
+      { label: t('paste'), k: kk('V'), run: doPaste },
+      { label: t('clear'), k: 'Delete', run: clearSel },
+      '-',
+      { label: t('mergeCells'), one: true },
+      { label: t('fillDown'), k: kk('D'), one: true },
+      { label: t('insRow'), one: true },
+      { label: rowsOnly ? t('delRows')(nRows) : t('delRowsAny'), off: !rowsOnly, offWhy: t('wholeRowsOnly') },
+    ], e.clientX, e.clientY)
+  })
+  tools.addEventListener('click', e => {
+    const b = e.target.closest('[data-cmd]'); if (!b) return
+    const cmd = b.dataset.cmd
+    if (cmd === 'undo') doUndo(); else if (cmd === 'redo') doRedo()
+    else if (cmd === 'sortmenu' || cmd === 'merge') {
+      const r = b.getBoundingClientRect()
+      menu(cmd === 'merge'
+        ? [{ label: t('mergeCells'), one: true }, { label: t('mergeAll'), one: true }, { label: t('unmerge'), one: true }]
+        : [{ label: t('sortAZ'), one: true }, { label: t('sortZA'), one: true }, '-', { label: t('filter'), k: kk('Shift+L'), one: true }, { label: t('table'), one: true }, { label: t('newRule'), one: true }],
+        r.left, r.bottom + 4)
+      return
+    } else format(cmd)
+    gw.focus()
+  })
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menu') && !e.target.closest('[data-cmd]')) closeMenu() }, true)
+
+  // Controls: language, computer, a ready-made example.
+  function setLang(v) {
+    lang = v; frame.dir = v === 'ar' ? 'rtl' : 'ltr'; frame.lang = v
+    frame.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t) })
+    vals[0] = S[v].head.slice()
+    document.querySelectorAll('#lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v))
+    requestAnimationFrame(render)
+  }
+  function setOs(v) {
+    mac = v === 'mac'
+    document.querySelectorAll('kbd.mod').forEach(k => { k.textContent = mac ? '⌘' : 'Ctrl' })
+    document.querySelectorAll('#os button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v))
+  }
+  document.getElementById('lang').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setLang(b.dataset.v) })
+  document.getElementById('os').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setOs(b.dataset.v) })
+  document.getElementById('sample').addEventListener('click', () => {
+    areas = [{ r0: 1, c0: 0, r1: 3, c1: 0 }, { r0: 5, c0: 4, r1: 5, c1: 4 }, { r0: 0, c0: 6, r1: R - 1, c1: 6 }, { r0: 8, c0: 1, r1: 9, c1: 3 }]
+    act = anchor = { r: 8, c: 1 }; fe = { r: 9, c: 3 }; addMode = false; render(); gw.focus()
+  })
+  window.addEventListener('resize', render)
+
+  build()
+  // Start in a realistic state: three areas picked, so the look shows at rest.
+  areas = [{ r0: 1, c0: 0, r1: 3, c1: 0 }, { r0: 5, c0: 4, r1: 5, c1: 4 }, { r0: 7, c0: 1, r1: 8, c1: 3 }]
+  act = anchor = { r: 7, c: 1 }; fe = { r: 8, c: 3 }
+  if (document.fonts?.ready) document.fonts.ready.then(render)
+  render()
+})()
+</script>
