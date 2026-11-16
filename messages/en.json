@@ -1006,6 +1006,8 @@
       "emailNotReady": "Email isn’t set up yet.",
       "dnd": "Do not disturb",
       "dndHelp": "No pop-ups or phone alerts. Notifications are still saved, and emails still go out.",
+      "celebrations": "Celebrations",
+      "celebrationsHelp": "A short animation and sound when you move a task to its next stage. Off unless you turn it on.",
       "device": "This device",
       "saved": "Saved",
       "gender": "Grammar in Arabic",

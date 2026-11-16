@@ -154,6 +154,7 @@ export interface NotificationSettingsView {
   kinds: KindSettings
   emailMode: EmailMode
   dnd: boolean
+  celebrations: boolean
   emailReady: boolean
   devices: { id: string; label: string; created_at: string }[]
   /** The language phone alerts and emails are written in (R13). */
@@ -174,7 +175,7 @@ export async function getNotificationSettings(): Promise<({ success: true } & No
   if (!me) return { success: false, error: 'not_authenticated' }
   const [rows, member, devices] = await Promise.all([
     prisma.notificationSetting.findMany({ where: { member_id: me.id } }),
-    prisma.member.findUnique({ where: { id: me.id }, select: { notify_dnd: true, email_mode: true, locale: true, gender: true } }),
+    prisma.member.findUnique({ where: { id: me.id }, select: { notify_dnd: true, email_mode: true, locale: true, gender: true, celebrations: true } }),
     prisma.pushSubscription.findMany({ where: { member_id: me.id }, orderBy: { created_at: 'desc' } }),
   ])
   return {
@@ -182,6 +183,7 @@ export async function getNotificationSettings(): Promise<({ success: true } & No
     kinds: mergeSettings(rows),
     emailMode: (member?.email_mode ?? 'daily') as EmailMode,
     dnd: !!member?.notify_dnd,
+    celebrations: !!member?.celebrations,
     emailReady: emailReady(),
     devices: devices.map(d => ({ id: d.id, label: deviceLabel(d.user_agent), created_at: d.created_at.toISOString() })),
     locale: member?.locale === 'ar' ? 'ar' : 'en',
@@ -190,7 +192,7 @@ export async function getNotificationSettings(): Promise<({ success: true } & No
 }
 
 /** Save a member's settings (FR-040): only what differs from the defaults is stored. */
-export async function saveNotificationSettings(input: { kinds?: KindSettings; emailMode?: EmailMode; dnd?: boolean }): Promise<{ success: true } | Fail> {
+export async function saveNotificationSettings(input: { kinds?: KindSettings; emailMode?: EmailMode; dnd?: boolean; celebrations?: boolean }): Promise<{ success: true } | Fail> {
   const me = await getSessionMember()
   if (!me) return { success: false, error: 'not_authenticated' }
   await prisma.$transaction(async tx => {
@@ -203,6 +205,7 @@ export async function saveNotificationSettings(input: { kinds?: KindSettings; em
     const data: Record<string, unknown> = {}
     if (input.emailMode && ['instant', 'daily', 'off'].includes(input.emailMode)) data.email_mode = input.emailMode
     if (input.dnd !== undefined) data.notify_dnd = !!input.dnd
+    if (input.celebrations !== undefined) data.celebrations = input.celebrations === true
     if (Object.keys(data).length) await tx.member.update({ where: { id: me.id }, data })
   })
   return { success: true }

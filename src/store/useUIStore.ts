@@ -11,8 +11,11 @@ export const useUIStore = create<UIStore>((set) => ({
   showTaskForm:   false,
   profileOpen:    false,
   pendingDeletes: {},
+  celebrationsOn: false,
 
-  setCelebration:  (payload: CelebrationPayload | null) => set({ celebration: payload }),
+  // Celebrations are off unless the member turns them on: a new one is dropped while off.
+  setCelebration:  (payload: CelebrationPayload | null) => set(s => (payload && !s.celebrationsOn ? s : { celebration: payload })),
+  setCelebrationsOn: (on: boolean) => set(on ? { celebrationsOn: true } : { celebrationsOn: false, celebration: null }),
   selectTask:      (id: string | null) => set({ selectedTaskId: id }),
   setShowTaskForm: (show: boolean) => set({ showTaskForm: show }),
   setProfileOpen:  (open: boolean) => set({ profileOpen: open }),

@@ -42,6 +42,8 @@ export interface SettingsView {
   kinds: KindSettings
   emailMode: EmailMode
   dnd: boolean
+  /** The stage-move celebration (off by default). */
+  celebrations: boolean
   emailReady: boolean
   devices: { id: string; label: string; created_at: string }[]
   locale: 'en' | 'ar'
@@ -59,7 +61,7 @@ export interface NotifyApi {
   getFollow(taskId: string): Promise<{ success: true; following: boolean } | Fail>
   setFollow(taskId: string, following: boolean): Promise<{ success: true; following: boolean } | Fail>
   getSettings(): Promise<SettingsView | Fail>
-  saveSettings(input: { kinds?: KindSettings; emailMode?: EmailMode; dnd?: boolean }): Promise<{ success: true } | Fail>
+  saveSettings(input: { kinds?: KindSettings; emailMode?: EmailMode; dnd?: boolean; celebrations?: boolean }): Promise<{ success: true } | Fail>
   setLocale(locale: 'en' | 'ar'): Promise<{ success: true } | Fail>
   setGender(gender: 'f' | 'm' | null): Promise<{ success: true } | Fail>
   /** The public key for phone alerts, or null when they aren't set up. */

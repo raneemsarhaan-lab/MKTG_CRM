@@ -7,6 +7,8 @@ import { CelebrationOverlay } from './CelebrationOverlay'
 import { NotifyProvider } from '@/components/notifications/NotifyProvider'
 import { notifyApi } from '@/components/notifications/api'
 import { HoursReminderApp } from '@/components/hours/pages'
+import { useEffect } from 'react'
+import { useUIStore } from '@/store/useUIStore'
 
 interface AppShellProps {
   member: Member
@@ -35,6 +37,9 @@ interface AppShellProps {
  * 36px 44px 44px, which other screens do not share.
  */
 export function AppShell({ member, pins = [], children }: AppShellProps) {
+  // The member's own choice; celebrations stay off until they turn them on.
+  const on = !!member.celebrations
+  useEffect(() => { useUIStore.getState().setCelebrationsOn(on) }, [on])
   return (
     // The notifications' pulse, toasts and opening (spec 012), once for the app.
     <NotifyProvider api={notifyApi} meId={member.id} storedLocale={member.locale}>

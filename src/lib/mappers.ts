@@ -31,6 +31,7 @@ export function mapMember(m: any): Member {
     has_password:    m.password_hash != null ? true : m.password_hash === null ? false : undefined,
     locale:          m.locale === 'ar' ? 'ar' : m.locale === 'en' ? 'en' : undefined,
     gender:          m.gender === 'f' || m.gender === 'm' ? m.gender : undefined,
+    celebrations:    m.celebrations === true,
   }
 }
 

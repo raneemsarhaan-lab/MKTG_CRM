@@ -19,6 +19,7 @@ import { useNotify } from './NotifyProvider'
 import { PushOffer } from './PushOffer'
 import type { SettingsView } from './types'
 import { applyLocale } from '@/lib/locale-switch'
+import { useUIStore } from '@/store/useUIStore'
 
 export const SETTINGS_ORDER: NotificationKind[] = [
   'mention', 'assigned', 'comment', 'reply', 'attachment',
@@ -50,7 +51,7 @@ export function NotificationSettings() {
     timer.current = window.setTimeout(() => setStatus(''), 2500)
   }
 
-  async function save(patch: Partial<Pick<SettingsView, 'kinds' | 'emailMode' | 'dnd'>>) {
+  async function save(patch: Partial<Pick<SettingsView, 'kinds' | 'emailMode' | 'dnd' | 'celebrations'>>) {
     if (!ctx || !view) return
     const before = view
     setView({ ...view, ...patch })
@@ -59,6 +60,7 @@ export function NotificationSettings() {
     const r = await run
     if (!r.success) setView(before)
     else if (patch.dnd !== undefined) ctx.setDnd(patch.dnd)
+    else if (patch.celebrations !== undefined) { useUIStore.getState().setCelebrationsOn(patch.celebrations); router.refresh() }
     flash(r.success)
   }
 
@@ -165,6 +167,11 @@ export function NotificationSettings() {
           <span><b id="nt-dnd">{tp('dnd')}</b><small>{tp('dndHelp')}</small></span>
           <button type="button" role="switch" className="fx-nt-sw" aria-checked={view.dnd} aria-labelledby="nt-dnd"
                   data-dnd="" onClick={() => void save({ dnd: !view.dnd })} />
+        </div>
+        <div className="fx-nt-opt">
+          <span><b id="nt-celebrate">{tp('celebrations')}</b><small>{tp('celebrationsHelp')}</small></span>
+          <button type="button" role="switch" className="fx-nt-sw" aria-checked={view.celebrations} aria-labelledby="nt-celebrate"
+                  data-celebrations="" onClick={() => void save({ celebrations: !view.celebrations })} />
         </div>
         <div className="fx-nt-opt">
           <span><b>{tp('device')}</b></span>
