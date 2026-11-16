@@ -88,6 +88,7 @@ type Lab = {
   opened: OpenTarget[]
   muted: string[]
   dnd: boolean
+  celebrations: boolean
   settings: { kinds: KindSettings; emailMode: SettingsView['emailMode']; gender: SettingsView['gender']; locale: 'en' | 'ar' }
   push: { subscribed: boolean; permission: NotificationPermission }
   failNext: Record<string, string>
@@ -110,6 +111,7 @@ const lab: Lab = {
   opened: [],
   muted: [],
   dnd: params.get('dnd') === '1',
+  celebrations: false,
   settings: { kinds: structuredClone(DEFAULT_SETTINGS), emailMode: 'daily', gender: null, locale },
   push: { subscribed: pushMode === 'on', permission: pushMode === 'blocked' ? 'denied' : pushMode === 'on' ? 'granted' : 'default' },
   failNext: {},
@@ -177,13 +179,14 @@ const api: NotifyApi = {
   getFollow: taskId => call('getFollow', [taskId], () => ({ success: true as const, following: true })),
   setFollow: (taskId, following) => call('setFollow', [taskId, following], () => ({ success: true as const, following })),
   getSettings: () => call('getSettings', [], () => ({
-    success: true as const, kinds: structuredClone(lab.settings.kinds), emailMode: lab.settings.emailMode, dnd: lab.dnd,
+    success: true as const, kinds: structuredClone(lab.settings.kinds), emailMode: lab.settings.emailMode, dnd: lab.dnd, celebrations: lab.celebrations,
     emailReady: params.get('email') !== '0', devices: [], locale: lab.settings.locale, gender: lab.settings.gender,
   })),
   saveSettings: input => call('saveSettings', [input], () => {
     if (input.kinds) lab.settings.kinds = structuredClone(input.kinds)
     if (input.emailMode) lab.settings.emailMode = input.emailMode
     if (input.dnd !== undefined) lab.dnd = input.dnd
+    if (input.celebrations !== undefined) lab.celebrations = input.celebrations
     return { success: true as const }
   }),
   setLocale: l => call('setLocale', [l], () => { lab.settings.locale = l; return { success: true as const } }),

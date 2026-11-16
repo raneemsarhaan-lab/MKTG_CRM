@@ -105,6 +105,8 @@ export interface Member {
   locale?: 'en' | 'ar'
   /** Spec 012 R6: for Arabic grammar; absent is the neutral phrasing. */
   gender?: 'f' | 'm'
+  /** The stage-move celebration is on (off by default). */
+  celebrations?: boolean
 }
 
 export interface Brand {
@@ -296,8 +298,11 @@ export interface UIStore {
   profileOpen: boolean
   /** Keyed by attachment id. */
   pendingDeletes: Record<string, PendingDelete>
+  /** The member turned celebrations on (off by default); while off, setCelebration ignores new ones. */
+  celebrationsOn: boolean
 
   setCelebration: (payload: CelebrationPayload | null) => void
+  setCelebrationsOn: (on: boolean) => void
   selectTask: (id: string | null) => void
   setShowTaskForm: (show: boolean) => void
   setProfileOpen: (open: boolean) => void

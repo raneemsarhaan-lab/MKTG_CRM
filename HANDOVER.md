@@ -646,6 +646,26 @@ A blank sheet's columns can follow board tasks (spec 016, `specs/016-sheet-task-
   - `scripts/spreadsheet-lab/smoke/links-perf.ts`;
   - `node scripts/spreadsheet-lab/realapp/links.cjs`.
 
+### Several areas (Ctrl+click)
+
+Every sheet's grid can select separate areas, as in Excel (spec 017, `specs/017-multi-area-selection/`). Design: `design/multi-area-selection.html`.
+
+- **How it works.**
+  - Ctrl/Cmd+click and drag add an area; Ctrl/Cmd on a selected cell takes cells out.
+  - Shift+F8 is Add to selection.
+  - Ctrl/Cmd+Enter fills every selected cell. Alt+Enter is the in-cell line break.
+- **Grid.** `GridCore` keeps the earlier areas by key (`extra`); the newest is still the active cell plus its far corner. `onSelect(rect, areas)` gives the hosts every area, newest last. `onAreasNotice` passes on what was refused (copy, cut, paste or the 100 cap).
+- **Pure helpers.** `src/lib/sheet-selection.ts` has `subtract`, `unionCells`, `copyLayout`, `areaLabel`, `wholeRows` and `wholeCols`.
+- **Hosts.** BlankSheet and `useLinkedFormats`:
+  - apply formats per area, merged into one undo step (`planAreas`);
+  - clear the union of the areas.
+- **Tools that need one area.** The tools that need one block check `FormatState.areas` and say "Works on one area".
+- **Check.** `node scripts/spreadsheet-lab/realapp/areas.cjs`.
+
+### Celebrations
+
+The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
@@ -920,7 +940,7 @@ Run through this after the first successful deploy.
 
 **Tasks**
 - [ ] "+ New task" creates a task in the correct column
-- [ ] Advancing a stage fires the celebration, for that person only
+- [ ] Advancing a stage fires the celebration, for that person only, when they have turned Celebrations on (off by default)
 - [ ] Reordering within a column works; dragging across columns does nothing
 - [ ] A task in Published cannot be moved out
 - [ ] Comments save and appear

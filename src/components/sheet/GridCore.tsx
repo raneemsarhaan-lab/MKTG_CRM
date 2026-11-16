@@ -23,12 +23,16 @@
  * - a multi-line editor with Alt+Enter (`multiline`);
  * - rows windowed to the visible area on long sheets.
  *
+ * Spec 017: several areas at once (Ctrl/Cmd+click and drag, Shift+F8). The
+ * newest area is the one above (active cell + far corner); earlier ones are
+ * kept by key in `extra`. Hosts get every area through `onSelect`.
+ *
  * What a cell is and shows comes from the model; this file knows nothing about
  * clips, pieces, themes or blank sheets.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { parseClipboard, pastePlan, serialise, toGrid, toStyles } from '@/lib/sheet-clipboard'
-import { edge as dataEdge } from '@/lib/sheet-selection'
+import { edge as dataEdge, subtract, unionCells, copyLayout, MAX_AREAS } from '@/lib/sheet-selection'
 import type { CellCss } from '@/lib/sheet-format'
 import type { CellStyle } from '@/types/index'
 
@@ -51,6 +55,11 @@ export type MenuTarget =
   | { kind: 'row'; r: number; rect: GridRect }
   | { kind: 'col'; c: number; rect: GridRect }
 export interface GridRect { r0: number; c0: number; r1: number; c1: number }
+/** Spec 017: what the grid can refuse with several areas. */
+export type AreasNotice = 'cantCopy' | 'cantCut' | 'pasteBlock' | 'max'
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+/** Ctrl+click on Windows and Linux, Cmd+click on a Mac (where Ctrl+click is the menu). */
+const addKey = (e: { ctrlKey: boolean; metaKey: boolean }) => (IS_MAC ? e.metaKey : e.ctrlKey || e.metaKey)
 
 export interface GridModel<R extends { key: string }> {
   rows: R[]
@@ -126,8 +135,12 @@ export interface GridModel<R extends { key: string }> {
   multiline?: boolean
   /** What a paste, clear or cut didn't change, by reason (FR-025). */
   onSkipped?(skipped: Partial<Record<string, number>>): void
-  /** Tells the host what is selected, for the toolbar and screen readers. */
-  onSelect?(rect: GridRect): void
+  /** Tells the host what is selected, for the toolbar and screen readers. `areas` lists every area, the newest (`rect`) last (spec 017). */
+  onSelect?(rect: GridRect, areas: GridRect[]): void
+  /** Spec 017: something the grid refused with several areas, for the host to say. */
+  onAreasNotice?(key: AreasNotice): void
+  /** Spec 017: Add to selection (Shift+F8) turned on or off. */
+  onAddMode?(on: boolean): void
   /** Row-number labels, when they aren't 1, 2, 3 (the linked sheets show clip numbers). */
   rowLabel?(row: R, index: number): ReactNode
 
@@ -293,14 +306,65 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const multi = rect.r0 !== rect.r1 || rect.c0 !== rect.c1
   const rectRef = useRef(rect)
   rectRef.current = rect
-  const sig = `${rect.r0},${rect.c0},${rect.r1},${rect.c1}`
-  useEffect(() => { m.onSelect?.(rectRef.current) }, [sig]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Select a block by indexes: the active cell is its top-left (or `anchor` when given). */
-  const selectBlock = useCallback((q: GridRect, anchor?: { r: number; c: number }) => {
+  // ── several areas (spec 017) ──────────────────────────────────────────────
+  /** Earlier areas, by key so they survive re-renders; the newest area is `rect`. */
+  const [extra, setExtraState] = useState<{ a: ActiveCell; b: ActiveCell }[]>([])
+  const extraRef = useRef(extra)
+  const setExtra = (v: { a: ActiveCell; b: ActiveCell }[]) => { if (v.length || extraRef.current.length) { extraRef.current = v; setExtraState(v) } }
+  /** Shift+F8, Add to selection: moves keep the areas; `fresh` = the newest area is just the cursor. */
+  const [adding, setAddingState] = useState(false)
+  const addingRef = useRef(false), fresh = useRef(false)
+  const setAdding = (on: boolean) => { addingRef.current = on; fresh.current = false; setAddingState(on) }
+  /** A Ctrl+drag that started on selected cells takes them out (FR-006). */
+  const [unsel, setUnselState] = useState<GridRect | null>(null)
+  const unselRef = useRef<GridRect | null>(null)
+  const setUnsel = (q: GridRect | null) => { unselRef.current = q; setUnselState(q) }
+  const removeFrom = useRef<{ r: number; c: number } | null>(null)
+  const extraRects: GridRect[] = []
+  if (m.selection) for (const x of extra) {
+    const r0 = rowIndex.get(x.a.key), r1 = rowIndex.get(x.b.key), c0 = m.cols.indexOf(x.a.col), c1 = m.cols.indexOf(x.b.col)
+    if (r0 === undefined || r1 === undefined || c0 < 0 || c1 < 0) continue
+    extraRects.push({ r0: Math.min(r0, r1), c0: Math.min(c0, c1), r1: Math.max(r0, r1), c1: Math.max(c0, c1) })
+  }
+  const areas = [...extraRects, rect]
+  const many = areas.length > 1
+  const showSel = multi || many
+  const areasRef = useRef(areas)
+  areasRef.current = areas
+  const inAreas = (r: number, c: number) => { for (const q of areas) if (r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1) return true; return false }
+  const keysOf = (q: GridRect) => ({ a: { key: m.rows[q.r0].key, col: m.cols[q.c0] }, b: { key: m.rows[q.r1].key, col: m.cols[q.c1] } })
+  /** Keep the newest area and start another (Ctrl+click): false at the cap. */
+  function pushCurrent(): boolean {
+    if (!m.rows[rect.r1] || !m.cols[rect.c1]) return false
+    if (areasRef.current.length >= MAX_AREAS) { m.onAreasNotice?.('max'); return false }
+    setExtra([...extraRef.current, keysOf(rect)])
+    return true
+  }
+  /** Make these areas the selection: the last becomes the newest (active at its top-left). */
+  function setAreas(list: GridRect[]) {
+    const last = list[list.length - 1]
+    if (!last) return
+    setExtra(list.slice(0, -1).map(keysOf))
+    wantFocus.current = true
+    setActive({ key: m.rows[last.r0].key, col: m.cols[last.c0] })
+    setFocusEnd({ key: m.rows[last.r1].key, col: m.cols[last.c1] })
+  }
+
+  // The document-level drag handlers read these, so they always see this render's rows.
+  const live = useRef({ rowIndex, cols: m.cols, setAreas })
+  live.current = { rowIndex, cols: m.cols, setAreas }
+
+  const sig = areas.map(q => `${q.r0},${q.c0},${q.r1},${q.c1}`).join(';')
+  useEffect(() => { m.onSelect?.(rectRef.current, areasRef.current) }, [sig]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { m.onAddMode?.(adding) }, [adding]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Select a block by indexes: the active cell is its top-left (or `anchor` when given). `keep` adds it as a new area. */
+  const selectBlock = useCallback((q: GridRect, anchor?: { r: number; c: number }, keep = false) => {
     const ar = anchor?.r ?? q.r0, acc = anchor?.c ?? q.c0
     const a = m.rows[Math.min(ar, m.rows.length - 1)], b = m.rows[Math.min(ar === q.r0 ? q.r1 : q.r0, m.rows.length - 1)]
     if (!a || !b) return
+    if (!keep) { extraRef.current = []; setExtraState(x => (x.length ? [] : x)) }
     wantFocus.current = true
     setActive({ key: a.key, col: m.cols[Math.min(acc, m.cols.length - 1)] })
     setFocusEnd({ key: b.key, col: m.cols[Math.min(acc === q.c0 ? q.c1 : q.c0, m.cols.length - 1)] })
@@ -393,7 +457,12 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
 
   function focusCell(row: R, col: GridCol, keepRange = false) {
     wantFocus.current = true
-    if (!keepRange) setFocusEnd(null)
+    if (!keepRange) {
+      // Add to selection (Shift+F8): the first move keeps the area just made; the cursor is a new one.
+      if (addingRef.current) { if (!fresh.current && pushCurrent()) fresh.current = true }
+      else setExtra([])
+      setFocusEnd(null)
+    }
     setActive({ key: row.key, col: fit(row, col) })
   }
 
@@ -468,16 +537,6 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (m.isText(row, col)) return m.textValue(row, col)
     return cells.current.get(cellKey(row.key, col))?.innerText.trim() ?? ''
   }
-  const gridOf = (q: GridRect) => {
-    const out: string[][] = []
-    for (let r = q.r0; r <= q.r1; r++) {
-      const row = m.rows[r], own = row ? colsFor(row) : []
-      const line: string[] = []
-      for (let c = q.c0; c <= q.c1; c++) line.push(row && own.includes(m.cols[c]) ? readText(row, m.cols[c]) : '')
-      out.push(line)
-    }
-    return out
-  }
   const writes = useRef(m.writeCells)
   writes.current = m.writeCells
 
@@ -490,17 +549,26 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     function onCopy(e: ClipboardEvent, cut: boolean) {
       if (!gridHasFocus() || editingRef.current || !e.clipboardData) return
       const q = rectRef.current
-      const each = <T,>(fn: (row: R, col: GridCol) => T, empty: T): T[][] => {
+      // Several areas (FR-011): one block when they share rows (side by side) or columns (stacked).
+      const list = areasRef.current
+      const layout = copyLayout(list)
+      if (list.length > 1 && (cut || !layout)) { e.preventDefault(); m.onAreasNotice?.(cut ? 'cantCut' : 'cantCopy'); return }
+      const one = <T,>(a: GridRect, fn: (row: R, col: GridCol) => T, empty: T): T[][] => {
         const out: T[][] = []
-        for (let r = q.r0; r <= q.r1; r++) {
+        for (let r = a.r0; r <= a.r1; r++) {
           const row = m.rows[r], own = row ? colsFor(row) : []
           const line: T[] = []
-          for (let c = q.c0; c <= q.c1; c++) line.push(row && own.includes(m.cols[c]) ? fn(row, m.cols[c]) : empty)
+          for (let c = a.c0; c <= a.c1; c++) line.push(row && own.includes(m.cols[c]) ? fn(row, m.cols[c]) : empty)
           out.push(line)
         }
         return out
       }
-      const { html, text } = serialise(gridOf(q), {
+      const each = <T,>(fn: (row: R, col: GridCol) => T, empty: T): T[][] => {
+        if (!layout || layout.kind === 'one') return one(q, fn, empty)
+        const parts = layout.order.map(a => one(a, fn, empty))
+        return layout.kind === 'cols' ? parts.flat() : parts[0].map((_, r) => parts.flatMap(p => p[r]))
+      }
+      const { html, text } = serialise(each(readText, ''), {
         styles: m.copyStyle ? each(m.copyStyle, null) : undefined,
         shown: m.copyShown ? each(m.copyShown, '') : undefined,
       })
@@ -522,9 +590,21 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       if (!g.length) return
       if (m.pasteAsRows?.(g, row, col)) { m.onPaste(e, row, col); return }
       e.preventDefault()
-      const plan = pastePlan(g, q)
       const styles = toStyles(clip)
       const one = g.length === 1 && g[0].length === 1
+      // Several areas (FR-012): one copied cell fills every selected cell; a block needs one area.
+      if (areasRef.current.length > 1) {
+        cutRect.current = null; setCutMark(null)
+        if (!one) { m.onAreasNotice?.('pasteBlock'); return }
+        const fillAll: CellWrite[] = unionCells(areasRef.current).map(({ r, c }) => {
+          const w: CellWrite = { r, c, value: g[0][0] }
+          if (styles) w.style = styles[0]?.[0] ?? null
+          return w
+        })
+        reportSkips(await writes.current(fillAll, 'paste'))
+        return
+      }
+      const plan = pastePlan(g, q)
       const list: CellWrite[] = []
       for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
         const w: CellWrite = { r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) }
@@ -570,12 +650,26 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   }
 
   async function clearRange() {
-    const q = rectRef.current
     if (!writes.current) return false
-    const list: CellWrite[] = []
-    for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) list.push({ r, c, value: '' })
+    // Every selected cell once, across every area (FR-009): one write, one undo step.
+    const list: CellWrite[] = unionCells(areasRef.current).map(({ r, c }) => ({ r, c, value: '' }))
     reportSkips(await writes.current(list, 'clear'))
     return true
+  }
+
+  /** Ctrl/Cmd+Enter (FR-010): the value being typed goes into every selected cell. */
+  async function fillSelection() {
+    const cur = editingRef.current
+    if (!cur || committing.current) return
+    const list = unionCells(areasRef.current)
+    if (!writes.current || list.length <= 1) { void commit('none'); return }
+    committing.current = true
+    setEditing(null)
+    const res = await writes.current(list.map(({ r, c }) => ({ r, c, value: cur.value })), 'paste')
+    committing.current = false
+    reportSkips(res)
+    wantFocus.current = true
+    setTick(t => t + 1)
   }
 
   function openMenu(target: MenuTarget, anchor: HTMLElement, at?: { x: number; y: number }) {
@@ -613,6 +707,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       return
     }
     if (ctrl && (e.key === 'y' || e.key === 'Y') && m.onRedo) { e.preventDefault(); m.onRedo(); return }
+    // Shift+F8 (spec 017 FR-015): Add to selection on and off.
+    if (e.key === 'F8' && e.shiftKey && m.selection) { e.preventDefault(); setAdding(!addingRef.current); return }
+    if (e.key === 'Escape' && addingRef.current) { e.preventDefault(); setAdding(false); return }
     // Select all (FR-010).
     if (ctrl && (e.key === 'a' || e.key === 'A') && m.selection && m.rows.length && m.cols.length) {
       e.preventDefault()
@@ -634,6 +731,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     /** Shift+arrows (FR-010): move the far corner; the active cell stays. */
     const extendTo = (r: number, c: number) => {
       e.preventDefault()
+      fresh.current = false
       const rr = Math.max(0, Math.min(m.rows.length - 1, r))
       const cc = Math.max(0, Math.min(m.cols.length - 1, c))
       setFocusEnd({ key: m.rows[rr].key, col: m.cols[cc] })
@@ -703,7 +801,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     // Delete or Backspace over a selection clears it in one step (FR-005).
     // On a linked sheet, Delete on a title or a non-text cell keeps its own meaning (drop a clip, clear a choice).
     const ownDelete = !!m.onDelete && (active.col === 'title' || !m.isText(row, active.col))
-    if ((e.key === 'Delete' || e.key === 'Backspace') && m.writeCells && active.col !== 'rowNo' && (multi || (m.selection && !ownDelete))) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && m.writeCells && active.col !== 'rowNo' && (showSel || (m.selection && !ownDelete))) {
       e.preventDefault()
       void clearRange()
       return
@@ -720,7 +818,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     }
     if (e.key.length === 1 && !ctrl && !e.altKey && e.key !== ' ' && m.isText(row, active.col)) {
       e.preventDefault()
-      setFocusEnd(null)
+      // The selection stays while typing, so Ctrl+Enter can fill it (spec 017 FR-010).
       startEdit(row, active.col, e.key)
       return
     }
@@ -762,15 +860,35 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       if (!el || !gridRef.current?.contains(el)) return
       const [key, col] = [el.dataset.rowKey ?? '', el.dataset.col ?? '']
       if (!key || !col || col === 'rowNo') return
+      const from = removeFrom.current
+      if (from) {
+        // Ctrl+drag over selected cells: the dashed block they leave (FR-006).
+        const r = live.current.rowIndex.get(key), c = live.current.cols.indexOf(col)
+        if (r === undefined || c < 0) return
+        const q = { r0: Math.min(from.r, r), c0: Math.min(from.c, c), r1: Math.max(from.r, r), c1: Math.max(from.c, c) }
+        const u = unselRef.current
+        if (!u || u.r0 !== q.r0 || u.c0 !== q.c0 || u.r1 !== q.r1 || u.c1 !== q.c1) setUnsel(q)
+        return
+      }
       setFocusEnd(f => (f && f.key === key && f.col === col ? f : { key, col }))
     }
-    const up = () => { dragging.current = false; cancelAnimationFrame(raf); raf = 0 }
+    const up = () => {
+      dragging.current = false; cancelAnimationFrame(raf); raf = 0
+      const from = removeFrom.current
+      if (!from) return
+      removeFrom.current = null
+      const cut = unselRef.current ?? { r0: from.r, c0: from.c, r1: from.r, c1: from.c }
+      setUnsel(null)
+      const left = subtract(areasRef.current, cut)
+      // Nothing left: the clicked cell becomes the selection.
+      live.current.setAreas(left.length ? left : [{ r0: from.r, c0: from.c, r1: from.r, c1: from.c }])
+    }
     document.addEventListener('pointermove', move)
     document.addEventListener('pointerup', up)
     return () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); cancelAnimationFrame(raf) }
   }, [m.selection]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const inRect = (r: number, c: number) => r >= rect.r0 && r <= rect.r1 && c >= rect.c0 && c <= rect.c1
+  const inUnsel = (r: number, c: number) => !!unsel && r >= unsel.r0 && r <= unsel.r1 && c >= unsel.c0 && c <= unsel.c1
   const cutIn = (r: number, c: number) => !!cutMark && r >= cutMark.r0 && r <= cutMark.r1 && c >= cutMark.c0 && c <= cutMark.c1
 
   function headerClick(col: GridCol, e: React.MouseEvent) {
@@ -782,7 +900,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       setActive({ key: m.rows[0].key, col: m.cols[ac] })
       return
     }
-    selectBlock({ r0: 0, c0: c, r1: m.rows.length - 1, c1: c })
+    // Ctrl/Cmd+click a letter: the column becomes one more area (FR-003).
+    const keep = addKey(e) && pushCurrent()
+    selectBlock({ r0: 0, c0: c, r1: m.rows.length - 1, c1: c }, undefined, keep)
   }
 
   // Frozen panes (spec 015 stage 2): the first rows always render and stick under the
@@ -821,7 +941,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
         {m.cols.map((col, c) => {
           const h = m.header(col)
           const movable = !!m.onReorder && col !== 'title'
-          const on = m.selection && multi && c >= rect.c0 && c <= rect.c1
+          const on = m.selection && showSel && areas.some(q => c >= q.c0 && c <= q.c1)
           return (
             <div key={col} role="columnheader" aria-sort={h.sort} aria-label={h.label}
                  data-col-head={col}
@@ -833,7 +953,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                    e.preventDefault()
                    const cc = m.cols.indexOf(col)
                    // Inside whole selected columns, the menu acts on them all; otherwise on this one.
-                   const whole = cc >= rect.c0 && cc <= rect.c1 && rect.r0 === 0 && rect.r1 - rect.r0 + 1 >= m.rows.length
+                   const whole = areas.some(q => cc >= q.c0 && cc <= q.c1) && areas.every(q => q.r0 === 0 && q.r1 - q.r0 + 1 >= m.rows.length)
                    const q = whole ? rect : { r0: 0, c0: cc, r1: Math.max(0, m.rows.length - 1), c1: cc }
                    if (!whole) selectBlock(q)
                    openMenu({ kind: 'col', c: cc, rect: q }, e.currentTarget, { x: e.clientX, y: e.clientY })
@@ -866,7 +986,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
         const own = colsFor(row)
         const spans = own !== allCols && own.length < allCols.length
         const h = heightOf(row)
-        const rowOn = m.selection && multi && i >= rect.r0 && i <= rect.r1
+        const rowOn = m.selection && showSel && areas.some(q => i >= q.r0 && i <= q.r1)
         return (
           <div
             key={row.key}
@@ -887,7 +1007,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const text = m.isText(row, col), menu = m.isMenu(row, col)
               const span = spans && ci === own.length - 1
               const c = m.cols.indexOf(col)
-              const selected = m.selection && multi && c >= 0 && inRect(i, c)
+              const selected = m.selection && showSel && c >= 0 && inAreas(i, c)
+              const unselecting = !!unsel && c >= 0 && inUnsel(i, c)
               const isNo = col === 'rowNo'
               const fx = !isNo && m.cellStyle ? m.cellStyle(row, col) : null
               const merge = !isNo && m.cellSpan ? m.cellSpan(row, col) : null
@@ -903,7 +1024,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
+                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
                   style={fx || freezeStyle ? { ...spanStyle, ...fx?.cell, ...freezeStyle } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
@@ -917,20 +1038,38 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                     if (isEditing || e.button !== 0 || (e.target as HTMLElement).closest('[data-row-resize], a, button')) return
                     if (isNo && !m.spreadsheet) return
                     if (isNo) {
-                      // A row number selects its row; Shift extends from the active row (FR-010).
+                      // A row number selects its row; Shift extends from the active row (FR-010); Ctrl/Cmd adds it (spec 017).
                       e.preventDefault()
                       if (e.shiftKey && active) { setFocusEnd({ key: row.key, col: m.cols[m.cols.length - 1] }); setActive({ key: active.key, col: m.cols[0] }) }
-                      else selectBlock({ r0: i, c0: 0, r1: i, c1: m.cols.length - 1 })
+                      else selectBlock({ r0: i, c0: 0, r1: i, c1: m.cols.length - 1 }, undefined, addKey(e) && pushCurrent())
                       return
                     }
-                    if (e.shiftKey && active) { e.preventDefault(); setFocusEnd({ key: row.key, col }); return }
+                    if (e.shiftKey && active) { e.preventDefault(); fresh.current = false; setFocusEnd({ key: row.key, col }); return }
+                    if (addKey(e) || addingRef.current) {
+                      e.preventDefault()
+                      // Ctrl/Cmd on a selected cell: take cells out (FR-006); elsewhere: a new area (FR-001, FR-002).
+                      if (addKey(e) && showSel && inAreas(i, c)) {
+                        removeFrom.current = { r: i, c }
+                        dragging.current = true
+                        setUnsel({ r0: i, c0: c, r1: i, c1: c })
+                        return
+                      }
+                      if (!pushCurrent()) return
+                      fresh.current = false
+                      dragging.current = true
+                      setFocusEnd(null)
+                      wantFocus.current = true
+                      setActive({ key: row.key, col })
+                      return
+                    }
                     dragging.current = true
                     setFocusEnd(null)
+                    setExtra([])
                     if (!isActive) { wantFocus.current = true; setActive({ key: row.key, col }) }
                   } : undefined}
                   onClick={e => {
                     if (isEditing) return
-                    if (m.selection && (e.shiftKey || (isNo && m.spreadsheet))) return
+                    if (m.selection && (e.shiftKey || (isNo && m.spreadsheet) || addKey(e) || addingRef.current)) return
                     if (!isActive) setActive({ key: row.key, col })
                     if (activate(row, col)) return
                     if (menu) m.onOpen(row, col, e.currentTarget)
@@ -939,14 +1078,14 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                     e.preventDefault()
                     if (isNo) {
                       // Inside whole selected rows, the menu acts on them all; otherwise on this one.
-                      const whole = i >= rect.r0 && i <= rect.r1 && rect.c0 === 0 && rect.c1 === m.cols.length - 1
+                      const whole = areas.some(q => i >= q.r0 && i <= q.r1) && areas.every(q => q.c0 === 0 && q.c1 === m.cols.length - 1)
                       const q = whole ? rect : { r0: i, c0: 0, r1: i, c1: Math.max(0, m.cols.length - 1) }
                       if (!whole) selectBlock(q)
                       openMenu({ kind: 'row', r: i, rect: q }, e.currentTarget, { x: e.clientX, y: e.clientY })
                       return
                     }
-                    if (c >= 0 && !inRect(i, c)) { setFocusEnd(null); setActive({ key: row.key, col }) }
-                    openMenu({ kind: 'cell', r: i, c, rect: inRect(i, c) ? rectRef.current : { r0: i, c0: c, r1: i, c1: c } }, e.currentTarget, { x: e.clientX, y: e.clientY })
+                    if (c >= 0 && !inAreas(i, c)) { setFocusEnd(null); setExtra([]); setActive({ key: row.key, col }) }
+                    openMenu({ kind: 'cell', r: i, c, rect: inAreas(i, c) ? rectRef.current : { r0: i, c0: c, r1: i, c1: c } }, e.currentTarget, { x: e.clientX, y: e.clientY })
                   } : undefined}
                   onDoubleClick={e => { if (!isEditing && !isNo) startEdit(row, col, undefined, caretAt(e.currentTarget, e.clientX, e.clientY)) }}
                 >
@@ -968,7 +1107,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           onChange={e => setEditing({ ...(editingRef.current ?? editing), value: e.target.value, caret: undefined })}
                           onKeyDown={e => {
                             e.stopPropagation()
-                            if (e.key === 'Enter' && (e.altKey || e.ctrlKey || e.metaKey)) {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.altKey) { e.preventDefault(); void fillSelection() }
+                            else if (e.key === 'Enter' && e.altKey) {
                               // Alt+Enter: a line break inside the cell (FR-003).
                               e.preventDefault()
                               const el = e.currentTarget, s = el.selectionStart, end = el.selectionEnd
@@ -1000,7 +1140,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           onChange={e => setEditing({ ...(editingRef.current ?? editing), value: e.target.value, caret: undefined })}
                           onKeyDown={e => {
                             e.stopPropagation()
-                            if (e.key === 'Enter') { e.preventDefault(); void commit(e.shiftKey ? 'up' : 'down') }
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && m.writeCells) { e.preventDefault(); void fillSelection() }
+                            else if (e.key === 'Enter') { e.preventDefault(); void commit(e.shiftKey ? 'up' : 'down') }
                             else if (e.key === 'Tab') { e.preventDefault(); void commit(e.shiftKey ? 'left' : 'right') }
                             else if (e.key === 'Escape') { e.preventDefault(); cancel() }
                           }}

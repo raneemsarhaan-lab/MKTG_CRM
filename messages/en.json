@@ -1006,6 +1006,8 @@
       "emailNotReady": "Email isn’t set up yet.",
       "dnd": "Do not disturb",
       "dndHelp": "No pop-ups or phone alerts. Notifications are still saved, and emails still go out.",
+      "celebrations": "Celebrations",
+      "celebrationsHelp": "A short animation and sound when you move a task to its next stage. Off unless you turn it on.",
       "device": "This device",
       "saved": "Saved",
       "gender": "Grammar in Arabic",
@@ -1891,6 +1893,18 @@
         "generic": "That didn't save. Try again."
       },
       "openTask": "Open task"
+    },
+    "areas": {
+      "status": "{label} · {n} areas, {count} cells",
+      "more": "+{n} more",
+      "adding": "Add to selection",
+      "oneArea": "Works on one area. Click a cell without Ctrl to start again.",
+      "cantCopy": "These areas can't be copied together. Pick areas that share the same rows or the same columns.",
+      "cantCut": "Cut works on one area. Click a cell without Ctrl to start again.",
+      "pasteBlock": "A block pastes into one area. Select one area, or copy a single cell to fill them all.",
+      "max": "You can select up to 100 areas.",
+      "wholeRows": "Select whole rows to delete them.",
+      "wholeCols": "Select whole columns to delete them."
     }
   },
   "hours": {

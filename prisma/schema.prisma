@@ -38,6 +38,8 @@ model Member {
   notify_dnd      Boolean   @default(false)
   /// Spec 012: 'instant' | 'daily' | 'off'.
   email_mode      String    @default("daily")
+  /// The stage-move celebration (animation and sound). Off unless the member turns it on.
+  celebrations    Boolean   @default(false)
   /// Spec 012 (R7): last time the app was open and in use, for toasts and push.
   last_active_at  DateTime? @db.Timestamptz(6)
 

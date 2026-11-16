@@ -270,7 +270,7 @@ export function Workbook(p: WorkbookProps) {
   }, [])
 
   // ── toolbar state ───────────────────────────────────────────────────────
-  const [sel, setSel] = useState<{ cell: string; count: number } | null>(null)
+  const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean } | null>(null)
   const [skip, setSkip] = useState<string | null>(null)
   const skipTimer = useRef<number | undefined>(undefined)
   const onSkipped = useCallback((s: Partial<Record<string, number>>) => {
@@ -501,7 +501,7 @@ export function Workbook(p: WorkbookProps) {
       // Stage 2: Paste Special, Fill Down and Right, Find and Replace (FR-003).
       const k = e.key.toLowerCase()
       const stop = () => { e.preventDefault(); e.stopPropagation() }
-      if (e.shiftKey && !e.altKey && k === 'v') { stop(); setPasteSpecial(true); return }
+      if (e.shiftKey && !e.altKey && k === 'v') { stop(); if ((fmt[target]?.areas ?? 1) > 1) say(t('areas.oneArea')); else setPasteSpecial(true); return }
       if (!e.shiftKey && !e.altKey && (k === 'd' || k === 'r')) { stop(); sendFormat(target, { kind: 'fill', dir: k === 'd' ? 'down' : 'right' }); return }
       if (!e.shiftKey && !e.altKey && (k === 'f' || k === 'h')) { stop(); setFind({ replace: k === 'h' }); return }
       // Stage 3: Filter on and off (FR-046).
@@ -586,7 +586,15 @@ export function Workbook(p: WorkbookProps) {
         <span className="fx-sh-sep" aria-hidden="true" />
         <span className="fx-sh-lbl" data-selection="" aria-live="polite">
           {openBlank
-            ? (sel ? (sel.count > 1 ? t('grid.activeRange', { cell: sel.cell, n: sel.count }) : t('grid.active', { cell: sel.cell })) : t('toolbar.blankHint'))
+            ? (sel
+              ? <>
+                  {(sel.areas ?? 1) > 1
+                    // Spec 017 FR-008: "B2, E5, B8:D9 +2 more · 5 areas, 14 cells".
+                    ? t('areas.status', { label: sel.more ? `${sel.label} ${t('areas.more', { n: sel.more })}` : sel.label ?? sel.cell, n: sel.areas ?? 1, count: sel.count })
+                    : sel.count > 1 ? t('grid.activeRange', { cell: sel.cell, n: sel.count }) : t('grid.active', { cell: sel.cell })}
+                  {sel.adding && <span className="fx-sh-adding" data-add-mode="">{t('areas.adding')}</span>}
+                </>
+              : t('toolbar.blankHint'))
             : t('toolbar.linkedHint')}
         </span>
         {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}

@@ -22,6 +22,7 @@ import { ConfirmDialog, ResizeDialog } from '@/components/sheets/Dialogs'
 import type { SheetColumnsHook } from './useSheetColumns'
 import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { askComment } from '@/components/sheets/format/bus'
+import { areaRows, unionCells } from '@/lib/sheet-selection'
 
 export interface LinkedMenuInput<R extends { key: string }> {
   rows: R[]
@@ -43,10 +44,13 @@ export interface LinkedMenuInput<R extends { key: string }> {
   /** Saved heights by task id, and how to save new ones. */
   heights?: Record<string, number>
   saveHeights?(entries: { taskId: string; height: number | null }[]): Promise<{ success: boolean }>
+  /** Spec 017: every selected area, the newest last. */
+  areas?(): GridRect[]
 }
 
 export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) {
   const t = useTranslations('sheets')
+  const ta = useTranslations('sheets.areas')
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: PopItem[]; anchor: HTMLElement } | null>(null)
   const [confirm, setConfirm] = useState<{ taskIds: string[] } | null>(null)
   const [resize, setResize] = useState<{ kind: 'row' | 'col'; keys: string[]; value: number } | null>(null)
@@ -65,7 +69,7 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
     try { ok = document.execCommand(kind) } catch { ok = false }
     if (!ok) p.say(t('grid.pasteHint'))
   }
-  async function menuPaste(q: GridRect) {
+  async function menuPaste(q: GridRect, sel: GridRect[] = [q]) {
     let html = '', text = ''
     try {
       for (const it of await navigator.clipboard.read()) {
@@ -77,15 +81,21 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
     }
     const g = toGrid(parseClipboard({ html, text }, new DOMParser()))
     if (!g.length) return
+    if (sel.length > 1) {
+      // Spec 017 FR-012: one cell fills every area; a block needs one area.
+      if (g.length !== 1 || g[0].length !== 1) { p.say(ta('pasteBlock')); return }
+      const res = await p.writeCells(unionCells(sel).map(({ r, c }) => ({ r, c, value: g[0][0] })), 'paste')
+      if (res) p.onSkipped?.(res.skipped)
+      return
+    }
     const plan = pastePlan(g, q)
     const list: CellWrite[] = []
     for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) list.push({ r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) })
     const res = await p.writeCells(list, 'paste')
     if (res) p.onSkipped?.(res.skipped)
   }
-  async function clear(q: GridRect) {
-    const list: CellWrite[] = []
-    for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) list.push({ r, c, value: '' })
+  async function clear(sel: GridRect[]) {
+    const list: CellWrite[] = unionCells(sel).map(({ r, c }) => ({ r, c, value: '' }))
     const res = await p.writeCells(list, 'clear')
     if (res) p.onSkipped?.(res.skipped)
   }
@@ -101,7 +111,15 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
   const inWorkbook = !!useContext(LinkedFormatsContext)
   function contextMenu(target: MenuTarget, at: { x: number; y: number }, anchor: HTMLElement) {
     const q = target.rect
-    const sel = p.rows.slice(q.r0, q.r1 + 1)
+    // Spec 017: opened inside a selection of several areas, the menu acts on all of them.
+    const all = p.areas?.() ?? [q]
+    const tr = target.kind === 'col' ? 0 : target.r, tc = target.kind === 'row' ? 0 : target.c
+    const inside = all.length > 1 && (target.kind === 'row' ? all.some(a => tr >= a.r0 && tr <= a.r1)
+      : target.kind === 'col' ? all.some(a => tc >= a.c0 && tc <= a.c1)
+      : all.some(a => tr >= a.r0 && tr <= a.r1 && tc >= a.c0 && tc <= a.c1))
+    const areas = inside ? all : [q]
+    const one = inside ? { disabled: true, why: ta('oneArea') } : {}
+    const sel = inside ? areaRows(areas).map(r => p.rows[r]).filter((r): r is R => !!r) : p.rows.slice(q.r0, q.r1 + 1)
     const removable = sel.filter(r => p.canRemove(r)).map(r => p.taskOf(r)!.id)
     const here = p.rows[target.kind === 'col' ? q.r0 : target.r]
     const cols = p.cols.slice(q.c0, q.c1 + 1)
@@ -110,14 +128,14 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
     const k = (key: string) => `${mac ? '⌘' : 'Ctrl+'}${key}`
     const no = (why: string) => ({ disabled: true, why })
     const clip: PopItem[] = [
-      { key: 'cut', label: t('menu.cut'), kbd: k('X'), onSelect: () => clipboardCommand('cut', anchor) },
+      { key: 'cut', label: t('menu.cut'), kbd: k('X'), ...one, onSelect: () => clipboardCommand('cut', anchor) },
       { key: 'copy', label: t('menu.copy'), kbd: k('C'), onSelect: () => clipboardCommand('copy', anchor) },
-      { key: 'paste', label: t('menu.paste'), kbd: k('V'), onSelect: () => void menuPaste(q) },
-      { key: 'clear', label: t('menu.clear'), kbd: 'Delete', onSelect: () => void clear(q) },
+      { key: 'paste', label: t('menu.paste'), kbd: k('V'), onSelect: () => void menuPaste(q, areas) },
+      { key: 'clear', label: t('menu.clear'), kbd: 'Delete', onSelect: () => void clear(areas) },
       // Spec 015: comments, where the workbook hosts them.
       ...(inWorkbook && target.kind === 'cell' ? [{ key: 'comment', label: t('comments.new'), kbd: mac ? '⌘⌥M' : 'Ctrl+Alt+M', onSelect: () => askComment() } as PopItem] : []),
     ]
-    const insertRow: PopItem = { key: 'insertRow', label: p.removal === 'drop' ? t('menu.newClip') : t('menu.newPiece'), onSelect: () => { if (here && !p.insertRow(here)) p.say(t('err.generic')) } }
+    const insertRow: PopItem = { key: 'insertRow', label: p.removal === 'drop' ? t('menu.newClip') : t('menu.newPiece'), ...one, onSelect: () => { if (here && !p.insertRow(here)) p.say(t('err.generic')) } }
     const removeRows: PopItem = {
       key: 'deleteRow', danger: true,
       label: p.removal === 'drop' ? t('menu.dropRows', { n: removable.length || sel.length }) : t('menu.archiveRows', { n: removable.length || sel.length }),
@@ -125,10 +143,10 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
       onSelect: () => setConfirm({ taskIds: removable }),
     }
     const insertCols: PopItem[] = [
-      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...(col === 'title' ? no(t('menu.titleFirst')) : {}), onSelect: () => p.columns.grid.insertColumn('before', col, anchor) },
-      { key: 'insertColRight', label: t('menu.insertColRight'), onSelect: () => p.columns.grid.insertColumn('after', cols[cols.length - 1] ?? col, anchor) },
+      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...(col === 'title' ? no(t('menu.titleFirst')) : one), onSelect: () => p.columns.grid.insertColumn('before', col, anchor) },
+      { key: 'insertColRight', label: t('menu.insertColRight'), ...one, onSelect: () => p.columns.grid.insertColumn('after', cols[cols.length - 1] ?? col, anchor) },
     ]
-    const team = cols.length === 1 && p.columns.grid.isTeamColumn(cols[0])
+    const team = !inside && cols.length === 1 && p.columns.grid.isTeamColumn(cols[0])
     const deleteCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: cols.length }), danger: true,
       ...(team ? {} : no(cols.length > 1 ? t('menu.oneColumn') : t('menu.pipelineCol'))),
       onSelect: () => p.columns.grid.deleteColumn(cols[0], anchor) }
