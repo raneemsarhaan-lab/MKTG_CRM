@@ -18,7 +18,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { GridCore, type ActiveCell, type CellWrite, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
+import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
 import type { CellStyle, ColFilter, ConditionalRule, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
@@ -31,7 +31,7 @@ import { taskIdFrom } from '@/lib/sheet-links'
 import { StagePill } from './links/LinkDialogs'
 import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
-import { cellName, colLetters } from '@/lib/sheet-selection'
+import { areaCols, areaRows, cellName, colLetters, unionCells, unionSize, wholeCols, wholeRows } from '@/lib/sheet-selection'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, ResizeDialog } from './Dialogs'
@@ -49,8 +49,8 @@ export interface BlankSheetProps {
   apply(label: string, changes: BlankChange[]): void
   onUndo(): void
   onRedo(): void
-  /** What is selected, for the toolbar: the active cell's name and the count. */
-  onSelect(info: { cell: string; count: number }): void
+  /** What is selected, for the toolbar: the active cell's name and the count; with several areas (spec 017) their names. */
+  onSelect(info: { cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean }): void
   onSkipped(skipped: Partial<Record<string, number>>): void
   /** A short message for the workbook's toast (a menu Paste the browser refused). */
   onNotice(text: string): void
@@ -70,6 +70,9 @@ export function BlankSheet(p: BlankSheetProps) {
   const [resize, setResize] = useState<{ kind: 'row' | 'col'; ids: string[]; value: number } | null>(null)
   const [selectRect, setSelectRect] = useState<GridRect | null>(null)
   const rectRef = useRef<GridRect>({ r0: 0, c0: 0, r1: 0, c1: 0 })
+  /** Spec 017: every selected area, the newest (`rectRef`) last. */
+  const areasRef = useRef<GridRect[]>([{ r0: 0, c0: 0, r1: 0, c1: 0 }])
+  const addingRef = useRef(false)
   const noteTimers = useRef(new Map<string, number>())
 
   const extras = doc.extras ?? emptyExtras()
@@ -139,6 +142,20 @@ export function BlankSheet(p: BlankSheetProps) {
   const vRowIndex = useMemo(() => new Map(vRows.map((r, i) => [r.id, i])), [vRows])
   /** The name of a visible cell: its real row number and column letter (B4). */
   const nameAt = (r: number, c: number) => cellName(rowIndex.get(vRows[r]?.id ?? '') ?? r, colIndex.get(vCols[c]?.id ?? '') ?? c)
+  /** An area as Excel names it ("B2", "B2:D4", "C:E", "3:5"), by the sheet's own letters and numbers. */
+  const areaName = (a: GridRect) => {
+    const rowN = (r: number) => (rowIndex.get(vRows[r]?.id ?? '') ?? r) + 1, colL = (c: number) => colLetters(colIndex.get(vCols[c]?.id ?? '') ?? c)
+    const allR = a.r0 === 0 && a.r1 >= vRows.length - 1, allC = a.c0 === 0 && a.c1 >= vCols.length - 1
+    if (allR && !allC) return `${colL(a.c0)}:${colL(a.c1)}`
+    if (allC && !allR) return `${rowN(a.r0)}:${rowN(a.r1)}`
+    return a.r0 === a.r1 && a.c0 === a.c1 ? nameAt(a.r0, a.c0) : `${nameAt(a.r0, a.c0)}:${nameAt(a.r1, a.c1)}`
+  }
+  /** The status line (spec 017 FR-008): the active cell, the count, and with several areas their names. */
+  function report() {
+    const list = areasRef.current, q = rectRef.current
+    const names = list.length > 1 ? list.map(areaName) : []
+    p.onSelect({ cell: nameAt(q.r0, q.c0), count: unionSize(list), areas: list.length, label: names.slice(0, 3).join(', '), more: Math.max(0, names.length - 3), adding: addingRef.current })
+  }
   /** Merges as blocks of visible indexes; one whose edges are gone or hidden is left out. */
   const boxes = useMemo(() => extras.merges.map(m => {
     const a = vRowIndex.get(m.top), b = vRowIndex.get(m.bottom), c = vColIndex.get(m.left), d = vColIndex.get(m.right)
@@ -172,7 +189,7 @@ export function BlankSheet(p: BlankSheetProps) {
   const lk = useTaskLinks({
     doc, api: p.links ?? noLinks, ro: p.readOnly, vRows, vCols, rowIndex, colIndex,
     value: (r, c) => doc.cells[r]?.[c] ?? '',
-    apply: p.apply, patch: fn => p.patch?.(fn), rect: () => rectRef.current, say: p.onNotice, onNote,
+    apply: p.apply, patch: fn => p.patch?.(fn), rect: () => rectRef.current, rows: () => areaRows(areasRef.current), say: p.onNotice, onNote,
     makeRows: (at, n) => insertAt(doc.rows, at < vRows.length ? rowIndex.get(vRows[at].id) ?? doc.rows.length : doc.rows.length, n, p.newId),
   })
   /** Every change goes through the link router: mapped cells to their tasks, the rest as before (spec 016 R5). */
@@ -257,12 +274,13 @@ export function BlankSheet(p: BlankSheetProps) {
     }
     return out
   }
-  function deleteRows(r0: number, r1: number) {
-    const gone = vRows.slice(r0, r1 + 1)
+  const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
+  function deleteRowsAt(at: number[]) {
+    const gone = at.map(i => vRows[i]).filter((x): x is NonNullable<typeof x> => !!x)
     applyR('deleteRows', [...tablesAfter('rows', new Set(gone.map(r => r.id))), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
   }
-  function deleteCols(c0: number, c1: number) {
-    const gone = vCols.slice(c0, c1 + 1)
+  function deleteColsAt(at: number[]) {
+    const gone = at.map(i => vCols[i]).filter((x): x is NonNullable<typeof x> => !!x)
     applyR('deleteCols', [...tablesAfter('cols', new Set(gone.map(c => c.id))), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
   }
   function setHeights(ids: string[], h: number | null) {
@@ -273,14 +291,41 @@ export function BlankSheet(p: BlankSheetProps) {
     const list = doc.cols.filter(c => ids.includes(c.id) && c.width !== w).map(c => ({ id: c.id, before: c.width, after: w }))
     if (list.length) applyR('colWidths', [{ kind: 'colWidths', cols: list }])
   }
-  function clear(q: GridRect) {
+  function clear(sel: GridRect[]) {
     const list: { rowId: string; colId: string; value: string }[] = []
-    for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) {
+    for (const { r, c } of unionCells(sel)) {
       const row = vRows[r], col = vCols[c]
       if (row && col && value(row.id, col.id)) list.push({ rowId: row.id, colId: col.id, value: '' })
     }
     const ch = cellChange(list)
     if (ch) applyR('clear', [ch])
+  }
+  // ── spec 017: several areas ─────────────────────────────────────────────
+  const tA = (k: string) => t(`areas.${k}`)
+  const many = () => areasRef.current.length > 1
+  /** A tool that needs one block, asked for with several areas: say so and stop (FR-014). */
+  const oneArea = () => { if (!many()) return false; p.onNotice(tA('oneArea')); return true }
+  /** The areas a menu acts on: the whole selection when it was opened inside it, else its own block. */
+  function menuAreas(target: MenuTarget): GridRect[] {
+    const list = areasRef.current
+    const r = target.kind === 'col' ? 0 : target.r, c = target.kind === 'row' ? 0 : target.c
+    const inside = target.kind === 'row' ? list.some(q => r >= q.r0 && r <= q.r1)
+      : target.kind === 'col' ? list.some(q => c >= q.c0 && c <= q.c1)
+      : list.some(q => r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1)
+    return inside && list.length > 1 ? list : [target.rect]
+  }
+  /** One format change per area, as one undo step: a cell in two areas changes once. */
+  function planAreas(plan: (q: GridRect) => FormatItem[] | null): FormatItem[] | null {
+    const byKey = new Map<string, FormatItem>()
+    for (const q of areasRef.current) {
+      const items = plan(q)
+      if (!items) return null
+      for (const it of items) {
+        const k = `${it.rowKey}|${it.colKey}`, had = byKey.get(k)
+        byKey.set(k, had ? { ...it, before: had.before } : it)
+      }
+    }
+    return [...byKey.values()]
   }
 
   /** Back to the grid after a menu or dialog, so the keys (Ctrl+Z…) keep working. */
@@ -300,7 +345,7 @@ export function BlankSheet(p: BlankSheetProps) {
     try { ok = document.execCommand(kind) } catch { ok = false }
     if (!ok) p.onNotice(t('grid.pasteHint'))
   }
-  async function menuPaste(q: GridRect) {
+  async function menuPaste(q: GridRect, sel: GridRect[] = [q]) {
     let html = '', text = ''
     try {
       const items = await navigator.clipboard.read()
@@ -313,6 +358,13 @@ export function BlankSheet(p: BlankSheetProps) {
     }
     const g = toGrid(parseClipboard({ html, text }, new DOMParser()))
     if (!g.length) return
+    if (sel.length > 1) {
+      // Several areas: one copied cell fills them all; a block needs one area (FR-012).
+      if (g.length !== 1 || g[0].length !== 1) { p.onNotice(tA('pasteBlock')); return }
+      const res = await writeCells(unionCells(sel).map(({ r, c }) => ({ r, c, value: g[0][0] })), 'paste')
+      p.onSkipped(res.skipped)
+      return
+    }
     const plan = pastePlan(g, q)
     const list: CellWrite[] = []
     for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) list.push({ r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) })
@@ -324,41 +376,47 @@ export function BlankSheet(p: BlankSheetProps) {
   // ── the menus (FR-040–FR-043) ───────────────────────────────────────────
   function contextMenu(target: MenuTarget, at: { x: number; y: number }, anchor: HTMLElement) {
     const q = target.rect
-    const nr = q.r1 - q.r0 + 1, nc = q.c1 - q.c0 + 1
+    const sel = menuAreas(target), several = sel.length > 1
+    const selRows = areaRows(sel), selCols = areaCols(sel)
+    const rowsWhole = wholeRows(sel, vCols.length), colsWhole = wholeCols(sel, vRows.length)
+    const nr = several ? selRows.length : q.r1 - q.r0 + 1, nc = several ? selCols.length : q.c1 - q.c0 + 1
+    const one = several ? { disabled: true, why: tA('oneArea') } : {}
     const lock = ro ? { disabled: true, why: ro } : {}
     const tooManyRows = doc.rows.length + nr > BLANK_ROW_LIMIT ? { disabled: true, why: t('err.too_many_rows') } : {}
     const tooManyCols = doc.cols.length + nc > BLANK_COL_LIMIT ? { disabled: true, why: t('err.too_many_cols') } : {}
-    const allRows = nr >= vRows.length ? { disabled: true, why: t('menu.keepOneRow') } : {}
-    const allCols = nc >= vCols.length ? { disabled: true, why: t('menu.keepOneCol') } : {}
+    const allRows = nr >= vRows.length ? { disabled: true, why: t('menu.keepOneRow') }
+      : several && !rowsWhole ? { disabled: true, why: tA('wholeRows') } : {}
+    const allCols = nc >= vCols.length ? { disabled: true, why: t('menu.keepOneCol') }
+      : several && !colsWhole ? { disabled: true, why: tA('wholeCols') } : {}
     const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
     const k = (key: string) => `${mac ? '⌘' : 'Ctrl+'}${key}`
     const clip: PopItem[] = [
-      { key: 'cut', label: t('menu.cut'), kbd: k('X'), ...lock, onSelect: () => clipboardCommand('cut', anchor) },
+      { key: 'cut', label: t('menu.cut'), kbd: k('X'), ...lock, ...(ro ? {} : one), onSelect: () => clipboardCommand('cut', anchor) },
       { key: 'copy', label: t('menu.copy'), kbd: k('C'), onSelect: () => clipboardCommand('copy', anchor) },
-      { key: 'paste', label: t('menu.paste'), kbd: k('V'), ...lock, onSelect: () => void menuPaste(q) },
+      { key: 'paste', label: t('menu.paste'), kbd: k('V'), ...lock, onSelect: () => void menuPaste(q, sel) },
     ]
     const rowItems: PopItem[] = [
-      { key: 'insertRowAbove', label: t('menu.insertRowAbove'), ...lock, ...(ro ? {} : tooManyRows), onSelect: () => insertRows(q.r0, target.kind === 'row' ? nr : 1) },
-      { key: 'insertRowBelow', label: t('menu.insertRowBelow'), ...lock, ...(ro ? {} : tooManyRows), onSelect: () => insertRows(q.r1 + 1, target.kind === 'row' ? nr : 1) },
+      { key: 'insertRowAbove', label: t('menu.insertRowAbove'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => insertRows(q.r0, target.kind === 'row' ? nr : 1) },
+      { key: 'insertRowBelow', label: t('menu.insertRowBelow'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => insertRows(q.r1 + 1, target.kind === 'row' ? nr : 1) },
     ]
     const colItems: PopItem[] = [
-      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...lock, ...(ro ? {} : tooManyCols), onSelect: () => insertCols(q.c0, target.kind === 'col' ? nc : 1) },
-      { key: 'insertColRight', label: t('menu.insertColRight'), ...lock, ...(ro ? {} : tooManyCols), onSelect: () => insertCols(q.c1 + 1, target.kind === 'col' ? nc : 1) },
+      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => insertCols(q.c0, target.kind === 'col' ? nc : 1) },
+      { key: 'insertColRight', label: t('menu.insertColRight'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => insertCols(q.c1 + 1, target.kind === 'col' ? nc : 1) },
     ]
-    const delRow: PopItem = { key: 'deleteRow', label: t('menu.deleteRow', { n: nr }), danger: true, ...lock, ...(ro ? {} : allRows), onSelect: () => deleteRows(q.r0, q.r1) }
-    const delCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: nc }), danger: true, ...lock, ...(ro ? {} : allCols), onSelect: () => deleteCols(q.c0, q.c1) }
-    const clearItem: PopItem = { key: 'clear', label: t('menu.clear'), kbd: 'Delete', ...lock, onSelect: () => clear(q) }
+    const delRow: PopItem = { key: 'deleteRow', label: t('menu.deleteRow', { n: nr }), danger: true, ...lock, ...(ro ? {} : allRows), onSelect: () => deleteRowsAt(several ? selRows : range(q.r0, q.r1)) }
+    const delCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: nc }), danger: true, ...lock, ...(ro ? {} : allCols), onSelect: () => deleteColsAt(several ? selCols : range(q.c0, q.c1)) }
+    const clearItem: PopItem = { key: 'clear', label: t('menu.clear'), kbd: 'Delete', ...lock, onSelect: () => clear(sel) }
     const commentItem: PopItem = { key: 'comment', label: t('comments.new'), kbd: mac ? '⌘⌥M' : 'Ctrl+Alt+M', onSelect: () => askComment() }
     const e = (k: string) => t(`format.edit.${k}`)
     let items: PopItem[]
     if (target.kind === 'row') {
-      const ids = vRows.slice(q.r0, q.r1 + 1).map(r => r.id)
+      const ids = (several ? selRows : range(q.r0, q.r1)).map(r => vRows[r]?.id).filter((x): x is string => !!x)
       items = [...clip, { kind: 'sep', key: 's1' }, ...rowItems, delRow, clearItem, { kind: 'sep', key: 's2' },
         { key: 'resizeRow', label: t('menu.resizeRow'), ...lock, onSelect: () => setResize({ kind: 'row', ids, value: vRows[q.r0]?.height ?? BLANK_ROW_H }) },
         { key: 'hideRows', label: e('hideRows'), ...lock, ...(ro ? {} : allRows), onSelect: () => viewOp('hideRows') },
         ...(hiddenNear('rows', q).length ? [{ key: 'unhideRows', label: e('unhideRows'), ...lock, onSelect: () => viewOp('unhideRows') }] : [])]
     } else if (target.kind === 'col') {
-      const ids = vCols.slice(q.c0, q.c1 + 1).map(c => c.id)
+      const ids = (several ? selCols : range(q.c0, q.c1)).map(c => vCols[c]?.id).filter((x): x is string => !!x)
       items = [...clip, { kind: 'sep', key: 's1' }, ...colItems, delCol, clearItem, { kind: 'sep', key: 's2' },
         { key: 'resizeCol', label: t('menu.resizeCol'), ...lock, onSelect: () => setResize({ kind: 'col', ids, value: vCols[q.c0]?.width ?? DEFAULT_COL_W }) },
         { key: 'hideCols', label: e('hideCols'), ...lock, ...(ro ? {} : allCols), onSelect: () => viewOp('hideCols') },
@@ -498,10 +556,13 @@ export function BlankSheet(p: BlankSheetProps) {
     rowHeight: row => row.height ?? autoH.get(row.id) ?? null,
     onRowResize: (row, h) => { if (!ro) setHeights([row.id], h) },
     onSkipped: p.onSkipped,
-    onSelect: q => {
+    onSelect: (q, list) => {
       rectRef.current = q
-      p.onSelect({ cell: nameAt(q.r0, q.c0), count: (q.r1 - q.r0 + 1) * (q.c1 - q.c0 + 1) })
+      areasRef.current = list
+      report()
     },
+    onAddMode: on => { addingRef.current = on; report() },
+    onAreasNotice: (key: AreasNotice) => p.onNotice(tA(key)),
     // Stage 2: frozen panes count the sheet's first rows and columns; hidden ones among them don't show.
     frozenRows: vRows.filter(r => (rowIndex.get(r.id) ?? 0) < (view.frozenRows ?? 0)).length,
     frozenCols: vCols.filter(c => (colIndex.get(c.id) ?? 0) < (view.frozenCols ?? 0)).length,
@@ -538,6 +599,7 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function merge(mode: MergeMode) {
     if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
     const q = rectRef.current
     const hit = boxes.filter(b => b.r0 <= q.r1 && q.r0 <= b.r1 && b.c0 <= q.c1 && q.c0 <= b.c1).map(b => b.m)
     if (mode === 'unmerge') { if (hit.length) applyR('unmerge', [{ kind: 'merges', add: [], remove: hit }]); return }
@@ -594,13 +656,13 @@ export function BlankSheet(p: BlankSheetProps) {
     const activeR = active ? rowIndex.get(active.key) ?? 0 : 0, activeC = active ? colIndex.get(active.col) ?? 0 : 0
     switch (op) {
       case 'hideRows': {
-        const ids = vRows.slice(q.r0, q.r1 + 1).map(r => r.id)
+        const ids = (many() ? areaRows(areasRef.current) : range(q.r0, q.r1)).map(r => vRows[r]?.id).filter((x): x is string => !!x)
         if (ids.length >= vRows.length) { p.onNotice(t('menu.keepOneRow')); return }
         setView('hideRows', { hiddenRows: [...new Set([...(view.hiddenRows ?? []), ...ids])] })
         break
       }
       case 'hideCols': {
-        const ids = vCols.slice(q.c0, q.c1 + 1).map(c => c.id)
+        const ids = (many() ? areaCols(areasRef.current) : range(q.c0, q.c1)).map(c => vCols[c]?.id).filter((x): x is string => !!x)
         if (ids.length >= vCols.length) { p.onNotice(t('menu.keepOneCol')); return }
         setView('hideCols', { hiddenCols: [...new Set([...(view.hiddenCols ?? []), ...ids])] })
         break
@@ -619,23 +681,24 @@ export function BlankSheet(p: BlankSheetProps) {
     for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) { const row = vRows[r], col = vCols[c]; if (row && col) f(row.id, col.id, r, c) }
   }
   function clearWhat(what: 'all' | 'formats' | 'contents' | 'comments') {
-    const q = rectRef.current
     if (ro && what !== 'comments') { p.onNotice(ro); return }
+    // Every area (spec 017 FR-009): each cell once.
+    const each = (f: (rowId: string, colId: string) => void) => { for (const { r, c } of unionCells(areasRef.current)) { const row = vRows[r], col = vCols[c]; if (row && col) f(row.id, col.id) } }
     const forward: BlankChange[] = []
     if (what === 'all' || what === 'contents') {
       const list: { rowId: string; colId: string; value: string }[] = []
-      cellsIn(q, (rid, cid) => { if (value(rid, cid)) list.push({ rowId: rid, colId: cid, value: '' }) })
+      each((rid, cid) => { if (value(rid, cid)) list.push({ rowId: rid, colId: cid, value: '' }) })
       const ch = cellChange(list)
       if (ch) forward.push(ch)
     }
     if (what === 'all' || what === 'formats') {
-      const items = planRect(index, q, size, rk, ck, clearPatch())
+      const items = planAreas(a => planRect(index, a, size, rk, ck, clearPatch()))
       if (!items) { p.onNotice(t('format.err.too_many_formats')); return }
       if (items.length) forward.push({ kind: 'formats', items })
     }
     if (what === 'all' || what === 'comments') {
       const keys: string[] = []
-      cellsIn(q, (rid, cid) => { if (marks.has(`${rid}|${cid}`)) keys.push(`${rid}|${cid}`) })
+      each((rid, cid) => { if (marks.has(`${rid}|${cid}`)) keys.push(`${rid}|${cid}`) })
       if (keys.length) clearComments('blank', keys)
     }
     if (forward.length) applyR(`clear-${what}`, forward)
@@ -643,6 +706,7 @@ export function BlankSheet(p: BlankSheetProps) {
   /** Fill Down / Right (FR-043): the first row or column's values and look, into the rest. */
   function fill(dir: 'down' | 'right') {
     if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
     const q = rectRef.current
     const list: { rowId: string; colId: string; value: string }[] = []
     const targets: { rowId: string; colId: string; src: { rowId: string; colId: string } }[] = []
@@ -667,6 +731,7 @@ export function BlankSheet(p: BlankSheetProps) {
   /** Paste Special (FR-041): values only, formats only, or both; optionally transposed. */
   async function pasteSpecial(cmd: Extract<FormatCmd, { kind: 'pasteSpecial' }>) {
     if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
     const q = rectRef.current
     const grid = cmd.transpose ? transpose(cmd.grid, '') : cmd.grid
     const styles = cmd.styles ? (cmd.transpose ? transpose(cmd.styles, null) : cmd.styles) : null
@@ -798,6 +863,7 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function sortBy(keys: SortKey[], header: boolean | null, fromFilter = false) {
     if (ro) { p.onNotice(ro); return }
+    if (!fromFilter && oneArea()) return
     if (!keys.length) return
     const sc = sortScope(fromFilter)
     const hdr = header ?? sc.header ?? looksLikeHeader(colIds.map(c => cellView(sc.rows[0]?.id ?? '', c)), sc.rows[1] ? colIds.map(c => cellView(sc.rows[1].id, c)) : undefined)
@@ -814,6 +880,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (ro) { p.onNotice(ro); return }
     const cur = active ? tableAt(active.key, active.col) : null
     if (cur) { applyR('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
+    if (oneArea()) return
     const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
     const d0 = rowIndex.get(vRows[q.r0].id) ?? 0, d1 = rowIndex.get(vRows[q.r1].id) ?? 0, e0 = colIndex.get(vCols[q.c0].id) ?? 0, e1 = colIndex.get(vCols[q.c1].id) ?? 0
     if (tableBoxes.some(b => b.dr[0] <= d1 && d0 <= b.dr[1] && b.dc[0] <= e1 && e0 <= b.dc[1])) { p.onNotice(sheetT('tableOverlap')); return }
@@ -837,6 +904,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (op === 'clear') { if (Object.keys(filter).length) setView('filterClear', { filter: {} }); return }
     if (op === 'reapply') return
     if (fArea) { setView('filterOff', { filterArea: null, filter: {} }); return }
+    if (oneArea()) return
     const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
     setView('filterOn', { filterArea: { header: vRows[q.r0].id, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: null }, filter: {} })
   }
@@ -861,6 +929,7 @@ export function BlankSheet(p: BlankSheetProps) {
     applyR(label, [{ kind: 'rules', before: rules, after }])
   }
   function ruleNew(rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'>) {
+    if (oneArea()) return
     const q = rectRef.current
     const range: ConditionalRule['range'] = {
       rows: q.r0 === 0 && q.r1 === vRows.length - 1 && !Object.keys(filter).length ? 'all' : vRows.slice(q.r0, q.r1 + 1).map(r => r.id),
@@ -870,9 +939,12 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function rulesClear(where: 'selection' | 'sheet') {
     if (where === 'sheet') { if (rules.length) setRules('rulesClear', []); return }
-    const q = rectRef.current
-    const rs = new Set(vRows.slice(q.r0, q.r1 + 1).map(r => r.id)), cs = new Set(vCols.slice(q.c0, q.c1 + 1).map(c => c.id))
-    const kept = rules.filter(r => !(r.range.cols.some(c => cs.has(c)) && (r.range.rows === 'all' || r.range.rows.some(x => rs.has(x)))))
+    // Every area (spec 017): a rule goes when it touches any of them.
+    const hits = (r: ConditionalRule) => areasRef.current.some(q => {
+      const rs = new Set(vRows.slice(q.r0, q.r1 + 1).map(x => x.id)), cs = new Set(vCols.slice(q.c0, q.c1 + 1).map(x => x.id))
+      return r.range.cols.some(c => cs.has(c)) && (r.range.rows === 'all' || r.range.rows.some(x => rs.has(x)))
+    })
+    const kept = rules.filter(r => !hits(r))
     if (kept.length !== rules.length) setRules('rulesClear', kept)
   }
   /** Sort's columns, named by the header row when there is one. */
@@ -894,15 +966,18 @@ export function BlankSheet(p: BlankSheetProps) {
 
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
-    if (cmd.kind === 'patch') applyItems(cmd.label, planRect(index, q, size, rk, ck, cmd.patch))
-    else if (cmd.kind === 'borders') applyItems('borders', planBorders(index, q, size, rk, ck, cmd.preset, cmd.line))
+    // Formats go to every area (spec 017 FR-009); borders are drawn per area.
+    if (cmd.kind === 'patch') applyItems(cmd.label, planAreas(a => planRect(index, a, size, rk, ck, cmd.patch)))
+    else if (cmd.kind === 'borders') applyItems('borders', planAreas(a => planBorders(index, a, size, rk, ck, cmd.preset, cmd.line)))
     else if (cmd.kind === 'merge') merge(cmd.mode)
-    else if (cmd.kind === 'paint') applyItems('paint', planRect(index, q, size, rk, ck, paintPatch(cmd.style)))
+    else if (cmd.kind === 'paint') applyItems('paint', planAreas(a => planRect(index, a, size, rk, ck, paintPatch(cmd.style))))
     else if (cmd.kind === 'view') viewOp(cmd.op)
     else if (cmd.kind === 'resize') {
       if (ro) { p.onNotice(ro); return }
-      if (cmd.what === 'row') setResize({ kind: 'row', ids: vRows.slice(q.r0, q.r1 + 1).map(r => r.id), value: heightOf(vRows[q.r0]) })
-      else setResize({ kind: 'col', ids: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), value: vCols[q.c0]?.width ?? DEFAULT_COL_W })
+      const rows = (many() ? areaRows(areasRef.current) : range(q.r0, q.r1)).map(r => vRows[r]?.id).filter((x): x is string => !!x)
+      const cols = (many() ? areaCols(areasRef.current) : range(q.c0, q.c1)).map(c => vCols[c]?.id).filter((x): x is string => !!x)
+      if (cmd.what === 'row') setResize({ kind: 'row', ids: rows, value: heightOf(vRows[q.r0]) })
+      else setResize({ kind: 'col', ids: cols, value: vCols[q.c0]?.width ?? DEFAULT_COL_W })
       return
     }
     else if (cmd.kind === 'clear') clearWhat(cmd.what)
@@ -910,7 +985,7 @@ export function BlankSheet(p: BlankSheetProps) {
     else if (cmd.kind === 'pasteSpecial') void pasteSpecial(cmd)
     else if (cmd.kind === 'find') { find(cmd); return }
     else if (cmd.kind === 'replace') { replace(cmd); return }
-    else if (cmd.kind === 'cellStyle') { const patch = cellStylePatch(cmd.key); if (patch) applyItems('cellStyle', planRect(index, q, size, rk, ck, patch)) }
+    else if (cmd.kind === 'cellStyle') { const patch = cellStylePatch(cmd.key); if (patch) applyItems('cellStyle', planAreas(a => planRect(index, a, size, rk, ck, patch))) }
     else if (cmd.kind === 'table') formatAsTable(cmd.style)
     else if (cmd.kind === 'tableOff') tableOff()
     else if (cmd.kind === 'sort') sortBy(cmd.keys, cmd.header)
@@ -932,7 +1007,8 @@ export function BlankSheet(p: BlankSheetProps) {
     readOnly: ro,
     mergeOff: null,
     merged: spans.anchor.has(`${active.key}|${active.col}`),
-    multi: rectRef.current.r0 !== rectRef.current.r1 || rectRef.current.c0 !== rectRef.current.c1,
+    multi: areasRef.current.length > 1 || rectRef.current.r0 !== rectRef.current.r1 || rectRef.current.c0 !== rectRef.current.c1,
+    areas: areasRef.current.length,
     viewOff: null,
     frozen: { rows: view.frozenRows ?? 0, cols: view.frozenCols ?? 0 },
     table: (() => { const tb = tableAt(active.key, active.col); return tb ? { style: tb.style } : null })(),

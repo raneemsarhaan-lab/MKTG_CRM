@@ -26,7 +26,8 @@ import { formatKey, indexFormats, planBorders, planRect, resolveStyle, toCss, va
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
 import { pastePlan } from '@/lib/sheet-clipboard'
 import { announceFind, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState } from '@/components/sheets/format/bus'
-import type { ActiveCell, CellWrite, GridCol, GridRect, WriteResult, WriteWhy } from './GridCore'
+import type { ActiveCell, AreasNotice, CellWrite, GridCol, GridRect, WriteResult, WriteWhy } from './GridCore'
+import { unionCells } from '@/lib/sheet-selection'
 
 export interface LinkedFormatsInput<R extends { key: string }> {
   /** Off outside the Sheets workbook's linked tab and the Content page (no `linked` prop). */
@@ -62,6 +63,7 @@ export interface LinkedFormatsInput<R extends { key: string }> {
 
 export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInput<R>) {
   const t = useTranslations('sheets.format')
+  const ta = useTranslations('sheets.areas')
   const api = useContext(LinkedFormatsContext)
   p = { ...p, enabled: p.enabled && !!api }
   const apiRef = useRef(api)
@@ -72,6 +74,18 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
   const formatsRef = useRef(formats)
   formatsRef.current = formats
   const rect = useRef<GridRect>({ r0: 0, c0: 0, r1: 0, c1: 0 })
+  /** Spec 017: every selected area, the newest (`rect`) last. */
+  const areas = useRef<GridRect[]>([{ r0: 0, c0: 0, r1: 0, c1: 0 }])
+  /** One format change per area, one undo step: a cell in two areas changes once. */
+  const planAreas = (plan: (q: GridRect) => FormatItem[] | null): FormatItem[] | null => {
+    const byKey = new Map<string, FormatItem>()
+    for (const q of areas.current) {
+      const items = plan(q)
+      if (!items) return null
+      for (const it of items) { const k = `${it.rowKey}|${it.colKey}`, had = byKey.get(k); byKey.set(k, had ? { ...it, before: had.before } : it) }
+    }
+    return [...byKey.values()]
+  }
   const [, setTick] = useState(0)
   const locale = useLocale()
   const [filterUi, setFilterUi] = useState<{ col: GridCol; anchor: HTMLElement } | null>(null)
@@ -126,23 +140,27 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
 
   const run = (cmd: FormatCmd) => {
     const q = rect.current
+    // Spec 017 FR-014: tools that need one block, asked for with several areas.
+    if (areas.current.length > 1 && (cmd.kind === 'fill' || cmd.kind === 'pasteSpecial' || cmd.kind === 'ruleNew' || (cmd.kind === 'sort') || (cmd.kind === 'filter' && cmd.op === 'toggle' && !p.store.view.filterArea))) {
+      p.say(ta('oneArea')); return
+    }
+    const every = unionCells(areas.current)
     switch (cmd.kind) {
       case 'merge': p.say(t('merge.why')); return
       case 'comment': return
       case 'view': case 'resize': p.say(t('edit.viewOff')); return
-      case 'patch': commit(cmd.label, planRect(index, q, size, rk, ck, cmd.patch)); return
-      case 'borders': commit('borders', planBorders(index, q, size, rk, ck, cmd.preset, cmd.line)); return
-      case 'paint': commit('paint', planRect(index, q, size, rk, ck, paintPatch(cmd.style))); return
+      case 'patch': commit(cmd.label, planAreas(a => planRect(index, a, size, rk, ck, cmd.patch))); return
+      case 'borders': commit('borders', planAreas(a => planBorders(index, a, size, rk, ck, cmd.preset, cmd.line))); return
+      case 'paint': commit('paint', planAreas(a => planRect(index, a, size, rk, ck, paintPatch(cmd.style)))); return
       case 'clear': {
-        if (cmd.what === 'all' || cmd.what === 'formats') commit('clearFormats', planRect(index, q, size, rk, ck, clearPatch()))
+        if (cmd.what === 'all' || cmd.what === 'formats') commit('clearFormats', planAreas(a => planRect(index, a, size, rk, ck, clearPatch())))
         if (cmd.what === 'all' || cmd.what === 'contents') {
-          const writes: CellWrite[] = []
-          for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) writes.push({ r, c, value: '' })
+          const writes: CellWrite[] = every.map(({ r, c }) => ({ r, c, value: '' }))
           void ref.current.writeCells?.(writes, 'clear').then(skippedNote)
         }
         if (cmd.what === 'all' || cmd.what === 'comments') {
           const keys: string[] = []
-          for (let r = q.r0; r <= q.r1; r++) { const task = rk(r); if (task) for (let c = q.c0; c <= q.c1; c++) keys.push(`${task}|${p.cols[c]}`) }
+          for (const { r, c } of every) { const task = rk(r); if (task) keys.push(`${task}|${p.cols[c]}`) }
           clearComments('linked', keys)
         }
         return
@@ -188,7 +206,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       }
       // Stage 3 (FR-030–FR-032, FR-045, FR-046, FR-075): cell styles and rules by task and column;
       // sort and filter inside each group, saved with the sheet and never on the board; no tables.
-      case 'cellStyle': { const patch = cellStylePatch(cmd.key); if (patch) commit('cellStyle', planRect(index, q, size, rk, ck, patch)); return }
+      case 'cellStyle': { const patch = cellStylePatch(cmd.key); if (patch) commit('cellStyle', planAreas(a => planRect(index, a, size, rk, ck, patch))); return }
       case 'table': case 'tableOff': p.say(t('st3.tablesLinked')); return
       case 'sort': {
         const keys = cmd.keys.filter(k => p.cols.includes(k.col) && k.col !== 'rowNo')
@@ -215,7 +233,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       case 'rulesClear': {
         const rules = p.store.rules
         if (cmd.where === 'sheet') { if (rules.length) setLinkedRules('rulesClear', []); return }
-        const cs = new Set(p.cols.slice(q.c0, q.c1 + 1))
+        const cs = new Set(areas.current.flatMap(a => p.cols.slice(a.c0, a.c1 + 1)))
         const kept = rules.filter(r => !r.range.cols.some(c => cs.has(c)))
         if (kept.length !== rules.length) setLinkedRules('rulesClear', kept)
         return
@@ -307,7 +325,8 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     readOnly: activeTask ? null : t('merge.why'),
     mergeOff: t('merge.why'),
     merged: false,
-    multi: rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1,
+    multi: areas.current.length > 1 || rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1,
+    areas: areas.current.length,
     viewOff: t('edit.viewOff'),
     table: null,
     tableOff: t('st3.tablesLinked'),
@@ -338,7 +357,11 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     node: filterNode,
     marked: (row: R, col: GridCol) => { const task = p.enabled ? p.taskOf(row) : null; return !!task && marks.has(`${task}|${col}`) },
     styleOf: (row: R, col: GridCol): CellStyle | null => { const task = p.taskOf(row); return task ? resolveStyle(index, task, col) : null },
-    onSelect: (q: GridRect) => { rect.current = q; setTick(x => x + 1) },
+    onSelect: (q: GridRect, list?: GridRect[]) => { rect.current = q; areas.current = list?.length ? list : [q]; setTick(x => x + 1) },
+    /** Spec 017: every selected area, for the menus. */
+    areasNow: () => areas.current,
+    /** Spec 017: what the grid refused with several areas. */
+    onAreasNotice: (key: AreasNotice) => p.say(ta(key)),
     /** For undo and redo (useLinkedEditing): put records to the given looks. */
     applyFormats: (items: FormatItem[]) => put(items),
   }

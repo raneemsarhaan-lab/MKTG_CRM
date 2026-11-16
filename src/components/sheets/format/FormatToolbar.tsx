@@ -115,6 +115,10 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const [line, setLine] = useState<BorderSide>(DEFAULT_LINE)
   const off = !state || !!state.readOnly
   const why = state?.readOnly ?? undefined
+  // Spec 017 FR-014: with several areas selected, tools that need one block say so.
+  const ta = useTranslations('sheets.areas')
+  const oneOff = (state?.areas ?? 1) > 1 ? ta('oneArea') : null
+  const one = (first = false): { disabled?: boolean; why?: string } => (oneOff ? { disabled: true, ...(first ? { why: oneOff } : {}) } : {})
 
   const at = (el: HTMLElement) => {
     const r = el.getBoundingClientRect(), rtl = getComputedStyle(el).direction === 'rtl'
@@ -152,7 +156,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   if (open?.k === 'font') menu = { label: t('ctl.font'), attr: 'data-font-menu', items: FONTS.map(f => ({ key: f.name, label: f.name, checked: font === f.name, onSelect: () => a.patch({ font: f.name === DEFAULT_FONT ? null : f.name }, 'font') })) }
   if (open?.k === 'size') menu = { label: t('ctl.size'), attr: 'data-size-menu', items: FONT_SIZES.map(n => ({ key: String(n), label: String(n), checked: size === n, onSelect: () => a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') })) }
   if (open?.k === 'rotate') menu = { label: t('ctl.rotate'), attr: 'data-rotate-menu', items: ([['none', null], ['ccw', 45], ['cw', -45], ['vertical', 'vertical'], ['up', 90], ['down', -90]] as const).map(([k, v]) => ({ key: k, label: t(`rotate.${k}`), checked: (st.rot ?? null) === v, onSelect: () => a.patch({ rot: v }, 'rotate') })) }
-  if (open?.k === 'merge') menu = { label: t('ctl.merge'), attr: 'data-merge-menu', items: (['center', 'across', 'cells', 'unmerge'] as MergeMode[]).map(m => ({ key: m, label: t(`merge.${m}`), disabled: !!mergeOff || (m === 'unmerge' && !state?.merged && !state?.multi), why: m === 'center' ? mergeOff ?? undefined : undefined, onSelect: () => a.merge(m) })) }
+  if (open?.k === 'merge') menu = { label: t('ctl.merge'), attr: 'data-merge-menu', items: (['center', 'across', 'cells', 'unmerge'] as MergeMode[]).map(m => ({ key: m, label: t(`merge.${m}`), disabled: !!oneOff || !!mergeOff || (m === 'unmerge' && !state?.merged && !state?.multi), why: m === 'center' ? oneOff ?? mergeOff ?? undefined : undefined, onSelect: () => a.merge(m) })) }
   if (open?.k === 'num') menu = { label: t('ctl.numberFormat'), attr: 'data-num-menu', items: [
     ...NUM_MENU.map(n => { const sm = n.sample ? sample(n.num, n.sample) : ''; return { key: n.key, label: sm ? `${t(`num.${n.key}`)} · ${sm}` : t(`num.${n.key}`), checked: nk === n.key, onSelect: () => a.num(n.num) } }),
     { kind: 'sep', key: 's' },
@@ -166,10 +170,10 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
   if (open?.k === 'paste') menu = { label: c.paste, attr: 'data-paste-menu', items: [
     { key: 'all', label: e('paste'), kbd: keyName('Ctrl+V'), onSelect: () => onPaste('all') },
-    { key: 'values', label: e('pasteValues'), onSelect: () => onPaste('values') },
-    { key: 'formats', label: e('pasteFormats'), onSelect: () => onPaste('formats') },
+    { key: 'values', label: e('pasteValues'), ...one(true), onSelect: () => onPaste('values') },
+    { key: 'formats', label: e('pasteFormats'), ...one(), onSelect: () => onPaste('formats') },
     { kind: 'sep', key: 's' },
-    { key: 'special', label: e('pasteSpecial'), kbd: keyName('Ctrl+Shift+V'), onSelect: onPasteSpecial },
+    { key: 'special', label: e('pasteSpecial'), kbd: keyName('Ctrl+Shift+V'), ...one(), onSelect: onPasteSpecial },
   ] }
   if (open?.k === 'fmt') menu = { label: c.fmt, attr: 'data-cells-menu', items: [
     { key: 'rowHeight', label: e('rowHeight'), disabled: !!viewOff, why: viewOff ?? undefined, onSelect: cmd({ kind: 'resize', what: 'row' }) },
@@ -181,8 +185,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
     key: w, label: e(`clear${w[0].toUpperCase()}${w.slice(1)}`), ...(w === 'contents' ? { kbd: 'Delete' } : {}), onSelect: cmd({ kind: 'clear', what: w }),
   })) }
   if (open?.k === 'fillDn') menu = { label: c.fillDown, attr: 'data-fill-menu', items: [
-    { key: 'down', label: e('fillDown'), kbd: keyName('Ctrl+D'), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
-    { key: 'right', label: e('fillRight'), kbd: keyName('Ctrl+R'), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
+    { key: 'down', label: e('fillDown'), kbd: keyName('Ctrl+D'), ...one(true), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
+    { key: 'right', label: e('fillRight'), kbd: keyName('Ctrl+R'), ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
   ] }
   if (open?.k === 'find') menu = { label: c.find, attr: 'data-find-menu', items: [
     { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
@@ -200,14 +204,14 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const head = (key: string, text: string): PopItem => ({ kind: 'node', key, node: <div role="presentation" className="fx-st-h">{text}</div> })
   if (open?.k === 'cond') menu = { label: t('ctl.cond'), attr: 'data-cond-menu', items: [
     head('hHi', s3('highlight')),
-    ...(['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup'] as RuleKind[]).map(k => ({ key: k, label: `${s3(`kinds.${k}`)}…`, onSelect: () => onRule(k) })),
+    ...(['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup'] as RuleKind[]).map((k, i) => ({ key: k, label: `${s3(`kinds.${k}`)}…`, ...one(i === 0), onSelect: () => onRule(k) })),
     head('hTop', s3('topBottom')),
-    ...(['top', 'bottom'] as RuleKind[]).map(k => ({ key: k, label: `${s3(`kinds.${k}`)}…`, onSelect: () => onRule(k) })),
+    ...(['top', 'bottom'] as RuleKind[]).map(k => ({ key: k, label: `${s3(`kinds.${k}`)}…`, ...one(), onSelect: () => onRule(k) })),
     { kind: 'sep', key: 's1' },
-    { key: 'bar', label: s3('kinds.bar'), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'bar', args: { colors: [DEFAULT_BAR] }, style: null } }) },
-    { key: 'scale', label: s3('kinds.scale'), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'scale', args: { colors: DEFAULT_SCALE }, style: null } }) },
+    { key: 'bar', label: s3('kinds.bar'), ...one(), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'bar', args: { colors: [DEFAULT_BAR] }, style: null } }) },
+    { key: 'scale', label: s3('kinds.scale'), ...one(), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'scale', args: { colors: DEFAULT_SCALE }, style: null } }) },
     { kind: 'sep', key: 's2' },
-    { key: 'new', label: `${s3('newRule')}…`, onSelect: () => onRule() },
+    { key: 'new', label: `${s3('newRule')}…`, ...one(), onSelect: () => onRule() },
     { key: 'clearSel', label: s3('clearSel'), onSelect: cmd({ kind: 'rulesClear', where: 'selection' }) },
     { key: 'clearAll', label: s3('clearAll'), disabled: !state?.rules?.length, onSelect: cmd({ kind: 'rulesClear', where: 'sheet' }) },
     { key: 'manage', label: `${s3('manage')}…`, onSelect: onManageRules },
@@ -216,11 +220,11 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
     const fl = state?.filter ?? { on: false, cols: 0 }
     const col = state?.colKey ?? ''
     menu = { label: t('ctl.sort'), attr: 'data-sort-menu', items: [
-      { key: 'az', label: s3('sortAZ'), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'asc' }], header: null }) },
-      { key: 'za', label: s3('sortZA'), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'desc' }], header: null }) },
-      { key: 'custom', label: `${s3('customSort')}…`, onSelect: onSortDialog },
+      { key: 'az', label: s3('sortAZ'), ...one(true), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'asc' }], header: null }) },
+      { key: 'za', label: s3('sortZA'), ...one(), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'desc' }], header: null }) },
+      { key: 'custom', label: `${s3('customSort')}…`, ...one(), onSelect: onSortDialog },
       { kind: 'sep', key: 's' },
-      { key: 'filter', label: s3('filter'), kbd: keyName('Ctrl+Shift+L'), checked: fl.on, onSelect: cmd({ kind: 'filter', op: 'toggle' }) },
+      { key: 'filter', label: s3('filter'), kbd: keyName('Ctrl+Shift+L'), checked: fl.on, ...(fl.on ? {} : one()), onSelect: cmd({ kind: 'filter', op: 'toggle' }) },
       { key: 'clearFilter', label: s3('clearFilter'), disabled: !fl.cols, onSelect: cmd({ kind: 'filter', op: 'clear' }) },
     ] }
   }
@@ -269,7 +273,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       </div>
       <div className="fx-fmt-g" role="group" aria-label={t('groups.styles')}>
         {btn('cellStyles', t('ctl.cellStyles'), <Icon k="styles" />, ev => toggleOpen('cellStyles', ev.currentTarget), { menu: 'cellStyles' })}
-        {btn('table', t('ctl.table'), <Icon k="table" />, ev => toggleOpen('table', ev.currentTarget), { menu: 'table' })}
+        {btn('table', t('ctl.table'), <Icon k="table" />, ev => toggleOpen('table', ev.currentTarget), { menu: 'table', ...(oneOff && !state?.table ? { disabled: oneOff } : {}) })}
         {btn('cond', t('ctl.cond'), <Icon k="cond" />, ev => toggleOpen('cond', ev.currentTarget), { menu: 'cond' })}
       </div>
       <div className="fx-fmt-g" role="group" aria-label={t('groups.cells')}>

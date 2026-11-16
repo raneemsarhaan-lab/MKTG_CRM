@@ -37,6 +37,8 @@ export type LinksApi = Pick<SheetsApi, 'resolveTaskCells' | 'writeTaskFields' | 
 type Row = { id: string; position: number; height: number | null }
 
 /** The text a snapshot cell keeps (R7): a stage's English name; the rest as shown. */
+/** The rows a row command acts on: every area's rows (spec 017), or the one block's. */
+const selRows = (x: { rect(): GridRect; rows?(): number[] }) => { const list = x.rows?.(); if (list?.length) return list; const q = x.rect(); return Array.from({ length: q.r1 - q.r0 + 1 }, (_, i) => q.r0 + i) }
 const snap = (f: TaskField, v: string) => (f === 'stage' ? STAGE_META[v as keyof typeof STAGE_META]?.label_en ?? v : v)
 
 export function useTaskLinks(p: {
@@ -51,6 +53,8 @@ export function useTaskLinks(p: {
   apply(label: string, changes: BlankChange[]): void
   patch(fn: (doc: SheetDoc) => SheetDoc): void
   rect(): GridRect
+  /** Spec 017: the selected rows across every area (several areas), ascending. */
+  rows?(): number[]
   say(text: string): void
   onNote(key: string, note: string | null): void
   /** New rows at a visible index, for Add tasks. */
@@ -278,9 +282,8 @@ export function useTaskLinks(p: {
   function createRows(): CreateRow[] {
     const cur = ref.current
     if (!map) return []
-    const q = cur.rect()
     const out: CreateRow[] = []
-    for (let r = q.r0; r <= q.r1; r++) {
+    for (const r of selRows(cur)) {
       const row = cur.vRows[r]
       if (!row || rowTasks[row.id]) continue
       const values: TaskFieldValues = {}
@@ -305,7 +308,7 @@ export function useTaskLinks(p: {
   }
 
   // ── the workbook's Board ▾ menu ──
-  const unlinkedSelected = (() => { if (!map) return 0; const q = p.rect(); let n = 0; for (let r = q.r0; r <= q.r1; r++) { const row = p.vRows[r]; if (row && !rowTasks[row.id]) n++ } return n })()
+  const unlinkedSelected = (() => { if (!map) return 0; let n = 0; for (const r of selRows(p)) { const row = p.vRows[r]; if (row && !rowTasks[row.id]) n++ } return n })()
   const stateKey = JSON.stringify({ linked: !!map, canCreate: !!choices?.canCreate, unlinkedSelected, readOnly: p.ro })
   useEffect(() => {
     document.dispatchEvent(new CustomEvent<LinksState>(LINKS_STATE, { detail: JSON.parse(stateKey) }))

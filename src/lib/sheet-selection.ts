@@ -93,3 +93,86 @@ export function colLetters(i: number): string {
 }
 /** "B3", for screen readers and the toolbar. */
 export const cellName = (r: number, c: number) => `${colLetters(c)}${r + 1}`
+
+// ── spec 017: several areas (Ctrl+click) ─────────────────────────────────────
+
+/** At most this many areas (FR-017). */
+export const MAX_AREAS = 100
+
+/** Take a block out of every area (Ctrl+click on selected cells): each area splits into at most 4 pieces. */
+export function subtract(areas: Rect[], cut: Rect): Rect[] {
+  const out: Rect[] = []
+  for (const q of areas) {
+    if (cut.r1 < q.r0 || cut.r0 > q.r1 || cut.c1 < q.c0 || cut.c0 > q.c1) { out.push(q); continue }
+    if (q.r0 < cut.r0) out.push({ ...q, r1: cut.r0 - 1 })
+    if (q.r1 > cut.r1) out.push({ ...q, r0: cut.r1 + 1 })
+    const r0 = Math.max(q.r0, cut.r0), r1 = Math.min(q.r1, cut.r1)
+    if (q.c0 < cut.c0) out.push({ r0, r1, c0: q.c0, c1: cut.c0 - 1 })
+    if (q.c1 > cut.c1) out.push({ r0, r1, c0: cut.c1 + 1, c1: q.c1 })
+  }
+  return out
+}
+
+/** Every selected cell once, in reading order (overlapping areas count once). */
+export function unionCells(areas: Rect[]): Cell[] {
+  const seen = new Set<number>(), out: Cell[] = []
+  const W = 1 + Math.max(0, ...areas.map(q => q.c1))
+  for (const q of areas) for (let r = q.r0; r <= q.r1; r++) for (let c = q.c0; c <= q.c1; c++) {
+    const k = r * W + c
+    if (!seen.has(k)) { seen.add(k); out.push({ r, c }) }
+  }
+  return out.sort((a, b) => a.r - b.r || a.c - b.c)
+}
+
+/** How many cells the areas cover, overlaps once. */
+export const unionSize = (areas: Rect[]) => unionCells(areas).length
+
+/**
+ * How several areas copy as one block (FR-011), as in Excel: areas over the
+ * same rows sit side by side (in column order), areas over the same columns
+ * stack (in row order); anything else can't be copied. One area is itself.
+ */
+export function copyLayout(areas: Rect[]): { kind: 'one' | 'rows' | 'cols'; order: Rect[] } | null {
+  if (areas.length <= 1) return { kind: 'one', order: areas }
+  const [a] = areas
+  if (areas.every(q => q.r0 === a.r0 && q.r1 === a.r1)) {
+    const order = [...areas].sort((x, y) => x.c0 - y.c0)
+    if (order.every((q, i) => i === 0 || q.c0 > order[i - 1].c1)) return { kind: 'rows', order }
+  }
+  if (areas.every(q => q.c0 === a.c0 && q.c1 === a.c1)) {
+    const order = [...areas].sort((x, y) => x.r0 - y.r0)
+    if (order.every((q, i) => i === 0 || q.r0 > order[i - 1].r1)) return { kind: 'cols', order }
+  }
+  return null
+}
+
+/** Every area is whole rows (or whole columns): row (column) commands take them all. */
+export const wholeRows = (areas: Rect[], cols: number) => areas.length > 0 && areas.every(q => q.c0 === 0 && q.c1 >= cols - 1)
+export const wholeCols = (areas: Rect[], rows: number) => areas.length > 0 && areas.every(q => q.r0 === 0 && q.r1 >= rows - 1)
+
+/** The distinct rows (or columns) the areas touch, ascending. */
+export function areaRows(areas: Rect[]): number[] {
+  const s = new Set<number>()
+  for (const q of areas) for (let r = q.r0; r <= q.r1; r++) s.add(r)
+  return [...s].sort((a, b) => a - b)
+}
+export function areaCols(areas: Rect[]): number[] {
+  const s = new Set<number>()
+  for (const q of areas) for (let c = q.c0; c <= q.c1; c++) s.add(c)
+  return [...s].sort((a, b) => a - b)
+}
+
+/** "B2", "B2:D4", "C:C", "3:5": an area as Excel names it. */
+export function areaLabel(q: Rect, rows: number, cols: number): string {
+  const allRows = q.r0 === 0 && q.r1 >= rows - 1, allCols = q.c0 === 0 && q.c1 >= cols - 1
+  if (allRows && !allCols) return `${colLetters(q.c0)}:${colLetters(q.c1)}`
+  if (allCols && !allRows) return `${q.r0 + 1}:${q.r1 + 1}`
+  if (q.r0 === q.r1 && q.c0 === q.c1) return cellName(q.r0, q.c0)
+  return `${cellName(q.r0, q.c0)}:${cellName(q.r1, q.c1)}`
+}
+
+/** "B2, E5, B8:D9" and how many more beyond the first three (FR-008). */
+export function selectionLabel(areas: Rect[], rows: number, cols: number, show = 3): { text: string; more: number } {
+  const names = areas.map(q => areaLabel(q, rows, cols))
+  return { text: names.slice(0, show).join(', '), more: Math.max(0, names.length - show) }
+}

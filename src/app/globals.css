@@ -2107,6 +2107,8 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sheet-td.is-selected { background: var(--sh-sel) !important; }
 .fx-sheet-td.is-anchor { box-shadow: inset 0 0 0 2px var(--sh-edge); }
 .fx-sheet-td.is-cut { outline: 1.5px dashed var(--sh-edge); outline-offset: -2px; }
+/* Spec 017: cells a Ctrl+drag is taking out of the selection. */
+.fx-sheet-td.is-unsel { background: var(--sheet-panel) !important; outline: 1.5px dashed var(--sh-edge); outline-offset: -2px; }
 .fx-sheet-th.is-sel-head, .fx-sheet-td.is-frozen-no.is-sel-head { background: var(--sh-head-sel) !important; color: var(--sh-edge); }
 .fx-sheet-tr.is-tall > .fx-sheet-td { height: var(--row-h); align-items: flex-start; padding-block: 4px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; }
 .fx-sheet-tr.is-tall > .fx-sheet-td.is-frozen-no { align-items: center; }
@@ -2140,6 +2142,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sh-ib:disabled { opacity: .4; cursor: default; }
 .fx-sh-sep { width: 1px; height: 22px; background: var(--inbox-border); margin-inline: 4px; }
 .fx-sh-lbl { font-size: 12.5px; color: var(--inbox-muted); font-variant-numeric: tabular-nums; }
+.fx-sh-adding { margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px; background: var(--sh-head-sel); color: var(--sh-edge); font-weight: 700; font-size: 11.5px; }
 .fx-sh-lock { font-size: 12.5px; color: var(--inbox-text2); background: var(--inbox-surface); border-radius: 8px; padding: 4px 10px; }
 .fx-sh-skip { margin-inline-start: auto; font-size: 12.5px; background: #FFF3E0; color: #9A5B02; border-radius: 8px; padding: 4px 10px; }
 .fx-sh-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }

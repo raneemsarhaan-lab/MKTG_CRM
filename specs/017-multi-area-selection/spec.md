@@ -77,7 +77,7 @@ Copy, cut and paste follow Excel's rules for several areas.
 
 ### User Story 4 - Tools that need one area say so (Priority: P2)
 
-Some tools only make sense on one block: Merge, Sort, Filter, Format as Table, Fill Down/Right, Paste Special, a new conditional formatting rule, Insert rows/columns, and Board ▾ → Create tasks for rows.
+Some tools only make sense on one block: Merge, Sort, Filter, Format as Table, Fill Down/Right, Paste Special, a new conditional formatting rule, and Insert rows/columns. (Board ▾ → Create tasks for rows works on the rows of every area.)
 
 **Why this priority**: Without this, those tools would quietly use only one of the areas, and the member wouldn't know.
 
@@ -132,8 +132,8 @@ A member who uses the keyboard presses Shift+F8, as in Excel. The status line sh
 - **FR-010**: Typing in the active cell and pressing Ctrl+Enter MUST write the value into every selected cell as one undo step. This also applies to one block.
 - **FR-011**: Copy MUST work when all areas cover the same rows (placed side by side) or the same columns (stacked), and MUST otherwise show the message in US3 and copy nothing. Cut with several areas MUST show the message in US3 and cut nothing.
 - **FR-012**: A paste of one cell onto several areas MUST fill every selected cell. A paste of a larger block onto several areas MUST change nothing and show a message.
-- **FR-013**: Hide, Unhide, Resize and Delete for rows (columns) MUST apply to every selected row (column) when every area is a set of whole rows (whole columns).
-- **FR-014**: Merge, Sort, Filter, Format as Table, Fill Down/Right, Paste Special, a new conditional formatting rule, Insert rows/columns, and Create tasks for rows MUST be disabled with the reason "Works on one area. Click a cell without Ctrl to start again." Their keyboard shortcuts MUST show that reason and change nothing.
+- **FR-013**: Board ▾ → Create tasks for rows MUST take the rows of every area. Hide, Unhide, Resize and Delete for rows (columns) MUST apply to every selected row (column) when every area is a set of whole rows (whole columns).
+- **FR-014**: Merge, Sort, Filter, Format as Table, Fill Down/Right, Paste Special, a new conditional formatting rule, and Insert rows/columns MUST be disabled with the reason "Works on one area. Click a cell without Ctrl to start again." Their keyboard shortcuts MUST show that reason and change nothing.
 - **FR-015**: Shift+F8 MUST turn Add to selection on and off, as described in US5. Escape MUST also turn it off. The status line MUST show when it is on.
 - **FR-016**: The grid MUST tell screen readers the selected areas and cell count when the selection changes.
 - **FR-017**: The selection MUST hold at most 100 areas.

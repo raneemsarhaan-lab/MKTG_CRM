@@ -285,6 +285,7 @@ export function SheetGrid(p: SheetGridProps) {
     drop: p.linked?.drop, restore: p.linked?.restore,
   })
   const lm = useLinkedMenu<SheetRow>({
+    areas: lf.areasNow,
     rows, cols: model.cols, widths: model.widths, columns: cl, removal: 'drop',
     taskOf: rowTask,
     canRemove: row => row.kind === 'clip' && !row.task.dropped_at && p.canEdit(row.task),
@@ -295,7 +296,7 @@ export function SheetGrid(p: SheetGridProps) {
   })
   leRef.current = le
   Object.assign(model, {
-    cellStyle: lf.cellStyle, onSelect: lf.onSelect, marked: lf.marked, headerExtra: lf.headerExtra,
+    cellStyle: lf.cellStyle, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),

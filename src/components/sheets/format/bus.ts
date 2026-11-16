@@ -40,6 +40,8 @@ export interface FormatState {
   merged: boolean
   /** More than one cell is selected. */
   multi: boolean
+  /** Spec 017: how many separate areas are selected (Ctrl+click); tools that need one block are off above 1. */
+  areas?: number
   /** Stage 2: why Hide and Freeze are off here (the Content and Video sheets), or null. */
   viewOff?: string | null
   /** Stage 2: the sheet's frozen panes, for the Freeze menu's tick. */
