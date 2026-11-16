@@ -8,6 +8,7 @@
  * with axe. The folder and its notifications are removed at the end.
  */
 const { chromium } = require('playwright')
+const { tool } = require('./toolbar.cjs')
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
@@ -77,7 +78,7 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
     await page.click('[data-fmt="b"]')
     await page.click('[data-fmt="fill"]'); await page.click('[data-color-picker] [data-pick="#7030A0"] >> nth=0')
     await page.click('[data-fmt="color"]'); await page.click('[data-color-picker] [data-pick="#FFFFFF"] >> nth=0')
-    await page.click('[data-fmt="center"]')
+    await tool(page, 'center')
     await page.click('[data-fmt="borders"]'); await page.click('[data-border-picker] [data-border="thickBottom"]')
     const secs = (Date.now() - t0) / 1000
     ok(secs < 20, 'SC-001: header formatted in under 20 s (scripted)', `${secs.toFixed(1)} s`)
@@ -268,7 +269,7 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
     const arAmount = await cellOf(AR.page, 1, 1).innerText()
     ok(/[٠-٩]/.test(arAmount), 'numbers follow the language', arAmount)
     await cellOf(AR.page, 1, 1).click()
-    await AR.page.click('[data-fmt="fmtCells"]'); await AR.page.waitForSelector('[data-format-dialog]')
+    await tool(AR.page, 'fmtCells'); await AR.page.waitForSelector('[data-format-dialog]')
     await axe(AR.page, 'Format Cells in Arabic')
     await AR.page.keyboard.press('Escape')
     await axe(AR.page, 'toolbar in Arabic')
@@ -292,7 +293,7 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
     await page.click('[data-fmt="fill"]'); await axe(page, 'colour picker'); await page.keyboard.press('Escape')
     await page.click('[data-fmt="borders"]'); await axe(page, 'border picker'); await page.keyboard.press('Escape')
     // Ctrl+1 is Chrome's own "first tab" key, so the page never hears it there; the button (and More number formats…) open it.
-    await page.click('[data-fmt="fmtCells"]'); await page.waitForSelector('[data-format-dialog]'); await axe(page, 'Format Cells'); await page.keyboard.press('Escape')
+    await tool(page, 'fmtCells'); await page.waitForSelector('[data-format-dialog]'); await axe(page, 'Format Cells'); await page.keyboard.press('Escape')
     ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '))
   } finally {
     await browser.close()

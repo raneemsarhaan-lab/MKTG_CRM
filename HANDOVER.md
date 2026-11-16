@@ -662,6 +662,25 @@ Every sheet's grid can select separate areas, as in Excel (spec 017, `specs/017-
 - **Tools that need one area.** The tools that need one block check `FormatState.areas` and say "Works on one area".
 - **Check.** `node scripts/spreadsheet-lab/realapp/areas.cjs`.
 
+### Sheet header (menu bar, strip, name box)
+
+The sheet header follows the familiar spreadsheet layout (spec 018, `specs/018-sheet-toolbar-layout/`). Design: `design/sheet-toolbar.html`.
+
+- **Title row.** The name and save status, with Board ▾ and Comments.
+- **Menu bar.** File · Edit · View · Insert · Format · Data · Help.
+  - File is the sheet's tab menu.
+  - Data › Board is the Board menu.
+  - Submenus open beside their item (`PopItem.sub`).
+- **Strip.** One rounded strip of the everyday tools. Groups that don't fit move under ⋮; the overflow is measured in `FormatToolbar`.
+- **Name box and cell bar.**
+  - The name box shows `FormatState.range`; on blank sheets, typing a cell or range jumps there (`goto`).
+  - The cell bar saves through `setValue`.
+  - `insert` is the Insert menu's command.
+- **Where things live.** Everything is in `src/components/sheets/format/FormatToolbar.tsx`, apart from the title row (Workbook). The phone keeps the Format sheet.
+- **Checks.**
+  - `node scripts/spreadsheet-lab/realapp/header.cjs`.
+  - Older labs reach moved controls through `realapp/toolbar.cjs` (`tool(page, key)`).
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.

@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-16
 
-**Status**: Draft (design awaiting approval)
+**Status**: Built (design approved 2026-11-16)
 
 **Input**: User description: "can we have same UI experience for the sheet formatting option" (with a screenshot of the Google Sheets header: a menu bar, then one rounded toolbar strip)
 
@@ -46,7 +46,7 @@ A member opens a sheet and finds the tools where Google Sheets puts them, in one
 
 1. **Given** a sheet is open, **When** the member looks at the header, **Then** one strip holds the tools above, in that order. It shows the active cell's state: B pressed, the font name, the size, and the colour bars.
 2. **Given** the active cell is size 10, **When** the member clicks +, **Then** it becomes 11. **When** they click −, it goes back to 10. They can also type a size into the box.
-3. **Given** the align ▾ is opened, **When** the member picks Center, **Then** the cell centres and the button's icon shows centre. The same applies to vertical align, wrapping (Overflow, Wrap, Clip) and rotation.
+3. **Given** the align ▾ is opened, **When** the member picks Center, **Then** the cell centres and the button's icon shows centre. The same applies to vertical align, wrapping (Wrap, Clip) and rotation.
 4. **Given** a window too narrow for every group, **When** the sheet opens, **Then** the lowest-priority groups go under a ⋮ button at the end, and nothing wraps to a second line.
 
 ---
@@ -86,7 +86,7 @@ Under the strip:
 
 1. **Given** a selection, **When** it changes, **Then** the name box, the cell bar and the count update. This replaces today's selection text.
 2. **Given** the name box, **When** the member types a cell or range ("D20", "B2:C5") and presses Enter, **Then** it is selected. Text that isn't a cell or range is refused with a short note.
-3. **Given** the cell bar, **When** the member edits it and presses Enter (or Alt+Enter for a line break), **Then** the active cell saves through the same path as typing in the cell. Escape cancels the edit.
+3. **Given** the cell bar, **When** the member edits it and presses Enter, **Then** the active cell saves through the same path as typing in the cell. Escape cancels the edit.
 4. **Given** a linked sheet, **When** the active cell is a field that can't be typed into (stage, person), **Then** the cell bar shows the value but is read-only, with the usual note.
 
 ### Edge Cases

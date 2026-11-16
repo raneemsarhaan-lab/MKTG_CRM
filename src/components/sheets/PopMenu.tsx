@@ -13,7 +13,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 export type PopItem =
-  | { kind?: 'item'; key: string; label: string; kbd?: string; disabled?: boolean; why?: string; danger?: boolean; checked?: boolean; onSelect(): void }
+  | { kind?: 'item'; key: string; label: string; kbd?: string; disabled?: boolean; why?: string; danger?: boolean; checked?: boolean; onSelect(): void
+      /** Spec 018: opens a submenu (shows ▸). */
+      sub?: boolean }
   | { kind: 'sep'; key: string }
   /** Anything else in the menu: the tab colour swatches. Its buttons join the arrow keys. */
   | { kind: 'node'; key: string; node: ReactNode }
@@ -115,12 +117,14 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
               data-item={it.key}
               aria-disabled={it.disabled || undefined}
               aria-describedby={whyId}
+              aria-haspopup={it.sub ? 'menu' : undefined}
               className={`${it.danger ? 'is-danger' : ''}${it.disabled ? ' is-disabled' : ''}`}
               onClick={() => { if (it.disabled) return; close(false); it.onSelect() }}
               onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !it.disabled) { e.preventDefault(); close(false); it.onSelect() } }}
             >
               <span>{it.checked ? '✓ ' : ''}{it.label}</span>
               {it.kbd && <kbd>{it.kbd}</kbd>}
+              {it.sub && <span className="fx-sh-subarrow" aria-hidden="true" />}
             </button>
             {whyId && <span className="fx-sh-why" id={whyId}>{it.why}</span>}
           </div>

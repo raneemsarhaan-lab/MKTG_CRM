@@ -270,6 +270,18 @@ export function Workbook(p: WorkbookProps) {
   }, [])
 
   // ── toolbar state ───────────────────────────────────────────────────────
+  /** Spec 018: where the title row ends on screen, so the comments panel opens below the Comments button. */
+  const topRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = topRef.current
+    if (!el) return
+    const put = () => el.parentElement?.style.setProperty('--fx-sh-top-h', `${Math.max(0, Math.round(el.getBoundingClientRect().bottom))}px`)
+    put()
+    const ro = new ResizeObserver(put)
+    ro.observe(el)
+    window.addEventListener('scroll', put, true)
+    return () => { ro.disconnect(); window.removeEventListener('scroll', put, true) }
+  }, [])
   const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean } | null>(null)
   const [skip, setSkip] = useState<string | null>(null)
   const skipTimer = useRef<number | undefined>(undefined)
@@ -564,9 +576,28 @@ export function Workbook(p: WorkbookProps) {
   const statusText = status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
+  // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
+  const headTools = (
+    <>
+      {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
+      {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
+      {openBlank && doc && (
+        <button type="button" className="fx-sh-ib is-text" data-board-menu="" aria-haspopup="menu" aria-expanded={!!boardMenu}
+                title={tl('boardTip')} onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(), x = getComputedStyle(el).direction === 'rtl' ? r.left : r.right; setBoardMenu(m => (m ? null : { x, y: r.bottom + 4, el })) }}>
+          {tl('board')} <span aria-hidden="true">▾</span>
+        </button>
+      )}
+      <button type="button" className="fx-sh-ib is-text fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
+              title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
+        <span className={phone ? 'sr-only' : undefined}>{t('comments.title')}</span>
+        {openThreads > 0 && <span className="fx-cmt-badge">{openThreads}</span>}
+      </button>
+    </>
+  )
   return (
     <div className="fx-sh-workbook" data-workbook={folder.id} onKeyDownCapture={onKeyDownCapture}>
-      <div className="fx-sh-top">
+      <div className="fx-sh-top" ref={topRef}>
         <nav className="fx-sh-crumbs" aria-label={t('crumb')} data-crumb="">
           <Link href="/sheets">{t('crumb')}</Link>
           <span aria-hidden="true">›</span>
@@ -575,8 +606,9 @@ export function Workbook(p: WorkbookProps) {
         </nav>
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
               title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>
+        {!phone && <div className="fx-sh-top-tools">{headTools}</div>}
       </div>
-      <div className="fx-sh-tools" role="toolbar" aria-label={folderName}>
+      {phone && <div className="fx-sh-tools" role="toolbar" aria-label={folderName}>
         <button type="button" className="fx-sh-ib" data-undo="" aria-label={t('toolbar.undoKey')} title={t('toolbar.undoKey')}
                 disabled={openBlank ? !stack || !canUndo(stack) : !linkedHist.canUndo}
                 onClick={() => (openBlank ? doUndo() : linkedUndo('undo'))}>↶</button>
@@ -597,24 +629,11 @@ export function Workbook(p: WorkbookProps) {
               : t('toolbar.blankHint'))
             : t('toolbar.linkedHint')}
         </span>
-        {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
-        {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
-        {openBlank && doc && (
-          <button type="button" className="fx-sh-ib is-text" data-board-menu="" aria-haspopup="menu" aria-expanded={!!boardMenu}
-                  title={tl('boardTip')} onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(), x = getComputedStyle(el).direction === 'rtl' ? r.left : r.right; setBoardMenu(m => (m ? null : { x, y: r.bottom + 4, el })) }}>
-            {tl('board')} <span aria-hidden="true">▾</span>
-          </button>
-        )}
-        <button type="button" className="fx-sh-ib is-text fx-cmt-btn" data-comments-btn="" aria-pressed={commentsOpen}
-                title={t('comments.button', { n: openThreads })} onClick={() => setCommentsOpen(v => !v)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
-          <span className={phone ? 'sr-only' : undefined}>{t('comments.title')}</span>
-          {openThreads > 0 && <span className="fx-cmt-badge">{openThreads}</span>}
-        </button>
-        {phone && fmtState && (
+        {headTools}
+        {fmtState && (
           <button type="button" className="fx-sh-ib is-text" data-format-open="" aria-expanded={phoneFormat} onClick={() => setPhoneFormat(v => !v)}>{t('format.phone.open')}</button>
         )}
-      </div>
+      </div>}
       {!phone && open && (!openBlank || doc) && (
         <FormatToolbar state={fmtState} target={fmtTarget} onFormatCells={() => setFormatCells(true)}
           painter={!!painter}
@@ -626,7 +645,11 @@ export function Workbook(p: WorkbookProps) {
           }}
           onPasteSpecial={() => setPasteSpecial(true)}
           onFind={replace => setFind({ replace })}
-          onRule={kind => setStyleDlg({ k: 'rule', kind })} onManageRules={() => setStyleDlg({ k: 'rules' })} onSortDialog={() => setStyleDlg({ k: 'sort' })} />
+          onRule={kind => setStyleDlg({ k: 'rule', kind })} onManageRules={() => setStyleDlg({ k: 'rules' })} onSortDialog={() => setStyleDlg({ k: 'sort' })}
+          onUndo={() => (openBlank ? doUndo() : linkedUndo('undo'))} onRedo={() => (openBlank ? doRedo() : linkedUndo('redo'))}
+          canUndo={openBlank ? !!stack && canUndo(stack) : linkedHist.canUndo} canRedo={openBlank ? !!stack && canRedo(stack) : linkedHist.canRedo}
+          onFileMenu={(el, at) => { if (openId) tabMenuFor(openId, at, el) }}
+          onBoardMenu={openBlank && doc ? (el, at) => setBoardMenu({ x: at.x, y: at.y, el }) : undefined} />
       )}
       {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 

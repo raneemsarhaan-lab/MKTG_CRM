@@ -8,6 +8,7 @@
  * makes is removed at the end.
  */
 const { chromium } = require('playwright')
+const { tool } = require('./toolbar.cjs')
 const { execSync } = require('child_process')
 const path = require('path'), os = require('os')
 // The pure helpers, compiled from src on the fly.
@@ -48,10 +49,12 @@ const cellOf = (page, r, c) => page.locator('[data-blank-sheet] .fx-sheet-tr[dat
 const rowNo = (page, r) => page.locator('[data-blank-sheet] .fx-sheet-tr[data-row]').nth(r).locator('.fx-sheet-td').first()
 const letter = (page, c) => page.locator('[data-blank-sheet] .fx-sheet-th.is-letter').nth(c)
 const saved = page => page.waitForSelector('[data-save-status="saved"]', { timeout: 15000 })
-const status = async page => (await page.locator('[data-selection]').innerText()).replace(/\s+/g, ' ').trim()
+/** Spec 018: the name box and the cell count, as "B8:D9 | 3 areas · 8 cells". */
+const statusText = () => `${document.querySelector('[data-namebox]')?.value ?? ''} | ${(document.querySelector('[data-selection]')?.textContent ?? '').replace(/\s+/g, ' ').trim()}`
+const status = page => page.evaluate(statusText)
 /** The status line settles a frame after the click: wait (up to 3 s) for it to match. */
-const statusIs = async (page, re) => { try { await page.waitForFunction(src => new RegExp(src).test((document.querySelector('[data-selection]')?.textContent ?? '').replace(/\s+/g, ' ')), re.source, { timeout: 3000 }) } catch {} return re.test(await status(page)) }
-const statusNot = async (page, re) => { try { await page.waitForFunction(src => !new RegExp(src).test(document.querySelector('[data-selection]')?.textContent ?? ''), re.source, { timeout: 3000 }) } catch {} return !re.test(await status(page)) }
+const statusIs = async (page, re) => { try { await page.waitForFunction(([src, f]) => new RegExp(src).test(new Function(`return (${f})()`)()), [re.source, statusText.toString()], { timeout: 3000 }) } catch {} return re.test(await status(page)) }
+const statusNot = async (page, re) => { try { await page.waitForFunction(([src, f]) => !new RegExp(src).test(new Function(`return (${f})()`)()), [re.source, statusText.toString()], { timeout: 3000 }) } catch {} return !re.test(await status(page)) }
 const nSel = page => page.locator('[data-blank-sheet] .fx-sheet-td.is-selected, [data-blank-sheet] .fx-sheet-td.is-anchor').count()
 /** True once the workbook's toast says this. */
 const toastHas = async (page, re) => { try { await page.waitForFunction(src => new RegExp(src).test(document.querySelector('[data-sheets-toast]')?.textContent ?? ''), re.source, { timeout: 5000 }); return true } catch { return false } }
@@ -93,18 +96,18 @@ async function threeAreas(page) {
     console.log('1. Pick separate cells and blocks (US1)')
     await threeAreas(page)
     ok(await nSel(page) === 8, 'Ctrl+click and Ctrl+drag: 8 cells in 3 areas show as selected', String(await nSel(page)))
-    ok(await statusIs(page, /B2, E5, B8:D9 · 3 areas, 8 cells/), 'the status names the areas and counts the cells', await status(page))
+    ok(await statusIs(page, /^B8:D9 \| 3 areas · 8 cells$/), 'the name box shows the newest area; the count, 3 areas and 8 cells', await status(page))
     ok(await page.locator('[data-blank-sheet] .fx-sheet-th.is-letter.is-sel-head').count() === 4, 'letters B, C, D, E light up')
     await cellOf(page, 7, 2).click({ modifiers: [mod] })
     ok(await nSel(page) === 7, 'Ctrl+click on a selected cell takes just that cell out', String(await nSel(page)))
     await ctrlDrag(page, [8, 1], [8, 3])
-    ok(await statusIs(page, /B2, E5, B8, D8 \+1 more · 4 areas, 4 cells|4 areas, 4 cells/), 'Ctrl+drag over selected cells takes the block out', await status(page))
+    ok(await statusIs(page, /^D8 \| 4 areas · 4 cells$/), 'Ctrl+drag over selected cells takes the block out', await status(page))
     await cellOf(page, 5, 5).click({ modifiers: ['Shift'] })
-    ok(await statusIs(page, /^B2, E5, B8 \+1 more · 4 areas/), 'Shift+click resizes only the newest area', await status(page))
+    ok(await statusIs(page, /^D6:F8 \| 4 areas · 12 cells$/), 'Shift+click resizes only the newest area', await status(page))
     await cellOf(page, 0, 0).click()
-    ok(await statusIs(page, /^A1$/) && await nSel(page) === 0, 'a plain click goes back to one cell', await status(page))
+    ok(await statusIs(page, /^A1 \| $/) && await nSel(page) === 0, 'a plain click goes back to one cell', await status(page))
     await letter(page, 6).click({ modifiers: [mod] })
-    ok(await statusIs(page, /A1, G:G · 2 areas, 41 cells/), 'Ctrl+click on a letter adds the whole column', await status(page))
+    ok(await statusIs(page, /^G:G \| 2 areas · 41 cells$/), 'Ctrl+click on a letter adds the whole column', await status(page))
     await page.keyboard.press('Control+a')
     ok(await statusNot(page, /areas/), 'Ctrl+A makes one area', await status(page))
 
@@ -147,9 +150,9 @@ async function threeAreas(page) {
 
     console.log('4. Tools that need one area (US4)')
     await threeAreas(page)
-    await page.click('[data-fmt="sort"]')
-    ok(await page.locator('[data-sort-menu] [role^="menuitem"]').first().getAttribute('aria-disabled') === 'true' || await page.locator('[data-sort-menu] [role^="menuitem"]').first().isDisabled(), 'Sort is off')
-    ok(/Works on one area/.test(await page.locator('[data-sort-menu]').innerText()), 'and says why')
+    await tool(page, 'sort')
+    ok(await page.locator('[data-mb-data] [role^="menuitem"]').first().getAttribute('aria-disabled') === 'true' || await page.locator('[data-mb-data] [role^="menuitem"]').first().isDisabled(), 'Sort is off')
+    ok(/Works on one area/.test(await page.locator('[data-mb-data]').innerText()), 'and says why')
     await page.keyboard.press('Escape')
     await page.locator('[data-blank-sheet] .fx-sheet-td.is-active').focus()
     await page.waitForFunction(() => document.activeElement?.matches('.fx-sheet-td.is-active'))
@@ -178,7 +181,7 @@ async function threeAreas(page) {
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight')
     await page.keyboard.press('Shift+ArrowDown')
     await page.keyboard.press('Escape')
-    ok(await statusIs(page, /^A25:B25, D25:D26 · 2 areas, 4 cells$/), 'arrows keep the first area, Shift+arrows add a second; Esc ends it', await status(page))
+    ok(await statusIs(page, /^D25:D26 \| 2 areas · 4 cells$/), 'arrows keep the first area, Shift+arrows add a second; Esc ends it', await status(page))
     await page.click('[data-fmt="b"]'); await saved(page)
     ok(bolds(ids.small) - b0 === 4, 'and the keyboard-made areas take Bold')
     await page.keyboard.press('Control+z'); await saved(page)
@@ -190,8 +193,8 @@ async function threeAreas(page) {
     await rows.nth(0).locator('.fx-sheet-td').nth(1).click()
     await rows.nth(2).locator('.fx-sheet-td').nth(1).click({ modifiers: [mod] })
     ok(await page.locator('[data-linked-pane] .fx-sheet-td.is-selected, [data-linked-pane] .fx-sheet-td.is-anchor').count() === 2, 'Ctrl+click works on the Content sheet too')
-    await page.click('[data-fmt="sort"]')
-    ok(/Works on one area/.test(await page.locator('[data-sort-menu]').innerText()), 'and its one-area tools say why')
+    await tool(page, 'sort')
+    ok(/Works on one area/.test(await page.locator('[data-mb-data]').innerText()), 'and its one-area tools say why')
     await page.keyboard.press('Escape')
 
     console.log('8. 100 areas on 2,000 rows (SC-003)')

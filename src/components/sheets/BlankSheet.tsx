@@ -964,6 +964,18 @@ export function BlankSheet(p: BlankSheetProps) {
     return { cols: cols.map(c => ({ key: c, name: (header && headRow ? value(headRow, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })), header }
   }
 
+  /** The name box (spec 018): "D20" or "B2:C5", by the sheet's own letters and numbers; false when it isn't one. */
+  function gotoRef(ref: string): boolean {
+    const m = /^\s*([A-Za-z]{1,3})(\d{1,6})(?:\s*:\s*([A-Za-z]{1,3})(\d{1,6}))?\s*$/.exec(ref)
+    if (!m) return false
+    const col = (l: string) => [...l.toUpperCase()].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1
+    const vis = (docR: number, docC: number) => ({ r: vRows.findIndex(x => (rowIndex.get(x.id) ?? -1) >= docR), c: vCols.findIndex(x => (colIndex.get(x.id) ?? -1) >= docC) })
+    const a = vis(Number(m[2]) - 1, col(m[1])), b = m[3] ? vis(Number(m[4]) - 1, col(m[3])) : a
+    if (a.r < 0 || a.c < 0 || b.r < 0 || b.c < 0) return false
+    setSelectRect({ r0: Math.min(a.r, b.r), c0: Math.min(a.c, b.c), r1: Math.max(a.r, b.r), c1: Math.max(a.c, b.c) })
+    return true
+  }
+
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
     // Formats go to every area (spec 017 FR-009); borders are drawn per area.
@@ -994,6 +1006,28 @@ export function BlankSheet(p: BlankSheetProps) {
     else if (cmd.kind === 'ruleNew') ruleNew(cmd.rule)
     else if (cmd.kind === 'rulesSet') setRules('rules', cmd.rules)
     else if (cmd.kind === 'rulesClear') rulesClear(cmd.where)
+    // Spec 018: the cell bar, the name box, Insert.
+    else if (cmd.kind === 'setValue') {
+      if (ro) { p.onNotice(ro); return }
+      if (!active) return
+      if (cmd.value.length > MAX_CELL) { p.onNotice(t('err.too_long')); return }
+      const ch = cellChange([{ rowId: active.key, colId: active.col, value: cmd.value }])
+      if (ch) applyR('edit', [ch])
+    }
+    else if (cmd.kind === 'goto') { if (!gotoRef(cmd.ref)) { p.onNotice(t('toolbar2.badRef', { ref: cmd.ref })); return } }
+    else if (cmd.kind === 'insert') {
+      if (ro) { p.onNotice(ro); return }
+      if (oneArea()) return
+      if (cmd.what === 'rowAbove' || cmd.what === 'rowBelow') {
+        const n = q.r1 - q.r0 + 1
+        if (doc.rows.length + n > BLANK_ROW_LIMIT) { p.onNotice(t('err.too_many_rows')); return }
+        insertRows(cmd.what === 'rowAbove' ? q.r0 : q.r1 + 1, n)
+      } else {
+        const n = q.c1 - q.c0 + 1
+        if (doc.cols.length + n > BLANK_COL_LIMIT) { p.onNotice(t('err.too_many_cols')); return }
+        insertCols(cmd.what === 'colLeft' ? q.c0 : q.c1 + 1, n)
+      }
+    }
     focusActive()
   }
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
@@ -1009,6 +1043,10 @@ export function BlankSheet(p: BlankSheetProps) {
     merged: spans.anchor.has(`${active.key}|${active.col}`),
     multi: areasRef.current.length > 1 || rectRef.current.r0 !== rectRef.current.r1 || rectRef.current.c0 !== rectRef.current.c1,
     areas: areasRef.current.length,
+    range: areaName(rectRef.current),
+    count: unionSize(areasRef.current),
+    canGoto: true,
+    adding: addingRef.current,
     viewOff: null,
     frozen: { rows: view.frozenRows ?? 0, cols: view.frozenCols ?? 0 },
     table: (() => { const tb = tableAt(active.key, active.col); return tb ? { style: tb.style } : null })(),
