@@ -115,6 +115,9 @@
   --hr-ok:              #15803D;
   /* Spec 015: sheet formatting and comments (FORMAT_UI in src/lib/tokens.ts) */
   --fx-bar-bg:          #F8F8FB;
+  /* Spec 018: the rounded toolbar strip. */
+  --fx-strip-bg:        #EEF0F5;
+  --fx-strip-hover:     #E2E5EC;
   --fx-pressed:         #F0EBFE;
   --fx-pressed-ink:     #7C3AED;
   --fx-marker:          #7C3AED;
@@ -2413,7 +2416,57 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-cell-bd { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 
 /* The format toolbar: one row in Excel's Home-tab order; scrolls sideways when narrow. */
-.fx-fmt-bar { display: flex; align-items: center; padding: 4px 16px; border-bottom: 1px solid var(--inbox-border); background: var(--fx-bar-bg); overflow-x: auto; scrollbar-width: thin; min-height: 44px; }
+/* Spec 018: menu bar, one rounded strip, name box and cell bar. */
+.fx-fmt-head { display: grid; border-bottom: 1px solid var(--inbox-border); }
+.fx-mb { display: flex; gap: 2px; padding: 0 14px 4px; flex-wrap: wrap; }
+.fx-mb > button { border: 0; background: none; padding: 4px 9px; border-radius: 6px; font: 500 14px var(--font-body); color: var(--inbox-text); cursor: pointer; }
+.fx-mb > button:hover, .fx-mb > button[aria-expanded="true"] { background: var(--fx-strip-hover); }
+.fx-mb > button:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 1px; }
+.fx-fmt-bar { display: flex; align-items: center; flex-wrap: nowrap; margin: 0 12px 8px; padding: 3px 10px; border-radius: 999px; background: var(--fx-strip-bg); min-height: 40px; overflow: hidden; }
+.fx-fmt-bar .fx-fmt-g { border: 0; padding: 0; gap: 1px; }
+.fx-fmt-bar .fx-fmt-g[hidden] { display: none; }
+.fx-fmt-bar .fx-fmt-b { height: 30px; }
+.fx-fmt-bar .fx-fmt-b:hover:not([aria-disabled="true"]) { background: var(--fx-strip-hover); }
+.fx-fmt-vsep { width: 1px; height: 20px; background: #D6D8E0; margin-inline: 4px; flex: none; }
+.fx-fmt-more { margin-inline-start: auto; flex: none; }
+.fx-fmt-size { width: 38px; height: 26px; border: 1px solid #C9CCD6; border-radius: 6px; text-align: center; font: 500 13px var(--font-body); background: var(--inbox-panel); color: var(--inbox-text); font-variant-numeric: tabular-nums; }
+.fx-fmt-size:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 0; }
+.fx-fmt-123, .fx-fmt-pct { font: 600 12.5px var(--font-body); }
+.fx-fmt-plus { font-size: 9px; margin-inline-start: -4px; margin-top: -10px; }
+.fx-fmt-bar .fx-fmt-b.is-sel { border: 0; background: transparent; }
+.fx-fmt-bar .fx-fmt-sel.is-font { width: 92px; }
+.fx-sh-top-tools .fx-sh-ib { white-space: nowrap; }
+.fx-sh-ib.is-text { display: inline-flex; align-items: center; gap: 6px; }
+.fx-fbar { display: flex; align-items: stretch; height: 32px; border-top: 1px solid var(--inbox-border); font-size: 13px; }
+.fx-namebox { width: 130px; flex: none; border: 0; border-inline-end: 1px solid var(--inbox-border); padding-inline: 12px; font: 600 13px var(--font-body); color: #14131A; background: var(--inbox-panel); font-variant-numeric: tabular-nums; }
+.fx-namebox:focus-visible, .fx-cellbar:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: -2px; }
+.fx-namebox[readonly] { color: var(--inbox-muted); }
+.fx-fx { width: 34px; flex: none; display: grid; place-items: center; color: var(--inbox-muted); border-inline-end: 1px solid var(--inbox-border); font: italic 13px Georgia, serif; }
+.fx-cellbar { flex: 1; min-width: 0; border: 0; padding-inline: 10px; font: 13px var(--font-body); color: #14131A; background: var(--inbox-panel); }
+.fx-cellbar[readonly] { color: var(--inbox-muted); }
+.fx-cellcount { flex: none; display: flex; align-items: center; padding-inline: 12px; color: var(--inbox-muted); font-size: 12px; white-space: nowrap; border-inline-start: 1px solid var(--inbox-border); font-variant-numeric: tabular-nums; }
+.fx-cellcount:empty { display: none; }
+.fx-sh-top:has(.fx-sh-top-tools) { border-bottom: 0; padding-bottom: 4px; }
+.fx-sh-top:has(.fx-sh-top-tools) .fx-sh-status { margin-inline-start: 0; }
+/* Spec 018: the Comments button sits in the title row, so the panel opens below it. */
+.fx-sh-workbook:has(.fx-sh-top-tools) .fx-cmt-panel:not(.is-full) { top: var(--fx-sh-top-h, 52px); }
+.fx-sh-top-tools { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fx-sh-subarrow::after { content: "▸"; color: var(--inbox-muted); font-size: 11px; }
+[dir="rtl"] .fx-sh-subarrow::after { content: "◂"; }
+.fx-mb-search { position: fixed; z-index: 85; top: 120px; inset-inline-start: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 32px)); background: var(--inbox-panel); border: 1px solid var(--inbox-border); border-radius: 12px; box-shadow: 0 14px 34px rgba(20, 19, 26, .2); padding: 8px; display: grid; gap: 6px; }
+[dir="rtl"] .fx-mb-search { transform: translateX(50%); }
+.fx-mb-search input { border: 1px solid #E3E3EA; border-radius: 8px; padding: 8px 10px; font: 14px var(--font-body); }
+.fx-mb-search ul { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+.fx-mb-search li button { display: flex; width: 100%; justify-content: space-between; gap: 8px; border: 0; background: none; text-align: start; padding: 7px 10px; border-radius: 8px; font: 13.5px var(--font-body); color: var(--inbox-text); cursor: pointer; }
+.fx-mb-search li button:hover, .fx-mb-search li button:focus-visible { background: var(--inbox-surface); outline: none; }
+.fx-mb-search li button[aria-disabled="true"] { color: var(--inbox-faint); cursor: not-allowed; }
+.fx-mb-search kbd { font: 500 11.5px var(--font-body); color: var(--inbox-muted); }
+.fx-mb-none { margin: 4px 10px; color: var(--inbox-muted); font-size: 13px; }
+.fx-sc-dialog { width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; }
+.fx-sc-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.fx-sc-table td { padding: 6px 4px; border-bottom: 1px solid var(--inbox-border); }
+.fx-sc-table td:last-child { text-align: end; white-space: nowrap; }
+.fx-sc-table kbd { font: 500 12px var(--font-body); color: var(--inbox-text); background: var(--inbox-surface); border-radius: 5px; padding: 2px 6px; }
 .fx-fmt-g { display: flex; align-items: center; gap: 2px; padding-inline: 6px; border-inline-end: 1px solid var(--inbox-border); flex: none; }
 .fx-fmt-g:last-of-type { border-inline-end: 0; }
 .fx-fmt-b { position: relative; height: 32px; min-width: 30px; border: 0; background: none; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 0 5px; color: var(--inbox-text); font: 500 13px var(--font-body); }

@@ -42,6 +42,13 @@ export interface FormatState {
   multi: boolean
   /** Spec 017: how many separate areas are selected (Ctrl+click); tools that need one block are off above 1. */
   areas?: number
+  /** Spec 018: the name box: the newest area's name ("B8:D9"), and how many cells are selected. */
+  range?: string
+  count?: number
+  /** Spec 018: the name box takes a typed cell or range here (blank sheets). */
+  canGoto?: boolean
+  /** Spec 017: Add to selection (Shift+F8) is on. */
+  adding?: boolean
   /** Stage 2: why Hide and Freeze are off here (the Content and Video sheets), or null. */
   viewOff?: string | null
   /** Stage 2: the sheet's frozen panes, for the Freeze menu's tick. */
@@ -86,6 +93,10 @@ export type FormatCmd =
   | { kind: 'ruleNew'; rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'> }
   | { kind: 'rulesSet'; rules: ConditionalRule[] }
   | { kind: 'rulesClear'; where: 'selection' | 'sheet' }
+  // Spec 018: the cell bar, the name box and Insert from the menu bar.
+  | { kind: 'setValue'; value: string }
+  | { kind: 'goto'; ref: string }
+  | { kind: 'insert'; what: 'rowAbove' | 'rowBelow' | 'colLeft' | 'colRight' }
 
 /** The toolbar started listening after a sheet announced itself: sheets announce again. */
 export const FORMAT_ASK = 'momentum:format-ask'

@@ -1,0 +1,331 @@
+<title>Sheet Toolbar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (width, language), then one workbook frame with the
+   new header: title row, menu bar, one rounded toolbar strip, a name box and
+   cell bar, a few grid rows. Below it, where every current control now lives.
+   Momentum tokens (spec 013/015); the arrangement follows the spreadsheet
+   layout people already know. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --strip: #EEF0F5; --hover: #E2E5EC; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --sh-sel: rgba(124, 58, 237, .10); --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD;
+  --ok: #15803D; --warn-bg: #FFF3E0; --warn: #9A5B02; --red: #C00000; --amber: #FFC000;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif; --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --sh-sel: rgba(167, 139, 250, .16); --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 80ch; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+
+/* frame */
+.frame { position: relative; background: var(--panel); border-radius: 16px; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10); overflow: hidden; margin-inline: auto; width: 100%; transition: max-width .2s; }
+.frame[dir="rtl"], .frame[dir="rtl"] button { font-family: var(--f-ar); }
+.frame.narrow { max-width: 760px; }
+.title { display: flex; align-items: center; gap: 10px; padding: 12px 16px 2px; flex-wrap: wrap; }
+.title .crumb { color: var(--muted); font-size: 13.5px; }
+.title b { font: 800 19px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .title b { font-family: var(--f-ar); }
+.title .saved { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.title .saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.title .right { margin-inline-start: auto; display: flex; gap: 8px; }
+.pill { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.pill.soft { background: var(--purple-soft); color: var(--purple); border-color: transparent; }
+
+/* menu bar */
+.menubar { display: flex; gap: 2px; padding: 0 10px 4px; flex-wrap: wrap; }
+.menubar > button { border: 0; background: none; padding: 4px 8px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.menubar > button:hover, .menubar > button[aria-expanded="true"] { background: var(--hover); }
+
+/* the strip */
+.strip { margin: 0 10px 8px; background: var(--strip); border-radius: 999px; display: flex; align-items: center; gap: 1px; padding: 3px 8px; min-height: 40px; overflow: hidden; }
+.tb { border: 0; background: none; height: 30px; min-width: 30px; padding: 0 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-size: 13.5px; color: var(--ink); flex: none; }
+.tb:hover { background: var(--hover); }
+.tb[aria-pressed="true"] { background: var(--sh-head-sel); color: var(--purple); }
+.tb:disabled { opacity: .4; cursor: default; }
+.tb svg { width: 18px; height: 18px; }
+.tb .car { font-size: 9px; opacity: .7; margin-inline-start: 1px; }
+.tb.sel { border: 0; min-width: 108px; justify-content: space-between; padding-inline: 8px; font-size: 13px; }
+.tb.sel.num { min-width: 42px; }
+.size { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.size output { width: 34px; height: 26px; border: 1px solid var(--input); border-radius: 6px; display: grid; place-items: center; font-size: 13px; background: var(--panel); font-variant-numeric: tabular-nums; }
+.vsep { width: 1px; height: 20px; background: var(--input); margin-inline: 5px; flex: none; }
+.uline { position: relative; display: inline-grid; place-items: center; }
+.uline i { position: absolute; inset-inline: 2px; bottom: -3px; height: 3px; border-radius: 1px; }
+.grp { display: inline-flex; align-items: center; gap: 1px; flex: none; }
+.more { margin-inline-start: auto; }
+.grp.hide { display: none; }
+
+/* name box + cell bar */
+.fbar { display: flex; align-items: stretch; border-block: 1px solid var(--line); height: 32px; font-size: 13px; }
+.namebox { width: 132px; border-inline-end: 1px solid var(--line); display: flex; align-items: center; padding-inline: 10px; gap: 6px; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; flex: none; }
+.namebox span { color: var(--muted); margin-inline-start: auto; font-size: 10px; }
+.fx { width: 34px; display: grid; place-items: center; color: var(--muted); border-inline-end: 1px solid var(--line); flex: none; font-style: italic; font-family: Georgia, serif; }
+.cellv { flex: 1; display: flex; align-items: center; padding-inline: 10px; min-width: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count { padding-inline: 12px; display: flex; align-items: center; color: var(--muted); font-size: 12px; white-space: nowrap; border-inline-start: 1px solid var(--line); }
+
+/* grid */
+.gw { overflow: auto; max-height: 260px; }
+.g { display: grid; grid-template-columns: 44px repeat(7, 128px); font-size: 13px; min-width: max-content; }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 28px; }
+.h, .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; text-align: center; }
+.h.on, .rn.on { background: var(--sh-head-sel); color: var(--purple); }
+.c.sel { background: var(--sh-sel); }
+.c.act { box-shadow: inset 0 0 0 2px var(--sh-edge); }
+.c.b { font-weight: 700; }
+
+/* menus */
+.menu { position: absolute; z-index: 30; min-width: 250px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px 0; font-size: 13.5px; max-height: 440px; overflow: auto; }
+.menu .mi { display: flex; width: 100%; gap: 12px; align-items: center; border: 0; background: none; padding: 6px 16px; text-align: start; cursor: pointer; min-height: 32px; }
+.menu .mi:hover:not(:disabled) { background: var(--surface); }
+.menu .mi:disabled { color: var(--muted); cursor: default; }
+.menu .mi .ic { width: 18px; text-align: center; color: var(--muted); flex: none; }
+.menu .mi .k { margin-inline-start: auto; color: var(--muted); font-size: 12px; }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 5px 0; }
+.menu .sub::after { content: "▸"; margin-inline-start: auto; color: var(--muted); }
+.frame[dir="rtl"] .menu .sub::after { content: "◂"; }
+
+/* the mapping */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border-radius: 16px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h2 { margin: 0; font: 800 16px var(--f-head); color: var(--ink); }
+.card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { text-align: start; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.tablewrap { overflow-x: auto; }
+.tag { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; background: var(--purple-soft); color: var(--purple); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Sheet toolbar, spreadsheet style</h1>
+    <p class="lede">Spec 018 design. The sheet header gets the layout people know from Google Sheets: a menu bar (File, Edit, View, Insert, Format, Data, Help), one rounded toolbar strip, and a name box with the cell's content. Every tool we have today stays; this page shows where each one goes. Click the menus and the ▾ buttons; switch to a narrow window to see the ⋮ overflow.</p>
+  </header>
+  <div class="ctl">
+    <span>Window</span><div class="seg" id="w"><button type="button" data-v="wide" aria-pressed="true">Wide</button><button type="button" data-v="narrow" aria-pressed="false">Narrow</button></div>
+    <span>Language</span><div class="seg" id="l"><button type="button" data-v="en" aria-pressed="true">English</button><button type="button" data-v="ar" aria-pressed="false">العربية</button></div>
+  </div>
+
+  <div class="frame" id="frame" dir="ltr">
+    <div class="title">
+      <span class="crumb" data-t="sheets">Sheets ›</span><b data-t="name">March plan</b>
+      <span class="saved" data-t="saved">Saved</span>
+      <span class="right"><button type="button" class="pill" data-t="board">Board ▾</button><button type="button" class="pill soft" data-t="comments">💬 Comments 2</button></span>
+    </div>
+    <nav class="menubar" id="menubar" aria-label="Menu"></nav>
+    <div class="strip" id="strip" role="toolbar" aria-label="Formatting"></div>
+    <div class="fbar">
+      <div class="namebox" id="namebox">B8:D9<span>▾</span></div>
+      <div class="fx">fx</div>
+      <div class="cellv" id="cellv">Instagram</div>
+      <div class="count" id="count">6 cells</div>
+    </div>
+    <div class="gw"><div class="g" id="g"></div></div>
+  </div>
+
+  <div class="cards">
+    <section class="card">
+      <h2>What changes</h2>
+      <p><b>Menu bar.</b> File, Edit, View, Insert, Format, Data and Help hold every command, including the ones in today's ▾ menus (Clear, Fill, Freeze, Hide, Sort &amp; Filter, Conditional formatting, Format as Table, Cell styles).</p>
+      <p><b>One toolbar strip.</b> The everyday tools in the familiar order: find, undo, redo, Format Painter, currency, %, decimals, number formats, font, size − +, bold, italic, strikethrough, text colour, fill, borders, merge, align, vertical align, wrap, rotate, then comment and filter. Undo and redo move into the strip. What doesn't fit goes under ⋮.</p>
+      <p><b>Name box and cell bar.</b> The selection's name (or "3 areas") on the left, the active cell's content beside it, and the cell count on the right. Typing in the cell bar edits the active cell; Enter saves it. Typing a cell name like D20 in the name box jumps there.</p>
+      <p><b>Same everywhere.</b> Blank sheets and the Content and Video sheets get the same header; tools a linked sheet can't use stay disabled with their reason, as now. Phones keep the Format sheet at the bottom.</p>
+    </section>
+    <section class="card">
+      <h2>Where today's controls go</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Today</th><th>New place</th></tr></thead>
+        <tbody>
+          <tr><td>↶ ↷ in the top row</td><td>Strip (and Edit)</td></tr>
+          <tr><td>Paste ▾ (values, formats, special)</td><td>Edit › Paste special</td></tr>
+          <tr><td>Format Painter</td><td>Strip</td></tr>
+          <tr><td>Font, size, B I U S, colour, fill, borders</td><td>Strip (Underline: Format › Text, Ctrl+U)</td></tr>
+          <tr><td>6 align buttons, wrap, rotate</td><td>Strip: 4 ▾ buttons (align, vertical, wrap, rotate)</td></tr>
+          <tr><td>Indent, outdent</td><td>Format › Alignment</td></tr>
+          <tr><td>Merge ▾</td><td>Strip</td></tr>
+          <tr><td>General ▾, EGP ▾, %, comma, decimals</td><td>Strip: EGP, %, .0, .00, 123 ▾ (comma inside 123 ▾)</td></tr>
+          <tr><td>Format Cells (Ctrl+1)</td><td>Format › Format cells</td></tr>
+          <tr><td>Cell styles, Format as Table, Conditional formatting</td><td>Format menu</td></tr>
+          <tr><td>Row height, column width, hide/unhide</td><td>View menu (and the row and column menus)</td></tr>
+          <tr><td>Clear ▾, Fill ▾, Find ▾</td><td>Edit menu; Find also in the strip</td></tr>
+          <tr><td>Sort &amp; Filter ▾</td><td>Data menu; Filter also in the strip</td></tr>
+          <tr><td>Freeze ▾</td><td>View › Freeze</td></tr>
+          <tr><td>Comment ＋</td><td>Strip and Insert</td></tr>
+          <tr><td>Board ▾, Comments</td><td>Top right, unchanged; Board items also in Data</td></tr>
+          <tr><td>Selection text ("B8:D9, 6 cells")</td><td>Name box and cell count</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const ic = {
+    find: '<path d="M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm9 15.5-4.4-4.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    undo: '<path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -3)"/>',
+    redo: '<path d="m15 7 5 5-5 5M20 12H10a6 6 0 0 0 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -3)"/>',
+    paint: '<path d="M5 4h11v5H5zM16 6.5h3v5h-8.5v3M10.5 14.5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+    fill: '<path d="m4 12 7-7 7 7-7 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M19 14s2 2.5 2 3.6a2 2 0 0 1-4 0c0-1.1 2-3.6 2-3.6z" fill="currentColor"/>',
+    borders: '<path d="M4 4h16v16H4zM12 4v16M4 12h16" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    merge: '<path d="M4 6v12M20 6v12M7 12h4m2 0h4M9 9.5 11.5 12 9 14.5M15 9.5 12.5 12l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    left: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    valign: '<path d="M12 4v10m-4-4 4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    wrap: '<path d="M4 6h16M4 12h13a3 3 0 0 1 0 6h-4m2-2-2 2 2 2M4 18h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    rotate: '<path d="M5 19 19 5M13 5h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="3" y="12" font-size="8" font-weight="700" fill="currentColor">A</text>',
+    comment: '<path d="M4 5h16v11H9l-5 4zM12 8v5M9.5 10.5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>',
+    filter: '<path d="M4 5h16l-6 7.5V19l-4-2v-4.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+    more: '<circle cx="12" cy="5" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="19" r="1.7" fill="currentColor"/>',
+  }
+  const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ic[k]}</svg>`
+  const S = {
+    en: { sheets: 'Sheets ›', name: 'March plan', saved: 'Saved', board: 'Board ▾', comments: '💬 Comments 2', count: '6 cells',
+      menus: { File: ['New sheet|Shift+F11', 'Duplicate sheet', 'Rename sheet|F2', '-', 'Protect sheet', 'Hide sheet', 'Delete sheet'],
+        Edit: ['Undo|Ctrl+Z', 'Redo|Ctrl+Y', '-', 'Cut|Ctrl+X', 'Copy|Ctrl+C', 'Paste|Ctrl+V', '>Paste special|Ctrl+Shift+V', '-', 'Fill down|Ctrl+D', 'Fill right|Ctrl+R', '-', 'Find and replace|Ctrl+H', '>Clear'],
+        View: ['>Freeze', '-', 'Hide rows', 'Hide columns', 'Unhide rows', 'Unhide columns', '-', 'Row height…', 'Column width…'],
+        Insert: ['Row above', 'Row below', 'Column left', 'Column right', '-', 'Comment|Ctrl+Alt+M'],
+        Format: ['>Number', '>Text', '>Alignment', '>Wrapping', '>Rotation', '>Font size', '>Merge cells', '-', 'Cell styles…', 'Format as table…', 'Conditional formatting…', '-', 'Format cells…|Ctrl+1', 'Clear formatting|Ctrl+\\'],
+        Data: ['Sort A → Z', 'Sort Z → A', 'Custom sort…', '-', 'Create a filter|Ctrl+Shift+L', 'Clear filter', '-', 'Link to board…', 'Create tasks for rows…', 'Refresh from board'],
+        Help: ['Keyboard shortcuts|Ctrl+/', 'What each tool does'] },
+      names: { File: 'File', Edit: 'Edit', View: 'View', Insert: 'Insert', Format: 'Format', Data: 'Data', Help: 'Help' },
+      tips: { find: 'Find (Ctrl+F)', undo: 'Undo (Ctrl+Z)', redo: 'Redo (Ctrl+Y)', paint: 'Format Painter', cur: 'Currency', pct: 'Percent', dd: 'Fewer decimals', di: 'More decimals', num: 'More number formats', font: 'Font', b: 'Bold (Ctrl+B)', i: 'Italic (Ctrl+I)', s: 'Strikethrough (Ctrl+5)', color: 'Text colour', fill: 'Fill colour', borders: 'Borders', merge: 'Merge cells', align: 'Align', valign: 'Vertical align', wrap: 'Wrapping', rotate: 'Rotation', comment: 'Comment (Ctrl+Alt+M)', filter: 'Filter (Ctrl+Shift+L)', more: 'More tools' },
+      align: ['Left', 'Center', 'Right', '-', 'Increase indent', 'Decrease indent'], valign: ['Top', 'Middle', 'Bottom'], wrapM: ['Overflow', 'Wrap', 'Clip'], rotM: ['None', 'Tilt up', 'Tilt down', 'Stack vertically', 'Rotate up', 'Rotate down'],
+      num: ['Automatic', 'Plain text', '-', 'Number|1,000.12', 'Percent|10.12%', 'Currency|EGP 1,000.12', 'Accounting|EGP (1,000.12)', '-', 'Date|16/11/2026', 'Time|15:59', 'Date time', '-', 'Custom… (Format cells)'],
+      head: ['Post', 'Channel', 'Owner', 'Due', 'Stage', 'Budget', ''], rows: [['Spring launch teaser', 'Instagram', 'Roaa', '3 Mar', 'Design', '4,000'], ['Founder Q&A', 'LinkedIn', 'Omar', '5 Mar', 'Writing', '0'], ['Ramadan greeting', 'All', 'Laila', '10 Mar', 'Brief', '2,500'], ['Behind the scenes', 'TikTok', 'Roaa', '12 Mar', 'Shooting', '6,000'], ['Product tips #4', 'Instagram', 'Nour', '14 Mar', 'Review', '1,200'], ['Case study: Atlas', 'Blog', 'Omar', '18 Mar', 'Writing', '0'], ['Iftar giveaway', 'Instagram', 'Laila', '20 Mar', 'Brief', '9,000'], ['Team spotlight', 'LinkedIn', 'Nour', '24 Mar', 'Design', '800']] },
+    ar: { sheets: 'الجداول ›', name: 'خطة مارس', saved: 'تم الحفظ', board: 'اللوحة ▾', comments: '💬 التعليقات 2', count: '6 خلايا',
+      menus: { File: ['ورقة جديدة|Shift+F11', 'تكرار الورقة', 'إعادة التسمية|F2', '-', 'حماية الورقة', 'إخفاء الورقة', 'حذف الورقة'],
+        Edit: ['تراجع|Ctrl+Z', 'إعادة|Ctrl+Y', '-', 'قص|Ctrl+X', 'نسخ|Ctrl+C', 'لصق|Ctrl+V', '>لصق خاص|Ctrl+Shift+V', '-', 'تعبئة لأسفل|Ctrl+D', 'تعبئة لليمين|Ctrl+R', '-', 'بحث واستبدال|Ctrl+H', '>مسح'],
+        View: ['>تجميد', '-', 'إخفاء الصفوف', 'إخفاء الأعمدة', 'إظهار الصفوف', 'إظهار الأعمدة', '-', 'ارتفاع الصف…', 'عرض العمود…'],
+        Insert: ['صف أعلى', 'صف أسفل', 'عمود يسار', 'عمود يمين', '-', 'تعليق|Ctrl+Alt+M'],
+        Format: ['>الأرقام', '>النص', '>المحاذاة', '>الالتفاف', '>التدوير', '>حجم الخط', '>دمج الخلايا', '-', 'أنماط الخلايا…', 'تنسيق كجدول…', 'التنسيق الشرطي…', '-', 'تنسيق الخلايا…|Ctrl+1', 'مسح التنسيق|Ctrl+\\'],
+        Data: ['فرز أ ← ي', 'فرز ي ← أ', 'فرز مخصص…', '-', 'إنشاء عامل تصفية|Ctrl+Shift+L', 'مسح التصفية', '-', 'ربط باللوحة…', 'إنشاء مهام للصفوف…', 'تحديث من اللوحة'],
+        Help: ['اختصارات لوحة المفاتيح|Ctrl+/', 'ماذا تفعل كل أداة'] },
+      names: { File: 'ملف', Edit: 'تعديل', View: 'عرض', Insert: 'إدراج', Format: 'تنسيق', Data: 'بيانات', Help: 'مساعدة' },
+      tips: null, align: ['يسار', 'وسط', 'يمين', '-', 'زيادة المسافة', 'تقليل المسافة'], valign: ['أعلى', 'وسط', 'أسفل'], wrapM: ['تجاوز', 'التفاف', 'قص'], rotM: ['بلا', 'إمالة لأعلى', 'إمالة لأسفل', 'عمودي', 'تدوير لأعلى', 'تدوير لأسفل'],
+      num: ['تلقائي', 'نص عادي', '-', 'رقم|1,000.12', 'نسبة|10.12%', 'عملة|EGP 1,000.12', 'محاسبي|EGP (1,000.12)', '-', 'تاريخ|16/11/2026', 'وقت|15:59', 'تاريخ ووقت', '-', 'مخصص… (تنسيق الخلايا)'],
+      head: ['المنشور', 'القناة', 'المسؤول', 'الموعد', 'المرحلة', 'الميزانية', ''], rows: null },
+  }
+  let lang = 'en'
+  const L = () => S[lang], tip = k => (S[lang].tips ?? S.en.tips)[k]
+  const frame = document.getElementById('frame'), strip = document.getElementById('strip'), bar = document.getElementById('menubar')
+
+  function closeMenu() { frame.querySelector('.menu')?.remove(); bar.querySelectorAll('[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false')) }
+  function openMenu(items, anchor) {
+    closeMenu()
+    const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'menu')
+    for (const raw of items) {
+      if (raw === '-') { m.appendChild(document.createElement('hr')); continue }
+      const sub = raw.startsWith('>'), [label, k] = (sub ? raw.slice(1) : raw).split('|')
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mi' + (sub ? ' sub' : ''); b.setAttribute('role', 'menuitem')
+      b.innerHTML = `<span>${label}</span>${k && !sub ? `<span class="k">${k}</span>` : ''}`
+      b.addEventListener('click', closeMenu)
+      m.appendChild(b)
+    }
+    frame.appendChild(m)
+    const fr = frame.getBoundingClientRect(), r = anchor.getBoundingClientRect(), rtl = frame.dir === 'rtl'
+    const x = rtl ? r.right - fr.left - m.offsetWidth : r.left - fr.left
+    m.style.left = Math.max(8, Math.min(x, fr.width - m.offsetWidth - 8)) + 'px'
+    m.style.top = (r.bottom - fr.top + 4) + 'px'
+  }
+
+  function buildMenubar() {
+    bar.innerHTML = ''
+    for (const k of Object.keys(L().menus)) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = L().names[k]; b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false')
+      b.addEventListener('click', e => { e.stopPropagation(); const was = b.getAttribute('aria-expanded') === 'true'; closeMenu(); if (!was) { openMenu(L().menus[k], b); b.setAttribute('aria-expanded', 'true') } })
+      bar.appendChild(b)
+    }
+  }
+
+  // The strip: groups in the familiar order; `p` is the priority (lower hides first into ⋮).
+  const groups = [
+    { p: 9, h: [['find', svg('find')], ['undo', svg('undo')], ['redo', svg('redo')], ['paint', svg('paint')]] },
+    { p: 5, h: [['cur', '<b style="font-size:12px">EGP</b>'], ['pct', '%'], ['dd', '<span style="font-size:12px">.0<sub>←</sub></span>'], ['di', '<span style="font-size:12px">.00<sub>→</sub></span>'], ['num', '<span style="font-size:12px">123</span><span class="car">▾</span>', 'num']] },
+    { p: 6, h: [['font', '<span>Inter</span><span class="car">▾</span>', 'font', 'sel']] },
+    { p: 7, size: true },
+    { p: 8, h: [['b', '<b>B</b>', null, null, true], ['i', '<i style="font-family:Georgia,serif">I</i>'], ['s', '<s>S</s>'], ['color', '<span class="uline"><b>A</b><i style="background:var(--red)"></i></span><span class="car">▾</span>', 'color']] },
+    { p: 7, h: [['fill', `<span class="uline">${svg('fill')}<i style="background:var(--amber)"></i></span><span class="car">▾</span>`, 'fill'], ['borders', svg('borders') + '<span class="car">▾</span>', 'borders'], ['merge', svg('merge') + '<span class="car">▾</span>', 'merge']] },
+    { p: 6, h: [['align', svg('left') + '<span class="car">▾</span>', 'align'], ['valign', svg('valign') + '<span class="car">▾</span>', 'valign'], ['wrap', svg('wrap') + '<span class="car">▾</span>', 'wrapM'], ['rotate', svg('rotate') + '<span class="car">▾</span>', 'rotM']] },
+    { p: 4, h: [['comment', svg('comment')], ['filter', svg('filter')]] },
+  ]
+  const groupEls = []
+  function buildStrip() {
+    strip.innerHTML = ''; groupEls.length = 0
+    groups.forEach((g, gi) => {
+      const el = document.createElement('span'); el.className = 'grp'; el.dataset.p = g.p; el.dataset.i = gi
+      if (g.size) el.innerHTML = `<button type="button" class="tb" title="Smaller">−</button><span class="size"><output>10</output></span><button type="button" class="tb" title="Larger">+</button>`
+      else for (const [k, html, menu, cls, pressed] of g.h) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'tb' + (cls ? ' ' + cls : ''); b.innerHTML = html; b.title = tip(k); b.setAttribute('aria-label', tip(k))
+        if (pressed) b.setAttribute('aria-pressed', 'true')
+        if (menu) { b.setAttribute('aria-haspopup', 'menu'); b.addEventListener('click', e => { e.stopPropagation(); openMenu(L()[menu] ?? ['Picker (as today)'], b) }) }
+        el.appendChild(b)
+      }
+      strip.appendChild(el); groupEls.push(el)
+      if (gi < groups.length - 1) { const s = document.createElement('span'); s.className = 'vsep'; s.dataset.after = gi; strip.appendChild(s) }
+    })
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'tb more'; more.innerHTML = svg('more'); more.title = tip('more'); more.setAttribute('aria-label', tip('more')); more.hidden = true
+    more.addEventListener('click', e => { e.stopPropagation(); openMenu(groupEls.filter(g => g.classList.contains('hide')).flatMap(g => [...g.querySelectorAll('.tb')].map(b => b.title)).filter(Boolean), more) })
+    strip.appendChild(more)
+    fit()
+  }
+  /** Hide the lowest-priority groups until the strip fits; they go under ⋮. */
+  function fit() {
+    groupEls.forEach(g => g.classList.remove('hide')); strip.querySelectorAll('.vsep').forEach(s => (s.hidden = false))
+    const more = strip.querySelector('.more'); more.hidden = true
+    const order = [...groupEls].sort((a, b) => a.dataset.p - b.dataset.p)
+    let i = 0
+    while (strip.scrollWidth > strip.clientWidth + 1 && i < order.length - 1) {
+      order[i].classList.add('hide'); const s = strip.querySelector(`.vsep[data-after="${order[i].dataset.i}"]`); if (s) s.hidden = true
+      more.hidden = false; i++
+    }
+  }
+
+  function buildGrid() {
+    const g = document.getElementById('g'); g.innerHTML = ''
+    const add = (cls, t) => { const d = document.createElement('div'); d.className = 'c ' + cls; d.textContent = t; d.dir = 'auto'; g.appendChild(d) }
+    add('h', ''); 'ABCDEFG'.split('').forEach((l, i) => add('h' + (i >= 1 && i <= 3 ? ' on' : ''), l))
+    const rows = [L().head, ...(L().rows ?? S.en.rows)]
+    rows.forEach((row, r) => { add('rn' + (r === 7 || r === 8 ? ' on' : ''), r + 1); for (let c = 0; c < 7; c++) { const inSel = (r === 7 || r === 8) && c >= 1 && c <= 3; add((inSel ? 'sel' : '') + (r === 7 && c === 1 ? ' act' : '') + (r === 0 ? ' b' : ''), row[c] ?? '') } })
+  }
+
+  function setLang(v) {
+    lang = v; frame.dir = v === 'ar' ? 'rtl' : 'ltr'; frame.lang = v
+    frame.querySelectorAll('[data-t]').forEach(el => { el.textContent = L()[el.dataset.t] })
+    document.getElementById('count').textContent = L().count
+    document.getElementById('cellv').textContent = (L().rows ?? S.en.rows)[6][1]
+    document.querySelectorAll('#l button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v))
+    closeMenu(); buildMenubar(); buildStrip(); buildGrid()
+  }
+  document.getElementById('l').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setLang(b.dataset.v) })
+  document.getElementById('w').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return
+    frame.classList.toggle('narrow', b.dataset.v === 'narrow')
+    document.querySelectorAll('#w button').forEach(x => x.setAttribute('aria-pressed', x === b))
+    closeMenu(); setTimeout(fit, 220)
+  })
+  document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu() })
+  window.addEventListener('resize', fit)
+  setLang('en')
+  if (document.fonts?.ready) document.fonts.ready.then(fit)
+})()
+</script>

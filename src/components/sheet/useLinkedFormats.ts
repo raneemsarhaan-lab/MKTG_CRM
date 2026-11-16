@@ -64,6 +64,7 @@ export interface LinkedFormatsInput<R extends { key: string }> {
 export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInput<R>) {
   const t = useTranslations('sheets.format')
   const ta = useTranslations('sheets.areas')
+  const t2 = useTranslations('sheets.toolbar2')
   const api = useContext(LinkedFormatsContext)
   p = { ...p, enabled: p.enabled && !!api }
   const apiRef = useRef(api)
@@ -230,6 +231,10 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
         return
       }
       case 'rulesSet': setLinkedRules('rules', cmd.rules); return
+      // Spec 018: the cell bar saves through the sheet's own per-cell saves; no name-box jumps or inserts here.
+      case 'setValue': { const h = at(); if (h) void ref.current.writeCells?.([{ r: h.r, c: h.c, value: cmd.value }], 'paste').then(skippedNote); return }
+      case 'goto': return
+      case 'insert': p.say(t2('insertLinked')); return
       case 'rulesClear': {
         const rules = p.store.rules
         if (cmd.where === 'sheet') { if (rules.length) setLinkedRules('rulesClear', []); return }
@@ -327,6 +332,7 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
     merged: false,
     multi: areas.current.length > 1 || rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1,
     areas: areas.current.length,
+    count: unionCells(areas.current).length,
     viewOff: t('edit.viewOff'),
     table: null,
     tableOff: t('st3.tablesLinked'),

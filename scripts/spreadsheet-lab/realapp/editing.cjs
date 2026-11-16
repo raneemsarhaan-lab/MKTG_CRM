@@ -8,6 +8,7 @@
  * changes is put back, and the folder is removed at the end.
  */
 const { chromium } = require('playwright')
+const { tool } = require('./toolbar.cjs')
 const { execSync } = require('child_process')
 const BASE = process.argv[2] || 'http://localhost:3000'
 const DB = process.env.DATABASE_URL || 'postgresql://momentum:momentum@localhost:5432/momentum'
@@ -54,7 +55,7 @@ const css = (loc, prop) => loc.evaluate((e, p) => getComputedStyle(e)[p], prop)
 const typeAt = async (page, r, c, v) => { await cellOf(page, r, c).click(); await page.keyboard.type(v); await page.keyboard.press('Enter') }
 const select = async (page, a, b) => { await cellOf(page, a[0], a[1]).click(); await cellOf(page, b[0], b[1]).click({ modifiers: ['Shift'] }) }
 const menu = async (page, btn, attr, n) => {
-  await page.click(`[data-fmt="${btn}"]`)
+  await tool(page, btn)
   try { await page.click(`[${attr}] [role^="menuitem"] >> nth=${n}`, { timeout: 8000 }) } catch (e) {
     console.log('    (menu', btn, 'disabled:', await page.locator(`[data-fmt="${btn}"]`).getAttribute('aria-disabled'), 'open:', await page.locator(`[${attr}]`).count(), ')'); throw e
   }
@@ -209,7 +210,7 @@ const writeClip = (page, html, text) => page.evaluate(([html, text]) => navigato
     const after = sql(`select string_agg(name, '|' order by id) from tasks where name like '%Report%'`)
     ok(after === before, 'undo puts every title back')
     if (after !== before) restore.push(before)
-    await M.page.click('[data-fmt="freeze"]')
+    await tool(M.page, 'freeze')
     ok((await M.page.locator('[data-freeze-menu]').innerText()).includes('Columns'), 'Freeze and Hide are off here, and say why')
     await M.page.keyboard.press('Escape')
 
@@ -220,7 +221,7 @@ const writeClip = (page, html, text) => page.evaluate(([html, text]) => navigato
     await cellOf(AR.page, 0, 0).click(); await AR.page.keyboard.press('Control+h'); await AR.page.waitForSelector('[data-find-panel]')
     await axe(AR.page, 'Find and Replace in Arabic')
     await AR.page.click('[data-find-panel] header button')
-    await AR.page.click('[data-fmt="clear"]'); await axe(AR.page, 'Clear menu in Arabic'); await AR.page.keyboard.press('Escape')
+    await tool(AR.page, 'clear'); await axe(AR.page, 'Clear menu in Arabic'); await AR.page.keyboard.press('Escape')
     const P = await login(browser, ADMIN, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
     await P.page.goto(url); await P.page.waitForSelector('[data-blank-sheet]')
     await cellOf(P.page, 0, 0).click(); await P.page.click('[data-format-open]'); await P.page.waitForSelector('[data-format-sheet]')
@@ -234,8 +235,8 @@ const writeClip = (page, html, text) => page.evaluate(([html, text]) => navigato
 
     console.log('10. Accessibility')
     await page.goto(url); await page.waitForSelector('[data-blank-sheet]'); await cellOf(page, 0, 0).click()
-    for (const [btn, attr] of [['paste', 'data-paste-menu'], ['fmt', 'data-cells-menu'], ['fillDn', 'data-fill-menu'], ['freeze', 'data-freeze-menu']]) {
-      await page.click(`[data-fmt="${btn}"]`); await page.waitForSelector(`[${attr}]`); await axe(page, `${btn} menu`); await page.keyboard.press('Escape')
+    for (const [btn, attr] of [['paste', 'data-paste-menu'], ['fmt', 'data-mb-view'], ['fillDn', 'data-mb-edit'], ['freeze', 'data-freeze-menu']]) {
+      await tool(page, btn); await page.waitForSelector(`[${attr}]`); await axe(page, `${btn} menu`); await page.keyboard.press('Escape')
     }
     ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '))
   } finally {
