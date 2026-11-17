@@ -2887,9 +2887,12 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sh-blank.is-content .fx-sheet-th.is-named { justify-content: flex-start; }
 .fx-sh-blank.is-content .fx-sheet-th-name { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .fx-sh-blank.is-content .fx-sheet-band { height: auto; flex-direction: column; align-items: stretch; background: none; border-bottom: 0; }
-.fx-cband { position: sticky; inset-inline-start: 0; display: flex; flex-direction: column; width: 100%; }
+.fx-cband { display: flex; flex-direction: column; width: 100%; }
+/* The band runs the sheet's width; its name stays at the start while the sheet scrolls sideways. */
+.fx-cband-label { position: sticky; inset-inline-start: 12px; }
 .fx-cband-main, .fx-cband-sub { display: flex; align-items: center; height: 30px; padding-inline: 12px; border-bottom: 1px solid var(--sheet-grid); white-space: nowrap; font-size: 12.5px; }
 .fx-cband-main { background: var(--sheet-header-bg); font-weight: 600; }
 .fx-cband-main.is-theme { background: var(--sheet-video-row); font-weight: 700; }
 .fx-cband-main b { font-weight: inherit; }
-.fx-cband-sub { background: var(--sheet-header-bg); font-weight: 600; font-size: 11.5px; padding-inline-start: 28px; }
+.fx-cband-sub { background: var(--sheet-header-bg); font-weight: 600; font-size: 11.5px; }
+.fx-cband-sub .fx-cband-label { inset-inline-start: 28px; margin-inline-start: 16px; }
