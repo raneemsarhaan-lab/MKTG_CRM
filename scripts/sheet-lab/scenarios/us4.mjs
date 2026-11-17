@@ -97,7 +97,8 @@ export const us4 = [
       t.eq(await t.page.locator('[data-cell="c:c03|source"] input').inputValue(), 'X', 'typing starts editing')
       await t.page.keyboard.press('Shift+Tab')
       await t.idle(200)
-      t.assert(await t.page.locator('[data-cell="c:c03|clipNo"] input').count() === 1, 'Shift+Tab: previous cell to type in')
+      // Spec 019 stage 3: Status takes typed stage words, so it is the previous cell to type in (before #).
+      t.assert(await t.page.locator('[data-cell="c:c03|status"] input').count() === 1, 'Shift+Tab: previous cell to type in (Status)')
     },
   },
 ]

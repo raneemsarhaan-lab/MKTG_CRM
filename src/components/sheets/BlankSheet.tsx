@@ -225,7 +225,7 @@ export function BlankSheet(p: BlankSheetProps) {
   // ── spec 016: columns linked to board tasks ─────────────────────────────
   const noLinks = useMemo<LinksApi>(() => {
     const no = async () => ({ success: false as const, error: 'generic' })
-    return { resolveTaskCells: no, writeTaskFields: no, refreshTaskFields: no, taskValues: no, searchTasks: no, linkChoices: no, createTasksForRows: no } as unknown as LinksApi
+    return { resolveTaskCells: no, writeTaskFields: no, refreshTaskFields: no, taskValues: no, searchTasks: no, linkChoices: no, createTasksForRows: no, addTheme: no } as unknown as LinksApi
   }, [])
   const lk = useTaskLinks({
     doc, api: p.links ?? noLinks, ro: p.readOnly, vRows, vCols, rowIndex, colIndex,
@@ -243,6 +243,7 @@ export function BlankSheet(p: BlankSheetProps) {
   const [valuesFor, setValuesFor] = useState<WordField | null>(null)
   const [match, setMatch] = useState<{ field: WordField; colId: string; colName: string; values: { text: string; n: number }[] } | null>(null)
   const [rename, setRename] = useState<{ col: string; anchor: HTMLElement } | null>(null)
+  const [newTheme, setNewTheme] = useState<HTMLElement | null>(null)
   useEffect(() => { if (lk.choices?.me) setMeId(lk.choices.me) }, [lk.choices?.me])
   /** The Content look: a column's name is its cell in the headings row; renaming writes that cell (one undo step). */
   const colName = (col: string) => (headRow ? value(headRow, col) : '')
@@ -1297,6 +1298,7 @@ export function BlankSheet(p: BlankSheetProps) {
           <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-team-mine="" onClick={() => setMine(v => !v)}>{tf('barMine')}</button>
           <button type="button" className="fx-sheet-tog" aria-pressed={showDone} data-team-done=""
                   onClick={() => setShowDone(v => { try { window.localStorage.setItem('momentum.team.done', v ? '0' : '1') } catch { /* private mode */ } return !v })}>{tf('barShowDone')}</button>
+          {lk.canAddTheme && <button type="button" className="fx-sheet-btn" data-team-add-theme="" disabled={!!ro} onClick={e => setNewTheme(e.currentTarget)}>{tf('barAddTheme')}</button>}
           <button type="button" className="fx-sheet-btn" data-team-add-tasks="" disabled={!!ro} onClick={() => openLinks('add')}>{tf('barAddTasks')}</button>
           <button type="button" className="fx-sheet-btn is-primary" data-team-create="" disabled={!!ro || !notCreated.length || !lk.canCreate}
                   onClick={() => lk.createForRow(notCreated)}>{tf('barCreateTasks', { n: notCreated.length })}</button>
@@ -1373,6 +1375,20 @@ export function BlankSheet(p: BlankSheetProps) {
                            onSort={dir => { sortBy([{ col: filterUi.col, dir }], true, true); close() }}
                            onApply={f => { filterCol(filterUi.col, f); close() }} onClose={close} />
       })()}
+      {newTheme && (
+        <SheetPopover anchor={newTheme} label={tf('newTheme')} onClose={() => setNewTheme(null)}>
+          <div data-new-theme="">
+            <NamePrompt title={tf('newTheme')} saveLabel={tf('save')} cancelLabel={tf('cancel')} onCancel={() => setNewTheme(null)}
+                        onSave={async name => {
+                          const err = await lk.addTheme(name.trim())
+                          if (err) return err
+                          setNewTheme(null)
+                          p.onNotice(tf('themeAdded', { name: name.trim() }))
+                          return null
+                        }} />
+          </div>
+        </SheetPopover>
+      )}
       {rename && (
         <SheetPopover anchor={rename.anchor} label={tf('rename')} onClose={() => { setRename(null); focusActive() }}>
           <div data-rename-col="">
@@ -1420,6 +1436,8 @@ export function groupRows<R extends { id: string }>(doc: SheetDoc, rows: R[], g:
     const m = tk.meta
     if (g.by === 'theme') {
       const th = m?.theme ?? '', pl = m?.pillar ?? ''
+      // Themes aren't required: a task with none is listed at the top, under no band.
+      if (!th) return { key: 'notheme', order: '', main: '' }
       return { key: `t${th}\u0000${pl}`, order: `${th ? `0${th.toLowerCase()}` : '1'}\u0000${pl ? `0${pl.toLowerCase()}` : '1'}`, main: th || w.noTheme, sub: pl || w.noPillar }
     }
     if (g.by === 'stage') {
@@ -1448,6 +1466,7 @@ export function groupRows<R extends { id: string }>(doc: SheetDoc, rows: R[], g:
   const themeN = new Map<string, number>()
   for (const b of list) themeN.set(b.k.main, (themeN.get(b.k.main) ?? 0) + count(b.rows))
   for (const b of list) {
+    if (b.k.key === 'notheme') { out.push(...b.rows); continue }
     const theme = g.by === 'theme' && b.k.key !== 'none'
     const sameTheme = theme && lastMain === b.k.main
     // Theme › Pillar: a new theme names both; the next pillars of the same theme name only themselves.

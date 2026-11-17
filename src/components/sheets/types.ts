@@ -37,4 +37,6 @@ export interface SheetsApi {
   searchTasks: typeof import('@/actions/sheet-links').searchTasks
   linkChoices: typeof import('@/actions/sheet-links').linkChoices
   createTasksForRows: typeof import('@/actions/sheet-links').createTasksForRows
+  /** Spec 019: + Theme from a team sheet (the Content sheet's own action; admins only). */
+  addTheme: typeof import('@/actions/content').addTheme
 }
