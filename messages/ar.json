@@ -2117,7 +2117,11 @@
       "sumPublished": "{n} منشورة",
       "lookTitle": "الشكل",
       "lookContent": "ورقة المحتوى",
-      "lookGrid": "جدول"
+      "lookGrid": "جدول",
+      "rowsVideo": "الفيديوهات ومقاطعها",
+      "rowsVideoHelp": "كل فيديو صف وتحته مقاطعه. المفاتيح تُظهر الأعمدة أو تخفيها في مجموعة {set}.",
+      "groupVideo": "الفيديو",
+      "groupEditor": "المونتير"
     }
   },
   "hours": {

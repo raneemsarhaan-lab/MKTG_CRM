@@ -197,3 +197,36 @@ The links and fields labs seed their sheets with `look: grid`, so their spreadsh
 | format | 52/52 |
 | styles | 54/54 |
 | perf-axe | 18/18 |
+
+# Stage 3: the Video sheet
+
+## What changed
+
+- **Columns** and **⚙ Fields** (title row, or Data › Task fields) open the same drawer as the Content sheet. It shows:
+  - Rows: "Videos and their clips";
+  - Group by: Video (the sheet's own order), Stage or Editor;
+  - each column with its switch, ↑ ↓ and "changed by", for the set on show (Editing, Copy or Full);
+  - Values for Stage;
+  - the team's columns.
+- **Headings and ＋.** Status, Editor, Type, Files and Published carry their field icon. ＋ after the last heading adds a hidden column back, or a spreadsheet column.
+- **Group by** moves whole videos (each with its clips, drafts and "+ Clip") under Stage or Editor headings. The choice is kept in the sheet's `view`.
+- **The sheet's own words.** Values is prefilled with the Video sheet's words (Script, Cutting, Edit Review…).
+  - Status takes typed and pasted words, which move the video or clip through the board's rules.
+  - Each move is one undo step.
+- **The Type column** now defaults to 96 px, so its icon and name fit. Widths a team has set are kept.
+
+## New lab: `realapp/video-fields.cjs`, 24/24
+
+- **Headings**: icons and ＋.
+- **Drawer**
+  - Rows: Videos and their clips.
+  - Group by reads Video, and Status has Values.
+  - axe is clean, and Columns opens the same drawer.
+- **Hiding and ＋**: Source off hides it, ＋ brings it back, and the menu closes.
+- **Group by**
+  - Stage groups the videos, and the choice is saved and kept after a reload (axe is clean).
+  - Video restores the sheet's own order.
+- **Values**: the sheet's words are prefilled, and "cutting" for D-In Progress is saved.
+- **Typing a word**: "Cutting" moves a clip to D-In Progress, the pill shows the word, and undo moves it back.
+- **Arabic and phone**: axe is clean in Arabic, and on a phone the drawer is a bottom sheet.
+- No page errors.
