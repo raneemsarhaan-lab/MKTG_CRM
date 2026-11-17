@@ -17,7 +17,7 @@ import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
 import { mergeStyle, validateStyle } from '@/lib/sheet-format'
-import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SortKey, TabColor, ViewWrite } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SortKey, TabColor, ViewWrite } from '@/types/index'
 import { RULE_KINDS, TAB_COLORS } from '@/types/index'
 import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
 import { cleanMap } from '@/lib/sheet-links'
@@ -246,7 +246,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     prisma.sheetRule.findMany({ where: { sheet_id: sheetId }, orderBy: { priority: 'asc' } }),
     prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
   ])
-  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[] }
+  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy }
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
@@ -256,6 +256,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
       ...(stored.filterArea ? { filterArea: stored.filterArea } : {}),
       ...(stored.filter ? { filter: stored.filter } : {}),
       ...(stored.sort ? { sort: stored.sort } : {}),
+      ...(stored.groupBy ? { groupBy: stored.groupBy } : {}),
     },
     threads,
     rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
@@ -317,7 +318,7 @@ function cleanSort(x: unknown): SortKey[] {
 }
 /** The filter area, filter and sort kept in `sheets.view` (null clears one). */
 async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
-  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v)) return
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v)) return
   const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
   const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
   if ('filterArea' in v) {
@@ -327,6 +328,13 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
   }
   if ('filter' in v) { const f = cleanFilter(v.filter); if (Object.keys(f).length) next.filter = f; else delete next.filter }
   if ('sort' in v) { const k = cleanSort(v.sort); if (k.length) next.sort = k; else delete next.sort }
+  // Spec 019: rows grouped by a task's theme, stage, assignee or type, or by a column.
+  if ('groupBy' in v) {
+    const g = v.groupBy as { by?: unknown; col?: unknown } | null | undefined
+    if (g && (g.by === 'theme' || g.by === 'stage' || g.by === 'assignee' || g.by === 'type')) next.groupBy = { by: g.by }
+    else if (g && g.by === 'col' && typeof g.col === 'string' && /^[0-9a-f-]{36}$/i.test(g.col)) next.groupBy = { by: 'col', col: g.col }
+    else delete next.groupBy
+  }
   await tx.sheet.update({ where: { id: sheetId }, data: { view: next as Prisma.InputJsonValue } })
 }
 async function writeRules(tx: Tx, sheetId: string, w: NonNullable<SheetChanges['rules']>) {
@@ -546,6 +554,12 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       const moved = (changes.rowPositions ?? []).filter(r => typeof r.id === 'string' && Number.isFinite(r.position)).slice(0, MAX_ROWS)
       if (moved.length) {
         await tx.$executeRaw`UPDATE sheet_rows s SET position = t.p FROM unnest(${moved.map(r => r.id)}::uuid[], ${moved.map(r => r.position)}::float8[]) AS t(id, p)
+          WHERE s.id = t.id AND s.sheet_id = ${sheetId}::uuid`
+      }
+      // Spec 019: a dragged column's new position.
+      const movedCols = (changes.colPositions ?? []).filter(c => typeof c.id === 'string' && /^[0-9a-f-]{36}$/i.test(c.id) && Number.isFinite(c.position)).slice(0, MAX_COLS)
+      if (movedCols.length) {
+        await tx.$executeRaw`UPDATE sheet_cols s SET position = t.p FROM unnest(${movedCols.map(c => c.id)}::uuid[], ${movedCols.map(c => c.position)}::float8[]) AS t(id, p)
           WHERE s.id = t.id AND s.sheet_id = ${sheetId}::uuid`
       }
       if (changes.rules) await writeRules(tx, sheetId, changes.rules)

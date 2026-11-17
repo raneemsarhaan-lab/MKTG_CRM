@@ -13,7 +13,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import type { LinkedTask, SheetTaskMap, StageId, TaskField, TaskFieldResult, TaskFieldValues, TaskFieldWrite } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { matchMember, matchPriority, matchStage, readDay, taskLink } from '@/lib/sheet-links'
+import { cleanMap, matchMember, matchPriority, matchStage, readDay, taskLink, wordValue } from '@/lib/sheet-links'
 import { linkedTasks, resolveCells, snapshotOf, teamColumns } from '@/lib/sheet-links-server'
 import { createTask, setTaskStage, updateTask } from './tasks'
 import { setPieceLink, updatePiece } from './content'
@@ -105,15 +105,15 @@ const LINK_ROLE = { 'link:doc': 'working_doc', 'link:design': 'design' } as cons
 const stageList = () => (Object.keys(STAGE_META) as StageId[]).map(id => ({ id, names: [STAGE_META[id].label_en, STAGE_META[id].label_ar] }))
 
 /** One mapped cell to its task, through the board's own action. Null = saved; otherwise the reason. */
-async function writeOne(taskId: string, field: TaskField, raw: string, ctx: { members: { id: string; name: string }[]; themes: { id: string; name: string }[]; types: string[] }): Promise<{ error?: string; celebrate?: boolean }> {
+async function writeOne(taskId: string, field: TaskField, raw: string, ctx: { members: { id: string; name: string }[]; themes: { id: string; name: string }[]; types: string[]; words?: SheetTaskMap['words'] }): Promise<{ error?: string; celebrate?: boolean }> {
   const v = raw.trim()
   const r = (x: { success: boolean; error?: string }) => (x.success ? {} : { error: x.error ?? 'generic' })
   switch (field) {
     case 'title': return v ? r(await updateTask(taskId, { name: v })) : { error: 'bad_value' }
-    case 'due': { const d = readDay(v); return d ? r(await updateTask(taskId, { due_date: d })) : { error: 'bad_date' } }
-    case 'priority': { const p = matchPriority(v); return p ? r(await updateTask(taskId, { priority: p })) : { error: 'bad_value' } }
+    case 'due': { if (!v.trim()) return r(await updateTask(taskId, { due_date: null })); const d = readDay(v); return d ? r(await updateTask(taskId, { due_date: d })) : { error: 'bad_date' } }
+    case 'priority': { const p = matchPriority(v, ctx.words?.priority); return p ? r(await updateTask(taskId, { priority: p })) : { error: 'bad_value' } }
     case 'platform': return r(await updateTask(taskId, { platform: v }))
-    case 'type': { const t = ctx.types.find(x => x.toLowerCase() === v.toLowerCase()); return v && !t ? { error: 'bad_value' } : r(await updateTask(taskId, { content_type_label: t ?? '' })) }
+    case 'type': { const w = wordValue(v, ctx.words?.type); const t = ctx.types.find(x => x.toLowerCase() === (w ?? v).toLowerCase()); return v && !t ? { error: 'bad_value' } : r(await updateTask(taskId, { content_type_label: t ?? '' })) }
     case 'assignee': case 'owner': {
       if (!v) return field === 'owner' ? { error: 'bad_value' } : r(await updateTask(taskId, { assignee_id: null }))
       const m = matchMember(v, ctx.members)
@@ -122,7 +122,7 @@ async function writeOne(taskId: string, field: TaskField, raw: string, ctx: { me
       return r(await updateTask(taskId, field === 'owner' ? { task_owner_id: m.id } : { assignee_id: m.id }))
     }
     case 'stage': {
-      const id = matchStage(v, stageList())
+      const id = matchStage(v, stageList(), ctx.words?.stage)
       if (!id) return { error: 'bad_stage' }
       const res = await setTaskStage(taskId, id as StageId)
       return res.success ? { celebrate: res.shouldCelebrate } : { error: res.error === 'not_authorized' ? 'not_allowed_move' : res.error ?? 'generic' }
@@ -152,9 +152,15 @@ async function writeOne(taskId: string, field: TaskField, raw: string, ctx: { me
  * a refusal never stops the rest. Saved writes keep a snapshot in the sheet
  * cell (R7), so unmapping or a deleted task leaves the last value.
  */
-export async function writeTaskFields(sheetId: string, writes: TaskFieldWrite[]): Promise<{ success: true; results: TaskFieldResult[]; tasks: Record<string, LinkedTask> } | Fail> {
+export async function writeTaskFields(sheetId: string, writes: TaskFieldWrite[], mapNow?: SheetTaskMap | null): Promise<{ success: true; results: TaskFieldResult[]; tasks: Record<string, LinkedTask> } | Fail> {
   const s = await sheetFor(sheetId)
   if (!s.ok) return fail(s.error)
+  // Spec 019: the sheet's mapping as the screen has it (a field just added, words just saved) may not have reached the server yet.
+  if (mapNow) {
+    const [colRows, team] = await Promise.all([prisma.sheetCol.findMany({ where: { sheet_id: sheetId }, select: { id: true } }), teamColumns()])
+    const clean = cleanMap(mapNow, new Set(colRows.map(c => c.id)), new Set(team.map(c => c.id)))
+    if (clean) s.map = clean
+  }
   if (!s.map) return fail('not_linked')
   const list = (Array.isArray(writes) ? writes : []).filter(w => w && isId(w.rowId) && typeof w.field === 'string')
   if (list.length > MAX_WRITES) return fail('too_many')
@@ -182,9 +188,11 @@ export async function writeTaskFields(sheetId: string, writes: TaskFieldWrite[])
     if (t.dropped && field !== 'stage') { results.push({ rowId: w.rowId, field, ok: false, reason: 'dropped' }); continue }
     if (field !== 'stage' && !t.editable) { results.push({ rowId: w.rowId, field, ok: false, reason: 'not_authorized' }); continue }
     if ((t.values[field] ?? '') === value.trim()) { results.push({ rowId: w.rowId, field, ok: true, shown: value.trim() }); continue }
-    const out = await writeOne(taskId, field, value, { members, themes, types })
+    // Spec 019: a stage named by this sheet's word, already the task's stage, is no change.
+    if (field === 'stage' && matchStage(value, stageList(), s.map.words?.stage) === t.stage) { results.push({ rowId: w.rowId, field, ok: true }); continue }
+    const out = await writeOne(taskId, field, value, { members, themes, types, words: s.map.words })
     if (out.error) { results.push({ rowId: w.rowId, field, ok: false, reason: out.error }); continue }
-    const stageLabel = field === 'stage' ? STAGE_META[matchStage(value, stageList()) as StageId]?.label_en : undefined
+    const stageLabel = field === 'stage' ? STAGE_META[matchStage(value, stageList(), s.map.words?.stage) as StageId]?.label_en : undefined
     results.push({ rowId: w.rowId, field, ok: true, celebrate: out.celebrate, stageLabel })
   }
   const after = await linkedTasks(Object.keys(before), s.map, s.m)
@@ -284,15 +292,34 @@ export async function searchTasks(query: string, filters: { stage?: string; pers
 }
 
 /** What Add tasks… and the mapping dialog offer: projects, people and the team columns. */
-export async function linkChoices(): Promise<{ success: true; projects: { id: string; name: string }[]; people: { id: string; name: string }[]; teamCols: { id: string; name: string; sheet: string }[]; canCreate: boolean } | Fail> {
+export interface LinkChoices {
+  success: true
+  projects: { id: string; name: string; isTheme: boolean }[]
+  /** Spec 019: colour and photo for the people picker; the workspace's content types; each theme's pillars. */
+  people: { id: string; name: string; color: string | null; avatar: string | null }[]
+  types: string[]
+  pillars: { id: string; name: string; projectId: string }[]
+  teamCols: { id: string; name: string; sheet: string }[]
+  canCreate: boolean
+}
+export async function linkChoices(): Promise<LinkChoices | Fail> {
   const m = await getSessionMember()
   if (!m) return fail('not_authenticated')
-  const [projects, people, teamCols] = await Promise.all([
-    prisma.project.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    prisma.member.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  const [projects, people, teamCols, types, pillars] = await Promise.all([
+    prisma.project.findMany({ select: { id: true, name: true, is_theme: true }, orderBy: { name: 'asc' } }),
+    prisma.member.findMany({ select: { id: true, name: true, color: true, avatar_url: true }, orderBy: { name: 'asc' } }),
     teamColumns(),
+    prisma.contentType.findMany({ select: { label: true }, orderBy: { label: 'asc' } }),
+    prisma.contentPillar.findMany({ select: { id: true, name: true, project_id: true }, orderBy: { name: 'asc' } }),
   ])
-  return { success: true, projects, people, teamCols, canCreate: m.access !== 'user' }
+  return {
+    success: true,
+    projects: projects.map(p => ({ id: p.id, name: p.name, isTheme: p.is_theme })),
+    people: people.map(p => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar_url })),
+    types: types.map(t => t.label),
+    pillars: pillars.map(p => ({ id: p.id, name: p.name, projectId: p.project_id })),
+    teamCols, canCreate: m.access !== 'user',
+  }
 }
 
 /**

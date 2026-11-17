@@ -141,6 +141,10 @@ export interface GridModel<R extends { key: string }> {
   onAreasNotice?(key: AreasNotice): void
   /** Spec 017: Add to selection (Shift+F8) turned on or off. */
   onAddMode?(on: boolean): void
+  /** Spec 019: a heading after the last column (the ＋ that adds a field or a column). */
+  tailHeader?: ReactNode
+  /** Spec 019: a group heading drawn above a row (rows grouped by theme, stage…), or null. */
+  rowBand?(row: R, index: number): ReactNode | null
   /** Row-number labels, when they aren't 1, 2, 3 (the linked sheets show clip numbers). */
   rowLabel?(row: R, index: number): ReactNode
 
@@ -183,6 +187,8 @@ export const cellKey = (rowKey: string, col: GridCol) => `${rowKey}|${col}`
 export const ROW_H = 24
 /** Rows beyond which only the visible part is rendered (R7). */
 const WINDOW_AT = 150
+/** Spec 019: a group heading's height. */
+const BAND_H = 30
 const OVERSCAN = 10
 
 type Editing = { key: string; col: GridCol; value: string; select?: boolean; caret?: number }
@@ -224,7 +230,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const [dropBefore, setDropBefore] = useState<GridCol | null>(null)
   const widthOf = (c: GridCol) => (liveWidth?.col === c ? liveWidth.width : m.widths[c])
   const allCols: GridCol[] = ['rowNo', ...m.cols]
-  const template = `${m.rowNoWidth}px ${m.cols.map(c => `${widthOf(c)}px`).join(' ')}`
+  const template = `${m.rowNoWidth}px ${m.cols.map(c => `${widthOf(c)}px`).join(' ')}${m.tailHeader ? ' 40px' : ''}`
   const heightOf = (row: R) => (liveHeight?.key === row.key ? liveHeight.height : m.rowHeight?.(row) ?? null)
 
   /** Double-click on a column edge: fit the widest rendered cell (R5). */
@@ -386,7 +392,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (!windowed) return null
     const t = new Array<number>(m.rows.length + 1)
     t[0] = 0
-    for (let i = 0; i < m.rows.length; i++) t[i + 1] = t[i] + (heightOf(m.rows[i]) ?? ROW_H)
+    for (let i = 0; i < m.rows.length; i++) t[i + 1] = t[i] + (heightOf(m.rows[i]) ?? ROW_H) + (m.rowBand?.(m.rows[i], i) ? BAND_H : 0)
     return t
   }, [windowed, m.rows, liveHeight]) // eslint-disable-line react-hooks/exhaustive-deps
   const [view, setView] = useState({ top: 0, height: 800 })
@@ -978,6 +984,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             </div>
           )
         })}
+        {m.tailHeader && (
+          <div role="columnheader" className={`fx-sheet-th is-tail${dropBefore === '\u0000end' && dragCol ? ' is-drop-before' : ''}`} data-tail-head=""
+               onDragOver={m.onReorder && dragCol ? e => { e.preventDefault(); if (dropBefore !== '\u0000end') setDropBefore('\u0000end') } : undefined}
+               onDrop={m.onReorder && dragCol ? e => { e.preventDefault(); const from = dragCol; setDragCol(null); setDropBefore(null); m.onReorder?.(from, null) } : undefined}>
+            {m.tailHeader}
+          </div>
+        )}
       </div>
       {items.map(item => {
         if ('spacer' in item) return <div key={item.key} className="fx-sheet-spacer" aria-hidden="true" style={{ height: item.spacer }} />
@@ -999,6 +1012,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             data-task={rp.taskId}
             style={{ ...(h ? { ['--row-h' as string]: `${h}px` } : {}), ...(i < F ? { position: 'sticky', top: frozenTop[i], zIndex: 3 } : {}) }}
           >
+            {(() => { const band = m.rowBand?.(row, i); return band ? <div className="fx-sheet-band" role="presentation" data-band="">{band}</div> : null })()}
             {own.map((col, ci) => {
               const key = cellKey(row.key, col)
               const isActive = active?.key === row.key && active.col === col
@@ -1166,6 +1180,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                 </div>
               )
             })}
+            {m.tailHeader && <div className="fx-sheet-td is-tail" aria-hidden="true" />}
           </div>
         )
       })}

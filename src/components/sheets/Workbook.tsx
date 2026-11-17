@@ -30,6 +30,7 @@ import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatSta
 import { FindPanel, PasteSpecialDialog, readClipboard } from './format/EditTools'
 import { ManageRulesDialog, RuleDialog, SortDialog } from './format/StyleTools'
 import { LINKS_STATE, openLinks, replayTaskFields, type LinksState } from './links/useTaskLinks'
+import { openFields } from './links/FieldsPanel'
 import type { TaskFieldsChange } from '@/lib/sheet-undo'
 import type { CellStyle, RuleKind } from '@/types/index'
 import { FormatToolbar, formatShortcut } from './format/FormatToolbar'
@@ -582,6 +583,12 @@ export function Workbook(p: WorkbookProps) {
       {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
       {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
       {openBlank && doc && (
+        <button type="button" className="fx-sh-ib is-text" data-fields-btn="" title={t('fields.title')} onClick={() => openFields()}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
+          <span className={phone ? 'sr-only' : undefined}>{t('fields.button')}</span>
+        </button>
+      )}
+      {openBlank && doc && (
         <button type="button" className="fx-sh-ib is-text" data-board-menu="" aria-haspopup="menu" aria-expanded={!!boardMenu}
                 title={tl('boardTip')} onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(), x = getComputedStyle(el).direction === 'rtl' ? r.left : r.right; setBoardMenu(m => (m ? null : { x, y: r.bottom + 4, el })) }}>
           {tl('board')} <span aria-hidden="true">▾</span>
@@ -649,7 +656,8 @@ export function Workbook(p: WorkbookProps) {
           onUndo={() => (openBlank ? doUndo() : linkedUndo('undo'))} onRedo={() => (openBlank ? doRedo() : linkedUndo('redo'))}
           canUndo={openBlank ? !!stack && canUndo(stack) : linkedHist.canUndo} canRedo={openBlank ? !!stack && canRedo(stack) : linkedHist.canRedo}
           onFileMenu={(el, at) => { if (openId) tabMenuFor(openId, at, el) }}
-          onBoardMenu={openBlank && doc ? (el, at) => setBoardMenu({ x: at.x, y: at.y, el }) : undefined} />
+          onBoardMenu={openBlank && doc ? (el, at) => setBoardMenu({ x: at.x, y: at.y, el }) : undefined}
+          onFields={openBlank && doc ? () => openFields() : undefined} />
       )}
       {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 

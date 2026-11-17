@@ -203,7 +203,7 @@ export interface TaskPatch {
   task_owner_id?:      string
   /** Null hands the task back to nobody. */
   assignee_id?:        string | null
-  due_date?:           string   // ISO yyyy-mm-dd
+  due_date?:           string | null   // ISO yyyy-mm-dd; null or '' clears it
   hours_estimate?:     number
   priority?:           'Low' | 'Medium' | 'High'
   cover_image_url?:    string
@@ -242,7 +242,8 @@ export async function updateTask(
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
   if (patch.priority !== undefined)           data.priority           = patch.priority
 
-  if (patch.due_date !== undefined) {
+  if (patch.due_date === null || patch.due_date === '') data.due_date = null
+  else if (patch.due_date !== undefined) {
     const d = new Date(patch.due_date)
     if (Number.isNaN(d.getTime())) return { success: false, error: 'Invalid due date' }
     data.due_date = d
@@ -780,7 +781,8 @@ export async function bulkUpdateTasks(
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
     if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
     if (patch.priority !== undefined)           data.priority           = patch.priority
-    if (patch.due_date !== undefined) {
+    if (patch.due_date === null || patch.due_date === '') data.due_date = null
+    else if (patch.due_date !== undefined) {
       const d = new Date(patch.due_date)
       if (Number.isNaN(d.getTime())) { refused++; continue }
       data.due_date = d
