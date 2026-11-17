@@ -750,8 +750,8 @@ export function BlankSheet(p: BlankSheetProps) {
       // The Content look: the theme in the Content sheet's band, its pillar under it.
       if (content) {
         return <span className="fx-cband" data-band-name={b.main ?? b.sub ?? ''}>
-          {b.main && <span className={`fx-cband-main${b.theme ? ' is-theme' : ''}`} data-band-theme={b.main}><b>{b.main}</b><span className="fx-sheet-muted"> · {b.theme ? b.themeN ?? b.n : b.n}</span></span>}
-          {b.sub && <span className="fx-cband-sub">{b.sub}<span className="fx-sheet-muted"> · {b.n}</span></span>}
+          {b.main && <span className={`fx-cband-main${b.theme ? ' is-theme' : ''}`} data-band-theme={b.main}><span className="fx-cband-label"><b>{b.main}</b><span className="fx-sheet-muted"> · {b.theme ? b.themeN ?? b.n : b.n}</span></span></span>}
+          {b.sub && <span className="fx-cband-sub"><span className="fx-cband-label">{b.sub}<span className="fx-sheet-muted"> · {b.n}</span></span></span>}
         </span>
       }
       return <span className={`fx-band${b.main ? '' : ' is-sub'}`} data-band-name={b.main ?? b.sub ?? ''}>
