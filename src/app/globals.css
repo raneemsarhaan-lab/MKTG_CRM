@@ -2882,3 +2882,4 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-lk-create { margin-inline-start: auto; flex: none; border: 1px solid var(--inbox-border); background: var(--inbox-panel); color: var(--sh-linked-ink); border-radius: 999px; padding: 1px 9px; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
 .fx-lk-create:hover { background: var(--inbox-purple-soft, #F0EBFE); }
 .fx-fd-ic[data-ic]::before { content: attr(data-ic); }
+.fx-lk-create.is-icon { width: 20px; height: 20px; padding: 0; display: inline-grid; place-items: center; font-size: 13px; line-height: 1; }

@@ -593,8 +593,8 @@ export function BlankSheet(p: BlankSheetProps) {
         return <>
           <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{tk && taskIdFrom(v) ? tk.name : v}</span>
           {note === 'notLinked' && lk.canCreate && !ro
-            ? <button type="button" className="fx-lk-create" data-create-task={row.id} tabIndex={-1}
-                      onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋ {tf('createTask')}</button>
+            ? <button type="button" className="fx-lk-create is-icon" data-create-task={row.id} tabIndex={-1} aria-label={tf('createTask')} title={tf('createTask')}
+                      onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋</button>
             : note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
                            onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); if (note !== 'dropped') void lk.openChoose(row.id) }}>
             {note === 'choose' ? tl('notes.choose', { n: 2 }) : tl(`notes.${note}`)}</button>}
