@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
+  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -146,8 +146,30 @@ export function useSheetColumns(o: UseSheetColumns) {
     if (c.kind) {
       items.push({ key: 'edit', group: '   ', text: t('edit'), label: t('edit'), onSelect: () => setPopup({ kind: 'editor', anchor, col: c }) })
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => setPopup({ kind: 'delete', anchor, col: c }) })
+    } else if (!title) {
+      items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => void removeBuiltIn(key) })
     }
     setPopup({ kind: 'menu', anchor, label: t('menuFor', { name: nameOf(key) || o.defaultName(key) }), items })
+  }
+
+  /**
+   * Delete a built-in column (Source, File name…): it leaves the sheet in
+   * every set. Its values are the tasks' and stay on the board; Undo, ＋ or
+   * ⚙ Fields bring it back.
+   */
+  async function removeBuiltIn(key: string) {
+    const c = byKey.get(key)
+    if (!c || key === 'title') return
+    close(false)
+    const was = c.record && !c.record.shownDefault ? c.record.shownIn : defaultShownIn(sheet, key)
+    for (const s of SHEET_SETS[sheet]) {
+      const r = await api.setShown(sheet, key, s, false)
+      if (!r.success) { o.say(err(r.error)); return }
+    }
+    const name = nameOf(key) || o.defaultName(key)
+    o.say(t('removed', { name }), () => {
+      void (async () => { for (const s of was) await api.setShown(sheet, key, s, true); o.say(t('shownCol', { name })) })()
+    })
   }
 
   async function remove(c: LaidColumn) {
@@ -301,11 +323,13 @@ export function useSheetColumns(o: UseSheetColumns) {
       if (laid.filter(c => c.kind).length >= MAX_CUSTOM_COLUMNS) { o.say(t('err.limit')); return }
       setPopup({ kind: 'editor', anchor, rel: at === 'title' ? 'after' : rel, at })
     },
-    /** Only the team's own columns can be deleted. */
+    /** Every column but Title can be deleted: a team column with its values; a built-in one leaves the sheet (spec 019). */
     isTeamColumn: (key: string) => !!byKey.get(key)?.kind,
+    canDelete: (key: string) => key !== 'title' && byKey.has(key),
     deleteColumn: (key: string, anchor: HTMLElement) => {
       const c = byKey.get(key)
       if (c?.kind) setPopup({ kind: 'delete', anchor, col: c })
+      else if (c) void removeBuiltIn(key)
     },
   }
   const header = (key: string) => {

@@ -85,6 +85,23 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
     await page.waitForSelector('[data-video-sheet] [data-col-head="source"]', { timeout: 15000 }).catch(() => {})
     ok(await head(page, 'source').count() === 1 && await page.locator('[data-sheet-menu]').count() === 0, '＋ → Source shows it again, and the menu closes')
 
+    console.log('3b. Delete a built-in column (it leaves the sheet in every set), and Undo')
+    await page.keyboard.press('Escape').catch(() => {})
+    await head(page, 'source').click({ button: 'right' })
+    await page.waitForSelector('[data-cell-menu] [data-item="deleteCol"]')
+    ok(await page.locator('[data-cell-menu] [data-item="deleteCol"][aria-disabled="true"]').count() === 0, 'Delete column is offered for Source')
+    await page.click('[data-cell-menu] [data-item="deleteCol"]')
+    await page.waitForFunction(() => !document.querySelector('[data-video-sheet] [data-col-head="source"]'), null, { timeout: 15000 }).catch(() => {})
+    ok(await head(page, 'source').count() === 0, 'Source is gone from the sheet')
+    ok(JSON.stringify(JSON.parse(sql(`select coalesce(row_to_json(c)::text,'{}') from sheet_columns c where sheet='video' and key='source'`)).shown_in ?? null) === '[]', 'in every set')
+    await page.click('[data-sheet-toast] button'); 
+    await page.waitForSelector('[data-video-sheet] [data-col-head="source"]', { timeout: 15000 }).catch(() => {})
+    ok(await head(page, 'source').count() === 1, 'Undo brings it back')
+    await page.locator('[data-video-sheet] [data-col-head="title"]').click({ button: 'right' })
+    await page.waitForSelector('[data-cell-menu] [data-item="deleteCol"]')
+    ok(await page.locator('[data-cell-menu] [data-item="deleteCol"][aria-disabled="true"]').count() === 1, 'Title can’t be deleted')
+    await page.keyboard.press('Escape')
+
     console.log('4. Group by')
     await drawer(page)
     await page.selectOption('[data-group-by]', 'stage')

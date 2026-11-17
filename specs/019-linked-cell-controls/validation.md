@@ -237,3 +237,12 @@ The links and fields labs seed their sheets with `look: grid`, so their spreadsh
 - **＋ Theme.** The bar has **＋ Theme** for admins (the board's own `addTheme`). The Theme field offers the new theme at once.
 - **Lab.** realapp fields passes 78/78 (3 new checks: a task with no theme sits first under no band; there's no "No theme" band; ＋ Theme creates a theme).
 - **Component lab.** lab:sheet passes 150/150. Shift+Tab from Source now lands on Status, since Status takes typed words in stage 3.
+
+## Deleting columns on the Video and Content sheets
+
+- **Every column but Title can be deleted** from the right-click menu or the heading's ▾.
+  - The team's own columns are deleted with their values, with Undo, as before.
+  - A built-in column (Source, File name, In, Out…) leaves the sheet in every set. Its values belong to the tasks and stay on the board. Undo in the toast, ＋ or ⚙ Fields bring it back.
+- **Labs.**
+  - video-fields passes 29/29 (5 new checks: Delete offered for Source; Source gone in every set; Undo; Title can't be deleted).
+  - run passes 56/56 (the old "pipeline columns can't be deleted" check now expects Delete column to be offered).
