@@ -22,7 +22,7 @@ All additions are optional. Existing rows read as before.
 
 ## Changed: `sheet_tables` (tips 73, 79)
 
-- **New column:** `totals jsonb NULL`, a map `{ [colId]: 'sum' | 'avg' | 'count' | 'min' | 'max' | 'none' }`.
+- **New column:** `totals jsonb NULL`, a map `{ [colId]: 'sum' | 'avg' | 'count' | 'countNums' | 'min' | 'max' | 'none' }` (Excel's Total row choices).
 - **Null:** no Total row.
 
 ## Changed: `workspace_settings` (tip 17)
@@ -35,7 +35,7 @@ All additions are optional. Existing rows read as before.
 
 - **`outline`**: `{ kind: 'rows' | 'cols'; from: id; to: id; level: 1–8; collapsed: boolean }[]`, at most 200.
 - **`slicers`**: `{ id: string; tableId: string; col: string }[]`, at most 20.
-- **`filter[col]`** gains an optional `advanced` form: `{ groups: { col: string; op: RuleOp; value: string }[][]; unique?: boolean }`. Within a group the conditions are joined with AND; the groups are joined with OR.
+- **`advanced`** (stage B, as built): `{ top, left, bottom, right: id; groups: { col: id; op: 'eq' | 'ne' | 'gt' | 'lt' | 'ge' | 'le' | 'begins'; value: string }[][]; unique?: boolean }`. It is the Advanced Filter in place over its list range, read from Excel's criteria range (approved design power-tips-b). Within a group the conditions are joined with AND; the groups are joined with OR. It is kept beside `filter`, not inside a column's filter, because it spans the list's columns. Null clears it.
 
 ## Changed: formats (`CellStyle`, `NumberFormat`) (tips 23–26, 95)
 
@@ -45,8 +45,8 @@ All additions are optional. Existing rows read as before.
 
 ## Changed: conditional rules (`ConditionalRule`) (tips 27–28)
 
-- **`RULE_KINDS`** gains `'icons'`, with `args.set: 'arrows3' | 'flags3' | 'lights3'` and `args.cuts: [number, number]` (percent or number via `args.by`).
-- **`args.row?: boolean`**: apply the look to the whole row (blank sheets).
+- **`RULE_KINDS`** gains `'icons'`, with `args.set: 'arrows3' | 'flags3' | 'lights3'` and `args.cuts: [number, number]` (percent or number via `args.by`), plus `args.reverse` and `args.iconOnly`.
+- **`args.row?: boolean`** with **`args.col`** (the column tested): apply the look to the whole row of the range (blank sheets).
 
 ## Kept in the browser (per member, not shared)
 

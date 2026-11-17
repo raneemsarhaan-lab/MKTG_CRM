@@ -11,14 +11,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { BorderSide, CellStyle, NumberFormat, RuleKind } from '@/types/index'
-import { CURRENCIES } from '@/types/index'
+import { CURRENCIES, ICON_SETS } from '@/types/index'
 import { DEFAULT_FONT, DEFAULT_SIZE, FONTS, FONT_SIZES, bumpDecimals, display, type BorderPreset, type StylePatch } from '@/lib/sheet-format'
 import { PopMenu, type PopItem } from '../PopMenu'
-import { askComment, sendFormat, type ClearWhat, type FormatSource, type FormatState, type MergeMode, type ViewOp } from './bus'
+import { askComment, sendFormat, type ClearWhat, type FormatSource, type FormatState, type MergeMode, type TipKey, type ViewOp } from './bus'
 import { ColorPicker } from './ColorPicker'
 import { BorderPicker } from './BorderPicker'
 import { CellStylesMenu, TableMenu } from './StyleTools'
-import { DEFAULT_BAR, DEFAULT_SCALE } from '@/lib/sheet-rules'
+import { DEFAULT_BAR, DEFAULT_SCALE, ICONS } from '@/lib/sheet-rules'
 
 const P: Record<string, ReactNode> = {
   left: <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />, center: <path d="M4 6h16M7 10h10M4 14h16M7 18h10" />, right: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" />,
@@ -96,6 +96,8 @@ export function useFormatActions(target: FormatSource, state: FormatState | null
 type MenuKey = 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merge' | 'num' | 'cur' | 'paste' | 'fmt' | 'clear' | 'fillDn' | 'find' | 'freeze' | 'cellStyles' | 'table' | 'cond' | 'sort'
   // Spec 018: the strip's ▾ menus, ⋮, and the menu bar's menus.
   | 'align' | 'valign' | 'wrapM' | 'text' | 'more' | 'mb-edit' | 'mb-view' | 'mb-insert' | 'mb-format' | 'mb-data' | 'mb-help'
+  // Spec 020 stage B: Data › Clean up and Change Case, Data › Table, Data › Group, Conditional formatting › Icon Sets.
+  | 'clean' | 'case' | 'tableM' | 'outlineM' | 'icons'
 type Open = { k: MenuKey; el: HTMLElement; at?: { x: number; y: number } } | null
 const MENUBAR = ['file', 'edit', 'view', 'insert', 'format', 'data', 'help'] as const
 type MenuBarKey = typeof MENUBAR[number]
@@ -136,7 +138,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   /** Spec 019: Data › Task fields… opens the sheet's Fields drawer. */
   onFields?(): void
   /** Spec 020: the workbook's dialogs (Go To, Go To Special, Series, Data Validation, Custom Lists). */
-  onTip?(k: 'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists'): void
+  onTip?(k: TipKey): void
 }) {
   const tt = useTranslations('sheets.tips')
   const t = useTranslations('sheets.format')
@@ -207,6 +209,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const lock = off ? { disabled: true, why } : {}
   /** Spec 020: Data Validation is a team-sheet tool (the Content and Video sheets keep the board's own choices). */
   const blankOnly = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
+  /** Spec 020 stage B: Clean up, tables, Advanced Filter and Group are team-sheet tools too. */
+  const cleanOff = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
   const setSize = (n: number) => { if (!off && n >= SIZE_MIN && n <= SIZE_MAX) a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') }
   const stepSize = (d: 1 | -1) => setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, size + d)))
 
@@ -234,10 +238,41 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       ] }
       case 'fmt': return { label: t('ctl.format'), attr: 'data-cells-menu', items: [
         { key: 'rowHeight', label: e('rowHeight'), disabled: !!viewOff, why: viewOff ?? undefined, onSelect: cmd({ kind: 'resize', what: 'row' }) },
+        // Spec 020 tip 60: AutoFit from the menu, for every selected row or column.
+        { key: 'autofitRow', label: tt('size.autofitRow'), disabled: !!viewOff, ...lock, onSelect: cmd({ kind: 'autofit', what: 'row' }) },
         { key: 'colWidth', label: e('colWidth'), disabled: !!viewOff, onSelect: cmd({ kind: 'resize', what: 'col' }) },
+        { key: 'autofitCol', label: tt('size.autofitCol'), disabled: !!viewOff, ...lock, onSelect: cmd({ kind: 'autofit', what: 'col' }) },
         { kind: 'sep', key: 's' },
         vItem('hideRows', 'hideRows'), vItem('hideCols', 'hideCols'), vItem('unhideRows', 'unhideRows'), vItem('unhideCols', 'unhideCols'),
       ] }
+      // ── spec 020 stage B ──
+      case 'clean': return { label: tt('clean.title'), attr: 'data-clean-menu', items: [
+        { key: 'dedupe', label: `${tt('clean.dedupe')}…`, ...lock, ...one(true), ...cleanOff, onSelect: () => onTip?.('dedupe') },
+        { key: 'split', label: `${tt('clean.split')}…`, ...lock, ...one(), ...cleanOff, onSelect: () => onTip?.('split') },
+        { kind: 'sep', key: 's' },
+        { key: 'trim', label: tt('clean.ops.trim'), ...lock, ...cleanOff, onSelect: cmd({ kind: 'clean', op: 'trim' }) },
+        sub('case', tt('clean.case'), 'case', { ...lock, ...cleanOff }),
+        { key: 'toNumber', label: tt('clean.ops.toNumber'), ...lock, ...cleanOff, onSelect: cmd({ kind: 'clean', op: 'toNumber' }) },
+        { key: 'blanks', label: tt('clean.ops.blanks'), ...lock, ...cleanOff, onSelect: cmd({ kind: 'clean', op: 'blanks' }) },
+      ] }
+      case 'case': return { label: tt('clean.case'), attr: 'data-case-menu', items: (['upper', 'lower', 'proper'] as const).map(op => ({ key: op, label: tt(`clean.ops.${op}`), ...lock, ...cleanOff, onSelect: cmd({ kind: 'clean', op }) })) }
+      case 'tableM': {
+        const ti = state?.tableInfo ?? null
+        const noTable = !ti ? { disabled: true, why: tt('table.none') } : {}
+        return { label: tt('table.title'), attr: 'data-table-menu', items: [
+          { key: 'create', label: `${tt('table.create')}…`, kbd: keyName('Ctrl+T'), ...lock, ...one(), ...cleanOff, disabled: !!ti || !!state?.readOnly || !!oneOff || !!state?.cleanOff, onSelect: () => onTip?.('createTable') },
+          { key: 'totalRow', label: tt('table.totalRow'), checked: !!ti?.totals, ...lock, ...cleanOff, ...noTable, onSelect: cmd({ kind: 'totalRow', on: !ti?.totals }) },
+          { key: 'slicers', label: `${tt('table.slicers')}…`, ...lock, ...cleanOff, ...noTable, onSelect: () => onTip?.('slicers') },
+        ] }
+      }
+      case 'outlineM': return { label: tt('outline.title'), attr: 'data-outline-menu', items: [
+        { key: 'group', label: tt('outline.group'), kbd: keyName('Shift+Alt+→'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'group' }) },
+        { key: 'ungroup', label: tt('outline.ungroup'), kbd: keyName('Shift+Alt+←'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'ungroup' }) },
+      ] }
+      case 'icons': return { label: tt('icons.title'), attr: 'data-icons-menu', items: ICON_SETS.map(set => ({
+        key: set, label: `${ICONS[set].map(x => x.glyph).join(' ')}  ${tt(`icons.${set}.name`)}`, ...one(),
+        onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'icons', args: { set }, style: null } }),
+      })) }
       case 'clear': return { label: t('ctl.clear'), attr: 'data-clear-menu', items: (['all', 'formats', 'contents', 'comments'] as ClearWhat[]).map(w => ({
         key: w, label: e(`clear${w[0].toUpperCase()}${w.slice(1)}`), ...(w === 'contents' ? { kbd: 'Delete' } : {}), onSelect: cmd({ kind: 'clear', what: w }),
       })) }
@@ -264,6 +299,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { kind: 'sep', key: 's1' },
         { key: 'bar', label: s3('kinds.bar'), ...one(), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'bar', args: { colors: [DEFAULT_BAR] }, style: null } }) },
         { key: 'scale', label: s3('kinds.scale'), ...one(), onSelect: cmd({ kind: 'ruleNew', rule: { kind: 'scale', args: { colors: DEFAULT_SCALE }, style: null } }) },
+        sub('icons', tt('icons.title'), 'icons', one()),
         { kind: 'sep', key: 's2' },
         { key: 'new', label: `${s3('newRule')}…`, ...one(), onSelect: () => onRule() },
         { key: 'clearSel', label: s3('clearSel'), onSelect: cmd({ kind: 'rulesClear', where: 'selection' }) },
@@ -285,6 +321,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       // ── spec 018 ──
       case 'align': return { label: tb('tips.align'), attr: 'data-align-menu', items: [
         ...(['left', 'center', 'right'] as const).map(h => ({ key: h, label: t(`ctl.align${h[0].toUpperCase()}${h.slice(1)}`), checked: (st.ha ?? null) === h, ...lock, onSelect: () => a.align(h) })),
+        // Spec 020 tip 26: Center Across Selection (team sheets: the text spans the empty cells after it, no merge).
+        { key: 'across', label: t('fc.h.across'), checked: st.ha === 'across', ...lock, onSelect: () => a.patch({ ha: st.ha === 'across' ? null : 'across' }, 'align') },
         { kind: 'sep', key: 's' },
         { key: 'indent', label: tb('indent'), ...lock, onSelect: () => a.indent(1) },
         { key: 'outdent', label: tb('outdent'), ...lock, onSelect: () => a.indent(-1) },
@@ -339,6 +377,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         sub('number', tb('number'), 'num', lock), sub('text', tb('text'), 'text', lock), sub('alignment', tb('alignment'), 'align', lock),
         sub('wrapping', tb('wrapping'), 'wrapM', lock), sub('rotation', tb('rotation'), 'rotate', lock), sub('fontSize', tb('fontSize'), 'size', lock),
         sub('merge', tb('mergeCells'), 'merge', lock),
+        sub('cellSize', tt('size.title'), 'fmt'),
         { kind: 'sep', key: 's1' },
         { key: 'cellStyles', label: tb('cellStyles'), ...lock, onSelect: () => openSub('cellStyles') },
         { key: 'table', label: tb('formatAsTable'), ...(oneOff && !state?.table ? { disabled: true, why: oneOff } : {}), onSelect: () => openSub('table') },
@@ -355,6 +394,12 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: isMac() ? '⌥↓' : 'Alt+↓', ...lock, onSelect: cmd({ kind: 'pickList' }) },
         { key: 'flashFillD', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
         { key: 'lists', label: `${tt('lists.title')}…`, onSelect: () => onTip?.('lists') },
+        // Spec 020 stage B: Clean up, Advanced Filter, Table, Group.
+        { kind: 'sep', key: 'sc' },
+        sub('clean', tt('clean.title'), 'clean', cleanOff),
+        { key: 'advanced', label: `${tt('adv.title')}…`, ...lock, ...cleanOff, onSelect: () => onTip?.('advanced') },
+        sub('tableM', tt('table.title'), 'tableM', cleanOff),
+        sub('outlineM', tt('outline.title'), 'outlineM', cleanOff),
         ...(onFields ? [{ kind: 'sep', key: 'sf' } as PopItem, { key: 'taskFields', label: tb('taskFields'), onSelect: onFields } as PopItem] : []),
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
       ] }
@@ -541,7 +586,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
     return out
   }
   const subOf = (parent: MenuKey, key: string): MenuKey | null => {
-    const map: Record<string, MenuKey> = { pasteSpecial: 'paste', clear: 'clear', freeze: 'freeze', number: 'num', text: 'text', alignment: 'align', wrapping: 'wrapM', rotation: 'rotate', fontSize: 'size', merge: 'merge', cond: 'cond' }
+    const map: Record<string, MenuKey> = { pasteSpecial: 'paste', clear: 'clear', freeze: 'freeze', number: 'num', text: 'text', alignment: 'align', wrapping: 'wrapM', rotation: 'rotate', fontSize: 'size', merge: 'merge', cond: 'cond', clean: 'clean', case: 'case', tableM: 'tableM', outlineM: 'outlineM', icons: 'icons', cellSize: 'fmt' }
     return parent.startsWith('mb-') ? map[key] ?? null : null
   }
 

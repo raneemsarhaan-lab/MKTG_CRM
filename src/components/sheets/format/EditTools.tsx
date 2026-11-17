@@ -10,10 +10,11 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import type { PasteOp } from '@/lib/sheet-clean'
 import type { CellStyle } from '@/types/index'
 import { parseClipboard, toGrid, toStyles } from '@/lib/sheet-clipboard'
 import { Modal } from '../Dialogs'
-import { FIND_RESULT, sendFormat, type FindResult, type FormatSource } from './bus'
+import { FIND_RESULT, sendFormat, type FindResult, type FormatSource, type PasteMode } from './bus'
 
 /** What's on the clipboard, read on a click (the browser asks the first time). Null when it won't say. */
 export async function readClipboard(): Promise<{ grid: string[][]; styles: (CellStyle | null)[][] | null } | null> {
@@ -91,25 +92,58 @@ export function FindPanel({ target, replace: startReplace, onClose }: { target: 
 
 export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSource; onClose(): void; say(text: string): void }) {
   const t = useTranslations('sheets.format.edit')
-  const [mode, setMode] = useState<'all' | 'values' | 'formats'>('values')
+  const tt = useTranslations('sheets.tips')
+  const [mode, setMode] = useState<PasteMode>('values')
+  const [op, setOp] = useState<PasteOp | null>(null)
   const [flip, setFlip] = useState(false)
+  const [skip, setSkip] = useState(false)
+  // Spec 020 (approved design power-tips-b): Excel's whole list; the new choices are team-sheet tools.
+  const linked = target === 'linked'
   async function ok() {
     const clip = await readClipboard()
     onClose()
     if (!clip || !clip.grid.length) { say(t('noClip')); return }
-    sendFormat(target, { kind: 'pasteSpecial', mode, transpose: flip, grid: clip.grid, styles: clip.styles })
+    sendFormat(target, { kind: 'pasteSpecial', mode, transpose: flip, grid: clip.grid, styles: clip.styles, op, skipBlanks: skip })
   }
+  const radio = (m: PasteMode | 'comments' | 'formulas', label: string, off = false, why?: string) => (
+    <label key={m} className={`fx-sh-check${off ? ' is-dis' : ''}`} title={off ? why : undefined}>
+      <input type="radio" name="ps" disabled={off} checked={mode === m} data-ps={m} onChange={() => setMode(m as PasteMode)} />{label}
+    </label>
+  )
+  const opRadio = (o: PasteOp | null, label: string) => (
+    <label key={o ?? 'none'} className={`fx-sh-check${linked && o ? ' is-dis' : ''}`} title={linked && o ? tt('blankOnly') : undefined}>
+      <input type="radio" name="psop" disabled={linked && !!o} checked={op === o} data-ps-op={o ?? 'none'} onChange={() => setOp(o)} />{label}
+    </label>
+  )
   return (
     <Modal title={t('psTitle')} body={t('psBody')} onCancel={onClose} attr="data-paste-special">
-      <div className="fx-fc-lb" role="radiogroup" aria-label={t('psTitle')}>
-        {(['all', 'values', 'formats'] as const).map(m => (
-          <label key={m} className="fx-fc-chk fx-ps-opt"><input type="radio" name="ps" checked={mode === m} data-ps={m} onChange={() => setMode(m)} />{t(m === 'all' ? 'psAll' : m === 'values' ? 'psValues' : 'psFormats')}</label>
-        ))}
-        <label className="fx-fc-chk fx-ps-opt is-off" title={t('psCommentsWhy')}><input type="radio" name="ps" disabled />{t('psComments')}</label>
-        <small className="fx-fc-hint fx-ps-why">{t('psCommentsWhy')}</small>
+      <div className="fx-tip-cap">{tt('ps.paste')}</div>
+      <div className="fx-tip-grid2" role="radiogroup" aria-label={tt('ps.paste')}>
+        <div className="fx-tip-col">
+          {radio('all', t('psAll'))}
+          {radio('formulas', tt('ps.formulas'), true, tt('ps.formulasWhy'))}
+          {radio('values', t('psValues'))}
+          {radio('formats', t('psFormats'))}
+        </div>
+        <div className="fx-tip-col">
+          {radio('comments', t('psComments'), true, t('psCommentsWhy'))}
+          {radio('validation', tt('ps.validation'), linked, tt('blankOnly'))}
+          {radio('noBorders', tt('ps.noBorders'), linked, tt('blankOnly'))}
+          {radio('widths', tt('ps.widths'), linked, tt('blankOnly'))}
+        </div>
       </div>
-      <label className="fx-fc-chk"><input type="checkbox" checked={flip} data-ps-transpose="" onChange={e => setFlip(e.target.checked)} />{t('transpose')}</label>
+      <div className="fx-tip-cap">{tt('ps.operation')}</div>
+      <div className="fx-tip-grid2" role="radiogroup" aria-label={tt('ps.operation')}>
+        <div className="fx-tip-col">{opRadio(null, tt('ps.none'))}{opRadio('add', tt('ps.add'))}{opRadio('sub', tt('ps.sub'))}</div>
+        <div className="fx-tip-col">{opRadio('mul', tt('ps.mul'))}{opRadio('div', tt('ps.div'))}</div>
+      </div>
+      <div className="fx-tip-grid2">
+        <label className={`fx-sh-check${linked ? ' is-dis' : ''}`}><input type="checkbox" checked={skip} disabled={linked} data-ps-skip="" onChange={e => setSkip(e.target.checked)} />{tt('ps.skipBlanks')}</label>
+        <label className="fx-sh-check"><input type="checkbox" checked={flip} data-ps-transpose="" onChange={e => setFlip(e.target.checked)} />{t('transpose')}</label>
+      </div>
       <div className="fx-sh-dialog-row">
+        <button type="button" disabled title={tt('ps.formulasWhy')}>{tt('ps.link')}</button>
+        <span className="fx-sh-dialog-sp" />
         <button type="button" onClick={onClose}>{t('cancel')}</button>
         <button type="button" className="is-go" data-ok="" onClick={() => void ok()}>{t('ok')}</button>
       </div>

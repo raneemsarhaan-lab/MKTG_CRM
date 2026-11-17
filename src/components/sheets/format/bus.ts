@@ -13,9 +13,10 @@
  *   one undo step, and saves it.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { BorderSide, CellStyle, ColFilter, ConditionalRule, SortKey, ValidationRule } from '@/types/index'
+import type { BorderSide, CellStyle, ColFilter, ConditionalRule, SortKey, TotalFn, ValidationRule } from '@/types/index'
 import type { BorderPreset, StylePatch } from '@/lib/sheet-format'
 import type { SeriesSpec } from '@/lib/sheet-fill'
+import type { PasteOp, SplitOpts } from '@/lib/sheet-clean'
 import type { GoSpecial } from '@/lib/sheet-selection'
 
 export const FORMAT_STATE = 'momentum:format-state'
@@ -72,8 +73,24 @@ export interface FormatState {
   /** Spec 020: the Go To Special choices this sheet answers; the selection's values (Custom Lists › Import). */
   goSpecial?: GoSpecial[]
   selValues?: string[]
+  /** Spec 020 stage B: the block around the active cell ("A1:D6"), the selection's first column's values (Text to Columns' preview), and the table's Total row and columns. */
+  region?: string
+  splitValues?: string[]
+  tableInfo?: { totals: boolean; cols: { key: string; name: string }[] } | null
+  /** Remove Duplicates' columns (named by the headings when there are some) and whether the first row reads as headings. */
+  dedupe?: { header: boolean; cols: { key: string; name: string }[] }
+  /** Why Clean up and the other team-sheet tools are off here (linked sheets), or null. */
+  cleanOff?: string | null
+  /** Rows or columns in an outline group; the Advanced Filter is on in place. */
+  outline?: boolean
+  advancedOn?: boolean
 }
 
+export type PasteMode = 'all' | 'values' | 'formats' | 'noBorders' | 'validation' | 'widths'
+export type CleanOp = 'trim' | 'upper' | 'lower' | 'proper' | 'toNumber' | 'blanks'
+export type SplitFormat = 'general' | 'text' | 'date' | 'skip'
+/** The dialogs the toolbar asks the workbook to open. */
+export type TipKey = 'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists' | 'dedupe' | 'split' | 'createTable' | 'slicers' | 'advanced'
 export type MergeMode = 'center' | 'across' | 'cells' | 'unmerge'
 export type ViewOp = 'hideRows' | 'hideCols' | 'unhideRows' | 'unhideCols' | 'freezeTop' | 'freezeFirst' | 'freezeHere' | 'unfreeze'
 export type ClearWhat = 'all' | 'formats' | 'contents' | 'comments'
@@ -89,7 +106,7 @@ export type FormatCmd =
   | { kind: 'paint'; style: CellStyle | null }
   | { kind: 'clear'; what: ClearWhat }
   | { kind: 'fill'; dir: 'down' | 'right' }
-  | { kind: 'pasteSpecial'; mode: 'all' | 'values' | 'formats'; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null }
+  | { kind: 'pasteSpecial'; mode: PasteMode; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null; op?: PasteOp | null; skipBlanks?: boolean }
   | { kind: 'find'; q: FindQuery; dir: 1 | -1 }
   | { kind: 'replace'; q: FindQuery; by: string; all: boolean }
   // Stage 3: Styles, Sort & Filter (FR-030–FR-032, FR-045, FR-046).
@@ -113,6 +130,20 @@ export type FormatCmd =
   | { kind: 'flashFill' }
   | { kind: 'repeat' }
   | { kind: 'pickList' }
+  // Spec 020 stage B (approved design power-tips-b): cell size, Clean up, tables, slicers, Advanced Filter, groups.
+  | { kind: 'autofit'; what: 'row' | 'col' }
+  /** Work out the block around the cell now (a dialog that needs it is opening). */
+  | { kind: 'scope' }
+  | { kind: 'clean'; op: CleanOp }
+  | { kind: 'dedupe'; cols: string[]; header: boolean }
+  | { kind: 'split'; opts: SplitOpts; formats: SplitFormat[] }
+  | { kind: 'createTable'; ref: string; header: boolean }
+  | { kind: 'totalRow'; on: boolean }
+  | { kind: 'total'; col: string; fn: TotalFn }
+  | { kind: 'slicers'; cols: string[] }
+  | { kind: 'advanced'; list: string; criteria: string; copy: 'none' | 'sheet' | 'cell'; to?: string; unique: boolean }
+  | { kind: 'advancedClear' }
+  | { kind: 'outline'; op: 'group' | 'ungroup'; what?: 'rows' | 'cols' }
 
 /** The toolbar started listening after a sheet announced itself: sheets announce again. */
 export const FORMAT_ASK = 'momentum:format-ask'

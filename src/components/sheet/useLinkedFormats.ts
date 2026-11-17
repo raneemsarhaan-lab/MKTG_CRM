@@ -18,6 +18,7 @@ import { createElement } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { CellStyle, ColFilter, ConditionalRule, SheetFormatRecord } from '@/types/index'
 import type { LinkedChange } from '@/lib/sheet-undo'
+import { iconFor } from '@/components/sheets/format/RuleIcon'
 import { barCss, cellStylePatch, columnValues, filterOn, filterRows, type RuleLook } from '@/lib/sheet-rules'
 import { FilterMenu } from '@/components/sheets/format/StyleTools'
 import type { LinkedStore } from './useLinkedView'
@@ -357,6 +358,12 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
       const css = toCss(look)
       if (!rl.bar) return css
       return { ...css, cell: { ...css.cell, ...barCss(rl.bar, rtl) } }
+    },
+    /** Spec 020 tip 28: icon sets on the board's number columns. */
+    cellIcon: (row: R, col: GridCol) => {
+      if (!p.enabled || col === 'rowNo' || !p.ruleLooks.size) return null
+      const task = p.taskOf(row)
+      return task ? iconFor(p.ruleLooks.get(`${task}|${col}`)) : null
     },
     /** Stage 3: the filter buttons on the headings, and the open filter menu. */
     headerExtra: filterBtn,

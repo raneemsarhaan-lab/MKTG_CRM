@@ -31,3 +31,15 @@ export function fitHeight(text: string, st: CellStyle, colWidth: number): number
   }
   return Math.max(1, lines) * line + PAD_Y
 }
+
+/** Column autofit from the menu (spec 020): how wide a value needs its column, measured with the same canvas. */
+export function fitWidth(text: string, st: CellStyle): number {
+  const px = st.size ? st.size * 4 / 3 : 13
+  if (typeof document === 'undefined') return text.length * px * 0.6 + PAD_X + 12
+  ctx ??= document.createElement('canvas').getContext('2d')
+  if (!ctx) return text.length * px * 0.6 + PAD_X + 12
+  ctx.font = `${st.i ? 'italic ' : ''}${st.b ? 700 : 400} ${px}px ${(FONTS.find(f => f.name === st.font) ?? FONTS[0]).stack}`
+  let w = 0
+  for (const line of text.split('\n')) w = Math.max(w, ctx.measureText(line).width)
+  return Math.ceil(w + PAD_X + 12 + (st.indent ?? 0) * 12)
+}

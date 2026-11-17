@@ -718,7 +718,7 @@ Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fiel
 
 ### Excel power tips in the sheets (spec 020)
 
-Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3). Design: `design/power-tips-a.html` (Excel's behaviour and wording, drawn in the app's look). No formulas (FR-015). Stages B and C each have their own design and PR.
+Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3) and stage B (US4–US6, below). Stage A design: `design/power-tips-a.html` (Excel's behaviour and wording, drawn in the app's look). No formulas (FR-015). Stages B and C each have their own design and PR.
 
 - **Keys (GridCore).**
   - Shift+Space selects the row, Ctrl+Space the column, and Ctrl+Shift+Space everything. The active cell moves to the block's corner, because the grid's selection always starts at the active cell.
@@ -754,6 +754,35 @@ Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3). Design: `design/p
   - Deleting rows or columns trims the ranges (`validationsAfter`). An insert inside a range grows it, because the range is held by its edge ids.
 - **Leading apostrophe.** `'007` is stored as `007`, and the cell is set to Text.
 - **Checks.** `node scripts/spreadsheet-lab/realapp/tips-a.cjs` (73 checks), and `npm run lab:spreadsheet` (`tips-*` pure checks).
+
+**Stage B (US4–US6).** Design: `design/power-tips-b.html`.
+
+- **Formats.**
+  - `sheet-numfmt.ts` reads Excel's custom codes: up to four sections, `0` `#` `,` `.` `%`, scaling by trailing commas, quoted text, `\x`, and `@` in the text section. Colours, conditions, `E+`, `_` and `*` are refused with a reason (`patternError`).
+  - Custom codes are stored as `NumberFormat { kind: 'custom', pattern }`, which `display()` uses. Format Cells › Custom lists Excel's codes. A date code typed there is stored as a date pattern, as before.
+  - Center Across Selection is `ha: 'across'`. The text spans the following empty cells that also carry `across` (`acrossWidth` in BlankSheet), with no merge.
+  - Conditional formatting has `icons` rules (3 Arrows, 3 Flags, 3 Traffic Lights). Thresholds are percents of the range or numbers, with reverse and icon-only options. The grid draws them through `GridModel.cellIcon` on team sheets and the Content and Video sheets.
+  - A rule's `args.row` + `args.col` tests one column and gives the look to the whole row of its range.
+  - Format › Cell size has AutoFit Row Height (heights go back to automatic) and AutoFit Column Width (measured with the same canvas as row fit, `fitWidth`).
+- **Clean up (Data menu, team sheets).** `sheet-clean.ts` returns plans; BlankSheet makes each one undo step, with a "N cells changed" note that has Undo (`onNotice(text, true)`).
+  - **Remove Duplicates** (`dataScope`: the selection, the table or the current region; headings guessed as Excel does). It keeps the first of each kind and closes the range up. It moves cells, not whole rows.
+  - **Text to Columns:** delimiters or fixed widths, a preview, and column formats or skip. When the columns to the right hold data, it asks before replacing it.
+  - **Trim Spaces and Clean, Change Case, Convert Text to Numbers, Fill Blanks from Above.**
+  - **Green corner:** a number kept as text (Text format over a numeric value) gets it. Its ! offers Convert to Number or Ignore Error; ignored cells are kept per member in `momentum.sheet.ignore.<id>`.
+  - **Find** takes Excel's wildcards everywhere (`wildRegex` in `sheet-tools.ts`).
+  - **Paste Special** has Add, Subtract, Multiply and Divide (one copied number; non-numbers are counted), Skip blanks, All except borders, and Validation and Column widths. The last two come from the cells last copied on this sheet (`GridModel.onCopied`). Formulas, Comments and Paste Link stay greyed.
+- **Tables.**
+  - Ctrl+T (or Ctrl+L, which browsers leave to the page) opens Create Table.
+  - **Total Row:** `sheet_tables.totals` holds `{ colId: 'sum' | 'avg' | 'count' | 'countNums' | 'max' | 'min' | 'none' }`. The row under the table becomes the Total row, inserting one if that row holds data. Its first cell holds the word "Total"; the others are computed from the visible rows (`totalOf`), so filters and slicers change them. Each has a ▾ on the active cell.
+  - **Slicers:** `view.slicers` (`{ id, tableId, col }`) are drawn as boxes at the sheet's end side. A click sets `view.filter[col]`; ☰ or Ctrl+click selects several, and ✕ clears.
+- **Advanced Filter** uses Excel's criteria range, not a builder (a change from the plan's AND/OR builder, approved in the design).
+  - `readCriteria` reads the headings and cells (`Meta`, `>1000`, `<>Draft`, `*teaser*`; plain text matches values that begin with it, as in Excel).
+  - In place, it is stored as `view.advanced` (list range ids + groups + unique) and hides failing rows next to the filter.
+  - The copy goes to a new sheet (`onNewSheet` → `newSheetWith` in the Workbook) or to a cell on this sheet.
+- **Groups.** `sheet-outline.ts` keeps Excel's per-row levels as groups by ids in `view.outline` (8 levels, 200 groups). Shift+Alt+→ / ← and Data › Group group and ungroup. Collapsed groups hide rows through the filtered-out set, apart from Hide, so Unhide doesn't fight them. The bar beside the row numbers draws brackets with − / +, and the corner has the level buttons. Column groups show a line above the letters and − / + on the column after them; the corner's level buttons are for rows.
+- **Status bar.** Right-click it (or ⋯) for Customize Status Bar: Average, Count, Numerical Count, Minimum, Maximum, Sum and the Zoom Slider. The choice is kept per member in `momentum.sheet.stats`. Min and Max come from `report()` on team sheets and `useGridTips` on the linked sheets.
+- **Selection over fills.** A selected cell with a fill keeps it under the selection tint (`box-shadow`), so a table's white header text stays readable.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/tips-b.cjs` (58 checks), and the `tips-numfmt`, `tips-clean`, `tips-criteria`, `tips-wildcards`, `tips-outline` and `tips-icons` pure checks.
 
 ### Celebrations
 

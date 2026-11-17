@@ -8,22 +8,35 @@ import type { StylePatch } from '@/lib/sheet-format'
 
 export interface FindOpts { matchCase: boolean; whole: boolean }
 
-const norm = (s: string, o: FindOpts) => (o.matchCase ? s : s.toLocaleLowerCase())
+/**
+ * Excel's wildcards (spec 020 tip 55): `*` any characters, `?` one character,
+ * `~*`, `~?` and `~~` the marks themselves. A query without them is plain text.
+ */
+export function wildRegex(query: string, o: FindOpts, global = false): RegExp {
+  const esc = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  let src = ''
+  for (let i = 0; i < query.length; i++) {
+    const ch = query[i]
+    if (ch === '~' && i + 1 < query.length && '*?~'.includes(query[i + 1])) { src += esc(query[++i]); continue }
+    if (ch === '*') { src += '[\\s\\S]*'; continue }
+    if (ch === '?') { src += '[\\s\\S]'; continue }
+    src += esc(ch)
+  }
+  if (o.whole) src = `^\\s*${src}\\s*$`
+  return new RegExp(src, (o.matchCase ? '' : 'i') + 'u' + (global ? 'g' : ''))
+}
 
-/** Whether a cell's value matches (FR-044): anywhere in the text, or the whole cell. */
+/** Whether a cell's value matches (FR-044): anywhere in the text, or the whole cell; with wildcards. */
 export function matches(text: string, query: string, o: FindOpts): boolean {
   if (!query) return false
-  const t = norm(text, o), q = norm(query, o)
-  return o.whole ? t.trim() === q.trim() : t.includes(q)
+  return wildRegex(query, o).test(text)
 }
 
 /** The value after Replace: every match in the text, or the whole cell when "match entire cell". */
 export function replaceIn(text: string, query: string, by: string, o: FindOpts): string {
   if (!matches(text, query, o)) return text
   if (o.whole) return by
-  if (o.matchCase) return text.split(query).join(by)
-  const esc = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return text.replace(new RegExp(esc, 'gi'), () => by)
+  return text.replace(wildRegex(query, o, true), m => (m ? by : m))
 }
 
 /**

@@ -953,6 +953,8 @@ model SheetTable {
   style      String
   header     Boolean @default(true)
   banded     Boolean @default(true)
+  /// Spec 020 tip 73: the Total row, a total per column id; null = no Total row.
+  totals     Json?
 
   sheet Sheet @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
 

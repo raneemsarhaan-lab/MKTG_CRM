@@ -162,6 +162,12 @@ export interface GridModel<R extends { key: string }> {
    * value the model renders stays its own (number formats are applied there).
    */
   cellStyle?(row: R, col: GridCol): CellCss | null
+  /** Spec 020 tip 80: what the top-left corner shows (the outline's level buttons). */
+  corner?(): ReactNode
+  /** Spec 020: what was just copied here (Paste Special › Validation and Column widths need the cells it came from). */
+  onCopied?(rect: GridRect, grid: string[][]): void
+  /** Spec 020 tip 28: a conditional-format icon drawn before the value; `only` shows the icon without the value. */
+  cellIcon?(row: R, col: GridCol): { node: ReactNode; only: boolean } | null
   /** The look a copy carries to Excel and Google Sheets, and the text as shown (EGP 12,500.00). */
   copyStyle?(row: R, col: GridCol): CellStyle | null
   copyShown?(row: R, col: GridCol): string
@@ -631,6 +637,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       e.clipboardData.setData('text/plain', text)
       e.clipboardData.setData('text/html', html)
       e.preventDefault()
+      if (list.length === 1) m.onCopied?.(q, each(readText, ''))
       if (cut && writes.current) { cutRect.current = q; setCutMark(q) } else { cutRect.current = null; setCutMark(null) }
     }
     const copy = (e: ClipboardEvent) => onCopy(e, false)
@@ -1182,7 +1189,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     >
       <div role="row" aria-rowindex={1} className="fx-sheet-tr is-head">
         <div role="columnheader" className="fx-sheet-th is-frozen-no" aria-label="#"
-             onClick={() => { if (m.selection && m.rows.length) selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 }) }} />
+             onClick={() => { if (m.selection && m.rows.length) selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 }) }}>{m.corner?.()}</div>
         {m.cols.map((col, c) => {
           const h = m.header(col)
           const movable = !!m.onReorder && col !== 'title'
@@ -1264,6 +1271,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const unselecting = !!unsel && c >= 0 && inUnsel(i, c)
               const isNo = col === 'rowNo'
               const fx = !isNo && m.cellStyle ? m.cellStyle(row, col) : null
+              const icon = !isNo && !isEditing && m.cellIcon ? m.cellIcon(row, col) : null
               const merge = !isNo && m.cellSpan ? m.cellSpan(row, col) : null
               const covered = merge === 'covered'
               const freezeStyle = frozenCell(c)
@@ -1431,8 +1439,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                         />
                       ))
                     : (isNo && m.rowLabel ? m.rowLabel(row, i)
-                      : fx?.text ? <span style={fx.text}>{m.render(row, col, () => cells.current.get(key))}</span>
-                      : m.render(row, col, () => cells.current.get(key)))}
+                      : icon?.only ? icon.node
+                      : fx?.text ? <span style={fx.text}>{icon?.node}{m.render(row, col, () => cells.current.get(key))}</span>
+                      : <>{icon?.node}{m.render(row, col, () => cells.current.get(key))}</>)}
                   {fx?.border && !isEditing && <span className="fx-cell-bd" aria-hidden="true" style={fx.border} />}
                   {!isNo && m.marked?.(row, col) && <b className="fx-cmt-mark" data-comment-marker={key} aria-hidden="true" />}
                   {isNo && m.onRowResize && (

@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheet power tips B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #F7F7F7; --panel: #FFFFFF; --ink: #1B1A13; --text: #1F2430; --muted: #5E6166; --faint: #8A8D91;
+  --line: #E2E3E3; --soft-line: #ECECF1; --head: #F3F4F2; --gutter: #F8F9F8; --hover: #F6F8FB;
+  --sel: #3563E9; --sel-fill: rgba(53, 99, 233, .07); --sel-head: #E5EDFF; --sel-head-ink: #1E40AF;
+  --lime: #C8F24E; --lime-ink: #1B1A13; --purple: #7C3AED; --purple-deep: #6D28D9; --purple-soft: #F0EBFE;
+  --danger: #D22040; --danger-soft: #FDE7EA;
+  --shadow: 0 8px 28px rgba(17, 18, 20, .16); --shadow-sm: 0 2px 8px rgba(17, 18, 20, .10);
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+u { text-decoration: none; }
+.wrap { max-width: 1260px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 900px; }
+.ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tabs button, .ctl button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 5px 12px; font: 600 12.5px var(--f-body); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.scene { display: none; } .scene.on { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+@media (max-width: 960px) { .scene.on { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; position: relative; }
+.stage .card, .scene > .card { overflow: visible; }
+
+/* formula bar */
+.fbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.namebox { border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; width: 96px; font-size: 12.5px; font-weight: 600; background: var(--gutter); }
+.fx { color: var(--faint); font-style: italic; padding: 0 8px; border-inline-end: 1px solid var(--line); }
+.stage { min-height: 360px; position: relative; }
+
+/* grid: the app's sheet */
+table { border-collapse: separate; border-spacing: 0; }
+th, td { height: 28px; border-bottom: 1px solid var(--line); border-inline-end: 1px solid var(--line); padding: 0 8px; white-space: nowrap; font-size: 12.5px; position: relative; }
+th { background: var(--head); font-weight: 600; font-size: 11.5px; color: var(--muted); text-align: center; min-width: 100px; }
+th.no, td.no { min-width: 40px; width: 40px; text-align: center; background: var(--gutter); color: var(--faint); font-size: 11.5px; font-weight: 500; }
+th.on, td.no.on { background: var(--sel-head); color: var(--sel-head-ink); font-weight: 700; }
+th.on { box-shadow: inset 0 -2px 0 var(--sel); }
+td.no.on { box-shadow: inset -2px 0 0 var(--sel); }
+[dir="rtl"] td.no.on { box-shadow: inset 2px 0 0 var(--sel); }
+td.in { background: var(--sel-fill); }
+td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.selbox { position: absolute; border: 2px solid var(--sel); border-radius: 2px; pointer-events: none; z-index: 2; }
+.handle { position: absolute; width: 9px; height: 9px; background: var(--sel); border: 2px solid var(--panel); border-radius: 3px; z-index: 3; box-shadow: 0 0 0 1px var(--sel); }
+.ghost { position: absolute; border: 2px dashed var(--sel); border-radius: 3px; opacity: .55; pointer-events: none; z-index: 2; }
+.xltip { position: absolute; background: var(--ink); color: var(--panel); font: 600 11.5px var(--f-body); padding: 2px 8px; border-radius: 6px; z-index: 4; box-shadow: var(--shadow-sm); }
+.cross { position: absolute; z-index: 5; font: 700 16px/1 monospace; color: var(--ink); }
+
+/* Auto Fill Options chip */
+.afo { position: absolute; z-index: 5; display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 600 11px var(--f-body); cursor: pointer; box-shadow: var(--shadow-sm); }
+.afo svg { display: block; }
+.afo .chev { color: var(--muted); font-size: 10px; }
+
+/* menus: the app's sheet menu */
+.xlmenu { position: absolute; z-index: 6; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 220px; font: 12.5px var(--f-body); }
+.xlmenu .grp { font: 700 10px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 2px; }
+.xlmenu .it { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: default; }
+.xlmenu .it:hover, .xlmenu .it.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.xlmenu .it.dis { opacity: .4; }
+.xlmenu .it small { margin-inline-start: auto; color: var(--faint); font-size: 11px; }
+.xlmenu .rad { width: 14px; flex: none; color: var(--purple); font-weight: 800; text-align: center; }
+.xlmenu .rad.on::before { content: "✓"; }
+.xlmenu .it.on { font-weight: 600; }
+.xlmenu hr { border: 0; border-top: 1px solid var(--soft-line); margin: 4px 2px; }
+
+/* dialogs: the app's sheet dialog */
+.dlg { position: absolute; z-index: 7; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font: 12.5px var(--f-body); overflow: hidden; }
+.dlg .tbar { display: flex; align-items: center; gap: 8px; padding: 14px 16px 2px; font: 800 16px var(--f-head); color: var(--ink); }
+.dlg .tbar .x { margin-inline-start: auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); font: 600 13px var(--f-body); }
+.dlg .tbar .x:hover { background: var(--hover); }
+.dlg .sub { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: 12px; }
+.dlg .body { padding: 8px 16px 14px; display: grid; gap: 10px; }
+.dlg fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; align-content: start; }
+.dlg legend, .dlg .cap { padding: 0; margin-bottom: 4px; font: 700 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dlg .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.dlg label { display: flex; align-items: center; gap: 0; min-height: 22px; }
+.dlg label > input[type=radio], .dlg label > input[type=checkbox] { margin: 0; margin-inline-end: 8px; accent-color: var(--purple); width: 15px; height: 15px; }
+.dlg label.dis { opacity: .4; }
+.dlg .ind { padding-inline-start: 22px; }
+.dlg .fld { display: grid; gap: 4px; }
+.dlg .fld > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.dlg .btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--gutter); }
+.dlg .btns .start { margin-inline-end: auto; }
+.xb { min-width: 72px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; font: 600 12.5px var(--f-body); border-radius: 8px; cursor: pointer; }
+.xb.def { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.xb.link { border-color: transparent; background: none; color: var(--muted); min-width: 0; padding-inline: 4px; }
+.dlg input[type=text], .dlg select, .dlg textarea { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: 12.5px var(--f-body); padding: 6px 9px; min-height: 32px; width: 100%; }
+.dlg textarea { resize: none; }
+.dlg input:focus, .dlg select:focus, .dlg textarea:focus { outline: 2px solid var(--sel); outline-offset: -1px; }
+.dlg select:disabled { opacity: .45; }
+.dtabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--soft-line); }
+.dtabs span { white-space: nowrap; padding: 8px 10px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dtabs span.on { color: var(--purple-deep); border-bottom-color: var(--purple); }
+.lb { border: 1px solid var(--line); border-radius: 10px; padding: 4px; display: grid; gap: 1px; align-content: start; overflow: auto; background: var(--panel); }
+.lb div { padding: 5px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb div.on { background: var(--purple-soft); color: var(--purple-deep); font-weight: 600; }
+.lb div.fixed { color: var(--muted); }
+.lb .tag { float: inline-end; font-size: 10px; font-weight: 700; color: var(--faint); }
+
+/* alert */
+.alert .body { grid-template-columns: auto 1fr; align-items: start; gap: 12px; }
+.alert .ico { width: 36px; height: 36px; border-radius: 50%; background: var(--danger-soft); color: var(--danger); display: grid; place-items: center; font: 800 18px var(--f-body); }
+.alert .msg b { display: block; font: 800 15px var(--f-head); color: var(--ink); margin-bottom: 2px; }
+
+/* list in the cell */
+.ddbtn { position: absolute; z-index: 4; width: 22px; height: 22px; border-radius: 6px; background: var(--hover); color: var(--muted); display: grid; place-items: center; font-size: 11px; box-shadow: inset 0 0 0 1px var(--line); }
+.list { position: absolute; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 150px; font: 12.5px var(--f-body); }
+.list div { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+.list div::before { content: ""; width: 12px; flex: none; color: var(--purple); font-weight: 800; }
+.list div.cur::before { content: "✓"; }
+.list div.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.list .q { display: block; padding: 4px 8px 6px; color: var(--faint); font-size: 11.5px; border-bottom: 1px solid var(--soft-line); margin-bottom: 4px; border-radius: 0; }
+.list .q::before { content: none; }
+.inmsg { position: absolute; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: 12px var(--f-body); color: var(--muted); max-width: 220px; box-shadow: var(--shadow); border-inline-start: 3px solid var(--purple); }
+.inmsg b { display: block; color: var(--ink); font-weight: 700; }
+
+/* status bar */
+.sbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--gutter); color: var(--muted); font: 12px var(--f-body); border-radius: 0 0 14px 14px; flex-wrap: wrap; }
+.sbar .sp { flex: 1; }
+.sbar .st { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+.sbar b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sbar .ready::before { content: "● "; color: #2B7A37; }
+.zoom { display: inline-flex; align-items: center; gap: 6px; }
+.zoom .track { width: 110px; height: 4px; border-radius: 999px; background: var(--line); position: relative; }
+.zoom .track i { position: absolute; top: -5px; width: 14px; height: 14px; margin-inline-start: -5px; border-radius: 50%; background: var(--panel); border: 2px solid var(--sel); box-shadow: var(--shadow-sm); }
+.zoom .track::after { content: ""; position: absolute; left: 50%; top: -2px; width: 2px; height: 8px; border-radius: 1px; background: var(--faint); opacity: .5; }
+.zoom button { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.zoom b { min-width: 38px; text-align: end; }
+.views { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.views span { width: 26px; height: 20px; display: inline-grid; place-items: center; color: var(--faint); font-size: 11px; }
+.views span + span { border-inline-start: 1px solid var(--line); }
+.views span.on { background: var(--sel-head); color: var(--sel-head-ink); }
+
+/* header menus and KeyTips */
+.menubar { display: flex; gap: 6px; padding: 8px 12px 4px; font-size: 13px; position: relative; }
+.menubar span { position: relative; padding: 4px 10px; border-radius: 8px; font-weight: 600; color: var(--text); }
+.menubar span:hover { background: var(--hover); }
+.kt { position: absolute; top: 22px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--ink); color: var(--lime); font: 800 10px var(--f-body); padding: 0 5px; border-radius: 5px; line-height: 16px; font-style: normal; box-shadow: var(--shadow-sm); }
+[dir="rtl"] .kt { transform: translateX(50%); }
+.ribbon { margin: 0 12px 8px; height: 34px; border-radius: 999px; background: var(--head); display: flex; align-items: center; padding: 0 14px; color: var(--muted); font-size: 12px; gap: 12px; overflow: hidden; transition: height .2s, margin .2s; }
+.ribbon.collapsed { height: 0; margin-bottom: 0; }
+
+/* notes */
+.side { display: grid; gap: 12px; }
+.side .card { padding: 12px 14px; }
+.side h3 { margin: 0 0 6px; font: 700 13.5px var(--f-body); color: var(--ink); }
+.side p, .side li { margin: 0; color: var(--muted); font-size: 12.5px; }
+.side ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+.side .xb { min-width: 0; padding: 2px 10px; font-size: 12px; }
+kbd { font: 600 11px var(--f-body); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--text); }
+/* sample text is English: keep its punctuation right in the Arabic layout */
+.side li, .inmsg, .dlg .body span, .dlg label span, .alert .msg { unicode-bidi: plaintext; }
+/* stage B additions */
+.grid-tabs { display: flex; gap: 0; }
+td.hl-row { background: #FDE7EA !important; }
+td.hl-row.num, td.hl-row { color: #9C0006; }
+[data-theme="dark"] td.hl-row { background: #3A1820 !important; color: #FF9AA8; }
+.ic { display: inline-block; width: 14px; margin-inline-end: 6px; text-align: center; font-size: 11px; }
+.ic.up { color: #2B7A37; } .ic.side { color: #C77700; } .ic.down { color: #C42B1C; }
+.across { position: absolute; z-index: 2; display: grid; place-items: center; font-weight: 700; pointer-events: none; }
+.tri { position: relative; }
+.tri::before { content: ""; position: absolute; top: 0; inset-inline-start: 0; border-style: solid; border-width: 7px 7px 0 0; border-color: #2B7A37 transparent transparent transparent; }
+[dir="rtl"] .tri::before { border-width: 7px 0 0 7px; border-color: #2B7A37 transparent transparent transparent; }
+.warn { position: absolute; z-index: 5; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: #FDF3E3; color: #8A5300; border: 1px solid #F0D9B0; font: 800 12px var(--f-body); box-shadow: var(--shadow-sm); }
+.total td { border-top: 2px solid var(--ink); font-weight: 700; background: var(--gutter); }
+.total td.sel-tot { box-shadow: inset 0 0 0 2px var(--sel); }
+th.tb, td.tbh { background: #4472C4; color: #fff; font-weight: 700; }
+tr.band td:not(.no) { background: #DCE6F5; }
+[data-theme="dark"] tr.band td:not(.no) { background: #1E2A4A; }
+.slicer { position: absolute; z-index: 4; width: 170px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; display: grid; gap: 4px; }
+.slicer header { display: flex; align-items: center; justify-content: space-between; font: 700 12px var(--f-body); color: var(--ink); padding: 2px 4px 4px; }
+.slicer header span { display: inline-flex; gap: 4px; color: var(--muted); font-weight: 600; }
+.slicer button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 5px 8px; text-align: start; font: 600 12px var(--f-body); }
+.slicer button.on { background: var(--purple-soft); border-color: transparent; color: var(--purple-deep); }
+.slicer button.off { color: var(--faint); }
+.olbar { position: absolute; z-index: 3; inset-block: 0; inset-inline-start: 0; width: 34px; border-inline-end: 1px solid var(--line); background: var(--gutter); }
+.ollv { position: absolute; z-index: 4; display: flex; gap: 3px; }
+.ollv b { width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center; font: 700 10.5px var(--f-body); color: var(--text); }
+.ollv b.on { background: var(--sel-head); color: var(--sel-head-ink); border-color: transparent; }
+.bracket { position: absolute; z-index: 4; width: 10px; border-inline-start: 2px solid var(--muted); border-block: 2px solid var(--muted); border-start-start-radius: 3px; border-end-start-radius: 3px; }
+.olbtn { position: absolute; z-index: 5; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--muted); background: var(--panel); display: grid; place-items: center; font: 700 11px/1 var(--f-body); color: var(--text); }
+.indent { padding-inline-start: 34px !important; }
+.wiz { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+.wiz b { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--line); color: var(--muted); font-size: 11px; }
+.wiz b.on { background: var(--purple); color: #fff; }
+.prev { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font: 12px var(--f-body); }
+.prev table { width: 100%; }
+.prev td { height: 24px; border-bottom: 1px solid var(--soft-line); border-inline-end: 1px dashed var(--purple); font-size: 12px; padding: 0 8px; background: var(--panel); }
+.prev tr:first-child td { background: var(--head); font-weight: 600; color: var(--muted); }
+.prev td:last-child { border-inline-end: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font: 600 12px var(--f-body); }
+.chips span.on { background: var(--purple-soft); color: var(--purple-deep); border-color: transparent; }
+.toast { position: absolute; z-index: 8; background: var(--ink); color: var(--panel); border-radius: 10px; padding: 8px 12px; font: 600 12.5px var(--f-body); display: flex; gap: 12px; align-items: center; box-shadow: var(--shadow); }
+.toast b { color: var(--lime); }
+.codes { height: 168px; }
+.sample { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; font: 600 14px var(--f-body); color: var(--ink); background: var(--gutter); }
+.sample small { display: block; font: 600 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.crit { position: absolute; z-index: 3; border: 2px dashed var(--purple); border-radius: 3px; pointer-events: none; }
+.sbmenu .it .val { margin-inline-start: auto; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.bracket { width: 10px !important; transform: translateX(-24px); }
+[dir="rtl"] .bracket { transform: translateX(46px); }
+[dir="rtl"] .olbtn { translate: -16px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sheet power tips: stage B</h1>
+  <p class="lede">Spec 020, user stories 4–6: formats, cleanup tools, tables and outlines. Excel's options, names and wording, drawn in Momentum's look, as in the approved stage A design. Options that need formulas stay greyed out. Everything here works on team sheets; the board's sheets get the parts that fit (noted on each scene).</p>
+  <div class="ctl">
+    <button id="theme">Dark</button>
+    <button id="dir">Arabic layout</button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Scenes">
+    <button role="tab" data-s="num" aria-selected="true">1 · Custom number formats</button>
+    <button role="tab" data-s="across">2 · Center Across Selection</button>
+    <button role="tab" data-s="row">3 · Whole-row highlight</button>
+    <button role="tab" data-s="icons">4 · Icon sets</button>
+    <button role="tab" data-s="autofit">5 · AutoFit Column Width</button>
+    <button role="tab" data-s="dups">6 · Remove Duplicates</button>
+    <button role="tab" data-s="split">7 · Text to Columns</button>
+    <button role="tab" data-s="clean">8 · Clean up</button>
+    <button role="tab" data-s="find">9 · Find with wildcards</button>
+    <button role="tab" data-s="ps">10 · Paste Special operations</button>
+    <button role="tab" data-s="table">11 · Ctrl+T and the Total row</button>
+    <button role="tab" data-s="slicer">12 · Slicers</button>
+    <button role="tab" data-s="adv">13 · Advanced Filter</button>
+    <button role="tab" data-s="outline">14 · Group and the status bar</button>
+  </div>
+
+  <!-- 1 custom number formats -->
+  <section class="scene on" data-scene="num">
+    <div class="card"><div class="fbar"><span class="namebox">B2:B5</span><span class="fx">fx</span><span>1250000</span></div>
+      <div class="stage" style="min-height:470px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Reach</td><td>Notes</td></tr>
+          <tr><td class="no on">2</td><td>Ramadan</td><td class="num in">1.3M</td><td></td></tr>
+          <tr><td class="no on">3</td><td>Eid</td><td class="num in">0.8M</td><td></td></tr>
+          <tr><td class="no on">4</td><td>Back to school</td><td class="num in">2.4M</td><td></td></tr>
+          <tr><td class="no on">5</td><td>Black Friday</td><td class="num in">3.1M</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,5,2"></div>
+        <div class="dlg" style="left:250px; top:16px; width:440px" role="dialog" aria-label="Format Cells">
+          <div class="tbar">Format Cells<span class="x">✕</span></div><p class="sub">B2:B5</p>
+          <div class="dtabs"><span class="on">Number</span><span>Alignment</span><span>Font</span><span>Border</span><span>Fill</span></div>
+          <div class="body" style="grid-template-columns:130px 1fr;gap:12px;align-items:start">
+            <div class="fld"><span class="cap">Category</span><div class="lb" style="height:236px"><div>General</div><div>Number</div><div>Currency</div><div>Accounting</div><div>Date</div><div>Time</div><div>Percentage</div><div>Scientific</div><div>Text</div><div class="on">Custom</div></div></div>
+            <div style="display:grid;gap:10px">
+              <div class="sample"><small>Sample</small>1.3M</div>
+              <label class="fld"><span>Type</span><input type="text" value='#,##0.0,,"M"' dir="ltr"></label>
+              <div class="lb codes" dir="ltr"><div>0</div><div>0.00</div><div>#,##0</div><div>#,##0.00</div><div>#,##0,"K"</div><div class="on">#,##0.0,,"M"</div><div>0%</div><div>;;;</div></div>
+            </div>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Ctrl+Shift+1 and Custom</h3><ul>
+      <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd> sets Number: two decimals with a thousands separator.</li>
+      <li>Custom takes Excel's codes: <code>0</code>, <code>#</code>, separators, decimals, text in quotes, %, sections for negatives and zero.</li>
+      <li>One comma scales by a thousand, two by a million: 1,250,000 shows as 1.3M; the cell still holds 1250000 (sums and sorts use it).</li>
+      <li><code>;;;</code> hides a value; the cell bar still shows it.</li>
+      <li>A code the sheet can't read is refused with a note, never saved half-read.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 2 center across selection -->
+  <section class="scene" data-scene="across">
+    <div class="card"><div class="fbar"><span class="namebox">A1:F1</span><span class="fx">fx</span><span>Q4 campaign plan</span></div>
+      <div class="stage" style="min-height:420px">
+        <table>
+          <tr><th class="no"></th><th class="on">A</th><th class="on">B</th><th class="on">C</th><th class="on">D</th><th class="on">E</th><th class="on">F</th></tr>
+          <tr><td class="no on">1</td><td class="in"></td><td class="in"></td><td class="in"></td><td class="in"></td><td class="in"></td><td class="in"></td></tr>
+          <tr><td class="no">2</td><td>Week</td><td>Owner</td><td>Reach</td><td>Spend</td><td>Status</td><td>Due</td></tr>
+          <tr><td class="no">3</td><td>W1</td><td>Samaa</td><td class="num">120</td><td class="num">4,000</td><td>Done</td><td>06/12</td></tr>
+        </table>
+        <div class="across" data-r="1,1,1,6">Q4 campaign plan</div>
+        <div class="selbox" data-r="1,1,1,6"></div>
+        <div class="dlg" style="left:40px; top:150px; width:420px" role="dialog" aria-label="Format Cells, Alignment">
+          <div class="tbar">Format Cells<span class="x">✕</span></div><p class="sub">A1:F1</p>
+          <div class="dtabs"><span>Number</span><span class="on">Alignment</span><span>Font</span><span>Border</span><span>Fill</span></div>
+          <div class="body">
+            <div class="cap">Text alignment</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <label class="fld"><span>Horizontal</span><select><option>General</option><option>Left</option><option>Center</option><option>Right</option><option selected>Center Across Selection</option></select></label>
+              <label class="fld"><span>Vertical</span><select><option>Bottom</option></select></label>
+            </div>
+            <label><input type="checkbox"><span>Merge cells</span></label>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Center Across Selection</h3><ul>
+      <li>Format Cells › Alignment › Horizontal, and the Align ▾ menu on the strip.</li>
+      <li>The title sits in A1 and shows centred over A1:F1, without a merge: you can still select, sort and paste each column.</li>
+      <li>It reaches as far as the next cell that has something in it, as Excel does.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 3 whole-row highlight -->
+  <section class="scene" data-scene="row">
+    <div class="card"><div class="fbar"><span class="namebox">A2:E7</span><span class="fx">fx</span><span>Ramadan</span></div>
+      <div class="stage" style="min-height:460px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Owner</td><td>Channel</td><td>Spend</td><td>Status</td></tr>
+          <tr><td class="no">2</td><td class="hl-row">Ramadan</td><td class="hl-row">Samaa</td><td class="hl-row">Meta</td><td class="num hl-row">1,800</td><td class="hl-row">Live</td></tr>
+          <tr><td class="no">3</td><td>Eid</td><td>Hisham</td><td>TikTok</td><td class="num">650</td><td>Draft</td></tr>
+          <tr><td class="no">4</td><td class="hl-row">Back to school</td><td class="hl-row">Islam</td><td class="hl-row">Google</td><td class="num hl-row">2,400</td><td class="hl-row">Live</td></tr>
+          <tr><td class="no">5</td><td>Launch teaser</td><td>Raneem</td><td>Meta</td><td class="num">300</td><td>Done</td></tr>
+          <tr><td class="no">6</td><td class="hl-row">Black Friday</td><td class="hl-row">Roaa</td><td class="hl-row">Meta</td><td class="num hl-row">3,100</td><td class="hl-row">Planned</td></tr>
+        </table>
+        <div class="dlg" style="left:560px; top:30px; width:390px" role="dialog" aria-label="New Formatting Rule">
+          <div class="tbar">New Formatting Rule<span class="x">✕</span></div><p class="sub">A2:E7</p>
+          <div class="body">
+            <div class="cap">Select a rule type</div>
+            <div class="lb" style="height:118px"><div>Format all cells based on their values</div><div class="on">Format only cells that contain</div><div>Format only top or bottom ranked values</div><div>Format only unique or duplicate values</div><div style="opacity:.45">Use a formula to determine which cells to format</div></div>
+            <div class="cap">Format only cells with</div>
+            <div style="display:grid;grid-template-columns:110px 1fr 90px;gap:8px">
+              <select><option>Column D</option></select><select><option>greater than</option></select><input type="text" value="1000" dir="ltr">
+            </div>
+            <label><input type="checkbox" checked><span>Format the entire row</span></label>
+          </div>
+          <div class="btns"><span class="start" style="display:inline-flex;gap:6px;align-items:center;color:var(--muted)">Preview <span style="background:#FDE7EA;color:#9C0006;border-radius:6px;padding:2px 10px;font-weight:600">AaBbCc</span></span><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>The whole row, no formula</h3><ul>
+      <li>Excel does this with a formula (<code>=$D2&gt;1000</code>); here it's a choice in the rule: pick the column, the test and the value, then <b>Format the entire row</b>.</li>
+      <li>Rows where Spend &gt; 1,000 take the look across every column of the range.</li>
+      <li>Sorting and filtering keep it with the row. "Use a formula" stays greyed.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 4 icon sets -->
+  <section class="scene" data-scene="icons">
+    <div class="card"><div class="fbar"><span class="namebox">C2:C7</span><span class="fx">fx</span><span>92</span></div>
+      <div class="stage" style="min-height:470px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th class="on">C</th></tr>
+          <tr><td class="no">1</td><td>Post</td><td>Owner</td><td>Score</td></tr>
+          <tr><td class="no on">2</td><td>Hook test</td><td>Samaa</td><td class="num in"><span class="ic up">▲</span>92</td></tr>
+          <tr><td class="no on">3</td><td>Reel cut</td><td>Hisham</td><td class="num in"><span class="ic side">▶</span>61</td></tr>
+          <tr><td class="no on">4</td><td>Carousel</td><td>Islam</td><td class="num in"><span class="ic down">▼</span>18</td></tr>
+          <tr><td class="no on">5</td><td>Story</td><td>Raneem</td><td class="num in"><span class="ic up">▲</span>77</td></tr>
+          <tr><td class="no on">6</td><td>Live</td><td>Roaa</td><td class="num in"><span class="ic down">▼</span>25</td></tr>
+        </table>
+        <div class="selbox" data-r="2,3,6,3"></div>
+        <div class="dlg" style="left:330px; top:20px; width:440px" role="dialog" aria-label="New Formatting Rule, Icon Sets">
+          <div class="tbar">New Formatting Rule<span class="x">✕</span></div><p class="sub">Format all cells based on their values · C2:C7</p>
+          <div class="body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <label class="fld"><span>Format style</span><select><option>Icon Sets</option></select></label>
+              <label class="fld"><span>Icon style</span><select><option>▲ ▶ ▼ 3 Arrows</option><option>⚑ 3 Flags</option><option>● 3 Traffic Lights</option></select></label>
+            </div>
+            <div style="display:flex;gap:16px"><label><input type="checkbox"><span>Reverse Icon Order</span></label><label><input type="checkbox"><span>Show Icon Only</span></label></div>
+            <div class="cap">Display each icon according to these rules</div>
+            <div style="display:grid;grid-template-columns:auto 1fr 70px 90px;gap:8px;align-items:center">
+              <span class="ic up">▲</span><span>when value is ≥</span><input type="text" value="67" dir="ltr"><select><option>Percent</option><option>Number</option></select>
+              <span class="ic side">▶</span><span>when &lt; 67 and ≥</span><input type="text" value="33" dir="ltr"><select><option>Percent</option><option>Number</option></select>
+              <span class="ic down">▼</span><span>when &lt; 33</span><span></span><span></span>
+            </div>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Icon sets</h3><ul>
+      <li>Format › Conditional formatting › Icon Sets ▸ 3 Arrows, 3 Flags, 3 Traffic Lights, and in New Rule with Excel's thresholds (percent of the range, or numbers).</li>
+      <li>Reverse Icon Order and Show Icon Only, as Excel.</li>
+      <li>On the board's sheets too: icon sets and highlights work on their number columns.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 5 autofit -->
+  <section class="scene" data-scene="autofit">
+    <div class="card"><div class="fbar"><span class="namebox">A:B</span><span class="fx">fx</span><span>Campaign</span></div>
+      <div class="stage" style="min-height:360px">
+        <table>
+          <tr><th class="no"></th><th class="on" style="min-width:80px">A</th><th class="on" style="min-width:80px">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td class="in" style="max-width:80px;overflow:hidden">Campaign na…</td><td class="in" style="max-width:80px;overflow:hidden">Channel and…</td><td></td></tr>
+          <tr><td class="no">2</td><td class="in" style="max-width:80px;overflow:hidden">Ramadan te…</td><td class="in" style="max-width:80px;overflow:hidden">Meta · Reels</td><td></td></tr>
+        </table>
+        <div class="xlmenu" data-at="0,2,bl" data-dx="20" data-dy="6" role="menu" aria-label="Format">
+          <div class="grp">Cell size</div>
+          <div class="it"><span>Row Height…</span></div>
+          <div class="it"><span>AutoFit Row Height</span></div>
+          <div class="it"><span>Column Width…</span></div>
+          <div class="it hl"><span>AutoFit Column Width</span></div>
+          <hr><div class="grp">Visibility</div>
+          <div class="it"><span>Hide Columns</span></div>
+          <div class="it"><span>Unhide Columns</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>AutoFit from the menu</h3><ul>
+      <li>Format › Cell size: AutoFit Column Width and AutoFit Row Height, for every selected column or row, beside the double-click on a heading's edge.</li>
+      <li>One undo step.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 6 remove duplicates -->
+  <section class="scene" data-scene="dups">
+    <div class="card"><div class="fbar"><span class="namebox">A1:C301</span><span class="fx">fx</span><span>Email</span></div>
+      <div class="stage" style="min-height:440px">
+        <table>
+          <tr><th class="no"></th><th class="on">A</th><th class="on">B</th><th class="on">C</th></tr>
+          <tr><td class="no on">1</td><td class="in">Email</td><td class="in">Name</td><td class="in">City</td></tr>
+          <tr><td class="no on">2</td><td class="in">samaa@acme.io</td><td class="in">Samaa Adel</td><td class="in">Cairo</td></tr>
+          <tr><td class="no on">3</td><td class="in">islam@acme.io</td><td class="in">Islam S.</td><td class="in">Giza</td></tr>
+          <tr><td class="no on">4</td><td class="in">samaa@acme.io</td><td class="in">Samaa Adel</td><td class="in">Cairo</td></tr>
+        </table>
+        <div class="dlg" style="left:40px; top:150px; width:380px" role="dialog" aria-label="Remove Duplicates">
+          <div class="tbar">Remove Duplicates<span class="x">✕</span></div><p class="sub">Choose the columns that make a row a duplicate.</p>
+          <div class="body">
+            <div style="display:flex;gap:8px;align-items:center"><button class="xb">Select All</button><button class="xb">Unselect All</button><label style="margin-inline-start:auto"><input type="checkbox" checked><span>My data has headers</span></label></div>
+            <div class="lb" style="height:96px"><div><label><input type="checkbox" checked><span>Email</span></label></div><div><label><input type="checkbox"><span>Name</span></label></div><div><label><input type="checkbox"><span>City</span></label></div></div>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+        <div class="toast" style="left:450px; top:330px">12 duplicate rows found and removed; 288 unique rows remain. <b>Undo</b></div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Data › Clean up › Remove Duplicates</h3><ul>
+      <li>Excel's dialog: the columns that define a duplicate, My data has headers.</li>
+      <li>The first of each kind stays; Excel's message says how many went and how many remain.</li>
+      <li>One undo step brings every removed row back.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 7 text to columns -->
+  <section class="scene" data-scene="split">
+    <div class="card"><div class="fbar"><span class="namebox">A2:A301</span><span class="fx">fx</span><span>Samaa Adel, Cairo</span></div>
+      <div class="stage" style="min-height:470px">
+        <div class="dlg" style="left:30px; top:20px; width:560px" role="dialog" aria-label="Text to Columns">
+          <div class="tbar">Text to Columns<span class="x">✕</span></div><p class="sub">Step 2 of 3 · Split A2:A301 by a delimiter.</p>
+          <div class="body">
+            <div class="wiz"><b class="">1</b>Original type<b class="on">2</b>Delimiters<b>3</b>Column format</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+              <fieldset><legend>Delimiters</legend>
+                <label><input type="checkbox"><span>Tab</span></label><label><input type="checkbox"><span>Semicolon</span></label>
+                <label><input type="checkbox" checked><span>Comma</span></label><label><input type="checkbox" checked><span>Space</span></label>
+                <label><input type="checkbox"><span>Other</span><input type="text" style="width:46px;margin-inline-start:8px;min-height:26px;padding:2px 6px"></label>
+              </fieldset>
+              <div style="display:grid;gap:8px">
+                <label><input type="checkbox" checked><span>Treat consecutive delimiters as one</span></label>
+                <label class="fld"><span>Text qualifier</span><select><option>"</option></select></label>
+              </div>
+            </div>
+            <div class="cap">Data preview</div>
+            <div class="prev"><table><tr><td>Column 1</td><td>Column 2</td><td>Column 3</td></tr><tr><td>Samaa</td><td>Adel</td><td>Cairo</td></tr><tr><td>Islam</td><td>Saadany</td><td>Giza</td></tr><tr><td>Raneem</td><td>Sarhan</td><td>Cairo</td></tr></table></div>
+          </div>
+          <div class="btns"><button class="xb start">‹ Back</button><button class="xb">Cancel</button><button class="xb">Next ›</button><button class="xb def">Finish</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Data › Text to Columns</h3><ul>
+      <li>Excel's three steps: Delimited or Fixed width; the delimiters (or the break lines for fixed width) with a live preview; then each column's format (General, Text, Date, or Do not import).</li>
+      <li>When the split needs empty columns to the right that hold data, it asks first: <i>There's already data here. Replace it?</i></li>
+      <li>One undo step.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 8 clean up -->
+  <section class="scene" data-scene="clean">
+    <div class="card"><div class="fbar"><span class="namebox">B2</span><span class="fx">fx</span><span>1,200</span></div>
+      <div class="stage" style="min-height:460px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td>Name</td><td>Spend</td><td>City</td></tr>
+          <tr><td class="no on">2</td><td>&nbsp;&nbsp;samaa adel </td><td class="tri" style="text-align:start">1,200</td><td>Cairo</td></tr>
+          <tr><td class="no">3</td><td>ISLAM SAADANY</td><td class="tri" style="text-align:start">850</td><td></td></tr>
+          <tr><td class="no">4</td><td>raneem   sarhan</td><td class="tri" style="text-align:start">2,050</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,2,2"></div>
+        <div class="warn" data-at="2,2,tr" data-dx="4" data-dy="1">!</div>
+        <div class="xlmenu" data-at="2,2,tr" data-dx="4" data-dy="26" role="menu" aria-label="Number Stored as Text" style="min-width:230px">
+          <div class="grp">Number Stored as Text</div>
+          <div class="it hl"><span>Convert to Number</span></div>
+          <div class="it"><span>Ignore Error</span></div>
+        </div>
+        <div class="xlmenu" data-at="4,1,bl" data-dx="0" data-dy="14" role="menu" aria-label="Clean up" style="min-width:250px">
+          <div class="grp">Data › Clean up</div>
+          <div class="it"><span>Remove Duplicates…</span></div>
+          <div class="it"><span>Text to Columns…</span></div>
+          <hr>
+          <div class="it hl"><span>Trim Spaces and Clean</span></div>
+          <div class="it"><span>Change Case</span><small>▸</small></div>
+          <div class="it"><span>Convert Text to Numbers</span></div>
+          <div class="it"><span>Fill Blanks from Above</span></div>
+        </div>
+        <div class="xlmenu" data-at="4,1,bl" data-dx="258" data-dy="150" role="menu" aria-label="Change Case" style="min-width:160px">
+          <div class="it"><span>UPPERCASE</span></div><div class="it"><span>lowercase</span></div><div class="it"><span>Proper Case</span></div>
+        </div>
+        <div class="toast" style="left:330px; top:400px; white-space:nowrap">Trim Spaces and Clean: 214 cells changed. <b>Undo</b></div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Clean up</h3><ul>
+      <li>Numbers typed or pasted as text ("1,200" kept as text) get Excel's green corner; the ! offers Convert to Number.</li>
+      <li>Data › Clean up: Trim Spaces and Clean (extra and non-breaking spaces, line breaks), Change Case ▸ UPPERCASE · lowercase · Proper Case, Convert Text to Numbers, Fill Blanks from Above.</li>
+      <li>Each works on the selection, says how many cells changed, and undoes in one step.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 9 find wildcards -->
+  <section class="scene" data-scene="find">
+    <div class="card"><div class="fbar"><span class="namebox">B3</span><span class="fx">fx</span><span>5* rating</span></div>
+      <div class="stage" style="min-height:400px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th></tr>
+          <tr><td class="no">1</td><td>Post</td><td>Note</td></tr>
+          <tr><td class="no">2</td><td>Reel 01</td><td>Q4 plan</td></tr>
+          <tr><td class="no on">3</td><td>Reel 02</td><td class="in">5* rating</td></tr>
+        </table>
+        <div class="selbox" data-r="3,2,3,2"></div>
+        <div class="dlg" style="left:280px; top:20px; width:430px" role="dialog" aria-label="Find and Replace">
+          <div class="tbar">Find and Replace<span class="x">✕</span></div>
+          <div class="dtabs"><span class="on">Find</span><span>Replace</span></div>
+          <div class="body">
+            <label class="fld"><span>Find what</span><input type="text" value="~*" dir="ltr"></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <label class="fld"><span>Within</span><select><option>Sheet</option></select></label>
+              <label class="fld"><span>Search</span><select><option>By Rows</option></select></label>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap"><label><input type="checkbox"><span>Match case</span></label><label><input type="checkbox"><span>Match entire cell contents</span></label></div>
+            <p class="sub" style="padding:0">* any characters · ? one character · ~* or ~? the mark itself</p>
+          </div>
+          <div class="btns"><span class="start" style="color:var(--muted)">1 of 1 · B3</span><button class="xb">Find All</button><button class="xb def">Find Next</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Wildcards</h3><ul>
+      <li>Find and Replace read <code>*</code> (any characters) and <code>?</code> (one character), as Excel: <code>Q? plan</code> finds Q4 plan.</li>
+      <li><code>~*</code> and <code>~?</code> find the marks themselves.</li>
+      <li>On every sheet, the board's sheets included.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 10 paste special operations -->
+  <section class="scene" data-scene="ps">
+    <div class="card"><div class="stage" style="min-height:420px">
+      <div class="dlg" style="left:30px; top:20px; width:460px" role="dialog" aria-label="Paste Special">
+        <div class="tbar">Paste Special<span class="x">✕</span></div><p class="sub">Copied: 1000 (one cell) · into D2:D51</p>
+        <div class="body">
+          <fieldset><legend>Paste</legend>
+            <div class="grid2">
+              <label><input type="radio" name="pp"><span>All</span></label><label><input type="radio" name="pp"><span>Comments</span></label>
+              <label class="dis"><input type="radio" name="pp" disabled><span>Formulas</span></label><label><input type="radio" name="pp"><span>Validation</span></label>
+              <label><input type="radio" name="pp" checked><span>Values</span></label><label><input type="radio" name="pp"><span>All except borders</span></label>
+              <label><input type="radio" name="pp"><span>Formats</span></label><label><input type="radio" name="pp"><span>Column widths</span></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Operation</legend>
+            <div class="grid2">
+              <label><input type="radio" name="po"><span>None</span></label><label><input type="radio" name="po" checked><span>Multiply</span></label>
+              <label><input type="radio" name="po"><span>Add</span></label><label><input type="radio" name="po"><span>Divide</span></label>
+              <label><input type="radio" name="po"><span>Subtract</span></label>
+            </div>
+          </fieldset>
+          <div style="display:flex;gap:16px"><label><input type="checkbox"><span>Skip blanks</span></label><label><input type="checkbox"><span>Transpose</span></label></div>
+        </div>
+        <div class="btns"><button class="xb start" disabled style="opacity:.45">Paste Link</button><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+      </div>
+    </div></div>
+    <div class="side"><div class="card"><h3>Operations</h3><ul>
+      <li>Copy 1000, select the amounts, Paste Special › Multiply: every number becomes thousands. Add, Subtract and Divide likewise.</li>
+      <li>Cells that aren't numbers are left alone and counted in the note; dividing by zero is refused.</li>
+      <li>Also new from Excel's list: Comments, Validation, All except borders, Column widths, Skip blanks. Formulas and Paste Link stay greyed.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 11 table + total row -->
+  <section class="scene" data-scene="table">
+    <div class="card"><div class="fbar"><span class="namebox">D7</span><span class="fx">fx</span><span>Sum: 9,850</span></div>
+      <div class="stage" style="min-height:460px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th class="on">D</th></tr>
+          <tr><td class="no">1</td><td class="tbh">Campaign</td><td class="tbh">Owner</td><td class="tbh">Channel</td><td class="tbh">Spend</td></tr>
+          <tr><td class="no">2</td><td>Ramadan</td><td>Samaa</td><td>Meta</td><td class="num">1,800</td></tr>
+          <tr class="band"><td class="no">3</td><td>Eid</td><td>Hisham</td><td>TikTok</td><td class="num">650</td></tr>
+          <tr><td class="no">4</td><td>Back to school</td><td>Islam</td><td>Google</td><td class="num">2,400</td></tr>
+          <tr class="band"><td class="no">5</td><td>Black Friday</td><td>Roaa</td><td>Meta</td><td class="num">3,100</td></tr>
+          <tr><td class="no">6</td><td>Launch</td><td>Raneem</td><td>Meta</td><td class="num">1,900</td></tr>
+          <tr class="total"><td class="no">7</td><td>Total</td><td></td><td></td><td class="num sel-tot" style="padding-inline-end:32px">9,850</td></tr>
+        </table>
+        <div class="ddbtn" data-at="7,4,tr" data-dx="-25" data-dy="3">▾</div>
+        <div class="list" data-at="7,4,bl" data-dx="-30" data-dy="4" style="width:170px"><div>None</div><div>Average</div><div>Count</div><div>Count Numbers</div><div>Max</div><div>Min</div><div class="cur hl">Sum</div></div>
+        <div class="dlg" style="left:520px; top:20px; width:300px" role="dialog" aria-label="Create Table">
+          <div class="tbar">Create Table<span class="x">✕</span></div>
+          <div class="body">
+            <label class="fld"><span>Where is the data for your table?</span><input type="text" value="A1:D6" dir="ltr"></label>
+            <label><input type="checkbox" checked><span>My table has headers</span></label>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3><kbd>Ctrl</kbd>+<kbd>T</kbd> and Total Row</h3><ul>
+      <li>Ctrl+T opens Create Table with the block around the cell, as Excel.</li>
+      <li>Table › Total Row adds a row under the table; each column's ▾ picks None, Average, Count, Count Numbers, Max, Min or Sum.</li>
+      <li>Totals count the rows the filter shows (Excel's SUBTOTAL), with no formula in the cell; they follow every edit.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 12 slicers -->
+  <section class="scene" data-scene="slicer">
+    <div class="card"><div class="fbar"><span class="namebox">A1</span><span class="fx">fx</span><span>Campaign</span></div>
+      <div class="stage" style="min-height:470px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th>D</th></tr>
+          <tr><td class="no">1</td><td class="tbh">Campaign</td><td class="tbh">Owner</td><td class="tbh">Channel ▼</td><td class="tbh">Spend</td></tr>
+          <tr><td class="no">2</td><td>Ramadan</td><td>Samaa</td><td>Meta</td><td class="num">1,800</td></tr>
+          <tr class="band"><td class="no">5</td><td>Black Friday</td><td>Roaa</td><td>Meta</td><td class="num">3,100</td></tr>
+          <tr><td class="no">6</td><td>Launch</td><td>Raneem</td><td>Meta</td><td class="num">1,900</td></tr>
+          <tr class="total"><td class="no">7</td><td>Total</td><td></td><td></td><td class="num">6,800</td></tr>
+        </table>
+        <div class="slicer" data-at="0,4,tr" data-dx="20" data-dy="34"><header>Channel <span>☰ ✕</span></header>
+          <button class="on">Meta</button><button>Google</button><button>TikTok</button></div>
+        <div class="dlg" style="left:40px; top:190px; width:280px" role="dialog" aria-label="Insert Slicers">
+          <div class="tbar">Insert Slicers<span class="x">✕</span></div>
+          <div class="body"><div class="lb" style="height:110px"><div><label><input type="checkbox"><span>Campaign</span></label></div><div><label><input type="checkbox"><span>Owner</span></label></div><div><label><input type="checkbox" checked><span>Channel</span></label></div><div><label><input type="checkbox"><span>Spend</span></label></div></div></div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Slicers</h3><ul>
+      <li>Table › Insert Slicer: pick columns; each gets a box of buttons beside the table.</li>
+      <li>A click filters to that value; ☰ (Multi-Select) or Ctrl+click picks several; ✕ clears it. The rows numbers skip as Excel's do, and the Total row follows.</li>
+      <li>Kept with the sheet for everyone.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 13 advanced filter -->
+  <section class="scene" data-scene="adv">
+    <div class="card"><div class="fbar"><span class="namebox">F1</span><span class="fx">fx</span><span>Channel</span></div>
+      <div class="stage" style="min-height:660px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Owner</td><td>Channel</td><td>Spend</td><td></td><td>Channel</td><td>Spend</td></tr>
+          <tr><td class="no">2</td><td>Ramadan</td><td>Samaa</td><td>Meta</td><td class="num">1,800</td><td></td><td>Meta</td><td>&gt;1000</td></tr>
+          <tr><td class="no">3</td><td>Eid</td><td>Hisham</td><td>TikTok</td><td class="num">650</td><td></td><td>Google</td><td></td></tr>
+          <tr><td class="no">4</td><td>Back to school</td><td>Islam</td><td>Google</td><td class="num">2,400</td><td></td><td></td><td></td></tr>
+        </table>
+        <div class="crit" data-r="1,6,3,7"></div>
+        <div class="dlg" style="left:60px; top:170px; width:420px" role="dialog" aria-label="Advanced Filter">
+          <div class="tbar">Advanced Filter<span class="x">✕</span></div><p class="sub">Conditions on one row must all match (AND); separate rows are alternatives (OR).</p>
+          <div class="body">
+            <fieldset><legend>Action</legend><label><input type="radio" name="af"><span>Filter the list, in-place</span></label><label><input type="radio" name="af" checked><span>Copy to another location</span></label></fieldset>
+            <label class="fld"><span>List range</span><input type="text" value="A1:D300" dir="ltr"></label>
+            <label class="fld"><span>Criteria range</span><input type="text" value="F1:G3" dir="ltr"></label>
+            <label class="fld"><span>Copy to</span><select><option>A new sheet</option><option>A cell on this sheet…</option></select></label>
+            <label><input type="checkbox" checked><span>Unique records only</span></label>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Data › Advanced Filter</h3><ul>
+      <li>Excel's dialog and its criteria range: headings, then conditions typed in cells (<code>Meta</code>, <code>&gt;1000</code>, <code>&lt;&gt;Draft</code>, <code>*teaser*</code>). No formulas needed.</li>
+      <li>Here: Channel is Meta <b>and</b> Spend &gt; 1000, <b>or</b> Channel is Google.</li>
+      <li>Filter in place, or copy the matching rows (unique only, if asked) to a new sheet.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 14 group + status bar -->
+  <section class="scene" data-scene="outline">
+    <div class="card">
+      <div class="fbar"><span class="namebox">D3:D6</span><span class="fx">fx</span><span>1,200</span></div>
+      <div class="stage" style="min-height:330px">
+        <table class="indent-table" style="margin-inline-start:34px">
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th class="on">D</th></tr>
+          <tr><td class="no">1</td><td>Q4</td><td>Owner</td><td>Channel</td><td>Spend</td></tr>
+          <tr><td class="no">2</td><td><b>October</b></td><td></td><td></td><td class="num"><b>4,450</b></td></tr>
+          <tr><td class="no on">3</td><td>Ramadan</td><td>Samaa</td><td>Meta</td><td class="num in">1,200</td></tr>
+          <tr><td class="no on">4</td><td>Eid</td><td>Hisham</td><td>TikTok</td><td class="num in">650</td></tr>
+          <tr><td class="no on">5</td><td>Launch</td><td>Raneem</td><td>Meta</td><td class="num in">1,900</td></tr>
+          <tr><td class="no on">6</td><td>Teaser</td><td>Roaa</td><td>Google</td><td class="num in">700</td></tr>
+          <tr><td class="no">7</td><td><b>November</b> <span style="color:var(--faint)">(collapsed)</span></td><td></td><td></td><td class="num"><b>5,500</b></td></tr>
+        </table>
+        <div class="olbar" style="top:0"></div>
+        <div class="ollv" style="inset-inline-start:7px;top:6px"><b>1</b><b class="on">2</b></div>
+        <div class="bracket" data-r="3,0,6,0" data-dx="0" style="width:8px"></div>
+        <div class="olbtn" data-at="6,0,bl" data-dx="-27" data-dy="-6">−</div>
+        <div class="olbtn" data-at="7,0,tl" data-dx="-27" data-dy="4">+</div>
+        <div class="xlmenu sbmenu" style="inset-inline-end:16px; bottom:8px; min-width:260px" role="menu" aria-label="Customize Status Bar">
+          <div class="grp">Customize Status Bar</div>
+          <div class="it on"><span class="rad on"></span><span>Average</span><span class="val">1,113</span></div>
+          <div class="it on"><span class="rad on"></span><span>Count</span><span class="val">4</span></div>
+          <div class="it"><span class="rad"></span><span>Numerical Count</span><span class="val">4</span></div>
+          <div class="it on"><span class="rad on"></span><span>Minimum</span><span class="val">650</span></div>
+          <div class="it on"><span class="rad on"></span><span>Maximum</span><span class="val">1,900</span></div>
+          <div class="it on"><span class="rad on"></span><span>Sum</span><span class="val">4,450</span></div>
+          <hr>
+          <div class="it on"><span class="rad on"></span><span>Zoom Slider</span></div>
+        </div>
+      </div>
+      <div class="sbar"><span class="ready">Ready</span><span class="sp"></span><span class="st">Average <b>1,113</b></span><span class="st">Count <b>4</b></span><span class="st">Min <b>650</b></span><span class="st">Max <b>1,900</b></span><span class="st">Sum <b>4,450</b></span><span class="zoom"><button>−</button><span class="track"><i style="left:36px"></i></span><button>+</button><b>100%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3>Group and the status bar</h3><ul>
+      <li><kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>→</kbd> groups the selected rows or columns (Data › Group); <kbd>Shift</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd> ungroups. Up to 8 levels.</li>
+      <li>The bar beside the row numbers (and above the letters for columns) has − and +, and the level buttons 1 2 … collapse to a level. Kept with the sheet after a reload.</li>
+      <li>Right-click the status bar: Customize Status Bar, as Excel, with Numerical Count, Minimum and Maximum to add; your choice is kept for you.</li>
+    </ul></div></div>
+  </section>
+</div>
+
+<script>
+const tabs = document.querySelectorAll('[role="tab"]')
+tabs.forEach(b => b.addEventListener('click', () => {
+  tabs.forEach(x => x.setAttribute('aria-selected', String(x === b)))
+  document.querySelectorAll('.scene').forEach(s => s.classList.toggle('on', s.dataset.scene === b.dataset.s))
+}))
+const R = document.documentElement
+document.getElementById('theme').onclick = () => { R.dataset.theme = R.dataset.theme === 'dark' ? 'light' : 'dark' }
+document.getElementById('dir').onclick = () => { R.dir = R.dir === 'rtl' ? 'ltr' : 'rtl' }
+/** Each overlay sits on its real cells: data-r="r0,c0,r1,c1" (a box), data-at="r,c,corner" (a point). */
+function place() {
+  document.querySelectorAll('.scene.on .stage').forEach(st => {
+    const tb = st.querySelector('table'); if (!tb) return
+    const o = st.getBoundingClientRect()
+    const cell = (r, c) => tb.rows[r].cells[c].getBoundingClientRect()
+    st.querySelectorAll('[data-r]').forEach(el => {
+      const [r0, c0, r1, c1] = el.dataset.r.split(',').map(Number)
+      const a = cell(r0, c0), b = cell(r1, c1)
+      const L = Math.min(a.left, b.left), T = Math.min(a.top, b.top), Rr = Math.max(a.right, b.right), B = Math.max(a.bottom, b.bottom)
+      Object.assign(el.style, { left: (L - o.left - 1) + 'px', top: (T - o.top - 1) + 'px', width: (Rr - L + 1) + 'px', height: (B - T + 1) + 'px' })
+    })
+    st.querySelectorAll('[data-at]').forEach(el => {
+      const [r, c, k] = el.dataset.at.split(','); const x = cell(+r, +c)
+      const rtl = getComputedStyle(st).direction === 'rtl'
+      const right = rtl ? x.left : x.right, left = rtl ? x.right : x.left
+      let px = k === 'br' || k === 'tr' ? right : k === 'c' ? (x.left + x.right) / 2 : left
+      let py = k === 'tr' ? x.top : k === 'c' ? (x.top + x.bottom) / 2 : x.bottom
+      const dx = (+el.dataset.dx || 0) * (rtl ? -1 : 1), dy = +el.dataset.dy || 0
+      if (rtl && el.offsetWidth > 20) px -= el.offsetWidth
+      Object.assign(el.style, { left: (px - o.left + dx) + 'px', top: (py - o.top + dy) + 'px' })
+    })
+  })
+}
+tabs.forEach(b => b.addEventListener('click', () => requestAnimationFrame(place)))
+document.getElementById('dir').addEventListener('click', () => requestAnimationFrame(place))
+window.addEventListener('resize', place)
+window.addEventListener('load', place)
+</script>
+</body>
+</html>

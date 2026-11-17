@@ -99,6 +99,7 @@ Each decision lists what was chosen, why, and the alternatives considered.
   - **Total row:** `sheet_tables.totals` stores `{ [colId]: 'sum'|'avg'|'count'|'min'|'max' }`. It is drawn as a sticky footer row below the table's last row. It is computed over the visible rows only, so filters are respected, as in tip 79. It is not a stored cell, so there is nothing to recalculate.
   - **Slicers:** `view.slicers = [{ tableId, col }]`, drawn as chip rows above the table. A click sets the existing `view.filter[col]`, so filters and slicers stay one model.
   - **Advanced filter:** a dialog with condition rows (column, operator, value; AND within a group, OR between groups) and "unique rows only". The result either filters in place (`view.filter` gains an `advanced` entry), or is copied to a new sheet with `createSheet` and the rows' values.
+  - **As built (approved design power-tips-b):** Excel's own dialog and criteria range instead of a builder. Headings, then conditions typed in cells (`Meta`, `>1000`, `<>Draft`, `*teaser*`; plain text matches values that begin with it, as in Excel), read by `readCriteria`. In place it is stored as `view.advanced`; a copy goes to a new sheet or a cell on this sheet. Unique records only drops repeated rows.
 
 ## R12. Outline groups (tip 80)
 

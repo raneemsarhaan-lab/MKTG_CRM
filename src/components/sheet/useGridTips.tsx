@@ -298,14 +298,14 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
   // ── the status bar: the mode text and Average, Count, Sum ──
   const statusAt = useRef(0)
   /** `text` undefined leaves the mode as it is; null puts it back to Ready. */
-  function status(text: string | null | undefined, stats?: { count: number; nums: number; sum: number; avg: number | null; cells: number }) {
+  function status(text: string | null | undefined, stats?: { count: number; nums: number; sum: number; avg: number | null; min: number | null; max: number | null; cells: number }) {
     if (text) statusAt.current = Date.now()
     document.dispatchEvent(new CustomEvent(STATUS_EVENT, { detail: { source, text, stats } }))
   }
   function onSelect(q: GridRect, list?: GridRect[]) {
     rect.current = q
     areas.current = list?.length ? list : [q]
-    let count = 0, nums = 0, sum = 0, cells = 0
+    let count = 0, nums = 0, sum = 0, cells = 0, min = Infinity, max = -Infinity
     const seen = new Set<string>()
     outer: for (const a of areas.current) for (let r = a.r0; r <= a.r1; r++) for (let c = a.c0; c <= a.c1; c++) {
       const k = `${r},${c}`
@@ -316,9 +316,9 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
       if (!v) continue
       count++
       const n = parseNumber(v)
-      if (n !== null) { nums++; sum += n }
+      if (n !== null) { nums++; sum += n; if (n < min) min = n; if (n > max) max = n }
     }
-    status(Date.now() - statusAt.current > 800 ? null : undefined, { count, nums, sum, avg: nums ? sum / nums : null, cells })
+    status(Date.now() - statusAt.current > 800 ? null : undefined, { count, nums, sum, avg: nums ? sum / nums : null, min: nums ? min : null, max: nums ? max : null, cells })
   }
 
   // ── the workbook's commands for this sheet ──

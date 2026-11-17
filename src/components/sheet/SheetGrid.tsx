@@ -367,7 +367,7 @@ export function SheetGrid(p: SheetGridProps) {
   })
   leRef.current = le
   Object.assign(model, {
-    cellStyle: lf.cellStyle, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
+    cellStyle: lf.cellStyle, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
-import type { CellStyle, ColFilter, ConditionalRule, GroupBy, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, ValidationRecord, ValidationRule, WordField } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, GroupBy, OutlineGroupRecord, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, TotalFn, ValidationRecord, ValidationRule, WordField } from '@/types/index'
 import { defaultMode, fillModesFor, learnFlash, planSeries, planSeriesDialog, previewValue, sourceKind, type FillCtx, type FillMode, type SeriesSpec } from '@/lib/sheet-fill'
 import { allowed, listSpelling, overlaps } from '@/lib/sheet-validate'
 import { foldCells, type GoSpecial } from '@/lib/sheet-selection'
@@ -29,13 +29,14 @@ import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
 import { display, formatKey, indexFormats, parseNumber, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
-import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
+import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, tableStyle, type CellView } from '@/lib/sheet-rules'
+import { TOTAL_FNS } from '@/types/index'
 import { FilterMenu } from './format/StyleTools'
 import { useTaskLinks, type LinksApi } from './links/useTaskLinks'
 import { normTitle, shownWord, taskIdFrom } from '@/lib/sheet-links'
 import { CONTROL_FIELDS, FieldEditor, FieldIcon, FieldValue } from './links/FieldCells'
 import { AddFieldMenu, FIELDS_OPEN, FieldsDrawer, MatchDialog, ValuesDialog, type ColRef } from './links/FieldsPanel'
-import { SERIES_OPEN, announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
+import { SERIES_OPEN, announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type CleanOp, type FormatCmd, type FormatState, type MergeMode, type SplitFormat, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
 import { areaCols, areaRows, cellName, colLetters, unionCells, unionSize, wholeCols, wholeRows } from '@/lib/sheet-selection'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
@@ -45,10 +46,14 @@ import { NamePrompt } from '@/components/content/ThemeEditor'
 import { openLinks } from './links/useTaskLinks'
 import { ConfirmDialog, ResizeDialog } from './Dialogs'
 import { ValidationAlert } from './format/TipsDialogs'
+import { iconFor } from './format/RuleIcon'
+import { type SplitOpts, advancedPlan, applyOp, blanksFromAbove, changeCase, dedupePlan, readCriteria, splitPlan, storedAsText, toNumber, trimClean } from '@/lib/sheet-clean'
+import { group as outlineGroup, hiddenIds, showLevel, spans as olSpansOf, toggle as olToggle, ungroup as outlineUngroup } from '@/lib/sheet-outline'
+import { fitWidth } from './format/fit'
 
 const MAX_CELL = 50_000
 /** Spec 020: the status bar's figures for the selection (Excel's Average, Count, Sum). */
-export interface SelStats { count: number; nums: number; sum: number; avg: number | null }
+export interface SelStats { count: number; nums: number; sum: number; avg: number | null; min: number | null; max: number | null }
 const STATS_CAP = 50_000
 export const BLANK_ROW_H = 24
 
@@ -66,7 +71,9 @@ export interface BlankSheetProps {
   onSelect(info: { cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean; stats?: SelStats }): void
   onSkipped(skipped: Partial<Record<string, number>>): void
   /** A short message for the workbook's toast (a menu Paste the browser refused). */
-  onNotice(text: string): void
+  onNotice(text: string, undo?: boolean): void
+  /** Spec 020: Advanced Filter › Copy to a new sheet. */
+  onNewSheet?(grid: string[][]): void
   newId(): string
   /** Spec 016: the link actions, and a change to the doc that isn't an undo step (values from the board). */
   links?: LinksApi
@@ -131,11 +138,24 @@ export function BlankSheet(p: BlankSheetProps) {
   }, [fArea, doc.rows])
   const filteredOut = useMemo(() => {
     const out = new Set<string>()
+    // Spec 020 tip 78: the Advanced Filter in place hides the list's rows that fail its criteria (and repeats, with Unique).
+    const adv = view.advanced
+    if (adv) {
+      const a = doc.rows.findIndex(r => r.id === adv.top), b = doc.rows.findIndex(r => r.id === adv.bottom)
+      const c0 = doc.cols.findIndex(c => c.id === adv.left), c1 = doc.cols.findIndex(c => c.id === adv.right)
+      if (a >= 0 && b >= a && c0 >= 0 && c1 >= c0) {
+        const body = doc.rows.slice(a + 1, b + 1), cols = doc.cols.slice(c0, c1 + 1).map(c => c.id)
+        const keep = new Set(advancedPlan(body.map(r => cols.map(c => doc.cells[r.id]?.[c] ?? '')), cols, adv.groups, !!adv.unique))
+        body.forEach((r, i) => { if (!keep.has(i)) out.add(r.id) })
+      }
+    }
+    // Spec 020 tip 80: rows in a collapsed group.
+    for (const id of hiddenIds(view.outline, 'rows', doc.rows.map(r => r.id))) out.add(id)
     if (!fArea || !Object.values(filter).some(filterOn)) return out
     const keep = new Set(filterRows(filterScope, filter, cellView))
     for (const id of filterScope) if (!keep.has(id)) out.add(id)
     return out
-  }, [fArea, filter, filterScope, cellView])
+  }, [fArea, filter, filterScope, cellView, view.advanced, view.outline, doc.rows, doc.cols, doc.cells])
   const baseRows = useMemo(() => {
     const rt = extras.rowTasks ?? {}, tks = extras.tasks ?? {}
     const taskOf = (id: string) => (rt[id] ? tks[rt[id]] : undefined)
@@ -157,7 +177,13 @@ export function BlankSheet(p: BlankSheetProps) {
     none: tf('bandNone'), blank: tf('bandBlank'), noTheme: tf('bandNoTheme'), unassigned: tf('bandUnassigned'), noType: tf('bandNoType'), noPillar: tf('noPillar'),
   }), [doc, baseRows, groupBy, locale, tf])
   const vRows = grouping.rows
-  const vCols = useMemo(() => doc.cols.filter(c => !hiddenC.has(c.id)), [doc.cols, hiddenC])
+  const vCols = useMemo(() => {
+    const folded = hiddenIds(view.outline, 'cols', doc.cols.map(c => c.id))
+    return doc.cols.filter(c => !hiddenC.has(c.id) && !folded.has(c.id))
+  }, [doc.cols, hiddenC, view.outline])
+  /** Spec 020 tip 80: the outline groups, placed on the sheet's rows and columns. */
+  const olSpans = useMemo(() => ({ rows: olSpansOf(view.outline, 'rows', doc.rows.map(r => r.id)), cols: olSpansOf(view.outline, 'cols', doc.cols.map(c => c.id)) }), [view.outline, doc.rows, doc.cols])
+  const olDepth = { rows: Math.max(0, ...olSpans.rows.map(g => g.level)), cols: Math.max(0, ...olSpans.cols.map(g => g.level)) }
   /** The grid shows its first cell as active before anything is clicked; the toolbar must agree. */
   const active: ActiveCell | null = picked && vRows.some(r => r.id === picked.key) ? picked
     : vRows[0] && vCols[0] ? { key: vRows[0].id, col: vCols[0].id } : null
@@ -211,7 +237,7 @@ export function BlankSheet(p: BlankSheetProps) {
     const names = list.length > 1 ? list.map(areaName) : []
     // Spec 020: Average, Count and Sum of the selection, as Excel's status bar (capped for speed).
     // Only filled cells are read (a sheet is mostly empty), row by row, up to the cap.
-    let count = 0, nums = 0, sum = 0, seen = 0
+    let count = 0, nums = 0, sum = 0, seen = 0, min = Infinity, max = -Infinity
     const counted = new Set<string>()
     for (const q of list) {
       for (let r = q.r0; r <= q.r1 && seen < STATS_CAP; r++) {
@@ -224,11 +250,11 @@ export function BlankSheet(p: BlankSheetProps) {
           if (counted.has(k)) continue
           counted.add(k); seen++; count++
           const n = parseNumber(v)
-          if (n !== null) { nums++; sum += n }
+          if (n !== null) { nums++; sum += n; if (n < min) min = n; if (n > max) max = n }
         }
       }
     }
-    const stats: SelStats = { count, nums, sum, avg: nums ? sum / nums : null }
+    const stats: SelStats = { count, nums, sum, avg: nums ? sum / nums : null, min: nums ? min : null, max: nums ? max : null }
     p.onSelect({ cell: nameAt(q.r0, q.c0), count: unionSize(list), areas: list.length, label: names.slice(0, 3).join(', '), more: Math.max(0, names.length - 3), adding: addingRef.current, stats })
     if (Date.now() - statusAt.current > 800) p.onStatus?.(null)
   }
@@ -632,7 +658,7 @@ export function BlankSheet(p: BlankSheetProps) {
     rows,
     cols: colIds,
     widths,
-    rowNoWidth: 46,
+    rowNoWidth: 46 + (olDepth.rows ? 4 + 12 * olDepth.rows : 0),
     label: t('grid.label', { name: p.name, rows: doc.rows.length, cols: doc.cols.length }),
     header: col => {
       const i = colIndex.get(col) ?? 0
@@ -644,6 +670,16 @@ export function BlankSheet(p: BlankSheetProps) {
         return { text: <>{icon}{name || <span className="fx-sheet-muted">{colLetters(i)}</span>}</>, label: name || colLetters(i), className: `is-named${f ? ' is-field' : ''}` }
       }
       const before = i > 0 && hiddenC.has(doc.cols[i - 1].id)
+      // Spec 020 tip 80: a column group draws a line above its letters, and − or + on the column after it.
+      const inGroup = olSpans.cols.some(g => i >= g.i0 && i <= g.i1)
+      const after = olSpans.cols.filter(g => i === g.i1 + 1).sort((x, y) => y.level - x.level)[0]
+      const olBtn = after ? <button type="button" className="fx-ol-btn is-col" data-ol-toggle-col={after.from} tabIndex={-1} aria-expanded={!after.collapsed}
+                                    aria-label={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')} title={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')}
+                                    onPointerDown={ev => ev.stopPropagation()}
+                                    onClick={ev => { ev.stopPropagation(); setOutline(olToggle(view.outline ?? [], after), after.collapsed ? 'outlineExpand' : 'outlineCollapse') }}>{after.collapsed ? '+' : '−'}</button> : null
+      if (inGroup || olBtn) {
+        return { text: <>{olBtn}{colLetters(i)}</>, className: `is-letter${inGroup ? ' is-ol-col' : ''}${lk.map?.fields[col] ? ' is-field' : ''}` }
+      }
       return {
         text: before
           ? <>{colLetters(i)}<button type="button" className="fx-hid-mark" data-unhide-col={col} title={t('format.edit.unhideCols')} aria-label={t('format.edit.unhideCols')}
@@ -678,9 +714,9 @@ export function BlankSheet(p: BlankSheetProps) {
       const sh = lk.shown(row.id, col)
       return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : content ? '' : ' is-lk') : ''}`
     },
-    isText: (row, col) => { if (col === 'rowNo' || ro) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
-    textValue: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
-    copyText: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
+    isText: (row, col) => { if (col === 'rowNo' || ro) return false; if (totalCell(row.id, col)?.fn) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
+    textValue: (row, col) => { const tot = totalCell(row.id, col); if (tot?.fn) return tot.raw; const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
+    copyText: (row, col) => { const tot = totalCell(row.id, col); if (tot?.fn) return tot.raw; const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     // Spec 019: a field cell on a linked row opens its control (typing still works, through the same rules).
     isMenu: (row, col) => {
       if (col === 'rowNo' || ro) return false
@@ -715,6 +751,21 @@ export function BlankSheet(p: BlankSheetProps) {
         return <button type="button" className="fx-lk-create" data-create-task={row.id} tabIndex={-1}
                        onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋ {tf('createTask')}</button>
       }
+      // Spec 020 tip 73: a table's Total row shows its totals (no formula in the cell) and a ▾ on the active cell.
+      const tot = totalCell(row.id, col)
+      if (tot) {
+        const isAct = active?.key === row.id && active.col === col
+        const drop = isAct && !ro && tot.pickable
+          ? <button type="button" className="fx-total-drop" data-total-drop={col} tabIndex={-1} aria-haspopup="menu" aria-label={tt('total.pick')} title={tt('total.pick')}
+                    onPointerDown={ev => ev.stopPropagation()}
+                    onClick={ev => {
+                      ev.stopPropagation()
+                      const el = ev.currentTarget, r = el.getBoundingClientRect()
+                      setMenu({ at: { x: rtl ? r.right : r.left, y: r.bottom + 4 }, anchor: el, items: TOTAL_FNS.map(fn => ({ key: fn, label: tt(`total.fns.${fn}`), checked: (tot.fn ?? 'none') === fn, onSelect: () => setTotal(tot.tb.id, col, fn) })) })
+                    }}>▾</button>
+          : null
+        return <><span className="fx-sheet-cell-text" data-total={tot.fn ?? 'label'}>{tot.shown}</span>{drop}</>
+      }
       const v = value(row.id, col)
       // Stage 3: the filter buttons sit in the filter's header row.
       const fb = fArea && fArea.header === row.id && fArea.cols.includes(col)
@@ -726,10 +777,35 @@ export function BlankSheet(p: BlankSheetProps) {
       if (!v) return fb
       const st = styleOf(row.id, col)
       const shown = st?.num ? display(v, st.num, locale) : v
-      const text = <span className="fx-sheet-cell-text" style={showsRed(v, st?.num) ? { color: '#C00000' } : undefined}>{shown}</span>
-      return fb ? <>{text}{fb}</> : text
+      // Spec 020 tip 26: Center Across Selection lays the text over the next empty cells that also carry it.
+      const across = st?.ha === 'across' ? acrossWidth(row.id, col) : 0
+      const red = showsRed(v, st?.num) ? { color: '#C00000' } : undefined
+      const text = across
+        ? <span className="fx-sheet-cell-text fx-across" data-across={across} style={{ ...red, width: across }}>{shown}</span>
+        : <span className="fx-sheet-cell-text" style={red}>{shown}</span>
+      // Spec 020: Excel's green corner on a number kept as text, with its ! menu on the active cell.
+      const isGreen = storedAsText(v, st?.num?.kind) && !ro && !ignored.has(`${row.id}|${col}`)
+      const green = isGreen ? <>
+        <span className="fx-num-text" data-num-text="" aria-hidden="true" />
+        {active?.key === row.id && active.col === col && (
+          <button type="button" className="fx-num-text-btn" data-num-text-btn="" tabIndex={-1} aria-haspopup="menu" aria-label={tt('clean.numText')} title={tt('clean.numText')}
+                  onPointerDown={ev => ev.stopPropagation()}
+                  onClick={ev => {
+                    ev.stopPropagation()
+                    const el = ev.currentTarget, r = el.getBoundingClientRect()
+                    setMenu({ at: { x: rtl ? r.right : r.left, y: r.bottom + 4 }, anchor: el, items: [
+                      { kind: 'node', key: 'h', node: <div role="presentation" className="fx-st-h">{tt('clean.numText')}</div> },
+                      { key: 'convert', label: tt('clean.convert'), onSelect: () => convertCell(row.id, col) },
+                      { key: 'ignore', label: tt('clean.ignore'), onSelect: () => ignoreCell(`${row.id}|${col}`) },
+                    ] })
+                  }}>!</button>
+        )}
+      </> : null
+      return fb || green ? <>{text}{green}{fb}</> : text
     },
     cellStyle: (row, col) => lookCss(row.id, col),
+    cellIcon: (row, col) => (ruleLooks.size && col !== 'rowNo' ? iconFor(ruleLooks.get(`${row.id}|${col}`)) : null),
+    onCopied: (q, grid) => { lastCopy.current = { rows: vRows.slice(q.r0, q.r1 + 1).map(r => r.id), cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), grid } },
     copyStyle: (row, col) => styleOf(row.id, col),
     copyShown: (row, col) => { const v = value(row.id, col), st = styleOf(row.id, col); return st?.num ? display(v, st.num, locale) : v },
     marked: (row, col) => marks.has(`${row.id}|${col}`),
@@ -738,7 +814,15 @@ export function BlankSheet(p: BlankSheetProps) {
       if (spans.covered.has(k)) return 'covered'
       return spans.anchor.get(k) ?? null
     },
-    rowLabel: row => {
+    corner: () => olDepth.rows ? (
+      <span className="fx-ol-levels" data-ol-levels="" role="group" aria-label={tt('outline.levels')}>
+        {Array.from({ length: olDepth.rows + 1 }, (_, k) => (
+          <button key={k} type="button" data-ol-level={k + 1} tabIndex={-1} aria-label={tt('outline.level', { n: k + 1 })} title={tt('outline.level', { n: k + 1 })}
+                  onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); setOutline(showLevel(view.outline ?? [], 'rows', k + 1), 'outlineLevel') }}>{k + 1}</button>
+        ))}
+      </span>
+    ) : null,
+    rowLabel: row => <>{olGutter(row.id)}{(() => {
       const i = rowIndex.get(row.id) ?? 0
       const tk = lk.taskOfRow(row.id)
       const hasLinkCol = content && Object.values(lk.map?.fields ?? {}).includes('task')
@@ -751,13 +835,14 @@ export function BlankSheet(p: BlankSheetProps) {
                                 onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); unhideBefore('rows', i) }} /></>
       }
       return i + 1
-    },
+    })()}</>,
     isDraft: () => false,
     inputLabel: (row, col) => cellName(rowIndex.get(row.id) ?? 0, colIndex.get(col) ?? 0),
     inputDir: () => undefined,
     readOnlyNote: (row, col) => {
       if (col === 'rowNo') return null
       if (ro) return ro
+      if (totalCell(row.id, col)?.fn) return tt('total.readOnly')
       const sh = lk.shown(row.id, col)
       if (sh?.na) return tl('naWhy', { field: tl(`fields.${sh.field.startsWith('col:') ? 'none' : sh.field}`) })
       if (sh?.field === 'task') return tf('taskLinkWhy')
@@ -913,7 +998,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (clears.length) setMergeAsk({ value: keep, run }); else run()
   }
   // ── stage 2: hide, unhide, freeze (FR-047) ──────────────────────────────
-  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {}, groupBy: view.groupBy ?? null, look: view.look })
+  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {}, groupBy: view.groupBy ?? null, look: view.look, slicers: view.slicers ?? [], advanced: view.advanced ?? null, outline: view.outline ?? [] })
   function setView(label: string, after: Partial<SheetView>) {
     if (ro) { p.onNotice(ro); return }
     applyR(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
@@ -1013,7 +1098,13 @@ export function BlankSheet(p: BlankSheetProps) {
     if (items.length) forward.push({ kind: 'formats', items })
     if (forward.length) applyR(`fill-${dir}`, forward)
   }
-  /** Paste Special (FR-041): values only, formats only, or both; optionally transposed. */
+  /** Spec 020: the block last copied on this sheet, by ids (Paste Special › Validation and Column widths). */
+  const lastCopy = useRef<{ rows: string[]; cols: string[]; grid: string[][] } | null>(null)
+  /**
+   * Paste Special (FR-041; spec 020 tip 99): All, Values, Formats, All except
+   * borders, Validation, Column widths; Add/Subtract/Multiply/Divide with the
+   * copied number; Skip blanks; Transpose.
+   */
   async function pasteSpecial(cmd: Extract<FormatCmd, { kind: 'pasteSpecial' }>) {
     if (ro) { p.onNotice(ro); return }
     if (oneArea()) return
@@ -1023,6 +1114,41 @@ export function BlankSheet(p: BlankSheetProps) {
     if (!grid.length) return
     const plan = pastePlan(grid, q)
     const one = grid.length === 1 && grid[0].length === 1
+    // An operation: the copied number applied to each number in the selection; other cells are left and counted.
+    if (cmd.op) {
+      const by = one ? parseNumber(grid[0][0]) : null
+      if (by === null) { p.onNotice(tt('ps.opOne')); return }
+      if (cmd.op === 'div' && by === 0) { p.onNotice(tt('ps.divZero')); return }
+      const list: { rowId: string; colId: string; value: string }[] = []
+      let skipped = 0
+      for (const x of selFilled()) {
+        const v = applyOp(x.v, by, cmd.op)
+        if (v === null) skipped++
+        else list.push({ rowId: x.rowId, colId: x.colId, value: v })
+      }
+      const ch = cellChange(list)
+      if (ch) applyR(`paste-${cmd.op}`, [ch])
+      p.onNotice(skipped ? tt('ps.opSkipped', { n: list.length, skipped }) : tt('ps.opDone', { n: list.length }), !!ch)
+      return
+    }
+    // Validation and Column widths come from the cells copied on this sheet.
+    if (cmd.mode === 'validation' || cmd.mode === 'widths') {
+      const src = lastCopy.current
+      if (!src || JSON.stringify(src.grid) !== JSON.stringify(cmd.grid)) { p.onNotice(tt('ps.needCopy')); return }
+      if (cmd.mode === 'widths') {
+        const list = src.cols.map((id, j) => {
+          const from = doc.cols.find(c => c.id === id), to = vCols[q.c0 + j]
+          return to ? { id: to.id, before: to.width ?? null, after: from?.width ?? null } : null
+        }).filter((x): x is { id: string; before: number | null; after: number | null } => !!x && x.before !== x.after)
+        if (list.length) applyR('pasteWidths', [{ kind: 'colWidths', cols: list }])
+        return
+      }
+      const rules = new Set(src.rows.flatMap(r => src.cols.map(c => ruleAt(r, c)?.id ?? '')))
+      if (rules.size > 1) { p.onNotice(tt('ps.dvMixed')); return }
+      const rule = ruleAt(src.rows[0], src.cols[0])
+      setValidation(rule ?? null, false)
+      return
+    }
     if (cmd.mode === 'formats') {
       if (!styles) { p.onNotice(t('format.edit.noFormats')); return }
       const items: FormatItem[] = []
@@ -1037,8 +1163,19 @@ export function BlankSheet(p: BlankSheetProps) {
     } else {
       const list: CellWrite[] = []
       for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
-        const w: CellWrite = { r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) }
-        if (cmd.mode === 'all' && styles) w.style = (one ? styles[0]?.[0] : styles[r]?.[c]) ?? null
+        const v = plan.value(r, c)
+        // Skip blanks: an empty copied cell leaves the cell under it alone.
+        if (cmd.skipBlanks && !v) continue
+        const w: CellWrite = { r: q.r0 + r, c: q.c0 + c, value: v }
+        if ((cmd.mode === 'all' || cmd.mode === 'noBorders') && styles) {
+          let st = (one ? styles[0]?.[0] : styles[r]?.[c]) ?? null
+          if (cmd.mode === 'noBorders') {
+            // All except borders: the copied look, with the cell's own borders kept.
+            const row = vRows[q.r0 + r], col = vCols[q.c0 + c], mine = row && col ? index.get(formatKey(row.id, col.id)) ?? null : null
+            st = { ...(st ?? {}), bt: mine?.bt ?? undefined, br: mine?.br ?? undefined, bb: mine?.bb ?? undefined, bl: mine?.bl ?? undefined }
+          }
+          w.style = st
+        }
         list.push(w)
       }
       const res = await writeCells(list, 'paste')
@@ -1113,11 +1250,68 @@ export function BlankSheet(p: BlankSheetProps) {
     const rl = ruleLooks.size ? ruleLooks.get(`${rowId}|${colId}`) : undefined
     if (!tl && !rl) return own ? toCss(own) : null
     let st: CellStyle = { ...(tl ?? {}), ...(own ?? {}) }
+    // Spec 020: a Total row is bold under a double line in the table's colour.
+    const ttb = tl ? totalTableOf(rowId) : null
+    if (ttb) st = { b: true, ...st, bt: { w: 'double', c: tableStyle(ttb.style).base } }
     if (rl?.style) st = { ...st, ...rl.style }
     if (rl?.scale) st = { ...st, fill: rl.scale }
     const css = toCss(st)
     if (!rl?.bar) return css
     return { ...css, cell: { ...css.cell, ...barCss(rl.bar, rtl) } }
+  }
+  /** The bar beside a row number: a lane per level with the group's bracket, and − or + on the row under it. */
+  function olGutter(rowId: string) {
+    if (!olDepth.rows) return null
+    const i = rowIndex.get(rowId) ?? -1
+    return (
+      <span className="fx-ol-gut" aria-hidden={false}>
+        {Array.from({ length: olDepth.rows }, (_, k) => {
+          const lv = k + 1
+          const g = olSpans.rows.find(x => x.level === lv && i >= x.i0 && i <= x.i1)
+          const after = olSpans.rows.find(x => x.level === lv && i === x.i1 + 1)
+          return (
+            <span key={lv} className={`fx-ol-lane${g ? ' is-in' : ''}${g && i === g.i0 ? ' is-top' : ''}${g && i === g.i1 ? ' is-end' : ''}`}>
+              {after && (
+                <button type="button" className="fx-ol-btn" data-ol-toggle={after.from} tabIndex={-1} aria-expanded={!after.collapsed}
+                        aria-label={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')} title={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')}
+                        onPointerDown={ev => ev.stopPropagation()}
+                        onClick={ev => { ev.stopPropagation(); setOutline(olToggle(view.outline ?? [], after), after.collapsed ? 'outlineExpand' : 'outlineCollapse') }}>
+                  {after.collapsed ? '+' : '−'}</button>
+              )}
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
+  /** Spec 020 tip 73: a Total row cell: its total (computed from the rows on screen) or the "Total" label. */
+  function totalCell(rowId: string, colId: string): { tb: SheetTableRecord; fn: TotalFn | null; raw: string; shown: string; pickable: boolean } | null {
+    if (!tables.length) return null
+    const tb = totalTableOf(rowId)
+    if (!tb) return null
+    const box = tableBoxes.find(b => b.tb.id === tb.id)
+    if (!box?.cols.has(colId)) return null
+    const first = vCols.find(c => box.cols.has(c.id))?.id === colId
+    const fn = tb.totals?.[colId]
+    if (!fn || fn === 'none') return first ? { tb, fn: null, raw: value(rowId, colId), shown: value(rowId, colId), pickable: false } : { tb, fn: null, raw: '', shown: '', pickable: true }
+    const raw = totalOf(tb, colId, fn)
+    // Shown in the column's number format (the cell's own, else the body's), as Excel's SUBTOTAL takes it.
+    const above = vRows.find(r => box.pos.has(r.id) && r.id !== tb.top && r.id !== tb.bottom)
+    const num = styleOf(rowId, colId)?.num ?? (above ? styleOf(above.id, colId)?.num : undefined)
+    const shown = fn === 'count' || fn === 'countNums' ? raw : num ? display(raw, num, locale) : raw
+    return { tb, fn, raw, shown, pickable: true }
+  }
+  /** Spec 020 tip 26: how far a Center Across cell's text reaches (px), or 0 when it stays in its cell. */
+  function acrossWidth(rowId: string, colId: string): number {
+    const at = vColIndex.get(colId)
+    if (at === undefined) return 0
+    let w = widths[colId] ?? DEFAULT_COL_W, n = 0
+    for (let c = at + 1; c < vCols.length; c++) {
+      const id = vCols[c].id
+      if (value(rowId, id) || styleOf(rowId, id)?.ha !== 'across' || spans.anchor.has(`${rowId}|${id}`) || spans.covered.has(`${rowId}|${id}`)) break
+      w += widths[id] ?? DEFAULT_COL_W; n++
+    }
+    return n ? w : 0
   }
   /** The block of filled cells around a cell, as Excel's "current region". */
   function region(r: number, c: number): GridRect {
@@ -1141,7 +1335,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (fromFilter && fArea?.header) { const h = vRows.find(r => r.id === fArea.header); const inScope = new Set(filterScope); return { rows: [...(h ? [h] : []), ...vRows.filter(r => inScope.has(r.id))], header: !!h } }
     if (q.r0 !== q.r1) return { rows: vRows.slice(q.r0, q.r1 + 1), header: null }
     const tb = active ? tableAt(active.key, active.col) : null
-    if (tb) { const b = tableBoxes.find(x => x.tb.id === tb.id)!; return { rows: vRows.filter(r => b.pos.has(r.id)), header: tb.header } }
+    if (tb) { const b = tableBoxes.find(x => x.tb.id === tb.id)!; return { rows: vRows.filter(r => b.pos.has(r.id) && !(tb.totals && r.id === tb.bottom)), header: tb.header } }
     if (fArea?.header) { const h = vRows.find(r => r.id === fArea.header); const inScope = new Set(filterScope); return { rows: [...(h ? [h] : []), ...vRows.filter(r => inScope.has(r.id))], header: !!h } }
     const a = activeAt(), g = region(a.r, a.c)
     return { rows: vRows.slice(g.r0, g.r1 + 1), header: null }
@@ -1161,19 +1355,19 @@ export function BlankSheet(p: BlankSheetProps) {
     const moved = ordered.map((r, i) => ({ id: r.id, before: r.position, after: slots[i] })).filter(x => x.before !== x.after)
     if (moved.length) applyR('sort', [{ kind: 'rowOrder', rows: moved }])
   }
-  function formatAsTable(style: string) {
+  function formatAsTable(style: string, at?: GridRect, header = true) {
     if (ro) { p.onNotice(ro); return }
     const cur = active ? tableAt(active.key, active.col) : null
-    if (cur) { applyR('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
+    if (cur && !at) { applyR('tableStyle', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === cur.id ? { ...x, style } : x)) }]); return }
     if (oneArea()) return
-    const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
+    const a = activeAt(), q = at ?? (multi() ? rectRef.current : region(a.r, a.c))
     const d0 = rowIndex.get(vRows[q.r0].id) ?? 0, d1 = rowIndex.get(vRows[q.r1].id) ?? 0, e0 = colIndex.get(vCols[q.c0].id) ?? 0, e1 = colIndex.get(vCols[q.c1].id) ?? 0
     if (tableBoxes.some(b => b.dr[0] <= d1 && d0 <= b.dr[1] && b.dc[0] <= e1 && e0 <= b.dc[1])) { p.onNotice(sheetT('tableOverlap')); return }
     if (boxes.some(b => b.r0 <= q.r1 && q.r0 <= b.r1 && b.c0 <= q.c1 && q.c0 <= b.c1)) { p.onNotice(sheetT('tableMerged')); return }
-    const rec: SheetTableRecord = { id: p.newId(), top: vRows[q.r0].id, bottom: vRows[q.r1].id, left: vCols[q.c0].id, right: vCols[q.c1].id, style, header: true, banded: true }
+    const rec: SheetTableRecord = { id: p.newId(), top: vRows[q.r0].id, bottom: vRows[q.r1].id, left: vCols[q.c0].id, right: vCols[q.c1].id, style, header, banded: true }
     applyR('table', [
       { kind: 'tables', before: tables, after: [...tables, rec] },
-      { kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: { header: rec.top, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: rec.bottom }, filter: {} } },
+      ...(header ? [{ kind: 'view' as const, before: viewNow(), after: { ...viewNow(), filterArea: { header: rec.top, cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), last: rec.bottom }, filter: {} } }] : []),
     ])
     setSelectRect(q)
   }
@@ -1220,6 +1414,8 @@ export function BlankSheet(p: BlankSheetProps) {
       rows: q.r0 === 0 && q.r1 === vRows.length - 1 && !Object.keys(filter).length ? 'all' : vRows.slice(q.r0, q.r1 + 1).map(r => r.id),
       cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id),
     }
+    // Spec 020 tip 27: a whole-row rule tests a column of its own range.
+    if (rule.args.row && rule.args.col && !range.cols.includes(rule.args.col)) range.cols = [...range.cols, rule.args.col]
     setRules('rule', [{ id: p.newId(), range, ...rule, priority: 0 }, ...[...rules].sort((x, y) => x.priority - y.priority).map((r, i) => ({ ...r, priority: i + 1 }))])
   }
   function rulesClear(where: 'selection' | 'sheet') {
@@ -1261,6 +1457,352 @@ export function BlankSheet(p: BlankSheetProps) {
     return true
   }
 
+  // ── spec 020 stage B (approved design power-tips-b) ─────────────────────
+  /** The selection's filled cells, each once (a sheet is mostly empty); linked task cells are left out. */
+  function selFilled(): { rowId: string; colId: string; v: string }[] {
+    const out: { rowId: string; colId: string; v: string }[] = [], seen = new Set<string>()
+    for (const q of areasRef.current) for (let r = q.r0; r <= q.r1; r++) {
+      const row = vRows[r], cells = row ? doc.cells[row.id] : undefined
+      if (!cells) continue
+      for (const [colId, v] of Object.entries(cells)) {
+        const c = vColIndex.get(colId)
+        if (c === undefined || c < q.c0 || c > q.c1 || !v || lk.shown(row.id, colId)) continue
+        const k = `${row.id}|${colId}`
+        if (seen.has(k)) continue
+        seen.add(k); out.push({ rowId: row.id, colId, v })
+      }
+    }
+    return out
+  }
+  /** A rewrite of cells (and Text formats that go) as one step, with Excel's "N cells changed" note and Undo. */
+  function rewrite(label: string, what: string, list: { rowId: string; colId: string; value: string }[], unText: [string, string][] = []) {
+    const forward: BlankChange[] = []
+    const ch = cellChange(list)
+    if (ch) forward.push(ch)
+    if (unText.length) { const f = planFormat(index, unText, { num: null }); if (f.length) forward.push({ kind: 'formats', items: f }) }
+    if (!forward.length) { p.onNotice(tt('clean.none', { what })); return }
+    const n = new Set([...(ch?.kind === 'cells' ? ch.cells.map(x => `${x.rowId}|${x.colId}`) : []), ...unText.map(([a, b]) => `${a}|${b}`)]).size
+    applyR(label, forward)
+    p.onNotice(tt('clean.done', { what, n }), true)
+  }
+  /** Data › Clean up: Trim Spaces and Clean, Change Case, Convert Text to Numbers, Fill Blanks from Above (tips 61–67). */
+  function cleanup(op: CleanOp) {
+    if (ro) { p.onNotice(ro); return }
+    const list: { rowId: string; colId: string; value: string }[] = []
+    const unText: [string, string][] = []
+    if (op === 'blanks') {
+      for (const q of areasRef.current) for (let c = q.c0; c <= q.c1; c++) {
+        const col = vCols[c]
+        if (!col) continue
+        const vals: string[] = []
+        for (let r = q.r0; r <= q.r1 && r < vRows.length; r++) vals.push(value(vRows[r].id, col.id))
+        // Blanks below the last value aren't part of the list.
+        let last = vals.length - 1
+        while (last >= 0 && !vals[last].trim()) last--
+        blanksFromAbove(vals.slice(0, last + 1)).forEach((v, i) => { if (v !== null) list.push({ rowId: vRows[q.r0 + i].id, colId: col.id, value: v }) })
+      }
+    } else {
+      for (const x of selFilled()) {
+        let v: string | null = null
+        if (op === 'trim') v = trimClean(x.v)
+        else if (op === 'toNumber') {
+          v = toNumber(x.v)
+          if (v !== null && styleOf(x.rowId, x.colId)?.num?.kind === 'text') unText.push([x.rowId, x.colId])
+        } else v = changeCase(x.v, op)
+        if (v !== null && v !== x.v) list.push({ rowId: x.rowId, colId: x.colId, value: v })
+      }
+    }
+    rewrite(`clean-${op}`, tt(`clean.ops.${op}`), list, unText)
+  }
+  /** The green corner's Convert to Number, on one cell. */
+  function convertCell(rowId: string, colId: string) {
+    if (ro) { p.onNotice(ro); return }
+    const v = toNumber(value(rowId, colId))
+    if (v === null) return
+    rewrite('clean-toNumber', tt('clean.ops.toNumber'), [{ rowId, colId, value: v }], [[rowId, colId]])
+  }
+  /** Ignore Error: the corner goes for this member (kept in this browser). */
+  const [ignored, setIgnored] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    try { setIgnored(new Set(JSON.parse(localStorage.getItem(`momentum.sheet.ignore.${p.doc.id}`) ?? '[]'))) } catch { /* private window */ }
+  }, [p.doc.id])
+  function ignoreCell(k: string) {
+    setIgnored(s => { const n = new Set(s); n.add(k); try { localStorage.setItem(`momentum.sheet.ignore.${p.doc.id}`, JSON.stringify([...n].slice(-500))) } catch { /* not kept */ } return n })
+  }
+  /**
+   * What Remove Duplicates works on (tip 52): the selection, the table, or
+   * the block around the active cell; with headings when the first row's
+   * labels don't repeat below (as Excel guesses).
+   */
+  function dataScope(): { rows: typeof vRows; cols: string[]; header: boolean } {
+    const tb = !multi() ? tableHere() : null
+    let rowsIn: typeof vRows, cols: string[], header: boolean | null = null
+    if (tb) {
+      const b = tableBoxes.find(x => x.tb.id === tb.id)!
+      rowsIn = vRows.filter(r => b.pos.has(r.id) && !(tb.totals && r.id === tb.bottom))
+      cols = vCols.filter(c => b.cols.has(c.id)).map(c => c.id)
+      header = tb.header
+    } else {
+      const a = activeAt(), g = multi() ? rectRef.current : region(a.r, a.c)
+      rowsIn = vRows.slice(g.r0, g.r1 + 1)
+      cols = vCols.slice(g.c0, g.c1 + 1).map(c => c.id)
+    }
+    if (header === null) {
+      const first = rowsIn[0], rest = rowsIn.slice(1)
+      header = !!first && rest.length > 0 && (
+        looksLikeHeader(cols.map(c => cellView(first.id, c)), cols.map(c => cellView(rest[0].id, c))) ||
+        cols.every(c => { const v = value(first.id, c).trim(); return !!v && parseNumber(v) === null && !rest.some(r => value(r.id, c).trim() === v) }))
+    }
+    return { rows: rowsIn, cols, header }
+  }
+  function dedupe(cols: string[], header: boolean) {
+    if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
+    const sc = dataScope()
+    const body = header ? sc.rows.slice(1) : sc.rows
+    if (!cols.length || body.length < 2) { p.onNotice(tt('clean.dupNone', { left: body.length })); return }
+    const gone = new Set(dedupePlan(body.map(r => cols.map(c => value(r.id, c)))))
+    if (!gone.size) { p.onNotice(tt('clean.dupNone', { left: body.length })); return }
+    const kept = body.filter((_, i) => !gone.has(i))
+    // The unique rows close up inside the range; what's left at its foot is cleared (Excel removes the cells, not whole rows).
+    const list: { rowId: string; colId: string; value: string }[] = []
+    body.forEach((r, i) => { const src = kept[i]; for (const c of sc.cols) list.push({ rowId: r.id, colId: c, value: src ? value(src.id, c) : '' }) })
+    const ch = cellChange(list)
+    if (ch) applyR('dedupe', [ch])
+    p.onNotice(tt('clean.dupDone', { n: gone.size, left: kept.length }), true)
+  }
+  /** Text to Columns (tip 54): one column split into the next ones; data there is replaced after a confirm. */
+  const [splitAsk, setSplitAsk] = useState<{ run(): void } | null>(null)
+  function split(opts: SplitOpts, formats: SplitFormat[], confirmed = false) {
+    if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
+    const q = rectRef.current
+    if (q.c0 !== q.c1) { p.onNotice(tt('clean.splitOneCol')); return }
+    const src = vCols[q.c0]
+    if (!src) return
+    const sel = vRows.slice(q.r0, q.r1 + 1)
+    let last = sel.length - 1
+    while (last >= 0 && !value(sel[last].id, src.id)) last--
+    const rowsIn = sel.slice(0, last + 1)
+    if (!rowsIn.length) return
+    const plan = splitPlan(rowsIn.map(r => value(r.id, src.id)), opts)
+    const keep = Array.from({ length: plan.width }, (_, i) => i).filter(i => formats[i] !== 'skip')
+    if (!keep.length) return
+    const newCols = growTo(doc.cols, doc.cols.length + (q.c0 + keep.length - 1) - vCols.length, BLANK_COL_LIMIT, p.newId)
+    const allCols = [...vCols, ...newCols]
+    if (q.c0 + keep.length > allCols.length) { p.onNotice(t('err.too_many_cols')); return }
+    if (!confirmed && rowsIn.some(r => keep.slice(1).some((_, j) => !!value(r.id, allCols[q.c0 + 1 + j]?.id ?? '')))) {
+      setSplitAsk({ run: () => split(opts, formats, true) }); return
+    }
+    const forward: BlankChange[] = []
+    if (newCols.length) forward.push({ kind: 'insertCols', cols: newCols.map(c => ({ ...c, width: null })) })
+    const list: { rowId: string; colId: string; value: string }[] = []
+    rowsIn.forEach((r, ri) => keep.forEach((pi, j) => list.push({ rowId: r.id, colId: allCols[q.c0 + j].id, value: plan.parts[ri][pi] ?? '' })))
+    const ch = cellChange(list)
+    if (ch) forward.push(ch)
+    for (const kind of ['text', 'date'] as const) {
+      const targets: [string, string][] = []
+      keep.forEach((pi, j) => { if (formats[pi] === kind) for (const r of rowsIn) targets.push([r.id, allCols[q.c0 + j].id]) })
+      if (targets.length) { const f = planFormat(index, targets, { num: { kind } }); if (f.length) forward.push({ kind: 'formats', items: f }) }
+    }
+    if (!forward.length) return
+    applyR('split', forward)
+    p.onNotice(tt('clean.splitDone', { n: rowsIn.length, cols: keep.length }), true)
+    setSelectRect({ r0: q.r0, c0: q.c0, r1: q.r0 + rowsIn.length - 1, c1: q.c0 + keep.length - 1 })
+  }
+  /** Format › Cell size › AutoFit Column Width / AutoFit Row Height, for every selected column or row, one step. */
+  function autofit(what: 'row' | 'col') {
+    if (ro) { p.onNotice(ro); return }
+    const q = rectRef.current
+    if (what === 'row') {
+      const ids = (many() ? areaRows(areasRef.current) : range(q.r0, q.r1)).map(r => vRows[r]?.id).filter((x): x is string => !!x)
+      setHeights(ids, null)
+      return
+    }
+    const ids = (many() ? areaCols(areasRef.current) : range(q.c0, q.c1)).map(c => vCols[c]?.id).filter((x): x is string => !!x)
+    const list = ids.map(id => {
+      let w = 40
+      for (const r of vRows) {
+        const v = doc.cells[r.id]?.[id]
+        if (!v) continue
+        const st = styleOf(r.id, id) ?? {}
+        if (st.ha === 'across' || spans.anchor.has(`${r.id}|${id}`)) continue
+        w = Math.max(w, fitWidth(st.num ? display(v, st.num, locale) : v, st))
+      }
+      const col = doc.cols.find(c => c.id === id)
+      return { id, before: col?.width ?? null, after: Math.min(600, w) }
+    }).filter(x => x.before !== x.after)
+    if (list.length) applyR('autofit', [{ kind: 'colWidths', cols: list }])
+  }
+  /** A typed range ("A1:D6", "$A$1:$D$6") as sheet indexes, or null. */
+  function readRef(ref: string): { r0: number; c0: number; r1: number; c1: number } | null {
+    const m = /^\s*=?\$?([A-Za-z]{1,3})\$?(\d{1,6})(?:\s*:\s*\$?([A-Za-z]{1,3})\$?(\d{1,6}))?\s*$/.exec(ref)
+    if (!m) return null
+    const col = (l: string) => [...l.toUpperCase()].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1
+    const r0 = Number(m[2]) - 1, c0 = col(m[1]), r1 = m[3] ? Number(m[4]) - 1 : r0, c1 = m[3] ? col(m[3]) : c0
+    const out = { r0: Math.min(r0, r1), r1: Math.max(r0, r1), c0: Math.min(c0, c1), c1: Math.max(c0, c1) }
+    return out.r1 < doc.rows.length && out.c1 < doc.cols.length && out.r0 >= 0 && out.c0 >= 0 ? out : null
+  }
+  /** A sheet range as text ("A1:D6"). */
+  const refOf = (r0: number, c0: number, r1: number, c1: number) => `${colLetters(c0)}${r0 + 1}:${colLetters(c1)}${r1 + 1}`
+  /** The block around the active cell (or the selection), as the sheet names it: Create Table's and Advanced Filter's default. */
+  function regionRef(): string {
+    const a = activeAt(), q = multi() ? rectRef.current : region(a.r, a.c)
+    const d = (r: number) => rowIndex.get(vRows[r]?.id ?? '') ?? 0, e = (c: number) => colIndex.get(vCols[c]?.id ?? '') ?? 0
+    return refOf(d(q.r0), e(q.c0), d(q.r1), e(q.c1))
+  }
+  // ── tables: Ctrl+T, the Total row, slicers (tips 71, 73, 74, 79) ──
+  const tableHere = () => (active ? tableAt(active.key, active.col) : null)
+  function createTable(ref: string, header: boolean) {
+    if (ro) { p.onNotice(ro); return }
+    const g = readRef(ref)
+    if (!g) { p.onNotice(t('toolbar2.badRef', { ref })); return }
+    const vis = (docR: number, docC: number) => ({ r: vRows.findIndex(x => (rowIndex.get(x.id) ?? -1) >= docR), c: vCols.findIndex(x => (colIndex.get(x.id) ?? -1) >= docC) })
+    const a = vis(g.r0, g.c0), b = vis(g.r1, g.c1)
+    if (a.r < 0 || a.c < 0 || b.r < 0 || b.c < 0) { p.onNotice(t('toolbar2.badRef', { ref })); return }
+    formatAsTable('medium-0', { r0: a.r, c0: a.c, r1: b.r, c1: b.c }, header)
+  }
+  /** The Total row's number for a column, over the rows the filter shows (Excel's SUBTOTAL). */
+  function totalOf(tb: SheetTableRecord, col: string, fn: TotalFn): string {
+    const box = tableBoxes.find(b => b.tb.id === tb.id)
+    if (!box || fn === 'none') return ''
+    const body = vRows.filter(r => box.pos.has(r.id) && r.id !== tb.bottom && !(tb.header && r.id === tb.top))
+    const vals = body.map(r => value(r.id, col))
+    const nums = vals.map(v => parseNumber(v)).filter((n): n is number => n !== null)
+    const fmt = (n: number) => String(Number(n.toPrecision(15)))
+    switch (fn) {
+      case 'count': return String(vals.filter(v => v.trim()).length)
+      case 'countNums': return String(nums.length)
+      case 'sum': return fmt(nums.reduce((x, y) => x + y, 0))
+      case 'avg': return nums.length ? fmt(nums.reduce((x, y) => x + y, 0) / nums.length) : ''
+      case 'min': return nums.length ? fmt(Math.min(...nums)) : ''
+      case 'max': return nums.length ? fmt(Math.max(...nums)) : ''
+    }
+    return ''
+  }
+  /** The table whose Total row a row is, or null. */
+  const totalTableOf = (rowId: string) => tables.find(tb => tb.totals && tb.bottom === rowId) ?? null
+  function totalRow(on: boolean) {
+    if (ro) { p.onNotice(ro); return }
+    const tb = tableHere()
+    if (!tb) { p.onNotice(tt('table.none')); return }
+    if (!!tb.totals === on) return
+    const box = tableBoxes.find(b => b.tb.id === tb.id)!
+    const cols = vCols.filter(c => box.cols.has(c.id)).map(c => c.id)
+    const forward: BlankChange[] = []
+    if (on) {
+      // The row under the table becomes its Total row (one is inserted when that row holds data).
+      const at = (rowIndex.get(tb.bottom) ?? 0) + 1
+      let below = doc.rows[at]
+      if (!below || cols.some(c => value(below!.id, c))) {
+        const made = insertAt(doc.rows, at, 1, p.newId)[0]
+        forward.push({ kind: 'insertRows', rows: [{ ...made, height: null }] })
+        below = { ...made, height: null } as typeof below
+      }
+      const last = cols[cols.length - 1]
+      const numeric = vRows.some(r => box.pos.has(r.id) && parseNumber(value(r.id, last)) !== null)
+      forward.push({ kind: 'tables', before: tables, after: tables.map(x => (x.id === tb.id ? { ...x, bottom: below!.id, totals: { [last]: numeric ? 'sum' : 'count' } } : x)) })
+      forward.push({ kind: 'cells', cells: [{ rowId: below.id, colId: cols[0], before: value(below.id, cols[0]), after: tt('total.label') }] })
+      if (fArea?.header === tb.top) forward.push({ kind: 'view', before: viewNow(), after: { ...viewNow(), filterArea: { ...fArea, last: tb.bottom } } })
+    } else {
+      const i = rowIndex.get(tb.bottom) ?? 0, prev = doc.rows[i - 1]
+      if (!prev) return
+      forward.push({ kind: 'tables', before: tables, after: tables.map(x => (x.id === tb.id ? { ...x, bottom: prev.id, totals: null } : x)) })
+      const ch = cellChange(cols.map(c => ({ rowId: tb.bottom, colId: c, value: '' })))
+      if (ch) forward.push(ch)
+    }
+    applyR(on ? 'totalRowOn' : 'totalRowOff', forward)
+  }
+  function setTotal(tableId: string, col: string, fn: TotalFn) {
+    if (ro) { p.onNotice(ro); return }
+    const tb = tables.find(x => x.id === tableId)
+    if (!tb?.totals) return
+    applyR('total', [{ kind: 'tables', before: tables, after: tables.map(x => (x.id === tb.id ? { ...x, totals: { ...x.totals, [col]: fn } } : x)) }])
+  }
+  const [slicerMulti, setSlicerMulti] = useState<Set<string>>(() => new Set())
+  const slicers = useMemo(() => (view.slicers ?? []).filter(sl => tables.some(tb => tb.id === sl.tableId)), [view.slicers, tables])
+  function addSlicers(cols: string[]) {
+    if (ro) { p.onNotice(ro); return }
+    const tb = tableHere()
+    if (!tb) { p.onNotice(tt('table.none')); return }
+    const have = new Set(slicers.filter(x => x.tableId === tb.id).map(x => x.col))
+    const add = cols.filter(c => !have.has(c)).map(col => ({ id: p.newId(), tableId: tb.id, col }))
+    if (!add.length) return
+    const box = tableBoxes.find(b => b.tb.id === tb.id)
+    const after: Partial<SheetView> = { slicers: [...(view.slicers ?? []), ...add].slice(0, 20) }
+    // A slicer filters through the table's filter buttons.
+    if (box && fArea?.header !== tb.top) Object.assign(after, { filterArea: { header: tb.top, cols: vCols.filter(c => box.cols.has(c.id)).map(c => c.id), last: tb.totals ? doc.rows[(rowIndex.get(tb.bottom) ?? 1) - 1]?.id ?? tb.bottom : tb.bottom }, filter: {} })
+    setView('slicers', after)
+  }
+  function slicerPick(sl: { tableId: string; col: string }, val: string | null, add: boolean) {
+    const tb = tables.find(x => x.id === sl.tableId)
+    if (!tb) return
+    const cur = filter[sl.col]?.values
+    let values: string[] | null
+    if (val === null) values = null
+    else if (add) { const set = new Set(cur ?? []); if (set.has(val)) set.delete(val); else set.add(val); values = set.size ? [...set] : null }
+    else values = cur?.length === 1 && cur[0] === val ? null : [val]
+    const next = { ...filter }
+    if (values) next[sl.col] = { values }; else delete next[sl.col]
+    setView('slicer', { filter: next })
+  }
+  function slicerOff(id: string) {
+    const sl = slicers.find(x => x.id === id)
+    const next = { ...filter }
+    if (sl) delete next[sl.col]
+    setView('slicerOff', { slicers: (view.slicers ?? []).filter(x => x.id !== id), filter: next })
+  }
+  // ── Data › Advanced Filter (tip 78) ──
+  function advanced(cmd: Extract<FormatCmd, { kind: 'advanced' }>) {
+    if (ro) { p.onNotice(ro); return }
+    const L = readRef(cmd.list), C = readRef(cmd.criteria)
+    if (!L || L.r1 - L.r0 < 1) { p.onNotice(t('toolbar2.badRef', { ref: cmd.list })); return }
+    if (!C) { p.onNotice(t('toolbar2.badRef', { ref: cmd.criteria })); return }
+    const lrows = doc.rows.slice(L.r0, L.r1 + 1), lcols = doc.cols.slice(L.c0, L.c1 + 1).map(c => c.id)
+    const heads = lcols.map(c => ({ col: c, name: value(lrows[0].id, c) }))
+    const crit = doc.rows.slice(C.r0, C.r1 + 1).map(r => doc.cols.slice(C.c0, C.c1 + 1).map(c => value(r.id, c.id)))
+    const read = readCriteria(crit, heads)
+    if ('error' in read) { p.onNotice(read.error === 'heading' ? tt('adv.badHeading', { name: read.name ?? '' }) : tt('adv.empty')); return }
+    if (cmd.copy === 'none') {
+      setView('advanced', { advanced: { top: lrows[0].id, bottom: lrows[lrows.length - 1].id, left: lcols[0], right: lcols[lcols.length - 1], groups: read.groups, ...(cmd.unique ? { unique: true } : {}) } })
+      return
+    }
+    const body = lrows.slice(1)
+    const rowsV = body.map(r => lcols.map(c => value(r.id, c)))
+    const keep = advancedPlan(rowsV, lcols, read.groups, cmd.unique)
+    const grid = [heads.map(h => h.name), ...keep.map(i => rowsV[i])]
+    if (cmd.copy === 'sheet') { p.onNewSheet?.(grid); p.onNotice(tt('adv.copied', { n: keep.length })); return }
+    const T = readRef(cmd.to ?? '')
+    if (!T) { p.onNotice(t('toolbar2.badRef', { ref: cmd.to ?? '' })); return }
+    const newRows = growTo(doc.rows, T.r0 + grid.length - 1, BLANK_ROW_LIMIT, p.newId)
+    const newCols = growTo(doc.cols, T.c0 + grid[0].length - 1, BLANK_COL_LIMIT, p.newId)
+    const allRows = [...doc.rows, ...newRows], allCols = [...doc.cols, ...newCols]
+    if (T.r0 + grid.length > allRows.length || T.c0 + grid[0].length > allCols.length) { p.onNotice(t('err.too_many_rows')); return }
+    const forward: BlankChange[] = []
+    if (newRows.length) forward.push({ kind: 'insertRows', rows: newRows.map(r => ({ ...r, height: null })) })
+    if (newCols.length) forward.push({ kind: 'insertCols', cols: newCols.map(c => ({ ...c, width: null })) })
+    const ch = cellChange(grid.flatMap((line, i) => line.map((v, j) => ({ rowId: allRows[T.r0 + i].id, colId: allCols[T.c0 + j].id, value: v }))))
+    if (ch) forward.push(ch)
+    if (forward.length) applyR('advancedCopy', forward)
+    p.onNotice(tt('adv.copied', { n: keep.length }), true)
+  }
+  // ── Data › Group (tip 80) ──
+  function outline(op: 'group' | 'ungroup', what?: 'rows' | 'cols') {
+    if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
+    const q = rectRef.current
+    const allR = q.c0 === 0 && q.c1 >= vCols.length - 1, allC = q.r0 === 0 && q.r1 >= vRows.length - 1
+    const kind: 'rows' | 'cols' = what ?? (allC && !allR ? 'cols' : 'rows')
+    const order = kind === 'rows' ? doc.rows.map(r => r.id) : doc.cols.map(c => c.id)
+    const idx = kind === 'rows' ? rowIndex : colIndex
+    const a = idx.get(kind === 'rows' ? vRows[q.r0]?.id ?? '' : vCols[q.c0]?.id ?? '') ?? 0
+    const b = idx.get(kind === 'rows' ? vRows[q.r1]?.id ?? '' : vCols[q.c1]?.id ?? '') ?? 0
+    const next = op === 'group' ? outlineGroup(view.outline, kind, order, a, b) : outlineUngroup(view.outline, kind, order, a, b)
+    if (!next) { p.onNotice(tt(op === 'group' ? 'outline.max' : 'outline.none')); return }
+    setView(op, { outline: next })
+  }
+  function setOutline(next: OutlineGroupRecord[], label: string) { setView(label, { outline: next }) }
+
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
     // Spec 020: what F4 repeats (formatting, inserting, hiding, clearing formats).
@@ -1270,6 +1812,19 @@ export function BlankSheet(p: BlankSheetProps) {
     if (cmd.kind === 'validation') { setValidation(cmd.rule, cmd.all); focusActive(); return }
     if (cmd.kind === 'flashFill') { flashFill(); focusActive(); return }
     if (cmd.kind === 'repeat') { repeat(); focusActive(); return }
+    // Spec 020 stage B.
+    if (cmd.kind === 'scope') { workScope(); return }
+    if (cmd.kind === 'autofit') { autofit(cmd.what); focusActive(); return }
+    if (cmd.kind === 'clean') { cleanup(cmd.op); focusActive(); return }
+    if (cmd.kind === 'dedupe') { dedupe(cmd.cols, cmd.header); focusActive(); return }
+    if (cmd.kind === 'split') { split(cmd.opts, cmd.formats); focusActive(); return }
+    if (cmd.kind === 'createTable') { createTable(cmd.ref, cmd.header); focusActive(); return }
+    if (cmd.kind === 'totalRow') { totalRow(cmd.on); focusActive(); return }
+    if (cmd.kind === 'total') { const tb = tableHere(); if (tb) setTotal(tb.id, cmd.col, cmd.fn); focusActive(); return }
+    if (cmd.kind === 'slicers') { addSlicers(cmd.cols); focusActive(); return }
+    if (cmd.kind === 'advanced') { advanced(cmd); focusActive(); return }
+    if (cmd.kind === 'advancedClear') { if (view.advanced) setView('advancedClear', { advanced: null }); focusActive(); return }
+    if (cmd.kind === 'outline') { outline(cmd.op, cmd.what); focusActive(); return }
     if (cmd.kind === 'pickList') {
       const el = rootRef.current?.querySelector<HTMLElement>('.fx-sheet-td.is-active')
       const row = active ? vRows.find(r => r.id === active.key) : undefined
@@ -1685,6 +2240,22 @@ export function BlankSheet(p: BlankSheetProps) {
     return kind === 'date' ? `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}` : `${p2(d.getHours())}:${p2(d.getMinutes())}`
   }
 
+  // Spec 020 stage B: the block around the cell (Create Table, Advanced Filter, Remove Duplicates) scans the sheet,
+  // so it is worked out once the selection settles, not on every key press.
+  const [scopeInfo, setScopeInfo] = useState<{ region: string; dedupe: NonNullable<FormatState['dedupe']> } | null>(null)
+  const scopeKey = `${active?.key}|${active?.col}|${JSON.stringify(rectRef.current)}|${areasRef.current.length}`
+  const workScope = () => {
+    if (!active) return
+    const ds = dataScope()
+    setScopeInfo({
+      region: regionRef(),
+      dedupe: { header: ds.header, cols: ds.cols.map(c => ({ key: c, name: (ds.header && ds.rows[0] ? value(ds.rows[0].id, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })) },
+    })
+  }
+  useEffect(() => {
+    const t = window.setTimeout(workScope, 250)
+    return () => window.clearTimeout(t)
+  }, [scopeKey, doc.cells, tables]) // eslint-disable-line react-hooks/exhaustive-deps
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
   const fmtState: FormatState | null = active && activeRow !== undefined && activeCol !== undefined ? {
     source: 'blank',
@@ -1729,7 +2300,14 @@ export function BlankSheet(p: BlankSheetProps) {
         if (!cells) continue
         for (let c = q.c0; c <= q.c1 && selValues.length < 200; c++) { const v = (cells[vCols[c]?.id ?? ''] ?? '').trim(); if (v) selValues.push(v) }
       }
-      return { validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
+      // Spec 020 stage B: Text to Columns' preview (the first selected column, up to 8 values), the block around, the table's Total row.
+      const splitValues: string[] = []
+      for (let r = q.r0; r <= q.r1 && splitValues.length < 8; r++) { const v = value(vRows[r]?.id ?? '', vCols[q.c0]?.id ?? ''); if (v) splitValues.push(v) }
+      const tb = tableAt(active.key, active.col), box = tb ? tableBoxes.find(b => b.tb.id === tb.id) : null
+      const tableInfo = tb && box ? { totals: !!tb.totals, cols: vCols.filter(c => box.cols.has(c.id)).map(c => ({ key: c.id, name: (tb.header ? value(tb.top, c.id) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c.id) ?? 0)}` })) } : null
+      const ai = rowIndex.get(active.key) ?? 0
+      const outline = olSpans.rows.some(g => ai >= g.i0 && ai <= g.i1)
+      return { dedupe: scopeInfo?.dedupe, splitValues, tableInfo, region: scopeInfo?.region, cleanOff: null, outline, advancedOn: !!view.advanced, validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
     })(),
   } : null
   useFormatBridge('blank', true, fmtState, runFormat)
@@ -1818,6 +2396,43 @@ export function BlankSheet(p: BlankSheetProps) {
                  onClose={() => { setMenu(null); focusActive() }} />
       )}
       {lk.node}
+      {slicers.length > 0 && (
+        <div className="fx-slicers" data-slicers="">
+          {slicers.map(sl => {
+            const tb = tables.find(x => x.id === sl.tableId)!
+            const box = tableBoxes.find(b => b.tb.id === tb.id)
+            const name = (tb.header ? value(tb.top, sl.col) : '') || `${sheetT('column')} ${colLetters(colIndex.get(sl.col) ?? 0)}`
+            // Every value in the table's column (filtered rows too), A to Z.
+            const i0 = rowIndex.get(tb.top) ?? 0, i1 = rowIndex.get(tb.bottom) ?? 0
+            const body = doc.rows.slice(i0 + (tb.header ? 1 : 0), i1 + 1 - (tb.totals ? 1 : 0))
+            const vals = [...new Set(body.map(r => value(r.id, sl.col).trim()))].sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })))
+            const cur = filter[sl.col]?.values
+            const multiOn = slicerMulti.has(sl.id)
+            if (!box) return null
+            return (
+              <section key={sl.id} className="fx-slicer" data-slicer={name} aria-label={tt('slicer.label', { name })}>
+                <header>
+                  <b>{name}</b>
+                  <button type="button" data-slicer-multi="" aria-pressed={multiOn} title={tt('slicer.multi')} aria-label={tt('slicer.multi')}
+                          onClick={() => setSlicerMulti(m => { const n = new Set(m); if (n.has(sl.id)) n.delete(sl.id); else n.add(sl.id); return n })}>☰</button>
+                  <button type="button" data-slicer-clear="" disabled={!cur} title={tt('slicer.clear')} aria-label={tt('slicer.clear')} onClick={() => slicerPick(sl, null, false)}>✕</button>
+                  {!ro && <button type="button" data-slicer-remove="" title={tt('slicer.remove')} aria-label={tt('slicer.remove')} onClick={() => slicerOff(sl.id)}>🗑</button>}
+                </header>
+                <div className="fx-slicer-items" role="group" aria-label={name}>
+                  {vals.map(v => (
+                    <button key={v} type="button" data-slicer-item={v} aria-pressed={!cur || cur.includes(v)}
+                            onClick={ev => slicerPick(sl, v, multiOn || ev.ctrlKey || ev.metaKey)}>{v || tt('slicer.blank')}</button>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      )}
+      {splitAsk && (
+        <ConfirmDialog attr="data-split-replace" title={tt('clean.replaceTitle')} body={tt('clean.replaceBody')} ok={tt('clean.replaceOk')} cancel={tt('cancel')}
+                       onCancel={() => { setSplitAsk(null); focusActive() }} onOk={() => { const run = splitAsk.run; setSplitAsk(null); run(); focusActive() }} />
+      )}
       {fieldEd && lk.map && (() => {
         const tk = lk.taskOfRow(fieldEd.rowId)
         if (!tk) return null
