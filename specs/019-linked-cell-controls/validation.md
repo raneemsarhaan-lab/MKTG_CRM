@@ -230,3 +230,10 @@ The links and fields labs seed their sheets with `look: grid`, so their spreadsh
 - **Typing a word**: "Cutting" moves a clip to D-In Progress, the pill shows the word, and undo moves it back.
 - **Arabic and phone**: axe is clean in Arabic, and on a phone the drawer is a bottom sheet.
 - No page errors.
+
+## Themes are optional on team sheets
+
+- **No theme, no band.** In the Content look, a linked task with no theme is listed at the top, under no band. There is no "No theme" band, and a sheet whose tasks have no themes shows no theme bands at all.
+- **＋ Theme.** The bar has **＋ Theme** for admins (the board's own `addTheme`). The Theme field offers the new theme at once.
+- **Lab.** realapp fields passes 78/78 (3 new checks: a task with no theme sits first under no band; there's no "No theme" band; ＋ Theme creates a theme).
+- **Component lab.** lab:sheet passes 150/150. Shift+Tab from Source now lands on Status, since Status takes typed words in stage 3.

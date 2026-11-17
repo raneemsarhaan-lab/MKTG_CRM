@@ -2121,7 +2121,10 @@
       "rowsVideo": "Videos and their clips",
       "rowsVideoHelp": "Each video is a row with its clips under it. The switches show or hide columns in the {set} set.",
       "groupVideo": "Video",
-      "groupEditor": "Editor"
+      "groupEditor": "Editor",
+      "barAddTheme": "+ Theme",
+      "newTheme": "New theme",
+      "themeAdded": "“{name}” added. Pick it in a task’s Theme."
     }
   },
   "hours": {
