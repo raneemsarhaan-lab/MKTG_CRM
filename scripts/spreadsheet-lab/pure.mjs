@@ -461,6 +461,85 @@ export async function runPure(lab, root) {
     eq(h.cleanRule({ allow: 'list', values: [], ignoreBlank: true, dropdown: true, input: null, error: null }), null, 'an empty list is refused')
   })
 
+  // ── spec 020 stage B: custom formats, cleanup, wildcards, outline ─────────
+  await check('tips-numfmt', () => {
+    const f = (v, p, lang) => h.display(v, { kind: 'custom', pattern: p }, lang)
+    eq(f('1250000', '#,##0.0,,"M"'), '1.3M', '1,250,000 shows as 1.3M (quickstart B §1)')
+    eq(f('1250000', '#,##0,"K"'), '1,250K', 'one comma scales by a thousand')
+    eq(f('1234.5', '#,##0.00'), '1,234.50', 'separator and decimals')
+    eq(f('5', '000'), '005', 'zeros pad')
+    eq(f('0.5', '#.00'), '.50', '# hides a lone zero')
+    eq(f('0.256', '0.0%'), '25.6%', 'percent')
+    eq([f('5', ';;;'), f('-5', ';;;'), f('0', ';;;'), f('hello', ';;;')], ['', '', '', ''], ';;; hides everything')
+    eq([f('5', '0;(0);"zero"'), f('-5', '0;(0);"zero"'), f('0', '0;(0);"zero"')], ['5', '(5)', 'zero'], 'three sections')
+    eq(f('-1500', '#,##0'), '-1,500', 'one section: negatives get a minus')
+    eq(f('5551234', '000-0000'), '555-1234', 'literals between digits')
+    eq(f('abc', '0;0;0;"Note: "@'), 'Note: abc', 'the text section')
+    eq(f('abc', '0.00'), 'abc', 'text without a text section shows as typed')
+    eq(f('1250000', '#,##0.0,,"M"', 'ar'), '١٫٣M', 'Arabic digits')
+    eq(['[Red]0', 'dd/mm', '0.0E+00', '_(0', '"open'].map(h.patternError), ['color', 'date', 'sci', 'pad', 'quote'], 'unsupported codes are refused with a reason')
+    eq(h.validateNum({ kind: 'custom', pattern: '[Red]0' }), undefined, 'the server drops an unreadable code')
+    eq(h.validateNum({ kind: 'custom', pattern: '#,##0,"K"' }), { kind: 'custom', pattern: '#,##0,"K"' }, 'and keeps a good one')
+  })
+  await check('tips-clean', () => {
+    eq(h.dedupePlan([['a@x.io', 'Cairo'], ['b@x.io', 'Giza'], ['A@x.io', 'cairo'], ['a@x.io', 'Giza']]), [2], 'first of each kind stays; case ignored')
+    eq(h.splitOne('Samaa Adel, Cairo', { mode: 'delim', delims: { comma: true } }), ['Samaa Adel', 'Cairo'], 'split by comma')
+    eq(h.splitOne('a,,b', { mode: 'delim', delims: { comma: true }, consecutive: true }), ['a', 'b'], 'consecutive delimiters as one')
+    eq(h.splitOne('"Cairo, EG",5', { mode: 'delim', delims: { comma: true }, qualifier: '"' }), ['Cairo, EG', '5'], 'text qualifier')
+    eq(h.splitOne('ABCDEF', { mode: 'fixed', breaks: [2, 4] }), ['AB', 'CD', 'EF'], 'fixed width')
+    eq(h.splitPlan(['a,b,c', 'd'], { mode: 'delim', delims: { comma: true } }).width, 3, 'widest row')
+    eq(h.trimClean('\u00A0 samaa   adel\nx '), 'samaa adel x', 'trim and clean')
+    eq(h.changeCase("raneem o'neil-SARHAN", 'proper'), "Raneem O'neil-Sarhan", 'proper case')
+    eq([h.toNumber(' 1 200 '), h.toNumber('150-'), h.toNumber('١٢'), h.toNumber('abc')], ['1200', '-150', '١٢', null], 'text to numbers')
+    ok(h.storedAsText('1,200', 'text') && !h.storedAsText('1,200', undefined) && !h.storedAsText('Cairo', 'text'), 'the green corner')
+    eq(h.blanksFromAbove(['Cairo', '', '', 'Giza', '']), [null, 'Cairo', 'Cairo', null, 'Giza'], 'fill blanks from above')
+    eq([h.applyOp('1.2', 1000, 'mul'), h.applyOp('x', 2, 'mul'), h.applyOp('10', 4, 'div'), h.applyOp('', 1, 'add')], ['1200', null, '2.5', null], 'paste special operations')
+  })
+  await check('tips-criteria', () => {
+    const heads = [{ col: 'c', name: 'Channel' }, { col: 's', name: 'Spend' }]
+    const crit = h.readCriteria([['Channel', 'Spend'], ['Meta', '>1000'], ['Google', '']], heads)
+    eq(crit.groups.length, 2, 'two OR groups')
+    const rows = [['Meta', '1800'], ['TikTok', '650'], ['Google', '2400'], ['Meta', '300'], ['Meta Ads', '1200'], ['Meta', '1800']]
+    eq(h.advancedPlan(rows, ['c', 's'], crit.groups, false), [0, 2, 4, 5], 'AND in a row, OR between rows; text begins with')
+    eq(h.advancedPlan(rows, ['c', 's'], crit.groups, true), [0, 2, 4], 'unique records only')
+    ok(h.meets('Launch teaser', h.readCriterion('*teaser*')) && h.meets('Live', h.readCriterion('<>Draft')) && !h.meets('Meta Ads', h.readCriterion('=Meta')), 'wildcards, not equal, exact')
+    eq(h.readCriteria([['Region'], ['x']], heads), { error: 'heading', name: 'Region' }, 'an unknown heading is named')
+  })
+  await check('tips-wildcards', () => {
+    const o = { matchCase: false, whole: false }
+    ok(h.matches('5* rating', '~*', o) && !h.matches('Q4 plan', '~*', o), '~* finds a literal asterisk (quickstart B §2)')
+    ok(h.matches('Q4 plan', 'Q? plan', o) && h.matches('Launch teaser', 'l*r', { matchCase: false, whole: true }), '? and *')
+    eq(h.replaceIn('a.b.c', '.', '-', o), 'a-b-c', 'regex marks are plain text')
+  })
+  await check('tips-outline', () => {
+    const order = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']
+    let o = h.group([], 'rows', order, 2, 5)
+    eq(o, [{ kind: 'rows', from: 'r3', to: 'r6', level: 1, collapsed: false }], 'Shift+Alt+→ groups')
+    o = h.group(o, 'rows', order, 3, 4)
+    eq(o.map(g => [g.from, g.to, g.level]), [['r3', 'r6', 1], ['r4', 'r5', 2]], 'nested level 2')
+    eq(h.depth(o, 'rows'), 2, 'depth')
+    eq([...h.hiddenIds(h.showLevel(o, 'rows', 2), 'rows', order)], ['r4', 'r5'], 'level 2 button collapses level 2')
+    eq([...h.hiddenIds(h.toggle(o, { kind: 'rows', from: 'r3', level: 1 }), 'rows', order)], ['r3', 'r4', 'r5', 'r6'], '− collapses the group')
+    eq(h.ungroup(o, 'rows', order, 3, 4), [{ kind: 'rows', from: 'r3', to: 'r6', level: 1, collapsed: false }], 'Shift+Alt+← ungroups a level')
+    eq(h.ungroup([], 'rows', order, 0, 1), null, 'nothing to ungroup')
+    let deep = []
+    for (let i = 0; i < 8; i++) deep = h.group(deep, 'rows', order, 0, 1)
+    eq(h.group(deep, 'rows', order, 0, 1), null, 'eight levels at most')
+    eq(h.cleanOutline([{ kind: 'rows', from: 'a', to: 'b', level: 9, collapsed: true }, { kind: 'cols', from: 'a', to: 'b', level: 1 }]), [{ kind: 'cols', from: 'a', to: 'b', level: 1, collapsed: false }], 'the server guard')
+  })
+  await check('tips-icons', () => {
+    const rule = { id: 'x', range: { rows: 'all', cols: ['c'] }, kind: 'icons', args: { set: 'arrows3' }, style: null, priority: 0 }
+    const vals = { r1: '92', r2: '61', r3: '18', r4: '77', r5: '25' }
+    const looks = h.evalRules([rule], Object.keys(vals), ['c'], r => vals[r])
+    eq(Object.keys(vals).map(r => looks.get(`${r}|c`).icon.i), [0, 1, 2, 0, 2], 'thirds of the range (the design: 92 ▲, 61 ▶, 18 ▼)')
+    const rev = h.evalRules([{ ...rule, args: { set: 'flags3', reverse: true, by: 'number', cuts: [50, 20] } }], Object.keys(vals), ['c'], r => vals[r])
+    eq(Object.keys(vals).map(r => rev.get(`${r}|c`).icon.i), [2, 2, 0, 2, 1], 'numbers and Reverse Icon Order')
+    const row = { id: 'y', range: { rows: 'all', cols: ['a', 'd'] }, kind: 'gt', args: { a: '1000', row: true, col: 'd' }, style: { fill: '#FFEB9C' }, priority: 0 }
+    const sp = { r1: '1800', r2: '650' }
+    const rl = h.evalRules([row], ['r1', 'r2'], ['a', 'd'], (r, c) => (c === 'd' ? sp[r] : 'name'))
+    eq([rl.has('r1|a'), rl.has('r1|d'), rl.has('r2|a')], [true, true, false], 'Format the entire row where D > 1000')
+  })
+
   await check('clip-html', async () => {
     const { chromium } = require('playwright')
     const exe = process.env.LAB_CHROMIUM ?? (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined)

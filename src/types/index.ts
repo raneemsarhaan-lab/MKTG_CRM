@@ -472,6 +472,10 @@ export interface ViewWrite {
   words?: SheetTaskMap['words'] | null
   show?: SheetTaskMap['show'] | null
   look?: 'content' | 'grid' | null
+  /** Spec 020: null removes them. */
+  slicers?: SlicerRecord[] | null
+  advanced?: AdvancedFilter | null
+  outline?: OutlineGroupRecord[] | null
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─
@@ -482,7 +486,7 @@ export const CURRENCIES = ['EGP', 'USD', 'EUR', 'GBP', 'SAR', 'AED'] as const
 export type Currency = typeof CURRENCIES[number]
 /** How a cell's text is shown. Values stay as typed (R2). */
 export interface NumberFormat {
-  kind: 'general' | 'number' | 'currency' | 'accounting' | 'percent' | 'scientific' | 'date' | 'time' | 'text'
+  kind: 'general' | 'number' | 'currency' | 'accounting' | 'percent' | 'scientific' | 'date' | 'time' | 'text' | 'custom'
   /** Decimal places, 0–10. */
   dp?: number
   /** Thousands separator. */
@@ -491,7 +495,7 @@ export interface NumberFormat {
   neg?: 'minus' | 'paren' | 'red' | 'paren-red'
   /** Dates: the long form (Mon, 16 Nov 2026) rather than the short one. */
   long?: boolean
-  /** A custom date pattern: d, dd, ddd, dddd, m, mm, mmm, mmmm, yy, yyyy. */
+  /** A custom date pattern: d, dd, ddd, dddd, m, mm, mmm, mmmm, yy, yyyy; or, with kind 'custom', Excel's number code (spec 020, sheet-numfmt). */
   pattern?: string
 }
 /** A cell's look (research R3). Every field is optional; layers override field by field. */
@@ -511,7 +515,8 @@ export interface CellStyle {
   br?: BorderSide | null
   bb?: BorderSide | null
   bl?: BorderSide | null
-  ha?: 'general' | 'left' | 'center' | 'right' | 'justify'
+  /** 'across': Center Across Selection (spec 020 tip 26), shown over the next empty cells that also carry it, with no merge. */
+  ha?: 'general' | 'left' | 'center' | 'right' | 'justify' | 'across'
   va?: 'top' | 'middle' | 'bottom'
   wrap?: boolean
   /** 0–15 levels. */
@@ -563,6 +568,10 @@ export interface SheetView {
   show?: SheetTaskMap['show']
   /** Spec 019 (approved design team-sheet-content-style): a team sheet in the Content sheet's look, or as a spreadsheet. Unset: content when linked to the board. */
   look?: 'content' | 'grid'
+  /** Spec 020 (blank sheets): slicers, the advanced filter in place, and outline groups. */
+  slicers?: SlicerRecord[]
+  advanced?: AdvancedFilter | null
+  outline?: OutlineGroupRecord[]
 }
 export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'none' } | { by: 'col'; col: string }
 
@@ -586,7 +595,10 @@ export interface SortKey {
   on?: 'value' | 'fill' | 'color'
   color?: string
 }
-export const RULE_KINDS = ['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup', 'unique', 'top', 'bottom', 'bar', 'scale'] as const
+export const RULE_KINDS = ['gt', 'lt', 'between', 'eq', 'contains', 'date', 'dup', 'unique', 'top', 'bottom', 'bar', 'scale', 'icons'] as const
+/** Spec 020 tip 28: Excel's three-icon sets. */
+export const ICON_SETS = ['arrows3', 'flags3', 'lights3'] as const
+export type IconSet = typeof ICON_SETS[number]
 export type RuleKind = typeof RULE_KINDS[number]
 export interface RuleArgs {
   /** The value (gt, lt, eq, contains) or the low end (between). */
@@ -600,6 +612,15 @@ export interface RuleArgs {
   percent?: boolean
   /** bar: the bar's colour; scale: low, middle, high colours (middle may be ''). */
   colors?: string[]
+  /** Spec 020 tip 27 (blank sheets): test this column and give the look to the rule's whole row. */
+  row?: boolean
+  col?: string
+  /** Spec 020 tip 28, icons: the set, the two cuts (≥ cuts[0] the first icon, ≥ cuts[1] the second), as percents of the range or numbers. */
+  set?: IconSet
+  cuts?: [number, number]
+  by?: 'percent' | 'number'
+  reverse?: boolean
+  iconOnly?: boolean
 }
 export interface ConditionalRule {
   id: string
@@ -647,7 +668,24 @@ export interface LinkedTask {
 export interface TaskFieldWrite { rowId: string; field: TaskField; value: string }
 export interface TaskFieldResult { rowId: string; field: TaskField; ok: boolean; reason?: string; shown?: string; celebrate?: boolean; stageLabel?: string }
 
-export interface SheetTableRecord { id: string; top: string; left: string; bottom: string; right: string; style: string; header: boolean; banded: boolean }
+export interface SheetTableRecord {
+  id: string; top: string; left: string; bottom: string; right: string; style: string; header: boolean; banded: boolean
+  /** Spec 020 tip 73: the Total row, a total per column id; null or unset: no Total row. */
+  totals?: Record<string, TotalFn> | null
+}
+/** The Total row's choices (Excel's SUBTOTAL over the rows the filter shows). */
+export const TOTAL_FNS = ['none', 'avg', 'count', 'countNums', 'max', 'min', 'sum'] as const
+export type TotalFn = typeof TOTAL_FNS[number]
+/** Spec 020 tip 74: a slicer, a box of buttons that sets a table column's filter. */
+export interface SlicerRecord { id: string; tableId: string; col: string }
+/** Spec 020 tip 78: Data › Advanced Filter, in place, over a list range; the criteria as read from the criteria range. */
+export interface AdvancedFilter {
+  top: string; left: string; bottom: string; right: string
+  groups: { col: string; op: 'eq' | 'ne' | 'gt' | 'lt' | 'ge' | 'le' | 'begins'; value: string }[][]
+  unique?: boolean
+}
+/** Spec 020 tip 80: an outline group, by row or column ids. */
+export interface OutlineGroupRecord { kind: 'rows' | 'cols'; from: string; to: string; level: number; collapsed: boolean }
 
 /**
  * Spec 020 (tip 18): Data › Data Validation…, as Excel's three tabs. The range

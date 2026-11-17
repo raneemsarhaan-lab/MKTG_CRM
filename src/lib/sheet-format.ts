@@ -9,6 +9,7 @@
  * - Values stay the text people typed (R2). `display` only changes what is
  *   shown; editing and copying use the text.
  */
+import { formatCustom, patternError } from '@/lib/sheet-numfmt'
 import type { BorderSide, CellStyle, Currency, NumberFormat, SheetFormatRecord } from '@/types/index'
 import { CURRENCIES } from '@/types/index'
 
@@ -63,9 +64,9 @@ export function luminance(hex: string): number {
 
 const HEX = /^#[0-9A-Fa-f]{6}$/
 const LINE_W = ['thin', 'medium', 'thick', 'dashed', 'dotted', 'double'] as const
-const HA = ['general', 'left', 'center', 'right', 'justify'] as const
+const HA = ['general', 'left', 'center', 'right', 'justify', 'across'] as const
 const VA = ['top', 'middle', 'bottom'] as const
-const NUM_KINDS = ['general', 'number', 'currency', 'accounting', 'percent', 'scientific', 'date', 'time', 'text'] as const
+const NUM_KINDS = ['general', 'number', 'currency', 'accounting', 'percent', 'scientific', 'date', 'time', 'text', 'custom'] as const
 const NEG = ['minus', 'paren', 'red', 'paren-red'] as const
 const PATTERN = /^[dmyhs\s/\-.,:'’]{1,40}$/i
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -79,6 +80,8 @@ function border(v: unknown): BorderSide | undefined {
 
 export function validateNum(v: unknown): NumberFormat | undefined {
   if (!isObj(v) || !oneOf(NUM_KINDS, v.kind)) return undefined
+  // Spec 020: a custom code is kept only when the sheet can read all of it.
+  if (v.kind === 'custom') return typeof v.pattern === 'string' && patternError(v.pattern) === null ? { kind: 'custom', pattern: v.pattern } : undefined
   const out: NumberFormat = { kind: v.kind }
   const dp = int(v.dp, 0, 10); if (dp !== undefined) out.dp = dp
   if (typeof v.sep === 'boolean') out.sep = v.sep
@@ -265,8 +268,8 @@ export function toCss(s: CellStyle | null | undefined): CellCss {
     if (s.color) cell.color = s.color
     else if (s.fill) cell.color = luminance(s.fill) < 0.5 ? '#FFFFFF' : '#14131A'
     if (s.ha) {
-      cell.textAlign = { left: 'start', center: 'center', right: 'end', justify: 'justify', general: 'start' }[s.ha]
-      cell.justifyContent = { left: 'flex-start', center: 'center', right: 'flex-end', justify: 'flex-start', general: 'flex-start' }[s.ha]
+      cell.textAlign = { left: 'start', center: 'center', right: 'end', justify: 'justify', general: 'start', across: 'center' }[s.ha]
+      cell.justifyContent = { left: 'flex-start', center: 'center', right: 'flex-end', justify: 'flex-start', general: 'flex-start', across: 'center' }[s.ha]
     }
     if (s.va) cell.alignItems = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[s.va]
     if (s.wrap) { cell.whiteSpace = 'pre-wrap'; cell.overflowWrap = 'anywhere' }
@@ -354,6 +357,7 @@ export function formatPattern(date: Date, pattern: string, lang: string): string
  */
 export function display(text: string, num: NumberFormat | null | undefined, lang = 'en'): string {
   if (!num || num.kind === 'general' || num.kind === 'text' || text === '') return text
+  if (num.kind === 'custom') return formatCustom(text, num.pattern ?? '', parseNumber(text), lang)
   const loc = intlLocale(lang)
   if (num.kind === 'date' || num.kind === 'time') {
     const d = parseDate(text)
@@ -392,7 +396,7 @@ export const showsRed = (text: string, num: NumberFormat | null | undefined) =>
 
 /** Increase or Decrease decimal (US2 scenario 5): General becomes Number first. */
 export function bumpDecimals(num: NumberFormat | null | undefined, delta: 1 | -1, text = ''): NumberFormat {
-  const base: NumberFormat = !num || num.kind === 'general' || num.kind === 'text'
+  const base: NumberFormat = !num || num.kind === 'general' || num.kind === 'text' || num.kind === 'custom'
     ? { kind: 'number', dp: decimalsIn(text), sep: false }
     : { ...num }
   const dp = base.dp ?? (base.kind === 'percent' ? 0 : 2)
@@ -504,7 +508,7 @@ export function cssForClipboard(s: CellStyle | null | undefined): string {
   if (deco) o.push(`text-decoration:${deco}`)
   if (s.color) o.push(`color:${s.color}`)
   if (s.fill) o.push(`background-color:${s.fill}`)
-  if (s.ha) o.push(`text-align:${s.ha}`)
+  if (s.ha) o.push(`text-align:${s.ha === 'across' ? 'center' : s.ha}`)
   if (s.va) o.push(`vertical-align:${s.va === 'middle' ? 'middle' : s.va}`)
   if (s.wrap) o.push('white-space:normal')
   const W = { thin: '1px solid', medium: '2px solid', thick: '3px solid', dashed: '1px dashed', dotted: '1px dotted', double: '3px double' } as const

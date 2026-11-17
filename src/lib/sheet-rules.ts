@@ -10,7 +10,7 @@
  * - Groups: the Content and Video sheets sort and filter inside each group
  *   (FR-075), and a child row (a clip) stays with its parent.
  */
-import type { CellStyle, ColFilter, ConditionalRule, FilterOp, RuleArgs, SheetTableRecord, SortKey } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterOp, IconSet, RuleArgs, SheetTableRecord, SortKey } from '@/types/index'
 import { parseDate, parseNumber, tint } from '@/lib/sheet-format'
 
 // ─── cell styles (FR-030) ────────────────────────────────────────────────────
@@ -114,8 +114,17 @@ function compareKeys(a: Key, b: Key): number {
 
 // ─── conditional formatting (FR-032) ─────────────────────────────────────────
 
-/** What rules give one cell: a look, a data bar (0–1 of the cell's width), a colour-scale fill. */
-export interface RuleLook { style?: CellStyle; bar?: { pct: number; color: string }; scale?: string }
+/** What rules give one cell: a look, a data bar (0–1 of the cell's width), a colour-scale fill, an icon (spec 020). */
+export interface RuleLook { style?: CellStyle; bar?: { pct: number; color: string }; scale?: string; icon?: { set: IconSet; i: 0 | 1 | 2; only: boolean } }
+
+/** Spec 020 tip 28: the three icons of each set, best first, with a colour and a word for screen readers. */
+export const ICONS: Record<IconSet, { glyph: string; color: string; name: string }[]> = {
+  arrows3: [{ glyph: '▲', color: '#1E8E3E', name: 'up' }, { glyph: '▶', color: '#B26A00', name: 'side' }, { glyph: '▼', color: '#C5221F', name: 'down' }],
+  flags3: [{ glyph: '⚑', color: '#1E8E3E', name: 'green' }, { glyph: '⚑', color: '#B26A00', name: 'yellow' }, { glyph: '⚑', color: '#C5221F', name: 'red' }],
+  lights3: [{ glyph: '●', color: '#1E8E3E', name: 'green' }, { glyph: '●', color: '#E2A400', name: 'yellow' }, { glyph: '●', color: '#C5221F', name: 'red' }],
+}
+/** Excel's default cuts: the top third, the middle third, the rest. */
+export const DEFAULT_CUTS: [number, number] = [67, 33]
 export interface RuleCell { row: string; col: string; text: string }
 
 /** Whether a highlight rule matches a value. */
@@ -201,8 +210,12 @@ export function evalRules(rules: ConditionalRule[], rows: string[], cols: string
     const rs = rule.range.rows === 'all' ? rows : rule.range.rows.filter(r => onScreen.has(r))
     const cs = rule.range.cols.filter(c => colSet.has(c))
     const cells: RuleCell[] = []
-    for (const r of rs) for (const c of cs) cells.push({ row: r, col: c, text: value(r, c) })
-    const hit = cellsFor(rule, cells, today)
+    // Spec 020 tip 27: a whole-row rule tests its own column and gives the look to every cell of the row.
+    const whole = !!rule.args?.row && !!rule.args.col && rule.kind !== 'bar' && rule.kind !== 'scale' && rule.kind !== 'icons'
+    if (whole) for (const r of rs) cells.push({ row: r, col: rule.args.col!, text: value(r, rule.args.col!) })
+    else for (const r of rs) for (const c of cs) cells.push({ row: r, col: c, text: value(r, c) })
+    let hit = cellsFor(rule, cells, today)
+    if (whole) hit = hit.flatMap(([cell, look]) => cs.map(c => [{ ...cell, col: c }, look] as [RuleCell, RuleLook]))
     for (const [cell, look] of hit) {
       const k = `${cell.row}|${cell.col}`
       const have = out.get(k) ?? {}
@@ -213,6 +226,7 @@ export function evalRules(rules: ConditionalRule[], rows: string[], cols: string
       }
       if (look.bar && !have.bar) have.bar = look.bar
       if (look.scale && !have.scale) have.scale = look.scale
+      if (look.icon && !have.icon) have.icon = look.icon
       out.set(k, have)
     }
   }
@@ -236,6 +250,19 @@ function cellsFor(rule: ConditionalRule, cells: RuleCell[], today: number): [Rul
       const sorted = nums.map(x => x.n).sort((x, y) => (rule.kind === 'top' ? y - x : x - y))
       const edge = sorted[Math.min(want, sorted.length) - 1]
       return nums.filter(x => (rule.kind === 'top' ? x.n >= edge : x.n <= edge)).map(x => [x.c, { style }])
+    }
+    case 'icons': {
+      const nums = cells.map(c => ({ c, n: parseNumber(c.text) })).filter((x): x is { c: RuleCell; n: number } => x.n !== null)
+      if (!nums.length) return []
+      const lo = Math.min(...nums.map(x => x.n)), hi = Math.max(...nums.map(x => x.n))
+      const [c0, c1] = a.cuts ?? DEFAULT_CUTS
+      const at = (p: number) => (a.by === 'number' ? p : lo + (hi - lo) * p / 100)
+      const set = a.set ?? 'arrows3'
+      return nums.map(x => {
+        let i: 0 | 1 | 2 = x.n >= at(c0) ? 0 : x.n >= at(c1) ? 1 : 2
+        if (a.reverse) i = (2 - i) as 0 | 1 | 2
+        return [x.c, { icon: { set, i, only: !!a.iconOnly } }]
+      })
     }
     case 'bar': case 'scale': {
       const nums = cells.map(c => ({ c, n: parseNumber(c.text) })).filter((x): x is { c: RuleCell; n: number } => x.n !== null)

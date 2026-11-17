@@ -108,7 +108,7 @@
 
   in src/components/sheets/BlankSheet.tsx
 - [X] T035 [US3] Alt+Down on a text cell opens `SheetCombo` with the column's distinct values (`pickFromColumn`) on team, Content and Video sheets, in src/components/sheet/GridCore.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
-- [ ] T036 [US3] Lab checks for US3 (quickstart Stage A §5), then the stage A regressions, docs (validation.md, HANDOVER) and the stage A PR, in scripts/spreadsheet-lab/realapp/tips-a.cjs and specs/020-excel-power-tips/validation.md
+- [X] T036 [US3] Lab checks for US3 (quickstart Stage A §5), then the stage A regressions, docs (validation.md, HANDOVER) and the stage A PR, in scripts/spreadsheet-lab/realapp/tips-a.cjs and specs/020-excel-power-tips/validation.md
 
 **Checkpoint**: stage A is done (MVP), with its PR open and waiting for the user's merge.
 
@@ -120,8 +120,8 @@
 
 **Independent Test**: 1,250,000 shows 1.3M with the value unchanged; a title is centered across A1:F1 with no merge; rows where D > 1000 are highlighted (spec US4).
 
-- [ ] T037 Write the stage B HTML design (custom format field, Center across, whole-row rule and icon sets in the rule editor, Data › Clean up tools with previews, Total row, slicers, advanced filter, outline bar, status-bar math) in design/power-tips-b.html, and get approval
-- [ ] T038 [P] [US4] Pure custom number-format engine (research R7: sections, 0/#, separators, `,` and `,,` scaling, decimals, literals, %, `;;;`; refuses unsupported tokens) in src/lib/sheet-numfmt.ts, with pure checks in scripts/spreadsheet-lab/pure.mjs
+- [X] T037 Write the stage B HTML design (custom format field, Center across, whole-row rule and icon sets in the rule editor, Data › Clean up tools with previews, Total row, slicers, advanced filter, outline bar, status-bar math) in design/power-tips-b.html, and get approval
+- [X] T038 [P] [US4] Pure custom number-format engine (research R7: sections, 0/#, separators, `,` and `,,` scaling, decimals, literals, %, `;;;`; refuses unsupported tokens) in src/lib/sheet-numfmt.ts, with pure checks in scripts/spreadsheet-lab/pure.mjs
 - [ ] T039 [US4] `NumberFormat.kind = 'custom'` with `pattern` in src/types/index.ts; `display()` uses sheet-numfmt in src/lib/sheet-format.ts; a Custom field in Format Cells → Number in the existing Format Cells dialog
 - [ ] T040 [US4] Ctrl+Shift+1 sets Number (2 decimal places, separator) in src/components/sheets/format/FormatToolbar.tsx
 - [ ] T041 [US4] `ha: 'across'`: rendering lays the text over the following empty cells that also carry `across` (no merge), in src/lib/sheet-format.ts and src/components/sheets/BlankSheet.tsx; offered in Format Cells → Alignment
@@ -137,8 +137,8 @@
 
 **Independent Test**: on 300 pasted rows, each tool says how many cells changed and undoes in one step (spec US5, SC-002).
 
-- [ ] T045 [P] [US5] Pure cleanup planners in src/lib/sheet-clean.ts (research R10): `dedupePlan`, `splitPlan` (delimiter or fixed width, preview), `trimClean`, `changeCase`, `toNumber` and `blanksFromAbove`, with pure checks in scripts/spreadsheet-lab/pure.mjs
-- [ ] T046 [P] [US5] Wildcards `*`, `?`, `~*` and `~?` in `matches` and `replaceIn` in src/lib/sheet-tools.ts
+- [X] T045 [P] [US5] Pure cleanup planners in src/lib/sheet-clean.ts (research R10): `dedupePlan`, `splitPlan` (delimiter or fixed width, preview), `trimClean`, `changeCase`, `toNumber` and `blanksFromAbove`, with pure checks in scripts/spreadsheet-lab/pure.mjs
+- [X] T046 [P] [US5] Wildcards `*`, `?`, `~*` and `~?` in `matches` and `replaceIn` in src/lib/sheet-tools.ts
 - [ ] T047 [US5] Data › Clean up submenu and dialogs (Remove duplicates with column picks and a count first; Split with a preview and an insert-columns confirm) in src/components/sheets/format/CleanupDialogs.tsx, wired in src/components/sheets/format/FormatToolbar.tsx
 - [ ] T048 [US5] BlankSheet commands turn each plan into one `BlankChange` step, with a "N cells changed" notice and one-area guards, in src/components/sheets/BlankSheet.tsx
 - [ ] T049 [US5] Paste Special Add, Subtract, Multiply and Divide (the clipboard's single number, applied to numeric cells, non-numbers skipped and counted) in src/components/sheets/BlankSheet.tsx and the Paste Special dialog
@@ -157,7 +157,7 @@
 - [ ] T053 [US6] Total row: a sticky footer under the table's last row, with a per-column aggregate menu, computed over visible rows only, in src/components/sheets/BlankSheet.tsx
 - [ ] T054 [US6] Slicers: `view.slicers`, with chip rows above the table that set `view.filter[col]`, in src/components/sheets/BlankSheet.tsx and src/actions/sheets.ts (view validation)
 - [ ] T055 [US6] Advanced filter dialog (AND/OR groups, unique only, filter in place or copy to a new sheet) in src/components/sheets/format/AdvancedFilter.tsx, plus `filter.advanced` in src/lib/sheet-rules.ts
-- [ ] T056 [P] [US6] Pure outline helpers (groups by ids, levels 1–8, collapsed → hidden ids) in src/lib/sheet-outline.ts, with pure checks
+- [X] T056 [P] [US6] Pure outline helpers (groups by ids, levels 1–8, collapsed → hidden ids) in src/lib/sheet-outline.ts, with pure checks
 - [ ] T057 [US6] Outline bar beside the row numbers and above the letters (brackets, +/−), Shift+Alt+→ and ← to group and ungroup, and Data › Group, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx, stored in `view.outline`
 - [ ] T058 [US6] Status-bar math: Sum, Average and Count over the numeric cells of every area (capped at 50k, debounced), with Min and Max switches from the status bar's menu kept in `momentum.sheet.stats`, on blank and linked sheets, in src/components/sheets/Workbook.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
 - [ ] T059 [US6] Lab checks for US6 (quickstart Stage B §3–§4), then the stage B regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-b.cjs
