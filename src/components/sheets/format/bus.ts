@@ -132,6 +132,8 @@ export type FormatCmd =
   | { kind: 'pickList' }
   // Spec 020 stage B (approved design power-tips-b): cell size, Clean up, tables, slicers, Advanced Filter, groups.
   | { kind: 'autofit'; what: 'row' | 'col' }
+  /** Work out the block around the cell now (a dialog that needs it is opening). */
+  | { kind: 'scope' }
   | { kind: 'clean'; op: CleanOp }
   | { kind: 'dedupe'; cols: string[]; header: boolean }
   | { kind: 'split'; opts: SplitOpts; formats: SplitFormat[] }

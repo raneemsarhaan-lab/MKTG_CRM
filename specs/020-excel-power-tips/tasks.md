@@ -160,7 +160,7 @@
 - [X] T056 [P] [US6] Pure outline helpers (groups by ids, levels 1–8, collapsed → hidden ids) in src/lib/sheet-outline.ts, with pure checks
 - [X] T057 [US6] Outline bar beside the row numbers and above the letters (brackets, +/−), Shift+Alt+→ and ← to group and ungroup, and Data › Group, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx, stored in `view.outline`
 - [X] T058 [US6] Status-bar math: Sum, Average and Count over the numeric cells of every area (capped at 50k, debounced), with Min and Max switches from the status bar's menu kept in `momentum.sheet.stats`, on blank and linked sheets, in src/components/sheets/Workbook.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
-- [ ] T059 [US6] Lab checks for US6 (quickstart Stage B §3–§4), then the stage B regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-b.cjs
+- [X] T059 [US6] Lab checks for US6 (quickstart Stage B §3–§4), then the stage B regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-b.cjs
 
 **Checkpoint**: stage B is done.
 

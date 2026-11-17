@@ -77,8 +77,11 @@ Run against `next start` with the local database (see `quickstart.md`).
 - **The Content sheet:** Clean up is greyed there with the reason, and Find takes wildcards.
 - **Also:** Arabic, axe on every dialog and menu, and no page errors.
 
+**Regressions (stage B):** tips-a, fields (78), content-fields (29), video-fields (29), links (41), areas (42), header (45), run, editing (50), format (52), styles (54), perf-axe (18), `npm run lab:sheet` (150/150) and `npm run lab:spreadsheet` (39/39): all pass.
+
 **Notes:**
 
+- **Speed fix found by perf-axe:** the block around the cell (Create Table, Advanced Filter, Remove Duplicates) was worked out on every key press, so arrow keys on the big sheet took about 1.5 s. It is now worked out once the selection settles (and right before those dialogs open), and arrow keys are back to about 33 ms.
 - **Advanced Filter** reads Excel's criteria range, as in the approved design, instead of the plan's AND/OR builder. Plain text in a criteria cell matches values that begin with it, as in Excel; `=Meta` matches exactly.
 - **Remove Duplicates** works on the selection, the table or the block around the cell. It closes the range up and doesn't delete whole sheet rows, so data beside the range stays where it is (as Excel does).
 - **Paste Special › Comments** stays greyed, with its reason. Comments are threads with replies and notifications, and copying them is left for later. Validation and Column widths come from cells copied on the same sheet.

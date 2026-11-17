@@ -1813,6 +1813,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (cmd.kind === 'flashFill') { flashFill(); focusActive(); return }
     if (cmd.kind === 'repeat') { repeat(); focusActive(); return }
     // Spec 020 stage B.
+    if (cmd.kind === 'scope') { workScope(); return }
     if (cmd.kind === 'autofit') { autofit(cmd.what); focusActive(); return }
     if (cmd.kind === 'clean') { cleanup(cmd.op); focusActive(); return }
     if (cmd.kind === 'dedupe') { dedupe(cmd.cols, cmd.header); focusActive(); return }
@@ -2239,6 +2240,22 @@ export function BlankSheet(p: BlankSheetProps) {
     return kind === 'date' ? `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}` : `${p2(d.getHours())}:${p2(d.getMinutes())}`
   }
 
+  // Spec 020 stage B: the block around the cell (Create Table, Advanced Filter, Remove Duplicates) scans the sheet,
+  // so it is worked out once the selection settles, not on every key press.
+  const [scopeInfo, setScopeInfo] = useState<{ region: string; dedupe: NonNullable<FormatState['dedupe']> } | null>(null)
+  const scopeKey = `${active?.key}|${active?.col}|${JSON.stringify(rectRef.current)}|${areasRef.current.length}`
+  const workScope = () => {
+    if (!active) return
+    const ds = dataScope()
+    setScopeInfo({
+      region: regionRef(),
+      dedupe: { header: ds.header, cols: ds.cols.map(c => ({ key: c, name: (ds.header && ds.rows[0] ? value(ds.rows[0].id, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })) },
+    })
+  }
+  useEffect(() => {
+    const t = window.setTimeout(workScope, 250)
+    return () => window.clearTimeout(t)
+  }, [scopeKey, doc.cells, tables]) // eslint-disable-line react-hooks/exhaustive-deps
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
   const fmtState: FormatState | null = active && activeRow !== undefined && activeCol !== undefined ? {
     source: 'blank',
@@ -2290,9 +2307,7 @@ export function BlankSheet(p: BlankSheetProps) {
       const tableInfo = tb && box ? { totals: !!tb.totals, cols: vCols.filter(c => box.cols.has(c.id)).map(c => ({ key: c.id, name: (tb.header ? value(tb.top, c.id) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c.id) ?? 0)}` })) } : null
       const ai = rowIndex.get(active.key) ?? 0
       const outline = olSpans.rows.some(g => ai >= g.i0 && ai <= g.i1)
-      const ds = dataScope()
-      const dedupeInfo = { header: ds.header, cols: ds.cols.map(c => ({ key: c, name: (ds.header && ds.rows[0] ? value(ds.rows[0].id, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })) }
-      return { dedupe: dedupeInfo, splitValues, tableInfo, region: regionRef(), cleanOff: null, outline, advancedOn: !!view.advanced, validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
+      return { dedupe: scopeInfo?.dedupe, splitValues, tableInfo, region: scopeInfo?.region, cleanOff: null, outline, advancedOn: !!view.advanced, validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
     })(),
   } : null
   useFormatBridge('blank', true, fmtState, runFormat)

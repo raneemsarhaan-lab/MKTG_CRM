@@ -339,7 +339,12 @@ export function Workbook(p: WorkbookProps) {
     document.addEventListener(STATUS_EVENT, on)
     return () => document.removeEventListener(STATUS_EVENT, on)
   }, [])
-  const [tip, setTip] = useState<TipKey | null>(null)
+  const [tip, setTipState] = useState<TipKey | null>(null)
+  /** Dialogs that start from the block around the cell ask the sheet to work it out first (it isn't worked out on every key). */
+  const setTip = (k: TipKey | null) => {
+    if (k === 'createTable' || k === 'advanced' || k === 'dedupe') { sendFormat('blank', { kind: 'scope' }); requestAnimationFrame(() => requestAnimationFrame(() => setTipState(k))) }
+    else setTipState(k)
+  }
   const [recentRefs, setRecentRefs] = useState<string[]>([])
   useEffect(() => {
     const on = () => setTip('series')
