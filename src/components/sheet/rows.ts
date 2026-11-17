@@ -14,6 +14,8 @@ export type SheetRow =
   | { kind: 'clip';  key: string; task: SheetTask; video: SheetTask; n: number }
   | { kind: 'draft'; key: string; video: SheetTask; n: number }
   | { kind: 'add';   key: string; video: SheetTask }
+  /** Spec 019 stage 3: a heading when videos are grouped by stage or editor. */
+  | { kind: 'group'; key: string; label: string; count: number; n: number }
 
 export function isVideoTask(t: Pick<Task, 'content_type_label' | 'parent_task_id'>): boolean {
   return t.content_type_label === 'Video' && !t.parent_task_id
@@ -117,4 +119,29 @@ export function buildRows(tasks: SheetTask[], o: RowOptions): SheetRow[] {
     rows.push({ kind: 'add', key: `a:${video.id}`, video })
   }
   return rows
+}
+
+/**
+ * Spec 019 stage 3: the videos grouped by their stage or editor (Group by in
+ * ⚙ Fields). Each video keeps its clips, drafts and "+ Clip" under it. Pure.
+ */
+export function regroupVideos(rows: SheetRow[], keyOf: (video: SheetTask) => { key: string; label: string; order: string }): SheetRow[] {
+  const blocks: SheetRow[][] = []
+  for (const r of rows) {
+    if (r.kind === 'video') blocks.push([r])
+    else if (r.kind !== 'group' && blocks.length) blocks[blocks.length - 1].push(r)
+  }
+  const groups = new Map<string, { label: string; order: string; blocks: SheetRow[][] }>()
+  for (const b of blocks) {
+    const k = keyOf((b[0] as Extract<SheetRow, { kind: 'video' }>).task)
+    const g = groups.get(k.key)
+    if (g) g.blocks.push(b); else groups.set(k.key, { label: k.label, order: k.order, blocks: [b] })
+  }
+  const out: SheetRow[] = []
+  let n = 1
+  for (const [key, g] of [...groups.entries()].sort((a, b) => a[1].order.localeCompare(b[1].order))) {
+    out.push({ kind: 'group', key: `g:${key}`, label: g.label, count: g.blocks.length, n: n++ })
+    for (const b of g.blocks) for (const r of b) out.push(r.kind === 'add' || r.kind === 'group' ? r : { ...r, n: n++ })
+  }
+  return out
 }
