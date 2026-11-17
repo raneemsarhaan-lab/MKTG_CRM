@@ -17,9 +17,10 @@ import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
 import { mergeStyle, validateStyle } from '@/lib/sheet-format'
-import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SortKey, TabColor, ValidationRecord, ViewWrite } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SlicerRecord, AdvancedFilter, TotalFn, SortKey, TabColor, ValidationRecord, ViewWrite } from '@/types/index'
 import { MAX_VALIDATIONS, cleanRecord as cleanValidation } from '@/lib/sheet-validate'
-import { RULE_KINDS, TAB_COLORS } from '@/types/index'
+import { ICON_SETS, RULE_KINDS, TAB_COLORS, TOTAL_FNS } from '@/types/index'
+import { cleanOutline } from '@/lib/sheet-outline'
 import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
 import { cleanMap, cleanWords } from '@/lib/sheet-links'
 import { linkedTasks, teamColumns } from '@/lib/sheet-links-server'
@@ -248,7 +249,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
     prisma.sheetValidation.findMany({ where: { sheet_id: sheetId } }),
   ])
-  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show']; look?: SheetView['look'] }
+  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show']; look?: SheetView['look']; slicers?: SlicerRecord[]; advanced?: AdvancedFilter; outline?: SheetView['outline'] }
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
@@ -262,10 +263,13 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
       ...(stored.words ? { words: stored.words } : {}),
       ...(stored.show ? { show: stored.show } : {}),
       ...(stored.look ? { look: stored.look } : {}),
+      ...(stored.slicers?.length ? { slicers: stored.slicers } : {}),
+      ...(stored.advanced ? { advanced: stored.advanced } : {}),
+      ...(stored.outline?.length ? { outline: stored.outline } : {}),
     },
     threads,
     rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
-    tables: tables.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col, style: x.style, header: x.header, banded: x.banded })),
+    tables: tables.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col, style: x.style, header: x.header, banded: x.banded, totals: (x.totals ?? null) as SheetTableRecord['totals'] })),
     // Spec 020: data validation, re-cleaned on the way out so an old record can't break the sheet.
     validations: validations.map(x => cleanValidation({ ...(x.rule as object), id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })).filter((x): x is ValidationRecord => !!x),
   }
@@ -295,13 +299,25 @@ function cleanRule(x: unknown): ConditionalRule | null {
   if (typeof a.n === 'number' && Number.isFinite(a.n)) args.n = Math.max(1, Math.min(1000, Math.round(a.n)))
   if (a.percent) args.percent = true
   if (Array.isArray(a.colors)) args.colors = a.colors.slice(0, 3).map(c => (typeof c === 'string' && (c === '' || HEX.test(c)) ? c.toUpperCase() : ''))
-  const style = r.kind === 'bar' || r.kind === 'scale' ? null : validateStyle(r.style)
+  // Spec 020: a whole-row rule's tested column; icon sets.
+  if (a.row === true && typeof a.col === 'string' && a.col.length <= 80 && cols.includes(a.col)) { args.row = true; args.col = a.col }
+  if (ICON_SETS.includes(a.set as never)) args.set = a.set
+  if (Array.isArray(a.cuts) && a.cuts.length === 2 && a.cuts.every(n => typeof n === 'number' && Number.isFinite(n))) args.cuts = [a.cuts[0], a.cuts[1]]
+  if (a.by === 'number' || a.by === 'percent') args.by = a.by
+  if (a.reverse === true) args.reverse = true
+  if (a.iconOnly === true) args.iconOnly = true
+  const style = r.kind === 'bar' || r.kind === 'scale' || r.kind === 'icons' ? null : validateStyle(r.style)
   return { id: r.id, range: { rows, cols }, kind: r.kind as ConditionalRule['kind'], args, style, priority: typeof r.priority === 'number' ? Math.max(0, Math.min(10_000, Math.round(r.priority))) : 0 }
 }
 function cleanTable(x: unknown): SheetTableRecord | null {
   const t = x as Partial<SheetTableRecord> | null
   if (!t || ![t.id, t.top, t.left, t.bottom, t.right].every(v => typeof v === 'string' && UUID.test(v))) return null
-  return { id: t.id!, top: t.top!, left: t.left!, bottom: t.bottom!, right: t.right!, style: TABLE_STYLES.some(s => s.key === t.style) ? t.style! : 'medium-0', header: t.header !== false, banded: t.banded !== false }
+  let totals: Record<string, TotalFn> | null = null
+  if (t.totals && typeof t.totals === 'object') {
+    totals = {}
+    for (const [col, fn] of Object.entries(t.totals).slice(0, 200)) if (UUID.test(col) && TOTAL_FNS.includes(fn as TotalFn)) totals[col] = fn as TotalFn
+  }
+  return { id: t.id!, top: t.top!, left: t.left!, bottom: t.bottom!, right: t.right!, style: TABLE_STYLES.some(s => s.key === t.style) ? t.style! : 'medium-0', header: t.header !== false, banded: t.banded !== false, totals }
 }
 function cleanFilter(x: unknown): Record<string, ColFilter> {
   const out: Record<string, ColFilter> = {}
@@ -325,7 +341,7 @@ function cleanSort(x: unknown): SortKey[] {
 }
 /** The filter area, filter and sort kept in `sheets.view` (null clears one). */
 async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
-  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v) && !('look' in v)) return
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v) && !('look' in v) && !('slicers' in v) && !('advanced' in v) && !('outline' in v)) return
   const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
   const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
   if ('filterArea' in v) {
@@ -349,7 +365,25 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
     if (w.words) next.words = w.words; else delete next.words
     if (w.show) next.show = w.show; else delete next.show
   }
+  // Spec 020: slicers, the advanced filter in place, outline groups (blank sheets).
+  if ('slicers' in v) { const x = cleanSlicers(v.slicers); if (x.length) next.slicers = x; else delete next.slicers }
+  if ('advanced' in v) { const x = cleanAdvanced(v.advanced); if (x) next.advanced = x; else delete next.advanced }
+  if ('outline' in v) { const x = cleanOutline(v.outline) ?? []; if (x.length) next.outline = x; else delete next.outline }
   await tx.sheet.update({ where: { id: sheetId }, data: { view: next as Prisma.InputJsonValue } })
+}
+function cleanSlicers(x: unknown): SlicerRecord[] {
+  if (!Array.isArray(x)) return []
+  return x.slice(0, 20).filter(s => s && typeof s.id === 'string' && UUID.test(s.id) && typeof s.tableId === 'string' && UUID.test(s.tableId) && typeof s.col === 'string' && UUID.test(s.col))
+    .map(s => ({ id: s.id, tableId: s.tableId, col: s.col }))
+}
+const CRIT_OPS = ['eq', 'ne', 'gt', 'lt', 'ge', 'le', 'begins'] as const
+function cleanAdvanced(x: unknown): AdvancedFilter | null {
+  const a = x as Partial<AdvancedFilter> | null
+  if (!a || ![a.top, a.left, a.bottom, a.right].every(v => typeof v === 'string' && UUID.test(v)) || !Array.isArray(a.groups)) return null
+  const groups = a.groups.slice(0, 50).map(g => (Array.isArray(g) ? g.slice(0, 50) : [])
+    .filter(c => c && typeof c.col === 'string' && UUID.test(c.col) && CRIT_OPS.includes(c.op) && typeof c.value === 'string')
+    .map(c => ({ col: c.col, op: c.op, value: c.value.slice(0, 200) }))).filter(g => g.length)
+  return { top: a.top!, left: a.left!, bottom: a.bottom!, right: a.right!, groups, ...(a.unique ? { unique: true } : {}) }
 }
 async function writeRules(tx: Tx, sheetId: string, w: NonNullable<SheetChanges['rules']>) {
   if (w.remove?.length) await tx.sheetRule.deleteMany({ where: { sheet_id: sheetId, id: { in: keys(w.remove, MAX_RULES * 2) } } })
@@ -368,7 +402,7 @@ async function writeTables(tx: Tx, sheetId: string, w: NonNullable<SheetChanges[
   if ((w.put?.length ?? 0) > MAX_TABLES) throw new Refuse('too_many_tables')
   for (const t of (w.put ?? []).map(cleanTable)) {
     if (!t) continue
-    const data = { top_row: t.top, left_col: t.left, bottom_row: t.bottom, right_col: t.right, style: t.style, header: t.header, banded: t.banded }
+    const data = { top_row: t.top, left_col: t.left, bottom_row: t.bottom, right_col: t.right, style: t.style, header: t.header, banded: t.banded, totals: (t.totals ?? Prisma.DbNull) as Prisma.InputJsonValue }
     const own = await tx.sheetTable.findUnique({ where: { id: t.id }, select: { sheet_id: true } })
     if (own && own.sheet_id !== sheetId) continue
     await tx.sheetTable.upsert({ where: { id: t.id }, create: { id: t.id, sheet_id: sheetId, ...data }, update: data })

@@ -75,6 +75,11 @@ const byPos = (a: SheetSummary, b: SheetSummary) => a.position - b.position
 const renumber = (list: SheetSummary[]) => list.map((s, i) => (s.position === i ? s : { ...s, position: i }))
 const newId = () => crypto.randomUUID()
 
+/** Spec 020 tip 38: Customize Status Bar's choices; Excel's defaults. */
+type SbKey = 'avg' | 'count' | 'nums' | 'min' | 'max' | 'sum' | 'zoom'
+const SB_DEFAULT: Record<SbKey, boolean> = { avg: true, count: true, nums: false, min: false, max: false, sum: true, zoom: true }
+const SB_KEY = 'momentum.sheet.stats'
+
 export function Workbook(p: WorkbookProps) {
   const t = useTranslations('sheets')
   const { api, folder } = p
@@ -110,9 +115,11 @@ export function Workbook(p: WorkbookProps) {
   const loading = useRef(new Set<string>())
 
   const [toast, setToast] = useState<string | null>(null)
+  // Spec 020: a cleanup's note offers Undo, as the design's toasts do.
+  const [toastUndo, setToastUndo] = useState(false)
   const toastTimer = useRef<number | undefined>(undefined)
-  const say = useCallback((text: string) => {
-    setToast(text)
+  const say = useCallback((text: string, undo = false) => {
+    setToast(text); setToastUndo(undo)
     window.clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setToast(null), 6000)
   }, [])
@@ -339,7 +346,15 @@ export function Workbook(p: WorkbookProps) {
     return () => document.removeEventListener(SERIES_OPEN, on)
   }, [])
   const [zoomMenu, setZoomMenu] = useState<{ x: number; y: number; el: HTMLElement } | null>(null)
+  // Spec 020 tip 38: Customize Status Bar, as Excel: which numbers show, kept for this member (momentum.sheet.stats).
+  const [sbMenu, setSbMenu] = useState<{ x: number; y: number; el: HTMLElement } | null>(null)
+  const [sbShow, setSbShow] = useState<Record<SbKey, boolean>>(SB_DEFAULT)
+  useEffect(() => {
+    try { const v = JSON.parse(localStorage.getItem(SB_KEY) ?? 'null'); if (v && typeof v === 'object') setSbShow(x => ({ ...x, ...Object.fromEntries(Object.entries(v).filter(([k, b]) => k in SB_DEFAULT && typeof b === 'boolean')) })) } catch { /* private window: the defaults */ }
+  }, [])
+  const setSbShowKey = (k: SbKey) => setSbShow(x => { const n = { ...x, [k]: !x[k] }; try { localStorage.setItem(SB_KEY, JSON.stringify(n)) } catch { /* not kept */ } return n })
   /** Status-bar figures as the member reads numbers (at most 2 decimals, grouped). */
+  const curStats = openBlank ? (sel && sel.count > 1 ? sel.stats ?? null : null) : (linkedStats && linkedStats.cells > 1 ? linkedStats : null)
   const fmtNum = (n: number) => new Intl.NumberFormat(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 2 }).format(n)
   const [skip, setSkip] = useState<string | null>(null)
   const skipTimer = useRef<number | undefined>(undefined)
@@ -759,24 +774,27 @@ export function Workbook(p: WorkbookProps) {
       />
 
       {/* Spec 020: Excel's status bar: the mode, Average / Count / Sum of the selection, and the zoom. */}
-      <div className="fx-sh-statusbar" data-statusbar="">
+      <div className="fx-sh-statusbar" data-statusbar="" onContextMenu={ev => { ev.preventDefault(); setSbMenu({ x: ev.clientX, y: ev.clientY, el: ev.currentTarget }) }}>
         <span className="fx-sb-mode" role="status" aria-live="polite" data-sb-mode="">
           <i aria-hidden="true" className="fx-sb-dot" />{statusMode ?? (sel?.adding ? t('areas.adding') : tt('ready'))}
         </span>
         <span className="fx-sb-sp" />
         {(() => {
           // Blank sheets report through onSelect; the Content and Video sheets through STATUS_EVENT.
-          const st = openBlank ? (sel && sel.count > 1 ? sel.stats : null) : (linkedStats && linkedStats.cells > 1 ? linkedStats : null)
+          const st = curStats
           if (!st || st.count === 0) return null
           return (
             <span className="fx-sb-stats" data-sb-stats="">
-              {st.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(st.avg ?? 0)}</b></span>}
-              <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{st.count}</b></span>
-              {st.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(st.sum)}</b></span>}
+              {sbShow.avg && st.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(st.avg ?? 0)}</b></span>}
+              {sbShow.count && <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{st.count}</b></span>}
+              {sbShow.nums && <span className="fx-sb-chip" data-sb-nums="">{tt('sb.numsShort')} <b>{st.nums}</b></span>}
+              {sbShow.min && st.nums > 0 && st.min !== null && <span className="fx-sb-chip" data-sb-min="">{tt('sb.minShort')} <b>{fmtNum(st.min)}</b></span>}
+              {sbShow.max && st.nums > 0 && st.max !== null && <span className="fx-sb-chip" data-sb-max="">{tt('sb.maxShort')} <b>{fmtNum(st.max)}</b></span>}
+              {sbShow.sum && st.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(st.sum)}</b></span>}
             </span>
           )
         })()}
-        {!phone && (
+        {!phone && sbShow.zoom && (
           <span className="fx-sb-zoom" data-sb-zoom="">
             <button type="button" className="fx-sb-zb" data-zoom-out="" aria-label={tt('zoomOut')} title={tt('zoomOut')} disabled={zoom <= 0.5} onClick={() => setZoom(zoom - 0.1)}>−</button>
             <input type="range" min={50} max={200} step={10} value={Math.round(zoom * 100)} aria-label={tt('zoom')} data-zoom-slider=""
@@ -786,7 +804,21 @@ export function Workbook(p: WorkbookProps) {
                     onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(); setZoomMenu({ x: getComputedStyle(el).direction === 'rtl' ? r.left : r.right - 120, y: r.top - 8, el }) }}>{Math.round(zoom * 100)}%</button>
           </span>
         )}
+        <button type="button" className="fx-sb-more" data-sb-customize="" aria-haspopup="menu" aria-label={tt('sb.title')} title={tt('sb.title')}
+                onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(); setSbMenu({ x: getComputedStyle(el).direction === 'rtl' ? r.left : r.right - 260, y: r.top - 8, el }) }}>⋯</button>
       </div>
+      {sbMenu && (
+        <PopMenu at={{ x: sbMenu.x, y: sbMenu.y }} label={tt('sb.title')} attr="data-sb-menu" returnTo={sbMenu.el} onClose={() => setSbMenu(null)}
+          items={[
+            { kind: 'node', key: 'h', node: <div role="presentation" className="fx-st-h">{tt('sb.title')}</div> },
+            ...(['avg', 'count', 'nums', 'min', 'max', 'sum'] as const).map(k => {
+              const st = curStats, v = !st ? '' : k === 'avg' ? (st.nums ? fmtNum(st.avg ?? 0) : '') : k === 'count' ? String(st.count) : k === 'nums' ? String(st.nums) : k === 'sum' ? (st.nums ? fmtNum(st.sum) : '') : (st[k] !== null && st.nums ? fmtNum(st[k]!) : '')
+              return { key: k, label: tt(`sb.${k}`), kbd: v || undefined, checked: sbShow[k], onSelect: () => setSbShowKey(k) }
+            }),
+            { kind: 'sep', key: 's' },
+            { key: 'zoom', label: tt('sb.zoom'), checked: sbShow.zoom, onSelect: () => setSbShowKey('zoom') },
+          ]} />
+      )}
       {zoomMenu && (
         <PopMenu at={{ x: zoomMenu.x, y: zoomMenu.y }} label={tt('zoom')} attr="data-zoom-menu" returnTo={zoomMenu.el} onClose={() => setZoomMenu(null)}
           items={[200, 150, 125, 100, 75, 50].map(n => ({ key: String(n), label: `${n}%`, checked: Math.round(zoom * 100) === n, onSelect: () => setZoom(n / 100) }))} />
@@ -907,7 +939,8 @@ export function Workbook(p: WorkbookProps) {
                              if (r.success) { setFillLists(f => ({ ...f, lists: r.lists })); say(tt('lists.saved')) } else say(t('err.generic'))
                            }} />
       )}
-      {toast && <div className="fx-sh-toast" role="status" data-sheets-toast="">{toast}</div>}
+      {toast && <div className="fx-sh-toast" role="status" data-sheets-toast="">{toast}
+        {toastUndo && <button type="button" className="fx-sh-toast-undo" data-toast-undo="" onClick={() => { setToast(null); if (openBlank) doUndo() }}>{t('undo')}</button>}</div>}
     </div>
   )
 }

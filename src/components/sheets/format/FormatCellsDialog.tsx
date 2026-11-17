@@ -11,6 +11,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import type { BorderSide, CellStyle, NumberFormat } from '@/types/index'
 import { CURRENCIES } from '@/types/index'
 import { DEFAULT_FONT, DEFAULT_SIZE, FONTS, FONT_SIZES, STANDARD_COLORS, THEME_COLORS, diffStyle, display, showsRed, toCss, validateNum, type BorderPreset } from '@/lib/sheet-format'
+import { patternError } from '@/lib/sheet-numfmt'
 import { Modal } from '../Dialogs'
 import { sendFormat, type FormatSource, type FormatState } from './bus'
 import { DEFAULT_LINE, numKey } from './FormatToolbar'
@@ -22,6 +23,11 @@ const CATS = ['general', 'number', 'currency', 'accounting', 'shortDate', 'time'
 const NEG: NonNullable<NumberFormat['neg']>[] = ['minus', 'red', 'paren', 'paren-red']
 const DATE_TYPES: NumberFormat[] = [{ kind: 'date' }, { kind: 'date', long: true }, { kind: 'date', pattern: 'dd/mm/yyyy' }, { kind: 'date', pattern: 'ddd d mmm' }, { kind: 'date', pattern: 'd mmmm yyyy' }]
 const LINES: BorderSide['w'][] = ['thin', 'medium', 'thick', 'dashed', 'dotted', 'double']
+/** Spec 020 tips 23–25: Excel's ready-made custom codes, then a date code. */
+const CODES = ['0', '0.00', '#,##0', '#,##0.00', '#,##0,"K"', '#,##0.0,,"M"', '0%', ';;;', 'ddd d mmm yyyy']
+const DATE_CODE = /^[dmyhs\s/\-.,:'’]{1,40}$/i
+/** A code typed in Custom › Type: a date code, or Excel's number code. */
+const customNum = (code: string): NumberFormat => (DATE_CODE.test(code) && /[dmy]/i.test(code) ? { kind: 'date', pattern: code } : { kind: 'custom', pattern: code })
 
 /** An id from a label (Arabic labels have spaces, which would split aria-labelledby). */
 const idOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36)
@@ -38,7 +44,7 @@ function catNum(cat: typeof CATS[number], prev: NumberFormat | undefined): Numbe
     case 'percent': return { kind: 'percent', dp: prev?.kind === 'percent' ? dp : 0 }
     case 'scientific': return { kind: 'scientific', dp }
     case 'text': return { kind: 'text' }
-    case 'custom': return { kind: 'date', pattern: prev?.pattern ?? 'ddd d mmm yyyy' }
+    case 'custom': return customNum(prev?.pattern ?? '#,##0')
   }
 }
 
@@ -54,9 +60,10 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
   const setNum = (num: NumberFormat | undefined) => set({ num })
 
   const cat = d.num?.pattern ? 'custom' : d.num?.kind === 'date' ? 'shortDate' : (numKey(d.num) === 'longDate' ? 'shortDate' : numKey(d.num)) as typeof CATS[number]
-  const raw = state.value || (d.num?.kind === 'date' ? '2026-11-16' : d.num?.kind === 'time' ? '14:30' : '-1234.5')
+  const raw = state.value || (d.num?.kind === 'date' ? '2026-11-16' : d.num?.kind === 'time' ? '14:30' : d.num?.kind === 'custom' ? '1250000' : '-1234.5')
   const shown = display(raw, d.num, locale)
   const patternOk = !d.num?.pattern || !!validateNum(d.num)?.pattern
+  const why = d.num?.kind === 'custom' && d.num.pattern !== undefined ? patternError(d.num.pattern) : null
 
   function ok() {
     const patch = diffStyle(state.style, d)
@@ -103,9 +110,14 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                 {d.num?.kind === 'date' && !d.num.pattern && lb(t('fc.type'), DATE_TYPES.map((_, i) => i), DATE_TYPES.findIndex(x => JSON.stringify(x) === JSON.stringify({ kind: 'date', ...(d.num!.long ? { long: true } : {}) })), i => display('2026-11-16', DATE_TYPES[i], locale), i => setNum(DATE_TYPES[i]))}
                 {cat === 'custom' && (
                   <div className="fx-fc-fld">
-                    {fld(t('fc.pattern'), <input type="text" value={d.num?.pattern ?? ''} data-fc-pattern="" aria-invalid={!patternOk || undefined} dir="ltr"
-                                                 onChange={e => setNum({ kind: 'date', pattern: e.target.value })} />)}
-                    <small className={patternOk ? 'fx-fc-hint' : 'fx-fc-bad'} role={patternOk ? undefined : 'alert'}>{patternOk ? t('fc.patternHint') : t('fc.patternBad')}</small>
+                    {fld(t('fc.type'), <input type="text" value={d.num?.pattern ?? ''} data-fc-pattern="" aria-invalid={!patternOk || undefined} dir="ltr" maxLength={60}
+                                              onChange={e => setNum(customNum(e.target.value))} />)}
+                    <div className="fx-fc-lb is-codes" role="listbox" aria-label={t('fc.type')} dir="ltr">
+                      {CODES.map(c => <button key={c} type="button" role="option" aria-selected={d.num?.pattern === c} data-fc-code={c} onClick={() => setNum(customNum(c))}>{c}</button>)}
+                    </div>
+                    <small className={patternOk ? 'fx-fc-hint' : 'fx-fc-bad'} role={patternOk ? undefined : 'alert'} data-fc-why={why ?? undefined}>
+                      {patternOk ? t('fc.customHint') : why ? t(`fc.why.${why}`) : t('fc.patternBad')}
+                    </small>
                   </div>
                 )}
                 <p className="fx-fc-note">{t('fc.numNote')}</p>
@@ -116,7 +128,7 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
             <div className="fx-fc-stack">
               <div className="fx-fc-row">
                 {fld(t('fc.horizontal'), <select value={d.ha ?? 'general'} data-fc-ha="" onChange={e => set({ ha: e.target.value === 'general' ? undefined : e.target.value as CellStyle['ha'] })}>
-                  {(['general', 'left', 'center', 'right', 'justify'] as const).map(x => <option key={x} value={x}>{t(`fc.h.${x}`)}</option>)}</select>)}
+                  {(['general', 'left', 'center', 'right', 'justify', 'across'] as const).map(x => <option key={x} value={x}>{t(`fc.h.${x}`)}</option>)}</select>)}
                 {fld(t('fc.vertical'), <select value={d.va ?? 'bottom'} data-fc-va="" onChange={e => set({ va: e.target.value as CellStyle['va'] })}>
                   {(['top', 'middle', 'bottom'] as const).map(x => <option key={x} value={x}>{t(`fc.v.${x}`)}</option>)}</select>)}
               </div>
