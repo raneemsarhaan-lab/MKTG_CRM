@@ -3126,3 +3126,5 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
   #fx-print-root tr { break-inside: avoid; }
 }
 .fx-ak-hint { color: var(--inbox-muted); font-size: 11px; }
+/* A comment's card steps aside while cells are being dragged. */
+body:has(.fx-sheet-grid.is-moving) .fx-cmt-thread:not(.is-full) { visibility: hidden; }

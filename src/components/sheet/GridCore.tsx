@@ -945,6 +945,12 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       pendingChar.current = e.key
       if (activate(row, active.col)) e.preventDefault()
       else pendingChar.current = ''
+      return
+    }
+    // Spec 020: typing into a cell that can't take it (a locked cell on a protected sheet) says why, as Excel does.
+    if (e.key.length === 1 && !ctrl && !e.altKey && m.spreadsheet && active.col !== 'rowNo' && !m.isText(row, active.col)) {
+      const note = m.readOnlyNote?.(row, active.col)
+      if (note) { e.preventDefault(); onNote(cellKey(row.key, active.col), note) }
     }
   }
 
@@ -1143,8 +1149,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   }
   /** The cell under the pointer, as grid indexes. */
   const cellUnder = (x: number, y: number) => {
-    const el = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-cell]')
-    if (!el || !gridRef.current?.contains(el)) return null
+    // Through anything floating over the grid (a comment's card, a note): the cell under the pointer.
+    const el = document.elementsFromPoint(x, y).map(e => (e as HTMLElement).closest<HTMLElement>('[data-cell]')).find(e => !!e && !!gridRef.current?.contains(e)) ?? null
+    if (!el) return null
     const r = live.current.rowIndex.get(el.dataset.rowKey ?? ''), c = live.current.cols.indexOf(el.dataset.col ?? '')
     return r === undefined || c < 0 ? null : { r, c, el }
   }
@@ -1419,7 +1426,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const afoHere = !!lastFill && !fillDrag && !isEditing && !!m.onFillMenu && i === lastFill.to.r1 && c === lastFill.to.c1
               const dv = isActive && !isEditing && !isNo && m.validation ? m.validation(row, col) : null
               const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` }
-                : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2 }
+                // A merge reaching into the rows below overlaps them; its own row keeps its height (negative bottom margin).
+                : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2, marginBottom: Math.min(0, (heightOf(row) ?? 24) - merge.height) }
                 : undefined
               if (covered) return <div key={col} className="fx-sheet-td is-covered" aria-hidden="true" data-covered={key} />
               return (

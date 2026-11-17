@@ -13,13 +13,13 @@
  *   room, in the target's columns (or rows) only; a move then closes the gap
  *   it left, as Excel does.
  */
-export interface Pt { r: number; c: number }
-export interface Rect { r0: number; c0: number; r1: number; c1: number }
+export interface MovePt { r: number; c: number }
+export interface MoveRect { r0: number; c0: number; r1: number; c1: number }
 export type MoveKind = 'move' | 'copy'
 export type Shift = 'down' | 'right' | null
 export interface MovePlan {
   /** Each changed cell: what it holds now (null: emptied). */
-  cells: { to: Pt; from: Pt | null }[]
+  cells: { to: MovePt; from: MovePt | null }[]
   /** How many rows and columns the sheet needs afterwards. */
   rows: number
   cols: number
@@ -31,14 +31,14 @@ const key = (r: number, c: number) => `${r},${c}`
  * The plan for a block `src` dropped with its top-left corner at `dst`, on a
  * sheet of `rows` × `cols` (the sheet grows if the result reaches past it).
  */
-export function planMove(src: Rect, dst: Pt, kind: MoveKind, shift: Shift, rows: number, cols: number): MovePlan {
+export function planMove(src: MoveRect, dst: MovePt, kind: MoveKind, shift: Shift, rows: number, cols: number): MovePlan {
   const h = src.r1 - src.r0 + 1, w = src.c1 - src.c0 + 1
   // The grid as "where each cell's content came from"; untouched cells are themselves.
-  const V = new Map<string, Pt | null>()
-  const get = (r: number, c: number): Pt | null => (V.has(key(r, c)) ? V.get(key(r, c))! : { r, c })
-  const set = (r: number, c: number, v: Pt | null) => V.set(key(r, c), v)
+  const V = new Map<string, MovePt | null>()
+  const get = (r: number, c: number): MovePt | null => (V.has(key(r, c)) ? V.get(key(r, c))! : { r, c })
+  const set = (r: number, c: number, v: MovePt | null) => V.set(key(r, c), v)
   let maxR = rows, maxC = cols
-  const block = (i: number, j: number): Pt => ({ r: src.r0 + i, c: src.c0 + j })
+  const block = (i: number, j: number): MovePt => ({ r: src.r0 + i, c: src.c0 + j })
 
   if (!shift) {
     for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) set(dst.r + i, dst.c + j, block(i, j))
@@ -101,7 +101,7 @@ export function planMove(src: Rect, dst: Pt, kind: MoveKind, shift: Shift, rows:
 }
 
 /** Whether a rectangle cuts through another (overlaps without holding it whole). */
-export const splits = (block: Rect, other: Rect) => {
+export const splits = (block: MoveRect, other: MoveRect) => {
   const meets = block.r0 <= other.r1 && other.r0 <= block.r1 && block.c0 <= other.c1 && other.c0 <= block.c1
   const holds = block.r0 <= other.r0 && block.r1 >= other.r1 && block.c0 <= other.c0 && block.c1 >= other.c1
   return meets && !holds
