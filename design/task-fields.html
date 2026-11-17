@@ -1,0 +1,371 @@
+<title>Task Fields</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (which sheet, signed in as, language), one workbook
+   frame (title row with ⚙ Fields, menu bar, strip, name box, the grid with a
+   "+" column at the end) and a Fields drawer on the right, then the rules.
+   Stage and type colours are the board's content colours (src/lib/tokens.ts). */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --strip: #EEF0F5; --hover: #E2E5EC; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --link: #1D4ED8; --sh-edge: #7C3AED; --lime: #C9F24E;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --na: #A3A3AE; --fieldhead: #F3EEFF;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif; --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --link: #93B4FF; --sh-edge: #A78BFA; --warn-bg: #3A2A0E; --warn: #F5C46B; --na: #6B6B78; --fieldhead: #251E3D; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --link: #93B4FF; --sh-edge: #A78BFA; --warn-bg: #3A2A0E; --warn: #F5C46B; --na: #6B6B78; --fieldhead: #251E3D; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 84ch; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 12px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+
+.frame { position: relative; background: var(--panel); border-radius: 16px; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10); overflow: hidden; display: flex; flex-direction: column; min-height: 640px; }
+.frame[dir="rtl"], .frame[dir="rtl"] button { font-family: var(--f-ar); }
+.title { display: flex; align-items: center; gap: 10px; padding: 12px 16px 2px; flex-wrap: wrap; }
+.title .crumb { color: var(--muted); font-size: 13.5px; }
+.title b { font: 800 19px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .title b { font-family: var(--f-ar); }
+.saved { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.linkedtag { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 8px; background: var(--purple-soft); color: var(--purple); }
+.title .right { margin-inline-start: auto; display: flex; gap: 8px; }
+.pill { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.pill[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); border-color: transparent; }
+.menubar { display: flex; gap: 2px; padding: 0 10px 4px; font-size: 14px; }
+.menubar span { padding: 4px 8px; }
+.strip { margin: 0 10px 8px; background: var(--strip); border-radius: 999px; height: 38px; display: flex; align-items: center; padding: 0 16px; color: var(--muted); font-size: 13px; overflow: hidden; white-space: nowrap; }
+.fbar { display: flex; height: 32px; border-top: 1px solid var(--line); font-size: 13px; align-items: center; }
+.fbar .nb { width: 120px; padding-inline: 12px; font-weight: 600; border-inline-end: 1px solid var(--line); height: 100%; display: flex; align-items: center; }
+.fbar .fx { width: 34px; color: var(--muted); font-style: italic; font-family: Georgia, serif; border-inline-end: 1px solid var(--line); height: 100%; display: grid; place-items: center; }
+.fbar .v { padding-inline: 10px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.body { flex: 1; display: flex; min-height: 0; border-top: 1px solid var(--line); }
+.gw { flex: 1; overflow: auto; min-width: 0; }
+.g { display: grid; font-size: 13px; min-width: max-content; }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 6px 8px; min-height: 40px; display: flex; align-items: center; gap: 6px; position: relative; min-width: 0; }
+.c > .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.h { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12.5px; min-height: 34px; gap: 6px; }
+.h.field { background: var(--fieldhead); color: var(--ink); }
+.h .ic { width: 18px; height: 18px; border-radius: 5px; display: inline-grid; place-items: center; font-size: 11px; background: var(--purple); color: #fff; flex: none; }
+.h .ic.reg { background: var(--surface); color: var(--muted); border: 1px solid var(--input); }
+.h .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h .car { margin-inline-start: auto; font-size: 9px; opacity: .6; }
+.h.add { justify-content: center; cursor: pointer; color: var(--purple); font-size: 18px; font-weight: 700; }
+.h.add:hover { background: var(--purple-soft); }
+.rn { background: var(--grid-head); color: var(--muted); font-size: 12px; justify-content: center; min-height: 40px; }
+.rn .mk { width: 18px; height: 18px; border-radius: 5px; background: var(--purple); color: #fff; display: inline-grid; place-items: center; font-size: 11px; }
+.grp { grid-column: 1 / -1; background: var(--surface); font-weight: 700; color: var(--ink); min-height: 34px; }
+.c.ctrl { cursor: pointer; } .c.ctrl:hover { background: var(--surface); }
+.c.act { box-shadow: inset 0 0 0 2px var(--sh-edge); }
+.na { color: var(--na); }
+.taskname { color: var(--ink); font-weight: 600; }
+.open { margin-inline-start: auto; color: var(--purple); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.linkbtn { margin-inline-start: auto; color: var(--muted); font-size: 12px; border: 1px dashed var(--input); border-radius: 999px; padding: 2px 8px; white-space: nowrap; background: none; cursor: pointer; }
+.newrow { color: var(--muted); }
+
+.status { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px 3px 8px; font-weight: 600; font-size: 12.5px; border: 1px solid; white-space: nowrap; }
+.status i { width: 8px; height: 8px; border-radius: 50%; }
+.chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 700 9.5px var(--f-body); flex: none; }
+.av.empty { border: 1.5px dashed var(--input); }
+.typepill { display: inline-flex; color: #fff; border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+.pillar { display: inline-flex; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; background: var(--surface); border: 1px solid var(--input); color: var(--ink); }
+.lnk { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.add { color: var(--muted); }
+.due.late { color: #B42318; font-weight: 600; }
+.prio { font-weight: 600; font-size: 12.5px; }
+
+/* drawer */
+.drawer { width: 330px; flex: none; border-inline-start: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.drawer[hidden] { display: none; }
+.drawer header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.drawer header h2 { margin: 0; font: 800 15px var(--f-head); color: var(--ink); }
+.drawer header button { margin-inline-start: auto; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); }
+.drawer .scroll { overflow: auto; padding: 10px 14px 16px; display: grid; gap: 14px; }
+.drawer h3 { margin: 0 0 4px; font: 700 11px var(--f-body); color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.frame[dir="rtl"] .drawer h3 { letter-spacing: 0; }
+.drawer .src { border: 1px solid var(--input); border-radius: 10px; padding: 10px; font-size: 13px; display: grid; gap: 6px; }
+.drawer .src b { color: var(--ink); }
+.drawer .src small { color: var(--muted); line-height: 1.4; }
+.drawer select { border: 1px solid var(--input); border-radius: 8px; padding: 5px 8px; background: var(--panel); width: 100%; }
+.frow { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; font-size: 13px; }
+.frow:hover { background: var(--surface); }
+.frow .drag { color: var(--na); cursor: grab; font-size: 12px; }
+.frow .ic { width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center; font-size: 11px; background: var(--purple); color: #fff; flex: none; }
+.frow .ic.reg { background: var(--surface); color: var(--muted); border: 1px solid var(--input); }
+.frow .nm { flex: 1; min-width: 0; }
+.frow .where { font-size: 11px; color: var(--muted); }
+.sw { width: 32px; height: 18px; border-radius: 999px; background: var(--input); border: 0; position: relative; cursor: pointer; flex: none; padding: 0; }
+.sw::after { content: ""; position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: inset-inline-start .15s; }
+.sw[aria-checked="true"] { background: var(--purple); }
+.sw[aria-checked="true"]::after { inset-inline-start: 16px; }
+.drawer .addcol { border: 1px dashed var(--input); background: none; border-radius: 8px; padding: 7px; font-weight: 600; cursor: pointer; color: var(--purple); }
+.drawer input[type="search"] { width: 100%; border: 1px solid var(--input); border-radius: 8px; padding: 6px 9px; background: var(--panel); }
+
+.pop { position: absolute; z-index: 30; min-width: 240px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13px; max-height: 420px; overflow: auto; }
+.pop .mi { display: flex; width: 100%; gap: 8px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 6px 10px; text-align: start; cursor: pointer; min-height: 32px; }
+.pop .mi:hover:not(:disabled) { background: var(--surface); }
+.pop .mi:disabled { color: var(--muted); cursor: not-allowed; }
+.pop .mi .ck { margin-inline-start: auto; color: var(--purple); font-weight: 700; }
+.pop .mi .ic { width: 20px; height: 20px; border-radius: 5px; display: inline-grid; place-items: center; font-size: 11px; background: var(--purple); color: #fff; flex: none; }
+.pop .mi .ic.reg { background: var(--surface); color: var(--muted); border: 1px solid var(--input); }
+.pop h4 { margin: 6px 10px 4px; font: 700 11px var(--f-body); color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.pop input { width: 100%; border: 1px solid var(--input); border-radius: 8px; padding: 7px 9px; margin-bottom: 4px; background: var(--panel); }
+.pop hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.toast { position: absolute; inset-inline: 0; bottom: 14px; margin-inline: auto; width: max-content; max-width: calc(100% - 32px); background: var(--ink); color: var(--panel); border-radius: 12px; padding: 10px 14px; font-size: 13px; z-index: 40; }
+.tabs { display: flex; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 40px; }
+.tabs button { border: 0; background: none; padding: 0 16px; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; border-inline-end: 1px solid var(--line); }
+.tabs button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border-radius: 16px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h2 { margin: 0; font: 800 16px var(--f-head); color: var(--ink); }
+.card ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+@media (max-width: 900px) { .drawer { position: absolute; inset-block: 0; inset-inline-end: 0; z-index: 20; box-shadow: -10px 0 30px rgba(20,19,26,.15); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Task fields, ClickUp style</h1>
+    <p class="lede">Spec 019 design, take two. Every sheet works the same way: rows that hold a task get live <b>task fields</b>, everything else is a regular spreadsheet. Add a field from the <b>＋</b> at the end of the headings or from <b>⚙ Fields</b>; add a regular column the same way. The Content and Video sheets use the same model, with their rows filled from the board and grouped by theme. Click headings, cells, ＋ and the switches in the drawer.</p>
+  </header>
+  <div class="ctl">
+    <span>Sheet</span><div class="seg" id="sheet"><button type="button" data-v="tsc" aria-pressed="true">TSC Calendar (your sheet)</button><button type="button" data-v="content" aria-pressed="false">Content (preset)</button></div>
+    <span>Language</span><div class="seg" id="lang"><button type="button" data-v="en" aria-pressed="true">English</button><button type="button" data-v="ar" aria-pressed="false">العربية</button></div>
+  </div>
+
+  <div class="frame" id="frame" dir="ltr">
+    <div class="title"><span class="crumb">Sheets ›</span><b id="sname">TSC Calendar</b><span class="linkedtag" id="ltag" hidden>🔗 Linked</span><span class="saved">Saved</span>
+      <span class="right"><button type="button" class="pill" id="fieldsBtn" aria-pressed="true">⚙ Fields</button><span class="pill">Board ▾</span><span class="pill">Comments</span></span></div>
+    <div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span><span>Help</span></div>
+    <div class="strip">🔍 ↶ ↷ 🖌 &nbsp;|&nbsp; EGP % .0 .00 123 ▾ &nbsp;|&nbsp; Inter ▾ &nbsp;|&nbsp; − 10 + &nbsp;|&nbsp; B I S A ▾ &nbsp;|&nbsp; fill ▾ borders ▾ merge ▾ &nbsp;|&nbsp; align ▾ …</div>
+    <div class="fbar"><div class="nb" id="nb">A2</div><div class="fx">fx</div><div class="v" id="fv"></div></div>
+    <div class="body">
+      <div class="gw"><div class="g" id="g"></div></div>
+      <aside class="drawer" id="drawer" aria-label="Fields"></aside>
+    </div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+
+  <div class="cards">
+    <section class="card">
+      <h2>How it works</h2>
+      <ul>
+        <li><b>Task column.</b> One column says which task a row is (a link, or a task's name). Rows with a task get a ↗ marker and live fields; other rows are plain rows.</li>
+        <li><b>Task fields</b> (purple headings): Stage, Assignee, Owner, Due date, Priority, Platform, Content type, Theme, Pillar, the four links, and the team's own Content columns. They show and edit like the Content sheet; on rows without a task they stay empty.</li>
+        <li><b>Regular columns</b> (grey headings): normal spreadsheet cells with all the formatting tools.</li>
+        <li><b>Add</b> from ＋ at the end of the headings, or ⚙ Fields → switch a field on. <b>Use an existing column</b> for a field (today's mapping) from the same place: “Show in: column F”.</li>
+        <li><b>Hide</b> a field by switching it off: the column goes, the task keeps its value.</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>Content and Video sheets</h2>
+      <ul>
+        <li>Same drawer, same field columns and regular columns (today's “+ Column” custom columns become regular or field columns).</li>
+        <li>Their rows are filled from the board (Content pipeline / Video), grouped by Theme › Pillar; that's shown at the top of the drawer and can't be switched off there.</li>
+        <li>Columns, Mine, Show archived and Paste plan stay; Columns becomes ⚙ Fields.</li>
+        <li>Nothing about the board changes; this is how sheets show and edit task fields.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STAGES = [['todo', 'Planned', '#64748B', null], ['c-prog', 'Writing', '#3B82F6', null], ['c-final', 'Content Review', '#2E6FB0', 'Marketing Manager'], ['c-check', 'Content Check', '#1F5A94', 'Managing Director'], ['r-design', 'Ready for Design', '#8B5CF6', null], ['d-prog', 'Initial Design', '#7C3AED', null], ['d-check', 'Final Design', '#5B3FB5', 'Brand Director'], ['final-check', 'Final Check', '#F59E0B', 'Marketing Manager'], ['ready-publish', 'Ready to Publish', '#0EA5E9', null], ['scheduled', 'Scheduled', '#14B8A6', null], ['publish', 'Published', '#22C55E', null]]
+  const TYPES = { Post: '#1D4ED8', Reel: '#BE185D', Video: '#7E22CE', Article: '#0F766E', Report: '#B45309', 'Framework/Model': '#4338CA' }
+  const PEOPLE = [['Raneem Sarhaan', 'RS', '#E05E5E'], ['Yosra Eltopgy', 'YE', '#16A34A'], ['Content Creator', 'CC', '#6D5AE6'], ['Graphic Designer', 'GD', '#475569'], ['Video Editor', 'VE', '#0E7490']]
+  const PILLARS = ['Sessions', 'Speakers', 'Venue', 'AI', 'Decision Making']
+  const PRIO = { High: '#B42318', Normal: '#334155', Low: '#64748B' }
+  const mix = (hex, a) => { const n = parseInt(hex.slice(1), 16); return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * a + 255 * (1 - a)).toString(16).padStart(2, '0')).join('') }
+  // Fields a column can show (TASK_FIELDS + the team's own Content columns).
+  const FIELDS = [['stage', 'Stage', '◐'], ['assignee', 'Assignee', '👤'], ['owner', 'Owner', '★'], ['due', 'Due date', '📅'], ['priority', 'Priority', '⚑'], ['platform', 'Platform', '◎'], ['type', 'Content type', '▣'], ['theme', 'Theme', '◆'], ['pillar', 'Pillar', '◇'], ['link:doc', 'Working doc', '🔗'], ['link:design', 'Design link', '🔗'], ['link:post', 'Post link', '🔗'], ['link:published', 'Published link', '🔗'], ['col:hook', 'Hook (team column)', '✎']]
+  const fname = k => FIELDS.find(f => f[0] === k)?.[1] ?? k
+  const ficon = k => FIELDS.find(f => f[0] === k)?.[2] ?? '•'
+  const S = {
+    tsc: { name: 'TSC Calendar', preset: false, tab: 'Calendar',
+      cols: [{ k: 'task', name: 'Topic / Title', task: true }, { k: 'stage', field: 'stage' }, { k: 'assignee', field: 'assignee' }, { k: 'type', field: 'type' }, { k: 'cap', name: 'Caption (LinkedIn)', w: 280 }, { k: 'design', field: 'link:design' }, { k: 'pillar', field: 'pillar' }, { k: 'notes', name: 'Notes', w: 160 }],
+      rows: [
+        { task: { name: 'Retreat 26 · Quote · Hisham El Badawy · 2', stage: 'r-design', assignee: 0, type: 'Article', 'link:design': '', pillar: 'Sessions', due: '2026-11-20', priority: 'High', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, cap: '“Inventing an intermediate level just to promote someone doesn’t solve the problem…”', notes: 'Approved by Islam' },
+        { task: { name: 'Retreat 26 · Quote · Islam Saadany · 1', stage: 'c-final', assignee: 1, type: 'Article', 'link:design': 'https://www.canva.com/design/x', pillar: 'Sessions', due: '2026-11-12', priority: 'Normal', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, cap: '“The strategy’s role in execution is not execution…”', notes: '' },
+        { task: { name: 'Retreat 26 · Venue reveal', stage: 'publish', assignee: 4, type: 'Reel', 'link:design': 'https://claude.ai/public/artifacts/x', pillar: 'Venue', due: '2026-11-05', priority: 'Normal', owner: 1, platform: 'Instagram', theme: 'TSC Retreat 26' }, cap: 'Where we’re meeting this year 🏔️', notes: 'Boosted' },
+        { task: null, title: 'Speakers line-up (draft)', cap: 'Not on the board yet', notes: 'Waiting for names' },
+        { task: null, title: '', cap: '', notes: '' },
+      ] },
+    content: { name: 'Content', preset: true, tab: 'Content library',
+      cols: [{ k: 'task', name: 'Title', task: true }, { k: 'type', field: 'type' }, { k: 'stage', field: 'stage' }, { k: 'assignee', field: 'assignee' }, { k: 'doc', field: 'link:doc' }, { k: 'design', field: 'link:design' }, { k: 'hook', field: 'col:hook' }, { k: 'notes', name: 'Notes', w: 160 }],
+      rows: [
+        { grp: 'Strategy › AI' },
+        { task: { name: '[YOSRA] Forefront – LinkedIn carousel', stage: 'publish', assignee: 1, type: 'Post', 'link:doc': 'https://docs.google.com/d/x', 'link:design': '', 'col:hook': 'Most AI pilots fail quietly', due: '2026-11-01' }, notes: '' },
+        { task: { name: 'AI Pillar Article', stage: 'publish', assignee: null, type: 'Article', 'link:doc': 'https://docs.google.com/d/y', 'link:design': '', 'col:hook': '', due: '2026-10-28' }, notes: 'Evergreen' },
+        { grp: 'Strategy › Decision Making' },
+        { task: { name: 'A CEO Guide to Say No', stage: 'c-final', assignee: null, type: 'Article', 'link:doc': 'https://docs.google.com/d/z', 'link:design': '', 'col:hook': '', due: '2026-11-19' }, notes: '' },
+        { task: { name: 'A CEO Guide to a Missed Opportunity', stage: 'r-design', assignee: 2, type: 'Article', 'link:doc': 'https://docs.google.com/d/w', 'link:design': '', 'col:hook': '', due: '2026-11-21' }, notes: '' },
+      ] },
+  }
+  let cur = 'tsc', lang = 'en', act = { r: 0, c: 0 }, drawerOpen = true
+  const frame = document.getElementById('frame'), g = document.getElementById('g'), drawer = document.getElementById('drawer')
+  const sh = () => S[cur]
+  const site = u => { try { const h = new URL(u).hostname.replace(/^www\./, ''); return h.includes('docs.google') ? 'Google Docs' : h.includes('canva') ? 'Canva' : h } catch { return u } }
+  const today = '2026-11-17'
+  const fmtDate = d => d ? new Date(d + 'T00:00').toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' }) : ''
+  const closePop = () => frame.querySelector('.pop')?.remove()
+  const toast = t => { frame.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.setAttribute('role', 'status'); d.textContent = t; frame.appendChild(d); setTimeout(() => d.remove(), 2800) }
+  function pop(anchor, build) {
+    closePop()
+    const p = document.createElement('div'); p.className = 'pop'; p.setAttribute('role', 'menu'); build(p); frame.appendChild(p)
+    const fr = frame.getBoundingClientRect(), r = anchor.getBoundingClientRect()
+    const x = frame.dir === 'rtl' ? r.right - fr.left - p.offsetWidth : r.left - fr.left
+    p.style.left = Math.max(8, Math.min(x, fr.width - p.offsetWidth - 8)) + 'px'
+    p.style.top = Math.min(r.bottom - fr.top + 4, fr.height - p.offsetHeight - 8) + 'px'
+    p.querySelector('input, .mi:not(:disabled)')?.focus()
+  }
+  const item = (p, html, on, o = {}) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem'); b.innerHTML = html + (o.ck ? '<span class="ck">✓</span>' : ''); b.disabled = !!o.off; if (o.off) b.title = o.off; b.addEventListener('click', () => { closePop(); on() }); p.appendChild(b) }
+  const head = (p, t) => { const h = document.createElement('h4'); h.textContent = t; p.appendChild(h) }
+
+  function fieldHTML(f, t) {
+    const v = t[f]
+    if (f === 'stage') { const s = STAGES.find(x => x[0] === v); return `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}</span>` }
+    if (f === 'assignee' || f === 'owner') { const p = PEOPLE[v]; return p ? `<span class="chip"><span class="av" style="background:${p[2]}">${p[1]}</span><span class="t">${p[0]}</span></span>` : '<span class="chip"><span class="av empty"></span><span class="t na">Unassigned</span></span>' }
+    if (f === 'type') return `<span class="typepill" style="background:${TYPES[v] ?? '#52525B'}">${v}</span>`
+    if (f === 'pillar' || f === 'theme') return v ? `<span class="pillar">${v}</span>` : ''
+    if (f === 'due') return `<span class="due${v && v < today && t.stage !== 'publish' ? ' late' : ''}">${fmtDate(v)}</span>`
+    if (f === 'priority') return `<span class="prio" style="color:${PRIO[v] ?? 'inherit'}">⚑ ${v ?? ''}</span>`
+    if (f.startsWith('link:')) return v ? `<span class="lnk">${site(v)}</span>` : '<span class="add">+ link</span>'
+    return `<span class="t">${v ?? ''}</span>`
+  }
+  function edit(f, t, el) {
+    if (f === 'stage') pop(el, p => STAGES.forEach(s => item(p, `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}</span>`, () => { t.stage = s[0]; render(); toast(`Moved to ${s[1]} on the board.`) }, { ck: t.stage === s[0], off: s[3] && s[3] !== 'Marketing Manager' ? `${s[3]} moves this stage` : null })))
+    else if (f === 'assignee' || f === 'owner') pop(el, p => { PEOPLE.forEach((pp, i) => item(p, `<span class="av" style="background:${pp[2]}">${pp[1]}</span>${pp[0]}`, () => { t[f] = i; render() }, { ck: t[f] === i })); item(p, '<span class="av empty"></span>Unassigned', () => { t[f] = null; render() }) })
+    else if (f === 'type') pop(el, p => Object.entries(TYPES).forEach(([k, c]) => item(p, `<span class="typepill" style="background:${c}">${k}</span>`, () => { t.type = k; render() }, { ck: t.type === k })))
+    else if (f === 'pillar') pop(el, p => PILLARS.forEach(k => item(p, `<span class="pillar">${k}</span>`, () => { t.pillar = k; render() }, { ck: t.pillar === k })))
+    else if (f === 'priority') pop(el, p => Object.keys(PRIO).forEach(k => item(p, `<span class="prio" style="color:${PRIO[k]}">⚑ ${k}</span>`, () => { t.priority = k; render() }, { ck: t.priority === k })))
+    else if (f === 'due') pop(el, p => { const i = document.createElement('input'); i.type = 'date'; i.value = t.due ?? ''; i.setAttribute('aria-label', 'Due date'); i.addEventListener('change', () => { t.due = i.value; closePop(); render() }); p.appendChild(i) })
+    else if (f.startsWith('link:')) pop(el, p => { const i = document.createElement('input'); i.placeholder = 'Paste a link'; i.value = t[f] ?? ''; i.setAttribute('aria-label', fname(f)); i.addEventListener('keydown', e => { if (e.key === 'Enter') { t[f] = i.value.trim(); closePop(); render() } }); p.appendChild(i) })
+    else toast('Type into the cell to change it.')
+  }
+  /** The ＋ heading: add a task field, or a regular column (ClickUp's "+ add field"). */
+  function addMenu(el) {
+    pop(el, p => {
+      const s = document.createElement('input'); s.type = 'search'; s.placeholder = 'Search fields'; s.setAttribute('aria-label', 'Search fields'); p.appendChild(s)
+      const list = document.createElement('div'); p.appendChild(list)
+      const fill = q => {
+        list.innerHTML = ''
+        head(list, 'Task fields')
+        const shown = new Set(sh().cols.map(c => c.field).filter(Boolean))
+        FIELDS.filter(f => !shown.has(f[0]) && (!q || f[1].toLowerCase().includes(q))).forEach(f => item(list, `<span class="ic">${f[2]}</span>${f[1]}`, () => { sh().cols.push({ k: f[0], field: f[0] }); render(); toast(`${f[1]} added. Rows with a task show it.`) }))
+        const hr = document.createElement('hr'); list.appendChild(hr)
+        head(list, 'Regular column')
+        item(list, '<span class="ic reg">A</span>Spreadsheet column', () => { sh().cols.push({ k: 'r' + Date.now(), name: 'Column', w: 140 }); render() })
+      }
+      s.addEventListener('input', () => fill(s.value.toLowerCase())); fill('')
+    })
+  }
+  function headMenu(c, el) {
+    pop(el, p => {
+      if (c.field) { item(p, `Field: <b>${fname(c.field)}</b>`, () => {}, { off: ' ' }); item(p, 'Hide field (the task keeps its value)', () => { sh().cols = sh().cols.filter(x => x !== c); render() }); item(p, 'Turn into a regular column (keep today’s values as text)', () => { delete c.field; c.name = fname(c.k); render() }) }
+      else if (c.task) { item(p, 'This column says which task a row is', () => {}, { off: ' ' }); item(p, 'Use another column as the task column…', () => toast('Pick the column in ⚙ Fields.')) }
+      else { item(p, 'Rename', () => {}); item(p, 'Use this column for a task field ▸', () => { pop(el, q => { head(q, 'Show this field here'); FIELDS.forEach(f => item(q, `<span class="ic">${f[2]}</span>${f[1]}`, () => { c.field = f[0]; render(); toast(`${c.name} now shows ${f[1]}. Rows without a task keep their text.`) })) }) }); item(p, 'Delete column', () => { sh().cols = sh().cols.filter(x => x !== c); render() }) }
+    })
+  }
+
+  function render() {
+    const cols = sh().cols
+    g.style.gridTemplateColumns = `48px ${cols.map(c => (c.task ? 260 : c.w ?? (c.field ? 170 : 150)) + 'px').join(' ')} 44px`
+    g.innerHTML = ''
+    const add = (cls, html, at = {}) => { const d = document.createElement('div'); d.className = 'c ' + cls; d.innerHTML = html; for (const [k, v] of Object.entries(at)) d.setAttribute(k, v); g.appendChild(d); return d }
+    add('h', '')
+    cols.forEach(c => {
+      const d = add('h' + (c.field || c.task ? ' field' : ''), `<span class="ic${c.field || c.task ? '' : ' reg'}">${c.task ? '✓' : c.field ? ficon(c.field) : 'A'}</span><span class="nm">${c.task ? c.name : c.field ? fname(c.field) : c.name}</span><span class="car">▾</span>`, { role: 'columnheader', tabindex: '0' })
+      d.addEventListener('click', () => headMenu(c, d))
+    })
+    const plus = add('h add', '＋', { role: 'columnheader', tabindex: '0', 'aria-label': 'Add a field or column', title: 'Add a field or column' })
+    plus.addEventListener('click', () => addMenu(plus))
+    let n = 0
+    sh().rows.forEach((row, r) => {
+      if (row.grp) { add('grp', row.grp); return }
+      n++
+      add('rn', row.task ? `<span class="mk" title="Linked to a task">↗</span>` : String(n))
+      cols.forEach((c, ci) => {
+        let html = '', ctrl = false
+        if (c.task) html = row.task ? `<span class="t taskname">${row.task.name}</span><span class="open">Open ↗</span>` : (row.title ? `<span class="t">${row.title}</span><button type="button" class="linkbtn">Link a task</button>` : `<span class="t newrow">${sh().preset ? '' : ''}</span>`)
+        else if (c.field) { if (row.task) { html = fieldHTML(c.field, row.task); ctrl = !c.field.startsWith('col:') } else html = '' }
+        else html = `<span class="t">${row[c.k] ?? ''}</span>`
+        const d = add((act.r === r && act.c === ci ? 'act ' : '') + (ctrl ? 'ctrl' : ''), html, { role: 'gridcell', tabindex: '0', 'data-r': r, 'data-c': ci })
+        d.addEventListener('click', ev => {
+          act = { r, c: ci }; render()
+          const el = g.querySelector(`[data-r="${r}"][data-c="${ci}"]`)
+          if (ev.target.closest('.linkbtn')) { pop(el, p => { const i = document.createElement('input'); i.placeholder = 'Search tasks or paste a link'; p.appendChild(i); item(p, '＋ Create a task “' + row.title + '”', () => { row.task = { name: row.title, stage: 'todo', assignee: null, type: 'Post', pillar: '', due: '' }; render(); toast('Task created on the board; the row is linked.') }) }); return }
+          if (ctrl) edit(c.field, row.task, el)
+        })
+      })
+      add('', '')
+    })
+    if (!sh().preset) { add('rn', ''); const d = add('newrow', '<span class="t">＋ New row</span>'); d.style.gridColumn = `2 / -1` }
+    const row = sh().rows[act.r], c = cols[act.c]
+    document.getElementById('nb').textContent = `${String.fromCharCode(65 + act.c)}${act.r + 1}`
+    document.getElementById('fv').textContent = !row || row.grp ? '' : c?.task ? (row.task?.name ?? row.title ?? '') : c?.field ? (row.task ? String(row.task[c.field] ?? '') : '') : (row[c?.k] ?? '')
+    document.getElementById('sname').textContent = sh().name
+    document.getElementById('ltag').hidden = !sh().preset
+    renderDrawer()
+    document.getElementById('tabs').innerHTML = `<button type="button" aria-selected="true">${sh().tab}</button>`
+  }
+
+  function renderDrawer() {
+    drawer.hidden = !drawerOpen
+    document.getElementById('fieldsBtn').setAttribute('aria-pressed', drawerOpen)
+    if (!drawerOpen) return
+    const cols = sh().cols
+    const shown = new Map(cols.filter(c => c.field).map((c, i) => [c.field, c]))
+    const letter = c => String.fromCharCode(65 + cols.indexOf(c))
+    const taskCol = cols.find(c => c.task)
+    drawer.innerHTML = `<header><h2>Fields</h2><button type="button" aria-label="Close" id="dclose">×</button></header><div class="scroll" id="dscroll"></div>`
+    const sc = drawer.querySelector('#dscroll')
+    const sec = (title, html) => { const d = document.createElement('section'); d.innerHTML = `<h3>${title}</h3>${html}`; sc.appendChild(d); return d }
+    if (sh().preset) sec('Rows', `<div class="src"><b>Content tasks from the board</b><small>Every content task is a row, grouped by Theme › Pillar. Archived ones show with “Show archived”.</small><label>Group by <select><option>Theme › Pillar</option><option>Stage</option><option>Assignee</option><option>None</option></select></label></div>`)
+    else sec('Linked to the board', `<div class="src"><b>Task column: ${letter(taskCol)} · ${taskCol.name}</b><small>Rows whose ${taskCol.name} holds a task link or name get its fields. Other rows are ordinary rows.</small><label>Task column <select>${cols.filter(c => !c.field).map(c => `<option${c === taskCol ? ' selected' : ''}>${letter(c)} · ${c.task ? c.name : c.name}</option>`).join('')}</select></label></div>`)
+    const fs = sec('Task fields', '<input type="search" placeholder="Search fields" aria-label="Search fields">')
+    const list = document.createElement('div'); fs.appendChild(list)
+    const fill = q => {
+      list.innerHTML = ''
+      FIELDS.filter(f => !q || f[1].toLowerCase().includes(q)).forEach(f => {
+        const c = shown.get(f[0])
+        const row = document.createElement('div'); row.className = 'frow'
+        row.innerHTML = `<span class="drag" aria-hidden="true">⋮⋮</span><span class="ic">${f[2]}</span><span class="nm">${f[1]}${c ? `<br><span class="where">Column ${letter(c)}</span>` : ''}</span>`
+        const sw = document.createElement('button'); sw.type = 'button'; sw.className = 'sw'; sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', !!c); sw.setAttribute('aria-label', `Show ${f[1]}`)
+        sw.addEventListener('click', () => { if (c) sh().cols = sh().cols.filter(x => x !== c); else sh().cols.push({ k: f[0], field: f[0] }); render() })
+        row.appendChild(sw); list.appendChild(row)
+      })
+    }
+    fs.querySelector('input').addEventListener('input', e => fill(e.target.value.toLowerCase())); fill('')
+    const rs = sec('Regular columns', '')
+    cols.filter(c => !c.field && !c.task).forEach(c => { const row = document.createElement('div'); row.className = 'frow'; row.innerHTML = `<span class="drag" aria-hidden="true">⋮⋮</span><span class="ic reg">A</span><span class="nm">${c.name}<br><span class="where">Column ${letter(c)}</span></span>`; rs.appendChild(row) })
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'addcol'; b.textContent = '＋ Add a regular column'; b.addEventListener('click', () => { sh().cols.push({ k: 'r' + Date.now(), name: 'Column', w: 140 }); render() }); rs.appendChild(b)
+    drawer.querySelector('#dclose').addEventListener('click', () => { drawerOpen = false; render() })
+  }
+
+  document.getElementById('fieldsBtn').addEventListener('click', () => { drawerOpen = !drawerOpen; render() })
+  const seg = (id, fn) => document.getElementById(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); closePop(); fn(b.dataset.v) })
+  seg('sheet', v => { cur = v; act = { r: v === 'content' ? 1 : 0, c: 0 }; render(); document.querySelector('.gw').scrollLeft = 0 })
+  seg('lang', v => { lang = v; frame.dir = v === 'ar' ? 'rtl' : 'ltr'; render() })
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.pop') && !e.target.closest('.c')) closePop() })
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop() })
+  render()
+})()
+</script>

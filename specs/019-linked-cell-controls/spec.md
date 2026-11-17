@@ -1,96 +1,117 @@
-# Feature Specification: Content-Sheet Controls in Linked Sheets
+# Feature Specification: Task Fields in Every Sheet (ClickUp Style)
 
 **Feature Branch**: `claude/nice-noether-x4rgei`
 
-**Created**: 2026-11-17
+**Created**: 2026-11-17 (revised the same day)
 
 **Status**: Draft (design awaiting approval)
 
-**Input**: User description: "why when I connect any sheet manually, it doesn't show like the one we connect hard code?" Follow-up: "yes, design it".
+**Input**:
+- User description: "why when I connect any sheet manually, it doesn't show like the one we connect hard code?"
+- Then: "lets do something more professional, as clickup we have fields that are already linked, and we can add them from the sheet setting, and we always have extra regular columns as regular excel sheet".
 
-**Design**: [design/linked-cells.html](../../design/linked-cells.html)
+**Design**: [design/task-fields.html](../../design/task-fields.html). An earlier take, [design/linked-cells.html](../../design/linked-cells.html), was set aside.
+
+## Clarifications
+
+### Session 2026-11-17
+
+- **Q: Which rows are tasks?**
+  A: As in linked sheets today. A row is a task only when it is linked to one, through the task column. Every other row is an ordinary row.
+- **Q: What happens to today's column mapping (TSC Calendar)?**
+  A: **Keep both.** Mapping an existing column stays possible: "Use this column for a task field".
+- **Q: Content and Video sheets?**
+  A: **Same model.** They become sheets with a preset row source (the board's content or video tasks, grouped by theme and pillar), the same Fields drawer, field columns and regular columns.
 
 ## Context
 
-Spec 016 lets a blank sheet link its rows to board tasks and map columns to task fields. Mapped cells show the task's value:
+Today a team-linked sheet maps columns to fields, and those cells show plain text. The Content sheet shows real controls, but its columns are fixed by code.
 
-- **Stage** shows as a plain pill.
-- **Every other field** shows as text: assignee, type, pillar, due date, and links as the bare address.
-- **Editing** works by typing a value, which the app then matches.
+ClickUp's table view is the model people expect:
 
-The Content sheet shows the same fields with real controls:
-
-- a status pill with a menu;
-- an avatar chip with a people picker;
-- a coloured type pill;
-- link labels such as "Google Docs".
-
-So a sheet the team links themselves looks and feels poorer than the Content sheet, even though the data is the same.
+- The fields belong to the task, and you add them from "＋" or from the view's settings.
+- They show and edit with their own controls.
+- Regular columns sit beside them.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Mapped cells look like the Content sheet (Priority: P1)
+### User Story 1 - Add task fields from the sheet (Priority: P1)
 
-On a linked row, each mapped cell shows the Content sheet's look:
+A member clicks ＋ at the end of the headings, or opens **⚙ Fields**. They switch on Stage, Assignee, Due date and Design link. Each one appears as a column with a purple field heading:
 
-- **Stage**: the status pill with its colour dot, in the Content sheet's words (Ready for Design, Content Review…).
-- **Assignee**: an avatar and name, or "Unassigned".
-- **Content type**: the coloured type pill.
-- **Pillar / theme**: a chip.
-- **Due date**: a short date, red when late (as on the board).
-- **Links**: the site's name, or "+ link" when empty.
+- **Rows with a task** show the field's control: status pill, avatar, date, link label.
+- **Rows without a task** leave the cell empty.
 
-**Independent Test**: Link TSC Calendar's Stage, Owner, Content Type, Link and Pillar columns. Each linked row shows the controls above. The unlinked row shows plain text.
+**Independent Test**: In a sheet whose Topic column holds task links, add Stage, Assignee, Due date and Design link from ＋. Each linked row shows the task's values. Switch Assignee off: the column goes away, and the task keeps its assignee.
 
 **Acceptance Scenarios**:
 
-1. **Given** a linked row, **When** the sheet opens, **Then** each mapped cell shows its control.
-2. **Given** a row that isn't linked, **When** the sheet opens, **Then** its cells are ordinary text, with the "Not linked" note in its Task cell.
-3. **Given** a value changes on the board, **When** the sheet refreshes (focus, or every 60 s), **Then** the control shows the new value.
+1. **Given** ＋ is clicked, **When** a task field is picked, **Then** a field column is added at the end, filled for linked rows.
+2. **Given** the Fields drawer, **When** a field's switch is turned off, **Then** its column is removed from the sheet, and nothing changes on the task.
+3. **Given** the drawer, **When** the member drags a field, **Then** its column moves to match.
+4. **Given** the available fields, **Then** they are Stage, Assignee, Owner, Due date, Priority, Platform, Content type, Theme, Pillar, Working doc, Design link, Post link, Published link, and the team's own Content columns.
 
-### User Story 2 - Edit with the controls (Priority: P1)
+### User Story 2 - Edit fields with their controls (Priority: P1)
 
-The member clicks a mapped cell, or presses Enter or Space on it. The matching control opens:
+A field cell on a linked row opens its control: the stage menu (stages the member doesn't hold are disabled), the people picker, type, pillar, priority, the date picker, or a link field. Saving follows the board's rules, and undo reverts it.
 
-- **Stage**: a menu of the stages the member may move to. The others are disabled with their owner named.
-- **Assignee**: a people picker with search, plus Unassigned.
-- **Content type**: a menu of the workspace's types.
-- **Pillar**: a menu of the task's theme's pillars.
-- **Due date**: a date picker, plus Clear.
-- **Links**: a link field, plus Open link ↗.
+**Independent Test**: Change stage, assignee, type, pillar, due date and design link from the sheet. Each shows on the board. Each undoes in one step.
 
-**Independent Test**: Set a task's stage, assignee, type, pillar, date and design link from the sheet, using only the controls. The board shows each change. Each one undoes in one step.
+### User Story 3 - Regular columns stay a spreadsheet (Priority: P1)
 
-**Acceptance Scenarios**:
+Regular columns have grey headings and are ordinary cells. They keep every spreadsheet tool (formatting, merges, sort and filter, comments, several areas). ＋ → "Spreadsheet column" adds one. "Use this column for a task field" turns a regular column into a field column, as today's mapping does. "Turn into a regular column" goes back, keeping the shown text.
 
-1. **Given** a mapped cell, **When** the member picks a value, **Then** it saves to the task through the same rules as the Content sheet (permissions, stage-move rules, link checks), and undo reverts it.
-2. **Given** a stage the member doesn't hold, **When** the stage menu opens, **Then** that stage is disabled, with its owner named.
-3. **Given** a cell the member may not change, **When** it is clicked, **Then** the control doesn't open and the cell explains why (🔒).
-4. **Given** a mapped cell, **When** the member types a value instead, **Then** it is matched and saved as today. Paste, Fill, Delete and Find & Replace are also unchanged.
+**Independent Test**: Add a "Notes" regular column, type in it, format it and sort by it. Turn "Owner" (a text column) into the Assignee field: linked rows show avatars, and unlinked rows keep their text.
+
+### User Story 4 - Rows link to tasks (Priority: P1)
+
+The drawer names the **task column**. Rows whose task cell holds a task link or a task's name are linked:
+
+- A linked row shows ↗ and "Open ↗".
+- An unlinked row with text shows "Link a task". It searches tasks, or offers "＋ Create a task" with that name.
+
+### User Story 5 - Content and Video sheets use the same model (Priority: P2)
+
+The Content sheet's columns become field columns (Type, Stage, Assignee, Working doc…) and regular columns (today's custom columns, if they are text). Its rows are still every content task, grouped by Theme › Pillar. The drawer shows this at the top as **Rows: Content tasks from the board**, with a Group by choice. Columns, Mine, Show archived and Paste plan stay; Columns opens the same Fields drawer. The Video sheet works the same way.
+
+**Independent Test**: On the Content sheet, open ⚙ Fields, switch on Due date and switch off Working doc. The columns change, and the grouping and counts stay. Reload: the choice is kept for the sheet.
 
 ### Edge Cases
 
-- **Merged or wrapped cells**: the control sits at the top start, like any cell text.
-- **Arabic**: the controls mirror; the stage words and types use their Arabic labels where they exist.
-- **Phones**: the controls open as bottom sheets, as on the Content sheet.
-- **Several areas selected (spec 017)**: a click opens the control for the clicked cell only.
+- **Sheets mapped with spec 016 (TSC Calendar)** open with their mapped columns shown as field columns. Nothing has to be redone.
+- **Merges, frozen panes and formats** on field columns keep working. A field cell's own formatting (fill, bold) applies around its control.
+- **Arabic**: headings, drawer and controls mirror.
+- **Phones**: the drawer is a bottom sheet, and the controls are the Content sheet's phone versions.
+- **Permissions**: field cells follow the task's rules. Regular cells follow the sheet's protection.
 
 ## Requirements *(mandatory)*
 
-- **FR-001**: Mapped cells on linked rows MUST render with the Content sheet's components for stage, assignee, content type, pillar, due date and links.
-- **FR-002**: Clicking, or pressing Enter or Space on, a mapped cell MUST open that field's control. The control's choices and their disabled reasons MUST match the Content sheet's.
-- **FR-003**: Saves MUST go through the existing linked-field write path (`writeTaskFields`): one undo step each, same permissions, same celebrations setting.
-- **FR-004**: Typing, paste, fill, clear and replace into mapped cells MUST keep working as today.
-- **FR-005**: Unlinked rows and unmapped columns MUST NOT change.
-- **FR-006**: English and Arabic, keyboard reachable, and axe-clean.
+- **FR-001**: Every sheet MUST have a Fields drawer (⚙ Fields; also Data › Task fields) that:
+  - names the task column, or the preset row source;
+  - lists every task field with an on/off switch and drag to reorder;
+  - lists the regular columns, with "＋ Add a regular column".
+- **FR-002**: The last heading MUST be ＋. It opens a searchable picker of the task fields not yet shown, plus "Spreadsheet column".
+- **FR-003**: Field columns MUST have a distinct heading (field icon, purple), and their cells MUST use the Content sheet's controls on linked rows. On unlinked rows the cells are empty and can't be typed into.
+- **FR-004**: A column's heading menu MUST offer:
+  - for a field column: Hide field, and Turn into a regular column;
+  - for a regular column: Use this column for a task field ▸, Rename, and Delete.
+- **FR-005**: Field edits MUST save through the existing task write path (`writeTaskFields` and the board's actions). The same permissions, stage rules and celebrations setting apply, with one undo step each. Typing, paste, fill and replace into field cells keep working.
+- **FR-006**: Spec 016 mappings MUST load as field columns with no data loss. The task column and row links are unchanged.
+- **FR-007**: The Content and Video sheets MUST render through the same field-column model. Their row source, grouping, counts and buttons stay as today. Their column set (shown fields, order, widths, custom columns) MUST be kept per sheet.
+- **FR-008**: English and Arabic, keyboard reachable, and axe-clean.
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001**: Side by side, a mapped Stage, Assignee, Type and Link cell in a linked sheet looks the same as on the Content sheet.
-- **SC-002**: Every spec 016 lab check still passes.
-- **SC-003**: A linked sheet with 500 linked rows still opens and scrolls as before (under 1 s to first paint, as in the spec 016 checks).
+- **SC-001**: A member adds four task fields to a sheet in under 20 seconds, without help.
+- **SC-002**: The same field (e.g. Stage) looks and edits identically in a team sheet and on the Content sheet.
+- **SC-003**: Every spec 009/010/013–018 lab check passes, after selector updates where needed.
+- **SC-004**: The Content sheet with 500 tasks opens and scrolls as fast as today.
 
 ## Assumptions
 
-- The Content sheet's theme grouping, summary bar and its own buttons (Columns, Mine, Show archived, Paste plan) stay on the Content sheet.
-- Video-only fields (clips, files) aren't mappable today and aren't added here.
+- No new task fields are added to the board; the list is today's `TASK_FIELDS` plus the team's Content columns.
+- Regular columns stay plain spreadsheet cells. Typed regular columns (dropdown, date, checkbox) are a later step, if wanted.
+- This is a large change. It will be built in stages:
+  1. team sheets: the drawer, ＋, field columns and controls;
+  2. the Content sheet;
+  3. the Video sheet.
