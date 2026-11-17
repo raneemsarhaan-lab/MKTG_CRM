@@ -28,7 +28,7 @@ function pickTasks() {
 }
 function seed(T) {
   const folder = sql(`insert into sheet_folders (id, kind, name) values (gen_random_uuid(), 'team', 'Links lab ' || floor(random()*1e6)) returning id`)
-  const sheet = sql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'May plan', 0, 40, 10) returning id`)
+  const sheet = sql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count, view) values (gen_random_uuid(), '${folder}', 'blank', 'May plan', 0, 40, 10, '{"look":"grid"}') returning id`)
   sql(`insert into sheet_rows (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 40) g`)
   sql(`insert into sheet_cols (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 10) g`)
   // Two tasks with the same title, for "2 tasks have this title".

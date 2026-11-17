@@ -145,6 +145,8 @@ export interface GridModel<R extends { key: string }> {
   tailHeader?: ReactNode
   /** Spec 019: a group heading drawn above a row (rows grouped by theme, stage…), or null. */
   rowBand?(row: R, index: number): ReactNode | null
+  /** A band's height (default 30): a theme and its first pillar take two lines. */
+  rowBandHeight?(row: R, index: number): number
   /** Row-number labels, when they aren't 1, 2, 3 (the linked sheets show clip numbers). */
   rowLabel?(row: R, index: number): ReactNode
 
@@ -392,7 +394,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (!windowed) return null
     const t = new Array<number>(m.rows.length + 1)
     t[0] = 0
-    for (let i = 0; i < m.rows.length; i++) t[i + 1] = t[i] + (heightOf(m.rows[i]) ?? ROW_H) + (m.rowBand?.(m.rows[i], i) ? BAND_H : 0)
+    for (let i = 0; i < m.rows.length; i++) t[i + 1] = t[i] + (heightOf(m.rows[i]) ?? ROW_H) + (m.rowBand?.(m.rows[i], i) ? (m.rowBandHeight?.(m.rows[i], i) ?? BAND_H) : 0)
     return t
   }, [windowed, m.rows, liveHeight]) // eslint-disable-line react-hooks/exhaustive-deps
   const [view, setView] = useState({ top: 0, height: 800 })
@@ -1012,7 +1014,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             data-task={rp.taskId}
             style={{ ...(h ? { ['--row-h' as string]: `${h}px` } : {}), ...(i < F ? { position: 'sticky', top: frozenTop[i], zIndex: 3 } : {}) }}
           >
-            {(() => { const band = m.rowBand?.(row, i); return band ? <div className="fx-sheet-band" role="presentation" data-band="">{band}</div> : null })()}
+            {(() => { const band = m.rowBand?.(row, i); return band ? <div className="fx-sheet-band" role="presentation" data-band="" style={{ height: m.rowBandHeight?.(row, i) ?? BAND_H }}>{band}</div> : null })()}
             {own.map((col, ci) => {
               const key = cellKey(row.key, col)
               const isActive = active?.key === row.key && active.col === col

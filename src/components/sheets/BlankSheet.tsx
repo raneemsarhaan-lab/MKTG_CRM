@@ -37,6 +37,9 @@ import { fitHeight } from './format/fit'
 import { areaCols, areaRows, cellName, colLetters, unionCells, unionSize, wholeCols, wholeRows } from '@/lib/sheet-selection'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
 import { PopMenu, type PopItem } from './PopMenu'
+import { SheetPopover } from '@/components/sheet/SheetMenu'
+import { NamePrompt } from '@/components/content/ThemeEditor'
+import { openLinks } from './links/useTaskLinks'
 import { ConfirmDialog, ResizeDialog } from './Dialogs'
 
 const MAX_CELL = 50_000
@@ -82,6 +85,20 @@ export function BlankSheet(p: BlankSheetProps) {
 
   const extras = doc.extras ?? emptyExtras()
   const view = extras.view
+  // ── spec 019: the Content look (approved design team-sheet-content-style) ──
+  const linkedMap = extras.taskMap ?? null
+  /** A sheet linked to the board opens in the Content sheet's look; ⚙ Fields → Look switches it per sheet. */
+  const look: 'content' | 'grid' = view.look ?? (linkedMap ? 'content' : 'grid')
+  const content = look === 'content'
+  /** The headings row: the first row, unless it names a task. In the Content look its cells are the column names. */
+  const headRow = useMemo(() => {
+    const f = doc.rows[0]
+    if (!f) return null
+    return linkedMap && taskIdFrom(doc.cells[f.id]?.[linkedMap.taskCol] ?? '') ? null : f.id
+  }, [doc.rows, doc.cells, linkedMap])
+  const [mine, setMine] = useState(false)
+  const [showDone, setShowDone] = useState(() => { try { return typeof window === 'undefined' || window.localStorage.getItem('momentum.team.done') !== '0' } catch { return true } })
+  const [meId, setMeId] = useState<string | null>(null)
   const index = useMemo(() => indexFormats(extras.formats), [extras.formats])
   const styleOf = useCallback((rowId: string, colId: string) => resolveStyle(index, rowId, colId), [index])
   // Stage 2: what's hidden is left out of the grid; indexes from the grid are over what's visible.
@@ -105,12 +122,26 @@ export function BlankSheet(p: BlankSheetProps) {
     for (const id of filterScope) if (!keep.has(id)) out.add(id)
     return out
   }, [fArea, filter, filterScope, cellView])
-  const baseRows = useMemo(() => doc.rows.filter(r => !hiddenR.has(r.id) && !filteredOut.has(r.id)), [doc.rows, hiddenR, filteredOut])
+  const baseRows = useMemo(() => {
+    const rt = extras.rowTasks ?? {}, tks = extras.tasks ?? {}
+    const taskOf = (id: string) => (rt[id] ? tks[rt[id]] : undefined)
+    return doc.rows.filter(r => {
+      if (hiddenR.has(r.id) || filteredOut.has(r.id)) return false
+      if (!content) return true
+      if (r.id === headRow) return false
+      const tk = taskOf(r.id)
+      if (mine && !(tk && meId && (tk.meta?.assigneeId === meId || tk.meta?.ownerId === meId))) return false
+      if (!showDone && tk?.stage === 'publish') return false
+      return true
+    })
+  }, [doc.rows, hiddenR, filteredOut, content, headRow, mine, showDone, meId, extras.rowTasks, extras.tasks])
+  /** Rows are grouped by Theme › Pillar in the Content look, unless the sheet chose otherwise. */
+  const groupBy: GroupBy | null = view.groupBy ?? (content && linkedMap ? { by: 'theme' } : null)
   // Spec 019: Group rows by (a task's theme › pillar, stage, assignee or type, or a column's value).
   // The grid's order is the grouped one, so every index below stays over what's on screen.
-  const grouping = useMemo(() => groupRows(doc, baseRows, view.groupBy ?? null, locale, {
+  const grouping = useMemo(() => groupRows(doc, baseRows, groupBy, locale, {
     none: tf('bandNone'), blank: tf('bandBlank'), noTheme: tf('bandNoTheme'), unassigned: tf('bandUnassigned'), noType: tf('bandNoType'), noPillar: tf('noPillar'),
-  }), [doc, baseRows, view.groupBy, locale, tf])
+  }), [doc, baseRows, groupBy, locale, tf])
   const vRows = grouping.rows
   const vCols = useMemo(() => doc.cols.filter(c => !hiddenC.has(c.id)), [doc.cols, hiddenC])
   /** The grid shows its first cell as active before anything is clicked; the toolbar must agree. */
@@ -211,6 +242,26 @@ export function BlankSheet(p: BlankSheetProps) {
   const [drawer, setDrawer] = useState(false)
   const [valuesFor, setValuesFor] = useState<WordField | null>(null)
   const [match, setMatch] = useState<{ field: WordField; colId: string; colName: string; values: { text: string; n: number }[] } | null>(null)
+  const [rename, setRename] = useState<{ col: string; anchor: HTMLElement } | null>(null)
+  useEffect(() => { if (lk.choices?.me) setMeId(lk.choices.me) }, [lk.choices?.me])
+  /** The Content look: a column's name is its cell in the headings row; renaming writes that cell (one undo step). */
+  const colName = (col: string) => (headRow ? value(headRow, col) : '')
+  async function renameCol(col: string, name: string): Promise<string | null> {
+    if (ro) return ro
+    if (!headRow) return null
+    const c = cellChange([{ rowId: headRow, colId: col, value: name.trim() }])
+    if (c) applyR('renameCol', [c])
+    setRename(null); focusActive()
+    return null
+  }
+  /** + Column in the Content look: a regular column at the end, then its name. */
+  function addRegularAtEnd(anchor: HTMLElement) {
+    if (ro) { p.onNotice(ro); return }
+    if (doc.cols.length + 1 > BLANK_COL_LIMIT) { p.onNotice(t('err.too_many_cols')); return }
+    const made = insertAt(doc.cols, doc.cols.length, 1, p.newId)
+    applyR('insertCols', [{ kind: 'insertCols', cols: made.map(c => ({ ...c, width: null })) }])
+    if (content && headRow) setRename({ col: made[0].id, anchor })
+  }
   useEffect(() => {
     const on = () => setDrawer(true)
     document.addEventListener(FIELDS_OPEN, on)
@@ -509,6 +560,7 @@ export function BlankSheet(p: BlankSheetProps) {
       // Spec 019: a field column can be hidden or turned back into a regular one; a regular column can become a field.
       const fieldItems: PopItem[] = []
       const colId = !several && q.c0 === q.c1 ? vCols[q.c0]?.id : undefined
+      if (colId && content && headRow) fieldItems.push({ key: 'renameCol', label: tf('rename'), ...lock, onSelect: () => setRename({ col: colId, anchor }) })
       if (colId) {
         const f = lk.map?.fields[colId]
         if (f) {
@@ -541,6 +593,13 @@ export function BlankSheet(p: BlankSheetProps) {
     label: t('grid.label', { name: p.name, rows: doc.rows.length, cols: doc.cols.length }),
     header: col => {
       const i = colIndex.get(col) ?? 0
+      if (content) {
+        // The Content look: the column's name with its field icon, as on the Content sheet; the letter when it has no name.
+        const name = colName(col)
+        const f = lk.map?.fields[col]
+        const icon = <FieldIcon field={lk.map?.taskCol === col ? 'taskcol' : f ?? 'regular'} />
+        return { text: <>{icon}{name || <span className="fx-sheet-muted">{colLetters(i)}</span>}</>, label: name || colLetters(i), className: `is-named${f ? ' is-field' : ''}` }
+      }
       const before = i > 0 && hiddenC.has(doc.cols[i - 1].id)
       return {
         text: before
@@ -553,6 +612,14 @@ export function BlankSheet(p: BlankSheetProps) {
     },
     // Spec 016: the Task column and mapped columns say so on their heading.
     headerExtra: col => {
+      // The Content look: the headings row is the header, so its filter buttons live here.
+      if (content) {
+        if (!(fArea && fArea.header === headRow && fArea.cols.includes(col))) return null
+        return <button type="button" className={`fx-flt-btn${filterOn(filter[col]) ? ' is-on' : ''}`} data-filter-btn={col} tabIndex={-1}
+                       aria-label={sheetT('filterOf', { col: colName(col) || colLetters(colIndex.get(col) ?? 0) })} aria-haspopup="dialog"
+                       onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); setFilterUi({ col, anchor: ev.currentTarget }) }}>
+          {filterOn(filter[col]) ? '▼' : '▾'}</button>
+      }
       if (!lk.map) return null
       // Spec 019: a small icon beside the letter; its name is in the tooltip and for screen readers.
       if (col === lk.map.taskCol) return <span className="fx-lk-hic is-task" data-task-col-badge="" role="img" aria-label={tl('taskCol')} title={tl('taskCol')}><FieldIcon field="taskcol" /></span>
@@ -566,7 +633,7 @@ export function BlankSheet(p: BlankSheetProps) {
     cellClass: (row, col) => {
       if (col === 'rowNo') return 'fx-sheet-td is-frozen-no'
       const sh = lk.shown(row.id, col)
-      return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : ' is-lk') : ''}`
+      return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : content ? '' : ' is-lk') : ''}`
     },
     isText: (row, col) => { if (col === 'rowNo' || ro) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
     textValue: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
@@ -583,7 +650,7 @@ export function BlankSheet(p: BlankSheetProps) {
       const sh = lk.shown(row.id, col)
       if (sh) {
         if (sh.na) return <span className="fx-sheet-cell-text fx-lk-na">{sh.text}</span>
-        if (lk.map) return <FieldValue field={sh.field} raw={sh.raw} map={lk.map} people={lk.choices?.people ?? []} />
+        if (lk.map) return <FieldValue field={sh.field} raw={sh.raw} map={lk.map} people={lk.choices?.people ?? []} plain={content} />
         return <span className="fx-sheet-cell-text" dir="auto">{sh.text}</span>
       }
       if (lk.map && col === lk.map.taskCol) {
@@ -591,7 +658,7 @@ export function BlankSheet(p: BlankSheetProps) {
         // A pasted link shows the task's name instead of the URL; the row's ↗ marker (and a Task link column) open the task.
         // A row with no task offers Create task (spec 019): a task is either open or not created yet.
         return <>
-          <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{tk && taskIdFrom(v) ? tk.name : v}</span>
+          <span className={`fx-sheet-cell-text${tk && !content ? ' fx-lk-link' : ''}`} dir="auto">{tk && taskIdFrom(v) ? tk.name : v}</span>
           {note === 'notLinked' && lk.canCreate && !ro
             ? <button type="button" className="fx-lk-create is-icon" data-create-task={row.id} tabIndex={-1} aria-label={tf('createTask')} title={tf('createTask')}
                       onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋</button>
@@ -631,7 +698,8 @@ export function BlankSheet(p: BlankSheetProps) {
     rowLabel: row => {
       const i = rowIndex.get(row.id) ?? 0
       const tk = lk.taskOfRow(row.id)
-      const marker = tk ? <a className="fx-lk-mk" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" data-task-marker={tk.id}
+      const hasLinkCol = content && Object.values(lk.map?.fields ?? {}).includes('task')
+      const marker = tk && !hasLinkCol ? <a className="fx-lk-mk" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" data-task-marker={tk.id}
                              aria-label={tl('marker', { name: tk.name })} title={tl('marker', { name: tk.name })}
                              onPointerDown={ev => ev.stopPropagation()} onClick={ev => ev.stopPropagation()}>↗</a> : null
       if (marker) return <>{marker}{i + 1}</>
@@ -665,9 +733,27 @@ export function BlankSheet(p: BlankSheetProps) {
     onReorder: (col, before) => moveCol(col, before),
     tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
                         onPointerDown={ev => ev.stopPropagation()} onClick={ev => { if (ro) { p.onNotice(ro); return } setAddMenu(ev.currentTarget) }}>＋</button>,
+    // The Content look: each heading has the Content sheet's ▾ (the column's menu).
+    ...(content ? {
+      headerMenu: (col: string, anchor: HTMLElement) => {
+        const c = vColIndex.get(col)
+        if (c === undefined) return
+        const r = anchor.getBoundingClientRect()
+        contextMenu({ kind: 'col', c, rect: { r0: 0, c0: c, r1: Math.max(0, vRows.length - 1), c1: c } }, { x: r.left, y: r.bottom + 2 }, anchor)
+      },
+      headerName: (col: string) => tf('colMenu', { name: colName(col) || colLetters(colIndex.get(col) ?? 0) }),
+    } : {}),
+    rowBandHeight: row => { const b = grouping.bands.get(row.id); return content && b?.main && b.sub ? 60 : 30 },
     rowBand: row => {
       const b = grouping.bands.get(row.id)
       if (!b) return null
+      // The Content look: the theme in the Content sheet's band, its pillar under it.
+      if (content) {
+        return <span className="fx-cband" data-band-name={b.main ?? b.sub ?? ''}>
+          {b.main && <span className={`fx-cband-main${b.theme ? ' is-theme' : ''}`} data-band-theme={b.main}><b>{b.main}</b><span className="fx-sheet-muted"> · {b.theme ? b.themeN ?? b.n : b.n}</span></span>}
+          {b.sub && <span className="fx-cband-sub">{b.sub}<span className="fx-sheet-muted"> · {b.n}</span></span>}
+        </span>
+      }
       return <span className={`fx-band${b.main ? '' : ' is-sub'}`} data-band-name={b.main ?? b.sub ?? ''}>
         {b.main && <b>{b.main}</b>}{b.sub && <span className="fx-band-sub">{b.main ? ' › ' : '› '}{b.sub}</span>}<span className="fx-band-n">{b.n}</span>
       </span>
@@ -756,7 +842,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (clears.length) setMergeAsk({ value: keep, run }); else run()
   }
   // ── stage 2: hide, unhide, freeze (FR-047) ──────────────────────────────
-  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {}, groupBy: view.groupBy ?? null })
+  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {}, groupBy: view.groupBy ?? null, look: view.look })
   function setView(label: string, after: Partial<SheetView>) {
     if (ro) { p.onNotice(ro); return }
     applyR(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
@@ -1191,8 +1277,47 @@ export function BlankSheet(p: BlankSheetProps) {
     requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(`[data-cell="${rowKey}|${colKey}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
   })
 
+  // ── the Content look's bar and summary (as the Content sheet's) ──
+  const rt = extras.rowTasks ?? {}, tks = extras.tasks ?? {}
+  const dataRows = doc.rows.filter(r => r.id !== headRow)
+  const linkedRows = dataRows.filter(r => rt[r.id] && tks[rt[r.id]])
+  const notCreated = lk.map ? dataRows.filter(r => lk.noteOfRow(r.id) === 'notLinked').map(r => r.id) : []
+  const sum = {
+    rows: dataRows.filter(r => Object.values(doc.cells[r.id] ?? {}).some(v => v)).length,
+    tasks: linkedRows.length,
+    published: linkedRows.filter(r => tks[rt[r.id]].stage === 'publish').length,
+  }
+  const contentBar = content ? (
+    <>
+      <div className="fx-sheet-bar" role="toolbar" aria-label={tf('barLabel')} data-team-bar="">
+        <span className="fx-sheet-bar-gap" />
+        <button type="button" className="fx-sheet-btn" data-team-columns="" aria-haspopup="dialog" onClick={() => setDrawer(true)}>{tf('barColumns')}</button>
+        <button type="button" className="fx-sheet-btn" data-team-add-column="" onClick={e => addRegularAtEnd(e.currentTarget)}>{tf('barAddColumn')}</button>
+        {lk.map && <>
+          <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-team-mine="" onClick={() => setMine(v => !v)}>{tf('barMine')}</button>
+          <button type="button" className="fx-sheet-tog" aria-pressed={showDone} data-team-done=""
+                  onClick={() => setShowDone(v => { try { window.localStorage.setItem('momentum.team.done', v ? '0' : '1') } catch { /* private mode */ } return !v })}>{tf('barShowDone')}</button>
+          <button type="button" className="fx-sheet-btn" data-team-add-tasks="" disabled={!!ro} onClick={() => openLinks('add')}>{tf('barAddTasks')}</button>
+          <button type="button" className="fx-sheet-btn is-primary" data-team-create="" disabled={!!ro || !notCreated.length || !lk.canCreate}
+                  onClick={() => lk.createForRow(notCreated)}>{tf('barCreateTasks', { n: notCreated.length })}</button>
+        </>}
+      </div>
+      <div className="fx-sheet-sum" data-team-summary="">
+        <span className="fx-sheet-sum-name">{p.name}</span>
+        <span><b>{tf('sumRows', { n: sum.rows })}</b></span>
+        {lk.map && <>
+          <span>{tf('sumTasks', { n: sum.tasks })}</span>
+          {notCreated.length > 0 && <span className="fx-sheet-sum-bad">{tf('sumNotCreated', { n: notCreated.length })}</span>}
+          <span>{tf('sumPublished', { n: sum.published })}</span>
+        </>}
+      </div>
+    </>
+  ) : null
+
   return (
-    <div ref={rootRef} className="fx-sheet-scroll fx-sh-blank" data-blank-sheet={doc.id} data-protected={ro ? '' : undefined}>
+    <>
+    {contentBar}
+    <div ref={rootRef} className={`fx-sheet-scroll fx-sh-blank${content ? ' is-content' : ''}`} data-blank-sheet={doc.id} data-look={look} data-protected={ro ? '' : undefined}>
       <GridCore model={model} active={active} setActive={setActiveCell} editDraft={null} notes={notes} onNote={onNote} selectRect={selectRect} />
       {mergeAsk && (
         <ConfirmDialog attr="data-merge-warn" title={t('format.merge.warnTitle')} body={t('format.merge.warnBody', { value: mergeAsk.value })}
@@ -1220,9 +1345,10 @@ export function BlankSheet(p: BlankSheetProps) {
                       onClose={() => { setAddMenu(null); focusActive() }} />
       )}
       {drawer && (
-        <FieldsDrawer map={lk.map} cols={colRefs} teamCols={lk.teamCols} groupBy={view.groupBy ?? null} groupCols={colRefs} readOnly={ro}
+        <FieldsDrawer map={lk.map} cols={colRefs} teamCols={lk.teamCols} groupBy={groupBy} groupCols={colRefs} readOnly={ro}
+                      look={look} onLook={l => setView('look', { look: l })}
                       onToggle={(f, on) => (on ? addFieldAtEnd(f) : hideField(f))} onValues={f => setValuesFor(f)}
-                      onGroupBy={g => setView('groupBy', { groupBy: g })} onAddRegular={() => insertCols(vCols.length, 1)}
+                      onGroupBy={g => setView('groupBy', { groupBy: g ?? (content && lk.map ? { by: 'none' } : null) })} onAddRegular={() => insertCols(vCols.length, 1)}
                       onAskLink={() => lk.askLink()} onClose={() => { setDrawer(false); focusActive() }} />
       )}
       {valuesFor && lk.map && (
@@ -1247,16 +1373,25 @@ export function BlankSheet(p: BlankSheetProps) {
                            onSort={dir => { sortBy([{ col: filterUi.col, dir }], true, true); close() }}
                            onApply={f => { filterCol(filterUi.col, f); close() }} onClose={close} />
       })()}
+      {rename && (
+        <SheetPopover anchor={rename.anchor} label={tf('rename')} onClose={() => { setRename(null); focusActive() }}>
+          <div data-rename-col="">
+            <NamePrompt title={tf('renameTitle')} initial={colName(rename.col)} saveLabel={tf('save')} cancelLabel={tf('cancel')}
+                        onCancel={() => { setRename(null); focusActive() }} onSave={name => renameCol(rename.col, name)} />
+          </div>
+        </SheetPopover>
+      )}
       {resize && (
         <ResizeDialog kind={resize.kind} value={resize.value} onCancel={() => { setResize(null); focusActive() }}
                       onOk={v => { if (resize.kind === 'row') setHeights(resize.ids, v); else setWidths(resize.ids, v); setResize(null); focusActive() }} />
       )}
     </div>
+    </>
   )
 }
 
 /** A band over the first row of each group: its name (or a pillar under the theme above) and how many rows it holds. */
-export interface Band { main: string | null; sub: string | null; n: number }
+export interface Band { main: string | null; sub: string | null; n: number; /** A theme's rows over all its pillars (the Content look's theme band). */ themeN?: number; theme?: boolean }
 const STAGE_ORDER = Object.keys(STAGE_META) as StageId[]
 
 /**
@@ -1307,11 +1442,19 @@ export function groupRows<R extends { id: string }>(doc: SheetDoc, rows: R[], g:
   const list = [...buckets.values()].sort((a, b) => a.k.order.localeCompare(b.k.order))
   const out: R[] = head ? [head] : []
   let lastMain: string | null = null
+  // Counts leave out empty rows (a sheet's spare rows sit in the last group without being counted).
+  const filled = (r: R) => Object.values(doc.cells[r.id] ?? {}).some(v => v)
+  const count = (rs: R[]) => rs.filter(filled).length
+  const themeN = new Map<string, number>()
+  for (const b of list) themeN.set(b.k.main, (themeN.get(b.k.main) ?? 0) + count(b.rows))
   for (const b of list) {
     const theme = g.by === 'theme' && b.k.key !== 'none'
     const sameTheme = theme && lastMain === b.k.main
     // Theme › Pillar: a new theme names both; the next pillars of the same theme name only themselves.
-    bands.set(b.rows[0].id, { main: sameTheme ? null : b.k.main, sub: theme ? b.k.sub ?? null : null, n: b.rows.length })
+    // As on the Content sheet, rows with no pillar sit straight under their theme (named only after the theme's pillars).
+    const noPillar = theme && b.k.sub === w.noPillar
+    const sub = theme ? (noPillar && !sameTheme ? null : b.k.sub ?? null) : null
+    bands.set(b.rows[0].id, { main: sameTheme ? null : b.k.main, sub, n: count(b.rows), themeN: themeN.get(b.k.main), theme: g.by === 'theme' })
     lastMain = b.k.main
     out.push(...b.rows)
   }

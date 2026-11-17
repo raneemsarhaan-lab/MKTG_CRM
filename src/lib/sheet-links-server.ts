@@ -84,7 +84,7 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
       applies: [...TASK_FIELDS, ...[...fields].filter(f => f.startsWith('col:'))].filter(f => fieldApplies(kind, f as TaskField)) as TaskField[],
       // Spec 019: the stage menu's choices, and what rows group by.
       moves: me.role ? allowedStages({ status: t.status, nine_stage: t.nine_stage, task_owner_id: t.task_owner_id, assignee_id: t.assignee_id, dropped_at: t.dropped_at }, { id: me.id, role: me.role, access: me.access }) : undefined,
-      meta: { theme: t.project?.name ?? '', pillar: t.pillar?.name ?? '', stage: t.status, assignee: t.assignee_id ? name.get(t.assignee_id) ?? '' : '', assigneeId: t.assignee_id, type: t.content_type_label ?? '' },
+      meta: { theme: t.project?.name ?? '', pillar: t.pillar?.name ?? '', stage: t.status, assignee: t.assignee_id ? name.get(t.assignee_id) ?? '' : '', assigneeId: t.assignee_id, type: t.content_type_label ?? '', ownerId: t.task_owner_id },
     }
   }
   return out

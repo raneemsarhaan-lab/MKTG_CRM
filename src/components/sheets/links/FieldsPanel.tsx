@@ -33,13 +33,16 @@ export function boardValues(field: WordField, types: string[], locale: string): 
   return PRIORITIES.map(x => ({ value: x, name: x }))
 }
 
-export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly, onToggle, onValues, onGroupBy, onAddRegular, onAskLink, onClose }: {
+export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly, look, onLook, onToggle, onValues, onGroupBy, onAddRegular, onAskLink, onClose }: {
   map: SheetTaskMap | null
   cols: ColRef[]
   teamCols: { id: string; name: string }[]
   groupBy: GroupBy | null
   groupCols: ColRef[]
   readOnly: string | null
+  /** The sheet's look: the Content sheet's, or a spreadsheet. */
+  look?: 'content' | 'grid'
+  onLook?(look: 'content' | 'grid'): void
   onToggle(field: TaskField, on: boolean): void
   onValues(field: WordField): void
   onGroupBy(g: GroupBy | null): void
@@ -56,7 +59,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
   const colOf = new Map(cols.filter(c => c.field).map(c => [c.field!, c]))
   const taskCol = cols.find(c => c.task)
   const shownList = all.filter(f => !q || name(f).toLowerCase().includes(q.toLowerCase()))
-  const gval = groupBy ? (groupBy.by === 'col' ? `col:${groupBy.col}` : groupBy.by) : ''
+  const gval = groupBy && groupBy.by !== 'none' ? (groupBy.by === 'col' ? `col:${groupBy.col}` : groupBy.by) : ''
   return (
     <aside ref={ref} className="fx-fd-drawer" aria-label={t('title')} data-fields-drawer=""
            onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }}>
@@ -66,6 +69,18 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
       </header>
       <div className="fx-fd-scroll">
         {readOnly && <p className="fx-fd-why">🔒 {readOnly}</p>}
+        {look && onLook && (
+          <section>
+            <h3>{t('lookTitle')}</h3>
+            <label className="fx-fd-group">
+              <span className="sr-only">{t('lookTitle')}</span>
+              <select value={look} data-look-select="" disabled={!!readOnly} onChange={e => onLook(e.target.value as 'content' | 'grid')}>
+                <option value="content">{t('lookContent')}</option>
+                <option value="grid">{t('lookGrid')}</option>
+              </select>
+            </label>
+          </section>
+        )}
         <section>
           <h3>{t('linkedTitle')}</h3>
           {map && taskCol

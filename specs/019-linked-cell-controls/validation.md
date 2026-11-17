@@ -147,3 +147,53 @@ Stage 1 covers team (blank) sheets. The Content sheet (stage 2) and the Video sh
 | format | 52/52 |
 | styles | 54/54 |
 | perf-axe | 18/18 |
+
+# Team sheets in the Content look (approved design `design/team-sheet-content-style.html`)
+
+## What changed
+
+- **Look switch.** ⚙ Fields → **Look** is "Content sheet" or "Spreadsheet", saved per sheet as `view.look`. A sheet linked to the board opens in the Content look; an unlinked sheet stays a spreadsheet unless switched.
+- **Headings.** In the Content look, the headings row is the header:
+  - each column shows its name and field icon, like the Content sheet;
+  - columns without a name show their letter;
+  - each heading has the Content sheet's ▾ menu, which adds Rename column (it writes the heading, as one undo step).
+  - The name box still uses letters ("B4").
+- **Rows.** Rows are grouped by Theme › Pillar by default:
+  - the theme band is lime with its count, and the pillar band is grey under it;
+  - rows with no pillar sit straight under their theme;
+  - rows without a task go under "Not created yet";
+  - empty rows aren't counted.
+  - Group by also offers "None (sheet order)".
+- **Cells.** These are the Content sheet's: no lavender tint, plain titles, and an underlined "Open task". The row's ↗ hides when a Task link column shows.
+- **Bar and summary.**
+  - The bar has Columns (opens ⚙ Fields), + Column (a regular column at the end, then its name), Mine, Show done, Add tasks… and Create N tasks….
+  - The summary line shows rows, tasks, not created yet, and published.
+- **Not built:**
+  - **Collapsing a theme.** A band belongs to its first row, so it can't stay when that theme's rows are hidden.
+  - **"+ Row" inside a group.** A new empty row has no task, so it can't belong to a theme.
+  - **"Paste plan".** Team sheets have no plan import.
+
+## Lab: `realapp/fields.cjs`, 75/75 (12 new checks)
+
+- Look → Content sheet is saved.
+- The header shows names, and the headings row leaves the grid.
+- Rows sit under theme bands, with "Not created yet" last, and there's no tint.
+- The bar and the summary appear ("3 tasks", "1 not created yet"), and axe is clean.
+- Rename column writes the heading.
+- Columns opens ⚙ Fields, and Look → Spreadsheet brings back the letters.
+
+The links and fields labs seed their sheets with `look: grid`, so their spreadsheet checks stand.
+
+## Regressions
+
+| Lab | Result |
+|---|---|
+| links | 41/41 |
+| content-fields | 29/29 |
+| areas | 42/42 |
+| header | 45/45 |
+| run | 56/56 |
+| editing | 50/50 |
+| format | 52/52 |
+| styles | 54/54 |
+| perf-axe | 18/18 |

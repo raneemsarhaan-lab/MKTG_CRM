@@ -246,7 +246,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     prisma.sheetRule.findMany({ where: { sheet_id: sheetId }, orderBy: { priority: 'asc' } }),
     prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
   ])
-  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show'] }
+  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show']; look?: SheetView['look'] }
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
@@ -259,6 +259,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
       ...(stored.groupBy ? { groupBy: stored.groupBy } : {}),
       ...(stored.words ? { words: stored.words } : {}),
       ...(stored.show ? { show: stored.show } : {}),
+      ...(stored.look ? { look: stored.look } : {}),
     },
     threads,
     rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
@@ -320,7 +321,7 @@ function cleanSort(x: unknown): SortKey[] {
 }
 /** The filter area, filter and sort kept in `sheets.view` (null clears one). */
 async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
-  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v)) return
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v) && !('look' in v)) return
   const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
   const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
   if ('filterArea' in v) {
@@ -337,6 +338,7 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
     else if (g && g.by === 'col' && typeof g.col === 'string' && /^[0-9a-f-]{36}$/i.test(g.col)) next.groupBy = { by: 'col', col: g.col }
     else delete next.groupBy
   }
+  if ('look' in v) { if (v.look === 'content' || v.look === 'grid') next.look = v.look; else delete next.look }
   // Spec 019 stage 2: a linked sheet's own words (the same limits as a team sheet's).
   if ('words' in v || 'show' in v) {
     const w = cleanWords({ words: 'words' in v ? v.words ?? undefined : next.words as SheetView['words'], show: 'show' in v ? v.show ?? undefined : next.show as SheetView['show'] })

@@ -48,7 +48,7 @@ export function siteName(url: string): string {
 }
 
 /** What a field cell shows on a linked row. */
-export function FieldValue({ field, raw, map, people }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people'] }) {
+export function FieldValue({ field, raw, map, people, plain }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people']; /** The Content look: the Content sheet's underlined "Open task". */ plain?: boolean }) {
   const locale = useLocale()
   const t = useTranslations('sheets.fields')
   switch (field) {
@@ -71,6 +71,8 @@ export function FieldValue({ field, raw, map, people }: { field: TaskField; raw:
       return <span className={`fx-fd-due${late ? ' is-late' : ''}`}>{Number.isNaN(+d) ? raw : d.toLocaleDateString(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' })}</span>
     }
     case 'task':
+      if (raw && plain) return <a className="fx-sheet-link fx-sheet-ellipsis" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
+                                  onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')}</a>
       return raw ? <a className="fx-sheet-link fx-lk-open" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
                       onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')} ↗</a> : null
     default:

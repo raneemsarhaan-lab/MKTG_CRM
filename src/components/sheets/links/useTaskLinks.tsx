@@ -374,11 +374,11 @@ export function useTaskLinks(p: {
     return out
   }
   /** "Create task" on an unlinked row (its Task cell or its Task link cell): the same preview, for this row. */
-  function createForRow(rowId: string) {
+  function createForRow(rowId: string | string[]) {
     const cur = ref.current
     if (cur.ro) { cur.say(cur.ro); return }
     if (!choices?.canCreate) { cur.say(t('menu.cantCreate')); return }
-    const rows = createRows([rowId])
+    const rows = createRows(Array.isArray(rowId) ? rowId : [rowId])
     if (rows.length) setDlg({ k: 'create', rows })
   }
   async function createTasks(rows: { rowId: string; values: TaskFieldValues }[], due: string) {
