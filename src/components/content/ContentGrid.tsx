@@ -10,21 +10,26 @@
  * (Samaa for the content plan) owns its pieces, and the sheet works by
  * assignee.
  */
-import { useTranslations } from 'next-intl'
-import type { ContentTheme, Member, Task, TaskAttachment } from '@/types/index'
+import { useLocale, useTranslations } from 'next-intl'
+import type { ContentTheme, Member, Task, TaskAttachment, TaskField, WordField } from '@/types/index'
 import { GridCore, type ActiveCell, type GridCol, type GridModel } from '@/components/sheet/GridCore'
 import { StatusContent, useStageNames } from '@/components/sheet/StatusCell'
 import type { StageId } from '@/types/index'
 import { EditorContent } from '@/components/sheet/EditorCell'
 import { siteName } from '@/lib/content-plan'
-import type { ContentRow } from './rows'
+import { regroupContent, type ContentRow } from './rows'
+import { STAGE_META } from '@/lib/stage-meta'
+import { matchStage, normTitle, shownWord, wordValue } from '@/lib/sheet-links'
+import { FieldIcon } from '@/components/sheets/links/FieldCells'
+import { FIELDS_OPEN, PresetFieldsDrawer, ValuesDialog, type PresetRow } from '@/components/sheets/links/FieldsPanel'
+import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
-import { useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
 
 export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
@@ -34,6 +39,12 @@ const WIDTHS: Record<string, number> = {
   doc: 124, design: 116, task: 104, post: 120, published: 128, pillar: 120, date: 104, archive: 80,
 }
 export const LINK_COLS = ['doc', 'design', 'post', 'published'] as const
+/** Spec 019 stage 2: each built-in column as a task field (its icon and, for Stage and Type, its words). */
+const FIELD_OF: Record<string, TaskField> = {
+  type: 'type', status: 'stage', assignee: 'assignee', doc: 'link:doc', design: 'link:design', task: 'task',
+  post: 'link:post', published: 'link:published', pillar: 'pillar', date: 'due',
+}
+const STAGE_ORDER = Object.keys(STAGE_META)
 
 /** A piece's link for a column, from its attachments (working doc, design) or its own fields. */
 export function pieceLink(task: Task, col: typeof LINK_COLS[number]): string | null {
@@ -74,6 +85,10 @@ export interface ContentGridProps {
   columns: SheetColumnsHook
   /** A letter typed on the Type cell: its type-ahead (spec 010). */
   onTypeAhead(row: ContentRow, ch: string, anchor: HTMLElement): boolean
+  /** Spec 019 stage 2: the workspace's content types (the Values table for Type). */
+  contentTypes?: { label: string }[]
+  /** Spec 019 stage 2: how rows are grouped now ('theme' is the sheet's own order). */
+  onGroupMode?(by: string): void
   /** Spec 013: whether a paste is a content plan (Paste plan) rather than cells to fill. */
   pasteAsRows?(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean
   /** Spec 013: what a paste, clear or undo didn't change, by reason. */
@@ -93,6 +108,33 @@ export function ContentGrid(p: ContentGridProps) {
   const t = useTranslations('content')
   const ts = useTranslations('sheet')
   const stageNames = useStageNames('content')
+  const tf = useTranslations('sheets.fields')
+  const locale = useLocale()
+  /** Spec 019 stage 2: the sheet's view (group by, words); read through a ref, since the view loads after the model is built. */
+  const viewRef = useRef<LinkedView>({})
+  const boardName = (id: string) => { const m = STAGE_META[id as StageId]; return m ? (locale.startsWith('ar') ? m.label_ar : m.label_en) : id }
+  /** A piece's stage as this sheet calls it: its own word, the Content sheet's word, or the board's name. */
+  const stageWord = (id: string) => {
+    const v = viewRef.current
+    if (v.show === 'board') return boardName(id)
+    return v.words?.stage?.[id]?.[0] ?? stageNames.video(id as StageId)
+  }
+  const typeWord = (label: string) => shownWord(label, viewRef.current.words?.type, viewRef.current.show, label)
+  /** Typed or pasted text in Status or Type, as the value it stands for (null: not one). */
+  function readWord(col: 'status' | 'type', text: string): string | null {
+    const v = viewRef.current
+    if (!text.trim()) return col === 'type' ? '' : null
+    if (col === 'status') {
+      const own = wordValue(text, v.words?.stage)
+      if (own) return own
+      const k = normTitle(text)
+      const content = STAGE_ORDER.find(id => normTitle(stageNames.video(id as StageId)) === k)
+      return content ?? matchStage(text, STAGE_ORDER.map(id => ({ id, names: [STAGE_META[id as StageId].label_en, STAGE_META[id as StageId].label_ar] })))
+    }
+    const own = wordValue(text, v.words?.type)
+    if (own) return own
+    return (p.contentTypes ?? []).find(x => normTitle(x.label) === normTitle(text))?.label ?? null
+  }
   const byId = new Map(p.members.map(m => [m.id, m]))
   const taskOf = (row: ContentRow): Task | null => (row.kind === 'piece' || row.kind === 'clip' ? row.task : null)
 
@@ -101,11 +143,13 @@ export function ContentGrid(p: ContentGridProps) {
   const isText = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
     if (isCustom(col)) return (row.kind === 'piece' || row.kind === 'clip') && cl.custom.isText(row.task, col)
+    // Spec 019 stage 2: Status and Type take typed and pasted words too (the menus stay on click and Enter).
+    if (col === 'status' && (row.kind === 'piece' || row.kind === 'clip')) return !row.task.dropped_at
     if (row.kind !== 'piece' || row.task.dropped_at || !p.canEdit(row.task)) return false
-    return col === 'title' || col === 'date'
+    return col === 'title' || col === 'date' || col === 'type'
   }
   const isMenu = (row: ContentRow, col: GridCol) => {
-    if (row.kind === 'add' || row.kind === 'draft') return false
+    if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
     if (row.kind === 'theme' || row.kind === 'pillar') return col === 'title' || col === 'rowNo'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
@@ -140,7 +184,7 @@ export function ContentGrid(p: ContentGridProps) {
   /** The type as a filled pill, one colour per content type. */
   function typePill(label: string | null | undefined) {
     if (!label) return null
-    return <span className="fx-content-type" style={{ background: contentTypeColor(label) }}>{label}</span>
+    return <span className="fx-content-type" style={{ background: contentTypeColor(label) }}>{typeWord(label)}</span>
   }
 
   function linkCell(task: Task, col: typeof LINK_COLS[number], can: boolean) {
@@ -153,6 +197,30 @@ export function ContentGrid(p: ContentGridProps) {
     return can && !task.dropped_at ? <span className="fx-sheet-muted">{t('links.add')}</span> : null
   }
 
+  /** Status and Type read typed and pasted words as the value they stand for; the rest goes to the sheet as before. */
+  function commitWord(row: ContentRow, col: GridCol, value: string): Promise<string | null> {
+    if ((col === 'status' || col === 'type') && (row.kind === 'piece' || row.kind === 'clip')) {
+      const v = readWord(col, value)
+      if (v === null) return Promise.resolve(tf(col === 'status' ? 'notAStage' : 'notAType', { text: value.trim() }))
+      if (col === 'status' && v === row.task.status) return Promise.resolve(null)
+      if (col === 'type' && v === (row.task.content_type_label ?? '')) return Promise.resolve(null)
+      return p.onCommit(row, col, v)
+    }
+    return p.onCommit(row, col, value)
+  }
+
+  // ── spec 019 stage 2: ⚙ Fields, ＋ and Values ──
+  const tc = useTranslations('sheet.columns')
+  const [drawer, setDrawer] = useState(false)
+  const [valuesFor, setValuesFor] = useState<WordField | null>(null)
+  const [addAt, setAddAt] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const on = () => setDrawer(true)
+    document.addEventListener(FIELDS_OPEN, on)
+    return () => document.removeEventListener(FIELDS_OPEN, on)
+  }, [])
+  const colLabel = (key: string) => cl.nameOf(key) || (isCustom(key) ? '' : t(`col.${key as ContentCol}`))
+
   const model: GridModel<ContentRow> = {
     rows: p.rows,
     cols: cl.cols,
@@ -161,22 +229,27 @@ export function ContentGrid(p: ContentGridProps) {
     label: t('gridLabel'),
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
+      const text = col === 'archive' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as ContentCol}`)))
+      // Spec 019 stage 2: a task field's heading has its icon before the name.
+      const f = FIELD_OF[col]
       return {
-        text: col === 'archive' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as ContentCol}`))),
-        label: col === 'archive' && !named ? t('col.archive') : undefined,
+        text: f && text ? <><FieldIcon field={f} />{text}</> : text,
+        label: col === 'archive' && !named ? t('col.archive') : f && text ? text : undefined,
       }
     },
     ...cl.grid,
+    tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
+                        onPointerDown={e => e.stopPropagation()} onClick={e => setAddAt(e.currentTarget)}>＋</button>,
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'piece' && row.kind !== 'clip') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
       return isCustom(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
     },
-    colsOf: row => (row.kind === 'theme' || row.kind === 'pillar' ? ['rowNo', 'title'] : null),
+    colsOf: row => (row.kind === 'theme' || row.kind === 'pillar' || row.kind === 'group' ? ['rowNo', 'title'] : null),
     rowProps: row => ({
       className: [
         row.kind === 'theme' ? 'is-video fx-content-theme-row' : '',
-        row.kind === 'pillar' ? 'fx-content-pillar-row' : '',
+        row.kind === 'pillar' || row.kind === 'group' ? 'fx-content-pillar-row' : '',
         row.kind === 'add' ? 'is-add' : '',
         row.kind === 'draft' ? 'is-draft' : '',
         (row.kind === 'piece' || row.kind === 'clip') && row.task.dropped_at ? 'is-dropped' : '',
@@ -205,6 +278,8 @@ export function ContentGrid(p: ContentGridProps) {
       if (col === 'title') return task.name
       if (col === 'date') return task.due_date ?? ''
       if (col === 'task') return `${typeof window !== 'undefined' ? window.location.origin : ''}/board?task=${task.id}`
+      if (col === 'status') return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageWord(task.status)
+      if (col === 'type') return task.content_type_label ? typeWord(task.content_type_label) : ''
       return ''
     },
     describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
@@ -217,7 +292,7 @@ export function ContentGrid(p: ContentGridProps) {
       if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
       return row.kind === 'piece' && task && !task.dropped_at && (col === 'title' || col === 'date') && !p.canEdit(task) ? t('readOnly') : null
     },
-    onCommit: p.onCommit,
+    onCommit: (row, col, v) => commitWord(row, col, v),
     onCancelDraft: row => p.onCancelDraft(row.key.slice(2)),
     onOpen: p.onOpen,
     onActivate: (row, col) => {
@@ -242,6 +317,11 @@ export function ContentGrid(p: ContentGridProps) {
         return col === 'rowNo' ? row.n : col === 'title' ? <span className="fx-sheet-muted">{t('newPiece.placeholder')}</span> : null
       }
       if (row.kind === 'theme') return col === 'rowNo' ? row.n : themeLine(row)
+      if (row.kind === 'group') {
+        return col === 'rowNo' ? row.n : (
+          <span className="fx-content-pillar" data-group-row={row.label}>{row.label}<span className="fx-sheet-muted"> · {row.count}</span></span>
+        )
+      }
       if (row.kind === 'pillar') {
         return col === 'rowNo' ? row.n : (
           <span className="fx-content-pillar"><span className="fx-sheet-indent" aria-hidden="true" />{row.pillar.name}
@@ -269,11 +349,11 @@ export function ContentGrid(p: ContentGridProps) {
           )
         }
         case 'type':     return typePill(task.content_type_label)
-        case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} />
+        case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} name={isClip ? undefined : stageWord(task.status)} />
         case 'assignee': return <EditorContent member={task.assignee_id ? byId.get(task.assignee_id) : undefined} t={ts} />
         case 'pillar': {
           if (isClip) return null
-          const pl = row.theme.pillars.find(x => x.id === task.pillar_id)
+          const pl = row.theme.pillars.find((x: ContentTheme['pillars'][number]) => x.id === task.pillar_id)
           return pl ? <span className="fx-sheet-ellipsis">{pl.name}</span> : <span className="fx-sheet-muted">{t('pillar.none')}</span>
         }
         case 'doc': case 'design': case 'post': case 'published':
@@ -304,10 +384,10 @@ export function ContentGrid(p: ContentGridProps) {
     const task = taskOf(row)
     if (task && !isCustom(col)) {
       switch (col) {
-        case 'status': return stageNames.video(task.status as StageId)
+        case 'status': return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageWord(task.status)
         case 'assignee': return task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''
-        case 'type': return task.content_type_label ?? ''
-        case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find(x => x.id === task.pillar_id)?.name ?? '' : ''
+        case 'type': return task.content_type_label ? typeWord(task.content_type_label) : ''
+        case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find((x: ContentTheme['pillars'][number]) => x.id === task.pillar_id)?.name ?? '' : ''
         case 'doc': case 'design': case 'post': case 'published': return pieceLink(task, col) ?? ''
         case 'date': return task.status === 'publish' ? task.stage_date ?? '' : task.due_date ?? ''
       }
@@ -319,7 +399,20 @@ export function ContentGrid(p: ContentGridProps) {
     kind: row => (row.kind === 'piece' ? 'item' : row.kind === 'clip' ? 'child' : 'fixed'),
     taskOf: row => taskOf(row)?.id ?? null, textValue: shownText, say: text => p.linked?.say(text),
   })
-  const rows = lv.rows
+  viewRef.current = lv.store.view
+  const by = lv.store.view.groupBy?.by ?? 'theme'
+  useEffect(() => { p.onGroupMode?.(by) }, [by]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Spec 019 stage 2: Group by Stage, Assignee or Type, or None, instead of Theme › Pillar. */
+  const rows = useMemo(() => {
+    if (by === 'theme' || by === 'col') return lv.rows
+    if (by === 'none') return regroupContent(lv.rows, null)
+    return regroupContent(lv.rows, task => {
+      if (by === 'stage') return { key: task.status, label: stageWord(task.status), order: String(STAGE_ORDER.indexOf(task.status)).padStart(3, '0') }
+      if (by === 'assignee') { const n = task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''; return n ? { key: `a${task.assignee_id}`, label: n, order: `0${n.toLowerCase()}` } : { key: 'none', label: tf('bandUnassigned'), order: '1' } }
+      const ty = task.content_type_label ?? ''
+      return ty ? { key: `t${ty}`, label: typeWord(ty), order: `0${ty.toLowerCase()}` } : { key: 'none', label: tf('bandNoType'), order: '1' }
+    })
+  }, [lv.rows, by, lv.store.view.words, lv.store.view.show]) // eslint-disable-line react-hooks/exhaustive-deps
   model.rows = rows
   const colName = (col: GridCol) => { const h = model.header(col); return h.label ?? (typeof h.text === 'string' ? h.text : col) }
   const cellName = (row: ContentRow, col: GridCol) => {
@@ -345,7 +438,7 @@ export function ContentGrid(p: ContentGridProps) {
   const le = useLinkedEditing<ContentRow>({
     applyFormats: lf.applyFormats,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
-    rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: p.onCommit,
+    rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
     onSkipped: p.onSkipped,
@@ -369,12 +462,64 @@ export function ContentGrid(p: ContentGridProps) {
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<ContentRow>>)
 
+  const view = lv.store.view
+  const saveView = (patch: Partial<LinkedView>) => void lv.store.saveView({ ...view, ...patch })
+  const laid = cl.laid
+  const asRow = (c: (typeof laid)[number]): PresetRow => {
+    const i = laid.indexOf(c), name = colLabel(c.key) || t('col.archive')
+    return {
+      key: c.key, name, icon: c.kind ? 'regular' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
+      values: c.key === 'status' ? 'stage' : c.key === 'type' ? 'type' : undefined,
+      up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
+      upLabel: tc('moveUp', { name }), downLabel: tc('moveDown', { name }),
+    }
+  }
+  const closeBack = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-content-sheet] .fx-sheet-td.is-active, [data-content-sheet] [data-cell][tabindex="0"]')?.focus())
+  const addItems: MenuItem[] = addAt ? [
+    ...laid.filter(c => c.builtIn && !c.shown).map(c => ({
+      key: c.key, text: colLabel(c.key) || t('col.archive'), group: tf('fieldsTitle'),
+      label: <span className="fx-fd-mi">{FIELD_OF[c.key] && <FieldIcon field={FIELD_OF[c.key]} />}{colLabel(c.key) || t('col.archive')}</span>,
+      onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
+    })),
+    { key: 'regular', text: tf('spreadsheetCol'), group: tf('regularTitle'), label: <span className="fx-fd-mi"><FieldIcon field="regular" />{tf('spreadsheetCol')}</span>,
+      onSelect: () => { const a = addAt; setAddAt(null); cl.openAdd(a) } },
+  ] : []
+
   return (
     <>
     <GridCore model={model} active={p.active} setActive={p.setActive}
               editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote} />
     {lm.node}
     {lf.node}
+    {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
+    {drawer && (
+      <PresetFieldsDrawer
+        rowsName={tf('rowsContent')} rowsHelp={tf('rowsContentHelp')}
+        groups={[
+          { value: 'theme', label: tf('groupTheme') }, { value: 'stage', label: tf('names.stage') },
+          { value: 'assignee', label: tf('names.assignee') }, { value: 'type', label: tf('names.type') }, { value: 'none', label: tf('groupNone') },
+        ]}
+        group={by}
+        onGroup={v => saveView({ groupBy: v === 'theme' ? null : { by: v as 'stage' | 'assignee' | 'type' | 'none' } })}
+        fields={laid.filter(c => !c.kind).map(asRow)}
+        regular={laid.filter(c => c.kind).map(asRow)}
+        onToggle={(key, on) => void cl.setShown(key, on)}
+        onMove={(key, dir) => { const i = laid.findIndex(c => c.key === key); void cl.move(key, dir < 0 ? laid[i - 1]?.key ?? null : laid[i + 2]?.key ?? null) }}
+        onValues={f => setValuesFor(f)}
+        onAddRegular={a => cl.openAdd(a)}
+        onClose={() => { setDrawer(false); closeBack() }} />
+    )}
+    {valuesFor && (
+      <ValuesDialog field={valuesFor} map={{ words: view.words, show: view.show }} types={(p.contentTypes ?? []).map(x => x.label)}
+                    defaults={valuesFor === 'stage' ? Object.fromEntries(STAGE_ORDER.map(id => [id, stageNames.video(id as StageId)])) : undefined}
+                    onSave={(words, show) => {
+                      const all = { ...(view.words ?? {}), [valuesFor]: words }
+                      if (!Object.keys(words).length) delete all[valuesFor]
+                      saveView({ words: all, show })
+                      setValuesFor(null); closeBack()
+                    }}
+                    onClose={() => { setValuesFor(null); closeBack() }} />
+    )}
     </>
   )
 }

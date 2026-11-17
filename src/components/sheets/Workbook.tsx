@@ -577,12 +577,14 @@ export function Workbook(p: WorkbookProps) {
   const statusText = status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
+  // Spec 019: ⚙ Fields on team sheets and (stage 2) the Content sheet.
+  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content'
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>
       {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
       {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
-      {openBlank && doc && (
+      {fieldsHere && (
         <button type="button" className="fx-sh-ib is-text" data-fields-btn="" title={t('fields.title')} onClick={() => openFields()}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
           <span className={phone ? 'sr-only' : undefined}>{t('fields.button')}</span>
@@ -657,7 +659,7 @@ export function Workbook(p: WorkbookProps) {
           canUndo={openBlank ? !!stack && canUndo(stack) : linkedHist.canUndo} canRedo={openBlank ? !!stack && canRedo(stack) : linkedHist.canRedo}
           onFileMenu={(el, at) => { if (openId) tabMenuFor(openId, at, el) }}
           onBoardMenu={openBlank && doc ? (el, at) => setBoardMenu({ x: at.x, y: at.y, el }) : undefined}
-          onFields={openBlank && doc ? () => openFields() : undefined} />
+          onFields={fieldsHere ? () => openFields() : undefined} />
       )}
       {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 

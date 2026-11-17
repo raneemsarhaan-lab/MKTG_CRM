@@ -15,6 +15,8 @@ export type ContentRow =
   | { kind: 'clip'; key: string; task: Task; video: Task; theme: ContentTheme; n: number }
   | { kind: 'draft'; key: string; theme: ContentTheme; pillarId: string | null; n: number }
   | { kind: 'add'; key: string; theme: ContentTheme }
+  /** Spec 019 stage 2: a heading when rows are grouped by stage, assignee or type instead of theme. */
+  | { kind: 'group'; key: string; label: string; count: number; n: number }
 
 /** Children of a video are clips, not pieces. */
 export function piecesOf(tasks: Task[], themeId: string): Task[] {
@@ -73,4 +75,34 @@ export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: Conte
     rows.push({ kind: 'add', key: `a:${theme.id}`, theme })
   }
   return rows
+}
+
+/**
+ * Spec 019 stage 2: the same pieces grouped another way (Group by in ⚙ Fields).
+ * Each piece keeps its clips under it; theme, pillar, draft and "+ Piece" rows
+ * drop out. `keyOf` null lists the pieces with no headings (None). Pure.
+ */
+export function regroupContent(rows: ContentRow[], keyOf: ((task: Task) => { key: string; label: string; order: string }) | null): ContentRow[] {
+  const blocks: ContentRow[][] = []
+  for (const r of rows) {
+    if (r.kind === 'piece') blocks.push([r])
+    else if (r.kind === 'clip' && blocks.length) blocks[blocks.length - 1].push(r)
+  }
+  const out: ContentRow[] = []
+  let n = 1
+  const number = (r: ContentRow): ContentRow => (r.kind === 'piece' || r.kind === 'clip' ? { ...r, n: n++ } : r)
+  if (!keyOf) { for (const b of blocks) out.push(...b.map(number)); return out }
+  const groups = new Map<string, { label: string; order: string; blocks: ContentRow[][] }>()
+  for (const b of blocks) {
+    const head = b[0] as Extract<ContentRow, { kind: 'piece' }>
+    const k = keyOf(head.task)
+    const g = groups.get(k.key)
+    if (g) g.blocks.push(b); else groups.set(k.key, { label: k.label, order: k.order, blocks: [b] })
+  }
+  for (const [key, g] of [...groups.entries()].sort((a, b) => a[1].order.localeCompare(b[1].order))) {
+    const count = g.blocks.filter(b => !(b[0] as Extract<ContentRow, { kind: 'piece' }>).task.dropped_at).length
+    out.push({ kind: 'group', key: `g:${key}`, label: g.label, count, n: n++ })
+    for (const b of g.blocks) out.push(...b.map(number))
+  }
+  return out
 }

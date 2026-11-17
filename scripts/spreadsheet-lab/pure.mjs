@@ -348,7 +348,8 @@ export async function runPure(lab, root) {
     eq(h.cleanMap({ taskCol: 'A', fields: { B: 'col:nope', C: 'bogus' } }, cols, team), { taskCol: 'A', fields: {} }, 'unknown fields are dropped')
     const piece = { piece: true, video: false, clip: false }, video = { piece: false, video: true, clip: false }, plain = { piece: false, video: false, clip: false }
     ok(h.fieldApplies(piece, 'theme') && !h.fieldApplies(video, 'theme') && !h.fieldApplies(plain, 'pillar'), 'theme and pillar are for content pieces')
-    ok(h.fieldApplies(video, 'link:design') && !h.fieldApplies(plain, 'link:design'), 'links are for pieces and videos')
+    // Spec 019 follow-up: any board task carries its links (a clip's live on its video).
+    ok(h.fieldApplies(video, 'link:design') && h.fieldApplies(plain, 'link:design') && !h.fieldApplies({ piece: false, video: false, clip: true }, 'link:design'), 'links are for every task but a clip')
     ok(h.fieldApplies(plain, 'stage') && h.fieldApplies(plain, 'due'), 'every task has a stage and a due date')
     const people = [{ id: '1', name: 'Samaa Ali' }, { id: '2', name: 'Ahmed Omar' }, { id: '3', name: 'Ahmed Saleh' }]
     eq(h.matchMember('samaa ali', people), { id: '1' }, 'a full name, any case')

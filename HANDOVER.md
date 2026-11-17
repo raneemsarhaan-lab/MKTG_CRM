@@ -699,7 +699,18 @@ Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fiel
 - **Saving.** Picks go through the same path as typing: a cell change, then `applyRouted`, then `writeTaskFields`. The board's rules, refusals and one undo step all apply.
 - **Column drag.** Drag a heading onto another, or onto ＋ for the end. This is a `colOrder` change (positions are fractional), saved as `colPositions`.
 - **Group rows by.** `view.groupBy` holds theme › pillar, stage, assignee, type, or a column. `groupRows` in BlankSheet orders the visible rows, and `GridCore.rowBand` draws the bands. The headings row stays on top.
-- **Check.** `node scripts/spreadsheet-lab/realapp/fields.cjs`.
+- **Task column.** A linked row's Task cell is the task's title (rows link by title; a pasted link becomes the title; Refresh keeps it current). Unlinked rows offer ＋ Create task. The read-only **Task link** field shows Open task or Create task.
+- **Content look for team sheets.** `view.look` is 'content' or 'grid'; it's unset by default, which means content when the sheet is linked.
+  - In the Content look, BlankSheet hides the headings row (`headRow`) from the grid and shows its cells as the header names (with ▾ → Rename).
+  - It groups Theme › Pillar by default (`groupRows`, with two-line bands through `GridCore.rowBandHeight`).
+  - It renders the Content-style bar and summary above the grid. Mine and Show done filter `baseRows`.
+- **Content sheet (stage 2).**
+  - `ContentGrid` hosts `PresetFieldsDrawer`, ＋ and Values.
+  - Columns and ⚙ Fields open the drawer.
+  - Group by, words and show live in the linked sheet's `view` (`LinkedView`, saved through `applyLinkedFormats`).
+  - `regroupContent` (`content/rows.ts`) builds the Stage, Assignee, Type or None groups.
+  - Status and Type read typed and pasted words (`readWord`) before `ContentSheet.onCommit` moves or retypes the task.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/fields.cjs` and `content-fields.cjs`.
 
 ### Celebrations
 

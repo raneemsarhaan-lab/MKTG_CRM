@@ -466,6 +466,10 @@ export interface ViewWrite {
   sort?: SortKey[] | null
   /** Spec 019: null removes it. */
   groupBy?: GroupBy | null
+  /** Spec 019 stage 2 (linked sheets): this sheet's words; null removes them. */
+  words?: SheetTaskMap['words'] | null
+  show?: SheetTaskMap['show'] | null
+  look?: 'content' | 'grid' | null
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─
@@ -550,10 +554,15 @@ export interface SheetView {
   sort?: SortKey[]
   hiddenRows?: string[]
   hiddenCols?: string[]
-  /** Spec 019: rows grouped under headings (blank sheets): by a task's theme (and pillar), stage, assignee or type, or by a column's value. */
+  /** Spec 019: rows grouped under headings: by a task's theme (and pillar), stage, assignee or type, or by a column's value. 'none' is the Content sheet's flat list (its default is theme). */
   groupBy?: GroupBy | null
+  /** Spec 019 stage 2, linked sheets: this sheet's words for stages and types, and which name cells show. */
+  words?: SheetTaskMap['words']
+  show?: SheetTaskMap['show']
+  /** Spec 019 (approved design team-sheet-content-style): a team sheet in the Content sheet's look, or as a spreadsheet. Unset: content when linked to the board. */
+  look?: 'content' | 'grid'
 }
-export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' } | { by: 'col'; col: string }
+export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'none' } | { by: 'col'; col: string }
 
 // ─── Spec 015 stage 3: sort, filter, tables, conditional formatting ─────────
 
@@ -602,7 +611,7 @@ export interface ConditionalRule {
 }
 // ─── Spec 016: a blank sheet's columns linked to board tasks ────────────────
 
-export const TASK_FIELDS = ['title', 'stage', 'due', 'assignee', 'owner', 'priority', 'platform', 'type', 'theme', 'pillar', 'link:doc', 'link:design', 'link:post', 'link:published'] as const
+export const TASK_FIELDS = ['title', 'stage', 'due', 'assignee', 'owner', 'priority', 'platform', 'type', 'theme', 'pillar', 'link:doc', 'link:design', 'link:post', 'link:published', 'task'] as const
 /** A task field a column can stand for; `col:<id>` is one of the team's own Content columns (spec 010). */
 export type TaskField = typeof TASK_FIELDS[number] | `col:${string}`
 /** Spec 019: fields whose values a sheet may call by its own words ("editing in progress" → D-In Progress). */
@@ -631,7 +640,7 @@ export interface LinkedTask {
   applies: TaskField[]
   /** Spec 019: the stages this member may move it to (the stage menu), and its theme, pillar, stage, assignee and type for grouping. */
   moves?: string[]
-  meta?: { theme: string; pillar: string; stage: string; assignee: string; assigneeId: string | null; type: string }
+  meta?: { theme: string; pillar: string; stage: string; assignee: string; assigneeId: string | null; type: string; ownerId?: string }
 }
 export interface TaskFieldWrite { rowId: string; field: TaskField; value: string }
 export interface TaskFieldResult { rowId: string; field: TaskField; ok: boolean; reason?: string; shown?: string; celebrate?: boolean; stageLabel?: string }

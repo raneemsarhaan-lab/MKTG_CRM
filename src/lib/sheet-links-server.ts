@@ -73,6 +73,8 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
         case 'link:design': values['link:design'] = atts.find(a => a.link_role === 'design')?.url ?? ''; break
         case 'link:post': values['link:post'] = t.post_url ?? ''; break
         case 'link:published': values['link:published'] = t.published_url ?? ''; break
+        // The row's task on the board (the Content sheet's Task Link): shown as "Open task", never typed.
+        case 'task': values.task = `/board?task=${t.id}`; break
         default: values[f] = svals.find(v => v.column_id === f.slice(4))?.value ?? ''
       }
     }
@@ -82,7 +84,7 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
       applies: [...TASK_FIELDS, ...[...fields].filter(f => f.startsWith('col:'))].filter(f => fieldApplies(kind, f as TaskField)) as TaskField[],
       // Spec 019: the stage menu's choices, and what rows group by.
       moves: me.role ? allowedStages({ status: t.status, nine_stage: t.nine_stage, task_owner_id: t.task_owner_id, assignee_id: t.assignee_id, dropped_at: t.dropped_at }, { id: me.id, role: me.role, access: me.access }) : undefined,
-      meta: { theme: t.project?.name ?? '', pillar: t.pillar?.name ?? '', stage: t.status, assignee: t.assignee_id ? name.get(t.assignee_id) ?? '' : '', assigneeId: t.assignee_id, type: t.content_type_label ?? '' },
+      meta: { theme: t.project?.name ?? '', pillar: t.pillar?.name ?? '', stage: t.status, assignee: t.assignee_id ? name.get(t.assignee_id) ?? '' : '', assigneeId: t.assignee_id, type: t.content_type_label ?? '', ownerId: t.task_owner_id },
     }
   }
   return out

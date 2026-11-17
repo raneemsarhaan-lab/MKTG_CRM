@@ -11,7 +11,7 @@
  */
 import { isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { useTranslations } from 'next-intl'
-import type { ColFilter, ConditionalRule, FilterArea, SheetFormatRecord, SortKey } from '@/types/index'
+import type { ColFilter, ConditionalRule, FilterArea, GroupBy, SheetFormatRecord, SheetTaskMap, SortKey } from '@/types/index'
 import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { indexFormats, resolveStyle, type FormatIndex } from '@/lib/sheet-format'
 import { arrangeGroups, evalRules, type RuleLook } from '@/lib/sheet-rules'
@@ -30,7 +30,11 @@ export function nodeText(node: ReactNode): string {
   return ''
 }
 
-export interface LinkedView { sort?: SortKey[]; filter?: Record<string, ColFilter>; filterArea?: FilterArea | null }
+export interface LinkedView {
+  sort?: SortKey[]; filter?: Record<string, ColFilter>; filterArea?: FilterArea | null
+  /** Spec 019 stage 2: how rows are grouped (none = the sheet's default), and this sheet's words. */
+  groupBy?: GroupBy | null; words?: SheetTaskMap['words']; show?: SheetTaskMap['show']
+}
 
 export interface LinkedStore {
   enabled: boolean
@@ -76,7 +80,8 @@ export function useLinkedView<R extends { key: string }>(p: {
       if (!live || !r.success) return
       setFormats(r.extras.formats)
       setRules(r.extras.rules ?? [])
-      setView({ sort: r.extras.view.sort, filter: r.extras.view.filter, filterArea: r.extras.view.filterArea ?? null })
+      const v = r.extras.view
+      setView({ sort: v.sort, filter: v.filter, filterArea: v.filterArea ?? null, groupBy: v.groupBy ?? null, words: v.words, show: v.show })
     })
     return () => { live = false }
   }, [enabled, p.sheetKey])
@@ -87,7 +92,10 @@ export function useLinkedView<R extends { key: string }>(p: {
     const before = viewRef.current
     setView(after)
     const res = apiRef.current
-      ? await apiRef.current.applyLinkedFormats(ref.current.sheetKey, { view: { sort: after.sort ?? null, filter: after.filter ?? null, filterArea: after.filterArea ?? null } })
+      ? await apiRef.current.applyLinkedFormats(ref.current.sheetKey, { view: {
+          sort: after.sort ?? null, filter: after.filter ?? null, filterArea: after.filterArea ?? null,
+          groupBy: after.groupBy ?? null, words: after.words ?? null, show: after.show ?? null,
+        } })
       : { success: false as const, error: 'generic' }
     if (!res.success) { setView(before); ref.current.say(t('err.generic')); return false }
     return true

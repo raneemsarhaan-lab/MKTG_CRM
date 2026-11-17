@@ -328,6 +328,7 @@ export function viewWrite(before: Partial<SheetView>, after: Partial<SheetView>)
   if ('filter' in after && JSON.stringify(after.filter ?? null) !== JSON.stringify(before.filter ?? null)) out.filter = after.filter ?? null
   if ('sort' in after && JSON.stringify(after.sort ?? null) !== JSON.stringify(before.sort ?? null)) out.sort = after.sort ?? null
   if ('groupBy' in after && JSON.stringify(after.groupBy ?? null) !== JSON.stringify(before.groupBy ?? null)) out.groupBy = after.groupBy ?? null
+  if ('look' in after && (after.look ?? null) !== (before.look ?? null)) out.look = after.look ?? null
   return out
 }
 
@@ -347,7 +348,7 @@ export function mergeView(a: ViewWrite | undefined, b: ViewWrite | undefined): V
   if (r.show.length) out.showRows = r.show
   if (c.hide.length) out.hideCols = c.hide
   if (c.show.length) out.showCols = c.show
-  for (const k of ['filterArea', 'filter', 'sort', 'groupBy'] as const) if (k in b) (out as Record<string, unknown>)[k] = b[k]; else if (k in a) (out as Record<string, unknown>)[k] = a[k]
+  for (const k of ['filterArea', 'filter', 'sort', 'groupBy', 'look'] as const) if (k in b) (out as Record<string, unknown>)[k] = b[k]; else if (k in a) (out as Record<string, unknown>)[k] = a[k]
   for (const k of Object.keys(out) as (keyof ViewWrite)[]) if (out[k] === undefined) delete out[k]
   return out
 }

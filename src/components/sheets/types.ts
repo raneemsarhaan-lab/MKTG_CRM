@@ -27,7 +27,7 @@ export interface SheetsApi {
   reorderSheets(folderId: string, ids: string[]): Promise<Ok>
   // ── spec 015 ──
   loadLinkedSheetExtras(sheetId: string): Promise<Ok<{ extras: SheetExtras; sheetId: string }>>
-  applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea'> }): Promise<Ok<{ updatedAt: string }>>
+  applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea' | 'groupBy' | 'words' | 'show'> }): Promise<Ok<{ updatedAt: string }>>
   // ── spec 016 ──
   linkColumn: typeof import('@/actions/sheet-links').linkColumn
   resolveTaskCells: typeof import('@/actions/sheet-links').resolveTaskCells

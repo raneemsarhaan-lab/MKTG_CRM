@@ -48,7 +48,7 @@ export function siteName(url: string): string {
 }
 
 /** What a field cell shows on a linked row. */
-export function FieldValue({ field, raw, map, people }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people'] }) {
+export function FieldValue({ field, raw, map, people, plain }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people']; /** The Content look: the Content sheet's underlined "Open task". */ plain?: boolean }) {
   const locale = useLocale()
   const t = useTranslations('sheets.fields')
   switch (field) {
@@ -70,6 +70,11 @@ export function FieldValue({ field, raw, map, people }: { field: TaskField; raw:
       const late = raw < new Date().toISOString().slice(0, 10)
       return <span className={`fx-fd-due${late ? ' is-late' : ''}`}>{Number.isNaN(+d) ? raw : d.toLocaleDateString(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' })}</span>
     }
+    case 'task':
+      if (raw && plain) return <a className="fx-sheet-link fx-sheet-ellipsis" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
+                                  onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')}</a>
+      return raw ? <a className="fx-sheet-link fx-lk-open" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
+                      onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')} ↗</a> : null
     default:
       if (field.startsWith('link:')) {
         return raw
@@ -157,10 +162,11 @@ function InputPop({ field, value, anchor, onSave, onClose }: { field: TaskField;
 }
 
 /** A field heading's icon. */
-export function FieldIcon({ field }: { field: TaskField | 'task' | 'regular' }): ReactNode {
+export function FieldIcon({ field }: { field: TaskField | 'taskcol' | 'regular' }): ReactNode {
   if (field === 'stage') {
     return <span className="fx-fd-ic" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5 1a4 4 0 0 1 0 8z" fill="currentColor" /></svg></span>
   }
-  const ch = field === 'task' ? '✓' : field === 'regular' ? 'A' : field === 'assignee' || field === 'owner' ? '◉' : field === 'due' ? '▦' : field === 'priority' ? '⚑' : field === 'type' ? '▣' : field === 'theme' ? '◆' : field === 'pillar' ? '◇' : field === 'platform' ? '◎' : field === 'title' ? 'T' : field.startsWith('link:') ? '↗' : '✎'
-  return <span className={`fx-fd-ic${field === 'regular' ? ' is-reg' : ''}`} aria-hidden="true">{ch}</span>
+  const ch = field === 'taskcol' ? '✓' : field === 'task' ? '↗' : field === 'regular' ? 'A' : field === 'assignee' || field === 'owner' ? '◉' : field === 'due' ? '▦' : field === 'priority' ? '⚑' : field === 'type' ? '▣' : field === 'theme' ? '◆' : field === 'pillar' ? '◇' : field === 'platform' ? '◎' : field === 'title' ? 'T' : field.startsWith('link:') ? '↗' : '✎'
+  // The glyph is drawn by CSS, so it isn't part of the heading's text (copy, find, a column's name).
+  return <span className={`fx-fd-ic${field === 'regular' ? ' is-reg' : ''}`} data-ic={ch} aria-hidden="true" />
 }

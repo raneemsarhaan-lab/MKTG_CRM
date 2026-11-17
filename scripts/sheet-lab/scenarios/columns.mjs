@@ -8,7 +8,7 @@
 const C = 'view=content&cols=1'
 const POST1 = 'f51f43c9-069d-46af-95c0-04cba2f72efa'
 const POST2 = '3be798dc-ba7a-4742-a1df-d48722c2b039'
-const heads = t => t.page.$$eval('[role="columnheader"]', hs => hs.slice(1).map(h => (h.querySelector('.fx-sheet-th-name')?.textContent ?? h.textContent).trim()))
+const heads = t => t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => (h.querySelector('.fx-sheet-th-name')?.textContent ?? h.textContent).trim()))
 const cols = t => t.page.evaluate(() => window.__cols)
 const calls = async (t, fn) => (await t.lab()).calls.filter(c => c.fn === fn).map(c => c.args)
 async function headMenu(t, key) {
@@ -235,10 +235,10 @@ export const columns = [
       await t.idle(200)
       t.assert(!(await heads(t)).includes('Hook'), 'hidden')
       await t.page.locator('[data-columns-button]').click()
-      await t.page.locator('[data-panel-col="c:hook"] input[type="checkbox"]').click()
+      await t.page.locator('[data-panel-col="c:hook"] [data-field-switch]').click()
       await t.idle(250)
       t.assert((await heads(t)).includes('Hook'), 'shown again from Columns')
-      t.assert(await t.page.locator('[data-panel-col="title"] input[type="checkbox"]').isDisabled(), 'Title cannot be hidden')
+      t.assert(await t.page.locator('[data-panel-col="title"] [data-field-switch]').isDisabled(), 'Title cannot be hidden')
     },
   },
   {

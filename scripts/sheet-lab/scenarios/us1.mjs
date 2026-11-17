@@ -7,7 +7,7 @@ export const us1 = [
       t.eq(rows[0], 'v:v1', 'the video is the first row')
       const nos = await t.page.$$eval('[data-row^="c:"] [data-col="clipNo"]', els => els.map(e => e.textContent))
       t.eq(nos, ['04', '05', '08', '09', '11', '12', '13', '13', '14', '18', '22', '23', '28', ''], 'clips in clip order')
-      const heads = await t.page.$$eval('[role="columnheader"]', hs => hs.map(h => h.textContent || h.getAttribute('aria-label')))
+      const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.map(h => h.textContent || h.getAttribute('aria-label')))
       t.eq(heads, ['#', 'Title', '#', 'Type', 'Status', 'Editor', 'Source', 'File name', 'In', 'Out', 'Length', 'Files', 'Published', 'Drop or restore'], 'Full columns')
       t.eq((await t.text('c:c01', 'length')).trim(), '1:28.8', 'length from in and out')
       const h = await t.cell('c:c01', 'title').evaluate(e => e.getBoundingClientRect().height)
