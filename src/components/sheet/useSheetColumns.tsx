@@ -454,6 +454,11 @@ export function useSheetColumns(o: UseSheetColumns) {
 
   return {
     laid, shown,
+    /** Spec 019 stage 2: the Fields drawer and ＋ drive the same layout actions as the Columns panel. */
+    openAdd,
+    setShown: (key: string, on: boolean) => run(api.setShown(sheet, key, set, on), t(on ? 'shownCol' : 'hidden', { name: nameOf(key) || o.defaultName(key) })),
+    move: (key: string, before: string | null) => run(api.move(sheet, key, before), t('movedCol', { name: nameOf(key) || o.defaultName(key) })),
+    changedBy,
     cols: shown.map(c => c.key),
     widths: Object.fromEntries(laid.map(c => [c.key, c.width])) as Record<string, number>,
     nameOf, header, grid, custom, typeCombo, toolbar, layer,

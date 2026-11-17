@@ -72,3 +72,78 @@ Stage 1 covers team (blank) sheets. The Content sheet (stage 2) and the Video sh
 - **Link fields on every task.** Working doc, Design link, Post link and Published link now apply to every board task, not only to tasks under a theme (the board lets any task have them). A clip's links are still on its video.
 - **Field headings.** A field heading is now the column letter plus a small icon. The field's name is in the tooltip and is read by screen readers. The Task column has a dark ✓ icon.
 - Re-run: realapp fields 58/58 (twice), links 40/40.
+
+# Stage 2: the Content sheet, and the task column (2026-11-17)
+
+## What changed
+
+- **The Content sheet uses the fields model.**
+  - **Columns and ⚙ Fields** (title row, or Data › Task fields) open the same drawer:
+    - Rows: "Content tasks from the board", with Group by (Theme › Pillar, Stage, Assignee, Type, None);
+    - a switch, ↑ ↓ and "changed by" for each field (the old Columns panel's keyboard path, spec 010 FR-004);
+    - Values for Stage and Type;
+    - the team's columns, with "＋ Add a regular column".
+  - **Headings and ＋.** Built-in headings carry their field icon. ＋ after the last heading adds a hidden field back, or a spreadsheet column.
+  - **The sheet's words.** The Values table is prefilled with the Content sheet's own words (Writing, Editing…). The words and Group by are kept in the sheet's `view`.
+  - **Typing and pasting into Status and Type.** These cells take typed and pasted words, which move the task through the board's rules and undo in one step. An unknown word is refused with a note.
+- **Team sheets: the task column.**
+  - A linked row's Task cell is the task's title only. A pasted link becomes the title, and Refresh keeps the title current. Rows still link by title.
+  - A row chosen among same-named tasks keeps its link when the sheet is linked again.
+  - "Open task" is gone from the Task cell. The row's ↗ opens the task.
+  - A row with no task offers **＋ Create task** (the Create tasks preview for that row).
+- **New field: Task link** (team sheets): "Open task ↗" on linked rows and "Create task" on the others. It is read-only.
+- **Small fixes:**
+  - The ＋ menu now closes after a pick.
+  - Field icons are drawn by CSS, so they aren't part of a heading's text.
+  - ＋ adds no extra cell to rows that span the grid.
+
+## New lab: `realapp/content-fields.cjs`, 29/29
+
+- **Headings**: field icons, ＋ last, and grouped by Theme › Pillar.
+- **Drawer**
+  - ⚙ Fields and Columns open the same drawer.
+  - It shows Rows: Content tasks, and Group by reads Theme › Pillar.
+  - Stage and Type have Values.
+  - axe is clean.
+- **Hiding and ＋**: Working doc off hides its column. ＋ offers it back, plus a spreadsheet column, and the menu closes.
+- **Group by**
+  - Stage groups the pieces, and the choice is saved and kept after a reload (axe is clean).
+  - None removes the headings.
+  - Theme › Pillar comes back.
+- **Values**
+  - The sheet's words are prefilled.
+  - "editing in progress" for D-In Progress is saved.
+- **Typing a word**
+  - "Editing in  progress" moves the task to D-In Progress, and the pill shows the word.
+  - Undo moves it back.
+  - "not a stage" is refused with a note.
+- **Arabic and phone**: axe is clean in Arabic, and on a phone the drawer is a bottom sheet.
+- No page errors.
+
+## Updated labs
+
+- **fields 63/63**
+  - No "Open task" in Task cells.
+  - Create task appears on the unlinked row.
+  - Cells hold titles, not links.
+  - The Task link field shows Open task or Create task, and Create task opens the preview.
+- **links 41/41**
+  - Pasted links become titles.
+  - Create task replaces "Not linked".
+  - Choose a task keeps the title.
+- **lab:sheet 150/150**
+  - The Columns panel checks run against the drawer (same hooks; the show checkbox is now a switch).
+  - The heading list skips ＋.
+- **lab:spreadsheet 28/28**: the links rule now says links apply to every task but a clip (from [#101](https://github.com/raneemsarhaan-lab/MKTG_CRM/pull/101)).
+
+## Regressions
+
+| Lab | Result |
+|---|---|
+| areas | 42/42 |
+| header | 45/45 |
+| run | 56/56 |
+| editing | 50/50 |
+| format | 52/52 |
+| styles | 54/54 |
+| perf-axe | 18/18 |

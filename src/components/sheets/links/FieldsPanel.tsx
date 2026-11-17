@@ -151,17 +151,19 @@ export function AddFieldMenu({ anchor, shown, teamCols, linked, onField, onRegul
 }
 
 /** ⚙ Fields → Values: each board value and this sheet's words for it. */
-export function ValuesDialog({ field, map, types, onSave, onClose }: {
+export function ValuesDialog({ field, map, types, defaults, onSave, onClose }: {
   field: WordField
-  map: SheetTaskMap
+  map: Pick<SheetTaskMap, 'words' | 'show'>
   types: string[]
+  /** Spec 019 stage 2: a sheet's built-in word per value (the Content sheet's Writing, Editing…), shown until changed. */
+  defaults?: Record<string, string>
   onSave(words: Record<string, string[]>, show: 'sheet' | 'board'): void
   onClose(): void
 }) {
   const t = useTranslations('sheets.fields')
   const locale = useLocale()
   const values = boardValues(field, types, locale)
-  const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(values.map(v => [v.value, (map.words?.[field]?.[v.value] ?? []).join(', ')])))
+  const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(values.map(v => [v.value, (map.words?.[field]?.[v.value] ?? (defaults?.[v.value] ? [defaults[v.value]] : [])).join(', ')])))
   const [show, setShow] = useState<'sheet' | 'board'>(map.show ?? 'sheet')
   const [err, setErr] = useState('')
   function save() {
@@ -268,5 +270,76 @@ export function MatchDialog({ field, colName, values, map, types, linkedRows, on
         </div>
       </div>
     </div>
+  )
+}
+
+/** One row of the Content sheet's drawer: a column, who changed it last, ↑ ↓, and its switch. */
+export interface PresetRow { key: string; name: string; icon: TaskField | 'taskcol' | 'regular' | null; shown: boolean; who: string; locked?: boolean; values?: WordField; up: boolean; down: boolean; upLabel: string; downLabel: string }
+
+/**
+ * Spec 019 stage 2: the drawer of a sheet whose rows come from the board (the
+ * Content sheet). Its rows are a preset; its columns are the sheet's fields
+ * and the team's own columns, with the same switches as a team sheet's.
+ */
+export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup, fields, regular, onToggle, onMove, onValues, onAddRegular, onClose }: {
+  rowsName: string
+  rowsHelp: string
+  groups: { value: string; label: string }[]
+  group: string
+  onGroup(value: string): void
+  fields: PresetRow[]
+  regular: PresetRow[]
+  onToggle(key: string, on: boolean): void
+  onMove(key: string, dir: -1 | 1): void
+  onValues(field: WordField): void
+  onAddRegular(anchor: HTMLElement): void
+  onClose(): void
+}) {
+  const t = useTranslations('sheets.fields')
+  const ref = useRef<HTMLElement>(null)
+  useEffect(() => { ref.current?.querySelector<HTMLElement>('select, button')?.focus() }, [])
+  const row = (r: PresetRow) => (
+    <li key={r.key} className="fx-fd-row" data-field-row={r.key} data-panel-col={r.key}>
+      {r.icon && <FieldIcon field={r.icon} />}
+      <span className="fx-fd-nm">{r.name}<small className="fx-col-who">{r.who}</small></span>
+      {r.values && <button type="button" className="fx-fd-values" data-field-values={r.values} onClick={() => onValues(r.values!)}>{t('values')}</button>}
+      <button type="button" className="fx-fd-mv" aria-label={r.upLabel} disabled={!r.up} onClick={() => onMove(r.key, -1)}>↑</button>
+      <button type="button" className="fx-fd-mv" aria-label={r.downLabel} disabled={!r.down} onClick={() => onMove(r.key, 1)}>↓</button>
+      <button type="button" role="switch" className="fx-nt-sw" aria-checked={r.shown} aria-label={t('showField', { name: r.name })} data-field-switch={r.key}
+              disabled={r.locked} onClick={() => onToggle(r.key, !r.shown)} />
+    </li>
+  )
+  return (
+    <aside ref={ref} className="fx-fd-drawer" aria-label={t('title')} data-fields-drawer="" data-columns-panel=""
+           onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }}>
+      <header>
+        <h2>{t('title')}</h2>
+        <button type="button" aria-label={t('close')} data-fields-close="" onClick={onClose}>×</button>
+      </header>
+      <div className="fx-fd-scroll">
+        <section>
+          <h3>{t('rowsTitle')}</h3>
+          <div className="fx-fd-src" data-rows-source="">
+            <b>{rowsName}</b><small>{rowsHelp}</small>
+            <label className="fx-fd-group">
+              <span>{t('groupTitle')}</span>
+              <select value={group} data-group-by="" onChange={e => onGroup(e.target.value)}>
+                {groups.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </label>
+          </div>
+        </section>
+        <section>
+          <h3>{t('fieldsTitle')}</h3>
+          <ul className="fx-fd-list">{fields.map(row)}</ul>
+          <p className="fx-fd-hint">{t('dragHint')}</p>
+        </section>
+        <section>
+          <h3>{t('regularTitle')}</h3>
+          <ul className="fx-fd-list">{regular.map(row)}</ul>
+          <button type="button" className="fx-fd-add" data-add-regular="" onClick={e => onAddRegular(e.currentTarget)}>＋ {t('addRegular')}</button>
+        </section>
+      </div>
+    </aside>
   )
 }

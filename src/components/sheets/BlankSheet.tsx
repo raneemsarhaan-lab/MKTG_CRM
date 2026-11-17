@@ -555,7 +555,7 @@ export function BlankSheet(p: BlankSheetProps) {
     headerExtra: col => {
       if (!lk.map) return null
       // Spec 019: a small icon beside the letter; its name is in the tooltip and for screen readers.
-      if (col === lk.map.taskCol) return <span className="fx-lk-hic is-task" data-task-col-badge="" role="img" aria-label={tl('taskCol')} title={tl('taskCol')}><FieldIcon field="task" /></span>
+      if (col === lk.map.taskCol) return <span className="fx-lk-hic is-task" data-task-col-badge="" role="img" aria-label={tl('taskCol')} title={tl('taskCol')}><FieldIcon field="taskcol" /></span>
       const f = lk.map.fields[col]
       if (!f) return null
       const name = f.startsWith('col:') ? tl('teamCol', { name: lk.teamCols.find(c => c.id === f.slice(4))?.name ?? '' }) : tl(`fields.${f}`)
@@ -568,7 +568,7 @@ export function BlankSheet(p: BlankSheetProps) {
       const sh = lk.shown(row.id, col)
       return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : ' is-lk') : ''}`
     },
-    isText: (row, col) => col !== 'rowNo' && !ro && !lk.shown(row.id, col)?.na,
+    isText: (row, col) => { if (col === 'rowNo' || ro) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
     textValue: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     copyText: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     // Spec 019: a field cell on a linked row opens its control (typing still works, through the same rules).
@@ -588,16 +588,22 @@ export function BlankSheet(p: BlankSheetProps) {
       }
       if (lk.map && col === lk.map.taskCol) {
         const note = lk.noteOfRow(row.id), v = value(row.id, col), tk = lk.taskOfRow(row.id)
-        // As on the Content sheet: a linked row's Task cell opens its task. A pasted link shows the task's name instead of the URL.
-        const open = tk ? <a className="fx-lk-open" href={`/board?task=${tk.id}`} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task={tk.id}
-                             aria-label={tl('marker', { name: tk.name })} onPointerDown={ev => ev.stopPropagation()} onClick={ev => ev.stopPropagation()}>{tl('openTask')} ↗</a> : null
+        // A pasted link shows the task's name instead of the URL; the row's ↗ marker (and a Task link column) open the task.
+        // A row with no task offers Create task (spec 019): a task is either open or not created yet.
         return <>
           <span className={`fx-sheet-cell-text${tk ? ' fx-lk-link' : ''}`} dir="auto">{tk && taskIdFrom(v) ? tk.name : v}</span>
-          {open}
-          {note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
+          {note === 'notLinked' && lk.canCreate && !ro
+            ? <button type="button" className="fx-lk-create" data-create-task={row.id} tabIndex={-1}
+                      onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋ {tf('createTask')}</button>
+            : note && <button type="button" className={`fx-lk-note is-${note}`} data-link-note={note} tabIndex={-1}
                            onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); if (note !== 'dropped') void lk.openChoose(row.id) }}>
             {note === 'choose' ? tl('notes.choose', { n: 2 }) : tl(`notes.${note}`)}</button>}
         </>
+      }
+      // A Task link column on a row with no task yet: Create task (the same preview as Board › Create tasks).
+      if (lk.map?.fields[col] === 'task' && lk.noteOfRow(row.id) === 'notLinked' && lk.canCreate && !ro) {
+        return <button type="button" className="fx-lk-create" data-create-task={row.id} tabIndex={-1}
+                       onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋ {tf('createTask')}</button>
       }
       const v = value(row.id, col)
       // Stage 3: the filter buttons sit in the filter's header row.
@@ -643,6 +649,7 @@ export function BlankSheet(p: BlankSheetProps) {
       if (ro) return ro
       const sh = lk.shown(row.id, col)
       if (sh?.na) return tl('naWhy', { field: tl(`fields.${sh.field.startsWith('col:') ? 'none' : sh.field}`) })
+      if (sh?.field === 'task') return tf('taskLinkWhy')
       if (sh && !sh.editable) return lk.taskOfRow(row.id)?.dropped ? tl('why.dropped') : tl('why.not_authorized')
       return null
     },
@@ -1209,7 +1216,7 @@ export function BlankSheet(p: BlankSheetProps) {
       })()}
       {addMenu && (
         <AddFieldMenu anchor={addMenu} shown={new Set(Object.values(lk.map?.fields ?? {}))} teamCols={lk.teamCols} linked={!!lk.map}
-                      onField={f => addFieldAtEnd(f)} onRegular={() => insertCols(vCols.length, 1)}
+                      onField={f => { setAddMenu(null); addFieldAtEnd(f) }} onRegular={() => { setAddMenu(null); insertCols(vCols.length, 1) }}
                       onClose={() => { setAddMenu(null); focusActive() }} />
       )}
       {drawer && (
@@ -1260,7 +1267,7 @@ const STAGE_ORDER = Object.keys(STAGE_META) as StageId[]
 export function groupRows<R extends { id: string }>(doc: SheetDoc, rows: R[], g: GroupBy | null, locale: string,
   w: { none: string; blank: string; noTheme: string; unassigned: string; noType: string; noPillar: string }): { rows: R[]; bands: Map<string, Band> } {
   const bands = new Map<string, Band>()
-  if (!g || !rows.length) return { rows, bands }
+  if (!g || g.by === 'none' || !rows.length) return { rows, bands }
   const ex = doc.extras, map = ex?.taskMap ?? null
   if (g.by !== 'col' && !map) return { rows, bands }
   if (g.by === 'col' && !doc.cols.some(c => c.id === g.col)) return { rows, bands }

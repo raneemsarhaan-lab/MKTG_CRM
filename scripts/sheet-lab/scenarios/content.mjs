@@ -51,7 +51,7 @@ export const content = [
   {
     id: 'cus1-2', hash: C,
     async run(t) {
-      const heads = await t.page.$$eval('[role="columnheader"]', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
+      const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
       t.eq(heads, ['Title', 'Type', 'Status', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Date', 'Archive or restore'], 'piece columns')
       t.eq(await t.page.getAttribute('[data-cell="t:th-strategy|title"]', 'class').then(c => c.includes('is-span')), true, 'the theme row spans the columns')
     },

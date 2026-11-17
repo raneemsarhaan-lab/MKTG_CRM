@@ -1789,7 +1789,8 @@
         "link:design": "Design link",
         "link:post": "Post link",
         "link:published": "Published link",
-        "none": "Not linked (sheet only)"
+        "none": "Not linked (sheet only)",
+        "task": "Task link"
       },
       "teamCol": "Team column: {name}",
       "badgeTip": "Linked to the board: {field}",
@@ -2022,7 +2023,8 @@
         "link:design": "Design link",
         "link:post": "Post link",
         "link:published": "Published link",
-        "title": "Title"
+        "title": "Title",
+        "task": "Task link"
       },
       "linkedTitle": "Linked to the board",
       "taskColIs": "Task column: {col}",
@@ -2090,7 +2092,15 @@
       "bandNoTheme": "No theme",
       "bandUnassigned": "Unassigned",
       "bandNoType": "No type",
-      "moveMerged": "A merged area spans this column. Unmerge it before moving the column."
+      "moveMerged": "A merged area spans this column. Unmerge it before moving the column.",
+      "rowsTitle": "Rows",
+      "rowsContent": "Content tasks from the board",
+      "rowsContentHelp": "Every content task is a row. Archived ones show with “Show archived”.",
+      "notAStage": "“{text}” isn’t a stage on this sheet. Add it in ⚙ Fields → Stage → Values.",
+      "notAType": "“{text}” isn’t a content type. Pick one from the list, or add it in ⚙ Fields → Content type → Values.",
+      "createTask": "Create task",
+      "openTask": "Open task",
+      "taskLinkWhy": "The task link comes from the board. Use the row’s ↗ to open the task."
     }
   },
   "hours": {

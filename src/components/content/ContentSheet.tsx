@@ -25,6 +25,7 @@ import { PlanPreview } from './PlanPreview'
 import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
+import { openFields } from '@/components/sheets/links/FieldsPanel'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -73,6 +74,9 @@ export function ContentSheet(p: ContentSheetProps) {
     })
   }
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  /** Spec 019 stage 2: grouped another way, every theme shows all its pieces. */
+  const [groupMode, setGroupMode] = useState('theme')
+  const noneCollapsed = useMemo(() => new Set<string>(), [])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [drafts, setDrafts] = useState<{ key: string; themeId: string; pillarId: string | null }[]>([])
   const [editDraft, setEditDraft] = useState<string | null>(null)
@@ -82,8 +86,8 @@ export function ContentSheet(p: ContentSheetProps) {
     set(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
-    mine, showArchived, me: me.id, collapsed, expanded, drafts, query: p.query,
-  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, expanded, drafts, p.query])
+    mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query,
+  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query])
   const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesOf(p.tasks, th.id))), [p.tasks, p.themes])
 
   // ── permissions ─────────────────────────────────────────────────────────
@@ -285,6 +289,17 @@ export function ContentSheet(p: ContentSheetProps) {
       const r = await p.api.update(task.id, { name: value.trim() })
       return r.success ? null : why(r.error)
     }
+    // Spec 019 stage 2: a typed or pasted stage or type (ContentGrid has read the sheet's words into a stage id or a type label).
+    if (col === 'status') {
+      const res = await p.api.move(task.id, value as StageId)
+      if (!res.success) return why(res.error)
+      say(t('moved', { name: task.name, stage: names.video(value as StageId) }))
+      return null
+    }
+    if (col === 'type') {
+      const r = await p.api.update(task.id, { content_type_label: value })
+      return r.success ? null : why(r.error)
+    }
     if (col === 'date') {
       const d = readDate(value)
       if (d === null) return t('date.badDate')
@@ -334,7 +349,9 @@ export function ContentSheet(p: ContentSheetProps) {
           own controls. Pipeline | Content are the header's tabs now. */}
       <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
         <span className="fx-sheet-bar-gap" />
-        {cl.toolbar}
+        {/* Spec 019 stage 2: Columns opens the Fields drawer (the same as ⚙ Fields). */}
+        <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{ts('columns.button')}</button>
+        <button type="button" className="fx-sheet-btn" data-add-column="" onClick={e => cl.openAdd(e.currentTarget)}>{ts('columns.add')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showArchived} data-show-archived="" onClick={toggleArchived}>{t('showArchived')}</button>
         {admin && (
@@ -389,6 +406,7 @@ export function ContentSheet(p: ContentSheetProps) {
                   if (row.kind === 'pillar') addPiece(row.theme, row.pillar.id)
                   else if (row.kind === 'piece') addPiece(row.theme, row.task.pillar_id ?? null)
                   else if (row.kind === 'draft') addPiece(row.theme, row.pillarId)
+                  else if (row.kind === 'group') return false
                   else addPiece(row.theme, null)
                   return true
                 },
@@ -397,6 +415,8 @@ export function ContentSheet(p: ContentSheetProps) {
                 say: text => say(text),
               }}
               columns={cl}
+              contentTypes={p.contentTypes}
+              onGroupMode={setGroupMode}
               onTypeAhead={(row, ch, anchor) => {
                 if (row.kind !== 'piece' && row.kind !== 'clip') return false
                 if (!canEdit(row.task) || row.task.dropped_at) { onNote(`${row.key}|type`, t('readOnly')); return true }

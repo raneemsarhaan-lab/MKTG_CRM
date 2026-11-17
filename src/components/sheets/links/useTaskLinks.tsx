@@ -103,7 +103,7 @@ export function useTaskLinks(p: {
     // Spec 019: this sheet's words for a stage, type or priority, when it shows them.
     const board = f === 'stage' ? stageLabel(raw, locale) : raw
     const text = (WORD_FIELDS as readonly string[]).includes(f) ? shownWord(raw, map?.words?.[f as WordField], map?.show, board) : board
-    return { field: f, raw, text: na ? t('na') : text, na, editable: f === 'stage' ? !tk.dropped : tk.editable && !tk.dropped }
+    return { field: f, raw, text: na ? t('na') : text, na, editable: f === 'task' ? false : f === 'stage' ? !tk.dropped : tk.editable && !tk.dropped }
   }
   /** The first row is the sheet's headings unless it names a task by link. */
   const isHeading = (rowId: string, m = map) => !!m && p.doc.rows[0]?.id === rowId && !taskIdFrom(p.value(rowId, m.taskCol))
@@ -127,6 +127,9 @@ export function useTaskLinks(p: {
       for (const x of pairs) {
         const tk = x.taskId ? vals[x.taskId] : null
         if (!tk) continue
+        // Spec 019: the Task cell holds the task's title only (a pasted link becomes the title).
+        const tc = ref.current.value(x.rowId, m.taskCol)
+        if (tk.name && tc !== tk.name && taskIdFrom(tc)) cells.push({ rowId: x.rowId, colId: m.taskCol, before: tc, after: tk.name })
         for (const [colId, f] of Object.entries(m.fields)) {
           if (!tk.applies.includes(f)) continue
           const after = snap(f, tk.values[f] ?? ''), before = ref.current.value(x.rowId, colId)
@@ -219,6 +222,12 @@ export function useTaskLinks(p: {
     const cells = cur.doc.rows.map(r => ({ rowId: r.id, text: cur.value(r.id, next.taskCol) })).filter(c => (c.text.trim() || rowTasks[c.rowId]) && !isHeading(c.rowId, next))
     const res = cells.length ? await cur.api.resolveTaskCells(sheetId, cells) : { success: true as const, linked: [], ambiguous: [], unmatched: [], cleared: [], tasks: {} }
     if (!res.success) { cur.say(t(`why.${res.error === 'protected' ? 'protected' : 'generic'}`)); return null }
+    // A row already linked to one of several same-named tasks keeps it (it was chosen; its cell holds only the title).
+    const kept = res.ambiguous.filter(a => rowTasks[a.rowId] && a.choices.some(c => c.id === rowTasks[a.rowId]))
+    if (kept.length) {
+      res.linked.push(...kept.map(a => ({ rowId: a.rowId, taskId: rowTasks[a.rowId] })) as typeof res.linked)
+      res.ambiguous = res.ambiguous.filter(a => !kept.includes(a))
+    }
     const ids = res.linked.map(x => x.taskId)
     const tv = ids.length ? await cur.api.taskValues(sheetId, ids, next) : { success: true as const, tasks: {} }
     const vals = tv.success ? tv.tasks : {}
@@ -246,9 +255,11 @@ export function useTaskLinks(p: {
     const tv = await cur.api.taskValues(cur.doc.id, [taskId], map)
     const vals = tv.success ? tv.tasks : {}
     mergeTasks(vals)
-    const link = taskLink(taskId, window.location.origin)
+    // The cell keeps the title; the row's link to this one task is what decides between same-named tasks.
+    const title = vals[taskId]?.name ?? cur.value(rowId, map.taskCol)
     const parts = linkParts([{ rowId, taskId }], map, vals)
-    cur.apply('chooseTask', [{ kind: 'cells', cells: [{ rowId, colId: map.taskCol, before: cur.value(rowId, map.taskCol), after: link }] }, ...parts])
+    const before = cur.value(rowId, map.taskCol)
+    cur.apply('chooseTask', [...(before !== title ? [{ kind: 'cells' as const, cells: [{ rowId, colId: map.taskCol, before, after: title }] }] : []), ...parts])
     setAmbiguous(a => { const n = { ...a }; delete n[rowId]; return n })
   }
   async function openChoose(rowId: string) {
@@ -335,7 +346,7 @@ export function useTaskLinks(p: {
     const origin = window.location.origin
     const cells: { rowId: string; colId: string; before: string; after: string }[] = []
     made.forEach((r, i) => {
-      cells.push({ rowId: r.id, colId: map.taskCol, before: '', after: taskLink(ids[i], origin) })
+      cells.push({ rowId: r.id, colId: map.taskCol, before: '', after: vals[ids[i]]?.name || taskLink(ids[i], origin) })
       const tk = vals[ids[i]]
       if (tk) for (const [colId, f] of Object.entries(map.fields)) if (tk.applies.includes(f) && tk.values[f]) cells.push({ rowId: r.id, colId, before: '', after: snap(f, tk.values[f] ?? '') })
     })
@@ -347,20 +358,28 @@ export function useTaskLinks(p: {
   }
 
   // ── Create tasks for rows… ──
-  function createRows(): CreateRow[] {
+  function createRows(only?: string[]): CreateRow[] {
     const cur = ref.current
     if (!map) return []
     const out: CreateRow[] = []
-    for (const r of selRows(cur)) {
-      const row = cur.vRows[r]
+    const list = only ? only.map(id => cur.vRows.find(r => r.id === id)).filter((r): r is Row => !!r) : selRows(cur).map(r => cur.vRows[r])
+    for (const row of list) {
       if (!row || rowTasks[row.id]) continue
       const values: TaskFieldValues = {}
-      for (const [colId, f] of Object.entries(map.fields)) { const v = cur.value(row.id, colId).trim(); if (v) values[f] = v }
+      for (const [colId, f] of Object.entries(map.fields)) { if (f === 'task') continue; const v = cur.value(row.id, colId).trim(); if (v) values[f] = v }
       if (!values.title) { const tc = cur.value(row.id, map.taskCol).trim(); if (tc) values.title = tc }
       if (!Object.keys(values).length) continue
       out.push({ rowId: row.id, n: (cur.rowIndex.get(row.id) ?? 0) + 1, values })
     }
     return out
+  }
+  /** "Create task" on an unlinked row (its Task cell or its Task link cell): the same preview, for this row. */
+  function createForRow(rowId: string) {
+    const cur = ref.current
+    if (cur.ro) { cur.say(cur.ro); return }
+    if (!choices?.canCreate) { cur.say(t('menu.cantCreate')); return }
+    const rows = createRows([rowId])
+    if (rows.length) setDlg({ k: 'create', rows })
   }
   async function createTasks(rows: { rowId: string; values: TaskFieldValues }[], due: string) {
     const cur = ref.current
@@ -369,9 +388,9 @@ export function useTaskLinks(p: {
     if (!r.success) { cur.say(t(`why.${r.error === 'protected' || r.error === 'not_authorized' ? r.error : 'generic'}`)); return }
     mergeTasks(r.tasks)
     const origin = window.location.origin
-    const cells = r.created.map(c => ({ rowId: c.rowId, colId: map.taskCol, before: cur.value(c.rowId, map.taskCol), after: taskLink(c.taskId, origin) }))
+    const cells = r.created.map(c => ({ rowId: c.rowId, colId: map.taskCol, before: cur.value(c.rowId, map.taskCol), after: r.tasks[c.taskId]?.name || taskLink(c.taskId, origin) })).filter(c => c.before !== c.after)
     const parts = linkParts(r.created.map(c => ({ rowId: c.rowId, taskId: c.taskId })), map, r.tasks)
-    if (r.created.length) cur.apply('createTasks', [{ kind: 'cells', cells }, ...parts])
+    if (r.created.length) cur.apply('createTasks', [...(cells.length ? [{ kind: 'cells' as const, cells }] : []), ...parts])
     cur.say(t('create.done', { n: r.created.length }) + (r.problems.length ? ` ${t('result.skippedMixed', { n: r.problems.length })}` : ''))
   }
 
@@ -428,7 +447,7 @@ export function useTaskLinks(p: {
     search={async (q, f) => { const r = await p.api.searchTasks(q, f); return r.success ? r.tasks : [] }} onAdd={ids => void addTasks(ids)} onClose={close} />
   if (dlg?.k === 'create') node = <CreateTasksPreview rows={dlg.rows} people={choices?.people ?? []} onCreate={createTasks} onClose={close} />
 
-  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [], choices, addField, removeField, setWords, askLink, isHeading }
+  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [], choices, addField, removeField, setWords, askLink, isHeading, createForRow, canCreate: !!choices?.canCreate }
 }
 
 /** Undo and redo of mapped cells: the earlier values go back through the board's rules (R5). */

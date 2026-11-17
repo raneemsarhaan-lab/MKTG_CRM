@@ -17,10 +17,10 @@ import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
 import { mergeStyle, validateStyle } from '@/lib/sheet-format'
-import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SortKey, TabColor, ViewWrite } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SortKey, TabColor, ViewWrite } from '@/types/index'
 import { RULE_KINDS, TAB_COLORS } from '@/types/index'
 import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
-import { cleanMap } from '@/lib/sheet-links'
+import { cleanMap, cleanWords } from '@/lib/sheet-links'
 import { linkedTasks, teamColumns } from '@/lib/sheet-links-server'
 import type { SheetTaskMap } from '@/types/index'
 
@@ -246,7 +246,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     prisma.sheetRule.findMany({ where: { sheet_id: sheetId }, orderBy: { priority: 'asc' } }),
     prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
   ])
-  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy }
+  const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show'] }
   return {
     formats: formats.map(f => ({ rowKey: f.row_key, colKey: f.col_key, style: (f.style ?? {}) as CellStyle })),
     merges: merges.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })),
@@ -257,6 +257,8 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
       ...(stored.filter ? { filter: stored.filter } : {}),
       ...(stored.sort ? { sort: stored.sort } : {}),
       ...(stored.groupBy ? { groupBy: stored.groupBy } : {}),
+      ...(stored.words ? { words: stored.words } : {}),
+      ...(stored.show ? { show: stored.show } : {}),
     },
     threads,
     rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
@@ -318,7 +320,7 @@ function cleanSort(x: unknown): SortKey[] {
 }
 /** The filter area, filter and sort kept in `sheets.view` (null clears one). */
 async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
-  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v)) return
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v)) return
   const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
   const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
   if ('filterArea' in v) {
@@ -331,9 +333,15 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
   // Spec 019: rows grouped by a task's theme, stage, assignee or type, or by a column.
   if ('groupBy' in v) {
     const g = v.groupBy as { by?: unknown; col?: unknown } | null | undefined
-    if (g && (g.by === 'theme' || g.by === 'stage' || g.by === 'assignee' || g.by === 'type')) next.groupBy = { by: g.by }
+    if (g && (g.by === 'theme' || g.by === 'stage' || g.by === 'assignee' || g.by === 'type' || g.by === 'none')) next.groupBy = { by: g.by }
     else if (g && g.by === 'col' && typeof g.col === 'string' && /^[0-9a-f-]{36}$/i.test(g.col)) next.groupBy = { by: 'col', col: g.col }
     else delete next.groupBy
+  }
+  // Spec 019 stage 2: a linked sheet's own words (the same limits as a team sheet's).
+  if ('words' in v || 'show' in v) {
+    const w = cleanWords({ words: 'words' in v ? v.words ?? undefined : next.words as SheetView['words'], show: 'show' in v ? v.show ?? undefined : next.show as SheetView['show'] })
+    if (w.words) next.words = w.words; else delete next.words
+    if (w.show) next.show = w.show; else delete next.show
   }
   await tx.sheet.update({ where: { id: sheetId }, data: { view: next as Prisma.InputJsonValue } })
 }
@@ -858,7 +866,7 @@ export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success:
  * team's own columns, and never a change to the tasks. Merges aren't offered
  * there (FR-074), so a call with merges is refused as `linked`.
  */
-export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
+export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea' | 'groupBy' | 'words' | 'show'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
   if (changes.merges || changes.tables) return fail('linked')
@@ -872,7 +880,7 @@ export async function applyLinkedFormats(sheetId: string, changes: { formats?: F
     if (formats.length) await writeFormats(tx, sheet.id, m.id, formats)
     // Stage 3 (FR-075): rules over whole columns, and a sort and filter that live in the sheet, never on the board.
     if (changes.rules) await writeRules(tx, sheet.id, { put: changes.rules.put?.map(r => ({ ...r, range: { rows: 'all', cols: r.range?.cols ?? [] } })), remove: changes.rules.remove })
-    if (changes.view) await writeViewJson(tx, sheet.id, { ...('filter' in changes.view ? { filter: changes.view.filter } : {}), ...('sort' in changes.view ? { sort: changes.view.sort } : {}), ...('filterArea' in changes.view ? { filterArea: changes.view.filterArea ? { header: null, cols: [] } : null } : {}) })
+    if (changes.view) await writeViewJson(tx, sheet.id, { ...('filter' in changes.view ? { filter: changes.view.filter } : {}), ...('sort' in changes.view ? { sort: changes.view.sort } : {}), ...('filterArea' in changes.view ? { filterArea: changes.view.filterArea ? { header: null, cols: [] } : null } : {}), ...('groupBy' in changes.view ? { groupBy: changes.view.groupBy } : {}), ...('words' in changes.view ? { words: changes.view.words } : {}), ...('show' in changes.view ? { show: changes.view.show } : {}) })
     await bumpFolder(tx, sheet.folder_id, m.id)
     return null
   }, { timeout: 30_000 }).catch(e => { if (e instanceof Refuse) return e; throw e })

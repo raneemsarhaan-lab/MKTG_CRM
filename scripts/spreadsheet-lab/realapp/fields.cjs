@@ -101,6 +101,10 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     await page.waitForFunction(() => document.querySelectorAll('[data-task-marker]').length === 3, null, { timeout: 15000 }).catch(() => {})
     ok(await page.locator('[data-task-marker]').count() === 3, 'three rows are linked to their tasks')
     ok(/Task column: A/.test(await page.locator('[data-fields-drawer]').innerText()), 'the drawer names the task column')
+    ok(await page.locator('[data-blank-sheet] [data-open-task]').count() === 0, 'no “Open task” inside the Task cells')
+    ok(await cellAt(page, rid[4], ids.cols[0]).locator('[data-create-task]').count() === 1, 'a row with no task offers Create task')
+    await saved(page)
+    ok(sql(`select count(*) from sheet_cells where sheet_id='${ids.sheet}' and value like '%board?task=%'`) === '0', 'linked Task cells hold the task’s title, not its link')
     await page.click('[data-fields-close]')
     await saved(page)
 
@@ -129,7 +133,7 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     ok(await page.locator(`[data-col-head="${ids.cols[1]}"].is-field`).count() === 1, 'the heading is a field heading')
 
     console.log('3. ＋ adds task fields (US1)')
-    for (const f of ['assignee', 'due', 'link:design']) {
+    for (const f of ['assignee', 'due', 'link:design', 'task']) {
       await page.click('[data-add-field]'); await page.waitForSelector('[data-sheet-menu]')
       await page.click(`[data-sheet-menu] [data-menu-item="${f}"]`)
       await page.waitForFunction(f => document.querySelectorAll(`[data-field-badge="${f}"]`).length === 1, f, { timeout: 15000 }).catch(() => {})
@@ -138,9 +142,15 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     ok(await headCount(page, 'assignee') === 1 && await headCount(page, 'due') === 1 && await headCount(page, 'link:design') === 1, 'Assignee, Due date and Design link are field columns')
     const dueCol = colOfField(ids.sheet, 'due'), asgCol = colOfField(ids.sheet, 'assignee'), dzCol = colOfField(ids.sheet, 'link:design')
     ok(!!dueCol && sql(`select value from sheet_cells where sheet_id='${ids.sheet}' and row_id='${rid[0]}' and col_id='${dueCol}'`) === 'Due date', 'the new column is named in the headings row')
-    ok(sql(`select count(*) from sheet_cols where sheet_id='${ids.sheet}'`) === '9', 'each is a new column at the end')
+    ok(sql(`select count(*) from sheet_cols where sheet_id='${ids.sheet}'`) === '10', 'each is a new column at the end')
     ok((await cellAt(page, rid[4], dzCol).innerText()).trim() === '', 'an unlinked row’s field cell is empty')
     ok(/\+ link/.test(await cellAt(page, rid[1], dzCol).innerText()), 'an empty link field offers “+ link”')
+    const tkCol = colOfField(ids.sheet, 'task')
+    ok(/Open task/.test(await cellAt(page, rid[1], tkCol).innerText()) && await cellAt(page, rid[4], tkCol).locator('[data-create-task]').count() === 1, 'Task link: Open task on linked rows, Create task on the others')
+    await cellAt(page, rid[4], tkCol).locator('[data-create-task]').click()
+    await page.waitForSelector('[data-create-tasks]')
+    ok(await page.locator('[data-create-tasks] [data-create-row]').count() === 1, 'Create task opens the preview for that row')
+    await page.keyboard.press('Escape'); await page.waitForSelector('[data-create-tasks]', { state: 'detached' }).catch(() => {})
 
     console.log('4. Controls save to the task, with undo (US2)')
     await cellAt(page, rid[1], ids.cols[1]).click()
@@ -226,10 +236,12 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     ok((await page.locator('[data-blank-sheet] .fx-sheet-th.is-letter').first().innerText()).trim().startsWith('A') && (await text(page, 0, 0)) === 'Notes', 'it is now column A')
     await undo(page); await saved(page)
     ok(sql(`select id from sheet_cols where sheet_id='${ids.sheet}' order by position`).split('\n')[2] === notes, 'undo moves it back')
+    await page.setViewportSize({ width: 2200, height: 860 })
     await page.locator(`[data-col-head="${notes}"]`).dragTo(page.locator('[data-tail-head]'))
     await page.waitForTimeout(800); await saved(page)
     ok(sql(`select id from sheet_cols where sheet_id='${ids.sheet}' order by position desc limit 1`) === notes, 'dropping on ＋ moves it to the end')
     await undo(page); await saved(page)
+    await page.setViewportSize({ width: 1360, height: 860 })
 
     console.log('9. Group rows by (theme, stage, a column)')
     await drawer(page)

@@ -73,6 +73,8 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
         case 'link:design': values['link:design'] = atts.find(a => a.link_role === 'design')?.url ?? ''; break
         case 'link:post': values['link:post'] = t.post_url ?? ''; break
         case 'link:published': values['link:published'] = t.published_url ?? ''; break
+        // The row's task on the board (the Content sheet's Task Link): shown as "Open task", never typed.
+        case 'task': values.task = `/board?task=${t.id}`; break
         default: values[f] = svals.find(v => v.column_id === f.slice(4))?.value ?? ''
       }
     }

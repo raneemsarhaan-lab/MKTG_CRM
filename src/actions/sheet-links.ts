@@ -140,6 +140,7 @@ async function writeOne(taskId: string, field: TaskField, raw: string, ctx: { me
     case 'link:doc': case 'link:design': return r(await setPieceLink(taskId, LINK_ROLE[field], v))
     case 'link:post': return r(await updatePiece(taskId, { post_url: v || null }))
     case 'link:published': return r(await updatePiece(taskId, { published_url: v || null }))
+    case 'task': return { error: 'bad_value' }
     default: {
       const res = await setValue(field.slice(4), taskId, v)
       return res.success ? {} : { error: res.error }
@@ -237,11 +238,13 @@ export async function refreshTaskFields(sheetId: string): Promise<{ success: tru
   const tasks = map ? await linkedTasks(rows.map(r => r.task_id!), map, m) : {}
   const cells: { rowId: string; colId: string; value: string }[] = []
   if (map) {
-    const have = await prisma.sheetCell.findMany({ where: { sheet_id: sheetId, row_id: { in: rows.map(r => r.id) }, col_id: { in: Object.keys(map.fields) } }, select: { row_id: true, col_id: true, value: true } })
+    const have = await prisma.sheetCell.findMany({ where: { sheet_id: sheetId, row_id: { in: rows.map(r => r.id) }, col_id: { in: [...Object.keys(map.fields), map.taskCol] } }, select: { row_id: true, col_id: true, value: true } })
     const cur = new Map(have.map(c => [`${c.row_id}|${c.col_id}`, c.value]))
     for (const r of rows) {
       const t = tasks[r.task_id!]
       if (!t) continue
+      // Spec 019: a linked row's Task cell is the task's title (a pasted link, or a rename on the board, becomes the current title).
+      if (t.name && (cur.get(`${r.id}|${map.taskCol}`) ?? '') !== t.name) cells.push({ rowId: r.id, colId: map.taskCol, value: t.name })
       for (const [colId, f] of Object.entries(map.fields)) {
         if (!t.applies.includes(f)) continue
         const v = snapshotOf(f, t.values[f] ?? '')

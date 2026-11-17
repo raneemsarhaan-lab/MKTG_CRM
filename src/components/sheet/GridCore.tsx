@@ -1180,7 +1180,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                 </div>
               )
             })}
-            {m.tailHeader && <div className="fx-sheet-td is-tail" aria-hidden="true" />}
+            {m.tailHeader && !spans && <div className="fx-sheet-td is-tail" aria-hidden="true" />}
           </div>
         )
       })}

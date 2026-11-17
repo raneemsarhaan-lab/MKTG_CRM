@@ -1,5 +1,5 @@
 // US6: each role opens on the columns it needs (FR-050–FR-054, SC-006).
-const heads = t => t.page.$$eval('[role="columnheader"]', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
+const heads = t => t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
 const pressed = t => t.page.$eval('[data-sets] [aria-pressed="true"]', b => b.dataset.set)
 
 export const us6 = [

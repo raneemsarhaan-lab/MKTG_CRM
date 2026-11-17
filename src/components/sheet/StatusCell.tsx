@@ -21,14 +21,14 @@ export function useStageNames(ns: 'sheet' | 'content' = 'sheet') {
   }
 }
 
-export function StatusContent({ task, me, tipId, ns = 'sheet' }: { task: Task; me: Member; tipId: string; ns?: 'sheet' | 'content' }) {
+export function StatusContent({ task, me, tipId, ns = 'sheet', name }: { task: Task; me: Member; tipId: string; ns?: 'sheet' | 'content'; /** Spec 019 stage 2: this sheet's word for the stage. */ name?: string }) {
   const t = useTranslations(ns)
   const names = useStageNames(ns)
   const status = task.status as StageId
   const moves = allowedStages(task, me)
   return (
     <>
-      <StagePill stage={status} name={names.video(status)} chevron={moves.length > 0} />
+      <StagePill stage={status} name={name ?? names.video(status)} chevron={moves.length > 0} />
       <span className="fx-sheet-tip" id={tipId} role="tooltip">
         {t('stageTitle', { video: names.video(status), real: names.real(status) })}
       </span>
