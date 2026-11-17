@@ -225,6 +225,8 @@ tr.band td:not(.no) { background: #DCE6F5; }
 [dir="rtl"] .bracket { transform: translateX(46px); }
 [dir="rtl"] .olbtn { translate: -16px 0; }
 /* stage C additions */
+u.ak { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1.5px; }
+.xlmenu .it small { font: 600 11px var(--f-body); color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; min-width: 16px; text-align: center; }
 .mv { position: absolute; z-index: 6; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: var(--shadow-sm); color: var(--ink); font: 700 14px/1 var(--f-body); }
 .mv.plus::after { content: "+"; position: absolute; top: -6px; inset-inline-end: -6px; width: 13px; height: 13px; border-radius: 50%; background: var(--sel); color: #fff; font: 800 10px/13px var(--f-body); text-align: center; }
 .insbar { position: absolute; z-index: 4; background: var(--sel); border-radius: 2px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sel) 25%, transparent); }
@@ -355,25 +357,28 @@ td.unl { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 35%, trans
         <div class="selbox" data-r="2,2,5,2"></div>
         <div class="ghost" data-r="2,4,5,4"></div>
         <div class="xlmenu" data-at="5,4,br" data-dx="4" data-dy="4" role="menu" aria-label="Right-drag">
-          <div class="it">Move Here</div>
-          <div class="it">Copy Here</div>
-          <div class="it hl">Copy Here as Values Only</div>
-          <div class="it">Copy Here as Formats Only</div>
-          <div class="it dis">Link Here</div>
-          <div class="it dis">Create Hyperlink Here</div>
+          <div class="it"><span><u class="ak">M</u>ove Here</span><small>M</small></div>
+          <div class="it"><span><u class="ak">C</u>opy Here</span><small>C</small></div>
+          <div class="it hl"><span>Copy Here as <u class="ak">V</u>alues Only</span><small>V</small></div>
+          <div class="it"><span>Copy Here as <u class="ak">F</u>ormats Only</span><small>F</small></div>
+          <div class="it dis"><span><u class="ak">L</u>ink Here</span><small>L</small></div>
+          <div class="it dis"><span>Create <u class="ak">H</u>yperlink Here</span><small>H</small></div>
           <hr>
-          <div class="it">Shift Down and Copy</div>
-          <div class="it">Shift Right and Copy</div>
-          <div class="it">Shift Down and Move</div>
-          <div class="it">Shift Right and Move</div>
+          <div class="it"><span><u class="ak">S</u>hift Down and Copy</span><small>S</small></div>
+          <div class="it"><span>Shift <u class="ak">R</u>ight and Copy</span><small>R</small></div>
+          <div class="it"><span>Shift <u class="ak">D</u>own and Move</span><small>D</small></div>
+          <div class="it"><span>Shift Righ<u class="ak">t</u> and Move</span><small>T</small></div>
           <hr>
-          <div class="it">Cancel</div>
+          <div class="it"><span>C<u class="ak">a</u>ncel</span><small>Esc</small></div>
         </div>
       </div>
     </div>
     <div class="side"><div class="card"><h3>Right-drag the border</h3><ul>
       <li>Drop with the right button and Excel's menu opens where you let go.</li>
+      <li>Excel's keys work in it, so there's no need to click: <kbd>V</kbd> copies as values only, <kbd>F</kbd> formats only, <kbd>M</kbd> moves, <kbd>C</kbd> copies, and <kbd>S</kbd> / <kbd>R</kbd> / <kbd>D</kbd> / <kbd>T</kbd> shift and copy or move. Each item's letter is underlined; <kbd>Esc</kbd> cancels.</li>
+      <li>The letters stay the English ones in Arabic too, as in Excel, and are shown in each row.</li>
       <li>Copy Here as Values Only leaves the look behind; Formats Only takes just the look.</li>
+      <li>The same from the keyboard, as in Excel: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>) opens Paste Special, then <kbd>V</kbd> values, <kbd>T</kbd> formats, <kbd>E</kbd> transpose, <kbd>M</kbd> multiply… and <kbd>Enter</kbd>. Its options get the same underlined letters.</li>
       <li>Link Here and Create Hyperlink Here need formulas, so they stay greyed.</li>
       <li>Every choice is one undo step.</li>
     </ul></div></div>
