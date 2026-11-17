@@ -10,9 +10,9 @@
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { CellStyle, ColFilter, ConditionalRule, FilterOp, RuleArgs, RuleKind, SortKey } from '@/types/index'
-import { RULE_KINDS } from '@/types/index'
+import { ICON_SETS, RULE_KINDS } from '@/types/index'
 import { toCss } from '@/lib/sheet-format'
-import { BAR_COLORS, CELL_STYLES, DEFAULT_BAR, FILTER_OPS, RULE_LOOKS, SCALES, SORT_COLOR, TABLE_LEVELS, TABLE_STYLES, barCss, tableLook } from '@/lib/sheet-rules'
+import { BAR_COLORS, CELL_STYLES, DEFAULT_BAR, DEFAULT_CUTS, FILTER_OPS, ICONS, RULE_LOOKS, SCALES, SORT_COLOR, TABLE_LEVELS, TABLE_STYLES, barCss, tableLook } from '@/lib/sheet-rules'
 import { Modal } from '../Dialogs'
 import { Pop, gridKeys } from './Pop'
 import { sendFormat, type FormatSource, type FormatState } from './bus'
@@ -205,6 +205,7 @@ export function useRuleName() {
       case 'date': return t('names.date', { when: t(`when.${a.when ?? 'past'}`) })
       case 'top': case 'bottom': return t(`names.${r.kind}`, { n: a.n ?? 10, pct: a.percent ? '%' : '' })
       case 'dup': case 'unique': case 'bar': case 'scale': return t(`names.${r.kind}`)
+      case 'icons': return t('names.icons', { set: ICONS[a.set ?? 'arrows3'].map(x => x.glyph).join(' ') })
       default: return t(`names.${r.kind}`, { a: a.a ?? '' })
     }
   }
@@ -214,6 +215,7 @@ export function useRuleName() {
 export function RuleSample({ rule }: { rule: Pick<ConditionalRule, 'kind' | 'args' | 'style'> }) {
   if (rule.kind === 'bar') return <span className="fx-rule-sample" style={barCss({ pct: 0.6, color: rule.args.colors?.[0] || DEFAULT_BAR }, false)}>AaBbCc</span>
   if (rule.kind === 'scale') { const [x, y, z] = rule.args.colors ?? SCALES[0].colors; return <span className="fx-rule-sample" style={{ background: `linear-gradient(90deg, ${x}, ${y || x}, ${z})` }}>AaBbCc</span> }
+  if (rule.kind === 'icons') { const set = ICONS[rule.args.set ?? 'arrows3'], order = rule.args.reverse ? [...set].reverse() : set; return <span className="fx-rule-sample">{order.map((x, i) => <b key={i} style={{ color: x.color }}>{x.glyph} </b>)}</span> }
   return <span className="fx-rule-sample" style={cssOf(rule.style)}>AaBbCc</span>
 }
 
@@ -235,12 +237,21 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
   const [scale, setScale] = useState(SCALES.find(s => JSON.stringify(s.colors) === JSON.stringify(edit?.args.colors))?.key ?? 'gyr')
   const [bar, setBar] = useState(edit?.kind === 'bar' ? edit.args.colors?.[0] ?? DEFAULT_BAR : DEFAULT_BAR)
   const set = (patch: Partial<RuleArgs>) => setArgs(a => ({ ...a, ...patch }))
-  const style = kind === 'bar' || kind === 'scale' ? null : RULE_LOOKS.find(l => l.key === look)!.style
-  const final: RuleArgs = kind === 'bar' ? { colors: [bar] } : kind === 'scale' ? { colors: SCALES.find(s => s.key === scale)!.colors }
+  const set_ = set
+  const tt = useTranslations('sheets.tips')
+  const style = kind === 'bar' || kind === 'scale' || kind === 'icons' ? null : RULE_LOOKS.find(l => l.key === look)!.style
+  // Spec 020 tip 27 (team sheets): Format the entire row, testing one column of the range.
+  const rowCols = target === 'blank' ? state.sortCols ?? [] : []
+  const [whole, setWhole] = useState(!!edit?.args.row)
+  const [testCol, setTestCol] = useState(edit?.args.col ?? (rowCols.some(c => c.key === state.colKey) ? state.colKey : rowCols[0]?.key ?? ''))
+  const cuts = args.cuts ?? DEFAULT_CUTS
+  const base: RuleArgs = kind === 'bar' ? { colors: [bar] } : kind === 'scale' ? { colors: SCALES.find(s => s.key === scale)!.colors }
+    : kind === 'icons' ? { set: args.set ?? 'arrows3', cuts, by: args.by ?? 'percent', ...(args.reverse ? { reverse: true } : {}), ...(args.iconOnly ? { iconOnly: true } : {}) }
     : kind === 'between' ? { a: args.a ?? '', b: args.b ?? '' } : kind === 'date' ? { when: args.when ?? 'past' }
     : kind === 'top' || kind === 'bottom' ? { n: args.n ?? 10, ...(args.percent ? { percent: true } : {}) }
     : kind === 'dup' || kind === 'unique' ? {} : { a: args.a ?? '' }
-  const ready = !['gt', 'lt', 'eq', 'contains'].includes(kind) || !!final.a?.trim()
+  const final: RuleArgs = style !== null && whole && testCol ? { ...base, row: true, col: testCol } : base
+  const ready = (!['gt', 'lt', 'eq', 'contains'].includes(kind) || !!final.a?.trim()) && (kind !== 'icons' || cuts[0] >= cuts[1])
   function save() {
     if (!ready) return
     if (edit && onSave) onSave({ ...edit, kind, args: final, style })
@@ -284,6 +295,50 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
               <select value={scale} data-rule-scale="" onChange={e => setScale(e.target.value)}>
                 {SCALES.map(s => <option key={s.key} value={s.key}>{t(`scales.${s.key}`)}</option>)}
               </select></label>
+          )}
+          {kind === 'icons' && (
+            <div className="fx-fc-fld">
+              <span>{tt('icons.style')}</span>
+              <div className="fx-rule-sets" role="radiogroup" aria-label={tt('icons.style')}>
+                {ICON_SETS.map(set => (
+                  <label key={set} className="fx-sh-check"><input type="radio" name="iset" checked={(args.set ?? 'arrows3') === set} data-icon-set={set} onChange={() => set_({ set })} />
+                    <span aria-hidden="true">{ICONS[set].map((x, i) => <b key={i} style={{ color: x.color }}>{x.glyph}</b>)}</span>{tt(`icons.${set}.name`)}</label>
+                ))}
+              </div>
+              <div className="fx-fc-two">
+                <label className="fx-sh-check"><input type="checkbox" checked={!!args.reverse} data-icon-reverse="" onChange={e => set({ reverse: e.target.checked })} />{tt('icons.reverse')}</label>
+                <label className="fx-sh-check"><input type="checkbox" checked={!!args.iconOnly} data-icon-only="" onChange={e => set({ iconOnly: e.target.checked })} />{tt('icons.only')}</label>
+              </div>
+              <span>{tt('icons.rules')}</span>
+              {[0, 1].map(i => {
+                const glyph = ICONS[args.set ?? 'arrows3'][args.reverse ? 2 - i : i]
+                return (
+                  <div key={i} className="fx-rule-cut">
+                    <b style={{ color: glyph.color }} aria-hidden="true">{glyph.glyph}</b>
+                    <span>{i === 0 ? tt('icons.when') : tt('icons.whenBelow', { n: cuts[0] })}</span>
+                    <input type="number" value={cuts[i]} data-icon-cut={i} aria-label={tt('icons.cut', { n: i + 1 })}
+                           onChange={e => { const v = Number(e.target.value); const nc: [number, number] = [...cuts] as [number, number]; nc[i] = Number.isFinite(v) ? v : 0; set({ cuts: nc }) }} />
+                    {i === 0 && (
+                      <select value={args.by ?? 'percent'} data-icon-by="" aria-label={tt('icons.type')} onChange={e => set({ by: e.target.value as 'percent' | 'number' })}>
+                        <option value="percent">{tt('icons.percent')}</option><option value="number">{tt('icons.number')}</option>
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+              {(() => { const g = ICONS[args.set ?? 'arrows3'][args.reverse ? 0 : 2]; return <div className="fx-rule-cut"><b style={{ color: g.color }} aria-hidden="true">{g.glyph}</b><span>{tt('icons.whenBelow', { n: cuts[1] })}</span></div> })()}
+            </div>
+          )}
+          {style !== null && rowCols.length > 0 && (
+            <div className="fx-fc-fld">
+              <label className="fx-sh-check"><input type="checkbox" checked={whole} data-rule-row="" onChange={e => setWhole(e.target.checked)} />{tt('rowRule.label')}</label>
+              {whole && (
+                <label className="fx-fc-fld"><span>{tt('rowRule.test')}</span>
+                  <select value={testCol} data-rule-col="" onChange={e => setTestCol(e.target.value)}>
+                    {rowCols.map(c => <option key={c.key} value={c.key}>{c.name}</option>)}
+                  </select></label>
+              )}
+            </div>
           )}
           {style !== null && (
             <label className="fx-fc-fld"><span>{t('look')}</span>

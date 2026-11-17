@@ -77,10 +77,13 @@ export interface FormatState {
   region?: string
   splitValues?: string[]
   tableInfo?: { totals: boolean; cols: { key: string; name: string }[] } | null
+  /** Remove Duplicates' columns (named by the headings when there are some) and whether the first row reads as headings. */
+  dedupe?: { header: boolean; cols: { key: string; name: string }[] }
   /** Why Clean up and the other team-sheet tools are off here (linked sheets), or null. */
   cleanOff?: string | null
-  /** Rows or columns in an outline group. */
+  /** Rows or columns in an outline group; the Advanced Filter is on in place. */
   outline?: boolean
+  advancedOn?: boolean
 }
 
 export type PasteMode = 'all' | 'values' | 'formats' | 'noBorders' | 'validation' | 'widths'

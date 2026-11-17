@@ -17,7 +17,7 @@ import type { FolderSummary, SheetChanges, SheetDoc, SheetSummary, TabColor } fr
 import { TAB_COLORS } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { canRedo, canUndo, emptyStack, makeStep, push, redo, undo, type Stack } from '@/lib/sheet-undo'
-import { applyAll, toServer } from '@/lib/sheet-doc'
+import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, applyAll, growTo, toServer } from '@/lib/sheet-doc'
 import { validateSheetName, SHEET_NAME_MAX } from '@/lib/sheet-names'
 import type { SheetsApi } from './types'
 import { useOutbox } from './useOutbox'
@@ -26,7 +26,8 @@ import { TabBar } from './TabBar'
 import { PopMenu, type PopItem } from './PopMenu'
 import { ConfirmDialog, Modal, MoveCopyDialog, UnhideDialog } from './Dialogs'
 import { HISTORY_EVENT, UNDO_EVENT } from '@/components/sheet/useLinkedEditing'
-import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatState } from './format/bus'
+import { FORMAT_ASK, FORMAT_STATE, sendFormat, type FormatSource, type FormatState, type TipKey } from './format/bus'
+import { AdvancedFilterDialog, CreateTableDialog, InsertSlicersDialog, RemoveDuplicatesDialog, TextToColumnsDialog } from './format/CleanupDialogs'
 import { FindPanel, PasteSpecialDialog, readClipboard } from './format/EditTools'
 import { ManageRulesDialog, RuleDialog, SortDialog } from './format/StyleTools'
 import { LINKS_STATE, openLinks, replayTaskFields, type LinksState } from './links/useTaskLinks'
@@ -338,7 +339,7 @@ export function Workbook(p: WorkbookProps) {
     document.addEventListener(STATUS_EVENT, on)
     return () => document.removeEventListener(STATUS_EVENT, on)
   }, [])
-  const [tip, setTip] = useState<'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists' | null>(null)
+  const [tip, setTip] = useState<TipKey | null>(null)
   const [recentRefs, setRecentRefs] = useState<string[]>([])
   useEffect(() => {
     const on = () => setTip('series')
@@ -416,6 +417,33 @@ export function Workbook(p: WorkbookProps) {
       else if (where.after) { const i = vis.findIndex(s => s.id === where.after); if (i >= 0) at = i + 1 }
       return renumber([...vis.slice(0, at), made, ...vis.slice(at)])
     })
+    setGrouped(new Set([made.id]))
+    openSheet(made.id)
+  }
+
+  /** Spec 020 tip 78: Advanced Filter › Copy to a new sheet: a sheet after this one, holding the rows. */
+  async function newSheetWith(grid: string[][]) {
+    const res = await outbox.track(api.createSheet(folder.id, { after: openRef.current, pattern }))
+    if (!res.success) { say(errText(res.error)); return }
+    const made = res.sheet
+    const fresh = await api.loadSheet(made.id)
+    if (!fresh.success) return
+    const doc0 = fresh.doc
+    const width = Math.max(1, ...grid.map(r => r.length))
+    const rows = growTo(doc0.rows, grid.length - 1, BLANK_ROW_LIMIT, newId), cols = growTo(doc0.cols, width - 1, BLANK_COL_LIMIT, newId)
+    const allRows = [...doc0.rows, ...rows], allCols = [...doc0.cols, ...cols]
+    const forward: BlankChange[] = []
+    if (rows.length) forward.push({ kind: 'insertRows', rows: rows.map(r => ({ ...r, height: null })) })
+    if (cols.length) forward.push({ kind: 'insertCols', cols: cols.map(c => ({ ...c, width: null })) })
+    const cells = grid.flatMap((line, i) => line.map((v, j) => ({ rowId: allRows[i]?.id ?? '', colId: allCols[j]?.id ?? '', before: '', after: v }))).filter(x => x.after && x.rowId && x.colId)
+    if (cells.length) forward.push({ kind: 'cells', cells })
+    setDocs(d => ({ ...d, [made.id]: doc0 }))
+    setSheets(list => {
+      const vis = [...list].sort(byPos)
+      const i = vis.findIndex(x => x.id === openRef.current)
+      return renumber([...vis.slice(0, i + 1), made, ...vis.slice(i + 1)])
+    })
+    if (forward.length) apply(made.id, 'advancedCopy', forward)
     setGrouped(new Set([made.id]))
     openSheet(made.id)
   }
@@ -593,6 +621,16 @@ export function Workbook(p: WorkbookProps) {
       if (e.shiftKey && !e.altKey && k === 'l') { stop(); sendFormat(target, { kind: 'filter', op: 'toggle' }); return }
       // Spec 020: Ctrl+G, Go To.
       if (!e.shiftKey && !e.altKey && k === 'g') { stop(); setTip('goto'); return }
+      // Spec 020 tip 71: Ctrl+T (and Ctrl+L, which browsers leave to the page) creates a table (team sheets).
+      if (!e.shiftKey && !e.altKey && (k === 't' || k === 'l') && open?.kind === 'blank') { stop(); if (fmt.blank?.tableInfo) say(tt('table.already')); else setTip('createTable'); return }
+    }
+    // Spec 020 tip 80: Shift+Alt+→ groups, Shift+Alt+← ungroups (team sheets).
+    if (e.shiftKey && e.altKey && !ctrl && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && open?.kind === 'blank' && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select')) {
+      e.preventDefault(); e.stopPropagation()
+      const rtl = getComputedStyle(el).direction === 'rtl'
+      const right = e.key === 'ArrowRight' ? !rtl : rtl
+      sendFormat('blank', { kind: 'outline', op: right ? 'group' : 'ungroup' })
+      return
     }
     // Spec 020: F5, Go To (instead of the browser's reload while the grid has focus).
     if (e.key === 'F5' && !ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select')) {
@@ -749,7 +787,7 @@ export function Workbook(p: WorkbookProps) {
         {openBlank && (doc
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
-                        onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId}
+                        onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId} onNewSheet={grid => void newSheetWith(grid)}
                         links={api} patch={fn => patchDoc(doc.id, fn)}
                         fillLists={fillItems} zoom={zoom} onZoom={setZoom} canRedo={!!stack && canRedo(stack)} onStatus={setStatusMode} />
           : loadError[openId]
@@ -928,6 +966,27 @@ export function Workbook(p: WorkbookProps) {
       {tip === 'validation' && fmtState && openBlank && (
         <DataValidationDialog range={fmtState.range ?? fmtState.cell} rule={fmtState.validation ?? null} mixed={!!fmtState.validationMixed} inRule={!!fmtState.validation}
                               onCancel={() => setTip(null)} onOk={(rule, all) => { setTip(null); sendFormat('blank', { kind: 'validation', rule, all }) }} />
+      )}
+      {tip === 'dedupe' && fmtState && openBlank && (
+        <RemoveDuplicatesDialog cols={fmtState.dedupe?.cols ?? []} header={fmtState.dedupe?.header ?? true} range={fmtState.region ?? fmtState.range ?? ''}
+                                onCancel={() => setTip(null)} onOk={(cols, header) => { setTip(null); sendFormat('blank', { kind: 'dedupe', cols, header }) }} />
+      )}
+      {tip === 'split' && fmtState && openBlank && (
+        <TextToColumnsDialog values={fmtState.splitValues ?? []} range={fmtState.range ?? ''}
+                             onCancel={() => setTip(null)} onOk={(opts, formats) => { setTip(null); sendFormat('blank', { kind: 'split', opts, formats }) }} />
+      )}
+      {tip === 'createTable' && fmtState && openBlank && (
+        <CreateTableDialog range={fmtState.region ?? fmtState.range ?? 'A1'}
+                           onCancel={() => setTip(null)} onOk={(ref, header) => { setTip(null); sendFormat('blank', { kind: 'createTable', ref, header }) }} />
+      )}
+      {tip === 'slicers' && fmtState?.tableInfo && openBlank && (
+        <InsertSlicersDialog cols={fmtState.tableInfo.cols}
+                             onCancel={() => setTip(null)} onOk={cols => { setTip(null); sendFormat('blank', { kind: 'slicers', cols }) }} />
+      )}
+      {tip === 'advanced' && fmtState && openBlank && (
+        <AdvancedFilterDialog range={fmtState.region ?? ''} active={!!fmtState.advancedOn}
+                              onCancel={() => setTip(null)} onClear={() => { setTip(null); sendFormat('blank', { kind: 'advancedClear' }) }}
+                              onOk={v => { setTip(null); sendFormat('blank', { kind: 'advanced', ...v }) }} />
       )}
       {tip === 'lists' && (
         <CustomListsDialog lists={fillLists.lists} canEdit={fillLists.canEdit}

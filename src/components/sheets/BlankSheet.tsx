@@ -832,6 +832,7 @@ export function BlankSheet(p: BlankSheetProps) {
     readOnlyNote: (row, col) => {
       if (col === 'rowNo') return null
       if (ro) return ro
+      if (totalCell(row.id, col)?.fn) return tt('total.readOnly')
       const sh = lk.shown(row.id, col)
       if (sh?.na) return tl('naWhy', { field: tl(`fields.${sh.field.startsWith('col:') ? 'none' : sh.field}`) })
       if (sh?.field === 'task') return tf('taskLinkWhy')
@@ -1403,6 +1404,8 @@ export function BlankSheet(p: BlankSheetProps) {
       rows: q.r0 === 0 && q.r1 === vRows.length - 1 && !Object.keys(filter).length ? 'all' : vRows.slice(q.r0, q.r1 + 1).map(r => r.id),
       cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id),
     }
+    // Spec 020 tip 27: a whole-row rule tests a column of its own range.
+    if (rule.args.row && rule.args.col && !range.cols.includes(rule.args.col)) range.cols = [...range.cols, rule.args.col]
     setRules('rule', [{ id: p.newId(), range, ...rule, priority: 0 }, ...[...rules].sort((x, y) => x.priority - y.priority).map((r, i) => ({ ...r, priority: i + 1 }))])
   }
   function rulesClear(where: 'selection' | 'sheet') {
@@ -1516,19 +1519,44 @@ export function BlankSheet(p: BlankSheetProps) {
   function ignoreCell(k: string) {
     setIgnored(s => { const n = new Set(s); n.add(k); try { localStorage.setItem(`momentum.sheet.ignore.${p.doc.id}`, JSON.stringify([...n].slice(-500))) } catch { /* not kept */ } return n })
   }
-  /** Remove Duplicates (tip 52): the first of each kind stays; the range's rows close up, as Excel removes the cells. */
+  /**
+   * What Remove Duplicates works on (tip 52): the selection, the table, or
+   * the block around the active cell; with headings when the first row's
+   * labels don't repeat below (as Excel guesses).
+   */
+  function dataScope(): { rows: typeof vRows; cols: string[]; header: boolean } {
+    const tb = !multi() ? tableHere() : null
+    let rowsIn: typeof vRows, cols: string[], header: boolean | null = null
+    if (tb) {
+      const b = tableBoxes.find(x => x.tb.id === tb.id)!
+      rowsIn = vRows.filter(r => b.pos.has(r.id) && !(tb.totals && r.id === tb.bottom))
+      cols = vCols.filter(c => b.cols.has(c.id)).map(c => c.id)
+      header = tb.header
+    } else {
+      const a = activeAt(), g = multi() ? rectRef.current : region(a.r, a.c)
+      rowsIn = vRows.slice(g.r0, g.r1 + 1)
+      cols = vCols.slice(g.c0, g.c1 + 1).map(c => c.id)
+    }
+    if (header === null) {
+      const first = rowsIn[0], rest = rowsIn.slice(1)
+      header = !!first && rest.length > 0 && (
+        looksLikeHeader(cols.map(c => cellView(first.id, c)), cols.map(c => cellView(rest[0].id, c))) ||
+        cols.every(c => { const v = value(first.id, c).trim(); return !!v && parseNumber(v) === null && !rest.some(r => value(r.id, c).trim() === v) }))
+    }
+    return { rows: rowsIn, cols, header }
+  }
   function dedupe(cols: string[], header: boolean) {
     if (ro) { p.onNotice(ro); return }
     if (oneArea()) return
-    const sc = sortScope()
-    const scopeCols = sortInfo().cols.map(c => c.key)
+    const sc = dataScope()
     const body = header ? sc.rows.slice(1) : sc.rows
     if (!cols.length || body.length < 2) { p.onNotice(tt('clean.dupNone', { left: body.length })); return }
     const gone = new Set(dedupePlan(body.map(r => cols.map(c => value(r.id, c)))))
     if (!gone.size) { p.onNotice(tt('clean.dupNone', { left: body.length })); return }
     const kept = body.filter((_, i) => !gone.has(i))
+    // The unique rows close up inside the range; what's left at its foot is cleared (Excel removes the cells, not whole rows).
     const list: { rowId: string; colId: string; value: string }[] = []
-    body.forEach((r, i) => { const src = kept[i]; for (const c of scopeCols) list.push({ rowId: r.id, colId: c, value: src ? value(src.id, c) : '' }) })
+    body.forEach((r, i) => { const src = kept[i]; for (const c of sc.cols) list.push({ rowId: r.id, colId: c, value: src ? value(src.id, c) : '' }) })
     const ch = cellChange(list)
     if (ch) applyR('dedupe', [ch])
     p.onNotice(tt('clean.dupDone', { n: gone.size, left: kept.length }), true)
@@ -2252,7 +2280,9 @@ export function BlankSheet(p: BlankSheetProps) {
       const tableInfo = tb && box ? { totals: !!tb.totals, cols: vCols.filter(c => box.cols.has(c.id)).map(c => ({ key: c.id, name: (tb.header ? value(tb.top, c.id) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c.id) ?? 0)}` })) } : null
       const ai = rowIndex.get(active.key) ?? 0
       const outline = olSpans.rows.some(g => ai >= g.i0 && ai <= g.i1)
-      return { splitValues, tableInfo, region: regionRef(), cleanOff: null, outline, validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
+      const ds = dataScope()
+      const dedupeInfo = { header: ds.header, cols: ds.cols.map(c => ({ key: c, name: (ds.header && ds.rows[0] ? value(ds.rows[0].id, c) : '') || `${sheetT('column')} ${colLetters(colIndex.get(c) ?? 0)}` })) }
+      return { dedupe: dedupeInfo, splitValues, tableInfo, region: regionRef(), cleanOff: null, outline, advancedOn: !!view.advanced, validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
     })(),
   } : null
   useFormatBridge('blank', true, fmtState, runFormat)

@@ -2147,7 +2147,9 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
    spacers, and the row-number resize handle. On every sheet that opts in. */
 .fx-sheet-grid.is-selectable .fx-sheet-td { cursor: cell; user-select: none; }
 .fx-sheet-grid.is-selectable .fx-sheet-td.is-frozen-no { cursor: e-resize; }
-.fx-sheet-td.is-selected { background: var(--sh-sel) !important; }
+.fx-sheet-td.is-selected:not(.has-fill) { background: var(--sh-sel) !important; }
+/* A filled cell keeps its fill when selected (white header text stays readable): the tint goes over it. */
+.fx-sheet-td.is-selected.has-fill { box-shadow: inset 0 0 0 9999px var(--sh-sel); }
 .fx-sheet-td.is-anchor { box-shadow: inset 0 0 0 2px var(--sh-edge); }
 .fx-sheet-td.is-cut { outline: 1.5px dashed var(--sh-edge); outline-offset: -2px; }
 /* Spec 017: cells a Ctrl+drag is taking out of the selection. */
@@ -3000,3 +3002,88 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-cband-main b { font-weight: inherit; }
 .fx-cband-sub { background: var(--sheet-header-bg); font-weight: 600; font-size: 11.5px; }
 .fx-cband-sub .fx-cband-label { inset-inline-start: 28px; margin-inline-start: 16px; }
+
+/* Spec 020 stage B (approved design power-tips-b): Center Across, icon sets, the green corner, the Total row, slicers, groups */
+.fx-sheet-td:has(.fx-across) { justify-content: flex-start !important; z-index: 1; }
+.fx-across { flex: none; box-sizing: border-box; margin-inline-start: -6px; padding-inline: 6px; text-align: center; }
+.fx-cf-icon { flex: none; font-size: 11px; line-height: 1; }
+.fx-cf-icon.is-flags3 { font-size: 12px; }
+.fx-num-text {
+  position: absolute; top: 0; inset-inline-start: 0; width: 0; height: 0; pointer-events: none;
+  border-top: 7px solid #1E8E3E; border-inline-end: 7px solid transparent;
+}
+.fx-num-text-btn, .fx-total-drop {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 6; height: 19px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700;
+}
+.fx-num-text-btn { inset-inline-end: 3px; width: 19px; background: #FEF3C7; color: #92400E; box-shadow: inset 0 0 0 1px #F2C14E; }
+.fx-sheet-td:has(.fx-num-text-btn), .fx-sheet-td:has(.fx-total-drop) { padding-inline-end: 28px; }
+.fx-total-drop { inset-inline-end: 3px; width: 21px; background: var(--sheet-hover); color: var(--sheet-muted); box-shadow: inset 0 0 0 1px var(--sheet-grid); }
+.fx-num-text-btn:focus-visible, .fx-total-drop:hover, .fx-total-drop:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--sheet-focus); color: var(--sheet-ink); }
+.fx-sheet-td:has(.fx-num-text-btn), .fx-sheet-td:has(.fx-total-drop) { z-index: 5; }
+
+.fx-slicers { position: absolute; top: 34px; inset-inline-end: 18px; z-index: 8; display: grid; gap: 10px; max-height: calc(100% - 60px); overflow: auto; }
+.fx-slicer { width: 190px; background: var(--sheet-panel); border: 1px solid var(--sheet-grid); border-radius: 12px; box-shadow: var(--sheet-shadow); padding: 8px; display: grid; gap: 6px; }
+.fx-slicer header { display: flex; align-items: center; gap: 4px; }
+.fx-slicer header b { flex: 1; font-size: 12.5px; color: var(--sheet-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-slicer header button { width: 24px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--sheet-muted); cursor: pointer; font-size: 12px; }
+.fx-slicer header button[aria-pressed="true"] { background: color-mix(in srgb, var(--inbox-purple, #7C3AED) 14%, transparent); color: var(--inbox-purple, #7C3AED); }
+.fx-slicer header button:disabled { opacity: .45; cursor: default; }
+.fx-slicer header button:not(:disabled):hover, .fx-slicer header button:focus-visible { background: var(--sheet-hover); color: var(--sheet-ink); outline: none; }
+.fx-slicer-items { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
+.fx-slicer-items button {
+  text-align: start; border: 1px solid var(--sheet-grid); border-radius: 8px; padding: 4px 9px; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--sheet-panel); color: var(--sheet-muted);
+}
+.fx-slicer-items button[aria-pressed="true"] { background: color-mix(in srgb, var(--inbox-purple, #7C3AED) 12%, var(--sheet-panel)); border-color: color-mix(in srgb, var(--inbox-purple, #7C3AED) 45%, transparent); color: var(--sheet-ink); font-weight: 600; }
+.fx-slicer-items button:focus-visible { outline: 2px solid var(--sheet-focus); outline-offset: 1px; }
+
+.fx-ol-gut { position: absolute; inset-block: 0; inset-inline-start: 0; display: flex; }
+.fx-ol-lane { position: relative; width: 12px; }
+.fx-ol-lane.is-in::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: 5px; border-inline-start: 2px solid var(--sheet-muted); opacity: .7; }
+.fx-ol-lane.is-top::before { top: 4px; }
+.fx-ol-lane.is-end::before { bottom: 3px; }
+.fx-ol-lane.is-end::after { content: ""; position: absolute; bottom: 3px; inset-inline-start: 5px; width: 6px; border-bottom: 2px solid var(--sheet-muted); opacity: .7; }
+.fx-ol-btn, .fx-ol-levels button {
+  position: relative; z-index: 1; width: 13px; height: 13px; margin-top: 5px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  border: 1px solid var(--sheet-muted); border-radius: 3px; background: var(--sheet-panel); color: var(--sheet-ink); font-size: 11px; line-height: 1; font-weight: 700;
+}
+.fx-ol-btn:hover, .fx-ol-btn:focus-visible, .fx-ol-levels button:hover, .fx-ol-levels button:focus-visible { outline: none; border-color: var(--sheet-focus); color: var(--sheet-focus); }
+.fx-ol-levels { position: absolute; inset-block: 0; inset-inline-start: 0; display: flex; align-items: center; gap: 1px; padding-inline-start: 1px; }
+.fx-ol-levels button { margin: 0; width: 11px; font-size: 9.5px; }
+
+.fx-sb-more { border: 0; background: transparent; color: var(--inbox-muted); cursor: pointer; border-radius: 6px; padding: 0 6px; height: 22px; }
+.fx-sb-more:hover, .fx-sb-more:focus-visible { background: var(--inbox-panel); color: var(--inbox-ink, #14131A); outline: none; }
+.fx-sh-toast-undo { border: 0; background: transparent; color: #D7F75B; font: inherit; font-weight: 700; cursor: pointer; padding: 0 2px; }
+.fx-sh-toast-undo:focus-visible { outline: 2px solid #D7F75B; outline-offset: 2px; border-radius: 4px; }
+
+/* Stage B dialogs */
+.fx-sh-dialog-sp { flex: 1; }
+.fx-tip-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fx-tip-btns > button { border: 1px solid #E3E3EA; border-radius: 9px; background: var(--inbox-panel); padding: 5px 10px; font: inherit; font-size: 12.5px; cursor: pointer; color: inherit; }
+.fx-tip-btns > label { margin-inline-start: auto; }
+.fx-sh-listbox.is-checks { padding: 6px 10px; gap: 2px; }
+.fx-tip-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.fx-tip-steps li { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--inbox-muted); padding: 6px 8px; border-radius: 9px; background: var(--inbox-panel); }
+.fx-tip-steps li b { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: #E3E3EA; color: #14131A; }
+.fx-tip-steps li.is-on { color: #14131A; font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--inbox-purple, #7C3AED); }
+.fx-tip-steps li.is-on b { background: var(--inbox-purple, #7C3AED); color: #fff; }
+.fx-tip-steps li.is-done b { background: #D7F75B; }
+.fx-tip-set { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.fx-tip-other { display: inline-flex; align-items: center; gap: 6px; }
+.fx-tip-other input[type="text"] { width: 34px; border: 1px solid #E3E3EA; border-radius: 7px; padding: 3px 6px; font: inherit; text-align: center; background: var(--inbox-panel); color: inherit; }
+.fx-tip-preview { border: 1px solid #E3E3EA; border-radius: 10px; overflow: auto; max-height: 170px; font-size: 12.5px; }
+.fx-tip-preview [role="row"] { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(96px, 1fr); }
+.fx-tip-preview [role="row"] > * { padding: 4px 8px; border-bottom: 1px solid #EFEFF4; border-inline-end: 1px solid #EFEFF4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-tip-preview .is-head > * { background: var(--inbox-panel); font: inherit; font-weight: 600; font-size: 11.5px; text-align: start; border-width: 0 1px 1px 0; border-style: solid; border-color: #EFEFF4; color: inherit; }
+.fx-tip-preview .is-head > button:not(:disabled) { cursor: pointer; }
+.fx-tip-preview .is-head > .is-on { background: #14131A; color: #fff; }
+.fx-tip-preview .is-skip { color: var(--inbox-muted); text-decoration: line-through; }
+.fx-fc-hint.is-sub { padding-inline-start: 23px; margin-top: -4px; }
+.fx-fc-lb.is-codes { max-height: 132px; overflow: auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.fx-rule-sets { display: grid; gap: 4px; }
+.fx-rule-sets .fx-sh-check span { display: inline-flex; gap: 3px; min-width: 44px; }
+.fx-rule-cut { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.fx-rule-cut b { width: 16px; text-align: center; }
+.fx-rule-cut input { width: 64px; border: 1px solid #E3E3EA; border-radius: 8px; padding: 4px 6px; font: inherit; background: var(--inbox-panel); color: inherit; }
+.fx-rule-cut select { border: 1px solid #E3E3EA; border-radius: 8px; padding: 4px 6px; font: inherit; background: var(--inbox-panel); color: inherit; }

@@ -1435,7 +1435,8 @@
           "left": "Left",
           "center": "Centre",
           "right": "Right",
-          "justify": "Justify"
+          "justify": "Justify",
+          "across": "Center Across Selection"
         },
         "v": {
           "top": "Top",
@@ -1474,7 +1475,19 @@
         "numNote": "Number formats change only how the value looks. Editing and copying use the value you typed.",
         "ok": "OK",
         "cancel": "Cancel",
-        "date": "Date"
+        "date": "Date",
+        "customHint": "Excel's codes: 0 # , . % \"text\" and sections pos;neg;zero;text (;;; hides). Dates: d m y.",
+        "why": {
+          "empty": "Type a code.",
+          "long": "Codes are 60 characters at most.",
+          "sections": "Four sections at most: positive;negative;zero;text.",
+          "color": "Colours and conditions in [brackets] aren't supported here.",
+          "date": "Date letters belong in a date code (d, m, y) on their own.",
+          "pad": "_ and * padding aren't supported here.",
+          "sci": "Scientific codes (E+) aren't supported here; use the Scientific category.",
+          "quote": "A quote is missing its pair.",
+          "char": "That code has a character the sheet can't read; put text in \"quotes\"."
+        }
       },
       "phone": {
         "open": "Format",
@@ -1658,7 +1671,8 @@
           "top": "Top 10 items",
           "bottom": "Bottom 10 items",
           "bar": "Data bars",
-          "scale": "Colour scale"
+          "scale": "Colour scale",
+          "icons": "Icon sets"
         },
         "names": {
           "gt": "Greater than {a}",
@@ -1672,7 +1686,8 @@
           "top": "Top {n}{pct}",
           "bottom": "Bottom {n}{pct}",
           "bar": "Data bar",
-          "scale": "Colour scale"
+          "scale": "Colour scale",
+          "icons": "Icon set {set}"
         },
         "when": {
           "past": "before today",
@@ -2324,8 +2339,210 @@
         "edit": "Edit Custom Lists…"
       },
       "goLinkedBad": "There's no row {ref} here. Type a row number as shown on the left.",
-      "oneArea": "This works on one block of cells. Select one area first."
-    }
+      "oneArea": "This works on one block of cells. Select one area first.",
+      "icons": {
+        "title": "Icon Sets",
+        "style": "Icon style",
+        "reverse": "Reverse Icon Order",
+        "only": "Show Icon Only",
+        "rules": "Display each icon according to these rules",
+        "when": "when value is ≥",
+        "whenBelow": "when < {n}",
+        "cut": "Threshold {n}",
+        "type": "Type",
+        "percent": "Percent",
+        "number": "Number",
+        "arrows3": {
+          "0": "Up arrow",
+          "1": "Sideways arrow",
+          "2": "Down arrow",
+          "name": "3 Arrows"
+        },
+        "flags3": {
+          "0": "Green flag",
+          "1": "Yellow flag",
+          "2": "Red flag",
+          "name": "3 Flags"
+        },
+        "lights3": {
+          "0": "Green light",
+          "1": "Yellow light",
+          "2": "Red light",
+          "name": "3 Traffic Lights"
+        }
+      },
+      "rowRule": {
+        "label": "Format the entire row",
+        "test": "Test this column"
+      },
+      "sb": {
+        "title": "Customize Status Bar",
+        "avg": "Average",
+        "count": "Count",
+        "nums": "Numerical Count",
+        "min": "Minimum",
+        "max": "Maximum",
+        "sum": "Sum",
+        "zoom": "Zoom Slider",
+        "numsShort": "Numerical Count",
+        "minShort": "Min",
+        "maxShort": "Max"
+      },
+      "size": {
+        "title": "Cell size",
+        "autofitRow": "AutoFit Row Height",
+        "autofitCol": "AutoFit Column Width"
+      },
+      "clean": {
+        "title": "Clean up",
+        "dedupe": "Remove Duplicates",
+        "split": "Text to Columns",
+        "case": "Change Case",
+        "ops": {
+          "trim": "Trim Spaces and Clean",
+          "upper": "UPPERCASE",
+          "lower": "lowercase",
+          "proper": "Proper Case",
+          "toNumber": "Convert Text to Numbers",
+          "blanks": "Fill Blanks from Above"
+        },
+        "none": "{what}: nothing to change in the selection.",
+        "done": "{what}: {n, plural, one {# cell changed} other {# cells changed}}.",
+        "dupNone": "No duplicate values found; {left, plural, one {# unique row remains} other {# unique rows remain}}.",
+        "dupDone": "{n, plural, one {# duplicate row found and removed} other {# duplicate rows found and removed}}; {left, plural, one {# unique row remains} other {# unique rows remain}}.",
+        "splitOneCol": "Text to Columns works on one column at a time.",
+        "splitDone": "Split {n, plural, one {# value} other {# values}} into {cols, plural, one {# column} other {# columns}}.",
+        "replaceTitle": "Replace the data here?",
+        "replaceBody": "There's already data here. Replace it?",
+        "replaceOk": "Replace",
+        "numText": "Number Stored as Text",
+        "convert": "Convert to Number",
+        "ignore": "Ignore Error",
+        "dedupeSub": "Choose the columns that make a row a duplicate ({range}).",
+        "selectAll": "Select All",
+        "unselectAll": "Unselect All",
+        "hasHeaders": "My data has headers",
+        "columns": "Columns",
+        "splitSub": "Step {step} of 3 · split {range}.",
+        "steps": {
+          "type": "Original type",
+          "delims": "Delimiters",
+          "format": "Column format"
+        },
+        "delimited": "Delimited",
+        "delimitedHint": "Characters such as commas or tabs separate each field.",
+        "fixed": "Fixed width",
+        "fixedHint": "Fields are lined up in columns with spaces between them.",
+        "delims": "Delimiters",
+        "tab": "Tab",
+        "semicolon": "Semicolon",
+        "comma": "Comma",
+        "space": "Space",
+        "other": "Other",
+        "consecutive": "Treat consecutive delimiters as one",
+        "qualifier": "Text qualifier",
+        "none2": "None",
+        "breaks": "Break lines (after character)",
+        "breaksHint": "Positions to split at, separated by commas: 10, 20.",
+        "colFormat": "Column data format",
+        "colN": "Column {n}",
+        "fmt": {
+          "general": "General",
+          "text": "Text",
+          "date": "Date",
+          "skip": "Do not import column (skip)"
+        },
+        "colFormatHint": "Pick a column in the preview, then its format.",
+        "preview": "Data preview",
+        "back": "Back",
+        "next": "Next",
+        "finish": "Finish"
+      },
+      "table": {
+        "title": "Table",
+        "create": "Create Table",
+        "totalRow": "Total Row",
+        "slicers": "Insert Slicer",
+        "none": "Click inside a table first.",
+        "already": "This cell is already in a table.",
+        "where": "Where is the data for your table?",
+        "hasHeaders": "My table has headers",
+        "slicersSub": "Pick the columns to filter with buttons."
+      },
+      "total": {
+        "label": "Total",
+        "pick": "Choose the total",
+        "readOnly": "Totals are worked out from the rows above; pick another one with ▾.",
+        "fns": {
+          "none": "None",
+          "avg": "Average",
+          "count": "Count",
+          "countNums": "Count Numbers",
+          "max": "Max",
+          "min": "Min",
+          "sum": "Sum"
+        }
+      },
+      "slicer": {
+        "label": "Slicer: {name}",
+        "multi": "Multi-Select",
+        "clear": "Clear Filter",
+        "remove": "Remove slicer",
+        "blank": "(blank)"
+      },
+      "adv": {
+        "title": "Advanced Filter",
+        "sub": "Conditions on one row must all match (AND); separate rows are alternatives (OR).",
+        "action": "Action",
+        "inPlace": "Filter the list, in-place",
+        "copy": "Copy to another location",
+        "list": "List range",
+        "criteria": "Criteria range",
+        "copyTo": "Copy to",
+        "newSheet": "A new sheet",
+        "cellHere": "A cell on this sheet…",
+        "cell": "Cell",
+        "unique": "Unique records only",
+        "clear": "Show all",
+        "badHeading": "The criteria heading “{name}” isn't a heading in the list range.",
+        "empty": "The criteria range needs headings and at least one condition under them.",
+        "copied": "{n, plural, one {# matching row copied} other {# matching rows copied}}."
+      },
+      "outline": {
+        "title": "Group",
+        "group": "Group",
+        "ungroup": "Ungroup",
+        "levels": "Outline levels",
+        "level": "Show level {n}",
+        "expand": "Expand group",
+        "collapse": "Collapse group",
+        "max": "Groups go eight levels deep at most.",
+        "none": "Nothing here is grouped."
+      },
+      "ps": {
+        "paste": "Paste",
+        "formulas": "Formulas",
+        "formulasWhy": "Sheets here don't have formulas.",
+        "validation": "Validation",
+        "noBorders": "All except borders",
+        "widths": "Column widths",
+        "operation": "Operation",
+        "none": "None",
+        "add": "Add",
+        "sub": "Subtract",
+        "mul": "Multiply",
+        "div": "Divide",
+        "skipBlanks": "Skip blanks",
+        "link": "Paste Link",
+        "opOne": "Copy one number first: the operation uses it on every number in the selection.",
+        "divZero": "Can't divide by zero.",
+        "opSkipped": "{n, plural, one {# number changed} other {# numbers changed}}; {skipped, plural, one {# cell that isn't a number was left alone} other {# cells that aren't numbers were left alone}}.",
+        "opDone": "{n, plural, one {# number changed} other {# numbers changed}}.",
+        "needCopy": "Copy cells on this sheet first: Validation and Column widths come from them.",
+        "dvMixed": "The copied cells have different validation; copy cells that share one."
+      }
+    },
+    "undo": "Undo"
   },
   "hours": {
     "today": "Today's hours",
