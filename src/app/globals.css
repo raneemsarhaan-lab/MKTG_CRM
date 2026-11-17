@@ -3087,3 +3087,5 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-rule-cut b { width: 16px; text-align: center; }
 .fx-rule-cut input { width: 64px; border: 1px solid #E3E3EA; border-radius: 8px; padding: 4px 6px; font: inherit; background: var(--inbox-panel); color: inherit; }
 .fx-rule-cut select { border: 1px solid #E3E3EA; border-radius: 8px; padding: 4px 6px; font: inherit; background: var(--inbox-panel); color: inherit; }
+.fx-sheet-th.is-ol-col { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--sheet-muted) 70%, transparent); }
+.fx-ol-btn.is-col { position: absolute; inset-inline-start: 3px; top: 50%; margin: 0; transform: translateY(-50%); }

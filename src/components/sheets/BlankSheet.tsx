@@ -670,6 +670,16 @@ export function BlankSheet(p: BlankSheetProps) {
         return { text: <>{icon}{name || <span className="fx-sheet-muted">{colLetters(i)}</span>}</>, label: name || colLetters(i), className: `is-named${f ? ' is-field' : ''}` }
       }
       const before = i > 0 && hiddenC.has(doc.cols[i - 1].id)
+      // Spec 020 tip 80: a column group draws a line above its letters, and − or + on the column after it.
+      const inGroup = olSpans.cols.some(g => i >= g.i0 && i <= g.i1)
+      const after = olSpans.cols.filter(g => i === g.i1 + 1).sort((x, y) => y.level - x.level)[0]
+      const olBtn = after ? <button type="button" className="fx-ol-btn is-col" data-ol-toggle-col={after.from} tabIndex={-1} aria-expanded={!after.collapsed}
+                                    aria-label={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')} title={tt(after.collapsed ? 'outline.expand' : 'outline.collapse')}
+                                    onPointerDown={ev => ev.stopPropagation()}
+                                    onClick={ev => { ev.stopPropagation(); setOutline(olToggle(view.outline ?? [], after), after.collapsed ? 'outlineExpand' : 'outlineCollapse') }}>{after.collapsed ? '+' : '−'}</button> : null
+      if (inGroup || olBtn) {
+        return { text: <>{olBtn}{colLetters(i)}</>, className: `is-letter${inGroup ? ' is-ol-col' : ''}${lk.map?.fields[col] ? ' is-field' : ''}` }
+      }
       return {
         text: before
           ? <>{colLetters(i)}<button type="button" className="fx-hid-mark" data-unhide-col={col} title={t('format.edit.unhideCols')} aria-label={t('format.edit.unhideCols')}

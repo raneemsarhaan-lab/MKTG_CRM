@@ -122,12 +122,12 @@
 
 - [X] T037 Write the stage B HTML design (custom format field, Center across, whole-row rule and icon sets in the rule editor, Data › Clean up tools with previews, Total row, slicers, advanced filter, outline bar, status-bar math) in design/power-tips-b.html, and get approval
 - [X] T038 [P] [US4] Pure custom number-format engine (research R7: sections, 0/#, separators, `,` and `,,` scaling, decimals, literals, %, `;;;`; refuses unsupported tokens) in src/lib/sheet-numfmt.ts, with pure checks in scripts/spreadsheet-lab/pure.mjs
-- [ ] T039 [US4] `NumberFormat.kind = 'custom'` with `pattern` in src/types/index.ts; `display()` uses sheet-numfmt in src/lib/sheet-format.ts; a Custom field in Format Cells → Number in the existing Format Cells dialog
-- [ ] T040 [US4] Ctrl+Shift+1 sets Number (2 decimal places, separator) in src/components/sheets/format/FormatToolbar.tsx
-- [ ] T041 [US4] `ha: 'across'`: rendering lays the text over the following empty cells that also carry `across` (no merge), in src/lib/sheet-format.ts and src/components/sheets/BlankSheet.tsx; offered in Format Cells → Alignment
-- [ ] T042 [US4] Rule kind `icons` (arrows3, flags3, lights3, with cuts by percent or number) and `args.row` (whole-row look) in src/lib/sheet-rules.ts and src/types/index.ts; the rule editor in src/components/sheets/format/StyleTools.tsx
-- [ ] T043 [US4] Format › Autofit column width (the selected columns) in src/components/sheets/format/FormatToolbar.tsx and src/components/sheets/BlankSheet.tsx
-- [ ] T044 [US4] Lab checks for US4 (quickstart Stage B §1) in scripts/spreadsheet-lab/realapp/tips-b.cjs
+- [X] T039 [US4] `NumberFormat.kind = 'custom'` with `pattern` in src/types/index.ts; `display()` uses sheet-numfmt in src/lib/sheet-format.ts; a Custom field in Format Cells → Number in the existing Format Cells dialog
+- [X] T040 [US4] Ctrl+Shift+1 sets Number (2 decimal places, separator) in src/components/sheets/format/FormatToolbar.tsx
+- [X] T041 [US4] `ha: 'across'`: rendering lays the text over the following empty cells that also carry `across` (no merge), in src/lib/sheet-format.ts and src/components/sheets/BlankSheet.tsx; offered in Format Cells → Alignment
+- [X] T042 [US4] Rule kind `icons` (arrows3, flags3, lights3, with cuts by percent or number) and `args.row` (whole-row look) in src/lib/sheet-rules.ts and src/types/index.ts; the rule editor in src/components/sheets/format/StyleTools.tsx
+- [X] T043 [US4] Format › Autofit column width (the selected columns) in src/components/sheets/format/FormatToolbar.tsx and src/components/sheets/BlankSheet.tsx
+- [X] T044 [US4] Lab checks for US4 (quickstart Stage B §1) in scripts/spreadsheet-lab/realapp/tips-b.cjs
 
 ---
 
@@ -139,10 +139,10 @@
 
 - [X] T045 [P] [US5] Pure cleanup planners in src/lib/sheet-clean.ts (research R10): `dedupePlan`, `splitPlan` (delimiter or fixed width, preview), `trimClean`, `changeCase`, `toNumber` and `blanksFromAbove`, with pure checks in scripts/spreadsheet-lab/pure.mjs
 - [X] T046 [P] [US5] Wildcards `*`, `?`, `~*` and `~?` in `matches` and `replaceIn` in src/lib/sheet-tools.ts
-- [ ] T047 [US5] Data › Clean up submenu and dialogs (Remove duplicates with column picks and a count first; Split with a preview and an insert-columns confirm) in src/components/sheets/format/CleanupDialogs.tsx, wired in src/components/sheets/format/FormatToolbar.tsx
-- [ ] T048 [US5] BlankSheet commands turn each plan into one `BlankChange` step, with a "N cells changed" notice and one-area guards, in src/components/sheets/BlankSheet.tsx
-- [ ] T049 [US5] Paste Special Add, Subtract, Multiply and Divide (the clipboard's single number, applied to numeric cells, non-numbers skipped and counted) in src/components/sheets/BlankSheet.tsx and the Paste Special dialog
-- [ ] T050 [US5] Lab checks for US5 (quickstart Stage B §2) in scripts/spreadsheet-lab/realapp/tips-b.cjs
+- [X] T047 [US5] Data › Clean up submenu and dialogs (Remove duplicates with column picks and a count first; Split with a preview and an insert-columns confirm) in src/components/sheets/format/CleanupDialogs.tsx, wired in src/components/sheets/format/FormatToolbar.tsx
+- [X] T048 [US5] BlankSheet commands turn each plan into one `BlankChange` step, with a "N cells changed" notice and one-area guards, in src/components/sheets/BlankSheet.tsx
+- [X] T049 [US5] Paste Special Add, Subtract, Multiply and Divide (the clipboard's single number, applied to numeric cells, non-numbers skipped and counted) in src/components/sheets/BlankSheet.tsx and the Paste Special dialog
+- [X] T050 [US5] Lab checks for US5 (quickstart Stage B §2) in scripts/spreadsheet-lab/realapp/tips-b.cjs
 
 ---
 
@@ -152,14 +152,14 @@
 
 **Independent Test**: a 50-row table with a Total row follows a slicer filter; grouped rows collapse and are kept after a reload; the status bar shows Sum, Average and Count (spec US6).
 
-- [ ] T051 [P] [US6] `sheet_tables.totals` column (prisma/schema.prisma), then load it and accept the `tableTotals` change in src/actions/sheets.ts
-- [ ] T052 [US6] Ctrl+T runs Format as table with the default style, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
-- [ ] T053 [US6] Total row: a sticky footer under the table's last row, with a per-column aggregate menu, computed over visible rows only, in src/components/sheets/BlankSheet.tsx
-- [ ] T054 [US6] Slicers: `view.slicers`, with chip rows above the table that set `view.filter[col]`, in src/components/sheets/BlankSheet.tsx and src/actions/sheets.ts (view validation)
-- [ ] T055 [US6] Advanced filter dialog (AND/OR groups, unique only, filter in place or copy to a new sheet) in src/components/sheets/format/AdvancedFilter.tsx, plus `filter.advanced` in src/lib/sheet-rules.ts
+- [X] T051 [P] [US6] `sheet_tables.totals` column (prisma/schema.prisma), then load it and accept the `tableTotals` change in src/actions/sheets.ts
+- [X] T052 [US6] Ctrl+T runs Format as table with the default style, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
+- [X] T053 [US6] Total row: a sticky footer under the table's last row, with a per-column aggregate menu, computed over visible rows only, in src/components/sheets/BlankSheet.tsx
+- [X] T054 [US6] Slicers: `view.slicers`, with chip rows above the table that set `view.filter[col]`, in src/components/sheets/BlankSheet.tsx and src/actions/sheets.ts (view validation)
+- [X] T055 [US6] Advanced filter dialog (AND/OR groups, unique only, filter in place or copy to a new sheet) in src/components/sheets/format/AdvancedFilter.tsx, plus `filter.advanced` in src/lib/sheet-rules.ts
 - [X] T056 [P] [US6] Pure outline helpers (groups by ids, levels 1–8, collapsed → hidden ids) in src/lib/sheet-outline.ts, with pure checks
-- [ ] T057 [US6] Outline bar beside the row numbers and above the letters (brackets, +/−), Shift+Alt+→ and ← to group and ungroup, and Data › Group, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx, stored in `view.outline`
-- [ ] T058 [US6] Status-bar math: Sum, Average and Count over the numeric cells of every area (capped at 50k, debounced), with Min and Max switches from the status bar's menu kept in `momentum.sheet.stats`, on blank and linked sheets, in src/components/sheets/Workbook.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
+- [X] T057 [US6] Outline bar beside the row numbers and above the letters (brackets, +/−), Shift+Alt+→ and ← to group and ungroup, and Data › Group, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx, stored in `view.outline`
+- [X] T058 [US6] Status-bar math: Sum, Average and Count over the numeric cells of every area (capped at 50k, debounced), with Min and Max switches from the status bar's menu kept in `momentum.sheet.stats`, on blank and linked sheets, in src/components/sheets/Workbook.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
 - [ ] T059 [US6] Lab checks for US6 (quickstart Stage B §3–§4), then the stage B regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-b.cjs
 
 **Checkpoint**: stage B is done.
