@@ -29,6 +29,8 @@ export type RowTasksChange = { kind: 'rowTasks'; rows: { rowId: string; before: 
 export type TaskFieldsChange = { kind: 'taskFields'; cells: { rowId: string; field: TaskField; before: string; after: string }[] }
 /** Stage 3: Sort moves rows by changing their positions (blank sheets). */
 export type RowOrderChange = { kind: 'rowOrder'; rows: { id: string; before: number; after: number }[] }
+/** Spec 019: a dragged column's new position. */
+export type ColOrderChange = { kind: 'colOrder'; cols: { id: string; before: number; after: number }[] }
 
 /** A blank sheet's change, with enough to reverse it. */
 export type BlankChange =
@@ -45,6 +47,7 @@ export type BlankChange =
   | RulesChange
   | TablesChange
   | RowOrderChange
+  | ColOrderChange
   | TaskMapChange
   | RowTasksChange
   | TaskFieldsChange
@@ -79,6 +82,7 @@ export function invert(ch: Change): Change {
     case 'rules': return { kind: 'rules', before: ch.after, after: ch.before }
     case 'tables': return { kind: 'tables', before: ch.after, after: ch.before }
     case 'rowOrder': return { kind: 'rowOrder', rows: ch.rows.map(x => ({ id: x.id, before: x.after, after: x.before })) }
+    case 'colOrder': return { kind: 'colOrder', cols: ch.cols.map(x => ({ id: x.id, before: x.after, after: x.before })) }
     case 'taskMap': return { kind: 'taskMap', before: ch.after, after: ch.before }
     case 'rowTasks': return { kind: 'rowTasks', rows: ch.rows.map(x => ({ rowId: x.rowId, before: x.after, after: x.before })) }
     case 'taskFields': return { kind: 'taskFields', cells: ch.cells.map(x => ({ ...x, before: x.after, after: x.before })) }

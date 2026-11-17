@@ -7,9 +7,10 @@ import { prisma } from '@/lib/prisma'
 import type { LinkedTask, SheetTaskMap, TaskField } from '@/types/index'
 import { TASK_FIELDS } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
+import { allowedStages } from '@/lib/stage-moves'
 import { fieldApplies, matchCells, normTitle, type MatchResult } from '@/lib/sheet-links'
 
-type Who = { id: string; access: string }
+type Who = { id: string; access: string; role?: string }
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '')
 export const mayActOn = (t: { task_owner_id: string; assignee_id: string | null }, m: Who) =>
   t.task_owner_id === m.id || t.assignee_id === m.id || m.access === 'admin' || m.access === 'superuser'
@@ -35,7 +36,7 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
     prisma.task.findMany({
       where: { id: { in: ids } },
       select: {
-        id: true, name: true, status: true, due_date: true, assignee_id: true, task_owner_id: true, priority: true, platform: true,
+        id: true, name: true, status: true, due_date: true, assignee_id: true, task_owner_id: true, priority: true, platform: true, nine_stage: true,
         content_type_label: true, parent_task_id: true, dropped_at: true, post_url: true, published_url: true,
         project: { select: { name: true, is_theme: true } }, pillar: { select: { name: true } },
         parent: { select: { content_type_label: true, parent_task_id: true } },
@@ -43,7 +44,8 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
         sheet_values: [...fields].some(f => f.startsWith('col:')) ? { where: { column_id: { in: [...fields].filter(f => f.startsWith('col:')).map(f => f.slice(4)) } }, select: { column_id: true, value: true } } : false,
       },
     }),
-    fields.has('assignee') || fields.has('owner') ? prisma.member.findMany({ select: { id: true, name: true } }) : Promise.resolve([] as { id: string; name: string }[]),
+    // Spec 019: names always, for grouping by assignee.
+    prisma.member.findMany({ select: { id: true, name: true } }),
   ])
   const name = new Map(members.map(m => [m.id, m.name]))
   const out: Record<string, LinkedTask> = {}
@@ -78,6 +80,9 @@ export async function linkedTasks(taskIds: string[], map: SheetTaskMap | null, m
       id: t.id, name: t.name, values, stage: t.status, dropped: !!t.dropped_at,
       editable: mayActOn(t, me),
       applies: [...TASK_FIELDS, ...[...fields].filter(f => f.startsWith('col:'))].filter(f => fieldApplies(kind, f as TaskField)) as TaskField[],
+      // Spec 019: the stage menu's choices, and what rows group by.
+      moves: me.role ? allowedStages({ status: t.status, nine_stage: t.nine_stage, task_owner_id: t.task_owner_id, assignee_id: t.assignee_id, dropped_at: t.dropped_at }, { id: me.id, role: me.role, access: me.access }) : undefined,
+      meta: { theme: t.project?.name ?? '', pillar: t.pillar?.name ?? '', stage: t.status, assignee: t.assignee_id ? name.get(t.assignee_id) ?? '' : '', assigneeId: t.assignee_id, type: t.content_type_label ?? '' },
     }
   }
   return out

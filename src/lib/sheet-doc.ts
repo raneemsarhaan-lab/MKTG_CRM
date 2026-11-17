@@ -96,6 +96,10 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const pos = new Map(ch.rows.map(r => [r.id, r.after]))
       return { ...doc, rows: doc.rows.map(r => (pos.has(r.id) ? { ...r, position: pos.get(r.id)! } : r)).sort(byPos) }
     }
+    case 'colOrder': {
+      const pos = new Map(ch.cols.map(c => [c.id, c.after]))
+      return { ...doc, cols: doc.cols.map(c => (pos.has(c.id) ? { ...c, position: pos.get(c.id)! } : c)).sort(byPos) }
+    }
     case 'taskMap': {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, taskMap: ch.after } }
@@ -168,6 +172,7 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'rules': out.rules = mergeLists<ConditionalRule>(out.rules, listWrite(ch.before, ch.after)); break
       case 'tables': out.tables = mergeLists<SheetTableRecord>(out.tables, listWrite(ch.before, ch.after)); break
       case 'rowOrder': push('rowPositions', ch.rows.map(r => ({ id: r.id, position: r.after }))); break
+      case 'colOrder': push('colPositions', ch.cols.map(c => ({ id: c.id, position: c.after }))); break
       case 'taskMap': out.taskMap = ch.after; break
       case 'rowTasks': out.rowTasks = lastByRow([...(out.rowTasks ?? []), ...ch.rows.map(r => ({ rowId: r.rowId, taskId: r.after }))]); break
       case 'taskFields': break
@@ -193,6 +198,7 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     rules: mergeLists(a.rules, b.rules),
     tables: mergeLists(a.tables, b.tables),
     rowPositions: lastById(cat(a.rowPositions, b.rowPositions)),
+    colPositions: lastById(cat(a.colPositions, b.colPositions)),
     ...('taskMap' in b ? { taskMap: b.taskMap } : 'taskMap' in a ? { taskMap: a.taskMap } : {}),
     rowTasks: a.rowTasks || b.rowTasks ? lastByRow([...(a.rowTasks ?? []), ...(b.rowTasks ?? [])]) : undefined,
   }
@@ -321,6 +327,7 @@ export function viewWrite(before: Partial<SheetView>, after: Partial<SheetView>)
   if ('filterArea' in after && JSON.stringify(after.filterArea ?? null) !== JSON.stringify(before.filterArea ?? null)) out.filterArea = after.filterArea ?? null
   if ('filter' in after && JSON.stringify(after.filter ?? null) !== JSON.stringify(before.filter ?? null)) out.filter = after.filter ?? null
   if ('sort' in after && JSON.stringify(after.sort ?? null) !== JSON.stringify(before.sort ?? null)) out.sort = after.sort ?? null
+  if ('groupBy' in after && JSON.stringify(after.groupBy ?? null) !== JSON.stringify(before.groupBy ?? null)) out.groupBy = after.groupBy ?? null
   return out
 }
 
@@ -340,7 +347,7 @@ export function mergeView(a: ViewWrite | undefined, b: ViewWrite | undefined): V
   if (r.show.length) out.showRows = r.show
   if (c.hide.length) out.hideCols = c.hide
   if (c.show.length) out.showCols = c.show
-  for (const k of ['filterArea', 'filter', 'sort'] as const) if (k in b) (out as Record<string, unknown>)[k] = b[k]; else if (k in a) (out as Record<string, unknown>)[k] = a[k]
+  for (const k of ['filterArea', 'filter', 'sort', 'groupBy'] as const) if (k in b) (out as Record<string, unknown>)[k] = b[k]; else if (k in a) (out as Record<string, unknown>)[k] = a[k]
   for (const k of Object.keys(out) as (keyof ViewWrite)[]) if (out[k] === undefined) delete out[k]
   return out
 }

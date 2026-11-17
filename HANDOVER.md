@@ -681,6 +681,26 @@ The sheet header follows the familiar spreadsheet layout (spec 018, `specs/018-s
   - `node scripts/spreadsheet-lab/realapp/header.cjs`.
   - Older labs reach moved controls through `realapp/toolbar.cjs` (`tool(page, key)`).
 
+### Task fields in team sheets (ClickUp style)
+
+Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fields.html`. The Content and Video sheets move to the same model in stages 2 and 3.
+
+- **Model.** A team sheet stays a spreadsheet. A row is a task only when its task column links one (spec 016).
+  - A column in `taskMap.fields` is a *field column*: its cells on linked rows show and edit the task's value with the Content sheet's controls (`links/FieldCells.tsx`).
+  - Every other column is a regular column.
+- **Settings.**
+  - ⚙ Fields (title row) and Data › Task fields open the drawer (`links/FieldsPanel.tsx`, event `FIELDS_OPEN`).
+  - The drawer offers the task column, Group rows by, a switch per field, and the regular columns.
+  - ＋ after the last heading (`GridCore.tailHeader`) adds a field or a regular column.
+  - A column's menu offers Use this column for a task field ▸, Hide field, Turn into a regular column, and Values….
+- **Sheet words.** `taskMap.words` maps a stage, type or priority to this sheet's words, and `taskMap.show` picks whether cells show the sheet's words or the board's names.
+  - Typed, pasted and filled words match through `wordValue` (case and spaces ignored).
+  - Match the values builds the words when a column becomes Stage, Type or Priority. It can also move the tasks to the column's values.
+- **Saving.** Picks go through the same path as typing: a cell change, then `applyRouted`, then `writeTaskFields`. The board's rules, refusals and one undo step all apply.
+- **Column drag.** Drag a heading onto another, or onto ＋ for the end. This is a `colOrder` change (positions are fractional), saved as `colPositions`.
+- **Group rows by.** `view.groupBy` holds theme › pillar, stage, assignee, type, or a column. `groupRows` in BlankSheet orders the visible rows, and `GridCore.rowBand` draws the bands. The headings row stays on top.
+- **Check.** `node scripts/spreadsheet-lab/realapp/fields.cjs`.
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.

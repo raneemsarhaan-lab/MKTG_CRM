@@ -1,0 +1,263 @@
+<title>Linked Sheet Cells</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: a control strip (Before/After, language), one workbook frame showing
+   a sheet the team linked to the board (TSC Calendar), then the rules card.
+   Mapped cells use the Content sheet's own controls; stage and type colours
+   are the board's content colours (src/lib/tokens.ts), not UI tokens. */
+:root {
+  --page: #F3F3F7; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B7280;
+  --line: #ECECF1; --input: #E3E3EA; --surface: #F6F6F9; --strip: #EEF0F5; --hover: #E2E5EC; --grid-head: #F8F8FB; --grid-line: #E8E8EE;
+  --purple: #7C3AED; --purple-soft: #F0EBFE; --link: #1D4ED8; --sh-edge: #7C3AED; --sh-head-sel: #E9E2FD;
+  --warn-bg: #FFF3E0; --warn: #9A5B02; --ok: #15803D; --na: #9CA3AF;
+  --f-head: Montserrat, "Segoe UI", Arial, sans-serif; --f-body: Inter, "Segoe UI", Arial, sans-serif; --f-ar: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --link: #93B4FF; --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; --na: #6B6B78; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #0F0F14; --panel: #17171E; --ink: #F4F4F7; --text: #DADAE2; --muted: #9A9AA8; --line: #2A2A34; --input: #34343F;
+  --surface: #1F1F28; --strip: #22222C; --hover: #2E2E3A; --grid-head: #1C1C24; --grid-line: #2A2A34; --purple: #A78BFA; --purple-soft: #2A2145;
+  --link: #93B4FF; --sh-edge: #A78BFA; --sh-head-sel: #2E2650; --warn-bg: #3A2A0E; --warn: #F5C46B; --na: #6B6B78; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; font: 800 26px/1.2 var(--f-head); color: var(--ink); text-wrap: balance; }
+.lede { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 82ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+.ctl { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--input); border-radius: 999px; padding: 3px; background: var(--panel); }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 12px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--purple-soft); color: var(--purple); }
+
+.frame { position: relative; background: var(--panel); border-radius: 16px; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 14px 40px rgba(20,19,26,.10); overflow: hidden; }
+.frame[dir="rtl"], .frame[dir="rtl"] button { font-family: var(--f-ar); }
+.title { display: flex; align-items: center; gap: 10px; padding: 12px 16px 2px; flex-wrap: wrap; }
+.title .crumb { color: var(--muted); font-size: 13.5px; }
+.title b { font: 800 19px var(--f-head); color: var(--ink); }
+.frame[dir="rtl"] .title b { font-family: var(--f-ar); }
+.saved { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.title .right { margin-inline-start: auto; display: flex; gap: 8px; }
+.pill { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 13px; }
+.menubar { display: flex; gap: 2px; padding: 0 10px 4px; font-size: 14px; }
+.menubar span { padding: 4px 8px; }
+.strip { margin: 0 10px 8px; background: var(--strip); border-radius: 999px; height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 16px; color: var(--muted); font-size: 13px; overflow: hidden; white-space: nowrap; }
+.fbar { display: flex; height: 32px; border-top: 1px solid var(--line); font-size: 13px; align-items: center; }
+.fbar .nb { width: 120px; padding-inline: 12px; font-weight: 600; border-inline-end: 1px solid var(--line); height: 100%; display: flex; align-items: center; }
+.fbar .fx { width: 34px; text-align: center; color: var(--muted); font-style: italic; font-family: Georgia, serif; border-inline-end: 1px solid var(--line); height: 100%; display: grid; place-items: center; }
+.fbar .v { padding-inline: 10px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+
+/* grid */
+.gw { overflow: auto; border-top: 1px solid var(--line); min-height: 380px; }
+.g { display: grid; grid-template-columns: 44px 168px 176px 140px 210px 300px 150px 150px 120px; font-size: 13px; min-width: max-content; }
+.c { border-bottom: 1px solid var(--grid-line); border-inline-end: 1px solid var(--grid-line); padding: 6px 8px; min-height: 40px; display: flex; align-items: center; gap: 6px; position: relative; min-width: 0; }
+.c > .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.h, .rn { background: var(--grid-head); color: var(--muted); font-weight: 600; font-size: 12px; justify-content: center; min-height: 30px; }
+.h { justify-content: space-between; padding-inline: 8px; }
+.h .badge { font-size: 11px; font-weight: 700; color: var(--purple); background: var(--purple-soft); border-radius: 999px; padding: 2px 8px; }
+.h .badge.task { background: var(--ink); color: var(--panel); }
+.hd { font-weight: 600; color: var(--ink); background: var(--surface); }
+.c.act { box-shadow: inset 0 0 0 2px var(--sh-edge); }
+.c.ctrl { cursor: pointer; }
+.c.ctrl:hover { background: var(--surface); }
+.wrapcell { white-space: normal !important; line-height: 1.45; }
+.rn .mk { width: 18px; height: 18px; border-radius: 5px; background: var(--purple); color: #fff; display: inline-grid; place-items: center; font-size: 11px; margin-inline-end: 4px; }
+.na { color: var(--na); font-style: italic; }
+.taskname { color: var(--link); }
+.open { margin-inline-start: auto; color: var(--purple); font-weight: 600; font-size: 12px; white-space: nowrap; text-decoration: none; }
+.note { font-size: 11.5px; color: var(--warn); background: var(--warn-bg); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+
+/* the Content sheet's controls */
+.status { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px 3px 8px; font-weight: 600; font-size: 12.5px; border: 1px solid; white-space: nowrap; }
+.status i { width: 8px; height: 8px; border-radius: 50%; }
+.status .car, .typepill .car { font-size: 9px; opacity: .7; }
+.chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 700 9.5px var(--f-body); flex: none; }
+.av.empty { border: 1.5px dashed var(--input); background: none; }
+.typepill { display: inline-flex; align-items: center; gap: 5px; color: #fff; border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+.pillar { display: inline-flex; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; background: var(--surface); border: 1px solid var(--input); color: var(--ink); }
+.lnk { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+.add { color: var(--muted); }
+.due { font-variant-numeric: tabular-nums; }
+.due.late { color: #B42318; font-weight: 600; }
+.lock { color: var(--muted); font-size: 11px; }
+
+/* popovers */
+.pop { position: absolute; z-index: 30; min-width: 220px; max-width: calc(100% - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 34px rgba(20,19,26,.2); padding: 6px; font-size: 13px; }
+.pop .mi { display: flex; width: 100%; gap: 8px; align-items: center; border: 0; background: none; border-radius: 8px; padding: 6px 10px; text-align: start; cursor: pointer; min-height: 32px; }
+.pop .mi:hover:not(:disabled) { background: var(--surface); }
+.pop .mi:disabled { color: var(--muted); cursor: not-allowed; }
+.pop .mi .ck { margin-inline-start: auto; color: var(--purple); font-weight: 700; }
+.pop .why { display: block; color: var(--warn); background: var(--warn-bg); border-radius: 8px; font-size: 12px; padding: 6px 10px; margin: 2px 2px 6px; line-height: 1.4; }
+.pop input { width: 100%; border: 1px solid var(--input); border-radius: 8px; padding: 7px 9px; margin-bottom: 4px; background: var(--panel); }
+.pop hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+.toast { position: absolute; inset-inline: 0; bottom: 14px; margin-inline: auto; width: max-content; max-width: calc(100% - 32px); background: var(--ink); color: var(--panel); border-radius: 12px; padding: 10px 14px; font-size: 13px; z-index: 40; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border-radius: 16px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h2 { margin: 0; font: 800 16px var(--f-head); color: var(--ink); }
+.card ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+.card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Linked sheets get the Content sheet's cells</h1>
+    <p class="lede">Spec 019 design. A sheet the team links to the board (Board ▾ → Link to board) keeps its own columns, rows and formatting. What changes is how a mapped cell looks and edits: the same status pill, people picker, type pill, pillar chip, date picker and link labels as the Content sheet. Switch between Before and After, then click the mapped cells.</p>
+  </header>
+  <div class="ctl">
+    <span>View</span><div class="seg" id="mode"><button type="button" data-v="before" aria-pressed="false">Before (today)</button><button type="button" data-v="after" aria-pressed="true">After</button></div>
+    <span>Signed in as</span><div class="seg" id="who"><button type="button" data-v="mm" aria-pressed="true">Marketing Manager</button><button type="button" data-v="cc" aria-pressed="false">Content Creator</button></div>
+    <span>Language</span><div class="seg" id="lang"><button type="button" data-v="en" aria-pressed="true">English</button><button type="button" data-v="ar" aria-pressed="false">العربية</button></div>
+  </div>
+
+  <div class="frame" id="frame" dir="ltr">
+    <div class="title"><span class="crumb" data-t="crumb">Sheets ›</span><b>TSC Calendar</b><span class="saved" data-t="saved">Saved</span>
+      <span class="right"><span class="pill" data-t="board">Board ▾</span><span class="pill" data-t="comments">Comments</span></span></div>
+    <div class="menubar" id="menubar"></div>
+    <div class="strip">🔍 ↶ ↷ 🖌 &nbsp;|&nbsp; EGP % .0 .00 123 ▾ &nbsp;|&nbsp; Inter ▾ &nbsp;|&nbsp; − 10 + &nbsp;|&nbsp; B I S A ▾ &nbsp;|&nbsp; fill ▾ borders ▾ merge ▾ &nbsp;|&nbsp; align ▾ …</div>
+    <div class="fbar"><div class="nb" id="nb">B3</div><div class="fx">fx</div><div class="v" id="fv"></div></div>
+    <div class="gw"><div class="g" id="g"></div></div>
+  </div>
+
+  <div class="cards">
+    <section class="card">
+      <h2>How mapped cells work</h2>
+      <ul>
+        <li><b>Stage</b>: the status pill with its dot. Click or press Enter for the stages you may move to; the others show who holds them.</li>
+        <li><b>Assignee</b>: avatar and name; the people picker searches the team.</li>
+        <li><b>Content type</b>: the coloured pill; its menu lists the workspace's types.</li>
+        <li><b>Pillar / theme</b>: a chip; its menu lists the task's theme's pillars.</li>
+        <li><b>Due date</b>: a date picker; past dates read red, as on the board.</li>
+        <li><b>Links</b> (brief, design, video, final): the site's name ("Google Docs", "claude.ai"), or "+ link" to add one.</li>
+        <li>Typing still works: type a name, a stage or a date and it is matched, as today. Paste, Fill, Delete and undo are unchanged.</li>
+      </ul>
+    </section>
+    <section class="card">
+      <h2>What stays the same</h2>
+      <ul>
+        <li>The sheet's own columns, row order, row heights, formatting, comments and frozen panes.</li>
+        <li>Unmapped columns are ordinary cells (Caption here).</li>
+        <li>Rows that aren't linked show plain text, with the "Not linked" note in the Task cell.</li>
+        <li>Who may change what: the same rules as the board and the Content sheet. A cell you can't change shows 🔒 and why.</li>
+        <li>The theme grouping, summary bar and Content-only buttons stay on the Content sheet.</li>
+      </ul>
+      <p>Phones: the same controls open as bottom sheets.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STAGES = [
+    ['todo', 'Planned', '#64748B', null], ['c-prog', 'Writing', '#3B82F6', null], ['c-final', 'Content Review', '#2E6FB0', 'Marketing Manager'], ['c-check', 'Content Check', '#1F5A94', 'Managing Director'],
+    ['r-design', 'Ready for Design', '#8B5CF6', null], ['d-prog', 'Initial Design', '#7C3AED', null], ['d-check', 'Final Design', '#5B3FB5', 'Brand Director'],
+    ['final-check', 'Final Check', '#F59E0B', 'Marketing Manager'], ['ready-publish', 'Ready to Publish', '#0EA5E9', null], ['scheduled', 'Scheduled', '#14B8A6', null], ['publish', 'Published', '#22C55E', null],
+  ]
+  const TYPES = { Post: '#1D4ED8', Reel: '#BE185D', Video: '#7E22CE', Article: '#0F766E', Report: '#B45309', 'Framework/Model': '#4338CA', Story: '#C2410C', Deck: '#334155' }
+  const PEOPLE = [['Raneem Sarhaan', 'RS', '#E05E5E'], ['Yosra Eltopgy', 'YE', '#16A34A'], ['Content Creator', 'CC', '#6D5AE6'], ['Graphic Designer', 'GD', '#475569'], ['Video Editor', 'VE', '#0E7490']]
+  const PILLARS = ['Sessions', 'Speakers', 'Venue', 'Partners']
+  const mix = (hex, a) => { const n = parseInt(hex.slice(1), 16); return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * a + 255 * (1 - a)).toString(16).padStart(2, '0')).join('') }
+  const tasks = [
+    { title: 'Retreat 26 - Quote - Hisham El Badawy - 2', stage: 'r-design', who: 0, type: 'Article', cap: '"Inventing an ‘intermediate level’ just to promote someone doesn’t solve the problem. It can multiply it."', design: '', pillar: 'Sessions', due: '2026-11-20' },
+    { title: 'Retreat 26 - Quote - Islam Saadany - 1', stage: 'c-final', who: 1, type: 'Article', cap: '"The strategy’s role in execution is not execution. It’s execution management."', design: 'https://www.canva.com/design/DAF', pillar: 'Sessions', due: '2026-11-12' },
+    { title: 'Retreat 26 - Venue reveal', stage: 'publish', who: 4, type: 'Reel', cap: 'Where we’re meeting this year 🏔️', design: 'https://claude.ai/public/artifacts/x', pillar: 'Venue', due: '2026-11-05' },
+    { title: 'Speakers line-up (draft)', stage: null, who: null, type: 'Post', cap: 'Not on the board yet', design: '', pillar: 'Speakers', due: '' },
+  ]
+  let mode = 'after', who = 'mm', lang = 'en', act = { r: 0, c: 1 }
+  const frame = document.getElementById('frame'), g = document.getElementById('g')
+  const site = u => { try { const h = new URL(u).hostname.replace(/^www\./, ''); return h.includes('docs.google') ? 'Google Docs' : h.includes('canva') ? 'Canva' : h } catch { return u } }
+  const fmtDate = d => d ? new Date(d + 'T00:00').toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' }) : ''
+  const today = '2026-11-17'
+  const may = st => { const owner = STAGES.find(s => s[0] === st)?.[3]; return !owner || (who === 'mm' && owner === 'Marketing Manager') }
+
+  function closePop() { frame.querySelector('.pop')?.remove() }
+  function toast(t) { frame.querySelector('.toast')?.remove(); const d = document.createElement('div'); d.className = 'toast'; d.setAttribute('role', 'status'); d.textContent = t; frame.appendChild(d); setTimeout(() => d.remove(), 2800) }
+  function pop(anchor, build) {
+    closePop()
+    const p = document.createElement('div'); p.className = 'pop'; p.setAttribute('role', 'menu'); build(p); frame.appendChild(p)
+    const fr = frame.getBoundingClientRect(), r = anchor.getBoundingClientRect()
+    const x = frame.dir === 'rtl' ? r.right - fr.left - p.offsetWidth : r.left - fr.left
+    p.style.left = Math.max(8, Math.min(x, fr.width - p.offsetWidth - 8)) + 'px'; p.style.top = (r.bottom - fr.top + 4) + 'px'
+    p.querySelector('input, .mi:not(:disabled)')?.focus()
+  }
+  const item = (p, html, on, opts = {}) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem'); b.innerHTML = html + (opts.ck ? '<span class="ck">✓</span>' : ''); b.disabled = !!opts.off; if (opts.off) b.title = opts.off; b.addEventListener('click', () => { closePop(); on() }); p.appendChild(b); return b }
+
+  function cellHTML(t, f) {
+    if (mode === 'before' || t.stage === null) {
+      // Today: the task's value as text (only Stage has a pill, without a menu).
+      if (f === 'stage') return t.stage ? `<span class="status" style="background:${mix(STAGES.find(s => s[0] === t.stage)[2], .14)};border-color:${mix(STAGES.find(s => s[0] === t.stage)[2], .38)}">${STAGES.find(s => s[0] === t.stage)[1]}</span>` : ''
+      if (f === 'who') return `<span class="t">${t.who === null ? '' : PEOPLE[t.who][0]}</span>`
+      if (f === 'type') return `<span class="t">${t.type}</span>`
+      if (f === 'design') return t.design ? `<span class="t lnk">${t.design.replace(/^https?:\/\//, '')}</span>` : (t.stage === null ? '' : '<span class="na">Not applicable</span>')
+      if (f === 'pillar') return `<span class="t">${t.pillar}</span>`
+      if (f === 'due') return `<span class="t">${t.due}</span>`
+    }
+    const s = STAGES.find(x => x[0] === t.stage)
+    if (f === 'stage') return `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}<span class="car">▾</span></span>`
+    if (f === 'who') { const p = PEOPLE[t.who]; return p ? `<span class="chip"><span class="av" style="background:${p[2]}">${p[1]}</span><span class="t">${p[0]}</span></span>` : `<span class="chip"><span class="av empty"></span><span class="t na">Unassigned</span></span>` }
+    if (f === 'type') return `<span class="typepill" style="background:${TYPES[t.type] ?? '#52525B'}">${t.type}<span class="car">▾</span></span>`
+    if (f === 'design') return t.design ? `<span class="lnk">${site(t.design)}</span>` : '<span class="add">+ link</span>'
+    if (f === 'pillar') return `<span class="pillar">${t.pillar}</span>`
+    if (f === 'due') return `<span class="due${t.due < today && t.stage !== 'publish' ? ' late' : ''}">${fmtDate(t.due)}</span>`
+  }
+
+  function open(t, f, el) {
+    if (mode === 'before' || t.stage === null) { toast(mode === 'before' ? 'Before: type the new value into the cell.' : 'This row isn’t linked to a task.'); return }
+    if (f === 'stage') pop(el, p => {
+      const off = STAGES.filter(s => !may(s[0]))
+      if (off.length) { const w = document.createElement('span'); w.className = 'why'; w.textContent = `Some stages belong to their owner (${[...new Set(off.map(s => s[3]))].join(', ')}).`; p.appendChild(w) }
+      for (const s of STAGES) item(p, `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}</span>`, () => { t.stage = s[0]; render(); toast(`Moved to ${s[1]}. The board shows it too.`) }, { ck: t.stage === s[0], off: may(s[0]) ? null : `${s[3]} moves this stage` })
+    })
+    if (f === 'who') pop(el, p => {
+      const inp = document.createElement('input'); inp.placeholder = 'Search people'; inp.setAttribute('aria-label', 'Search people'); p.appendChild(inp)
+      const list = document.createElement('div'); p.appendChild(list)
+      const fill = q => { list.innerHTML = ''; PEOPLE.forEach((pp, i) => { if (q && !pp[0].toLowerCase().includes(q)) return; item(list, `<span class="av" style="background:${pp[2]}">${pp[1]}</span>${pp[0]}`, () => { t.who = i; render() }, { ck: t.who === i }) }); const hr = document.createElement('hr'); list.appendChild(hr); item(list, '<span class="av empty"></span>Unassigned', () => { t.who = null; render() }, { ck: t.who === null }) }
+      inp.addEventListener('input', () => fill(inp.value.toLowerCase())); fill('')
+    })
+    if (f === 'type') pop(el, p => { for (const [k, c] of Object.entries(TYPES)) item(p, `<span class="typepill" style="background:${c}">${k}</span>`, () => { t.type = k; render() }, { ck: t.type === k }) })
+    if (f === 'pillar') pop(el, p => { for (const k of PILLARS) item(p, `<span class="pillar">${k}</span>`, () => { t.pillar = k; render() }, { ck: t.pillar === k }) })
+    if (f === 'due') pop(el, p => { const i = document.createElement('input'); i.type = 'date'; i.value = t.due; i.setAttribute('aria-label', 'Due date'); i.addEventListener('change', () => { t.due = i.value; closePop(); render() }); p.appendChild(i); item(p, 'Clear the date', () => { t.due = ''; render() }) })
+    if (f === 'design') pop(el, p => { const i = document.createElement('input'); i.placeholder = 'Paste a link'; i.value = t.design; i.setAttribute('aria-label', 'Design link'); i.addEventListener('keydown', e => { if (e.key === 'Enter') { t.design = i.value.trim(); closePop(); render() } }); p.appendChild(i); if (t.design) item(p, 'Open link ↗', () => toast('Opens ' + t.design)) })
+  }
+
+  const COLS = [['stage', 'A', 'Stage', 'Stage'], ['who', 'B', 'Assignee', 'Owner'], ['type', 'C', 'Content type', 'Content Type'], ['title', 'D', 'Task column', 'Topic / Title'], ['cap', 'E', '', 'Caption (LinkedIn)'], ['design', 'F', 'Design link', 'Link'], ['pillar', 'G', 'Pillar', 'Pillar'], ['due', 'H', 'Due date', 'Due']]
+  function render() {
+    g.innerHTML = ''
+    const add = (cls, html, attrs = {}) => { const d = document.createElement('div'); d.className = 'c ' + cls; d.innerHTML = html; for (const [k, v] of Object.entries(attrs)) d.setAttribute(k, v); g.appendChild(d); return d }
+    add('h', '')
+    COLS.forEach(([, l, badge]) => add('h', `<span>${l}</span>${badge ? `<span class="badge${badge === 'Task column' ? ' task' : ''}">${badge}</span>` : ''}`))
+    add('rn', '1'); COLS.forEach(c => add('hd', `<span class="t">${c[3]}</span>`))
+    tasks.forEach((t, r) => {
+      add('rn', `${t.stage !== null ? '<span class="mk" aria-hidden="true">↗</span>' : ''}${r + 2}`)
+      COLS.forEach(([f], c) => {
+        let html
+        if (f === 'title') html = t.stage !== null ? `<span class="t taskname">${t.title}</span><a class="open" href="#" onclick="return false">Open task ↗</a>` : `<span class="t">${t.title}</span><span class="note">Not linked</span>`
+        else if (f === 'cap') html = `<span class="t wrapcell">${t.cap}</span>`
+        else html = cellHTML(t, f)
+        const d = add((act.r === r && act.c === c ? 'act ' : '') + (f !== 'title' && f !== 'cap' && mode === 'after' && t.stage !== null ? 'ctrl' : ''), html, { role: 'gridcell', tabindex: '0', 'data-r': r, 'data-c': c })
+        d.addEventListener('click', () => { act = { r, c }; render(); const el = g.querySelector(`[data-r="${r}"][data-c="${c}"]`); if (f !== 'title' && f !== 'cap') open(t, f, el) })
+        d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(t, f, d) } })
+      })
+    })
+    const t = tasks[act.r], f = COLS[act.c][0]
+    document.getElementById('nb').textContent = `${COLS[act.c][1]}${act.r + 2}`
+    document.getElementById('fv').textContent = f === 'stage' ? (STAGES.find(s => s[0] === t.stage)?.[1] ?? '') : f === 'who' ? (t.who === null ? '' : PEOPLE[t.who][0]) : f === 'design' ? t.design : (t[f] ?? '')
+  }
+  const MB = { en: ['File', 'Edit', 'View', 'Insert', 'Format', 'Data', 'Help'], ar: ['ملف', 'تعديل', 'عرض', 'إدراج', 'تنسيق', 'بيانات', 'مساعدة'] }
+  const T = { en: { crumb: 'Sheets ›', saved: 'Saved', board: 'Board ▾', comments: 'Comments' }, ar: { crumb: 'الجداول ›', saved: 'تم الحفظ', board: 'اللوحة ▾', comments: 'التعليقات' } }
+  function setLang(v) { lang = v; frame.dir = v === 'ar' ? 'rtl' : 'ltr'; document.getElementById('menubar').innerHTML = MB[v].map(x => `<span>${x}</span>`).join(''); frame.querySelectorAll('[data-t]').forEach(e => { e.textContent = T[v][e.dataset.t] }); render() }
+  const seg = (id, fn) => document.getElementById(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); closePop(); fn(b.dataset.v) })
+  seg('mode', v => { mode = v; render() }); seg('who', v => { who = v; render() }); seg('lang', setLang)
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.pop') && !e.target.closest('.c')) closePop() })
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop() })
+  setLang('en')
+})()
+</script>

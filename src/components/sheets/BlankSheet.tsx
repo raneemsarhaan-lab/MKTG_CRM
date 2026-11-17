@@ -16,10 +16,12 @@
  * letters still count every row and column, as in Excel (hide row 5 and the
  * next one is still 6).
  */
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
-import type { CellStyle, ColFilter, ConditionalRule, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, GroupBy, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, WordField } from '@/types/index'
+import { WORD_FIELDS } from '@/types/index'
+import { STAGE_META } from '@/lib/stage-meta'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
 import { display, formatKey, indexFormats, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
@@ -27,8 +29,9 @@ import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from
 import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
 import { FilterMenu } from './format/StyleTools'
 import { useTaskLinks, type LinksApi } from './links/useTaskLinks'
-import { taskIdFrom } from '@/lib/sheet-links'
-import { StagePill } from './links/LinkDialogs'
+import { normTitle, shownWord, taskIdFrom } from '@/lib/sheet-links'
+import { CONTROL_FIELDS, FieldEditor, FieldIcon, FieldValue } from './links/FieldCells'
+import { AddFieldMenu, FIELDS_OPEN, FieldsDrawer, MatchDialog, ValuesDialog, type ColRef } from './links/FieldsPanel'
 import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
 import { areaCols, areaRows, cellName, colLetters, unionCells, unionSize, wholeCols, wholeRows } from '@/lib/sheet-selection'
@@ -63,7 +66,9 @@ export interface BlankSheetProps {
 export function BlankSheet(p: BlankSheetProps) {
   const t = useTranslations('sheets')
   const tl = useTranslations('sheets.links')
+  const tf = useTranslations('sheets.fields')
   const { doc } = p
+  const locale = useLocale()
   const [picked, setActive] = useState<ActiveCell | null>(null)
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: PopItem[]; anchor: HTMLElement } | null>(null)
@@ -100,7 +105,13 @@ export function BlankSheet(p: BlankSheetProps) {
     for (const id of filterScope) if (!keep.has(id)) out.add(id)
     return out
   }, [fArea, filter, filterScope, cellView])
-  const vRows = useMemo(() => doc.rows.filter(r => !hiddenR.has(r.id) && !filteredOut.has(r.id)), [doc.rows, hiddenR, filteredOut])
+  const baseRows = useMemo(() => doc.rows.filter(r => !hiddenR.has(r.id) && !filteredOut.has(r.id)), [doc.rows, hiddenR, filteredOut])
+  // Spec 019: Group rows by (a task's theme › pillar, stage, assignee or type, or a column's value).
+  // The grid's order is the grouped one, so every index below stays over what's on screen.
+  const grouping = useMemo(() => groupRows(doc, baseRows, view.groupBy ?? null, locale, {
+    none: tf('bandNone'), blank: tf('bandBlank'), noTheme: tf('bandNoTheme'), unassigned: tf('bandUnassigned'), noType: tf('bandNoType'), noPillar: tf('noPillar'),
+  }), [doc, baseRows, view.groupBy, locale, tf])
+  const vRows = grouping.rows
   const vCols = useMemo(() => doc.cols.filter(c => !hiddenC.has(c.id)), [doc.cols, hiddenC])
   /** The grid shows its first cell as active before anything is clicked; the toolbar must agree. */
   const active: ActiveCell | null = picked && vRows.some(r => r.id === picked.key) ? picked
@@ -113,7 +124,6 @@ export function BlankSheet(p: BlankSheetProps) {
   const widths = useMemo(() => Object.fromEntries(doc.cols.map(c => [c.id, c.width ?? DEFAULT_COL_W])), [doc.cols])
   const value = (rowId: string, colId: string) => doc.cells[rowId]?.[colId] ?? ''
   const ro = p.readOnly
-  const locale = useLocale()
 
   // ── spec 015: formatting, merges ────────────────────────────────────────
   /** Rows grow to fit wrapped text and large type, unless someone set their height (as Excel's autofit). */
@@ -194,6 +204,85 @@ export function BlankSheet(p: BlankSheetProps) {
   })
   /** Every change goes through the link router: mapped cells to their tasks, the rest as before (spec 016 R5). */
   const applyR = (label: string, changes: BlankChange[]) => { void lk.applyRouted(label, changes) }
+
+  // ── spec 019: task fields, ＋, the Fields drawer, column drag ───────────
+  const [fieldEd, setFieldEd] = useState<{ rowId: string; col: string; field: TaskField; anchor: HTMLElement } | null>(null)
+  const [addMenu, setAddMenu] = useState<HTMLElement | null>(null)
+  const [drawer, setDrawer] = useState(false)
+  const [valuesFor, setValuesFor] = useState<WordField | null>(null)
+  const [match, setMatch] = useState<{ field: WordField; colId: string; colName: string; values: { text: string; n: number }[] } | null>(null)
+  useEffect(() => {
+    const on = () => setDrawer(true)
+    document.addEventListener(FIELDS_OPEN, on)
+    return () => document.removeEventListener(FIELDS_OPEN, on)
+  }, [])
+  const isWord = (f: TaskField): f is WordField => (WORD_FIELDS as readonly string[]).includes(f)
+  const fieldName = (f: TaskField) => (f.startsWith('col:') ? lk.teamCols.find(c => `col:${c.id}` === f)?.name ?? f : tf(`names.${f}`))
+  /** The headings row: an unlinked sheet's first row, or a linked sheet's first row that names no task. */
+  const headId = (() => { const f = doc.rows[0]?.id; if (!f) return null; return lk.map ? (lk.isHeading(f) ? f : null) : f })()
+  const colRefs: ColRef[] = vCols.map(c => ({
+    id: c.id, letter: colLetters(colIndex.get(c.id) ?? 0), name: headId ? value(headId, c.id) : '',
+    field: lk.map?.fields[c.id] ?? null, task: lk.map?.taskCol === c.id,
+  }))
+  /** ＋ and the drawer: a field as a new column at the sheet's end, named in the headings row. */
+  function addFieldAtEnd(f: TaskField) {
+    if (ro) { p.onNotice(ro); return }
+    if (!lk.map) { lk.askLink(); return }
+    if (doc.cols.length + 1 > BLANK_COL_LIMIT) { p.onNotice(t('err.too_many_cols')); return }
+    const last = doc.cols[doc.cols.length - 1]
+    void lk.addField(f, { newCol: { id: p.newId(), position: (last?.position ?? 0) + 1 } }, { heading: fieldName(f) })
+    p.onNotice(tf('added', { name: fieldName(f) }))
+  }
+  /** A field switched off: its column goes (undo brings it back); the tasks keep their values. */
+  function hideField(f: TaskField) {
+    if (ro) { p.onNotice(ro); return }
+    const colId = Object.entries(lk.map?.fields ?? {}).find(([, x]) => x === f)?.[0]
+    if (!colId) return
+    const at = vCols.findIndex(c => c.id === colId)
+    if (at < 0) lk.removeField(colId)
+    else if (vCols.length <= 1) { p.onNotice(t('menu.keepOneCol')); return }
+    else deleteColsAt([at])
+    p.onNotice(tf('hidden', { name: fieldName(f) }))
+  }
+  /** "Use this column for a task field": Stage, Type and Priority match the column's own words first. */
+  function useColumnFor(colId: string, f: TaskField) {
+    if (ro) { p.onNotice(ro); return }
+    if (isWord(f)) {
+      const seen = new Map<string, { text: string; n: number }>()
+      for (const r of doc.rows) {
+        if (r.id === headId) continue
+        const v = value(r.id, colId).trim()
+        if (!v) continue
+        const k = normTitle(v), e = seen.get(k)
+        if (e) e.n++; else seen.set(k, { text: v, n: 1 })
+      }
+      if (seen.size) { setMatch({ field: f, colId, colName: (headId ? value(headId, colId) : '') || colLetters(colIndex.get(colId) ?? 0), values: [...seen.values()].slice(0, 60) }); return }
+    }
+    void lk.addField(f, { colId })
+  }
+  /** Drag a heading (spec 019): the column moves before the one it's dropped on, or to the end. One undo step. */
+  function moveCol(from: string, before: string | null) {
+    if (ro) { p.onNotice(ro); return }
+    const src = doc.cols.find(c => c.id === from)
+    if (!src || from === before) return
+    const rest = doc.cols.filter(c => c.id !== from)
+    const at = before ? rest.findIndex(c => c.id === before) : rest.length
+    if (at < 0 || at === doc.cols.indexOf(src)) return
+    // A merge across columns can't be split or entered by a move (as Excel).
+    const spans = extras.merges.map(m => [colIndex.get(m.left) ?? 0, colIndex.get(m.right) ?? 0].sort((a, b) => a - b)).filter(([a, b]) => a !== b)
+    const i = colIndex.get(from) ?? 0
+    const prevI = at > 0 ? colIndex.get(rest[at - 1].id) ?? -1 : -1, nextI = at < rest.length ? colIndex.get(rest[at].id) ?? -1 : -1
+    if (spans.some(([a, b]) => (i >= a && i <= b) || (prevI >= a && nextI <= b && prevI >= 0 && nextI >= 0))) { p.onNotice(tf('moveMerged')); return }
+    const prev = rest[at - 1], next = rest[at]
+    const pos = prev && next ? (prev.position + next.position) / 2 : next ? next.position - 1 : prev ? prev.position + 1 : 0
+    applyR('moveCol', [{ kind: 'colOrder', cols: [{ id: from, before: src.position, after: pos }] }])
+  }
+  /** The items of "Use this column for a task field ▸": the fields not shown yet. */
+  function useForItems(colId: string): PopItem[] {
+    const shownF = new Set(Object.values(lk.map?.fields ?? {}))
+    const all: TaskField[] = [...(['stage', 'assignee', 'owner', 'due', 'priority', 'platform', 'type', 'theme', 'pillar', 'link:doc', 'link:design', 'link:post', 'link:published'] as TaskField[]), ...lk.teamCols.map(c => `col:${c.id}` as TaskField)]
+    return all.filter(f => !shownF.has(f)).map(f => ({ key: `use-${f}`, label: fieldName(f), onSelect: () => useColumnFor(colId, f) }))
+  }
 
   /** Cells to change, with what they held; unchanged ones drop out. */
   function cellChange(list: { rowId: string; colId: string; value: string }[]): BlankChange | null {
@@ -417,7 +506,24 @@ export function BlankSheet(p: BlankSheetProps) {
         ...(hiddenNear('rows', q).length ? [{ key: 'unhideRows', label: e('unhideRows'), ...lock, onSelect: () => viewOp('unhideRows') }] : [])]
     } else if (target.kind === 'col') {
       const ids = (several ? selCols : range(q.c0, q.c1)).map(c => vCols[c]?.id).filter((x): x is string => !!x)
+      // Spec 019: a field column can be hidden or turned back into a regular one; a regular column can become a field.
+      const fieldItems: PopItem[] = []
+      const colId = !several && q.c0 === q.c1 ? vCols[q.c0]?.id : undefined
+      if (colId) {
+        const f = lk.map?.fields[colId]
+        if (f) {
+          fieldItems.push(
+            { key: 'hideField', label: tf('menuHide'), ...lock, ...(ro ? {} : allCols), onSelect: () => hideField(f) },
+            { key: 'toRegular', label: tf('menuToRegular'), ...lock, onSelect: () => lk.removeField(colId) },
+          )
+          if (isWord(f)) fieldItems.push({ key: 'values', label: tf('menuValues'), onSelect: () => setValuesFor(f) })
+        } else if (lk.map && colId !== lk.map.taskCol) {
+          fieldItems.push({ key: 'useFor', label: tf('menuUseFor'), sub: true, ...lock,
+            onSelect: () => requestAnimationFrame(() => requestAnimationFrame(() => setMenu({ at, anchor, items: useForItems(colId) }))) })
+        } else if (!lk.map) fieldItems.push({ key: 'linkBoard', label: tf('menuLink'), ...lock, onSelect: () => lk.askLink() })
+      }
       items = [...clip, { kind: 'sep', key: 's1' }, ...colItems, delCol, clearItem, { kind: 'sep', key: 's2' },
+        ...(fieldItems.length ? [...fieldItems, { kind: 'sep' as const, key: 's3' }] : []),
         { key: 'resizeCol', label: t('menu.resizeCol'), ...lock, onSelect: () => setResize({ kind: 'col', ids, value: vCols[q.c0]?.width ?? DEFAULT_COL_W }) },
         { key: 'hideCols', label: e('hideCols'), ...lock, ...(ro ? {} : allCols), onSelect: () => viewOp('hideCols') },
         ...(hiddenNear('cols', q).length ? [{ key: 'unhideCols', label: e('unhideCols'), ...lock, onSelect: () => viewOp('unhideCols') }] : [])]
@@ -442,7 +548,7 @@ export function BlankSheet(p: BlankSheetProps) {
                                        onPointerDown={ev => ev.stopPropagation()}
                                        onClick={ev => { ev.stopPropagation(); unhideBefore('cols', i) }} /></>
           : colLetters(i),
-        className: `is-letter${before ? ' is-after-hidden' : ''}`,
+        className: `is-letter${before ? ' is-after-hidden' : ''}${lk.map?.fields[col] ? ' is-field' : ''}`,
       }
     },
     // Spec 016: the Task column and mapped columns say so on their heading.
@@ -452,7 +558,7 @@ export function BlankSheet(p: BlankSheetProps) {
       const f = lk.map.fields[col]
       if (!f) return null
       const name = f.startsWith('col:') ? tl('teamCol', { name: lk.teamCols.find(c => c.id === f.slice(4))?.name ?? '' }) : tl(`fields.${f}`)
-      return <span className="fx-lk-badge" data-field-badge={f} title={tl('badgeTip', { field: name })}>{name}</span>
+      return <span className="fx-lk-badge" data-field-badge={f} title={tl('badgeTip', { field: name })}><FieldIcon field={f} />{name}</span>
     },
     rowProps: row => ({ className: `is-blank${(rowIndex.get(row.id) ?? 0) > 0 && hiddenR.has(doc.rows[(rowIndex.get(row.id) ?? 1) - 1].id) ? ' is-after-hidden' : ''}`, level: 1 }),
     cellRole: () => 'gridcell',
@@ -464,15 +570,19 @@ export function BlankSheet(p: BlankSheetProps) {
     isText: (row, col) => col !== 'rowNo' && !ro && !lk.shown(row.id, col)?.na,
     textValue: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     copyText: (row, col) => { const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
-    isMenu: () => false,
+    // Spec 019: a field cell on a linked row opens its control (typing still works, through the same rules).
+    isMenu: (row, col) => {
+      if (col === 'rowNo' || ro) return false
+      const sh = lk.shown(row.id, col)
+      return !!sh && !sh.na && sh.editable && CONTROL_FIELDS.has(sh.field)
+    },
     render: (row, col) => {
       if (col === 'rowNo') return null
       // Spec 016: a mapped cell on a linked row shows its task's value; the Task cell shows its note.
       const sh = lk.shown(row.id, col)
       if (sh) {
         if (sh.na) return <span className="fx-sheet-cell-text fx-lk-na">{sh.text}</span>
-        if (sh.field === 'stage' && sh.raw) return <StagePill stage={sh.raw} />
-        if (sh.field.startsWith('link:') && sh.raw) return <a className="fx-sheet-link fx-sheet-ellipsis" href={sh.raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} onClick={e => e.stopPropagation()}>{sh.raw.replace(/^https?:\/\//, '')}</a>
+        if (lk.map) return <FieldValue field={sh.field} raw={sh.raw} map={lk.map} people={lk.choices?.people ?? []} />
         return <span className="fx-sheet-cell-text" dir="auto">{sh.text}</span>
       }
       if (lk.map && col === lk.map.taskCol) {
@@ -543,7 +653,17 @@ export function BlankSheet(p: BlankSheetProps) {
       return null
     },
     onCancelDraft: () => {},
-    onOpen: () => {},
+    onOpen: (row, col, anchor) => { const sh = lk.shown(row.id, col); if (sh && !sh.na) setFieldEd({ rowId: row.id, col, field: sh.field, anchor }) },
+    onReorder: (col, before) => moveCol(col, before),
+    tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
+                        onPointerDown={ev => ev.stopPropagation()} onClick={ev => { if (ro) { p.onNotice(ro); return } setAddMenu(ev.currentTarget) }}>＋</button>,
+    rowBand: row => {
+      const b = grouping.bands.get(row.id)
+      if (!b) return null
+      return <span className={`fx-band${b.main ? '' : ' is-sub'}`} data-band-name={b.main ?? b.sub ?? ''}>
+        {b.main && <b>{b.main}</b>}{b.sub && <span className="fx-band-sub">{b.main ? ' › ' : '› '}{b.sub}</span>}<span className="fx-band-n">{b.n}</span>
+      </span>
+    },
     onPaste: () => {},
     onResize: (col, w) => { if (!ro) setWidths([col], w) },
     selection: true,
@@ -628,7 +748,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (clears.length) setMergeAsk({ value: keep, run }); else run()
   }
   // ── stage 2: hide, unhide, freeze (FR-047) ──────────────────────────────
-  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {} })
+  const viewNow = (): Partial<SheetView> => ({ frozenRows: view.frozenRows ?? 0, frozenCols: view.frozenCols ?? 0, hiddenRows: view.hiddenRows ?? [], hiddenCols: view.hiddenCols ?? [], filterArea: view.filterArea ?? null, filter: view.filter ?? {}, groupBy: view.groupBy ?? null })
   function setView(label: string, after: Partial<SheetView>) {
     if (ro) { p.onNotice(ro); return }
     applyR(label, [{ kind: 'view', before: viewNow(), after: { ...viewNow(), ...after } }])
@@ -1073,10 +1193,41 @@ export function BlankSheet(p: BlankSheetProps) {
                        onOk={() => { const run = mergeAsk.run; setMergeAsk(null); run(); focusActive() }} />
       )}
       {menu && (
-        <PopMenu at={menu.at} items={menu.items} label={t('tabMenu.label')} attr="data-cell-menu"
+        <PopMenu key={menu.items[0]?.key} at={menu.at} items={menu.items} label={t('tabMenu.label')} attr="data-cell-menu"
                  onClose={() => { setMenu(null); focusActive() }} />
       )}
       {lk.node}
+      {fieldEd && lk.map && (() => {
+        const tk = lk.taskOfRow(fieldEd.rowId)
+        if (!tk) return null
+        const ch = lk.choices
+        return <FieldEditor field={fieldEd.field} task={tk} anchor={fieldEd.anchor} map={lk.map}
+                            choices={{ people: ch?.people ?? [], types: ch?.types ?? [], pillars: ch?.pillars ?? [], projects: ch?.projects ?? [] }}
+                            onPick={v => { const c = cellChange([{ rowId: fieldEd.rowId, colId: fieldEd.col, value: v }]); if (c) applyR('edit', [c]) }}
+                            onClose={restore => { setFieldEd(null); if (restore) focusActive() }} />
+      })()}
+      {addMenu && (
+        <AddFieldMenu anchor={addMenu} shown={new Set(Object.values(lk.map?.fields ?? {}))} teamCols={lk.teamCols} linked={!!lk.map}
+                      onField={f => addFieldAtEnd(f)} onRegular={() => insertCols(vCols.length, 1)}
+                      onClose={() => { setAddMenu(null); focusActive() }} />
+      )}
+      {drawer && (
+        <FieldsDrawer map={lk.map} cols={colRefs} teamCols={lk.teamCols} groupBy={view.groupBy ?? null} groupCols={colRefs} readOnly={ro}
+                      onToggle={(f, on) => (on ? addFieldAtEnd(f) : hideField(f))} onValues={f => setValuesFor(f)}
+                      onGroupBy={g => setView('groupBy', { groupBy: g })} onAddRegular={() => insertCols(vCols.length, 1)}
+                      onAskLink={() => lk.askLink()} onClose={() => { setDrawer(false); focusActive() }} />
+      )}
+      {valuesFor && lk.map && (
+        <ValuesDialog field={valuesFor} map={lk.map} types={lk.choices?.types ?? []}
+                      onSave={(words, show) => { if (ro) p.onNotice(ro); else lk.setWords(valuesFor, words, show); setValuesFor(null); focusActive() }}
+                      onClose={() => { setValuesFor(null); focusActive() }} />
+      )}
+      {match && lk.map && (
+        <MatchDialog field={match.field} colName={match.colName} values={match.values} map={lk.map} types={lk.choices?.types ?? []}
+                     linkedRows={Object.keys(lk.rowTasks).length}
+                     onSave={(words, win) => { void lk.addField(match.field, { colId: match.colId }, { words, win }); setMatch(null); focusActive() }}
+                     onClose={() => { setMatch(null); focusActive() }} />
+      )}
       {filterUi && (() => {
         const others = { ...filter }
         delete others[filterUi.col]
@@ -1094,4 +1245,67 @@ export function BlankSheet(p: BlankSheetProps) {
       )}
     </div>
   )
+}
+
+/** A band over the first row of each group: its name (or a pillar under the theme above) and how many rows it holds. */
+export interface Band { main: string | null; sub: string | null; n: number }
+const STAGE_ORDER = Object.keys(STAGE_META) as StageId[]
+
+/**
+ * Spec 019 FR (group by): the rows in groups, each group in the sheet's order.
+ * The headings row (a first row that names no task) stays on top; rows with no
+ * task go last when grouping by a task's field.
+ */
+export function groupRows<R extends { id: string }>(doc: SheetDoc, rows: R[], g: GroupBy | null, locale: string,
+  w: { none: string; blank: string; noTheme: string; unassigned: string; noType: string; noPillar: string }): { rows: R[]; bands: Map<string, Band> } {
+  const bands = new Map<string, Band>()
+  if (!g || !rows.length) return { rows, bands }
+  const ex = doc.extras, map = ex?.taskMap ?? null
+  if (g.by !== 'col' && !map) return { rows, bands }
+  if (g.by === 'col' && !doc.cols.some(c => c.id === g.col)) return { rows, bands }
+  const rt = ex?.rowTasks ?? {}, tks = ex?.tasks ?? {}
+  const first = doc.rows[0]?.id
+  const head = first && rows[0]?.id === first && (!map || !taskIdFrom(doc.cells[first]?.[map.taskCol] ?? '')) ? rows[0] : null
+  type Key = { key: string; order: string; main: string; sub?: string }
+  const keyOf = (rowId: string): Key => {
+    if (g.by === 'col') {
+      const v = (doc.cells[rowId]?.[g.col] ?? '').trim()
+      return v ? { key: `v${normTitle(v)}`, order: `0${v.toLowerCase()}`, main: v } : { key: 'blank', order: '2', main: w.blank }
+    }
+    const tk = rt[rowId] ? tks[rt[rowId]] : null
+    if (!tk) return { key: 'none', order: '9', main: w.none }
+    const m = tk.meta
+    if (g.by === 'theme') {
+      const th = m?.theme ?? '', pl = m?.pillar ?? ''
+      return { key: `t${th}\u0000${pl}`, order: `${th ? `0${th.toLowerCase()}` : '1'}\u0000${pl ? `0${pl.toLowerCase()}` : '1'}`, main: th || w.noTheme, sub: pl || w.noPillar }
+    }
+    if (g.by === 'stage') {
+      const s = m?.stage || tk.stage
+      const i = STAGE_ORDER.indexOf(s as StageId)
+      const board = STAGE_META[s as StageId] ? (locale.startsWith('ar') ? STAGE_META[s as StageId].label_ar : STAGE_META[s as StageId].label_en) : s
+      return { key: `s${s}`, order: `0${String(i < 0 ? 99 : i).padStart(3, '0')}`, main: shownWord(s, map?.words?.stage, map?.show, board) }
+    }
+    const v = g.by === 'assignee' ? m?.assignee ?? '' : m?.type ?? ''
+    if (!v) return { key: 'empty', order: '1', main: g.by === 'assignee' ? w.unassigned : w.noType }
+    return { key: `v${v}`, order: `0${v.toLowerCase()}`, main: g.by === 'type' ? shownWord(v, map?.words?.type, map?.show, v) : v }
+  }
+  const buckets = new Map<string, { k: Key; rows: R[] }>()
+  for (const r of rows) {
+    if (r === head) continue
+    const k = keyOf(r.id)
+    const b = buckets.get(k.key)
+    if (b) b.rows.push(r); else buckets.set(k.key, { k, rows: [r] })
+  }
+  const list = [...buckets.values()].sort((a, b) => a.k.order.localeCompare(b.k.order))
+  const out: R[] = head ? [head] : []
+  let lastMain: string | null = null
+  for (const b of list) {
+    const theme = g.by === 'theme' && b.k.key !== 'none'
+    const sameTheme = theme && lastMain === b.k.main
+    // Theme › Pillar: a new theme names both; the next pillars of the same theme name only themselves.
+    bands.set(b.rows[0].id, { main: sameTheme ? null : b.k.main, sub: theme ? b.k.sub ?? null : null, n: b.rows.length })
+    lastMain = b.k.main
+    out.push(...b.rows)
+  }
+  return { rows: out, bands }
 }

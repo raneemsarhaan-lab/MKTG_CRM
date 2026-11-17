@@ -15,13 +15,14 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { LinkedTask, SheetDoc, SheetTaskMap, TaskField, TaskFieldResult, TaskFieldValues } from '@/types/index'
+import type { LinkedTask, SheetDoc, SheetTaskMap, TaskField, TaskFieldResult, TaskFieldValues, WordField } from '@/types/index'
+import { WORD_FIELDS } from '@/types/index'
 import type { BlankChange, RowTasksChange, TaskFieldsChange } from '@/lib/sheet-undo'
 import type { GridRect } from '@/components/sheet/GridCore'
 import type { SheetsApi } from '../types'
-import type { TaskHit } from '@/actions/sheet-links'
+import type { LinkChoices, TaskHit } from '@/actions/sheet-links'
 import { STAGE_META } from '@/lib/stage-meta'
-import { taskIdFrom, taskLink } from '@/lib/sheet-links'
+import { shownWord, taskIdFrom, taskLink } from '@/lib/sheet-links'
 import { colLetters } from '@/lib/sheet-selection'
 import { useUIStore } from '@/store/useUIStore'
 import { AddTasks, ChooseTask, CreateTasksPreview, LinkDialog, stageLabel, type ColInfo, type CreateRow, type TeamCol } from './LinkDialogs'
@@ -74,7 +75,7 @@ export function useTaskLinks(p: {
     | { k: 'add' }
     | { k: 'create'; rows: CreateRow[] }
     | null>(null)
-  const [choices, setChoices] = useState<{ projects: { id: string; name: string }[]; people: { id: string; name: string }[]; teamCols: TeamCol[]; canCreate: boolean } | null>(null)
+  const [choices, setChoices] = useState<LinkChoices | null>(null)
   /** Rows that matched several tasks, until they're chosen (not stored: after a reload they read as Not linked). */
   const [ambiguous, setAmbiguous] = useState<Record<string, TaskHit[]>>({})
 
@@ -99,7 +100,10 @@ export function useTaskLinks(p: {
     if (!tk) return null
     const na = !tk.applies.includes(f)
     const raw = tk.values[f] ?? ''
-    return { field: f, raw, text: na ? t('na') : f === 'stage' ? stageLabel(raw, locale) : raw, na, editable: f === 'stage' ? !tk.dropped : tk.editable && !tk.dropped }
+    // Spec 019: this sheet's words for a stage, type or priority, when it shows them.
+    const board = f === 'stage' ? stageLabel(raw, locale) : raw
+    const text = (WORD_FIELDS as readonly string[]).includes(f) ? shownWord(raw, map?.words?.[f as WordField], map?.show, board) : board
+    return { field: f, raw, text: na ? t('na') : text, na, editable: f === 'stage' ? !tk.dropped : tk.editable && !tk.dropped }
   }
   /** The first row is the sheet's headings unless it names a task by link. */
   const isHeading = (rowId: string, m = map) => !!m && p.doc.rows[0]?.id === rowId && !taskIdFrom(p.value(rowId, m.taskCol))
@@ -153,7 +157,7 @@ export function useTaskLinks(p: {
       if (ch.kind === 'deleteCols') {
         const gone = new Set(ch.cols.map(c => c.id))
         if (gone.has(m.taskCol)) fwd.push({ kind: 'taskMap', before: m, after: null })
-        else if (Object.keys(m.fields).some(c => gone.has(c))) fwd.push({ kind: 'taskMap', before: m, after: { taskCol: m.taskCol, fields: Object.fromEntries(Object.entries(m.fields).filter(([c]) => !gone.has(c))) } })
+        else if (Object.keys(m.fields).some(c => gone.has(c))) fwd.push({ kind: 'taskMap', before: m, after: { ...m, fields: Object.fromEntries(Object.entries(m.fields).filter(([c]) => !gone.has(c))) } })
         fwd.push(ch)
         continue
       }
@@ -181,7 +185,7 @@ export function useTaskLinks(p: {
       }
     }
     if (writes.length) {
-      const r = await cur.api.writeTaskFields(sheetId, writes.map(w => ({ rowId: w.rowId, field: w.field, value: w.value })))
+      const r = await cur.api.writeTaskFields(sheetId, writes.map(w => ({ rowId: w.rowId, field: w.field, value: w.value })), m)
       if (!r.success) { cur.say(t(`why.${r.error === 'protected' ? 'protected' : 'generic'}`)) }
       else {
         mergeTasks(r.tasks)
@@ -254,6 +258,70 @@ export function useTaskLinks(p: {
     if (!list) { const r = await ref.current.api.searchTasks(text, {}); list = r.success ? r.tasks : [] }
     setDlg({ k: 'choose', rowId, text, choices: list })
   }
+
+  // ── spec 019: task fields from ⚙ Fields and ＋ ──
+  /**
+   * Show a field in a column: a new one (from ＋ or the drawer) or an existing
+   * regular column (its own words matched first). `win` 'sheet' moves linked
+   * tasks to the column's values; otherwise the board's values show. One step.
+   */
+  async function addField(field: TaskField, at: { colId: string } | { newCol: { id: string; position: number } }, opts: { win?: 'board' | 'sheet'; words?: Record<string, string[]>; heading?: string } = {}) {
+    const cur = ref.current, m = cur.doc.extras?.taskMap ?? null
+    if (!m) { setDlg({ k: 'link' }); return }
+    const colId = 'colId' in at ? at.colId : at.newCol.id
+    const words = opts.words && (WORD_FIELDS as readonly string[]).includes(field) ? { ...(m.words ?? {}), [field]: { ...(m.words?.[field as WordField] ?? {}), ...opts.words } } : m.words
+    const next: SheetTaskMap = { ...m, fields: { ...Object.fromEntries(Object.entries(m.fields).filter(([, f]) => f !== field)), [colId]: field }, ...(words ? { words } : {}) }
+    const rt = cur.doc.extras?.rowTasks ?? {}
+    const ids = [...new Set(Object.values(rt))]
+    const changes: BlankChange[] = []
+    if ('newCol' in at) changes.push({ kind: 'insertCols', cols: [{ ...at.newCol, width: null }] })
+    changes.push({ kind: 'taskMap', before: m, after: next })
+    if (opts.win === 'sheet' && ids.length) {
+      // The column's values go to their tasks first (the board's rules; refusals are counted).
+      const writes = Object.entries(rt).map(([rowId]) => ({ rowId, field, value: cur.value(rowId, colId) })).filter(w => w.value.trim())
+      if (writes.length) {
+        const before = cur.doc.extras?.tasks ?? {}
+        const r = await cur.api.writeTaskFields(cur.doc.id, writes, next)
+        if (r.success) {
+          const ok: TaskFieldsChange['cells'] = []
+          r.results.forEach((res, i) => { if (res.ok) { const tid = rt[writes[i].rowId]; const was = (before[tid]?.values[field] ?? (field === 'stage' ? before[tid]?.stage : '')) ?? ''; if (was && was !== (res.shown ?? '')) ok.push({ rowId: writes[i].rowId, field, before: was, after: res.shown ?? '' }) } })
+          if (ok.length) changes.push({ kind: 'taskFields', cells: ok })
+          const refused = r.results.filter(x => !x.ok).length
+          if (refused) cur.say(t('result.skippedMixed', { n: refused }))
+        }
+      }
+    }
+    const tv = ids.length ? await cur.api.taskValues(cur.doc.id, ids, next) : { success: true as const, tasks: {} as Record<string, LinkedTask> }
+    const vals = tv.success ? tv.tasks : {}
+    mergeTasks(vals)
+    const cells: { rowId: string; colId: string; before: string; after: string }[] = []
+    for (const [rowId, tid] of Object.entries(rt)) {
+      const tk = vals[tid]
+      if (!tk || !tk.applies.includes(field)) continue
+      const after = snap(field, tk.values[field] ?? ''), before = cur.value(rowId, colId)
+      if (after !== before) cells.push({ rowId, colId, before, after })
+    }
+    const first = cur.doc.rows[0]?.id
+    if (opts.heading && first && isHeading(first, next) && !cur.value(first, colId)) cells.push({ rowId: first, colId, before: '', after: opts.heading })
+    if (cells.length) changes.push({ kind: 'cells', cells })
+    cur.apply('addField', changes)
+  }
+  /** A field column back to a regular column: its cells keep the text they show. */
+  function removeField(colId: string) {
+    const m = ref.current.doc.extras?.taskMap ?? null
+    if (!m || !m.fields[colId]) return
+    ref.current.apply('unmapField', [{ kind: 'taskMap', before: m, after: { ...m, fields: Object.fromEntries(Object.entries(m.fields).filter(([c]) => c !== colId)) } }])
+  }
+  /** This sheet's words for a field's values, and whether cells show them. */
+  function setWords(field: WordField, words: Record<string, string[]>, show: 'sheet' | 'board') {
+    const m = ref.current.doc.extras?.taskMap ?? null
+    if (!m) return
+    const all = { ...(m.words ?? {}), [field]: words }
+    if (!Object.keys(words).length) delete all[field]
+    ref.current.apply('words', [{ kind: 'taskMap', before: m, after: { ...m, words: all, show } }])
+  }
+  /** Spec 019: the first ⚙ Fields step when nothing is linked yet: which column names each row's task. */
+  const askLink = () => setDlg({ k: 'link' })
 
   // ── Add tasks… ──
   async function addTasks(ids: string[]) {
@@ -360,7 +428,7 @@ export function useTaskLinks(p: {
     search={async (q, f) => { const r = await p.api.searchTasks(q, f); return r.success ? r.tasks : [] }} onAdd={ids => void addTasks(ids)} onClose={close} />
   if (dlg?.k === 'create') node = <CreateTasksPreview rows={dlg.rows} people={choices?.people ?? []} onCreate={createTasks} onClose={close} />
 
-  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [] }
+  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [], choices, addField, removeField, setWords, askLink, isHeading }
 }
 
 /** Undo and redo of mapped cells: the earlier values go back through the board's rules (R5). */

@@ -21,7 +21,7 @@ import type { HoursApi } from './types'
 
 const SETTLE_MS = 1200
 /** Something else is asking for attention: a dialog, or the task form. */
-const busyScreen = () => !!document.querySelector('[role="dialog"], [role="alertdialog"], [data-task-form]')
+const busyScreen = () => !!document.querySelector('[role="dialog"], [role="alertdialog"], [data-task-form], [data-fields-drawer]')
 
 export function HoursReminder({ api, delay = SETTLE_MS }: { api: HoursApi; delay?: number }) {
   const t = useTranslations('hours')

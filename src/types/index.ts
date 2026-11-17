@@ -447,6 +447,8 @@ export interface SheetChanges {
   tables?: { put?: SheetTableRecord[]; remove?: string[] }
   /** Stage 3: Sort moves rows by rewriting their positions. */
   rowPositions?: { id: string; position: number }[]
+  /** Spec 019: dragging a column rewrites its position. */
+  colPositions?: { id: string; position: number }[]
   /** Spec 016: the column mapping (null unlinks the sheet), and rows' tasks (null unlinks a row). */
   taskMap?: SheetTaskMap | null
   rowTasks?: { rowId: string; taskId: string | null }[]
@@ -462,6 +464,8 @@ export interface ViewWrite {
   filterArea?: FilterArea | null
   filter?: Record<string, ColFilter> | null
   sort?: SortKey[] | null
+  /** Spec 019: null removes it. */
+  groupBy?: GroupBy | null
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─
@@ -546,7 +550,10 @@ export interface SheetView {
   sort?: SortKey[]
   hiddenRows?: string[]
   hiddenCols?: string[]
+  /** Spec 019: rows grouped under headings (blank sheets): by a task's theme (and pillar), stage, assignee or type, or by a column's value. */
+  groupBy?: GroupBy | null
 }
+export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' } | { by: 'col'; col: string }
 
 // ─── Spec 015 stage 3: sort, filter, tables, conditional formatting ─────────
 
@@ -598,7 +605,17 @@ export interface ConditionalRule {
 export const TASK_FIELDS = ['title', 'stage', 'due', 'assignee', 'owner', 'priority', 'platform', 'type', 'theme', 'pillar', 'link:doc', 'link:design', 'link:post', 'link:published'] as const
 /** A task field a column can stand for; `col:<id>` is one of the team's own Content columns (spec 010). */
 export type TaskField = typeof TASK_FIELDS[number] | `col:${string}`
-export interface SheetTaskMap { taskCol: string; fields: Record<string, TaskField> }
+/** Spec 019: fields whose values a sheet may call by its own words ("editing in progress" → D-In Progress). */
+export const WORD_FIELDS = ['stage', 'type', 'priority'] as const
+export type WordField = typeof WORD_FIELDS[number]
+export interface SheetTaskMap {
+  taskCol: string
+  fields: Record<string, TaskField>
+  /** Spec 019: this sheet's words for each value, by field then value (a stage id, a type label, a priority). */
+  words?: Partial<Record<WordField, Record<string, string[]>>>
+  /** Spec 019: cells show this sheet's words (default) or the board's names. */
+  show?: 'sheet' | 'board'
+}
 export type TaskFieldValues = Partial<Record<TaskField, string>>
 /** A linked task as a sheet sees it: the shown text of each mapped field. */
 export interface LinkedTask {
@@ -612,6 +629,9 @@ export interface LinkedTask {
   editable: boolean
   /** The fields this task has (a video has no theme or pillar). */
   applies: TaskField[]
+  /** Spec 019: the stages this member may move it to (the stage menu), and its theme, pillar, stage, assignee and type for grouping. */
+  moves?: string[]
+  meta?: { theme: string; pillar: string; stage: string; assignee: string; assigneeId: string | null; type: string }
 }
 export interface TaskFieldWrite { rowId: string; field: TaskField; value: string }
 export interface TaskFieldResult { rowId: string; field: TaskField; ok: boolean; reason?: string; shown?: string; celebrate?: boolean; stageLabel?: string }

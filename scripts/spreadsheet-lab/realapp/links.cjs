@@ -75,7 +75,12 @@ const text = async (page, r, c) => (await cellOf(page, r, c).innerText()).trim()
 const saved = page => page.waitForSelector('[data-save-status="saved"]', { timeout: 20000 })
 const board = async (page, n) => { await page.click('[data-board-menu]'); await page.click(`[data-board-items] [role^="menuitem"] >> nth=${n}`) }
 const undo = async page => { await page.click('[data-undo]'); await page.waitForTimeout(1200) }
-const typeAt = async (page, r, c, v) => { await cellOf(page, r, c).click(); await page.keyboard.type(v); await page.keyboard.press('Enter') }
+// Spec 019: a field cell on a linked row opens its control on click; Escape goes back to the cell, where typing still works.
+const typeAt = async (page, r, c, v) => {
+  await cellOf(page, r, c).click(); await page.waitForTimeout(150)
+  if (await page.locator('[data-field-pop], [data-sheet-menu]').count()) { await page.keyboard.press('Escape'); await page.waitForTimeout(150) }
+  await page.keyboard.type(v); await page.keyboard.press('Enter')
+}
 const taskSig = () => sql(`select md5(string_agg(id || name || status || coalesce(assignee_id::text,'') || coalesce(due_date::text,''), '|' order by id)) from tasks`)
 
 ;(async () => {

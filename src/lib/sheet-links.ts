@@ -10,7 +10,7 @@
  *   priority, a date.
  */
 import type { SheetTaskMap, TaskField } from '@/types/index'
-import { TASK_FIELDS } from '@/types/index'
+import { TASK_FIELDS, WORD_FIELDS } from '@/types/index'
 import { parseDate } from '@/lib/sheet-format'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
@@ -71,7 +71,39 @@ export function cleanMap(map: unknown, colIds: Set<string>, teamCols: Set<string
     used.add(f)
     fields[col] = f
   }
-  return { taskCol: m.taskCol, fields }
+  return { taskCol: m.taskCol, fields, ...cleanWords(m) }
+}
+
+/** Spec 019: a sheet's own words, checked: known fields, short strings, each word once per field. */
+export function cleanWords(m: Partial<SheetTaskMap>): Pick<SheetTaskMap, 'words' | 'show'> {
+  const out: Pick<SheetTaskMap, 'words' | 'show'> = {}
+  if (m.show === 'board' || m.show === 'sheet') out.show = m.show
+  const words: NonNullable<SheetTaskMap['words']> = {}
+  for (const f of WORD_FIELDS) {
+    const src = m.words?.[f]
+    if (!src || typeof src !== 'object') continue
+    const per: Record<string, string[]> = {}, seen = new Set<string>()
+    for (const [value, list] of Object.entries(src).slice(0, 60)) {
+      if (typeof value !== 'string' || !value || value.length > 80 || !Array.isArray(list)) continue
+      const keep = list.filter((w): w is string => typeof w === 'string').map(w => w.trim().slice(0, 60)).filter(w => w && !seen.has(normTitle(w))).slice(0, 12)
+      keep.forEach(w => seen.add(normTitle(w)))
+      if (keep.length) per[value] = keep
+    }
+    if (Object.keys(per).length) words[f] = per
+  }
+  if (Object.keys(words).length) out.words = words
+  return out
+}
+/** Spec 019: the value a sheet word stands for (case and spacing ignored), or null. */
+export function wordValue(text: string, words: Record<string, string[]> | undefined): string | null {
+  const t = normTitle(text)
+  if (!t || !words) return null
+  for (const [value, list] of Object.entries(words)) if (list.some(w => normTitle(w) === t)) return value
+  return null
+}
+/** Spec 019: how a cell shows a value: this sheet's first word for it when the sheet shows its words, else the board's name. */
+export function shownWord(value: string, words: Record<string, string[]> | undefined, show: SheetTaskMap['show'], board: string): string {
+  return show !== 'board' && words?.[value]?.[0] ? words[value][0] : board
 }
 
 /** What kind of task a row is, for which fields it has (R4). */
@@ -97,13 +129,13 @@ export function matchMember(text: string, members: { id: string; name: string }[
   return first.length > 1 ? 'ambiguous' : 'none'
 }
 /** A stage by its id or its English or Arabic name. */
-export function matchStage(text: string, stages: { id: string; names: string[] }[]): string | null {
+export function matchStage(text: string, stages: { id: string; names: string[] }[], words?: Record<string, string[]>): string | null {
   const t = normTitle(text)
   if (!t) return null
-  return stages.find(s => s.id.toLowerCase() === t || s.names.some(n => normTitle(n) === t))?.id ?? null
+  return stages.find(s => s.id.toLowerCase() === t || s.names.some(n => normTitle(n) === t))?.id ?? wordValue(text, words)
 }
 const PRIORITY: Record<string, 'Low' | 'Medium' | 'High'> = { low: 'Low', medium: 'Medium', high: 'High', 'منخفضة': 'Low', 'متوسطة': 'Medium', 'عالية': 'High' }
-export const matchPriority = (text: string) => PRIORITY[normTitle(text)] ?? null
+export const matchPriority = (text: string, words?: Record<string, string[]>) => PRIORITY[normTitle(text)] ?? (wordValue(text, words) as 'Low' | 'Medium' | 'High' | null)
 /** A typed date as yyyy-mm-dd, or null. */
 export function readDay(text: string): string | null {
   const d = parseDate(text)

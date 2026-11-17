@@ -110,7 +110,7 @@ type Leaf = Extract<PopItem, { label: string; onSelect(): void }>
 /** One tool on the strip; the same entry feeds the ⋮ menu when its group is hidden. */
 interface Tool { key: string; label: string; kbd?: string; inner: ReactNode; run(el: HTMLElement): void; pressed?: boolean; menu?: MenuKey; disabled?: string | null; cls?: string; dbl?(): void; data?: Record<string, string> }
 
-export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog, onUndo, onRedo, canUndo, canRedo, onFileMenu, onBoardMenu }: {
+export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog, onUndo, onRedo, canUndo, canRedo, onFileMenu, onBoardMenu, onFields }: {
   state: FormatState | null
   target: FormatSource
   onFormatCells(): void
@@ -131,6 +131,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   canRedo: boolean
   onFileMenu(anchor: HTMLElement, at: { x: number; y: number }): void
   onBoardMenu?(anchor: HTMLElement, at: { x: number; y: number }): void
+  /** Spec 019: Data › Task fields… opens the sheet's Fields drawer. */
+  onFields?(): void
 }) {
   const t = useTranslations('sheets.format')
   const tc = useTranslations('sheets.comments')
@@ -327,6 +329,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       ] }
       case 'mb-data': return { label: tb('menu.data'), attr: 'data-mb-data', items: [
         ...(menuFor('sort')?.items ?? []),
+        ...(onFields ? [{ kind: 'sep', key: 'sf' } as PopItem, { key: 'taskFields', label: tb('taskFields'), onSelect: onFields } as PopItem] : []),
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
       ] }
       case 'mb-help': return { label: tb('menu.help'), attr: 'data-mb-help', items: [
