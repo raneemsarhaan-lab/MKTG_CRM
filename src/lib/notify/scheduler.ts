@@ -2,8 +2,18 @@
  * Timed notification jobs (spec 012 R9). Server-only.
  *
  * One tick a minute, started by src/instrumentation.ts on the Node runtime.
- * Each job runs under a Postgres advisory lock, so only one instance runs it,
- * and keys its work by date, so a missed tick is caught up by the next one.
+ * Each job keys its work by date, so a missed tick is caught up by the next
+ * one, and claims each piece of work by a key the database enforces (a due
+ * reminder's, a digest's, a notification's emailed_at), so two instances — the
+ * old and new container overlapping during a deploy — never send twice.
+ *
+ * Every database call here is short and uses one connection at a time. This
+ * used to wrap each job in a transaction held open for its whole run (up to
+ * two minutes) just to hold an advisory lock, while the job opened further
+ * transactions of its own; and a new tick started every minute whether the
+ * last had finished or not. On a container's small connection pool that left
+ * nothing for pages: every request queued, the proxy answered 504, and the
+ * platform killed the container as unresponsive — over and over.
  *
  *   every tick   instant emails (unread for 10 minutes)
  *   hourly       due tomorrow / overdue reminders
@@ -22,13 +32,8 @@ const TZ = () => process.env.NOTIFY_TZ || DEFAULT_TZ
 const INSTANT_DELAY_MS = 10 * 60_000
 const MAX_TRIES = 5
 
-async function locked<T>(job: string, fn: () => Promise<T>): Promise<T | null> {
-  return prisma.$transaction(async tx => {
-    const rows = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext(${'notify-scheduler:' + job})) AS ok`
-    if (!rows[0]?.ok) return null
-    return fn()
-  }, { timeout: 120_000 })
-}
+/** A unique-key clash: another instance got there first. */
+const isClash = (e: unknown) => (e as { code?: string })?.code === 'P2002'
 
 /** Due tomorrow and overdue, once per task, kind and due date (FR-050). */
 export async function runDueReminders(now = new Date()): Promise<number> {
@@ -36,18 +41,30 @@ export async function runDueReminders(now = new Date()): Promise<number> {
     where: { due_date: { not: null }, dropped_at: null, status: { not: 'publish' } },
     select: { id: true, due_date: true, status: true, dropped_at: true },
   })
+  const due = tasks.flatMap(t => {
+    const day = t.due_date!.toISOString().slice(0, 10)
+    const kind = dueState({ due_date: day, status: t.status, dropped_at: t.dropped_at }, now, TZ())
+    return kind ? [{ id: t.id, kind, day }] : []
+  })
+  if (!due.length) return 0
+  // The ones already sent, in one query, rather than a transaction per task to find out.
+  const done = new Set((await prisma.dueReminder.findMany({
+    where: { task_id: { in: due.map(d => d.id) } }, select: { task_id: true, kind: true, due_date: true },
+  })).map(r => `${r.task_id}|${r.kind}|${r.due_date.toISOString().slice(0, 10)}`))
   let sent = 0
-  for (const t of tasks) {
-    const due = t.due_date!.toISOString().slice(0, 10)
-    const kind = dueState({ due_date: due, status: t.status, dropped_at: t.dropped_at }, now, TZ())
-    if (!kind) continue
-    const ids = await prisma.$transaction(async tx => {
-      const done = await tx.dueReminder.findUnique({ where: { task_id_kind_due_date: { task_id: t.id, kind, due_date: new Date(due) } } })
-      if (done) return [] as string[]
-      await tx.dueReminder.create({ data: { task_id: t.id, kind, due_date: new Date(due) } })
-      return notify(tx, { kind, actorId: null, taskId: t.id, dueDate: due })
-    })
-    if (ids.length) { sent += ids.length; void deliver(ids) }
+  for (const d of due) {
+    if (done.has(`${d.id}|${d.kind}|${d.day}`)) continue
+    try {
+      const ids = await prisma.$transaction(async tx => {
+        // The key claims it: a second instance's create fails here and sends nothing.
+        await tx.dueReminder.create({ data: { task_id: d.id, kind: d.kind, due_date: new Date(d.day) } })
+        return notify(tx, { kind: d.kind, actorId: null, taskId: d.id, dueDate: d.day })
+      }, { timeout: 20_000 })
+      if (ids.length) { sent += ids.length; await deliver(ids) }
+    } catch (e) {
+      // One task's failure is that task's; the rest still get their reminders.
+      if (!isClash(e)) console.error('[notify] due reminder failed', d.id, e)
+    }
   }
   return sent
 }
@@ -73,16 +90,17 @@ export async function runInstantEmails(now = new Date()): Promise<number> {
   let sent = 0
   for (const n of rows) {
     const r = n.recipient
-    if (!effective(mergeSettings(r.notification_settings), n.kind as NotificationKind, 'email')) {
-      await prisma.notification.update({ where: { id: n.id }, data: { emailed_at: now } })   // not wanted by email: never again
-      continue
-    }
+    // Claim it: only the instance whose update lands sends it.
+    const claimed = await prisma.notification.updateMany({ where: { id: n.id, emailed_at: null }, data: { emailed_at: new Date() } })
+    if (!claimed.count) continue
+    if (!effective(mergeSettings(r.notification_settings), n.kind as NotificationKind, 'email')) continue   // not wanted by email: never again
     const ownParent = n.kind === 'reply' ? n.comment?.parent?.author_id === r.id : undefined
     const { text, html } = renderNotification(asItem(n), actors, r.locale, { ownParent })
     const meta = n.meta as unknown as NotificationMeta
     const ok = await sendEmail(r.email, text, emailHtml(r.locale, [{ html, url: targetPath(n), snippet: meta.snippet }]))
-    await prisma.notification.update({ where: { id: n.id }, data: ok ? { emailed_at: new Date() } : { email_tries: { increment: 1 } } })
-    if (ok) sent++
+    // Not sent: give the claim back so a later tick tries again.
+    if (!ok) await prisma.notification.update({ where: { id: n.id }, data: { emailed_at: null, email_tries: { increment: 1 } } })
+    else sent++
   }
   return sent
 }
@@ -103,7 +121,9 @@ export async function runDailySummary(now = new Date()): Promise<number> {
       include: { comment: { select: { parent: { select: { author_id: true } } } } },
       orderBy: { last_event_at: 'desc' }, take: 50,
     })).filter(n => effective(settings, n.kind as NotificationKind, 'email'))
-    await prisma.emailDigest.create({ data: { member_id: m.id, day: new Date(day) } })
+    // The key claims the day: a second instance's create fails and it moves on.
+    try { await prisma.emailDigest.create({ data: { member_id: m.id, day: new Date(day) } }) }
+    catch (e) { if (isClash(e)) continue; throw e }
     if (!rows.length) continue
     const actorIds = [...new Set(rows.flatMap(r => r.actor_ids))]
     const actors = new Map((await prisma.member.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, gender: true } })).map(a => [a.id, a]))
@@ -127,31 +147,42 @@ export async function runCleanup(now = new Date()): Promise<number> {
 }
 
 let lastDue = 0, lastCleanupDay = ''
-/** One tick: every job that is due now. Returns the jobs it ran. */
+/**
+ * One tick: every job that is due now. Returns the jobs it ran. A job that
+ * fails is logged and the others still run; the hourly and nightly ones are
+ * marked done before they start, so a failure waits for its next turn rather
+ * than retrying every minute.
+ */
 export async function tick(now = new Date()): Promise<string[]> {
   const ran: string[] = []
+  const job = async (name: string, fn: () => Promise<unknown>) => {
+    try { await fn(); ran.push(name) } catch (e) { console.error(`[notify] ${name} failed`, e) }
+  }
   const clock = teamClock(now, TZ())
-  if (await locked('instant', () => runInstantEmails(now)) !== null) ran.push('instant')
+  await job('instant', () => runInstantEmails(now))
   if (now.getTime() - lastDue >= 55 * 60_000) {
-    if (await locked('due', () => runDueReminders(now)) !== null) ran.push('due')
     lastDue = now.getTime()
+    await job('due', () => runDueReminders(now))
   }
-  if (clock.h > 8 || (clock.h === 8 && clock.m >= 30)) {
-    if (await locked('daily', () => runDailySummary(now)) !== null) ran.push('daily')
-  }
+  if (clock.h > 8 || (clock.h === 8 && clock.m >= 30)) await job('daily', () => runDailySummary(now))
   const day = teamDay(now, TZ())
   if (clock.h >= 3 && lastCleanupDay !== day) {
-    if (await locked('cleanup', () => runCleanup(now)) !== null) ran.push('cleanup')
     lastCleanupDay = day
+    await job('cleanup', () => runCleanup(now))
   }
   return ran
 }
 
-let started = false
+let started = false, running = false
 export function startNotifyScheduler(): void {
   if (started || process.env.NOTIFY_SCHEDULER === '0') return
   started = true
-  const run = () => { tick().catch(e => console.error('[notify] tick failed', e)) }
+  // Never two ticks at once: a slow one is skipped over, not stacked on.
+  const run = () => {
+    if (running) return
+    running = true
+    tick().catch(e => console.error('[notify] tick failed', e)).finally(() => { running = false })
+  }
   setTimeout(run, 15_000)
   setInterval(run, 60_000).unref?.()
 }
