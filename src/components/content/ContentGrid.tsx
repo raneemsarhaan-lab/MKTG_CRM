@@ -463,7 +463,7 @@ export function ContentGrid(p: ContentGridProps) {
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<ContentRow>>)
   // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
-  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped })
+  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped, say: text => p.linked?.say(text) })
   Object.assign(model, tips.model)
 
   const view = lv.store.view
@@ -492,7 +492,8 @@ export function ContentGrid(p: ContentGridProps) {
   return (
     <>
     <GridCore model={model} active={p.active} setActive={p.setActive}
-              editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote} />
+              editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote}
+              selectAreas={tips.grid.selectAreas} optionsAt={tips.grid.optionsAt} />
     {lm.node}
     {lf.node}
     {tips.node}

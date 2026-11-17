@@ -373,7 +373,7 @@ export function SheetGrid(p: SheetGridProps) {
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<SheetRow>>)
   // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
-  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped })
+  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped, say: text => p.linked?.say(text) })
   Object.assign(model, tips.model)
 
   // ── spec 019 stage 3: ⚙ Fields, ＋ and Values ──
@@ -410,6 +410,8 @@ export function SheetGrid(p: SheetGridProps) {
       editDraft={p.editDraft ? `d:${p.editDraft}` : null}
       notes={p.notes}
       onNote={p.onNote}
+      selectAreas={tips.grid.selectAreas}
+      optionsAt={tips.grid.optionsAt}
     />
     {lm.node}
     {lf.node}

@@ -44,7 +44,8 @@ import { SERIES_OPEN } from './format/bus'
 import { CustomListsDialog, DataValidationDialog, GoToDialog, GoToSpecialDialog, SeriesDialog } from './format/TipsDialogs'
 import { loadFillLists, saveFillLists } from '@/actions/settings'
 import type { FillList } from '@/lib/sheet-fill'
-import { ZOOM_EVENT, zoomBus } from '@/components/sheet/GridCore'
+import { STATUS_EVENT, ZOOM_EVENT, tipsBus, zoomBus } from '@/components/sheet/GridCore'
+import { LINKED_SPECIAL } from '@/components/sheet/useGridTips'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -317,6 +318,19 @@ export function Workbook(p: WorkbookProps) {
   const [fillLists, setFillLists] = useState<{ lists: FillList[]; canEdit: boolean }>({ lists: [], canEdit: false })
   useEffect(() => { void loadFillLists().then(r => { if (r.success) setFillLists({ lists: r.lists, canEdit: r.canEdit }) }) }, [])
   const fillItems = useMemo(() => fillLists.lists.map(l => l.items), [fillLists.lists])
+  // The Content and Video sheets read the lists here (they live in the board's page).
+  useEffect(() => { tipsBus.lists = fillItems }, [fillItems])
+  // Their status-bar news: the mode text and the selection's figures.
+  const [linkedStats, setLinkedStats] = useState<(SelStats & { cells: number }) | null>(null)
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ text?: string | null; stats?: SelStats & { cells: number } }>).detail
+      if (d.text !== undefined) setStatusMode(d.text)
+      if (d.stats) setLinkedStats(d.stats)
+    }
+    document.addEventListener(STATUS_EVENT, on)
+    return () => document.removeEventListener(STATUS_EVENT, on)
+  }, [])
   const [tip, setTip] = useState<'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists' | null>(null)
   const [recentRefs, setRecentRefs] = useState<string[]>([])
   useEffect(() => {
@@ -338,7 +352,7 @@ export function Workbook(p: WorkbookProps) {
     setSkip(t('grid.skipped', { n: total, reasons: reasons.join(', ') }))
     skipTimer.current = window.setTimeout(() => setSkip(null), 10000)
   }, [t])
-  useEffect(() => { setSel(null); setSkip(null); setStatusMode(null) }, [openId])
+  useEffect(() => { setSel(null); setSkip(null); setStatusMode(null); setLinkedStats(null) }, [openId])
 
   // ── names ───────────────────────────────────────────────────────────────
   const folderName = folder.kind === 'content' ? t('folder.content') : folder.kind === 'video' ? t('folder.video') : folder.name ?? ''
@@ -563,12 +577,12 @@ export function Workbook(p: WorkbookProps) {
       // Stage 3: Filter on and off (FR-046).
       if (e.shiftKey && !e.altKey && k === 'l') { stop(); sendFormat(target, { kind: 'filter', op: 'toggle' }); return }
       // Spec 020: Ctrl+G, Go To.
-      if (!e.shiftKey && !e.altKey && k === 'g' && target === 'blank') { stop(); setTip('goto'); return }
+      if (!e.shiftKey && !e.altKey && k === 'g') { stop(); setTip('goto'); return }
     }
     // Spec 020: F5, Go To (instead of the browser's reload while the grid has focus).
     if (e.key === 'F5' && !ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select')) {
       e.preventDefault(); e.stopPropagation()
-      if (open?.kind === 'blank') setTip('goto')
+      setTip('goto')
       return
     }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
@@ -750,13 +764,18 @@ export function Workbook(p: WorkbookProps) {
           <i aria-hidden="true" className="fx-sb-dot" />{statusMode ?? (sel?.adding ? t('areas.adding') : tt('ready'))}
         </span>
         <span className="fx-sb-sp" />
-        {openBlank && sel?.stats && sel.count > 1 && sel.stats.count > 0 && (
-          <span className="fx-sb-stats" data-sb-stats="">
-            {sel.stats.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(sel.stats.avg ?? 0)}</b></span>}
-            <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{sel.stats.count}</b></span>
-            {sel.stats.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(sel.stats.sum)}</b></span>}
-          </span>
-        )}
+        {(() => {
+          // Blank sheets report through onSelect; the Content and Video sheets through STATUS_EVENT.
+          const st = openBlank ? (sel && sel.count > 1 ? sel.stats : null) : (linkedStats && linkedStats.cells > 1 ? linkedStats : null)
+          if (!st || st.count === 0) return null
+          return (
+            <span className="fx-sb-stats" data-sb-stats="">
+              {st.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(st.avg ?? 0)}</b></span>}
+              <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{st.count}</b></span>
+              {st.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(st.sum)}</b></span>}
+            </span>
+          )
+        })()}
         {!phone && (
           <span className="fx-sb-zoom" data-sb-zoom="">
             <button type="button" className="fx-sb-zb" data-zoom-out="" aria-label={tt('zoomOut')} title={tt('zoomOut')} disabled={zoom <= 0.5} onClick={() => setZoom(zoom - 0.1)}>−</button>
@@ -863,18 +882,18 @@ export function Workbook(p: WorkbookProps) {
       )}
       {tip === 'goto' && (
         <GoToDialog recent={recentRefs}
-                    onGo={ref => { setTip(null); setRecentRefs(r => [ref, ...r.filter(x => x !== ref)].slice(0, 8)); sendFormat('blank', { kind: 'goto', ref }) }}
+                    onGo={ref => { setTip(null); setRecentRefs(r => [ref, ...r.filter(x => x !== ref)].slice(0, 8)); sendFormat(fmtTarget, { kind: 'goto', ref }) }}
                     onSpecial={() => setTip('gotoSpecial')} onCancel={() => setTip(null)} />
       )}
       {tip === 'gotoSpecial' && (
-        <GoToSpecialDialog supported={fmtState?.goSpecial ?? []} onCancel={() => setTip(null)}
+        <GoToSpecialDialog supported={fmtState?.goSpecial ?? (openBlank ? [] : LINKED_SPECIAL)} onCancel={() => setTip(null)}
                            onOk={(what, numbers, text) => { setTip(null); sendFormat(fmtTarget, { kind: 'goSpecial', what, numbers, text }) }} />
       )}
       {tip === 'series' && fmtState && (
         <SeriesDialog range={fmtState.range ?? fmtState.cell} by={(() => { const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(fmtState.range ?? ''); return m && m[1] !== m[3] && m[2] === m[4] ? 'rows' : 'cols' })()}
-                      onCancel={() => setTip(null)} onOk={(spec, by) => { setTip(null); sendFormat('blank', { kind: 'series', spec, by }) }} />
+                      onCancel={() => setTip(null)} onOk={(spec, by) => { setTip(null); sendFormat(fmtTarget, { kind: 'series', spec, by }) }} />
       )}
-      {tip === 'validation' && fmtState && (
+      {tip === 'validation' && fmtState && openBlank && (
         <DataValidationDialog range={fmtState.range ?? fmtState.cell} rule={fmtState.validation ?? null} mixed={!!fmtState.validationMixed} inRule={!!fmtState.validation}
                               onCancel={() => setTip(null)} onOk={(rule, all) => { setTip(null); sendFormat('blank', { kind: 'validation', rule, all }) }} />
       )}

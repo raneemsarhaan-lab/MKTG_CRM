@@ -2172,7 +2172,7 @@
       "pickNone": "This column has no other values to pick from yet.",
       "repeat": "Repeat",
       "collapse": "Collapse the toolbar",
-      "blankOnly": "Available on team sheets",
+      "blankOnly": "Available on team sheets; the board's sheets keep their own choices",
       "ready": "Ready",
       "avg": "Average",
       "count": "Count",
@@ -2322,7 +2322,9 @@
         "none": "No lists yet. The built-in day and month lists always work.",
         "count": "{n} items",
         "edit": "Edit Custom Lists…"
-      }
+      },
+      "goLinkedBad": "There's no row {ref} here. Type a row number as shown on the left.",
+      "oneArea": "This works on one block of cells. Select one area first."
     }
   },
   "hours": {

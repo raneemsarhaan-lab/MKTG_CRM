@@ -223,6 +223,10 @@ export const cellKey = (rowKey: string, col: GridCol) => `${rowKey}|${col}`
 export const ZOOM_EVENT = 'momentum:sheet-zoom'
 /** The zoom as the workbook last set it (a linked grid that mounts later reads it here), and how to change it. */
 export const zoomBus: { z: number; set: ((z: number) => void) | null } = { z: 1, set: null }
+/** The workspace's custom lists for the fill handle, as the workbook loaded them. */
+export const tipsBus: { lists: string[][] } = { lists: [] }
+/** A linked grid's status-bar news: the mode text (undefined = unchanged, null = Ready) and the selection's figures. */
+export const STATUS_EVENT = 'momentum:sheet-status'
 
 export const ROW_H = 24
 /** Rows beyond which only the visible part is rendered (R7). */

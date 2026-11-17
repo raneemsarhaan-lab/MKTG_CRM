@@ -7,7 +7,7 @@ Run against `next start` with the local database (see `quickstart.md`).
 | Check | Command | Result |
 |---|---|---|
 | Pure checks (series, dates, Flash Fill, Go To Special folding, validation) | `npm run lab:spreadsheet` | 33/33 |
-| Stage A on the running app | `node scripts/spreadsheet-lab/realapp/tips-a.cjs` | 66/66 |
+| Stage A on the running app | `node scripts/spreadsheet-lab/realapp/tips-a.cjs` | 73/73 |
 
 **What `tips-a.cjs` covers (quickstart Stage A):**
 
@@ -24,7 +24,13 @@ Run against `next start` with the local database (see `quickstart.md`).
   - A value typed in another case is spelled as in the list. A paste keeps only allowed values and counts the refused one.
   - An insert inside the range grows it, and Alt+↓ shows the column's values.
 - **§6:** Ctrl+wheel zoom kept after a reload, Ctrl+0, Shift+wheel, Ctrl+F1, KeyTips (Alt, A), and the status bar's Average, Count and Sum.
-- **§7:** The Content sheet: the fill handle, Alt+↓, and zoom from the status bar.
+- **§7:** The Content sheet:
+  - the fill handle, Alt+↓, and zoom from the status bar;
+  - Ctrl+G by row number;
+  - Go To Special (the choices that fit; Data validation greyed);
+  - Constants with the status bar's Count;
+  - F4 repeating Bold, with both undone;
+  - Ctrl+E's note.
 - **§8:** Arabic (the handle on the left corner), a phone (status bar without the slider), axe on every dialog and menu, and no page errors.
 
 **Regressions:** fields, content-fields, video-fields, links, areas, header, run, editing, format, styles, perf-axe, and `npm run lab:sheet`. Results are recorded in the stage A PR.
@@ -33,4 +39,8 @@ Run against `next start` with the local database (see `quickstart.md`).
 
 - Shift+Space moves the active cell to the row's first cell. Ctrl+Space moves it to the column's first cell. The grid's selection always starts at the active cell, so it can't stay where it was as it does in Excel.
 - The design's Page Layout and Page Break view buttons are left out of the status bar until printing arrives (stage C), so nothing is shown that does nothing.
-- Go To Special, Series…, Data Validation and Flash Fill are blank-sheet tools. On the Content and Video sheets their menu items say "Available on team sheets". Those sheets get zoom, the fill handle (through their own write rules), Alt+↓ and Ctrl+;.
+- **On the Content and Video sheets:**
+  - They have everything but Data Validation, which they don't need: their values are already the board's choices.
+  - Go To there takes a row number as shown on the left.
+  - Go To Special offers Notes, Constants, Blanks (empty cells you can type into), Current region, Last cell, Visible cells only, and Row and Column differences.
+  - F4 repeats the last formatting, Clear or Fill Down / Right.

@@ -739,14 +739,21 @@ Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3). Design: `design/p
   - `sheet-fill.ts` is pure. `planSeries` handles numbers (trend and growth), dates (days, weekdays with a Fri/Sat weekend, months, years), English and Arabic day and month names, custom lists, and text ending in a number. `learnFlash` is the Flash Fill learner.
   - GridCore draws the handle on the newest single area and handles the drag: a dashed target, a value tip, Ctrl to swap copy and series, Shift to insert, drag back to clear, right-drag for the menu, and double-click to fill to the end.
   - The host builds the step (`onFill`). Auto Fill Options re-runs the last fill another way: an undo plus a new step computed from the doc before the fill (`lastFill.base`).
-  - The Content and Video sheets get the same tools through `useGridTips` (fills go through their `writeCells(…, 'fill')`).
+  - The Content and Video sheets get the same tools through `useGridTips`, and every write goes through their `writeCells(…, 'fill')`, so the board's rules apply. The tools:
+    - zoom and the fill handle, with custom lists via `tipsBus`;
+    - Alt+↓ and Ctrl+;;
+    - Go To by row number, and Go To Special with the choices in `LINKED_SPECIAL`;
+    - F4 / Ctrl+Y repeat of the last formatting command sent to the sheet;
+    - Flash Fill and Series…;
+    - the status bar's mode and figures (`STATUS_EVENT`).
+  - Data Validation stays a team-sheet tool.
 - **Custom lists.** `workspace_settings.fill_lists` holds them, read with `loadFillLists` and written with `saveFillLists` (admins only). They're edited in Data › Custom Lists… or Settings › Sheets.
 - **Data validation.** The `sheet_validations` table holds one `rule` JSON per range (Excel's Settings, Input Message and Error Alert tabs). It is cleaned by `sheet-validate.ts` on both sides and changed through the `validations` change kind (whole list before and after, like tables).
   - The selected cell shows ▾ (lists) and its input message.
   - A typed value outside the rule brings the Stop, Warning or Information alert. Pasted and filled values that a Stop rule refuses are counted as `invalid`.
   - Deleting rows or columns trims the ranges (`validationsAfter`). An insert inside a range grows it, because the range is held by its edge ids.
 - **Leading apostrophe.** `'007` is stored as `007`, and the cell is set to Text.
-- **Checks.** `node scripts/spreadsheet-lab/realapp/tips-a.cjs` (66 checks), and `npm run lab:spreadsheet` (`tips-*` pure checks).
+- **Checks.** `node scripts/spreadsheet-lab/realapp/tips-a.cjs` (73 checks), and `npm run lab:spreadsheet` (`tips-*` pure checks).
 
 ### Celebrations
 

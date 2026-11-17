@@ -205,7 +205,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
   const head = (key: string, text: string): PopItem => ({ kind: 'node', key, node: <div role="presentation" className="fx-st-h">{text}</div> })
   const lock = off ? { disabled: true, why } : {}
-  /** Spec 020: tools only blank sheets have (the Content and Video sheets keep their own rules). */
+  /** Spec 020: Data Validation is a team-sheet tool (the Content and Video sheets keep the board's own choices). */
   const blankOnly = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
   const setSize = (n: number) => { if (!off && n >= SIZE_MIN && n <= SIZE_MAX) a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') }
   const stepSize = (d: 1 | -1) => setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, size + d)))
@@ -313,14 +313,14 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { key: 'fillDown', label: e('fillDown'), kbd: keyName('Ctrl+D'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
         { key: 'fillRight', label: e('fillRight'), kbd: keyName('Ctrl+R'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
         // Spec 020: Series…, Flash Fill, Repeat.
-        { key: 'series', label: `${tt('series.title')}…`, ...lock, ...one(), ...(blankOnly), onSelect: () => onTip?.('series') },
-        { key: 'flashFill', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, ...(blankOnly), onSelect: cmd({ kind: 'flashFill' }) },
-        { key: 'repeat', label: tt('repeat'), kbd: 'F4', ...lock, ...(blankOnly), onSelect: cmd({ kind: 'repeat' }) },
+        { key: 'series', label: `${tt('series.title')}…`, ...lock, ...one(), onSelect: () => onTip?.('series') },
+        { key: 'flashFill', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'repeat', label: tt('repeat'), kbd: 'F4', ...lock, onSelect: cmd({ kind: 'repeat' }) },
         { kind: 'sep', key: 's3' },
         { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
         { key: 'replace', label: e('replace'), kbd: keyName('Ctrl+H'), onSelect: () => onFind(true) },
-        { key: 'goto', label: `${tt('goto.title')}…`, kbd: keyName('Ctrl+G'), ...(blankOnly), onSelect: () => onTip?.('goto') },
-        { key: 'gotoSpecial', label: `${tt('gs.title')}…`, ...(blankOnly), onSelect: () => onTip?.('gotoSpecial') },
+        { key: 'goto', label: `${tt('goto.title')}…`, kbd: keyName('Ctrl+G'), onSelect: () => onTip?.('goto') },
+        { key: 'gotoSpecial', label: `${tt('gs.title')}…`, onSelect: () => onTip?.('gotoSpecial') },
         sub('clear', tb('clear'), 'clear', lock),
       ] }
       case 'mb-view': return { label: tb('menu.view'), attr: 'data-mb-view', items: [
@@ -353,7 +353,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { kind: 'sep', key: 'sv' },
         { key: 'validation', label: `${tt('dv.title')}…`, ...lock, ...one(), ...(blankOnly), onSelect: () => onTip?.('validation') },
         { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: isMac() ? '⌥↓' : 'Alt+↓', ...lock, onSelect: cmd({ kind: 'pickList' }) },
-        { key: 'flashFillD', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, ...(blankOnly), onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'flashFillD', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
         { key: 'lists', label: `${tt('lists.title')}…`, onSelect: () => onTip?.('lists') },
         ...(onFields ? [{ kind: 'sep', key: 'sf' } as PopItem, { key: 'taskFields', label: tb('taskFields'), onSelect: onFields } as PopItem] : []),
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
