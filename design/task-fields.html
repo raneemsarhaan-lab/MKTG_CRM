@@ -129,6 +129,19 @@ button, input, select { font: inherit; color: inherit; }
 .pop input { width: 100%; border: 1px solid var(--input); border-radius: 8px; padding: 7px 9px; margin-bottom: 4px; background: var(--panel); }
 .pop hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
 .toast { position: absolute; inset-inline: 0; bottom: 14px; margin-inline: auto; width: max-content; max-width: calc(100% - 32px); background: var(--ink); color: var(--panel); border-radius: 12px; padding: 10px 14px; font-size: 13px; z-index: 40; }
+.valbtn { border: 1px solid var(--input); background: var(--panel); border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer; color: var(--purple); }
+.scrim { position: absolute; inset: 0; background: rgba(20,19,26,.35); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.dialog { background: var(--panel); border-radius: 16px; padding: 18px; width: min(560px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 12px; font-size: 13.5px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+.dialog h2 { margin: 0; font: 800 17px var(--f-head); color: var(--ink); }
+.dialog p { margin: 0; color: var(--muted); line-height: 1.5; }
+.vtable { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 6px 12px; align-items: center; }
+.vtable b { font-size: 12px; color: var(--muted); }
+.vtable input, .vtable select { border: 1px solid var(--input); border-radius: 8px; padding: 6px 8px; background: var(--panel); min-width: 0; width: 100%; }
+.vtable small { color: var(--muted); }
+.dialog fieldset { border: 1px solid var(--input); border-radius: 10px; padding: 8px 12px; display: grid; gap: 4px; }
+.dialog legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.drow { display: flex; gap: 8px; justify-content: flex-end; }
+.pill.go { background: var(--ink); color: var(--panel); border-color: var(--ink); }
 .tabs { display: flex; border-top: 1px solid var(--line); background: var(--grid-head); min-height: 40px; }
 .tabs button { border: 0; background: none; padding: 0 16px; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; border-inline-end: 1px solid var(--line); }
 .tabs button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 3px 0 var(--purple); }
@@ -172,6 +185,7 @@ button, input, select { font: inherit; color: inherit; }
         <li><b>Regular columns</b> (grey headings): normal spreadsheet cells with all the formatting tools.</li>
         <li><b>Add</b> from ＋ at the end of the headings, or ⚙ Fields → switch a field on. <b>Use an existing column</b> for a field (today's mapping) from the same place: “Show in: column F”.</li>
         <li><b>Hide</b> a field by switching it off: the column goes, the task keeps its value.</li>
+        <li><b>Your own words.</b> ⚙ Fields → Stage → <b>Values</b>: write the words this sheet uses for each stage (“editing in progress” → D-In Progress). Typing or pasting them sets the stage; cells can show your words or the board's. Turning a column like “Status (our words)” into Stage asks you to match each value once.</li>
       </ul>
     </section>
     <section class="card">
@@ -200,16 +214,18 @@ button, input, select { font: inherit; color: inherit; }
   const ficon = k => FIELDS.find(f => f[0] === k)?.[2] ?? '•'
   const S = {
     tsc: { name: 'TSC Calendar', preset: false, tab: 'Calendar',
-      cols: [{ k: 'task', name: 'Topic / Title', task: true }, { k: 'stage', field: 'stage' }, { k: 'assignee', field: 'assignee' }, { k: 'type', field: 'type' }, { k: 'cap', name: 'Caption (LinkedIn)', w: 280 }, { k: 'design', field: 'link:design' }, { k: 'pillar', field: 'pillar' }, { k: 'notes', name: 'Notes', w: 160 }],
+      cols: [{ k: 'task', name: 'Topic / Title', task: true }, { k: 'stage', field: 'stage' }, { k: 'assignee', field: 'assignee' }, { k: 'type', field: 'type' }, { k: 'cap', name: 'Caption (LinkedIn)', w: 280 }, { k: 'design', field: 'link:design' }, { k: 'pillar', field: 'pillar' }, { k: 'old', name: 'Status (our words)', w: 170 }, { k: 'notes', name: 'Notes', w: 160 }],
+      words: {}, show: 'board',
       rows: [
-        { task: { name: 'Retreat 26 · Quote · Hisham El Badawy · 2', stage: 'r-design', assignee: 0, type: 'Article', 'link:design': '', pillar: 'Sessions', due: '2026-11-20', priority: 'High', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, cap: '“Inventing an intermediate level just to promote someone doesn’t solve the problem…”', notes: 'Approved by Islam' },
-        { task: { name: 'Retreat 26 · Quote · Islam Saadany · 1', stage: 'c-final', assignee: 1, type: 'Article', 'link:design': 'https://www.canva.com/design/x', pillar: 'Sessions', due: '2026-11-12', priority: 'Normal', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, cap: '“The strategy’s role in execution is not execution…”', notes: '' },
-        { task: { name: 'Retreat 26 · Venue reveal', stage: 'publish', assignee: 4, type: 'Reel', 'link:design': 'https://claude.ai/public/artifacts/x', pillar: 'Venue', due: '2026-11-05', priority: 'Normal', owner: 1, platform: 'Instagram', theme: 'TSC Retreat 26' }, cap: 'Where we’re meeting this year 🏔️', notes: 'Boosted' },
-        { task: null, title: 'Speakers line-up (draft)', cap: 'Not on the board yet', notes: 'Waiting for names' },
+        { task: { name: 'Retreat 26 · Quote · Hisham El Badawy · 2', stage: 'r-design', assignee: 0, type: 'Article', 'link:design': '', pillar: 'Sessions', due: '2026-11-20', priority: 'High', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, old: 'editing in progress', cap: '“Inventing an intermediate level just to promote someone doesn’t solve the problem…”', notes: 'Approved by Islam' },
+        { task: { name: 'Retreat 26 · Quote · Islam Saadany · 1', stage: 'c-final', assignee: 1, type: 'Article', 'link:design': 'https://www.canva.com/design/x', pillar: 'Sessions', due: '2026-11-12', priority: 'Normal', owner: 0, platform: 'LinkedIn', theme: 'TSC Retreat 26' }, old: 'with client', cap: '“The strategy’s role in execution is not execution…”', notes: '' },
+        { task: { name: 'Retreat 26 · Venue reveal', stage: 'publish', assignee: 4, type: 'Reel', 'link:design': 'https://claude.ai/public/artifacts/x', pillar: 'Venue', due: '2026-11-05', priority: 'Normal', owner: 1, platform: 'Instagram', theme: 'TSC Retreat 26' }, old: 'live', cap: 'Where we’re meeting this year 🏔️', notes: 'Boosted' },
+        { task: null, title: 'Speakers line-up (draft)', old: 'idea', cap: 'Not on the board yet', notes: 'Waiting for names' },
         { task: null, title: '', cap: '', notes: '' },
       ] },
     content: { name: 'Content', preset: true, tab: 'Content library',
       cols: [{ k: 'task', name: 'Title', task: true }, { k: 'type', field: 'type' }, { k: 'stage', field: 'stage' }, { k: 'assignee', field: 'assignee' }, { k: 'doc', field: 'link:doc' }, { k: 'design', field: 'link:design' }, { k: 'hook', field: 'col:hook' }, { k: 'notes', name: 'Notes', w: 160 }],
+      words: { todo: ['Planned'], 'c-prog': ['Writing'], 'c-final': ['Content Review'], 'c-check': ['Content Check'], 'r-design': ['Ready for Design'], 'd-prog': ['Initial Design'], 'd-check': ['Final Design'], 'final-check': ['Final Check'], publish: ['Published'] }, show: 'sheet',
       rows: [
         { grp: 'Strategy › AI' },
         { task: { name: '[YOSRA] Forefront – LinkedIn carousel', stage: 'publish', assignee: 1, type: 'Post', 'link:doc': 'https://docs.google.com/d/x', 'link:design': '', 'col:hook': 'Most AI pilots fail quietly', due: '2026-11-01' }, notes: '' },
@@ -239,9 +255,12 @@ button, input, select { font: inherit; color: inherit; }
   const item = (p, html, on, o = {}) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'mi'; b.setAttribute('role', 'menuitem'); b.innerHTML = html + (o.ck ? '<span class="ck">✓</span>' : ''); b.disabled = !!o.off; if (o.off) b.title = o.off; b.addEventListener('click', () => { closePop(); on() }); p.appendChild(b) }
   const head = (p, t) => { const h = document.createElement('h4'); h.textContent = t; p.appendChild(h) }
 
+  /** A stage as this sheet names it: its own word when it has one and shows them, else the board's name. */
+  const stageName = id => { const s = STAGES.find(x => x[0] === id); const w = sh().words?.[id]?.[0]; return sh().show === 'sheet' && w ? w : s[1] }
+  const BOARD = { todo: 'To Do', 'c-prog': 'C-In Progress', 'c-final': 'C-Review', 'c-check': 'C-Check', 'r-design': 'Ready For Design', 'd-prog': 'D-In Progress', 'd-check': 'D-Check', 'final-check': 'F-Check', 'ready-publish': 'Ready to Publish', scheduled: 'Scheduled', publish: 'Published' }
   function fieldHTML(f, t) {
     const v = t[f]
-    if (f === 'stage') { const s = STAGES.find(x => x[0] === v); return `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}</span>` }
+    if (f === 'stage') { const s = STAGES.find(x => x[0] === v); return `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${stageName(v)}</span>` }
     if (f === 'assignee' || f === 'owner') { const p = PEOPLE[v]; return p ? `<span class="chip"><span class="av" style="background:${p[2]}">${p[1]}</span><span class="t">${p[0]}</span></span>` : '<span class="chip"><span class="av empty"></span><span class="t na">Unassigned</span></span>' }
     if (f === 'type') return `<span class="typepill" style="background:${TYPES[v] ?? '#52525B'}">${v}</span>`
     if (f === 'pillar' || f === 'theme') return v ? `<span class="pillar">${v}</span>` : ''
@@ -251,7 +270,7 @@ button, input, select { font: inherit; color: inherit; }
     return `<span class="t">${v ?? ''}</span>`
   }
   function edit(f, t, el) {
-    if (f === 'stage') pop(el, p => STAGES.forEach(s => item(p, `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${s[1]}</span>`, () => { t.stage = s[0]; render(); toast(`Moved to ${s[1]} on the board.`) }, { ck: t.stage === s[0], off: s[3] && s[3] !== 'Marketing Manager' ? `${s[3]} moves this stage` : null })))
+    if (f === 'stage') pop(el, p => STAGES.forEach(s => item(p, `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${stageName(s[0])}</span>`, () => { t.stage = s[0]; render(); toast(`Moved to ${BOARD[s[0]]} on the board.`) }, { ck: t.stage === s[0], off: s[3] && s[3] !== 'Marketing Manager' ? `${s[3]} moves this stage` : null })))
     else if (f === 'assignee' || f === 'owner') pop(el, p => { PEOPLE.forEach((pp, i) => item(p, `<span class="av" style="background:${pp[2]}">${pp[1]}</span>${pp[0]}`, () => { t[f] = i; render() }, { ck: t[f] === i })); item(p, '<span class="av empty"></span>Unassigned', () => { t[f] = null; render() }) })
     else if (f === 'type') pop(el, p => Object.entries(TYPES).forEach(([k, c]) => item(p, `<span class="typepill" style="background:${c}">${k}</span>`, () => { t.type = k; render() }, { ck: t.type === k })))
     else if (f === 'pillar') pop(el, p => PILLARS.forEach(k => item(p, `<span class="pillar">${k}</span>`, () => { t.pillar = k; render() }, { ck: t.pillar === k })))
@@ -281,7 +300,7 @@ button, input, select { font: inherit; color: inherit; }
     pop(el, p => {
       if (c.field) { item(p, `Field: <b>${fname(c.field)}</b>`, () => {}, { off: ' ' }); item(p, 'Hide field (the task keeps its value)', () => { sh().cols = sh().cols.filter(x => x !== c); render() }); item(p, 'Turn into a regular column (keep today’s values as text)', () => { delete c.field; c.name = fname(c.k); render() }) }
       else if (c.task) { item(p, 'This column says which task a row is', () => {}, { off: ' ' }); item(p, 'Use another column as the task column…', () => toast('Pick the column in ⚙ Fields.')) }
-      else { item(p, 'Rename', () => {}); item(p, 'Use this column for a task field ▸', () => { pop(el, q => { head(q, 'Show this field here'); FIELDS.forEach(f => item(q, `<span class="ic">${f[2]}</span>${f[1]}`, () => { c.field = f[0]; render(); toast(`${c.name} now shows ${f[1]}. Rows without a task keep their text.`) })) }) }); item(p, 'Delete column', () => { sh().cols = sh().cols.filter(x => x !== c); render() }) }
+      else { item(p, 'Rename', () => {}); item(p, 'Use this column for a task field ▸', () => { pop(el, q => { head(q, 'Show this field here'); FIELDS.forEach(f => item(q, `<span class="ic">${f[2]}</span>${f[1]}`, () => { if (f[0] === 'stage' || f[0] === 'type' || f[0] === 'priority') { matchDialog(c, f[0]); return } c.field = f[0]; render(); toast(`${c.name} now shows ${f[1]}. Rows without a task keep their text.`) })) }) }); item(p, 'Delete column', () => { sh().cols = sh().cols.filter(x => x !== c); render() }) }
     })
   }
 
@@ -350,6 +369,7 @@ button, input, select { font: inherit; color: inherit; }
         row.innerHTML = `<span class="drag" aria-hidden="true">⋮⋮</span><span class="ic">${f[2]}</span><span class="nm">${f[1]}${c ? `<br><span class="where">Column ${letter(c)}</span>` : ''}</span>`
         const sw = document.createElement('button'); sw.type = 'button'; sw.className = 'sw'; sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', !!c); sw.setAttribute('aria-label', `Show ${f[1]}`)
         sw.addEventListener('click', () => { if (c) sh().cols = sh().cols.filter(x => x !== c); else sh().cols.push({ k: f[0], field: f[0] }); render() })
+        if (f[0] === 'stage' || f[0] === 'type' || f[0] === 'priority') { const vb = document.createElement('button'); vb.type = 'button'; vb.className = 'valbtn'; vb.textContent = 'Values'; vb.title = `How this sheet names each ${f[1].toLowerCase()}`; vb.addEventListener('click', () => valuesDialog(f[0])); row.appendChild(vb) }
         row.appendChild(sw); list.appendChild(row)
       })
     }
@@ -358,6 +378,75 @@ button, input, select { font: inherit; color: inherit; }
     cols.filter(c => !c.field && !c.task).forEach(c => { const row = document.createElement('div'); row.className = 'frow'; row.innerHTML = `<span class="drag" aria-hidden="true">⋮⋮</span><span class="ic reg">A</span><span class="nm">${c.name}<br><span class="where">Column ${letter(c)}</span></span>`; rs.appendChild(row) })
     const b = document.createElement('button'); b.type = 'button'; b.className = 'addcol'; b.textContent = '＋ Add a regular column'; b.addEventListener('click', () => { sh().cols.push({ k: 'r' + Date.now(), name: 'Column', w: 140 }); render() }); rs.appendChild(b)
     drawer.querySelector('#dclose').addEventListener('click', () => { drawerOpen = false; render() })
+  }
+
+  // ── value matching (the sheet's own words for board values) ──
+  function modal(title, build) {
+    frame.querySelector('.scrim')?.remove()
+    const sc = document.createElement('div'); sc.className = 'scrim'
+    const d = document.createElement('div'); d.className = 'dialog'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', title)
+    d.innerHTML = `<h2>${title}</h2>`; build(d); sc.appendChild(d); frame.appendChild(sc)
+    sc.addEventListener('pointerdown', e => { if (e.target === sc) sc.remove() })
+    d.querySelector('input, select, button')?.focus()
+    return () => sc.remove()
+  }
+  /** ⚙ Fields → Stage → Values: each board stage, and the words this sheet uses for it. */
+  function valuesDialog(field) {
+    if (field !== 'stage') { toast('Same table for ' + fname(field) + ': each value, and this sheet’s words for it.'); return }
+    const words = sh().words ?? (sh().words = {})
+    const close = modal(`Stage values in ${sh().name}`, d => {
+      d.insertAdjacentHTML('beforeend', `<p>Type the words this sheet uses for each stage, separated by commas. Typing or pasting any of them sets that stage; the board keeps its own names.</p>`)
+      const tb = document.createElement('div'); tb.className = 'vtable'
+      tb.innerHTML = `<b>On the board</b><b>This sheet calls it</b>`
+      for (const s of STAGES) {
+        tb.insertAdjacentHTML('beforeend', `<span class="status" style="background:${mix(s[2], .14)};border-color:${mix(s[2], .38)}"><i style="background:${s[2]}"></i>${BOARD[s[0]]}</span><input data-st="${s[0]}" value="${(words[s[0]] ?? []).join(', ')}" placeholder="e.g. ${s[0] === 'd-prog' ? 'Editing in progress' : s[1]}" aria-label="This sheet's words for ${BOARD[s[0]]}">`)
+      }
+      d.appendChild(tb)
+      d.insertAdjacentHTML('beforeend', `<fieldset><legend>Cells show</legend><label><input type="radio" name="show" value="sheet" ${sh().show === 'sheet' ? 'checked' : ''}> This sheet’s words</label><label><input type="radio" name="show" value="board" ${sh().show !== 'sheet' ? 'checked' : ''}> The board’s names</label></fieldset>`)
+      const row = document.createElement('div'); row.className = 'drow'
+      row.innerHTML = `<button type="button" class="pill">Cancel</button><button type="button" class="pill go">Save</button>`
+      row.children[0].addEventListener('click', () => close())
+      row.children[1].addEventListener('click', () => {
+        d.querySelectorAll('input[data-st]').forEach(i => { const v = i.value.split(',').map(x => x.trim()).filter(Boolean); if (v.length) words[i.dataset.st] = v; else delete words[i.dataset.st] })
+        sh().show = d.querySelector('input[name="show"]:checked').value
+        close(); render(); toast('Saved. Typing “editing in progress” now sets D-In Progress.')
+      })
+      d.appendChild(row)
+    })
+  }
+  /** "Use this column for Stage" on a column with its own words: match each word once. */
+  function matchDialog(c, field) {
+    if (field !== 'stage') { c.field = field; render(); return }
+    const rows = sh().rows.filter(r => !r.grp)
+    const counts = new Map()
+    rows.forEach(r => { const v = (r[c.k] ?? '').trim(); if (v) counts.set(v, (counts.get(v) ?? 0) + 1) })
+    const words = sh().words ?? (sh().words = {})
+    const known = v => { const n = v.toLowerCase(); for (const s of STAGES) if (BOARD[s[0]].toLowerCase() === n || s[1].toLowerCase() === n || (words[s[0]] ?? []).some(w => w.toLowerCase() === n)) return s[0]; return '' }
+    const guess = { 'editing in progress': 'd-prog', live: 'publish' }
+    const close = modal(`Match the values in “${c.name}”`, d => {
+      d.insertAdjacentHTML('beforeend', `<p>${counts.size} different values. Pick the board stage each one means; they’re saved as this sheet’s words, so typing them later works too.</p>`)
+      const tb = document.createElement('div'); tb.className = 'vtable'
+      tb.innerHTML = `<b>In this column</b><b>Board stage</b>`
+      for (const [v, n] of counts) {
+        const k = known(v) || guess[v] || ''
+        tb.insertAdjacentHTML('beforeend', `<span>“${v}” <small>${n} row${n > 1 ? 's' : ''}</small></span><select data-v="${v}" aria-label="Board stage for ${v}"><option value="">Not a stage (leave as text)</option>${STAGES.map(s => `<option value="${s[0]}" ${k === s[0] ? 'selected' : ''}>${BOARD[s[0]]}</option>`).join('')}</select>`)
+      }
+      d.appendChild(tb)
+      d.insertAdjacentHTML('beforeend', `<fieldset><legend>Linked rows whose task is at a different stage</legend><label><input type="radio" name="win" value="board" checked> Keep the board’s stage (show it here)</label><label><input type="radio" name="win" value="sheet"> Move the tasks to this column’s stage</label></fieldset>`)
+      const row = document.createElement('div'); row.className = 'drow'
+      row.innerHTML = `<button type="button" class="pill">Cancel</button><button type="button" class="pill go">Use for Stage</button>`
+      row.children[0].addEventListener('click', () => close())
+      row.children[1].addEventListener('click', () => {
+        const pick = new Map([...d.querySelectorAll('select[data-v]')].map(sel => [sel.dataset.v, sel.value]))
+        for (const [v, st] of pick) if (st && BOARD[st].toLowerCase() !== v.toLowerCase()) (words[st] ??= []).includes(v) || words[st].push(v)
+        let moved = 0
+        if (d.querySelector('input[name="win"]:checked').value === 'sheet') rows.forEach(r => { const st = pick.get((r[c.k] ?? '').trim()); if (r.task && st && r.task.stage !== st) { r.task.stage = st; moved++ } })
+        sh().cols = sh().cols.filter(x => x.field !== 'stage' || x === c)
+        c.field = 'stage'; sh().show = 'sheet'
+        close(); render(); toast(moved ? `${c.name} now shows Stage; ${moved} task${moved > 1 ? 's' : ''} moved on the board.` : `${c.name} now shows Stage, in this sheet’s words.`)
+      })
+      d.appendChild(row)
+    })
   }
 
   document.getElementById('fieldsBtn').addEventListener('click', () => { drawerOpen = !drawerOpen; render() })
