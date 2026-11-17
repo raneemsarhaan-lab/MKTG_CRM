@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain. Two remain: Q1 formulas, Q2 pivots and charts.
+- [x] No [NEEDS CLARIFICATION] markers remain (Q1 formulas: a later spec; Q2 pivots and charts: out of scope)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Q1 and Q2 decide FR-015 and FR-016 and the size of the plan. Everything else is ready for `/speckit-plan`.
+- All items pass. Ready for `/speckit-plan`.
 - Shortcut names (Ctrl+E, F4…) are the reference's own user-facing terms, not implementation details.

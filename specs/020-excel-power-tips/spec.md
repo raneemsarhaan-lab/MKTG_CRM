@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-17
 
-**Status**: Draft (two scope questions open)
+**Status**: Draft (clarified)
 
 **Input**: User description: "all these hacks". Implement the tips in the attached reference *100 Excel Tips and Tricks*: 120 tips in eleven areas (navigation, data entry, formatting, formulas, lookups, text and dates, cleanup, tables, pivots and charts, productivity, mouse hacks).
 
@@ -17,7 +17,10 @@ This feature adds the rest of the everyday power moves people expect from Excel,
 - **Team sheets**: every tip that makes sense for a sheet.
 - **Content and Video sheets**: the tips that apply to cells you can type in. These are navigation, selection, fill, status-bar math and drop-down picks. Structure tips do not apply there: moving cells with the mouse, removing duplicates and grouping rows would rearrange the board's tasks. In these sheets, a value a member types still goes through the board's rules.
 
-Spec 013 decided that the sheets have no formulas. Tips 31–60 and 72 are formula functions; 79 and the formula rule in 27 need formulas too. Tips 81–90 and 115–116 are pivots and charts. Two questions about these are marked below.
+Spec 013 decided that the sheets have no formulas.
+
+- **Formulas:** tips 31–60 and 72 are formula functions, and 79 and the formula rule in 27 need formulas too. They are left to a later formulas spec. Where a formula-free tool does the same job, it is in this spec.
+- **Pivots and charts:** tips 81–90 and 115–116 are out of scope.
 
 ### Already available (no new work)
 
@@ -49,10 +52,20 @@ Spec 013 decided that the sheets have no formulas. Tips 31–60 and 72 are formu
 
 ## Clarifications
 
-### Open
+### Session 2026-11-17
 
-- **Q1, formulas (tips 27 formula rule, 31–60, 72, 79):** [NEEDS CLARIFICATION: add formulas to the sheets, keep "no formulas" and offer formula-free equivalents, or phase formulas into their own spec?]
-- **Q2, pivots and charts (tips 81–90, 115–116):** [NEEDS CLARIFICATION: include summaries and charts now, later, or not at all?]
+- **Q: Formulas (tips 27 formula rule, 31–60, 72, 79)?**
+  A: **Later, in their own spec.**
+  - This spec adds no formula engine.
+  - Its formula-free tools stay in it:
+    - status-bar math (38);
+    - table total rows (73, 79);
+    - one-click cleanup and case tools (54, 55);
+    - date series by fill (in place of 57, 60);
+    - split to columns (52, 62).
+  - The formula tips (27's formula rule, 31–37, 39–51, 53, 56–60, 72) wait for the formulas spec.
+- **Q: Pivots and charts (tips 81–90, 115–116)?**
+  A: **Not now.** These tips are out of scope.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -281,8 +294,8 @@ Also:
 - **FR-012 (print):** Print / PDF of the sheet, with repeated header rows, fit to width, orientation, and gridlines on or off.
 - **FR-013 (Content and Video sheets):** FR-001, FR-002 (copy and series into typable cells, going through each cell's own rules), FR-009, the Alt+Down pick, and zoom apply. Structure tools stay team-sheet only.
 - **FR-014:** English and Arabic, keyboard reachable, axe-clean, and every change undoable.
-- **FR-015 (formulas):** depends on Q1.
-- **FR-016 (pivots and charts):** depends on Q2.
+- **FR-015 (formulas):** none in this spec. Typed text that starts with "=" stays text, as today. The formula tips are kept for a later formulas spec.
+- **FR-016 (pivots and charts):** out of scope.
 
 ### Key Entities
 
@@ -311,7 +324,8 @@ Also:
   - OneDrive version history (96);
   - side-by-side windows (97);
   - shape snapping (117);
-  - Evaluate Formula, trace arrows and F9 (33–35), unless formulas come in (Q1).
+  - the formula tips (left to a later formulas spec);
+  - pivots and charts (81–90, 115–116), out of scope by decision.
 - **Weekends:** "weekdays" follow the workspace's weekend (Friday–Saturday by default, as in tip 58).
 - **Build order:**
   1. US1–US3;
