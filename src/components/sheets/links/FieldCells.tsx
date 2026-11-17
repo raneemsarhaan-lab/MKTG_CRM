@@ -158,6 +158,9 @@ function InputPop({ field, value, anchor, onSave, onClose }: { field: TaskField;
 
 /** A field heading's icon. */
 export function FieldIcon({ field }: { field: TaskField | 'task' | 'regular' }): ReactNode {
-  const ch = field === 'task' ? '✓' : field === 'regular' ? 'A' : field === 'stage' ? '◐' : field === 'assignee' || field === 'owner' ? '◉' : field === 'due' ? '▦' : field === 'priority' ? '⚑' : field === 'type' ? '▣' : field === 'theme' ? '◆' : field === 'pillar' ? '◇' : field === 'platform' ? '◎' : field === 'title' ? 'T' : field.startsWith('link:') ? '↗' : '✎'
+  if (field === 'stage') {
+    return <span className="fx-fd-ic" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5 1a4 4 0 0 1 0 8z" fill="currentColor" /></svg></span>
+  }
+  const ch = field === 'task' ? '✓' : field === 'regular' ? 'A' : field === 'assignee' || field === 'owner' ? '◉' : field === 'due' ? '▦' : field === 'priority' ? '⚑' : field === 'type' ? '▣' : field === 'theme' ? '◆' : field === 'pillar' ? '◇' : field === 'platform' ? '◎' : field === 'title' ? 'T' : field.startsWith('link:') ? '↗' : '✎'
   return <span className={`fx-fd-ic${field === 'regular' ? ' is-reg' : ''}`} aria-hidden="true">{ch}</span>
 }

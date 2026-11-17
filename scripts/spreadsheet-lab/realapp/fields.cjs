@@ -183,7 +183,8 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
 
     console.log('5. Typing a sheet word (US6)')
     await cellAt(page, rid[3], ids.cols[1]).click()
-    await page.keyboard.press('Escape').catch(() => {})
+    await page.waitForSelector('[data-sheet-menu]')
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200)
     await page.keyboard.type('Editing  in progress'); await page.keyboard.press('Enter')
     await page.waitForTimeout(1800)
     ok(status(T[2].id) === 'd-prog', 'typing the sheet’s word moves the task to D-In Progress (case and spaces ignored)', status(T[2].id))

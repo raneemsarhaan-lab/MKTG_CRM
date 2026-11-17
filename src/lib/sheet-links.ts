@@ -110,7 +110,8 @@ export function shownWord(value: string, words: Record<string, string[]> | undef
 export interface TaskKind { piece: boolean; video: boolean; clip: boolean }
 export function fieldApplies(k: TaskKind, field: TaskField): boolean {
   if (field === 'theme' || field === 'pillar') return k.piece
-  if (field.startsWith('link:')) return k.piece || k.video
+  // Any board task can carry its links (the board's own link fields); a clip's live on its video.
+  if (field.startsWith('link:')) return !k.clip
   if (field.startsWith('col:')) return k.piece || k.clip
   return true
 }
