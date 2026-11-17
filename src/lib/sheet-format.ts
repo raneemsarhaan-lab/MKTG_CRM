@@ -109,6 +109,7 @@ export function validateStyle(input: unknown): CellStyle | null {
   if (input.rot === 'vertical') s.rot = 'vertical'
   else { const rot = int(input.rot, -90, 90); if (rot) s.rot = rot }
   const num = validateNum(input.num); if (num && num.kind !== 'general') s.num = num
+  if (input.unlocked === true) s.unlocked = true
   return Object.keys(s).length ? s : null
 }
 

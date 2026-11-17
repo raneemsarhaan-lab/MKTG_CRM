@@ -17,8 +17,8 @@ import { sendFormat, type FormatSource, type FormatState } from './bus'
 import { DEFAULT_LINE, numKey } from './FormatToolbar'
 import { PresetIcon } from './BorderPicker'
 
-type Tab = 'number' | 'alignment' | 'font' | 'border' | 'fill'
-const TABS: Tab[] = ['number', 'alignment', 'font', 'border', 'fill']
+type Tab = 'number' | 'alignment' | 'font' | 'border' | 'fill' | 'protection'
+const TABS: Tab[] = ['number', 'alignment', 'font', 'border', 'fill', 'protection']
 const CATS = ['general', 'number', 'currency', 'accounting', 'shortDate', 'time', 'percent', 'scientific', 'text', 'custom'] as const
 const NEG: NonNullable<NumberFormat['neg']>[] = ['minus', 'red', 'paren', 'paren-red']
 const DATE_TYPES: NumberFormat[] = [{ kind: 'date' }, { kind: 'date', long: true }, { kind: 'date', pattern: 'dd/mm/yyyy' }, { kind: 'date', pattern: 'ddd d mmm' }, { kind: 'date', pattern: 'd mmmm yyyy' }]
@@ -50,6 +50,7 @@ function catNum(cat: typeof CATS[number], prev: NumberFormat | undefined): Numbe
 
 export function FormatCellsDialog({ state, target, onClose }: { state: FormatState; target: FormatSource; onClose(): void }) {
   const t = useTranslations('sheets.format')
+  const tt = useTranslations('sheets.tips')
   const locale = useLocale()
   const uid = useId()
   const [tab, setTab] = useState<Tab>('number')
@@ -84,7 +85,7 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
     <Modal title={t('fc.titleAt', { cell: state.cell })} onCancel={onClose} attr="data-format-dialog">
       <div className="fx-fc">
         <div className="fx-fc-tabs" role="tablist">
-          {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} data-fc-tab={x} onClick={() => setTab(x)}>{t(`fc.tabs.${x}`)}</button>)}
+          {TABS.filter(x => x !== 'protection' || target === 'blank').map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} data-fc-tab={x} onClick={() => setTab(x)}>{x === 'protection' ? tt('protect.tab') : t(`fc.tabs.${x}`)}</button>)}
         </div>
         <div className="fx-fc-body" role="tabpanel">
           {tab === 'number' && (
@@ -193,6 +194,13 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                 </div>
                 {fld(t('border.colour'), <input type="color" value={line.c} onChange={e => setLine({ ...line, c: e.target.value.toUpperCase() })} />)}
               </div>
+            </div>
+          )}
+          {tab === 'protection' && (
+            <div className="fx-fc-stack">
+              <label className="fx-fc-chk"><input type="checkbox" checked={!d.unlocked} data-fc-locked="" onChange={e => set({ unlocked: e.target.checked ? undefined : true })} />{tt('protect.locked1')}</label>
+              <label className="fx-fc-chk is-off" title={tt('protect.hiddenWhy')}><input type="checkbox" disabled />{tt('protect.hidden')}</label>
+              <p className="fx-fc-note">{tt('protect.note')}</p>
             </div>
           )}
           {tab === 'fill' && (

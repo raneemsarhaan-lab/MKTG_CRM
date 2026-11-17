@@ -40,7 +40,7 @@ import { FormatSheet } from './format/FormatSheet'
 import { SheetComments } from './comments/SheetComments'
 import { LinkedFormatsContext } from './format/context'
 import { cellName as blankCellName } from '@/lib/sheet-selection'
-import type { SelStats } from './BlankSheet'
+import type { Carry, SelStats } from './BlankSheet'
 import { SERIES_OPEN } from './format/bus'
 import { CustomListsDialog, DataValidationDialog, GoToDialog, GoToSpecialDialog, SeriesDialog } from './format/TipsDialogs'
 import { loadFillLists, saveFillLists } from '@/actions/settings'
@@ -426,6 +426,31 @@ export function Workbook(p: WorkbookProps) {
     openSheet(made.id)
   }
 
+  // Spec 020 tip 111: Alt+drag over a tab carries the block to that sheet; it's dropped there with the pointer.
+  const [carry, setCarry] = useState<(Carry & { n: number; now?: boolean }) | null>(null)
+  const carryRef = useRef(carry)
+  carryRef.current = carry
+  function startCarry(tab: string, c: Carry) {
+    if (!visible.some(x => x.id === tab && x.kind === 'blank')) { say(tt('move.teamOnly')); return }
+    setCarry({ ...c, n: Date.now() })
+    setGrouped(new Set([tab]))
+    openSheet(tab)
+    // Let go before the sheet was ready: it lands where it was on its own sheet.
+    const up = () => window.setTimeout(() => { const cur = carryRef.current; if (cur && !cur.now) setCarry({ ...cur, now: true }) }, 120)
+    document.addEventListener('pointerup', up, { once: true })
+  }
+  /** The block landed (or the drag was cancelled): a move empties its old cells, one step on that sheet. */
+  function endCarry(c: Carry | null) {
+    setCarry(null)
+    if (!c || c.copy || !docsRef.current[c.sheetId]) return
+    const cells = c.cells.flat().filter(x => x.value).map(x => ({ rowId: x.rowId, colId: x.colId, before: x.value, after: '' }))
+    const formats = c.cells.flat().filter(x => x.style).map(x => ({ rowKey: x.rowId, colKey: x.colId, before: x.style, after: null }))
+    const forward: BlankChange[] = []
+    if (cells.length) forward.push({ kind: 'cells', cells })
+    if (formats.length) forward.push({ kind: 'formats', items: formats })
+    if (forward.length) apply(c.sheetId, 'moveCells', forward)
+  }
+
   /** Spec 020 tip 78: Advanced Filter › Copy to a new sheet: a sheet after this one, holding the rows. */
   async function newSheetWith(grid: string[][]) {
     const res = await outbox.track(api.createSheet(folder.id, { after: openRef.current, pattern }))
@@ -584,6 +609,8 @@ export function Workbook(p: WorkbookProps) {
       ? { key: 'unprotect', label: t('tabMenu.unprotect'), ...(single && mayUnprotect(s) ? {} : no(t('tabMenu.why.notProtector'))), onSelect: () => void protect(id, false) }
       : { key: 'protect', label: t('tabMenu.protect'), ...(s.kind !== 'blank' ? no(t('tabMenu.why.linked')) : !single ? { disabled: true } : {}), onSelect: () => setDialog({ kind: 'protect', id }) }
     const items: PopItem[] = [
+      // Spec 020 stage C: File › Print (the open sheet).
+      ...(id === openId ? [{ key: 'print', label: `${tt('print.title')}…`, kbd: 'Ctrl+P', onSelect: () => sendFormat(open?.kind === 'blank' ? 'blank' : 'linked', { kind: 'print' }) } as PopItem, { kind: 'sep', key: 'sp' } as PopItem] : []),
       { key: 'insert', label: t('tabMenu.insert'), onSelect: () => void createSheet({ before: id }) },
       { key: 'delete', label: t('tabMenu.delete'), danger: true, ...del, onSelect: () => setDialog({ kind: 'delete', ids }) },
       { key: 'rename', label: t('tabMenu.rename'), kbd: 'F2', ...(s.kind !== 'blank' ? no(t('tabMenu.why.linked')) : !single ? { disabled: true } : {}), onSelect: () => setRenaming(id) },
@@ -619,7 +646,10 @@ export function Workbook(p: WorkbookProps) {
       // Stage 2: Paste Special, Fill Down and Right, Find and Replace (FR-003).
       const k = e.key.toLowerCase()
       const stop = () => { e.preventDefault(); e.stopPropagation() }
-      if (e.shiftKey && !e.altKey && k === 'v') { stop(); if ((fmt[target]?.areas ?? 1) > 1) say(t('areas.oneArea')); else setPasteSpecial(true); return }
+      // Spec 020 stage C: Ctrl+P, File › Print (the sheet's own print, not the browser's page).
+      if (!e.shiftKey && !e.altKey && (k === 'p' || e.code === 'KeyP')) { stop(); sendFormat(target, { kind: 'print' }); return }
+      // Ctrl+Shift+V, and Excel's Ctrl+Alt+V (spec 020 stage C), open Paste Special.
+      if (((e.shiftKey && !e.altKey) || (e.altKey && !e.shiftKey)) && (k === 'v' || e.code === 'KeyV')) { stop(); if ((fmt[target]?.areas ?? 1) > 1) say(t('areas.oneArea')); else setPasteSpecial(true); return }
       if (!e.shiftKey && !e.altKey && (k === 'd' || k === 'r')) { stop(); sendFormat(target, { kind: 'fill', dir: k === 'd' ? 'down' : 'right' }); return }
       if (!e.shiftKey && !e.altKey && (k === 'f' || k === 'h')) { stop(); setFind({ replace: k === 'h' }); return }
       // Stage 3: Filter on and off (FR-046).
@@ -705,7 +735,7 @@ export function Workbook(p: WorkbookProps) {
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>
-      {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}</span>}
+      {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}{doc?.extras?.formats.some(f => f.style.unlocked) ? ` ${tt('protect.inputsOpen')}` : ''}</span>}
       {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
       {fieldsHere && (
         <button type="button" className="fx-sh-ib is-text" data-fields-btn="" title={t('fields.title')} onClick={() => openFields()}>
@@ -793,6 +823,7 @@ export function Workbook(p: WorkbookProps) {
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
                         onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId} onNewSheet={grid => void newSheetWith(grid)}
+                        carry={carry} onCarry={startCarry} onCarryDone={endCarry}
                         links={api} patch={fn => patchDoc(doc.id, fn)}
                         fillLists={fillItems} zoom={zoom} onZoom={setZoom} canRedo={!!stack && canRedo(stack)} onStatus={setStatusMode} />
           : loadError[openId]

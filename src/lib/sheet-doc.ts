@@ -92,6 +92,14 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, tables: ch.after } }
     }
+    case 'commentMoves': {
+      // The threads' markers follow their cells.
+      const ex = doc.extras ?? emptyExtras()
+      // All at once: a cell can move to where another moved away from.
+      const to = new Map(ch.moves.map(mv => [`${mv.from[0]}|${mv.from[1]}`, mv.to]))
+      const threads = ex.threads.map(t => { const d = to.get(`${t.rowKey}|${t.colKey}`); return d ? { ...t, rowKey: d[0], colKey: d[1] } : t })
+      return { ...doc, extras: { ...ex, threads } }
+    }
     case 'validations': {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, validations: ch.after } }
@@ -176,6 +184,7 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'rules': out.rules = mergeLists<ConditionalRule>(out.rules, listWrite(ch.before, ch.after)); break
       case 'tables': out.tables = mergeLists<SheetTableRecord>(out.tables, listWrite(ch.before, ch.after)); break
       case 'validations': out.validations = mergeLists<ValidationRecord>(out.validations, listWrite(ch.before, ch.after)); break
+      case 'commentMoves': push('commentMoves', [ch.moves]); break
       case 'rowOrder': push('rowPositions', ch.rows.map(r => ({ id: r.id, position: r.after }))); break
       case 'colOrder': push('colPositions', ch.cols.map(c => ({ id: c.id, position: c.after }))); break
       case 'taskMap': out.taskMap = ch.after; break
@@ -203,6 +212,7 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     rules: mergeLists(a.rules, b.rules),
     tables: mergeLists(a.tables, b.tables),
     validations: mergeLists(a.validations, b.validations),
+    commentMoves: cat(a.commentMoves, b.commentMoves),
     rowPositions: lastById(cat(a.rowPositions, b.rowPositions)),
     colPositions: lastById(cat(a.colPositions, b.colPositions)),
     ...('taskMap' in b ? { taskMap: b.taskMap } : 'taskMap' in a ? { taskMap: a.taskMap } : {}),

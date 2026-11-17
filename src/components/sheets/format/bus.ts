@@ -134,6 +134,8 @@ export type FormatCmd =
   | { kind: 'autofit'; what: 'row' | 'col' }
   /** Work out the block around the cell now (a dialog that needs it is opening). */
   | { kind: 'scope' }
+  /** Spec 020 stage C: File › Print (Ctrl+P). */
+  | { kind: 'print' }
   | { kind: 'clean'; op: CleanOp }
   | { kind: 'dedupe'; cols: string[]; header: boolean }
   | { kind: 'split'; opts: SplitOpts; formats: SplitFormat[] }

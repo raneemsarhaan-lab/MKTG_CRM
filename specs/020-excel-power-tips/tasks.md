@@ -172,7 +172,7 @@
 
 **Independent Test**: B2:C5 dragged to E2 moves cells, formats and comments in one undo; a move that splits a merge is refused (spec US7).
 
-- [ ] T060 Write the stage C HTML design (border-drag cursor and outline, right-drag menu, Alt+drag over a tab, Protection tab in Format Cells, print view and its options) in design/power-tips-c.html, and get approval
+- [X] T060 Write the stage C HTML design (border-drag cursor and outline, right-drag menu, Alt+drag over a tab, Protection tab in Format Cells, print view and its options) in design/power-tips-c.html, and get approval
 - [ ] T061 [US7] Border drag in the grid: hit-test 4 px around the selection outline, a ghost target, Ctrl/Shift/Ctrl+Shift modes, right-drag menu, calling `onMove`, in src/components/sheet/GridCore.tsx
 - [ ] T062 [US7] BlankSheet `onMove`: one step moving or copying cells, formats, comments and merges inside the block, with insert shifting; refused when it would split a merge or a table, in src/components/sheets/BlankSheet.tsx
 - [ ] T063 [US7] Alt+drag over a sheet tab: `onMoveToSheet` in the Workbook applies a clear here and a write there, one step on each sheet's stack, in src/components/sheets/Workbook.tsx and src/components/sheets/TabBar.tsx

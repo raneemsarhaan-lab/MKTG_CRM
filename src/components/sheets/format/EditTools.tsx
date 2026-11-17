@@ -105,18 +105,40 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
     if (!clip || !clip.grid.length) { say(t('noClip')); return }
     sendFormat(target, { kind: 'pasteSpecial', mode, transpose: flip, grid: clip.grid, styles: clip.styles, op, skipBlanks: skip })
   }
+  // Spec 020 stage C: Excel's letters (Ctrl+Alt+V, then V for values, T for formats, …, and Enter).
+  const AK: Record<string, string> = { all: 'A', formulas: 'F', values: 'V', formats: 'T', comments: 'C', validation: 'N', noBorders: 'X', widths: 'W', none: 'O', add: 'D', sub: 'S', mul: 'M', div: 'I', skip: 'B', transpose: 'E' }
+  const ak = (k: string, label: string) => {
+    const letter = AK[k], i = label.toLowerCase().indexOf(letter.toLowerCase())
+    if (i < 0 || !/^[\x00-\x7F]*$/.test(label)) return <>{label} <span className="fx-ak-hint">({letter})</span></>
+    return <>{label.slice(0, i)}<u className="fx-ak">{label[i]}</u>{label.slice(i + 1)}</>
+  }
+  function onKeys(e: React.KeyboardEvent) {
+    if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).tagName === 'SELECT') return
+    if (e.key === 'Enter') { e.preventDefault(); void ok(); return }
+    const k = Object.keys(AK).find(x => e.code === `Key${AK[x]}` || e.key.toLowerCase() === AK[x].toLowerCase())
+    if (!k) return
+    e.preventDefault()
+    const off = linked && ['validation', 'noBorders', 'widths', 'add', 'sub', 'mul', 'div', 'skip'].includes(k)
+    if (off || k === 'formulas' || k === 'comments') return
+    if (k === 'skip') setSkip(v => !v)
+    else if (k === 'transpose') setFlip(v => !v)
+    else if (k === 'none') setOp(null)
+    else if (['add', 'sub', 'mul', 'div'].includes(k)) setOp(k as PasteOp)
+    else setMode(k as PasteMode)
+  }
   const radio = (m: PasteMode | 'comments' | 'formulas', label: string, off = false, why?: string) => (
     <label key={m} className={`fx-sh-check${off ? ' is-dis' : ''}`} title={off ? why : undefined}>
-      <input type="radio" name="ps" disabled={off} checked={mode === m} data-ps={m} onChange={() => setMode(m as PasteMode)} />{label}
+      <input type="radio" name="ps" disabled={off} checked={mode === m} data-ps={m} onChange={() => setMode(m as PasteMode)} />{ak(m, label)}
     </label>
   )
   const opRadio = (o: PasteOp | null, label: string) => (
     <label key={o ?? 'none'} className={`fx-sh-check${linked && o ? ' is-dis' : ''}`} title={linked && o ? tt('blankOnly') : undefined}>
-      <input type="radio" name="psop" disabled={linked && !!o} checked={op === o} data-ps-op={o ?? 'none'} onChange={() => setOp(o)} />{label}
+      <input type="radio" name="psop" disabled={linked && !!o} checked={op === o} data-ps-op={o ?? 'none'} onChange={() => setOp(o)} />{ak(o ?? 'none', label)}
     </label>
   )
   return (
     <Modal title={t('psTitle')} body={t('psBody')} onCancel={onClose} attr="data-paste-special">
+      <div onKeyDown={onKeys} className="fx-ps-keys">
       <div className="fx-tip-cap">{tt('ps.paste')}</div>
       <div className="fx-tip-grid2" role="radiogroup" aria-label={tt('ps.paste')}>
         <div className="fx-tip-col">
@@ -138,8 +160,9 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
         <div className="fx-tip-col">{opRadio('mul', tt('ps.mul'))}{opRadio('div', tt('ps.div'))}</div>
       </div>
       <div className="fx-tip-grid2">
-        <label className={`fx-sh-check${linked ? ' is-dis' : ''}`}><input type="checkbox" checked={skip} disabled={linked} data-ps-skip="" onChange={e => setSkip(e.target.checked)} />{tt('ps.skipBlanks')}</label>
-        <label className="fx-sh-check"><input type="checkbox" checked={flip} data-ps-transpose="" onChange={e => setFlip(e.target.checked)} />{t('transpose')}</label>
+        <label className={`fx-sh-check${linked ? ' is-dis' : ''}`}><input type="checkbox" checked={skip} disabled={linked} data-ps-skip="" onChange={e => setSkip(e.target.checked)} />{ak('skip', tt('ps.skipBlanks'))}</label>
+        <label className="fx-sh-check"><input type="checkbox" checked={flip} data-ps-transpose="" onChange={e => setFlip(e.target.checked)} />{ak('transpose', t('transpose'))}</label>
+      </div>
       </div>
       <div className="fx-sh-dialog-row">
         <button type="button" disabled title={tt('ps.formulasWhy')}>{tt('ps.link')}</button>

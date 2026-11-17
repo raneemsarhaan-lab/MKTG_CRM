@@ -14,11 +14,20 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 
 export type PopItem =
   | { kind?: 'item'; key: string; label: string; kbd?: string; disabled?: boolean; why?: string; danger?: boolean; checked?: boolean; onSelect(): void
+      /** Spec 020: Excel's access key (press it to choose the item); an "&" in the label underlines its letter. */
+      ak?: string
       /** Spec 018: opens a submenu (shows ▸). */
       sub?: boolean }
   | { kind: 'sep'; key: string }
   /** Anything else in the menu: the tab colour swatches. Its buttons join the arrow keys. */
   | { kind: 'node'; key: string; node: ReactNode }
+
+/** A label with "&" before its access key's letter: that letter underlined (a "&&" is a plain "&"). */
+function akLabel(label: string) {
+  const i = label.search(/&(?=[\p{L}\p{N}])/u)
+  if (i < 0) return label.replace(/&&/g, '&')
+  return <>{label.slice(0, i).replace(/&&/g, '&')}<u className="fx-ak">{label[i + 1]}</u>{label.slice(i + 2).replace(/&&/g, '&')}</>
+}
 
 export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
   at: { x: number; y: number }
@@ -85,6 +94,11 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
       case 'Escape': e.preventDefault(); e.stopPropagation(); return close(true)
       case 'Tab': e.preventDefault(); return close(true)
     }
+    // Excel's access keys (by the key's place too, so they work on an Arabic keyboard).
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      const hit = items.find(it => it.kind !== 'sep' && it.kind !== 'node' && it.ak && (e.key.toLowerCase() === it.ak.toLowerCase() || e.code === `Key${it.ak.toUpperCase()}`))
+      if (hit && hit.kind !== 'sep' && hit.kind !== 'node') { e.preventDefault(); if (!hit.disabled) { close(false); hit.onSelect() } return }
+    }
     if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey) {
       const now = Date.now()
       typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : '') + e.key.toLowerCase(), at: now }
@@ -122,7 +136,7 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
               onClick={() => { if (it.disabled) return; close(false); it.onSelect() }}
               onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !it.disabled) { e.preventDefault(); close(false); it.onSelect() } }}
             >
-              <span>{it.checked ? '✓ ' : ''}{it.label}</span>
+              <span>{it.checked ? '✓ ' : ''}{akLabel(it.label)}</span>
               {it.kbd && <kbd>{it.kbd}</kbd>}
               {it.sub && <span className="fx-sh-subarrow" aria-hidden="true" />}
             </button>

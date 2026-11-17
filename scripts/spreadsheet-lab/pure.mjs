@@ -540,6 +540,28 @@ export async function runPure(lab, root) {
     eq([rl.has('r1|a'), rl.has('r1|d'), rl.has('r2|a')], [true, true, false], 'Format the entire row where D > 1000')
   })
 
+  // ── spec 020 stage C: moving and copying with the mouse ───────────────────
+  await check('tips-move', () => {
+    const apply = (grid, plan) => {
+      const out = grid.map(r => r.slice())
+      while (out.length < plan.rows) out.push(Array(out[0].length).fill(''))
+      for (const r of out) while (r.length < plan.cols) r.push('')
+      for (const x of plan.cells) out[x.to.r][x.to.c] = x.from ? grid[x.from.r]?.[x.from.c] ?? '' : ''
+      return out
+    }
+    const g = [['a', 'b', '', ''], ['c', 'd', '', ''], ['e', 'f', '', '']]
+    eq(apply(g, h.planMove({ r0: 0, c0: 0, r1: 1, c1: 1 }, { r: 0, c: 2 }, 'move', null, 3, 4)), [['', '', 'a', 'b'], ['', '', 'c', 'd'], ['e', 'f', '', '']], 'a move empties the source (B2:C5 to E2)')
+    eq(apply(g, h.planMove({ r0: 0, c0: 0, r1: 1, c1: 1 }, { r: 1, c: 1 }, 'move', null, 3, 4)), [['', '', '', ''], ['', 'a', 'b', ''], ['e', 'c', 'd', '']], 'overlapping move')
+    eq(apply(g, h.planMove({ r0: 0, c0: 0, r1: 0, c1: 1 }, { r: 2, c: 2 }, 'copy', null, 3, 4)), [['a', 'b', '', ''], ['c', 'd', '', ''], ['e', 'f', 'a', 'b']], 'Ctrl copies')
+    const col = [['a'], ['b'], ['c'], ['d'], ['e'], ['f']]
+    eq(apply(col, h.planMove({ r0: 1, c0: 0, r1: 1, c1: 0 }, { r: 4, c: 0 }, 'move', 'down', 6, 1)).map(r => r[0]), ['a', 'c', 'd', 'b', 'e', 'f'], 'Shift moves b in above e')
+    eq(apply(col, h.planMove({ r0: 4, c0: 0, r1: 4, c1: 0 }, { r: 1, c: 0 }, 'move', 'down', 6, 1)).map(r => r[0]), ['a', 'e', 'b', 'c', 'd', 'f'], 'and upwards')
+    eq(apply(col, h.planMove({ r0: 2, c0: 0, r1: 2, c1: 0 }, { r: 5, c: 0 }, 'copy', 'down', 6, 1)).map(r => r[0]), ['a', 'b', 'c', 'd', 'e', 'c', 'f'], 'Ctrl+Shift inserts a copy (the sheet grows)')
+    eq(apply([['a', 'b', 'c', 'd']], h.planMove({ r0: 0, c0: 0, r1: 0, c1: 0 }, { r: 0, c: 3 }, 'move', 'right', 1, 4))[0], ['b', 'c', 'a', 'd'], 'Shift right')
+    ok(h.splits({ r0: 0, c0: 0, r1: 1, c1: 1 }, { r0: 1, c0: 1, r1: 2, c1: 1 }) && !h.splits({ r0: 0, c0: 0, r1: 3, c1: 3 }, { r0: 1, c0: 1, r1: 2, c1: 1 }), 'a block cutting a merge is caught')
+    eq(h.MOVE_CHOICES.find(c => c.key === 'values').letter + h.MOVE_CHOICES.find(c => c.key === 'formats').letter, 'VF', 'Excel\'s keys: V values, F formats')
+  })
+
   await check('clip-html', async () => {
     const { chromium } = require('playwright')
     const exe = process.env.LAB_CHROMIUM ?? (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined)
