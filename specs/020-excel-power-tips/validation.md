@@ -98,6 +98,9 @@ Run against `next start` with the local database (see `quickstart.md`).
 |---|---|---|
 | Pure checks (the move planner, plus every earlier check) | `npm run lab:spreadsheet` | 40/40 |
 | Stage C on the running app | `node scripts/spreadsheet-lab/realapp/tips-c.cjs` | 36/36 |
+| Regressions on the running app | tips-a 73, tips-b 58, fields 78, content-fields 29, video-fields 29, links 41, areas 42, header 45, run, editing 50, format 52, styles 54, perf-axe 18 | all pass |
+| Sheet lab | `npm run lab:sheet` | 150/150 |
+| Build | `npm run build` | passes |
 
 **What `tips-c.cjs` covers (quickstart Stage C):**
 
