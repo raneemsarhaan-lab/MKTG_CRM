@@ -99,6 +99,8 @@ type MenuKey = 'font' | 'size' | 'color' | 'fill' | 'borders' | 'rotate' | 'merg
 type Open = { k: MenuKey; el: HTMLElement; at?: { x: number; y: number } } | null
 const MENUBAR = ['file', 'edit', 'view', 'insert', 'format', 'data', 'help'] as const
 type MenuBarKey = typeof MENUBAR[number]
+/** Spec 020: Excel's KeyTip letters where they match (File F, Insert N, Format O, Data A, View W, Help Y), by key code so they work in any layout. */
+const KEYTIP: Record<MenuBarKey, string> = { file: 'KeyF', edit: 'KeyE', view: 'KeyW', insert: 'KeyN', format: 'KeyO', data: 'KeyA', help: 'KeyY' }
 /** The strip's groups, in the familiar order; the lower `p`, the sooner a group moves under ⋮ (FR-003). */
 const GROUPS: { id: string; p: number }[] = [
   { id: 'edit', p: 9 }, { id: 'number', p: 3 }, { id: 'font', p: 5 }, { id: 'size', p: 6 }, { id: 'text', p: 8 },
@@ -110,7 +112,7 @@ type Leaf = Extract<PopItem, { label: string; onSelect(): void }>
 /** One tool on the strip; the same entry feeds the ⋮ menu when its group is hidden. */
 interface Tool { key: string; label: string; kbd?: string; inner: ReactNode; run(el: HTMLElement): void; pressed?: boolean; menu?: MenuKey; disabled?: string | null; cls?: string; dbl?(): void; data?: Record<string, string> }
 
-export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog, onUndo, onRedo, canUndo, canRedo, onFileMenu, onBoardMenu, onFields }: {
+export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog, onUndo, onRedo, canUndo, canRedo, onFileMenu, onBoardMenu, onFields, onTip }: {
   state: FormatState | null
   target: FormatSource
   onFormatCells(): void
@@ -133,7 +135,10 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   onBoardMenu?(anchor: HTMLElement, at: { x: number; y: number }): void
   /** Spec 019: Data › Task fields… opens the sheet's Fields drawer. */
   onFields?(): void
+  /** Spec 020: the workbook's dialogs (Go To, Go To Special, Series, Data Validation, Custom Lists). */
+  onTip?(k: 'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists'): void
 }) {
+  const tt = useTranslations('sheets.tips')
   const t = useTranslations('sheets.format')
   const tc = useTranslations('sheets.comments')
   const tb = useTranslations('sheets.toolbar2')
@@ -147,6 +152,11 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const [line, setLine] = useState<BorderSide>(DEFAULT_LINE)
   const [help, setHelp] = useState(false)
   const [search, setSearch] = useState<string | null>(null)
+  // Spec 020: Alt shows a key letter on each menu (Alt, then the letter, opens it); Ctrl+F1 collapses the strip.
+  const [keyTips, setKeyTips] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => { try { if (window.localStorage.getItem('momentum.sheet.strip') === '0') setCollapsed(true) } catch { /* private mode */ } }, [])
+  const toggleCollapsed = () => setCollapsed(v => { try { window.localStorage.setItem('momentum.sheet.strip', v ? '1' : '0') } catch { /* private mode */ } return !v })
   const off = !state || !!state.readOnly
   const why = state?.readOnly ?? undefined
   // Spec 017 FR-014: with several areas selected, tools that need one block say so.
@@ -195,6 +205,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
   const head = (key: string, text: string): PopItem => ({ kind: 'node', key, node: <div role="presentation" className="fx-st-h">{text}</div> })
   const lock = off ? { disabled: true, why } : {}
+  /** Spec 020: tools only blank sheets have (the Content and Video sheets keep their own rules). */
+  const blankOnly = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
   const setSize = (n: number) => { if (!off && n >= SIZE_MIN && n <= SIZE_MAX) a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') }
   const stepSize = (d: 1 | -1) => setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, size + d)))
 
@@ -300,15 +312,23 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { kind: 'sep', key: 's2' },
         { key: 'fillDown', label: e('fillDown'), kbd: keyName('Ctrl+D'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
         { key: 'fillRight', label: e('fillRight'), kbd: keyName('Ctrl+R'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
+        // Spec 020: Series…, Flash Fill, Repeat.
+        { key: 'series', label: `${tt('series.title')}…`, ...lock, ...one(), ...(blankOnly), onSelect: () => onTip?.('series') },
+        { key: 'flashFill', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, ...(blankOnly), onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'repeat', label: tt('repeat'), kbd: 'F4', ...lock, ...(blankOnly), onSelect: cmd({ kind: 'repeat' }) },
         { kind: 'sep', key: 's3' },
         { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
         { key: 'replace', label: e('replace'), kbd: keyName('Ctrl+H'), onSelect: () => onFind(true) },
+        { key: 'goto', label: `${tt('goto.title')}…`, kbd: keyName('Ctrl+G'), ...(blankOnly), onSelect: () => onTip?.('goto') },
+        { key: 'gotoSpecial', label: `${tt('gs.title')}…`, ...(blankOnly), onSelect: () => onTip?.('gotoSpecial') },
         sub('clear', tb('clear'), 'clear', lock),
       ] }
       case 'mb-view': return { label: tb('menu.view'), attr: 'data-mb-view', items: [
         sub('freeze', tb('freeze'), 'freeze'),
         { kind: 'sep', key: 's1' },
         ...(menuFor('fmt')?.items ?? []),
+        { kind: 'sep', key: 's2' },
+        { key: 'collapse', label: tt('collapse'), kbd: keyName('Ctrl+F1'), checked: collapsed, onSelect: () => toggleCollapsed() },
       ] }
       case 'mb-insert': return { label: tb('menu.insert'), attr: 'data-mb-insert', items: [
         ...(['rowAbove', 'rowBelow', 'colLeft', 'colRight'] as const).map(w => ({ key: w, label: tb(w), ...lock, ...one(), onSelect: cmd({ kind: 'insert', what: w }) })),
@@ -329,6 +349,12 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       ] }
       case 'mb-data': return { label: tb('menu.data'), attr: 'data-mb-data', items: [
         ...(menuFor('sort')?.items ?? []),
+        // Spec 020: Data Validation, Pick From Drop-down List, Flash Fill, Custom Lists.
+        { kind: 'sep', key: 'sv' },
+        { key: 'validation', label: `${tt('dv.title')}…`, ...lock, ...one(), ...(blankOnly), onSelect: () => onTip?.('validation') },
+        { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: isMac() ? '⌥↓' : 'Alt+↓', ...lock, onSelect: cmd({ kind: 'pickList' }) },
+        { key: 'flashFillD', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, ...(blankOnly), onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'lists', label: `${tt('lists.title')}…`, onSelect: () => onTip?.('lists') },
         ...(onFields ? [{ kind: 'sep', key: 'sf' } as PopItem, { key: 'taskFields', label: tb('taskFields'), onSelect: onFields } as PopItem] : []),
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
       ] }
@@ -419,6 +445,31 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
     return () => ro.disconnect()
   }, [locale, font, target])
 
+  // Spec 020: KeyTips (Alt alone, then a letter) and Ctrl+F1.
+  const keyTipsRef = useRef(false)
+  keyTipsRef.current = keyTips
+  const openBarRef = useRef<(k: MenuBarKey, el: HTMLElement) => void>(() => {})
+  useEffect(() => {
+    let armed = false
+    const typing = () => { const a = document.activeElement; return !!a && (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement) }
+    const down = (ev: KeyboardEvent) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === 'F1') { ev.preventDefault(); toggleCollapsed(); return }
+      if (ev.key === 'Alt' && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey) { armed = !typing() && !document.querySelector('[role="dialog"][aria-modal="true"]'); return }
+      armed = false
+      if (!keyTipsRef.current) return
+      setKeyTips(false)
+      const k = MENUBAR.find(m => KEYTIP[m] === ev.code)
+      if (k) { ev.preventDefault(); ev.stopPropagation(); const el = mbRefs.current.get(k); if (el) { el.focus(); openBarRef.current(k, el) } }
+    }
+    const up = (ev: KeyboardEvent) => { if (ev.key === 'Alt' && armed) { armed = false; ev.preventDefault(); setKeyTips(v => !v) } }
+    const off = () => { armed = false; if (keyTipsRef.current) setKeyTips(false) }
+    document.addEventListener('keydown', down, true)
+    document.addEventListener('keyup', up, true)
+    document.addEventListener('pointerdown', off, true)
+    window.addEventListener('blur', off)
+    return () => { document.removeEventListener('keydown', down, true); document.removeEventListener('keyup', up, true); document.removeEventListener('pointerdown', off, true); window.removeEventListener('blur', off) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Alt+/ (Option+/): search the menus (US2).
   useEffect(() => {
     const k = (ev: KeyboardEvent) => {
@@ -454,6 +505,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
     if (k === 'file') { setOpen(null); const r = el.getBoundingClientRect(); onFileMenu(el, { x: rtlOf(el) ? r.right : r.left, y: r.bottom }); return }
     setOpen(o => (o?.k === mbKey(k) ? null : { k: mbKey(k)!, el }))
   }
+  openBarRef.current = openBar
   const barOpen = open?.k.startsWith('mb-') ? open.k : null
   function onBarKey(ev: React.KeyboardEvent, i: number) {
     const rtl = rtlOf(ev.currentTarget as HTMLElement)
@@ -508,10 +560,11 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
                   onPointerEnter={ev => { if (barOpen && barOpen !== mbKey(k) && k !== 'file') openBar(k, ev.currentTarget) }}
                   onKeyDown={ev => onBarKey(ev, i)}>
             {tb(`menu.${k}`)}
+            {keyTips && <i className="fx-kt" aria-hidden="true" data-keytip={KEYTIP[k].slice(3)}>{KEYTIP[k].slice(3)}</i>}
           </button>
         ))}
       </div>
-      <div className="fx-fmt-bar" role="toolbar" aria-label={tb('tips.strip')} data-format-bar="" ref={stripRef}>
+      <div className="fx-fmt-bar" role="toolbar" aria-label={tb('tips.strip')} data-format-bar="" ref={stripRef} hidden={collapsed} data-collapsed={collapsed || undefined}>
         {GROUPS.map((g, gi) => (
           <div key={g.id} className="fx-fmt-g" role="group" data-group={g.id} hidden={hidden.includes(g.id)}
                ref={el => { if (el) groupRefs.current.set(g.id, el); else groupRefs.current.delete(g.id) }}>
@@ -619,6 +672,10 @@ function ShortcutsDialog({ onClose }: { onClose(): void }) {
     ['bold', `${k('Ctrl+B')} · ${k('Ctrl+I')} · ${k('Ctrl+U')}`], ['strike', k('Ctrl+5')], ['formatCells', k('Ctrl+1')], ['currency', `${k('Ctrl+Shift+$')} · ${k('Ctrl+Shift+%')}`],
     ['pasteSpecial', k('Ctrl+Shift+V')], ['fill', `${k('Ctrl+D')} · ${k('Ctrl+R')}`], ['find', `${k('Ctrl+F')} · ${k('Ctrl+H')}`], ['filter', k('Ctrl+Shift+L')],
     ['comment', k('Ctrl+Alt+M')], ['sheets', `${k('Ctrl+')}PgUp · ${k('Ctrl+')}PgDn`], ['newSheet', 'Shift+F11'], ['menus', isMac() ? '⌥/' : 'Alt+/'],
+    // Spec 020.
+    ['selectRowCol', `Shift+Space · ${k('Ctrl+')}Space`], ['goto', `F5 · ${k('Ctrl+G')}`], ['repeat', `F4 · ${k('Ctrl+Y')}`], ['now', `${k('Ctrl+;')} · ${k('Ctrl+Shift+;')}`],
+    ['flash', k('Ctrl+E')], ['pick', isMac() ? '⌥↓' : 'Alt+↓'], ['zoom', `${k('Ctrl+')}wheel · ${k('Ctrl+=')} · ${k('Ctrl+−')} · ${k('Ctrl+0')}`],
+    ['collapse', k('Ctrl+F1')], ['keytips', isMac() ? '⌥' : 'Alt'],
   ]
   const ref = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)

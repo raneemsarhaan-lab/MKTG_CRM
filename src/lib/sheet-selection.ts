@@ -176,3 +176,39 @@ export function selectionLabel(areas: Rect[], rows: number, cols: number, show =
   const names = areas.map(q => areaLabel(q, rows, cols))
   return { text: names.slice(0, show).join(', '), more: Math.max(0, names.length - show) }
 }
+
+/**
+ * Spec 020 (Go To Special, research R1): cells picked one by one, folded into
+ * as few rectangles as possible (runs along each row, then runs of equal runs
+ * down the rows). Null when it would take more than `max` areas.
+ */
+export function foldCells(list: Cell[], max = MAX_AREAS): Rect[] | null {
+  if (!list.length) return []
+  const byRow = new Map<number, number[]>()
+  for (const { r, c } of list) { const a = byRow.get(r); if (a) a.push(c); else byRow.set(r, [c]) }
+  // Runs per row: [c0, c1].
+  const runs: { r: number; c0: number; c1: number }[] = []
+  for (const r of [...byRow.keys()].sort((a, b) => a - b)) {
+    const cs = [...new Set(byRow.get(r)!)].sort((a, b) => a - b)
+    let s = cs[0], p = cs[0]
+    for (let i = 1; i <= cs.length; i++) {
+      if (i < cs.length && cs[i] === p + 1) { p = cs[i]; continue }
+      runs.push({ r, c0: s, c1: p })
+      if (i < cs.length) { s = cs[i]; p = cs[i] }
+    }
+  }
+  // Stack a run onto an open rectangle with the same columns that ended on the row above.
+  const open = new Map<string, Rect>()
+  const done: Rect[] = []
+  for (const run of runs) {
+    const k = `${run.c0}:${run.c1}`, q = open.get(k)
+    if (q && q.r1 === run.r - 1) { q.r1 = run.r; continue }
+    if (q) done.push(q)
+    open.set(k, { r0: run.r, c0: run.c0, r1: run.r, c1: run.c1 })
+  }
+  const out = [...done, ...open.values()].sort((a, b) => a.r0 - b.r0 || a.c0 - b.c0)
+  return out.length > max ? null : out
+}
+
+/** Go To Special's choices this sheet can answer (the others need formulas or objects). */
+export type GoSpecial = 'notes' | 'constants' | 'blanks' | 'region' | 'lastCell' | 'visible' | 'conditional' | 'validation' | 'validationSame' | 'rowDiffs' | 'colDiffs'

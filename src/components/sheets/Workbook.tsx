@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { FolderSummary, SheetChanges, SheetDoc, SheetSummary, TabColor } from '@/types/index'
 import { TAB_COLORS } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
@@ -39,6 +39,12 @@ import { FormatSheet } from './format/FormatSheet'
 import { SheetComments } from './comments/SheetComments'
 import { LinkedFormatsContext } from './format/context'
 import { cellName as blankCellName } from '@/lib/sheet-selection'
+import type { SelStats } from './BlankSheet'
+import { SERIES_OPEN } from './format/bus'
+import { CustomListsDialog, DataValidationDialog, GoToDialog, GoToSpecialDialog, SeriesDialog } from './format/TipsDialogs'
+import { loadFillLists, saveFillLists } from '@/actions/settings'
+import type { FillList } from '@/lib/sheet-fill'
+import { ZOOM_EVENT, zoomBus } from '@/components/sheet/GridCore'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -283,7 +289,44 @@ export function Workbook(p: WorkbookProps) {
     window.addEventListener('scroll', put, true)
     return () => { ro.disconnect(); window.removeEventListener('scroll', put, true) }
   }, [])
-  const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean } | null>(null)
+  const [sel, setSel] = useState<{ cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean; stats?: SelStats } | null>(null)
+  // ── spec 020: zoom per sheet, the status bar's mode, the custom lists, the Go To / Series / Validation dialogs ──
+  const tt = useTranslations('sheets.tips')
+  const locale = useLocale()
+  const [zooms, setZooms] = useState<Record<string, number>>({})
+  const zoomKey = (id: string) => `momentum.sheet.zoom.${id}`
+  useEffect(() => {
+    if (!openId || zooms[openId] !== undefined) return
+    let z = 1
+    try { const v = Number(window.localStorage.getItem(zoomKey(openId))); if (v >= 0.5 && v <= 2) z = v } catch { /* private mode */ }
+    setZooms(m => ({ ...m, [openId]: z }))
+  }, [openId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const zoom = zooms[openId] ?? 1
+  const setZoom = useCallback((z: number) => {
+    const v = Math.round(Math.max(0.5, Math.min(2, z)) * 100) / 100
+    const id = openRef.current
+    setZooms(m => ({ ...m, [id]: v }))
+    try { window.localStorage.setItem(zoomKey(id), String(v)) } catch { /* private mode */ }
+  }, [])
+  // The linked sheets live in the board's page: they hear the zoom by event (and ask for it with one).
+  useEffect(() => {
+    zoomBus.z = zoom; zoomBus.set = setZoom
+    document.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: { z: zoom } }))
+  }, [zoom, openId, setZoom])
+  const [statusMode, setStatusMode] = useState<string | null>(null)
+  const [fillLists, setFillLists] = useState<{ lists: FillList[]; canEdit: boolean }>({ lists: [], canEdit: false })
+  useEffect(() => { void loadFillLists().then(r => { if (r.success) setFillLists({ lists: r.lists, canEdit: r.canEdit }) }) }, [])
+  const fillItems = useMemo(() => fillLists.lists.map(l => l.items), [fillLists.lists])
+  const [tip, setTip] = useState<'goto' | 'gotoSpecial' | 'series' | 'validation' | 'lists' | null>(null)
+  const [recentRefs, setRecentRefs] = useState<string[]>([])
+  useEffect(() => {
+    const on = () => setTip('series')
+    document.addEventListener(SERIES_OPEN, on)
+    return () => document.removeEventListener(SERIES_OPEN, on)
+  }, [])
+  const [zoomMenu, setZoomMenu] = useState<{ x: number; y: number; el: HTMLElement } | null>(null)
+  /** Status-bar figures as the member reads numbers (at most 2 decimals, grouped). */
+  const fmtNum = (n: number) => new Intl.NumberFormat(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 2 }).format(n)
   const [skip, setSkip] = useState<string | null>(null)
   const skipTimer = useRef<number | undefined>(undefined)
   const onSkipped = useCallback((s: Partial<Record<string, number>>) => {
@@ -295,7 +338,7 @@ export function Workbook(p: WorkbookProps) {
     setSkip(t('grid.skipped', { n: total, reasons: reasons.join(', ') }))
     skipTimer.current = window.setTimeout(() => setSkip(null), 10000)
   }, [t])
-  useEffect(() => { setSel(null); setSkip(null) }, [openId])
+  useEffect(() => { setSel(null); setSkip(null); setStatusMode(null) }, [openId])
 
   // ── names ───────────────────────────────────────────────────────────────
   const folderName = folder.kind === 'content' ? t('folder.content') : folder.kind === 'video' ? t('folder.video') : folder.name ?? ''
@@ -519,6 +562,14 @@ export function Workbook(p: WorkbookProps) {
       if (!e.shiftKey && !e.altKey && (k === 'f' || k === 'h')) { stop(); setFind({ replace: k === 'h' }); return }
       // Stage 3: Filter on and off (FR-046).
       if (e.shiftKey && !e.altKey && k === 'l') { stop(); sendFormat(target, { kind: 'filter', op: 'toggle' }); return }
+      // Spec 020: Ctrl+G, Go To.
+      if (!e.shiftKey && !e.altKey && k === 'g' && target === 'blank') { stop(); setTip('goto'); return }
+    }
+    // Spec 020: F5, Go To (instead of the browser's reload while the grid has focus).
+    if (e.key === 'F5' && !ctrl && el.closest('.fx-sh-panel') && !el.closest('input, textarea, select')) {
+      e.preventDefault(); e.stopPropagation()
+      if (open?.kind === 'blank') setTip('goto')
+      return
     }
     if (ctrl && (e.key === 'PageDown' || e.key === 'PageUp')) {
       e.preventDefault(); e.stopPropagation()
@@ -659,7 +710,8 @@ export function Workbook(p: WorkbookProps) {
           canUndo={openBlank ? !!stack && canUndo(stack) : linkedHist.canUndo} canRedo={openBlank ? !!stack && canRedo(stack) : linkedHist.canRedo}
           onFileMenu={(el, at) => { if (openId) tabMenuFor(openId, at, el) }}
           onBoardMenu={openBlank && doc ? (el, at) => setBoardMenu({ x: at.x, y: at.y, el }) : undefined}
-          onFields={fieldsHere ? () => openFields() : undefined} />
+          onFields={fieldsHere ? () => openFields() : undefined}
+          onTip={k => setTip(k)} />
       )}
       {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
 
@@ -669,7 +721,8 @@ export function Workbook(p: WorkbookProps) {
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
                         onSelect={setSel} onSkipped={onSkipped} onNotice={say} newId={newId}
-                        links={api} patch={fn => patchDoc(doc.id, fn)} />
+                        links={api} patch={fn => patchDoc(doc.id, fn)}
+                        fillLists={fillItems} zoom={zoom} onZoom={setZoom} canRedo={!!stack && canRedo(stack)} onStatus={setStatusMode} />
           : loadError[openId]
             ? <div className="fx-sh-empty" role="alert">{errText(loadError[openId])}</div>
             : <div className="fx-sh-skeleton" data-sheet-loading="" aria-busy="true" />)}
@@ -690,6 +743,35 @@ export function Workbook(p: WorkbookProps) {
         onRename={onRename}
         onDrop={(id, before, copy) => void onDrop(id, before, copy)}
       />
+
+      {/* Spec 020: Excel's status bar: the mode, Average / Count / Sum of the selection, and the zoom. */}
+      <div className="fx-sh-statusbar" data-statusbar="">
+        <span className="fx-sb-mode" role="status" aria-live="polite" data-sb-mode="">
+          <i aria-hidden="true" className="fx-sb-dot" />{statusMode ?? (sel?.adding ? t('areas.adding') : tt('ready'))}
+        </span>
+        <span className="fx-sb-sp" />
+        {openBlank && sel?.stats && sel.count > 1 && sel.stats.count > 0 && (
+          <span className="fx-sb-stats" data-sb-stats="">
+            {sel.stats.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(sel.stats.avg ?? 0)}</b></span>}
+            <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{sel.stats.count}</b></span>
+            {sel.stats.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(sel.stats.sum)}</b></span>}
+          </span>
+        )}
+        {!phone && (
+          <span className="fx-sb-zoom" data-sb-zoom="">
+            <button type="button" className="fx-sb-zb" data-zoom-out="" aria-label={tt('zoomOut')} title={tt('zoomOut')} disabled={zoom <= 0.5} onClick={() => setZoom(zoom - 0.1)}>−</button>
+            <input type="range" min={50} max={200} step={10} value={Math.round(zoom * 100)} aria-label={tt('zoom')} data-zoom-slider=""
+                   onChange={e => setZoom(Number(e.target.value) / 100)} />
+            <button type="button" className="fx-sb-zb" data-zoom-in="" aria-label={tt('zoomIn')} title={tt('zoomIn')} disabled={zoom >= 2} onClick={() => setZoom(zoom + 0.1)}>+</button>
+            <button type="button" className="fx-sb-pct" data-zoom-pct="" aria-haspopup="menu" title={tt('zoomMenu')}
+                    onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(); setZoomMenu({ x: getComputedStyle(el).direction === 'rtl' ? r.left : r.right - 120, y: r.top - 8, el }) }}>{Math.round(zoom * 100)}%</button>
+          </span>
+        )}
+      </div>
+      {zoomMenu && (
+        <PopMenu at={{ x: zoomMenu.x, y: zoomMenu.y }} label={tt('zoom')} attr="data-zoom-menu" returnTo={zoomMenu.el} onClose={() => setZoomMenu(null)}
+          items={[200, 150, 125, 100, 75, 50].map(n => ({ key: String(n), label: `${n}%`, checked: Math.round(zoom * 100) === n, onSelect: () => setZoom(n / 100) }))} />
+      )}
 
       {open && (
         <SheetComments
@@ -778,6 +860,33 @@ export function Workbook(p: WorkbookProps) {
             {docs[gone] && <button type="button" className="is-go" data-ok="" onClick={() => void copyGone(gone)}>{t('gone.copy')}</button>}
           </div>
         </Modal>
+      )}
+      {tip === 'goto' && (
+        <GoToDialog recent={recentRefs}
+                    onGo={ref => { setTip(null); setRecentRefs(r => [ref, ...r.filter(x => x !== ref)].slice(0, 8)); sendFormat('blank', { kind: 'goto', ref }) }}
+                    onSpecial={() => setTip('gotoSpecial')} onCancel={() => setTip(null)} />
+      )}
+      {tip === 'gotoSpecial' && (
+        <GoToSpecialDialog supported={fmtState?.goSpecial ?? []} onCancel={() => setTip(null)}
+                           onOk={(what, numbers, text) => { setTip(null); sendFormat(fmtTarget, { kind: 'goSpecial', what, numbers, text }) }} />
+      )}
+      {tip === 'series' && fmtState && (
+        <SeriesDialog range={fmtState.range ?? fmtState.cell} by={(() => { const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(fmtState.range ?? ''); return m && m[1] !== m[3] && m[2] === m[4] ? 'rows' : 'cols' })()}
+                      onCancel={() => setTip(null)} onOk={(spec, by) => { setTip(null); sendFormat('blank', { kind: 'series', spec, by }) }} />
+      )}
+      {tip === 'validation' && fmtState && (
+        <DataValidationDialog range={fmtState.range ?? fmtState.cell} rule={fmtState.validation ?? null} mixed={!!fmtState.validationMixed} inRule={!!fmtState.validation}
+                              onCancel={() => setTip(null)} onOk={(rule, all) => { setTip(null); sendFormat('blank', { kind: 'validation', rule, all }) }} />
+      )}
+      {tip === 'lists' && (
+        <CustomListsDialog lists={fillLists.lists} canEdit={fillLists.canEdit}
+                           fromCells={openBlank ? fmtState?.selValues ?? [] : []}
+                           onCancel={() => setTip(null)}
+                           onSave={async lists => {
+                             setTip(null)
+                             const r = await saveFillLists(lists)
+                             if (r.success) { setFillLists(f => ({ ...f, lists: r.lists })); say(tt('lists.saved')) } else say(t('err.generic'))
+                           }} />
       )}
       {toast && <div className="fx-sh-toast" role="status" data-sheets-toast="">{toast}</div>}
     </div>

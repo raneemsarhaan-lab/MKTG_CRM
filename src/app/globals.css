@@ -1432,6 +1432,46 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
   background: var(--sheet-danger); color: var(--sheet-panel); font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 4px;
 }
 
+/* Spec 020 (approved design power-tips-a): the fill handle, its drag, Auto Fill Options, the validation ▾ and input message */
+.fx-sheet-td.has-fill-ui { z-index: 4; }
+.fx-sheet-td.has-dv { z-index: 5; padding-inline-end: 28px; }
+.fx-fill-h {
+  position: absolute; inset-inline-end: -5px; bottom: -5px; width: 9px; height: 9px; z-index: 6; cursor: crosshair; touch-action: none;
+  background: var(--sheet-focus); border: 2px solid var(--sheet-panel); border-radius: 3px; box-shadow: 0 0 0 1px var(--sheet-focus);
+}
+.fx-sheet-grid.is-filling, .fx-sheet-grid.is-filling * { cursor: crosshair !important; }
+.fx-sheet-grid.is-filling .fx-fill-h { opacity: 0; }
+.fx-sheet-td.is-fg::after { content: ""; position: absolute; inset: -1px; pointer-events: none; z-index: 2; border: 0 dashed var(--sheet-focus); opacity: .7; }
+.fx-sheet-td.is-fg-t::after { border-top-width: 2px; }
+.fx-sheet-td.is-fg-b::after { border-bottom-width: 2px; }
+.fx-sheet-td.is-fg-s::after { border-inline-start-width: 2px; }
+.fx-sheet-td.is-fg-e::after { border-inline-end-width: 2px; }
+.fx-sheet-td.is-fclr { background: color-mix(in srgb, var(--sheet-muted) 22%, var(--sheet-panel)) !important; color: var(--sheet-muted); }
+.fx-fill-tip {
+  position: absolute; top: calc(100% + 4px); inset-inline-start: calc(100% + 4px); z-index: 7; pointer-events: none; white-space: nowrap;
+  background: var(--sheet-ink); color: var(--sheet-panel); font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(17, 18, 20, .14);
+}
+.fx-afo {
+  position: absolute; top: calc(100% + 3px); inset-inline-start: calc(100% + 2px); z-index: 7; height: 24px; display: inline-flex; align-items: center; gap: 2px;
+  padding: 0 5px; border: 1px solid var(--sheet-grid); border-radius: 7px; background: var(--sheet-panel); color: var(--sheet-ink); cursor: pointer; box-shadow: 0 2px 8px rgba(17, 18, 20, .10);
+}
+.fx-afo:hover, .fx-afo:focus-visible { background: var(--sheet-hover); outline: none; box-shadow: inset 0 0 0 2px var(--sheet-focus); }
+.fx-afo .fx-afo-bolt { stroke: var(--inbox-purple, #7C3AED); }
+.fx-afo-chev { font-size: 10px; color: var(--sheet-muted); }
+.fx-dv-btn {
+  position: absolute; inset-inline-end: 3px; top: 50%; transform: translateY(-50%); width: 21px; height: 19px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 6px; background: var(--sheet-hover); box-shadow: inset 0 0 0 1px var(--sheet-grid); color: var(--sheet-muted); font-size: 11px; cursor: pointer;
+}
+.fx-dv-btn:hover, .fx-dv-btn:focus-visible { color: var(--sheet-ink); outline: none; box-shadow: inset 0 0 0 2px var(--sheet-focus); }
+.fx-dv-msg {
+  position: absolute; top: 0; inset-inline-start: calc(100% + 64px); z-index: 7; pointer-events: none; width: max-content; max-width: 220px; white-space: normal;
+  background: var(--sheet-panel); color: var(--sheet-muted); font-size: 12px; font-weight: 400; line-height: 1.35; padding: 7px 10px;
+  border: 1px solid var(--sheet-grid); border-inline-start: 3px solid var(--inbox-purple, #7C3AED); border-radius: 10px; box-shadow: var(--sheet-shadow);
+}
+.fx-dv-msg b { display: block; color: var(--sheet-ink); font-weight: 700; }
+/* The pick list fits its values (the app's menus are 252px), so the input message beside the cell stays in view. */
+.fx-sh-menu[data-pick-list] { width: max-content; min-width: 160px; max-width: 280px; }
+
 /* menus and popovers */
 .fx-sheet-menu, .fx-sheet-pop {
   position: fixed; z-index: 60; background: var(--sheet-panel); color: var(--sheet-ink);
@@ -2198,7 +2238,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sh-menu [role="menuitem"]:focus-visible { box-shadow: inset 0 0 0 2px var(--inbox-purple); }
 .fx-sh-menu [role="menuitem"].is-danger:not(.is-disabled) { color: var(--inbox-late); }
 .fx-sh-menu [role="menuitem"].is-disabled { color: var(--inbox-faint); cursor: not-allowed; }
-.fx-sh-menu kbd { font: 500 11.5px var(--font-body); color: var(--inbox-muted); }
+.fx-sh-menu kbd { font: 500 11.5px var(--font-body); color: #5A5F6C; } /* 4.5:1 on the hovered row too (axe) */
 .fx-sh-why { display: block; color: var(--inbox-muted); font-size: 11.5px; padding: 0 10px 6px; line-height: 1.4; }
 .fx-sh-menu hr { border: 0; height: 1px; background: var(--inbox-border); margin: 4px 6px; }
 .fx-sh-swatches { padding: 4px 10px 6px; display: grid; gap: 6px; }
@@ -2231,6 +2271,50 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sh-dialog-row .is-go { background: #14131A; color: #fff; border-color: #14131A; }
 .fx-sh-dialog-row .is-danger { background: var(--inbox-late); color: #fff; border-color: var(--inbox-late); }
 .fx-sh-dialog-row button:disabled { opacity: .45; cursor: default; }
+/* Spec 020 dialogs (approved design power-tips-a): Go To, Go To Special, Series, Data Validation, the alert, Custom Lists */
+.fx-sh-dialog-row .is-lime { background: var(--inbox-lime, #C8F24E); color: #14131A; border-color: transparent; }
+[data-goto-special-dialog], [data-dv-dialog], [data-series-dialog] { width: min(470px, 100%); }
+[data-custom-lists] { width: min(660px, 100%); }
+.fx-tip-cap { font: 700 10.5px var(--font-heading); letter-spacing: .08em; text-transform: uppercase; color: var(--inbox-muted); }
+[dir="rtl"] .fx-tip-cap { letter-spacing: 0; font-family: inherit; }
+.fx-tip-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.fx-tip-col { display: grid; gap: 2px; align-content: start; }
+.fx-tip-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.fx-tip-fs { border: 0; padding: 0; margin: 0; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.fx-tip-fs legend { padding: 0; margin-bottom: 4px; }
+.fx-tip-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.fx-tip-checks { display: grid; gap: 4px; padding-bottom: 6px; }
+.fx-tip-body { display: grid; gap: 10px; }
+.fx-tip-note { margin: 0; font-size: 12px; color: var(--inbox-muted); line-height: 1.45; }
+.fx-sh-check { min-height: 24px; }
+.fx-sh-check input[type="radio"], .fx-sh-check input[type="checkbox"] { accent-color: var(--inbox-purple); width: 15px; height: 15px; margin: 0; flex: none; }
+.fx-sh-check.is-sub { padding-inline-start: 22px; }
+.fx-sh-check.is-dis { opacity: .42; }
+.fx-tip-ta { width: 100%; border: 1px solid #E3E3EA; border-radius: 10px; padding: 8px 10px; background: var(--inbox-panel); font: inherit; color: inherit; resize: vertical; min-height: 64px; }
+.fx-tip-ta.is-tall { min-height: 210px; height: 210px; resize: none; }
+.fx-sh-field select:disabled, .fx-sh-field input:disabled, .fx-tip-ta:disabled { opacity: .5; }
+.fx-tip-alert { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+.fx-tip-alert p { color: var(--inbox-text); }
+.fx-tip-alert-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 800 18px var(--font-body); background: var(--att-danger-soft, #FDE7EA); color: var(--att-danger, #D22040); }
+.fx-tip-alert.is-warning .fx-tip-alert-ic { background: #FDF3E3; color: #8A5300; }
+.fx-tip-alert.is-info .fx-tip-alert-ic { background: var(--inbox-purple-soft); color: var(--inbox-purple-deep); }
+.fx-sh-dialog-row .fx-tip-help { border-color: transparent; background: none; color: var(--inbox-muted); padding-inline: 6px; }
+.fx-tip-lists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 96px; gap: 12px; align-items: start; }
+.fx-tip-lb { max-height: 236px; min-height: 236px; }
+.fx-tip-lb [role="option"] { display: flex; gap: 8px; align-items: center; justify-content: space-between; white-space: nowrap; overflow: hidden; }
+.fx-tip-lb [role="option"] span { overflow: hidden; text-overflow: ellipsis; }
+.fx-tip-lb [role="option"].is-fixed { color: #5A5F6C; } /* 4.5:1 on hover too (axe) */
+.fx-tip-lb small { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; color: #5A5F6C; flex: none; }
+.fx-tip-new { color: var(--inbox-purple-deep); font-weight: 600; }
+.fx-tip-side { display: grid; gap: 8px; padding-top: 24px; }
+.fx-tip-btn { border: 1px solid #E3E3EA; background: var(--inbox-panel); border-radius: 999px; padding: 7px 12px; font: 700 13px var(--font-body); cursor: pointer; color: var(--inbox-text); min-height: 34px; }
+.fx-tip-btn.is-danger { color: var(--inbox-late, #D22040); }
+.fx-tip-btn:disabled { opacity: .45; cursor: default; }
+.fx-tip-import { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--inbox-muted); font-weight: 600; }
+@media (max-width: 560px) {
+  .fx-tip-grid2, .fx-tip-grid3, .fx-tip-lists, .fx-tip-two { grid-template-columns: 1fr; }
+  .fx-tip-side { padding-top: 0; grid-auto-flow: column; }
+}
 .fx-sh-toast { position: fixed; bottom: 70px; inset-inline-start: 50%; transform: translateX(-50%); background: #14131A; color: #fff; border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 13.5px; z-index: 85; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
 [dir="rtl"] .fx-sh-toast { transform: translateX(50%); }
 .fx-sh-toast button { border: 0; background: none; color: var(--inbox-lime); font-weight: 700; cursor: pointer; font: inherit; font-weight: 700; }
@@ -2422,6 +2506,26 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-mb > button { border: 0; background: none; padding: 4px 9px; border-radius: 6px; font: 500 14px var(--font-body); color: var(--inbox-text); cursor: pointer; }
 .fx-mb > button:hover, .fx-mb > button[aria-expanded="true"] { background: var(--fx-strip-hover); }
 .fx-mb > button:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 1px; }
+/* Spec 020: KeyTips (Alt), Excel's letters under each menu */
+.fx-mb > button { position: relative; }
+.fx-kt { position: absolute; top: calc(100% - 6px); inset-inline-start: 50%; transform: translateX(-50%); z-index: 6; font: 800 10px/16px var(--font-body); font-style: normal;
+  padding: 0 5px; border-radius: 5px; background: #14131A; color: var(--inbox-lime, #C8F24E); box-shadow: 0 2px 6px rgba(20, 19, 26, .2); pointer-events: none; }
+[dir="rtl"] .fx-kt { transform: translateX(50%); }
+/* Spec 020: Excel's status bar under the tabs */
+.fx-sh-statusbar { display: flex; align-items: center; gap: 10px; padding: 4px 12px; min-height: 32px; flex: none; flex-wrap: wrap;
+  border-top: 1px solid var(--inbox-border); background: #F8F8FB; color: var(--inbox-muted); font-size: 12px; }
+.fx-sb-mode { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.fx-sb-dot { width: 7px; height: 7px; border-radius: 50%; background: #2B7A37; flex: none; }
+.fx-sb-sp { flex: 1; }
+.fx-sb-stats { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.fx-sb-chip { display: inline-flex; gap: 4px; background: var(--inbox-panel); border: 1px solid var(--inbox-border); border-radius: 999px; padding: 1px 9px; }
+.fx-sb-chip b { color: #14131A; font-variant-numeric: tabular-nums; }
+.fx-sb-zoom { display: inline-flex; align-items: center; gap: 6px; }
+.fx-sb-zb { width: 24px; height: 24px; border: 1px solid var(--inbox-border); border-radius: 6px; background: var(--inbox-panel); color: var(--inbox-text); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.fx-sb-zb:disabled { opacity: .4; cursor: default; }
+.fx-sb-zoom input[type="range"] { width: 110px; accent-color: var(--sheet-focus, #3563E9); }
+.fx-sb-pct { border: 0; background: none; font: 700 12px var(--font-body); color: #14131A; cursor: pointer; min-width: 44px; text-align: end; padding: 2px 4px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.fx-sb-pct:hover, .fx-sb-zb:hover:not(:disabled) { background: var(--inbox-surface); }
 .fx-fmt-bar { display: flex; align-items: center; flex-wrap: nowrap; margin: 0 12px 8px; padding: 3px 10px; border-radius: 999px; background: var(--fx-strip-bg); min-height: 40px; overflow: hidden; }
 .fx-fmt-bar .fx-fmt-g { border: 0; padding: 0; gap: 1px; }
 .fx-fmt-bar .fx-fmt-g[hidden] { display: none; }

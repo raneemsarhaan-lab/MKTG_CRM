@@ -16,18 +16,18 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Write the stage A HTML design (keyboard and view, fill handle with Auto Fill Options and right-drag menu, Flash Fill, validation chips and ▾, Alt+Down pick, zoom, Settings → Sheet lists) in design/power-tips-a.html, and get the user's approval before any stage A UI work
-- [ ] T002 [P] Add the `sheets.tips.*` string namespace (en and ar) with the stage A labels, notes and shortcut names in messages/en.json and messages/ar.json
-- [ ] T003 [P] Create the lab skeleton (seed a 200-row team sheet with gaps, login helper with the hours-reminder handler, axe helper, cleanup) in scripts/spreadsheet-lab/realapp/tips-a.cjs
+- [X] T001 Write the stage A HTML design (keyboard and view, fill handle with Auto Fill Options and right-drag menu, Flash Fill, validation chips and ▾, Alt+Down pick, zoom, Settings → Sheet lists) in design/power-tips-a.html, and get the user's approval before any stage A UI work
+- [X] T002 [P] Add the `sheets.tips.*` string namespace (en and ar) with the stage A labels, notes and shortcut names in messages/en.json and messages/ar.json
+- [X] T003 [P] Create the lab skeleton (seed a 200-row team sheet with gaps, login helper with the hours-reminder handler, axe helper, cleanup) in scripts/spreadsheet-lab/realapp/tips-a.cjs
 
 ---
 
 ## Phase 2: Foundational (blocks all stories)
 
-- [ ] T004 Add the optional `GridModel` hooks from contracts/grid.md (`onFill`, `fillModes`, `onMove`, `onMoveToSheet`, `onRepeat`, `onGoToSpecial`, `pickFromColumn`, `validation`, `zoom`, `onZoom`) as types only, plus a `selectAreas(areas)` prop that selects several areas through the spec 017 model, in src/components/sheet/GridCore.tsx
-- [ ] T005 [P] Add the shared `FillMode` and `ValidationRecord` types, and the `validations`, `outline` and `tableTotals` `BlankChange` kinds with their inverses, in src/types/index.ts and src/lib/sheet-undo.ts
-- [ ] T006 Apply and queue the new change kinds (`validations`, `outline` and `slicers` via `view`, `tableTotals`) in src/lib/sheet-doc.ts, with `push` to the outbox and `mergeServer`
-- [ ] T007 Record the last repeatable command (`FormatCmd`, row and column insert/delete, fill, cleanup) in a `lastCmd` ref in src/components/sheets/BlankSheet.tsx (research R3)
+- [X] T004 Add the optional `GridModel` hooks from contracts/grid.md (`onFill`, `fillModes`, `onMove`, `onMoveToSheet`, `onRepeat`, `onGoToSpecial`, `pickFromColumn`, `validation`, `zoom`, `onZoom`) as types only, plus a `selectAreas(areas)` prop that selects several areas through the spec 017 model, in src/components/sheet/GridCore.tsx
+- [X] T005 [P] Add the shared `FillMode` and `ValidationRecord` types, and the `validations`, `outline` and `tableTotals` `BlankChange` kinds with their inverses, in src/types/index.ts and src/lib/sheet-undo.ts *(stage A adds `validations`; `outline` and `tableTotals` come with stage B, which uses them)*
+- [X] T006 Apply and queue the new change kinds (`validations`, `outline` and `slicers` via `view`, `tableTotals`) in src/lib/sheet-doc.ts, with `push` to the outbox and `mergeServer` *(stage A: `validations`; the rest with stage B)*
+- [X] T007 Record the last repeatable command (`FormatCmd`, row and column insert/delete, fill, cleanup) in a `lastCmd` ref in src/components/sheets/BlankSheet.tsx (research R3)
 
 **Checkpoint**: the grid and the blank sheet accept the new hooks; nothing changes on screen yet.
 
@@ -39,17 +39,17 @@
 
 **Independent Test**: F5 → Special → Blanks selects only the empty cells; "TBD" + Ctrl+Enter fills them as one undo step; F4 repeats an insert row (spec US1).
 
-- [ ] T008 [US1] Handle Shift+Space (select the row) and Ctrl+Space (select the column) in the grid's key handler in src/components/sheet/GridCore.tsx
-- [ ] T009 [US1] Double-click within 4 px of the active cell's edge runs `dataEdge` in that direction, in src/components/sheet/GridCore.tsx (research R14)
-- [ ] T010 [P] [US1] Add pure `goToSpecial(kind, cells)` (blanks, filled, visible), which folds cells into at most 100 rectangles, in src/lib/sheet-selection.ts (research R1)
-- [ ] T011 [US1] Wire F5 and Edit › Go to special… to a small dialog (Blanks, Filled cells, Visible cells only) that calls the host's `onGoToSpecial` and `selectAreas`, in src/components/sheets/BlankSheet.tsx and src/components/sheets/format/FormatToolbar.tsx
-- [ ] T012 [US1] F4 (and Ctrl+Y with an empty redo stack) calls `onRepeat`; BlankSheet re-runs `lastCmd` on the current selection, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
-- [ ] T013 [US1] Zoom: Ctrl+wheel and Ctrl+=/−/0 scale the grid wrapper (CSS `zoom`, 50–200%), kept in `momentum.sheet.zoom.<sheetId>` (localStorage read after mount, try/catch), with the zoom shown in the status line, in src/components/sheet/GridCore.tsx and src/components/sheets/Workbook.tsx
-- [ ] T014 [US1] Shift+wheel scrolls sideways where the browser doesn't already, in src/components/sheet/GridCore.tsx
-- [ ] T015 [US1] Ctrl+F1 collapses and expands the toolbar strip (kept per member), and Alt shows a key letter on each menu bar item (Alt+letter opens it), in src/components/sheets/format/FormatToolbar.tsx and src/components/sheets/Workbook.tsx
-- [ ] T016 [US1] Add the new shortcuts to the Shortcuts dialog (en and ar) in src/components/sheets/format/FormatToolbar.tsx
-- [ ] T017 [US1] Linked sheets: Shift/Ctrl+Space, Go to special (filled and blanks over typable cells), zoom and edge jump, through the same grid hooks, in src/components/sheet/useLinkedFormats.ts
-- [ ] T018 [US1] Lab checks for US1 (quickstart Stage A §1, §2 and §6) in scripts/spreadsheet-lab/realapp/tips-a.cjs
+- [X] T008 [US1] Handle Shift+Space (select the row) and Ctrl+Space (select the column) in the grid's key handler in src/components/sheet/GridCore.tsx
+- [X] T009 [US1] Double-click within 4 px of the active cell's edge runs `dataEdge` in that direction, in src/components/sheet/GridCore.tsx (research R14)
+- [X] T010 [P] [US1] Add pure `goToSpecial(kind, cells)` (blanks, filled, visible), which folds cells into at most 100 rectangles, in src/lib/sheet-selection.ts (research R1)
+- [X] T011 [US1] Wire F5 and Edit › Go to special… to a small dialog (Blanks, Filled cells, Visible cells only) that calls the host's `onGoToSpecial` and `selectAreas`, in src/components/sheets/BlankSheet.tsx and src/components/sheets/format/FormatToolbar.tsx
+- [X] T012 [US1] F4 (and Ctrl+Y with an empty redo stack) calls `onRepeat`; BlankSheet re-runs `lastCmd` on the current selection, in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
+- [X] T013 [US1] Zoom: Ctrl+wheel and Ctrl+=/−/0 scale the grid wrapper (CSS `zoom`, 50–200%), kept in `momentum.sheet.zoom.<sheetId>` (localStorage read after mount, try/catch), with the zoom shown in the status line, in src/components/sheet/GridCore.tsx and src/components/sheets/Workbook.tsx
+- [X] T014 [US1] Shift+wheel scrolls sideways where the browser doesn't already, in src/components/sheet/GridCore.tsx
+- [X] T015 [US1] Ctrl+F1 collapses and expands the toolbar strip (kept per member), and Alt shows a key letter on each menu bar item (Alt+letter opens it), in src/components/sheets/format/FormatToolbar.tsx and src/components/sheets/Workbook.tsx
+- [X] T016 [US1] Add the new shortcuts to the Shortcuts dialog (en and ar) in src/components/sheets/format/FormatToolbar.tsx
+- [X] T017 [US1] Linked sheets: Shift/Ctrl+Space, Go to special (filled and blanks over typable cells), zoom and edge jump, through the same grid hooks, in src/components/sheet/useLinkedFormats.ts
+- [X] T018 [US1] Lab checks for US1 (quickstart Stage A §1, §2 and §6) in scripts/spreadsheet-lab/realapp/tips-a.cjs
 
 **Checkpoint**: US1 works on its own.
 
@@ -61,7 +61,7 @@
 
 **Independent Test**: 5, 10 dragged gives 15–30; a date with Fill weekdays skips Friday and Saturday; Ctrl+E fills first names; each undoes in one step (spec US2).
 
-- [ ] T019 [P] [US2] Pure series engine `planSeries(source, count, mode, ctx)` in src/lib/sheet-fill.ts (research R4). It covers:
+- [X] T019 [P] [US2] Pure series engine `planSeries(source, count, mode, ctx)` in src/lib/sheet-fill.ts (research R4). It covers:
   - number step;
   - text with a trailing number;
   - date (day, month or year step);
@@ -69,9 +69,9 @@
   - English and Arabic month and day names (long and short);
   - custom lists;
   - the Ctrl swap.
-- [ ] T020 [P] [US2] Pure Flash Fill learner `learnFlash(examples, sources)` in src/lib/sheet-fill.ts (research R5), returning the outputs or `null` when the examples aren't consistent
-- [ ] T021 [P] [US2] Pure checks for the series and Flash Fill cases in quickstart Stage A §3–§4 in scripts/spreadsheet-lab/pure.mjs
-- [ ] T022 [US2] Draw the fill handle on the newest single area. The grid handles:
+- [X] T020 [P] [US2] Pure Flash Fill learner `learnFlash(examples, sources)` in src/lib/sheet-fill.ts (research R5), returning the outputs or `null` when the examples aren't consistent
+- [X] T021 [P] [US2] Pure checks for the series and Flash Fill cases in quickstart Stage A §3–§4 in scripts/spreadsheet-lab/pure.mjs
+- [X] T022 [US2] Draw the fill handle on the newest single area. The grid handles:
   - drag with a dashed target and a preview tooltip;
   - drag back to clear;
   - Shift to insert;
@@ -79,14 +79,14 @@
   - double-click to the end of the neighbouring data;
 
   and calls `onFill`, in src/components/sheet/GridCore.tsx (RTL directions mirrored)
-- [ ] T023 [US2] The Auto Fill Options button stays by the last fill's target until the next action, and offers the modes from `fillModes`. A pick re-runs the fill as undo + apply in one step. In src/components/sheet/GridCore.tsx
-- [ ] T024 [US2] BlankSheet `onFill`: build one `BlankChange` step (cells, formats per mode, insertRows/insertCols for Shift, clears for drag-back) with the row and column limits, in src/components/sheets/BlankSheet.tsx
-- [ ] T025 [US2] Linked sheets `onFill`: copy and series into typable cells through `writeCells(writes, 'fill')`, with refusals counted (spec FR-013), in src/components/sheet/useLinkedEditing.ts and src/components/sheet/useLinkedFormats.ts
-- [ ] T026 [US2] Ctrl+; and Ctrl+Shift+; start editing with today's date or the current time; Ctrl+E runs Flash Fill on the active column (note when inconsistent), in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
-- [ ] T027 [US2] Leading apostrophe: a typed value starting with ' is stored without it and shown as text (the Text format keeps zeros), in src/components/sheets/BlankSheet.tsx and src/lib/sheet-format.ts
-- [ ] T028 [P] [US2] Server: `workspace_settings.fill_lists` column (prisma/schema.prisma) and `loadFillLists` / `saveFillLists` (admins only, cleaned to the limits) in src/actions/settings.ts
-- [ ] T029 [US2] Settings → Sheet lists editor for admins (hidden for others) in src/components/settings/FillLists.tsx, linked from the Settings page
-- [ ] T030 [US2] Lab checks for US2 (quickstart Stage A §3, §4 and §7) in scripts/spreadsheet-lab/realapp/tips-a.cjs
+- [X] T023 [US2] The Auto Fill Options button stays by the last fill's target until the next action, and offers the modes from `fillModes`. A pick re-runs the fill as undo + apply in one step. In src/components/sheet/GridCore.tsx
+- [X] T024 [US2] BlankSheet `onFill`: build one `BlankChange` step (cells, formats per mode, insertRows/insertCols for Shift, clears for drag-back) with the row and column limits, in src/components/sheets/BlankSheet.tsx
+- [X] T025 [US2] Linked sheets `onFill`: copy and series into typable cells through `writeCells(writes, 'fill')`, with refusals counted (spec FR-013), in src/components/sheet/useLinkedEditing.ts and src/components/sheet/useLinkedFormats.ts
+- [X] T026 [US2] Ctrl+; and Ctrl+Shift+; start editing with today's date or the current time; Ctrl+E runs Flash Fill on the active column (note when inconsistent), in src/components/sheet/GridCore.tsx and src/components/sheets/BlankSheet.tsx
+- [X] T027 [US2] Leading apostrophe: a typed value starting with ' is stored without it and shown as text (the Text format keeps zeros), in src/components/sheets/BlankSheet.tsx and src/lib/sheet-format.ts
+- [X] T028 [P] [US2] Server: `workspace_settings.fill_lists` column (prisma/schema.prisma) and `loadFillLists` / `saveFillLists` (admins only, cleaned to the limits) in src/actions/settings.ts
+- [X] T029 [US2] Settings → Sheet lists editor for admins (hidden for others) in src/components/settings/FillLists.tsx, linked from the Settings page
+- [X] T030 [US2] Lab checks for US2 (quickstart Stage A §3, §4 and §7) in scripts/spreadsheet-lab/realapp/tips-a.cjs
 
 **Checkpoint**: US1 and US2 both work.
 
@@ -98,16 +98,16 @@
 
 **Independent Test**: C2:C50 as To do/Doing/Done shows chips; typing "Maybe" is refused; Alt+Down lists the column's values (spec US3).
 
-- [ ] T031 [P] [US3] `sheet_validations` table (data-model.md) in prisma/schema.prisma, then `bash scripts/migrate.sh`
-- [ ] T032 [US3] Server: load validations in `loadExtras`, and accept the `validations` change (ids checked, values cleaned, at most 200 per sheet, no overlaps) in `applySheetChanges`, in src/actions/sheets.ts (contracts/server.md)
-- [ ] T033 [US3] Data › Data validation… dialog (values with optional colors, reject or warn; replaces an overlapping rule after a confirm) in src/components/sheets/format/ValidationDialog.tsx, wired from the Data menu in src/components/sheets/format/FormatToolbar.tsx
-- [ ] T034 [US3] BlankSheet:
+- [X] T031 [P] [US3] `sheet_validations` table (data-model.md) in prisma/schema.prisma, then `bash scripts/migrate.sh`
+- [X] T032 [US3] Server: load validations in `loadExtras`, and accept the `validations` change (ids checked, values cleaned, at most 200 per sheet, no overlaps) in `applySheetChanges`, in src/actions/sheets.ts (contracts/server.md)
+- [X] T033 [US3] Data › Data validation… dialog (values with optional colors, reject or warn; replaces an overlapping rule after a confirm) in src/components/sheets/format/ValidationDialog.tsx, wired from the Data menu in src/components/sheets/format/FormatToolbar.tsx
+- [X] T034 [US3] BlankSheet:
   - validated cells render a chip and ▾, and Enter or a click opens the value menu;
   - typed, pasted, filled and moved values are checked (`invalid` counted, warn shows a note);
   - row and column inserts and deletes grow or shrink the ranges, like `tablesAfter`;
 
   in src/components/sheets/BlankSheet.tsx
-- [ ] T035 [US3] Alt+Down on a text cell opens `SheetCombo` with the column's distinct values (`pickFromColumn`) on team, Content and Video sheets, in src/components/sheet/GridCore.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
+- [X] T035 [US3] Alt+Down on a text cell opens `SheetCombo` with the column's distinct values (`pickFromColumn`) on team, Content and Video sheets, in src/components/sheet/GridCore.tsx, src/components/sheets/BlankSheet.tsx and src/components/sheet/useLinkedFormats.ts
 - [ ] T036 [US3] Lab checks for US3 (quickstart Stage A §5), then the stage A regressions, docs (validation.md, HANDOVER) and the stage A PR, in scripts/spreadsheet-lab/realapp/tips-a.cjs and specs/020-excel-power-tips/validation.md
 
 **Checkpoint**: stage A is done (MVP), with its PR open and waiting for the user's merge.

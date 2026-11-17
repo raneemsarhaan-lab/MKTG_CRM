@@ -13,8 +13,10 @@
  *   one undo step, and saves it.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { BorderSide, CellStyle, ColFilter, ConditionalRule, SortKey } from '@/types/index'
+import type { BorderSide, CellStyle, ColFilter, ConditionalRule, SortKey, ValidationRule } from '@/types/index'
 import type { BorderPreset, StylePatch } from '@/lib/sheet-format'
+import type { SeriesSpec } from '@/lib/sheet-fill'
+import type { GoSpecial } from '@/lib/sheet-selection'
 
 export const FORMAT_STATE = 'momentum:format-state'
 export const FORMAT_CMD = 'momentum:format-cmd'
@@ -63,6 +65,13 @@ export interface FormatState {
   sortHeader?: boolean | null
   /** Stage 3: the sheet's conditional formatting rules, in order, with where each applies ("E3:E6", "Status"). */
   rules?: (ConditionalRule & { where: string })[]
+  /** Spec 020: the active cell's data validation (null = none), and whether the selection mixes several; why it's off here (linked sheets). */
+  validation?: ValidationRule | null
+  validationMixed?: boolean
+  validationOff?: string | null
+  /** Spec 020: the Go To Special choices this sheet answers; the selection's values (Custom Lists › Import). */
+  goSpecial?: GoSpecial[]
+  selValues?: string[]
 }
 
 export type MergeMode = 'center' | 'across' | 'cells' | 'unmerge'
@@ -97,6 +106,13 @@ export type FormatCmd =
   | { kind: 'setValue'; value: string }
   | { kind: 'goto'; ref: string }
   | { kind: 'insert'; what: 'rowAbove' | 'rowBelow' | 'colLeft' | 'colRight' }
+  // Spec 020: Go To Special, Series…, Data Validation, Flash Fill, repeat (F4), Pick From Drop-down List.
+  | { kind: 'goSpecial'; what: GoSpecial; numbers?: boolean; text?: boolean }
+  | { kind: 'series'; spec: SeriesSpec; by: 'rows' | 'cols' }
+  | { kind: 'validation'; rule: ValidationRule | null; all: boolean }
+  | { kind: 'flashFill' }
+  | { kind: 'repeat' }
+  | { kind: 'pickList' }
 
 /** The toolbar started listening after a sheet announced itself: sheets announce again. */
 export const FORMAT_ASK = 'momentum:format-ask'
@@ -179,3 +195,6 @@ export const announceFind = (r: FindResult) => document.dispatchEvent(new Custom
 export const COMMENTS_CLEAR = 'momentum:comments-clear'
 export const clearComments = (source: FormatSource, keys: string[]) =>
   document.dispatchEvent(new CustomEvent(COMMENTS_CLEAR, { detail: { source, keys } }))
+
+/** Spec 020: the right-drag menu's Series… asks the workbook for the Series dialog. */
+export const SERIES_OPEN = 'momentum:series-open'

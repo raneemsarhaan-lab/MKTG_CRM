@@ -6,7 +6,7 @@
  * change set for the outbox. The same function applies a step backwards on
  * undo, so the screen, the server and the history can't disagree.
  */
-import type { ConditionalRule, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord, SheetTableRecord, SheetView, ViewWrite } from '@/types/index'
+import type { ConditionalRule, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetMergeRecord, SheetTableRecord, SheetView, ValidationRecord, ViewWrite } from '@/types/index'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { betweenMany } from '@/lib/sheet-positions'
 
@@ -92,6 +92,10 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, tables: ch.after } }
     }
+    case 'validations': {
+      const ex = doc.extras ?? emptyExtras()
+      return { ...doc, extras: { ...ex, validations: ch.after } }
+    }
     case 'rowOrder': {
       const pos = new Map(ch.rows.map(r => [r.id, r.after]))
       return { ...doc, rows: doc.rows.map(r => (pos.has(r.id) ? { ...r, position: pos.get(r.id)! } : r)).sort(byPos) }
@@ -171,6 +175,7 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'view': out.view = mergeView(out.view, viewWrite(ch.before, ch.after)); break
       case 'rules': out.rules = mergeLists<ConditionalRule>(out.rules, listWrite(ch.before, ch.after)); break
       case 'tables': out.tables = mergeLists<SheetTableRecord>(out.tables, listWrite(ch.before, ch.after)); break
+      case 'validations': out.validations = mergeLists<ValidationRecord>(out.validations, listWrite(ch.before, ch.after)); break
       case 'rowOrder': push('rowPositions', ch.rows.map(r => ({ id: r.id, position: r.after }))); break
       case 'colOrder': push('colPositions', ch.cols.map(c => ({ id: c.id, position: c.after }))); break
       case 'taskMap': out.taskMap = ch.after; break
@@ -197,6 +202,7 @@ export function mergeServer(a: SheetChanges, b: SheetChanges): SheetChanges {
     view: a.view || b.view ? mergeView(a.view, b.view) : undefined,
     rules: mergeLists(a.rules, b.rules),
     tables: mergeLists(a.tables, b.tables),
+    validations: mergeLists(a.validations, b.validations),
     rowPositions: lastById(cat(a.rowPositions, b.rowPositions)),
     colPositions: lastById(cat(a.colPositions, b.colPositions)),
     ...('taskMap' in b ? { taskMap: b.taskMap } : 'taskMap' in a ? { taskMap: a.taskMap } : {}),

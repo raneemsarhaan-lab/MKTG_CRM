@@ -24,6 +24,7 @@ import { GridCore, type GridModel, type GridCol, type ActiveCell } from './GridC
 import type { SheetColumnsHook } from './useSheetColumns'
 import { useLinkedEditing } from './useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
+import { useGridTips } from '@/components/sheet/useGridTips'
 import { useLinkedFormats } from './useLinkedFormats'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from './useLinkedMenu'
@@ -371,6 +372,9 @@ export function SheetGrid(p: SheetGridProps) {
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<SheetRow>>)
+  // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
+  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped })
+  Object.assign(model, tips.model)
 
   // ── spec 019 stage 3: ⚙ Fields, ＋ and Values ──
   const view = lv.store.view
@@ -409,6 +413,7 @@ export function SheetGrid(p: SheetGridProps) {
     />
     {lm.node}
     {lf.node}
+    {tips.node}
     {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
     {drawer && (
       <PresetFieldsDrawer

@@ -28,6 +28,7 @@ import { contentTypeColor } from '@/lib/tokens'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
+import { useGridTips } from '@/components/sheet/useGridTips'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
@@ -461,6 +462,9 @@ export function ContentGrid(p: ContentGridProps) {
     pasteAsRows: p.pasteAsRows, onSkipped: p.onSkipped,
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<ContentRow>>)
+  // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
+  const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped })
+  Object.assign(model, tips.model)
 
   const view = lv.store.view
   const saveView = (patch: Partial<LinkedView>) => void lv.store.saveView({ ...view, ...patch })
@@ -491,6 +495,7 @@ export function ContentGrid(p: ContentGridProps) {
               editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote} />
     {lm.node}
     {lf.node}
+    {tips.node}
     {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
     {drawer && (
       <PresetFieldsDrawer

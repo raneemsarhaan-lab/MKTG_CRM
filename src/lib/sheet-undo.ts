@@ -9,7 +9,7 @@
  * merges and view settings. A whole column or Ctrl+A is one record, so one
  * step however many cells it covers.
  */
-import type { CellStyle, ConditionalRule, SheetMergeRecord, SheetTableRecord, SheetTaskMap, SheetView, TaskField } from '@/types/index'
+import type { CellStyle, ConditionalRule, SheetMergeRecord, SheetTableRecord, SheetTaskMap, SheetView, TaskField, ValidationRecord } from '@/types/index'
 
 /** Formatting, on any sheet: rowKey and colKey as in sheet_formats ('' = every). */
 export type FormatsChange = { kind: 'formats'; items: { rowKey: string; colKey: string; before: CellStyle | null; after: CellStyle | null }[] }
@@ -21,6 +21,8 @@ export type ViewChange = { kind: 'view'; before: Partial<SheetView>; after: Part
 export type RulesChange = { kind: 'rules'; before: ConditionalRule[]; after: ConditionalRule[] }
 /** Stage 3: Format as Table and Convert to range, the whole list before and after (blank sheets). */
 export type TablesChange = { kind: 'tables'; before: SheetTableRecord[]; after: SheetTableRecord[] }
+/** Spec 020: data validation, the whole list before and after (blank sheets). */
+export type ValidationsChange = { kind: 'validations'; before: ValidationRecord[]; after: ValidationRecord[] }
 /** Spec 016: the sheet's column mapping before and after. */
 export type TaskMapChange = { kind: 'taskMap'; before: SheetTaskMap | null; after: SheetTaskMap | null }
 /** Spec 016: rows' tasks before and after (null = not linked). */
@@ -46,6 +48,7 @@ export type BlankChange =
   | ViewChange
   | RulesChange
   | TablesChange
+  | ValidationsChange
   | RowOrderChange
   | ColOrderChange
   | TaskMapChange
@@ -81,6 +84,7 @@ export function invert(ch: Change): Change {
     case 'view': return { kind: 'view', before: ch.after, after: ch.before }
     case 'rules': return { kind: 'rules', before: ch.after, after: ch.before }
     case 'tables': return { kind: 'tables', before: ch.after, after: ch.before }
+    case 'validations': return { kind: 'validations', before: ch.after, after: ch.before }
     case 'rowOrder': return { kind: 'rowOrder', rows: ch.rows.map(x => ({ id: x.id, before: x.after, after: x.before })) }
     case 'colOrder': return { kind: 'colOrder', cols: ch.cols.map(x => ({ id: x.id, before: x.after, after: x.before })) }
     case 'taskMap': return { kind: 'taskMap', before: ch.after, after: ch.before }

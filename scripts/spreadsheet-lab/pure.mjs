@@ -406,6 +406,61 @@ export async function runPure(lab, root) {
   })
 
   // ── the HTML clipboard, in Chromium ───────────────────────────────────────
+  // ── spec 020: the fill handle, Flash Fill, Go To Special, data validation ──
+  await check('tips-series', () => {
+    eq(h.planSeries(['5', '10'], 4, 'series'), ['15', '20', '25', '30'], '5, 10 → 15–30 (quickstart A §3)')
+    eq(h.defaultMode(['5']), 'copy', 'one number copies by default')
+    eq(h.planSeries(['5'], 2, 'series'), ['6', '7'], 'Ctrl turns one number into a series')
+    eq(h.planSeries(['1.5', '2'], 2, 'series'), ['2.5', '3'], 'decimals without float noise')
+    eq(h.planSeries(['Jan'], 4, 'series'), ['Feb', 'Mar', 'Apr', 'May'], 'Jan → Feb–May')
+    eq(h.planSeries(['JANUARY'], 1, 'series'), ['FEBRUARY'], 'spelling kept')
+    eq(h.planSeries(['Nov', 'Dec'], 2, 'series'), ['Jan', 'Feb'], 'wraps')
+    eq(h.planSeries(['يناير'], 2, 'series'), ['فبراير', 'مارس'], 'Arabic month names continue in Arabic')
+    eq(h.planSeries(['Sun', 'Tue'], 2, 'series'), ['Thu', 'Sat'], 'step through days')
+    eq(h.planSeries(['Item 3'], 2, 'series'), ['Item 4', 'Item 5'], 'text ending in a number counts on')
+    eq(h.planSeries(['W01'], 1, 'series'), ['W02'], 'zeros kept')
+    eq(h.planSeries(['a', 'b'], 3, 'series'), ['a', 'b', 'a'], 'plain text repeats')
+    eq(h.planSeries(['5', '10'], 2, 'copy'), ['5', '10'], 'Copy Cells repeats')
+    eq(h.planSeries(['2', '4'], 2, 'growth'), ['8', '16'], 'Growth Trend multiplies')
+    eq(h.planSeries(['Samaa', 'Hisham'], 3, 'series', { lists: [['Samaa', 'Hisham', 'Islam', 'Raneem']] }), ['Islam', 'Raneem', 'Samaa'], "an admin's custom list continues")
+  })
+  await check('tips-dates', () => {
+    eq(h.planSeries(['2026-12-06'], 3, 'series'), ['2026-12-07', '2026-12-08', '2026-12-09'], 'one date counts days')
+    // 10/12/2026 is a Thursday; Friday and Saturday are the weekend.
+    eq(h.planSeries(['10/12/2026'], 2, 'weekdays'), ['13/12/2026', '14/12/2026'], 'Fill Weekdays skips Friday and Saturday')
+    eq(h.planSeries(['31/01/2026'], 2, 'months'), ['28/02/2026', '31/03/2026'], 'months keep the day where they can')
+    eq(h.planSeries(['2026-01-15', '2026-03-15'], 2, 'series'), ['2026-05-15', '2026-07-15'], 'a two-month step')
+    eq(h.planSeries(['2026-01-15'], 1, 'years'), ['2027-01-15'], 'years')
+    eq(h.fillModesFor(['2026-01-15']).includes('weekdays'), true, 'dates offer the date modes')
+    eq(h.planSeriesDialog('1', 5, { type: 'linear', unit: 'day', step: 2, stop: 7, trend: false }), ['3', '5', '7'], 'Series… stops at the stop value')
+    eq(h.planSeriesDialog('2026-01-31', 2, { type: 'date', unit: 'month', step: 1, stop: null, trend: false }), ['2026-02-28', '2026-03-31'], 'Series… by month')
+  })
+  await check('tips-flash', () => {
+    const rows = [['Hisham El Badawy'], ['Islam Saadany'], ['Raneem Sarhan'], ['Samaa Adel']]
+    eq(h.learnFlash([{ row: rows[0], out: 'Hisham' }], rows.slice(1)), ['Islam', 'Raneem', 'Samaa'], 'first names (quickstart A §4)')
+    eq(h.learnFlash([{ row: ['raneem@forefront.co'], out: 'forefront' }], [['samaa@acme.io']]), ['acme'], 'domains')
+    eq(h.learnFlash([{ row: ['Hisham', 'Badawy'], out: 'H. Badawy' }], [['Islam', 'Saadany']]), ['I. Saadany'], 'initial and a last name')
+    eq(h.learnFlash([{ row: rows[0], out: 'Something else entirely' }], rows.slice(1)), null, 'an example that the cells beside it can’t build is refused')
+  })
+  await check('tips-fold', () => {
+    eq(h.foldCells([{ r: 0, c: 0 }, { r: 0, c: 1 }, { r: 1, c: 0 }, { r: 1, c: 1 }, { r: 3, c: 2 }]), [{ r0: 0, c0: 0, r1: 1, c1: 1 }, { r0: 3, c0: 2, r1: 3, c1: 2 }], 'cells fold into blocks')
+    eq(h.foldCells(Array.from({ length: 300 }, (_, i) => ({ r: i * 2, c: 0 }))), null, 'over 100 areas is refused')
+  })
+  await check('tips-validate', () => {
+    const list = h.cleanRule({ allow: 'list', values: ['To do', 'Doing', 'Done', 'doing'], ignoreBlank: true, dropdown: true, input: null, error: { style: 'stop', title: '', msg: '' } })
+    eq(list.values, ['To do', 'Doing', 'Done'], 'list items unique ignoring case')
+    ok(h.allowed(list, 'doing') && !h.allowed(list, 'Maybe') && h.allowed(list, ''), 'list: in, out, blank')
+    eq(h.listSpelling(list, 'doing'), 'Doing', 'spelled as in the list')
+    const whole = h.cleanRule({ allow: 'whole', op: 'between', a: '1', b: '10', ignoreBlank: false, dropdown: false, input: null, error: { style: 'stop', title: '', msg: '' } })
+    ok(h.allowed(whole, '5') && !h.allowed(whole, '5.5') && !h.allowed(whole, '11') && !h.allowed(whole, ''), 'whole number between, blank refused')
+    const date = h.cleanRule({ allow: 'date', op: 'ge', a: '2026-01-01', ignoreBlank: true, dropdown: false, input: null, error: { style: 'warning', title: '', msg: '' } })
+    ok(h.allowed(date, '15/03/2026') && !h.allowed(date, '2025-12-31'), 'dates on or after')
+    const len = h.cleanRule({ allow: 'length', op: 'le', a: '5', ignoreBlank: true, dropdown: false, input: null, error: { style: 'stop', title: '', msg: '' } })
+    ok(h.allowed(len, 'abcde') && !h.allowed(len, 'abcdef'), 'text length')
+    ok(h.allowed({ ...list, error: null }, 'Maybe'), 'no error alert: anything goes')
+    eq(h.cleanRule({ allow: 'list', values: [], ignoreBlank: true, dropdown: true, input: null, error: null }), null, 'an empty list is refused')
+  })
+
   await check('clip-html', async () => {
     const { chromium } = require('playwright')
     const exe = process.env.LAB_CHROMIUM ?? (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined)
