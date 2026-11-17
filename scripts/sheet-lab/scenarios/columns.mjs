@@ -244,12 +244,8 @@ export const columns = [
   {
     id: 'col-4-delete-undo', hash: C,
     async run(t) {
-      // Spec 019 (replaces spec 010 FR-040): a built-in column can be deleted from the sheet (the tasks keep their values); Title can't.
       await headMenu(t, 'type')
-      t.assert((await t.menuItems()).includes('delete'), 'built-in columns offer Delete (they leave the sheet)')
-      await t.page.keyboard.press('Escape')
-      await headMenu(t, 'title')
-      t.assert(!(await t.menuItems()).includes('delete'), 'Title offers no Delete')
+      t.assert(!(await t.menuItems()).includes('delete'), 'built-in columns offer no Delete (FR-040)')
       await t.page.keyboard.press('Escape')
       await headMenu(t, 'c:words')
       await pick(t, 'delete')

@@ -304,9 +304,8 @@ export interface LinkChoices {
   pillars: { id: string; name: string; projectId: string }[]
   teamCols: { id: string; name: string; sheet: string }[]
   canCreate: boolean
-  /** Spec 019: who is asking (the team sheet's Mine), and whether they may add a theme (admins). */
+  /** Spec 019: who is asking (the team sheet's Mine). */
   me: string
-  canAddTheme: boolean
 }
 export async function linkChoices(): Promise<LinkChoices | Fail> {
   const m = await getSessionMember()
@@ -324,7 +323,7 @@ export async function linkChoices(): Promise<LinkChoices | Fail> {
     people: people.map(p => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar_url })),
     types: types.map(t => t.label),
     pillars: pillars.map(p => ({ id: p.id, name: p.name, projectId: p.project_id })),
-    teamCols, canCreate: m.access !== 'user', me: m.id, canAddTheme: m.access === 'admin' || m.access === 'superuser',
+    teamCols, canCreate: m.access !== 'user', me: m.id,
   }
 }
 

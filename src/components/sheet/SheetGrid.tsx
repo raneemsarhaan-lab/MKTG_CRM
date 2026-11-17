@@ -5,15 +5,10 @@
  * Video rows group their clips; "+ Clip" rows add one; drafts are clips not
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
-import { useLocale, useTranslations } from 'next-intl'
-import type { Member, SheetColumn, Task, TaskField, WordField } from '@/types/index'
+import { useTranslations } from 'next-intl'
+import type { Member, SheetColumn, Task } from '@/types/index'
 import { COLUMN_WIDTHS, ROW_NO_WIDTH } from './columns'
-import { regroupVideos, type SheetRow } from './rows'
-import { STAGE_META } from '@/lib/stage-meta'
-import { matchStage, normTitle, wordValue } from '@/lib/sheet-links'
-import { FieldIcon } from '@/components/sheets/links/FieldCells'
-import { FIELDS_OPEN, PresetFieldsDrawer, ValuesDialog, type PresetRow } from '@/components/sheets/links/FieldsPanel'
-import { SheetMenu, type MenuItem } from './SheetMenu'
+import type { SheetRow } from './rows'
 import { clipLength, formatClipTime } from './time'
 import { StatusContent, useStageNames } from './StatusCell'
 import type { StageId } from '@/types/index'
@@ -25,14 +20,10 @@ import type { SheetColumnsHook } from './useSheetColumns'
 import { useLinkedEditing } from './useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useLinkedFormats } from './useLinkedFormats'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useLinkedMenu } from './useLinkedMenu'
 
 export type { GridCol, ActiveCell }
-
-/** Spec 019 stage 3: the built-in columns that are task fields (their icon in the heading). */
-const FIELD_OF: Record<string, TaskField> = { type: 'type', status: 'stage', editor: 'assignee', files: 'link:doc', published: 'link:published' }
-const STAGE_ORDER = Object.keys(STAGE_META)
 
 /** Columns typed into. */
 const TEXT_COLS: GridCol[] = ['title', 'clipNo', 'source', 'fileName', 'in', 'out']
@@ -72,8 +63,6 @@ export interface SheetGridProps {
   pasteAsRows?(grid: string[][], row: SheetRow | null, col: GridCol | null): boolean
   /** Spec 013: what a paste, clear or undo didn't change, by reason. */
   onSkipped?(skipped: Partial<Record<string, number>>): void
-  /** Spec 019 stage 3: the column set on show (the drawer's switches act on it). */
-  setName?: string
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
   linked?: {
     drop(taskId: string): Promise<boolean>
@@ -88,59 +77,20 @@ export interface SheetGridProps {
 export function SheetGrid(p: SheetGridProps) {
   const t = useTranslations('sheet')
   const stageNames = useStageNames('sheet')
-  const tf = useTranslations('sheets.fields')
-  const tc = useTranslations('sheet.columns')
-  const locale = useLocale()
-  /** Spec 019 stage 3: the sheet's view (group by, words), read through a ref since it loads after the model. */
-  const viewRef = useRef<LinkedView>({})
-  const boardName = (id: string) => { const m = STAGE_META[id as StageId]; return m ? (locale.startsWith('ar') ? m.label_ar : m.label_en) : id }
-  /** A stage as this sheet calls it: its own word, the Video sheet's word, or the board's name. */
-  const stageWord = (id: string) => {
-    const v = viewRef.current
-    if (v.show === 'board') return boardName(id)
-    return v.words?.stage?.[id]?.[0] ?? stageNames.video(id as StageId)
-  }
-  /** Typed or pasted text in Status, as the stage it stands for (null: not one). */
-  function readStage(text: string): string | null {
-    const own = wordValue(text, viewRef.current.words?.stage)
-    if (own) return own
-    const k = normTitle(text)
-    return STAGE_ORDER.find(id => normTitle(stageNames.video(id as StageId)) === k)
-      ?? matchStage(text, STAGE_ORDER.map(id => ({ id, names: [STAGE_META[id as StageId].label_en, STAGE_META[id as StageId].label_ar] })))
-  }
-  function commitWord(row: SheetRow, col: GridCol, value: string): Promise<string | null> {
-    if (col === 'status' && (row.kind === 'clip' || row.kind === 'video')) {
-      const v = readStage(value)
-      if (!v) return Promise.resolve(tf('notAStage', { text: value.trim() }))
-      if (v === row.task.status) return Promise.resolve(null)
-      return p.onCommit(row, col, v)
-    }
-    return p.onCommit(row, col, value)
-  }
   const membersById = new Map(p.members.map(m => [m.id, m]))
   const rowTask = (row: SheetRow): Task | null => (row.kind === 'clip' || row.kind === 'video' ? row.task : null)
-  const [drawer, setDrawer] = useState(false)
-  const [valuesFor, setValuesFor] = useState<WordField | null>(null)
-  const [addAt, setAddAt] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    const on = () => setDrawer(true)
-    document.addEventListener(FIELDS_OPEN, on)
-    return () => document.removeEventListener(FIELDS_OPEN, on)
-  }, [])
 
   const cl = p.columns
   const isCustom = (col: GridCol) => cl.custom.is(col)
   const isText = (row: SheetRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
-    // Spec 019 stage 3: Status takes typed and pasted words too (the menu stays on click and Enter).
-    if (col === 'status' && (row.kind === 'clip' || row.kind === 'video')) return !row.task.dropped_at
     if (isCustom(col)) return (row.kind === 'clip' || row.kind === 'video') && cl.custom.isText(row.task, col)
     if (row.kind === 'video') return col === 'title' && p.canEdit(row.task)
     if (row.kind !== 'clip' || row.task.dropped_at) return false
     return TEXT_COLS.includes(col) && p.canEdit(row.task)
   }
   const isMenu = (row: SheetRow, col: GridCol) => {
-    if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
+    if (row.kind === 'add' || row.kind === 'draft') return false
     if (col === 'rowNo') return true
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'video') return ['status', 'editor', 'type', 'files'].includes(col)
@@ -155,18 +105,13 @@ export function SheetGrid(p: SheetGridProps) {
     label: p.label,
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
-      const text = col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`)))
-      const f = FIELD_OF[col]
       return {
-        text: f && text ? <><FieldIcon field={f} />{text}</> : text,
-        label: col === 'drop' && !named ? t('col.drop') : f && text ? text : undefined,
+        text: col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`))),
+        label: col === 'drop' && !named ? t('col.drop') : undefined,
         sort: col === 'clipNo' ? 'ascending' : undefined,
       }
     },
     ...cl.grid,
-    tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
-                        onPointerDown={e => e.stopPropagation()} onClick={e => setAddAt(e.currentTarget)}>＋</button>,
-    colsOf: row => (row.kind === 'group' ? ['rowNo', 'title'] : null),
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'clip' && row.kind !== 'video') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
@@ -177,7 +122,6 @@ export function SheetGrid(p: SheetGridProps) {
       return {
         className: [
           row.kind === 'video' ? 'is-video' : '',
-          row.kind === 'group' ? 'fx-content-pillar-row' : '',
           row.kind === 'add' ? 'is-add' : '',
           row.kind === 'draft' ? 'is-draft' : '',
           row.kind === 'clip' && row.task.dropped_at ? 'is-dropped' : '',
@@ -210,7 +154,6 @@ export function SheetGrid(p: SheetGridProps) {
         case 'clipNo':   return task.clip?.clip_no == null ? '' : String(task.clip.clip_no)
         case 'source':   return task.clip?.source ?? ''
         case 'fileName': return task.clip?.file_name ?? ''
-        case 'status':   return row.kind === 'video' || row.kind === 'clip' ? stageWord(task.status) : ''
         case 'in':       return formatClipTime(task.clip?.in_ms)
         case 'out':      return formatClipTime(task.clip?.out_ms)
         default:         return ''
@@ -226,7 +169,7 @@ export function SheetGrid(p: SheetGridProps) {
       if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
       return task && TEXT_COLS.includes(col) && !(row.kind === 'clip' && task.dropped_at) && !p.canEdit(task) ? t('readOnly') : null
     },
-    onCommit: (row, col, v) => commitWord(row, col, v),
+    onCommit: p.onCommit,
     onCancelDraft: row => p.onCancelDraft(row.key.slice(2)),
     onOpen: p.onOpen,
     onActivate: (row, col) => {
@@ -245,9 +188,6 @@ export function SheetGrid(p: SheetGridProps) {
       if (row.kind === 'add') return col === 'title' ? <span className="fx-sheet-plus">{t('addClip')}</span> : null
       if (row.kind === 'draft') {
         return col === 'rowNo' ? row.n : col === 'title' ? <span className="fx-sheet-muted">{t('newClip.placeholder')}</span> : null
-      }
-      if (row.kind === 'group') {
-        return col === 'rowNo' ? row.n : <span className="fx-content-pillar" data-group-row={row.label}>{row.label}<span className="fx-sheet-muted"> · {row.count}</span></span>
       }
       const task = row.task
       const isVideo = row.kind === 'video'
@@ -271,7 +211,7 @@ export function SheetGrid(p: SheetGridProps) {
           )
         case 'clipNo': return isVideo || task.clip?.clip_no == null ? '' : String(task.clip.clip_no).padStart(2, '0')
         case 'type':   return <span className="fx-sheet-ellipsis">{task.content_type_label}</span>
-        case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} name={stageWord(task.status)} />
+        case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} />
         case 'editor': return <EditorContent member={task.assignee_id ? membersById.get(task.assignee_id) : undefined} t={t} />
         case 'source': return isVideo ? '' : <span className="fx-sheet-ellipsis">{task.clip?.source ?? ''}</span>
         case 'fileName': return isVideo ? '' : <span className="fx-sheet-ellipsis" title={task.clip?.file_name ?? undefined}>{task.clip?.file_name ?? ''}</span>
@@ -299,7 +239,7 @@ export function SheetGrid(p: SheetGridProps) {
     const task = rowTask(row)
     if (task && !cl.custom.is(col)) {
       switch (col) {
-        case 'status': return stageWord(task.status)
+        case 'status': return stageNames.video(task.status as StageId)
         case 'editor': return task.assignee_id ? membersById.get(task.assignee_id)?.name ?? '' : ''
         case 'type': return task.content_type_label ?? ''
         case 'length': return formatClipTime(clipLength(task.clip?.in_ms, task.clip?.out_ms))
@@ -312,17 +252,7 @@ export function SheetGrid(p: SheetGridProps) {
     kind: row => (row.kind === 'video' ? 'item' : 'child'),
     taskOf: row => rowTask(row)?.id ?? null, textValue: shownText, say: text => p.linked?.say(text),
   })
-  viewRef.current = lv.store.view
-  const by = lv.store.view.groupBy?.by ?? 'video'
-  /** Spec 019 stage 3: the videos grouped by stage or editor, each with its clips. */
-  const rows = useMemo(() => {
-    if (by !== 'stage' && by !== 'assignee') return lv.rows
-    return regroupVideos(lv.rows, v => {
-      if (by === 'stage') return { key: v.status, label: stageWord(v.status), order: String(STAGE_ORDER.indexOf(v.status)).padStart(3, '0') }
-      const n = v.assignee_id ? membersById.get(v.assignee_id)?.name ?? '' : ''
-      return n ? { key: `a${v.assignee_id}`, label: n, order: `0${n.toLowerCase()}` } : { key: 'none', label: tf('bandUnassigned'), order: '1' }
-    })
-  }, [lv.rows, by, lv.store.view.words, lv.store.view.show]) // eslint-disable-line react-hooks/exhaustive-deps
+  const rows = lv.rows
   model.rows = rows
   const colName = (col: GridCol) => { const h = model.header(col); return h.label ?? (typeof h.text === 'string' ? h.text : col) }
   const cellName = (row: SheetRow, col: GridCol) => {
@@ -348,7 +278,7 @@ export function SheetGrid(p: SheetGridProps) {
   const le = useLinkedEditing<SheetRow>({
     applyFormats: lf.applyFormats,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
-    rows, cols: model.cols, isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
+    rows, cols: model.cols, isText, textValue: model.textValue, commit: p.onCommit,
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
     isCellRow: row => row.kind === 'clip' || row.kind === 'video',
     onSkipped: p.onSkipped,
@@ -372,31 +302,6 @@ export function SheetGrid(p: SheetGridProps) {
     ...(p.linked ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<SheetRow>>)
 
-  // ── spec 019 stage 3: ⚙ Fields, ＋ and Values ──
-  const view = lv.store.view
-  const saveView = (patch: Partial<LinkedView>) => void lv.store.saveView({ ...view, ...patch })
-  const laid = cl.laid
-  const colLabel = (key: string) => cl.nameOf(key) || (isCustom(key) ? '' : t(`col.${key as SheetColumn}`))
-  const asRow = (c: (typeof laid)[number]): PresetRow => {
-    const i = laid.indexOf(c), name = colLabel(c.key) || t('col.drop')
-    return {
-      key: c.key, name, icon: c.kind ? 'regular' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
-      values: c.key === 'status' ? 'stage' : undefined,
-      up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
-      upLabel: tc('moveUp', { name }), downLabel: tc('moveDown', { name }),
-    }
-  }
-  const closeBack = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-video-sheet] .fx-sheet-td.is-active, [data-video-sheet] [data-cell][tabindex="0"]')?.focus())
-  const addItems: MenuItem[] = addAt ? [
-    ...laid.filter(c => c.builtIn && !c.shown).map(c => ({
-      key: c.key, text: colLabel(c.key) || t('col.drop'), group: tf('fieldsTitle'),
-      label: <span className="fx-fd-mi">{FIELD_OF[c.key] && <FieldIcon field={FIELD_OF[c.key]} />}{colLabel(c.key) || t('col.drop')}</span>,
-      onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
-    })),
-    { key: 'regular', text: tf('spreadsheetCol'), group: tf('regularTitle'), label: <span className="fx-fd-mi"><FieldIcon field="regular" />{tf('spreadsheetCol')}</span>,
-      onSelect: () => { const a = addAt; setAddAt(null); cl.openAdd(a) } },
-  ] : []
-
   return (
     <>
     <GridCore
@@ -409,32 +314,6 @@ export function SheetGrid(p: SheetGridProps) {
     />
     {lm.node}
     {lf.node}
-    {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
-    {drawer && (
-      <PresetFieldsDrawer
-        rowsName={tf('rowsVideo')} rowsHelp={tf('rowsVideoHelp', { set: p.setName ?? '' })}
-        groups={[{ value: 'video', label: tf('groupVideo') }, { value: 'stage', label: tf('names.stage') }, { value: 'assignee', label: tf('groupEditor') }]}
-        group={by === 'stage' || by === 'assignee' ? by : 'video'}
-        onGroup={v => saveView({ groupBy: v === 'video' ? null : { by: v as 'stage' | 'assignee' } })}
-        fields={laid.filter(c => !c.kind).map(asRow)}
-        regular={laid.filter(c => c.kind).map(asRow)}
-        onToggle={(key, on) => void cl.setShown(key, on)}
-        onMove={(key, dir) => { const i = laid.findIndex(c => c.key === key); void cl.move(key, dir < 0 ? laid[i - 1]?.key ?? null : laid[i + 2]?.key ?? null) }}
-        onValues={f => setValuesFor(f)}
-        onAddRegular={a => cl.openAdd(a)}
-        onClose={() => { setDrawer(false); closeBack() }} />
-    )}
-    {valuesFor && (
-      <ValuesDialog field={valuesFor} map={{ words: view.words, show: view.show }} types={[]}
-                    defaults={Object.fromEntries(STAGE_ORDER.map(id => [id, stageNames.video(id as StageId)]))}
-                    onSave={(words, show) => {
-                      const all = { ...(view.words ?? {}), [valuesFor]: words }
-                      if (!Object.keys(words).length) delete all[valuesFor]
-                      saveView({ words: all, show })
-                      setValuesFor(null); closeBack()
-                    }}
-                    onClose={() => { setValuesFor(null); closeBack() }} />
-    )}
     </>
   )
 }

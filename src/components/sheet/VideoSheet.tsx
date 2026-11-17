@@ -33,7 +33,6 @@ import { FILE_RE } from '@/lib/clip-file-name'
 import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
-import { openFields } from '@/components/sheets/links/FieldsPanel'
 
 type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
@@ -83,7 +82,7 @@ export function VideoSheet(p: VideoSheetProps) {
 
   const [active, setActive] = useState<ActiveCell | null>(null)
   const activeRow = active ? rows.find(r => r.key === active.key) : undefined
-  const focusVideo: Task | undefined = activeRow && activeRow.kind !== 'group'
+  const focusVideo: Task | undefined = activeRow
     ? (activeRow.kind === 'video' ? activeRow.task : activeRow.video)
     : rows.find(r => r.kind === 'video')?.task as Task | undefined
   const summary = useMemo(() => summarise(focusVideo ? clipsOf(p.tasks, focusVideo.id) : []), [p.tasks, focusVideo])
@@ -294,8 +293,6 @@ export function VideoSheet(p: VideoSheetProps) {
           if (v && !/^\d{1,4}$/.test(v)) return { success: false, error: 'badNumber' }
           return p.api.updateClip(task.id, { clip_no: v ? Number(v) : null })
         }
-        // Spec 019 stage 3: a typed or pasted stage (SheetGrid has read the sheet's words into a stage id).
-        case 'status':   return p.api.move(task.id, value as StageId)
         case 'source':   return p.api.updateClip(task.id, { source: value.trim() || null })
         case 'fileName': return p.api.updateClip(task.id, { file_name: value.trim() || null })
         case 'in': case 'out': {
@@ -326,7 +323,7 @@ export function VideoSheet(p: VideoSheetProps) {
   // ── pasting ─────────────────────────────────────────────────────────────
   const [paste, setPaste] = useState<{ videoId: string; cells: PastedCell[][] | null } | null>(null)
   function pasteTarget(row: SheetRow | null): string | null {
-    if (row) return row.kind === 'group' ? null : row.kind === 'video' ? row.task.id : row.video.id
+    if (row) return row.kind === 'video' ? row.task.id : row.video.id
     return p.videoId ?? focusVideo?.id ?? null
   }
   function onPaste(e: React.ClipboardEvent, row: SheetRow | null, col: GridCol | null) {
@@ -398,9 +395,7 @@ export function VideoSheet(p: VideoSheetProps) {
           ))}
         </div>
         <span className="fx-sheet-bar-gap" />
-        {/* Spec 019 stage 3: Columns opens the Fields drawer (the same as ⚙ Fields). */}
-        <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{t('columns.button')}</button>
-        <button type="button" className="fx-sheet-btn" data-add-column="" onClick={e => cl.openAdd(e.currentTarget)}>{t('columns.add')}</button>
+        {cl.toolbar}
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showDropped} data-show-dropped="" onClick={toggleDropped}>{t('showDropped')}</button>
         <button
@@ -437,7 +432,6 @@ export function VideoSheet(p: VideoSheetProps) {
       {!empty && (
         <div className="fx-sheet-scroll">
           <SheetGrid
-            setName={t(`sets.${set}`)}
             rows={rows}
             columns={cl}
             me={me}
@@ -464,7 +458,7 @@ export function VideoSheet(p: VideoSheetProps) {
             linked={{
               drop: id => p.api.drop(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
               restore: id => p.api.restore(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
-              insertRow: row => { if (row.kind === 'group') return false; addClip(row.kind === 'video' ? row.task.id : row.video.id); return true },
+              insertRow: row => { addClip(row.kind === 'video' ? row.task.id : row.video.id); return true },
               heights: p.rowHeights,
               saveHeights: p.api.setRowHeights ? e => p.api.setRowHeights!('linked_video', e) : undefined,
               say: text => say(text),

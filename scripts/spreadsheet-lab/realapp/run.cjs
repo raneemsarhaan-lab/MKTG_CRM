@@ -240,8 +240,7 @@ const paste = (page, text, html) => page.evaluate(([text, html]) => {
   ok(sql(`select dropped_at is null from tasks where id='${taskId}'`) === 't', 'toolbar Undo brings it back')
   await page.locator('[data-linked-pane] [data-col-head="status"]').click({ button: 'right' })
   await page.waitForSelector('[data-cell-menu]')
-  // Spec 019: every column but Title can be deleted (a built-in one leaves the sheet; the tasks keep their values).
-  ok(await page.locator('[data-cell-menu] [data-item="deleteCol"]').count() === 1 && await page.locator('[data-cell-menu] [data-item="deleteCol"][aria-disabled="true"]').count() === 0, 'a built-in column can be deleted')
+  ok(await page.locator('[data-cell-menu] [data-item="deleteCol"][aria-disabled="true"]').count() === 1, "pipeline columns can't be deleted")
   await page.click('[data-cell-menu] [data-item="insertColRight"]')
   await page.waitForSelector('[data-sheet-pop]', { timeout: 5000 }).catch(() => {})
   ok(await page.locator('[data-sheet-pop]').count() >= 1, "Insert column opens the add-column form")

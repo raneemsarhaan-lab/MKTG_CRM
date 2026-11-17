@@ -710,11 +710,7 @@ Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fiel
   - Group by, words and show live in the linked sheet's `view` (`LinkedView`, saved through `applyLinkedFormats`).
   - `regroupContent` (`content/rows.ts`) builds the Stage, Assignee, Type or None groups.
   - Status and Type read typed and pasted words (`readWord`) before `ContentSheet.onCommit` moves or retypes the task.
-- **Video sheet (stage 3).**
-  - `SheetGrid` hosts the same drawer, ＋ and Values.
-  - Group by (Video, Stage, Editor) uses `regroupVideos` (`sheet/rows.ts`) and moves whole videos with their clips.
-  - Status reads typed and pasted words, and `VideoSheet.onCommit` moves the task.
-- **Checks.** `node scripts/spreadsheet-lab/realapp/fields.cjs`, `content-fields.cjs` and `video-fields.cjs`.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/fields.cjs` and `content-fields.cjs`.
 
 ### Celebrations
 

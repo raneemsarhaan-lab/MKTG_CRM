@@ -34,7 +34,7 @@ export const openLinks = (what: LinksWhat) => document.dispatchEvent(new CustomE
 export const LINKS_STATE = 'momentum:links-state'
 export interface LinksState { linked: boolean; canCreate: boolean; unlinkedSelected: number; readOnly: string | null }
 
-export type LinksApi = Pick<SheetsApi, 'resolveTaskCells' | 'writeTaskFields' | 'refreshTaskFields' | 'taskValues' | 'searchTasks' | 'linkChoices' | 'createTasksForRows' | 'addTheme'>
+export type LinksApi = Pick<SheetsApi, 'resolveTaskCells' | 'writeTaskFields' | 'refreshTaskFields' | 'taskValues' | 'searchTasks' | 'linkChoices' | 'createTasksForRows'>
 type Row = { id: string; position: number; height: number | null }
 
 /** The text a snapshot cell keeps (R7): a stage's English name; the rest as shown. */
@@ -79,15 +79,7 @@ export function useTaskLinks(p: {
   /** Rows that matched several tasks, until they're chosen (not stored: after a reload they read as Not linked). */
   const [ambiguous, setAmbiguous] = useState<Record<string, TaskHit[]>>({})
 
-  const loadChoices = useCallback(() => { void ref.current.api.linkChoices().then(r => { if (r.success) setChoices(r) }) }, [])
-  useEffect(() => { loadChoices() }, [p.api, loadChoices])
-  /** Spec 019: + Theme from the sheet; the Theme field offers it at once. Null when made, otherwise the reason. */
-  async function addTheme(name: string): Promise<string | null> {
-    const r = await ref.current.api.addTheme(name)
-    if (!r.success) return r.error === 'may_not_edit_theme' ? t('why.not_authorized') : t('why.generic')
-    loadChoices()
-    return null
-  }
+  useEffect(() => { void p.api.linkChoices().then(r => { if (r.success) setChoices(r) }) }, [p.api])
 
   const mergeTasks = useCallback((more: Record<string, LinkedTask>) => {
     if (!Object.keys(more).length) return
@@ -455,7 +447,7 @@ export function useTaskLinks(p: {
     search={async (q, f) => { const r = await p.api.searchTasks(q, f); return r.success ? r.tasks : [] }} onAdd={ids => void addTasks(ids)} onClose={close} />
   if (dlg?.k === 'create') node = <CreateTasksPreview rows={dlg.rows} people={choices?.people ?? []} onCreate={createTasks} onClose={close} />
 
-  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [], choices, addField, removeField, setWords, askLink, isHeading, createForRow, canCreate: !!choices?.canCreate, addTheme, canAddTheme: !!choices?.canAddTheme }
+  return { map, rowTasks, tasks, taskOfRow, shown, noteOfRow, applyRouted, openChoose, node, teamCols: choices?.teamCols ?? [], choices, addField, removeField, setWords, askLink, isHeading, createForRow, canCreate: !!choices?.canCreate }
 }
 
 /** Undo and redo of mapped cells: the earlier values go back through the board's rules (R5). */

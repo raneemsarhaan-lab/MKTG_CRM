@@ -5,7 +5,6 @@
  */
 import * as A from '@/actions/sheets'
 import * as Lk from '@/actions/sheet-links'
-import { addTheme } from '@/actions/content'
 import type { SheetsApi } from './types'
 
 const net = { success: false as const, error: 'network' }
@@ -39,5 +38,4 @@ export const sheetsApi: SheetsApi = {
   searchTasks: safe(Lk.searchTasks),
   linkChoices: safe(Lk.linkChoices),
   createTasksForRows: safe(Lk.createTasksForRows),
-  addTheme: safe(addTheme),
 } as SheetsApi

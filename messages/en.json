@@ -544,8 +544,7 @@
         "badSection": "Values that don’t fit their column · left empty",
         "fillExistingClips": "{n, plural, one {Fills the empty cells of # clip already in the sheet} other {Fills the empty cells of # clips already in the sheet}}",
         "problemHead": "Problem"
-      },
-      "removed": "{name} removed from the sheet. The tasks keep their values; add it back from ＋."
+      }
     }
   },
   "content": {
@@ -1132,7 +1131,7 @@
       "resizeRow": "Resize row…",
       "resizeCol": "Resize column…",
       "selectRange": "Select range",
-      "pipelineCol": "Title can't be deleted.",
+      "pipelineCol": "Pipeline columns can't be deleted.",
       "deleteRowsTitle": "{n, plural, one {Drop this row?} other {Drop # rows?}}",
       "deleteRowsNote": "Dropped tasks leave the board and can be brought back with Show dropped or Undo.",
       "drop": "Drop",
@@ -2118,14 +2117,7 @@
       "sumPublished": "{n} published",
       "lookTitle": "Look",
       "lookContent": "Content sheet",
-      "lookGrid": "Spreadsheet",
-      "rowsVideo": "Videos and their clips",
-      "rowsVideoHelp": "Each video is a row with its clips under it. The switches show or hide columns in the {set} set.",
-      "groupVideo": "Video",
-      "groupEditor": "Editor",
-      "barAddTheme": "+ Theme",
-      "newTheme": "New theme",
-      "themeAdded": "“{name}” added. Pick it in a task’s Theme."
+      "lookGrid": "Spreadsheet"
     }
   },
   "hours": {

@@ -46,7 +46,7 @@ export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
   video: [
     { key: 'title', width: 320, en: 'Title', sets: ['editing', 'copy', 'full'] },
     { key: 'clipNo', width: 40, en: '#', sets: ['editing', 'copy', 'full'] },
-    { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full'] },
+    { key: 'type', width: 70, en: 'Type', sets: ['copy', 'full'] },
     { key: 'status', width: 156, en: 'Status', sets: ['editing', 'copy', 'full'] },
     { key: 'editor', width: 112, en: 'Editor', sets: ['editing', 'copy', 'full'] },
     { key: 'source', width: 92, en: 'Source', sets: ['editing', 'full'] },

@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-17 (revised the same day)
 
-**Status**: Built (stage 1 team sheets, stage 2 Content sheet, stage 3 Video sheet)
+**Status**: Stages 1 (team sheets) and 2 (Content sheet) built; stage 3 (Video) to follow
 
 **Input**:
 - User description: "why when I connect any sheet manually, it doesn't show like the one we connect hard code?"

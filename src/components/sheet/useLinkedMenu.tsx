@@ -146,9 +146,9 @@ export function useLinkedMenu<R extends { key: string }>(p: LinkedMenuInput<R>) 
       { key: 'insertColLeft', label: t('menu.insertColLeft'), ...(col === 'title' ? no(t('menu.titleFirst')) : one), onSelect: () => p.columns.grid.insertColumn('before', col, anchor) },
       { key: 'insertColRight', label: t('menu.insertColRight'), ...one, onSelect: () => p.columns.grid.insertColumn('after', cols[cols.length - 1] ?? col, anchor) },
     ]
-    const deletable = !inside && cols.length === 1 && p.columns.grid.canDelete(cols[0])
+    const team = !inside && cols.length === 1 && p.columns.grid.isTeamColumn(cols[0])
     const deleteCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: cols.length }), danger: true,
-      ...(deletable ? {} : no(cols.length > 1 ? t('menu.oneColumn') : t('menu.pipelineCol'))),
+      ...(team ? {} : no(cols.length > 1 ? t('menu.oneColumn') : t('menu.pipelineCol'))),
       onSelect: () => p.columns.grid.deleteColumn(cols[0], anchor) }
     const resizeRow: PopItem = { key: 'resizeRow', label: t('menu.resizeRow'),
       ...(sel.some(r => p.taskOf(r)) ? {} : no(t('menu.noTask'))),

@@ -83,7 +83,6 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
   const T = ids.pieces
   const rid = rowIds(ids.sheet)
   const before = Object.fromEntries(T.map(t => [t.id, t]))
-  let plainTask = null
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
   try {
     const A = await login(browser), page = A.page
@@ -288,23 +287,6 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     await page.waitForTimeout(600); await saved(page)
     ok(sql(`select value from sheet_cells where sheet_id='${ids.sheet}' and row_id='${rid[0]}' and col_id='${ids.cols[2]}'`) === 'Remarks', 'Rename column writes the heading (the header shows it)')
     await undo(page)
-    // Themes aren't required: a linked task with no theme sits at the top, under no band.
-    const plainName = `Lab no theme ${Date.now().toString(36)}`
-    plainTask = sql(`insert into tasks (id, name, task_owner_id, initiator_role, status) values (gen_random_uuid(), '${plainName}', '${ADMIN_ID}', 'admin', 'todo') returning id`)
-    sql(`insert into sheet_cells (sheet_id, row_id, col_id, value) values ('${ids.sheet}', '${rid[9]}', '${ids.cols[0]}', '${plainName}')`)
-    sql(`update sheet_rows set task_id='${plainTask}' where id='${rid[9]}'`)
-    await page.reload(); await page.waitForSelector('[data-blank-sheet][data-look="content"] [data-task-marker], [data-blank-sheet][data-look="content"] [data-band]')
-    await page.waitForTimeout(800)
-    ok(await rowsOf(page).first().getAttribute('data-row') === rid[9] && await page.locator(`[data-blank-sheet] [data-row="${rid[9]}"] [data-band]`).count() === 0, 'a task with no theme is listed first, under no theme band')
-    ok(!/No theme/.test(await page.locator('[data-blank-sheet]').innerText()), 'and there is no “No theme” band')
-    // + Theme (admins): a theme made from the sheet.
-    const themeName = `Lab theme ${Date.now().toString(36)}`
-    await page.click('[data-team-add-theme]'); await page.waitForSelector('[data-new-theme] input')
-    await page.fill('[data-new-theme] input', themeName); await page.keyboard.press('Enter')
-    await page.waitForFunction(() => !document.querySelector('[data-new-theme]'), null, { timeout: 15000 }).catch(() => {})
-    ok(sql(`select count(*) from projects where name='${themeName}' and is_theme`) === '1', '+ Theme creates a theme')
-    sql(`delete from projects where name='${themeName}'`)
-
     await page.click('[data-team-columns]'); await page.waitForSelector('[data-fields-drawer]')
     ok(await page.locator('[data-look-select]').inputValue() === 'content', 'Columns opens ⚙ Fields')
     await page.selectOption('[data-look-select]', 'grid')
@@ -335,7 +317,6 @@ const drawer = async page => { if (!(await page.locator('[data-fields-drawer]').
     await browser.close()
     for (const t of Object.values(before)) sql(`update tasks set status='${t.status}', assignee_id=${t.assignee ? `'${t.assignee}'` : 'null'}, due_date=${t.due ? `'${t.due}'` : 'null'} where id='${t.id}'`)
     sql(`delete from sheet_folders where id='${ids.folder}'`)
-    if (plainTask) sql(`delete from tasks where id='${plainTask}'`)
   }
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
