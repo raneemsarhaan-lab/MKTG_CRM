@@ -18,13 +18,16 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
-import type { CellStyle, ColFilter, ConditionalRule, GroupBy, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, WordField } from '@/types/index'
+import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
+import type { CellStyle, ColFilter, ConditionalRule, GroupBy, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, ValidationRecord, ValidationRule, WordField } from '@/types/index'
+import { defaultMode, fillModesFor, learnFlash, planSeries, planSeriesDialog, previewValue, sourceKind, type FillCtx, type FillMode, type SeriesSpec } from '@/lib/sheet-fill'
+import { allowed, listSpelling, overlaps } from '@/lib/sheet-validate'
+import { foldCells, type GoSpecial } from '@/lib/sheet-selection'
 import { WORD_FIELDS } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
 import type { BlankChange } from '@/lib/sheet-undo'
 import { BLANK_COL_LIMIT, BLANK_ROW_LIMIT, DEFAULT_COL_W, cellsOfCols, cellsOfRows, emptyExtras, growTo, insertAt } from '@/lib/sheet-doc'
-import { display, formatKey, indexFormats, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
+import { display, formatKey, indexFormats, parseNumber, planBorders, planFormat, planRect, resolveStyle, showsRed, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
 import { cellStylePatch, columnValues, evalRules, filterOn, filterRows, looksLikeHeader, barCss, sortRows, tableLook, type CellView } from '@/lib/sheet-rules'
 import { FilterMenu } from './format/StyleTools'
@@ -32,7 +35,7 @@ import { useTaskLinks, type LinksApi } from './links/useTaskLinks'
 import { normTitle, shownWord, taskIdFrom } from '@/lib/sheet-links'
 import { CONTROL_FIELDS, FieldEditor, FieldIcon, FieldValue } from './links/FieldCells'
 import { AddFieldMenu, FIELDS_OPEN, FieldsDrawer, MatchDialog, ValuesDialog, type ColRef } from './links/FieldsPanel'
-import { announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
+import { SERIES_OPEN, announceFind, askComment, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState, type MergeMode, type ViewOp } from './format/bus'
 import { fitHeight } from './format/fit'
 import { areaCols, areaRows, cellName, colLetters, unionCells, unionSize, wholeCols, wholeRows } from '@/lib/sheet-selection'
 import { parseClipboard, pastePlan, toGrid } from '@/lib/sheet-clipboard'
@@ -41,8 +44,12 @@ import { SheetPopover } from '@/components/sheet/SheetMenu'
 import { NamePrompt } from '@/components/content/ThemeEditor'
 import { openLinks } from './links/useTaskLinks'
 import { ConfirmDialog, ResizeDialog } from './Dialogs'
+import { ValidationAlert } from './format/TipsDialogs'
 
 const MAX_CELL = 50_000
+/** Spec 020: the status bar's figures for the selection (Excel's Average, Count, Sum). */
+export interface SelStats { count: number; nums: number; sum: number; avg: number | null }
+const STATS_CAP = 50_000
 export const BLANK_ROW_H = 24
 
 type Row = { key: string; id: string; position: number; height: number | null }
@@ -56,7 +63,7 @@ export interface BlankSheetProps {
   onUndo(): void
   onRedo(): void
   /** What is selected, for the toolbar: the active cell's name and the count; with several areas (spec 017) their names. */
-  onSelect(info: { cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean }): void
+  onSelect(info: { cell: string; count: number; areas?: number; label?: string; more?: number; adding?: boolean; stats?: SelStats }): void
   onSkipped(skipped: Partial<Record<string, number>>): void
   /** A short message for the workbook's toast (a menu Paste the browser refused). */
   onNotice(text: string): void
@@ -64,12 +71,19 @@ export interface BlankSheetProps {
   /** Spec 016: the link actions, and a change to the doc that isn't an undo step (values from the board). */
   links?: LinksApi
   patch?(fn: (doc: SheetDoc) => SheetDoc): void
+  /** Spec 020: the workspace's custom lists for the fill handle; the zoom; whether there's something to redo (Ctrl+Y repeats otherwise); the status bar's mode text. */
+  fillLists?: string[][]
+  zoom?: number
+  onZoom?(z: number): void
+  canRedo?: boolean
+  onStatus?(text: string | null): void
 }
 
 export function BlankSheet(p: BlankSheetProps) {
   const t = useTranslations('sheets')
   const tl = useTranslations('sheets.links')
   const tf = useTranslations('sheets.fields')
+  const tt = useTranslations('sheets.tips')
   const { doc } = p
   const locale = useLocale()
   const [picked, setActive] = useState<ActiveCell | null>(null)
@@ -195,8 +209,30 @@ export function BlankSheet(p: BlankSheetProps) {
   function report() {
     const list = areasRef.current, q = rectRef.current
     const names = list.length > 1 ? list.map(areaName) : []
-    p.onSelect({ cell: nameAt(q.r0, q.c0), count: unionSize(list), areas: list.length, label: names.slice(0, 3).join(', '), more: Math.max(0, names.length - 3), adding: addingRef.current })
+    // Spec 020: Average, Count and Sum of the selection, as Excel's status bar (capped for speed).
+    // Only filled cells are read (a sheet is mostly empty), row by row, up to the cap.
+    let count = 0, nums = 0, sum = 0, seen = 0
+    const counted = new Set<string>()
+    for (const q of list) {
+      for (let r = q.r0; r <= q.r1 && seen < STATS_CAP; r++) {
+        const row = vRows[r], cells = row ? doc.cells[row.id] : undefined
+        if (!cells) continue
+        for (const [colId, v] of Object.entries(cells)) {
+          const c = vColIndex.get(colId)
+          if (c === undefined || c < q.c0 || c > q.c1 || !v) continue
+          const k = `${row.id}|${colId}`
+          if (counted.has(k)) continue
+          counted.add(k); seen++; count++
+          const n = parseNumber(v)
+          if (n !== null) { nums++; sum += n }
+        }
+      }
+    }
+    const stats: SelStats = { count, nums, sum, avg: nums ? sum / nums : null }
+    p.onSelect({ cell: nameAt(q.r0, q.c0), count: unionSize(list), areas: list.length, label: names.slice(0, 3).join(', '), more: Math.max(0, names.length - 3), adding: addingRef.current, stats })
+    if (Date.now() - statusAt.current > 800) p.onStatus?.(null)
   }
+  const statusAt = useRef(0)
   /** Merges as blocks of visible indexes; one whose edges are gone or hidden is left out. */
   const boxes = useMemo(() => extras.merges.map(m => {
     const a = vRowIndex.get(m.top), b = vRowIndex.get(m.bottom), c = vColIndex.get(m.left), d = vColIndex.get(m.right)
@@ -361,10 +397,12 @@ export function BlankSheet(p: BlankSheetProps) {
       if (w.value.length > MAX_CELL) { bump('invalid'); continue }
       list.push({ rowId: r.id, colId: c.id, value: w.value })
     }
+    // Spec 020: pasted and filled values are checked against data validation; refused ones are counted.
+    const checked = why === 'clear' || why === 'cut' ? list : checkList(list, bump)
     const forward: BlankChange[] = []
     if (newRows.length) forward.push({ kind: 'insertRows', rows: newRows.map(r => ({ ...r, height: null })) })
     if (newCols.length) forward.push({ kind: 'insertCols', cols: newCols.map(c => ({ ...c, width: null })) })
-    const cells = cellChange(list)
+    const cells = cellChange(checked)
     if (cells) forward.push(cells)
     // A paste from an HTML table brings its formatting (spec 015 FR-041, SC-003); text leaves it alone.
     const items: FormatItem[] = []
@@ -418,11 +456,13 @@ export function BlankSheet(p: BlankSheetProps) {
   const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
   function deleteRowsAt(at: number[]) {
     const gone = at.map(i => vRows[i]).filter((x): x is NonNullable<typeof x> => !!x)
-    applyR('deleteRows', [...tablesAfter('rows', new Set(gone.map(r => r.id))), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
+    const ids = new Set(gone.map(r => r.id))
+    applyR('deleteRows', [...tablesAfter('rows', ids), ...validationsAfter('rows', ids), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
   }
   function deleteColsAt(at: number[]) {
     const gone = at.map(i => vCols[i]).filter((x): x is NonNullable<typeof x> => !!x)
-    applyR('deleteCols', [...tablesAfter('cols', new Set(gone.map(c => c.id))), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
+    const ids = new Set(gone.map(c => c.id))
+    applyR('deleteCols', [...tablesAfter('cols', ids), ...validationsAfter('cols', ids), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
   }
   function setHeights(ids: string[], h: number | null) {
     const list = doc.rows.filter(r => ids.includes(r.id) && r.height !== h).map(r => ({ id: r.id, before: r.height, after: h }))
@@ -537,15 +577,15 @@ export function BlankSheet(p: BlankSheetProps) {
       { key: 'paste', label: t('menu.paste'), kbd: k('V'), ...lock, onSelect: () => void menuPaste(q, sel) },
     ]
     const rowItems: PopItem[] = [
-      { key: 'insertRowAbove', label: t('menu.insertRowAbove'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => insertRows(q.r0, target.kind === 'row' ? nr : 1) },
-      { key: 'insertRowBelow', label: t('menu.insertRowBelow'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => insertRows(q.r1 + 1, target.kind === 'row' ? nr : 1) },
+      { key: 'insertRowAbove', label: t('menu.insertRowAbove'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => { lastCmd.current = { kind: 'insert', what: 'rowAbove' }; insertRows(q.r0, target.kind === 'row' ? nr : 1) } },
+      { key: 'insertRowBelow', label: t('menu.insertRowBelow'), ...lock, ...(ro ? {} : several ? one : tooManyRows), onSelect: () => { lastCmd.current = { kind: 'insert', what: 'rowBelow' }; insertRows(q.r1 + 1, target.kind === 'row' ? nr : 1) } },
     ]
     const colItems: PopItem[] = [
-      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => insertCols(q.c0, target.kind === 'col' ? nc : 1) },
-      { key: 'insertColRight', label: t('menu.insertColRight'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => insertCols(q.c1 + 1, target.kind === 'col' ? nc : 1) },
+      { key: 'insertColLeft', label: t('menu.insertColLeft'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => { lastCmd.current = { kind: 'insert', what: 'colLeft' }; insertCols(q.c0, target.kind === 'col' ? nc : 1) } },
+      { key: 'insertColRight', label: t('menu.insertColRight'), ...lock, ...(ro ? {} : several ? one : tooManyCols), onSelect: () => { lastCmd.current = { kind: 'insert', what: 'colRight' }; insertCols(q.c1 + 1, target.kind === 'col' ? nc : 1) } },
     ]
-    const delRow: PopItem = { key: 'deleteRow', label: t('menu.deleteRow', { n: nr }), danger: true, ...lock, ...(ro ? {} : allRows), onSelect: () => deleteRowsAt(several ? selRows : range(q.r0, q.r1)) }
-    const delCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: nc }), danger: true, ...lock, ...(ro ? {} : allCols), onSelect: () => deleteColsAt(several ? selCols : range(q.c0, q.c1)) }
+    const delRow: PopItem = { key: 'deleteRow', label: t('menu.deleteRow', { n: nr }), danger: true, ...lock, ...(ro ? {} : allRows), onSelect: () => { lastCmd.current = { kind: 'deleteRows' }; deleteRowsAt(several ? selRows : range(q.r0, q.r1)) } }
+    const delCol: PopItem = { key: 'deleteCol', label: t('menu.deleteCol', { n: nc }), danger: true, ...lock, ...(ro ? {} : allCols), onSelect: () => { lastCmd.current = { kind: 'deleteCols' }; deleteColsAt(several ? selCols : range(q.c0, q.c1)) } }
     const clearItem: PopItem = { key: 'clear', label: t('menu.clear'), kbd: 'Delete', ...lock, onSelect: () => clear(sel) }
     const commentItem: PopItem = { key: 'comment', label: t('comments.new'), kbd: mac ? '⌘⌥M' : 'Ctrl+Alt+M', onSelect: () => askComment() }
     const e = (k: string) => t(`format.edit.${k}`)
@@ -581,7 +621,9 @@ export function BlankSheet(p: BlankSheetProps) {
         { key: 'hideCols', label: e('hideCols'), ...lock, ...(ro ? {} : allCols), onSelect: () => viewOp('hideCols') },
         ...(hiddenNear('cols', q).length ? [{ key: 'unhideCols', label: e('unhideCols'), ...lock, onSelect: () => viewOp('unhideCols') }] : [])]
     } else {
-      items = [...clip, { kind: 'sep', key: 's1' }, commentItem, clearItem, { kind: 'sep', key: 's2' }, ...rowItems, ...colItems, { kind: 'sep', key: 's3' }, delRow, delCol]
+      const pickItem: PopItem = { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: 'Alt+↓', ...lock,
+        onSelect: () => { const row = vRows[target.r], col = vCols[target.c]; if (row && col) requestAnimationFrame(() => pickList({ key: row.id, ...row }, col.id, anchor, 'menu')) } }
+      items = [...clip, { kind: 'sep', key: 's1' }, commentItem, clearItem, pickItem, { kind: 'sep', key: 's2' }, ...rowItems, ...colItems, { kind: 'sep', key: 's3' }, delRow, delCol]
     }
     setMenu({ at, items, anchor })
   }
@@ -725,8 +767,20 @@ export function BlankSheet(p: BlankSheetProps) {
     onCommit: async (row, col, v) => {
       if (ro) return ro
       if (v.length > MAX_CELL) return t('err.too_long')
-      const ch = cellChange([{ rowId: row.id, colId: col, value: v }])
-      if (ch) applyR('edit', [ch])
+      // Spec 020: a typed value outside the cell's validation asks first (Stop, Warning or Information).
+      if (!validateTyped(row.id, col, v)) return null
+      // A leading apostrophe keeps a value as text ('007, '1/2): stored without the mark, the cell set to Text (tip 15).
+      const rule = ruleAt(row.id, col)
+      const forward: BlankChange[] = []
+      let val = rule ? listSpelling(rule, v) : v
+      if (val.startsWith("'") && val.length > 1) {
+        val = val.slice(1)
+        const before = index.get(formatKey(row.id, col)) ?? null
+        if (before?.num?.kind !== 'text') forward.push({ kind: 'formats', items: [{ rowKey: row.id, colKey: col, before, after: { ...(before ?? {}), num: { kind: 'text' } } }] })
+      }
+      const ch = cellChange([{ rowId: row.id, colId: col, value: val }])
+      if (ch) forward.unshift(ch)
+      if (forward.length) applyR('edit', forward)
       return null
     },
     onCancelDraft: () => {},
@@ -766,8 +820,24 @@ export function BlankSheet(p: BlankSheetProps) {
     multiline: true,
     writeCells,
     onUndo: p.onUndo,
-    onRedo: p.onRedo,
+    // Spec 020: Ctrl+Y with nothing to redo repeats the last action, as Excel.
+    onRedo: () => { if (p.canRedo === false) repeat(); else p.onRedo() },
     contextMenu,
+    fillInfo: from => fillInfo(from),
+    onFill,
+    onFillMenu,
+    onRepeat: () => repeat(),
+    onFlashFill: () => flashFill(),
+    pickList: (row, col, anchor, from) => pickList(row, col, anchor, from),
+    validation: (row, col) => {
+      const rule = ruleAt(row.id, col)
+      if (!rule) return null
+      return { dropdown: rule.allow === 'list' && rule.dropdown && !ro, input: rule.input && (rule.input.title || rule.input.msg) ? rule.input : null }
+    },
+    zoom: p.zoom,
+    onZoom: p.onZoom,
+    nowText,
+    controlLabels: { handle: tt('handle'), options: tt('fillOptions'), dropdown: tt('dropdown') },
     rowHeight: row => row.height ?? autoH.get(row.id) ?? null,
     onRowResize: (row, h) => { if (!ro) setHeights([row.id], h) },
     onSkipped: p.onSkipped,
@@ -1193,6 +1263,19 @@ export function BlankSheet(p: BlankSheetProps) {
 
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
+    // Spec 020: what F4 repeats (formatting, inserting, hiding, clearing formats).
+    if (REPEATABLE.has(cmd.kind) && !(cmd.kind === 'clear' && cmd.what === 'comments')) lastCmd.current = cmd
+    if (cmd.kind === 'goSpecial') { goSpecial(cmd.what, cmd.numbers, cmd.text); focusActive(); return }
+    if (cmd.kind === 'series') { series(cmd.spec, cmd.by); focusActive(); return }
+    if (cmd.kind === 'validation') { setValidation(cmd.rule, cmd.all); focusActive(); return }
+    if (cmd.kind === 'flashFill') { flashFill(); focusActive(); return }
+    if (cmd.kind === 'repeat') { repeat(); focusActive(); return }
+    if (cmd.kind === 'pickList') {
+      const el = rootRef.current?.querySelector<HTMLElement>('.fx-sheet-td.is-active')
+      const row = active ? vRows.find(r => r.id === active.key) : undefined
+      if (el && row && active) pickList({ key: row.id, ...row }, active.col, el, 'menu')
+      return
+    }
     // Formats go to every area (spec 017 FR-009); borders are drawn per area.
     if (cmd.kind === 'patch') applyItems(cmd.label, planAreas(a => planRect(index, a, size, rk, ck, cmd.patch)))
     else if (cmd.kind === 'borders') applyItems('borders', planAreas(a => planBorders(index, a, size, rk, ck, cmd.preset, cmd.line)))
@@ -1245,6 +1328,363 @@ export function BlankSheet(p: BlankSheetProps) {
     }
     focusActive()
   }
+  // ── spec 020: power tips (approved design power-tips-a) ─────────────────
+  const fillCtx: FillCtx = useMemo(() => ({ lists: p.fillLists ?? [], weekend: [5, 6] }), [p.fillLists])
+  const dirOf = (from: GridRect, to: GridRect): FillRequest['dir'] => (to.r1 > from.r1 ? 'down' : to.r0 < from.r0 ? 'up' : to.c1 > from.c1 ? 'right' : 'left')
+  const vertical = (d: FillRequest['dir']) => d === 'down' || d === 'up'
+  /** One line of the source block along the fill: a column going down or up, a row going right or left (read backwards going up or left). */
+  function lineOf(base: SheetDoc, from: GridRect, dir: FillRequest['dir'], k: number): { ids: [string, string][]; vals: string[] } {
+    const ids: [string, string][] = []
+    if (vertical(dir)) for (let r = from.r0; r <= from.r1; r++) { const row = vRows[r], col = vCols[k]; if (row && col) ids.push([row.id, col.id]) }
+    else for (let c = from.c0; c <= from.c1; c++) { const row = vRows[k], col = vCols[c]; if (row && col) ids.push([row.id, col.id]) }
+    if (dir === 'up' || dir === 'left') ids.reverse()
+    return { ids, vals: ids.map(([r, c]) => base.cells[r]?.[c] ?? '') }
+  }
+  /** The new cells of a fill along one line, nearest the source first. */
+  function targetsOf(from: GridRect, to: GridRect, dir: FillRequest['dir'], k: number): [string, string][] {
+    const out: [string, string][] = []
+    if (dir === 'down') for (let r = from.r1 + 1; r <= to.r1; r++) out.push([vRows[r]?.id, vCols[k]?.id] as [string, string])
+    if (dir === 'up') for (let r = from.r0 - 1; r >= to.r0; r--) out.push([vRows[r]?.id, vCols[k]?.id] as [string, string])
+    if (dir === 'right') for (let c = from.c1 + 1; c <= to.c1; c++) out.push([vRows[k]?.id, vCols[c]?.id] as [string, string])
+    if (dir === 'left') for (let c = from.c0 - 1; c >= to.c0; c--) out.push([vRows[k]?.id, vCols[c]?.id] as [string, string])
+    return out.filter(([r, c]) => r && c)
+  }
+  /** The line the drag's tip previews: the active cell's column (or row). */
+  const tipLine = (from: GridRect, dir: FillRequest['dir']) => {
+    const a = activeAt()
+    return vertical(dir) ? Math.min(from.c1, Math.max(from.c0, a.c)) : Math.min(from.r1, Math.max(from.r0, a.r))
+  }
+  function fillInfo(from: GridRect): FillInfo | null {
+    if (ro || !vRows.length) return null
+    const src = lineOf(doc, from, 'down', tipLine(from, 'down')).vals
+    return {
+      def: defaultMode(src, fillCtx),
+      modes: fillModesFor(src, fillCtx),
+      preview: (mode, to) => {
+        const d = dirOf(from, to)
+        const k = tipLine(from, d)
+        const n = vertical(d) ? (to.r1 - to.r0) - (from.r1 - from.r0) : (to.c1 - to.c0) - (from.c1 - from.c0)
+        return previewValue(lineOf(doc, from, d, k).vals, n, mode, fillCtx)
+      },
+    }
+  }
+  /** Data validation by the sheet's own row and column places (hidden rows too). */
+  const dvBoxes = useMemo(() => (extras.validations ?? []).map(v => {
+    const a = rowIndex.get(v.top), b = rowIndex.get(v.bottom), c = colIndex.get(v.left), d = colIndex.get(v.right)
+    if (a === undefined || b === undefined || c === undefined || d === undefined) return null
+    return { v, r0: Math.min(a, b), r1: Math.max(a, b), c0: Math.min(c, d), c1: Math.max(c, d) }
+  }).filter((x): x is { v: ValidationRecord; r0: number; r1: number; c0: number; c1: number } => !!x), [extras.validations, rowIndex, colIndex])
+  const ruleAt = useCallback((rowId: string, colId: string): ValidationRecord | null => {
+    if (!dvBoxes.length) return null
+    const r = rowIndex.get(rowId), c = colIndex.get(colId)
+    if (r === undefined || c === undefined) return null
+    return dvBoxes.find(b => r >= b.r0 && r <= b.r1 && c >= b.c0 && c <= b.c1)?.v ?? null
+  }, [dvBoxes, rowIndex, colIndex])
+  /** Values a rule (Error Alert: Stop) refuses are left out and counted; Warning and Information let them in. */
+  function checkList(list: { rowId: string; colId: string; value: string }[], skip: (k: string) => void) {
+    if (!dvBoxes.length) return list
+    return list.flatMap(x => {
+      const rule = ruleAt(x.rowId, x.colId)
+      if (!rule || rule.error?.style !== 'stop' || allowed(rule, x.value)) return [rule ? { ...x, value: listSpelling(rule, x.value) } : x]
+      skip('invalid')
+      return []
+    })
+  }
+
+  /** The changes a fill makes, worked out against `base` (Auto Fill Options works from before the last fill). */
+  function fillChanges(req: FillRequest, base: SheetDoc): { forward: BlankChange[]; skipped: number } {
+    const baseIndex = base === doc ? index : indexFormats(base.extras?.formats ?? [])
+    const val = (r: string, c: string) => base.cells[r]?.[c] ?? ''
+    let list: { rowId: string; colId: string; value: string }[] = []
+    const items: FormatItem[] = []
+    const forward: BlankChange[] = []
+    let skipped = 0
+    if (req.mode === 'clear') {
+      // Dragging back inside the block clears the cells it leaves (contents only, as Excel).
+      for (let r = req.from.r0; r <= req.from.r1; r++) for (let c = req.from.c0; c <= req.from.c1; c++) {
+        if (r >= req.to.r0 && r <= req.to.r1 && c >= req.to.c0 && c <= req.to.c1) continue
+        const row = vRows[r], col = vCols[c]
+        if (row && col && val(row.id, col.id)) list.push({ rowId: row.id, colId: col.id, value: '' })
+      }
+    } else {
+      const dir = req.dir
+      const lines = vertical(dir) ? range(req.from.c0, req.from.c1) : range(req.from.r0, req.from.r1)
+      // Shift+drag inserts rows (down) or columns (right) for the fill, instead of writing over what's there.
+      let made: { id: string; position: number }[] = []
+      const n = vertical(dir) ? req.to.r1 - req.to.r0 - (req.from.r1 - req.from.r0) : req.to.c1 - req.to.c0 - (req.from.c1 - req.from.c0)
+      if (req.insert && (dir === 'down' || dir === 'right')) {
+        if (dir === 'down') { made = insertAt(base.rows, docRow(req.from.r1 + 1), n, p.newId); forward.push({ kind: 'insertRows', rows: made.map(r => ({ ...r, height: null })) }) }
+        else { made = insertAt(base.cols, docCol(req.from.c1 + 1), n, p.newId); forward.push({ kind: 'insertCols', cols: made.map(c => ({ ...c, width: null })) }) }
+      }
+      for (const k of lines) {
+        const src = lineOf(base, req.from, dir, k)
+        const tgts = made.length
+          ? made.map(x => (dir === 'down' ? [x.id, vCols[k]?.id] : [vRows[k]?.id, x.id]) as [string, string]).filter(([r, c]) => r && c)
+          : targetsOf(req.from, req.to, dir, k)
+        const mode: FillMode = req.mode === 'flash' ? 'copy' : req.mode
+        const vals = planSeries(src.vals, tgts.length, mode, fillCtx)
+        tgts.forEach(([rid, cid], i) => {
+          const v = vals[i]
+          if (v !== null && v !== undefined && v !== val(rid, cid)) list.push({ rowId: rid, colId: cid, value: v })
+          // Formats come along unless asked not to (Fill Without Formatting).
+          if (mode !== 'values') {
+            const [sr, sc] = src.ids[i % src.ids.length] ?? []
+            if (!sr) return
+            const before = baseIndex.get(formatKey(rid, cid)) ?? null, after = baseIndex.get(formatKey(sr, sc)) ?? null
+            if (JSON.stringify(before) !== JSON.stringify(after)) items.push({ rowKey: rid, colKey: cid, before, after })
+          }
+        })
+      }
+      list = checkList(list, () => { skipped++ })
+    }
+    const cells = list.map(x => ({ rowId: x.rowId, colId: x.colId, before: val(x.rowId, x.colId), after: x.value })).filter(x => x.before !== x.after || made(x))
+    function made(x: { rowId: string; colId: string }) { return forward.some(f => (f.kind === 'insertRows' && f.rows.some(r => r.id === x.rowId)) || (f.kind === 'insertCols' && f.cols.some(c => c.id === x.colId))) }
+    if (cells.length) forward.push({ kind: 'cells', cells })
+    if (items.length) forward.push({ kind: 'formats', items })
+    return { forward, skipped }
+  }
+  /** The last fill, so Auto Fill Options can put it back and fill another way. */
+  const lastFill = useRef<{ base: SheetDoc; applied: boolean } | null>(null)
+  function onFill(req: FillRequest, again: boolean) {
+    if (ro) { p.onNotice(ro); return }
+    if (req.mode === 'flash') { if (again && lastFill.current?.applied) p.onUndo(); flashFill(vertical(req.dir) ? req.to.c0 : activeAt().c); return }
+    let base = doc
+    if (again && lastFill.current) { base = lastFill.current.base; if (lastFill.current.applied) p.onUndo() }
+    if (req.insert && (req.dir === 'down' ? doc.rows.length + (req.to.r1 - req.from.r1) > BLANK_ROW_LIMIT : req.dir === 'right' && doc.cols.length + (req.to.c1 - req.from.c1) > BLANK_COL_LIMIT)) { p.onNotice(t(req.dir === 'down' ? 'err.too_many_rows' : 'err.too_many_cols')); return }
+    const { forward, skipped } = fillChanges(req, base)
+    if (forward.length) applyR(req.mode === 'clear' ? 'clear' : 'fill', forward)
+    lastFill.current = req.mode === 'clear' ? null : { base, applied: forward.length > 0 }
+    if (skipped) p.onSkipped({ invalid: skipped })
+    lastCmd.current = null
+  }
+  const [fillMenu, setFillMenu] = useState<{ at: { x: number; y: number }; anchor: HTMLElement; items: PopItem[]; label: string } | null>(null)
+  function onFillMenu(f: FillRequest, at: { x: number; y: number }, anchor: HTMLElement, kind: 'right' | 'options' | 'flash', run: (mode: FillMode) => void) {
+    if (kind === 'flash') {
+      const n = flashDone.current?.n ?? 0
+      setFillMenu({ at, anchor, label: tt('flashOptions'), items: [
+        { key: 'undo', label: tt('flashUndo'), onSelect: () => { p.onUndo(); flashDone.current = null } },
+        { key: 'accept', label: tt('flashAccept'), onSelect: () => { flashDone.current = null } },
+        { key: 'select', label: tt('flashSelect', { n }), onSelect: () => { const q = flashDone.current?.rect; if (q) setSelectRect({ ...q }) } },
+      ] })
+      return
+    }
+    // Auto Fill Options reads the source as it was before the fill it replaces; the right-drag menu, as it is now.
+    const src = lineOf(kind === 'options' ? lastFill.current?.base ?? doc : doc, f.from, f.dir, tipLine(f.from, f.dir)).vals
+    const kindOf = sourceKind(src, fillCtx)
+    const can = new Set<FillMode>(fillModesFor(src, fillCtx))
+    const item = (mode: FillMode, extra: Partial<PopItem> = {}): PopItem => ({ key: mode, label: tt(`fill.${mode}`), checked: kind === 'options' ? f.mode === mode : undefined, ...extra, onSelect: () => run(mode) } as PopItem)
+    const dates: PopItem[] = (['days', 'weekdays', 'months', 'years'] as FillMode[]).map(m => item(m, can.has(m) ? {} : { disabled: true }))
+    const items: PopItem[] = kind === 'right'
+      ? [item('copy'), item('series'), item('formats'), item('values'), { kind: 'sep', key: 's1' }, ...dates, { kind: 'sep', key: 's2' },
+          item('linear', kindOf === 'number' ? {} : { disabled: true }), item('growth', kindOf === 'number' ? {} : { disabled: true }),
+          item('flash', { kbd: keyLabel('Ctrl+E') }), { kind: 'sep', key: 's3' },
+          { key: 'seriesDlg', label: `${tt('fill.seriesDlg')}…`, onSelect: () => { setSelectRect({ ...f.to }); requestAnimationFrame(() => document.dispatchEvent(new CustomEvent(SERIES_OPEN))) } }]
+      : [item('copy'), item('series'), item('formats'), item('values'),
+          ...(kindOf === 'date' ? [{ kind: 'sep', key: 's1' } as PopItem, ...dates.filter(x => !('disabled' in x && x.disabled))] : []),
+          { kind: 'sep', key: 's2' }, item('flash', { kbd: keyLabel('Ctrl+E') })]
+    setFillMenu({ at, anchor, items, label: tt(kind === 'right' ? 'fillMenu' : 'fillOptions') })
+  }
+  const keyLabel = (k: string) => (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? k.replace('Ctrl+', '⌘') : k)
+
+  // ── Flash Fill (Ctrl+E, tip 14) ──
+  const [optionsAt, setOptionsAt] = useState<{ to: GridRect; n: number } | null>(null)
+  const flashDone = useRef<{ n: number; rect: GridRect } | null>(null)
+  function flashFill(targetC?: number) {
+    if (ro) { p.onNotice(ro); return }
+    const a = activeAt(), c = targetC ?? a.c
+    const g = region(a.r, c)
+    const srcCols = range(g.c0, g.c1).filter(x => x !== c)
+    if (!srcCols.length) { p.onNotice(tt('flashNone')); return }
+    const srcOf = (r: number) => srcCols.map(x => value(vRows[r].id, vCols[x].id))
+    const examples: { row: string[]; out: string }[] = [], todo: number[] = []
+    for (let r = g.r0; r <= g.r1; r++) {
+      const v = value(vRows[r].id, vCols[c].id)
+      if (v) examples.push({ row: srcOf(r), out: v })
+      else if (srcOf(r).some(Boolean)) todo.push(r)
+    }
+    // A header row isn't an example: one whose output can't be built from its own row is left out.
+    const usable = examples.filter(ex => learnFlash([ex], [ex.row])?.[0] === ex.out)
+    if (!usable.length || !todo.length) { p.onNotice(tt('flashNone')); return }
+    const outs = learnFlash(usable, todo.map(srcOf))
+    if (!outs) { p.onNotice(tt('flashNone')); return }
+    const ch = cellChange(todo.map((r, i) => ({ rowId: vRows[r].id, colId: vCols[c].id, value: outs[i] })).filter(x => x.value))
+    if (!ch || ch.kind !== 'cells') { p.onNotice(tt('flashNone')); return }
+    applyR('flashFill', [ch])
+    const rect = { r0: Math.min(...todo), c0: c, r1: Math.max(...todo), c1: c }
+    flashDone.current = { n: ch.cells.length, rect }
+    lastFill.current = { base: doc, applied: true }
+    setSelectRect(rect)
+    setOptionsAt({ to: rect, n: Date.now() })
+    statusAt.current = Date.now()
+    p.onStatus?.(tt('flashChanged', { n: ch.cells.length }))
+  }
+
+  // ── Go To Special (F5 › Special…, tip 9) ──
+  const [goAreas, setGoAreas] = useState<GridRect[] | null>(null)
+  function goSpecial(what: GoSpecial, numbers = true, text = true) {
+    const q = rectRef.current
+    const multiCell = areasRef.current.length > 1 || q.r0 !== q.r1 || q.c0 !== q.c1
+    // Within the selection when it's more than one cell, as Excel; otherwise the used range.
+    const used = (() => {
+      let r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1
+      vRows.forEach((row, r) => { const cells = doc.cells[row.id]; if (!cells) return; vCols.forEach((col, c) => { if (cells[col.id]) { r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c) } }) })
+      return r1 < 0 ? null : { r0, r1, c0, c1 }
+    })()
+    const scope: GridRect[] = multiCell ? areasRef.current : used ? [used] : []
+    const pick: { r: number; c: number }[] = []
+    const each = (f: (r: number, c: number, v: string) => boolean) => { for (const { r, c } of unionCells(scope)) { const row = vRows[r], col = vCols[c]; if (row && col && f(r, c, value(row.id, col.id))) pick.push({ r, c }) } }
+    const a = activeAt()
+    switch (what) {
+      case 'blanks': each((_r, _c, v) => v === ''); break
+      case 'constants': each((_r, _c, v) => v !== '' && (parseNumber(v) !== null ? numbers : text)); break
+      case 'notes': each((r, c) => marks.has(`${vRows[r].id}|${vCols[c].id}`)); break
+      case 'conditional': each((r, c) => ruleLooks.has(`${vRows[r].id}|${vCols[c].id}`) || rules.some(x => x.range.cols.includes(vCols[c].id) && (x.range.rows === 'all' || x.range.rows.includes(vRows[r].id)))); break
+      case 'validation': case 'validationSame': {
+        const mine = active ? ruleAt(active.key, active.col) : null
+        const all: GridRect = { r0: 0, c0: 0, r1: vRows.length - 1, c1: vCols.length - 1 }
+        for (const { r, c } of unionCells(multiCell ? areasRef.current : [all])) { const v = ruleAt(vRows[r].id, vCols[c].id); if (v && (what === 'validation' || v.id === mine?.id)) pick.push({ r, c }) }
+        break
+      }
+      case 'region': { const g = region(a.r, a.c); setSelectRect(g); return }
+      case 'lastCell': { if (used) setSelectRect({ r0: used.r1, c0: used.c1, r1: used.r1, c1: used.c1 }); return }
+      case 'visible': setGoAreas([...areasRef.current]); return
+      case 'rowDiffs': case 'colDiffs': {
+        // Cells that differ from the active column's cell in their row (or the active row's cell in their column).
+        for (const { r, c } of unionCells(areasRef.current)) {
+          const ref = what === 'rowDiffs' ? value(vRows[r].id, vCols[a.c].id) : value(vRows[a.r].id, vCols[c].id)
+          if (value(vRows[r].id, vCols[c].id) !== ref) pick.push({ r, c })
+        }
+        break
+      }
+    }
+    if (!pick.length) { p.onNotice(tt('goNone')); return }
+    const folded = foldCells(pick)
+    if (!folded) { p.onNotice(tt('goTooMany')); return }
+    setGoAreas(folded)
+  }
+
+  // ── Series… (Home › Fill › Series, tip 104) ──
+  function series(spec: SeriesSpec, by: 'rows' | 'cols') {
+    if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
+    const q = rectRef.current
+    const list: { rowId: string; colId: string; value: string }[] = []
+    const lines = by === 'cols' ? range(q.c0, q.c1) : range(q.r0, q.r1)
+    for (const k of lines) {
+      const cellsIn: [string, string][] = by === 'cols' ? range(q.r0, q.r1).map(r => [vRows[r].id, vCols[k].id]) : range(q.c0, q.c1).map(c => [vRows[k].id, vCols[c].id])
+      const first = value(cellsIn[0][0], cellsIn[0][1])
+      if (!first) continue
+      // Without a stop value the selection is filled; with one, as far as the selection allows or the stop is reached.
+      const vals = planSeriesDialog(first, cellsIn.length - 1, spec, fillCtx)
+      vals.forEach((v, i) => list.push({ rowId: cellsIn[i + 1][0], colId: cellsIn[i + 1][1], value: v }))
+    }
+    let skipped = 0
+    const ch = cellChange(checkList(list, () => { skipped++ }))
+    if (ch) applyR('series', [ch])
+    if (skipped) p.onSkipped({ invalid: skipped })
+    if (!ch) p.onNotice(tt('seriesNone'))
+  }
+
+  // ── repeat (F4, tip 93) ──
+  type Repeatable = FormatCmd | { kind: 'deleteRows' } | { kind: 'deleteCols' }
+  const lastCmd = useRef<Repeatable | null>(null)
+  const REPEATABLE = new Set(['patch', 'borders', 'merge', 'paint', 'clear', 'cellStyle', 'insert', 'view'])
+  function repeat() {
+    const c = lastCmd.current
+    if (!c) { p.onNotice(tt('repeatNone')); return }
+    if (c.kind === 'deleteRows' || c.kind === 'deleteCols') {
+      const q = rectRef.current
+      if (c.kind === 'deleteRows') { if (q.r1 - q.r0 + 1 >= vRows.length) { p.onNotice(t('menu.keepOneRow')); return } deleteRowsAt(range(q.r0, q.r1)) }
+      else { if (q.c1 - q.c0 + 1 >= vCols.length) { p.onNotice(t('menu.keepOneCol')); return } deleteColsAt(range(q.c0, q.c1)) }
+      return
+    }
+    runFormat(c)
+  }
+
+  // ── data validation (Data › Data Validation…, tip 18) ──
+  const [dvAsk, setDvAsk] = useState<{ run(): void } | null>(null)
+  const [alert, setAlert] = useState<{ rule: ValidationRecord; rowId: string; colId: string; value: string } | null>(null)
+  const [editAgain, setEditAgain] = useState<{ key: string; col: string; value: string; n: number } | null>(null)
+  /** Validation rules after rows or columns go: a rule whose edge goes keeps its other cells; one fully gone goes too. */
+  function validationsAfter(kind: 'rows' | 'cols', goneIds: Set<string>): BlankChange[] {
+    const list = extras.validations ?? []
+    if (!list.length) return []
+    const all = kind === 'rows' ? doc.rows : doc.cols, idx = kind === 'rows' ? rowIndex : colIndex
+    const [a, b] = kind === 'rows' ? ['top', 'bottom'] as const : ['left', 'right'] as const
+    let changed = false
+    const after = list.flatMap(v => {
+      if (!goneIds.has(v[a]) && !goneIds.has(v[b])) return [v]
+      const i0 = idx.get(v[a]) ?? 0, i1 = idx.get(v[b]) ?? 0
+      const kept = all.slice(Math.min(i0, i1), Math.max(i0, i1) + 1).filter(x => !goneIds.has(x.id))
+      changed = true
+      return kept.length ? [{ ...v, [a]: kept[0].id, [b]: kept[kept.length - 1].id }] : []
+    })
+    return changed ? [{ kind: 'validations', before: list, after }] : []
+  }
+  function setValidation(rule: ValidationRule | null, all: boolean) {
+    if (ro) { p.onNotice(ro); return }
+    if (oneArea()) return
+    const list = extras.validations ?? []
+    const q = rectRef.current
+    const mine = active ? ruleAt(active.key, active.col) : null
+    // "Apply these changes to all other cells with the same settings": the rule's whole range.
+    if (all && mine) {
+      const after = rule ? list.map(v => (v.id === mine.id ? { ...v, ...rule } : v)) : list.filter(v => v.id !== mine.id)
+      applyR('validation', [{ kind: 'validations', before: list, after }])
+      return
+    }
+    const d0 = rowIndex.get(vRows[q.r0].id) ?? 0, d1 = rowIndex.get(vRows[q.r1].id) ?? 0, e0 = colIndex.get(vCols[q.c0].id) ?? 0, e1 = colIndex.get(vCols[q.c1].id) ?? 0
+    const sel = { r0: d0, r1: d1, c0: e0, c1: e1 }
+    const hit = dvBoxes.filter(b => overlaps(b, sel))
+    const inside = (b: typeof hit[number]) => b.r0 >= d0 && b.r1 <= d1 && b.c0 >= e0 && b.c1 <= e1
+    const run = () => {
+      const gone = new Set(hit.map(b => b.v.id))
+      const kept = list.filter(v => !gone.has(v.id))
+      const after = rule ? [...kept, { id: p.newId(), top: vRows[q.r0].id, bottom: vRows[q.r1].id, left: vCols[q.c0].id, right: vCols[q.c1].id, ...rule }] : kept
+      if (after.length > 200) { p.onNotice(t('err.too_many_validations')); return }
+      applyR('validation', [{ kind: 'validations', before: list, after }])
+    }
+    // A rule that reaches outside the selection is replaced as a whole: ask first.
+    if (rule && hit.some(b => !inside(b))) { setDvAsk({ run }); return }
+    run()
+  }
+  /** Alt+↓ or the ▾: the cell's list (validation), or the column's values (Pick From Drop-down List). */
+  const [pick, setPick] = useState<{ at: { x: number; y: number }; anchor: HTMLElement; items: PopItem[]; label: string } | null>(null)
+  function pickList(row: Row, col: string, anchor: HTMLElement, from: 'keys' | 'button' | 'menu'): boolean {
+    const rule = ruleAt(row.id, col)
+    const cur = value(row.id, col)
+    let values: string[]
+    if (rule && rule.allow === 'list') values = rule.values ?? []
+    else {
+      if (from === 'button') return false
+      const seen = new Map<string, string>()
+      for (const r of vRows) { const v = value(r.id, col).trim(); if (v && r.id !== row.id && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v) }
+      values = [...seen.values()].sort((a, b) => a.localeCompare(b, locale, { numeric: true, sensitivity: 'base' })).slice(0, 500)
+      if (!values.length) { p.onNotice(tt('pickNone')); return true }
+    }
+    const b = anchor.closest('[data-cell]')?.getBoundingClientRect() ?? anchor.getBoundingClientRect()
+    const rtlCell = getComputedStyle(anchor).direction === 'rtl'
+    setPick({
+      at: { x: rtlCell ? b.right : b.left, y: b.bottom + 2 }, anchor, label: rule ? (rule.input?.title || tt('pickLabel')) : tt('pickLabel'),
+      items: values.map(v => ({ key: v, label: v, checked: !!rule && v.toLowerCase() === cur.trim().toLowerCase() ? true : rule ? false : undefined, onSelect: () => {
+        const ch = cellChange([{ rowId: row.id, colId: col, value: v }])
+        if (ch) applyR('edit', [ch])
+      } })),
+    })
+    return true
+  }
+  /** A typed value against the cell's rule: true when it may go in; otherwise the alert asks. */
+  function validateTyped(rowId: string, colId: string, v: string): boolean {
+    const rule = ruleAt(rowId, colId)
+    if (!rule || allowed(rule, v)) return true
+    setAlert({ rule, rowId, colId, value: v })
+    return false
+  }
+  function nowText(kind: 'date' | 'time') {
+    const d = new Date(), p2 = (n: number) => String(n).padStart(2, '0')
+    return kind === 'date' ? `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}` : `${p2(d.getHours())}:${p2(d.getMinutes())}`
+  }
+
   const activeRow = active ? rowIndex.get(active.key) : undefined, activeCol = active ? colIndex.get(active.col) : undefined
   const fmtState: FormatState | null = active && activeRow !== undefined && activeCol !== undefined ? {
     source: 'blank',
@@ -1269,6 +1709,28 @@ export function BlankSheet(p: BlankSheetProps) {
     filter: { on: !!fArea, cols: Object.values(filter).filter(filterOn).length },
     ...(() => { const si = sortInfo(); return { sortCols: si.cols, sortHeader: si.header } })(),
     rules: [...rules].sort((x, y) => x.priority - y.priority).map(r => ({ ...r, where: whereOf(r) })),
+    ...(() => {
+      const mine = ruleAt(active.key, active.col)
+      const q = rectRef.current
+      // Mixed: the selection reaches a rule other than the active cell's, or (with a rule) cells outside it.
+      let mixed = false
+      if (dvBoxes.length && (q.r0 !== q.r1 || q.c0 !== q.c1)) {
+        const d0 = rowIndex.get(vRows[q.r0]?.id ?? '') ?? 0, d1 = rowIndex.get(vRows[q.r1]?.id ?? '') ?? 0
+        const e0 = colIndex.get(vCols[q.c0]?.id ?? '') ?? 0, e1 = colIndex.get(vCols[q.c1]?.id ?? '') ?? 0
+        const sel = { r0: d0, r1: d1, c0: e0, c1: e1 }
+        const hits = dvBoxes.filter(b => overlaps(b, sel))
+        const mineBox = mine ? dvBoxes.find(b => b.v.id === mine.id) : null
+        mixed = hits.some(b => b.v.id !== mine?.id) || (!!mineBox && !(mineBox.r0 <= d0 && mineBox.r1 >= d1 && mineBox.c0 <= e0 && mineBox.c1 >= e1)) || (!mine && hits.length > 0)
+      }
+      // Custom Lists › Import: the selection's values in order (filled cells only, at most 200).
+      const selValues: string[] = []
+      for (let r = q.r0; r <= q.r1 && selValues.length < 200; r++) {
+        const row = vRows[r], cells = row ? doc.cells[row.id] : undefined
+        if (!cells) continue
+        for (let c = q.c0; c <= q.c1 && selValues.length < 200; c++) { const v = (cells[vCols[c]?.id ?? ''] ?? '').trim(); if (v) selValues.push(v) }
+      }
+      return { validation: mine, validationMixed: mixed, validationOff: null, selValues, goSpecial: ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'conditional', 'validation', 'validationSame', 'rowDiffs', 'colDiffs'] as GoSpecial[] }
+    })(),
   } : null
   useFormatBridge('blank', true, fmtState, runFormat)
   // Spec 015 comments: corner markers, and selecting a cell from the panel or a link.
@@ -1320,7 +1782,31 @@ export function BlankSheet(p: BlankSheetProps) {
     <>
     {contentBar}
     <div ref={rootRef} className={`fx-sheet-scroll fx-sh-blank${content ? ' is-content' : ''}`} data-blank-sheet={doc.id} data-look={look} data-protected={ro ? '' : undefined}>
-      <GridCore model={model} active={active} setActive={setActiveCell} editDraft={null} notes={notes} onNote={onNote} selectRect={selectRect} />
+      <GridCore model={model} active={active} setActive={setActiveCell} editDraft={null} notes={notes} onNote={onNote} selectRect={selectRect}
+                selectAreas={goAreas} editAgain={editAgain} optionsAt={optionsAt} />
+      {fillMenu && (
+        <PopMenu key={`fill-${fillMenu.label}`} at={fillMenu.at} items={fillMenu.items} label={fillMenu.label} attr="data-fill-menu"
+                 onClose={() => { setFillMenu(null); focusActive() }} />
+      )}
+      {pick && (
+        <PopMenu key="pick" at={pick.at} items={pick.items} label={pick.label} attr="data-pick-list"
+                 onClose={() => { setPick(null); focusActive() }} />
+      )}
+      {dvAsk && (
+        <ConfirmDialog attr="data-dv-replace" title={tt('dv.replaceTitle')} body={tt('dv.replaceBody')} ok={tt('dv.replaceOk')} cancel={tt('cancel')}
+                       onCancel={() => { setDvAsk(null); focusActive() }} onOk={() => { const run = dvAsk.run; setDvAsk(null); run(); focusActive() }} />
+      )}
+      {alert && (
+        <ValidationAlert rule={alert.rule} value={alert.value}
+          onAnswer={a => {
+            const x = alert
+            setAlert(null)
+            // Retry / No: back into the cell with what was typed. Yes / OK: in it goes. Cancel: nothing changes.
+            if (a === 'retry') { setEditAgain({ key: x.rowId, col: x.colId, value: x.value, n: Date.now() }); return }
+            if (a === 'accept') { const ch = cellChange([{ rowId: x.rowId, colId: x.colId, value: x.value }]); if (ch) applyR('edit', [ch]) }
+            focusActive()
+          }} />
+      )}
       {mergeAsk && (
         <ConfirmDialog attr="data-merge-warn" title={t('format.merge.warnTitle')} body={t('format.merge.warnBody', { value: mergeAsk.value })}
                        ok={t('format.merge.warnGo')} cancel={t('format.merge.cancel')}

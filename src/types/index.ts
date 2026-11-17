@@ -445,6 +445,8 @@ export interface SheetChanges {
   /** Stage 3: conditional formatting rules put (whole records) or removed; tables likewise (blank sheets only). */
   rules?: { put?: ConditionalRule[]; remove?: string[] }
   tables?: { put?: SheetTableRecord[]; remove?: string[] }
+  /** Spec 020: data validation rules put (whole records) or removed (blank sheets only). */
+  validations?: { put?: ValidationRecord[]; remove?: string[] }
   /** Stage 3: Sort moves rows by rewriting their positions. */
   rowPositions?: { id: string; position: number }[]
   /** Spec 019: dragging a column rewrites its position. */
@@ -646,6 +648,31 @@ export interface TaskFieldWrite { rowId: string; field: TaskField; value: string
 export interface TaskFieldResult { rowId: string; field: TaskField; ok: boolean; reason?: string; shown?: string; celebrate?: boolean; stageLabel?: string }
 
 export interface SheetTableRecord { id: string; top: string; left: string; bottom: string; right: string; style: string; header: boolean; banded: boolean }
+
+/**
+ * Spec 020 (tip 18): Data › Data Validation…, as Excel's three tabs. The range
+ * is by row and column ids, like a merge. `allow` 'any' keeps only the input
+ * message. Values are checked when typed, pasted, filled or moved.
+ */
+export type ValidationAllow = 'any' | 'whole' | 'decimal' | 'list' | 'date' | 'time' | 'length'
+export type ValidationOp = 'between' | 'notBetween' | 'eq' | 'ne' | 'gt' | 'lt' | 'ge' | 'le'
+export interface ValidationRule {
+  allow: ValidationAllow
+  op?: ValidationOp
+  /** Bounds (numbers, dates or times as typed), for every kind but list and any. */
+  a?: string
+  b?: string
+  /** The list's items, in order (1–100, each 1–80 characters). */
+  values?: string[]
+  ignoreBlank: boolean
+  /** List: show the ▾ beside the selected cell. */
+  dropdown: boolean
+  /** Input Message tab: shown beside the cell when it's selected; null = off. */
+  input: { title: string; msg: string } | null
+  /** Error Alert tab: null = off (anything may be typed). */
+  error: { style: 'stop' | 'warning' | 'info'; title: string; msg: string } | null
+}
+export interface ValidationRecord extends ValidationRule { id: string; top: string; left: string; bottom: string; right: string }
 /** Formatting, merges, view and thread summaries for one sheet (blank or linked). */
 export interface SheetExtras {
   formats: SheetFormatRecord[]
@@ -655,6 +682,8 @@ export interface SheetExtras {
   /** Stage 3. */
   rules?: ConditionalRule[]
   tables?: SheetTableRecord[]
+  /** Spec 020: data validation. */
+  validations?: ValidationRecord[]
   /** Spec 016: the column mapping, each linked row's task, and those tasks' values. */
   taskMap?: SheetTaskMap | null
   rowTasks?: Record<string, string>

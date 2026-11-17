@@ -515,6 +515,9 @@ model WorkspaceSettings {
   complexity_threshold_days Decimal   @default(3) @db.Decimal(4, 1)
   /// Whose row receives supervision overhead. A role, never a named person.
   supervising_role          String    @default("Marketing Manager")
+  /// Spec 020 (tip 17): the workspace's own fill-handle lists (Custom Lists),
+  /// as { id, name, items }[]. Admins edit them; every member's fill uses them.
+  fill_lists                Json      @default("[]")
 
   updated_at DateTime @default(now()) @db.Timestamptz(6)
 
@@ -822,6 +825,7 @@ model Sheet {
   comments  SheetComment[]
   rules     SheetRule[]
   tables    SheetTable[]
+  validations SheetValidation[]
 
   @@index([folder_id, position])
   @@map("sheets")
@@ -954,6 +958,25 @@ model SheetTable {
 
   @@index([sheet_id])
   @@map("sheet_tables")
+}
+
+/// Spec 020 (tip 18): Data › Data Validation… on a blank sheet. The range is
+/// by row and column ids, like sheet_merges; `rule` holds Excel's three tabs
+/// (Settings, Input Message, Error Alert) as ValidationRule.
+model SheetValidation {
+  id         String   @id @db.Uuid
+  sheet_id   String   @db.Uuid
+  top_row    String   @db.Uuid
+  bottom_row String   @db.Uuid
+  left_col   String   @db.Uuid
+  right_col  String   @db.Uuid
+  rule       Json
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  sheet Sheet @relation(fields: [sheet_id], references: [id], onDelete: Cascade)
+
+  @@index([sheet_id])
+  @@map("sheet_validations")
 }
 
 /// Spec 015 R5: threaded comments on a cell. A thread is its first comment

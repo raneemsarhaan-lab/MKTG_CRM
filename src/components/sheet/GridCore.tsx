@@ -35,6 +35,7 @@ import { parseClipboard, pastePlan, serialise, toGrid, toStyles } from '@/lib/sh
 import { edge as dataEdge, subtract, unionCells, copyLayout, MAX_AREAS } from '@/lib/sheet-selection'
 import type { CellCss } from '@/lib/sheet-format'
 import type { CellStyle } from '@/types/index'
+import type { FillMode } from '@/lib/sheet-fill'
 
 export type GridCol = string
 export interface ActiveCell { key: string; col: GridCol }
@@ -45,7 +46,7 @@ export interface CellWrite {
   /** Spec 015: the pasted cell's look (null = none); absent for a text paste, which leaves formatting alone. */
   style?: CellStyle | null
 }
-export type WriteWhy = 'paste' | 'clear' | 'cut'
+export type WriteWhy = 'paste' | 'clear' | 'cut' | 'fill'
 /** What a write didn't change, by reason (shown under the toolbar, FR-025). */
 export type WriteResult = { skipped: Partial<Record<string, number>> } | null
 
@@ -57,6 +58,10 @@ export type MenuTarget =
 export interface GridRect { r0: number; c0: number; r1: number; c1: number }
 /** Spec 017: what the grid can refuse with several areas. */
 export type AreasNotice = 'cantCopy' | 'cantCut' | 'pasteBlock' | 'max'
+/** Spec 020: a fill from one block into a larger one (the fill handle), or a drag back that clears. */
+export interface FillRequest { from: GridRect; to: GridRect; mode: FillMode | 'clear'; insert: boolean; dir: 'down' | 'up' | 'right' | 'left' }
+/** Spec 020: what a fill from this block can do, for the drag's tip and the menus. */
+export interface FillInfo { def: 'copy' | 'series'; modes: FillMode[]; preview(mode: FillMode, to: GridRect): string }
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 /** Ctrl+click on Windows and Linux, Cmd+click on a Mac (where Ctrl+click is the menu). */
 const addKey = (e: { ctrlKey: boolean; metaKey: boolean }) => (IS_MAC ? e.metaKey : e.ctrlKey || e.metaKey)
@@ -170,6 +175,29 @@ export interface GridModel<R extends { key: string }> {
   /** Spec 015 stage 2: Freeze Panes. The first N rows and columns stay in view while scrolling. */
   frozenRows?: number
   frozenCols?: number
+
+  // ── spec 020 ──
+  /** The fill handle: what a fill from `from` toward `dir` can do; null = no handle here. */
+  fillInfo?(from: GridRect, dir: FillRequest['dir']): FillInfo | null
+  /** A fill (drag, double-click), or Auto Fill Options' pick (`again` replaces the last fill). */
+  onFill?(f: FillRequest, again: boolean): void
+  /** The right-drag menu and the Auto Fill Options button: the host shows its menu here. */
+  onFillMenu?(f: FillRequest, at: { x: number; y: number }, anchor: HTMLElement, kind: 'right' | 'options' | 'flash', run: (mode: FillMode) => void): void
+  /** F4 (and Ctrl+Y with nothing to redo, decided by the host): repeat the last action. */
+  onRepeat?(): void
+  /** Ctrl+E: Flash Fill the active column. */
+  onFlashFill?(): void
+  /** Alt+↓ on a text cell, or a click on the validation ▾: the host opens its list. True when handled. */
+  pickList?(row: R, col: GridCol, anchor: HTMLElement, from: 'keys' | 'button'): boolean
+  /** A validated cell: show the ▾ beside it when selected (a list with In-cell dropdown), and its input message. */
+  validation?(row: R, col: GridCol): { dropdown: boolean; input: { title: string; msg: string } | null } | null
+  /** The grid's zoom (1 = 100%); Ctrl+wheel and Ctrl+= / − / 0 ask for another (50%–200%). */
+  zoom?: number
+  onZoom?(z: number): void
+  /** What Ctrl+; and Ctrl+Shift+; type (today's date, the time), in the sheet's style. */
+  nowText?(kind: 'date' | 'time'): string
+  /** Names for the grid's own controls (the fill handle, Auto Fill Options, the validation ▾). */
+  controlLabels?: { handle: string; options: string; dropdown: string }
 }
 
 export interface GridCoreProps<R extends { key: string }> {
@@ -182,9 +210,23 @@ export interface GridCoreProps<R extends { key: string }> {
   onNote(cellKey: string, note: string | null): void
   /** Select this block after the next render (a paste's result). */
   selectRect?: GridRect | null
+  /** Spec 020: select these areas after the next render (Go To Special's result). */
+  selectAreas?: GridRect[] | null
+  /** Spec 020: edit this cell again with this text (a validation alert's Retry); `n` makes each ask new. */
+  editAgain?: { key: string; col: GridCol; value: string; n: number } | null
+  /** Spec 020: show the options button for this block (Flash Fill Options), until the next action. */
+  optionsAt?: { to: GridRect; n: number } | null
 }
 
 export const cellKey = (rowKey: string, col: GridCol) => `${rowKey}|${col}`
+/** Spec 020: the workbook's zoom for the open sheet, for grids it doesn't render (the Content and Video sheets). */
+export const ZOOM_EVENT = 'momentum:sheet-zoom'
+/** The zoom as the workbook last set it (a linked grid that mounts later reads it here), and how to change it. */
+export const zoomBus: { z: number; set: ((z: number) => void) | null } = { z: 1, set: null }
+/** The workspace's custom lists for the fill handle, as the workbook loaded them. */
+export const tipsBus: { lists: string[][] } = { lists: [] }
+/** A linked grid's status-bar news: the mode text (undefined = unchanged, null = Ready) and the selection's figures. */
+export const STATUS_EVENT = 'momentum:sheet-status'
 
 export const ROW_H = 24
 /** Rows beyond which only the visible part is rendered (R7). */
@@ -208,7 +250,7 @@ function caretAt(cell: HTMLElement, x: number, y: number): number | undefined {
   return r.toString().length
 }
 
-export function GridCore<R extends { key: string }>({ model: m, active: activeIn, setActive, editDraft, notes, onNote, selectRect }: GridCoreProps<R>) {
+export function GridCore<R extends { key: string }>({ model: m, active: activeIn, setActive, editDraft, notes, onNote, selectRect, selectAreas, editAgain, optionsAt }: GridCoreProps<R>) {
   const gridRef = useRef<HTMLDivElement>(null)
   const cells = useRef(new Map<string, HTMLElement>())
   const wantFocus = useRef(false)
@@ -383,6 +425,11 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (!selectRect || !m.selection || selectRect.r1 >= m.rows.length) return
     selectBlock(selectRect)
   }, [selectRect, m.rows.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Spec 020: Go To Special's areas become the selection.
+  useEffect(() => {
+    if (!selectAreas?.length || !m.selection || selectAreas.some(q => q.r1 >= m.rows.length || q.c1 >= m.cols.length)) return
+    setAreas(selectAreas)
+  }, [selectAreas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dragging = useRef(false)
   const cutRect = useRef<GridRect | null>(null)
@@ -416,8 +463,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     while (lo < hi) { const mid = (lo + hi) >> 1; if (tops[mid + 1] <= y) lo = mid + 1; else hi = mid }
     return lo
   }
-  const first = windowed ? Math.max(0, find(view.top - 26) - OVERSCAN) : 0
-  const last = windowed ? Math.min(m.rows.length, find(view.top + view.height) + OVERSCAN + 1) : m.rows.length
+  const z = m.zoom && m.zoom > 0 ? m.zoom : 1
+  const first = windowed ? Math.max(0, find(view.top / z - 26) - OVERSCAN) : 0
+  const last = windowed ? Math.min(m.rows.length, find((view.top + view.height) / z) + OVERSCAN + 1) : m.rows.length
 
   useLayoutEffect(() => {
     if (!wantFocus.current || !active || editing) return
@@ -427,7 +475,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const i = rowIndex.get(active.key)
       const sc = scroller()
       if (windowed && tops && i !== undefined && sc) {
-        const y = tops[i], h = tops[i + 1] - tops[i]
+        const y = tops[i] * z, h = (tops[i + 1] - tops[i]) * z
         if (y < sc.scrollTop + 26) sc.scrollTop = Math.max(0, y - 26)
         else if (y + h > sc.scrollTop + sc.clientHeight) sc.scrollTop = y + h - sc.clientHeight + 4
         setView({ top: sc.scrollTop, height: sc.clientHeight })
@@ -701,6 +749,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (editing || !active) return
     const target = e.target as HTMLElement
     if (!target.matches('[data-cell]')) return
+    if (lastFill && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) setLastFill(null)
     const ri = m.rows.findIndex(r => r.key === active.key)
     const ci = allCols.indexOf(active.col)
     const row = m.rows[ri]
@@ -722,6 +771,31 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (ctrl && (e.key === 'a' || e.key === 'A') && m.selection && m.rows.length && m.cols.length) {
       e.preventDefault()
       selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 })
+      return
+    }
+    // Spec 020: Shift+Space the row, Ctrl+Space the column, Ctrl+Shift+Space everything (tip 2).
+    if (e.key === ' ' && m.selection && (e.shiftKey || ctrl) && !e.altKey && m.rows.length && m.cols.length) {
+      e.preventDefault()
+      const cc = Math.max(0, m.cols.indexOf(active.col))
+      if (e.shiftKey && ctrl) selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 })
+      else if (e.shiftKey) selectBlock({ r0: ri, c0: 0, r1: ri, c1: m.cols.length - 1 })
+      else selectBlock({ r0: 0, c0: cc, r1: m.rows.length - 1, c1: cc })
+      return
+    }
+    // F4: repeat the last action (tip 93).
+    if (e.key === 'F4' && !ctrl && !e.altKey && m.onRepeat) { e.preventDefault(); m.onRepeat(); return }
+    // Ctrl+E: Flash Fill (tip 14).
+    if (ctrl && !e.altKey && !e.shiftKey && (e.key === 'e' || e.key === 'E') && m.onFlashFill) { e.preventDefault(); m.onFlashFill(); return }
+    // Ctrl+; today's date, Ctrl+Shift+; the time (tip 16): typed into the cell, not yet saved.
+    if (ctrl && !e.altKey && (e.code === 'Semicolon' || e.key === ';' || e.key === ':') && m.nowText) {
+      e.preventDefault()
+      if (m.isText(row, active.col)) startEdit(row, active.col, m.nowText(e.shiftKey || e.key === ':' ? 'time' : 'date'))
+      return
+    }
+    // Ctrl+= / Ctrl+− / Ctrl+0: zoom in, out, back to 100%.
+    if (ctrl && !e.altKey && m.onZoom && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) {
+      e.preventDefault()
+      m.onZoom(e.key === '0' ? 1 : Math.round(Math.max(0.5, Math.min(2, z + (e.key === '-' ? -0.1 : 0.1))) * 100) / 100)
       return
     }
     // The menu (FR-040).
@@ -753,6 +827,11 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const next = own[at + dir]
       if (next) { e.preventDefault(); focusCell(row, next) } else e.preventDefault()
     }
+    // Spec 020: Alt+↓ on a text cell picks from the column's values (Excel's Pick From Drop-down List).
+    if (e.altKey && e.key === 'ArrowDown' && m.pickList && active.col !== 'rowNo' && m.isText(row, active.col) && m.pickList(row, active.col, target, 'keys')) {
+      e.preventDefault()
+      return
+    }
     // Alt+↓: the active column's header menu (spec 010 R6).
     if (e.altKey && e.key === 'ArrowDown' && m.headerMenu && active.col !== 'rowNo') {
       e.preventDefault()
@@ -783,11 +862,11 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       case 'Home':       return ctrl ? go(0, m.spreadsheet ? 1 : 0) : go(ri, m.spreadsheet ? 1 : 0)
       case 'End':        return ctrl ? go(m.rows.length - 1, allCols.length - 1) : go(ri, allCols.length - 1)
       case 'PageDown': {
-        const page = Math.max(1, Math.floor((scroller()?.clientHeight ?? 400) / ROW_H) - 1)
+        const page = Math.max(1, Math.floor((scroller()?.clientHeight ?? 400) / (ROW_H * z)) - 1)
         return go(ri + (m.selection ? page : 15), ci)
       }
       case 'PageUp': {
-        const page = Math.max(1, Math.floor((scroller()?.clientHeight ?? 400) / ROW_H) - 1)
+        const page = Math.max(1, Math.floor((scroller()?.clientHeight ?? 400) / (ROW_H * z)) - 1)
         return go(ri - (m.selection ? page : 15), ci)
       }
     }
@@ -896,6 +975,163 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     return () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); cancelAnimationFrame(raf) }
   }, [m.selection]) // eslint-disable-line react-hooks/exhaustive-deps
 
+
+  // ── spec 020: the fill handle (research R4) ──────────────────────────────
+  type FillDrag = FillRequest & { right: boolean; info: FillInfo; ctrl: boolean }
+  const [fillDrag, setFillDragState] = useState<FillDrag | null>(null)
+  const fillRef = useRef<FillDrag | null>(null)
+  const setFillDrag = (v: FillDrag | null) => { fillRef.current = v; setFillDragState(v) }
+  /** The last fill, for the Auto Fill Options button; gone with the next action. */
+  const [lastFill, setLastFill] = useState<FillRequest | null>(null)
+  const lastFillRef = useRef(lastFill)
+  lastFillRef.current = lastFill
+  useEffect(() => {
+    const lf = lastFillRef.current
+    if (lf && (rect.r0 !== lf.to.r0 || rect.r1 !== lf.to.r1 || rect.c0 !== lf.to.c0 || rect.c1 !== lf.to.c1 || many)) setLastFill(null)
+  }, [sig]) // eslint-disable-line react-hooks/exhaustive-deps
+  const canFill = !!m.onFill && !!m.fillInfo && !!m.selection && !many && !editing
+  const swap = (d: 'copy' | 'series'): FillMode => (d === 'copy' ? 'series' : 'copy')
+  /** Where a pointer over cell (r, c) takes a fill from `from`: out along the longer way, or back inside to clear. */
+  function fillTarget(from: GridRect, r: number, c: number): { to: GridRect; dir: FillRequest['dir']; clear: boolean } {
+    const dDown = r - from.r1, dUp = from.r0 - r, dRight = c - from.c1, dLeft = from.c0 - c
+    const outV = Math.max(dDown, dUp), outH = Math.max(dRight, dLeft)
+    if (outV <= 0 && outH <= 0) {
+      const backV = from.r1 - r, backH = from.c1 - c
+      if (backV > 0 && backV >= backH) return { to: { ...from, r1: r }, dir: 'up', clear: true }
+      if (backH > 0) return { to: { ...from, c1: c }, dir: 'left', clear: true }
+      return { to: from, dir: 'down', clear: false }
+    }
+    if (outV >= outH) return dDown > 0 ? { to: { ...from, r1: r }, dir: 'down', clear: false } : { to: { ...from, r0: r }, dir: 'up', clear: false }
+    return dRight > 0 ? { to: { ...from, c1: c }, dir: 'right', clear: false } : { to: { ...from, c0: c }, dir: 'left', clear: false }
+  }
+  /** Run a fill and select what it filled (as Excel); `again` replaces the last fill (Auto Fill Options). */
+  function doFill(req: FillRequest, again: boolean) {
+    m.onFill?.(req, again)
+    if (req.mode === 'clear') { setLastFill(null); selectBlock(req.to); return }
+    lastFillRef.current = req
+    setLastFill(req)
+    selectBlock(req.to)
+  }
+  const fillRun = (req: FillRequest, again: boolean) => (mode: FillMode) => doFill({ ...req, mode }, again)
+  // Flash Fill Options: the host's button over the cells Ctrl+E filled ('flash' marks it).
+  useEffect(() => {
+    if (!optionsAt) return
+    const req: FillRequest = { from: optionsAt.to, to: optionsAt.to, mode: 'flash', insert: false, dir: 'down' }
+    lastFillRef.current = req
+    setLastFill(req)
+  }, [optionsAt?.n]) // eslint-disable-line react-hooks/exhaustive-deps
+  // A validation alert's Retry: back into the cell with what was typed.
+  useEffect(() => {
+    if (!editAgain) return
+    const row = m.rows.find(r => r.key === editAgain.key)
+    if (!row) return
+    setActive({ key: row.key, col: editAgain.col })
+    setEditing({ key: row.key, col: editAgain.col, value: editAgain.value, select: true })
+  }, [editAgain?.n]) // eslint-disable-line react-hooks/exhaustive-deps
+  function startFill(e: React.PointerEvent<HTMLElement>) {
+    if (!canFill || (e.button !== 0 && e.button !== 2)) return
+    e.preventDefault(); e.stopPropagation()
+    const from = rectRef.current
+    const info = m.fillInfo?.(from, 'down')
+    if (!info) return
+    setLastFill(null)
+    setFillDrag({ from, to: from, dir: 'down', mode: info.def, insert: false, right: e.button === 2, info, ctrl: addKey(e) })
+  }
+  useEffect(() => {
+    if (!fillDrag) return
+    let raf = 0, lastX = 0, lastY = 0
+    const tickScroll = () => {
+      const sc = scroller()
+      if (!fillRef.current || !sc) return
+      const b = sc.getBoundingClientRect()
+      const dy = lastY < b.top + 30 ? -18 : lastY > b.bottom - 20 ? 18 : 0
+      const dx = lastX < b.left + 20 ? -18 : lastX > b.right - 20 ? 18 : 0
+      if (dx || dy) sc.scrollBy(dx, dy)
+      raf = requestAnimationFrame(tickScroll)
+    }
+    const move = (e: PointerEvent) => {
+      const cur = fillRef.current
+      if (!cur) return
+      lastX = e.clientX; lastY = e.clientY
+      if (!raf) raf = requestAnimationFrame(tickScroll)
+      const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-cell]')
+      if (!el || !gridRef.current?.contains(el)) return
+      const r = live.current.rowIndex.get(el.dataset.rowKey ?? ''), c = live.current.cols.indexOf(el.dataset.col ?? '')
+      if (r === undefined || c < 0) return
+      const t = fillTarget(cur.from, r, c)
+      const ctrl = IS_MAC ? e.metaKey : e.ctrlKey || e.metaKey
+      const mode: FillRequest['mode'] = t.clear ? 'clear' : ctrl !== cur.ctrl ? swap(cur.info.def) : cur.info.def
+      const same = cur.to.r0 === t.to.r0 && cur.to.r1 === t.to.r1 && cur.to.c0 === t.to.c0 && cur.to.c1 === t.to.c1 && cur.mode === mode && cur.insert === e.shiftKey
+      if (!same) setFillDrag({ ...cur, to: t.to, dir: t.dir, mode, insert: e.shiftKey && !t.clear })
+    }
+    const up = (e: PointerEvent) => {
+      cancelAnimationFrame(raf); raf = 0
+      const cur = fillRef.current
+      setFillDrag(null)
+      if (!cur) return
+      const req: FillRequest = { from: cur.from, to: cur.to, mode: cur.mode, insert: cur.insert, dir: cur.dir }
+      const unchanged = cur.to.r0 === cur.from.r0 && cur.to.r1 === cur.from.r1 && cur.to.c0 === cur.from.c0 && cur.to.c1 === cur.from.c1
+      if (unchanged) return
+      if (cur.right && cur.mode !== 'clear' && m.onFillMenu) {
+        const anchor = cells.current.get(cellKey(m.rows[cur.to.r1]?.key ?? '', m.cols[cur.to.c1] ?? '')) ?? gridRef.current
+        if (anchor) m.onFillMenu(req, { x: e.clientX, y: e.clientY }, anchor, 'right', fillRun(req, false))
+        return
+      }
+      doFill(req, false)
+    }
+    // The right-drag's own context menu would cover ours.
+    const noMenu = (e: Event) => { if (fillRef.current?.right) e.preventDefault() }
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+    document.addEventListener('contextmenu', noMenu, true)
+    return () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('contextmenu', noMenu, true); cancelAnimationFrame(raf) }
+  }, [!!fillDrag]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Double-click the handle: down as far as the column beside it has data. */
+  function fillDownToEnd() {
+    if (!canFill) return
+    const from = rectRef.current
+    const info = m.fillInfo?.(from, 'down')
+    if (!info) return
+    const has = (r: number, c: number) => { const rw = m.rows[r]; return c >= 0 && c < m.cols.length && !!rw && readText(rw, m.cols[c]) !== '' }
+    let side = from.c0 - 1
+    if (!has(from.r1 + 1, side)) side = from.c1 + 1
+    let end = from.r1
+    while (end + 1 < m.rows.length && has(end + 1, side)) end++
+    if (end > from.r1) doFill({ from, to: { ...from, r1: end }, mode: info.def, insert: false, dir: 'down' }, false)
+  }
+  const fillTip = fillDrag && fillDrag.mode !== 'clear' && !(fillDrag.to.r0 === fillDrag.from.r0 && fillDrag.to.r1 === fillDrag.from.r1 && fillDrag.to.c0 === fillDrag.from.c0 && fillDrag.to.c1 === fillDrag.from.c1)
+    ? { text: fillDrag.info.preview(fillDrag.mode as FillMode, fillDrag.to), r: fillDrag.dir === 'up' ? fillDrag.to.r0 : fillDrag.to.r1, c: fillDrag.dir === 'left' ? fillDrag.to.c0 : fillDrag.to.c1 }
+    : null
+  const ghost = fillDrag && fillDrag.mode !== 'clear' ? fillDrag.to : null
+  const inQ = (q: GridRect | null, r: number, c: number) => !!q && r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1
+
+  // ── spec 020: zoom (Ctrl+wheel) and Shift+wheel ──────────────────────────
+  const zoomRef = useRef({ z, on: m.onZoom })
+  zoomRef.current = { z, on: m.onZoom }
+  useEffect(() => {
+    const sc = scroller()
+    if (!sc) return
+    let acc = 0
+    const onWheel = (e: WheelEvent) => {
+      if ((e.ctrlKey || e.metaKey) && zoomRef.current.on) {
+        e.preventDefault()
+        acc += e.deltaY
+        if (Math.abs(acc) < 40) return
+        const step = acc < 0 ? 0.1 : -0.1
+        acc = 0
+        zoomRef.current.on(Math.round(Math.max(0.5, Math.min(2, zoomRef.current.z + step)) * 100) / 100)
+        return
+      }
+      if (e.shiftKey && !e.deltaX && e.deltaY) {
+        e.preventDefault()
+        const rtl = getComputedStyle(sc).direction === 'rtl'
+        sc.scrollLeft += rtl ? -e.deltaY : e.deltaY
+      }
+    }
+    sc.addEventListener('wheel', onWheel, { passive: false })
+    return () => sc.removeEventListener('wheel', onWheel)
+  }, [])
+
   const inUnsel = (r: number, c: number) => !!unsel && r >= unsel.r0 && r <= unsel.r1 && c >= unsel.c0 && c <= unsel.c1
   const cutIn = (r: number, c: number) => !!cutMark && r >= cutMark.r0 && r <= cutMark.r1 && c >= cutMark.c0 && c <= cutMark.c1
 
@@ -938,9 +1174,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       aria-rowcount={m.rows.length + 1}
       aria-colcount={allCols.length}
       aria-multiselectable={m.selection || undefined}
-      className={`fx-sheet-grid${m.selection ? ' is-selectable' : ''}`}
+      className={`fx-sheet-grid${m.selection ? ' is-selectable' : ''}${fillDrag ? ' is-filling' : ''}`}
       data-sheet-grid=""
-      style={{ ['--sheet-cols' as string]: template }}
+      data-zoom={z !== 1 ? Math.round(z * 100) : undefined}
+      style={{ ['--sheet-cols' as string]: template, ...(z !== 1 ? { zoom: z } : {}) }}
       onKeyDown={onGridKeyDown}
     >
       <div role="row" aria-rowindex={1} className="fx-sheet-tr is-head">
@@ -1030,6 +1267,15 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const merge = !isNo && m.cellSpan ? m.cellSpan(row, col) : null
               const covered = merge === 'covered'
               const freezeStyle = frozenCell(c)
+              // Spec 020: the fill handle, the drag's dashed target and its tip, Auto Fill Options, the validation ▾.
+              // Kept in place while dragging (hidden by CSS), so a double-click's second press still finds it.
+              const hasHandle = canFill && !isNo && i === rect.r1 && c === rect.c1 && c >= 0
+              const inGhost = !!ghost && c >= 0 && inQ(ghost, i, c)
+              const fgEdges = inGhost ? `${i === ghost!.r0 ? ' is-fg-t' : ''}${i === ghost!.r1 ? ' is-fg-b' : ''}${c === ghost!.c0 ? ' is-fg-s' : ''}${c === ghost!.c1 ? ' is-fg-e' : ''}` : ''
+              const clearing = !!fillDrag && fillDrag.mode === 'clear' && c >= 0 && inQ(fillDrag.from, i, c) && !inQ(fillDrag.to, i, c)
+              const tipHere = !!fillTip && fillTip.r === i && fillTip.c === c
+              const afoHere = !!lastFill && !fillDrag && !isEditing && !!m.onFillMenu && i === lastFill.to.r1 && c === lastFill.to.c1
+              const dv = isActive && !isEditing && !isNo && m.validation ? m.validation(row, col) : null
               const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` }
                 : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2 }
                 : undefined
@@ -1040,7 +1286,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
+                  className={`${m.cellClass(row, col)}${inGhost ? ` is-fg${fgEdges}` : ''}${clearing ? ' is-fclr' : ''}${hasHandle || afoHere || tipHere ? ' has-fill-ui' : ''}${dv ? ' has-dv' : ''}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
                   style={fx || freezeStyle ? { ...spanStyle, ...fx?.cell, ...freezeStyle } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
@@ -1049,7 +1295,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   aria-haspopup={menu && col !== 'drop' && col !== 'archive' ? 'menu' : undefined}
                   aria-readonly={!text && !menu ? true : undefined}
                   aria-describedby={[m.describedBy?.(row, col) ?? '', note ? `${key}-note` : ''].filter(Boolean).join(' ') || undefined}
-                  onFocus={() => { if (!isActive) setActive({ key: row.key, col }) }}
+                  // Only the cell itself: a button inside it (Auto Fill Options) taking focus mustn't move the selection.
+                  onFocus={e => { if (e.target === e.currentTarget && !isActive) setActive({ key: row.key, col }) }}
                   onPointerDown={m.selection ? e => {
                     if (isEditing || e.button !== 0 || (e.target as HTMLElement).closest('[data-row-resize], a, button')) return
                     if (isNo && !m.spreadsheet) return
@@ -1103,7 +1350,22 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                     if (c >= 0 && !inAreas(i, c)) { setFocusEnd(null); setExtra([]); setActive({ key: row.key, col }) }
                     openMenu({ kind: 'cell', r: i, c, rect: inAreas(i, c) ? rectRef.current : { r0: i, c0: c, r1: i, c1: c } }, e.currentTarget, { x: e.clientX, y: e.clientY })
                   } : undefined}
-                  onDoubleClick={e => { if (!isEditing && !isNo) startEdit(row, col, undefined, caretAt(e.currentTarget, e.clientX, e.clientY)) }}
+                  onDoubleClick={e => {
+                    if (isEditing || isNo) return
+                    // Spec 020 (tip 95): a double-click on the active cell's edge jumps like Ctrl+arrow.
+                    if (m.selection && isActive && c >= 0) {
+                      const b = e.currentTarget.getBoundingClientRect(), rtl = getComputedStyle(e.currentTarget).direction === 'rtl'
+                      const near = e.clientY > b.bottom - 4 ? 'down' : e.clientY < b.top + 3 ? 'up' : e.clientX > b.right - 4 ? (rtl ? 'left' : 'right') : e.clientX < b.left + 3 ? (rtl ? 'right' : 'left') : null
+                      if (near) {
+                        const filled = (r: number, cc: number) => { const rw = m.rows[r]; return !!rw && readText(rw, m.cols[cc]) !== '' }
+                        const to = dataEdge({ r: i, c }, near, m.rows.length, m.cols.length, filled)
+                        const rw = m.rows[to.r]
+                        if (rw) focusCell(rw, m.cols[Math.max(0, to.c)])
+                        return
+                      }
+                    }
+                    startEdit(row, col, undefined, caretAt(e.currentTarget, e.clientX, e.clientY))
+                  }}
                 >
                   {isEditing
                     ? (m.multiline
@@ -1179,6 +1441,29 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           onDoubleClick={e => { e.stopPropagation(); m.onRowResize?.(row, null) }} />
                   )}
                   {note && <span className="fx-sheet-cellnote" id={`${key}-note`} role="note">{note}</span>}
+                  {hasHandle && <span className="fx-fill-h" data-fill-handle="" aria-hidden="true" title={m.controlLabels?.handle}
+                                      onPointerDown={startFill} onClick={ev => ev.stopPropagation()}
+                                      onContextMenu={ev => { ev.preventDefault(); ev.stopPropagation() }}
+                                      onDoubleClick={ev => { ev.stopPropagation(); fillDownToEnd() }} />}
+                  {tipHere && <span className="fx-fill-tip" data-fill-tip="" role="status">{fillTip!.text}</span>}
+                  {afoHere && (
+                    <button type="button" className="fx-afo" data-autofill-options="" tabIndex={-1} aria-haspopup="menu" aria-label={m.controlLabels?.options} title={m.controlLabels?.options}
+                            onPointerDown={ev => ev.stopPropagation()}
+                            onClick={ev => {
+                              ev.stopPropagation()
+                              const lf = lastFill!, b = ev.currentTarget.getBoundingClientRect(), rtl = getComputedStyle(ev.currentTarget).direction === 'rtl'
+                              m.onFillMenu?.(lf, { x: rtl ? b.right : b.left, y: b.bottom + 2 }, ev.currentTarget, lf.mode === 'flash' ? 'flash' : 'options', fillRun({ ...lf, from: lf.from }, true))
+                            }}>
+                      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="8" height="10.5" rx="2" /><path d="M5 3V2h3v1" /><path d="M13 5.5l-1.6 3h2.2l-1.6 3" className="fx-afo-bolt" /></svg>
+                      <span aria-hidden="true" className="fx-afo-chev">▾</span>
+                    </button>
+                  )}
+                  {dv?.dropdown && (
+                    <button type="button" className="fx-dv-btn" data-dv-drop="" tabIndex={-1} aria-haspopup="listbox" aria-label={m.controlLabels?.dropdown} title={m.controlLabels?.dropdown}
+                            onPointerDown={ev => ev.stopPropagation()}
+                            onClick={ev => { ev.stopPropagation(); m.pickList?.(row, col, ev.currentTarget, 'button') }}>▾</button>
+                  )}
+                  {dv?.input && <span className="fx-dv-msg" data-dv-input="" role="note">{dv.input.title && <b>{dv.input.title}</b>}{dv.input.msg}</span>}
                 </div>
               )
             })}

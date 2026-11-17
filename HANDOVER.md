@@ -716,6 +716,45 @@ Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fiel
   - Status reads typed and pasted words, and `VideoSheet.onCommit` moves the task.
 - **Checks.** `node scripts/spreadsheet-lab/realapp/fields.cjs`, `content-fields.cjs` and `video-fields.cjs`.
 
+### Excel power tips in the sheets (spec 020)
+
+Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3). Design: `design/power-tips-a.html` (Excel's behaviour and wording, drawn in the app's look). No formulas (FR-015). Stages B and C each have their own design and PR.
+
+- **Keys (GridCore).**
+  - Shift+Space selects the row, Ctrl+Space the column, and Ctrl+Shift+Space everything. The active cell moves to the block's corner, because the grid's selection always starts at the active cell.
+  - F4 repeats (`onRepeat`). Ctrl+Y with nothing to redo repeats too, decided in BlankSheet with `canRedo`.
+  - Ctrl+E runs Flash Fill (`onFlashFill`). Ctrl+; enters today's date and Ctrl+Shift+; the time (`nowText`).
+  - Alt+↓ on a text cell opens Pick From Drop-down List (`pickList`), before the column menu.
+  - A double-click on the active cell's edge jumps like Ctrl+arrow.
+- **Zoom and view.**
+  - Ctrl+wheel and Ctrl+= / − / 0 set the zoom. It's CSS `zoom` on the grid, and windowing divides by it.
+  - The workbook keeps the zoom per sheet (`momentum.sheet.zoom.<id>`). It reaches the Content and Video grids through `zoomBus` and `ZOOM_EVENT`.
+  - Shift+wheel scrolls sideways. Ctrl+F1 collapses the strip (`momentum.sheet.strip`).
+  - Alt alone shows KeyTips. Letters are read by key code, so they work in Arabic: F, E, W, N, O, A, Y.
+- **Status bar.** It sits under the tabs (`data-statusbar`) and shows the mode (Ready, Add to selection, "Flash Fill Changed Cells: N"). On a blank sheet it also shows Average, Count and Sum, from `report()` and capped at 50k cells. It has the zoom slider and a % menu; phones have no slider.
+- **Go To.** F5 / Ctrl+G and Edit › Go To… open the Go To dialog, whose Special… button opens Go To Special.
+  - Go To Special (`goSpecial` in BlankSheet) offers the choices that need no formulas. It works within the selection when that's more than one cell, otherwise within the used range.
+  - The result is folded into areas (`foldCells`, at most 100) and selected through `GridCore.selectAreas`.
+- **The fill handle.**
+  - `sheet-fill.ts` is pure. `planSeries` handles numbers (trend and growth), dates (days, weekdays with a Fri/Sat weekend, months, years), English and Arabic day and month names, custom lists, and text ending in a number. `learnFlash` is the Flash Fill learner.
+  - GridCore draws the handle on the newest single area and handles the drag: a dashed target, a value tip, Ctrl to swap copy and series, Shift to insert, drag back to clear, right-drag for the menu, and double-click to fill to the end.
+  - The host builds the step (`onFill`). Auto Fill Options re-runs the last fill another way: an undo plus a new step computed from the doc before the fill (`lastFill.base`).
+  - The Content and Video sheets get the same tools through `useGridTips`, and every write goes through their `writeCells(…, 'fill')`, so the board's rules apply. The tools:
+    - zoom and the fill handle, with custom lists via `tipsBus`;
+    - Alt+↓ and Ctrl+;;
+    - Go To by row number, and Go To Special with the choices in `LINKED_SPECIAL`;
+    - F4 / Ctrl+Y repeat of the last formatting command sent to the sheet;
+    - Flash Fill and Series…;
+    - the status bar's mode and figures (`STATUS_EVENT`).
+  - Data Validation stays a team-sheet tool.
+- **Custom lists.** `workspace_settings.fill_lists` holds them, read with `loadFillLists` and written with `saveFillLists` (admins only). They're edited in Data › Custom Lists… or Settings › Sheets.
+- **Data validation.** The `sheet_validations` table holds one `rule` JSON per range (Excel's Settings, Input Message and Error Alert tabs). It is cleaned by `sheet-validate.ts` on both sides and changed through the `validations` change kind (whole list before and after, like tables).
+  - The selected cell shows ▾ (lists) and its input message.
+  - A typed value outside the rule brings the Stop, Warning or Information alert. Pasted and filled values that a Stop rule refuses are counted as `invalid`.
+  - Deleting rows or columns trims the ranges (`validationsAfter`). An insert inside a range grows it, because the range is held by its edge ids.
+- **Leading apostrophe.** `'007` is stored as `007`, and the cell is set to Text.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/tips-a.cjs` (73 checks), and `npm run lab:spreadsheet` (`tips-*` pure checks).
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.

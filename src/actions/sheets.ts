@@ -17,7 +17,8 @@ import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
 import { mergeStyle, validateStyle } from '@/lib/sheet-format'
-import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SortKey, TabColor, ViewWrite } from '@/types/index'
+import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SortKey, TabColor, ValidationRecord, ViewWrite } from '@/types/index'
+import { MAX_VALIDATIONS, cleanRecord as cleanValidation } from '@/lib/sheet-validate'
 import { RULE_KINDS, TAB_COLORS } from '@/types/index'
 import { FILTER_OPS, TABLE_STYLES } from '@/lib/sheet-rules'
 import { cleanMap, cleanWords } from '@/lib/sheet-links'
@@ -236,7 +237,7 @@ export async function loadSheet(id: string): Promise<{ success: true; doc: Sheet
 
 /** A sheet's formatting, merges and thread summaries (contracts/server.md "Loading"). */
 async function loadExtras(sheetId: string): Promise<SheetExtras> {
-  const [formats, merges, threads, sheet, hiddenRows, hiddenCols, rules, tables] = await Promise.all([
+  const [formats, merges, threads, sheet, hiddenRows, hiddenCols, rules, tables, validations] = await Promise.all([
     prisma.sheetFormat.findMany({ where: { sheet_id: sheetId }, select: { row_key: true, col_key: true, style: true } }),
     prisma.sheetMerge.findMany({ where: { sheet_id: sheetId } }),
     threadSummaries(sheetId),
@@ -245,6 +246,7 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     prisma.sheetCol.findMany({ where: { sheet_id: sheetId, hidden: true }, select: { id: true } }),
     prisma.sheetRule.findMany({ where: { sheet_id: sheetId }, orderBy: { priority: 'asc' } }),
     prisma.sheetTable.findMany({ where: { sheet_id: sheetId } }),
+    prisma.sheetValidation.findMany({ where: { sheet_id: sheetId } }),
   ])
   const stored = (sheet?.view ?? {}) as { filterArea?: FilterArea | null; filter?: Record<string, ColFilter>; sort?: SortKey[]; groupBy?: GroupBy; words?: SheetView['words']; show?: SheetView['show']; look?: SheetView['look'] }
   return {
@@ -264,6 +266,8 @@ async function loadExtras(sheetId: string): Promise<SheetExtras> {
     threads,
     rules: rules.map(r => ({ id: r.id, range: r.range as ConditionalRule['range'], kind: r.kind as ConditionalRule['kind'], args: (r.args ?? {}) as ConditionalRule['args'], style: (r.style ?? null) as CellStyle | null, priority: r.priority })),
     tables: tables.map(x => ({ id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col, style: x.style, header: x.header, banded: x.banded })),
+    // Spec 020: data validation, re-cleaned on the way out so an old record can't break the sheet.
+    validations: validations.map(x => cleanValidation({ ...(x.rule as object), id: x.id, top: x.top_row, left: x.left_col, bottom: x.bottom_row, right: x.right_col })).filter((x): x is ValidationRecord => !!x),
   }
 }
 
@@ -370,6 +374,21 @@ async function writeTables(tx: Tx, sheetId: string, w: NonNullable<SheetChanges[
     await tx.sheetTable.upsert({ where: { id: t.id }, create: { id: t.id, sheet_id: sheetId, ...data }, update: data })
   }
   if (await tx.sheetTable.count({ where: { sheet_id: sheetId } }) > MAX_TABLES) throw new Refuse('too_many_tables')
+}
+
+/** Spec 020: data validation rules put (whole records) or removed; at most 200 on a sheet. */
+async function writeValidations(tx: Tx, sheetId: string, w: NonNullable<SheetChanges['validations']>) {
+  if (w.remove?.length) await tx.sheetValidation.deleteMany({ where: { sheet_id: sheetId, id: { in: keys(w.remove, MAX_VALIDATIONS * 2) } } })
+  if ((w.put?.length ?? 0) > MAX_VALIDATIONS) throw new Refuse('too_many_validations')
+  for (const v of (w.put ?? []).map(cleanValidation)) {
+    if (!v) continue
+    const { id, top, left, bottom, right, ...rule } = v
+    const data = { top_row: top, left_col: left, bottom_row: bottom, right_col: right, rule: rule as unknown as Prisma.InputJsonValue }
+    const own = await tx.sheetValidation.findUnique({ where: { id }, select: { sheet_id: true } })
+    if (own && own.sheet_id !== sheetId) continue
+    await tx.sheetValidation.upsert({ where: { id }, create: { id, sheet_id: sheetId, ...data }, update: data })
+  }
+  if (await tx.sheetValidation.count({ where: { sheet_id: sheetId } }) > MAX_VALIDATIONS) throw new Refuse('too_many_validations')
 }
 
 /** Threads with at least one comment left, for the corner markers and the panel's counts. */
@@ -574,6 +593,7 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       }
       if (changes.rules) await writeRules(tx, sheetId, changes.rules)
       if (changes.tables) await writeTables(tx, sheetId, changes.tables)
+      if (changes.validations) await writeValidations(tx, sheetId, changes.validations)
       // Spec 016: the column mapping and rows' tasks (cleaned; unknown rows and tasks are skipped).
       if ('taskMap' in changes) {
         let map: SheetTaskMap | null = null

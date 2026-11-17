@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/authz'
+import { Prisma } from '@prisma/client'
+import { requireAdmin, requireMember } from '@/lib/authz'
+import { cleanFillLists, type FillList } from '@/lib/sheet-fill'
 
 function revalidateAll() {
   revalidatePath('/settings')
@@ -346,5 +348,33 @@ export async function updateSeniorityLevel(
     return { success: true }
   } catch (e: unknown) {
     return { success: false, error: String(e).slice(0, 200) }
+  }
+}
+
+// ─── Spec 020: the fill handle's custom lists (tip 17) ────────────────────────
+
+/** The workspace's own lists, for every member's fill handle (built-in day and month lists aren't stored). */
+export async function loadFillLists(): Promise<{ success: true; lists: FillList[]; canEdit: boolean } | { success: false; error: string }> {
+  const auth = await requireMember()
+  if (auth.error) return { success: false, error: auth.error }
+  const row = await prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { fill_lists: true } })
+  return { success: true, lists: cleanFillLists(row?.fill_lists ?? []), canEdit: auth.member?.access === 'admin' }
+}
+
+/** Admins only: the whole list of lists, cleaned to the limits (at most 50 lists, 2–200 items, 60 characters each). */
+export async function saveFillLists(lists: FillList[]): Promise<{ success: true; lists: FillList[] } | { success: false; error: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+  const clean = cleanFillLists(lists)
+  try {
+    await prisma.workspaceSettings.upsert({
+      where: { id: 1 },
+      update: { fill_lists: clean as unknown as Prisma.InputJsonValue, updated_at: new Date() },
+      create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: false, fill_lists: clean as unknown as Prisma.InputJsonValue },
+    })
+    revalidatePath('/settings')
+    return { success: true, lists: clean }
+  } catch (e: unknown) {
+    return { success: false, error: String(e) }
   }
 }

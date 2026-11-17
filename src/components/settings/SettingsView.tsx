@@ -7,8 +7,9 @@ import { WorkflowSettings } from './WorkflowSettings'
 import { BrandSettings, type BrandWithAssets } from './BrandSettings'
 import { Diagnostics } from './Diagnostics'
 import { WorkloadSettings } from './WorkloadSettings'
+import { FillLists } from './FillLists'
 
-type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics' | 'workload'
+type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics' | 'workload' | 'sheets'
 
 interface SettingsViewProps {
   seniorityLevels?: { key: string; label: string }[]
@@ -80,6 +81,9 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
           <button style={tabBtn(tab === 'workload')} onClick={() => setTab('workload')}>
             Workload
           </button>
+          <button style={tabBtn(tab === 'sheets')} onClick={() => setTab('sheets')} data-settings-tab="sheets">
+            Sheets
+          </button>
           <button style={tabBtn(tab === 'diagnostics')} onClick={() => setTab('diagnostics')}>
             Diagnostics
           </button>
@@ -94,6 +98,7 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
           <WorkloadSettings settings={workload.settings} levels={workload.levels} roles={workload.roles} />
         )}
         {tab === 'diagnostics' && <Diagnostics />}
+        {tab === 'sheets' && <FillLists />}
         {tab === 'workflow' && (
           <WorkflowSettings
             contentTypes={contentTypes}

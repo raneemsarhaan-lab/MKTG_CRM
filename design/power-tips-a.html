@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheet power tips A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #F7F7F7; --panel: #FFFFFF; --ink: #1B1A13; --text: #1F2430; --muted: #5E6166; --faint: #8A8D91;
+  --line: #E2E3E3; --soft-line: #ECECF1; --head: #F3F4F2; --gutter: #F8F9F8; --hover: #F6F8FB;
+  --sel: #3563E9; --sel-fill: rgba(53, 99, 233, .07); --sel-head: #E5EDFF; --sel-head-ink: #1E40AF;
+  --lime: #C8F24E; --lime-ink: #1B1A13; --purple: #7C3AED; --purple-deep: #6D28D9; --purple-soft: #F0EBFE;
+  --danger: #D22040; --danger-soft: #FDE7EA;
+  --shadow: 0 8px 28px rgba(17, 18, 20, .16); --shadow-sm: 0 2px 8px rgba(17, 18, 20, .10);
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+u { text-decoration: none; }
+.wrap { max-width: 1260px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 900px; }
+.ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tabs button, .ctl button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 5px 12px; font: 600 12.5px var(--f-body); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.scene { display: none; } .scene.on { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+@media (max-width: 960px) { .scene.on { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; position: relative; }
+.stage .card, .scene > .card { overflow: visible; }
+
+/* formula bar */
+.fbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.namebox { border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; width: 96px; font-size: 12.5px; font-weight: 600; background: var(--gutter); }
+.fx { color: var(--faint); font-style: italic; padding: 0 8px; border-inline-end: 1px solid var(--line); }
+.stage { min-height: 360px; position: relative; }
+
+/* grid: the app's sheet */
+table { border-collapse: separate; border-spacing: 0; }
+th, td { height: 28px; border-bottom: 1px solid var(--line); border-inline-end: 1px solid var(--line); padding: 0 8px; white-space: nowrap; font-size: 12.5px; position: relative; }
+th { background: var(--head); font-weight: 600; font-size: 11.5px; color: var(--muted); text-align: center; min-width: 100px; }
+th.no, td.no { min-width: 40px; width: 40px; text-align: center; background: var(--gutter); color: var(--faint); font-size: 11.5px; font-weight: 500; }
+th.on, td.no.on { background: var(--sel-head); color: var(--sel-head-ink); font-weight: 700; }
+th.on { box-shadow: inset 0 -2px 0 var(--sel); }
+td.no.on { box-shadow: inset -2px 0 0 var(--sel); }
+[dir="rtl"] td.no.on { box-shadow: inset 2px 0 0 var(--sel); }
+td.in { background: var(--sel-fill); }
+td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.selbox { position: absolute; border: 2px solid var(--sel); border-radius: 2px; pointer-events: none; z-index: 2; }
+.handle { position: absolute; width: 9px; height: 9px; background: var(--sel); border: 2px solid var(--panel); border-radius: 3px; z-index: 3; box-shadow: 0 0 0 1px var(--sel); }
+.ghost { position: absolute; border: 2px dashed var(--sel); border-radius: 3px; opacity: .55; pointer-events: none; z-index: 2; }
+.xltip { position: absolute; background: var(--ink); color: var(--panel); font: 600 11.5px var(--f-body); padding: 2px 8px; border-radius: 6px; z-index: 4; box-shadow: var(--shadow-sm); }
+.cross { position: absolute; z-index: 5; font: 700 16px/1 monospace; color: var(--ink); }
+
+/* Auto Fill Options chip */
+.afo { position: absolute; z-index: 5; display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 600 11px var(--f-body); cursor: pointer; box-shadow: var(--shadow-sm); }
+.afo svg { display: block; }
+.afo .chev { color: var(--muted); font-size: 10px; }
+
+/* menus: the app's sheet menu */
+.xlmenu { position: absolute; z-index: 6; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 220px; font: 12.5px var(--f-body); }
+.xlmenu .grp { font: 700 10px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 2px; }
+.xlmenu .it { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: default; }
+.xlmenu .it:hover, .xlmenu .it.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.xlmenu .it.dis { opacity: .4; }
+.xlmenu .it small { margin-inline-start: auto; color: var(--faint); font-size: 11px; }
+.xlmenu .rad { width: 14px; flex: none; color: var(--purple); font-weight: 800; text-align: center; }
+.xlmenu .rad.on::before { content: "✓"; }
+.xlmenu .it.on { font-weight: 600; }
+.xlmenu hr { border: 0; border-top: 1px solid var(--soft-line); margin: 4px 2px; }
+
+/* dialogs: the app's sheet dialog */
+.dlg { position: absolute; z-index: 7; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font: 12.5px var(--f-body); overflow: hidden; }
+.dlg .tbar { display: flex; align-items: center; gap: 8px; padding: 14px 16px 2px; font: 800 16px var(--f-head); color: var(--ink); }
+.dlg .tbar .x { margin-inline-start: auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); font: 600 13px var(--f-body); }
+.dlg .tbar .x:hover { background: var(--hover); }
+.dlg .sub { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: 12px; }
+.dlg .body { padding: 8px 16px 14px; display: grid; gap: 10px; }
+.dlg fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; align-content: start; }
+.dlg legend, .dlg .cap { padding: 0; margin-bottom: 4px; font: 700 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dlg .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.dlg label { display: flex; align-items: center; gap: 0; min-height: 22px; }
+.dlg label > input[type=radio], .dlg label > input[type=checkbox] { margin: 0; margin-inline-end: 8px; accent-color: var(--purple); width: 15px; height: 15px; }
+.dlg label.dis { opacity: .4; }
+.dlg .ind { padding-inline-start: 22px; }
+.dlg .fld { display: grid; gap: 4px; }
+.dlg .fld > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.dlg .btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--gutter); }
+.dlg .btns .start { margin-inline-end: auto; }
+.xb { min-width: 72px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; font: 600 12.5px var(--f-body); border-radius: 8px; cursor: pointer; }
+.xb.def { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.xb.link { border-color: transparent; background: none; color: var(--muted); min-width: 0; padding-inline: 4px; }
+.dlg input[type=text], .dlg select, .dlg textarea { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: 12.5px var(--f-body); padding: 6px 9px; min-height: 32px; width: 100%; }
+.dlg textarea { resize: none; }
+.dlg input:focus, .dlg select:focus, .dlg textarea:focus { outline: 2px solid var(--sel); outline-offset: -1px; }
+.dlg select:disabled { opacity: .45; }
+.dtabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--soft-line); }
+.dtabs span { white-space: nowrap; padding: 8px 10px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dtabs span.on { color: var(--purple-deep); border-bottom-color: var(--purple); }
+.lb { border: 1px solid var(--line); border-radius: 10px; padding: 4px; display: grid; gap: 1px; align-content: start; overflow: auto; background: var(--panel); }
+.lb div { padding: 5px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb div.on { background: var(--purple-soft); color: var(--purple-deep); font-weight: 600; }
+.lb div.fixed { color: var(--muted); }
+.lb .tag { float: inline-end; font-size: 10px; font-weight: 700; color: var(--faint); }
+
+/* alert */
+.alert .body { grid-template-columns: auto 1fr; align-items: start; gap: 12px; }
+.alert .ico { width: 36px; height: 36px; border-radius: 50%; background: var(--danger-soft); color: var(--danger); display: grid; place-items: center; font: 800 18px var(--f-body); }
+.alert .msg b { display: block; font: 800 15px var(--f-head); color: var(--ink); margin-bottom: 2px; }
+
+/* list in the cell */
+.ddbtn { position: absolute; z-index: 4; width: 22px; height: 22px; border-radius: 6px; background: var(--hover); color: var(--muted); display: grid; place-items: center; font-size: 11px; box-shadow: inset 0 0 0 1px var(--line); }
+.list { position: absolute; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 150px; font: 12.5px var(--f-body); }
+.list div { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+.list div::before { content: ""; width: 12px; flex: none; color: var(--purple); font-weight: 800; }
+.list div.cur::before { content: "✓"; }
+.list div.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.list .q { display: block; padding: 4px 8px 6px; color: var(--faint); font-size: 11.5px; border-bottom: 1px solid var(--soft-line); margin-bottom: 4px; border-radius: 0; }
+.list .q::before { content: none; }
+.inmsg { position: absolute; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: 12px var(--f-body); color: var(--muted); max-width: 220px; box-shadow: var(--shadow); border-inline-start: 3px solid var(--purple); }
+.inmsg b { display: block; color: var(--ink); font-weight: 700; }
+
+/* status bar */
+.sbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--gutter); color: var(--muted); font: 12px var(--f-body); border-radius: 0 0 14px 14px; flex-wrap: wrap; }
+.sbar .sp { flex: 1; }
+.sbar .st { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+.sbar b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sbar .ready::before { content: "● "; color: #2B7A37; }
+.zoom { display: inline-flex; align-items: center; gap: 6px; }
+.zoom .track { width: 110px; height: 4px; border-radius: 999px; background: var(--line); position: relative; }
+.zoom .track i { position: absolute; top: -5px; width: 14px; height: 14px; margin-inline-start: -5px; border-radius: 50%; background: var(--panel); border: 2px solid var(--sel); box-shadow: var(--shadow-sm); }
+.zoom .track::after { content: ""; position: absolute; left: 50%; top: -2px; width: 2px; height: 8px; border-radius: 1px; background: var(--faint); opacity: .5; }
+.zoom button { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.zoom b { min-width: 38px; text-align: end; }
+.views { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.views span { width: 26px; height: 20px; display: inline-grid; place-items: center; color: var(--faint); font-size: 11px; }
+.views span + span { border-inline-start: 1px solid var(--line); }
+.views span.on { background: var(--sel-head); color: var(--sel-head-ink); }
+
+/* header menus and KeyTips */
+.menubar { display: flex; gap: 6px; padding: 8px 12px 4px; font-size: 13px; position: relative; }
+.menubar span { position: relative; padding: 4px 10px; border-radius: 8px; font-weight: 600; color: var(--text); }
+.menubar span:hover { background: var(--hover); }
+.kt { position: absolute; top: 22px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--ink); color: var(--lime); font: 800 10px var(--f-body); padding: 0 5px; border-radius: 5px; line-height: 16px; font-style: normal; box-shadow: var(--shadow-sm); }
+[dir="rtl"] .kt { transform: translateX(50%); }
+.ribbon { margin: 0 12px 8px; height: 34px; border-radius: 999px; background: var(--head); display: flex; align-items: center; padding: 0 14px; color: var(--muted); font-size: 12px; gap: 12px; overflow: hidden; transition: height .2s, margin .2s; }
+.ribbon.collapsed { height: 0; margin-bottom: 0; }
+
+/* notes */
+.side { display: grid; gap: 12px; }
+.side .card { padding: 12px 14px; }
+.side h3 { margin: 0 0 6px; font: 700 13.5px var(--f-body); color: var(--ink); }
+.side p, .side li { margin: 0; color: var(--muted); font-size: 12.5px; }
+.side ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+.side .xb { min-width: 0; padding: 2px 10px; font-size: 12px; }
+kbd { font: 600 11px var(--f-body); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--text); }
+/* sample text is English: keep its punctuation right in the Arabic layout */
+.side li, .inmsg, .dlg .body span, .dlg label span, .alert .msg { unicode-bidi: plaintext; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sheet power tips: stage A</h1>
+  <p class="lede">Spec 020, user stories 1–3. Excel's gestures, shortcuts, menu items and dialog options, drawn in Momentum's own look: the sheet's menus, dialogs, lime primary buttons and blue selection. Options that need formulas or objects (which these sheets don't have) stay greyed out, as Excel greys out options that don't apply.</p>
+  <div class="ctl">
+    <button id="theme">Dark</button>
+    <button id="dir">Arabic layout</button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Scenes">
+    <button role="tab" data-s="drag" aria-selected="true">1 · Drag the fill handle</button>
+    <button role="tab" data-s="afo">2 · Auto Fill Options</button>
+    <button role="tab" data-s="rdrag">3 · Right-drag menu</button>
+    <button role="tab" data-s="series">4 · Series dialog</button>
+    <button role="tab" data-s="goto">5 · Go To / Go To Special</button>
+    <button role="tab" data-s="flash">6 · Flash Fill</button>
+    <button role="tab" data-s="dv">7 · Data Validation dialog</button>
+    <button role="tab" data-s="dvcell">8 · List in the cell</button>
+    <button role="tab" data-s="pick">9 · Pick From Drop-down List</button>
+    <button role="tab" data-s="view">10 · Status bar, zoom, KeyTips, Ctrl+F1</button>
+    <button role="tab" data-s="lists">11 · Custom Lists</button>
+  </div>
+
+  <!-- 1 drag -->
+  <section class="scene on" data-scene="drag">
+    <div class="card"><div class="fbar"><span class="namebox">B2:B3</span><span class="fx">fx</span><span>5</span></div>
+      <div class="stage">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th><th>D</th><th>E</th></tr>
+          <tr><td class="no">1</td><td>Week</td><td>Reach (k)</td><td>Month</td><td>Due</td><td></td></tr>
+          <tr><td class="no on">2</td><td>W1</td><td class="num">5</td><td>Jan</td><td>06/12/2026</td><td></td></tr>
+          <tr><td class="no on">3</td><td>W2</td><td class="num in">10</td><td></td><td></td><td></td></tr>
+          <tr><td class="no">4</td><td></td><td class="num"></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">5</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">6</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">7</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">8</td><td></td><td></td><td></td><td></td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,3,2"></div>
+        <div class="ghost" data-r="2,2,7,2"></div>
+        <div class="handle" data-at="3,2,br" data-dx="-4" data-dy="-4"></div>
+        <span class="cross" data-at="7,2,br" data-dx="-6" data-dy="-8">+</span>
+        <div class="xltip" data-at="7,2,br" data-dx="10" data-dy="4">30</div>
+      </div>
+      <div class="sbar"><span class="ready">Ready</span><span class="sp"></span><span class="st">Average <b>7.5</b></span><span class="st">Count <b>2</b></span><span class="st">Sum <b>15</b></span><span class="views" aria-label="Views"><span class="on" title="Normal">▦</span><span title="Page Layout">▭</span><span title="Page Break Preview">⊞</span></span><span class="zoom"><button>−</button><span class="track"><i style="left:54px"></i></span><button>+</button><b>100%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3>As in Excel</h3><ul>
+      <li>The fill handle is the square at the bottom-right of the selection; the pointer turns into a thin black <b>+</b>.</li>
+      <li>While dragging, a grey border shows the target and a pale-yellow tip shows the last value (30).</li>
+      <li>5, 10 → 15, 20, 25, 30. One cell copies; <kbd>Ctrl</kbd> while dragging switches between copying and filling a series.</li>
+      <li>Double-click the handle: fills down as far as the column beside it has data.</li>
+      <li>Drag back inside the selection: the cells turn grey and are cleared on release.</li>
+      <li><kbd>Shift</kbd>+drag: inserts cells instead of overwriting.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 2 Auto Fill Options -->
+  <section class="scene" data-scene="afo">
+    <div class="card"><div class="fbar"><span class="namebox">D2</span><span class="fx">fx</span><span>06/12/2026</span></div>
+      <div class="stage" style="min-height:620px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th><th class="on">D</th><th>E</th></tr>
+          <tr><td class="no">1</td><td>Week</td><td>Reach (k)</td><td>Month</td><td>Due</td><td></td></tr>
+          <tr><td class="no on">2</td><td>W1</td><td class="num">5</td><td>Jan</td><td class="num">06/12/2026</td><td></td></tr>
+          <tr><td class="no on">3</td><td>W2</td><td class="num">10</td><td>Feb</td><td class="num in">07/12/2026</td><td></td></tr>
+          <tr><td class="no on">4</td><td>W3</td><td class="num">15</td><td>Mar</td><td class="num in">08/12/2026</td><td></td></tr>
+          <tr><td class="no on">5</td><td>W4</td><td class="num">20</td><td>Apr</td><td class="num in">09/12/2026</td><td></td></tr>
+          <tr><td class="no on">6</td><td>W5</td><td class="num">25</td><td>May</td><td class="num in">10/12/2026</td><td></td></tr>
+          <tr><td class="no on">7</td><td>W6</td><td class="num">30</td><td>Jun</td><td class="num in">13/12/2026</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,4,7,4"></div>
+        <div class="handle" data-at="7,4,br" data-dx="-4" data-dy="-4"></div>
+        <button class="afo" data-at="7,4,br" data-dx="4" data-dy="4" aria-label="Auto Fill Options"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3" width="8" height="10.5" rx="2"/><path d="M5 3V2h3v1"/><path d="M13 5.5l-1.6 3h2.2l-1.6 3" stroke="var(--purple)"/></svg><span class="chev">▾</span></button>
+        <div class="xlmenu" data-at="7,4,br" data-dx="4" data-dy="26" role="menu" aria-label="Auto Fill Options">
+          <div class="grp">Fill</div>
+          <div class="it"><span class="rad"></span><span><u>C</u>opy Cells</span></div>
+          <div class="it"><span class="rad"></span><span>Fill <u>S</u>eries</span></div>
+          <div class="it"><span class="rad"></span><span>Fill <u>F</u>ormatting Only</span></div>
+          <div class="it"><span class="rad"></span><span>Fill Wit<u>h</u>out Formatting</span></div>
+          <hr><div class="grp">Dates</div>
+          <div class="it"><span class="rad"></span><span>Fill <u>D</u>ays</span></div>
+          <div class="it on hl"><span class="rad on"></span><span>Fill <u>W</u>eekdays</span><small>Sun–Thu</small></div>
+          <div class="it"><span class="rad"></span><span>Fill <u>M</u>onths</span></div>
+          <div class="it"><span class="rad"></span><span>Fill <u>Y</u>ears</span></div>
+          <hr>
+          <div class="it"><span class="rad"></span><span>Flash Fi<u>l</u>l</span><small>Ctrl+E</small></div>
+        </div>
+      </div>
+      <div class="sbar"><span class="ready">Ready</span><span class="sp"></span><span class="st">Count <b>6</b></span><span class="views" aria-label="Views"><span class="on" title="Normal">▦</span><span title="Page Layout">▭</span><span title="Page Break Preview">⊞</span></span><span class="zoom"><button>−</button><span class="track"><i style="left:54px"></i></span><button>+</button><b>100%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3>Auto Fill Options</h3><ul>
+      <li>The icon appears at the bottom-right of the filled range and stays until the next edit.</li>
+      <li>The list depends on what was filled: dates add Fill Days / Weekdays / Months / Years; text and numbers show the first four and Flash Fill.</li>
+      <li>Fill Weekdays skips the workspace weekend (Friday, Saturday by default): 10/12 is followed by 13/12.</li>
+      <li>Choosing another option replaces the fill: still one undo.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 3 right-drag -->
+  <section class="scene" data-scene="rdrag">
+    <div class="card"><div class="fbar"><span class="namebox">C2</span><span class="fx">fx</span><span>Jan</span></div>
+      <div class="stage" style="min-height:600px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th class="on">C</th><th>D</th><th>E</th></tr>
+          <tr><td class="no">1</td><td>Week</td><td>Reach (k)</td><td>Month</td><td>Due</td><td></td></tr>
+          <tr><td class="no on">2</td><td>W1</td><td class="num">5</td><td>Jan</td><td></td><td></td></tr>
+          <tr><td class="no">3</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">4</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">5</td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="no">6</td><td></td><td></td><td></td><td></td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,3,2,3"></div>
+        <div class="ghost" data-r="2,3,6,3"></div>
+        <div class="xlmenu" data-at="6,3,c" data-dx="10" data-dy="0" role="menu" aria-label="Fill">
+          <div class="it"><span><u>C</u>opy Cells</span></div>
+          <div class="it hl"><span>Fill <u>S</u>eries</span></div>
+          <div class="it"><span>Fill <u>F</u>ormatting Only</span></div>
+          <div class="it"><span>Fill Wit<u>h</u>out Formatting</span></div>
+          <hr>
+          <div class="it dis"><span>Fill <u>D</u>ays</span></div>
+          <div class="it dis"><span>Fill <u>W</u>eekdays</span></div>
+          <div class="it"><span>Fill <u>M</u>onths</span></div>
+          <div class="it dis"><span>Fill <u>Y</u>ears</span></div>
+          <hr>
+          <div class="it"><span><u>L</u>inear Trend</span></div>
+          <div class="it"><span><u>G</u>rowth Trend</span></div>
+          <div class="it"><span>Flash Fi<u>l</u>l</span><small>Ctrl+E</small></div>
+          <hr>
+          <div class="it"><span>S<u>e</u>ries…</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Right-drag the fill handle</h3><ul>
+      <li>Drag with the right mouse button; on release, Excel's menu appears.</li>
+      <li>Items that don't fit the data are greyed (Days and Weekdays for a month name).</li>
+      <li>Linear Trend continues a straight line; Growth Trend multiplies by the ratio (2, 4 → 8, 16).</li>
+      <li>Series… opens the Series dialog (next tab).</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 4 Series dialog -->
+  <section class="scene" data-scene="series">
+    <div class="card"><div class="fbar"><span class="namebox">A2:A13</span><span class="fx">fx</span><span>01/01/2027</span></div>
+      <div class="stage" style="min-height:440px">
+        <div class="dlg" style="left:40px; top:24px; width:420px" role="dialog" aria-label="Series">
+          <div class="tbar">Series<span class="x">✕</span></div><p class="sub">Fill A2:A13 by a step, or up to a stop value.</p>
+          <div class="body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <fieldset><legend>Series in</legend><label><input type="radio" name="si"><span><u>R</u>ows</span></label><label><input type="radio" name="si" checked><span><u>C</u>olumns</span></label></fieldset>
+              <fieldset><legend>Type</legend><label><input type="radio" name="ty"><span><u>L</u>inear</span></label><label><input type="radio" name="ty"><span><u>G</u>rowth</span></label><label><input type="radio" name="ty" checked><span><u>D</u>ate</span></label><label><input type="radio" name="ty"><span>Auto<u>F</u>ill</span></label></fieldset>
+              <fieldset><legend>Date unit</legend><label><input type="radio" name="du"><span>Day</span></label><label><input type="radio" name="du"><span><u>W</u>eekday</span></label><label><input type="radio" name="du" checked><span><u>M</u>onth</span></label><label><input type="radio" name="du"><span><u>Y</u>ear</span></label></fieldset>
+            </div>
+            <label class="dis"><input type="checkbox" disabled><span><u>T</u>rend</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fld"><span>Step value</span><input type="text" value="1"></label><label class="fld"><span>St<u>o</u>p value</span><input type="text" value="" placeholder="Optional"></label></div>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Home › Fill › Series…</h3><p>Fills the selected cells (or up to the Stop value) by a step: linear, growth, dates by day / weekday / month / year, or AutoFill. Also from the right-drag menu.</p></div></div>
+  </section>
+
+  <!-- 5 Go To / Go To Special -->
+  <section class="scene" data-scene="goto">
+    <div class="card"><div class="fbar"><span class="namebox">A1:D5</span><span class="fx">fx</span></div>
+      <div class="stage" style="min-height:470px">
+        <div class="dlg" style="left:16px; top:16px; width:260px" role="dialog" aria-label="Go To">
+          <div class="tbar">Go To<span class="x">✕</span></div><p class="sub">Jump to a cell or range.</p>
+          <div class="body">
+            <span class="cap">Recent</span>
+            <div class="lb" style="height:104px"><div>B4</div><div class="on">A1:D5</div><div>Budget!D20</div></div>
+            <label class="fld"><span>Reference</span><input type="text" value="A1:D5"></label>
+          </div>
+          <div class="btns"><button class="xb start">Special…</button><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+        <div class="dlg" style="left:292px; top:16px; width:400px" role="dialog" aria-label="Go To Special">
+          <div class="tbar">Go To Special<span class="x">✕</span></div><p class="sub">Select every cell of one kind in A1:D5.</p>
+          <div class="body">
+            <fieldset><legend>Select</legend>
+              <div class="grid2">
+                <label><input type="radio" name="gs"><span><u>N</u>otes</span></label><label><input type="radio" name="gs"><span>Row di<u>f</u>ferences</span></label>
+                <label><input type="radio" name="gs"><span>C<u>o</u>nstants</span></label><label><input type="radio" name="gs"><span>Colu<u>m</u>n differences</span></label>
+                <label class="dis"><input type="radio" name="gs" disabled><span><u>F</u>ormulas</span></label><label class="dis"><input type="radio" name="gs" disabled><span><u>P</u>recedents</span></label>
+                <label class="ind"><input type="checkbox" checked><span>N<u>u</u>mbers</span></label><label class="dis"><input type="radio" name="gs" disabled><span><u>D</u>ependents</span></label>
+                <label class="ind"><input type="checkbox" checked><span>Te<u>x</u>t</span></label><span></span>
+                <label class="ind dis"><input type="checkbox" disabled><span>Lo<u>g</u>icals</span></label><label><input type="radio" name="gs"><span>Last ce<u>l</u>l</span></label>
+                <label class="ind dis"><input type="checkbox" disabled><span><u>E</u>rrors</span></label><label><input type="radio" name="gs"><span>Visible cells onl<u>y</u></span></label>
+                <label><input type="radio" name="gs" checked><span><u>B</u>lanks</span></label><label><input type="radio" name="gs"><span>Condi<u>t</u>ional formats</span></label>
+                <label><input type="radio" name="gs"><span>Current <u>r</u>egion</span></label><label><input type="radio" name="gs"><span>Data <u>v</u>alidation</span></label>
+                <label class="dis"><input type="radio" name="gs" disabled><span>Current <u>a</u>rray</span></label><label class="ind"><input type="radio" name="gv" checked><span>A<u>l</u>l</span></label>
+                <label class="dis"><input type="radio" name="gs" disabled><span>O<u>b</u>jects</span></label><label class="ind"><input type="radio" name="gv"><span>Sam<u>e</u></span></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+      <div class="sbar"><span class="ready">Ready</span><span class="sp"></span><span class="views" aria-label="Views"><span class="on" title="Normal">▦</span><span title="Page Layout">▭</span><span title="Page Break Preview">⊞</span></span><span class="zoom"><button>−</button><span class="track"><i style="left:54px"></i></span><button>+</button><b>100%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3><kbd>F5</kbd> / <kbd>Ctrl</kbd>+<kbd>G</kbd> → Special…</h3><ul>
+      <li>Go To lists recent references; type B4, A1:D5 or Budget!D20 and press OK.</li>
+      <li>Go To Special has Excel's layout. Notes are the sheet's comments; Constants = filled cells (numbers / text).</li>
+      <li>Formulas, Precedents, Dependents, Current array, Objects, Logicals and Errors are greyed: these sheets have no formulas or objects.</li>
+      <li>The result is a multi-area selection; then type and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to fill them all.</li>
+    </ul></div>
+    <div class="card"><h3>Keys from the same list</h3><ul>
+      <li><kbd>Shift</kbd>+<kbd>Space</kbd> row · <kbd>Ctrl</kbd>+<kbd>Space</kbd> column</li>
+      <li><kbd>F4</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> repeat last action</li>
+      <li>Double-click a cell border: jump like <kbd>Ctrl</kbd>+arrow</li>
+      <li><kbd>Ctrl</kbd>+<kbd>;</kbd> date · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>;</kbd> time</li>
+      <li><kbd>Alt</kbd>+<kbd>;</kbd> select visible cells only</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 6 Flash Fill -->
+  <section class="scene" data-scene="flash">
+    <div class="card"><div class="fbar"><span class="namebox">B3</span><span class="fx">fx</span><span>Islam</span></div>
+      <div class="stage" style="min-height:300px">
+        <table>
+          <tr><th class="no"></th><th style="min-width:160px">A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td>Full name</td><td>First name</td><td></td></tr>
+          <tr><td class="no">2</td><td>Hisham El Badawy</td><td>Hisham</td><td></td></tr>
+          <tr><td class="no on">3</td><td>Islam Saadany</td><td>Islam</td><td></td></tr>
+          <tr><td class="no on">4</td><td>Raneem Sarhan</td><td class="in">Raneem</td><td></td></tr>
+          <tr><td class="no on">5</td><td>Samaa Adel</td><td class="in">Samaa</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="3,2,5,2"></div>
+        <button class="afo" data-at="3,2,tr" data-dx="4" data-dy="0" aria-label="Flash Fill Options"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--purple)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z"/></svg><span class="chev">▾</span></button>
+        <div class="xlmenu" data-at="3,2,tr" data-dx="4" data-dy="22" role="menu" aria-label="Flash Fill Options">
+          <div class="it"><span><u>U</u>ndo Flash Fill</span><small>Ctrl+Z</small></div>
+          <div class="it"><span><u>A</u>ccept suggestions</span></div>
+          <div class="it hl"><span><u>S</u>elect all 3 changed cells</span></div>
+        </div>
+      </div>
+      <div class="sbar"><span class="ready">Flash Fill Changed Cells: <b>3</b></span><span class="sp"></span><span class="st">Count <b>3</b></span><span class="views" aria-label="Views"><span class="on" title="Normal">▦</span><span title="Page Layout">▭</span><span title="Page Break Preview">⊞</span></span><span class="zoom"><button>−</button><span class="track"><i style="left:54px"></i></span><button>+</button><b>100%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3><kbd>Ctrl</kbd>+<kbd>E</kbd> Flash Fill</h3><ul>
+      <li>Type an example, then Ctrl+E (or Data › Flash Fill). Excel's Flash Fill Options icon appears beside the filled cells.</li>
+      <li>The status bar reads “Flash Fill Changed Cells: 3”.</li>
+      <li>When no pattern fits, Excel's message: “Flash Fill didn't find a pattern to fill.”</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 7 Data Validation dialog -->
+  <section class="scene" data-scene="dv">
+    <div class="card"><div class="fbar"><span class="namebox">C2:C50</span><span class="fx">fx</span></div>
+      <div class="stage" style="min-height:480px">
+        <div class="dlg" style="left:24px; top:16px; width:410px" role="dialog" aria-label="Data Validation">
+          <div class="tbar">Data Validation<span class="x">✕</span></div><p class="sub">What can be typed in C2:C50.</p>
+          <div class="dtabs"><span class="on">Settings</span><span>Input Message</span><span>Error Alert</span></div>
+          <div class="body">
+            <span class="cap">Validation criteria</span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <label class="fld"><span><u>A</u>llow</span><select><option>Any value</option><option>Whole number</option><option>Decimal</option><option selected>List</option><option>Date</option><option>Time</option><option>Text length</option><option disabled>Custom</option></select></label>
+              <div style="display:grid;gap:4px;padding-top:20px"><label><input type="checkbox" checked><span>Ignore <u>b</u>lank</span></label><label><input type="checkbox" checked><span><u>I</u>n-cell dropdown</span></label></div>
+            </div>
+            <label class="fld"><span><u>D</u>ata</span><select disabled><option>between</option></select></label>
+            <label class="fld"><span><u>S</u>ource</span><input type="text" value="To do,Doing,Done"></label>
+            <label><input type="checkbox"><span>Apply these changes to all other cells with the same settings</span></label>
+          </div>
+          <div class="btns"><button class="xb start">Clear All</button><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+        <div class="dlg" style="left:452px; top:16px; width:330px" role="dialog" aria-label="Error Alert tab">
+          <div class="tbar">Data Validation<span class="x">✕</span></div>
+          <div class="dtabs"><span>Settings</span><span>Input Message</span><span class="on">Error Alert</span></div>
+          <div class="body">
+            <label><input type="checkbox" checked><span>Show error alert after invalid data is entered</span></label>
+            <label class="fld"><span>St<u>y</u>le</span><select><option selected>Stop</option><option>Warning</option><option>Information</option></select></label>
+            <label class="fld"><span><u>T</u>itle</span><input type="text" value="Progress"></label>
+            <label class="fld"><span><u>E</u>rror message</span><textarea rows="2">Pick To do, Doing or Done.</textarea></label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Data › Data Validation…</h3><ul>
+      <li>Excel's three tabs: Settings, Input Message, Error Alert.</li>
+      <li>Allow: List (Source as text, or a range like <code>=$F$1:$F$3</code> on the same sheet), Whole number, Decimal, Date, Time, Text length. Custom needs formulas: greyed.</li>
+      <li>Input Message shows a small note beside the selected cell.</li>
+      <li>Error Alert: Stop rejects, Warning asks “Continue?”, Information just informs.</li>
+      <li>Team sheets only; Content and Video keep their own pickers.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 8 list in the cell + stop alert -->
+  <section class="scene" data-scene="dvcell">
+    <div class="card"><div class="fbar"><span class="namebox">C4</span><span class="fx">fx</span><span>Doing</span></div>
+      <div class="stage" style="min-height:430px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th class="on">C</th><th>D</th></tr>
+          <tr><td class="no">1</td><td>Task</td><td>Owner</td><td>Progress</td><td></td></tr>
+          <tr><td class="no">2</td><td>Brief</td><td>Samaa</td><td>Done</td><td></td></tr>
+          <tr><td class="no">3</td><td>Script</td><td>Hisham</td><td>Doing</td><td></td></tr>
+          <tr><td class="no on">4</td><td>Shoot</td><td>Islam</td><td>Doing</td><td></td></tr>
+          <tr><td class="no">5</td><td>Edit</td><td>Raneem</td><td>To do</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="4,3,4,3"></div>
+        <div class="ddbtn" data-at="4,3,tr" data-dx="-25" data-dy="3">▾</div>
+        <div class="list" data-at="4,3,bl" data-dx="0" data-dy="4" style="width:150px"><div>To do</div><div class="cur hl">Doing</div><div>Done</div></div>
+        <div class="inmsg" data-at="4,3,tr" data-dx="64" data-dy="0"><b>Progress</b>Pick from the list.</div>
+        <div class="dlg alert" style="left:300px; top:250px; width:350px" role="alertdialog" aria-label="Progress">
+          <div class="body" style="padding-top:16px"><span class="ico">!</span><div class="msg"><b>Progress</b>“Maybe” isn't allowed here. Pick To do, Doing or Done.</div></div>
+          <div class="btns"><button class="xb link start">Help</button><button class="xb">Cancel</button><button class="xb def">Retry</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>In the cell</h3><ul>
+      <li>As in Excel, the ▾ button shows only on the selected cell; other values look like plain text.</li>
+      <li><kbd>Alt</kbd>+<kbd>↓</kbd> or a click on ▾ opens the list; the current value is ticked.</li>
+      <li>Typing “Maybe” with Style Stop shows the Stop alert (Retry / Cancel / Help), with the title and message set in the Error Alert tab. Warning asks Yes / No / Cancel.</li>
+      <li>Pasted and filled values are checked too; the ones refused are counted in a note.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 9 Pick from drop-down list -->
+  <section class="scene" data-scene="pick">
+    <div class="card"><div class="fbar"><span class="namebox">B6</span><span class="fx">fx</span></div>
+      <div class="stage" style="min-height:300px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td>Name</td><td>Team</td><td></td></tr>
+          <tr><td class="no">2</td><td>Hisham</td><td>Video</td><td></td></tr>
+          <tr><td class="no">3</td><td>Islam</td><td>Video</td><td></td></tr>
+          <tr><td class="no">4</td><td>Raneem</td><td>Marketing</td><td></td></tr>
+          <tr><td class="no">5</td><td>Samaa</td><td>Content</td><td></td></tr>
+          <tr><td class="no on">6</td><td>Roaa</td><td></td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="6,2,6,2"></div>
+        <div class="list" data-at="6,2,bl" data-dx="0" data-dy="4" style="width:160px"><div class="hl">Content</div><div>Marketing</div><div>Video</div></div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Pick From Drop-down List</h3><ul>
+      <li><kbd>Alt</kbd>+<kbd>↓</kbd>, or right-click → Pick From Drop-down List…</li>
+      <li>The column's values, sorted, each once (as in Excel). Arrows and Enter pick; Esc closes.</li>
+      <li>On team sheets and the Content and Video sheets' text columns.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 10 view -->
+  <section class="scene" data-scene="view">
+    <div class="card">
+      <div class="menubar"><span>File<i class="kt">F</i></span><span>Edit<i class="kt">E</i></span><span>View<i class="kt">W</i></span><span>Insert<i class="kt">N</i></span><span>Format<i class="kt">O</i></span><span>Data<i class="kt">A</i></span><span>Help<i class="kt">Y</i></span></div>
+      <div class="ribbon" id="ribbon" style="margin-top:14px">🔍 ↶ ↷ 🖌 · EGP % .0 .00 123 · Inter · − 10 + · B I S A · fill · borders · merge · align · wrap</div>
+      <div class="fbar"><span class="namebox">B2:B5</span><span class="fx">fx</span><span>5</span></div>
+      <div class="stage" style="min-height:190px">
+        <table id="zt" style="zoom:1.1">
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td>Week</td><td>Reach (k)</td><td>Owner</td></tr>
+          <tr><td class="no on">2</td><td>W1</td><td class="num">5</td><td>Samaa</td></tr>
+          <tr><td class="no on">3</td><td>W2</td><td class="num in">10</td><td>Hisham</td></tr>
+          <tr><td class="no on">4</td><td>W3</td><td class="num in">15</td><td>Islam</td></tr>
+          <tr><td class="no on">5</td><td>W4</td><td class="num in">20</td><td>Raneem</td></tr>
+        </table>
+      </div>
+      <div class="sbar"><span class="ready">Ready</span><span class="sp"></span><span class="st">Average <b>12.5</b></span><span class="st">Count <b>4</b></span><span class="st">Sum <b>50</b></span><span class="views" aria-label="Views"><span class="on" title="Normal">▦</span><span title="Page Layout">▭</span><span title="Page Break Preview">⊞</span></span><span class="zoom"><button id="zm">−</button><span class="track"><i id="zk" style="left:62px"></i></span><button id="zp">+</button><b id="zv">110%</b></span></div>
+    </div>
+    <div class="side"><div class="card"><h3>As in Excel</h3><ul>
+      <li>Status bar: Average, Count and Sum on the right (right-click it to add Numerical Count, Minimum, Maximum), the view buttons and the zoom slider with − / + and the percentage.</li>
+      <li><kbd>Ctrl</kbd>+wheel zooms 10%–400% in Excel; here 50%–200%. Click the percentage for the Zoom dialog. Kept for you per sheet.</li>
+      <li><kbd>Ctrl</kbd>+<kbd>F1</kbd> collapses the ribbon (our toolbar). <button class="xb" id="f1">Try it</button></li>
+      <li>Press <kbd>Alt</kbd>: KeyTip badges appear under each menu; press the letter. Excel's letters where they match (Insert N, Data A, View W).</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 11 Custom Lists -->
+  <section class="scene" data-scene="lists">
+    <div class="card"><div class="stage" style="min-height:480px">
+      <div class="dlg" style="left:24px; top:20px; width:560px" role="dialog" aria-label="Custom Lists">
+        <div class="tbar">Custom Lists<span class="x">✕</span></div><p class="sub">Lists the fill handle continues, for the whole workspace.</p>
+        <div class="body" style="grid-template-columns:1fr 1fr 90px;align-items:start;gap:10px">
+          <div class="fld"><span class="cap">C<u>u</u>stom lists</span><div class="lb" style="height:200px"><div style="color:var(--purple-deep);font-weight:600">＋ New list</div><div class="fixed">Sun, Mon, Tue, Wed, … <span class="tag">BUILT-IN</span></div><div class="fixed">Sunday, Monday, … <span class="tag">BUILT-IN</span></div><div class="fixed">Jan, Feb, Mar, … <span class="tag">BUILT-IN</span></div><div class="fixed">January, February, … <span class="tag">BUILT-IN</span></div><div class="fixed">الأحد، الاثنين، … <span class="tag">BUILT-IN</span></div><div class="fixed">يناير، فبراير، … <span class="tag">BUILT-IN</span></div><div class="on">Samaa, Hisham, Islam, …</div><div>LinkedIn, Instagram, Facebook, …</div></div></div>
+          <div class="fld"><span class="cap">List <u>e</u>ntries</span><textarea rows="9" style="height:200px">Samaa
+Hisham
+Islam
+Raneem
+Roaa</textarea></div>
+          <div style="display:grid;gap:6px;padding-top:22px"><button class="xb">Add</button><button class="xb" style="color:var(--danger)">Delete</button></div>
+          <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center"><span style="white-space:nowrap;color:var(--muted);font-weight:600">Import list from cells</span><input type="text" value="A2:A6" style="width:120px"><button class="xb">Import</button></div>
+        </div>
+        <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+      </div>
+    </div></div>
+    <div class="side"><div class="card"><h3>Edit Custom Lists…</h3><ul>
+      <li>Built-in lists (days and months, also in Arabic) are fixed; your lists can be added, edited, deleted, or imported from the selected cells.</li>
+      <li>Opened from Settings › Sheets (admins) and from File › Options in the sheet. Workspace-wide.</li>
+      <li>Type any entry and drag the fill handle: the list continues.</li>
+    </ul></div></div>
+  </section>
+</div>
+<script>
+const tabs = document.querySelectorAll('[role="tab"]')
+tabs.forEach(b => b.addEventListener('click', () => {
+  tabs.forEach(x => x.setAttribute('aria-selected', String(x === b)))
+  document.querySelectorAll('.scene').forEach(s => s.classList.toggle('on', s.dataset.scene === b.dataset.s))
+}))
+const R = document.documentElement
+document.getElementById('theme').onclick = () => { R.dataset.theme = R.dataset.theme === 'dark' ? 'light' : 'dark' }
+document.getElementById('dir').onclick = () => { R.dir = R.dir === 'rtl' ? 'ltr' : 'rtl' }
+let z = 110
+const setZ = v => { z = Math.max(50, Math.min(200, v)); document.getElementById('zt').style.zoom = z / 100; document.getElementById('zv').textContent = z + '%'; document.getElementById('zk').style.left = (z - 50) / 150 * 106 + 'px' }
+document.getElementById('zm').onclick = () => setZ(z - 10)
+document.getElementById('zp').onclick = () => setZ(z + 10)
+/** Each overlay sits on its real cells: data-r="r0,c0,r1,c1" (a box), data-at="r,c,corner" (a point). */
+function place() {
+  document.querySelectorAll('.scene.on .stage').forEach(st => {
+    const tb = st.querySelector('table'); if (!tb) return
+    const o = st.getBoundingClientRect()
+    const cell = (r, c) => tb.rows[r].cells[c].getBoundingClientRect()
+    st.querySelectorAll('[data-r]').forEach(el => {
+      const [r0, c0, r1, c1] = el.dataset.r.split(',').map(Number)
+      const a = cell(r0, c0), b = cell(r1, c1)
+      const L = Math.min(a.left, b.left), T = Math.min(a.top, b.top), Rr = Math.max(a.right, b.right), B = Math.max(a.bottom, b.bottom)
+      Object.assign(el.style, { left: (L - o.left - 1) + 'px', top: (T - o.top - 1) + 'px', width: (Rr - L + 1) + 'px', height: (B - T + 1) + 'px' })
+    })
+    st.querySelectorAll('[data-at]').forEach(el => {
+      const [r, c, k] = el.dataset.at.split(','); const x = cell(+r, +c)
+      const rtl = getComputedStyle(st).direction === 'rtl'
+      const right = rtl ? x.left : x.right, left = rtl ? x.right : x.left
+      let px = k === 'br' || k === 'tr' ? right : k === 'c' ? (x.left + x.right) / 2 : left
+      let py = k === 'tr' ? x.top : k === 'c' ? (x.top + x.bottom) / 2 : x.bottom
+      const dx = (+el.dataset.dx || 0) * (rtl ? -1 : 1), dy = +el.dataset.dy || 0
+      if (rtl && el.offsetWidth > 20) px -= el.offsetWidth
+      Object.assign(el.style, { left: (px - o.left + dx) + 'px', top: (py - o.top + dy) + 'px' })
+    })
+  })
+}
+tabs.forEach(b => b.addEventListener('click', () => requestAnimationFrame(place)))
+document.getElementById('dir').addEventListener('click', () => requestAnimationFrame(place))
+window.addEventListener('resize', place)
+window.addEventListener('load', place)
+document.getElementById('f1').onclick = () => document.getElementById('ribbon').classList.toggle('collapsed')
+</script>
+</body>
+</html>
