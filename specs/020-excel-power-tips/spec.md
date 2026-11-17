@@ -48,6 +48,7 @@ Spec 013 decided that the sheets have no formulas.
 | 75 Ctrl+Shift+L | spec 015 stage 3 |
 | 76–77 Multi-level sort, sort by color | spec 015 stage 3 |
 | 109 Reorder columns by dragging | spec 019 |
+| 112 Ctrl+drag a sheet tab to duplicate | tab bar (spec 013) |
 | 118 Ctrl+click and Shift+F8 | spec 017 |
 
 ## Clarifications
@@ -210,7 +211,7 @@ Also:
 - **Dragging a selection's border** moves it (tip 13). **Ctrl** copies, **Shift** inserts between rows or columns, and **Ctrl+Shift** inserts a copy (tips 107–109).
 - **Right-dragging the border** offers Move, Copy, Copy values only, Copy formats only (tip 110).
 - **Alt+dragging** over a sheet tab drops the block on that sheet (tip 111).
-- **Ctrl+dragging a sheet tab** duplicates the sheet (tip 112).
+- Ctrl+dragging a sheet tab already duplicates it (tip 112).
 
 **Independent Test**: Move B2:C5 to E2 with the mouse, then Ctrl-drag the sheet tab. The cells, formats and comments move with the block; the copy has its own name; each is one undo step.
 
