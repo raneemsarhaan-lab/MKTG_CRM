@@ -554,11 +554,12 @@ export function BlankSheet(p: BlankSheetProps) {
     // Spec 016: the Task column and mapped columns say so on their heading.
     headerExtra: col => {
       if (!lk.map) return null
-      if (col === lk.map.taskCol) return <span className="fx-lk-tc" data-task-col-badge="">{tl('taskCol')}</span>
+      // Spec 019: a small icon beside the letter; its name is in the tooltip and for screen readers.
+      if (col === lk.map.taskCol) return <span className="fx-lk-hic is-task" data-task-col-badge="" role="img" aria-label={tl('taskCol')} title={tl('taskCol')}><FieldIcon field="task" /></span>
       const f = lk.map.fields[col]
       if (!f) return null
       const name = f.startsWith('col:') ? tl('teamCol', { name: lk.teamCols.find(c => c.id === f.slice(4))?.name ?? '' }) : tl(`fields.${f}`)
-      return <span className="fx-lk-badge" data-field-badge={f} title={tl('badgeTip', { field: name })}><FieldIcon field={f} />{name}</span>
+      return <span className="fx-lk-hic" data-field-badge={f} role="img" aria-label={tl('badgeTip', { field: name })} title={tl('badgeTip', { field: name })}><FieldIcon field={f} /></span>
     },
     rowProps: row => ({ className: `is-blank${(rowIndex.get(row.id) ?? 0) > 0 && hiddenR.has(doc.rows[(rowIndex.get(row.id) ?? 1) - 1].id) ? ' is-after-hidden' : ''}`, level: 1 }),
     cellRole: () => 'gridcell',

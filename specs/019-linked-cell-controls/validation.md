@@ -66,3 +66,9 @@ Stage 1 covers team (blank) sheets. The Content sheet (stage 2) and the Video sh
 
 - **Clearing a due date.** The board's `updateTask` refused an empty due date, so undoing a date on a task that had none failed, and so did the date box's Clear. An empty value now clears the date, as the Content sheet already allowed.
 - **The hours reminder.** It now waits while the Fields drawer is open, as it already does for dialogs.
+
+## Follow-up (after the first try in TSC Calendar)
+
+- **Link fields on every task.** Working doc, Design link, Post link and Published link now apply to every board task, not only to tasks under a theme (the board lets any task have them). A clip's links are still on its video.
+- **Field headings.** A field heading is now the column letter plus a small icon. The field's name is in the tooltip and is read by screen readers. The Task column has a dark ✓ icon.
+- Re-run: realapp fields 58/58 (twice), links 40/40.
