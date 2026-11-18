@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
 import { nextSheetName, validateFolderName } from '@/lib/sheet-names'
-import { mergeStyle, validateStyle } from '@/lib/sheet-format'
+import { indexFormats, mergeStyle, resolveStyle, validateStyle } from '@/lib/sheet-format'
 import type { CellStyle, ColFilter, ConditionalRule, FilterArea, FolderSummary, GroupBy, FormatWrite, SheetChanges, SheetDoc, SheetExtras, SheetKind, SheetMergeRecord, SheetSummary, SheetTableRecord, SheetThreadSummary, SheetView, SlicerRecord, AdvancedFilter, TotalFn, SortKey, TabColor, ValidationRecord, ViewWrite } from '@/types/index'
 import { MAX_VALIDATIONS, cleanRecord as cleanValidation } from '@/lib/sheet-validate'
 import { ICON_SETS, RULE_KINDS, TAB_COLORS, TOTAL_FNS } from '@/types/index'
@@ -541,7 +541,15 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       const sheet = await tx.sheet.findUnique({ where: { id: sheetId } })
       if (!sheet) throw new Refuse('gone')
       if (sheet.kind !== 'blank') throw new Refuse('linked')
-      if (!mayEdit(sheet, m)) throw new Refuse('protected')
+      if (!mayEdit(sheet, m)) {
+        // Spec 020 tip 95: while protected, others may change values in unlocked cells only, and nothing else.
+        const other = Object.entries(changes).some(([k, v]) => k !== 'cells' && v !== undefined && v !== null && !(Array.isArray(v) && !v.length))
+        if (other || !cells.length) throw new Refuse('protected')
+        const rowIds = [...new Set(cells.map(c => c.rowId))], colIds = [...new Set(cells.map(c => c.colId))]
+        const recs = await tx.sheetFormat.findMany({ where: { sheet_id: sheetId, row_key: { in: [...rowIds, ''] }, col_key: { in: [...colIds, ''] } } })
+        const idx = indexFormats(recs.map(r => ({ rowKey: r.row_key, colKey: r.col_key, style: (r.style ?? {}) as CellStyle })))
+        if (cells.some(c => !resolveStyle(idx, c.rowId, c.colId)?.unlocked)) throw new Refuse('protected')
+      }
 
       // Structure first: deletes, then inserts, then sizes.
       if (changes.deleteRows?.length) await tx.sheetRow.deleteMany({ where: { sheet_id: sheetId, id: { in: changes.deleteRows } } })
@@ -628,6 +636,13 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
       if (changes.rules) await writeRules(tx, sheetId, changes.rules)
       if (changes.tables) await writeTables(tx, sheetId, changes.tables)
       if (changes.validations) await writeValidations(tx, sheetId, changes.validations)
+      // Spec 020: comments move with their cells (a border drag), in order.
+      // All at once (through a parking key), since a cell can move to where another moved away from.
+      for (const group of (Array.isArray(changes.commentMoves) ? changes.commentMoves : []).slice(0, 200)) {
+        const moves = (Array.isArray(group) ? group : []).slice(0, 5000).filter(mv => Array.isArray(mv?.from) && Array.isArray(mv?.to) && [...mv.from, ...mv.to].every(k => typeof k === 'string' && k.length <= 80))
+        for (let i = 0; i < moves.length; i++) await tx.sheetComment.updateMany({ where: { sheet_id: sheetId, row_key: moves[i].from[0], col_key: moves[i].from[1] }, data: { row_key: `~move~${i}` } })
+        for (let i = 0; i < moves.length; i++) await tx.sheetComment.updateMany({ where: { sheet_id: sheetId, row_key: `~move~${i}` }, data: { row_key: moves[i].to[0], col_key: moves[i].to[1] } })
+      }
       // Spec 016: the column mapping and rows' tasks (cleaned; unknown rows and tasks are skipped).
       if ('taskMap' in changes) {
         let map: SheetTaskMap | null = null

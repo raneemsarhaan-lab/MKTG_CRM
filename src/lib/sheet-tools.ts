@@ -61,7 +61,7 @@ export function transpose<T>(grid: T[][], fill: T): T[][] {
   return Array.from({ length: w }, (_, c) => grid.map(r => (c < r.length ? r[c] : fill)))
 }
 
-const STYLE_KEYS: (keyof CellStyle)[] = ['font', 'size', 'b', 'i', 's', 'u', 'color', 'fill', 'bt', 'br', 'bb', 'bl', 'ha', 'va', 'wrap', 'indent', 'rot', 'num']
+const STYLE_KEYS: (keyof CellStyle)[] = ['font', 'size', 'b', 'i', 's', 'u', 'color', 'fill', 'bt', 'br', 'bb', 'bl', 'ha', 'va', 'wrap', 'indent', 'rot', 'num', 'unlocked']
 
 /** A patch that makes a cell look exactly like `style` (Format Painter): its fields, and nulls for the rest. */
 export function paintPatch(style: CellStyle | null | undefined): StylePatch {

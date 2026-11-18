@@ -15,13 +15,17 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { STATUS_EVENT, ZOOM_EVENT, tipsBus, zoomBus, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type WriteResult, type WriteWhy } from './GridCore'
+import { STATUS_EVENT, ZOOM_EVENT, tipsBus, zoomBus, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MoveRequest, type WriteResult, type WriteWhy } from './GridCore'
 import { defaultMode, fillModesFor, learnFlash, planSeries, planSeriesDialog, previewValue, sourceKind, type FillCtx, type FillMode, type SeriesSpec } from '@/lib/sheet-fill'
 import { foldCells, type GoSpecial } from '@/lib/sheet-selection'
 import { parseNumber } from '@/lib/sheet-format'
 import { PopMenu, type PopItem } from '@/components/sheets/PopMenu'
 import { FORMAT_CMD, sendFormat, type FormatCmd, type FormatSource } from '@/components/sheets/format/bus'
 import { HISTORY_EVENT } from './useLinkedEditing'
+import { planMove } from '@/lib/sheet-move'
+import { moveFor, moveMenuItems } from '@/components/sheets/format/moveMenu'
+import { MoveAlert } from '@/components/sheets/format/TipsDialogs'
+import { PrintDialog, type PrintData } from '@/components/sheets/print/PrintDialog'
 
 /** The Go To Special choices these sheets answer. */
 export const LINKED_SPECIAL: GoSpecial[] = ['notes', 'constants', 'blanks', 'region', 'lastCell', 'visible', 'rowDiffs', 'colDiffs']
@@ -334,6 +338,7 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
       else if (cmd.kind === 'series') void series(cmd.spec, cmd.by)
       else if (cmd.kind === 'flashFill') void flashFill()
       else if (cmd.kind === 'repeat') repeat()
+      else if (cmd.kind === 'print') setPrinting(true)
       else if (cmd.kind === 'pickList') {
         const el = document.querySelector<HTMLElement>('[data-linked-pane] .fx-sheet-td.is-active')
         const row = el ? live.current.m.rows.find(r => r.key === el.dataset.rowKey) : undefined
@@ -343,6 +348,54 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
     document.addEventListener(FORMAT_CMD, on)
     return () => document.removeEventListener(FORMAT_CMD, on)
   }, [p.enabled, source]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── spec 020 stage C: File › Print (tip 99): what's on screen, the headings repeated on each page ──
+  const [printing, setPrinting] = useState(false)
+  function printData(selOnly: boolean): PrintData {
+    const mm = live.current.m, q = rect.current
+    const rowsAt = (selOnly ? range(q.r0, q.r1) : range(0, mm.rows.length - 1)).filter(cellRow)
+    const cols = (selOnly ? range(q.c0, q.c1) : range(0, mm.cols.length - 1)).filter(c => mm.cols[c] !== 'rowNo')
+    const label = (r: number) => { const l = mm.rowLabel?.(mm.rows[r], r); return typeof l === 'string' || typeof l === 'number' ? String(l) : String(r + 1) }
+    return {
+      title: document.title.split('·')[0].trim() || 'Sheet', headings: true, ref: `${rowsAt.length} × ${cols.length}`,
+      cols: cols.map(c => ({ name: mm.header(mm.cols[c]).label ?? String(mm.cols[c]), width: mm.widths[mm.cols[c]] ?? 120 })),
+      rows: rowsAt.map(r => ({ label: label(r), cells: cols.map(c => { const css = mm.cellStyle?.(mm.rows[r], mm.cols[c]); return { text: shownAt(r, c), css: css ? { ...css.cell, ...(css.text ?? {}) } : undefined } }) })),
+    }
+  }
+
+  // ── spec 020 stage C: moving and copying with the mouse ──
+  const [moveAlert, setMoveAlert] = useState<string | null>(null)
+  /** "Row 12 · Status": how these sheets name a cell (the row number on the left, the column's heading). */
+  const cellLabel = (r: number, c: number) => {
+    const row = live.current.m.rows[r], col = live.current.m.cols[c]
+    const l = row ? live.current.m.rowLabel?.(row, r) : null
+    const n = typeof l === 'string' || typeof l === 'number' ? String(l) : String(r + 1)
+    const h = col ? live.current.m.header(col).label ?? String(col) : ''
+    return tt('move.cellName', { row: n || String(r + 1), col: h })
+  }
+  const rangeName = (req: MoveRequest) => {
+    const h = req.from.r1 - req.from.r0, w = req.from.c1 - req.from.c0
+    return h || w ? `${cellLabel(req.to.r, req.to.c)} … ${cellLabel(req.to.r + h, req.to.c + w)}` : cellLabel(req.to.r, req.to.c)
+  }
+  function moveCells(req: MoveRequest): GridRect | null {
+    const { m: mm, p: pp } = live.current
+    if (!pp.writeCells) return null
+    const h = req.from.r1 - req.from.r0, w = req.from.c1 - req.from.c0
+    if (req.to.r + h >= mm.rows.length || req.to.c + w >= mm.cols.length) { say(tt('move.outside')); return null }
+    const plan = planMove(req.from, req.to, req.kind, null, mm.rows.length, mm.cols.length)
+    // Every value goes through the board's rules in one step; if any cell can't take its value, the step is undone and nothing moves.
+    const writes: CellWrite[] = plan.cells.map(x => ({ r: x.to.r, c: x.to.c, value: x.from ? textAt(x.from.r, x.from.c) : '' }))
+    void pp.writeCells(writes, 'paste').then(res => {
+      const bad = res?.refused?.[0]
+      if (bad) {
+        if ((res?.done ?? 0) > 0) live.current.p.onUndo?.()
+        setMoveAlert(bad.note ? `${cellLabel(bad.r, bad.c)}: ${bad.note}` : tt('move.cantTake', { cell: cellLabel(bad.r, bad.c), value: bad.value }))
+        return
+      }
+      if (res && (res.done ?? 0) > 0) say(tt(req.kind === 'copy' ? 'move.copied' : 'move.moved', { cell: rangeName(req) }))
+    })
+    return { r0: req.to.r, c0: req.to.c, r1: req.to.r + h, c1: req.to.c + w }
+  }
 
   const prevSelect = m.onSelect, prevRedo = m.onRedo
   const model: Partial<GridModel<R>> = p.enabled ? {
@@ -356,11 +409,20 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
     // Ctrl+Y with nothing to redo repeats, as Excel.
     onRedo: () => { if (canRedo.current || !lastCmd.current) prevRedo?.(); else repeat() },
     onSelect: (q, list) => { prevSelect?.(q, list); onSelect(q, list) },
+    // Spec 020 stage C (asked for in the design review): drag-moving works here too; a value a cell can't take stops the move with Excel's alert.
+    ...(p.writeCells ? {
+      onMove: req => moveCells(req),
+      onMoveMenu: (req, at, anchor) => setMenu({ at, anchor, label: tt('move.menuLabel'), attr: 'data-move-menu',
+        items: moveMenuItems(tt, c => { const r = moveFor(req, c); if (r) moveCells(r) }, { linked: true }) }),
+      moveTip: req => tt(req.kind === 'copy' ? 'move.tipCopy' : 'move.tipMove', { cell: rangeName(req) }),
+    } : {}),
   } : {}
-  const node = menu ? (
-    <PopMenu key={`${menu.attr}-${menu.label}`} at={menu.at} items={menu.items} label={menu.label} attr={menu.attr} returnTo={menu.anchor}
-             onClose={() => setMenu(null)} />
-  ) : null
+  const node = <>
+    {menu && <PopMenu key={`${menu.attr}-${menu.label}`} at={menu.at} items={menu.items} label={menu.label} attr={menu.attr} returnTo={menu.anchor}
+                      onClose={() => setMenu(null)} />}
+    {moveAlert && <MoveAlert text={moveAlert} onClose={() => setMoveAlert(null)} />}
+    {printing && <PrintDialog data={printData} selection={rect.current.r0 !== rect.current.r1 || rect.current.c0 !== rect.current.c1} onClose={() => setPrinting(false)} />}
+  </>
   return { model, node, grid: { selectAreas, optionsAt } }
 }
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)

@@ -172,11 +172,11 @@
 
 **Independent Test**: B2:C5 dragged to E2 moves cells, formats and comments in one undo; a move that splits a merge is refused (spec US7).
 
-- [ ] T060 Write the stage C HTML design (border-drag cursor and outline, right-drag menu, Alt+drag over a tab, Protection tab in Format Cells, print view and its options) in design/power-tips-c.html, and get approval
-- [ ] T061 [US7] Border drag in the grid: hit-test 4 px around the selection outline, a ghost target, Ctrl/Shift/Ctrl+Shift modes, right-drag menu, calling `onMove`, in src/components/sheet/GridCore.tsx
-- [ ] T062 [US7] BlankSheet `onMove`: one step moving or copying cells, formats, comments and merges inside the block, with insert shifting; refused when it would split a merge or a table, in src/components/sheets/BlankSheet.tsx
-- [ ] T063 [US7] Alt+drag over a sheet tab: `onMoveToSheet` in the Workbook applies a clear here and a write there, one step on each sheet's stack, in src/components/sheets/Workbook.tsx and src/components/sheets/TabBar.tsx
-- [ ] T064 [US7] Lab checks for US7 (quickstart Stage C §1) in scripts/spreadsheet-lab/realapp/tips-c.cjs
+- [X] T060 Write the stage C HTML design (border-drag cursor and outline, right-drag menu, Alt+drag over a tab, Protection tab in Format Cells, print view and its options) in design/power-tips-c.html, and get approval
+- [X] T061 [US7] Border drag in the grid: hit-test 4 px around the selection outline, a ghost target, Ctrl/Shift/Ctrl+Shift modes, right-drag menu, calling `onMove`, in src/components/sheet/GridCore.tsx
+- [X] T062 [US7] BlankSheet `onMove`: one step moving or copying cells, formats, comments and merges inside the block, with insert shifting; refused when it would split a merge or a table, in src/components/sheets/BlankSheet.tsx
+- [X] T063 [US7] Alt+drag over a sheet tab: `onMoveToSheet` in the Workbook applies a clear here and a write there, one step on each sheet's stack, in src/components/sheets/Workbook.tsx and src/components/sheets/TabBar.tsx
+- [X] T064 [US7] Lab checks for US7 (quickstart Stage C §1) in scripts/spreadsheet-lab/realapp/tips-c.cjs
 
 ---
 
@@ -186,10 +186,10 @@
 
 **Independent Test**: with B2:B20 unlocked and the sheet protected, a member types in B2 (saved) and A2 (refused); a 120-row print repeats the header row (spec US8).
 
-- [ ] T065 [US8] `CellStyle.unlocked` in src/types/index.ts, and a Format Cells → Protection tab with a Locked checkbox
-- [ ] T066 [US8] Server: while protected, a non-protector non-admin may send only a `cells` change whose cells all resolve to unlocked, in src/actions/sheets.ts; the client `readOnlyNote` mirrors this in src/components/sheets/BlankSheet.tsx
-- [ ] T067 [P] [US8] Print view of the used range or the selection (cell looks, `<thead>` repeat rows, fit to width, orientation, gridlines) in src/components/sheets/print/PrintView.tsx, opened from File › Print (print CSS in src/app/globals.css)
-- [ ] T068 [US8] Lab checks for US8 (quickstart Stage C §2–§3), then the stage C regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-c.cjs
+- [X] T065 [US8] `CellStyle.unlocked` in src/types/index.ts, and a Format Cells → Protection tab with a Locked checkbox
+- [X] T066 [US8] Server: while protected, a non-protector non-admin may send only a `cells` change whose cells all resolve to unlocked, in src/actions/sheets.ts; the client `readOnlyNote` mirrors this in src/components/sheets/BlankSheet.tsx
+- [X] T067 [P] [US8] Print view of the used range or the selection (cell looks, `<thead>` repeat rows, fit to width, orientation, gridlines) in src/components/sheets/print/PrintView.tsx, opened from File › Print (print CSS in src/app/globals.css)
+- [X] T068 [US8] Lab checks for US8 (quickstart Stage C §2–§3), then the stage C regressions, docs and PR, in scripts/spreadsheet-lab/realapp/tips-c.cjs
 
 **Checkpoint**: all eight stories are done.
 

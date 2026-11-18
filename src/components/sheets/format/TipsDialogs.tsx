@@ -338,3 +338,23 @@ export function CustomListsDialog({ lists, canEdit, fromCells, onSave, onCancel 
     </Modal>
   )
 }
+
+/**
+ * Spec 020 stage C: Excel's Stop alert for a move or copy that would put a
+ * value where it doesn't fit (a board field that can't take it, or a cell's
+ * data validation). Nothing has changed when it shows.
+ */
+export function MoveAlert({ text, onClose }: { text: string; onClose(): void }) {
+  const t = useTranslations('sheets.tips')
+  return (
+    <Modal title={t('move.alertTitle')} onCancel={onClose} attr="data-move-alert">
+      <div className="fx-tip-alert is-stop" role="alert">
+        <span className="fx-tip-alert-ic" aria-hidden="true">!</span>
+        <p>{t('move.alertLead')}<br /><b>{text}</b><br />{t('move.alertNothing')}</p>
+      </div>
+      <Row>
+        <button type="button" className="is-lime" data-autofocus="" data-ok="" onClick={onClose}>{t('ok')}</button>
+      </Row>
+    </Modal>
+  )
+}

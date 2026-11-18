@@ -718,7 +718,7 @@ Spec 019, stage 1 (`specs/019-linked-cell-controls/`). Design: `design/task-fiel
 
 ### Excel power tips in the sheets (spec 020)
 
-Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3) and stage B (US4–US6, below). Stage A design: `design/power-tips-a.html` (Excel's behaviour and wording, drawn in the app's look). No formulas (FR-015). Stages B and C each have their own design and PR.
+Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3), stage B (US4–US6) and stage C (US7–US8), below. Stage A design: `design/power-tips-a.html` (Excel's behaviour and wording, drawn in the app's look). No formulas (FR-015). Stages B and C each have their own design and PR.
 
 - **Keys (GridCore).**
   - Shift+Space selects the row, Ctrl+Space the column, and Ctrl+Shift+Space everything. The active cell moves to the block's corner, because the grid's selection always starts at the active cell.
@@ -783,6 +783,41 @@ Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3) and stage B (US4�
 - **Status bar.** Right-click it (or ⋯) for Customize Status Bar: Average, Count, Numerical Count, Minimum, Maximum, Sum and the Zoom Slider. The choice is kept per member in `momentum.sheet.stats`. Min and Max come from `report()` on team sheets and `useGridTips` on the linked sheets.
 - **Selection over fills.** A selected cell with a fill keeps it under the selection tint (`box-shadow`), so a table's white header text stays readable.
 - **Checks.** `node scripts/spreadsheet-lab/realapp/tips-b.cjs` (58 checks), and the `tips-numfmt`, `tips-clean`, `tips-criteria`, `tips-wildcards`, `tips-outline` and `tips-icons` pure checks.
+
+**Stage C (US7–US8).** Design: `design/power-tips-c.html`, approved with one change: the board's sheets get drag-moving too, with Excel's Stop alert when a value doesn't fit.
+
+- **Border drag (GridCore).**
+  - A press within 4 px of the selection's outline starts a move (`onEdge`, `startMove`). The grid shows `is-move-edge` (the move cursor) on hover and `is-moving` / `is-copying` while dragging.
+  - Ctrl copies, Shift inserts (`moveShift`; an insertion bar via `is-mvbar-t/s`), Esc cancels, and the tip comes from `moveTip`. The target is found through anything floating over the grid (`elementsFromPoint`).
+  - Drops call `onMove(req)`, which returns the block's new place to select. A right-drag calls `onMoveMenu`.
+- **The plan.**
+  - `sheet-move.ts` `planMove` says which cell's content ends up where: a plain move or copy, or an insert that shifts down or right and, for a move, closes the gap.
+  - `MOVE_CHOICES` is Excel's right-drag menu with its access keys (M C V F L H S R D T). `moveMenu.tsx` builds it.
+  - `PopMenu` items take `ak` (pressed by key or key position, so it works on an Arabic keyboard). An "&" in an English label underlines the letter.
+- **Team sheets (`moveCells` in BlankSheet).** One step holding:
+  - values, cell formats, and comments (the new `commentMoves` change kind, applied all at once per drag, in order across drags);
+  - merges, tables and data validation wholly inside a plain move (a copy copies merges and validation);
+  - new rows or columns when the drop reaches past the sheet.
+  - It refuses to split a merge or table, and Shift through either. It asks before replacing data, and a Stop validation rule at the destination stops it with `MoveAlert`.
+- **Board sheets (`useGridTips`).**
+  - Values go through the sheet's own `writeCells(…, 'paste')`, which now reports `refused` (cell, value, note) and `done`.
+  - If anything is refused, the step is undone (`onUndo`) and `MoveAlert` names the cell and the board's reason.
+  - Shift and Formats Only are greyed in the menu.
+- **Alt+drag to another sheet.**
+  - Over a tab, GridCore calls `onMoveToTab`, and BlankSheet builds a `Carry` (values and looks).
+  - The Workbook opens that sheet and hands the carry over as `incoming`. The target grid follows the pointer and drops (`dropCarry`).
+  - `endCarry` empties the source cells, one step on each sheet's stack. Let go before the target is ready and it lands at the same cells.
+- **Protection.**
+  - `CellStyle.unlocked` is set in Format Cells › Protection (Locked unticked); Format Painter and Paste Special › Formats carry it.
+  - While a sheet is protected, `applySheetChanges` lets others send only `cells` changes, and only for cells that resolve to unlocked; everything else is refused.
+  - BlankSheet mirrors this: `applyR` keeps only unlocked value changes, `writeCells` writes only unlocked cells, and `isText` / `readOnlyNote` show Excel's note.
+  - Typing a letter into any read-only cell now shows its note.
+- **Print.**
+  - File (tab) menu › Print… or Ctrl+P sends `{ kind: 'print' }` to the open sheet. BlankSheet (`printData`) and `useGridTips` hand `PrintDialog` what's on screen with its looks.
+  - Rows to repeat go into `<thead>` of `#fx-print-root`, which only shows under `@media print`. `@page` sets the orientation, and Fit All Columns scales with `zoom`.
+- **Paste Special keys.** Ctrl+Alt+V opens it as well as Ctrl+Shift+V. Excel's letters pick an option (V values, T formats, E transpose, M multiply…) and Enter pastes.
+- **Merged rows.** A merge reaching into the rows below no longer stretches its own row; a negative bottom margin lets it overlap them.
+- **Checks.** `node scripts/spreadsheet-lab/realapp/tips-c.cjs` (36 checks), and the `tips-move` pure check.
 
 ### Celebrations
 

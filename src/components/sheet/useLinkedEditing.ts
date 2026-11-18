@@ -64,15 +64,16 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
     const { rows, commit } = ref.current
     const byKey = new Map(rows.map(r => [r.key, r]))
     const done: Cell[] = []
+    const failed: { cell: Cell; note: string }[] = []
     const skipped: Partial<Record<string, number>> = {}
     await pool(cells, async c => {
       const row = byKey.get(c.rowKey)
       if (!row) { skipped.gone = (skipped.gone ?? 0) + 1; return }
       const note = await commit(row, c.col, forward ? c.after : c.before)
-      if (note) skipped.invalid = (skipped.invalid ?? 0) + 1
+      if (note) { skipped.invalid = (skipped.invalid ?? 0) + 1; failed.push({ cell: c, note }) }
       else done.push(c)
     })
-    return { done, skipped }
+    return { done, skipped, failed }
   }, [])
 
   const record = (label: string, cells: Cell[]) => {
@@ -95,6 +96,9 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
     const skipped: Partial<Record<string, number>> = {}
     const bump = (k: string) => { skipped[k] = (skipped[k] ?? 0) + 1 }
     const cells: Cell[] = []
+    // Spec 020: which cells were refused, and why (a move puts nothing in when any value doesn't fit).
+    const refused: NonNullable<NonNullable<WriteResult>['refused']> = []
+    const at = new Map<string, { r: number; c: number }>()
     for (const w of writes) {
       const row = rows[w.r], col = cols[w.c]
       if (!row || !col) { if (w.value) bump('read_only'); continue }
@@ -104,14 +108,17 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
       if (!isText(row, col)) {
         const note = readOnlyNote?.(row, col)
         bump(note ? 'not_authorized' : 'read_only')
+        refused.push({ r: w.r, c: w.c, value: w.value, note: note ?? '' })
         continue
       }
+      at.set(`${row.key}|${col}`, { r: w.r, c: w.c })
       cells.push({ rowKey: row.key, col, before, after: w.value })
     }
     const res = await save(cells, true)
     for (const [k, n] of Object.entries(res.skipped)) skipped[k] = (skipped[k] ?? 0) + (n ?? 0)
+    for (const f of res.failed) { const p = at.get(`${f.cell.rowKey}|${f.cell.col}`); if (p) refused.push({ ...p, value: f.cell.after, note: f.note }) }
     record(why, res.done)
-    return { skipped }
+    return { skipped, refused, done: res.done.length }
   }, [save])
 
   const apply = useCallback(async (dir: 'undo' | 'redo') => {

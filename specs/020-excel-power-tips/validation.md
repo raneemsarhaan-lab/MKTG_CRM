@@ -89,3 +89,53 @@ Run against `next start` with the local database (see `quickstart.md`).
 - **Ctrl+T** may be kept by some browsers (it opens a tab there); Ctrl+L does the same thing in the sheet, and Data › Table › Create Table… is always there.
 - **Groups:** rows show a bar beside the numbers with level buttons in the corner. Column groups show a line above the letters and − / + on the column after them; the level buttons are for rows.
 - **Fix found by the lab:** a selected cell with a fill (a table's header) lost its fill under the selection tint, leaving white text unreadable. The tint now goes over the fill.
+
+## Stage C (US7–US8)
+
+Run against `next start` with the local database (see `quickstart.md`).
+
+| Check | Command | Result |
+|---|---|---|
+| Pure checks (the move planner, plus every earlier check) | `npm run lab:spreadsheet` | 40/40 |
+| Stage C on the running app | `node scripts/spreadsheet-lab/realapp/tips-c.cjs` | 36/36 |
+| Regressions on the running app | tips-a 73, tips-b 58, fields 78, content-fields 29, video-fields 29, links 41, areas 42, header 45, run, editing 50, format 52, styles 54, perf-axe 18 | all pass |
+| Sheet lab | `npm run lab:sheet` | 150/150 |
+| Build | `npm run build` | passes |
+
+**What `tips-c.cjs` covers (quickstart Stage C):**
+
+- **§1 Moves:**
+  - The move cursor on the selection's outline, and the drag's tip (B9:C12).
+  - B2:C5 dragged down: values, the bold format and the comment move; one undo puts it all back.
+  - Ctrl+drag copies.
+  - Shift+drag inserts a row between others.
+  - The right-drag menu: V is underlined, Link Here is greyed, and pressing V copies values only.
+  - A drop onto part of a merge is refused.
+  - "There's already data here. Do you want to replace it?", with Cancel.
+- **Alt+drag:** onto the Archive tab, then into its grid. The block lands there and leaves Plan.
+- **The Content sheet:**
+  - Dragging a title onto a link column brings Excel's Stop alert (asked for in the design review).
+  - Nothing moves, and the task keeps its name.
+- **§2 Locks:**
+  - Format Cells › Protection: every cell starts Locked; B2:B20 is unlocked.
+  - The sheet is protected.
+  - A member sees "You can fill in the unlocked cells". Typing in B4 saves; typing in A4 is refused with Excel's note.
+- **§3 Print:**
+  - Ctrl+P on a 121-row sheet: "121 rows · 4 pages", and page 2 of the preview repeats the header row.
+  - Print puts the header row in `<thead>` (repeated on every page) with 120 rows, portrait. The dialog closes after printing.
+- **Paste Special:** Ctrl+Alt+V, then T (Formats), V (Values) and Enter.
+- **Also:** Arabic (the menu's keys shown in each row), axe on the menu, the alert, Protection and Print, and no page errors.
+
+**Changes from the plan, and notes:**
+
+- **The board's sheets** offer drag-moving too (asked for in the design review). Values go through the board's own rules in one step. If any value doesn't fit its cell, the step is undone and Excel's Stop alert names the cell and the reason, so nothing moves. Shift (insert) and Formats Only are off there: their rows are tasks.
+- **Comments** move with moved cells, not with copies.
+- **Merges, tables and data validation** wholly inside a moved block go with it; a copy copies merges and validation.
+- **Shift (insert)** is refused when it would run through a merge or a table.
+- **Alt+drag** carries values and looks to the other sheet. Comments, merges and validation stay on their own sheet.
+- **A protected sheet** accepts values (typing, paste, fill, clear) only in unlocked cells. The server checks every change, so a forged request is refused too. Formats, rows, columns and structure stay locked, as in Excel's default.
+- **Print** prints what's on screen: hidden, collapsed and filtered-out rows are left out.
+- **Fixes found by the lab:**
+  - A merged block reaching into the rows below made its own row twice as tall (from spec 015). It now overlaps the rows below, as in Excel.
+  - A comment's card no longer gets in the way of a drag.
+  - Typing into a locked cell now says why straight away (before, only Enter and F2 did).

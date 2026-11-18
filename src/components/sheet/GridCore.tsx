@@ -48,7 +48,9 @@ export interface CellWrite {
 }
 export type WriteWhy = 'paste' | 'clear' | 'cut' | 'fill'
 /** What a write didn't change, by reason (shown under the toolbar, FR-025). */
-export type WriteResult = { skipped: Partial<Record<string, number>> } | null
+export type WriteResult = { skipped: Partial<Record<string, number>>; refused?: { r: number; c: number; value: string; note: string }[]; done?: number } | null
+/** Spec 020: a border drag's drop. `to` is the block's new top-left; `shift` inserts (Shift); `only` is a right-drag's Values / Formats Only. */
+export interface MoveRequest { from: GridRect; to: { r: number; c: number }; kind: 'move' | 'copy'; shift: 'down' | 'right' | null; only?: 'values' | 'formats' }
 
 /** Where a context menu was asked for (FR-040). Indexes into `rows` and `cols`. */
 export type MenuTarget =
@@ -162,6 +164,19 @@ export interface GridModel<R extends { key: string }> {
    * value the model renders stays its own (number formats are applied there).
    */
   cellStyle?(row: R, col: GridCol): CellCss | null
+  /** Spec 020 tips 13, 107–111: dragging the selection's border moves or copies it. */
+  onMove?(req: MoveRequest): GridRect | null | void
+  /** A right-drag's drop: the host's menu (Move Here, Copy Here, … with Excel's keys). */
+  onMoveMenu?(req: MoveRequest, at: { x: number; y: number }, anchor: HTMLElement): void
+  /** Shift inserts (team sheets); without it, Shift is ignored. */
+  moveShift?: boolean
+  /** What the drag's tip says ("E2:F5", "Insert copy: A6:C6"). */
+  moveTip?(req: MoveRequest): string
+  /** Alt held over a sheet tab: the host carries the block to that sheet. */
+  onMoveToTab?(tab: string, from: GridRect, grab: { r: number; c: number }, copy: boolean): void
+  /** A block carried here from another sheet: follow the pointer, then drop it (null: cancelled). */
+  incoming?: { h: number; w: number; dr: number; dc: number; n: number } | null
+  onIncoming?(to: { r: number; c: number } | null): void
   /** Spec 020 tip 80: what the top-left corner shows (the outline's level buttons). */
   corner?(): ReactNode
   /** Spec 020: what was just copied here (Paste Special › Validation and Column widths need the cells it came from). */
@@ -930,6 +945,12 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       pendingChar.current = e.key
       if (activate(row, active.col)) e.preventDefault()
       else pendingChar.current = ''
+      return
+    }
+    // Spec 020: typing into a cell that can't take it (a locked cell on a protected sheet) says why, as Excel does.
+    if (e.key.length === 1 && !ctrl && !e.altKey && m.spreadsheet && active.col !== 'rowNo' && !m.isText(row, active.col)) {
+      const note = m.readOnlyNote?.(row, active.col)
+      if (note) { e.preventDefault(); onNote(cellKey(row.key, active.col), note) }
     }
   }
 
@@ -1106,10 +1127,122 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     while (end + 1 < m.rows.length && has(end + 1, side)) end++
     if (end > from.r1) doFill({ from, to: { ...from, r1: end }, mode: info.def, insert: false, dir: 'down' }, false)
   }
+  // ── spec 020: dragging the selection's border (tips 13, 107–111) ────────
+  type MoveDrag = { from: GridRect; grab: { r: number; c: number }; to: { r: number; c: number }; kind: 'move' | 'copy'; shift: 'down' | 'right' | null; right: boolean; moved: boolean; sx: number; sy: number; foreign?: boolean }
+  const [moveDrag, setMoveDragState] = useState<MoveDrag | null>(null)
+  const moveRef = useRef<MoveDrag | null>(null)
+  const setMoveDrag = (v: MoveDrag | null) => { moveRef.current = v; setMoveDragState(v) }
+  const canMove = !!m.onMove && !!m.selection && !editing
+  /** A pointer within 4 px of the selection's outline, on one of its edge cells. */
+  function onEdge(e: { clientX: number; clientY: number }, el: HTMLElement, r: number, c: number): boolean {
+    const q = rectRef.current
+    if (r < q.r0 || r > q.r1 || c < q.c0 || c > q.c1) return false
+    const b = el.getBoundingClientRect(), rtl = getComputedStyle(el).direction === 'rtl'
+    const leftCol = rtl ? q.c1 : q.c0, rightCol = rtl ? q.c0 : q.c1
+    return (r === q.r0 && e.clientY - b.top <= 4) || (r === q.r1 && b.bottom - e.clientY <= 4)
+      || (c === leftCol && e.clientX - b.left <= 4) || (c === rightCol && b.right - e.clientX <= 4)
+  }
+  function startMove(e: React.PointerEvent<HTMLElement>, r: number, c: number) {
+    const from = rectRef.current
+    setLastFill(null)
+    setMoveDrag({ from, grab: { r, c }, to: { r: from.r0, c: from.c0 }, kind: 'move', shift: null, right: e.button === 2, moved: false, sx: e.clientX, sy: e.clientY })
+  }
+  /** The cell under the pointer, as grid indexes. */
+  const cellUnder = (x: number, y: number) => {
+    // Through anything floating over the grid (a comment's card, a note): the cell under the pointer.
+    const el = document.elementsFromPoint(x, y).map(e => (e as HTMLElement).closest<HTMLElement>('[data-cell]')).find(e => !!e && !!gridRef.current?.contains(e)) ?? null
+    if (!el) return null
+    const r = live.current.rowIndex.get(el.dataset.rowKey ?? ''), c = live.current.cols.indexOf(el.dataset.col ?? '')
+    return r === undefined || c < 0 ? null : { r, c, el }
+  }
+  // A block carried here from another sheet (Alt+drag over this sheet's tab): it follows the pointer until it's dropped.
+  useEffect(() => {
+    const inc = m.incoming
+    if (!inc) return
+    setMoveDrag({ from: { r0: 0, c0: 0, r1: inc.h - 1, c1: inc.w - 1 }, grab: { r: inc.dr, c: inc.dc }, to: { r: 0, c: 0 }, kind: 'move', shift: null, right: false, moved: true, sx: 0, sy: 0, foreign: true })
+  }, [m.incoming?.n]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!moveDrag) return
+    let raf = 0, lastX = 0, lastY = 0
+    const tickScroll = () => {
+      const sc = scroller()
+      if (!moveRef.current || !sc) return
+      const b = sc.getBoundingClientRect()
+      const dy = lastY < b.top + 30 ? -18 : lastY > b.bottom - 20 ? 18 : 0
+      const dx = lastX < b.left + 20 ? -18 : lastX > b.right - 20 ? 18 : 0
+      if (dx || dy) sc.scrollBy(dx, dy)
+      raf = requestAnimationFrame(tickScroll)
+    }
+    const move = (e: PointerEvent) => {
+      const cur = moveRef.current
+      if (!cur) return
+      if (!cur.moved && Math.hypot(e.clientX - cur.sx, e.clientY - cur.sy) < 4) return
+      lastX = e.clientX; lastY = e.clientY
+      if (!raf) raf = requestAnimationFrame(tickScroll)
+      // Alt over a sheet tab: the block goes to that sheet (Ctrl+Alt leaves a copy here).
+      if (e.altKey && !cur.foreign && m.onMoveToTab) {
+        const tab = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-sheet-tab]')
+        const id = tab?.dataset.sheetTab
+        if (id) {
+          cancelAnimationFrame(raf); raf = 0
+          setMoveDrag(null)
+          m.onMoveToTab(id, cur.from, { r: cur.grab.r - cur.from.r0, c: cur.grab.c - cur.from.c0 }, addKey(e))
+          return
+        }
+      }
+      const at = cellUnder(e.clientX, e.clientY)
+      if (!at) { if (!cur.moved) setMoveDrag({ ...cur, moved: true }); return }
+      const dr = at.r - cur.grab.r, dc = at.c - cur.grab.c
+      const to = cur.foreign ? { r: Math.max(0, at.r - cur.grab.r), c: Math.max(0, at.c - cur.grab.c) } : { r: Math.max(0, cur.from.r0 + dr), c: Math.max(0, cur.from.c0 + dc) }
+      const kind: 'move' | 'copy' = !cur.foreign && addKey(e) ? 'copy' : 'move'
+      const shift = !cur.foreign && e.shiftKey && m.moveShift ? (Math.abs(dr) >= Math.abs(dc) ? 'down' : 'right') : null
+      if (!cur.moved || cur.to.r !== to.r || cur.to.c !== to.c || cur.kind !== kind || cur.shift !== shift) setMoveDrag({ ...cur, moved: true, to, kind, shift })
+    }
+    const finish = (e: PointerEvent | null) => {
+      cancelAnimationFrame(raf); raf = 0
+      const cur = moveRef.current
+      setMoveDrag(null)
+      if (!cur) return
+      if (cur.foreign) {
+        const at = e ? cellUnder(e.clientX, e.clientY) : null
+        m.onIncoming?.(at ? cur.to : null)
+        if (at) selectBlock({ r0: cur.to.r, c0: cur.to.c, r1: cur.to.r + cur.from.r1, c1: cur.to.c + cur.from.c1 })
+        return
+      }
+      if (!e || !cur.moved) return
+      const same = cur.to.r === cur.from.r0 && cur.to.c === cur.from.c0 && !cur.shift
+      if (same && !cur.right) return
+      const req: MoveRequest = { from: cur.from, to: cur.to, kind: cur.kind, shift: cur.shift }
+      if (cur.right && m.onMoveMenu) {
+        const anchor = cells.current.get(cellKey(m.rows[cur.to.r]?.key ?? '', m.cols[cur.to.c] ?? '')) ?? gridRef.current
+        if (anchor) m.onMoveMenu(req, { x: e.clientX, y: e.clientY }, anchor)
+        return
+      }
+      const res = m.onMove?.(req)
+      if (res) selectBlock(res)
+    }
+    const up = (e: PointerEvent) => finish(e)
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && moveRef.current) { e.preventDefault(); e.stopPropagation(); finish(null) } }
+    const noMenu = (e: Event) => { if (moveRef.current?.right) e.preventDefault() }
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+    document.addEventListener('keydown', key, true)
+    document.addEventListener('contextmenu', noMenu, true)
+    return () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('keydown', key, true); document.removeEventListener('contextmenu', noMenu, true); cancelAnimationFrame(raf) }
+  }, [!!moveDrag]) // eslint-disable-line react-hooks/exhaustive-deps
+  const moving = moveDrag && moveDrag.moved ? moveDrag : null
+  const moveH = moving ? moving.from.r1 - moving.from.r0 : 0, moveW = moving ? moving.from.c1 - moving.from.c0 : 0
+  /** Where the drag would drop: a dashed block, or an insertion bar (Shift). */
+  const moveGhost = moving && !moving.shift ? { r0: moving.to.r, c0: moving.to.c, r1: moving.to.r + moveH, c1: moving.to.c + moveW } : null
+  const moveBar = moving?.shift ? moving : null
+  const inBar = (i: number, c: number) => !!moveBar && (moveBar.shift === 'down'
+    ? i === moveBar.to.r && c >= moveBar.to.c && c <= moveBar.to.c + moveW
+    : c === moveBar.to.c && i >= moveBar.to.r && i <= moveBar.to.r + moveH)
+  const moveTipText = moving && m.moveTip ? m.moveTip({ from: moving.from, to: moving.to, kind: moving.kind, shift: moving.shift }) : null
   const fillTip = fillDrag && fillDrag.mode !== 'clear' && !(fillDrag.to.r0 === fillDrag.from.r0 && fillDrag.to.r1 === fillDrag.from.r1 && fillDrag.to.c0 === fillDrag.from.c0 && fillDrag.to.c1 === fillDrag.from.c1)
     ? { text: fillDrag.info.preview(fillDrag.mode as FillMode, fillDrag.to), r: fillDrag.dir === 'up' ? fillDrag.to.r0 : fillDrag.to.r1, c: fillDrag.dir === 'left' ? fillDrag.to.c0 : fillDrag.to.c1 }
     : null
-  const ghost = fillDrag && fillDrag.mode !== 'clear' ? fillDrag.to : null
+  const ghost = fillDrag && fillDrag.mode !== 'clear' ? fillDrag.to : moveGhost
   const inQ = (q: GridRect | null, r: number, c: number) => !!q && r >= q.r0 && r <= q.r1 && c >= q.c0 && c <= q.c1
 
   // ── spec 020: zoom (Ctrl+wheel) and Shift+wheel ──────────────────────────
@@ -1181,7 +1314,14 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       aria-rowcount={m.rows.length + 1}
       aria-colcount={allCols.length}
       aria-multiselectable={m.selection || undefined}
-      className={`fx-sheet-grid${m.selection ? ' is-selectable' : ''}${fillDrag ? ' is-filling' : ''}`}
+      className={`fx-sheet-grid${m.selection ? ' is-selectable' : ''}${fillDrag ? ' is-filling' : ''}${moving ? ` is-moving${moving.kind === 'copy' ? ' is-copying' : ''}` : ''}`}
+      onPointerMove={canMove && !moveDrag && !fillDrag ? e => {
+        // The pointer turns into the move arrows over the selection's outline.
+        const el = (e.target as HTMLElement).closest<HTMLElement>('[data-cell]')
+        const r = el ? live.current.rowIndex.get(el.dataset.rowKey ?? '') : undefined, c = el ? live.current.cols.indexOf(el.dataset.col ?? '') : -1
+        const on = !!el && r !== undefined && c >= 0 && !many && onEdge(e, el, r, c)
+        gridRef.current?.classList.toggle('is-move-edge', on)
+      } : undefined}
       data-sheet-grid=""
       data-zoom={z !== 1 ? Math.round(z * 100) : undefined}
       style={{ ['--sheet-cols' as string]: template, ...(z !== 1 ? { zoom: z } : {}) }}
@@ -1281,11 +1421,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
               const inGhost = !!ghost && c >= 0 && inQ(ghost, i, c)
               const fgEdges = inGhost ? `${i === ghost!.r0 ? ' is-fg-t' : ''}${i === ghost!.r1 ? ' is-fg-b' : ''}${c === ghost!.c0 ? ' is-fg-s' : ''}${c === ghost!.c1 ? ' is-fg-e' : ''}` : ''
               const clearing = !!fillDrag && fillDrag.mode === 'clear' && c >= 0 && inQ(fillDrag.from, i, c) && !inQ(fillDrag.to, i, c)
-              const tipHere = !!fillTip && fillTip.r === i && fillTip.c === c
+              const tipHere = (!!fillTip && fillTip.r === i && fillTip.c === c) || (!!moveTipText && !!moving && i === moving.to.r + moveH && c === moving.to.c + moveW)
+              const barHere = inBar(i, c) ? ` is-mvbar-${moveBar!.shift === 'down' ? 't' : 's'}` : ''
               const afoHere = !!lastFill && !fillDrag && !isEditing && !!m.onFillMenu && i === lastFill.to.r1 && c === lastFill.to.c1
               const dv = isActive && !isEditing && !isNo && m.validation ? m.validation(row, col) : null
               const spanStyle = span ? { gridColumn: `${allCols.indexOf(col) + 1} / -1` }
-                : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2 }
+                // A merge reaching into the rows below overlaps them; its own row keeps its height (negative bottom margin).
+                : merge && merge !== 'covered' ? { width: merge.width, height: merge.height, justifySelf: 'start' as const, alignSelf: 'start' as const, zIndex: 2, marginBottom: Math.min(0, (heightOf(row) ?? 24) - merge.height) }
                 : undefined
               if (covered) return <div key={col} className="fx-sheet-td is-covered" aria-hidden="true" data-covered={key} />
               return (
@@ -1294,7 +1436,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${inGhost ? ` is-fg${fgEdges}` : ''}${clearing ? ' is-fclr' : ''}${hasHandle || afoHere || tipHere ? ' has-fill-ui' : ''}${dv ? ' has-dv' : ''}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
+                  className={`${m.cellClass(row, col)}${barHere}${inGhost ? ` is-fg${fgEdges}` : ''}${clearing ? ' is-fclr' : ''}${hasHandle || afoHere || tipHere ? ' has-fill-ui' : ''}${dv ? ' has-dv' : ''}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
                   style={fx || freezeStyle ? { ...spanStyle, ...fx?.cell, ...freezeStyle } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
@@ -1306,6 +1448,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   // Only the cell itself: a button inside it (Auto Fill Options) taking focus mustn't move the selection.
                   onFocus={e => { if (e.target === e.currentTarget && !isActive) setActive({ key: row.key, col }) }}
                   onPointerDown={m.selection ? e => {
+                    // Spec 020: the selection's border starts a move (left or right button).
+                    if (canMove && !isNo && c >= 0 && !many && !isEditing && (e.button === 0 || e.button === 2) && !(e.target as HTMLElement).closest('[data-row-resize], a, button') && onEdge(e, e.currentTarget, i, c)) {
+                      e.preventDefault(); startMove(e, i, c); return
+                    }
                     if (isEditing || e.button !== 0 || (e.target as HTMLElement).closest('[data-row-resize], a, button')) return
                     if (isNo && !m.spreadsheet) return
                     if (isNo) {
@@ -1454,7 +1600,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                                       onPointerDown={startFill} onClick={ev => ev.stopPropagation()}
                                       onContextMenu={ev => { ev.preventDefault(); ev.stopPropagation() }}
                                       onDoubleClick={ev => { ev.stopPropagation(); fillDownToEnd() }} />}
-                  {tipHere && <span className="fx-fill-tip" data-fill-tip="" role="status">{fillTip!.text}</span>}
+                  {tipHere && <span className="fx-fill-tip" data-fill-tip="" role="status">{fillTip ? fillTip.text : moveTipText}</span>}
                   {afoHere && (
                     <button type="button" className="fx-afo" data-autofill-options="" tabIndex={-1} aria-haspopup="menu" aria-label={m.controlLabels?.options} title={m.controlLabels?.options}
                             onPointerDown={ev => ev.stopPropagation()}

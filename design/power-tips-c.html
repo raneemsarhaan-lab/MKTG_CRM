@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheet power tips C</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #F7F7F7; --panel: #FFFFFF; --ink: #1B1A13; --text: #1F2430; --muted: #5E6166; --faint: #8A8D91;
+  --line: #E2E3E3; --soft-line: #ECECF1; --head: #F3F4F2; --gutter: #F8F9F8; --hover: #F6F8FB;
+  --sel: #3563E9; --sel-fill: rgba(53, 99, 233, .07); --sel-head: #E5EDFF; --sel-head-ink: #1E40AF;
+  --lime: #C8F24E; --lime-ink: #1B1A13; --purple: #7C3AED; --purple-deep: #6D28D9; --purple-soft: #F0EBFE;
+  --danger: #D22040; --danger-soft: #FDE7EA;
+  --shadow: 0 8px 28px rgba(17, 18, 20, .16); --shadow-sm: 0 2px 8px rgba(17, 18, 20, .10);
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2E2E38; --soft-line: #2A2A34; --head: #1E1E26; --gutter: #1A1A21; --hover: #22222C;
+  --sel: #6F95FF; --sel-fill: rgba(111, 149, 255, .10); --sel-head: #1E2A4A; --sel-head-ink: #B9CBFF;
+  --purple: #A78BFA; --purple-deep: #C4B5FD; --purple-soft: #2A2145; --danger: #FF6B81; --danger-soft: #3A1820;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .5); --shadow-sm: 0 2px 8px rgba(0, 0, 0, .4);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+u { text-decoration: none; }
+.wrap { max-width: 1260px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 900px; }
+.ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tabs button, .ctl button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 5px 12px; font: 600 12.5px var(--f-body); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.scene { display: none; } .scene.on { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+@media (max-width: 960px) { .scene.on { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; position: relative; }
+.stage .card, .scene > .card { overflow: visible; }
+
+/* formula bar */
+.fbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.namebox { border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; width: 96px; font-size: 12.5px; font-weight: 600; background: var(--gutter); }
+.fx { color: var(--faint); font-style: italic; padding: 0 8px; border-inline-end: 1px solid var(--line); }
+.stage { min-height: 360px; position: relative; }
+
+/* grid: the app's sheet */
+table { border-collapse: separate; border-spacing: 0; }
+th, td { height: 28px; border-bottom: 1px solid var(--line); border-inline-end: 1px solid var(--line); padding: 0 8px; white-space: nowrap; font-size: 12.5px; position: relative; }
+th { background: var(--head); font-weight: 600; font-size: 11.5px; color: var(--muted); text-align: center; min-width: 100px; }
+th.no, td.no { min-width: 40px; width: 40px; text-align: center; background: var(--gutter); color: var(--faint); font-size: 11.5px; font-weight: 500; }
+th.on, td.no.on { background: var(--sel-head); color: var(--sel-head-ink); font-weight: 700; }
+th.on { box-shadow: inset 0 -2px 0 var(--sel); }
+td.no.on { box-shadow: inset -2px 0 0 var(--sel); }
+[dir="rtl"] td.no.on { box-shadow: inset 2px 0 0 var(--sel); }
+td.in { background: var(--sel-fill); }
+td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.selbox { position: absolute; border: 2px solid var(--sel); border-radius: 2px; pointer-events: none; z-index: 2; }
+.handle { position: absolute; width: 9px; height: 9px; background: var(--sel); border: 2px solid var(--panel); border-radius: 3px; z-index: 3; box-shadow: 0 0 0 1px var(--sel); }
+.ghost { position: absolute; border: 2px dashed var(--sel); border-radius: 3px; opacity: .55; pointer-events: none; z-index: 2; }
+.xltip { position: absolute; background: var(--ink); color: var(--panel); font: 600 11.5px var(--f-body); padding: 2px 8px; border-radius: 6px; z-index: 4; box-shadow: var(--shadow-sm); }
+.cross { position: absolute; z-index: 5; font: 700 16px/1 monospace; color: var(--ink); }
+
+/* Auto Fill Options chip */
+.afo { position: absolute; z-index: 5; display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); font: 600 11px var(--f-body); cursor: pointer; box-shadow: var(--shadow-sm); }
+.afo svg { display: block; }
+.afo .chev { color: var(--muted); font-size: 10px; }
+
+/* menus: the app's sheet menu */
+.xlmenu { position: absolute; z-index: 6; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 220px; font: 12.5px var(--f-body); }
+.xlmenu .grp { font: 700 10px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px 2px; }
+.xlmenu .it { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: default; }
+.xlmenu .it:hover, .xlmenu .it.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.xlmenu .it.dis { opacity: .4; }
+.xlmenu .it small { margin-inline-start: auto; color: var(--faint); font-size: 11px; }
+.xlmenu .rad { width: 14px; flex: none; color: var(--purple); font-weight: 800; text-align: center; }
+.xlmenu .rad.on::before { content: "✓"; }
+.xlmenu .it.on { font-weight: 600; }
+.xlmenu hr { border: 0; border-top: 1px solid var(--soft-line); margin: 4px 2px; }
+
+/* dialogs: the app's sheet dialog */
+.dlg { position: absolute; z-index: 7; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); font: 12.5px var(--f-body); overflow: hidden; }
+.dlg .tbar { display: flex; align-items: center; gap: 8px; padding: 14px 16px 2px; font: 800 16px var(--f-head); color: var(--ink); }
+.dlg .tbar .x { margin-inline-start: auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); font: 600 13px var(--f-body); }
+.dlg .tbar .x:hover { background: var(--hover); }
+.dlg .sub { margin: 0; padding: 0 16px 8px; color: var(--muted); font-size: 12px; }
+.dlg .body { padding: 8px 16px 14px; display: grid; gap: 10px; }
+.dlg fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 4px; align-content: start; }
+.dlg legend, .dlg .cap { padding: 0; margin-bottom: 4px; font: 700 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dlg .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.dlg label { display: flex; align-items: center; gap: 0; min-height: 22px; }
+.dlg label > input[type=radio], .dlg label > input[type=checkbox] { margin: 0; margin-inline-end: 8px; accent-color: var(--purple); width: 15px; height: 15px; }
+.dlg label.dis { opacity: .4; }
+.dlg .ind { padding-inline-start: 22px; }
+.dlg .fld { display: grid; gap: 4px; }
+.dlg .fld > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.dlg .btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--gutter); }
+.dlg .btns .start { margin-inline-end: auto; }
+.xb { min-width: 72px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; font: 600 12.5px var(--f-body); border-radius: 8px; cursor: pointer; }
+.xb.def { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.xb.link { border-color: transparent; background: none; color: var(--muted); min-width: 0; padding-inline: 4px; }
+.dlg input[type=text], .dlg select, .dlg textarea { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: 12.5px var(--f-body); padding: 6px 9px; min-height: 32px; width: 100%; }
+.dlg textarea { resize: none; }
+.dlg input:focus, .dlg select:focus, .dlg textarea:focus { outline: 2px solid var(--sel); outline-offset: -1px; }
+.dlg select:disabled { opacity: .45; }
+.dtabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--soft-line); }
+.dtabs span { white-space: nowrap; padding: 8px 10px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dtabs span.on { color: var(--purple-deep); border-bottom-color: var(--purple); }
+.lb { border: 1px solid var(--line); border-radius: 10px; padding: 4px; display: grid; gap: 1px; align-content: start; overflow: auto; background: var(--panel); }
+.lb div { padding: 5px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb div.on { background: var(--purple-soft); color: var(--purple-deep); font-weight: 600; }
+.lb div.fixed { color: var(--muted); }
+.lb .tag { float: inline-end; font-size: 10px; font-weight: 700; color: var(--faint); }
+
+/* alert */
+.alert .body { grid-template-columns: auto 1fr; align-items: start; gap: 12px; }
+.alert .ico { width: 36px; height: 36px; border-radius: 50%; background: var(--danger-soft); color: var(--danger); display: grid; place-items: center; font: 800 18px var(--f-body); }
+.alert .msg b { display: block; font: 800 15px var(--f-head); color: var(--ink); margin-bottom: 2px; }
+
+/* list in the cell */
+.ddbtn { position: absolute; z-index: 4; width: 22px; height: 22px; border-radius: 6px; background: var(--hover); color: var(--muted); display: grid; place-items: center; font-size: 11px; box-shadow: inset 0 0 0 1px var(--line); }
+.list { position: absolute; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 150px; font: 12.5px var(--f-body); }
+.list div { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+.list div::before { content: ""; width: 12px; flex: none; color: var(--purple); font-weight: 800; }
+.list div.cur::before { content: "✓"; }
+.list div.hl { background: var(--hover); box-shadow: inset 0 0 0 2px var(--sel); }
+.list .q { display: block; padding: 4px 8px 6px; color: var(--faint); font-size: 11.5px; border-bottom: 1px solid var(--soft-line); margin-bottom: 4px; border-radius: 0; }
+.list .q::before { content: none; }
+.inmsg { position: absolute; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: 12px var(--f-body); color: var(--muted); max-width: 220px; box-shadow: var(--shadow); border-inline-start: 3px solid var(--purple); }
+.inmsg b { display: block; color: var(--ink); font-weight: 700; }
+
+/* status bar */
+.sbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--gutter); color: var(--muted); font: 12px var(--f-body); border-radius: 0 0 14px 14px; flex-wrap: wrap; }
+.sbar .sp { flex: 1; }
+.sbar .st { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+.sbar b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sbar .ready::before { content: "● "; color: #2B7A37; }
+.zoom { display: inline-flex; align-items: center; gap: 6px; }
+.zoom .track { width: 110px; height: 4px; border-radius: 999px; background: var(--line); position: relative; }
+.zoom .track i { position: absolute; top: -5px; width: 14px; height: 14px; margin-inline-start: -5px; border-radius: 50%; background: var(--panel); border: 2px solid var(--sel); box-shadow: var(--shadow-sm); }
+.zoom .track::after { content: ""; position: absolute; left: 50%; top: -2px; width: 2px; height: 8px; border-radius: 1px; background: var(--faint); opacity: .5; }
+.zoom button { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.zoom b { min-width: 38px; text-align: end; }
+.views { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.views span { width: 26px; height: 20px; display: inline-grid; place-items: center; color: var(--faint); font-size: 11px; }
+.views span + span { border-inline-start: 1px solid var(--line); }
+.views span.on { background: var(--sel-head); color: var(--sel-head-ink); }
+
+/* header menus and KeyTips */
+.menubar { display: flex; gap: 6px; padding: 8px 12px 4px; font-size: 13px; position: relative; }
+.menubar span { position: relative; padding: 4px 10px; border-radius: 8px; font-weight: 600; color: var(--text); }
+.menubar span:hover { background: var(--hover); }
+.kt { position: absolute; top: 22px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--ink); color: var(--lime); font: 800 10px var(--f-body); padding: 0 5px; border-radius: 5px; line-height: 16px; font-style: normal; box-shadow: var(--shadow-sm); }
+[dir="rtl"] .kt { transform: translateX(50%); }
+.ribbon { margin: 0 12px 8px; height: 34px; border-radius: 999px; background: var(--head); display: flex; align-items: center; padding: 0 14px; color: var(--muted); font-size: 12px; gap: 12px; overflow: hidden; transition: height .2s, margin .2s; }
+.ribbon.collapsed { height: 0; margin-bottom: 0; }
+
+/* notes */
+.side { display: grid; gap: 12px; }
+.side .card { padding: 12px 14px; }
+.side h3 { margin: 0 0 6px; font: 700 13.5px var(--f-body); color: var(--ink); }
+.side p, .side li { margin: 0; color: var(--muted); font-size: 12.5px; }
+.side ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+.side .xb { min-width: 0; padding: 2px 10px; font-size: 12px; }
+kbd { font: 600 11px var(--f-body); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; color: var(--text); }
+/* sample text is English: keep its punctuation right in the Arabic layout */
+.side li, .side p, .inmsg, .dlg .body span, .dlg label span, .alert .msg { unicode-bidi: plaintext; }
+/* stage B additions */
+.grid-tabs { display: flex; gap: 0; }
+td.hl-row { background: #FDE7EA !important; }
+td.hl-row.num, td.hl-row { color: #9C0006; }
+[data-theme="dark"] td.hl-row { background: #3A1820 !important; color: #FF9AA8; }
+.ic { display: inline-block; width: 14px; margin-inline-end: 6px; text-align: center; font-size: 11px; }
+.ic.up { color: #2B7A37; } .ic.side { color: #C77700; } .ic.down { color: #C42B1C; }
+.across { position: absolute; z-index: 2; display: grid; place-items: center; font-weight: 700; pointer-events: none; }
+.tri { position: relative; }
+.tri::before { content: ""; position: absolute; top: 0; inset-inline-start: 0; border-style: solid; border-width: 7px 7px 0 0; border-color: #2B7A37 transparent transparent transparent; }
+[dir="rtl"] .tri::before { border-width: 7px 0 0 7px; border-color: #2B7A37 transparent transparent transparent; }
+.warn { position: absolute; z-index: 5; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: #FDF3E3; color: #8A5300; border: 1px solid #F0D9B0; font: 800 12px var(--f-body); box-shadow: var(--shadow-sm); }
+.total td { border-top: 2px solid var(--ink); font-weight: 700; background: var(--gutter); }
+.total td.sel-tot { box-shadow: inset 0 0 0 2px var(--sel); }
+th.tb, td.tbh { background: #4472C4; color: #fff; font-weight: 700; }
+tr.band td:not(.no) { background: #DCE6F5; }
+[data-theme="dark"] tr.band td:not(.no) { background: #1E2A4A; }
+.slicer { position: absolute; z-index: 4; width: 170px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; display: grid; gap: 4px; }
+.slicer header { display: flex; align-items: center; justify-content: space-between; font: 700 12px var(--f-body); color: var(--ink); padding: 2px 4px 4px; }
+.slicer header span { display: inline-flex; gap: 4px; color: var(--muted); font-weight: 600; }
+.slicer button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 5px 8px; text-align: start; font: 600 12px var(--f-body); }
+.slicer button.on { background: var(--purple-soft); border-color: transparent; color: var(--purple-deep); }
+.slicer button.off { color: var(--faint); }
+.olbar { position: absolute; z-index: 3; inset-block: 0; inset-inline-start: 0; width: 34px; border-inline-end: 1px solid var(--line); background: var(--gutter); }
+.ollv { position: absolute; z-index: 4; display: flex; gap: 3px; }
+.ollv b { width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center; font: 700 10.5px var(--f-body); color: var(--text); }
+.ollv b.on { background: var(--sel-head); color: var(--sel-head-ink); border-color: transparent; }
+.bracket { position: absolute; z-index: 4; width: 10px; border-inline-start: 2px solid var(--muted); border-block: 2px solid var(--muted); border-start-start-radius: 3px; border-end-start-radius: 3px; }
+.olbtn { position: absolute; z-index: 5; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--muted); background: var(--panel); display: grid; place-items: center; font: 700 11px/1 var(--f-body); color: var(--text); }
+.indent { padding-inline-start: 34px !important; }
+.wiz { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+.wiz b { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--line); color: var(--muted); font-size: 11px; }
+.wiz b.on { background: var(--purple); color: #fff; }
+.prev { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font: 12px var(--f-body); }
+.prev table { width: 100%; }
+.prev td { height: 24px; border-bottom: 1px solid var(--soft-line); border-inline-end: 1px dashed var(--purple); font-size: 12px; padding: 0 8px; background: var(--panel); }
+.prev tr:first-child td { background: var(--head); font-weight: 600; color: var(--muted); }
+.prev td:last-child { border-inline-end: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font: 600 12px var(--f-body); }
+.chips span.on { background: var(--purple-soft); color: var(--purple-deep); border-color: transparent; }
+.toast { position: absolute; z-index: 8; background: var(--ink); color: var(--panel); border-radius: 10px; padding: 8px 12px; font: 600 12.5px var(--f-body); display: flex; gap: 12px; align-items: center; box-shadow: var(--shadow); }
+.toast b { color: var(--lime); }
+.codes { height: 168px; }
+.sample { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; font: 600 14px var(--f-body); color: var(--ink); background: var(--gutter); }
+.sample small { display: block; font: 600 10.5px var(--f-head); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.crit { position: absolute; z-index: 3; border: 2px dashed var(--purple); border-radius: 3px; pointer-events: none; }
+.sbmenu .it .val { margin-inline-start: auto; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+.bracket { width: 10px !important; transform: translateX(-24px); }
+[dir="rtl"] .bracket { transform: translateX(46px); }
+[dir="rtl"] .olbtn { translate: -16px 0; }
+/* stage C additions */
+u.ak { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1.5px; }
+.xlmenu .it small { font: 600 11px var(--f-body); color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; min-width: 16px; text-align: center; }
+.mv { position: absolute; z-index: 6; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--panel); box-shadow: var(--shadow-sm); color: var(--ink); font: 700 14px/1 var(--f-body); }
+.mv.plus::after { content: "+"; position: absolute; top: -6px; inset-inline-end: -6px; width: 13px; height: 13px; border-radius: 50%; background: var(--sel); color: #fff; font: 800 10px/13px var(--f-body); text-align: center; }
+.insbar { position: absolute; z-index: 4; background: var(--sel); border-radius: 2px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sel) 25%, transparent); }
+.cmt { position: relative; }
+.cmt::after { content: ""; position: absolute; top: 0; inset-inline-end: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--purple) transparent transparent; }
+[dir="rtl"] .cmt::after { border-width: 0 0 7px 7px; border-color: transparent transparent transparent var(--purple); }
+td.fmt-b { font-weight: 700; } td.fill-y { background: #FFF4C2; } [data-theme="dark"] td.fill-y { background: #3A3418; }
+td.gone { color: var(--faint); background: repeating-linear-gradient(135deg, transparent 0 6px, var(--soft-line) 6px 7px); }
+.modes { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 12.5px; }
+.modes .k { display: inline-flex; gap: 3px; }
+.tabbar { display: flex; align-items: end; gap: 2px; padding: 6px 12px 0; border-top: 1px solid var(--line); background: var(--gutter); border-radius: 0 0 14px 14px; }
+.tabbar .add { width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); font-size: 16px; }
+.tabbar .t { padding: 6px 14px; border-radius: 8px 8px 0 0; font: 600 12.5px var(--f-body); color: var(--muted); border: 1px solid transparent; border-bottom: 0; }
+.tabbar .t.on { background: var(--panel); color: var(--ink); border-color: var(--line); box-shadow: inset 0 3px 0 var(--purple); }
+.tabbar .t.drop { background: var(--purple-soft); color: var(--purple-deep); border-color: var(--purple); border-style: dashed; }
+.tabbar .t .lk { font-size: 11px; margin-inline-start: 4px; }
+.dragchip { position: absolute; z-index: 8; background: var(--panel); border: 2px dashed var(--sel); border-radius: 6px; padding: 4px 8px; font: 600 11.5px var(--f-body); color: var(--ink); box-shadow: var(--shadow); display: grid; gap: 1px; }
+.dragchip small { color: var(--muted); font-weight: 500; }
+td.unl { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--purple) 35%, transparent); }
+.lockbar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--purple-soft); color: var(--purple-deep); font: 600 12.5px var(--f-body); }
+.lockbar .xb { margin-inline-start: auto; min-width: 0; padding: 3px 10px; font-size: 12px; }
+.cellnote { position: absolute; z-index: 6; max-width: 280px; background: var(--danger); color: #fff; font: 600 11.5px/1.35 var(--f-body); padding: 5px 9px; border-radius: 6px; white-space: normal; box-shadow: var(--shadow-sm); }
+.radios { display: grid; gap: 4px; }
+.pv { display: flex; gap: 16px; align-items: start; }
+.page { width: 230px; aspect-ratio: 1 / 1.414; background: #fff; color: #1B1A13; border: 1px solid var(--line); box-shadow: var(--shadow-sm); padding: 14px 12px; display: grid; align-content: start; gap: 6px; position: relative; }
+.page.land { width: 300px; aspect-ratio: 1.414 / 1; }
+.page table { width: 100%; }
+.page td, .page th { height: 13px; font-size: 7px; padding: 0 3px; border-color: #D9D9D9; min-width: 0; color: #1B1A13; background: #fff; text-align: start; }
+.page th { background: #4472C4; color: #fff; font-weight: 700; }
+.page .pn { position: absolute; bottom: 6px; inset-inline: 0; text-align: center; font: 600 8px var(--f-body); color: #8A8D91; }
+.page .rep { position: absolute; inset-inline: 8px; top: 12px; height: 16px; border: 1.5px dashed var(--purple); border-radius: 3px; }
+.page.nogrid td { border-color: transparent; }
+.pvlab { font: 600 11px var(--f-body); color: var(--muted); text-align: center; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Sheet power tips: stage C</h1>
+  <p class="lede">Spec 020, user stories 7–8: moving and copying cells with the mouse, protecting input cells, and printing. Excel's behaviour, menus and wording, drawn in Momentum's look, as in the approved stage A and B designs. These are team-sheet tools; each scene says what the board's sheets get.</p>
+  <div class="ctl">
+    <button id="theme">Dark</button>
+    <button id="dir">Arabic layout</button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="Scenes">
+    <button role="tab" data-s="move" aria-selected="true">1 · Drag the border to move</button>
+    <button role="tab" data-s="modes">2 · Ctrl, Shift, Ctrl+Shift</button>
+    <button role="tab" data-s="rdrag">3 · Right-drag menu</button>
+    <button role="tab" data-s="tab">4 · Alt+drag to another sheet</button>
+    <button role="tab" data-s="lock">5 · Locked and unlocked cells</button>
+    <button role="tab" data-s="prot">6 · A protected sheet</button>
+    <button role="tab" data-s="print">7 · Print and PDF</button>
+  </div>
+
+  <!-- 1 move -->
+  <section class="scene on" data-scene="move">
+    <div class="card"><div class="fbar"><span class="namebox">B2:C5</span><span class="fx">fx</span><span>Samaa</span></div>
+      <div class="stage" style="min-height:300px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th class="on">C</th><th>D</th><th>E</th><th>F</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td class="fmt-b">Owner</td><td class="fmt-b">Spend</td><td></td><td></td><td></td></tr>
+          <tr><td class="no on">2</td><td>Ramadan</td><td class="in cmt">Samaa</td><td class="in num fill-y">1,800</td><td></td><td></td><td></td></tr>
+          <tr><td class="no on">3</td><td>Eid</td><td class="in">Hisham</td><td class="in num">650</td><td></td><td></td><td></td></tr>
+          <tr><td class="no on">4</td><td>Back to school</td><td class="in">Islam</td><td class="in num">2,400</td><td></td><td></td><td></td></tr>
+          <tr><td class="no on">5</td><td>Black Friday</td><td class="in">Roaa</td><td class="in num">3,100</td><td></td><td></td><td></td></tr>
+          <tr><td class="no">6</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,5,3"></div>
+        <div class="ghost" data-r="2,5,5,6"></div>
+        <div class="mv" data-at="3,3,tr" data-dx="-11" data-dy="-11">✥</div>
+        <div class="xltip" data-at="5,6,br" data-dx="6" data-dy="4">E2:F5</div>
+        <div class="toast" style="inset-inline-start:16px; bottom:14px">Moved B2:C5 to E2:F5 <b>Undo</b></div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Drag the selection's border</h3><ul>
+      <li>Point at the edge of the selection: the pointer turns into the move arrows ✥. Drag, and a dashed outline shows where the block lands, with its address.</li>
+      <li>Drop: the cells move with their formats, comments, data validation and any merge inside the block. One undo step.</li>
+      <li>Over cells that hold data, Excel's question first: <i>There's already data here. Do you want to replace it?</i></li>
+      <li>A move that would split a merge or a table is refused with a note. <kbd>Esc</kbd> while dragging cancels.</li>
+      <li>Mouse only; phones keep Cut and Paste.</li>
+    </ul></div>
+    <div class="card"><h3>The board's sheets</h3><p>Their rows are tasks and their columns are task fields, so moving cells isn't offered there; Cut and Paste still work.</p></div></div>
+  </section>
+
+  <!-- 2 modes -->
+  <section class="scene" data-scene="modes">
+    <div class="card"><div class="fbar"><span class="namebox">A3:C3</span><span class="fx">fx</span><span>Eid</span></div>
+      <div class="stage" style="min-height:300px">
+        <table>
+          <tr><th class="no"></th><th class="on">A</th><th class="on">B</th><th class="on">C</th><th>D</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Owner</td><td>Spend</td><td></td></tr>
+          <tr><td class="no">2</td><td>Ramadan</td><td>Samaa</td><td class="num">1,800</td><td></td></tr>
+          <tr><td class="no on">3</td><td class="in">Eid</td><td class="in">Hisham</td><td class="in num">650</td><td></td></tr>
+          <tr><td class="no">4</td><td>Back to school</td><td>Islam</td><td class="num">2,400</td><td></td></tr>
+          <tr><td class="no">5</td><td>Black Friday</td><td>Roaa</td><td class="num">3,100</td><td></td></tr>
+          <tr><td class="no">6</td><td>Launch</td><td>Raneem</td><td class="num">1,900</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="3,1,3,3"></div>
+        <div class="insbar" data-at="5,1,bl" data-dy="-2" style="width:405px;height:4px"></div>
+        <div class="mv plus" data-at="5,2,br" data-dx="-4" data-dy="-12">✥</div>
+        <div class="xltip" data-at="5,3,br" data-dx="8" data-dy="-12">Insert copy: A6:C6</div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Hold a key while dragging</h3>
+      <div class="modes">
+        <span class="k">drag</span><span>Move</span>
+        <span class="k"><kbd>Ctrl</kbd></span><span>Copy (the pointer shows +)</span>
+        <span class="k"><kbd>Shift</kbd></span><span>Insert: a bar between rows or columns; the rest shift to make room</span>
+        <span class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd></span><span>Insert a copy (here: Eid's row copied in above Launch)</span>
+      </div>
+      <ul style="margin-top:8px">
+        <li>The key can change mid-drag; the tip says what the drop will do.</li>
+        <li>On a Mac, <kbd>⌥</kbd> copies, as in Excel for Mac.</li>
+      </ul></div></div>
+  </section>
+
+  <!-- 3 right-drag -->
+  <section class="scene" data-scene="rdrag">
+    <div class="card"><div class="fbar"><span class="namebox">B2:B5</span><span class="fx">fx</span><span>1,800</span></div>
+      <div class="stage" style="min-height:590px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th><th>D</th><th>E</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Spend</td><td></td><td>Budget</td><td></td></tr>
+          <tr><td class="no on">2</td><td>Ramadan</td><td class="in num fill-y">1,800</td><td></td><td class="num"></td><td></td></tr>
+          <tr><td class="no on">3</td><td>Eid</td><td class="in num">650</td><td></td><td class="num"></td><td></td></tr>
+          <tr><td class="no on">4</td><td>Back to school</td><td class="in num">2,400</td><td></td><td class="num"></td><td></td></tr>
+          <tr><td class="no on">5</td><td>Black Friday</td><td class="in num">3,100</td><td></td><td class="num"></td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,5,2"></div>
+        <div class="ghost" data-r="2,4,5,4"></div>
+        <div class="xlmenu" data-at="5,4,br" data-dx="4" data-dy="4" role="menu" aria-label="Right-drag">
+          <div class="it"><span><u class="ak">M</u>ove Here</span><small>M</small></div>
+          <div class="it"><span><u class="ak">C</u>opy Here</span><small>C</small></div>
+          <div class="it hl"><span>Copy Here as <u class="ak">V</u>alues Only</span><small>V</small></div>
+          <div class="it"><span>Copy Here as <u class="ak">F</u>ormats Only</span><small>F</small></div>
+          <div class="it dis"><span><u class="ak">L</u>ink Here</span><small>L</small></div>
+          <div class="it dis"><span>Create <u class="ak">H</u>yperlink Here</span><small>H</small></div>
+          <hr>
+          <div class="it"><span><u class="ak">S</u>hift Down and Copy</span><small>S</small></div>
+          <div class="it"><span>Shift <u class="ak">R</u>ight and Copy</span><small>R</small></div>
+          <div class="it"><span>Shift <u class="ak">D</u>own and Move</span><small>D</small></div>
+          <div class="it"><span>Shift Righ<u class="ak">t</u> and Move</span><small>T</small></div>
+          <hr>
+          <div class="it"><span>C<u class="ak">a</u>ncel</span><small>Esc</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Right-drag the border</h3><ul>
+      <li>Drop with the right button and Excel's menu opens where you let go.</li>
+      <li>Excel's keys work in it, so there's no need to click: <kbd>V</kbd> copies as values only, <kbd>F</kbd> formats only, <kbd>M</kbd> moves, <kbd>C</kbd> copies, and <kbd>S</kbd> / <kbd>R</kbd> / <kbd>D</kbd> / <kbd>T</kbd> shift and copy or move. Each item's letter is underlined; <kbd>Esc</kbd> cancels.</li>
+      <li>The letters stay the English ones in Arabic too, as in Excel, and are shown in each row.</li>
+      <li>Copy Here as Values Only leaves the look behind; Formats Only takes just the look.</li>
+      <li>The same from the keyboard, as in Excel: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>) opens Paste Special, then <kbd>V</kbd> values, <kbd>T</kbd> formats, <kbd>E</kbd> transpose, <kbd>M</kbd> multiply… and <kbd>Enter</kbd>. Its options get the same underlined letters.</li>
+      <li>Link Here and Create Hyperlink Here need formulas, so they stay greyed.</li>
+      <li>Every choice is one undo step.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 4 alt-drag to a tab -->
+  <section class="scene" data-scene="tab">
+    <div class="card"><div class="fbar"><span class="namebox">A2:C5</span><span class="fx">fx</span><span>Ramadan</span></div>
+      <div class="stage" style="min-height:250px">
+        <table>
+          <tr><th class="no"></th><th class="on">A</th><th class="on">B</th><th class="on">C</th><th>D</th></tr>
+          <tr><td class="no">1</td><td>Campaign</td><td>Owner</td><td>Spend</td><td></td></tr>
+          <tr><td class="no on">2</td><td class="in">Ramadan</td><td class="in">Samaa</td><td class="in num">1,800</td><td></td></tr>
+          <tr><td class="no on">3</td><td class="in">Eid</td><td class="in">Hisham</td><td class="in num">650</td><td></td></tr>
+          <tr><td class="no on">4</td><td class="in">Back to school</td><td class="in">Islam</td><td class="in num">2,400</td><td></td></tr>
+          <tr><td class="no on">5</td><td class="in">Black Friday</td><td class="in">Roaa</td><td class="in num">3,100</td><td></td></tr>
+        </table>
+        <div class="selbox" data-r="2,1,5,3"></div>
+        <div class="dragchip" style="inset-inline-start:300px; bottom:-6px">A2:C5 → Q4 archive<small>Alt: drop on the tab, then in the sheet</small></div>
+      </div>
+      <div class="tabbar"><span class="add">+</span><span class="t on">Plan</span><span class="t drop">Q4 archive</span><span class="t">Budget</span></div>
+    </div>
+    <div class="side"><div class="card"><h3>Alt+drag to another sheet</h3><ul>
+      <li>Start a border drag, hold <kbd>Alt</kbd> and move over a sheet tab: that sheet opens under the pointer, as in Excel.</li>
+      <li>Drop where it should go; the block leaves this sheet. <kbd>Ctrl</kbd>+<kbd>Alt</kbd> leaves a copy here instead.</li>
+      <li>Undo works on each sheet: the move is a step on both.</li>
+      <li><kbd>Ctrl</kbd>+drag a tab still duplicates the sheet (tip 112).</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 5 locked / unlocked -->
+  <section class="scene" data-scene="lock">
+    <div class="card"><div class="fbar"><span class="namebox">B2:B20</span><span class="fx">fx</span><span></span></div>
+      <div class="stage" style="min-height:420px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th class="on">B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td class="fmt-b">Week</td><td class="fmt-b">Spend (enter)</td><td class="fmt-b">Note</td></tr>
+          <tr><td class="no on">2</td><td>W1</td><td class="in"></td><td>Plan</td></tr>
+          <tr><td class="no on">3</td><td>W2</td><td class="in"></td><td>Plan</td></tr>
+          <tr><td class="no on">4</td><td>W3</td><td class="in"></td><td>Plan</td></tr>
+          <tr><td class="no on">5</td><td>W4</td><td class="in"></td><td>Plan</td></tr>
+        </table>
+        <div class="selbox" data-r="2,2,5,2"></div>
+        <div class="dlg" style="left:200px; top:30px; width:420px" role="dialog" aria-label="Format Cells">
+          <div class="tbar">Format Cells<span class="x">✕</span></div><p class="sub">B2:B20</p>
+          <div class="dtabs"><span>Number</span><span>Alignment</span><span>Font</span><span>Border</span><span>Fill</span><span class="on">Protection</span></div>
+          <div class="body">
+            <label><input type="checkbox"><span>Locked</span></label>
+            <label class="dis"><input type="checkbox" disabled><span>Hidden</span></label>
+            <p style="margin:0;color:var(--muted)">Locking cells has no effect until you protect the sheet (the sheet tab's menu › Protect sheet). Every cell starts locked; untick Locked for the cells people should still fill in.</p>
+          </div>
+          <div class="btns"><button class="xb">Cancel</button><button class="xb def">OK</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>Format Cells › Protection</h3><ul>
+      <li>Excel's tab: <b>Locked</b> (on for every cell until you untick it), and <b>Hidden</b>, greyed: it hides formulas, which these sheets don't have.</li>
+      <li>Unlocked cells keep their look; nothing changes until the sheet is protected.</li>
+      <li>Kept with the cell's format, so Format Painter and Paste Special › Formats carry it.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 6 protected sheet -->
+  <section class="scene" data-scene="prot">
+    <div class="card"><div class="lockbar">🔒 Protected by Raneem. You can fill in the unlocked cells. <button class="xb">Unprotect sheet</button></div>
+      <div class="fbar"><span class="namebox">A3</span><span class="fx">fx</span><span>W2</span></div>
+      <div class="stage" style="min-height:290px">
+        <table>
+          <tr><th class="no"></th><th>A</th><th>B</th><th>C</th></tr>
+          <tr><td class="no">1</td><td class="fmt-b">Week</td><td class="fmt-b">Spend (enter)</td><td class="fmt-b">Note</td></tr>
+          <tr><td class="no">2</td><td>W1</td><td class="unl num">1,200</td><td>Plan</td></tr>
+          <tr><td class="no">3</td><td>W2</td><td class="unl"></td><td>Plan</td></tr>
+          <tr><td class="no">4</td><td>W3</td><td class="unl"></td><td>Plan</td></tr>
+          <tr><td class="no">5</td><td>W4</td><td class="unl"></td><td>Plan</td></tr>
+        </table>
+        <div class="selbox" data-r="3,1,3,1"></div>
+        <div class="cellnote" data-at="3,1,bl" data-dy="4">The cell you're trying to change is on a protected sheet. The unlocked cells (B2:B20) can still be filled in.</div>
+      </div>
+      <div class="tabbar"><span class="add">+</span><span class="t on">Plan<span class="lk">🔒</span></span><span class="t">Budget</span></div>
+    </div>
+    <div class="side"><div class="card"><h3>Protect sheet, inputs open</h3><ul>
+      <li>The tab menu's Protect sheet (as today) now locks only the locked cells. Typing, pasting, filling and clearing work in unlocked cells; everything else is refused with Excel's note.</li>
+      <li>Formats, rows, columns and the sheet's structure stay locked, as in Excel's default.</li>
+      <li>The one who protected it and admins can unprotect, as today.</li>
+      <li>The server checks every change against the locks, so nothing gets round them.</li>
+    </ul></div></div>
+  </section>
+
+  <!-- 7 print -->
+  <section class="scene" data-scene="print">
+    <div class="card"><div class="fbar"><span class="namebox">A1</span><span class="fx">fx</span><span>Week</span></div>
+      <div class="stage" style="min-height:560px">
+        <div class="dlg" style="left:16px; top:16px; right:16px" role="dialog" aria-label="Print">
+          <div class="tbar">Print<span class="x">✕</span></div><p class="sub">Plan · 120 rows · 2 pages</p>
+          <div class="body" style="grid-template-columns:250px 1fr; gap:18px; align-items:start">
+            <div style="display:grid;gap:12px">
+              <fieldset><legend>Print what</legend><div class="radios">
+                <label><input type="radio" checked><span>The sheet (A1:F121)</span></label>
+                <label><input type="radio"><span>The selection</span></label></div></fieldset>
+              <fieldset><legend>Orientation</legend><div class="radios">
+                <label><input type="radio" checked><span>Portrait</span></label>
+                <label><input type="radio"><span>Landscape</span></label></div></fieldset>
+              <label class="fld"><span>Scaling</span><select><option>Fit All Columns on One Page</option><option>No Scaling</option><option>Fit Sheet on One Page</option></select></label>
+              <label class="fld"><span>Rows to repeat at top</span><input type="text" value="$1:$1" dir="ltr"></label>
+              <fieldset><legend>Print</legend><div class="radios">
+                <label><input type="checkbox" checked><span>Gridlines</span></label>
+                <label><input type="checkbox"><span>Row and column headings</span></label></div></fieldset>
+            </div>
+            <div>
+              <div class="pv">
+                <div><div class="page"><table>
+                  <tr><th>Week</th><th>Owner</th><th>Spend</th><th>Status</th><th>Due</th><th>Note</th></tr>
+                  <tr><td>W1</td><td>Samaa</td><td>1,200</td><td>Done</td><td>06/12</td><td>—</td></tr>
+                  <tr><td>W2</td><td>Hisham</td><td>850</td><td>Live</td><td>13/12</td><td>—</td></tr>
+                  <tr><td>W3</td><td>Islam</td><td>2,050</td><td>Draft</td><td>20/12</td><td>—</td></tr>
+                  <tr><td>W4</td><td>Raneem</td><td>640</td><td>Live</td><td>27/12</td><td>—</td></tr>
+                  <tr><td>W5</td><td>Roaa</td><td>1,900</td><td>Done</td><td>03/01</td><td>—</td></tr>
+                  <tr><td>W6</td><td>Samaa</td><td>720</td><td>Live</td><td>10/01</td><td>—</td></tr>
+                  <tr><td>…</td><td></td><td></td><td></td><td></td><td></td></tr>
+                </table><span class="pn">Page 1 of 2</span></div><div class="pvlab">Page 1</div></div>
+                <div><div class="page"><span class="rep"></span><table>
+                  <tr><th>Week</th><th>Owner</th><th>Spend</th><th>Status</th><th>Due</th><th>Note</th></tr>
+                  <tr><td>W61</td><td>Hisham</td><td>1,100</td><td>Plan</td><td>…</td><td>—</td></tr>
+                  <tr><td>W62</td><td>Islam</td><td>930</td><td>Plan</td><td>…</td><td>—</td></tr>
+                  <tr><td>W63</td><td>Raneem</td><td>1,480</td><td>Plan</td><td>…</td><td>—</td></tr>
+                  <tr><td>…</td><td></td><td></td><td></td><td></td><td></td></tr>
+                </table><span class="pn">Page 2 of 2</span></div><div class="pvlab">Page 2 · row 1 repeated</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="btns"><span class="start" style="color:var(--muted)">Your browser's print window opens next; choose Save as PDF there for a PDF.</span><button class="xb">Cancel</button><button class="xb def">Print</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="side"><div class="card"><h3>File › Print (Ctrl+P)</h3><ul>
+      <li>Prints the sheet's used range, or the selection, with the cells' looks (fonts, fills, borders, number formats, Center Across).</li>
+      <li>Excel's page options: orientation, Fit All Columns on One Page, Rows to repeat at top (the header row on every page), gridlines, row and column headings.</li>
+      <li>The preview shows the pages; Print opens the browser's print window, where Save as PDF makes the PDF.</li>
+      <li>Hidden rows, collapsed groups and filtered-out rows don't print, as in Excel.</li>
+    </ul></div>
+    <div class="card"><h3>The board's sheets</h3><p>File › Print there too, with the same options, printing what's on screen (the board's own columns).</p></div></div>
+  </section>
+</div>
+
+<script>
+const tabs = document.querySelectorAll('[role="tab"]')
+tabs.forEach(b => b.addEventListener('click', () => {
+  tabs.forEach(x => x.setAttribute('aria-selected', String(x === b)))
+  document.querySelectorAll('.scene').forEach(s => s.classList.toggle('on', s.dataset.scene === b.dataset.s))
+}))
+const R = document.documentElement
+document.getElementById('theme').onclick = () => { R.dataset.theme = R.dataset.theme === 'dark' ? 'light' : 'dark' }
+document.getElementById('dir').onclick = () => { R.dir = R.dir === 'rtl' ? 'ltr' : 'rtl' }
+/** Each overlay sits on its real cells: data-r="r0,c0,r1,c1" (a box), data-at="r,c,corner" (a point). */
+function place() {
+  document.querySelectorAll('.scene.on .stage').forEach(st => {
+    const tb = st.querySelector('table'); if (!tb) return
+    const o = st.getBoundingClientRect()
+    const cell = (r, c) => tb.rows[r].cells[c].getBoundingClientRect()
+    st.querySelectorAll('[data-r]').forEach(el => {
+      const [r0, c0, r1, c1] = el.dataset.r.split(',').map(Number)
+      const a = cell(r0, c0), b = cell(r1, c1)
+      const L = Math.min(a.left, b.left), T = Math.min(a.top, b.top), Rr = Math.max(a.right, b.right), B = Math.max(a.bottom, b.bottom)
+      Object.assign(el.style, { left: (L - o.left - 1) + 'px', top: (T - o.top - 1) + 'px', width: (Rr - L + 1) + 'px', height: (B - T + 1) + 'px' })
+    })
+    st.querySelectorAll('[data-at]').forEach(el => {
+      const [r, c, k] = el.dataset.at.split(','); const x = cell(+r, +c)
+      const rtl = getComputedStyle(st).direction === 'rtl'
+      const right = rtl ? x.left : x.right, left = rtl ? x.right : x.left
+      let px = k === 'br' || k === 'tr' ? right : k === 'c' ? (x.left + x.right) / 2 : left
+      let py = k === 'tr' ? x.top : k === 'c' ? (x.top + x.bottom) / 2 : x.bottom
+      const dx = (+el.dataset.dx || 0) * (rtl ? -1 : 1), dy = +el.dataset.dy || 0
+      if (rtl && el.offsetWidth > 20) px -= el.offsetWidth
+      Object.assign(el.style, { left: (px - o.left + dx) + 'px', top: (py - o.top + dy) + 'px' })
+    })
+  })
+}
+tabs.forEach(b => b.addEventListener('click', () => requestAnimationFrame(place)))
+document.getElementById('dir').addEventListener('click', () => requestAnimationFrame(place))
+window.addEventListener('resize', place)
+window.addEventListener('load', place)
+</script>
+</body>
+</html>

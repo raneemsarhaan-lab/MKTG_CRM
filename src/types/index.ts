@@ -447,6 +447,8 @@ export interface SheetChanges {
   tables?: { put?: SheetTableRecord[]; remove?: string[] }
   /** Spec 020: data validation rules put (whole records) or removed (blank sheets only). */
   validations?: { put?: ValidationRecord[]; remove?: string[] }
+  /** Spec 020: comment threads moved with their cells (border drag): one group per drag, in order; each group at once. By row and column ids. */
+  commentMoves?: { from: [string, string]; to: [string, string] }[][]
   /** Stage 3: Sort moves rows by rewriting their positions. */
   rowPositions?: { id: string; position: number }[]
   /** Spec 019: dragging a column rewrites its position. */
@@ -524,6 +526,8 @@ export interface CellStyle {
   /** Degrees, −90…90, or vertical stacked text. */
   rot?: number | 'vertical'
   num?: NumberFormat
+  /** Spec 020 tip 95: an input cell that stays open while the sheet is protected (Format Cells › Protection › Locked off). */
+  unlocked?: boolean
 }
 /** A style on a cell, a row (colKey ''), a column (rowKey '') or the sheet (both ''). */
 export interface SheetFormatRecord { rowKey: string; colKey: string; style: CellStyle }

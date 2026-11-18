@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MenuTarget, type WriteWhy } from '@/components/sheet/GridCore'
+import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MenuTarget, type MoveRequest, type WriteWhy } from '@/components/sheet/GridCore'
 import type { CellStyle, ColFilter, ConditionalRule, GroupBy, OutlineGroupRecord, SheetDoc, SheetMergeRecord, SheetTableRecord, SheetView, SortKey, StageId, TaskField, TotalFn, ValidationRecord, ValidationRule, WordField } from '@/types/index'
 import { defaultMode, fillModesFor, learnFlash, planSeries, planSeriesDialog, previewValue, sourceKind, type FillCtx, type FillMode, type SeriesSpec } from '@/lib/sheet-fill'
 import { allowed, listSpelling, overlaps } from '@/lib/sheet-validate'
@@ -47,12 +47,21 @@ import { openLinks } from './links/useTaskLinks'
 import { ConfirmDialog, ResizeDialog } from './Dialogs'
 import { ValidationAlert } from './format/TipsDialogs'
 import { iconFor } from './format/RuleIcon'
+import { planMove, splits } from '@/lib/sheet-move'
+import { moveFor, moveMenuItems } from './format/moveMenu'
+import { MoveAlert } from './format/TipsDialogs'
+import { PrintDialog, type PrintData } from './print/PrintDialog'
 import { type SplitOpts, advancedPlan, applyOp, blanksFromAbove, changeCase, dedupePlan, readCriteria, splitPlan, storedAsText, toNumber, trimClean } from '@/lib/sheet-clean'
 import { group as outlineGroup, hiddenIds, showLevel, spans as olSpansOf, toggle as olToggle, ungroup as outlineUngroup } from '@/lib/sheet-outline'
 import { fitWidth } from './format/fit'
 
 const MAX_CELL = 50_000
 /** Spec 020: the status bar's figures for the selection (Excel's Average, Count, Sum). */
+/** Spec 020 stage C: a block carried to another sheet with Alt+drag. */
+export interface Carry {
+  sheetId: string; copy: boolean; h: number; w: number; dr: number; dc: number; at: { r: number; c: number }
+  cells: { rowId: string; colId: string; value: string; style: CellStyle | null }[][]
+}
 export interface SelStats { count: number; nums: number; sum: number; avg: number | null; min: number | null; max: number | null }
 const STATS_CAP = 50_000
 export const BLANK_ROW_H = 24
@@ -74,6 +83,10 @@ export interface BlankSheetProps {
   onNotice(text: string, undo?: boolean): void
   /** Spec 020: Advanced Filter › Copy to a new sheet. */
   onNewSheet?(grid: string[][]): void
+  /** Spec 020 stage C: Alt+drag to another sheet: the block leaving this sheet, and one arriving here. */
+  onCarry?(tab: string, carry: Carry): void
+  carry?: (Carry & { n: number; now?: boolean }) | null
+  onCarryDone?(carry: Carry | null): void
   newId(): string
   /** Spec 016: the link actions, and a change to the doc that isn't an undo step (values from the board). */
   links?: LinksApi
@@ -122,6 +135,10 @@ export function BlankSheet(p: BlankSheetProps) {
   const [meId, setMeId] = useState<string | null>(null)
   const index = useMemo(() => indexFormats(extras.formats), [extras.formats])
   const styleOf = useCallback((rowId: string, colId: string) => resolveStyle(index, rowId, colId), [index])
+  // Spec 020 tip 95: Format Cells › Protection. Every cell is locked until its Locked box is unticked.
+  const lockedAt = (rowId: string, colId: string) => !resolveStyle(index, rowId, colId)?.unlocked
+  const hasUnlocked = useMemo(() => extras.formats.some(f => f.style.unlocked), [extras.formats])
+  const lockedNote = () => (hasUnlocked ? tt('protect.lockedSome') : tt('protect.locked'))
   // Stage 2: what's hidden is left out of the grid; indexes from the grid are over what's visible.
   const hiddenR = useMemo(() => new Set(view.hiddenRows ?? []), [view.hiddenRows])
   const hiddenC = useMemo(() => new Set(view.hiddenCols ?? []), [view.hiddenCols])
@@ -296,7 +313,17 @@ export function BlankSheet(p: BlankSheetProps) {
     makeRows: (at, n) => insertAt(doc.rows, at < vRows.length ? rowIndex.get(vRows[at].id) ?? doc.rows.length : doc.rows.length, n, p.newId),
   })
   /** Every change goes through the link router: mapped cells to their tasks, the rest as before (spec 016 R5). */
-  const applyR = (label: string, changes: BlankChange[]) => { void lk.applyRouted(label, changes) }
+  const applyR = (label: string, changes: BlankChange[]) => {
+    // Spec 020 tip 95: on a protected sheet only values in unlocked cells change (formats and structure stay locked).
+    if (ro) {
+      const kept = changes.flatMap(ch => (ch.kind === 'cells' ? [{ ...ch, cells: ch.cells.filter(x => !lockedAt(x.rowId, x.colId)) }] : []))
+        .filter(ch => ch.cells.length)
+      if (kept.length !== changes.length || kept.some((ch, i) => (changes[i] as typeof ch).cells.length !== ch.cells.length)) p.onNotice(lockedNote())
+      if (!kept.length) return
+      changes = kept
+    }
+    void lk.applyRouted(label, changes)
+  }
 
   // ── spec 019: task fields, ＋, the Fields drawer, column drag ───────────
   const [fieldEd, setFieldEd] = useState<{ rowId: string; col: string; field: TaskField; anchor: HTMLElement } | null>(null)
@@ -407,7 +434,13 @@ export function BlankSheet(p: BlankSheetProps) {
   }
 
   async function writeCells(writes: CellWrite[], why: WriteWhy) {
-    if (ro) return { skipped: { protected: writes.length } }
+    if (ro) {
+      // Protected: values go into unlocked cells only, with no new rows, columns or looks.
+      const open = writes.filter(w => vRows[w.r] && vCols[w.c] && !lockedAt(vRows[w.r].id, vCols[w.c].id)).map(w => ({ r: w.r, c: w.c, value: w.value }))
+      const ch = cellChange(open.map(w => ({ rowId: vRows[w.r].id, colId: vCols[w.c].id, value: w.value })))
+      if (ch) void lk.applyRouted(why, [ch])
+      return { skipped: writes.length > open.length ? { protected: writes.length - open.length } : {} }
+    }
     const skipped: Partial<Record<string, number>> = {}
     const bump = (k: string) => { skipped[k] = (skipped[k] ?? 0) + 1 }
     let maxR = -1, maxC = -1
@@ -714,7 +747,7 @@ export function BlankSheet(p: BlankSheetProps) {
       const sh = lk.shown(row.id, col)
       return `fx-sheet-td is-blank-cell${sh ? (sh.na ? ' is-lk-na' : content ? '' : ' is-lk') : ''}`
     },
-    isText: (row, col) => { if (col === 'rowNo' || ro) return false; if (totalCell(row.id, col)?.fn) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
+    isText: (row, col) => { if (col === 'rowNo' || (ro && lockedAt(row.id, col))) return false; if (totalCell(row.id, col)?.fn) return false; const sh = lk.shown(row.id, col); return !sh?.na && sh?.field !== 'task' },
     textValue: (row, col) => { const tot = totalCell(row.id, col); if (tot?.fn) return tot.raw; const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     copyText: (row, col) => { const tot = totalCell(row.id, col); if (tot?.fn) return tot.raw; const sh = lk.shown(row.id, col); return sh ? (sh.na ? '' : sh.text) : value(row.id, col) },
     // Spec 019: a field cell on a linked row opens its control (typing still works, through the same rules).
@@ -805,6 +838,13 @@ export function BlankSheet(p: BlankSheetProps) {
     },
     cellStyle: (row, col) => lookCss(row.id, col),
     cellIcon: (row, col) => (ruleLooks.size && col !== 'rowNo' ? iconFor(ruleLooks.get(`${row.id}|${col}`)) : null),
+    onMove: req => moveCells(req),
+    onMoveMenu: (req, at, anchor) => setMenu({ at, anchor, items: moveMenuItems(tt, c => { const r = moveFor(req, c); if (r) { const q = moveCells(r); if (q) setSelectRect(q) } }, { linked: false }) }),
+    moveShift: true,
+    moveTip: req => moveTip(req),
+    onMoveToTab: (tab, from, grab, copy) => carryTo(tab, from, grab, copy),
+    incoming: p.carry && p.carry.sheetId !== p.doc.id && !p.carry.now ? { h: p.carry.h, w: p.carry.w, dr: p.carry.dr, dc: p.carry.dc, n: p.carry.n } : null,
+    onIncoming: to => dropCarry(to),
     onCopied: (q, grid) => { lastCopy.current = { rows: vRows.slice(q.r0, q.r1 + 1).map(r => r.id), cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), grid } },
     copyStyle: (row, col) => styleOf(row.id, col),
     copyShown: (row, col) => { const v = value(row.id, col), st = styleOf(row.id, col); return st?.num ? display(v, st.num, locale) : v },
@@ -841,7 +881,7 @@ export function BlankSheet(p: BlankSheetProps) {
     inputDir: () => undefined,
     readOnlyNote: (row, col) => {
       if (col === 'rowNo') return null
-      if (ro) return ro
+      if (ro && lockedAt(row.id, col)) return lockedNote()
       if (totalCell(row.id, col)?.fn) return tt('total.readOnly')
       const sh = lk.shown(row.id, col)
       if (sh?.na) return tl('naWhy', { field: tl(`fields.${sh.field.startsWith('col:') ? 'none' : sh.field}`) })
@@ -850,7 +890,7 @@ export function BlankSheet(p: BlankSheetProps) {
       return null
     },
     onCommit: async (row, col, v) => {
-      if (ro) return ro
+      if (ro && lockedAt(row.id, col)) return lockedNote()
       if (v.length > MAX_CELL) return t('err.too_long')
       // Spec 020: a typed value outside the cell's validation asks first (Stop, Warning or Information).
       if (!validateTyped(row.id, col, v)) return null
@@ -1803,6 +1843,183 @@ export function BlankSheet(p: BlankSheetProps) {
   }
   function setOutline(next: OutlineGroupRecord[], label: string) { setView(label, { outline: next }) }
 
+  // ── spec 020 stage C: File › Print (tip 99) ──
+  const [printing, setPrinting] = useState(false)
+  /** What prints: the used range (or the selection), as shown, with the cells' looks. */
+  function printData(selOnly: boolean): PrintData {
+    let r1 = -1, c1 = -1
+    vRows.forEach((r, i) => { const cells = doc.cells[r.id]; if (!cells) return; for (const [cid, v] of Object.entries(cells)) { const c = vColIndex.get(cid); if (v && c !== undefined) { if (i > r1) r1 = i; if (c > c1) c1 = c } } })
+    const q = selOnly ? rectRef.current : { r0: 0, c0: 0, r1: Math.max(0, r1), c1: Math.max(0, c1) }
+    const cols = vCols.slice(q.c0, q.c1 + 1)
+    return {
+      title: p.name, ref: areaName(q),
+      cols: cols.map(c => ({ name: colLetters(colIndex.get(c.id) ?? 0), width: c.width ?? DEFAULT_COL_W })),
+      rows: vRows.slice(q.r0, q.r1 + 1).map(r => ({
+        label: String((rowIndex.get(r.id) ?? 0) + 1),
+        cells: cols.map(c => {
+          if (spans.covered.has(`${r.id}|${c.id}`)) return { text: '' }
+          const v = value(r.id, c.id), st = styleOf(r.id, c.id), css = lookCss(r.id, c.id)
+          return { text: st?.num ? display(v, st.num, locale) : v, css: css ? { ...css.cell, ...(css.text ?? {}), ...(css.border ?? {}) } : undefined }
+        }),
+      })),
+    }
+  }
+
+  // ── spec 020 stage C: moving and copying with the mouse (approved design power-tips-c) ──
+  const [moveAsk, setMoveAsk] = useState<{ run(): void } | null>(null)
+  const [moveAlert, setMoveAlert] = useState<string | null>(null)
+  /** A table or merge as visible indexes, or null when an edge is hidden. */
+  const visRect = (top: string, left: string, bottom: string, right: string) => {
+    const a = vRowIndex.get(top), b = vRowIndex.get(bottom), c = vColIndex.get(left), d = vColIndex.get(right)
+    return a === undefined || b === undefined || c === undefined || d === undefined ? null : { r0: Math.min(a, b), r1: Math.max(a, b), c0: Math.min(c, d), c1: Math.max(c, d) }
+  }
+  /**
+   * A border drag's drop (tips 13, 107–110): one step moving or copying the
+   * cells' values, formats and comments, with the merges, tables and data
+   * validation inside the block. Refused when it would split a merge or a
+   * table, or put a value a Stop rule refuses; asks before replacing data.
+   */
+  function moveCells(req: MoveRequest, confirmed = false): GridRect | null {
+    if (ro) { p.onNotice(ro); return null }
+    const h = req.from.r1 - req.from.r0 + 1, w = req.from.c1 - req.from.c0 + 1
+    const dst = { r0: req.to.r, c0: req.to.c, r1: req.to.r + h - 1, c1: req.to.c + w - 1 }
+    // A sheet linked to the board shows its tasks' values in the mapped columns: those stay where they are.
+    if (lk.map && [...range(req.from.c0, req.from.c1), ...range(dst.c0, dst.c1)].some(c => vCols[c] && (lk.map!.fields[vCols[c].id] || lk.map!.taskCol === vCols[c].id))) { p.onNotice(tt('move.mappedCols')); return null }
+    const tbs = tables.map(tb => ({ tb, q: visRect(tb.top, tb.left, tb.bottom, tb.right) })).filter((x): x is { tb: SheetTableRecord; q: GridRect } => !!x.q)
+    if (boxes.some(b => splits(req.from, b) || (!req.shift && splits(dst, b))) || tbs.some(x => splits(req.from, x.q) || (!req.shift && splits(dst, x.q)))) { p.onNotice(tt('move.splits')); return null }
+    if (req.shift) {
+      // Shifting cells can't run through a merge or a table (as Excel refuses).
+      const band = req.shift === 'down' ? (q: GridRect) => q.c1 >= Math.min(dst.c0, req.from.c0) && q.c0 <= Math.max(dst.c1, req.from.c1) && q.r1 >= Math.min(dst.r0, req.from.r0)
+        : (q: GridRect) => q.r1 >= Math.min(dst.r0, req.from.r0) && q.r0 <= Math.max(dst.r1, req.from.r1) && q.c1 >= Math.min(dst.c0, req.from.c0)
+      if (boxes.some(band) || tbs.some(x => band(x.q))) { p.onNotice(tt('move.splits')); return null }
+    }
+    const plan = planMove(req.from, req.to, req.kind, req.shift, vRows.length, vCols.length)
+    const newRows = plan.rows > vRows.length ? growTo(doc.rows, doc.rows.length + plan.rows - vRows.length - 1, BLANK_ROW_LIMIT, p.newId) : []
+    const newCols = plan.cols > vCols.length ? growTo(doc.cols, doc.cols.length + plan.cols - vCols.length - 1, BLANK_COL_LIMIT, p.newId) : []
+    const allRows = [...vRows, ...newRows], allCols = [...vCols, ...newCols]
+    if (plan.rows > allRows.length || plan.cols > allCols.length) { p.onNotice(t('err.too_many_rows')); return null }
+    const ids = (pt: { r: number; c: number }) => [allRows[pt.r].id, allCols[pt.c].id] as [string, string]
+    const val = (pt: { r: number; c: number }) => (pt.r < vRows.length && pt.c < vCols.length ? value(vRows[pt.r].id, vCols[pt.c].id) : '')
+    const inSrc = (pt: { r: number; c: number }) => pt.r >= req.from.r0 && pt.r <= req.from.r1 && pt.c >= req.from.c0 && pt.c <= req.from.c1
+    // Over data: Excel's question first (a plain move or copy).
+    if (!confirmed && !req.shift && plan.cells.some(x => x.from && !inSrc(x.to) && val(x.to))) {
+      setMoveAsk({ run: () => { const q = moveCells(req, true); if (q) setSelectRect(q) } }); return null
+    }
+    // A Stop rule at the destination refuses a value: nothing moves (Excel's alert).
+    if (req.only !== 'formats') {
+      for (const x of plan.cells) {
+        if (!x.from || x.to.r >= vRows.length || x.to.c >= vCols.length) continue
+        const v = val(x.from), [rid, cid] = ids(x.to)
+        const rule = ruleAt(rid, cid)
+        if (v && rule && rule.error?.style === 'stop' && !allowed(rule, v)) {
+          setMoveAlert(tt('move.ruleRefuses', { value: v, cell: cellName(rowIndex.get(rid) ?? 0, colIndex.get(cid) ?? 0) }))
+          return null
+        }
+      }
+    }
+    const forward: BlankChange[] = []
+    if (newRows.length) forward.push({ kind: 'insertRows', rows: newRows.map(r => ({ ...r, height: null })) })
+    if (newCols.length) forward.push({ kind: 'insertCols', cols: newCols.map(c => ({ ...c, width: null })) })
+    if (req.only !== 'formats') {
+      const ch = cellChange(plan.cells.map(x => { const [rowId, colId] = ids(x.to); return { rowId, colId, value: x.from ? val(x.from) : '' } }))
+      if (ch) forward.push(ch)
+    }
+    if (req.only !== 'values') {
+      const items: FormatItem[] = []
+      for (const x of plan.cells) {
+        const [rk, ck] = ids(x.to)
+        const before = index.get(formatKey(rk, ck)) ?? null
+        const after = x.from ? index.get(formatKey(...ids(x.from))) ?? null : null
+        if (JSON.stringify(before) !== JSON.stringify(after)) items.push({ rowKey: rk, colKey: ck, before, after })
+      }
+      if (items.length) forward.push({ kind: 'formats', items })
+    }
+    // Comments go with a moved cell (a copy leaves them, as Excel's Copy does with threads).
+    if (req.kind === 'move' && !req.only) {
+      const has = new Set(extras.threads.map(th => `${th.rowKey}|${th.colKey}`))
+      const moves = plan.cells.filter(x => x.from && has.has(ids(x.from).join('|'))).map(x => ({ from: ids(x.from!), to: ids(x.to) }))
+      if (moves.length) forward.push({ kind: 'commentMoves', moves })
+    }
+    // Merges, tables and validation wholly inside the block go with it (a copy copies merges and validation).
+    if (!req.shift && !req.only) {
+      const dr = req.to.r - req.from.r0, dc = req.to.c - req.from.c0
+      const shiftRec = <T extends { top: string; left: string; bottom: string; right: string }>(x: T, q: GridRect): T =>
+        ({ ...x, top: allRows[q.r0 + dr].id, bottom: allRows[q.r1 + dr].id, left: allCols[q.c0 + dc].id, right: allCols[q.c1 + dc].id })
+      const holds = (q: GridRect) => q.r0 >= req.from.r0 && q.r1 <= req.from.r1 && q.c0 >= req.from.c0 && q.c1 <= req.from.c1
+      const covered = (q: GridRect) => q.r0 >= dst.r0 && q.r1 <= dst.r1 && q.c0 >= dst.c0 && q.c1 <= dst.c1
+      const inside = boxes.filter(b => holds(b))
+      const replaced = boxes.filter(b => !holds(b) && covered(b)).map(b => b.m)
+      if (inside.length || replaced.length) {
+        const add = inside.map(b => shiftRec(req.kind === 'copy' ? { ...b.m, id: p.newId() } : b.m, b))
+        forward.push({ kind: 'merges', add, remove: [...replaced, ...(req.kind === 'move' ? inside.map(b => b.m) : [])] })
+      }
+      if (req.kind === 'move' && tbs.some(x => holds(x.q))) {
+        forward.push({ kind: 'tables', before: tables, after: tables.map(tb => { const x = tbs.find(y => y.tb.id === tb.id); return x && holds(x.q) ? shiftRec(tb, x.q) : tb }) })
+      }
+      const dvIn = dvBoxes.filter(b => { const q = visRect(b.v.top, b.v.left, b.v.bottom, b.v.right); return !!q && holds(q) })
+      if (dvIn.length) {
+        const list = extras.validations ?? []
+        const moved = dvIn.map(b => { const q = visRect(b.v.top, b.v.left, b.v.bottom, b.v.right)!; return shiftRec(req.kind === 'copy' ? { ...b.v, id: p.newId() } : b.v, q) })
+        const after = req.kind === 'copy' ? [...list, ...moved] : list.map(v => moved.find(x => x.id === v.id) ?? v)
+        forward.push({ kind: 'validations', before: list, after })
+      }
+    }
+    if (!forward.length) return null
+    applyR(req.kind === 'copy' ? 'copyCells' : 'moveCells', forward)
+    // Where the block ends up (a Shift move closes its gap, so a block moved further along lands h rows sooner).
+    let q = dst
+    if (req.shift && req.kind === 'move') {
+      if (req.shift === 'down' && dst.c0 <= req.from.c1 && req.from.c0 <= dst.c1 && req.from.r0 < dst.r0) q = { ...dst, r0: dst.r0 - h, r1: dst.r1 - h }
+      if (req.shift === 'right' && dst.r0 <= req.from.r1 && req.from.r0 <= dst.r1 && req.from.c0 < dst.c0) q = { ...dst, c0: dst.c0 - w, c1: dst.c1 - w }
+    }
+    p.onNotice(tt(req.kind === 'copy' ? 'move.copied' : 'move.moved', { cell: areaName(q) }), true)
+    return q
+  }
+  const moveTip = (req: MoveRequest) => {
+    const h = req.from.r1 - req.from.r0, w = req.from.c1 - req.from.c0
+    const name = areaName({ r0: req.to.r, c0: req.to.c, r1: req.to.r + h, c1: req.to.c + w })
+    return tt(req.shift ? (req.kind === 'copy' ? 'move.tipInsertCopy' : 'move.tipInsert') : req.kind === 'copy' ? 'move.tipCopy' : 'move.tipMove', { cell: name })
+  }
+  // Alt+drag to another sheet (tip 111): the block's values and looks travel with the pointer.
+  function carryTo(tab: string, from: GridRect, grab: { r: number; c: number }, copy: boolean) {
+    if (ro || tab === p.doc.id) return
+    const rowsIn = vRows.slice(from.r0, from.r1 + 1), colsIn = vCols.slice(from.c0, from.c1 + 1)
+    p.onCarry?.(tab, {
+      sheetId: p.doc.id, copy, h: rowsIn.length, w: colsIn.length, dr: grab.r, dc: grab.c, at: { r: from.r0, c: from.c0 },
+      cells: rowsIn.map(r => colsIn.map(c => ({ rowId: r.id, colId: c.id, value: value(r.id, c.id), style: index.get(formatKey(r.id, c.id)) ?? null }))),
+    })
+  }
+  /** A block carried here from another sheet, dropped at `to` (null: cancelled). */
+  function dropCarry(to: { r: number; c: number } | null) {
+    const cr = p.carry
+    if (!cr) return
+    if (!to || ro) { p.onCarryDone?.(null); if (ro && to) p.onNotice(ro); return }
+    const newRows = to.r + cr.h > vRows.length ? growTo(doc.rows, doc.rows.length + to.r + cr.h - vRows.length - 1, BLANK_ROW_LIMIT, p.newId) : []
+    const newCols = to.c + cr.w > vCols.length ? growTo(doc.cols, doc.cols.length + to.c + cr.w - vCols.length - 1, BLANK_COL_LIMIT, p.newId) : []
+    const allRows = [...vRows, ...newRows], allCols = [...vCols, ...newCols]
+    if (to.r + cr.h > allRows.length || to.c + cr.w > allCols.length) { p.onNotice(t('err.too_many_rows')); p.onCarryDone?.(null); return }
+    const forward: BlankChange[] = []
+    if (newRows.length) forward.push({ kind: 'insertRows', rows: newRows.map(r => ({ ...r, height: null })) })
+    if (newCols.length) forward.push({ kind: 'insertCols', cols: newCols.map(c => ({ ...c, width: null })) })
+    const list: { rowId: string; colId: string; value: string }[] = [], items: FormatItem[] = []
+    cr.cells.forEach((line, i) => line.forEach((x, j) => {
+      const rowId = allRows[to.r + i].id, colId = allCols[to.c + j].id
+      list.push({ rowId, colId, value: x.value })
+      const before = index.get(formatKey(rowId, colId)) ?? null
+      if (JSON.stringify(before) !== JSON.stringify(x.style)) items.push({ rowKey: rowId, colKey: colId, before, after: x.style })
+    }))
+    const ch = cellChange(list)
+    if (ch) forward.push(ch)
+    if (items.length) forward.push({ kind: 'formats', items })
+    if (forward.length) applyR(cr.copy ? 'copyCells' : 'moveCells', forward)
+    p.onCarryDone?.(cr)
+    p.onNotice(tt(cr.copy ? 'move.copied' : 'move.moved', { cell: areaName({ r0: to.r, c0: to.c, r1: to.r + cr.h - 1, c1: to.c + cr.w - 1 }) }))
+  }
+  // Released over the tab before this sheet was ready: the block lands where it was on its own sheet.
+  useEffect(() => {
+    if (p.carry?.now && p.carry.sheetId !== p.doc.id) dropCarry(p.carry.at)
+  }, [p.carry?.now]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function runFormat(cmd: FormatCmd) {
     const q = rectRef.current
     // Spec 020: what F4 repeats (formatting, inserting, hiding, clearing formats).
@@ -1814,6 +2031,7 @@ export function BlankSheet(p: BlankSheetProps) {
     if (cmd.kind === 'repeat') { repeat(); focusActive(); return }
     // Spec 020 stage B.
     if (cmd.kind === 'scope') { workScope(); return }
+    if (cmd.kind === 'print') { setPrinting(true); return }
     if (cmd.kind === 'autofit') { autofit(cmd.what); focusActive(); return }
     if (cmd.kind === 'clean') { cleanup(cmd.op); focusActive(); return }
     if (cmd.kind === 'dedupe') { dedupe(cmd.cols, cmd.header); focusActive(); return }
@@ -2001,7 +2219,7 @@ export function BlankSheet(p: BlankSheetProps) {
   /** The last fill, so Auto Fill Options can put it back and fill another way. */
   const lastFill = useRef<{ base: SheetDoc; applied: boolean } | null>(null)
   function onFill(req: FillRequest, again: boolean) {
-    if (ro) { p.onNotice(ro); return }
+    if (ro && (req.insert || !hasUnlocked)) { p.onNotice(ro); return }
     if (req.mode === 'flash') { if (again && lastFill.current?.applied) p.onUndo(); flashFill(vertical(req.dir) ? req.to.c0 : activeAt().c); return }
     let base = doc
     if (again && lastFill.current) { base = lastFill.current.base; if (lastFill.current.applied) p.onUndo() }
@@ -2429,6 +2647,12 @@ export function BlankSheet(p: BlankSheetProps) {
           })}
         </div>
       )}
+      {moveAsk && (
+        <ConfirmDialog attr="data-move-replace" title={tt('move.replaceTitle')} body={tt('move.replaceBody')} ok={tt('move.replaceOk')} cancel={tt('cancel')}
+                       onCancel={() => { setMoveAsk(null); focusActive() }} onOk={() => { const run = moveAsk.run; setMoveAsk(null); run(); focusActive() }} />
+      )}
+      {printing && <PrintDialog data={printData} selection={multi()} onClose={() => { setPrinting(false); focusActive() }} />}
+      {moveAlert && <MoveAlert text={moveAlert} onClose={() => { setMoveAlert(null); focusActive() }} />}
       {splitAsk && (
         <ConfirmDialog attr="data-split-replace" title={tt('clean.replaceTitle')} body={tt('clean.replaceBody')} ok={tt('clean.replaceOk')} cancel={tt('cancel')}
                        onCancel={() => { setSplitAsk(null); focusActive() }} onOk={() => { const run = splitAsk.run; setSplitAsk(null); run(); focusActive() }} />
