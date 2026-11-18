@@ -30,6 +30,31 @@ async function main() {
     }
   }
   console.log(`  ✓ Sheets: linked folders ready${made ? ` (${made} created)` : ''}`)
+  await videoLayout()
+}
+
+/**
+ * The redesigned Video sheet (design/video-sheet-v2.html), once: saved
+ * Video columns take the new order (Clip, Stage, Owner, Reviewer, Due, In
+ * stage, File, then the clip details), custom columns after them. The new
+ * columns' rows mark it done, so a later deploy leaves people's own order alone.
+ */
+const VIDEO_ORDER = ['title', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files',
+  'clipNo', 'type', 'source', 'fileName', 'in', 'out', 'length', 'published', 'drop']
+async function videoLayout() {
+  const recs = await prisma.sheetColumn.findMany({ where: { sheet: 'video' }, orderBy: { position: 'asc' } })
+  if (!recs.length || recs.some(r => r.key === 'inStage')) return
+  const custom = recs.filter(r => !VIDEO_ORDER.includes(r.key))
+  await prisma.$transaction([
+    ...VIDEO_ORDER.map((key, i) => {
+      const r = recs.find(x => x.key === key)
+      return r
+        ? prisma.sheetColumn.update({ where: { id: r.id }, data: { position: i } })
+        : prisma.sheetColumn.create({ data: { sheet: 'video', key, position: i } })
+    }),
+    ...custom.map((r, i) => prisma.sheetColumn.update({ where: { id: r.id }, data: { position: VIDEO_ORDER.length + i } })),
+  ])
+  console.log('  ✓ Sheets: Video columns in the new order')
 }
 
 main()

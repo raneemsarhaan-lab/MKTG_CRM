@@ -18,6 +18,18 @@ const CONTENT_ORDER = ['title', 'type', 'status', 'assignee', 'c:hook', 'c:platf
   'c:words', 'c:golive', 'c:brief', 'task', 'post', 'published', 'pillar', 'date', 'archive']
 const VIDEO_ORDER = ['title', 'clipNo', 'type', 'status', 'editor', 'c:vhook', 'source', 'fileName', 'in', 'out', 'length', 'c:music', 'files', 'published', 'drop']
 
+const ALL_SHOWN: Partial<SheetColumnRecord> = { shownDefault: false, shownIn: ['editing', 'copy', 'full', 'sheet'] }
+
+/**
+ * Without `#cols=1` the Video sheet still shows every built-in column (the
+ * clip details the earlier scenarios type into), in the redesign's order;
+ * `#plain=1` leaves it on the redesign's own defaults.
+ */
+export function videoAllColumns(): { records: SheetColumnRecord[]; values: SheetValues } {
+  const order = ['title', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'clipNo', 'type', 'source', 'fileName', 'in', 'out', 'length', 'published', 'drop']
+  return { records: order.map((k, i) => rec('video', k, i, ALL_SHOWN)), values: {} }
+}
+
 export function columnFixtures(): { records: SheetColumnRecord[]; values: SheetValues } {
   const c = (key: string, more: Partial<SheetColumnRecord> = {}) => rec('content', key, CONTENT_ORDER.indexOf(key), more)
   const v = (key: string, more: Partial<SheetColumnRecord> = {}) => rec('video', key, VIDEO_ORDER.indexOf(key), more)
@@ -34,9 +46,10 @@ export function columnFixtures(): { records: SheetColumnRecord[]; values: SheetV
     c('c:words', { name: 'Words', kind: 'number' }),
     c('c:golive', { name: 'Go-live', kind: 'date' }),
     c('c:brief', { name: 'Brief', kind: 'link' }),
-    ...VIDEO_ORDER.filter(k => !k.startsWith('c:')).map(k => v(k)),
-    v('c:vhook', { name: 'Hook', kind: 'text', shownDefault: false, shownIn: ['full', 'editing'] }),
-    v('c:music', { name: 'Music cleared', kind: 'checkbox', shownDefault: false, shownIn: ['full', 'editing'] }),
+    // The redesigned sheet shows one set ('sheet'); these fixtures show every column in it.
+    ...VIDEO_ORDER.filter(k => !k.startsWith('c:')).map(k => v(k, ALL_SHOWN)),
+    v('c:vhook', { name: 'Hook', kind: 'text', shownDefault: false, shownIn: ['full', 'editing', 'sheet'] }),
+    v('c:music', { name: 'Music cleared', kind: 'checkbox', shownDefault: false, shownIn: ['full', 'editing', 'sheet'] }),
   ]
   // The built-in duplicates above (status, pillar) replace their plain records.
   const seen = new Map<string, SheetColumnRecord>()

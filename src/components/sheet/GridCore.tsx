@@ -32,7 +32,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { parseClipboard, pastePlan, serialise, toGrid, toStyles } from '@/lib/sheet-clipboard'
-import { edge as dataEdge, subtract, unionCells, copyLayout, MAX_AREAS } from '@/lib/sheet-selection'
+import { edge as dataEdge, subtract, unionCells, copyLayout, MAX_AREAS, colLetters } from '@/lib/sheet-selection'
 import type { CellCss } from '@/lib/sheet-format'
 import type { CellStyle } from '@/types/index'
 import type { FillMode } from '@/lib/sheet-fill'
@@ -125,6 +125,8 @@ export interface GridModel<R extends { key: string }> {
    * their row-number menu, Home onto the number, and Tab into the next field.
    */
   spreadsheet?: boolean
+  /** Each heading shows its column letter (A, B, C…) above its name, like a spreadsheet. */
+  letters?: boolean
   /** The text a copy takes from a cell (default: `textValue`, or the cell's shown text). */
   copyText?(row: R, col: GridCol): string
   /** Write many cells at once: paste, clear, cut. Indexes may run past the end on sheets that grow. */
@@ -1327,7 +1329,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       style={{ ['--sheet-cols' as string]: template, ...(z !== 1 ? { zoom: z } : {}) }}
       onKeyDown={onGridKeyDown}
     >
-      <div role="row" aria-rowindex={1} className="fx-sheet-tr is-head">
+      <div role="row" aria-rowindex={1} className={`fx-sheet-tr is-head${m.letters ? ' is-lettered' : ''}`}>
         <div role="columnheader" className="fx-sheet-th is-frozen-no" aria-label="#"
              onClick={() => { if (m.selection && m.rows.length) selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 }) }}>{m.corner?.()}</div>
         {m.cols.map((col, c) => {
@@ -1337,6 +1339,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
           return (
             <div key={col} role="columnheader" aria-sort={h.sort} aria-label={h.label}
                  data-col-head={col}
+                 data-letter={m.letters ? colLetters(c) : undefined}
                  style={c < FC ? { position: 'sticky', insetInlineStart: frozenStart[c], zIndex: 5 } : undefined}
                  draggable={movable || undefined}
                  className={`fx-sheet-th is-${col}${col === 'title' ? ' is-frozen-title' : ''}${h.className ? ` ${h.className}` : ''}${dragCol === col ? ' is-dragging' : ''}${dropBefore === col && dragCol && dragCol !== col ? ' is-drop-before' : ''}${on ? ' is-sel-head' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}

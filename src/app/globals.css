@@ -3131,3 +3131,36 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-ak-hint { color: var(--inbox-muted); font-size: 11px; }
 /* A comment's card steps aside while cells are being dragged. */
 body:has(.fx-sheet-grid.is-moving) .fx-cmt-thread:not(.is-full) { visibility: hidden; }
+
+/* ── The Video sheet, redesigned (design/video-sheet-v2.html) ─────────────── */
+.fx-vs-bar { gap: 8px; }
+.fx-vs-more { position: relative; }
+.fx-vs-more-btn { height: 32px; width: 34px; border: 1px solid var(--sheet-line, #E2E3E3); border-radius: 8px; background: #fff; color: var(--sheet-muted); font-weight: 800; cursor: pointer; }
+.fx-vs-more-btn[aria-expanded="true"] { background: var(--hd-purple-soft); color: var(--hd-purple); border-color: transparent; }
+.fx-vs-more-panel { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 6px; padding: 8px; min-width: 190px;
+  background: #fff; border: 1px solid #E2E3E3; border-radius: 12px; box-shadow: 0 8px 28px rgba(17, 18, 20, .16); }
+.fx-vs-more-panel > button { width: 100%; justify-content: flex-start; text-align: start; }
+.fx-vs-new { height: 32px; border: 0; border-radius: 8px; padding: 0 14px; background: var(--hd-purple); color: #fff; font: 700 13px var(--font-body); cursor: pointer; white-space: nowrap; }
+[dir="rtl"] .fx-vs-new { font-family: inherit; }
+.fx-vs-new:hover { background: var(--inbox-purple-deep); }
+.fx-vs-new:disabled { opacity: .45; cursor: default; }
+/* Lettered headings: the letter on top, the name under it. */
+.fx-sheet-tr.is-head.is-lettered > .fx-sheet-th { height: 46px; padding-top: 16px; }
+/* The letter is drawn from data-letter, so it stays out of the heading's text. */
+.is-lettered > .fx-sheet-th[data-letter]::after { content: attr(data-letter); position: absolute; top: 0; inset-inline: 0; height: 16px; display: grid; place-items: center;
+  font-size: 10.5px; font-weight: 500; color: var(--sheet-muted); border-bottom: 1px solid var(--sheet-grid); pointer-events: none; }
+.is-lettered > .fx-sheet-th > .fx-sheet-th-name { font-size: 12.5px; font-weight: 700; color: var(--sheet-ink); }
+.is-lettered > .fx-sheet-th.is-num { justify-content: flex-end; }
+.is-lettered > .fx-sheet-th.is-num > .fx-sheet-th-name { flex: none; }
+/* A video is a lavender band across the sheet. */
+[data-video-sheet] .fx-sheet-tr.is-video > .fx-sheet-td:not(.is-frozen-no) { background: var(--hd-purple-soft); font-weight: 400; }
+.fx-vs-band { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; }
+.fx-vs-band-name { font-weight: 700; color: var(--sheet-ink); max-width: 40%; }
+.fx-vs-band-n, .fx-vs-band-mix { color: var(--sheet-muted); white-space: nowrap; font-size: 12.5px; }
+.fx-vs-prog { display: inline-flex; flex: none; width: 160px; height: 6px; border-radius: 999px; overflow: hidden; background: #E9E6F5; }
+.fx-vs-prog > span { height: 100%; }
+.fx-vs-band-due { margin-inline-start: auto; color: var(--sheet-muted); white-space: nowrap; font-size: 12.5px; }
+.fx-vs-band-due b { color: var(--sheet-ink); }
+.fx-vs-band .fx-sheet-open { margin-inline-start: 0; }
+[data-video-sheet] .fx-sheet-td.is-late { background: #FBE3E3; color: #C92A2A; font-weight: 700; }
+@media (max-width: 760px) { .fx-vs-band-mix, .fx-vs-prog { display: none; } }

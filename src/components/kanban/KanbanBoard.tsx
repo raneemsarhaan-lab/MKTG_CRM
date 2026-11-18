@@ -1003,6 +1003,7 @@ export function KanbanBoard({
           contentTypes={types}
           columns={columnsBundle}
           rowHeights={linkedRowHeights?.video}
+          slaConfig={slaConfig}
           hasStorage={hasStorage}
           videoId={sheetVideo}
           highlightId={sheetRow}

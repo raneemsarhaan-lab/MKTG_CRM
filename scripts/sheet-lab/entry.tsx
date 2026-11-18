@@ -30,7 +30,7 @@ import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { MEMBERS, makeTasks, sheetsHtml } from './fixtures'
 import { ContentApp, type ContentLab } from './content-entry'
 import { labWritePasted, useLabColumns } from './columns-stub'
-import { columnFixtures, customClipText, customPlanText } from './column-fixtures'
+import { columnFixtures, customClipText, customPlanText, videoAllColumns } from './column-fixtures'
 import { CONTENT_MEMBERS, referenceHtml, referenceText } from './content-fixtures'
 
 const params  = new URLSearchParams(location.hash.slice(1))
@@ -203,7 +203,7 @@ function App() {
   }
 
   const cols = useLabColumns({
-    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : { records: [], values: {} },
+    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : params.get('plain') === '1' ? { records: [], values: {} } : videoAllColumns(),
     types: ['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l })),
   })
   return (

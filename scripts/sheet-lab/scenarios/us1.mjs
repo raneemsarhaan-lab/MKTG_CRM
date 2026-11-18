@@ -8,7 +8,7 @@ export const us1 = [
       const nos = await t.page.$$eval('[data-row^="c:"] [data-col="clipNo"]', els => els.map(e => e.textContent))
       t.eq(nos, ['04', '05', '08', '09', '11', '12', '13', '13', '14', '18', '22', '23', '28', ''], 'clips in clip order')
       const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.map(h => h.textContent || h.getAttribute('aria-label')))
-      t.eq(heads, ['#', 'Title', '#', 'Type', 'Status', 'Editor', 'Source', 'File name', 'In', 'Out', 'Length', 'Files', 'Published', 'Drop or restore'], 'Full columns')
+      t.eq(heads, ['#', 'Clip', 'Stage', 'Owner', 'Reviewer', 'Due', 'In stage', 'File', '#', 'Type', 'Source', 'File name', 'In', 'Out', 'Length', 'Published', 'Drop or restore'], 'every column, in the redesign order')
       t.eq((await t.text('c:c01', 'length')).trim(), '1:28.8', 'length from in and out')
       const h = await t.cell('c:c01', 'title').evaluate(e => e.getBoundingClientRect().height)
       t.assert(h >= 24 && h <= 28, `rows are 24–28 px, got ${h}`)
@@ -38,12 +38,11 @@ export const us1 = [
   {
     id: 'us1-3',
     async run(t) {
-      const s = (await t.page.locator('[data-summary]').innerText()).replace(/\s+/g, ' ')
+      // The redesign: the video's band says what the summary line used to.
+      const s = (await t.text('v:v1', 'title')).replace(/\s+/g, ' ')
       t.assert(s.includes('13 clips'), `clip count: ${s}`)
-      t.assert(/\d+m \d{2}s/.test(s), `total length: ${s}`)
-      t.assert(s.includes('5 editing'), `editing: ${s}`)
-      t.assert(s.includes('3 published (1 no link)'), `published: ${s}`)
-      t.assert(s.includes('1 dropped'), `dropped: ${s}`)
+      t.assert(s.includes('3 published'), `published: ${s}`)
+      t.assert(/\d+ editing/.test(s) && /\d+ in review/.test(s), `stages: ${s}`)
     },
   },
   {

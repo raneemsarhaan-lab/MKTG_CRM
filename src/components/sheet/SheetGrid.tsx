@@ -6,7 +6,9 @@
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
 import { useLocale, useTranslations } from 'next-intl'
-import type { Member, SheetColumn, Task, TaskField, WordField } from '@/types/index'
+import type { Member, SheetColumn, SLAConfig, Task, TaskField, WordField } from '@/types/index'
+import { contentTypeColor } from '@/lib/tokens'
+import { businessDaysBetween } from '@/lib/utils'
 import { COLUMN_WIDTHS, ROW_NO_WIDTH } from './columns'
 import { regroupVideos, type SheetRow } from './rows'
 import { STAGE_META } from '@/lib/stage-meta'
@@ -34,6 +36,17 @@ export type { GridCol, ActiveCell }
 /** Spec 019 stage 3: the built-in columns that are task fields (their icon in the heading). */
 const FIELD_OF: Record<string, TaskField> = { type: 'type', status: 'stage', editor: 'assignee', files: 'link:doc', published: 'link:published' }
 const STAGE_ORDER = Object.keys(STAGE_META)
+
+/** The redesign's stage groups, for a video's band (design/video-sheet-v2.html). */
+const BUCKETS = [
+  { key: 'todo', stages: ['todo', 'c-prog', 'c-final', 'c-check', 'r-design'], color: '#8A8F98' },
+  { key: 'editing', stages: ['d-prog'], color: '#7C3AED' },
+  { key: 'review', stages: ['d-check', 'final-check'], color: '#D97706' },
+  { key: 'ready', stages: ['ready-publish', 'scheduled'], color: '#0E9F9A' },
+  { key: 'published', stages: ['publish'], color: '#2E9E4F' },
+] as const
+/** From Edit Review on, a clip shows who signs it off. */
+const REVIEW_FROM = STAGE_ORDER.indexOf('d-check')
 
 /** Columns typed into. */
 const TEXT_COLS: GridCol[] = ['title', 'clipNo', 'source', 'fileName', 'in', 'out']
@@ -75,6 +88,8 @@ export interface SheetGridProps {
   onSkipped?(skipped: Partial<Record<string, number>>): void
   /** Spec 019 stage 3: the column set on show (the drawer's switches act on it). */
   setName?: string
+  /** Each stage's time limit (business days) by content type: In stage turns red past it. */
+  slaConfig?: SLAConfig
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
   linked?: {
     drop(taskId: string): Promise<boolean>
@@ -119,6 +134,19 @@ export function SheetGrid(p: SheetGridProps) {
     return p.onCommit(row, col, value)
   }
   const membersById = new Map(p.members.map(m => [m.id, m]))
+  const dayFmt = new Intl.DateTimeFormat(locale.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const dueText = (d: string | null | undefined) => (d ? dayFmt.format(new Date(`${d.slice(0, 10)}T00:00:00Z`)) : '')
+  /** Who signs the clip off: its task owner, once it reaches review. */
+  const reviewerOf = (task: Task) => (STAGE_ORDER.indexOf(task.status) >= REVIEW_FROM ? membersById.get(task.task_owner_id) : undefined)
+  /** How long the clip has been in its stage: hours under a day, else working days; late past the stage's limit. */
+  function inStage(task: Task): { text: string; late: boolean } | null {
+    if (task.status === 'todo' || task.status === 'publish' || !task.stage_date) return null
+    const from = new Date(task.stage_date), now = new Date()
+    const hours = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 3_600_000))
+    const days = businessDaysBetween(from, now)
+    const limit = p.slaConfig?.[task.status]?.[task.content_type_label ?? '']
+    return { text: hours < 24 ? `${Math.max(1, hours)}h` : `${days}d`, late: limit != null && days > limit }
+  }
   const rowTask = (row: SheetRow): Task | null => (row.kind === 'clip' || row.kind === 'video' ? row.task : null)
   const [drawer, setDrawer] = useState(false)
   const [valuesFor, setValuesFor] = useState<WordField | null>(null)
@@ -144,8 +172,35 @@ export function SheetGrid(p: SheetGridProps) {
     if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
     if (col === 'rowNo') return true
     if (isCustom(col)) return cl.custom.isMenu(col)
-    if (row.kind === 'video') return ['status', 'editor', 'type', 'files'].includes(col)
+    if (row.kind === 'video') return false
     return ['status', 'editor', 'type', 'files', 'published', 'drop'].includes(col)
+  }
+
+  /** A video's band: name, clip count, a bar and words for its clips' stages, and its due date. */
+  function band(row: Extract<SheetRow, { kind: 'video' }>) {
+    const task = row.task
+    const live = row.clips.filter(c => !c.dropped_at)
+    const counts = BUCKETS.map(b => ({ ...b, n: live.filter(c => (b.stages as readonly string[]).includes(c.status)).length }))
+    const mix = counts.filter(b => b.n > 0 || b.key === 'todo' || b.key === 'published').map(b => t(`band.${b.key}`, { n: b.n })).join(' · ')
+    const due = task.due_date ?? live.map(c => c.due_date).filter(Boolean).sort().pop() ?? null
+    const done = counts.find(b => b.key === 'published')!.n
+    return (
+      <span className="fx-sheet-title fx-vs-band" data-video-band={task.id}>
+        <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
+              onClick={e => { e.stopPropagation(); p.onToggle(task.id) }}>{row.collapsed ? '▸' : '▾'}</span>
+        <b className="fx-sheet-ellipsis fx-vs-band-name" title={task.name}>{task.name}</b>
+        <span className="fx-vs-band-n">{t('band.clips', { n: live.length })}</span>
+        {live.length > 0 && (
+          <span className="fx-vs-prog" role="img" aria-label={t('band.progress', { done, all: live.length })}>
+            {counts.filter(b => b.n).map(b => <span key={b.key} style={{ width: `${(b.n / live.length) * 100}%`, background: b.color }} />)}
+          </span>
+        )}
+        <span className="fx-vs-band-mix">{mix}</span>
+        {p.allVideos && <span className="fx-sheet-open" role="link" tabIndex={-1} title={t('openOnItsOwn', { name: task.name })}
+                              onClick={e => { e.stopPropagation(); p.onOpenVideo(task.id) }} aria-hidden="true">↗</span>}
+        {due && <span className="fx-vs-band-due">{t.rich('band.due', { date: dueText(due), b: c => <b>{c}</b> })}</span>}
+      </span>
+    )
   }
 
   const model: GridModel<SheetRow> = {
@@ -157,17 +212,20 @@ export function SheetGrid(p: SheetGridProps) {
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
       const text = col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`)))
-      const f = FIELD_OF[col]
+      // The redesign: plain names under the column letters, as in a spreadsheet.
       return {
-        text: f && text ? <><FieldIcon field={f} />{text}</> : text,
-        label: col === 'drop' && !named ? t('col.drop') : f && text ? text : undefined,
+        text,
+        label: col === 'drop' && !named ? t('col.drop') : undefined,
         sort: col === 'clipNo' ? 'ascending' : undefined,
+        className: ['due', 'inStage', 'clipNo', 'in', 'out', 'length'].includes(col) ? 'is-num' : undefined,
       }
     },
+    letters: true,
     ...cl.grid,
     tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
                         onPointerDown={e => e.stopPropagation()} onClick={e => setAddAt(e.currentTarget)}>＋</button>,
-    colsOf: row => (row.kind === 'group' ? ['rowNo', 'title'] : null),
+    // A video is a band across the sheet, like a group heading.
+    colsOf: row => (row.kind === 'group' || row.kind === 'video' ? ['rowNo', 'title'] : null),
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'clip' && row.kind !== 'video') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
@@ -194,7 +252,8 @@ export function SheetGrid(p: SheetGridProps) {
       const c = ['fx-sheet-td', `is-${col}`]
       if (col === 'rowNo') c.push('is-frozen-no')
       if (col === 'title') c.push('is-frozen-title')
-      if (['clipNo', 'in', 'out', 'length'].includes(col)) c.push('fx-sheet-num')
+      if (['clipNo', 'in', 'out', 'length', 'due', 'inStage'].includes(col)) c.push('fx-sheet-num')
+      if (col === 'inStage' && row.kind === 'clip' && inStage(row.task)?.late) c.push('is-late')
       if (['source', 'fileName'].includes(col)) c.push('fx-sheet-mono')
       if (isMenu(row, col) || row.kind === 'add') c.push('is-action')
       if (isCustom(col)) c.push('is-custom', cl.custom.cellClass(col))
@@ -214,6 +273,7 @@ export function SheetGrid(p: SheetGridProps) {
         case 'status':   return row.kind === 'video' || row.kind === 'clip' ? stageWord(task.status) : ''
         case 'in':       return formatClipTime(task.clip?.in_ms)
         case 'out':      return formatClipTime(task.clip?.out_ms)
+        case 'due':      return row.kind === 'clip' ? dueText(task.due_date) : ''
         default:         return ''
       }
     },
@@ -257,21 +317,19 @@ export function SheetGrid(p: SheetGridProps) {
       switch (col) {
         case 'rowNo': return row.n
         case 'title':
+          if (isVideo && row.kind === 'video') return band(row)
           return (
             <span className="fx-sheet-title">
-              {isVideo
-                ? <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
-                        onClick={e => { e.stopPropagation(); p.onToggle(task.id) }}>{row.collapsed ? '▸' : '▾'}</span>
-                : <span className="fx-sheet-indent" aria-hidden="true" />}
+              <span className="fx-sheet-indent" aria-hidden="true" />
               <span className="fx-sheet-ellipsis" title={task.name}>{task.name}</span>
-              {isVideo && row.collapsed && <span className="fx-sheet-count">{t('summary.clips', { count: row.clips.filter(c => !c.dropped_at).length })}</span>}
               {row.kind === 'clip' && task.dropped_at && <span className="fx-sheet-sr">, {t('drop.droppedSr')}</span>}
-              {isVideo && p.allVideos && <span className="fx-sheet-open" role="link" tabIndex={-1} title={t('openOnItsOwn', { name: task.name })}
-                                onClick={e => { e.stopPropagation(); p.onOpenVideo(task.id) }} aria-hidden="true">↗</span>}
             </span>
           )
         case 'clipNo': return isVideo || task.clip?.clip_no == null ? '' : String(task.clip.clip_no).padStart(2, '0')
-        case 'type':   return <span className="fx-sheet-ellipsis">{task.content_type_label}</span>
+        case 'type':   return task.content_type_label ? <span className="fx-content-type" style={{ background: contentTypeColor(task.content_type_label) }}>{task.content_type_label}</span> : null
+        case 'reviewer': { const r = isVideo ? undefined : reviewerOf(task); return r ? <EditorContent member={r} t={t} /> : null }
+        case 'due':    return isVideo ? '' : dueText(task.due_date)
+        case 'inStage': { const s = isVideo ? null : inStage(task); return s ? s.text : <span className="fx-sheet-muted">–</span> }
         case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} name={stageWord(task.status)} />
         case 'editor': return <EditorContent member={task.assignee_id ? membersById.get(task.assignee_id) : undefined} t={t} />
         case 'source': return isVideo ? '' : <span className="fx-sheet-ellipsis">{task.clip?.source ?? ''}</span>
@@ -304,6 +362,8 @@ export function SheetGrid(p: SheetGridProps) {
         case 'editor': return task.assignee_id ? membersById.get(task.assignee_id)?.name ?? '' : ''
         case 'type': return task.content_type_label ?? ''
         case 'length': return formatClipTime(clipLength(task.clip?.in_ms, task.clip?.out_ms))
+        case 'reviewer': return row.kind === 'clip' ? reviewerOf(task)?.name ?? '' : ''
+        case 'inStage': return row.kind === 'clip' ? inStage(task)?.text ?? '' : ''
       }
     }
     return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())

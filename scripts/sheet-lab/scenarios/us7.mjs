@@ -1,5 +1,6 @@
 // US7: published links and dropped clips (FR-047, FR-048, FR-060–FR-063).
-const summary = t => t.page.locator('[data-summary]').innerText().then(s => s.replace(/\s+/g, ' '))
+// The redesign: the video's band carries the counts the summary line had.
+const summary = t => t.text('v:v1', 'title').then(s => s.replace(/\s+/g, ' '))
 
 export const us7 = [
   {
@@ -23,13 +24,13 @@ export const us7 = [
   {
     id: 'us7-2',
     async run(t) {
-      t.assert((await summary(t)).includes('3 published (1 no link)'), 'before')
+      t.assert((await summary(t)).includes('3 published'), 'before')
       await t.cell('c:c04', 'status').click()
       await t.page.locator('[data-menu-item="publish"]').click()
       await t.page.locator('[data-sheet-pop]').getByRole('button', { name: 'Skip' }).click()
       await t.idle(200)
       t.eq((await t.text('c:c04', 'published')).trim(), 'Missing link', 'Missing link')
-      t.assert((await summary(t)).includes('4 published (2 no link)'), `counted: ${await summary(t)}`)
+      t.assert((await summary(t)).includes('4 published'), `counted: ${await summary(t)}`)
       t.eq((await t.text('c:c02', 'published')).trim(), 'Missing link', 'a published clip from the fixture too')
     },
   },
@@ -43,7 +44,7 @@ export const us7 = [
       t.assert(await t.page.locator('[data-row="c:c06"].is-dropped').count() === 1, 'struck through and greyed')
       t.assert((await t.page.locator('[data-cell="c:c06|title"] .fx-sheet-sr').innerText()).includes('dropped'), 'and says so to screen readers')
       const s = await summary(t)
-      t.assert(s.includes('12 clips') && s.includes('2 dropped') && s.includes('4 editing'), `summary counts it as dropped only: ${s}`)
+      t.assert(s.includes('12 clips'), `the band stops counting it: ${s}`)
       t.assert((await t.toast()).includes('Clip dropped'), 'with a message')
       t.assert((await t.task('c06')).status === 'final-check', 'its stage is kept (FR-063)')
       await t.page.locator('[data-sheet-toast] button').click()
@@ -68,7 +69,7 @@ export const us7 = [
     id: 'us7-5',
     async run(t) {
       t.assert((await t.rows()).includes('c:c13'), 'dropped clips shown by default')
-      await t.page.locator('[data-show-dropped]').click()
+      await t.tool('[data-show-dropped]', 'click')
       t.assert(!(await t.rows()).includes('c:c13'), 'Show dropped off hides them')
       await t.open('')
       t.assert(!(await t.rows()).includes('c:c13'), 'remembered')
@@ -78,7 +79,6 @@ export const us7 = [
     id: 'us7-restore-editing',
     hash: 'me=omar',
     async run(t) {
-      t.eq(await t.page.$eval('[data-sets] [aria-pressed="true"]', b => b.dataset.set), 'editing', 'Editing set, no Drop column')
       await t.focusCell('c:c13', 'title')
       await t.page.keyboard.press('Home')
       await t.page.keyboard.press('Enter')

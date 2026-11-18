@@ -43,24 +43,30 @@ export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
     { key: 'date', width: 104, en: 'Date' },
     { key: 'archive', width: 80, en: 'Archive or restore' },
   ],
+  // The redesigned Video sheet (design/video-sheet-v2.html) shows its own set,
+  // 'sheet': Clip, Stage, Owner, Reviewer, Due, In stage, File. The rest are a
+  // click away in Columns. The older sets stay for saved layouts.
   video: [
-    { key: 'title', width: 320, en: 'Title', sets: ['editing', 'copy', 'full'] },
+    { key: 'title', width: 300, en: 'Clip', sets: ['editing', 'copy', 'full', 'sheet'] },
+    { key: 'status', width: 170, en: 'Stage', sets: ['editing', 'copy', 'full', 'sheet'] },
+    { key: 'editor', width: 150, en: 'Owner', sets: ['editing', 'copy', 'full', 'sheet'] },
+    { key: 'reviewer', width: 150, en: 'Reviewer', sets: ['sheet'] },
+    { key: 'due', width: 96, en: 'Due', sets: ['sheet'] },
+    { key: 'inStage', width: 92, en: 'In stage', sets: ['sheet'] },
+    { key: 'files', width: 170, en: 'File', sets: ['editing', 'full', 'sheet'] },
     { key: 'clipNo', width: 40, en: '#', sets: ['editing', 'copy', 'full'] },
     { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full'] },
-    { key: 'status', width: 156, en: 'Status', sets: ['editing', 'copy', 'full'] },
-    { key: 'editor', width: 112, en: 'Editor', sets: ['editing', 'copy', 'full'] },
     { key: 'source', width: 92, en: 'Source', sets: ['editing', 'full'] },
     { key: 'fileName', width: 250, en: 'File name', sets: ['editing', 'full'] },
     { key: 'in', width: 64, en: 'In', sets: ['editing', 'full'] },
     { key: 'out', width: 64, en: 'Out', sets: ['editing', 'full'] },
     { key: 'length', width: 64, en: 'Length', sets: ['editing', 'full'] },
-    { key: 'files', width: 150, en: 'Files', sets: ['editing', 'full'] },
     { key: 'published', width: 130, en: 'Published', sets: ['copy', 'full'] },
     { key: 'drop', width: 72, en: 'Drop or restore', sets: ['full'] },
   ],
 }
 /** The sets a sheet has: the Video sheet's three, or one for the Content sheet. */
-export const SHEET_SETS: Record<SheetId, string[]> = { content: ['all'], video: ['editing', 'copy', 'full'] }
+export const SHEET_SETS: Record<SheetId, string[]> = { content: ['all'], video: ['editing', 'copy', 'full', 'sheet'] }
 
 export const isCustomKey = (key: string) => key.startsWith('c:')
 export const builtInOf = (sheet: SheetId, key: string) => BUILT_INS[sheet].find(b => b.key === key)
