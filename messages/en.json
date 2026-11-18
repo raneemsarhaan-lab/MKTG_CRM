@@ -1,6 +1,6 @@
 {
   "nav": {
-    "overview": "My Day",
+    "overview": "Working Hours",
     "board": "Board",
     "capacity": "Capacity",
     "settings": "Settings",
@@ -2659,7 +2659,9 @@
       "capacity": "Capacity",
       "dayTotal": "Day total",
       "of": "of {capacity}",
-      "empty": "No members yet."
+      "empty": "No members yet.",
+      "teamTitle": "Team hours",
+      "managerOnly": "Marketing Manager only"
     },
     "err": {
       "bad_hours": "Hours go from 0 to 24.",
@@ -2668,7 +2670,7 @@
       "too_old": "Days more than 30 days ago can only be changed by an admin.",
       "duplicate": "That day is listed twice.",
       "bad_date": "That isn't a valid day.",
-      "not_authorized": "Only admins can see other people's hours.",
+      "not_authorized": "Only the Marketing Manager can see the team's hours.",
       "network": "Not saved: check your connection and try again.",
       "generic": "That didn't work. Try again."
     }

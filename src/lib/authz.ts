@@ -55,3 +55,14 @@ export async function requireTaskCreator(): Promise<Guard> {
   if (member.access === 'user') return { error: 'not_authorized' }
   return { member }
 }
+
+/**
+ * The team hours report belongs to the Marketing Manager: the workspace's
+ * supervising role (Settings, "Marketing Manager" unless changed), matched on
+ * the member's role. Being an admin is not enough.
+ */
+export async function isHoursManager(m: Pick<Member, 'role'>): Promise<boolean> {
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { supervising_role: true } })
+  const want = (ws?.supervising_role || 'Marketing Manager').trim().toLowerCase()
+  return (m.role ?? '').trim().toLowerCase() === want
+}
