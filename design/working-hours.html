@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Working hours page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #FFFFFF; --panel: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B6F7B; --faint: #9A9DA6;
+  --line: #ECECF1; --rail: #FAFAF7; --hover: #F4F4F0; --active: #E9F3C9; --active-ink: #1B1A13;
+  --lime: #C8F24E; --violet: #6E5BE6; --violet-soft: #EEEBFD; --amber-soft: #FDF0DD; --amber-ink: #A2610C;
+  --danger: #D22040; --chip: #E3E3EA; --note: #FFF7D6; --note-ink: #6B5300; --head: #F6F6F8;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2A2A34; --rail: #14141A; --hover: #1E1E26; --active: #2F3A12; --active-ink: #E6F7B0;
+  --violet: #A78BFA; --violet-soft: #2A2145; --amber-soft: #3A2A10; --amber-ink: #F2B866;
+  --danger: #FF6B81; --chip: #2E2E38; --note: #3A3214; --note-ink: #F3DE8A; --head: #1C1C24;
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --panel: #17171D; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --line: #2A2A34; --rail: #14141A; --hover: #1E1E26; --active: #2F3A12; --active-ink: #E6F7B0;
+  --violet: #A78BFA; --violet-soft: #2A2145; --amber-soft: #3A2A10; --amber-ink: #F2B866;
+  --danger: #FF6B81; --chip: #2E2E38; --note: #3A3214; --note-ink: #F3DE8A; --head: #1C1C24;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.45 var(--f-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 56px; }
+h1.doc { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 14px; color: var(--muted); max-width: 920px; }
+.ctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 16px; }
+.ctl span { color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel); color: var(--text); padding: 8px 14px; font: 600 13px var(--f-body); cursor: pointer; }
+.seg button.on { background: var(--violet); color: #fff; }
+.note { background: var(--note); color: var(--note-ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 16px; font-size: 13px; }
+.note b { font-weight: 700; }
+
+/* the app frame */
+.app { display: grid; grid-template-columns: 200px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--page); }
+.rail { background: var(--rail); border-inline-end: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+.logo { font: 800 20px var(--f-head); color: var(--ink); margin: 0 6px 8px; }
+.ws { align-self: flex-start; background: var(--lime); color: #1B1A13; border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: 12px; margin: 0 6px 14px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; color: var(--text); font-weight: 500; position: relative; }
+.nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.nav.on { background: var(--active); color: var(--active-ink); font-weight: 700; }
+.nav.on svg { stroke-width: 2.4; }
+.nav.sub { padding-inline-start: 40px; font-size: 13px; padding-block: 6px; }
+.nav.gone { opacity: .45; text-decoration: line-through; }
+.nav .tag { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 1px 6px; text-decoration: none; display: inline-block; }
+.tag.new { background: var(--violet-soft); color: var(--violet); }
+.tag.hid { background: var(--danger); color: #fff; opacity: .9; }
+.main { padding: 32px 36px 36px; min-width: 0; }
+.greet { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 22px; }
+.greet h2 { margin: 0; font: 700 38px/1.1 Caveat, cursive; color: var(--ink); }
+.greet p { margin: 4px 0 0; color: var(--muted); }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 2px; }
+.toggle span { padding: 6px 14px; border-radius: 9px; font-weight: 600; font-size: 13px; color: var(--muted); }
+.toggle span.on { background: var(--violet); color: #fff; }
+
+.card { border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; background: var(--panel); margin-bottom: 18px; }
+.top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.top h3 { margin: 0; font: 800 18px var(--f-head); color: var(--ink); }
+.muted { color: var(--muted); font-size: 13.5px; }
+.top .end { margin-inline-start: auto; }
+.entry { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 18px; }
+.field { display: inline-flex; align-items: center; border: 1.5px solid var(--chip); border-radius: 12px; height: 42px; padding: 0 12px; gap: 18px; font-weight: 700; font-size: 17px; color: var(--ink); }
+.field i { font-style: normal; color: var(--muted); font-size: 13px; }
+.chip { border: 1px solid var(--chip); border-radius: 999px; padding: 0 14px; height: 38px; display: inline-flex; align-items: center; font-weight: 600; font-size: 13.5px; }
+.save { background: #14131A; color: #fff; border-radius: 999px; padding: 0 20px; height: 40px; display: inline-flex; align-items: center; font-weight: 700; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.day { border-radius: 10px; padding: 8px 4px; text-align: center; font-size: 12px; background: var(--head); }
+.day b { display: block; font-size: 13px; margin-top: 2px; }
+.day.miss { background: var(--amber-soft); color: var(--amber-ink); }
+.day.today { outline: 2px solid var(--violet); background: var(--panel); }
+.link { color: var(--violet); font-weight: 600; font-size: 13.5px; display: inline-block; margin-top: 12px; }
+
+/* the report, moved here */
+.mgr { display: inline-flex; align-items: center; gap: 5px; background: var(--violet-soft); color: var(--violet); border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+.mgr svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.week { display: inline-flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px; font-weight: 700; }
+.week i { font-style: normal; color: var(--muted); }
+.csv { background: var(--lime); color: #1B1A13; border-radius: 999px; padding: 8px 16px; font-weight: 700; font-size: 13.5px; }
+.scroll { overflow-x: auto; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13.5px; }
+th, td { padding: 11px 14px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { background: var(--head); font-weight: 700; color: var(--muted); }
+th:first-child, td:first-child { text-align: start; font-weight: 600; color: var(--ink); }
+td.m { background: var(--amber-soft); color: var(--amber-ink); font-weight: 600; }
+td.dash { color: var(--faint); }
+tr.tot td { background: var(--head); font-weight: 800; }
+.cap { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+
+.sla { display: flex; align-items: center; gap: 10px; }
+.sla h3 { margin: 0; font: 800 17px var(--f-head); color: var(--danger); }
+.sla .end { margin-inline-start: auto; color: var(--danger); font-weight: 600; font-size: 13.5px; }
+.rows { margin-top: 10px; color: var(--muted); font-size: 13px; }
+.gonebox { border: 1.5px dashed var(--line); border-radius: 18px; padding: 16px 20px; margin-bottom: 18px; color: var(--muted); font-size: 13px; }
+.gonebox b { color: var(--text); }
+
+.icons { display: flex; gap: 22px; flex-wrap: wrap; margin: 26px 0 0; }
+.icon-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; display: flex; gap: 14px; align-items: center; background: var(--panel); }
+.icon-card svg { width: 30px; height: 30px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-card div { font-size: 13px; color: var(--muted); }
+.icon-card b { display: block; color: var(--ink); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { flex-direction: row; flex-wrap: wrap; border-inline-end: 0; border-bottom: 1px solid var(--line); }
+  .logo, .ws { display: none; }
+  .nav.sub { display: none; }
+  .main { padding: 20px 16px; }
+  .days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc">My Day becomes the working-hours page</h1>
+  <p class="lede">Your four changes on one screen. The dashboard section (the stat cards, the My Day planner, This Week and Last Week) is hidden. "Today's hours" stays at the top. The team Hours report now sits right under it, and only the Marketing Manager sees it. Capacity, Projects and Hours leave the side bar.</p>
+
+  <div class="ctl"><span>View as</span>
+    <div class="seg" role="group" aria-label="View as">
+      <button type="button" class="on" data-as="mgr">Marketing Manager</button>
+      <button type="button" data-as="member">Team member</button>
+    </div>
+  </div>
+  <p class="note" id="note"><b>Marketing Manager:</b> sees their own hours card and, under it, everyone's hours for the week, with ‹ › to change week and Download (.csv).</p>
+
+  <div class="app">
+    <nav class="rail" aria-label="Main">
+      <div class="logo">momentum</div>
+      <div class="ws">Creative Ops</div>
+      <a class="nav on">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 0-9.3 9"/><path d="M12 7v5l3 2"/><path d="m15.5 19 2 2 4-4"/></svg>
+        My Day <span class="tag new">new icon</span>
+      </a>
+      <a class="nav"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>Board</a>
+      <a class="nav"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="3" y2="21"/></svg>Sheets</a>
+      <a class="nav sub">Content</a>
+      <a class="nav sub">Video</a>
+      <a class="nav gone"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Projects <span class="tag hid">hidden</span></a>
+      <a class="nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><line x1="13" x2="21" y1="6" y2="6"/><line x1="13" x2="21" y1="12" y2="12"/><line x1="13" x2="21" y1="18" y2="18"/></svg>Team</a>
+      <a class="nav gone mgr-only"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Capacity <span class="tag hid">hidden</span></a>
+      <a class="nav gone mgr-only"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hours <span class="tag hid">moved</span></a>
+      <a class="nav mgr-only"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>Settings</a>
+    </nav>
+
+    <main class="main">
+      <div class="greet">
+        <div><h2>Good morning, Raneem 👋</h2><p>Let's make today count.</p></div>
+        <div class="toggle mgr-only" aria-label="Scope"><span class="on">Mine</span><span>Team</span></div>
+      </div>
+
+      <section class="card" aria-label="Today's hours">
+        <div class="top"><h3>Today's hours</h3><span class="muted">Wednesday, Nov 18</span><span class="muted end">23 of 40 h this week</span></div>
+        <div class="entry">
+          <span class="field">0 <i>h</i></span>
+          <span class="chip">4 h</span><span class="chip">6 h</span><span class="chip">8 h</span><span class="chip">Off</span>
+          <span class="save">Save</span>
+        </div>
+        <div class="muted" style="margin-bottom:6px">Last 7 days</div>
+        <div class="days">
+          <div class="day">12 Thu<b>8</b></div><div class="day">13 Fri<b>–</b></div><div class="day">14 Sat<b>–</b></div>
+          <div class="day">15 Sun<b>5</b></div><div class="day">16 Mon<b>8</b></div><div class="day">17 Tue<b>10</b></div>
+          <div class="day today">18 Wed<b>–</b></div>
+        </div>
+        <a class="link">Log several days</a>
+      </section>
+
+      <section class="card mgr-only" aria-label="Team hours">
+        <div class="top" style="align-items:center">
+          <h3>Team hours</h3>
+          <span class="mgr"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Marketing Manager only</span>
+          <span class="week"><i>‹</i>Nov 15 – Nov 21<i>›</i></span>
+          <span class="end csv">Download (.csv)</span>
+        </div>
+        <p class="cap">0 of 9 logged every working day · Missing days are marked.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Member</th><th>15 Sun</th><th>16 Mon</th><th>17 Tue</th><th>18 Wed</th><th>19 Thu</th><th>Total</th></tr></thead>
+            <tbody>
+              <tr><td>Alaa Allam</td><td class="m">⚠ Missing</td><td class="m">⚠ Missing</td><td class="m">⚠ Missing</td><td class="dash">–</td><td class="dash">–</td><td><b>0</b> of 40</td></tr>
+              <tr><td>Raneem Sarhaan</td><td>5</td><td>8</td><td>10</td><td class="dash">–</td><td class="dash">–</td><td><b>23</b> of 40</td></tr>
+              <tr><td>Salma Adel</td><td class="m">⚠ Missing</td><td>5</td><td class="m">⚠ Missing</td><td class="dash">–</td><td class="dash">–</td><td><b>5</b> of 40</td></tr>
+              <tr><td>Samaa hussein</td><td>5</td><td>4.5</td><td class="m">⚠ Missing</td><td class="dash">–</td><td class="dash">–</td><td><b>9.5</b> of 40</td></tr>
+              <tr class="tot"><td>Day total</td><td>18</td><td>17.5</td><td>10</td><td>0</td><td>0</td><td>45.5</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="gonebox"><b>Hidden:</b> the stat cards (My Day, This Week, SLA Breached, Completed), the My Day planner, This Week and Last Week.</div>
+
+      <section class="card" aria-label="SLA Breached">
+        <div class="sla"><span aria-hidden="true">⚠️</span><h3>SLA Breached</h3><span class="end">View all</span></div>
+        <div class="rows">Stays as it is today (it wasn't in your screenshot). Say if you want it hidden too.</div>
+      </section>
+    </main>
+  </div>
+
+  <div class="icons">
+    <div class="icon-card"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg><div><b>Before</b>Dashboard tiles</div></div>
+    <div class="icon-card"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 0-9.3 9"/><path d="M12 7v5l3 2"/><path d="m15.5 19 2 2 4-4"/></svg><div><b>After</b>A clock with a tick: hours logged</div></div>
+  </div>
+</div>
+<script>
+const note = document.getElementById('note')
+const text = {
+  mgr: '<b>Marketing Manager:</b> sees their own hours card and, under it, everyone\'s hours for the week, with ‹ › to change week and Download (.csv).',
+  member: '<b>Team member:</b> sees only their own hours card (and their own SLA breaches). No team report, no Mine/Team switch, and no Capacity, Hours or Settings in the bar, the same as today.',
+}
+document.querySelectorAll('[data-as]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-as]').forEach(x => x.classList.toggle('on', x === b))
+  const mgr = b.dataset.as === 'mgr'
+  document.querySelectorAll('.mgr-only').forEach(el => { el.style.display = mgr ? '' : 'none' })
+  note.innerHTML = text[b.dataset.as]
+}))
+</script>
+</body>
+</html>

@@ -11,7 +11,7 @@
  * report, and days older than 30 are admin-only (R7).
  */
 import { prisma } from '@/lib/prisma'
-import { getSessionMember } from '@/lib/authz'
+import { getSessionMember, isHoursManager } from '@/lib/authz'
 import type { HoursStatus, HoursWeekReport, WorkDayEntry } from '@/types/index'
 import {
   MAX_LINES, addDays, isDate, isWorkingDay, lastWorkingDayBefore, missingDays, sum, validateLines, weekComplete,
@@ -106,11 +106,11 @@ export async function dismissReminder(localDate: string): Promise<{ success: tru
   return { success: true }
 }
 
-/** The admin's weekly report (R4): every member, Sunday to Saturday, with totals. */
+/** The Marketing Manager's weekly report (R4): every member, Sunday to Saturday, with totals. */
 export async function teamHours(weekStart: string, localDate?: string): Promise<({ success: true } & HoursWeekReport) | Fail> {
   const m = await getSessionMember()
   if (!m) return fail('not_authenticated')
-  if (!isAdmin(m)) return fail('not_authorized')
+  if (!(await isHoursManager(m))) return fail('not_authorized')
   if (!isDate(weekStart)) return fail('bad_date')
   const sunday = weekOf(weekStart)
   const days = weekDays(sunday)

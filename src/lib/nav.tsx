@@ -25,11 +25,9 @@ export const NAV: readonly NavItem[] = [
   { href: '/board',    key: 'board',    adminOnly: false },
   // Spec 013: third, so it is on a phone's bar; Team moves into More (R13).
   { href: '/sheets',   key: 'sheets',   adminOnly: false },
-  { href: '/projects', key: 'projects', adminOnly: false },
+  // Projects and Capacity are hidden from the bar (their pages still open by
+  // address). The weekly Hours report moved onto Working Hours (/overview).
   { href: '/team',     key: 'team',     adminOnly: false },
-  { href: '/capacity', key: 'capacity', adminOnly: true  },
-  // Spec 014: the weekly hours report, admins only.
-  { href: '/hours',    key: 'hours',    adminOnly: true  },
   { href: '/settings', key: 'settings', adminOnly: true  },
 ] as const
 
@@ -49,9 +47,9 @@ export function navFor(access: AccessLevel): NavItem[] {
  * to the caller and only the geometry is shared.
  */
 export const NAV_ICON: Record<string, React.ReactNode> = {
+  // Working Hours: a clock with a tick, hours logged.
   overview: (<>
-    <rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" />
-    <rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" />
+    <path d="M21 12a9 9 0 1 0-9.3 9" /><path d="M12 7v5l3 2" /><path d="m15.5 19 2 2 4-4" />
   </>),
   board: (<>
     <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />

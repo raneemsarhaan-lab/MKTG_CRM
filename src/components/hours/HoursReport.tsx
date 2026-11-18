@@ -1,7 +1,9 @@
 'use client'
 
 /**
- * The admin's weekly hours report (spec 014 US4, FR-030–FR-034; contracts/ui.md §4).
+ * The team's weekly hours (spec 014 US4, FR-030–FR-034; contracts/ui.md §4), on
+ * Working Hours under Today's hours, for the Marketing Manager only (approved
+ * design `design/working-hours.html`).
  * One row per member, Sunday to Thursday (Friday and Saturday only when
  * someone logged them), totals against capacity, per-day totals, and Missing
  * marked with a word and an icon, not colour alone.
@@ -22,14 +24,18 @@ export function HoursReport({ report, today }: { report: HoursWeekReport; today:
   const total = Object.values(report.dayTotals).reduce((a, b) => a + b, 0)
 
   return (
-    <section className="fx-hr-report" data-hours-report="" aria-labelledby="fx-hr-rep-title">
+    <section className="fx-hr-report fx-hr-card" id="team-hours" data-hours-report="" aria-labelledby="fx-hr-rep-title">
       <div className="fx-hr-rep-head">
-        <h1 id="fx-hr-rep-title">{t('report.title')}</h1>
+        <h2 id="fx-hr-rep-title">{t('report.teamTitle')}</h2>
+        <span className="fx-hr-mgr" data-hours-manager-only="">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+          {t('report.managerOnly')}
+        </span>
         <nav className="fx-hr-weeknav" aria-label={span}>
-          <Link href={`/hours?week=${prev}`} aria-label={t('report.prev')} data-week-prev="">‹</Link>
+          <Link href={`/overview?week=${prev}#team-hours`} scroll={false} aria-label={t('report.prev')} data-week-prev="">‹</Link>
           <span>{span}</span>
           {next <= today
-            ? <Link href={`/hours?week=${next}`} aria-label={t('report.next')} data-week-next="">›</Link>
+            ? <Link href={`/overview?week=${next}#team-hours`} scroll={false} aria-label={t('report.next')} data-week-next="">›</Link>
             : <span className="is-dim" aria-hidden="true">›</span>}
         </nav>
         <a className="fx-hr-dl" href={`/hours/export?week=${report.weekStart}`} download data-hours-export="">{t('report.download')}</a>

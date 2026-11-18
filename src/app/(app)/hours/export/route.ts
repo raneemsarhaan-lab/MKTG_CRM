@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
-import { getSessionMember } from '@/lib/authz'
+import { getSessionMember, isHoursManager } from '@/lib/authz'
 import { teamHours } from '@/actions/hours'
 import { isDate, toCsv, weekOf } from '@/lib/hours'
 
-/** The weekly report as CSV (spec 014 R4): admins only, UTF-8 with a BOM. */
+/** The weekly report as CSV (spec 014 R4): the Marketing Manager only, UTF-8 with a BOM. */
 export async function GET(req: Request) {
   const member = await getSessionMember()
-  if (!member || member.access !== 'admin') return new Response('Forbidden', { status: 403 })
+  if (!member || !(await isHoursManager(member))) return new Response('Forbidden', { status: 403 })
   const week = new URL(req.url).searchParams.get('week') ?? ''
   const today = new Date().toISOString().slice(0, 10)
   const sunday = weekOf(isDate(week) ? week : today)
