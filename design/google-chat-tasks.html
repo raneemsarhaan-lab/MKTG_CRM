@@ -1,0 +1,434 @@
+<title>Add to Momentum</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a bench (stepper, scenario picker) around two live mocks side by side:
+   a Chat conversation on the left, the Momentum board on the right, and the
+   behind-the-click checks underneath. Both mocks are light-only, as the app is;
+   the bench follows the viewer's theme. Momentum colours are its tokens. */
+:root {
+  --ink: #14131A; --text: #1F2430; --text2: #4A5061; --muted: #6B7280; --faint: #9096A3;
+  --line: #ECECF1; --surface: #F3F3F7; --panel: #FFFFFF;
+  --lime: #C9F24E; --purple: #7C3AED; --purple-soft: #F0EBFE;
+  --late: #C81E3A; --late-soft: #FDE7EA; --ok: #15803D; --ok-soft: #E6F4EA; --warn: #8A5300; --warn-soft: #FDF3E3;
+  --todo: #64748B; --writing: #3B82F6; --review: #2E6FB0;
+  --chat-bg: #F6F7F9; --chat-line: #E3E5EA; --chat-ink: #202124; --chat-muted: #5F6368; --chat-hover: #ECEEF2; --chat-own: #E8EEF9;
+  --f-head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --f-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --b-bg: #EEEEF3; --b-fg: #1F2430; --b-muted: #5B6170; --b-card: #FFFFFF; --b-line: #DCDCE5; --b-on: #14133C; --b-on-fg: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --b-bg: #15141B; --b-fg: #E8E8EE; --b-muted: #A3A6B3; --b-card: #1F1E27; --b-line: #33323E; --b-on: #D6F551; --b-on-fg: #14131A; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--b-bg); color: var(--b-fg); font-family: var(--f-body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2.5px solid var(--purple); outline-offset: 2px; }
+
+.bench { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+.bench h1 { font: 800 22px/1.2 var(--f-head); margin: 0; letter-spacing: -0.01em; }
+.lede { color: var(--b-muted); margin: 4px 0 0; max-width: 80ch; line-height: 1.5; font-size: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 10px 14px; }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--b-muted); font-weight: 600; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--b-line); border-radius: 999px; padding: 2px; }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; color: var(--b-fg); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--b-on); color: var(--b-on-fg); }
+.nav { margin-left: auto; display: flex; gap: 8px; }
+.nav button { border: 1px solid var(--b-line); background: var(--b-card); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.nav button.primary { background: var(--b-on); color: var(--b-on-fg); border-color: var(--b-on); }
+.nav button:disabled { opacity: .4; cursor: default; }
+
+.stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.step { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.4; color: var(--b-muted); cursor: pointer; text-align: left; }
+.step b { display: block; color: var(--b-fg); font-size: 13px; margin-bottom: 2px; }
+.step .n { font: 800 11px var(--f-head); letter-spacing: .06em; text-transform: uppercase; color: var(--b-muted); display: block; margin-bottom: 4px; }
+.step[aria-current="step"] { border-color: var(--b-on); box-shadow: inset 0 0 0 1px var(--b-on); }
+.step.done .n::after { content: " ✓"; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
+.pane-label { font: 700 11px var(--f-head); text-transform: uppercase; letter-spacing: .08em; color: var(--b-muted); margin: 0 0 6px 4px; }
+
+/* ── Chat mock ─────────────────────────────────────────── */
+.chat { background: var(--panel); color: var(--chat-ink); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 12px 40px rgba(20,19,26,.10); min-height: 560px; display: flex; flex-direction: column; }
+.chat-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--chat-line); }
+.space-ic { width: 32px; height: 32px; border-radius: 10px; background: #DDE3EE; display: grid; place-items: center; font: 700 13px var(--f-body); color: #3C4A63; }
+.chat-top .t { font-weight: 600; font-size: 15px; }
+.chat-top .s { font-size: 12px; color: var(--chat-muted); }
+.msgs { flex: 1; padding: 14px 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+.day { text-align: center; font-size: 11.5px; color: var(--chat-muted); margin: 4px 0 10px; }
+.msg { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: 10px; }
+.msg.target:hover, .msg.target.hot { background: var(--chat-hover); }
+.av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--f-body); color: #fff; }
+.who { font-size: 13.5px; font-weight: 600; }
+.who time { font-weight: 400; color: var(--chat-muted); font-size: 12px; margin-left: 6px; }
+.body { font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.mention { background: #E2EAF8; color: #1A4FB4; border-radius: 4px; padding: 0 3px; font-weight: 500; }
+.tools { position: absolute; top: -12px; right: 12px; display: none; background: var(--panel); border: 1px solid var(--chat-line); border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.msg.target:hover .tools, .msg.target.hot .tools { display: flex; }
+.tools button { border: 0; background: none; width: 32px; height: 30px; cursor: pointer; color: var(--chat-muted); font-size: 16px; line-height: 1; border-radius: 8px; }
+.tools button:hover, .tools button[aria-expanded="true"] { background: var(--chat-hover); color: var(--chat-ink); }
+.menu { position: absolute; top: 20px; right: 12px; z-index: 5; width: 250px; background: var(--panel); border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,.18); padding: 6px 0; font-size: 14px; }
+.menu .item { display: flex; align-items: center; gap: 12px; padding: 9px 16px; color: var(--chat-ink); border: 0; background: none; width: 100%; text-align: left; cursor: default; }
+.menu .sep { height: 1px; background: var(--chat-line); margin: 6px 0; }
+.menu .apps { font-size: 11.5px; color: var(--chat-muted); padding: 4px 16px 2px; }
+.menu .item.ours { cursor: pointer; font-weight: 600; }
+.menu .item.ours:hover, .menu .item.ours:focus-visible { background: var(--purple-soft); }
+.menu .ic { width: 18px; text-align: center; color: var(--chat-muted); }
+.m-logo { width: 20px; height: 20px; border-radius: 6px; background: var(--ink); color: var(--lime); display: grid; place-items: center; font: 800 11px var(--f-head); flex: none; }
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(124,58,237,.0); } 50% { box-shadow: inset 0 0 0 2px rgba(124,58,237,.55); } }
+
+.private { margin: 6px 10px 4px 56px; border: 1px solid var(--chat-line); border-radius: 12px; overflow: hidden; background: var(--panel); animation: rise .35s ease-out; }
+.private-h { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--chat-muted); padding: 8px 12px; background: var(--chat-bg); border-bottom: 1px solid var(--chat-line); }
+.private-h b { color: var(--chat-ink); font-size: 13px; }
+.private-h .eye { margin-left: auto; font-size: 11.5px; }
+.card { padding: 12px 14px; display: grid; gap: 10px; }
+.card .headline { font-weight: 700; font-size: 14.5px; display: flex; gap: 8px; align-items: baseline; }
+.card .headline .mark { font-weight: 800; }
+.card.ok .mark { color: var(--ok); } .card.same .mark { color: var(--purple); } .card.bad .mark { color: var(--late); } .card.warn .mark { color: var(--warn); }
+.card .tname { font-size: 14px; color: var(--chat-ink); }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--chat-muted); }
+.card .meta span b { color: var(--chat-ink); font-weight: 600; }
+.card .why { font-size: 13.5px; line-height: 1.5; color: var(--text2); }
+.card .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.card .btns button { border: 1px solid var(--chat-line); background: var(--panel); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: #1A4FB4; }
+.card .btns button.go { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.compose { margin: 8px 12px 12px; border: 1px solid var(--chat-line); border-radius: 22px; padding: 10px 16px; font-size: 13.5px; color: var(--chat-muted); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Momentum mock ─────────────────────────────────────── */
+.app { position: relative; background: var(--surface); color: var(--text); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,19,26,.06), 0 12px 40px rgba(20,19,26,.10); min-height: 560px; }
+.app-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.app-top .logo { width: 26px; height: 26px; border-radius: 8px; background: var(--ink); color: var(--lime); display: grid; place-items: center; font: 800 13px var(--f-head); }
+.app-top h2 { font: 800 16px var(--f-head); margin: 0; letter-spacing: -0.01em; }
+.app-top .me { margin-left: auto; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px; overflow-x: auto; }
+.col { min-width: 150px; display: grid; gap: 8px; align-content: start; }
+.col-h { display: flex; align-items: center; gap: 6px; font: 700 12px var(--f-head); color: var(--text2); padding: 2px 2px 4px; }
+.col-h i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.col-h .c { margin-left: auto; font: 600 11px var(--f-body); color: var(--faint); font-variant-numeric: tabular-nums; }
+.tcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 7px; font-size: 12.5px; cursor: default; }
+.tcard .tn { font-weight: 600; font-size: 13px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+.tcard .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: 11.5px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; background: var(--surface); color: var(--text2); }
+.chip.gc { background: var(--purple-soft); color: var(--purple); }
+.chip.brand { background: #FFF4D6; color: #7A5600; }
+.chip.empty { background: none; border: 1px dashed #CFD2DA; color: var(--faint); }
+.mini { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font: 600 10px var(--f-body); }
+.tcard.new { cursor: pointer; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(124,58,237,.14); animation: land .5s ease-out; }
+@keyframes land { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.panel { position: absolute; inset: 0 0 0 auto; width: min(430px, 100%); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(20,19,26,.12); display: flex; flex-direction: column; animation: slide .3s ease-out; }
+@keyframes slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.panel-h { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.panel-h .x { margin-left: auto; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); width: 28px; height: 28px; border-radius: 8px; }
+.panel-h .x:hover { background: var(--surface); }
+.panel-b { padding: 16px; display: grid; gap: 14px; overflow-y: auto; }
+.panel-b h3 { font: 800 17px/1.3 var(--f-head); margin: 0; color: var(--ink); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.fields { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px 10px; font-size: 13px; align-items: center; }
+.fields dt { color: var(--muted); }
+.fields dd { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.stage-pill { border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; color: #fff; background: var(--todo); }
+.add { color: var(--faint); border-bottom: 1px dashed #CFD2DA; }
+.brief { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.brief-h { font: 700 11px var(--f-head); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 10px 12px 0; }
+.origin { margin: 10px 12px; border-left: 3px solid var(--purple); background: #FAF8FF; border-radius: 0 8px 8px 0; padding: 10px 12px; display: grid; gap: 6px; }
+.origin .src { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--purple); font-weight: 700; }
+.origin .q { font-size: 13.5px; line-height: 1.55; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; }
+.origin .by { font-size: 12px; color: var(--muted); }
+.origin .open { font-size: 12.5px; font-weight: 600; color: #1A4FB4; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; justify-self: start; }
+.notes { font-size: 12.5px; color: var(--muted); padding: 0 12px 12px; line-height: 1.5; }
+.toast { position: absolute; left: 14px; bottom: 14px; background: var(--ink); color: #fff; font-size: 12.5px; border-radius: 10px; padding: 9px 12px; display: flex; gap: 8px; align-items: center; animation: rise .3s ease-out; max-width: calc(100% - 28px); }
+.toast b { color: var(--lime); }
+
+/* ── behind the click ──────────────────────────────────── */
+.pipe { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
+.pipe h2 { font: 800 15px var(--f-head); margin: 0; }
+.pipe ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.pipe li { border: 1px solid var(--b-line); border-radius: 10px; padding: 10px; font-size: 12.5px; line-height: 1.45; color: var(--b-muted); display: grid; gap: 4px; align-content: start; transition: border-color .2s, background .2s; }
+.pipe li b { color: var(--b-fg); font-size: 13px; }
+.pipe li .st { font: 700 10.5px var(--f-head); text-transform: uppercase; letter-spacing: .08em; }
+.pipe li.pass { border-color: #3FA34D; } .pipe li.pass .st { color: #3FA34D; }
+.pipe li.fail { border-color: #E5484D; } .pipe li.fail .st { color: #E5484D; }
+.pipe li.skip { opacity: .5; }
+.foot { font-size: 13px; color: var(--b-muted); line-height: 1.55; max-width: 100ch; }
+
+@media (max-width: 900px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+  .stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pipe ol { grid-template-columns: minmax(0, 1fr); }
+  .nav { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="bench">
+  <header>
+    <h1>Add to Momentum from Google Chat</h1>
+    <p class="lede">A walkthrough of spec 021. Someone asks you for work in Chat; one click on their message puts it on the Momentum board, with you as assignee and them as owner. Click inside the mocks to try it yourself, or use <b>Next</b>. Change the case to see the other replies.</p>
+  </header>
+
+  <div class="controls">
+    <div class="ctl">Case
+      <div class="seg" id="cases" role="group" aria-label="Case">
+        <button data-case="added" aria-pressed="true">First click</button>
+        <button data-case="again" aria-pressed="false">Clicked again</button>
+        <button data-case="stranger" aria-pressed="false">Not a member</button>
+        <button data-case="off" aria-pressed="false">Not set up yet</button>
+      </div>
+    </div>
+    <div class="nav">
+      <button id="back">Back</button>
+      <button id="next" class="primary">Next</button>
+    </div>
+  </div>
+
+  <div class="stepper" id="stepper">
+    <button class="step" data-step="0"><span class="n">Step 1</span><b>Someone asks in Chat</b>Salma asks Yosra for a carousel in the Marketing space.</button>
+    <button class="step" data-step="1"><span class="n">Step 2</span><b>Open the message menu</b>Hover the message, click ⋮, choose Add to Momentum.</button>
+    <button class="step" data-step="2"><span class="n">Step 3</span><b>Momentum replies, privately</b>Only Yosra sees it. The task is already on the board.</button>
+    <button class="step" data-step="3"><span class="n">Step 4</span><b>Open the task</b>The brief keeps the message and a link back to it.</button>
+  </div>
+
+  <div class="stage">
+    <div>
+      <p class="pane-label" id="chat-label">Google Chat (illustration) · viewing as Yosra</p>
+      <div class="chat" aria-label="Chat conversation">
+        <div class="chat-top">
+          <div class="space-ic">M</div>
+          <div><div class="t">Marketing</div><div class="s">12 members</div></div>
+        </div>
+        <div class="msgs" id="msgs">
+          <div class="day">Today</div>
+          <div class="msg">
+            <div class="av" style="background:#0F766E">N</div>
+            <div><div class="who">Nermin<time>10:02</time></div>
+              <div class="body">Morning all. The Omnisight launch assets are due next week; the drive folder is up to date.</div></div>
+          </div>
+          <div class="msg target" id="target">
+            <div class="av" style="background:#B45309">S</div>
+            <div><div class="who">Salma<time>10:14</time></div>
+              <div class="body"><span class="mention">@Yosra</span> can you do the LinkedIn carousel for the Omnisight launch? Ideally by Thursday.
+Copy and references are in the drive folder.</div></div>
+            <div class="tools" role="toolbar" aria-label="Message actions">
+              <button title="Add reaction" aria-label="Add reaction">☺</button>
+              <button title="Reply in thread" aria-label="Reply in thread">↩</button>
+              <button id="more" title="More actions" aria-label="More actions" aria-haspopup="menu" aria-expanded="false">⋮</button>
+            </div>
+            <div class="menu" id="menu" role="menu" hidden>
+              <div class="item"><span class="ic">⧉</span>Copy text</div>
+              <div class="item"><span class="ic">↗</span>Forward to inbox</div>
+              <div class="item"><span class="ic">☐</span>Add to tasks</div>
+              <div class="item"><span class="ic">🔔</span>Mark as unread</div>
+              <div class="sep"></div>
+              <div class="apps">Apps</div>
+              <button class="item ours" id="add" role="menuitem"><span class="m-logo">M</span>Add to Momentum</button>
+            </div>
+          </div>
+          <div id="reply"></div>
+        </div>
+        <div class="compose">Reply to Marketing</div>
+      </div>
+    </div>
+
+    <div>
+      <p class="pane-label">Momentum · Board</p>
+      <div class="app" id="app" aria-label="Momentum board">
+        <div class="app-top">
+          <div class="logo">M</div><h2>Pipeline</h2>
+          <div class="me">Yosra · Graphic Designer <span class="mini" style="background:#7C3AED">Y</span></div>
+        </div>
+        <div class="cols">
+          <div class="col" id="col-todo">
+            <div class="col-h"><i style="background:var(--todo)"></i>To Do <span class="c" id="todo-count">2</span></div>
+            <div id="slot"></div>
+            <div class="tcard"><div class="tn">Ramadan teaser, story set</div>
+              <div class="row"><span class="chip brand">Forefront</span><span>Due 24 Nov</span><span class="mini" style="background:#7C3AED">Y</span></div></div>
+            <div class="tcard"><div class="tn">Q4 case study cover</div>
+              <div class="row"><span class="chip brand">Omnisight</span><span>Due 2 Dec</span><span class="mini" style="background:#0F766E">N</span></div></div>
+          </div>
+          <div class="col">
+            <div class="col-h"><i style="background:var(--writing)"></i>Writing <span class="c">1</span></div>
+            <div class="tcard"><div class="tn">Omnisight launch email</div>
+              <div class="row"><span class="chip brand">Omnisight</span><span>Due 21 Nov</span><span class="mini" style="background:#B45309">S</span></div></div>
+          </div>
+          <div class="col">
+            <div class="col-h"><i style="background:var(--review)"></i>Content Review <span class="c">1</span></div>
+            <div class="tcard"><div class="tn">Manifesto post</div>
+              <div class="row"><span class="chip brand">Forefront</span><span>Due 19 Nov</span><span class="mini" style="background:#0F766E">N</span></div></div>
+          </div>
+        </div>
+        <div id="panel-slot"></div>
+        <div id="toast-slot"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="pipe" aria-labelledby="pipe-h">
+    <h2 id="pipe-h">What happens behind the click</h2>
+    <ol id="pipe">
+      <li data-k="send"><span class="st">Waiting</span><b>Chat tells Momentum</b>Which message, who clicked, and their Google email.</li>
+      <li data-k="setup"><span class="st">Waiting</span><b>Is Momentum set up?</b>The app's Google settings are in Momentum's hosting.</li>
+      <li data-k="google"><span class="st">Waiting</span><b>Really from Google?</b>Every request is signed by Google. Forged ones are dropped.</li>
+      <li data-k="member"><span class="st">Waiting</span><b>Who is this?</b>The Google email is matched to a Momentum member.</li>
+      <li data-k="task"><span class="st">Waiting</span><b>Task, once</b>Owner: the sender. Assignee: the clicker. One per message.</li>
+    </ol>
+    <p class="foot">Nothing else in the space is read or stored: only the one message that was clicked. The reply always comes back within a few seconds, so no click ends in silence. Brand, type and due date are left for you to fill in on the board; "by Thursday" in the message is not read as a date.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const MSG = '@Yosra can you do the LinkedIn carousel for the Omnisight launch? Ideally by Thursday.\nCopy and references are in the drive folder.';
+  const NAME = 'Can you do the LinkedIn carousel for the Omnisight launch? Ideally by Thursday.';
+  let step = 0, kase = 'added';
+
+  const $ = id => document.getElementById(id);
+  const target = $('target'), menu = $('menu'), more = $('more');
+
+  const REPLIES = {
+    added: () => `
+      <div class="card ok">
+        <div class="headline"><span class="mark">✓</span>Added to Momentum</div>
+        <div class="tname">${NAME}</div>
+        <div class="meta"><span>Stage <b>To Do</b></span><span>Owner <b>Salma</b></span><span>Assignee <b>you</b></span></div>
+        <div class="btns"><button class="go" data-open>Open task</button></div>
+      </div>`,
+    again: () => `
+      <div class="card same">
+        <div class="headline"><span class="mark">●</span>Already in Momentum</div>
+        <div class="tname">${NAME}</div>
+        <div class="why">This message was added at 10:15, so no new task was made.</div>
+        <div class="btns"><button class="go" data-open>Open task</button></div>
+      </div>`,
+    stranger: () => `
+      <div class="card bad">
+        <div class="headline"><span class="mark">✕</span>Momentum didn't recognise your account</div>
+        <div class="why">You're signed in to Chat as <b>lina.studio@gmail.com</b>, which isn't on the Momentum team. Ask an admin to add you, then try again. Nothing was created.</div>
+      </div>`,
+    off: () => `
+      <div class="card warn">
+        <div class="headline"><span class="mark">!</span>Momentum isn't set up for Chat yet</div>
+        <div class="why">An admin needs to finish the Google Chat setup in Momentum. Nothing was created.</div>
+      </div>`,
+  };
+
+  const PIPE = {
+    added:    { send: 'pass', setup: 'pass', google: 'pass', member: 'pass', task: 'pass' },
+    again:    { send: 'pass', setup: 'pass', google: 'pass', member: 'pass', task: 'same' },
+    stranger: { send: 'pass', setup: 'pass', google: 'pass', member: 'fail', task: 'skip' },
+    off:      { send: 'pass', setup: 'fail', google: 'skip', member: 'skip', task: 'skip' },
+  };
+  const LABEL = { pass: 'Passed', fail: 'Stopped here', skip: 'Not reached', same: 'Found existing task', wait: 'Waiting' };
+
+  function card(isNew) {
+    return `<div class="tcard${isNew ? ' new' : ''}" data-open tabindex="0" role="button" aria-label="Open task">
+      <div class="tn">${NAME}</div>
+      <div class="row"><span class="chip gc">From Google Chat</span><span class="chip empty">No brand</span><span class="chip empty">No due date</span><span class="mini" style="background:#7C3AED">Y</span></div>
+    </div>`;
+  }
+
+  function panel() {
+    return `<aside class="panel" aria-label="Task">
+      <div class="panel-h">Task · To Do <button class="x" id="close" aria-label="Close task">×</button></div>
+      <div class="panel-b">
+        <h3>${NAME}</h3>
+        <dl class="fields">
+          <dt>Stage</dt><dd><span class="stage-pill">To Do</span></dd>
+          <dt>Owner</dt><dd><span class="mini" style="background:#B45309">S</span>Salma <span style="color:var(--faint)">· sent the message</span></dd>
+          <dt>Assignee</dt><dd><span class="mini" style="background:#7C3AED">Y</span>Yosra <span style="color:var(--faint)">· clicked Add</span></dd>
+          <dt>Brand</dt><dd><span class="add">Add brand</span></dd>
+          <dt>Due date</dt><dd><span class="add">Add due date</span></dd>
+          <dt>Priority</dt><dd>Medium</dd>
+        </dl>
+        <div class="brief">
+          <div class="brief-h">Brief</div>
+          <div class="origin">
+            <div class="src"><span class="m-logo" style="width:16px;height:16px;font-size:9px">M</span>From Google Chat</div>
+            <div class="q">${MSG}</div>
+            <div class="by">Salma · Marketing space · 18 Nov, 10:14</div>
+            <button class="open" title="In Momentum this opens the original message in Google Chat">Open in Google Chat ↗</button>
+          </div>
+          <p class="notes">Yosra and Salma follow this task, so both hear about comments and moves.</p>
+        </div>
+      </div>
+    </aside>`;
+  }
+
+  function render() {
+    const ok = kase === 'added' || kase === 'again';
+    // chat
+    target.classList.toggle('hot', step === 1);
+    menu.hidden = step !== 1;
+    more.setAttribute('aria-expanded', String(step === 1));
+    $('add').classList.toggle('pulse', step === 1);
+    const r = $('reply');
+    if (step >= 2) {
+      if (!r.dataset.k || r.dataset.k !== kase) {
+        r.innerHTML = `<div class="private"><div class="private-h"><span class="m-logo">M</span><b>Momentum</b>App<span class="eye">Only visible to you</span></div>${REPLIES[kase]()}</div>`;
+        r.dataset.k = kase;
+      }
+    } else { r.innerHTML = ''; delete r.dataset.k; }
+    $('chat-label').textContent = 'Google Chat (illustration) · viewing as ' + (kase === 'stranger' ? 'Lina, a freelancer' : 'Yosra');
+
+    // board: in "again" the task already exists from the start
+    const hasTask = kase === 'again' || (kase === 'added' && step >= 2);
+    $('slot').innerHTML = hasTask ? card(kase === 'added' && step === 2) : '';
+    $('todo-count').textContent = hasTask ? '3' : '2';
+    $('panel-slot').innerHTML = (ok && step === 3) ? panel() : '';
+    $('toast-slot').innerHTML = (kase === 'added' && step === 2) ? '<div class="toast"><b>New</b> Salma assigned you a task from Google Chat</div>' : '';
+
+    // pipeline
+    document.querySelectorAll('#pipe li').forEach(li => {
+      const s = step >= 2 ? PIPE[kase][li.dataset.k] : 'wait';
+      li.className = s === 'same' ? 'pass' : s === 'wait' ? '' : s;
+      li.querySelector('.st').textContent = LABEL[s];
+    });
+
+    // stepper and nav
+    const last = ok ? 3 : 2;
+    document.querySelectorAll('.step').forEach(b => {
+      const n = +b.dataset.step;
+      b.toggleAttribute('aria-current', n === step);
+      if (n === step) b.setAttribute('aria-current', 'step');
+      b.classList.toggle('done', n < step);
+      b.disabled = n > last;
+      b.style.opacity = n > last ? .45 : '';
+    });
+    $('back').disabled = step === 0;
+    $('next').disabled = step >= last;
+    $('next').textContent = step === 1 ? 'Click Add to Momentum' : 'Next';
+  }
+
+  function go(n) { step = Math.max(0, Math.min(n, 3)); render(); }
+
+  $('next').onclick = () => go(step + 1);
+  $('back').onclick = () => go(step - 1);
+  document.querySelectorAll('.step').forEach(b => b.onclick = () => go(+b.dataset.step));
+  document.querySelectorAll('#cases button').forEach(b => b.onclick = () => {
+    kase = b.dataset.case;
+    document.querySelectorAll('#cases button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if (step === 3 && !(kase === 'added' || kase === 'again')) step = 2;
+    $('reply').innerHTML = ''; delete $('reply').dataset.k;
+    render();
+  });
+  more.onclick = e => { e.stopPropagation(); go(step === 1 ? 0 : 1); };
+  $('add').onclick = () => go(2);
+  target.addEventListener('mouseenter', () => { if (step === 0) target.classList.add('hot'); });
+  target.addEventListener('mouseleave', () => { if (step === 0) target.classList.remove('hot'); });
+  document.addEventListener('click', e => {
+    const opener = e.target.closest('[data-open]');
+    if (opener) { go(3); return; }
+    if (e.target.id === 'close') { go(2); return; }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.tcard[data-open]')) { e.preventDefault(); go(3); }
+    if (e.key === 'Escape' && step === 1) go(0);
+  });
+  render();
+})();
+</script>

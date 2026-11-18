@@ -23,7 +23,7 @@
 
 ### User Story 1 - Turn a Chat message into my task with one click (Priority: P1)
 
-In the "Marketing" space, Salma writes: "Yosra, can you do the LinkedIn carousel for the Omnisight launch, ideally by Thursday?" Yosra opens the message's menu and chooses **Add to Momentum**. A moment later, a reply only she can see says "Added to Momentum ✓ **LinkedIn carousel for the Omnisight launch**" with an **Open task** button. The task is on the board in To Do. Its brief holds Salma's full message, who sent it, when, and a link back to the conversation.
+In the "Marketing" space, Salma writes: "@Yosra can you do the LinkedIn carousel for the Omnisight launch? Ideally by Thursday." Yosra opens the message's menu and chooses **Add to Momentum**. A moment later, a reply only she can see says "Added to Momentum ✓ **Can you do the LinkedIn carousel for the Omnisight launch? Ideally by Thursday.**" with an **Open task** button. The task is on the board in To Do. Its brief holds Salma's full message, who sent it, when, and a link back to the conversation.
 
 **Why this priority**: This is the whole request. Without it nothing else has value.
 
@@ -32,7 +32,7 @@ In the "Marketing" space, Salma writes: "Yosra, can you do the LinkedIn carousel
 **Acceptance Scenarios**:
 
 1. **Given** any Momentum member, **When** they choose Add to Momentum on a message, **Then** one task is created in To Do, and they get a private "Added" reply with a link that opens that task.
-2. **Given** a message of several lines, **When** it is added, **Then** the task name is its first meaningful line, trimmed and cut to 120 characters, and the brief holds the whole message.
+2. **Given** a message of several lines, **When** it is added, **Then** the task name is its first meaningful line without leading @mentions, trimmed and cut to 120 characters, and the brief holds the whole message.
 3. **Given** the added task, **When** anyone opens it, **Then** the brief shows who sent the message, in which space or chat, when, and a link that opens the original message in Google Chat.
 4. **Given** the new task, **Then** the clicker is its assignee. The sender (Salma) is its owner when she is a member, otherwise the clicker is. Both follow it, as with any new task (spec 012).
 5. **Given** the Chat reply, **Then** only the clicker sees it; nobody else in the space is shown a message.
@@ -122,7 +122,7 @@ An admin follows a written setup guide: create the Google Cloud project, turn on
 **The task**
 
 - **FR-011**: The task MUST be created under the same rules as a task made on the board: To Do stage, the workspace's current pipeline length, default priority, created by the clicker. The same notifications and following apply (spec 012).
-- **FR-012**: The task name MUST be the message's first non-empty line, with Chat formatting removed, trimmed, and cut to 120 characters with an ellipsis. With no text, it falls back to "Task from <sender> in <space name>".
+- **FR-012**: The task name MUST be the message's first non-empty line, with Chat formatting and any @mentions at its start removed, its first letter capitalised, trimmed, and cut to 120 characters with an ellipsis. Example: "@Yosra can you do the carousel?" becomes "Can you do the carousel?". With no text, it falls back to "Task from <sender> in <space name>".
 - **FR-013**: The brief MUST contain the full message text, the sender's name, the space or chat name, the time it was sent, and a link that opens the original message in Google Chat.
 - **FR-014**: Brand, content type, campaign, platform, hours estimate and due date MUST be left empty, for the person to fill in on the board. A due date written in the message ("by Thursday") is NOT read automatically.
 - **FR-015**: Momentum MUST remember which Chat message each task came from, and show "From Google Chat" with the link on the task.
