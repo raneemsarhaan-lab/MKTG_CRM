@@ -277,18 +277,6 @@ Two distinct concepts, easy to confuse:
 
 `publish` has `terminal_flag = true`. Once a task is published it cannot move out — for any tier, by any route. No drag, no action, no admin override.
 
-### Working Hours (My Day as the hours page)
-
-Design: `design/working-hours.html`, approved, with two changes asked for in review: hide SLA Breached too, and name the page Working Hours.
-
-- **The page.** `/overview` is now Working Hours: the greeting, Today's hours for everyone, then **Team hours** (the weekly report that was `/hours`) for the Marketing Manager only.
-  - The old dashboard is hidden: the stat cards, the day planner, This Week, Last Week, SLA Breached, and the Mine/Team switch. Its components stay in `components/myboard`.
-  - `/hours` redirects to `/overview#team-hours`, keeping `?week=`.
-- **Who sees Team hours.** `isHoursManager` (`lib/authz.ts`) matches the member's role against the workspace's supervising role ("Marketing Manager" unless Settings changes it). Being an admin is not enough.
-  - The page, `teamHours` and `/hours/export` all check it.
-- **The side bar** (`lib/nav.tsx`): Working Hours (a clock with a tick), Board, Sheets, Team, Settings. Projects and Capacity are off the bar but still open by address.
-- **Checks.** `node scripts/hours-lab/realapp/run.cjs` (47). It now reads the manager and the member from the database.
-
 ### Celebrations fire for one person
 
 When someone advances a task out of a stage they own, a confetti overlay plus sound fires — **only for that person**, never broadcast to the team. Implemented as a direct Zustand call (`setCelebration(payload)`) in `TaskModal.handleAdvance`.
@@ -830,6 +818,18 @@ Spec 020 (`specs/020-excel-power-tips/`), stage A (US1–US3), stage B (US4–US
 - **Paste Special keys.** Ctrl+Alt+V opens it as well as Ctrl+Shift+V. Excel's letters pick an option (V values, T formats, E transpose, M multiply…) and Enter pastes.
 - **Merged rows.** A merge reaching into the rows below no longer stretches its own row; a negative bottom margin lets it overlap them.
 - **Checks.** `node scripts/spreadsheet-lab/realapp/tips-c.cjs` (36 checks), and the `tips-move` pure check.
+
+### Working Hours (My Day as the hours page)
+
+Design: `design/working-hours.html`, approved, with two changes asked for in review: hide SLA Breached too, and name the page Working Hours.
+
+- **The page.** `/overview` is now Working Hours: the greeting, Today's hours for everyone, then **Team hours** (the weekly report that was `/hours`) for the Marketing Manager only.
+  - The old dashboard is hidden: the stat cards, the day planner, This Week, Last Week, SLA Breached, and the Mine/Team switch. Its components stay in `components/myboard`.
+  - `/hours` redirects to `/overview#team-hours`, keeping `?week=`.
+- **Who sees Team hours.** `isHoursManager` (`lib/authz.ts`) matches the member's role against the workspace's supervising role ("Marketing Manager" unless Settings changes it). Being an admin is not enough.
+  - The page, `teamHours` and `/hours/export` all check it.
+- **The side bar** (`lib/nav.tsx`): Working Hours (a clock with a tick), Board, Sheets, Team, Settings. Projects and Capacity are off the bar but still open by address.
+- **Checks.** `node scripts/hours-lab/realapp/run.cjs` (47). It now reads the manager and the member from the database.
 
 ### Celebrations
 
