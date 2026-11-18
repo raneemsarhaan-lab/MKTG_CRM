@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video sheet like Content</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B6F7B; --faint: #9A9DA6; --line: #E6E7EB; --soft: #F1F1F4;
+  --head: #F6F6F8; --band: #F6F8E8; --band-line: #E2E8C2; --sel: #3563E9; --lime: #C8F24E; --violet: #6E5BE6; --violet-soft: #EEEBFD;
+  --ic: #7C5CF0; --note: #FFF7D6; --note-ink: #6B5300; --bad: #A2610C; --bad-bg: #FDF0DD;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --line: #2A2A34; --soft: #1C1C24;
+  --head: #1A1A21; --band: #1F2414; --band-line: #34401A; --violet-soft: #2A2145; --note: #3A3214; --note-ink: #F3DE8A; --bad: #F2B866; --bad-bg: #3A2A10;
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --line: #2A2A34; --soft: #1C1C24;
+  --head: #1A1A21; --band: #1F2414; --band-line: #34401A; --violet-soft: #2A2145; --note: #3A3214; --note-ink: #F3DE8A; --bad: #F2B866; --bad-bg: #3A2A10;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+h2 { margin: 26px 0 8px; font: 800 16px var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 14px; color: var(--muted); max-width: 940px; font-size: 14px; }
+.note { background: var(--note); color: var(--note-ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; font-size: 13px; }
+.frame { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.bar { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.bar .gap { flex: 1; }
+.btn { border: 1px solid var(--line); background: var(--page); border-radius: 8px; padding: 6px 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.btn.dark { background: #14131A; color: #fff; border-color: #14131A; }
+.btn.lime { background: var(--lime); color: #1B1A13; border-color: var(--lime); }
+.gone { text-decoration: line-through; opacity: .5; }
+.x { display: inline-flex; gap: 6px; align-items: center; }
+.x .tag { background: #D22040; color: #fff; border-radius: 6px; font-size: 10.5px; font-weight: 700; padding: 1px 6px; }
+.sum { display: flex; gap: 14px; padding: 9px 14px; background: var(--head); border-bottom: 1px solid var(--line); flex-wrap: wrap; color: var(--muted); }
+.sum b { color: var(--ink); }
+.sum .name { font-weight: 800; color: var(--ink); }
+.sum .warn { color: var(--bad); font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; min-width: 1180px; width: 100%; }
+th, td { border-bottom: 1px solid var(--soft); border-inline-end: 1px solid var(--soft); padding: 0 8px; height: 30px; white-space: nowrap; text-align: start; }
+th { background: var(--head); font-weight: 600; color: var(--text); height: 32px; }
+td.no, th.no { width: 40px; text-align: center; color: var(--faint); font-size: 12px; background: var(--head); }
+.ic { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--ic); color: #fff; font-size: 9.5px; font-weight: 800; margin-inline-end: 6px; vertical-align: -3px; }
+.ic.new { box-shadow: 0 0 0 2px #FDE68A; }
+tr.band td { background: var(--band); border-bottom-color: var(--band-line); font-weight: 700; color: var(--ink); }
+tr.band td.no { background: var(--band); }
+.caret { color: var(--muted); margin-inline-end: 6px; }
+.cnt { color: var(--muted); font-weight: 500; }
+.open { color: var(--violet); margin-inline-start: 8px; font-weight: 700; }
+.pill { display: inline-block; border-radius: 6px; color: #fff; font-weight: 700; font-size: 11.5px; padding: 1px 8px; }
+.reel { background: #D9480F; } .short { background: #0B7285; } .video { background: #5F3DC4; }
+.st { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 700; }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ed { background: #EEEBFD; color: #5B47D6; } .pub { background: #E3F6E8; color: #237A3B; } .rev { background: #E6EEFF; color: #2F4FB8; } .todo { background: #EEF0F2; color: #586069; }
+.person { display: inline-flex; align-items: center; gap: 6px; }
+.av { width: 18px; height: 18px; border-radius: 50%; background: #E76F51; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; }
+.av.gd { background: #444; } .av.ve { background: #E64980; }
+.mono { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.num { text-align: end; font-variant-numeric: tabular-nums; }
+.chip { border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-size: 11.5px; font-weight: 600; }
+.plus td { color: var(--muted); }
+.plus td.t { color: var(--violet); font-weight: 600; }
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 8px; }
+.cmp div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.cmp b { display: block; color: var(--ink); margin-bottom: 4px; }
+.cmp ul { margin: 0; padding-inline-start: 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The Video sheet, in the Content sheet's look</h1>
+  <p class="lede">The four changes you picked. Each video becomes a tinted band with its clip count, the way Content shows "Strategy · 9", and gets its own "+ Clip" row. Type is a coloured pill. Every heading has an icon. The Editing / Copy / Full switch and the Board / Sheet switch are gone, so the toolbar is Content's: Columns, + Column, Mine, Show dropped (Content's "Show archived") and Paste clips.</p>
+  <p class="note">Columns you don't want are hidden from <b>Columns</b> (the Fields drawer), as on Content. Everyone starts from the full set; the old per-person Editing / Copy views go away.</p>
+
+  <div class="frame">
+    <div class="bar" role="toolbar" aria-label="Video sheet">
+      <span class="x"><span class="btn gone">Editing</span><span class="btn gone">Copy</span><span class="btn gone">Full</span><span class="tag">removed</span></span>
+      <span class="gap"></span>
+      <span class="btn">Columns</span><span class="btn">+ Column</span><span class="btn">Mine</span><span class="btn dark">Show dropped</span><span class="btn lime">Paste clips</span>
+      <span class="x"><span class="btn gone">Board</span><span class="btn gone">Sheet</span><span class="tag">removed</span></span>
+    </div>
+    <div class="sum"><span class="name">Video plan</span><span><b>2 videos</b></span><span><b>16 clips</b></span><span><b>17m 32s</b></span><span>6 editing</span><span>3 published <span class="warn">(1 no link)</span></span><span>1 dropped</span></div>
+    <div class="scroll">
+      <table>
+        <thead><tr>
+          <th class="no"></th>
+          <th>Title</th>
+          <th><span class="ic new">#</span>#</th>
+          <th><span class="ic">▣</span>Type</th>
+          <th><span class="ic">●</span>Status</th>
+          <th><span class="ic">◉</span>Editor</th>
+          <th><span class="ic new">A</span>Source</th>
+          <th><span class="ic new">A</span>File name</th>
+          <th><span class="ic new">◷</span>In</th>
+          <th><span class="ic new">◷</span>Out</th>
+          <th><span class="ic new">◷</span>Length</th>
+          <th><span class="ic">↗</span>Files</th>
+          <th><span class="ic">↗</span>Published</th>
+        </tr></thead>
+        <tbody>
+          <tr class="band"><td class="no">1</td><td colspan="12"><span class="caret">▼</span>Strategy Execution and Leadership <span class="cnt">· 12</span> <span class="st ed" style="margin-inline-start:10px">Editing</span><span class="open" title="Open the video's task">↗</span></td></tr>
+          <tr><td class="no">2</td><td>Keeping Strategy on Track</td><td class="num">04</td><td><span class="pill reel">Reel</span></td><td><span class="st pub">Published</span></td><td><span class="person"><span class="av ve">VE</span>Video Editor</span></td><td class="mono">IMG_0293</td><td class="mono">04_IMG_0293_2m20.2s-3m49.0s.mp4</td><td class="num">2:20.2</td><td class="num">3:49.0</td><td class="num">1:28.8</td><td><span class="chip">Drive</span></td><td>instagram.com</td></tr>
+          <tr><td class="no">3</td><td>Strategy Deployment: The Missing Link</td><td class="num">05</td><td><span class="pill reel">Reel</span></td><td><span class="st pub">Published</span></td><td><span class="person"><span class="av ve">VE</span>Video Editor</span></td><td class="mono">IMG_0293</td><td class="mono">05_IMG_0293_3m56.1s-5m06.8s.mp4</td><td class="num">3:56.1</td><td class="num">5:06.8</td><td class="num">1:10.7</td><td><span class="chip">Drive</span></td><td style="color:var(--bad)">Missing link</td></tr>
+          <tr><td class="no">4</td><td>Tie Rewards to What Matters Most</td><td class="num">11</td><td><span class="pill reel">Reel</span></td><td><span class="st rev">Edit Review</span></td><td><span class="person"><span class="av ve">VE</span>Video Editor</span></td><td class="mono">IMG_0293</td><td class="mono">11_IMG_0293_13m37.1s-14m50.5s.mp4</td><td class="num">13:37.1</td><td class="num">14:50.5</td><td class="num">1:13.4</td><td><span class="chip">Drive</span></td><td style="color:var(--faint)">+ link</td></tr>
+          <tr><td class="no">5</td><td>The Two Anchors of Leadership</td><td class="num">22</td><td><span class="pill short">Short</span></td><td><span class="st todo">Script</span></td><td><span class="person"><span class="av">R</span>Raneem</span></td><td class="mono">IMG_0295</td><td class="mono">22_IMG_0295_6m30.7s-7m32.6s.mp4</td><td class="num">6:30.7</td><td class="num">7:32.6</td><td class="num">1:01.9</td><td><span class="chip">Drive</span></td><td style="color:var(--faint)">+ link</td></tr>
+          <tr class="plus"><td class="no"></td><td class="t" colspan="12">+ Clip</td></tr>
+          <tr class="band"><td class="no">6</td><td colspan="12"><span class="caret">▼</span>Pricing Psychology Explained <span class="cnt">· 4</span> <span class="st rev" style="margin-inline-start:10px">Ready to Edit</span><span class="open">↗</span></td></tr>
+          <tr><td class="no">7</td><td>Anchoring in One Minute</td><td class="num">01</td><td><span class="pill reel">Reel</span></td><td><span class="st ed">Editing</span></td><td><span class="person"><span class="av gd">GD</span>Graphic Designer</span></td><td class="mono">IMG_0310</td><td class="mono">01_IMG_0310_0m12.0s-1m05.4s.mp4</td><td class="num">0:12.0</td><td class="num">1:05.4</td><td class="num">0:53.4</td><td><span class="chip">Drive</span></td><td style="color:var(--faint)">+ link</td></tr>
+          <tr class="plus"><td class="no"></td><td class="t" colspan="12">+ Clip</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>What changes, and what stays</h2>
+  <div class="cmp">
+    <div><b>1 · Videos as bands</b><ul><li>Tinted band like Content's: ▼ name · clip count.</li><li>The video's stage shows as a pill on the band; ↗ opens its task (editor and files are set there).</li><li>▼ folds the clips; each band ends with "+ Clip".</li></ul></div>
+    <div><b>2 · Type as pills</b><ul><li>Reel, Short, Video… in the same coloured pills as Post, Article, Report.</li><li>Clicking still opens the type menu.</li></ul></div>
+    <div><b>3 · Icons on every heading</b><ul><li># for the clip number, A for Source and File name, ◷ for In, Out and Length (marked in yellow here).</li><li>Title stays plain, as on Content.</li></ul></div>
+    <div><b>4 · Toolbar like Content's</b><ul><li>Editing / Copy / Full removed: one column set, trimmed in Columns.</li><li>Board / Sheet removed from the Sheets page. On the Board page the switch stays, or you couldn't get back to the board.</li><li>Summary line reads "Video plan · videos · clips · time · …" like "Content plan · 18 pieces".</li></ul></div>
+  </div>
+</div>
+</body>
+</html>
