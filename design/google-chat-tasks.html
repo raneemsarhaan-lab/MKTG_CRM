@@ -142,8 +142,6 @@ button { font: inherit; color: inherit; }
 .origin .by { font-size: 12px; color: var(--muted); }
 .origin .open { font-size: 12.5px; font-weight: 600; color: #1A4FB4; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; justify-self: start; }
 .notes { font-size: 12.5px; color: var(--muted); padding: 0 12px 12px; line-height: 1.5; }
-.toast { position: absolute; left: 14px; bottom: 14px; background: var(--ink); color: #fff; font-size: 12.5px; border-radius: 10px; padding: 9px 12px; display: flex; gap: 8px; align-items: center; animation: rise .3s ease-out; max-width: calc(100% - 28px); }
-.toast b { color: var(--lime); }
 
 /* ── behind the click ──────────────────────────────────── */
 .pipe { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
@@ -263,7 +261,6 @@ Copy and references are in the drive folder.</div></div>
           </div>
         </div>
         <div id="panel-slot"></div>
-        <div id="toast-slot"></div>
       </div>
     </div>
   </div>
@@ -380,7 +377,6 @@ Copy and references are in the drive folder.</div></div>
     $('slot').innerHTML = hasTask ? card(kase === 'added' && step === 2) : '';
     $('todo-count').textContent = hasTask ? '3' : '2';
     $('panel-slot').innerHTML = (ok && step === 3) ? panel() : '';
-    $('toast-slot').innerHTML = (kase === 'added' && step === 2) ? '<div class="toast"><b>New</b> Salma assigned you a task from Google Chat</div>' : '';
 
     // pipeline
     document.querySelectorAll('#pipe li').forEach(li => {
