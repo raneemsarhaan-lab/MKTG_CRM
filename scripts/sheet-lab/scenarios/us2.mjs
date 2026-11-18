@@ -18,7 +18,7 @@ export const us2 = [
   {
     id: 'us2-tip-focus',
     async run(t) {
-      await t.focusCell('c:c07', 'source')
+      await t.focusCell('c:c07', 'reviewer')
       await t.page.keyboard.press('ArrowLeft')
       await t.page.keyboard.press('ArrowLeft')
       t.eq(await t.active(), 'c:c07|status', 'keyboard reached the status cell')
@@ -34,7 +34,8 @@ export const us2 = [
     async run(t) {
       const member = h.MEMBERS.find(m => m.id === me)
       const tasks = await t.tasks()
-      for (const id of ['v1', 'c01', 'c05', 'c06', 'c07', 'c08', 'c10', 'c11', 'c12', 'c99']) {
+      // The redesign: the video is a band (its own stage moves on the board), so the clips.
+      for (const id of ['c01', 'c05', 'c06', 'c07', 'c08', 'c10', 'c11', 'c12', 'c99']) {
         const task = tasks.find(x => x.id === id)
         const key = id.startsWith('v') ? `v:${id}` : `c:${id}`
         const want = h.allowedStages(task, member)
@@ -96,12 +97,15 @@ export const us2 = [
   {
     id: 'us2-video-alone',
     async run(t) {
-      const before = (await t.tasks()).filter(x => x.parent_task_id === 'v1').map(x => x.status)
-      await t.cell('v:v1', 'status').click()
-      await t.page.locator('[data-menu-item="d-check"]').click()
+      // The redesign: the video's band has no Stage cell; moving a clip leaves the video and the other clips alone.
+      t.eq(await t.page.locator('[data-cell="v:v1|status"]').count(), 0, "the band has no Stage cell")
+      const before = (await t.tasks()).filter(x => x.parent_task_id === 'v1' && x.id !== 'c07').map(x => x.status)
+      const video = (await t.task('v1')).status
+      await t.cell('c:c07', 'status').click()
+      await t.page.locator('[data-sheet-menu] [role="menuitem"]:not([data-menu-item="task"])').first().click()
       await t.idle(250)
-      t.eq((await t.task('v1')).status, 'd-check', 'the video moved')
-      t.eq((await t.tasks()).filter(x => x.parent_task_id === 'v1').map(x => x.status), before, 'its clips did not (FR-024)')
+      t.eq((await t.task('v1')).status, video, 'the video did not move')
+      t.eq((await t.tasks()).filter(x => x.parent_task_id === 'v1' && x.id !== 'c07').map(x => x.status), before, 'nor the other clips (FR-024)')
     },
   },
 ]

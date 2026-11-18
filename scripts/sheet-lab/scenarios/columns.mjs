@@ -343,21 +343,21 @@ export const columns = [
   {
     id: 'vcol-sets', hash: 'cols=1&me=raneem',
     async run(t) {
-      await t.page.locator('[data-set="editing"]').click()
-      t.assert((await heads(t)).includes('Hook'), 'Hook in Editing')
+      // The redesign has one set ('sheet'): hiding there leaves the older sets' choice alone.
+      t.assert((await heads(t)).includes('Hook'), 'Hook shown')
       await headMenu(t, 'c:vhook')
       await pick(t, 'hide')
       await t.idle(200)
-      t.assert(!(await heads(t)).includes('Hook'), 'hidden in Editing')
-      await t.page.locator('[data-set="full"]').click()
-      t.assert((await heads(t)).includes('Hook'), 'still in Full (FR-033)')
+      t.assert(!(await heads(t)).includes('Hook'), 'hidden')
+      const hook = (await cols(t)).records.find(r => r.key === 'c:vhook')
+      t.assert(!hook.shownIn.includes('sheet') && hook.shownIn.includes('full'), 'only in the sheet set (FR-033)')
       t.assert((await t.text('c:c09', 'c:music')).includes('Yes'), 'the checkbox shows on a clip')
       await t.tool('[data-add-column]', 'click')
       await t.page.locator('[data-column-editor] input[type="text"]').first().fill('Caption')
       await t.page.locator('[data-column-editor] button[type="submit"]').click()
       await t.idle(200)
       const rec = (await cols(t)).records.find(r => r.name === 'Caption')
-      t.eq([rec.sheet, rec.shownIn.sort()], ['video', ['full']], 'a new Video column shows in Full and its set (FR-034)')
+      t.eq([rec.sheet, rec.shownIn.sort()], ['video', ['full', 'sheet']], 'a new Video column shows in Full and the sheet set (FR-034)')
     },
   },
   // ── Polish ───────────────────────────────────────────────────────────────

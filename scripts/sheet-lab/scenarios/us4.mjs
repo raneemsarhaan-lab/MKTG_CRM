@@ -81,9 +81,9 @@ export const us4 = [
     async run(t) {
       await t.focusCell('c:c01', 'title')
       await t.page.keyboard.press('ArrowRight')
-      t.eq(await t.active(), 'c:c01|clipNo', '→')
+      t.eq(await t.active(), 'c:c01|status', '→')
       await t.page.keyboard.press('ArrowDown')
-      t.eq(await t.active(), 'c:c02|clipNo', '↓')
+      t.eq(await t.active(), 'c:c02|status', '↓')
       await t.page.keyboard.press('Home')
       t.eq(await t.active(), 'c:c02|rowNo', 'Home')
       await t.page.keyboard.press('End')

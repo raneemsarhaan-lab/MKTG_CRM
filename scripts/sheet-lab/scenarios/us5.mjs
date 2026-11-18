@@ -76,8 +76,8 @@ export const us5 = [
       t.eq(items, ['latt-c01-l', 'fatt-c01-f', 'upload', 'link', 'task'], 'open link, preview, upload, paste a link, open task')
       await t.page.locator('[data-menu-item="fatt-c01-f"]').click()
       t.eq((await t.lab()).opened, [{ id: 'c01', opts: { previewId: 'att-c01-f' } }], "opens the file's preview in its task")
-      await t.cell('v:v1', 'files').click()
-      t.assert((await t.menuItems()).includes('upload'), "the video row's Files cell works the same (FR-044)")
+      // The redesign: the video is a band; its own files are on its task.
+      t.eq(await t.page.locator('[data-cell="v:v1|files"]').count(), 0, 'the band has no Files cell')
     },
   },
   {

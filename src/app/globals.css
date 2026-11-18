@@ -3133,6 +3133,7 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 body:has(.fx-sheet-grid.is-moving) .fx-cmt-thread:not(.is-full) { visibility: hidden; }
 
 /* ── The Video sheet, redesigned (design/video-sheet-v2.html) ─────────────── */
+:root { --vs-todo: #8A8F98; --vs-editing: #7C3AED; --vs-review: #D97706; --vs-ready: #0E9F9A; --vs-published: #2E9E4F; }
 .fx-vs-bar { gap: 8px; }
 .fx-vs-more { position: relative; }
 .fx-vs-more-btn { height: 32px; width: 34px; border: 1px solid var(--sheet-line, #E2E3E3); border-radius: 8px; background: #fff; color: var(--sheet-muted); font-weight: 800; cursor: pointer; }

@@ -39,11 +39,11 @@ const STAGE_ORDER = Object.keys(STAGE_META)
 
 /** The redesign's stage groups, for a video's band (design/video-sheet-v2.html). */
 const BUCKETS = [
-  { key: 'todo', stages: ['todo', 'c-prog', 'c-final', 'c-check', 'r-design'], color: '#8A8F98' },
-  { key: 'editing', stages: ['d-prog'], color: '#7C3AED' },
-  { key: 'review', stages: ['d-check', 'final-check'], color: '#D97706' },
-  { key: 'ready', stages: ['ready-publish', 'scheduled'], color: '#0E9F9A' },
-  { key: 'published', stages: ['publish'], color: '#2E9E4F' },
+  { key: 'todo', stages: ['todo', 'c-prog', 'c-final', 'c-check', 'r-design'], color: 'var(--vs-todo)' },
+  { key: 'editing', stages: ['d-prog'], color: 'var(--vs-editing)' },
+  { key: 'review', stages: ['d-check', 'final-check'], color: 'var(--vs-review)' },
+  { key: 'ready', stages: ['ready-publish', 'scheduled'], color: 'var(--vs-ready)' },
+  { key: 'published', stages: ['publish'], color: 'var(--vs-published)' },
 ] as const
 /** From Edit Review on, a clip shows who signs it off. */
 const REVIEW_FROM = STAGE_ORDER.indexOf('d-check')
