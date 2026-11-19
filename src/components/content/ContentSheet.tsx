@@ -26,6 +26,7 @@ import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -162,6 +163,62 @@ export function ContentSheet(p: ContentSheetProps) {
     const r = await p.api.restore(task.id)
     if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return }
     say(t('archive.restored', { stage: names.video(task.status as StageId) }))
+  }
+
+  // ── bulk editing (design/content-sheet-bulk-bar.html) ───────────────────
+  const [bulkIds, setBulkIds] = useState<string[]>([])
+  /** What the sheet calls each stage, from the grid (its own words or the content names). */
+  const bulkWord = useRef<((id: StageId) => string) | null>(null)
+  const [bulkHidden, setBulkHidden] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkTasks = bulkIds.map(id => p.tasks.find(x => x.id === id)).filter((x): x is Task => !!x && !x.dropped_at)
+  /** Pillar spans one theme: that theme's pillars, or null when the pieces come from several. */
+  const bulkThemes = new Set(bulkTasks.map(x => p.themes.find(th => piecesOf(p.tasks, th.id).some(y => y.id === x.id))?.id ?? ''))
+  const bulkTheme = bulkThemes.size === 1 ? p.themes.find(th => bulkThemes.has(th.id)) : undefined
+  const bulkMessage = (changed: number, refused: number) =>
+    (refused ? t('bulk.doneSome', { n: changed, m: refused }) : t('bulk.done', { n: changed }))
+  /** The board's bulk save, then one Undo that puts every changed piece back as it was. */
+  async function bulkApply(patch: BulkPatch) {
+    if (!p.api.bulkUpdate || !bulkTasks.length) return
+    const key = Object.keys(patch)[0] as keyof BulkPatch
+    const before = bulkTasks.map(x => ({ id: x.id, old: (x as unknown as Record<string, unknown>)[key] as string | null | undefined }))
+    setBulkBusy(true)
+    const res = await p.api.bulkUpdate(bulkTasks.map(x => x.id), patch)
+    setBulkBusy(false)
+    if (!res.success && !res.changed) { say(t('notSaved', { reason: why(res.error) })); return }
+    say(bulkMessage(res.changed, res.refused), res.changed ? () => void bulkUndo(key, before) : undefined)
+  }
+  async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[]) {
+    if (key === 'status') {
+      for (const b of before) if (b.old) await p.api.move(b.id, b.old as StageId)
+    } else {
+      const groups = new Map<string, string[]>()
+      for (const b of before) { const k = b.old ?? ''; groups.set(k, [...(groups.get(k) ?? []), b.id]) }
+      for (const [old, ids] of groups) {
+        const value = key === 'due_date' ? (old ? old.slice(0, 10) : '') : old
+        await p.api.bulkUpdate?.(ids, { [key]: value } as BulkPatch)
+      }
+    }
+    say(t('bulk.undone'))
+  }
+  /** Pillar isn't one of the board's fields: each piece is saved as the Pillar cell saves it. */
+  async function bulkPillar(id: string | null) {
+    const list = bulkTasks.filter(canEdit)
+    const before = list.map(x => ({ id: x.id, old: x.pillar_id ?? null }))
+    setBulkBusy(true)
+    let n = 0
+    for (const x of list) { const r = await p.api.updatePiece(x.id, { pillar_id: id }); if (r.success) n++ }
+    setBulkBusy(false)
+    say(bulkMessage(n, bulkTasks.length - n), n ? () => {
+      void (async () => { for (const b of before) await p.api.updatePiece(b.id, { pillar_id: b.old }); say(t('bulk.undone')) })()
+    } : undefined)
+  }
+  async function bulkArchive() {
+    const list = bulkTasks.filter(canEdit)
+    let n = 0
+    for (const x of list) { const r = await p.api.drop(x.id); if (r.success) n++ }
+    say(t('bulk.archived', { n }), n ? () => { void (async () => { for (const x of list) await p.api.restore(x.id); say(t('bulk.undone')) })() } : undefined)
+    setBulkIds([])
   }
 
   function onOpen(row: ContentRow, col: GridCol, anchor: HTMLElement) {
@@ -399,6 +456,7 @@ export function ContentSheet(p: ContentSheetProps) {
               onPaste={onPaste}
               pasteAsRows={pasteAsRows}
               onSkipped={onSkipped}
+              onSelectPieces={(ids, word) => { bulkWord.current = word; setBulkIds(ids); setBulkHidden(false) }}
               linked={{
                 drop: id => p.api.drop(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
                 restore: id => p.api.restore(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
@@ -493,6 +551,29 @@ export function ContentSheet(p: ContentSheetProps) {
             requestAnimationFrame(() => (document.querySelector<HTMLElement>('[data-cell][tabindex="0"]') ?? document.querySelector<HTMLElement>('[data-paste-plan]'))?.focus())
           }}
           initialCells={paste.cells}
+        />
+      )}
+
+      {!bulkHidden && bulkTasks.length >= 2 && p.api.bulkUpdate && (
+        <BulkBar
+          count={bulkTasks.length}
+          fields={['stage', 'assignee', 'type', 'pillar', 'due']}
+          labels={{
+            count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.assignee'), type: t('bulk.type'),
+            pillar: t('bulk.pillar'), due: t('bulk.date'), remove: t('bulk.archive'), confirm: t('bulk.archiveConfirm', { n: bulkTasks.length }),
+            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'), noPillar: t('bulk.noPillar'), pillarOff: t('bulk.pillarOff'),
+          }}
+          members={p.members}
+          brands={[]}
+          types={p.contentTypes.map(c => ({ ...c } as unknown as import('@/types/index').ContentType))}
+          busy={bulkBusy}
+          note=""
+          onApply={patch => void bulkApply(patch)}
+          onDelete={() => void bulkArchive()}
+          onClear={() => setBulkHidden(true)}
+          stageName={id => bulkWord.current?.(id) ?? names.video(id)}
+          pillars={bulkTheme ? bulkTheme.pillars.map(pl => ({ id: pl.id, name: pl.name })) : null}
+          onPillar={id => void bulkPillar(id)}
         />
       )}
 

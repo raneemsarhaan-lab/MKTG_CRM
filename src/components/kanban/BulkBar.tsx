@@ -25,14 +25,14 @@ export interface BulkPatch {
 }
 
 /** The choices the bar can offer. The board shows its six; the Video sheet picks its own (design/video-sheet-bulk-bar.html). */
-export type BulkField = 'stage' | 'assignee' | 'owner' | 'brand' | 'type' | 'priority' | 'due'
+export type BulkField = 'stage' | 'assignee' | 'owner' | 'brand' | 'type' | 'priority' | 'due' | 'pillar'
 
 interface BulkBarProps {
   count:     number
   /** Which choices, in order (default: the board's). */
   fields?:   BulkField[]
   /** Words for the count, each choice and the remove button (default: the board's English). */
-  labels?:   Partial<Record<BulkField | 'count' | 'remove' | 'confirm' | 'cancel' | 'clear' | 'noBrand' | 'setDue', string>>
+  labels?:   Partial<Record<BulkField | 'count' | 'remove' | 'confirm' | 'cancel' | 'clear' | 'noBrand' | 'setDue' | 'noPillar' | 'pillarOff', string>>
   members:   Member[]
   brands:    Brand[]
   types:     ContentType[]
@@ -43,6 +43,9 @@ interface BulkBarProps {
   onClear:   () => void
   /** What each stage is called in the list (the Video sheet's words); the board's name is shown beside it as a hint. Default: the board's names. */
   stageName?: (id: StageId) => string
+  /** The Content sheet's Pillar choice: the pillars of the pieces' theme, or null when the pieces span themes (the button is greyed out, with labels.pillarOff as its tip). */
+  pillars?: { id: string; name: string }[] | null
+  onPillar?: (id: string | null) => void
 }
 
 type MenuKind = BulkField | null
@@ -97,11 +100,11 @@ function Item({ onClick, children, stage }: { onClick: () => void; children: Rea
 }
 
 export function BulkBar({
-  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {}, stageName,
+  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {}, stageName, pillars, onPillar,
 }: BulkBarProps) {
   const L = {
     count: `${count} selected`, stage: 'Stage', assignee: 'Assignee', owner: 'Owner', brand: 'Brand', type: 'Type', priority: 'Priority',
-    due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', ...labels,
+    due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', pillar: 'Pillar', noPillar: 'No pillar', pillarOff: 'Pick pieces from one theme', ...labels,
   }
   const [menu, setMenu]       = useState<MenuKind>(null)
   const [dueDraft, setDue]    = useState('')
@@ -121,7 +124,7 @@ export function BulkBar({
           <Item key={id} stage={id} onClick={() => apply({ status: id })}>
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_META[id].color, flexShrink: 0 }} />
             {stageName ? stageName(id) : STAGE_META[id].label_en}
-            {stageName && stageName(id) !== STAGE_META[id].label_en && (
+            {stageName && stageName(id).toLowerCase() !== STAGE_META[id].label_en.toLowerCase() && (
               <small style={{ marginInlineStart: 'auto', paddingInlineStart: 12, color: PIPE.textMuted, fontSize: 11.5 }}>{STAGE_META[id].label_en}</small>
             )}
           </Item>
@@ -138,6 +141,10 @@ export function BulkBar({
           )),
         ]
         case 'type': return types.map(t => <Item key={t.id} onClick={() => apply({ content_type_label: t.label })}>{t.label}</Item>)
+        case 'pillar': return [
+          ...(pillars ?? []).map(pl => <Item key={pl.id} onClick={() => { close(); onPillar?.(pl.id) }}>{pl.name}</Item>),
+          <Item key="" onClick={() => { close(); onPillar?.(null) }}>{L.noPillar}</Item>,
+        ]
         case 'priority': return (['High', 'Medium', 'Low'] as const).map(p => <Item key={p} onClick={() => apply({ priority: p })}>{p}</Item>)
         case 'due': return (
           <div style={{ padding: 6, display: 'grid', gap: 6 }}>
@@ -163,9 +170,12 @@ export function BulkBar({
         )
       }
     })()
+    // Pillar spans one theme only: across themes the button is greyed out and says why.
+    const off = k === 'pillar' && !pillars
     return (
       <div key={k} style={{ position: 'relative' }}>
-        <button type="button" style={BTN} disabled={busy} data-bulk={k} aria-expanded={menu === k} onClick={() => toggle(k)}>
+        <button type="button" style={off ? { ...BTN, opacity: 0.45, cursor: 'not-allowed' } : BTN} disabled={busy} aria-disabled={off || undefined}
+                title={off ? L.pillarOff : undefined} data-bulk={k} aria-expanded={menu === k} onClick={() => { if (!off) toggle(k) }}>
           {L[k]} ▾
         </button>
         {menu === k && <Menu onClose={close}>{list}</Menu>}
