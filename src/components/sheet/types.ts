@@ -51,6 +51,12 @@ export interface SheetApi {
   restore(taskId: string): Promise<Result>
   /** A board field of a clip, from a column linked to it (design/video-sheet-v5.html). */
   writeField?(taskId: string, field: string, value: string): Promise<Result>
+  /**
+   * Remove a clip's file or link: it leaves the sheet at once; `commit` sends the
+   * delete (the board's own), `undo` puts it back. The sheet commits once its
+   * Undo message has gone.
+   */
+  removeFile?(taskId: string, attachmentId: string): { undo(): void; commit(): Promise<Result> } | null
   /** "+ Video": a new video, ready for clips. */
   addVideo?(name: string): Promise<Result & { id?: string }>
   /** Spec 013 FR-044: a row's height on a linked sheet, shared by the team (null: the default). */

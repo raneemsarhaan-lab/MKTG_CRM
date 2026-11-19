@@ -169,6 +169,16 @@ function App() {
       patch(taskId, { attachments: [...(find(taskId)!.attachments ?? []), a] })
       return { success: true }
     },
+    // Remove a file or link: gone at once, back on Undo; the delete is recorded when committed.
+    removeFile(taskId: string, attachmentId: string) {
+      const t = find(taskId), gone = t?.attachments?.find(a => a.id === attachmentId)
+      if (!t || !gone) return null
+      patch(taskId, { attachments: (t.attachments ?? []).filter(a => a.id !== attachmentId) })
+      return {
+        undo: () => patch(taskId, { attachments: [...(find(taskId)!.attachments ?? []), gone] }),
+        commit: async () => { record('removeAttachment', attachmentId); return { success: true } },
+      }
+    },
     // "+ Video" (design/video-sheet-v5.html): a new video in To do, owned by the member.
     async addVideo(name: string) {
       record('addVideo', name)

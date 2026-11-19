@@ -345,7 +345,12 @@
       "attach": "Attach",
       "attached": "Link attached",
       "uploaded": "Uploaded {name}",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "remove": "Remove {name}",
+      "removeGroup": "Remove",
+      "removed": "{name} removed.",
+      "restored": "{name} is back.",
+      "removeFailed": "{name} wasn't removed: {reason}"
     },
     "published": {
       "missing": "Missing link",

@@ -345,7 +345,12 @@
       "attach": "إرفاق",
       "attached": "تم إرفاق الرابط",
       "uploaded": "تم رفع {name}",
-      "cancel": "إلغاء"
+      "cancel": "إلغاء",
+      "remove": "إزالة {name}",
+      "removeGroup": "إزالة",
+      "removed": "تمت إزالة {name}.",
+      "restored": "عاد {name}.",
+      "removeFailed": "لم تتم إزالة {name}: {reason}"
     },
     "published": {
       "missing": "الرابط مفقود",

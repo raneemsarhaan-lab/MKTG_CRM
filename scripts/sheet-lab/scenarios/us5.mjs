@@ -73,11 +73,30 @@ export const us5 = [
     async run(t) {
       await t.cell('c:c01', 'files').click()
       const items = await t.menuItems()
-      t.eq(items, ['latt-c01-l', 'fatt-c01-f', 'upload', 'link', 'task'], 'open link, preview, upload, paste a link, open task')
+      t.eq(items, ['latt-c01-l', 'fatt-c01-f', 'upload', 'link', 'task', 'rmatt-c01-f', 'rmatt-c01-l'], 'open link, preview, upload, paste a link, open task, then Remove for each')
       await t.page.locator('[data-menu-item="fatt-c01-f"]').click()
       t.eq((await t.lab()).opened, [{ id: 'c01', opts: { previewId: 'att-c01-f' } }], "opens the file's preview in its task")
       // The redesign: the video is a band; its own files are on its task.
       t.eq(await t.page.locator('[data-cell="v:v1|files"]').count(), 0, 'the band has no Files cell')
+    },
+  },
+  {
+    id: 'us5-remove',
+    async run(t) {
+      const has = async id => (await t.task('c01')).attachments.some(a => a.id === id)
+      await t.cell('c:c01', 'files').click()
+      await t.page.locator('[data-menu-item="rmatt-c01-f"]').click()
+      await t.idle(150)
+      t.assert(!(await has('att-c01-f')), 'Remove: the file leaves the clip at once')
+      t.assert((await t.toast()).includes('removed'), 'with a message')
+      await t.page.locator('[data-sheet-toast] button').click()
+      await t.idle(150)
+      t.assert(await has('att-c01-f'), 'Undo puts it back')
+      await t.cell('c:c01', 'files').click()
+      await t.page.locator('[data-menu-item="rmatt-c01-l"]').click()
+      await t.page.waitForTimeout(10_500)
+      t.assert((await t.lab()).calls.some(c => c.fn === 'removeAttachment' && c.args[0] === 'att-c01-l'), 'once the message has gone, the delete is sent')
+      t.assert(!(await has('att-c01-l')), 'and the link stays gone')
     },
   },
   {
