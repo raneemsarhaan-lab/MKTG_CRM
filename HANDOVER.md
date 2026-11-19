@@ -847,6 +847,19 @@ Designs: `design/video-sheet-v2.html` (the layout, from the user's reference, wi
 - **Saved layouts:** `scripts/sheets-backfill.ts` puts saved Video columns into the new order once (custom columns after); the `post` column's row marks it done.
 - **Checks:** `npm run lab:sheet` (152, `#plain=1` shows the redesign's defaults; the default seed shows every column), `realapp/video-fields.cjs` (29).
 
+### Video sheet: + Video and columns that follow the board
+
+Design: `design/video-sheet-v5.html`, approved, with one level of grouping (no theme rows).
+
+- **+ Video** (`addVideo` in `actions/tasks.ts`, the bar in `VideoSheet.tsx`): a video task in To do, owned by the member, no due date. `sheetVideos` in `rows.ts` lists every video with clips plus any live, unpublished video without clips, so the new band shows at once.
+- **Columns that follow a board field:**
+  - A custom column's ▾ menu offers "Link to a board field…" (Priority, Platform, Theme, Pillar, Owner, Due date), and ＋ adds one directly (Board fields).
+  - The link lives in the sheet's view as `colFields` (column key → field), saved through `applyLinkedFormats` and cleaned in `writeViewJson`.
+  - Cells show the clip's value; typing saves through `writeClipField` (`actions/sheet-links.ts`), which uses the team sheets' `writeOne`, so names, dates and words parse the same and the board's rules apply.
+  - "Unlink from board" copies the shown values into the column's own values.
+  - Offered only where the sheet's view can be saved: the Sheets page, not the Board's sheet view.
+- **Checks:** `lab:sheet` (153, `us6-add-video`), `realapp/video-fields.cjs` (36, section 8).
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.

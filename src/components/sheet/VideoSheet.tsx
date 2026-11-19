@@ -31,6 +31,7 @@ import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { NamePrompt } from '@/components/content/ThemeEditor'
 import { clipLink, CLIP_LINK_COLS } from './SheetGrid'
 import type { LinkRole } from '@/types/index'
 
@@ -42,6 +43,7 @@ type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
   | { kind: 'link'; anchor: HTMLElement; taskId: string; mode: 'files' | 'published' | 'prompt' | LinkCol }
   | { kind: 'drop'; anchor: HTMLElement; task: Task }
+  | { kind: 'video'; anchor: HTMLElement }
 
 const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage_not_in_pipeline', 'terminal',
   'not_a_video', 'not_a_clip', 'dropped', 'bad_link', 'bad_times', 'duplicate_file_name', 'generic']
@@ -49,6 +51,7 @@ const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage
 export function VideoSheet(p: VideoSheetProps) {
   const t = useTranslations('sheet')
   const ta = useTranslations('attachments')
+  const tl = useTranslations('sheets.links')
   const names = useStageNames()
   const me = p.me
 
@@ -126,10 +129,20 @@ export function VideoSheet(p: VideoSheetProps) {
   [me])
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
+  // The grid fills in the column menu's "Link to a board field…" (it knows which columns are linked).
+  const menuRef = useRef<((key: string, anchor: HTMLElement) => MenuItem[]) | null>(null)
   const cl = useSheetColumns({
     sheet: 'video', set, bundle: p.columns, me, members: p.members,
     defaultName: key => t(`col.${key}` as 'col.title'), canEdit, say, onNote,
+    extraMenu: (key, anchor) => menuRef.current?.(key, anchor) ?? [],
   })
+  /** A column linked to a board field: the board's rules, and its words for a refusal. */
+  const boardField = async (task: Task, field: string, value: string): Promise<string | null> => {
+    if (!p.api.writeField) return t('err.generic')
+    const r = await p.api.writeField(task.id, field, value)
+    if (r.success) return null
+    return r.error && tl.has(`why.${r.error}`) ? tl(`why.${r.error}`) : why(r.error)
+  }
   const setType = (task: Task, label: string) =>
     void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
 
@@ -431,6 +444,9 @@ export function VideoSheet(p: VideoSheetProps) {
         )}
         <span className="fx-sheet-bar-gap" />
         <ViewPair view="sheet" onView={v => p.onView(v)} />
+        {p.api.addVideo && me.access !== 'user' && (
+          <button type="button" className="fx-sheet-btn fx-vs-addvideo" data-add-video="" onClick={e => setPopup({ kind: 'video', anchor: e.currentTarget })}>{t('addVideo')}</button>
+        )}
         <div className="fx-vs-more" ref={moreRef}>
           <button type="button" className="fx-vs-more-btn" data-sheet-more="" aria-haspopup="true" aria-expanded={more}
                   aria-label={t('more')} title={t('more')} onClick={() => setMore(v => !v)}>⋯</button>
@@ -468,6 +484,9 @@ export function VideoSheet(p: VideoSheetProps) {
           <SheetGrid
             setName={t(`sets.${set}`)}
             slaConfig={p.slaConfig}
+            boardField={boardField}
+            themes={p.themes}
+            menuRef={menuRef}
             rows={rows}
             columns={cl}
             me={me}
@@ -578,6 +597,20 @@ export function VideoSheet(p: VideoSheetProps) {
               return null
             }}
           />
+        </SheetPopover>
+      )}
+      {popup?.kind === 'video' && (
+        <SheetPopover anchor={popup.anchor} label={t('newVideo.title')} onClose={closePopup}>
+          <NamePrompt title={t('newVideo.title')} saveLabel={t('newVideo.add')} cancelLabel={t('newVideo.cancel')}
+                      onCancel={() => closePopup(true)}
+                      onSave={async name => {
+                        const r = await p.api.addVideo!(name)
+                        if (!r.success) return why(r.error)
+                        closePopup(false)
+                        say(t('newVideo.added', { name }))
+                        if (r.id) { const id = r.id; requestAnimationFrame(() => document.querySelector(`[data-row="v:${id}"]`)?.scrollIntoView({ block: 'center' })) }
+                        return null
+                      }} />
         </SheetPopover>
       )}
       {popup?.kind === 'drop' && (

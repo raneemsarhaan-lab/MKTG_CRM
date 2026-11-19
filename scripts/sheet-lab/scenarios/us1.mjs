@@ -62,7 +62,7 @@ export const us1 = [
     hash: 'video=all',
     async run(t) {
       const videos = (await t.rows()).filter(r => r.startsWith('v:'))
-      t.eq(videos, ['v:v1', 'v:v2'], 'every video that has clips, as groups')
+      t.eq(videos, ['v:v1', 'v:v2', 'v:v3'], 'every video with clips, and one not published yet with none (+ Video), as groups')
       await t.cell('v:v2', 'rowNo').click()
       t.assert((await t.menuItems()).includes('own'), 'row menu offers "open on its own"')
       await t.page.locator('[data-menu-item="own"]').click()

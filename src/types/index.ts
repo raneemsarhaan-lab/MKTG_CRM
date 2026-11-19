@@ -480,6 +480,8 @@ export interface ViewWrite {
   slicers?: SlicerRecord[] | null
   advanced?: AdvancedFilter | null
   outline?: OutlineGroupRecord[] | null
+  /** The Video sheet: custom column key → the board field it follows (design/video-sheet-v5.html); null removes them all. */
+  colFields?: Record<string, string> | null
 }
 
 // ─── Spec 015: formatting and comments (specs/015-sheet-formatting-comments) ─

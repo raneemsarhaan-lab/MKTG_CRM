@@ -578,6 +578,13 @@
       "post": "LinkedIn",
       "openTask": "Open task",
       "notALink": "Not a link"
+    },
+    "addVideo": "+ Video",
+    "newVideo": {
+      "title": "New video",
+      "add": "Add video",
+      "cancel": "Cancel",
+      "added": "{name} added. Add its clips below it."
     }
   },
   "content": {
@@ -2183,7 +2190,15 @@
       "groupEditor": "Editor",
       "barAddTheme": "+ Theme",
       "newTheme": "New theme",
-      "themeAdded": "“{name}” added. Pick it in a task’s Theme."
+      "themeAdded": "“{name}” added. Pick it in a task’s Theme.",
+      "linkedBadge": "Follows the board: {field}",
+      "linkField": "Link to a board field…",
+      "unlinkField": "Unlink from board",
+      "linkedTo": "{name} now follows the board’s {field}.",
+      "unlinked": "{name} is a sheet column again, with the values it showed.",
+      "alreadyLinked": "another column follows it",
+      "boardFieldsTitle": "Board fields",
+      "notSaved": "That didn't save. Try again."
     },
     "tips": {
       "handle": "Fill handle: drag to fill, double-click to fill down",

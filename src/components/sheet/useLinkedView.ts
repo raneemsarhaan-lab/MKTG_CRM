@@ -34,6 +34,8 @@ export interface LinkedView {
   sort?: SortKey[]; filter?: Record<string, ColFilter>; filterArea?: FilterArea | null
   /** Spec 019 stage 2: how rows are grouped (none = the sheet's default), and this sheet's words. */
   groupBy?: GroupBy | null; words?: SheetTaskMap['words']; show?: SheetTaskMap['show']
+  /** The Video sheet: custom column key → the board field it follows. */
+  colFields?: Record<string, string>
 }
 
 export interface LinkedStore {
@@ -81,7 +83,7 @@ export function useLinkedView<R extends { key: string }>(p: {
       setFormats(r.extras.formats)
       setRules(r.extras.rules ?? [])
       const v = r.extras.view
-      setView({ sort: v.sort, filter: v.filter, filterArea: v.filterArea ?? null, groupBy: v.groupBy ?? null, words: v.words, show: v.show })
+      setView({ sort: v.sort, filter: v.filter, filterArea: v.filterArea ?? null, groupBy: v.groupBy ?? null, words: v.words, show: v.show, colFields: (v as { colFields?: Record<string, string> }).colFields })
     })
     return () => { live = false }
   }, [enabled, p.sheetKey])
@@ -94,7 +96,7 @@ export function useLinkedView<R extends { key: string }>(p: {
     const res = apiRef.current
       ? await apiRef.current.applyLinkedFormats(ref.current.sheetKey, { view: {
           sort: after.sort ?? null, filter: after.filter ?? null, filterArea: after.filterArea ?? null,
-          groupBy: after.groupBy ?? null, words: after.words ?? null, show: after.show ?? null,
+          groupBy: after.groupBy ?? null, words: after.words ?? null, show: after.show ?? null, colFields: after.colFields ?? null,
         } })
       : { success: false as const, error: 'generic' }
     if (!res.success) { setView(before); ref.current.say(t('err.generic')); return false }

@@ -3175,3 +3175,10 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-pill.is-task { background: #F1F1F4; color: #3F444C; }
 .fx-pill.is-more { flex: none; padding: 0 8px; background: #F1F1F4; color: var(--sheet-muted); }
 .fx-sheet-files { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+/* Columns that follow a board field, and + Video (design/video-sheet-v5.html). */
+.fx-vs-lk { display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 4px; background: var(--hd-purple-soft); color: var(--hd-purple); margin-inline-end: 6px; vertical-align: -3px; }
+.fx-vs-lk > svg { width: 12px; height: 12px; }
+.fx-vs-prio { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: 12.5px; }
+.fx-vs-prio::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
+.fx-vs-prio.is-high { color: #B42318; } .fx-vs-prio.is-medium { color: #92400E; } .fx-vs-prio.is-low { color: #4B5563; }
+.fx-vs-addvideo { white-space: nowrap; }

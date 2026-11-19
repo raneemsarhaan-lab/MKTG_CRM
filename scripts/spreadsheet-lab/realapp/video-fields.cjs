@@ -53,6 +53,8 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
   const clip = sql(`select c.id || '|' || c.status from tasks c join tasks v on v.id=c.parent_task_id where v.content_type_label='Video' and v.parent_task_id is null
       and c.dropped_at is null and c.status in ('todo','c-prog','r-design') order by c.name limit 1`).split('|')
   const T = { id: clip[0], status: clip[1] }
+  let linkedKey = null
+  const prioBefore = sql(`select priority from tasks where id='${T.id}'`)
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] })
   try {
     const A = await login(browser), page = A.page
@@ -154,8 +156,36 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
     ok(box && box.width <= 390 && box.y > 100, 'phone: the drawer is a bottom sheet')
     if (SHOTS) { await page.reload(); await page.waitForSelector('[data-video-sheet] [data-cell]'); await page.waitForTimeout(1000); await page.screenshot({ path: `${SHOTS}/video-fields.png` }) }
 
+    console.log('8. A column that follows the board (design/video-sheet-v5.html)')
+    sql(`update tasks set priority='Low' where id='${T.id}'`)
+    await page.goto(url); await page.waitForSelector('[data-video-sheet] [data-cell]'); await page.waitForTimeout(1200)
+    await page.click('[data-video-sheet] [data-add-field]'); await page.waitForSelector('[data-sheet-menu] [data-menu-item="board-priority"]')
+    await page.click('[data-sheet-menu] [data-menu-item="board-priority"]')
+    await page.waitForSelector('[data-video-sheet] [data-linked-field="priority"]', { timeout: 15000 }).catch(() => {})
+    const pkey = await page.locator('[data-video-sheet] [data-linked-field="priority"]').evaluate(e => e.closest('[data-col-head]')?.getAttribute('data-col-head')).catch(() => null)
+    linkedKey = pkey
+    ok(!!pkey && pkey.startsWith('c:'), '＋ › Priority adds a column with the link badge', String(pkey))
+    const pcell = page.locator(`[data-cell="c:${T.id}|${pkey}"]`)
+    await pcell.scrollIntoViewIfNeeded()
+    ok(/Low/.test(await pcell.innerText()), "it shows the clip's own priority", await pcell.innerText())
+    await pcell.click(); await page.keyboard.type('High'); await page.keyboard.press('Enter')
+    await page.waitForFunction(id => true, T.id); await page.waitForTimeout(1500)
+    ok(sql(`select priority from tasks where id='${T.id}'`) === 'High', 'typing High saves it to the task')
+    await pcell.click(); await page.keyboard.type('Urgent'); await page.keyboard.press('Enter'); await page.waitForTimeout(1200)
+    ok(sql(`select priority from tasks where id='${T.id}'`) === 'High', 'a value the board refuses is not saved')
+    ok(/"priority"/.test(viewOf()), "the link is saved in the sheet's view")
+    await page.locator(`[data-video-sheet] [data-col-head="${pkey}"]`).hover()
+    await page.click(`[data-video-sheet] [data-col-menu="${pkey}"]`)
+    await page.waitForSelector('[data-sheet-menu] [data-menu-item="unlinkField"]', { timeout: 5000 }).catch(() => {})
+    await page.click('[data-sheet-menu] [data-menu-item="unlinkField"]').catch(() => {})
+    await page.waitForTimeout(1500)
+    ok(await page.locator('[data-video-sheet] [data-linked-field="priority"]').count() === 0, 'Unlink from board removes the badge')
+    ok(/High/.test(await pcell.innerText()) && sql(`select value from sheet_values v join sheet_columns c on c.id=v.column_id where c.key='${pkey}' and v.task_id='${T.id}'`) === 'High', 'and the column keeps the value it showed')
+
     ok(errors.length === 0, 'no page errors', errors.slice(0, 3).join(' | '))
   } finally {
+    if (linkedKey) sql(`delete from sheet_columns where key='${linkedKey}'`)
+    sql(`update tasks set priority='${prioBefore}' where id='${T.id}'`)
     await browser.close()
     sql(`update tasks set status='${T.status}' where id='${T.id}'`)
     sql(`update sheets set view='${viewBefore.replace(/'/g, "''")}'::jsonb where linked_key='linked_video'`)

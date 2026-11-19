@@ -93,6 +93,24 @@ export const us6 = [
     },
   },
   {
+    id: 'us6-add-video', hash: 'video=all',
+    async run(t) {
+      // design/video-sheet-v5.html: "+ Video", one level of grouping.
+      t.assert((await t.rows()).includes('v:v3'), 'a video with no clips yet (not published) has its band')
+      await t.page.locator('[data-add-video]').click()
+      const input = t.page.locator('[data-sheet-pop] input')
+      await input.waitFor({ timeout: 3000 })
+      await input.fill('Customer Stories')
+      await t.page.keyboard.press('Enter')
+      await t.idle(300)
+      const made = (await t.tasks()).find(x => x.name === 'Customer Stories')
+      t.assert(made && made.content_type_label === 'Video' && !made.parent_task_id, 'a new video task')
+      const rows = await t.rows()
+      t.assert(rows.includes(`v:${made.id}`) && rows.includes(`a:${made.id}`), 'its band shows at once, with + Clip under it')
+      t.eq(await t.page.locator('[data-video-band] .fx-sheet-th, .fx-content-theme-row').count(), 0, 'no separate theme rows')
+    },
+  },
+  {
     id: 'us6-no-storage',
     async run(t) {
       await t.page.addInitScript(() => {

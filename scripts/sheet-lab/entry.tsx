@@ -169,6 +169,21 @@ function App() {
       patch(taskId, { attachments: [...(find(taskId)!.attachments ?? []), a] })
       return { success: true }
     },
+    // "+ Video" (design/video-sheet-v5.html): a new video in To do, owned by the member.
+    async addVideo(name: string) {
+      record('addVideo', name)
+      await wait()
+      const id = `v${Math.random().toString(36).slice(2, 7)}`
+      const now = new Date().toISOString()
+      const base = find('v1')!
+      setTasks(ts => [{ ...base, id, name, status: 'todo', stage_date: now.slice(0, 10), due_date: null, task_owner_id: me.id, assignee_id: me.id, created_at: now, updated_at: now, attachments: [], clip: null, dropped_at: null, published_url: null }, ...ts])
+      return { success: true, id }
+    },
+    async writeField(taskId: string, field: string, value: string) {
+      record('writeField', taskId, field, value)
+      await wait()
+      return { success: true }
+    },
     // The Content sheet's link actions, which the Video sheet's link columns use (design/video-sheet-v4.html).
     async setPieceLink(taskId: string, role: 'working_doc' | 'design', url: string) {
       record('setPieceLink', taskId, role, url)

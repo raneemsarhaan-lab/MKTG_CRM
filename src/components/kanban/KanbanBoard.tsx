@@ -11,8 +11,9 @@ import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAtta
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
-  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip,
+  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo,
 } from '@/actions/tasks'
+import { writeClipField } from '@/actions/sheet-links'
 import { useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
@@ -505,6 +506,29 @@ export function KanbanBoard({
         }
         return r
       }
+    },
+    // The Video sheet's board-linked columns and "+ Video" (design/video-sheet-v5.html):
+    // saved by the server with the board's rules, then the board reloads its tasks.
+    async writeField(taskId, field, value) {
+      const res = await writeClipField(taskId, field, value).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success) router.refresh()
+      return res
+    },
+    async addVideo(name) {
+      const res = await addVideo(name).catch(() => ({ success: false as const, error: 'generic' }))
+      if (res.success && res.id) {
+        const now = new Date().toISOString()
+        const base = tasks[0]
+        if (base) setTasks(prev => [{
+          ...base, id: res.id!, name: name.trim(), parent_task_id: null, parent: undefined, project_id: null, pillar_id: null,
+          content_type_label: 'Video', status: 'todo' as StageId, stage_date: now.slice(0, 10), due_date: null, priority: 'Medium' as const,
+          task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: currentUser.id, assignee: currentUser,
+          created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [], published_url: null, post_url: null, dropped_at: null, clip: null,
+          cover_image_url: undefined, cover_thumb: undefined,
+        }, ...prev])
+        router.refresh()
+      }
+      return res
     },
     async drop(taskId) {
       const at = new Date().toISOString()
@@ -1004,6 +1028,7 @@ export function KanbanBoard({
           columns={columnsBundle}
           rowHeights={linkedRowHeights?.video}
           slaConfig={slaConfig}
+          themes={themes}
           hasStorage={hasStorage}
           videoId={sheetVideo}
           highlightId={sheetRow}

@@ -61,6 +61,21 @@ export function videosWithClips(tasks: SheetTask[]): { video: SheetTask; clips: 
     .sort((a, b) => (lastTouched(b.video, b.clips) > lastTouched(a.video, a.clips) ? 1 : -1))
 }
 
+/**
+ * The videos the sheet lists: every video with clips, and (the redesign's
+ * "+ Video", design/video-sheet-v5.html) a live video without clips yet that
+ * isn't published, so a new video's band is there to add clips to. Most
+ * recently worked on first.
+ */
+export function sheetVideos(tasks: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
+  const withClips = videosWithClips(tasks)
+  const has = new Set(withClips.map(g => g.video.id))
+  const empty = tasks
+    .filter(t => isVideoTask(t) && !has.has(t.id) && !t.dropped_at && t.status !== 'publish')
+    .map(video => ({ video, clips: [] as SheetTask[] }))
+  return [...withClips, ...empty].sort((a, b) => (lastTouched(b.video, b.clips) > lastTouched(a.video, a.clips) ? 1 : -1))
+}
+
 export interface RowOptions {
   /** One video's sheet, or null for every video with clips. */
   videoId: string | null
@@ -94,7 +109,7 @@ export function buildRows(tasks: SheetTask[], o: RowOptions): SheetRow[] {
         const video = tasks.find(t => t.id === o.videoId)
         return video ? [{ video, clips: clipsOf(tasks, video.id) }] : []
       })()
-    : videosWithClips(tasks)
+    : sheetVideos(tasks)
   const rows: SheetRow[] = []
   const q = normQuery(o.query)
   let n = 1
