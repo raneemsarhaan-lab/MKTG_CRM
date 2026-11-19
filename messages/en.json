@@ -813,6 +813,25 @@
       "backTo": "Back to",
       "skipTo": "Skip to",
       "statusFor": "Move {name}"
+    },
+    "bulk": {
+      "count": "{n} pieces selected",
+      "stage": "Stage",
+      "assignee": "Assignee",
+      "type": "Type",
+      "pillar": "Pillar",
+      "date": "Date",
+      "archive": "Archive",
+      "archiveConfirm": "Archive {n} pieces? Yes",
+      "cancel": "Cancel",
+      "clear": "Clear selection",
+      "setDue": "Set date",
+      "noPillar": "No pillar",
+      "pillarOff": "Pick pieces from one theme",
+      "done": "{n, plural, one {# piece changed} other {# pieces changed}}.",
+      "doneSome": "{n, plural, one {# piece changed} other {# pieces changed}} · {m} not changed (the board's rules).",
+      "undone": "Put back as they were.",
+      "archived": "{n, plural, one {# piece archived} other {# pieces archived}}."
     }
   },
   "inbox": {

@@ -869,6 +869,16 @@ Design: `design/video-sheet-bulk-bar.html`, approved.
 - Writes go through `SheetApi.bulkUpdate`, which calls the board's `bulkUpdateTasks`, so the board's rules apply. Clips it refuses are counted in the message. Undo puts back each clip's old value: stages move back one clip at a time, and other fields are grouped by old value. Drop asks first, and Undo restores the clips.
 - **Checks:** `lab:sheet` (155, `us6-bulk`).
 
+### Content sheet: bulk editing
+
+Design: `design/content-sheet-bulk-bar.html`, approved.
+
+- The same `BulkBar`, on piece rows. `ContentGrid`'s `onSelectPieces` reports them. Theme rows, pillar rows, "+ Piece" rows and archived pieces aren't counted.
+- The choices are Stage (the Content sheet's names), Assignee, Type, Pillar, Date (due date) and Archive. Stage, Assignee, Type and Date go through `bulkUpdate`, as on the Video sheet.
+- **Pillar** isn't a board field. Each piece is saved through `updatePiece`, as the Pillar cell does. The list shows the pieces' theme's pillars plus "No pillar". When the pieces span more than one theme, the button is greyed out with the tip "Pick pieces from one theme". BulkBar's `pillars` prop is null in that case.
+- Undo puts every piece back. Archive asks first, and Undo restores the pieces.
+- **Checks:** `lab:sheet` (156, `cbulk`).
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.

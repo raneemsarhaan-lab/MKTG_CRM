@@ -33,6 +33,53 @@ async function addPlan(t) {
 }
 
 export const content = [
+  // ── bulk editing (design/content-sheet-bulk-bar.html) ──
+  {
+    id: 'cbulk', hash: C,
+    async run(t) {
+      const bar = () => t.page.locator('[data-bulk-bar]').count()
+      await t.page.locator(`[data-cell="k:${POST1}|title"]`).click()
+      t.eq(await bar(), 0, 'one piece: no bar')
+      await t.page.locator('[data-cell="k:v1|title"]').click({ modifiers: ['Shift'] })
+      await t.idle(150)
+      t.eq((await t.page.locator('[data-bulk-count]').innerText()).trim(), '2 pieces selected', 'two pieces (the pillar row between is not counted)')
+      t.eq(await t.page.$$eval('[data-bulk-bar] [data-bulk]', bs => bs.map(b => b.dataset.bulk)), ['stage', 'assignee', 'type', 'pillar', 'due'], 'Stage, Assignee, Type, Pillar, Date')
+      await t.page.locator('[data-bulk="stage"]').click()
+      const st = async id => (await t.page.locator(`[data-bulk-stage="${id}"]`).innerText()).replace(/\s+/g, ' ').trim()
+      t.eq([await st('todo'), await st('d-prog'), await st('r-design')], ['Planned To Do', 'Initial Design D-In Progress', 'Ready for Design'], "the Content sheet's stage names; no hint when it's the same")
+      await t.page.mouse.click(4, 4)
+      // Type → Article, then Undo.
+      const types = () => Promise.all([POST1, 'v1'].map(async id => (await t.task(id)).content_type_label))
+      const was = await types()
+      await t.page.locator('[data-bulk="type"]').click()
+      await t.page.locator('[data-bulk-bar] [role="menuitem"]', { hasText: 'Article' }).click()
+      await t.idle(250)
+      t.eq(await types(), ['Article', 'Article'], 'Type → Article for both')
+      t.assert((await t.page.locator('[data-sheet-toast]').innerText()).includes('2 pieces changed'), 'the message says so')
+      await t.page.locator('[data-sheet-toast] button').click()
+      await t.idle(300)
+      t.eq(await types(), was, 'Undo puts each one back')
+      // Pillar: one theme, so its pillars and "No pillar".
+      await t.page.locator('[data-bulk="pillar"]').click()
+      t.eq(await t.page.$$eval('[data-bulk-bar] [role="menuitem"]', is => is.map(i => i.textContent.trim())), ['AI', 'No pillar'], "the theme's pillars")
+      await t.page.locator('[data-bulk-bar] [role="menuitem"]', { hasText: 'AI' }).click()
+      await t.idle(300)
+      t.eq(await Promise.all([POST1, 'v1'].map(async id => (await t.task(id)).pillar_id)), ['pl-ai', 'pl-ai'], 'Pillar → AI for both')
+      // Archive asks first.
+      await t.page.locator('[data-cell="k:v1|title"]').click({ modifiers: ['Shift'] })
+      await t.idle(150)
+      if (!(await bar())) {
+        await t.page.locator(`[data-cell="k:${POST1}|title"]`).click()
+        await t.page.locator('[data-cell="k:v1|title"]').click({ modifiers: ['Shift'] })
+        await t.idle(150)
+      }
+      await t.page.locator('[data-bulk-remove]').click()
+      t.assert((await t.page.locator('[data-bulk-confirm]').innerText()).includes('Archive 2 pieces'), 'Archive asks first')
+      await t.page.locator('[data-bulk-confirm]').click()
+      await t.idle(300)
+      t.eq(await Promise.all([POST1, 'v1'].map(async id => !!(await t.task(id)).dropped_at)), [true, true], 'then archives them')
+    },
+  },
   // ── US1 ──
   {
     id: 'cus1-1', hash: C,

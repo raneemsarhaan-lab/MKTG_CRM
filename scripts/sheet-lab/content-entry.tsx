@@ -70,6 +70,19 @@ export function ContentApp({ me, lab }: { me: Member; lab: ContentLab }) {
       if (!canAct(t)) { patch(taskId, before); return { success: false, error: 'not_authorized' } }
       return { success: true }
     },
+    // The board's bulk save: each piece on its own, with the same edit rule.
+    async bulkUpdate(ids, change) {
+      record('bulkUpdate', ids, change)
+      await delay()
+      let changed = 0, refused = 0
+      for (const id of ids) {
+        const t = find(id)
+        if (!t || !canAct(t)) { refused++; continue }
+        patch(id, change as Partial<Task>)
+        changed++
+      }
+      return { success: true, changed, refused }
+    },
     async updateClip() { return { success: true } },
     async addClips() { return { success: true, created: [], skipped: [] } },
     async addLink() { return { success: true } },

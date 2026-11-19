@@ -94,6 +94,8 @@ export interface ContentGridProps {
   pasteAsRows?(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean
   /** Spec 013: what a paste, clear or undo didn't change, by reason. */
   onSkipped?(skipped: Partial<Record<string, number>>): void
+  /** The bulk bar (design/content-sheet-bulk-bar.html): the piece rows in the selection, and what this sheet calls each stage. */
+  onSelectPieces?(taskIds: string[], stageWord: (id: StageId) => string): void
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
   linked?: {
     drop(taskId: string): Promise<boolean>
@@ -465,6 +467,22 @@ export function ContentGrid(p: ContentGridProps) {
   // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
   const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped, say: text => p.linked?.say(text) })
   Object.assign(model, tips.model)
+  // The bulk bar (design/content-sheet-bulk-bar.html): which pieces the selection covers.
+  const selectFmt = model.onSelect
+  const lastPieces = useRef('')
+  model.onSelect = (q, list) => {
+    selectFmt?.(q, list)
+    if (!p.onSelectPieces) return
+    const ids: string[] = []
+    for (const a of list?.length ? list : [q]) {
+      for (let r = Math.max(0, a.r0); r <= a.r1 && r < model.rows.length; r++) {
+        const row = model.rows[r]
+        if (row.kind === 'piece' && !ids.includes(row.task.id)) ids.push(row.task.id)
+      }
+    }
+    const sig = ids.join(',')
+    if (sig !== lastPieces.current) { lastPieces.current = sig; p.onSelectPieces(ids, id => stageWord(id)) }
+  }
 
   const view = lv.store.view
   const saveView = (patch: Partial<LinkedView>) => void lv.store.saveView({ ...view, ...patch })
