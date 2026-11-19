@@ -523,7 +523,7 @@ export function SheetGrid(p: SheetGridProps) {
   // ── design/video-sheet-v5.html: columns that follow a board field ──
   const linkColumn = (key: string, f: ClipField) => {
     void lv.store.saveView({ ...view, colFields: { ...(view.colFields ?? {}), [key]: f } })
-      .then(ok => { if (ok) p.linked?.say(tf('linkedTo', { name: cl.nameOf(key) || '', field: tf(`names.${f}`) })) })
+      .then(ok => { if (ok) p.linked?.say(tf('linkedTo', { name: cl.nameOf(key) || tf(`names.${f}`), field: tf(`names.${f}`) })) })
   }
   /** Unlink: the column keeps the values it shows, as its own. */
   async function unlinkColumn(key: string) {
