@@ -122,6 +122,10 @@ export const us6 = [
       t.eq(await t.page.$$eval('[data-bulk-bar] [data-bulk]', bs => bs.map(b => b.dataset.bulk)), ['stage', 'assignee', 'owner', 'type', 'priority', 'due'], 'Stage, Owner, Reviewer, Type, Priority, Due')
       const pr = async () => Promise.all(['c01', 'c02', 'c03'].map(async id => (await t.task(id)).priority))
       const was = await pr()
+      await t.page.locator('[data-bulk="stage"]').click()
+      const stageText = async id => (await t.page.locator(`[data-bulk-stage="${id}"]`).innerText()).replace(/\s+/g, ' ').trim()
+      t.eq([await stageText('d-prog'), await stageText('d-check')], ['Editing D-In Progress', 'Edit Review D-Check'], "Stage list: the sheet's names, the board's name beside each")
+      await t.page.mouse.click(4, 4) // the menu's click-away layer closes it
       await t.page.locator('[data-bulk="priority"]').click()
       await t.page.locator('[data-bulk-bar] [role="menuitem"]', { hasText: 'High' }).click()
       await t.idle(250)

@@ -41,6 +41,8 @@ interface BulkBarProps {
   onApply:   (patch: BulkPatch) => void
   onDelete:  () => void
   onClear:   () => void
+  /** What each stage is called in the list (the Video sheet's words); the board's name is shown beside it as a hint. Default: the board's names. */
+  stageName?: (id: StageId) => string
 }
 
 type MenuKind = BulkField | null
@@ -73,17 +75,18 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
   )
 }
 
-function Item({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function Item({ onClick, children, stage }: { onClick: () => void; children: React.ReactNode; stage?: string }) {
   return (
     <button
       type="button"
       role="menuitem"
+      data-bulk-stage={stage}
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
         padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent',
         color: PIPE.textPrimary, fontSize: 13, fontFamily: 'inherit',
-        cursor: 'pointer', textAlign: 'start',
+        cursor: 'pointer', textAlign: 'start', whiteSpace: 'nowrap',
       }}
       onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -94,7 +97,7 @@ function Item({ onClick, children }: { onClick: () => void; children: React.Reac
 }
 
 export function BulkBar({
-  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {},
+  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {}, stageName,
 }: BulkBarProps) {
   const L = {
     count: `${count} selected`, stage: 'Stage', assignee: 'Assignee', owner: 'Owner', brand: 'Brand', type: 'Type', priority: 'Priority',
@@ -115,9 +118,12 @@ export function BulkBar({
     const list = (() => {
       switch (k) {
         case 'stage': return ALL_STAGES.map(id => (
-          <Item key={id} onClick={() => apply({ status: id })}>
+          <Item key={id} stage={id} onClick={() => apply({ status: id })}>
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_META[id].color, flexShrink: 0 }} />
-            {STAGE_META[id].label_en}
+            {stageName ? stageName(id) : STAGE_META[id].label_en}
+            {stageName && stageName(id) !== STAGE_META[id].label_en && (
+              <small style={{ marginInlineStart: 'auto', paddingInlineStart: 12, color: PIPE.textMuted, fontSize: 11.5 }}>{STAGE_META[id].label_en}</small>
+            )}
           </Item>
         ))
         case 'assignee': return members.map(m => <Item key={m.id} onClick={() => apply({ assignee_id: m.id })}>{m.name}</Item>)
