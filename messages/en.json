@@ -253,10 +253,11 @@
       "label": "Columns",
       "editing": "Editing",
       "copy": "Copy",
-      "full": "Full"
+      "full": "Full",
+      "sheet": "Sheet"
     },
     "mine": "Mine",
-    "showDropped": "Show dropped",
+    "showDropped": "Show archived",
     "pasteClips": "Paste clips",
     "addClip": "+ Clip",
     "allVideos": "All videos",
@@ -283,19 +284,26 @@
     "stageTitle": "{video} · {real}",
     "stageName": "{video}, {real}",
     "col": {
-      "title": "Title",
+      "title": "Clip",
       "clipNo": "#",
       "type": "Type",
-      "status": "Status",
-      "editor": "Editor",
+      "status": "Stage",
+      "editor": "Owner",
       "source": "Source",
       "fileName": "File name",
       "in": "In",
       "out": "Out",
       "length": "Length",
-      "files": "Files",
-      "published": "Published",
-      "drop": "Drop or restore"
+      "files": "File",
+      "published": "Published Link",
+      "drop": "Drop or restore",
+      "reviewer": "Reviewer",
+      "due": "Due",
+      "inStage": "In stage",
+      "doc": "Working Doc",
+      "design": "Design Link",
+      "task": "Task Link",
+      "post": "LinkedIn Link"
     },
     "summary": {
       "clips": "{count, plural, one {# clip} other {# clips}}",
@@ -546,6 +554,30 @@
         "problemHead": "Problem"
       },
       "removed": "{name} removed from the sheet. The tasks keep their values; add it back from ＋."
+    },
+    "more": "More sheet controls",
+    "newClipButton": "+ New clip",
+    "band": {
+      "clips": "{n, plural, one {# clip} other {# clips}}",
+      "todo": "{n} to do",
+      "editing": "{n} editing",
+      "review": "{n} in review",
+      "ready": "{n} ready",
+      "published": "{n} published",
+      "due": "Due <b>{date}</b>",
+      "progress": "{done} of {all} published"
+    },
+    "links": {
+      "add": "+ link",
+      "edit": "{label} link for {name}",
+      "saved": "Link saved",
+      "save": "Save",
+      "cancel": "Cancel",
+      "doc": "Working doc",
+      "design": "Design",
+      "post": "LinkedIn",
+      "openTask": "Open task",
+      "notALink": "Not a link"
     }
   },
   "content": {

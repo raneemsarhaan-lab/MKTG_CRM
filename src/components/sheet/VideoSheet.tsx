@@ -4,10 +4,9 @@
  * The video sheet (spec 008): every clip of a video in one dense grid, beside
  * the board and from the same tasks.
  *
- * The toolbar switches Board | Sheet, the column set (Editing, Copy, Full,
- * remembered per member on this device: Constitution §VI 2.1.0), Mine and Show
- * dropped, and opens Paste clips. The summary line describes the video in
- * focus. Every change goes through the host's `api`, which is the board's own
+ * Redesigned (design/video-sheet-v2.html): a slim bar with Board | Sheet, ⋯
+ * (Columns, + Column, Mine, Show dropped, Paste clips) and + New clip; each
+ * video is a band with its clips' progress; lettered columns. Every change goes through the host's `api`, which is the board's own
  * code path, so the sheet can never do what the board would refuse.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,8 +17,6 @@ import { formatBytes } from '@/components/kanban/attachments/limits'
 import { nextFreeName, sameName } from '@/components/kanban/attachments/names'
 import { buildRows, clipsOf, videosWithClips, type SheetRow } from './rows'
 import { ViewPair } from '@/components/board/ViewPair'
-import { defaultColumnSet, isColumnSet } from './columns'
-import { summarise } from './summary'
 import { formatLength, parseClipTime } from './time'
 import { SheetGrid, type ActiveCell, type GridCol } from './SheetGrid'
 import { SheetMenu, SheetPopover, type MenuItem } from './SheetMenu'
@@ -34,10 +31,16 @@ import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { clipLink, CLIP_LINK_COLS } from './SheetGrid'
+import type { LinkRole } from '@/types/index'
+
+/** The Content sheet's link columns on the Video sheet (design/video-sheet-v4.html). */
+type LinkCol = typeof CLIP_LINK_COLS[number]
+const isLinkCol = (c: string): c is LinkCol => (CLIP_LINK_COLS as readonly string[]).includes(c)
 
 type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
-  | { kind: 'link'; anchor: HTMLElement; taskId: string; mode: 'files' | 'published' | 'prompt' }
+  | { kind: 'link'; anchor: HTMLElement; taskId: string; mode: 'files' | 'published' | 'prompt' | LinkCol }
   | { kind: 'drop'; anchor: HTMLElement; task: Task }
 
 const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage_not_in_pipeline', 'terminal',
@@ -50,21 +53,25 @@ export function VideoSheet(p: VideoSheetProps) {
   const me = p.me
 
   // ── preferences (per member, this device) ───────────────────────────────
-  const colsKey = `momentum.sheet.columns.${me.id}`
-  const [set, setSet] = useState<SheetColumnSet>(() => defaultColumnSet(me.role))
+  // One column set for everyone; Columns shows or hides the rest.
+  const set: SheetColumnSet = 'sheet'
   const [showDropped, setShowDropped] = useState(true)
   const [mine, setMine] = useState(false)
+  const [more, setMore] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     try {
-      const c = window.localStorage.getItem(colsKey)
-      if (isColumnSet(c)) setSet(c)
       if (window.localStorage.getItem('momentum.sheet.dropped') === '0') setShowDropped(false)
     } catch { /* storage refused: defaults stand */ }
-  }, [colsKey])
-  function chooseSet(s: SheetColumnSet) {
-    setSet(s)
-    try { window.localStorage.setItem(colsKey, s) } catch { /* private mode */ }
-  }
+  }, [])
+  useEffect(() => {
+    if (!more) return
+    const off = (e: PointerEvent) => { if (!moreRef.current?.contains(e.target as Node)) setMore(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false) }
+    document.addEventListener('pointerdown', off)
+    document.addEventListener('keydown', esc)
+    return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc) }
+  }, [more])
   function toggleDropped() {
     setShowDropped(v => {
       try { window.localStorage.setItem('momentum.sheet.dropped', v ? '0' : '1') } catch { /* private mode */ }
@@ -86,7 +93,6 @@ export function VideoSheet(p: VideoSheetProps) {
   const focusVideo: Task | undefined = activeRow && activeRow.kind !== 'group'
     ? (activeRow.kind === 'video' ? activeRow.task : activeRow.video)
     : rows.find(r => r.kind === 'video')?.task as Task | undefined
-  const summary = useMemo(() => summarise(focusVideo ? clipsOf(p.tasks, focusVideo.id) : []), [p.tasks, focusVideo])
   const singleVideo = p.videoId ? p.tasks.find(x => x.id === p.videoId) : undefined
 
   // ── messages ────────────────────────────────────────────────────────────
@@ -248,11 +254,35 @@ export function VideoSheet(p: VideoSheetProps) {
         if (can) return setPopup({ kind: 'link', anchor, taskId: task.id, mode: 'published' })
         if (task.published_url) window.open(task.published_url, '_blank', 'noopener,noreferrer')
         return
+      case 'doc': case 'design': case 'post': {
+        if (can && !task.dropped_at) return setPopup({ kind: 'link', anchor, taskId: task.id, mode: col })
+        const url = clipLink(task, col)
+        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      case 'task':
+        p.onOpenTask(task.id)
+        return
       case 'drop':
         if (!can) return
         if (task.dropped_at) { void restore(task); return }
         return setPopup({ kind: 'drop', anchor, task })
     }
+  }
+
+  /** Working Doc, Design or LinkedIn on a clip, through the Content sheet's actions. Empty clears it. */
+  async function saveClipLink(taskId: string, col: LinkCol, url: string): Promise<string | null> {
+    const api = p.api as Partial<{
+      setPieceLink(taskId: string, role: LinkRole, url: string): Promise<{ success: boolean; error?: string }>
+      updatePiece(taskId: string, patch: { post_url?: string | null }): Promise<{ success: boolean; error?: string }>
+    }>
+    const r = col === 'post'
+      ? await api.updatePiece?.(taskId, { post_url: url || null })
+      : await api.setPieceLink?.(taskId, col === 'doc' ? 'working_doc' : 'design', url)
+    if (!r) return t('err.generic')
+    if (!r.success) return why(r.error)
+    say(t('links.saved'))
+    return null
   }
 
   async function drop(task: Task) {
@@ -342,6 +372,11 @@ export function VideoSheet(p: VideoSheetProps) {
         void p.api.addLink(row.task.id, single).then(r => say(r.success ? t('files.attached') : t('notSaved', { reason: why(r.error) })))
         return
       }
+      if (col && isLinkCol(col) && row.kind === 'clip') {
+        e.preventDefault()
+        void saveClipLink(row.task.id, col, single)
+        return
+      }
       if (col === 'published' && row.kind === 'clip') {
         e.preventDefault()
         void p.api.updateClip(row.task.id, { published_url: single }).then(r => say(r.success ? t('published.saved') : t('notSaved', { reason: why(r.error) })))
@@ -363,7 +398,7 @@ export function VideoSheet(p: VideoSheetProps) {
   function pasteAsRows(grid: string[][], row: SheetRow | null, col: GridCol | null): boolean {
     if (!row || (row.kind !== 'clip' && row.kind !== 'video')) return true
     const flat = grid.flat().filter(Boolean)
-    if (flat.length === 1 && (col === 'files' || col === 'published')) return true
+    if (flat.length === 1 && (col === 'files' || col === 'published' || (col != null && isLinkCol(col)))) return true
     return flat.some(v => FILE_RE.test(v))
   }
   const skipText = useSkipText()
@@ -386,49 +421,43 @@ export function VideoSheet(p: VideoSheetProps) {
       {/* The header's third row on Pipeline · Sheet (spec 011 R2): the sheet's
           own controls, with Board | Sheet at the end in place of the old
           three-way switch. Content is a page tab now. */}
-      <div className="fx-sheet-bar" role="toolbar" aria-label={t('view.label')} data-toolbar="">
+      {/* The redesign's bar: back, then Board | Sheet, ⋯ and + New clip. The
+          sheet's other controls sit in ⋯ so the grid leads. */}
+      <div className="fx-sheet-bar fx-vs-bar" role="toolbar" aria-label={t('view.label')} data-toolbar="">
         {p.videoId && (
           <button type="button" className="fx-sheet-back" onClick={() => p.onOpenVideo(null)}>
             <span aria-hidden="true">‹ </span>{t('backToAll')}
           </button>
         )}
-        <div className="fx-sheet-seg" role="group" aria-label={t('sets.label')} data-sets="">
-          {(['editing', 'copy', 'full'] as const).map(s => (
-            <button key={s} type="button" aria-pressed={set === s} data-set={s} onClick={() => chooseSet(s)}>{t(`sets.${s}`)}</button>
-          ))}
-        </div>
         <span className="fx-sheet-bar-gap" />
-        {/* Spec 019 stage 3: Columns opens the Fields drawer (the same as ⚙ Fields). */}
-        <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{t('columns.button')}</button>
-        <button type="button" className="fx-sheet-btn" data-add-column="" onClick={e => cl.openAdd(e.currentTarget)}>{t('columns.add')}</button>
-        <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
-        <button type="button" className="fx-sheet-tog" aria-pressed={showDropped} data-show-dropped="" onClick={toggleDropped}>{t('showDropped')}</button>
-        <button
-          type="button"
-          className="fx-sheet-btn is-primary"
-          data-paste-clips=""
-          disabled={!pasteTarget(activeRow ?? null)}
-          onClick={() => { const v = pasteTarget(activeRow ?? null); if (v) setPaste({ videoId: v, cells: null }) }}
-        >
-          {t('pasteClips')}
-        </button>
-        <span className="fx-hd-vr" aria-hidden="true" />
         <ViewPair view="sheet" onView={v => p.onView(v)} />
-      </div>
-
-      {focusVideo && (
-        <div className="fx-sheet-sum" data-summary="">
-          <span className="fx-sheet-sum-name">{focusVideo.name}</span>
-          <span><b>{t('summary.clips', { count: summary.clips })}</b></span>
-          <span><b>{formatLength(summary.totalMs)}</b></span>
-          <span>{t('summary.editing', { n: summary.editing })}</span>
-          <span>
-            {t('summary.published', { n: summary.published })}
-            {summary.noLink > 0 && <> <span className="fx-sheet-sum-bad">{t('summary.noLink', { n: summary.noLink })}</span></>}
-          </span>
-          <span>{t('summary.dropped', { n: summary.dropped })}</span>
+        <div className="fx-vs-more" ref={moreRef}>
+          <button type="button" className="fx-vs-more-btn" data-sheet-more="" aria-haspopup="true" aria-expanded={more}
+                  aria-label={t('more')} title={t('more')} onClick={() => setMore(v => !v)}>⋯</button>
+          {more && (
+            <div className="fx-vs-more-panel" role="group" aria-label={t('more')} data-more-panel="">
+              {/* Spec 019 stage 3: Columns opens the Fields drawer (the same as ⚙ Fields). */}
+              <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => { setMore(false); openFields() }}>{t('columns.button')}</button>
+              <button type="button" className="fx-sheet-btn" data-add-column="" onClick={e => cl.openAdd(e.currentTarget)}>{t('columns.add')}</button>
+              <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
+              <button type="button" className="fx-sheet-tog" aria-pressed={showDropped} data-show-dropped="" onClick={toggleDropped}>{t('showDropped')}</button>
+              <button
+                type="button"
+                className="fx-sheet-btn"
+                data-paste-clips=""
+                disabled={!pasteTarget(activeRow ?? null)}
+                onClick={() => { const v = pasteTarget(activeRow ?? null); if (v) { setMore(false); setPaste({ videoId: v, cells: null }) } }}
+              >
+                {t('pasteClips')}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+        <button type="button" className="fx-vs-new" data-new-clip="" disabled={!pasteTarget(activeRow ?? null)}
+                onClick={() => { const v = pasteTarget(activeRow ?? null); if (v) addClip(v) }}>
+          {t('newClipButton')}
+        </button>
+      </div>
 
       {(noVideo || empty) && (
         <div className="fx-sheet-empty"><p>{t('noVideos')}</p></div>
@@ -438,6 +467,7 @@ export function VideoSheet(p: VideoSheetProps) {
         <div className="fx-sheet-scroll">
           <SheetGrid
             setName={t(`sets.${set}`)}
+            slaConfig={p.slaConfig}
             rows={rows}
             columns={cl}
             me={me}
@@ -503,6 +533,26 @@ export function VideoSheet(p: VideoSheetProps) {
         <SheetMenu anchor={popup.anchor} label={popup.label} items={popup.items} onClose={closePopup} />
       )}
       {popup?.kind === 'link' && popupTask && (
+        isLinkCol(popup.mode) ? (
+          <SheetPopover anchor={popup.anchor} label={t('links.edit', { label: t(`links.${popup.mode}`), name: popupTask.name })} onClose={closePopup}>
+            <LinkPrompt
+              title={t('links.edit', { label: t(`links.${popup.mode}`), name: popupTask.name })}
+              initial={clipLink(popupTask, popup.mode) ?? ''}
+              saveLabel={t('links.save')}
+              skipLabel={t('links.cancel')}
+              badLink={t('err.bad_link')}
+              placeholder="https://…"
+              onSkip={() => closePopup(true)}
+              onSave={async url => {
+                const mode = popup.mode as LinkCol
+                const err = await saveClipLink(popupTask.id, mode, url)
+                if (err) return err
+                closePopup(true)
+                return null
+              }}
+            />
+          </SheetPopover>
+        ) :
         <SheetPopover anchor={popup.anchor} label={popup.mode === 'files' ? t('files.linkLabel') : t('published.edit', { name: popupTask.name })} onClose={closePopup}>
           <LinkPrompt
             title={popup.mode === 'files' ? t('files.linkLabel') : popup.mode === 'prompt' ? t('published.prompt') : t('published.edit', { name: popupTask.name })}

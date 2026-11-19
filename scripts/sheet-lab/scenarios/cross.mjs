@@ -12,7 +12,7 @@ export const cross = [
       await k('Control+Home')
       for (let i = 0; i < 11; i++) await k('ArrowDown')
       t.eq(await t.active(), 'c:c11|rowNo', 'down to clip 22')
-      for (let i = 0; i < 4; i++) await k('ArrowRight')
+      for (let i = 0; i < 3; i++) await k('ArrowRight')
       t.eq(await t.active(), 'c:c11|status', 'across to its status')
       await k('Enter')
       await t.page.waitForFunction(() => document.activeElement?.matches('[data-sheet-menu] [role="menuitem"]'))
@@ -35,7 +35,7 @@ export const cross = [
       await t.idle(250)
       t.assert((await t.tasks()).some(x => x.name === 'Keyboard clip'), '+ Clip by keyboard')
       // Paste clips by keyboard: Shift+Tab out of the grid to the toolbar button.
-      await t.page.locator('[data-paste-clips]').focus()
+      await t.tool('[data-paste-clips]', 'focus')
       await k('Enter')
       await t.page.waitForSelector('[data-paste-preview]')
       await k('Escape')
@@ -55,7 +55,7 @@ export const cross = [
       t.assert(pos.right <= 20, `row numbers on the right: ${pos.right}`)
       t.eq((await t.text('c:c07', 'status')).split('\n')[0].replace('▾', '').trim(), 'مونتاج', 'Arabic video name')
       t.eq((await t.text('c:c01', 'in')).trim(), '2:20.2', 'Western digits')
-      t.assert((await t.page.locator('[data-summary]').innerText()).includes('13'), 'summary in Arabic with Western digits')
+      t.assert((await t.text('v:v1', 'title')).includes('13'), 'the band in Arabic with Western digits')
     },
   },
   {
@@ -73,7 +73,7 @@ export const cross = [
     id: 'rtl-paste',
     hash: 'locale=ar&me=sara',
     async run(t) {
-      await t.page.locator('[data-paste-clips]').click()
+      await t.tool('[data-paste-clips]', 'click')
       await t.page.locator('[data-paste-preview] textarea').fill('30_IMG_0296_6m12.4s-7m20.9s.mp4\tعنوان')
       t.eq(await t.page.$eval('[data-paste-preview]', d => getComputedStyle(d).direction), 'rtl', 'the preview mirrors')
       t.assert((await t.page.locator('[data-paste-counts]').innerText()).includes('1 جديد'), 'in Arabic')
@@ -117,7 +117,7 @@ export const cross = [
   {
     id: 'axe-dialogs',
     async run(t) {
-      await t.page.locator('[data-paste-clips]').click()
+      await t.tool('[data-paste-clips]', 'click')
       await t.page.locator('[data-paste-preview] textarea').fill('30_IMG_0296_6m12.4s-7m20.9s.mp4\tA\nQ&A\tB')
       t.eq(await t.axe('[data-paste-preview]'), [], 'paste preview')
       await t.page.keyboard.press('Escape')

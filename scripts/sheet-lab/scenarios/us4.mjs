@@ -81,13 +81,13 @@ export const us4 = [
     async run(t) {
       await t.focusCell('c:c01', 'title')
       await t.page.keyboard.press('ArrowRight')
-      t.eq(await t.active(), 'c:c01|clipNo', '→')
+      t.eq(await t.active(), 'c:c01|type', '→')
       await t.page.keyboard.press('ArrowDown')
-      t.eq(await t.active(), 'c:c02|clipNo', '↓')
+      t.eq(await t.active(), 'c:c02|type', '↓')
       await t.page.keyboard.press('Home')
       t.eq(await t.active(), 'c:c02|rowNo', 'Home')
       await t.page.keyboard.press('End')
-      t.eq(await t.active(), 'c:c02|drop', 'End')
+      t.eq(await t.active(), 'c:c02|length', 'End')
       await t.page.keyboard.press('Control+Home')
       t.eq(await t.active(), 'v:v1|rowNo', 'Ctrl+Home')
       await t.page.keyboard.press('ArrowUp')
@@ -97,8 +97,8 @@ export const us4 = [
       t.eq(await t.page.locator('[data-cell="c:c03|source"] input').inputValue(), 'X', 'typing starts editing')
       await t.page.keyboard.press('Shift+Tab')
       await t.idle(200)
-      // Spec 019 stage 3: Status takes typed stage words, so it is the previous cell to type in (before #).
-      t.assert(await t.page.locator('[data-cell="c:c03|status"] input').count() === 1, 'Shift+Tab: previous cell to type in (Status)')
+      // The redesign puts # just before Source, so it is the previous cell to type in.
+      t.assert(await t.page.locator('[data-cell="c:c03|clipNo"] input').count() === 1, 'Shift+Tab: previous cell to type in (#)')
     },
   },
 ]

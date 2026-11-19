@@ -30,7 +30,7 @@ import { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
 import { MEMBERS, makeTasks, sheetsHtml } from './fixtures'
 import { ContentApp, type ContentLab } from './content-entry'
 import { labWritePasted, useLabColumns } from './columns-stub'
-import { columnFixtures, customClipText, customPlanText } from './column-fixtures'
+import { columnFixtures, customClipText, customPlanText, videoAllColumns } from './column-fixtures'
 import { CONTENT_MEMBERS, referenceHtml, referenceText } from './content-fixtures'
 
 const params  = new URLSearchParams(location.hash.slice(1))
@@ -87,7 +87,7 @@ function App() {
   const record = (fn: string, ...args: unknown[]) => lab.calls.push({ fn, args, at: performance.now() })
   const failed = (fn: string) => { const e = lab.failNext[fn]; if (e) { delete lab.failNext[fn]; return e } return null }
 
-  const api: SheetApi = {
+  const api: SheetApi & { setPieceLink(taskId: string, role: 'working_doc' | 'design', url: string): Promise<{ success: boolean }>; updatePiece(taskId: string, p: { post_url?: string | null }): Promise<{ success: boolean }> } = {
     async move(taskId, to): Promise<MoveTaskResult> {
       record('move', taskId, to)
       const t = find(taskId)!
@@ -169,6 +169,21 @@ function App() {
       patch(taskId, { attachments: [...(find(taskId)!.attachments ?? []), a] })
       return { success: true }
     },
+    // The Content sheet's link actions, which the Video sheet's link columns use (design/video-sheet-v4.html).
+    async setPieceLink(taskId: string, role: 'working_doc' | 'design', url: string) {
+      record('setPieceLink', taskId, role, url)
+      await wait()
+      const others = (find(taskId)!.attachments ?? []).filter(x => x.link_role !== role)
+      const a: TaskAttachment = { id: `att-${Math.random().toString(36).slice(2, 8)}`, task_id: taskId, filename: new URL(url).hostname, url, content_type: 'text/uri-list', link_role: role, uploaded_at: new Date().toISOString() }
+      patch(taskId, { attachments: url ? [...others, a] : others })
+      return { success: true }
+    },
+    async updatePiece(taskId: string, p: { post_url?: string | null }) {
+      record('updatePiece', taskId, p)
+      await wait()
+      patch(taskId, p)
+      return { success: true }
+    },
     upload: taskId => async (file, name, onProgress) => {
       record('upload', taskId, name, file.size)
       lab.uploads.push({ name, size: file.size })
@@ -203,7 +218,7 @@ function App() {
   }
 
   const cols = useLabColumns({
-    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : { records: [], values: {} },
+    me, members: MEMBERS, lab, seed: withCols ? columnFixtures() : params.get('plain') === '1' ? { records: [], values: {} } : videoAllColumns(),
     types: ['Post', 'Video', 'Reel', 'Design', 'Story'].map(l => ({ id: l, label: l })),
   })
   return (

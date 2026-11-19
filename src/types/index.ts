@@ -74,11 +74,13 @@ export type AudienceKey = 'c-level' | 'strategy-heads' | 'top-management' | 'sec
 /** What a link attachment is for (spec 009). */
 export type LinkRole = 'working_doc' | 'design'
 /** The video sheet's column sets (spec 008 FR-050). */
-export type SheetColumnSet = 'editing' | 'copy' | 'full'
+/** 'sheet': the redesigned Video sheet's one set (design/video-sheet-v2.html); the other three are kept for saved layouts. */
+export type SheetColumnSet = 'editing' | 'copy' | 'full' | 'sheet'
 /** Every column the video sheet can show, in display order. */
 export type SheetColumn =
   | 'title' | 'clipNo' | 'type' | 'status' | 'editor' | 'source' | 'fileName'
   | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
+  | 'reviewer' | 'due' | 'inStage' | 'doc' | 'design' | 'task' | 'post'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
 export type Priority = 'Low' | 'Medium' | 'High'
 

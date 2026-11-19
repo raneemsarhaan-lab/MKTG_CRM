@@ -10,4 +10,7 @@ const roots = [...css.matchAll(/^:root\s*\{[\s\S]*?^\}/gm)].map(m => m[0])
 const start = css.indexOf('/* ─── Video sheet (spec 008)')
 const end   = css.indexOf('/* ─── end video sheet')
 if (start < 0 || end < 0) throw new Error('globals.css markers moved: update gen.mjs')
-fs.writeFileSync(path.join(OUT, 'sheet.css'), `${roots.join('\n')}\n\n${css.slice(start, end)}`)
+// The redesign's rules (bands, lettered headings, pills) close the file.
+const redesign = css.indexOf('/* ── The Video sheet, redesigned')
+if (redesign < 0) throw new Error('globals.css redesign marker moved: update gen.mjs')
+fs.writeFileSync(path.join(OUT, 'sheet.css'), `${roots.join('\n')}\n\n${css.slice(start, end)}\n\n${css.slice(redesign)}`)

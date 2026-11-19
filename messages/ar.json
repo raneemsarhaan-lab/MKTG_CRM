@@ -253,10 +253,11 @@
       "label": "الأعمدة",
       "editing": "المونتاج",
       "copy": "النصوص",
-      "full": "الكل"
+      "full": "الكل",
+      "sheet": "الجدول"
     },
     "mine": "مقاطعي",
-    "showDropped": "إظهار المستبعَد",
+    "showDropped": "إظهار المؤرشف",
     "pasteClips": "لصق المقاطع",
     "addClip": "+ مقطع",
     "allVideos": "كل الفيديوهات",
@@ -283,19 +284,26 @@
     "stageTitle": "{video} · {real}",
     "stageName": "{video}، {real}",
     "col": {
-      "title": "العنوان",
+      "title": "المقطع",
       "clipNo": "#",
       "type": "النوع",
       "status": "المرحلة",
-      "editor": "المونتير",
+      "editor": "المسؤول",
       "source": "المصدر",
       "fileName": "اسم الملف",
       "in": "البداية",
       "out": "النهاية",
       "length": "المدة",
-      "files": "الملفات",
+      "files": "الملف",
       "published": "رابط النشر",
-      "drop": "استبعاد أو استعادة"
+      "drop": "استبعاد أو استعادة",
+      "reviewer": "المراجِع",
+      "due": "الموعد",
+      "inStage": "في المرحلة",
+      "doc": "مستند العمل",
+      "design": "رابط التصميم",
+      "task": "رابط المهمة",
+      "post": "رابط لينكدإن"
     },
     "summary": {
       "clips": "{count, plural, zero {لا مقاطع} one {مقطع واحد} two {مقطعان} few {# مقاطع} many {# مقطعًا} other {# مقطع}}",
@@ -546,6 +554,30 @@
         "problemHead": "المشكلة"
       },
       "removed": "أُزيل {name} من الورقة. تحتفظ المهام بقيمها؛ أعده من ＋."
+    },
+    "more": "المزيد من أدوات الجدول",
+    "newClipButton": "+ مقطع جديد",
+    "band": {
+      "clips": "{n, plural, one {مقطع واحد} two {مقطعان} few {# مقاطع} many {# مقطعًا} other {# مقطع}}",
+      "todo": "{n} للتنفيذ",
+      "editing": "{n} قيد المونتاج",
+      "review": "{n} قيد المراجعة",
+      "ready": "{n} جاهز",
+      "published": "{n} منشور",
+      "due": "الموعد <b>{date}</b>",
+      "progress": "{done} من {all} منشور"
+    },
+    "links": {
+      "add": "+ رابط",
+      "edit": "رابط {label} لـ {name}",
+      "saved": "تم حفظ الرابط",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "doc": "مستند العمل",
+      "design": "التصميم",
+      "post": "لينكدإن",
+      "openTask": "فتح المهمة",
+      "notALink": "ليس رابطًا"
     }
   },
   "content": {

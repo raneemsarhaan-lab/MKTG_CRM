@@ -9,15 +9,11 @@ import { useState } from 'react'
 import type { useTranslations } from 'next-intl'
 import type { Task } from '@/types/index'
 import { hostOf } from './FilesCell'
+import { LinkPill, linkKind } from './LinkPill'
 
 export function PublishedContent({ task, canEdit, t }: { task: Task; canEdit: boolean; t: ReturnType<typeof useTranslations> }) {
   if (task.published_url) {
-    return (
-      <a className="fx-sheet-link fx-sheet-ellipsis" href={task.published_url} target="_blank" rel="noopener noreferrer"
-         tabIndex={-1} onClick={e => e.stopPropagation()}>
-        {hostOf(task.published_url) || task.published_url}
-      </a>
-    )
+    return <LinkPill kind={linkKind(task.published_url)} text={hostOf(task.published_url) || task.published_url} href={task.published_url} />
   }
   if (task.status === 'publish') return <span className="fx-sheet-missing">{t('published.missing')}</span>
   return canEdit ? <span className="fx-sheet-muted">{t('published.add')}</span> : null

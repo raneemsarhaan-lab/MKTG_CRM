@@ -92,7 +92,7 @@ export const us3 = [
   {
     id: 'us3-text',
     async run(t) {
-      await t.page.locator('[data-paste-clips]').click()
+      await t.tool('[data-paste-clips]', 'click')
       const box = t.page.locator('[data-paste-preview] textarea')
       await box.fill('32_IMG_0297_0m01.0s-0m31.5s.mp4\tThirty seconds\thttps://drive.google.com/x\n33_IMG_0297_1m00.0s-1m40.0s.mp4\tForty seconds')
       await t.idle()
@@ -121,7 +121,7 @@ export const us3 = [
   {
     id: 'paste-210',
     async run(t) {
-      await t.page.locator('[data-paste-clips]').click()
+      await t.tool('[data-paste-clips]', 'click')
       const text = Array.from({ length: 210 }, (_, i) => `${100 + i}_S_0m01.0s-0m02.0s.mp4\tT${i}`).join('\n')
       await t.page.locator('[data-paste-preview] textarea').fill(text)
       await t.idle(200)

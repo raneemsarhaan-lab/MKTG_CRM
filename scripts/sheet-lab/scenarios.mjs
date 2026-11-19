@@ -93,6 +93,11 @@ function makeHelpers(page, base) {
       await page.locator(`[data-cell="${row}|${col}"]`).click()
       await page.waitForTimeout(40)
     },
+    /** A sheet control: on the Video sheet the toolbar's extras sit behind ⋯ (the redesign), so open it first. */
+    async tool(sel, how = 'click') {
+      if (!(await page.locator(sel).count()) && await page.locator('[data-sheet-more]').count()) await page.locator('[data-sheet-more]').click()
+      await page.locator(sel)[how]()
+    },
     active: () => page.evaluate(() => document.activeElement?.getAttribute('data-cell') ?? document.activeElement?.tagName),
     menuItems: () => page.$$eval('[data-sheet-menu] [role="menuitem"]', els => els.map(e => e.getAttribute('data-menu-item'))),
     menuOpen: () => page.$('[data-sheet-menu]').then(Boolean),

@@ -5,7 +5,7 @@
  * same shape. Every `api` call updates the host's shared task state
  * optimistically, so the sheet keeps no copy of task data.
  */
-import type { Member, MoveTaskResult, StageId, Task, BoardView } from '@/types/index'
+import type { Member, MoveTaskResult, StageId, Task, BoardView, SLAConfig } from '@/types/index'
 import type { UploadFn } from '@/components/kanban/attachments/useUploadQueue'
 import type { PasteTarget, PasteValueColumn } from '@/lib/sheet-columns'
 
@@ -75,6 +75,8 @@ export interface VideoSheetProps {
   columns: ColumnsBundle
   /** Spec 013: saved row heights by task id. */
   rowHeights?: Record<string, number>
+  /** Each stage's time limit by content type, for In stage (business days). */
+  slaConfig?: SLAConfig
 }
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────

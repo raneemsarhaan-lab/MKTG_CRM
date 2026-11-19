@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video sheet, simple</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* Momentum's own colours: ink, lime, purple. */
+:root {
+  --ink: #1B1A13; --text: #1F2430; --muted: #6B6E72; --faint: #9A9DA1;
+  --page: #FFFFFF; --grid: #E2E3E3; --head: #F3F4F2; --group: #F7FBE6;
+  --lime: #C8F24E; --purple: #7C3AED; --purple-soft: #F0EBFE; --sel-fill: rgba(124, 58, 237, .06);
+  --late: #C92A2A;
+  --s-todo: #9A9DA1; --s-edit: #7C3AED; --s-rev: #D97706; --s-ready: #0E9F9A; --s-pub: #2E9E4F;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --page: #111116; --grid: #2A2A34; --head: #1A1A21; --group: #1C2112; --purple: #A78BFA; --purple-soft: #2A2145; --sel-fill: rgba(167, 139, 250, .10); --late: #FF6B6B;
+} }
+:root[data-theme="dark"] {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88;
+  --page: #111116; --grid: #2A2A34; --head: #1A1A21; --group: #1C2112; --purple: #A78BFA; --purple-soft: #2A2145; --sel-fill: rgba(167, 139, 250, .10); --late: #FF6B6B;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.4 var(--f-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 48px; }
+h1.doc { margin: 0 0 4px; font: 800 22px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 16px; color: var(--muted); max-width: 900px; font-size: 14px; }
+.frame { border: 1px solid var(--grid); border-radius: 12px; overflow: hidden; }
+
+/* one slim bar: name, saved, switches, search, new */
+.top { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; border-bottom: 1px solid var(--grid); }
+.crumb { color: var(--muted); }
+.title { font: 800 20px var(--f-head); color: var(--ink); }
+.saved { color: var(--muted); font-size: 12px; }
+.saved::before { content: "●"; color: #2E9E4F; margin-inline-end: 4px; font-size: 8px; vertical-align: 2px; }
+.sp { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--grid); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--page); padding: 6px 12px; font: 600 13px var(--f-body); color: var(--text); cursor: pointer; }
+.seg button.on { background: var(--ink); color: var(--page); }
+.search { border: 1px solid var(--grid); border-radius: 8px; height: 32px; padding: 0 10px; min-width: 180px; display: inline-flex; align-items: center; color: var(--faint); }
+.new { background: var(--lime); color: #1B1A13; border: 0; border-radius: 8px; height: 32px; padding: 0 14px; font: 700 13px var(--f-body); cursor: pointer; }
+
+/* stages as plain tabs */
+.tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; }
+.tab { border: 0; background: none; padding: 6px 10px; border-radius: 6px; font: 500 13px var(--f-body); color: var(--muted); cursor: pointer; }
+.tab b { font-weight: 600; color: var(--faint); margin-inline-start: 4px; }
+.tab.on { background: var(--head); color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--lime); }
+.tab.on b { color: var(--ink); }
+.wait { margin-inline-start: auto; border: 1px solid var(--grid); background: var(--page); border-radius: 6px; padding: 5px 10px; font: 600 13px var(--f-body); color: var(--text); cursor: pointer; }
+.wait.on { background: var(--purple-soft); color: var(--purple); border-color: transparent; }
+
+/* formula bar */
+.fx { display: flex; height: 30px; border-bottom: 1px solid var(--grid); }
+.fx .ref { width: 70px; padding: 0 8px; display: flex; align-items: center; font-weight: 600; border-inline-end: 1px solid var(--grid); }
+.fx .f { width: 34px; display: grid; place-items: center; color: var(--faint); font-style: italic; border-inline-end: 1px solid var(--grid); }
+.fx .v { padding: 0 10px; display: flex; align-items: center; }
+
+/* the grid: Excel plain */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 980px; table-layout: fixed; }
+th, td { border: 1px solid var(--grid); height: 26px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; font-weight: 400; }
+thead th { background: var(--head); color: var(--muted); text-align: center; font-size: 12px; height: 22px; }
+td.n, th.n { width: 46px; background: var(--head); color: var(--muted); text-align: center; font-size: 12px; }
+tr.h td { font-weight: 700; color: var(--ink); }
+tr.h td.n { font-weight: 400; }
+.r { text-align: end; font-variant-numeric: tabular-nums; }
+tr.g td { background: var(--group); font-weight: 700; color: var(--ink); }
+tr.g td.n { background: var(--head); font-weight: 400; color: var(--muted); }
+tr.g .car { cursor: pointer; display: inline-block; width: 14px; color: var(--muted); }
+tr.g .meta { font-weight: 400; color: var(--muted); margin-inline-start: 10px; }
+td.c { padding-inline-start: 22px; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-inline-end: 6px; vertical-align: 1px; }
+.todo { background: var(--s-todo); } .edit { background: var(--s-edit); } .rev { background: var(--s-rev); } .ready { background: var(--s-ready); } .pub { background: var(--s-pub); }
+td.late { color: var(--late); font-weight: 600; }
+td.dim { color: var(--faint); }
+a { color: var(--purple); }
+tr.add td { color: var(--muted); }
+tr.add td.c { padding-inline-start: 22px; cursor: pointer; }
+tr.sel td.n { background: var(--purple-soft); color: var(--purple); font-weight: 600; }
+td.cur { outline: 2px solid var(--purple); outline-offset: -2px; background: var(--sel-fill); }
+.hidden { display: none; }
+
+ul.notes { margin: 16px 0 0; padding-inline-start: 18px; color: var(--muted); max-width: 900px; }
+ul.notes li { margin: 4px 0; }
+ul.notes b { color: var(--ink); }
+@media (max-width: 640px) { .search { min-width: 0; flex: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc">Video sheet: simple, like Excel, in Momentum's colours</h1>
+  <p class="lede">Plain gridlines, lettered columns, row numbers and a header row. One light row per video, the clips under it. Ink, lime and purple only; stages are a small coloured dot, not big pills. Try the stage tabs, "Waiting on me" and the ▾ on a video.</p>
+
+  <div class="frame">
+    <div class="top">
+      <span class="crumb">Sheets /</span><span class="title">Video</span><span class="saved">Saved</span>
+      <span class="sp"></span>
+      <span class="seg" role="group" aria-label="View"><button type="button">Board</button><button type="button" class="on" aria-pressed="true">Sheet</button></span>
+      <span class="search">Search</span>
+      <button type="button" class="new">+ New clip</button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Stage">
+      <button type="button" class="tab on" data-f="all">All<b>13</b></button>
+      <button type="button" class="tab" data-f="todo">To do<b>6</b></button>
+      <button type="button" class="tab" data-f="edit">Editing<b>1</b></button>
+      <button type="button" class="tab" data-f="rev">In review<b>6</b></button>
+      <button type="button" class="tab" data-f="ready">Ready to publish<b>0</b></button>
+      <button type="button" class="tab" data-f="pub">Published<b>0</b></button>
+      <button type="button" class="wait" data-wait="">Waiting on me · 6</button>
+    </div>
+    <div class="fx"><span class="ref">A3</span><span class="f">fx</span><span class="v">Hesham</span></div>
+    <div class="scroll">
+      <table>
+        <colgroup><col style="width:46px"><col style="width:220px"><col style="width:150px"><col style="width:140px"><col style="width:140px"><col style="width:90px"><col style="width:90px"><col></colgroup>
+        <thead><tr><th class="n"></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th></tr></thead>
+        <tbody id="g">
+          <tr class="h"><td class="n">1</td><td>Clip</td><td>Stage</td><td>Owner</td><td>Reviewer</td><td class="r">Due</td><td class="r">In stage</td><td>File</td></tr>
+          <tr class="g"><td class="n">2</td><td colspan="7"><span class="car" data-car="a">▾</span>Retreat Session Audios<span class="meta">8 clips · 3 to do · 1 editing · 4 in review · due 25 Nov</span></td></tr>
+          <tr class="sel" data-in="a" data-s="rev" data-me="1"><td class="n">3</td><td class="c cur">Hesham</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">20 Nov</td><td class="r late">3d</td><td><a>Hesham_v2.mp4</a></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="n">4</td><td class="c">Islam</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">21 Nov</td><td class="r">1d</td><td><a>Islam_v1.mp4</a></td></tr>
+          <tr data-in="a" data-s="todo"><td class="n">5</td><td class="c">Ahmed Badr</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">24 Nov</td><td class="r dim">–</td><td></td></tr>
+          <tr data-in="a" data-s="todo"><td class="n">6</td><td class="c">Mohamed Aly</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">24 Nov</td><td class="r dim">–</td><td></td></tr>
+          <tr data-in="a" data-s="edit"><td class="n">7</td><td class="c">Mohamed Fahmy</td><td><span class="dot edit"></span>Editing</td><td>Salma</td><td></td><td class="r">22 Nov</td><td class="r">2d</td><td></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="n">8</td><td class="c">Mohamed Salama</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">21 Nov</td><td class="r">1d</td><td><a>Salama_v1.mp4</a></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="n">9</td><td class="c">Ramy</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">22 Nov</td><td class="r">4h</td><td><a>Ramy_v1.mp4</a></td></tr>
+          <tr data-in="a" data-s="todo"><td class="n">10</td><td class="c">Waleed Fahmy</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">25 Nov</td><td class="r dim">–</td><td></td></tr>
+          <tr class="add" data-in="a"><td class="n">11</td><td class="c" colspan="7">+ Add clip</td></tr>
+          <tr class="g"><td class="n">12</td><td colspan="7"><span class="car" data-car="b">▾</span>The Client's Chair<span class="meta">5 clips · 3 to do · 2 in review · due 2 Dec</span></td></tr>
+          <tr data-in="b" data-s="rev" data-me="1"><td class="n">13</td><td class="c">Episode 01</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">23 Nov</td><td class="r">2d</td><td><a>ClientsChair_01.mp4</a></td></tr>
+          <tr data-in="b" data-s="rev" data-me="1"><td class="n">14</td><td class="c">Episode 02</td><td><span class="dot rev"></span>In review</td><td>Salma</td><td>Raneem</td><td class="r">24 Nov</td><td class="r">1d</td><td><a>ClientsChair_02.mp4</a></td></tr>
+          <tr data-in="b" data-s="todo"><td class="n">15</td><td class="c">Episode 03</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">28 Nov</td><td class="r dim">–</td><td></td></tr>
+          <tr data-in="b" data-s="todo"><td class="n">16</td><td class="c">Episode 04</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">30 Nov</td><td class="r dim">–</td><td></td></tr>
+          <tr data-in="b" data-s="todo"><td class="n">17</td><td class="c">Episode 05</td><td><span class="dot todo"></span>To do</td><td>Salma</td><td></td><td class="r">2 Dec</td><td class="r dim">–</td><td></td></tr>
+          <tr class="add" data-in="b"><td class="n">18</td><td class="c" colspan="7">+ Add clip</td></tr>
+          <tr><td class="n">19</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr><td class="n">20</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <ul class="notes">
+    <li><b>Top bar:</b> Sheets / Video · Saved, Board | Sheet, Search, and a lime "+ New clip". The File, Edit, View… menus and the formatting toolbar stay above the sheet as they are today.</li>
+    <li><b>Stage tabs:</b> All, To do, Editing, In review, Ready to publish, Published, with counts. "Waiting on me": clips you're editing that aren't in review yet, and clips in review that you sign off.</li>
+    <li><b>Grid:</b> click a Stage, Owner or Reviewer cell and its list opens, as in Excel. "In stage" turns red past the stage's time limit. A video's row folds its clips with ▾.</li>
+    <li><b>Columns:</b> Clip, Stage, Owner (the clip's editor), Reviewer (the task owner, once the clip is in review), Due, In stage, File. #, Type, Source, File name, In, Out, Length and Published can be switched back on in Columns.</li>
+  </ul>
+</div>
+<script>
+let stage = 'all', wait = false
+const rows = [...document.querySelectorAll('#g tr[data-s]')]
+const apply = () => rows.forEach(r => r.classList.toggle('hidden', r.dataset.fold === '1' || !((stage === 'all' || r.dataset.s === stage) && (!wait || r.dataset.me))))
+document.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => { stage = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x === b)); apply() }))
+const w = document.querySelector('[data-wait]')
+w.addEventListener('click', () => { wait = !wait; w.classList.toggle('on', wait); apply() })
+document.querySelectorAll('[data-car]').forEach(c => c.addEventListener('click', () => {
+  const fold = c.textContent === '▾'; c.textContent = fold ? '▸' : '▾'
+  document.querySelectorAll(`#g tr[data-in="${c.dataset.car}"]`).forEach(r => { r.dataset.fold = fold ? '1' : '0'; if (r.classList.contains('add')) r.classList.toggle('hidden', fold) })
+  apply()
+}))
+</script>
+</body>
+</html>

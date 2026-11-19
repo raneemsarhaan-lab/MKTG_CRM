@@ -61,7 +61,8 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
     await page.waitForTimeout(1200)
 
     console.log('1. Headings: field icons and ＋')
-    ok(await head(page, 'status').locator('.fx-fd-ic').count() === 1 && await head(page, 'editor').locator('.fx-fd-ic').count() === 1, 'task fields carry their icon (Status, Editor)')
+    // The redesign (design/video-sheet-v4.html): plain names under column letters.
+    ok(await head(page, 'status').getAttribute('data-letter') != null && /Stage/.test(await head(page, 'status').innerText()), 'lettered headings with plain names (Stage)')
     ok(await page.locator('[data-video-sheet] [data-tail-head] [data-add-field]').count() === 1, 'the last heading is ＋')
     ok(await page.locator('[data-video-sheet] .fx-sheet-tr.is-video').count() >= 1, 'videos with their clips, as before')
 
@@ -72,18 +73,18 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
     ok(await page.locator('[data-fields-drawer] [data-field-values="stage"]').count() === 1, 'Status has Values')
     await axe(page, 'Video Fields drawer')
     await close(page)
-    await page.click('[data-video-sheet] [data-columns-button]')
+    await page.click('[data-video-sheet] [data-sheet-more]'); await page.click('[data-video-sheet] [data-columns-button]')
     ok(await page.locator('[data-fields-drawer]').count() === 1, 'Columns opens the same drawer')
 
     console.log('3. Hide a column, add it back from ＋')
-    await page.click('[data-field-switch="source"]')
-    await page.waitForFunction(() => !document.querySelector('[data-video-sheet] [data-col-head="source"]'), null, { timeout: 15000 }).catch(() => {})
-    ok(await head(page, 'source').count() === 0, 'switching Source off hides it')
+    await page.click('[data-field-switch="due"]')
+    await page.waitForFunction(() => !document.querySelector('[data-video-sheet] [data-col-head="due"]'), null, { timeout: 15000 }).catch(() => {})
+    ok(await head(page, 'due').count() === 0, 'switching Due off hides it')
     await close(page)
-    await page.click('[data-video-sheet] [data-add-field]'); await page.waitForSelector('[data-sheet-menu] [data-menu-item="source"]')
-    await page.click('[data-sheet-menu] [data-menu-item="source"]')
-    await page.waitForSelector('[data-video-sheet] [data-col-head="source"]', { timeout: 15000 }).catch(() => {})
-    ok(await head(page, 'source').count() === 1 && await page.locator('[data-sheet-menu]').count() === 0, '＋ → Source shows it again, and the menu closes')
+    await page.click('[data-video-sheet] [data-add-field]'); await page.waitForSelector('[data-sheet-menu] [data-menu-item="due"]')
+    await page.click('[data-sheet-menu] [data-menu-item="due"]')
+    await page.waitForSelector('[data-video-sheet] [data-col-head="due"]', { timeout: 15000 }).catch(() => {})
+    ok(await head(page, 'due').count() === 1 && await page.locator('[data-sheet-menu]').count() === 0, '＋ → Due shows it again, and the menu closes')
 
     console.log('3b. Delete a built-in column (it leaves the sheet in every set), and Undo')
     await page.keyboard.press('Escape').catch(() => {})
@@ -148,7 +149,7 @@ const head = (page, key) => page.locator(`[data-video-sheet] [data-col-head="${k
     await axe(AR.page, 'Video Fields drawer in Arabic')
     const P = await login(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
     await P.page.goto(url); await P.page.waitForSelector('[data-video-sheet] [data-cell]')
-    await P.page.click('[data-video-sheet] [data-columns-button]'); await P.page.waitForSelector('[data-fields-drawer]')
+    await P.page.click('[data-video-sheet] [data-sheet-more]'); await P.page.click('[data-video-sheet] [data-columns-button]'); await P.page.waitForSelector('[data-fields-drawer]')
     const box = await P.page.locator('[data-fields-drawer]').boundingBox()
     ok(box && box.width <= 390 && box.y > 100, 'phone: the drawer is a bottom sheet')
     if (SHOTS) { await page.reload(); await page.waitForSelector('[data-video-sheet] [data-cell]'); await page.waitForTimeout(1000); await page.screenshot({ path: `${SHOTS}/video-fields.png` }) }

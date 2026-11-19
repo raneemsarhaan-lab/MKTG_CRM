@@ -8,6 +8,7 @@
 import type { useTranslations } from 'next-intl'
 import type { TaskAttachment } from '@/types/index'
 import { isLinkAttachment } from '@/lib/attachments'
+import { LinkPill, MorePill, fileKind, linkKind } from './LinkPill'
 
 export type FilesCellState =
   | { kind: 'uploading'; name: string; progress: number | null }
@@ -66,14 +67,21 @@ export function FilesContent({ attachments, state, canEdit, t, onRetry, onLinkIn
       </span>
     )
   }
-  const { links, files, drive } = splitFiles(attachments)
-  if (!links.length && !files.length) {
+  // The redesign: each file is an icon pill; the first shows, "+N" counts the rest.
+  // Working-doc and design links have their own columns.
+  const { links, files } = splitFiles((attachments ?? []).filter(a => !a.link_role))
+  const items = [...files, ...links]
+  if (!items.length) {
     return canEdit ? <span className="fx-sheet-muted">{t('files.add')}</span> : null
   }
+  const first = items[0]
+  const isLink = isLinkAttachment(first)
+  const kind = isLink ? linkKind(first.url) : fileKind(first)
+  const text = isLink ? (kind === 'drive' ? t('files.drive') : hostOf(first.url) || t('files.link')) : first.filename
   return (
     <span className="fx-sheet-files">
-      {links.length > 0 && <span className="fx-sheet-tag">{drive ? t('files.drive') : t('files.link')}</span>}
-      {files.length > 0 && <span className="fx-sheet-tag">{t('files.count', { count: files.length })}</span>}
+      <LinkPill kind={kind} text={text} title={isLink ? first.url : first.filename} />
+      {items.length > 1 && <MorePill n={items.length - 1} title={t('files.count', { count: items.length })} />}
     </span>
   )
 }

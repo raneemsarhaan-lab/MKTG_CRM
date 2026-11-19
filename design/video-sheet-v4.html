@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video sheet with links</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --page: #FFFFFF; --ink: #14131A; --text: #1F2430; --muted: #6B6F7B; --faint: #9A9DA6; --line: #E4E5EA; --soft: #EEEFF2;
+  --chrome: #F6F6F8; --gutter: #F3F3F6; --sel: #3B5BDB; --sel-soft: #DCE4FF; --primary: #3B1FE0; --primary-soft: #EEEBFF;
+  --band: #F1EFFC; --band-line: #E2DEF8;
+  --todo: #8A8F98; --todo-bg: #EEF0F2; --edit: #2F6BFF; --edit-bg: #E3ECFF; --rev: #D97706; --rev-bg: #FDF0D5;
+  --ready: #0E9F9A; --ready-bg: #DDF5F3; --pub: #2E9E4F; --pub-bg: #E3F6E8; --late: #C92A2A; --late-bg: #FBE3E3;
+  --note: #FFF7D6; --note-ink: #6B5300;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #111116; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --line: #2A2A34; --soft: #22222B;
+  --chrome: #17171D; --gutter: #1A1A21; --sel-soft: #1E2A4A; --primary: #7C6CFF; --primary-soft: #2A2145; --band: #1F1B33; --band-line: #2E2850;
+  --todo-bg: #262A30; --edit-bg: #1B2A4D; --rev-bg: #3A2A10; --ready-bg: #10322F; --pub-bg: #15301E; --late-bg: #3A1820; --note: #3A3214; --note-ink: #F3DE8A;
+} }
+:root[data-theme="dark"] {
+  --page: #111116; --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --line: #2A2A34; --soft: #22222B;
+  --chrome: #17171D; --gutter: #1A1A21; --sel-soft: #1E2A4A; --primary: #7C6CFF; --primary-soft: #2A2145; --band: #1F1B33; --band-line: #2E2850;
+  --todo-bg: #262A30; --edit-bg: #1B2A4D; --rev-bg: #3A2A10; --ready-bg: #10322F; --pub-bg: #15301E; --late-bg: #3A1820; --note: #3A3214; --note-ink: #F3DE8A;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.45 var(--f-body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 24px 16px 56px; }
+h1.doc { margin: 0 0 4px; font: 800 24px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 960px; }
+.note { background: var(--note); color: var(--note-ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 16px; font-size: 13px; }
+.frame { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--page); }
+
+/* top bar */
+.top { display: flex; align-items: center; gap: 10px; padding: 14px 16px; flex-wrap: wrap; }
+.crumb { color: var(--muted); }
+.title { font: 800 24px var(--f-head); color: var(--ink); margin: 0 6px 0 2px; }
+.saved { color: #2E7D32; font-size: 13px; font-weight: 600; }
+.saved::before { content: "● "; font-size: 9px; vertical-align: 2px; }
+.sp { flex: 1; }
+.pair { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pair button { border: 0; background: var(--page); padding: 8px 14px; font: 600 14px var(--f-body); color: var(--text); cursor: pointer; }
+.pair button.on { background: var(--primary-soft); color: var(--primary); }
+.search { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; height: 38px; min-width: 200px; color: var(--faint); }
+.new { background: var(--primary); color: #fff; border: 0; border-radius: 10px; height: 38px; padding: 0 16px; font: 700 14px var(--f-body); }
+.more { border: 1px solid var(--line); background: var(--page); border-radius: 10px; height: 38px; width: 38px; font-weight: 800; color: var(--muted); }
+
+/* filters */
+.filters { display: flex; align-items: center; gap: 6px; padding: 10px 16px; background: var(--chrome); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.filters .lbl { color: var(--muted); font-size: 13px; margin-inline-end: 4px; }
+.chip { border: 1px solid var(--line); background: var(--page); border-radius: 8px; height: 32px; padding: 0 10px; font: 600 13px var(--f-body); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip i { font-style: normal; color: var(--muted); font-weight: 500; }
+.chip.on { background: #14131A; color: #fff; border-color: #14131A; }
+.chip.on i { color: #C8F24E; font-weight: 700; }
+.vr { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+.dd::after { content: " ▾"; font-size: 10px; }
+.wait { margin-inline-start: auto; background: var(--primary-soft); color: var(--primary); border-color: #D6D0FF; }
+.wait i { background: var(--page); color: var(--primary); border-radius: 999px; padding: 0 7px; font-weight: 700; }
+.wait.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* formula bar */
+.fx { display: flex; align-items: center; border-bottom: 2px solid var(--sel); height: 36px; }
+.fx .ref { width: 64px; padding: 0 10px; font-weight: 700; color: var(--ink); border-inline-end: 1px solid var(--line); height: 100%; display: flex; align-items: center; }
+.fx .f { width: 40px; text-align: center; color: var(--faint); font-style: italic; border-inline-end: 1px solid var(--line); height: 100%; display: grid; place-items: center; }
+.fx .val { padding: 0 12px; }
+
+/* grid */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 2020px; table-layout: fixed; }
+td, th { border-bottom: 1px solid var(--soft); border-inline-end: 1px solid var(--soft); height: 36px; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; font-weight: 400; }
+thead th { background: var(--chrome); color: var(--muted); font-size: 12.5px; text-align: center; height: 28px; }
+td.rn, th.rn { width: 62px; background: var(--gutter); color: var(--muted); text-align: center; font-size: 13px; }
+tr.hdr td { font-weight: 700; color: var(--ink); background: var(--chrome); }
+tr.hdr td.r { text-align: end; }
+tr.band td { background: var(--band); border-bottom-color: var(--band-line); }
+tr.band td.rn { background: var(--gutter); }
+.bandin { display: flex; align-items: center; gap: 12px; }
+.bandin .car { color: var(--ink); cursor: pointer; width: 16px; }
+.bandin b { color: var(--ink); }
+.bandin .n { color: var(--muted); }
+.bar { display: inline-flex; width: 180px; height: 6px; border-radius: 999px; overflow: hidden; background: var(--soft); }
+.bar span { height: 100%; }
+.bandin .mix { color: var(--muted); }
+.bandin .due { margin-inline-start: auto; color: var(--muted); }
+.bandin .due b { color: var(--ink); }
+td.clip { padding-inline-start: 26px; color: var(--ink); }
+tr.sel td.rn { background: var(--sel-soft); color: var(--sel); font-weight: 700; }
+tr.sel td.clip { outline: 2px solid var(--sel); outline-offset: -2px; }
+.st { display: flex; align-items: center; gap: 6px; border-radius: 6px; padding: 0 8px; height: 24px; font-size: 13px; font-weight: 600; }
+.st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.st::after { content: "⌄"; margin-inline-start: auto; font-size: 12px; opacity: .7; }
+.st.todo { background: var(--todo-bg); color: #4B5058; } .st.todo::before { background: var(--todo); }
+.st.edit { background: var(--edit-bg); color: var(--edit); }
+.st.rev { background: var(--rev-bg); color: #9A4D00; } .st.rev::before { background: var(--rev); }
+.st.ready { background: var(--ready-bg); color: #0B6E6A; }
+.st.pub { background: var(--pub-bg); color: #237A3B; }
+.who { display: inline-flex; align-items: center; gap: 8px; }
+.av { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 9.5px; font-weight: 800; }
+.av.sa { background: #FDE2D2; color: #B4501A; } .av.rs { background: #E5E0FF; color: #4B3BC4; } .av.ve { background: #FFE0EE; color: #B0245F; } .av.gd { background: #E4E6EA; color: #3F444C; }
+td.r { text-align: end; font-variant-numeric: tabular-nums; }
+td.late { background: var(--late-bg); color: var(--late); font-weight: 700; }
+td.dash { color: var(--faint); text-align: end; }
+a.file { color: var(--primary); text-decoration: underline; }
+tr.add td.t { color: var(--primary); font-weight: 600; font-size: 13px; padding-inline-start: 14px; }
+tr.empty td { height: 32px; }
+.hidden { display: none; }
+.fpill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 24px; padding: 0 10px 0 6px; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary); font-size: 12.5px; font-weight: 600; text-decoration: none; cursor: pointer; }
+.fpill:hover { filter: brightness(.96); }
+.fpill svg { flex: none; width: 16px; height: 16px; }
+.fpill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpill.drive { background: #E8F3EC; color: #1E7A44; }
+.fpill.more { padding: 0 8px; background: var(--soft); color: var(--muted); }
+.fadd { color: var(--faint); font-size: 12.5px; }
+
+th.nw { background: #FFF4C2; color: #6B5300; }
+.pill { display:inline-block; color:#fff; border-radius:6px; padding:1px 8px; font-size:12px; font-weight:700; }
+.lk { color: var(--faint); } .lk.on { color: var(--primary); text-decoration: underline; }
+.arch { border:1px solid var(--line); border-radius:6px; padding:0 6px; font-size:12px; font-weight:600; color: var(--muted); }
+.miss { background:#FDF0D5; color:#9A4D00; border-radius:4px; padding:0 6px; font-size:12px; font-weight:600; }
+
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 18px; }
+.cmp div { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13px; }
+.cmp b { display: block; color: var(--ink); margin-bottom: 4px; font-size: 14px; }
+.cmp ul { margin: 0; padding-inline-start: 18px; color: var(--muted); }
+@media (max-width: 700px) { .search { min-width: 0; flex: 1; } .title { font-size: 20px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc">Video sheet, with the Content sheet's columns and links</h1>
+  <p class="lede">Version 2 without the filter row, plus what the Content sheet has: Type as a coloured pill, the five link columns (Working Doc, Design Link, Task Link, LinkedIn Link, Published Link) with "+ link" to paste one, and Archive or restore. Scroll the grid sideways to see them all.</p>
+  <p class="note">Files are icon pills: a play icon for a video file, the Drive mark for a Drive link, and "+2" when a clip has more. Click a pill to open or preview it. New columns are marked in yellow. Every column can still be hidden, moved or renamed from ⋯ › Columns, as on Content.</p>
+
+  <div class="frame">
+    <div class="top">
+      <span class="crumb">Sheets /</span><span class="title">Video</span><span class="saved">Saved</span>
+      <span class="sp"></span>
+      <span class="pair" role="group" aria-label="View"><button type="button">Board</button><button type="button" class="on" aria-pressed="true">Sheet</button></span>
+      <span class="search">⌕ Search</span>
+      <button type="button" class="more" title="Menus: File, Edit, View, Insert, Format, Data and the formatting toolbar" aria-label="More">⋯</button>
+      <button type="button" class="new">+ New clip</button>
+    </div>
+    <div class="fx"><span class="ref">A3</span><span class="f">fx</span><span class="val">Hesham</span></div>
+    <div class="scroll">
+      <table>
+        <colgroup><col style="width:62px"><col style="width:190px"><col style="width:90px"><col style="width:150px"><col style="width:150px"><col style="width:150px"><col style="width:90px"><col style="width:90px"><col style="width:230px"><col style="width:120px"><col style="width:120px"><col style="width:100px"><col style="width:120px"><col style="width:130px"><col style="width:90px"></colgroup>
+        <thead><tr><th class="rn"></th><th>A</th><th class="nw">B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th class="nw">I</th><th class="nw">J</th><th class="nw">K</th><th class="nw">L</th><th class="nw">M</th><th class="nw">N</th></tr></thead>
+        <tbody id="g">
+          <tr class="hdr"><td class="rn">1</td><td>Clip</td><td>Type</td><td>Stage</td><td>Owner</td><td>Reviewer</td><td class="r">Due</td><td class="r">In stage</td><td>File</td><td>Working Doc</td><td>Design Link</td><td>Task Link</td><td>LinkedIn Link</td><td>Published Link</td><td>Archive</td></tr>
+          <tr class="band" data-band="a"><td class="rn">2</td><td colspan="14"><div class="bandin"><span class="car" data-car="a">⌄</span><b>Retreat Session Audios</b><span class="n">8 clips</span>
+            <span class="bar"><span style="width:37.5%;background:var(--todo)"></span><span style="width:12.5%;background:var(--edit)"></span><span style="width:50%;background:var(--rev)"></span></span>
+            <span class="mix">3 to do · 1 editing · 4 in review · 0 published</span><span class="due">Due <b>25 Nov</b></span></div></td></tr>
+          <tr class="sel" data-in="a" data-s="rev" data-me="1"><td class="rn">3</td><td class="clip">Hesham</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">20 Nov</td><td class="r late">3d</td><td><a class="fpill" title="Hesham_v2.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>Hesham_v2.mp4</span></a> <a class="fpill more" title="2 more files">+2</a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="rn">4</td><td class="clip">Islam</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">21 Nov</td><td class="r">1d</td><td><a class="fpill drive" title="Drive folder"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 2h4.8l4.1 7.1-2.4 4.1H3.9L1.5 9.1z" fill="currentColor" opacity=".18"/><path d="M5.6 2l4.1 7.1H1.5zM10.4 2l4.1 7.1-2.4 4.1-4.1-7.1z" fill="currentColor" opacity=".55"/><path d="M3.9 13.2l2.4-4.1h8.2l-2.4 4.1z" fill="currentColor"/></svg><span>Drive</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="todo"><td class="rn">5</td><td class="clip">Ahmed Badr</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">24 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="todo"><td class="rn">6</td><td class="clip">Mohamed Aly</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">24 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="edit"><td class="rn">7</td><td class="clip">Mohamed Fahmy</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st edit">Editing</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">22 Nov</td><td class="r">2d</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="rn">8</td><td class="clip">Mohamed Salama</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">21 Nov</td><td class="r">1d</td><td><a class="fpill" title="Salama_v1.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>Salama_v1.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="rev" data-me="1"><td class="rn">9</td><td class="clip">Ramy</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">22 Nov</td><td class="r">4h</td><td><a class="fpill" title="Ramy_v1.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>Ramy_v1.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="a" data-s="todo"><td class="rn">10</td><td class="clip">Waleed Fahmy</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">25 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr class="add" data-in="a"><td class="rn">11</td><td class="t" colspan="14">+ Add clip</td></tr>
+          <tr class="band" data-band="b"><td class="rn">12</td><td colspan="14"><div class="bandin"><span class="car" data-car="b">⌄</span><b>The Client's Chair</b><span class="n">5 clips</span>
+            <span class="bar"><span style="width:60%;background:var(--todo)"></span><span style="width:40%;background:var(--rev)"></span></span>
+            <span class="mix">3 to do · 0 editing · 2 in review · 0 published</span><span class="due">Due <b>2 Dec</b></span></div></td></tr>
+          <tr data-in="b" data-s="rev" data-me="1"><td class="rn">13</td><td class="clip">Episode 01</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">23 Nov</td><td class="r">2d</td><td><a class="fpill" title="ClientsChair_01.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>ClientsChair_01.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="b" data-s="rev" data-me="1"><td class="rn">14</td><td class="clip">Episode 02</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">24 Nov</td><td class="r">1d</td><td><a class="fpill" title="ClientsChair_02.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>ClientsChair_02.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="b" data-s="todo"><td class="rn">15</td><td class="clip">Episode 03</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">28 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="b" data-s="todo"><td class="rn">16</td><td class="clip">Episode 04</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">30 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr data-in="b" data-s="todo"><td class="rn">17</td><td class="clip">Episode 05</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">2 Dec</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td></tr>
+          <tr class="add" data-in="b"><td class="rn">18</td><td class="t" colspan="14">+ Add clip</td></tr>
+          <tr class="empty"><td class="rn">19</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty"><td class="rn">20</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty"><td class="rn">21</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div><b>From the Content sheet</b><ul><li>Type as a coloured pill (Reel, Short…).</li><li>File: each file is an icon pill (video, Drive, link) with its name; "+2" opens the rest.</li><li>Working Doc and Design Link: click "+ link" and paste, or paste a link into the cell.</li><li>Task Link opens the clip's task; LinkedIn Link and Published Link as on Content.</li><li>Archive or restore a clip (today's Drop).</li></ul></div>
+    <div><b>Already there, behind ⋯</b><ul><li>Columns (show, hide, move, rename, group by), + Column, Mine, Show archived, Paste clips.</li></ul></div>
+    <div><b>Not carried over</b><ul><li>Themes, pillars and Add theme: videos aren't grouped by theme. Each video is its own band instead.</li></ul></div>
+  </div>
+</div>
+<script>
+let stage = 'all', wait = false
+const rows = [...document.querySelectorAll('#g tr[data-s]')]
+function apply() {
+  rows.forEach(r => { const ok = (stage === 'all' || r.dataset.s === stage) && (!wait || r.dataset.me); r.classList.toggle('hidden', !ok || r.dataset.folded === '1') })
+}
+document.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
+  stage = b.dataset.f; document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x === b)); apply()
+}))
+document.querySelectorAll('[data-car]').forEach(c => c.addEventListener('click', () => {
+  const id = c.dataset.car, fold = c.textContent === '⌄'
+  c.textContent = fold ? '›' : '⌄'
+  document.querySelectorAll(`#g tr[data-in="${id}"]`).forEach(r => { r.dataset.folded = fold ? '1' : '0'; if (r.classList.contains('add')) r.classList.toggle('hidden', fold) })
+  apply()
+}))
+</script>
+</body>
+</html>

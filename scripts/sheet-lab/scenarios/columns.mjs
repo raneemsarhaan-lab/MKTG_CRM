@@ -26,7 +26,7 @@ async function openPlan(t, opts) {
 }
 const planCounts = t => t.page.locator('[data-plan-counts]').innerText().then(s => s.trim())
 async function openClips(t, opts) {
-  await t.page.locator('[data-paste-clips]').click()
+  await t.tool('[data-paste-clips]', 'click')
   await t.page.waitForSelector('[data-paste-preview] textarea')
   const text = await t.page.evaluate(o => window.__sheet.customClipText(o), opts)
   await t.page.locator('[data-paste-preview] textarea').fill(text)
@@ -80,7 +80,7 @@ export const columns = [
   {
     id: 'col-2-add', hash: C,
     async run(t) {
-      await t.page.locator('[data-add-column]').click()
+      await t.tool('[data-add-column]', 'click')
       await t.page.locator('[data-column-editor] input[type="text"]').first().fill('Notes')
       await t.page.locator('[data-column-editor] button[type="submit"]').click()
       await t.idle(200)
@@ -215,7 +215,7 @@ export const columns = [
   {
     id: 'col-3-panel', hash: C,
     async run(t) {
-      await t.page.locator('[data-columns-button]').click()
+      await t.tool('[data-columns-button]', 'click')
       await t.page.waitForSelector('[data-columns-panel]')
       const who = await t.page.locator('[data-panel-col="c:hook"] .fx-col-who').innerText()
       t.assert(/Changed by Samaa/.test(who), `who changed it (FR-004): ${who}`)
@@ -234,7 +234,7 @@ export const columns = [
       await pick(t, 'hide')
       await t.idle(200)
       t.assert(!(await heads(t)).includes('Hook'), 'hidden')
-      await t.page.locator('[data-columns-button]').click()
+      await t.tool('[data-columns-button]', 'click')
       await t.page.locator('[data-panel-col="c:hook"] [data-field-switch]').click()
       await t.idle(250)
       t.assert((await heads(t)).includes('Hook'), 'shown again from Columns')
@@ -343,21 +343,21 @@ export const columns = [
   {
     id: 'vcol-sets', hash: 'cols=1&me=raneem',
     async run(t) {
-      await t.page.locator('[data-set="editing"]').click()
-      t.assert((await heads(t)).includes('Hook'), 'Hook in Editing')
+      // The redesign has one set ('sheet'): hiding there leaves the older sets' choice alone.
+      t.assert((await heads(t)).includes('Hook'), 'Hook shown')
       await headMenu(t, 'c:vhook')
       await pick(t, 'hide')
       await t.idle(200)
-      t.assert(!(await heads(t)).includes('Hook'), 'hidden in Editing')
-      await t.page.locator('[data-set="full"]').click()
-      t.assert((await heads(t)).includes('Hook'), 'still in Full (FR-033)')
+      t.assert(!(await heads(t)).includes('Hook'), 'hidden')
+      const hook = (await cols(t)).records.find(r => r.key === 'c:vhook')
+      t.assert(!hook.shownIn.includes('sheet') && hook.shownIn.includes('full'), 'only in the sheet set (FR-033)')
       t.assert((await t.text('c:c09', 'c:music')).includes('Yes'), 'the checkbox shows on a clip')
-      await t.page.locator('[data-add-column]').click()
+      await t.tool('[data-add-column]', 'click')
       await t.page.locator('[data-column-editor] input[type="text"]').first().fill('Caption')
       await t.page.locator('[data-column-editor] button[type="submit"]').click()
       await t.idle(200)
       const rec = (await cols(t)).records.find(r => r.name === 'Caption')
-      t.eq([rec.sheet, rec.shownIn.sort()], ['video', ['full']], 'a new Video column shows in Full and its set (FR-034)')
+      t.eq([rec.sheet, rec.shownIn.sort()], ['video', ['full', 'sheet']], 'a new Video column shows in Full and the sheet set (FR-034)')
     },
   },
   // ── Polish ───────────────────────────────────────────────────────────────
@@ -369,7 +369,7 @@ export const columns = [
       await t.page.waitForSelector('[data-sheet-menu]')
       t.assert((await t.menuItems()).includes('edit'), 'Alt+↓ opens the column menu')
       await t.page.keyboard.press('Escape')
-      await t.page.locator('[data-columns-button]').focus()
+      await t.tool('[data-columns-button]', 'focus')
       await t.page.keyboard.press('Enter')
       await t.page.waitForSelector('[data-columns-panel]')
       t.assert(await t.page.evaluate(() => !!document.activeElement?.closest('[data-columns-panel]')), 'focus moves into the Columns panel')
@@ -379,10 +379,10 @@ export const columns = [
     id: 'cols-axe', hash: C,
     async run(t) {
       t.eq(await t.axe('[data-content-sheet]'), [], 'sheet with custom columns')
-      await t.page.locator('[data-columns-button]').click()
+      await t.tool('[data-columns-button]', 'click')
       t.eq(await t.axe('[data-columns-panel]'), [], 'Columns panel')
       await t.page.keyboard.press('Escape')
-      await t.page.locator('[data-add-column]').click()
+      await t.tool('[data-add-column]', 'click')
       t.eq(await t.axe('[data-column-editor]'), [], 'column editor')
       await t.page.keyboard.press('Escape')
       await t.focusCell(`k:${POST1}`, 'type')
