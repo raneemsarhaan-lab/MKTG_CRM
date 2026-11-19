@@ -261,6 +261,14 @@ export function VideoSheet(p: VideoSheetProps) {
           )
         }
         items.push({ key: 'task', text: t('files.openTask'), label: t('files.openTask'), onSelect: pick(() => p.onOpenTask(task.id)) })
+        if (can && p.api.removeFile) {
+          // Remove: gone at once, with Undo; the delete goes to the server when the message has gone.
+          for (const a of [...files, ...links]) {
+            const name = a.url && !files.includes(a) ? hostOf(a.url) || a.filename : a.filename
+            items.push({ key: `rm${a.id}`, group: t('files.removeGroup'), tone: 'danger', text: t('files.remove', { name }), label: t('files.remove', { name }),
+              onSelect: pick(() => removeFile(task, a.id, name)) })
+          }
+        }
         return menu(t('files.menuFor', { name: task.name }), items)
       }
       case 'published':
@@ -296,6 +304,17 @@ export function VideoSheet(p: VideoSheetProps) {
     if (!r.success) return why(r.error)
     say(t('links.saved'))
     return null
+  }
+
+  function removeFile(task: Task, attachmentId: string, name: string) {
+    const r = p.api.removeFile?.(task.id, attachmentId)
+    if (!r) return
+    let undone = false
+    say(t('files.removed', { name }), () => { undone = true; r.undo(); say(t('files.restored', { name })) })
+    setTimeout(() => {
+      if (undone) return
+      void r.commit().then(res => { if (!res.success) say(t('files.removeFailed', { name, reason: why(res.error) })) })
+    }, 10_000)
   }
 
   async function drop(task: Task) {

@@ -574,6 +574,11 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     else focusCell(row, col)
   }
 
+  /** The multi-line editor grows to show all its text (never shorter than its cell), as in Excel. */
+  const fitEditor = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(el.parentElement?.clientHeight ?? 0, el.scrollHeight)}px`
+  }
   function startEdit(row: R, col: GridCol, initial?: string, caret?: number) {
     if (!m.isText(row, col)) {
       const note = m.readOnlyNote?.(row, col)
@@ -1439,7 +1444,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   ref={el => { if (el) cells.current.set(key, el); else cells.current.delete(key) }}
                   role={m.cellRole(row, col)}
                   tabIndex={isActive && !isEditing ? 0 : -1}
-                  className={`${m.cellClass(row, col)}${barHere}${inGhost ? ` is-fg${fgEdges}` : ''}${clearing ? ' is-fclr' : ''}${hasHandle || afoHere || tipHere ? ' has-fill-ui' : ''}${dv ? ' has-dv' : ''}${isActive ? ' is-active' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
+                  className={`${m.cellClass(row, col)}${barHere}${inGhost ? ` is-fg${fgEdges}` : ''}${clearing ? ' is-fclr' : ''}${hasHandle || afoHere || tipHere ? ' has-fill-ui' : ''}${dv ? ' has-dv' : ''}${isActive ? ' is-active' : ''}${isEditing ? ' is-editing' : ''}${selected && !isActive ? ' is-selected' : ''}${selected && isActive ? ' is-anchor' : ''}${cutIn(i, c) ? ' is-cut' : ''}${unselecting ? ' is-unsel' : ''}${isNo && rowOn ? ' is-sel-head' : ''}${note ? ' has-note' : ''}${span ? ' is-span' : ''}${merge ? ' is-merged' : ''}${fx?.cell.backgroundColor ? ' has-fill' : ''}${freezeStyle ? ' is-frozen-cell' : ''}${c === FC - 1 ? ' is-frozen-edge-col' : ''}`}
                   style={fx || freezeStyle ? { ...spanStyle, ...fx?.cell, ...freezeStyle } : spanStyle}
                   data-cell={key}
                   data-row-key={row.key}
@@ -1525,7 +1530,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   }}
                 >
                   {isEditing
-                    ? (m.multiline
+                    // A tall row (its height set) edits in the multi-line box, so its text wraps as it shows.
+                    ? (m.multiline || !!heightOf(row)
                       ? (
                         <textarea
                           className="fx-sheet-input is-multi"
@@ -1538,7 +1544,9 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                             const el = e.currentTarget
                             const at = editing.caret ?? el.value.length
                             el.setSelectionRange(at, at)
+                            fitEditor(el)
                           }}
+                          onInput={e => fitEditor(e.currentTarget)}
                           onChange={e => setEditing({ ...(editingRef.current ?? editing), value: e.target.value, caret: undefined })}
                           onKeyDown={e => {
                             e.stopPropagation()

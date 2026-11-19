@@ -274,7 +274,9 @@ async function dragHandle(page, r, c, { button = 'left', shift = false, check } 
     ok(await page.locator('[data-keytip="A"]').isVisible(), 'Alt shows the key letters')
     await page.keyboard.press('a'); await page.waitForSelector('[data-mb-data]')
     ok(true, 'Alt, A opens the Data menu'); await page.keyboard.press('Escape')
-    await select(page, [20, 4], [21, 4]); await page.waitForTimeout(300)
+    await select(page, [20, 4], [21, 4])
+    // The totals follow the selection a moment later: wait for them rather than a fixed pause.
+    await page.waitForFunction(() => /Sum/.test(document.querySelector('[data-statusbar]')?.textContent ?? ''), null, { timeout: 3000 }).catch(() => {})
     const bar = (await page.locator('[data-statusbar]').innerText()).replace(/\s+/g, ' ')
     ok(/Sum 15/.test(bar) && /Count 2/.test(bar) && /Average 7\.5/.test(bar), 'the status bar shows Average, Count and Sum', bar)
     await axe(page, 'the sheet with the status bar')

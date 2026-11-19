@@ -11,7 +11,7 @@ import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAtta
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
-  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo,
+  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo, removeAttachment,
 } from '@/actions/tasks'
 import { writeClipField } from '@/actions/sheet-links'
 import { useTranslations } from 'next-intl'
@@ -513,6 +513,22 @@ export function KanbanBoard({
       const res = await writeClipField(taskId, field, value).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) router.refresh()
       return res
+    },
+    removeFile(taskId, attachmentId) {
+      const task = tasks.find(t => t.id === taskId)
+      const gone = task?.attachments?.find(a => a.id === attachmentId)
+      if (!task || !gone) return null
+      setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, attachments: (t.attachments ?? []).filter(a => a.id !== attachmentId) } : t)))
+      const back = () => setTasks(prev => prev.map(t => (t.id === taskId && !(t.attachments ?? []).some(a => a.id === attachmentId)
+        ? { ...t, attachments: [...(t.attachments ?? []), gone] } : t)))
+      return {
+        undo: back,
+        async commit() {
+          const res = await removeAttachment(attachmentId).catch(() => ({ success: false as const, error: 'generic' }))
+          if (!res.success) back(); else router.refresh()
+          return res
+        },
+      }
     },
     async addVideo(name) {
       const res = await addVideo(name).catch(() => ({ success: false as const, error: 'generic' }))
