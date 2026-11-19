@@ -2157,6 +2157,13 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-sheet-th.is-sel-head, .fx-sheet-td.is-frozen-no.is-sel-head { background: var(--sh-head-sel) !important; color: var(--sh-edge); }
 .fx-sheet-tr.is-tall > .fx-sheet-td { height: var(--row-h); align-items: flex-start; padding-block: 4px; white-space: normal; overflow-wrap: anywhere; overflow: hidden; }
 .fx-sheet-tr.is-tall > .fx-sheet-td.is-frozen-no { align-items: center; }
+/* A tall row wraps its text (the one-line ellipsis is for rows of the default height); pills stay on one line. */
+.fx-sheet-tr.is-tall > .fx-sheet-td .fx-sheet-ellipsis:not(.fx-pill-text) { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.fx-sheet-tr.is-tall > .fx-sheet-td .fx-sheet-title { align-items: flex-start; }
+/* The cell being edited shows one border, the editor's: the cell's own ring and fill handle step aside,
+   and a long text's editor may grow past the row, as in Excel. */
+.fx-sheet-td.is-editing { box-shadow: none !important; overflow: visible !important; z-index: 6; }
+.fx-sheet-td.is-editing > .fx-fill-h { display: none; }
 .fx-sheet-spacer { width: 1px; }
 .fx-sheet-row-rz { position: absolute; inset-inline: 0; bottom: -3px; height: 6px; cursor: row-resize; z-index: 3; }
 .fx-sheet-row-rz:hover { background: var(--sh-resize); }
