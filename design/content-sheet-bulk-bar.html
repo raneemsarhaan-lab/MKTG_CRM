@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content sheet bulk bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #14131A; --text: #1F2430; --muted: #6B6E72; --faint: #9A9DA1; --page: #FFFFFF; --grid: #E2E3E3; --head: #F3F4F2;
+  --theme: #F7FBE6; --pillar: #F3F4F2; --purple: #7C3AED; --sel: rgba(124, 58, 237, .07); --navy: #14133C; --lime: #C8F24E;
+  --link: #1F4FD8; --note: #FFF7D6; --note-ink: #6B5300; --warn: #FDECC8; --warn-ink: #7A4A00;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --page: #111116; --grid: #2A2A34; --head: #1A1A21;
+  --theme: #1E2414; --pillar: #1A1A21; --purple: #A78BFA; --sel: rgba(167, 139, 250, .12); --link: #8FB0FF; --note: #3A3214; --note-ink: #F3DE8A; --warn: #3A2C10; --warn-ink: #F3C27A;
+} }
+:root[data-theme="dark"] {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --page: #111116; --grid: #2A2A34; --head: #1A1A21;
+  --theme: #1E2414; --pillar: #1A1A21; --purple: #A78BFA; --sel: rgba(167, 139, 250, .12); --link: #8FB0FF; --note: #3A3214; --note-ink: #F3DE8A; --warn: #3A2C10; --warn-ink: #F3C27A;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 22px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 920px; font-size: 14px; }
+.note { background: var(--note); color: var(--note-ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; font-size: 13px; }
+.frame { position: relative; border: 1px solid var(--grid); border-radius: 12px; overflow: hidden; padding-bottom: 96px; }
+.sum { display: flex; gap: 18px; padding: 8px 14px; background: var(--head); border-bottom: 1px solid var(--grid); font-size: 12.5px; color: var(--muted); }
+.sum b { color: var(--ink); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 980px; table-layout: fixed; }
+th, td { border: 1px solid var(--grid); height: 30px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; font-weight: 400; }
+thead th { background: var(--head); color: var(--ink); font-size: 12px; font-weight: 600; }
+td.n, th.n { width: 46px; background: var(--head); color: var(--muted); text-align: center; font-size: 12px; font-weight: 400; }
+tr.theme td { background: var(--theme); font-weight: 700; color: var(--ink); }
+tr.pillar td { background: var(--pillar); font-weight: 600; font-size: 12px; color: var(--ink); }
+tr.theme td.n, tr.pillar td.n { background: var(--head); font-weight: 400; color: var(--muted); }
+tr.sel td { background: var(--sel); }
+tr.sel td.n { background: var(--purple); color: #fff; font-weight: 700; }
+td.c { padding-inline-start: 26px; }
+.who { display: inline-flex; align-items: center; gap: 6px; }
+.av { width: 18px; height: 18px; border-radius: 50%; background: #4A4F5C; color: #fff; font-size: 8px; font-weight: 700; display: inline-grid; place-items: center; }
+.av.cc { background: #7C3AED; }
+.av.none { background: transparent; border: 1px dashed var(--faint); }
+.pill { display: inline-block; color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; }
+.st { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--grid); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 600; }
+.st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--d, #9A9DA1); }
+.ln { color: var(--link); text-decoration: underline; }
+.add { color: var(--muted); }
+.miss { background: var(--warn); color: var(--warn-ink); border-radius: 4px; padding: 1px 6px; font-size: 11.5px; font-weight: 600; }
+.arch { color: var(--muted); font-size: 12px; }
+
+.bulk { position: absolute; inset-inline: 0; bottom: 20px; display: flex; justify-content: center; }
+.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--navy); border-radius: 14px; padding: 10px 12px; box-shadow: 0 18px 44px rgba(20, 19, 60, .34); max-width: calc(100% - 32px); }
+.count { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; background: var(--lime); color: #14131A; font-weight: 800; white-space: nowrap; }
+.btn { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #fff; font: 600 13px var(--f-body); white-space: nowrap; }
+.btn.on { background: rgba(255,255,255,.18); }
+.btn.drop { border-color: rgba(255, 122, 140, .55); color: #FFB3BE; }
+.x { width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; color: rgba(255,255,255,.7); font-size: 16px; }
+.menu { position: absolute; bottom: calc(100% + 8px); inset-inline-start: 0; width: 250px; background: #fff; color: #1F2430; border-radius: 12px; box-shadow: 0 10px 30px rgba(17,18,20,.22); padding: 6px; }
+.menu div { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.menu .hl { background: #F4F4F2; }
+.menu i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.menu small { margin-inline-start: auto; color: #6B7280; font-size: 11.5px; }
+.toast { display: inline-flex; margin-top: 12px; background: #14131A; color: #fff; border-radius: 10px; padding: 10px 14px; font-size: 13px; gap: 14px; align-items: center; }
+.toast b { color: var(--lime); font-weight: 700; }
+
+ul.notes { margin: 16px 0 0; padding-inline-start: 18px; color: var(--muted); max-width: 920px; }
+ul.notes li { margin: 5px 0; }
+ul.notes b { color: var(--ink); }
+@media (max-width: 700px) { .menu { width: 220px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Content sheet: bulk editing, like the board and the Video sheet</h1>
+  <p class="lede">Select several piece rows (click a row number, then Shift-click or Ctrl-click others, or select cells across several rows) and the same bulk bar as on the Video sheet comes up along the bottom. One choice changes every selected piece, with the board's rules, and one Undo puts them all back.</p>
+  <p class="note">Shown: three pieces selected in the Strategy theme, the Stage list open with the Content sheet's stage names. On this sheet the bar says "pieces", adds Pillar, and offers Archive (the sheet's word) instead of Drop.</p>
+
+  <div class="frame">
+    <div class="sum"><span><b>Content plan</b></span><span><b>18 pieces</b></span><span>9 published</span><span>3 in design</span><span>1 archived</span></div>
+    <div class="scroll">
+      <table>
+        <colgroup><col style="width:46px"><col style="width:270px"><col style="width:150px"><col style="width:110px"><col style="width:96px"><col style="width:96px"><col style="width:96px"><col style="width:120px"><col style="width:110px"><col style="width:76px"></colgroup>
+        <thead><tr><th class="n"></th><th>Title</th><th>Assignee</th><th>Type</th><th>Working Doc</th><th>Design</th><th>Task</th><th>Published</th><th>Date</th><th></th></tr></thead>
+        <tbody>
+          <tr class="theme"><td class="n">1</td><td colspan="9">▾ Strategy · 9</td></tr>
+          <tr class="pillar"><td class="n">2</td><td colspan="9" style="padding-inline-start:26px">AI · 6</td></tr>
+          <tr><td class="n">3</td><td class="c">AI Pillar SM Campaign - Post 1</td><td><span class="who"><span class="av">GD</span>Graphic Designer</span></td><td><span class="pill" style="background:#1D4ED8">Post</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td><span class="miss">Missing link</span></td><td>Published 4 Nov</td><td class="arch">Archive</td></tr>
+          <tr class="sel"><td class="n">4</td><td class="c">AI Pillar SM Campaign - Post 2</td><td><span class="who"><span class="av">GD</span>Graphic Designer</span></td><td><span class="pill" style="background:#1D4ED8">Post</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="add">+ link</td><td></td><td class="arch">Archive</td></tr>
+          <tr class="sel"><td class="n">5</td><td class="c">AI Pillar SM Campaign - Post 3</td><td><span class="who"><span class="av">GD</span>Graphic Designer</span></td><td><span class="pill" style="background:#1D4ED8">Post</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="add">+ link</td><td></td><td class="arch">Archive</td></tr>
+          <tr class="sel"><td class="n">6</td><td class="c">AI Pillar SM Campaign - Post 4</td><td><span class="who"><span class="av">GD</span>Graphic Designer</span></td><td><span class="pill" style="background:#1D4ED8">Post</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="add">+ link</td><td></td><td class="arch">Archive</td></tr>
+          <tr><td class="n">7</td><td class="c">AI Pillar Article</td><td><span class="who"><span class="av cc">CC</span>Content Creator</span></td><td><span class="pill" style="background:#047857">Article</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="ln">forefront.consulting</td><td>Published 1 Nov</td><td class="arch">Archive</td></tr>
+          <tr><td class="n">8</td><td class="c">AI Pillar Canvas</td><td><span class="who"><span class="av none"></span>Unassigned</span></td><td><span class="pill" style="background:#4338CA">Framework</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="ln">forefront.consulting</td><td>Published 1 Nov</td><td class="arch">Archive</td></tr>
+          <tr class="pillar"><td class="n">9</td><td colspan="9" style="padding-inline-start:26px">Decision Making · 2</td></tr>
+          <tr><td class="n">10</td><td class="c">A CEO Guide to a Missed Opportunity</td><td><span class="who"><span class="av none"></span>Unassigned</span></td><td><span class="pill" style="background:#047857">Article</span></td><td class="add">+ link</td><td class="add">+ link</td><td class="ln">Open task</td><td class="add">+ link</td><td>Due 24 Dec</td><td class="arch">Archive</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bulk">
+      <div class="bar" role="toolbar" aria-label="Bulk edit">
+        <span class="count">3 pieces selected</span>
+        <span class="btn on">Stage ▾
+          <div class="menu">
+            <div><i style="background:#9A9DA1"></i>Planned <small>To Do</small></div>
+            <div><i style="background:#3B82F6"></i>Writing <small>C-In Progress</small></div>
+            <div><i style="background:#2563EB"></i>Content Review <small>C-Review</small></div>
+            <div><i style="background:#1E40AF"></i>Content Check <small>C-Check</small></div>
+            <div class="hl"><i style="background:#8B5CF6"></i>Ready for Design</div>
+            <div><i style="background:#7C3AED"></i>Initial Design <small>D-In Progress</small></div>
+            <div><i style="background:#6D28D9"></i>Final Design <small>D-Check</small></div>
+            <div><i style="background:#F59E0B"></i>Final Check <small>F-Check</small></div>
+            <div><i style="background:#0EA5E9"></i>Ready to Publish</div>
+            <div><i style="background:#14B8A6"></i>Scheduled</div>
+            <div><i style="background:#2E9E4F"></i>Published</div>
+          </div>
+        </span>
+        <span class="btn">Assignee ▾</span>
+        <span class="btn">Type ▾</span>
+        <span class="btn">Pillar ▾</span>
+        <span class="btn">Date ▾</span>
+        <span class="btn drop">Archive</span>
+        <button type="button" class="x" aria-label="Clear selection">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div><span style="color:var(--muted);margin-inline-end:8px">After choosing Ready for Design:</span><span class="toast">3 pieces changed. <b>Undo</b></span></div>
+
+  <ul class="notes">
+    <li><b>Selecting:</b> the bar shows when two or more piece rows are selected. Theme rows, pillar rows, "+ Piece" rows and archived pieces aren't counted. ✕ clears it.</li>
+    <li><b>The choices:</b> Stage (the Content sheet's names, the board's name beside each), Assignee, Type, Pillar and Date (the due date), with the board's own lists and date picker.</li>
+    <li><b>Pillar:</b> lists the pillars of the selected pieces' theme, plus "No pillar". When the pieces come from more than one theme, Pillar is greyed out with a tip: "Pick pieces from one theme".</li>
+    <li><b>The board's rules:</b> the same server rules as the board's bar. A piece someone can't edit, or a stage move the board doesn't allow, is left as it was, and the message says how many weren't changed.</li>
+    <li><b>Archive:</b> asks first ("Archive 3 pieces?"), as Archive does for one piece; Undo restores them. Archived pieces stay under Show archived.</li>
+    <li><b>Undo:</b> one Undo in the message puts every changed piece back.</li>
+  </ul>
+</div>
+</body>
+</html>
