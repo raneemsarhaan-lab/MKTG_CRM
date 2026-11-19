@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video sheet bulk bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #14131A; --text: #1F2430; --muted: #6B6E72; --faint: #9A9DA1; --page: #FFFFFF; --grid: #E2E3E3; --head: #F3F4F2;
+  --band: #F0EBFE; --purple: #7C3AED; --purple-soft: #F0EBFE; --sel: rgba(124, 58, 237, .07); --navy: #14133C; --lime: #C8F24E;
+  --note: #FFF7D6; --note-ink: #6B5300;
+  --f-head: Montserrat, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --page: #111116; --grid: #2A2A34; --head: #1A1A21;
+  --band: #221B38; --purple: #A78BFA; --purple-soft: #2A2145; --sel: rgba(167, 139, 250, .12); --note: #3A3214; --note-ink: #F3DE8A;
+} }
+:root[data-theme="dark"] {
+  --ink: #EDEDF2; --text: #DADAE2; --muted: #A3A3AE; --faint: #7D7D88; --page: #111116; --grid: #2A2A34; --head: #1A1A21;
+  --band: #221B38; --purple: #A78BFA; --purple-soft: #2A2145; --sel: rgba(167, 139, 250, .12); --note: #3A3214; --note-ink: #F3DE8A;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--text); font: 13px/1.45 var(--f-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 56px; }
+h1 { margin: 0 0 4px; font: 800 22px/1.2 var(--f-head); color: var(--ink); }
+.lede { margin: 0 0 12px; color: var(--muted); max-width: 920px; font-size: 14px; }
+.note { background: var(--note); color: var(--note-ink); border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; font-size: 13px; }
+.frame { position: relative; border: 1px solid var(--grid); border-radius: 12px; overflow: hidden; padding-bottom: 96px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 980px; table-layout: fixed; }
+th, td { border: 1px solid var(--grid); height: 34px; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: start; font-weight: 400; }
+thead th { background: var(--head); color: var(--muted); font-size: 11px; text-align: center; height: 18px; }
+tr.h td { background: var(--head); font-weight: 700; color: var(--ink); }
+td.n, th.n { width: 46px; background: var(--head); color: var(--muted); text-align: center; font-size: 12px; }
+tr.band td { background: var(--band); font-weight: 700; color: var(--ink); }
+tr.band td.n { background: var(--head); font-weight: 400; color: var(--muted); }
+tr.sel td { background: var(--sel); }
+tr.sel td.n { background: var(--purple); color: #fff; font-weight: 700; }
+td.c { padding-inline-start: 22px; }
+.st { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--grid); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 600; }
+.st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--d, #9A9DA1); }
+.pill { display: inline-block; color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; background: #C2185B; }
+.r { text-align: end; }
+
+/* the board's bar, as it is */
+.bulk { position: absolute; inset-inline: 0; bottom: 20px; display: flex; justify-content: center; }
+.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--navy); border-radius: 14px; padding: 10px 12px; box-shadow: 0 18px 44px rgba(20, 19, 60, .34); max-width: calc(100% - 32px); }
+.count { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px; background: var(--lime); color: #14131A; font-weight: 800; white-space: nowrap; }
+.btn { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #fff; font: 600 13px var(--f-body); white-space: nowrap; }
+.btn.on { background: rgba(255,255,255,.18); }
+.btn.drop { border-color: rgba(255, 122, 140, .55); color: #FFB3BE; }
+.x { width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; color: rgba(255,255,255,.7); font-size: 16px; }
+.menu { position: absolute; bottom: calc(100% + 8px); inset-inline-start: 0; width: 220px; background: #fff; color: var(--text); border-radius: 12px; box-shadow: 0 10px 30px rgba(17,18,20,.22); padding: 6px; }
+.menu div { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+.menu div:hover, .menu .hl { background: #F4F4F2; }
+.menu i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.menu small { margin-inline-start: auto; color: var(--faint); font-size: 11.5px; }
+.toast { position: static; display: inline-flex; margin-top: 12px; background: #14131A; color: #fff; border-radius: 10px; padding: 10px 14px; font-size: 13px; display: flex; gap: 14px; align-items: center; }
+.toast b { color: var(--lime); font-weight: 700; }
+
+ul.notes { margin: 16px 0 0; padding-inline-start: 18px; color: var(--muted); max-width: 920px; }
+ul.notes li { margin: 5px 0; }
+ul.notes b { color: var(--ink); }
+@media (max-width: 700px) { .menu { width: 190px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Video sheet: bulk editing, like the board</h1>
+  <p class="lede">Select several clip rows (click a row number, then Shift-click or Ctrl-click others, or select cells across several rows) and the board's bulk bar comes up along the bottom. One choice changes every selected clip, with the board's own rules, and one Undo puts them all back.</p>
+  <p class="note">Shown: three clips selected, the Stage list open. The bar is the board's (same colours, same lists); on the sheet it says "clips" and offers Drop instead of Delete.</p>
+
+  <div class="frame">
+    <div class="scroll">
+      <table>
+        <colgroup><col style="width:46px"><col style="width:260px"><col style="width:80px"><col style="width:150px"><col style="width:150px"><col style="width:140px"><col style="width:80px"><col style="width:80px"><col></colgroup>
+        <thead><tr><th class="n"></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th></tr></thead>
+        <tbody>
+          <tr class="h"><td class="n">1</td><td>Clip</td><td>Type</td><td>Stage</td><td>Owner</td><td>Reviewer</td><td class="r">Due</td><td class="r">In stage</td><td>File</td></tr>
+          <tr class="band"><td class="n">2</td><td colspan="8">▾ Strategy Execution and Leadership <span style="font-weight:400;color:var(--muted)">· 12 clips · 4 to do · 2 editing · 2 in review · 3 published</span></td></tr>
+          <tr><td class="n">3</td><td class="c">Keeping Strategy on Track</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#2E9E4F">Published</span></td><td>Video Editor</td><td>Content Creator</td><td class="r">16 Nov</td><td class="r">–</td><td>Drive</td></tr>
+          <tr class="sel"><td class="n">4</td><td class="c">Strategy Deployment: The Missing Link</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#7C3AED">Editing</span></td><td>Graphic Designer</td><td></td><td class="r">18 Nov</td><td class="r">2d</td><td>Drive</td></tr>
+          <tr class="sel"><td class="n">5</td><td class="c">The Six Cs of Strategy Deployment</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#7C3AED">Editing</span></td><td>Graphic Designer</td><td></td><td class="r">18 Nov</td><td class="r">1d</td><td></td></tr>
+          <tr class="sel"><td class="n">6</td><td class="c">Connecting Every Team to the Strategy</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#0E9F9A">Ready to Edit</span></td><td>Unassigned</td><td></td><td class="r">20 Nov</td><td class="r">3d</td><td></td></tr>
+          <tr><td class="n">7</td><td class="c">Tie Rewards to What Matters Most</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#D97706">Edit Review</span></td><td>Video Editor</td><td>Content Creator</td><td class="r">21 Nov</td><td class="r">1d</td><td>Drive</td></tr>
+          <tr><td class="n">8</td><td class="c">Clear Roles Make Strategy Work</td><td><span class="pill">Reel</span></td><td><span class="st" style="--d:#9A9DA1">To Do</span></td><td>Graphic Designer</td><td></td><td class="r">22 Nov</td><td class="r">–</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bulk">
+      <div class="bar" role="toolbar" aria-label="Bulk edit">
+        <span class="count">3 clips selected</span>
+        <span class="btn on">Stage ▾
+          <div class="menu">
+            <div><i style="background:#9A9DA1"></i>To Do</div>
+            <div><i style="background:#0E9F9A"></i>Ready to Edit</div>
+            <div><i style="background:#7C3AED"></i>Editing</div>
+            <div class="hl"><i style="background:#D97706"></i>Edit Review</div>
+            <div><i style="background:#2E9E4F"></i>Ready to Publish</div>
+            <div><i style="background:#2E9E4F"></i>Published <small>asks for links</small></div>
+          </div>
+        </span>
+        <span class="btn">Owner ▾</span>
+        <span class="btn">Reviewer ▾</span>
+        <span class="btn">Type ▾</span>
+        <span class="btn">Priority ▾</span>
+        <span class="btn">Due ▾</span>
+        <span class="btn drop">Drop</span>
+        <button type="button" class="x" aria-label="Clear selection">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div><span style="color:var(--muted);margin-inline-end:8px">After choosing Edit Review:</span><span class="toast">Stage → Edit Review for 2 clips · 1 not changed (the board doesn't allow that move) <b>Undo</b></span></div>
+
+  <ul class="notes">
+    <li><b>Selecting:</b> the bar shows when two or more clip rows are selected: click a row number, Shift-click for a run, Ctrl-click to add one, or select cells that cross several rows. Video bands and "+ Clip" rows aren't counted. Esc or ✕ clears.</li>
+    <li><b>The choices:</b> Stage, Owner (the clip's editor), Reviewer (its task owner), Type, Priority and Due date, with the board's own lists and its date picker. Brand is left out: clips take their video's brand.</li>
+    <li><b>The board's rules:</b> the same server action as the board's bar. A clip someone can't edit, or a stage move the board doesn't allow, is left as it was and named in the message.</li>
+    <li><b>Undo:</b> one Undo in the message puts every changed clip back.</li>
+    <li><b>Drop:</b> asks first ("Drop 3 clips?"), as Drop does for one clip; Undo restores them. Dropped clips stay on the sheet under Show archived.</li>
+  </ul>
+</div>
+</body>
+</html>
