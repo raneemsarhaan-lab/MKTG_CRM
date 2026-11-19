@@ -32,6 +32,7 @@ import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
 import { NamePrompt } from '@/components/content/ThemeEditor'
+import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { clipLink, CLIP_LINK_COLS } from './SheetGrid'
 import type { LinkRole } from '@/types/index'
 
@@ -317,6 +318,45 @@ export function VideoSheet(p: VideoSheetProps) {
     }, 10_000)
   }
 
+  // ── bulk editing (design/video-sheet-bulk-bar.html) ─────────────────────
+  const [bulkIds, setBulkIds] = useState<string[]>([])
+  const [bulkHidden, setBulkHidden] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkTasks = bulkIds.map(id => p.tasks.find(x => x.id === id)).filter((x): x is Task => !!x && !x.dropped_at)
+  /** The board's bulk save, then one Undo that puts every changed clip back as it was. */
+  async function bulkApply(patch: BulkPatch) {
+    if (!p.api.bulkUpdate || !bulkTasks.length) return
+    const key = Object.keys(patch)[0] as keyof BulkPatch
+    const before = bulkTasks.map(x => ({ id: x.id, old: (x as unknown as Record<string, unknown>)[key] as string | null | undefined }))
+    setBulkBusy(true)
+    const res = await p.api.bulkUpdate(bulkTasks.map(x => x.id), patch)
+    setBulkBusy(false)
+    if (!res.success && !res.changed) { say(t('notSaved', { reason: why(res.error) })); return }
+    const text = res.refused ? t('bulk.doneSome', { n: res.changed, m: res.refused }) : t('bulk.done', { n: res.changed })
+    say(text, res.changed ? () => void bulkUndo(key, before) : undefined)
+  }
+  async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[]) {
+    const api = p.api
+    if (key === 'status') {
+      for (const b of before) if (b.old) await api.move(b.id, b.old as StageId)
+    } else {
+      const groups = new Map<string, string[]>()
+      for (const b of before) { const k = b.old ?? ''; groups.set(k, [...(groups.get(k) ?? []), b.id]) }
+      for (const [old, ids] of groups) {
+        const value = key === 'due_date' ? (old ? old.slice(0, 10) : '') : old
+        await api.bulkUpdate?.(ids, { [key]: value } as BulkPatch)
+      }
+    }
+    say(t('bulk.undone'))
+  }
+  async function bulkDrop() {
+    const list = bulkTasks.filter(canEdit)
+    let n = 0
+    for (const x of list) { const r = await p.api.drop(x.id); if (r.success) n++ }
+    say(t('bulk.dropped', { n }), n ? () => { void (async () => { for (const x of list) await p.api.restore(x.id); say(t('bulk.undone')) })() } : undefined)
+    setBulkIds([])
+  }
+
   async function drop(task: Task) {
     closePopup(true)
     const r = await p.api.drop(task.id)
@@ -506,6 +546,7 @@ export function VideoSheet(p: VideoSheetProps) {
             boardField={boardField}
             themes={p.themes}
             menuRef={menuRef}
+            onSelectClips={ids => { setBulkIds(ids); setBulkHidden(false) }}
             rows={rows}
             columns={cl}
             me={me}
@@ -617,6 +658,25 @@ export function VideoSheet(p: VideoSheetProps) {
             }}
           />
         </SheetPopover>
+      )}
+      {!bulkHidden && bulkTasks.length >= 2 && p.api.bulkUpdate && (
+        <BulkBar
+          count={bulkTasks.length}
+          fields={['stage', 'assignee', 'owner', 'type', 'priority', 'due']}
+          labels={{
+            count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.owner'), owner: t('bulk.reviewer'),
+            type: t('bulk.type'), priority: t('bulk.priority'), due: t('bulk.due'), remove: t('bulk.drop'), confirm: t('bulk.dropConfirm', { n: bulkTasks.length }),
+            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'),
+          }}
+          members={p.members}
+          brands={[]}
+          types={p.contentTypes.map(c => ({ ...c } as unknown as import('@/types/index').ContentType))}
+          busy={bulkBusy}
+          note=""
+          onApply={patch => void bulkApply(patch)}
+          onDelete={() => void bulkDrop()}
+          onClear={() => setBulkHidden(true)}
+        />
       )}
       {popup?.kind === 'video' && (
         <SheetPopover anchor={popup.anchor} label={t('newVideo.title')} onClose={closePopup}>
