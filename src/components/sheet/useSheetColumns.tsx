@@ -54,6 +54,8 @@ export interface UseSheetColumns {
   canEdit(task: Task): boolean
   say(text: string, undo?: () => void): void
   onNote(cellKey: string, note: string | null): void
+  /** More items for a column's menu (the Video sheet's "Link to a board field…"). */
+  extraMenu?(key: string, anchor: HTMLElement): MenuItem[]
 }
 
 export function useSheetColumns(o: UseSheetColumns) {
@@ -143,6 +145,7 @@ export function useSheetColumns(o: UseSheetColumns) {
       items.push({ key: 'hide', group: '  ', text: t('hide'), label: t('hide'), hint: sheet === 'video' ? t('hideIn', { set: setName(set) }) : undefined,
         onSelect: pick(() => void run(api.setShown(sheet, key, set, false), t('hidden', { name: nameOf(key) }))) })
     }
+    items.push(...(o.extraMenu?.(key, anchor) ?? []).map(it => ({ ...it, onSelect: () => { close(false); it.onSelect() } })))
     if (c.kind) {
       items.push({ key: 'edit', group: '   ', text: t('edit'), label: t('edit'), onSelect: () => setPopup({ kind: 'editor', anchor, col: c }) })
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => setPopup({ kind: 'delete', anchor, col: c }) })
@@ -494,6 +497,14 @@ export function useSheetColumns(o: UseSheetColumns) {
       id: c.key.slice(2), key: c.key, name: nameOf(c.key), kind: c.kind as ColumnKind, ctx: ctxFor(c),
     })),
     /** "Add as a column" for a pasted heading no column has (FR-052): a Text column at the end. */
+    /** A new Text column, and its key (for a column that will follow a board field). */
+    addTextColumnKey: async (name: string): Promise<{ key?: string; error?: string }> => {
+      const bad = nameError(name)
+      if (bad) return { error: bad }
+      const r = await api.add(sheet, { name, kind: 'text', set: sheet === 'video' ? set : undefined })
+      if (!r.success || !r.column) return { error: err(r.error) }
+      return { key: r.column.key }
+    },
     addTextColumn: async (name: string): Promise<string | null> => {
       const bad = nameError(name)
       if (bad) return bad

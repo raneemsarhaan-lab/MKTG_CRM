@@ -6,7 +6,8 @@
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
 import { useLocale, useTranslations } from 'next-intl'
-import type { Member, SheetColumn, SLAConfig, Task, TaskField, WordField } from '@/types/index'
+import type { ContentTheme, Member, SheetColumn, SLAConfig, Task, TaskField, WordField } from '@/types/index'
+import type { MutableRefObject } from 'react'
 import { contentTypeColor } from '@/lib/tokens'
 import { businessDaysBetween } from '@/lib/utils'
 import { COLUMN_WIDTHS, ROW_NO_WIDTH } from './columns'
@@ -54,6 +55,10 @@ export function clipLink(task: Task, col: typeof CLIP_LINK_COLS[number]): string
   const a = (task.attachments ?? []).filter(x => x.link_role === role)
   return a.length ? a[a.length - 1].url ?? null : null
 }
+/** The board fields a Video sheet column can follow (design/video-sheet-v5.html). */
+export const CLIP_FIELDS = ['priority', 'platform', 'theme', 'pillar', 'owner', 'due'] as const
+export type ClipField = typeof CLIP_FIELDS[number]
+const LINK_ICON = <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-.9.9M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l.9-.9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
 /** From Edit Review on, a clip shows who signs it off. */
 const REVIEW_FROM = STAGE_ORDER.indexOf('d-check')
 
@@ -99,6 +104,12 @@ export interface SheetGridProps {
   setName?: string
   /** Each stage's time limit (business days) by content type: In stage turns red past it. */
   slaConfig?: SLAConfig
+  /** A column linked to a board field saves through this (design/video-sheet-v5.html): null, or why not. */
+  boardField?(task: Task, field: string, value: string): Promise<string | null>
+  /** Themes, for the names in a column linked to Theme or Pillar. */
+  themes?: ContentTheme[]
+  /** The column menu's extra items, filled in here (the column hook lives in VideoSheet). */
+  menuRef?: MutableRefObject<((key: string, anchor: HTMLElement) => MenuItem[]) | null>
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
   linked?: {
     drop(taskId: string): Promise<boolean>
@@ -134,6 +145,8 @@ export function SheetGrid(p: SheetGridProps) {
       ?? matchStage(text, STAGE_ORDER.map(id => ({ id, names: [STAGE_META[id as StageId].label_en, STAGE_META[id as StageId].label_ar] })))
   }
   function commitWord(row: SheetRow, col: GridCol, value: string): Promise<string | null> {
+    const lfc = linkedOf(col)
+    if (lfc) return row.kind === 'clip' && p.boardField ? p.boardField(row.task, lfc, value) : Promise.resolve(null)
     if (col === 'status' && (row.kind === 'clip' || row.kind === 'video')) {
       const v = readStage(value)
       if (!v) return Promise.resolve(tf('notAStage', { text: value.trim() }))
@@ -160,6 +173,8 @@ export function SheetGrid(p: SheetGridProps) {
   const [drawer, setDrawer] = useState(false)
   const [valuesFor, setValuesFor] = useState<WordField | null>(null)
   const [addAt, setAddAt] = useState<HTMLElement | null>(null)
+  /** "Link to a board field…": which column (null: a new one from ＋) and where the field list opens. */
+  const [fieldMenu, setFieldMenu] = useState<{ anchor: HTMLElement; key: string | null } | null>(null)
   useEffect(() => {
     const on = () => setDrawer(true)
     document.addEventListener(FIELDS_OPEN, on)
@@ -168,8 +183,26 @@ export function SheetGrid(p: SheetGridProps) {
 
   const cl = p.columns
   const isCustom = (col: GridCol) => cl.custom.is(col)
+  /** The board field a custom column follows, if any. */
+  const linkedOf = (col: GridCol): ClipField | undefined => {
+    const f = isCustom(col) ? viewRef.current.colFields?.[col] : undefined
+    return f && (CLIP_FIELDS as readonly string[]).includes(f) ? f as ClipField : undefined
+  }
+  const themeOf = (task: Task) => p.themes?.find(x => x.id === task.project_id)
+  /** A clip's value for a board field, as text (`edit`: as typed back, dates as YYYY-MM-DD). */
+  function fieldText(task: Task, f: ClipField, edit = false): string {
+    switch (f) {
+      case 'priority': return task.priority ?? ''
+      case 'platform': return task.platform ?? ''
+      case 'theme': return themeOf(task)?.name ?? ''
+      case 'pillar': return themeOf(task)?.pillars.find(x => x.id === task.pillar_id)?.name ?? ''
+      case 'owner': return membersById.get(task.task_owner_id)?.name ?? ''
+      case 'due': return task.due_date ? (edit ? task.due_date.slice(0, 10) : dueText(task.due_date)) : ''
+    }
+  }
   const isText = (row: SheetRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
+    if (linkedOf(col)) return row.kind === 'clip' && !row.task.dropped_at && p.canEdit(row.task)
     // Spec 019 stage 3: Status takes typed and pasted words too (the menu stays on click and Enter).
     if (col === 'status' && (row.kind === 'clip' || row.kind === 'video')) return !row.task.dropped_at
     if (isCustom(col)) return (row.kind === 'clip' || row.kind === 'video') && cl.custom.isText(row.task, col)
@@ -180,6 +213,7 @@ export function SheetGrid(p: SheetGridProps) {
   const isMenu = (row: SheetRow, col: GridCol) => {
     if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
     if (col === 'rowNo') return true
+    if (linkedOf(col)) return false
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'video') return false
     return ['status', 'editor', 'type', 'files', 'published', 'drop', 'doc', 'design', 'post', 'task'].includes(col)
@@ -222,9 +256,12 @@ export function SheetGrid(p: SheetGridProps) {
       const named = cl.laid.find(c => c.key === col)?.name
       const text = col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`)))
       // The redesign: plain names under the column letters, as in a spreadsheet.
+      // A column that follows a board field carries a link badge.
+      const lk = linkedOf(col)
+      const badge = lk ? tf('linkedBadge', { field: tf(`names.${lk}`) }) : ''
       return {
-        text,
-        label: col === 'drop' && !named ? t('col.drop') : undefined,
+        text: lk ? <><span className="fx-vs-lk" role="img" aria-label={badge} title={badge} data-linked-field={lk}>{LINK_ICON}</span>{text}</> : text,
+        label: col === 'drop' && !named ? t('col.drop') : lk && typeof text === 'string' ? text : undefined,
         sort: col === 'clipNo' ? 'ascending' : undefined,
         className: ['due', 'inStage', 'clipNo', 'in', 'out', 'length'].includes(col) ? 'is-num' : undefined,
       }
@@ -238,7 +275,7 @@ export function SheetGrid(p: SheetGridProps) {
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'clip' && row.kind !== 'video') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
-      return isCustom(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
+      return isCustom(col) && !linkedOf(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
     },
     rowProps: row => {
       const task = rowTask(row)
@@ -265,7 +302,8 @@ export function SheetGrid(p: SheetGridProps) {
       if (col === 'inStage' && row.kind === 'clip' && inStage(row.task)?.late) c.push('is-late')
       if (['source', 'fileName'].includes(col)) c.push('fx-sheet-mono')
       if (isMenu(row, col) || row.kind === 'add') c.push('is-action')
-      if (isCustom(col)) c.push('is-custom', cl.custom.cellClass(col))
+      if (isCustom(col)) c.push('is-custom', linkedOf(col) ? 'is-linked' : cl.custom.cellClass(col))
+      if (linkedOf(col) === 'due') c.push('fx-sheet-num')
       return c.join(' ')
     },
     isText,
@@ -273,6 +311,8 @@ export function SheetGrid(p: SheetGridProps) {
     textValue: (row, col) => {
       const task = rowTask(row)
       if (!task) return ''
+      const lft = linkedOf(col)
+      if (lft) return row.kind === 'clip' ? fieldText(task, lft, true) : ''
       if (isCustom(col)) return cl.custom.textValue(task, col)
       switch (col) {
         case 'title':    return task.name
@@ -294,6 +334,7 @@ export function SheetGrid(p: SheetGridProps) {
     inputDir: col => (['in', 'out', 'clipNo', 'fileName'].includes(col) ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       const task = rowTask(row)
+      if (task && linkedOf(col)) return task.dropped_at ? t('drop.droppedSr') : !p.canEdit(task) ? t('readOnly') : null
       if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
       return task && TEXT_COLS.includes(col) && !(row.kind === 'clip' && task.dropped_at) && !p.canEdit(task) ? t('readOnly') : null
     },
@@ -301,12 +342,14 @@ export function SheetGrid(p: SheetGridProps) {
     onCancelDraft: row => p.onCancelDraft(row.key.slice(2)),
     onOpen: p.onOpen,
     onActivate: (row, col) => {
-      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) return cl.custom.activate(row.task, col, row.key)
+      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col) && !linkedOf(col)) return cl.custom.activate(row.task, col, row.key)
       if (row.kind === 'add' && col === 'title') { p.onAddClip(row.video.id); return true }
       return row.kind === 'add'
     },
     onToggle: row => { if (row.kind !== 'video') return false; p.onToggle(row.task.id); return true },
     onDelete: (row, col, anchor) => {
+      const lfd = linkedOf(col)
+      if (lfd) { if (row.kind === 'clip' && p.boardField) void p.boardField(row.task, lfd, '').then(err => { if (err) p.onNote(`${row.key}|${col}`, err) }); return true }
       if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) { cl.custom.clear(row.task, col, row.key); return true }
       if (row.kind !== 'clip') return false
       p.onDelete(row, anchor); return true
@@ -323,6 +366,15 @@ export function SheetGrid(p: SheetGridProps) {
       const task = row.task
       const isVideo = row.kind === 'video'
       const can = p.canEdit(task)
+      const lfr = linkedOf(col)
+      if (lfr) {
+        if (isVideo) return null
+        if (lfr === 'owner') { const m = membersById.get(task.task_owner_id); return m ? <EditorContent member={m} t={t} /> : null }
+        const v = fieldText(task, lfr)
+        if (!v) return null
+        if (lfr === 'priority') return <span className={`fx-vs-prio is-${v.toLowerCase()}`}>{v}</span>
+        return <span className="fx-sheet-ellipsis" title={v}>{v}</span>
+      }
       if (isCustom(col)) return cl.custom.render(task, col)
       switch (col) {
         case 'rowNo': return row.n
@@ -468,11 +520,53 @@ export function SheetGrid(p: SheetGridProps) {
     }
   }
   const closeBack = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-video-sheet] .fx-sheet-td.is-active, [data-video-sheet] [data-cell][tabindex="0"]')?.focus())
+  // ── design/video-sheet-v5.html: columns that follow a board field ──
+  const linkColumn = (key: string, f: ClipField) => {
+    void lv.store.saveView({ ...view, colFields: { ...(view.colFields ?? {}), [key]: f } })
+      .then(ok => { if (ok) p.linked?.say(tf('linkedTo', { name: cl.nameOf(key) || '', field: tf(`names.${f}`) })) })
+  }
+  /** Unlink: the column keeps the values it shows, as its own. */
+  async function unlinkColumn(key: string) {
+    const f = linkedOf(key)
+    if (!f) return
+    for (const r of p.rows) {
+      if (r.kind !== 'clip') continue
+      const v = fieldText(r.task, f, true)
+      if (v) await cl.custom.set(r.task, key, v, r.key)
+    }
+    const rest = { ...(view.colFields ?? {}) }
+    delete rest[key]
+    if (await lv.store.saveView({ ...view, colFields: rest })) p.linked?.say(tf('unlinked', { name: cl.nameOf(key) || '' }))
+  }
+  async function addLinked(f: ClipField) {
+    const r = await cl.addTextColumnKey(tf(`names.${f}`))
+    if (r.error || !r.key) { p.linked?.say(r.error ?? tf('notSaved')); return }
+    linkColumn(r.key, f)
+  }
+  if (p.menuRef) {
+    p.menuRef.current = (key, anchor) => {
+      // Saved in the sheet's view, which the Sheets page provides.
+      if (!isCustom(key) || !lv.store.enabled) return []
+      return linkedOf(key)
+        ? [{ key: 'unlinkField', group: '    ', text: tf('unlinkField'), label: tf('unlinkField'), onSelect: () => void unlinkColumn(key) }]
+        : [{ key: 'linkField', group: '    ', text: tf('linkField'), label: <span className="fx-fd-mi"><span className="fx-vs-lk" aria-hidden="true">{LINK_ICON}</span>{tf('linkField')}</span>, onSelect: () => setFieldMenu({ anchor, key }) }]
+    }
+  }
+  const linkedNow = new Set(Object.values(view.colFields ?? {}))
+  const fieldItems: MenuItem[] = fieldMenu ? CLIP_FIELDS.map(f => ({
+    key: `field-${f}`, text: tf(`names.${f}`), label: tf(`names.${f}`), hint: linkedNow.has(f) ? tf('alreadyLinked') : undefined,
+    onSelect: () => { const at = fieldMenu; setFieldMenu(null); if (at.key) linkColumn(at.key, f); else void addLinked(f) },
+  })) : []
   const addItems: MenuItem[] = addAt ? [
     ...laid.filter(c => c.builtIn && !c.shown).map(c => ({
       key: c.key, text: colLabel(c.key) || t('col.drop'), group: tf('fieldsTitle'),
       label: <span className="fx-fd-mi">{FIELD_OF[c.key] && <FieldIcon field={FIELD_OF[c.key]} />}{colLabel(c.key) || t('col.drop')}</span>,
       onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
+    })),
+    ...CLIP_FIELDS.filter(f => lv.store.enabled && f !== 'due' && !linkedNow.has(f)).map(f => ({
+      key: `board-${f}`, text: tf(`names.${f}`), group: tf('boardFieldsTitle'),
+      label: <span className="fx-fd-mi"><span className="fx-vs-lk" aria-hidden="true">{LINK_ICON}</span>{tf(`names.${f}`)}</span>,
+      onSelect: () => { setAddAt(null); void addLinked(f) },
     })),
     { key: 'regular', text: tf('spreadsheetCol'), group: tf('regularTitle'), label: <span className="fx-fd-mi"><FieldIcon field="regular" />{tf('spreadsheetCol')}</span>,
       onSelect: () => { const a = addAt; setAddAt(null); cl.openAdd(a) } },
@@ -494,6 +588,7 @@ export function SheetGrid(p: SheetGridProps) {
     {lf.node}
     {tips.node}
     {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
+    {fieldMenu && <SheetMenu anchor={fieldMenu.anchor} label={tf('linkField')} items={fieldItems} onClose={() => setFieldMenu(null)} />}
     {drawer && (
       <PresetFieldsDrawer
         rowsName={tf('rowsVideo')} rowsHelp={tf('rowsVideoHelp', { set: p.setName ?? '' })}

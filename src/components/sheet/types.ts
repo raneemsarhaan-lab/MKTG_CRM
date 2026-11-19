@@ -5,7 +5,7 @@
  * same shape. Every `api` call updates the host's shared task state
  * optimistically, so the sheet keeps no copy of task data.
  */
-import type { Member, MoveTaskResult, StageId, Task, BoardView, SLAConfig } from '@/types/index'
+import type { Member, MoveTaskResult, StageId, Task, BoardView, SLAConfig, ContentTheme } from '@/types/index'
 import type { UploadFn } from '@/components/kanban/attachments/useUploadQueue'
 import type { PasteTarget, PasteValueColumn } from '@/lib/sheet-columns'
 
@@ -49,6 +49,10 @@ export interface SheetApi {
   upload(taskId: string): UploadFn
   drop(taskId: string): Promise<Result>
   restore(taskId: string): Promise<Result>
+  /** A board field of a clip, from a column linked to it (design/video-sheet-v5.html). */
+  writeField?(taskId: string, field: string, value: string): Promise<Result>
+  /** "+ Video": a new video, ready for clips. */
+  addVideo?(name: string): Promise<Result & { id?: string }>
   /** Spec 013 FR-044: a row's height on a linked sheet, shared by the team (null: the default). */
   setRowHeights?(kind: 'linked_content' | 'linked_video', entries: { taskId: string; height: number | null }[]): Promise<Result>
 }
@@ -77,6 +81,8 @@ export interface VideoSheetProps {
   rowHeights?: Record<string, number>
   /** Each stage's time limit by content type, for In stage (business days). */
   slaConfig?: SLAConfig
+  /** Themes, for columns linked to Theme or Pillar. */
+  themes?: ContentTheme[]
 }
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────

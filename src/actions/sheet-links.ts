@@ -373,3 +373,30 @@ export async function createTasksForRows(sheetId: string, rows: { rowId: string;
   }
   return { success: true, created, problems, tasks: await linkedTasks(created.map(c => c.taskId), s.map, s.m) }
 }
+
+// ─── The Video sheet's board-linked columns (design/video-sheet-v5.html) ─────
+
+/** The fields a Video sheet column can follow. */
+const CLIP_FIELDS = ['priority', 'platform', 'theme', 'pillar', 'owner', 'due'] as const
+
+/**
+ * One board field of one clip, from a Video sheet column linked to it: the
+ * same parsing as a team sheet's mapped cell (names, dates, stage words) and
+ * the board's own action, so the sheet can never do what the board refuses.
+ */
+export async function writeClipField(taskId: string, field: string, value: string): Promise<{ success: true } | Fail> {
+  const m = await getSessionMember()
+  if (!m) return fail('not_authenticated')
+  if (!isId(taskId) || !(CLIP_FIELDS as readonly string[]).includes(field)) return fail('bad_value')
+  const task = await prisma.task.findUnique({ where: { id: taskId }, select: { dropped_at: true } })
+  if (!task) return fail('gone')
+  if (task.dropped_at) return fail('dropped')
+  const [members, themes] = await Promise.all([
+    field === 'owner' ? prisma.member.findMany({ select: { id: true, name: true } }) : [],
+    field === 'theme' ? prisma.project.findMany({ where: { is_theme: true }, select: { id: true, name: true } }) : [],
+  ])
+  const out = await writeOne(taskId, field as TaskField, typeof value === 'string' ? value.slice(0, 500) : '', { members, themes, types: [] })
+  if (out.error) return fail(out.error)
+  revalidatePath('/board')
+  return { success: true }
+}

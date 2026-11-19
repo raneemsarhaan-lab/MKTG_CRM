@@ -905,6 +905,32 @@ export async function createTask(
 }
 
 /**
+ * "+ Video" on the Video sheet (design/video-sheet-v5.html): a video task in
+ * To do, owned by the member, with no due date yet. Its band shows at once,
+ * ready for clips.
+ */
+export async function addVideo(name: string): Promise<{ success: boolean; id?: string; error?: string }> {
+  const auth = await requireTaskCreator()
+  if (auth.error) return { success: false, error: auth.error }
+  const member = auth.member
+  const n = (typeof name === 'string' ? name : '').replace(/\s+/g, ' ').trim().slice(0, 200)
+  if (!n) return { success: false, error: 'no_name' }
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+  const task = await prisma.task.create({
+    data: {
+      name: n, content_type_label: 'Video', task_owner_id: member.id, assignee_id: member.id, initiator_role: member.role,
+      nine_stage: ws?.nine_stage_default ?? false, status: 'todo', stage_date: new Date(), priority: 'Medium', created_by: member.id,
+    },
+  })
+  await notifyAfter(async tx => {
+    await follow(tx, task.id, member.id)
+    return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
+  })
+  revalidatePath('/board')
+  return { success: true, id: task.id }
+}
+
+/**
  * Create many tasks at once, from a pasted list.
  *
  * Everything except the name is shared: one brand, one owner, one due date.

@@ -341,7 +341,7 @@ function cleanSort(x: unknown): SortKey[] {
 }
 /** The filter area, filter and sort kept in `sheets.view` (null clears one). */
 async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
-  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v) && !('look' in v) && !('slicers' in v) && !('advanced' in v) && !('outline' in v)) return
+  if (!('filterArea' in v) && !('filter' in v) && !('sort' in v) && !('groupBy' in v) && !('words' in v) && !('show' in v) && !('look' in v) && !('slicers' in v) && !('advanced' in v) && !('outline' in v) && !('colFields' in v)) return
   const cur = await tx.sheet.findUnique({ where: { id: sheetId }, select: { view: true } })
   const next = { ...((cur?.view ?? {}) as Record<string, unknown>) }
   if ('filterArea' in v) {
@@ -364,6 +364,15 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
     const w = cleanWords({ words: 'words' in v ? v.words ?? undefined : next.words as SheetView['words'], show: 'show' in v ? v.show ?? undefined : next.show as SheetView['show'] })
     if (w.words) next.words = w.words; else delete next.words
     if (w.show) next.show = w.show; else delete next.show
+  }
+  // The Video sheet's board-linked columns: a custom column's key → one of the fields a clip column can follow.
+  if ('colFields' in v) {
+    const out: Record<string, string> = {}
+    const src = v.colFields && typeof v.colFields === 'object' ? v.colFields : {}
+    for (const [k, f] of Object.entries(src).slice(0, 30)) {
+      if (/^c:[0-9a-f-]{36}$/i.test(k) && typeof f === 'string' && ['priority', 'platform', 'theme', 'pillar', 'owner', 'due'].includes(f)) out[k] = f
+    }
+    if (Object.keys(out).length) next.colFields = out; else delete next.colFields
   }
   // Spec 020: slicers, the advanced filter in place, outline groups (blank sheets).
   if ('slicers' in v) { const x = cleanSlicers(v.slicers); if (x.length) next.slicers = x; else delete next.slicers }
@@ -937,7 +946,7 @@ export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success:
  * team's own columns, and never a change to the tasks. Merges aren't offered
  * there (FR-074), so a call with merges is refused as `linked`.
  */
-export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea' | 'groupBy' | 'words' | 'show'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
+export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea' | 'groupBy' | 'words' | 'show' | 'colFields'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
   if (changes.merges || changes.tables) return fail('linked')
@@ -951,7 +960,7 @@ export async function applyLinkedFormats(sheetId: string, changes: { formats?: F
     if (formats.length) await writeFormats(tx, sheet.id, m.id, formats)
     // Stage 3 (FR-075): rules over whole columns, and a sort and filter that live in the sheet, never on the board.
     if (changes.rules) await writeRules(tx, sheet.id, { put: changes.rules.put?.map(r => ({ ...r, range: { rows: 'all', cols: r.range?.cols ?? [] } })), remove: changes.rules.remove })
-    if (changes.view) await writeViewJson(tx, sheet.id, { ...('filter' in changes.view ? { filter: changes.view.filter } : {}), ...('sort' in changes.view ? { sort: changes.view.sort } : {}), ...('filterArea' in changes.view ? { filterArea: changes.view.filterArea ? { header: null, cols: [] } : null } : {}), ...('groupBy' in changes.view ? { groupBy: changes.view.groupBy } : {}), ...('words' in changes.view ? { words: changes.view.words } : {}), ...('show' in changes.view ? { show: changes.view.show } : {}) })
+    if (changes.view) await writeViewJson(tx, sheet.id, { ...('filter' in changes.view ? { filter: changes.view.filter } : {}), ...('sort' in changes.view ? { sort: changes.view.sort } : {}), ...('filterArea' in changes.view ? { filterArea: changes.view.filterArea ? { header: null, cols: [] } : null } : {}), ...('groupBy' in changes.view ? { groupBy: changes.view.groupBy } : {}), ...('words' in changes.view ? { words: changes.view.words } : {}), ...('show' in changes.view ? { show: changes.view.show } : {}), ...('colFields' in changes.view ? { colFields: changes.view.colFields } : {}) })
     await bumpFolder(tx, sheet.folder_id, m.id)
     return null
   }, { timeout: 30_000 }).catch(e => { if (e instanceof Refuse) return e; throw e })
