@@ -320,6 +320,8 @@ export function VideoSheet(p: VideoSheetProps) {
 
   // ── bulk editing (design/video-sheet-bulk-bar.html) ─────────────────────
   const [bulkIds, setBulkIds] = useState<string[]>([])
+  /** What the sheet calls each stage, from the grid (its own words or the video names), for the bar's Stage list. */
+  const bulkWord = useRef<((id: StageId) => string) | null>(null)
   const [bulkHidden, setBulkHidden] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkTasks = bulkIds.map(id => p.tasks.find(x => x.id === id)).filter((x): x is Task => !!x && !x.dropped_at)
@@ -546,7 +548,7 @@ export function VideoSheet(p: VideoSheetProps) {
             boardField={boardField}
             themes={p.themes}
             menuRef={menuRef}
-            onSelectClips={ids => { setBulkIds(ids); setBulkHidden(false) }}
+            onSelectClips={(ids, word) => { bulkWord.current = word; setBulkIds(ids); setBulkHidden(false) }}
             rows={rows}
             columns={cl}
             me={me}
@@ -676,6 +678,7 @@ export function VideoSheet(p: VideoSheetProps) {
           onApply={patch => void bulkApply(patch)}
           onDelete={() => void bulkDrop()}
           onClear={() => setBulkHidden(true)}
+          stageName={id => bulkWord.current?.(id) ?? names.video(id)}
         />
       )}
       {popup?.kind === 'video' && (

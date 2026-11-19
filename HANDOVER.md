@@ -865,7 +865,7 @@ Design: `design/video-sheet-v5.html`, approved, with one level of grouping (no t
 Design: `design/video-sheet-bulk-bar.html`, approved.
 
 - Selecting two or more clip rows brings up the board's `BulkBar`. `SheetGrid`'s `onSelectClips` reports the clip task ids in the selection; band and "+ Clip" rows aren't counted, and dropped clips are left out.
-- `BulkBar` takes `fields` and `labels` props. The board keeps its defaults. The sheet passes Stage, Owner (`assignee`), Reviewer (`owner`, the task owner), Type, Priority and Due, and Drop instead of Delete.
+- `BulkBar` takes `fields` and `labels` props. The board keeps its defaults. The sheet passes Stage, Owner (`assignee`), Reviewer (`owner`, the task owner), Type, Priority and Due, and Drop instead of Delete. Its Stage list uses the sheet's stage names (`stageName`, passed from `SheetGrid` through `onSelectClips`), with the board's name beside each.
 - Writes go through `SheetApi.bulkUpdate`, which calls the board's `bulkUpdateTasks`, so the board's rules apply. Clips it refuses are counted in the message. Undo puts back each clip's old value: stages move back one clip at a time, and other fields are grouped by old value. Drop asks first, and Undo restores the clips.
 - **Checks:** `lab:sheet` (155, `us6-bulk`).
 

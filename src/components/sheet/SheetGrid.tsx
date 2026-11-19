@@ -109,7 +109,8 @@ export interface SheetGridProps {
   /** Themes, for the names in a column linked to Theme or Pillar. */
   themes?: ContentTheme[]
   /** The clips inside the selection (whole rows or cells across rows), for the bulk bar. */
-  onSelectClips?(taskIds: string[]): void
+  /** The clip rows in the selection, and what this sheet calls each stage (for the bulk bar's Stage list). */
+  onSelectClips?(taskIds: string[], stageWord: (id: StageId) => string): void
   /** The column menu's extra items, filled in here (the column hook lives in VideoSheet). */
   menuRef?: MutableRefObject<((key: string, anchor: HTMLElement) => MenuItem[]) | null>
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
@@ -520,7 +521,7 @@ export function SheetGrid(p: SheetGridProps) {
       }
     }
     const sig = ids.join(',')
-    if (sig !== lastClips.current) { lastClips.current = sig; p.onSelectClips(ids) }
+    if (sig !== lastClips.current) { lastClips.current = sig; p.onSelectClips(ids, id => stageWord(id)) }
   }
 
   // ── spec 019 stage 3: ⚙ Fields, ＋ and Values ──
