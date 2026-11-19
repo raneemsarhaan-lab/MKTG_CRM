@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video sheet themes</title>
+<title>Video sheet groups</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
 <style>
@@ -148,8 +148,8 @@ th.nw { background: #FFF4C2; color: #6B5300; }
 </head>
 <body>
 <div class="wrap">
-  <h1 class="doc">Video sheet: themes and board-linked columns</h1>
-  <p class="lede">Two additions to the merged Video sheet. <b>Themes:</b> videos group under their theme, like the Content sheet (Theme › Video › clips), with "+ Theme" in the bar and a theme chip on each video to move it. <b>Board-linked columns:</b> any extra column can follow a board field, so its cells show and save the task's value.</p>
+  <h1 class="doc">Video sheet: + Video and board-linked columns</h1>
+  <p class="lede">One level of grouping: each video is the group, as a theme is on the Content sheet. <b>+ Video</b> in the bar (the Video sheet's "+ Theme") adds a new video band, ready for clips. <b>Board-linked columns:</b> any extra column can follow a board field, so its cells show and save the task's value.</p>
   <p class="note">Try the column menu: the open menu on column O shows "Link to a board field…" and the fields it offers. Columns that follow the board carry a small link badge.</p>
 
   <div class="frame">
@@ -158,7 +158,7 @@ th.nw { background: #FFF4C2; color: #6B5300; }
       <span class="sp"></span>
       <span class="pair" role="group" aria-label="View"><button type="button">Board</button><button type="button" class="on" aria-pressed="true">Sheet</button></span>
       <span class="search">⌕ Search</span>
-      <button type="button" class="theme-btn">+ Theme</button>
+      <button type="button" class="theme-btn">+ Video</button>
       <button type="button" class="more" title="Menus: File, Edit, View, Insert, Format, Data and the formatting toolbar" aria-label="More">⋯</button>
       <button type="button" class="new">+ New clip</button>
     </div>
@@ -169,8 +169,7 @@ th.nw { background: #FFF4C2; color: #6B5300; }
         <thead><tr><th class="rn"></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th class="nw lk-h">O<div class="hmenu"><div>Rename</div><div>Hide</div><div class="on">🔗 Link to a board field…</div><div class="sub">Priority ✓<br>Platform<br>Theme · Pillar<br>Owner · Due date</div><hr><div>Delete column</div></div></th></tr></thead>
         <tbody id="g">
           <tr class="hdr"><td class="rn">1</td><td>Clip</td><td>Type</td><td>Stage</td><td>Owner</td><td>Reviewer</td><td class="r">Due</td><td class="r">In stage</td><td>File</td><td>Working Doc</td><td>Design Link</td><td>Task Link</td><td>LinkedIn Link</td><td>Published Link</td><td>Archive</td><td><span class="lbadge">🔗</span>Priority</td></tr>
-          <tr class="tband"><td class="rn"></td><td colspan="15"><div class="tin"><span>▾</span>Strategy <i>· 2 videos · 13 clips</i><span class="addv">+ Video</span></div></td></tr>
-          <tr class="band" data-band="a"><td class="rn">2</td><td colspan="15"><div class="bandin"><span class="car" data-car="a">⌄</span><b>Retreat Session Audios</b><span class="thchip">◆ Strategy ▾</span><span class="n">8 clips</span>
+          <tr class="band" data-band="a"><td class="rn">2</td><td colspan="15"><div class="bandin"><span class="car" data-car="a">⌄</span><b>Retreat Session Audios</b><span class="n">8 clips</span>
             <span class="bar"><span style="width:37.5%;background:var(--todo)"></span><span style="width:12.5%;background:var(--edit)"></span><span style="width:50%;background:var(--rev)"></span></span>
             <span class="mix">3 to do · 1 editing · 4 in review · 0 published</span><span class="due">Due <b>25 Nov</b></span></div></td></tr>
           <tr class="sel" data-in="a" data-s="rev" data-me="1"><td class="rn">3</td><td class="clip">Hesham</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">20 Nov</td><td class="r late">3d</td><td><a class="fpill" title="Hesham_v2.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>Hesham_v2.mp4</span></a> <a class="fpill more" title="2 more files">+2</a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td><td><span class="prio m">Medium</span></td></tr>
@@ -182,8 +181,7 @@ th.nw { background: #FFF4C2; color: #6B5300; }
           <tr data-in="a" data-s="rev" data-me="1"><td class="rn">9</td><td class="clip">Ramy</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">22 Nov</td><td class="r">4h</td><td><a class="fpill" title="Ramy_v1.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>Ramy_v1.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td><td><span class="prio m">Medium</span></td></tr>
           <tr data-in="a" data-s="todo"><td class="rn">10</td><td class="clip">Waleed Fahmy</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st todo">To Do</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td></td><td class="r">25 Nov</td><td class="dash">—</td><td></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td><td><span class="prio m">Medium</span></td></tr>
           <tr class="add" data-in="a"><td class="rn">11</td><td class="t" colspan="15">+ Add clip</td></tr>
-          <tr class="tband"><td class="rn"></td><td colspan="15"><div class="tin"><span>▾</span>Newsjacking <i>· 1 video · 5 clips</i><span class="addv">+ Video</span></div></td></tr>
-          <tr class="band" data-band="b"><td class="rn">12</td><td colspan="15"><div class="bandin"><span class="car" data-car="b">⌄</span><b>The Client's Chair</b><span class="thchip">◆ Newsjacking ▾</span><span class="n">5 clips</span>
+          <tr class="band" data-band="b"><td class="rn">12</td><td colspan="15"><div class="bandin"><span class="car" data-car="b">⌄</span><b>The Client's Chair</b><span class="n">5 clips</span>
             <span class="bar"><span style="width:60%;background:var(--todo)"></span><span style="width:40%;background:var(--rev)"></span></span>
             <span class="mix">3 to do · 0 editing · 2 in review · 0 published</span><span class="due">Due <b>2 Dec</b></span></div></td></tr>
           <tr data-in="b" data-s="rev" data-me="1"><td class="rn">13</td><td class="clip">Episode 01</td><td><span class="pill" style="background:#D9480F">Reel</span></td><td><span class="st rev">In review</span></td><td><span class="who"><span class="av sa">SA</span>Salma</span></td><td><span class="who"><span class="av rs">RS</span>Raneem</span></td><td class="r">23 Nov</td><td class="r">2d</td><td><a class="fpill" title="ClientsChair_01.mp4"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2.5" fill="currentColor" opacity=".18"/><path d="M6.5 5.8v4.4l3.8-2.2z" fill="currentColor"/></svg><span>ClientsChair_01.mp4</span></a></td><td><span class="lk on">docs.google.com</span></td><td><span class="lk on">canva.com</span></td><td><span class="lk on">Open task</span></td><td><span class="lk">+ link</span></td><td><span class="lk">+ link</span></td><td><span class="arch">Archive</span></td><td><span class="prio m">Medium</span></td></tr>
@@ -201,7 +199,7 @@ th.nw { background: #FFF4C2; color: #6B5300; }
   </div>
 
   <div class="cmp">
-    <div><b>Themes</b><ul><li>Videos group under their theme, like Content (Theme › Video › clips); videos without one sit under "No theme".</li><li>"+ Theme" in the bar makes a theme (admins, as on Content). The ◆ chip on a video moves it to another theme.</li><li>Group by in Columns still offers Stage and Editor instead.</li></ul></div>
+    <div><b>+ Video</b><ul><li>One level: the video band is the group, as a theme is on Content. No separate theme rows.</li><li>"+ Video" asks for a name and adds an empty video band at the top, with "+ Add clip" under it; the video is a board task in To do (type Video), owned by you.</li><li>Rename a video by typing on its band, as today.</li></ul></div>
     <div><b>Board-linked columns</b><ul><li>A column's menu offers "Link to a board field…": Priority, Platform, Theme, Pillar, Owner, Due date.</li><li>Its cells then show the clip's own value and save to the task, with the board's rules; a 🔗 badge marks it.</li><li>"Unlink" turns it back into a plain sheet column, keeping its values.</li></ul></div>
   </div>
 </div>
