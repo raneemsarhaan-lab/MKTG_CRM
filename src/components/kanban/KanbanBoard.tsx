@@ -514,6 +514,11 @@ export function KanbanBoard({
       if (res.success) router.refresh()
       return res
     },
+    async bulkUpdate(ids, patch) {
+      const res = await bulkUpdateTasks(ids, patch).catch(() => ({ success: false, changed: 0, refused: 0, error: 'generic' }))
+      if (res.changed > 0) router.refresh()
+      return res
+    },
     removeFile(taskId, attachmentId) {
       const task = tasks.find(t => t.id === taskId)
       const gone = task?.attachments?.find(a => a.id === attachmentId)

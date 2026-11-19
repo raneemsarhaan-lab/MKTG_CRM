@@ -111,6 +111,33 @@ export const us6 = [
     },
   },
   {
+    id: 'us6-bulk', hash: 'me=raneem',
+    async run(t) {
+      // design/video-sheet-bulk-bar.html: the board's bar for several clips.
+      await t.cell('c:c01', 'title').click()
+      t.eq(await t.page.locator('[data-bulk-bar]').count(), 0, 'one clip: no bar')
+      await t.cell('c:c03', 'title').click({ modifiers: ['Shift'] })
+      await t.idle(150)
+      t.eq((await t.page.locator('[data-bulk-count]').innerText()).trim(), '3 clips selected', 'three clips: the bar, with the count')
+      t.eq(await t.page.$$eval('[data-bulk-bar] [data-bulk]', bs => bs.map(b => b.dataset.bulk)), ['stage', 'assignee', 'owner', 'type', 'priority', 'due'], 'Stage, Owner, Reviewer, Type, Priority, Due')
+      const pr = async () => Promise.all(['c01', 'c02', 'c03'].map(async id => (await t.task(id)).priority))
+      const was = await pr()
+      await t.page.locator('[data-bulk="priority"]').click()
+      await t.page.locator('[data-bulk-bar] [role="menuitem"]', { hasText: 'High' }).click()
+      await t.idle(250)
+      t.eq(await pr(), ['High', 'High', 'High'], 'Priority → High for all three')
+      t.assert((await t.toast()).includes('3 clips changed'), await t.toast())
+      await t.page.locator('[data-sheet-toast] button').click()
+      await t.idle(300)
+      t.eq(await pr(), was, 'Undo puts each one back as it was')
+      await t.page.locator('[data-bulk-remove]').click()
+      t.assert((await t.page.locator('[data-bulk-confirm]').innerText()).includes('Drop 3 clips'), 'Drop asks first')
+      await t.page.locator('[data-bulk-confirm]').click()
+      await t.idle(300)
+      t.eq(await Promise.all(['c01', 'c02', 'c03'].map(async id => !!(await t.task(id)).dropped_at)), [true, true, true], 'then drops them')
+    },
+  },
+  {
     id: 'us6-no-storage',
     async run(t) {
       await t.page.addInitScript(() => {

@@ -108,6 +108,8 @@ export interface SheetGridProps {
   boardField?(task: Task, field: string, value: string): Promise<string | null>
   /** Themes, for the names in a column linked to Theme or Pillar. */
   themes?: ContentTheme[]
+  /** The clips inside the selection (whole rows or cells across rows), for the bulk bar. */
+  onSelectClips?(taskIds: string[]): void
   /** The column menu's extra items, filled in here (the column hook lives in VideoSheet). */
   menuRef?: MutableRefObject<((key: string, anchor: HTMLElement) => MenuItem[]) | null>
   /** Spec 013 (T042): the row menu's Insert and Delete, row heights, and messages. */
@@ -504,6 +506,22 @@ export function SheetGrid(p: SheetGridProps) {
   // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
   const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped, say: text => p.linked?.say(text) })
   Object.assign(model, tips.model)
+  // The bulk bar (design/video-sheet-bulk-bar.html): which clips the selection covers.
+  const selectFmt = model.onSelect
+  const lastClips = useRef('')
+  model.onSelect = (q, list) => {
+    selectFmt?.(q, list)
+    if (!p.onSelectClips) return
+    const ids: string[] = []
+    for (const a of list?.length ? list : [q]) {
+      for (let r = Math.max(0, a.r0); r <= a.r1 && r < model.rows.length; r++) {
+        const row = model.rows[r]
+        if (row.kind === 'clip' && !ids.includes(row.task.id)) ids.push(row.task.id)
+      }
+    }
+    const sig = ids.join(',')
+    if (sig !== lastClips.current) { lastClips.current = sig; p.onSelectClips(ids) }
+  }
 
   // ── spec 019 stage 3: ⚙ Fields, ＋ and Values ──
   const view = lv.store.view

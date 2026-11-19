@@ -590,6 +590,24 @@
       "add": "Add video",
       "cancel": "Cancel",
       "added": "{name} added. Add its clips below it."
+    },
+    "bulk": {
+      "count": "{n} clips selected",
+      "stage": "Stage",
+      "owner": "Owner",
+      "reviewer": "Reviewer",
+      "type": "Type",
+      "priority": "Priority",
+      "due": "Due",
+      "drop": "Drop",
+      "dropConfirm": "Drop {n} clips? Yes",
+      "cancel": "Cancel",
+      "clear": "Clear selection",
+      "setDue": "Set due date",
+      "done": "{n, plural, one {# clip changed} other {# clips changed}}.",
+      "doneSome": "{n, plural, one {# clip changed} other {# clips changed}} · {m} not changed (the board's rules).",
+      "undone": "Put back as they were.",
+      "dropped": "{n, plural, one {# clip dropped} other {# clips dropped}}."
     }
   },
   "content": {

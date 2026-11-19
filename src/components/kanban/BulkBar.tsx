@@ -24,8 +24,15 @@ export interface BulkPatch {
   due_date?:           string
 }
 
+/** The choices the bar can offer. The board shows its six; the Video sheet picks its own (design/video-sheet-bulk-bar.html). */
+export type BulkField = 'stage' | 'assignee' | 'owner' | 'brand' | 'type' | 'priority' | 'due'
+
 interface BulkBarProps {
   count:     number
+  /** Which choices, in order (default: the board's). */
+  fields?:   BulkField[]
+  /** Words for the count, each choice and the remove button (default: the board's English). */
+  labels?:   Partial<Record<BulkField | 'count' | 'remove' | 'confirm' | 'cancel' | 'clear' | 'noBrand' | 'setDue', string>>
   members:   Member[]
   brands:    Brand[]
   types:     ContentType[]
@@ -36,7 +43,8 @@ interface BulkBarProps {
   onClear:   () => void
 }
 
-type MenuKind = 'stage' | 'assignee' | 'brand' | 'type' | 'priority' | 'due' | null
+type MenuKind = BulkField | null
+const BOARD_FIELDS: BulkField[] = ['stage', 'assignee', 'brand', 'type', 'priority', 'due']
 
 const BTN: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 7, height: 36,
@@ -86,8 +94,12 @@ function Item({ onClick, children }: { onClick: () => void; children: React.Reac
 }
 
 export function BulkBar({
-  count, members, brands, types, busy, note, onApply, onDelete, onClear,
+  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {},
 }: BulkBarProps) {
+  const L = {
+    count: `${count} selected`, stage: 'Stage', assignee: 'Assignee', owner: 'Owner', brand: 'Brand', type: 'Type', priority: 'Priority',
+    due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', ...labels,
+  }
   const [menu, setMenu]       = useState<MenuKind>(null)
   const [dueDraft, setDue]    = useState('')
   const [confirming, setConf] = useState(false)
@@ -96,179 +108,112 @@ export function BulkBar({
 
   const close = () => setMenu(null)
   const apply = (patch: BulkPatch) => { close(); onApply(patch) }
+  const toggle = (k: BulkField) => setMenu(m => (m === k ? null : k))
+
+  /** One choice's button and its list. */
+  function field(k: BulkField) {
+    const list = (() => {
+      switch (k) {
+        case 'stage': return ALL_STAGES.map(id => (
+          <Item key={id} onClick={() => apply({ status: id })}>
+            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_META[id].color, flexShrink: 0 }} />
+            {STAGE_META[id].label_en}
+          </Item>
+        ))
+        case 'assignee': return members.map(m => <Item key={m.id} onClick={() => apply({ assignee_id: m.id })}>{m.name}</Item>)
+        case 'owner': return members.map(m => <Item key={m.id} onClick={() => apply({ task_owner_id: m.id })}>{m.name}</Item>)
+        case 'brand': return [
+          <Item key="" onClick={() => apply({ brand_id: '' })}>{L.noBrand}</Item>,
+          ...brands.map(b => (
+            <Item key={b.id} onClick={() => apply({ brand_id: b.id })}>
+              <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 3, background: b.color, flexShrink: 0 }} />
+              {b.name}
+            </Item>
+          )),
+        ]
+        case 'type': return types.map(t => <Item key={t.id} onClick={() => apply({ content_type_label: t.label })}>{t.label}</Item>)
+        case 'priority': return (['High', 'Medium', 'Low'] as const).map(p => <Item key={p} onClick={() => apply({ priority: p })}>{p}</Item>)
+        case 'due': return (
+          <div style={{ padding: 6, display: 'grid', gap: 6 }}>
+            <input
+              type="date" value={dueDraft} onChange={e => setDue(e.target.value)} data-bulk-due=""
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: `1px solid ${PIPE.borderInput}`, fontSize: 13,
+                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <button
+              type="button" disabled={!dueDraft} onClick={() => apply({ due_date: dueDraft })}
+              style={{
+                padding: '8px 10px', borderRadius: 8, border: 'none',
+                background: PIPE.ink, color: PIPE.limePrimary, fontWeight: 700,
+                fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', opacity: dueDraft ? 1 : 0.5,
+              }}
+            >
+              {L.setDue}
+            </button>
+          </div>
+        )
+      }
+    })()
+    return (
+      <div key={k} style={{ position: 'relative' }}>
+        <button type="button" style={BTN} disabled={busy} data-bulk={k} aria-expanded={menu === k} onClick={() => toggle(k)}>
+          {L[k]} ▾
+        </button>
+        {menu === k && <Menu onClose={close}>{list}</Menu>}
+      </div>
+    )
+  }
 
   return (
     <div style={{
       position: 'fixed', insetInline: 0, bottom: 22, zIndex: 70,
       display: 'flex', justifyContent: 'center', pointerEvents: 'none',
     }}>
-      <div style={{
+      <div data-bulk-bar="" role="toolbar" aria-label={L.count} style={{
         pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10,
         background: PIPE.navy, borderRadius: 14, padding: '10px 12px',
         boxShadow: '0 18px 44px rgba(20,19,60,.34)', flexWrap: 'wrap',
         maxWidth: 'calc(100vw - 60px)',
       }}>
-        <span style={{
+        <span data-bulk-count="" style={{
           display: 'inline-flex', alignItems: 'center', height: 36, padding: '0 12px',
           borderRadius: 10, background: PIPE.limePrimary, color: PIPE.ink,
           fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
         }}>
-          {count} selected
+          {L.count}
         </span>
 
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'stage' ? null : 'stage'))}>
-            Stage ▾
-          </button>
-          {menu === 'stage' && (
-            <Menu onClose={close}>
-              {ALL_STAGES.map(id => (
-                <Item key={id} onClick={() => apply({ status: id })}>
-                  <span aria-hidden="true" style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: STAGE_META[id].color, flexShrink: 0,
-                  }} />
-                  {STAGE_META[id].label_en}
-                </Item>
-              ))}
-            </Menu>
-          )}
-        </div>
+        {fields.map(f => field(f))}
 
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'assignee' ? null : 'assignee'))}>
-            Assignee ▾
-          </button>
-          {menu === 'assignee' && (
-            <Menu onClose={close}>
-              {members.map(m => (
-                <Item key={m.id} onClick={() => apply({ assignee_id: m.id })}>{m.name}</Item>
-              ))}
-            </Menu>
-          )}
-        </div>
-
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'brand' ? null : 'brand'))}>
-            Brand ▾
-          </button>
-          {menu === 'brand' && (
-            <Menu onClose={close}>
-              <Item onClick={() => apply({ brand_id: '' })}>No brand</Item>
-              {brands.map(b => (
-                <Item key={b.id} onClick={() => apply({ brand_id: b.id })}>
-                  <span aria-hidden="true" style={{
-                    width: 10, height: 10, borderRadius: 3, background: b.color, flexShrink: 0,
-                  }} />
-                  {b.name}
-                </Item>
-              ))}
-            </Menu>
-          )}
-        </div>
-
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'type' ? null : 'type'))}>
-            Type ▾
-          </button>
-          {menu === 'type' && (
-            <Menu onClose={close}>
-              {types.map(t => (
-                <Item key={t.id} onClick={() => apply({ content_type_label: t.label })}>{t.label}</Item>
-              ))}
-            </Menu>
-          )}
-        </div>
-
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'priority' ? null : 'priority'))}>
-            Priority ▾
-          </button>
-          {menu === 'priority' && (
-            <Menu onClose={close}>
-              {(['High', 'Medium', 'Low'] as const).map(p => (
-                <Item key={p} onClick={() => apply({ priority: p })}>{p}</Item>
-              ))}
-            </Menu>
-          )}
-        </div>
-
-        <div style={{ position: 'relative' }}>
-          <button type="button" style={BTN} disabled={busy}
-                  onClick={() => setMenu(m => (m === 'due' ? null : 'due'))}>
-            Due date ▾
-          </button>
-          {menu === 'due' && (
-            <Menu onClose={close}>
-              <div style={{ padding: 6, display: 'grid', gap: 6 }}>
-                <input
-                  type="date"
-                  value={dueDraft}
-                  onChange={e => setDue(e.target.value)}
-                  style={{
-                    width: '100%', padding: '8px 10px', borderRadius: 8,
-                    border: `1px solid ${PIPE.borderInput}`, fontSize: 13,
-                    fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!dueDraft}
-                  onClick={() => apply({ due_date: dueDraft })}
-                  style={{
-                    padding: '8px 10px', borderRadius: 8, border: 'none',
-                    background: PIPE.ink, color: PIPE.limePrimary, fontWeight: 700,
-                    fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit',
-                    opacity: dueDraft ? 1 : 0.5,
-                  }}
-                >
-                  Set due date
-                </button>
-              </div>
-            </Menu>
-          )}
-        </div>
-
-        {/* Delete asks once. Bulk delete is the one action here with nothing
-            to undo it. */}
+        {/* The remove action asks once. */}
         {confirming ? (
           <>
             <button
-              type="button"
-              disabled={busy}
+              type="button" disabled={busy} data-bulk-confirm=""
               onClick={() => { setConf(false); onDelete() }}
               style={{ ...BTN, background: '#D22040', border: '1px solid #D22040', fontWeight: 800 }}
             >
-              Delete {count}? Yes
+              {L.confirm}
             </button>
-            <button type="button" style={BTN} onClick={() => setConf(false)}>Cancel</button>
+            <button type="button" style={BTN} onClick={() => setConf(false)}>{L.cancel}</button>
           </>
         ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setConf(true)}
-            style={{ ...BTN, color: '#FF9DAE' }}
-          >
-            Delete
+          <button type="button" disabled={busy} data-bulk-remove="" onClick={() => setConf(true)} style={{ ...BTN, color: '#FF9DAE' }}>
+            {L.remove}
           </button>
         )}
 
         {note && (
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
+          <span data-bulk-note="" style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
             {note}
           </span>
         )}
 
         <button
-          type="button"
-          onClick={onClear}
-          aria-label="Clear selection"
+          type="button" onClick={onClear} aria-label={L.clear} data-bulk-clear=""
           style={{ ...BTN, padding: '0 10px', color: 'rgba(255,255,255,.72)' }}
         >
           ✕

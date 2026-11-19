@@ -8,6 +8,7 @@
 import type { Member, MoveTaskResult, StageId, Task, BoardView, SLAConfig, ContentTheme } from '@/types/index'
 import type { UploadFn } from '@/components/kanban/attachments/useUploadQueue'
 import type { PasteTarget, PasteValueColumn } from '@/lib/sheet-columns'
+import type { BulkPatch } from '@/components/kanban/BulkBar'
 
 export type Result = { success: boolean; error?: string }
 
@@ -57,6 +58,8 @@ export interface SheetApi {
    * Undo message has gone.
    */
   removeFile?(taskId: string, attachmentId: string): { undo(): void; commit(): Promise<Result> } | null
+  /** The board's bulk save (design/video-sheet-bulk-bar.html): every clip at once, with the board's rules. */
+  bulkUpdate?(taskIds: string[], patch: BulkPatch): Promise<{ success: boolean; changed: number; refused: number; error?: string }>
   /** "+ Video": a new video, ready for clips. */
   addVideo?(name: string): Promise<Result & { id?: string }>
   /** Spec 013 FR-044: a row's height on a linked sheet, shared by the team (null: the default). */

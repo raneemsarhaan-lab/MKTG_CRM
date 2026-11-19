@@ -169,6 +169,19 @@ function App() {
       patch(taskId, { attachments: [...(find(taskId)!.attachments ?? []), a] })
       return { success: true }
     },
+    // The board's bulk save: each clip on its own, with the same edit rule.
+    async bulkUpdate(ids: string[], change: Record<string, unknown>) {
+      record('bulkUpdate', ids, change)
+      await wait()
+      let changed = 0, refused = 0
+      for (const id of ids) {
+        const t = find(id)
+        if (!t || !canAct(t)) { refused++; continue }
+        patch(id, (change.status !== undefined ? { status: change.status } : change) as Partial<Task>)
+        changed++
+      }
+      return { success: true, changed, refused }
+    },
     // Remove a file or link: gone at once, back on Undo; the delete is recorded when committed.
     removeFile(taskId: string, attachmentId: string) {
       const t = find(taskId), gone = t?.attachments?.find(a => a.id === attachmentId)
