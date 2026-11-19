@@ -80,7 +80,7 @@ export type SheetColumnSet = 'editing' | 'copy' | 'full' | 'sheet'
 export type SheetColumn =
   | 'title' | 'clipNo' | 'type' | 'status' | 'editor' | 'source' | 'fileName'
   | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
-  | 'reviewer' | 'due' | 'inStage'
+  | 'reviewer' | 'due' | 'inStage' | 'doc' | 'design' | 'task' | 'post'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
 export type Priority = 'Low' | 'Medium' | 'High'
 

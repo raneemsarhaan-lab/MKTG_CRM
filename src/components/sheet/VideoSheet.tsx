@@ -31,10 +31,16 @@ import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
 import { useSheetColumns } from './useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { clipLink, CLIP_LINK_COLS } from './SheetGrid'
+import type { LinkRole } from '@/types/index'
+
+/** The Content sheet's link columns on the Video sheet (design/video-sheet-v4.html). */
+type LinkCol = typeof CLIP_LINK_COLS[number]
+const isLinkCol = (c: string): c is LinkCol => (CLIP_LINK_COLS as readonly string[]).includes(c)
 
 type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
-  | { kind: 'link'; anchor: HTMLElement; taskId: string; mode: 'files' | 'published' | 'prompt' }
+  | { kind: 'link'; anchor: HTMLElement; taskId: string; mode: 'files' | 'published' | 'prompt' | LinkCol }
   | { kind: 'drop'; anchor: HTMLElement; task: Task }
 
 const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage_not_in_pipeline', 'terminal',
@@ -248,11 +254,35 @@ export function VideoSheet(p: VideoSheetProps) {
         if (can) return setPopup({ kind: 'link', anchor, taskId: task.id, mode: 'published' })
         if (task.published_url) window.open(task.published_url, '_blank', 'noopener,noreferrer')
         return
+      case 'doc': case 'design': case 'post': {
+        if (can && !task.dropped_at) return setPopup({ kind: 'link', anchor, taskId: task.id, mode: col })
+        const url = clipLink(task, col)
+        if (url) window.open(url, '_blank', 'noopener,noreferrer')
+        return
+      }
+      case 'task':
+        p.onOpenTask(task.id)
+        return
       case 'drop':
         if (!can) return
         if (task.dropped_at) { void restore(task); return }
         return setPopup({ kind: 'drop', anchor, task })
     }
+  }
+
+  /** Working Doc, Design or LinkedIn on a clip, through the Content sheet's actions. Empty clears it. */
+  async function saveClipLink(taskId: string, col: LinkCol, url: string): Promise<string | null> {
+    const api = p.api as Partial<{
+      setPieceLink(taskId: string, role: LinkRole, url: string): Promise<{ success: boolean; error?: string }>
+      updatePiece(taskId: string, patch: { post_url?: string | null }): Promise<{ success: boolean; error?: string }>
+    }>
+    const r = col === 'post'
+      ? await api.updatePiece?.(taskId, { post_url: url || null })
+      : await api.setPieceLink?.(taskId, col === 'doc' ? 'working_doc' : 'design', url)
+    if (!r) return t('err.generic')
+    if (!r.success) return why(r.error)
+    say(t('links.saved'))
+    return null
   }
 
   async function drop(task: Task) {
@@ -342,6 +372,11 @@ export function VideoSheet(p: VideoSheetProps) {
         void p.api.addLink(row.task.id, single).then(r => say(r.success ? t('files.attached') : t('notSaved', { reason: why(r.error) })))
         return
       }
+      if (col && isLinkCol(col) && row.kind === 'clip') {
+        e.preventDefault()
+        void saveClipLink(row.task.id, col, single)
+        return
+      }
       if (col === 'published' && row.kind === 'clip') {
         e.preventDefault()
         void p.api.updateClip(row.task.id, { published_url: single }).then(r => say(r.success ? t('published.saved') : t('notSaved', { reason: why(r.error) })))
@@ -363,7 +398,7 @@ export function VideoSheet(p: VideoSheetProps) {
   function pasteAsRows(grid: string[][], row: SheetRow | null, col: GridCol | null): boolean {
     if (!row || (row.kind !== 'clip' && row.kind !== 'video')) return true
     const flat = grid.flat().filter(Boolean)
-    if (flat.length === 1 && (col === 'files' || col === 'published')) return true
+    if (flat.length === 1 && (col === 'files' || col === 'published' || (col != null && isLinkCol(col)))) return true
     return flat.some(v => FILE_RE.test(v))
   }
   const skipText = useSkipText()
@@ -498,6 +533,26 @@ export function VideoSheet(p: VideoSheetProps) {
         <SheetMenu anchor={popup.anchor} label={popup.label} items={popup.items} onClose={closePopup} />
       )}
       {popup?.kind === 'link' && popupTask && (
+        isLinkCol(popup.mode) ? (
+          <SheetPopover anchor={popup.anchor} label={t('links.edit', { label: t(`links.${popup.mode}`), name: popupTask.name })} onClose={closePopup}>
+            <LinkPrompt
+              title={t('links.edit', { label: t(`links.${popup.mode}`), name: popupTask.name })}
+              initial={clipLink(popupTask, popup.mode) ?? ''}
+              saveLabel={t('links.save')}
+              skipLabel={t('links.cancel')}
+              badLink={t('err.bad_link')}
+              placeholder="https://…"
+              onSkip={() => closePopup(true)}
+              onSave={async url => {
+                const mode = popup.mode as LinkCol
+                const err = await saveClipLink(popupTask.id, mode, url)
+                if (err) return err
+                closePopup(true)
+                return null
+              }}
+            />
+          </SheetPopover>
+        ) :
         <SheetPopover anchor={popup.anchor} label={popup.mode === 'files' ? t('files.linkLabel') : t('published.edit', { name: popupTask.name })} onClose={closePopup}>
           <LinkPrompt
             title={popup.mode === 'files' ? t('files.linkLabel') : popup.mode === 'prompt' ? t('published.prompt') : t('published.edit', { name: popupTask.name })}

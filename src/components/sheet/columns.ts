@@ -6,22 +6,22 @@ import type { SheetColumn, SheetColumnSet } from '@/types/index'
 
 /** Every column, in display order. */
 export const ALL_COLUMNS: SheetColumn[] = [
-  'title', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files',
-  'clipNo', 'type', 'source', 'fileName', 'in', 'out', 'length', 'published', 'drop',
+  'title', 'type', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'doc', 'design', 'task', 'post', 'published', 'drop',
+  'clipNo', 'source', 'fileName', 'in', 'out', 'length',
 ]
 
 export const COLUMN_SETS: Record<SheetColumnSet, SheetColumn[]> = {
   editing: ['title', 'clipNo', 'status', 'editor', 'source', 'fileName', 'in', 'out', 'length', 'files'],
   copy:    ['title', 'clipNo', 'type', 'status', 'editor', 'published'],
-  full:    ALL_COLUMNS.filter(c => !['reviewer', 'due', 'inStage'].includes(c)),
-  sheet:   ['title', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files'],
+  full:    ALL_COLUMNS.filter(c => !['reviewer', 'due', 'inStage', 'doc', 'design', 'task', 'post'].includes(c)),
+  sheet:   ['title', 'type', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'doc', 'design', 'task', 'post', 'published', 'drop'],
 }
 
 /** Width of each column, in px. The row-number gutter is ROW_NO_WIDTH. */
 export const COLUMN_WIDTHS: Record<SheetColumn, number> = {
   title: 320, clipNo: 40, type: 96, status: 156, editor: 112, source: 92, fileName: 250,
-  in: 64, out: 64, length: 64, files: 170, published: 130, drop: 72,
-  reviewer: 150, due: 96, inStage: 92,
+  in: 64, out: 64, length: 64, files: 220, published: 130, drop: 72,
+  reviewer: 150, due: 90, inStage: 88, doc: 150, design: 150, task: 120, post: 150,
 }
 export const ROW_NO_WIDTH = 40
 

@@ -22,6 +22,7 @@ import type { StageId } from '@/types/index'
 import { EditorContent } from './EditorCell'
 import { FilesContent, type FilesCellState } from './FilesCell'
 import { PublishedContent } from './PublishedCell'
+import { LinkPill, hostOf, linkKind } from './LinkPill'
 import { GridCore, type GridModel, type GridCol, type ActiveCell } from './GridCore'
 import type { SheetColumnsHook } from './useSheetColumns'
 import { useLinkedEditing } from './useLinkedEditing'
@@ -45,6 +46,14 @@ const BUCKETS = [
   { key: 'ready', stages: ['ready-publish', 'scheduled'], color: 'var(--vs-ready)' },
   { key: 'published', stages: ['publish'], color: 'var(--vs-published)' },
 ] as const
+/** The Content sheet's link columns, on a clip: Working Doc and Design are link attachments, LinkedIn its post link. */
+export const CLIP_LINK_COLS = ['doc', 'design', 'post'] as const
+export function clipLink(task: Task, col: typeof CLIP_LINK_COLS[number]): string | null {
+  if (col === 'post') return task.post_url ?? null
+  const role = col === 'doc' ? 'working_doc' : 'design'
+  const a = (task.attachments ?? []).filter(x => x.link_role === role)
+  return a.length ? a[a.length - 1].url ?? null : null
+}
 /** From Edit Review on, a clip shows who signs it off. */
 const REVIEW_FROM = STAGE_ORDER.indexOf('d-check')
 
@@ -173,7 +182,7 @@ export function SheetGrid(p: SheetGridProps) {
     if (col === 'rowNo') return true
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'video') return false
-    return ['status', 'editor', 'type', 'files', 'published', 'drop'].includes(col)
+    return ['status', 'editor', 'type', 'files', 'published', 'drop', 'doc', 'design', 'post', 'task'].includes(col)
   }
 
   /** A video's band: name, clip count, a bar and words for its clips' stages, and its due date. */
@@ -274,6 +283,7 @@ export function SheetGrid(p: SheetGridProps) {
         case 'in':       return formatClipTime(task.clip?.in_ms)
         case 'out':      return formatClipTime(task.clip?.out_ms)
         case 'due':      return row.kind === 'clip' ? dueText(task.due_date) : ''
+        case 'doc': case 'design': case 'post': return row.kind === 'clip' ? clipLink(task, col) ?? '' : ''
         default:         return ''
       }
     },
@@ -342,6 +352,13 @@ export function SheetGrid(p: SheetGridProps) {
                                onRetry={() => p.onRetry(task.id)}
                                onLinkInstead={() => { const el = cellEl(); if (el) p.onLinkInstead(task.id, el) }} />
         case 'published': return isVideo ? null : <PublishedContent task={task} canEdit={can} t={t} />
+        case 'doc': case 'design': case 'post': {
+          if (isVideo) return null
+          const url = clipLink(task, col)
+          if (url) return <LinkPill kind={linkKind(url)} text={hostOf(url) || url} href={url} />
+          return can && !task.dropped_at ? <span className="fx-sheet-muted">{t('links.add')}</span> : null
+        }
+        case 'task': return isVideo ? null : <LinkPill kind="task" text={t('links.openTask')} />
         case 'drop':
           return isVideo || !can ? null : <span className="fx-sheet-dropb">{task.dropped_at ? t('drop.restore') : t('drop.drop')}</span>
       }

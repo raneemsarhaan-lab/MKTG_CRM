@@ -43,26 +43,31 @@ export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
     { key: 'date', width: 104, en: 'Date' },
     { key: 'archive', width: 80, en: 'Archive or restore' },
   ],
-  // The redesigned Video sheet (design/video-sheet-v2.html) shows its own set,
-  // 'sheet': Clip, Stage, Owner, Reviewer, Due, In stage, File. The rest are a
-  // click away in Columns. The older sets stay for saved layouts.
+  // The redesigned Video sheet (design/video-sheet-v4.html) shows its own set,
+  // 'sheet': Clip, Type, Stage, Owner, Reviewer, Due, In stage, File, the
+  // Content sheet's link columns, and Archive. The clip details are a click
+  // away in Columns. The older sets stay for saved layouts.
   video: [
-    { key: 'title', width: 300, en: 'Clip', sets: ['editing', 'copy', 'full', 'sheet'] },
-    { key: 'status', width: 170, en: 'Stage', sets: ['editing', 'copy', 'full', 'sheet'] },
+    { key: 'title', width: 280, en: 'Clip', sets: ['editing', 'copy', 'full', 'sheet'] },
+    { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full', 'sheet'] },
+    { key: 'status', width: 160, en: 'Stage', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'editor', width: 150, en: 'Owner', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'reviewer', width: 150, en: 'Reviewer', sets: ['sheet'] },
-    { key: 'due', width: 96, en: 'Due', sets: ['sheet'] },
-    { key: 'inStage', width: 92, en: 'In stage', sets: ['sheet'] },
-    { key: 'files', width: 170, en: 'File', sets: ['editing', 'full', 'sheet'] },
+    { key: 'due', width: 90, en: 'Due', sets: ['sheet'] },
+    { key: 'inStage', width: 88, en: 'In stage', sets: ['sheet'] },
+    { key: 'files', width: 220, en: 'File', sets: ['editing', 'full', 'sheet'] },
+    { key: 'doc', width: 150, en: 'Working Doc', sets: ['sheet'] },
+    { key: 'design', width: 150, en: 'Design Link', sets: ['sheet'] },
+    { key: 'task', width: 120, en: 'Task Link', sets: ['sheet'] },
+    { key: 'post', width: 150, en: 'LinkedIn Link', sets: ['sheet'] },
+    { key: 'published', width: 150, en: 'Published Link', sets: ['copy', 'full', 'sheet'] },
+    { key: 'drop', width: 80, en: 'Archive or restore', sets: ['full', 'sheet'] },
     { key: 'clipNo', width: 40, en: '#', sets: ['editing', 'copy', 'full'] },
-    { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full'] },
     { key: 'source', width: 92, en: 'Source', sets: ['editing', 'full'] },
     { key: 'fileName', width: 250, en: 'File name', sets: ['editing', 'full'] },
     { key: 'in', width: 64, en: 'In', sets: ['editing', 'full'] },
     { key: 'out', width: 64, en: 'Out', sets: ['editing', 'full'] },
     { key: 'length', width: 64, en: 'Length', sets: ['editing', 'full'] },
-    { key: 'published', width: 130, en: 'Published', sets: ['copy', 'full'] },
-    { key: 'drop', width: 72, en: 'Drop or restore', sets: ['full'] },
   ],
 }
 /** The sets a sheet has: the Video sheet's three, or one for the Content sheet. */

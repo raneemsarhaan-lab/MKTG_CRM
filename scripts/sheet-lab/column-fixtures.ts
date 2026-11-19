@@ -26,7 +26,8 @@ const ALL_SHOWN: Partial<SheetColumnRecord> = { shownDefault: false, shownIn: ['
  * `#plain=1` leaves it on the redesign's own defaults.
  */
 export function videoAllColumns(): { records: SheetColumnRecord[]; values: SheetValues } {
-  const order = ['title', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'clipNo', 'type', 'source', 'fileName', 'in', 'out', 'length', 'published', 'drop']
+  const order = ['title', 'type', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'doc', 'design', 'task', 'post', 'published', 'drop',
+  'clipNo', 'source', 'fileName', 'in', 'out', 'length']
   return { records: order.map((k, i) => rec('video', k, i, ALL_SHOWN)), values: {} }
 }
 

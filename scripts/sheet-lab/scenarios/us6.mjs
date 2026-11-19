@@ -2,7 +2,12 @@
 // the toolbar's extras behind ⋯, + New clip, lettered columns, and videos as bands.
 // `plain=1` shows the redesign's own default columns.
 const heads = t => t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
-const DEFAULT = ['Clip', 'Stage', 'Owner', 'Reviewer', 'Due', 'In stage', 'File']
+/** Scroll a cell to the middle of the sheet, clear of the frozen Clip column. */
+const reveal = (t, row, col) => t.cell(row, col).evaluate(el => {
+  const sc = el.closest('.fx-sheet-scroll'), r = el.getBoundingClientRect(), s = sc.getBoundingClientRect()
+  sc.scrollLeft += r.left - s.left - s.width / 2
+})
+const DEFAULT = ['Clip', 'Type', 'Stage', 'Owner', 'Reviewer', 'Due', 'In stage', 'File', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Drop or restore']
 
 export const us6 = [
   {
@@ -11,7 +16,7 @@ export const us6 = [
       t.eq(await t.page.locator('[data-sets]').count(), 0, 'no Editing / Copy / Full switch')
       t.eq(await heads(t), DEFAULT, 'a Video Editor sees the redesign columns')
       const letters = await t.page.$$eval('[data-col-head]', hs => hs.map(h => h.dataset.letter))
-      t.eq(letters, ['A', 'B', 'C', 'D', 'E', 'F', 'G'], 'lettered like a spreadsheet')
+      t.eq(letters.slice(0, 8), ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], 'lettered like a spreadsheet')
     },
   },
   {
@@ -58,6 +63,33 @@ export const us6 = [
       t.assert(/\d+ to do/.test(band) && band.includes('3 published'), `and their stages: ${band}`)
       t.eq(await t.page.getAttribute('[data-video-band="v1"] .fx-vs-prog', 'aria-label'), '3 of 13 published', 'a progress bar with words')
       t.eq(await t.page.locator('[data-cell="v:v1|status"]').count(), 0, 'the band spans the sheet')
+    },
+  },
+  {
+    id: 'us6-links',
+    async run(t) {
+      // The Content sheet's link columns, as pills.
+      t.eq((await t.text('c:c01', 'task')).trim(), 'Open task', 'Task Link is a pill')
+      await reveal(t, 'c:c01', 'task')
+      await t.cell('c:c01', 'task').click()
+      t.eq((await t.lab()).opened.at(-1)?.id, 'c01', 'and opens the task')
+      await reveal(t, 'c:c02', 'doc')
+      await t.cell('c:c02', 'doc').click()
+      const input = t.page.locator('[data-sheet-pop] input')
+      await input.waitFor({ timeout: 3000 })
+      await input.fill('https://docs.google.com/document/d/abc')
+      await t.page.keyboard.press('Enter')
+      await t.idle(250)
+      t.eq((await t.task('c02')).attachments.filter(a => a.link_role === 'working_doc').map(a => a.url), ['https://docs.google.com/document/d/abc'], 'Working Doc saved')
+      t.eq(await t.page.locator('[data-cell="c:c02|doc"] .fx-pill.is-drive').count(), 1, 'shown as a Drive pill')
+      await reveal(t, 'c:c03', 'post')
+      await t.focusCell('c:c03', 'post')
+      if (await t.page.locator('[data-sheet-pop]').count()) { await t.page.keyboard.press('Escape'); await t.idle(80) }
+      await t.paste({ text: 'https://www.linkedin.com/posts/xyz' })
+      await t.idle(250)
+      t.eq((await t.task('c03')).post_url, 'https://www.linkedin.com/posts/xyz', 'a pasted link fills LinkedIn Link')
+      t.eq((await t.text('c:c03', 'post')).trim(), 'linkedin.com', 'as a pill')
+      t.eq(await t.page.locator('[data-cell="c:c01|files"] .fx-pill').count() >= 1, true, 'files are pills too')
     },
   },
   {

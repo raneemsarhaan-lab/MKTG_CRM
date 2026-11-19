@@ -257,7 +257,7 @@
       "sheet": "الجدول"
     },
     "mine": "مقاطعي",
-    "showDropped": "إظهار المستبعَد",
+    "showDropped": "إظهار المؤرشف",
     "pasteClips": "لصق المقاطع",
     "addClip": "+ مقطع",
     "allVideos": "كل الفيديوهات",
@@ -299,7 +299,11 @@
       "drop": "استبعاد أو استعادة",
       "reviewer": "المراجِع",
       "due": "الموعد",
-      "inStage": "في المرحلة"
+      "inStage": "في المرحلة",
+      "doc": "مستند العمل",
+      "design": "رابط التصميم",
+      "task": "رابط المهمة",
+      "post": "رابط لينكدإن"
     },
     "summary": {
       "clips": "{count, plural, zero {لا مقاطع} one {مقطع واحد} two {مقطعان} few {# مقاطع} many {# مقطعًا} other {# مقطع}}",
@@ -562,6 +566,18 @@
       "published": "{n} منشور",
       "due": "الموعد <b>{date}</b>",
       "progress": "{done} من {all} منشور"
+    },
+    "links": {
+      "add": "+ رابط",
+      "edit": "رابط {label} لـ {name}",
+      "saved": "تم حفظ الرابط",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "doc": "مستند العمل",
+      "design": "التصميم",
+      "post": "لينكدإن",
+      "openTask": "فتح المهمة",
+      "notALink": "ليس رابطًا"
     }
   },
   "content": {
