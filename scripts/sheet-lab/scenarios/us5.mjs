@@ -30,7 +30,7 @@ export const us5 = [
       const during = await t.text('c:c03', 'files')
       t.assert(during.includes('13_final.mp4'), `progress in the cell: ${JSON.stringify(during)}`)
       await t.page.waitForFunction(() => !document.querySelector('[data-cell="c:c03|files"] [role="progressbar"]'), null, { timeout: 5000 })
-      t.eq((await t.text('c:c03', 'files')).replace(/\s+/g, ' ').trim(), 'Drive 1 file', 'then the file count')
+      t.eq((await t.text('c:c03', 'files')).replace(/\s+/g, ' ').trim(), '13_final.mp4 +1', 'then the file as a pill, +1 for the Drive link')
       t.eq((await t.lab()).uploads, [{ name: '13_final.mp4', size: 300_000 }], 'the file as picked')
       const menuLimit = await (async () => { await t.cell('c:c03', 'files').click(); return t.page.locator('[data-menu-item="upload"]').innerText() })()
       t.assert(menuLimit.includes('Up to 200 MB'), `the limit shown up front: ${menuLimit}`)
@@ -64,7 +64,7 @@ export const us5 = [
       const cell = await t.text('c:c04', 'files')
       t.assert(cell.includes('Connection lost') && cell.includes('Retry'), `reason and Retry: ${cell}`)
       await t.page.locator('[data-cell="c:c04|files"] [data-retry]').click()
-      await t.page.waitForFunction(() => /1 file/.test(document.querySelector('[data-cell="c:c04|files"]').textContent), null, { timeout: 5000 })
+      await t.page.waitForFunction(() => document.querySelector('[data-cell="c:c04|files"] .fx-pill.is-video'), null, { timeout: 5000 })
       t.eq((await t.lab()).uploads.length, 2, 'retried with the same file')
     },
   },

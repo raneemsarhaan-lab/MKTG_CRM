@@ -12,7 +12,7 @@ export const cross = [
       await k('Control+Home')
       for (let i = 0; i < 11; i++) await k('ArrowDown')
       t.eq(await t.active(), 'c:c11|rowNo', 'down to clip 22')
-      for (let i = 0; i < 2; i++) await k('ArrowRight')
+      for (let i = 0; i < 3; i++) await k('ArrowRight')
       t.eq(await t.active(), 'c:c11|status', 'across to its status')
       await k('Enter')
       await t.page.waitForFunction(() => document.activeElement?.matches('[data-sheet-menu] [role="menuitem"]'))

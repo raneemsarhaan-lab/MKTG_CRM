@@ -831,6 +831,22 @@ Design: `design/working-hours.html`, approved, with two changes asked for in rev
 - **The side bar** (`lib/nav.tsx`): Working Hours (a clock with a tick), Board, Sheets, Team, Settings. Projects and Capacity are off the bar but still open by address.
 - **Checks.** `node scripts/hours-lab/realapp/run.cjs` (47). It now reads the manager and the member from the database.
 
+### The Video sheet, redesigned
+
+Designs: `design/video-sheet-v2.html` (the layout, from the user's reference, without its filter row) and `design/video-sheet-v4.html` (the Content sheet's link columns, files and links as icon pills), both approved.
+
+- **Bar:** Board | Sheet, ⋯ (Columns, + Column, Mine, Show archived, Paste clips) and + New clip (`VideoSheet.tsx`). The Editing / Copy / Full switch and the summary line are gone.
+- **One column set, `sheet`** (`lib/sheet-columns.ts`), shown by default in this order:
+  - Clip, Type, Stage, Owner (assignee), Reviewer (task owner, from Edit Review on), Due, In stage, File;
+  - Working Doc, Design Link, Task Link, LinkedIn Link, Published Link, Archive.
+  - #, Source, File name, In, Out and Length are a click away in Columns.
+  - In stage counts working days since `stage_date` and goes red past the stage's limit (`slaConfig`, passed from the board).
+- **Videos are bands** (`colsOf` spans them, `band()` in `SheetGrid.tsx`): the video's name, its clip count, a bar and words for its clips' stages, and its due date. The video's own stage and files are set on its task.
+- **Lettered headings:** GridCore's `letters` puts each column's letter in `data-letter`, drawn by CSS, so heading text stays the name.
+- **Pills:** `LinkPill.tsx`. Files show the first one with "+N"; links show their site; Task Link is "Open task". Working Doc and Design save as link attachments (`setPieceLink`), LinkedIn as `post_url` (`updatePiece`), the Content sheet's own actions.
+- **Saved layouts:** `scripts/sheets-backfill.ts` puts saved Video columns into the new order once (custom columns after); the `post` column's row marks it done.
+- **Checks:** `npm run lab:sheet` (152, `#plain=1` shows the redesign's defaults; the default seed shows every column), `realapp/video-fields.cjs` (29).
+
 ### Celebrations
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.
