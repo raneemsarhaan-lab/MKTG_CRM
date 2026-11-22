@@ -49,7 +49,10 @@ export async function loadBoardData(member: SessionMember) {
           select: { clip_no: true, source: true, file_name: true, in_ms: true, out_ms: true, video_id: true, created_at: true },
         },
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: [
+        { due_date: { sort: 'asc', nulls: 'last' } },
+        { created_at: 'desc' },
+      ],
     }),
     prisma.member.findMany({ orderBy: { name: 'asc' } }),
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
