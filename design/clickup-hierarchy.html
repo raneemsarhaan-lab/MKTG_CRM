@@ -217,6 +217,12 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .col .cc { min-width: 22px; height: 22px; border-radius: 6px; background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted); display: grid; place-items: center; padding: 0 5px }
 .col .ar { font-size: 11px; color: var(--muted); direction: rtl; text-align: right; margin-top: -6px }
 .col .addt { border: 0; background: none; color: #7C3AED; font-weight: 700; font-size: 12.5px; padding: 4px 0 0 }
+.calbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.calbar .mon { font-family: var(--display); font-weight: 800; font-size: 16px; min-width: 150px; text-align: center; letter-spacing: -0.01em }
+.calbar .nav { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; width: 30px; height: 30px; font-size: 16px; line-height: 1 }
+.calbar .nav:hover { background: var(--hover) }
+.calgrid.week .day { min-height: 240px }
+.ev.pub { opacity: .62 }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -426,6 +432,10 @@ let tasks = [
   { name: 'Launch teaser', list: 'ff-plan', parent: 'tp', stage: 'todo', who: 'KA', due: '2026-12-23', type: 'Video', platform: 'YouTube', hours: 12, priority: 'Medium', pillar: 'Seasonal' },
   { name: 'Book recording studio', list: 'ff-pod', stage: 's-done', who: 'KA', due: '2026-11-28', kind: 'simple', hours: 1, priority: 'Low' },
   { name: 'Venue contract', list: 'tsc-meet', stage: 's-doing', who: 'SA', due: '2026-12-03', kind: 'simple', hours: 2, priority: 'Medium' },
+  { name: 'October newsletter', list: 'tsc-news', stage: 'publish', who: 'NO', due: '2026-10-28', type: 'Email', platform: 'Email', hours: 4, priority: 'Medium' },
+  { name: 'Founders day post', list: 'ff-li', stage: 'publish', who: 'SA', due: '2026-11-10', type: 'Post', platform: 'LinkedIn', hours: 2, priority: 'Medium' },
+  { name: 'New year message', list: 'ipb-li', stage: 'todo', who: 'LA', due: '2027-01-01', type: 'Post', platform: 'LinkedIn', hours: 2, priority: 'Medium' },
+  { name: 'Ramadan countdown stories', list: 'ff-ramvis', stage: 'todo', who: 'LA', due: '2027-01-25', type: 'Story', platform: 'Instagram', hours: 4, priority: 'High' },
 ].forEach((e, i) => tasks.push({ id: 'x' + i, kind: 'pipeline', parent: null, platform: null, type: null, pillar: null, breached: false, cover: false, clips: 0, ...e }));
 
 const FEATURES = [
@@ -700,32 +710,57 @@ function vTable(v, ts) {
     inp.onblur = commit;
   });
 }
-function vCal(v, ts) {
-  const first = new Date('2026-11-30T00:00'); const today = '2026-11-22';
-  let h = '<div class="cal"><div class="calgrid">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
-  for (let i = 0; i < 35; i++) {
-    const d = new Date(first); d.setDate(first.getDate() + i);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const ev = ts.filter(t => t.due === iso);
-    h += `<div class="day ${d.getMonth() !== 11 ? 'out' : ''} ${iso === today ? 'today' : ''}" data-day="${iso}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' ' + d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
-      ${ev.map(t => `<div class="ev" draggable="true" data-t="${t.id}" style="--c:${ST(t.stage).c}" title="${esc(t.name)} · ${esc(label(t.list, t.stage))}">${esc(t.name)}</div>`).join('')}</div>`;
+
+/* ---------- one continuous calendar ---------- */
+const TODAY = '2026-11-22';
+const CAL = { y: 2026, m: 10, mode: 'month', anchor: TODAY, camp: 'all' };
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const monday = (d) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+function calendar(v, ts, o) {
+  const camps = o.camps ? [...new Set(ts.map(o.camps).filter(Boolean))] : [];
+  if (CAL.camp !== 'all' && !camps.includes(CAL.camp)) CAL.camp = 'all';
+  const shown = ts.filter(t => CAL.camp === 'all' || o.camps(t) === CAL.camp);
+  const week = CAL.mode === 'week';
+  let start, cells, heading;
+  if (week) { start = monday(new Date(CAL.anchor + 'T00:00')); cells = 7; const e = new Date(start); e.setDate(e.getDate() + 6);
+    heading = `${start.getDate()} ${start.toLocaleDateString('en-GB', { month: 'short' })} – ${e.getDate()} ${e.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`; }
+  else { const first = new Date(CAL.y, CAL.m, 1); start = monday(first); const last = new Date(CAL.y, CAL.m + 1, 0);
+    cells = Math.ceil(((last - start) / 864e5 + 1) / 7) * 7; heading = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
+  let h = `<div class="calbar"><button type="button" class="nav" data-cal="prev" aria-label="Previous">‹</button><span class="mon">${heading}</span><button type="button" class="nav" data-cal="next" aria-label="Next">›</button>
+    <button type="button" class="btn" data-cal="today">Today</button>
+    <div class="seg" role="group" aria-label="Calendar layout">${[['month', 'Month'], ['week', 'Week']].map(x => `<button type="button" data-calmode="${x[0]}" class="${CAL.mode === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
+    ${camps.length ? `<span class="mini">Campaign</span><div class="seg" role="group" aria-label="Campaign">${['all'].concat(camps).map(c => `<button type="button" data-camp="${esc(c)}" class="${CAL.camp === c ? 'on' : ''}">${c === 'all' ? 'All' : esc(c)}</button>`).join('')}</div>` : ''}</div>
+    <div class="cal"><div class="calgrid ${week ? 'week' : ''}">` + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i); const iso = isoOf(d);
+    const out = !week && d.getMonth() !== CAL.m;
+    h += `<div class="day ${out ? 'out' : ''} ${iso === TODAY ? 'today' : ''}" data-day="${iso}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' ' + d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
+      ${shown.filter(t => t.due === iso).map(t => { const fin = t.stage === 'publish' || t.stage === 's-done';
+        return `<div class="ev ${fin ? 'pub' : ''}" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}" title="${esc(t.name)} · ${esc(o.tip(t))}">${fin ? '✓ ' : ''}${esc(t.name)}</div>`; }).join('')}</div>`;
   }
   h += '</div></div>';
-  const before = ts.filter(t => t.due && t.due < '2026-11-30');
-  const none = ts.filter(t => !t.due);
-  h += `<div class="nodate"><span class="mini"><b>December 2026.</b> Drag a task to another day to change its due date.</span></div>`;
-  if (none.length || before.length) h += `<div class="nodate"><span class="mini">${none.length ? 'No date:' : ''}</span>${none.map(t => `<span class="ev" draggable="true" data-t="${t.id}" style="--c:${ST(t.stage).c}">${esc(t.name)}</span>`).join('')}${before.length ? `<span class="mini">· ${before.length} due earlier in November</span>` : ''}</div>`;
+  const none = shown.filter(t => !t.due);
+  if (none.length) h += `<div class="nodate"><span class="mini">No date:</span>${none.map(t => `<span class="ev" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}">${esc(t.name)}</span>`).join('')}</div>`;
+  h += `<p class="mini" style="margin-top:10px">One calendar that keeps everything: move back and forward through any month. Finished work stays on its day, marked ✓.${o.note ? ' ' + o.note : ''}</p>`;
   v.innerHTML = h;
-  v.querySelectorAll('.ev').forEach(e => e.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', e.dataset.t); });
-  v.querySelectorAll('.day').forEach(d => {
-    d.ondragover = (e) => { e.preventDefault(); d.classList.add('drop'); };
-    d.ondragleave = () => d.classList.remove('drop');
-    d.ondrop = (e) => {
-      e.preventDefault(); const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain')); if (!t) return;
-      const prev = t.due; t.due = d.dataset.day; renderView();
-      toast(`"${esc(t.name)}" is now due ${fmt(t.due)}. Board and Table show it too.`, () => { t.due = prev; });
-    };
-  });
+  const go = (fn) => { fn(); o.rerender(); };
+  v.querySelector('[data-cal="prev"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() - 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m - 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="next"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() + 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m + 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="today"]').onclick = () => go(() => { CAL.anchor = TODAY; CAL.y = 2026; CAL.m = 10; });
+  v.querySelectorAll('[data-calmode]').forEach(b => b.onclick = () => go(() => { CAL.mode = b.dataset.calmode; if (CAL.mode === 'week' && (new Date(CAL.anchor + 'T00:00').getMonth() !== CAL.m)) CAL.anchor = isoOf(new Date(CAL.y, CAL.m, 1)); }));
+  v.querySelectorAll('[data-camp]').forEach(b => b.onclick = () => go(() => { CAL.camp = b.dataset.camp; }));
+  if (o.drag) {
+    v.querySelectorAll('.ev[draggable]').forEach(e => e.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', e.dataset.t); });
+    v.querySelectorAll('.day').forEach(d => {
+      d.ondragover = (e) => { e.preventDefault(); d.classList.add('drop'); };
+      d.ondragleave = () => d.classList.remove('drop');
+      d.ondrop = (e) => { e.preventDefault(); const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain')); if (t) o.onDrop(t, d.dataset.day); };
+    });
+  }
+}
+function vCal(v, ts) {
+  calendar(v, ts, { color: (t) => ST(t.stage).c, tip: (t) => label(t.list, t.stage), drag: true, rerender: renderView, note: 'Drag a task to another day to change its due date.',
+    onDrop: (t, day) => { const prev = t.due; t.due = day; renderView(); toast(`"${esc(t.name)}" is now due ${fmt(t.due)}. Board and Sheet show it too.`, () => { t.due = prev; }); } });
 }
 function vWork(v, ts) {
   const by = {}; ts.filter(t => t.stage !== 'publish' && t.stage !== 's-done').forEach(t => { (by[t.who] = by[t.who] || []).push(t); });

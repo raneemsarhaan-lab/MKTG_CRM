@@ -308,7 +308,7 @@ The hierarchy and views in this spec must leave room for each: a view type can b
 - **FR-013**: The Everything view MUST list every task the member may see across all Spaces, and only those.
 - **FR-013a**: Every Board view, at every level (Space, Folder, Subfolder, List, team view, Everything), MUST show the pipeline as built: its stages as columns in their original order, with their original English and Arabic names, owners and look, exactly as today's Board. Status words MUST NOT rename Board columns; they apply in the List, Sheet and Calendar views. Simple tasks, when shown, sit in their own three columns after the pipeline.
 - **FR-014a**: The Sheet view MUST be the existing spreadsheet, not a new or simpler table. It keeps its menu bar and toolbar, name box, cell editing, keyboard navigation, copy and paste (including from Excel and Google Sheets), formatting, merges, frozen panes, sort and filter, comments, multi-area selection, the power tips, and the Fields drawer with task field and regular columns. Opened on a Space, Folder or List, it shows that node's tasks as linked rows.
-- **FR-014**: Calendar MUST offer month and week layouts. Dragging a task to a day sets its due date, and tasks without a date are listed apart.
+- **FR-014**: The Calendar MUST be one continuous calendar, as a regular calendar is: every task with a date sits on its day, past and future. Members move back and forward through any month or week, and Today returns to the current date. Finished work stays on its day, marked as done. Campaigns are a filter on the calendar, not separate month or campaign Lists. Dragging a task to a day sets its due date, and tasks without a date are listed apart.
 
 **Status words (US3)**
 

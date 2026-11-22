@@ -217,6 +217,12 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .col .cc { min-width: 22px; height: 22px; border-radius: 6px; background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted); display: grid; place-items: center; padding: 0 5px }
 .col .ar { font-size: 11px; color: var(--muted); direction: rtl; text-align: right; margin-top: -6px }
 .col .addt { border: 0; background: none; color: #7C3AED; font-weight: 700; font-size: 12.5px; padding: 4px 0 0 }
+.calbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.calbar .mon { font-family: var(--display); font-weight: 800; font-size: 16px; min-width: 150px; text-align: center; letter-spacing: -0.01em }
+.calbar .nav { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; width: 30px; height: 30px; font-size: 16px; line-height: 1 }
+.calbar .nav:hover { background: var(--hover) }
+.calgrid.week .day { min-height: 240px }
+.ev.pub { opacity: .62 }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -286,7 +292,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   <header class="top">
     <span class="eyebrow">Spec 021 · Option B, for comparison</span>
     <h1>Teams × Brands</h1>
-    <p class="lede"><b>Brands</b> hold the work, each with the same four Folders: <b>Calendars</b>, <b>Assets</b>, <b>Sheet</b> and <b>Library</b>. <b>Team Spaces</b> hold no tasks of their own. Each one is a lens that pulls its team's work from every brand. A task lives in one brand Folder and shows up in every team Space it belongs to. Click around: the data is sample data.</p>
+    <p class="lede"><b>Brands</b> hold the work, each with the same four Folders: <b>Calendar</b>, <b>Assets</b>, <b>Sheet</b> and <b>Library</b>. <b>Team Spaces</b> hold no tasks of their own. Each one is a lens that pulls its team's work from every brand. A task lives in one brand Folder and shows up in every team Space it belongs to. Click around: the data is sample data.</p>
   </header>
 
   <section class="panel" aria-labelledby="mx">
@@ -317,7 +323,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       <div class="sc"><h3>Spec as written (Option A)</h3><ul>
         <li>Space = a brand</li><li>Folder = a team inside that brand (Content, Design, Video)</li><li>A designer working on three brands opens three Design Folders, or builds a view on Everything</li><li>Status words are set per team Folder, so each brand repeats them</li><li>Teams can lay out each brand differently</li></ul></div>
       <div class="sc now"><h3>This option (B)</h3><ul>
-        <li>Brand = where work lives, always with Calendars, Assets, Sheet and Library</li><li>Team Space = a lens across all brands: no tasks of its own, only a rule for which tasks it shows and who its members are</li><li>A designer opens one Space and sees every brand's design work</li><li>Status words are set once per team Space</li><li>Feature switches stay per brand</li><li>Hiding work from a team means leaving that team out of the Space, or making a brand Folder private</li></ul></div>
+        <li>Brand = where work lives, always with Calendar, Assets, Sheet and Library. The Calendar is one continuous calendar, not a List per month</li><li>Team Space = a lens across all brands: no tasks of its own, only a rule for which tasks it shows and who its members are</li><li>A designer opens one Space and sees every brand's design work</li><li>Status words are set once per team Space</li><li>Feature switches stay per brand</li><li>Hiding work from a team means leaving that team out of the Space, or making a brand Folder private</li></ul></div>
     </div>
   </section>
 </div>
@@ -365,7 +371,7 @@ const BRANDS = [
   { id: 'tsc', name: 'The Strategy Community', color: '#7A5A2E', cal: ['December 2026', 'Monthly meetup'] },
   { id: 'ipb', name: 'Islam Personal Branding', color: '#1E293B', cal: ['December 2026'] },
 ];
-const FOLDERS = [['cal', 'Calendars'], ['assets', 'Assets'], ['sheet', 'Sheet'], ['lib', 'Library']];
+const FOLDERS = [['cal', 'Calendar'], ['assets', 'Assets'], ['sheet', 'Sheet'], ['lib', 'Library']];
 const B = Object.fromEntries(BRANDS.map(b => [b.id, b]));
 const T = Object.fromEntries(TEAMS.map(t => [t.id, t]));
 
@@ -393,7 +399,12 @@ let tasks = [
   ['ipb', 0, 'Leadership lesson #8', 'c-check', 'NO', '2026-12-04', 'Post', 'LinkedIn'],
   ['ipb', 0, 'Year in review carousel', 'r-design', 'OM', '2026-12-28', 'Post', 'LinkedIn', false, true],
   ['ipb', 0, 'Talk clip: on patience', 'publish', 'KA', '2026-11-26', 'Reel', 'Instagram', false, true],
-].map((r, i) => ({ id: 't' + i, brand: r[0], cal: r[1], name: r[2], stage: r[3], who: r[4], due: r[5], type: r[6], platform: r[7], breached: !!r[8], cover: !!r[9], kind: r[10] || 'pipeline' }));
+  ['tsc', 0, 'October newsletter', 'publish', 'NO', '2026-10-28', 'Email', 'Email', false, true],
+  ['ff', 0, 'Founders day post', 'publish', 'SA', '2026-11-10', 'Post', 'LinkedIn', false, true],
+  ['ipb', 0, 'New year message', 'todo', 'LA', '2027-01-01', 'Post', 'LinkedIn'],
+  ['om', 1, 'Launch day post', 'todo', 'NO', '2027-01-12', 'Post', 'LinkedIn'],
+  ['ff', 1, 'Ramadan countdown stories', 'todo', 'LA', '2027-01-25', 'Story', 'Instagram'],
+].map((r, i) => ({ id: 't' + i, brand: r[0], cal: r[1], camp: r[1] === 1 ? B[r[0]].cal[1] : null, name: r[2], stage: r[3], who: r[4], due: r[5], type: r[6], platform: r[7], breached: !!r[8], cover: !!r[9], kind: r[10] || 'pipeline' }));
 const ASSETS = {
   ff: [['Logo · primary', 'SVG'], ['Logo · white', 'SVG'], ['Brand fonts', 'ZIP'], ['LinkedIn post template', 'FIG'], ['Story template', 'FIG'], ['Brand guide 2026', 'PDF']],
   om: [['Logo · primary', 'SVG'], ['Product screenshots', 'ZIP'], ['Deck template', 'PPTX']],
@@ -417,7 +428,6 @@ function scope() {
   const p = parse(S.node);
   if (p.kind === 'team') return tasks.filter(t => p.team.rule(t));
   let ts = tasks.filter(t => t.brand === p.brand.id);
-  if (p.folder === 'cal' && p.idx !== null) ts = ts.filter(t => t.cal === p.idx);
   if (p.folder === 'lib') ts = ts.filter(done);
   if (p.folder === 'assets') ts = ts.filter(t => t.type === 'Design' && !done(t));
   return ts;
@@ -461,7 +471,6 @@ function renderTree() {
     FOLDERS.forEach(([f, name]) => {
       const ct = f === 'assets' ? ASSETS[b.id].length : f === 'lib' ? tasks.filter(t => t.brand === b.id && done(t)).length : f === 'sheet' ? '' : tasks.filter(t => t.brand === b.id && !done(t)).length;
       h += btn(`b:${b.id}:${f}`, IC[f], name, 'folder lvl1', ct);
-      if (f === 'cal') b.cal.forEach((c, i) => { h += btn(`b:${b.id}:cal:${i}`, IC.list, c, 'lvl2', tasks.filter(t => t.brand === b.id && t.cal === i && !done(t)).length); });
     });
   });
   const tr = $('#tree'); tr.innerHTML = h;
@@ -491,8 +500,8 @@ function renderMain() {
     const fname = p.folder ? FOLDERS.find(f => f[0] === p.folder)[1] : null;
     title = `${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)} <span class="tag">${p.idx !== null ? 'List' : p.folder ? 'Folder' : 'Brand'}</span>`;
     crumbs = `<span>Brands</span><span>›</span>${p.folder ? `<span>${esc(p.brand.name)}</span><span>›</span>` : ''}${p.idx !== null ? `<span>Calendars</span><span>›</span>` : ''}<b>${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)}</b>`;
-    const ex = { cal: 'Where the brand\'s tasks live, one List per month or campaign.', assets: 'Brand files (logos, fonts, templates), plus design requests for new assets.', sheet: 'The brand\'s spreadsheets, with every tool the sheets have today.', lib: 'Everything published or done for this brand, kept for reuse. Tasks arrive here on their own when they finish.' };
-    sub = `<div class="actions"><span class="mini">${p.folder ? ex[p.folder] : 'Every task for this brand, from its Calendars. Each brand has the same four Folders.'}</span></div>`;
+    const ex = { cal: 'Where the brand\'s tasks live: one calendar that keeps everything, past and future. Campaigns are a filter, not separate Lists.', assets: 'Brand files (logos, fonts, templates), plus design requests for new assets.', sheet: 'The brand\'s spreadsheets, with every tool the sheets have today.', lib: 'Everything published or done for this brand, kept for reuse. Tasks arrive here on their own when they finish.' };
+    sub = `<div class="actions"><span class="mini">${p.folder ? ex[p.folder] : 'Every task for this brand, from its Calendar. Each brand has the same four Folders.'}</span></div>`;
   }
   const vs = viewsFor(p); if (!vs.some(v => v[0] === S.view)) S.view = vs[0][0];
   const groupable = S.view === 'list' && !['assets', 'lib'].includes(p.folder);
@@ -532,7 +541,7 @@ function vBoard(v, ts, p) {
 function vList(v, ts, p) {
   if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
   const groups = S.group === 'brand' && p.kind === 'team' ? BRANDS.map(b => [brandSq(b, true) + `<b>${esc(b.name)}</b>`, ts.filter(t => t.brand === b.id)]) : stagesIn(ts).map(s => [pill(s.id), ts.filter(t => t.stage === s.id)]);
-  v.innerHTML = groups.filter(g => g[1].length).map(([hd, g]) => `<div class="grp"><div class="grp-h">${hd}<span class="ct">${g.length}</span></div>${g.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(B[t.brand].name)} › ${esc(B[t.brand].cal[t.cal])}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('')}</div>`).join('');
+  v.innerHTML = groups.filter(g => g[1].length).map(([hd, g]) => `<div class="grp"><div class="grp-h">${hd}<span class="ct">${g.length}</span></div>${g.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(B[t.brand].name)}${t.camp ? ' › ' + esc(t.camp) : ''}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('')}</div>`).join('');
 }
 function vSheet(v, ts, p) {
   const tabs = p.folder === 'sheet' ? ['Content plan', 'Video sheet', 'Hashtags'] : null;
@@ -552,15 +561,56 @@ function vSheet(v, ts, p) {
     <p class="mini" style="margin-top:10px">${tabs ? 'The brand\'s workbook: linked tabs follow the tasks, and blank tabs are free-form, as in Sheets today.' : 'The same spreadsheet as today, filled with the tasks in this view.'}</p>`;
   v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.sheetTab = +b.dataset.tab; renderMain(); });
 }
-function vCal(v, ts) {
-  const first = new Date('2026-11-30T00:00'); const today = '2026-11-22';
-  let h = '<div class="cal"><div class="calgrid">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
-  for (let i = 0; i < 35; i++) {
-    const d = new Date(first); d.setDate(first.getDate() + i);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    h += `<div class="day ${d.getMonth() !== 11 ? 'out' : ''} ${iso === today ? 'today' : ''}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' Dec' : ''}</span>${ts.filter(t => t.due === iso).map(t => `<div class="ev" style="--c:${B[t.brand].color}" title="${esc(t.name)} · ${esc(label(t.stage))}">${esc(t.name)}</div>`).join('')}</div>`;
+
+/* ---------- one continuous calendar ---------- */
+const TODAY = '2026-11-22';
+const CAL = { y: 2026, m: 10, mode: 'month', anchor: TODAY, camp: 'all' };
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const monday = (d) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+function calendar(v, ts, o) {
+  const camps = o.camps ? [...new Set(ts.map(o.camps).filter(Boolean))] : [];
+  if (CAL.camp !== 'all' && !camps.includes(CAL.camp)) CAL.camp = 'all';
+  const shown = ts.filter(t => CAL.camp === 'all' || o.camps(t) === CAL.camp);
+  const week = CAL.mode === 'week';
+  let start, cells, heading;
+  if (week) { start = monday(new Date(CAL.anchor + 'T00:00')); cells = 7; const e = new Date(start); e.setDate(e.getDate() + 6);
+    heading = `${start.getDate()} ${start.toLocaleDateString('en-GB', { month: 'short' })} – ${e.getDate()} ${e.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`; }
+  else { const first = new Date(CAL.y, CAL.m, 1); start = monday(first); const last = new Date(CAL.y, CAL.m + 1, 0);
+    cells = Math.ceil(((last - start) / 864e5 + 1) / 7) * 7; heading = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
+  let h = `<div class="calbar"><button type="button" class="nav" data-cal="prev" aria-label="Previous">‹</button><span class="mon">${heading}</span><button type="button" class="nav" data-cal="next" aria-label="Next">›</button>
+    <button type="button" class="btn" data-cal="today">Today</button>
+    <div class="seg" role="group" aria-label="Calendar layout">${[['month', 'Month'], ['week', 'Week']].map(x => `<button type="button" data-calmode="${x[0]}" class="${CAL.mode === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
+    ${camps.length ? `<span class="mini">Campaign</span><div class="seg" role="group" aria-label="Campaign">${['all'].concat(camps).map(c => `<button type="button" data-camp="${esc(c)}" class="${CAL.camp === c ? 'on' : ''}">${c === 'all' ? 'All' : esc(c)}</button>`).join('')}</div>` : ''}</div>
+    <div class="cal"><div class="calgrid ${week ? 'week' : ''}">` + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i); const iso = isoOf(d);
+    const out = !week && d.getMonth() !== CAL.m;
+    h += `<div class="day ${out ? 'out' : ''} ${iso === TODAY ? 'today' : ''}" data-day="${iso}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' ' + d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
+      ${shown.filter(t => t.due === iso).map(t => { const fin = t.stage === 'publish' || t.stage === 's-done';
+        return `<div class="ev ${fin ? 'pub' : ''}" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}" title="${esc(t.name)} · ${esc(o.tip(t))}">${fin ? '✓ ' : ''}${esc(t.name)}</div>`; }).join('')}</div>`;
   }
-  v.innerHTML = h + '</div></div><p class="mini" style="margin-top:10px">December 2026. Each task is in its brand\'s colour.</p>';
+  h += '</div></div>';
+  const none = shown.filter(t => !t.due);
+  if (none.length) h += `<div class="nodate"><span class="mini">No date:</span>${none.map(t => `<span class="ev" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}">${esc(t.name)}</span>`).join('')}</div>`;
+  h += `<p class="mini" style="margin-top:10px">One calendar that keeps everything: move back and forward through any month. Finished work stays on its day, marked ✓.${o.note ? ' ' + o.note : ''}</p>`;
+  v.innerHTML = h;
+  const go = (fn) => { fn(); o.rerender(); };
+  v.querySelector('[data-cal="prev"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() - 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m - 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="next"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() + 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m + 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="today"]').onclick = () => go(() => { CAL.anchor = TODAY; CAL.y = 2026; CAL.m = 10; });
+  v.querySelectorAll('[data-calmode]').forEach(b => b.onclick = () => go(() => { CAL.mode = b.dataset.calmode; if (CAL.mode === 'week' && (new Date(CAL.anchor + 'T00:00').getMonth() !== CAL.m)) CAL.anchor = isoOf(new Date(CAL.y, CAL.m, 1)); }));
+  v.querySelectorAll('[data-camp]').forEach(b => b.onclick = () => go(() => { CAL.camp = b.dataset.camp; }));
+  if (o.drag) {
+    v.querySelectorAll('.ev[draggable]').forEach(e => e.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', e.dataset.t); });
+    v.querySelectorAll('.day').forEach(d => {
+      d.ondragover = (e) => { e.preventDefault(); d.classList.add('drop'); };
+      d.ondragleave = () => d.classList.remove('drop');
+      d.ondrop = (e) => { e.preventDefault(); const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain')); if (t) o.onDrop(t, d.dataset.day); };
+    });
+  }
+}
+function vCal(v, ts) {
+  calendar(v, ts, { color: (t) => B[t.brand].color, tip: (t) => `${B[t.brand].name} · ${label(t.stage)}`, camps: (t) => t.camp, rerender: renderMain, note: 'Each task is in its brand\'s colour.' });
 }
 function vWork(v, ts) {
   const by = {}; ts.filter(t => !done(t)).forEach(t => { (by[t.who] = by[t.who] || []).push(t); });
@@ -569,7 +619,7 @@ function vWork(v, ts) {
 function vFiles(v, ts, p) {
   const b = p.brand;
   v.innerHTML = `<div class="files">${ASSETS[b.id].map(a => `<div class="file"><div class="th" style="--c:${b.color}">${esc(a[1])}</div><div class="fn"><b>${esc(a[0])}</b><span class="mini">${esc(a[1])} · ${esc(b.name)}</span></div></div>`).join('')}</div>
-    <h3 style="margin-bottom:8px">Asset requests in progress</h3>${ts.length ? ts.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(b.cal[t.cal])}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('') : '<p class="mini">None right now.</p>'}`;
+    <h3 style="margin-bottom:8px">Asset requests in progress</h3>${ts.length ? ts.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(t.camp || 'No campaign')}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('') : '<p class="mini">None right now.</p>'}`;
 }
 function vGal(v, ts) {
   if (!ts.length) { v.innerHTML = '<div class="empty">Nothing published yet.</div>'; return; }
