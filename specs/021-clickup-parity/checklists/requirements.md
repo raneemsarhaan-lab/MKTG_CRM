@@ -1,7 +1,7 @@
 # Specification Quality Checklist: Momentum vs ClickUp — Hierarchy, Views and Modular Features
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-11-22
+**Created**: 2026-11-22 (revised the same day)
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -35,3 +35,4 @@
 - Iteration 2: applied the three answers. Removed the US5/US6 requirements from scope and renumbered FR-001–FR-026. Every item passes.
 - Iteration 3: added US5 (pipeline tasks and simple tasks, FR-027–FR-034), kept subtasks in the model, made the Sheet view the existing spreadsheet (FR-014a), and recorded the visual style. US5 depends on a constitution amendment to §II and §V. Every item passes.
 - Iteration 4: the spec now names the pipeline as built (11 stages, from the app) instead of the constitution's outdated nine, and every Board view shows that original process (FR-013a). Status words apply to List, Sheet and Calendar only. Every item passes.
+- Iteration 5: the structure changed to Teams × Brands (brands with Calendar, Assets, Sheet and Library; team Spaces as lenses across brands). Added US6, the hand-off (Shows in list, assignee adds a Space, the box at Ready For Design), FR-028–FR-033. Four defaults are recorded as assumptions for the user to confirm: four fixed Folders, Library fills itself, a sheet per brand, and 'video editor role' meaning Video Space membership. Every item passes.

@@ -223,6 +223,20 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .calbar .nav:hover { background: var(--hover) }
 .calgrid.week .day { min-height: 240px }
 .ev.pub { opacity: .62 }
+.card[data-open], .row[data-open] { cursor: pointer }
+.card[data-open]:hover, .row[data-open]:hover { box-shadow: 0 0 0 2px var(--sel-line) }
+.chipset { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end }
+.spc { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--c) 18%, transparent) }
+.spc button { border: 0; background: transparent; width: 20px; height: 20px; border-radius: 50%; color: var(--muted); font-size: 14px; line-height: 1 }
+.spc button:hover { background: var(--hover) }
+select { font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; max-width: 100% }
+.modal-bg { position: absolute; inset: 0; background: rgba(10,10,14,.38); display: grid; place-items: center; z-index: 60; padding: 16px }
+.modal { background: var(--panel); border-radius: 18px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: var(--shadow); border: 1px solid var(--line) }
+.opt { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer }
+.opt small { color: var(--muted); margin-inline-start: auto }
+.opt:has(input:checked) { background: var(--sel); border-color: var(--sel-line) }
+.stline { display: grid; gap: 2px }
+.stline small { color: var(--muted) }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -290,15 +304,15 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 </style>
 <div class="wrap">
   <header class="top">
-    <span class="eyebrow">Spec 021 · Option B, for comparison</span>
+    <span class="eyebrow">Spec 021 · The structure we're building</span>
     <h1>Teams × Brands</h1>
-    <p class="lede"><b>Brands</b> hold the work, each with the same four Folders: <b>Calendar</b>, <b>Assets</b>, <b>Sheet</b> and <b>Library</b>. <b>Team Spaces</b> hold no tasks of their own. Each one is a lens that pulls its team's work from every brand. A task lives in one brand Folder and shows up in every team Space it belongs to. Click around: the data is sample data.</p>
+    <p class="lede"><b>Brands</b> hold the work, each with the same four Folders: <b>Calendar</b>, <b>Assets</b>, <b>Sheet</b> and <b>Library</b>. <b>Team Spaces</b> hold no tasks of their own. Each one is a lens that pulls its team's work from every brand. A task lives in its brand and shows in every team Space it belongs to. A task joins a team Space when someone from that team is assigned, or when the hand-off box at Ready For Design asks where it should go. Try it: open the Content Space and press "+ New video task". The data is sample data.</p>
   </header>
 
   <section class="panel" aria-labelledby="mx">
     <div style="display:grid;gap:6px">
       <h2 id="mx">One task, one home, many team lenses</h2>
-      <p class="muted">Open tasks in this sample, by brand and team Space. A task can count in two columns: a LinkedIn post is in Content while it's written and in Design while it's designed.</p>
+      <p class="muted">Open tasks in this sample, by brand and team Space. One task can count in several columns. A post stays in Content after it's handed to Design, so the writer can follow it to the end.</p>
     </div>
     <div class="matrix" id="matrix"></div>
   </section>
@@ -316,14 +330,14 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 
   <section class="panel" aria-labelledby="cp">
     <div style="display:grid;gap:6px">
-      <h2 id="cp">How this differs from the spec as written</h2>
-      <p class="muted">If you choose this option, these are the changes to spec 021.</p>
+      <h2 id="cp">How this differs from the first layout</h2>
+      <p class="muted">Spec 021 now follows this structure. The first layout (Option A) is kept for reference.</p>
     </div>
     <div class="cmp">
-      <div class="sc"><h3>Spec as written (Option A)</h3><ul>
+      <div class="sc"><h3>First layout (Option A)</h3><ul>
         <li>Space = a brand</li><li>Folder = a team inside that brand (Content, Design, Video)</li><li>A designer working on three brands opens three Design Folders, or builds a view on Everything</li><li>Status words are set per team Folder, so each brand repeats them</li><li>Teams can lay out each brand differently</li></ul></div>
-      <div class="sc now"><h3>This option (B)</h3><ul>
-        <li>Brand = where work lives, always with Calendar, Assets, Sheet and Library. The Calendar is one continuous calendar, not a List per month</li><li>Team Space = a lens across all brands: no tasks of its own, only a rule for which tasks it shows and who its members are</li><li>A designer opens one Space and sees every brand's design work</li><li>Status words are set once per team Space</li><li>Feature switches stay per brand</li><li>Hiding work from a team means leaving that team out of the Space, or making a brand Folder private</li></ul></div>
+      <div class="sc now"><h3>Now in the spec (B)</h3><ul>
+        <li>Brand = where work lives, always with Calendar, Assets, Sheet and Library. The Calendar is one continuous calendar, not a List per month</li><li>Team Space = a lens across all brands: no tasks of its own. A task shows in every Space on its "Shows in" list</li><li>A task joins a Space when one of its members is assigned, or through the hand-off box at Ready For Design. It never leaves a Space on its own</li><li>A designer opens one Space and sees every brand's design work</li><li>Status words are set once per team Space</li><li>Feature switches stay per brand</li><li>Team Spaces are seen by their members and admins; brands by everyone</li></ul></div>
     </div>
   </section>
 </div>
@@ -347,23 +361,20 @@ const STAGES = [
 const SIMPLE = [{ id: 's-todo', en: 'To Do', c: '#94A3B8', simple: true }, { id: 's-doing', en: 'In progress', c: '#0EA5E9', simple: true }, { id: 's-done', en: 'Done', c: '#3FA34D', simple: true }];
 const ALL = STAGES.concat(SIMPLE); const SI = Object.fromEntries(ALL.map((s, i) => [s.id, i])); const ST = (id) => ALL[SI[id]];
 const W = (a) => Object.fromEntries(ALL.map((s, i) => [s.id, a[i] || '']));
-const PEOPLE = { RS: { n: 'Raneem', c: '#7C3AED', r: 'Marketing Manager' }, NO: { n: 'Noran', c: '#D4537E', r: 'Content' }, SA: { n: 'Samaa', c: '#0E7C7B', r: 'Content' },
+const PEOPLE = { RS: { n: 'Raneem', c: '#7C3AED', r: 'Admin' }, NO: { n: 'Noran', c: '#D4537E', r: 'Content' }, SA: { n: 'Samaa', c: '#0E7C7B', r: 'Content' },
   OM: { n: 'Omar', c: '#378ADD', r: 'Design' }, LA: { n: 'Laila', c: '#B45309', r: 'Design' }, KA: { n: 'Karim', c: '#475569', r: 'Video' } };
 const AS = [['RS', 'Raneem · admin'], ['OM', 'Omar · designer'], ['KA', 'Karim · video'], ['NO', 'Noran · content']];
 const DESIGN_ST = ['r-design', 'd-prog', 'd-check'];
 const CONTENT_ST = ['todo', 'c-prog', 'c-final', 'c-check'];
 const TEAMS = [
-  { id: 'tm-content', name: 'Content', color: '#3B82F6', members: ['RS', 'NO', 'SA'], ruleText: 'Pipeline tasks at To Do, C-In Progress, C-Review or C-Check, from every brand',
-    rule: (t) => t.kind === 'pipeline' && CONTENT_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
+  { id: 'tm-content', name: 'Content', color: '#3B82F6', members: ['NO', 'SA'], ruleText: 'Tasks created by the content team or assigned to it. They stay here after the hand-off.',
     words: W(['To write', 'Writing', 'Edit', 'Islam check', 'To design', 'In design', 'Design review', 'Final check', 'Ready', 'Scheduled', 'Published']) },
-  { id: 'tm-design', name: 'Design', color: '#7C3AED', members: ['RS', 'OM', 'LA'], ruleText: 'Pipeline tasks at Ready For Design, D-In Progress or D-Check, from every brand',
-    rule: (t) => t.kind === 'pipeline' && DESIGN_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
+  { id: 'tm-design', name: 'Design', color: '#7C3AED', members: ['OM', 'LA'], prod: true, ruleText: 'Tasks handed to Design at Ready For Design, or assigned to a designer',
     words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready for design', 'Designing', 'Design review', 'Final check', 'Ready to post', 'Scheduled', 'Posted']) },
-  { id: 'tm-video', name: 'Video', color: '#0E9F9A', members: ['RS', 'KA'], ruleText: 'Video and Reel tasks at any stage, from every brand',
-    rule: (t) => ['Video', 'Reel'].includes(t.type),
+  { id: 'tm-video', name: 'Video', color: '#0E9F9A', members: ['KA'], prod: true, ruleText: 'Tasks handed to Video at Ready For Design, or assigned to a video editor',
     words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Editing', 'Rough cut review', 'Final cut', 'Ready to post', 'Scheduled', 'Live']) },
-  { id: 'tm-plan', name: 'Planning', color: '#0EA5E9', members: ['RS', 'NO', 'SA'], ruleText: 'Simple tasks (planning, admin, events), from every brand',
-    rule: (t) => t.kind === 'simple', words: W(['', '', '', '', '', '', '', '', '', '', '', 'Not started', 'Doing', 'Done']) },
+  { id: 'tm-plan', name: 'Planning', color: '#0EA5E9', members: ['NO', 'SA'], simpleOnly: true, ruleText: 'Simple tasks for planning, admin and events',
+    words: W(['', '', '', '', '', '', '', '', '', '', '', 'Not started', 'Doing', 'Done']) },
 ];
 const BRANDS = [
   { id: 'ff', name: 'Forefront Consulting', color: '#B4322F', cal: ['December 2026', 'Ramadan 2027'] },
@@ -374,6 +385,15 @@ const BRANDS = [
 const FOLDERS = [['cal', 'Calendar'], ['assets', 'Assets'], ['sheet', 'Sheet'], ['lib', 'Library']];
 const B = Object.fromEntries(BRANDS.map(b => [b.id, b]));
 const T = Object.fromEntries(TEAMS.map(t => [t.id, t]));
+TEAMS.forEach(m => { m.rule = (t) => t.spaces.includes(m.id); });
+const isVid = (t) => ['Video', 'Reel'].includes(t.type);
+const sIdx = (id) => STAGES.findIndex(x => x.id === id);
+/* FR-029: assigning a member of a Space adds that Space. Simple-only Spaces are added for simple tasks only. */
+function addAssigneeSpaces(t) {
+  const added = [];
+  TEAMS.forEach(m => { if (m.members.includes(t.who) && !t.spaces.includes(m.id) && (!m.simpleOnly || t.kind === 'simple')) { t.spaces.push(m.id); added.push(m.name); } });
+  return added;
+}
 
 let tasks = [
   ['ff', 0, 'Q1 outlook carousel', 'c-final', 'SA', '2026-12-03', 'Post', 'LinkedIn', true],
@@ -405,6 +425,14 @@ let tasks = [
   ['om', 1, 'Launch day post', 'todo', 'NO', '2027-01-12', 'Post', 'LinkedIn'],
   ['ff', 1, 'Ramadan countdown stories', 'todo', 'LA', '2027-01-25', 'Story', 'Instagram'],
 ].map((r, i) => ({ id: 't' + i, brand: r[0], cal: r[1], camp: r[1] === 1 ? B[r[0]].cal[1] : null, name: r[2], stage: r[3], who: r[4], due: r[5], type: r[6], platform: r[7], breached: !!r[8], cover: !!r[9], kind: r[10] || 'pipeline' }));
+/* FR-008: starting "Shows in" lists */
+tasks.forEach(t => {
+  t.spaces = [];
+  if (t.kind === 'simple') t.spaces.push('tm-plan');
+  else { t.spaces.push('tm-content'); if (sIdx(t.stage) >= sIdx('r-design')) t.spaces.push(isVid(t) ? 'tm-video' : 'tm-design'); }
+  addAssigneeSpaces(t);
+  t.owner = ['NO', 'SA', 'RS'].includes(t.who) ? t.who : 'NO';
+});
 const ASSETS = {
   ff: [['Logo · primary', 'SVG'], ['Logo · white', 'SVG'], ['Brand fonts', 'ZIP'], ['LinkedIn post template', 'FIG'], ['Story template', 'FIG'], ['Brand guide 2026', 'PDF']],
   om: [['Logo · primary', 'SVG'], ['Product screenshots', 'ZIP'], ['Deck template', 'PPTX']],
@@ -412,7 +440,7 @@ const ASSETS = {
   ipb: [['Signature mark', 'SVG'], ['Portrait set', 'ZIP'], ['Carousel template', 'FIG']],
 };
 
-const S = { node: 'tm-design', view: 'board', as: 'RS', group: 'brand', sheetTab: 0 };
+const S = { node: 'tm-content', view: 'board', as: 'RS', group: 'brand', sheetTab: 0, open: null, ho: null };
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const av = (w) => `<span class="av" style="background:${PEOPLE[w].c}" title="${PEOPLE[w].n}">${PEOPLE[w].n[0]}</span>`;
@@ -428,7 +456,7 @@ function scope() {
   const p = parse(S.node);
   if (p.kind === 'team') return tasks.filter(t => p.team.rule(t));
   let ts = tasks.filter(t => t.brand === p.brand.id);
-  if (p.folder === 'lib') ts = ts.filter(done);
+  if (p.folder === 'lib') ts = ts.filter(t => t.stage === 'publish');
   if (p.folder === 'assets') ts = ts.filter(t => t.type === 'Design' && !done(t));
   return ts;
 }
@@ -469,7 +497,7 @@ function renderTree() {
   BRANDS.forEach(b => {
     h += btn('b:' + b.id, brandSq(b), b.name, 'space', tasks.filter(t => t.brand === b.id && !done(t)).length);
     FOLDERS.forEach(([f, name]) => {
-      const ct = f === 'assets' ? ASSETS[b.id].length : f === 'lib' ? tasks.filter(t => t.brand === b.id && done(t)).length : f === 'sheet' ? '' : tasks.filter(t => t.brand === b.id && !done(t)).length;
+      const ct = f === 'assets' ? ASSETS[b.id].length : f === 'lib' ? tasks.filter(t => t.brand === b.id && t.stage === 'publish').length : f === 'sheet' ? '' : tasks.filter(t => t.brand === b.id && !done(t)).length;
       h += btn(`b:${b.id}:${f}`, IC[f], name, 'folder lvl1', ct);
     });
   });
@@ -477,7 +505,7 @@ function renderTree() {
   tr.querySelectorAll('.node').forEach(x => x.onclick = () => {
     S.node = x.dataset.id; const p = parse(S.node);
     S.view = p.kind === 'team' ? 'board' : p.folder === 'assets' ? 'files' : p.folder === 'sheet' ? 'sheet' : p.folder === 'lib' ? 'gallery' : p.folder === 'cal' ? 'calendar' : 'list';
-    S.group = p.kind === 'team' ? 'brand' : 'stage'; render();
+    S.group = p.kind === 'team' ? 'brand' : 'stage'; S.open = null; S.ho = null; render();
   });
 }
 function btn(id, icon, name, cls, ct) { return `<button type="button" class="node ${cls} ${S.node === id ? 'on' : ''}" data-id="${id}" ${S.node === id ? 'aria-current="true"' : ''}>${icon}<span class="nm">${esc(name)}</span><span class="ct">${ct}</span></button>`; }
@@ -495,12 +523,12 @@ function renderMain() {
   if (p.kind === 'team') {
     title = `${p.team.name} <span class="tag">Team Space · lens</span>`; crumbs = `<span>Teams</span><span>›</span><b>${p.team.name}</b>`;
     sub = `<div class="actions"><span class="rule">${IC.lens.replace('<svg', '<svg width="13" height="13"')} Shows: ${esc(p.team.ruleText)}</span>
-      <span class="mini">Members: ${p.team.members.map(w => PEOPLE[w].n).join(', ')}</span></div>`;
+      <span class="mini">Members: ${p.team.members.map(w => PEOPLE[w].n).join(', ')}</span>${p.team.id === 'tm-content' ? '<button type="button" class="btn primary" id="tryNew">+ New video task</button>' : ''}</div>`;
   } else {
     const fname = p.folder ? FOLDERS.find(f => f[0] === p.folder)[1] : null;
     title = `${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)} <span class="tag">${p.idx !== null ? 'List' : p.folder ? 'Folder' : 'Brand'}</span>`;
     crumbs = `<span>Brands</span><span>›</span>${p.folder ? `<span>${esc(p.brand.name)}</span><span>›</span>` : ''}${p.idx !== null ? `<span>Calendars</span><span>›</span>` : ''}<b>${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)}</b>`;
-    const ex = { cal: 'Where the brand\'s tasks live: one calendar that keeps everything, past and future. Campaigns are a filter, not separate Lists.', assets: 'Brand files (logos, fonts, templates), plus design requests for new assets.', sheet: 'The brand\'s spreadsheets, with every tool the sheets have today.', lib: 'Everything published or done for this brand, kept for reuse. Tasks arrive here on their own when they finish.' };
+    const ex = { cal: 'Where the brand\'s tasks live: one calendar that keeps everything, past and future. Campaigns are a filter, not separate Lists.', assets: 'Brand files (logos, fonts, templates), plus design requests for new assets.', sheet: 'The brand\'s spreadsheets, with every tool the sheets have today.', lib: 'Everything published for this brand, kept for reuse. Tasks arrive here on their own when they are published.' };
     sub = `<div class="actions"><span class="mini">${p.folder ? ex[p.folder] : 'Every task for this brand, from its Calendar. Each brand has the same four Folders.'}</span></div>`;
   }
   const vs = viewsFor(p); if (!vs.some(v => v[0] === S.view)) S.view = vs[0][0];
@@ -516,15 +544,101 @@ function renderMain() {
   m.querySelectorAll('[data-as]').forEach(b => b.onclick = () => {
     S.as = b.dataset.as; const p2 = parse(S.node);
     if (p2.kind === 'team' && !teamsFor().includes(p2.team)) S.node = teamsFor()[0].id;
-    render(); toast(isAdmin() ? 'Raneem is an admin: she sees every team Space.' : `${PEOPLE[S.as].n} sees the ${teamsFor().map(t => t.name).join(' and ')} Space${teamsFor().length > 1 ? 's' : ''}, and every brand.`);
+    S.open = null; S.ho = null; render(); toast(isAdmin() ? 'Raneem is an admin: she sees every team Space.' : `${PEOPLE[S.as].n} sees the ${teamsFor().map(t => t.name).join(' and ')} Space${teamsFor().length > 1 ? 's' : ''}, and every brand.`);
   });
   const v = $('#view'); const ts = scope();
   ({ board: vBoard, list: vList, sheet: vSheet, calendar: vCal, workload: vWork, files: vFiles, gallery: vGal })[S.view](v, ts, p);
+  v.querySelectorAll('[data-open]').forEach(el => { el.onclick = () => { S.open = el.dataset.open; renderMain(); }; el.onkeydown = (e) => { if (e.key === 'Enter') el.click(); }; });
+  const tn = $('#tryNew'); if (tn) tn.onclick = newVideoTask;
+  if (S.open) { m.insertAdjacentHTML('beforeend', drawer()); bindDrawer(); }
+  if (S.ho) { m.insertAdjacentHTML('beforeend', handoff()); bindHandoff(); }
+}
+
+/* ---------- task panel, hand-off box ---------- */
+const spaceChip = (m, t) => `<span class="spc" style="--c:${m.color}">${m.name}<button type="button" data-rm="${m.id}" aria-label="Remove ${m.name} from this task">×</button></span>`;
+function nextOf(t) {
+  if (t.kind === 'simple') { const i = SIMPLE.findIndex(x => x.id === t.stage); return SIMPLE[i + 1] ? SIMPLE[i + 1].id : null; }
+  const i = sIdx(t.stage); return STAGES[i + 1] ? STAGES[i + 1].id : null;
+}
+function newVideoTask() {
+  const who = T['tm-content'].members.includes(S.as) ? S.as : 'NO';
+  let n = 16; while (tasks.some(t => t.name === `Podcast ep. ${n}`)) n++;
+  const t = { id: 'n' + Date.now(), brand: 'ff', cal: 0, camp: null, name: `Podcast ep. ${n}`, stage: 'todo', who, owner: who, due: '2026-12-30', type: 'Video', platform: 'YouTube', breached: false, cover: false, kind: 'pipeline', spaces: ['tm-content'] };
+  tasks.push(t); S.open = t.id; S.view = 'board'; render();
+  toast(`Created from the Content Space, so it shows there and on Forefront's Calendar. Press Advance to take it to the hand-off.`);
+}
+function drawer() {
+  const t = tasks.find(x => x.id === S.open); if (!t) return '';
+  const st = ST(t.stage); const nx = nextOf(t); const b = B[t.brand];
+  const own = t.kind === 'simple' ? 'Anyone who can edit it' : (STAGES[sIdx(t.stage)].owner === 'Assignee' ? `Assignee (${PEOPLE[t.who].n})` : STAGES[sIdx(t.stage)].owner);
+  return `<div class="sheet" role="dialog" aria-label="${esc(t.name)}"><div class="sheet-h"><button type="button" class="x" id="closeD" aria-label="Close">×</button>
+    <span class="crumbs" style="font-size:12px;color:var(--muted)">${brandSq(b, true)} ${esc(b.name)} › Calendar</span>
+    <h3 style="font-size:18px">${esc(t.name)}</h3>
+    <div class="actions">${t.type ? `<span class="tag">${esc(t.type)}</span>` : '<span class="tag simple">Simple</span>'}<span class="mini">Due ${fmt(t.due)}</span></div></div>
+    <div class="sheet-b">
+      <div class="frow"><div class="stline"><b><span class="pill" style="--c:${st.c}">${esc(st.en)}</span></b><small>${st.ar || ''}</small></div><div class="stline" style="text-align:end"><small>Moves it on</small><b>${esc(own)}</b></div></div>
+      <div class="frow"><div><b>Shows in</b><small>The team Spaces that list this task</small></div><div class="chipset">${t.spaces.length ? TEAMS.filter(m => t.spaces.includes(m.id)).map(m => spaceChip(m, t)).join('') : '<span class="mini">Only its brand</span>'}</div></div>
+      <div class="frow"><div><b>Assignee</b><small>Assigning a designer or video editor adds their Space</small></div>
+        <select id="asg" aria-label="Assignee">${Object.entries(PEOPLE).map(([k, pp]) => `<option value="${k}" ${t.who === k ? 'selected' : ''}>${pp.n} · ${pp.r}</option>`).join('')}</select></div>
+      <div class="frow"><div><b>Owner</b><small>Fixed at creation. Follows the task to the end.</small></div><span>${av(t.owner)} ${PEOPLE[t.owner].n}</span></div>
+      ${nx ? `<button type="button" class="btn primary" id="adv" style="justify-content:center;padding:10px">Advance to ${esc(ST(nx).en)}</button>` : '<p class="mini">Published is final. It\'s in the brand\'s Library.</p>'}
+      <p class="foot">One task: the same brief, comments and files in every Space it shows in. In the app, Advance keeps today's permission checks; this preview lets anyone press it.</p>
+    </div></div>`;
+}
+function bindDrawer() {
+  const t = tasks.find(x => x.id === S.open);
+  $('#closeD').onclick = () => { S.open = null; renderMain(); };
+  $('#asg').onchange = (e) => {
+    t.who = e.target.value; const added = addAssigneeSpaces(t); render();
+    toast(added.length ? `${PEOPLE[t.who].n} is in ${added.join(' and ')}, so the task now shows there too. ${PEOPLE[t.who].n} was notified.` : `Assigned to ${PEOPLE[t.who].n}. No new Space: they're not in another team Space.`);
+  };
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+    t.spaces = t.spaces.filter(x => x !== b.dataset.rm); render(); toast(`Removed from ${T[b.dataset.rm].name} by hand. Nothing else changed.`);
+  });
+  const adv = $('#adv'); if (!adv) return;
+  adv.onclick = () => {
+    const nx = nextOf(t);
+    if (nx === 'r-design' && !t.spaces.some(x => T[x].prod)) {
+      S.ho = { id: t.id, spaces: [isVid(t) ? 'tm-video' : 'tm-design'], who: null }; renderMain(); return;
+    }
+    t.stage = nx; render();
+    toast(nx === 'publish' ? `🎉 Published. It's in ${esc(B[t.brand].name)}'s Library now, and still in ${TEAMS.filter(m => t.spaces.includes(m.id)).map(m => m.name).join(' and ')}.`
+      : nx === 'r-design' ? `Ready For Design. It already shows in ${TEAMS.filter(m => t.spaces.includes(m.id) && m.prod).map(m => m.name).join(' and ')}, so no box was needed.`
+      : `Moved to ${esc(ST(nx).en)}.`);
+  };
+}
+function handoff() {
+  const t = tasks.find(x => x.id === S.ho.id);
+  const prods = TEAMS.filter(m => m.prod);
+  const people = [...new Set(prods.filter(m => S.ho.spaces.includes(m.id)).flatMap(m => m.members))];
+  if (!people.includes(S.ho.who)) S.ho.who = people[0] || null;
+  return `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="hoT">
+    <h3 id="hoT" style="font-size:18px">Where should this task show?</h3>
+    <p class="mini">"${esc(t.name)}" is ready for production. It stays in ${TEAMS.filter(m => t.spaces.includes(m.id)).map(m => m.name).join(' and ') || 'its brand'}; choose who picks it up next.</p>
+    ${prods.map(m => `<label class="opt"><input type="checkbox" data-hs="${m.id}" ${S.ho.spaces.includes(m.id) ? 'checked' : ''}> <b>${m.name}</b><small>${m.members.map(w => PEOPLE[w].n).join(', ')}</small></label>`).join('')}
+    <label class="frow" style="border:0;padding:0"><span><b>Assign to</b></span><select id="hoWho" ${people.length ? '' : 'disabled'}>${people.map(w => `<option value="${w}" ${S.ho.who === w ? 'selected' : ''}>${PEOPLE[w].n} · ${PEOPLE[w].r}</option>`).join('')}</select></label>
+    <div class="actions" style="justify-content:flex-end"><button type="button" class="btn" id="hoCancel">Cancel</button><button type="button" class="btn primary" id="hoOk" ${S.ho.spaces.length && S.ho.who ? '' : 'disabled'}>Move to Ready For Design</button></div>
+  </div></div>`;
+}
+function bindHandoff() {
+  const t = tasks.find(x => x.id === S.ho.id);
+  document.querySelectorAll('[data-hs]').forEach(c => c.onchange = () => {
+    S.ho.spaces = c.checked ? S.ho.spaces.concat(c.dataset.hs) : S.ho.spaces.filter(x => x !== c.dataset.hs); renderMain();
+  });
+  const w = $('#hoWho'); if (w) w.onchange = () => { S.ho.who = w.value; };
+  $('#hoCancel').onclick = () => { S.ho = null; renderMain(); toast('Cancelled. The task stays where it was.'); };
+  $('#hoOk').onclick = () => {
+    S.ho.spaces.forEach(x => { if (!t.spaces.includes(x)) t.spaces.push(x); });
+    t.who = S.ho.who; t.stage = 'r-design'; addAssigneeSpaces(t);
+    const names = TEAMS.filter(m => t.spaces.includes(m.id)).map(m => m.name).join(' and ');
+    S.ho = null; render();
+    toast(`Ready For Design. It now shows in ${names}. ${PEOPLE[t.who].n} was notified and follows it.`);
+  };
 }
 const metaTeams = (t) => teamsOf(t).map(m => `<span class="tag" style="background:color-mix(in srgb, ${m.color} 18%, transparent);color:var(--ink)">${m.name}</span>`).join('');
 function card(t, p) {
   const b = B[t.brand];
-  return `<div class="card">${t.cover ? `<div class="cv" style="--c:${b.color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>
+  return `<div class="card" data-open="${t.id}" tabindex="0">${t.cover ? `<div class="cv" style="--c:${b.color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>
     <div class="cf">${p.kind === 'team' ? `${brandSq(b, true)}<span class="mini">${esc(b.name)}</span>` : metaTeams(t)}</div>
     <div class="cf">${av(t.who)}<span class="mini">${fmt(t.due)}</span>${t.type ? `<span class="tag">${esc(t.type)}</span>` : '<span class="tag simple">Simple</span>'}${t.breached ? '<span class="sla">SLA</span>' : ''}</div></div></div>`;
 }
@@ -541,7 +655,7 @@ function vBoard(v, ts, p) {
 function vList(v, ts, p) {
   if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
   const groups = S.group === 'brand' && p.kind === 'team' ? BRANDS.map(b => [brandSq(b, true) + `<b>${esc(b.name)}</b>`, ts.filter(t => t.brand === b.id)]) : stagesIn(ts).map(s => [pill(s.id), ts.filter(t => t.stage === s.id)]);
-  v.innerHTML = groups.filter(g => g[1].length).map(([hd, g]) => `<div class="grp"><div class="grp-h">${hd}<span class="ct">${g.length}</span></div>${g.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(B[t.brand].name)}${t.camp ? ' › ' + esc(t.camp) : ''}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('')}</div>`).join('');
+  v.innerHTML = groups.filter(g => g[1].length).map(([hd, g]) => `<div class="grp"><div class="grp-h">${hd}<span class="ct">${g.length}</span></div>${g.map(t => `<div class="row" data-open="${t.id}" tabindex="0"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(B[t.brand].name)}${t.camp ? ' › ' + esc(t.camp) : ''}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('')}</div>`).join('');
 }
 function vSheet(v, ts, p) {
   const tabs = p.folder === 'sheet' ? ['Content plan', 'Video sheet', 'Hashtags'] : null;
@@ -619,7 +733,7 @@ function vWork(v, ts) {
 function vFiles(v, ts, p) {
   const b = p.brand;
   v.innerHTML = `<div class="files">${ASSETS[b.id].map(a => `<div class="file"><div class="th" style="--c:${b.color}">${esc(a[1])}</div><div class="fn"><b>${esc(a[0])}</b><span class="mini">${esc(a[1])} · ${esc(b.name)}</span></div></div>`).join('')}</div>
-    <h3 style="margin-bottom:8px">Asset requests in progress</h3>${ts.length ? ts.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(t.camp || 'No campaign')}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('') : '<p class="mini">None right now.</p>'}`;
+    <h3 style="margin-bottom:8px">Asset requests in progress</h3>${ts.length ? ts.map(t => `<div class="row" data-open="${t.id}" tabindex="0"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(t.camp || 'No campaign')}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('') : '<p class="mini">None right now.</p>'}`;
 }
 function vGal(v, ts) {
   if (!ts.length) { v.innerHTML = '<div class="empty">Nothing published yet.</div>'; return; }
