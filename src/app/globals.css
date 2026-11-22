@@ -3189,3 +3189,12 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-vs-prio::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
 .fx-vs-prio.is-high { color: #B42318; } .fx-vs-prio.is-medium { color: #92400E; } .fx-vs-prio.is-low { color: #4B5563; }
 .fx-vs-addvideo { white-space: nowrap; }
+
+/* Spec 021 (T081): a workbook on a Space, brand or My tasks page fills the room under the page's header. */
+[data-view-host]:has([data-node-workbook]) { height: 100dvh; min-height: 0 !important; }
+[data-view-host]:has([data-node-workbook]) > [role="tabpanel"] { min-height: 0; display: flex; flex-direction: column; }
+[data-node-workbook] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+[data-node-workbook] .fx-sh-workbook { height: auto; flex: 1; min-height: 0; }
+@media (max-width: 767px) {
+  [data-view-host]:has([data-node-workbook]) { height: calc(100dvh - 62px - env(safe-area-inset-bottom, 0px)); }
+}

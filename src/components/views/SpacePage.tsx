@@ -20,6 +20,8 @@ import { CalendarView } from './CalendarView'
 import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
 import { TaskSheet } from './TaskSheet'
+import { NodeWorkbook } from './NodeWorkbook'
+import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { viewTasks, viewOptions, type BoardData } from './types'
 import { applyView } from '@/lib/view-config'
 
@@ -65,10 +67,15 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
         if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={inView} spaceId={spaceId} />
-        if (tab === 'sheet' && sheetStart) return <BoardView key={view?.id} data={data} scopeTasks={inView} spaceId={spaceId} start={sheetStart} />
+        // T081: every Sheet tab is a full workbook (tabs, toolbar, formatting, comments, blank tabs).
+        if (tab === 'sheet' && sheetStart) return (
+          <NodeWorkbook key={view?.id} data={data} folder={space.key as 'content' | 'video'}
+            linked={<KanbanBoard {...data} surface="sheets" sheetsView={sheetStart} scopeTasks={inView} spaceId={spaceId} />} />
+        )
         // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
         const body = tab === 'sheet'
-          ? <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} label={label} />
+          ? <NodeWorkbook key={view?.id} data={data} node={`space:${spaceId}`}
+              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} sheetKey={`tasks:space:${spaceId}`} label={label} />} />
           : tab === 'calendar'
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" onOpen={open} />
             : tab === 'workload'

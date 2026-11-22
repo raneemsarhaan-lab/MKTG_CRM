@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
+  MAX_CUSTOM_COLUMNS, setsFor, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -165,7 +165,7 @@ export function useSheetColumns(o: UseSheetColumns) {
     if (!c || key === 'title') return
     close(false)
     const was = c.record && !c.record.shownDefault ? c.record.shownIn : defaultShownIn(sheet, key)
-    for (const s of SHEET_SETS[sheet]) {
+    for (const s of setsFor(sheet)) {
       const r = await api.setShown(sheet, key, s, false)
       if (!r.success) { o.say(err(r.error)); return }
     }
@@ -489,7 +489,7 @@ export function useSheetColumns(o: UseSheetColumns) {
     cols: shown.map(c => c.key),
     widths: Object.fromEntries(laid.map(c => [c.key, c.width])) as Record<string, number>,
     nameOf, header, grid, custom, typeCombo, toolbar, layer,
-    sets: SHEET_SETS[sheet],
+    sets: setsFor(sheet),
     /** The column's current names, for paste matching (R9). */
     pasteNames: laid.map(c => ({ key: c.key, kind: c.kind, names: [nameOf(c.key), c.builtIn ? o.defaultName(c.key) : '', builtInOf(sheet, c.key)?.en ?? ''].filter(Boolean) })),
     /** Custom columns a paste can fill (FR-050, FR-051). */

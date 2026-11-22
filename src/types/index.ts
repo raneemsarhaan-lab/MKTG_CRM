@@ -25,7 +25,8 @@ export type BoardTab = 'pipeline' | 'content'
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
 
-export type SheetId = 'content' | 'video'
+/** Spec 021 (T081): 'tasks:<node>' is a Space's, brand's or My tasks' Tasks sheet. */
+export type SheetId = 'content' | 'video' | `tasks:${string}`
 export type ColumnKind = 'text' | 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox'
 export interface ChoiceOption { id: string; name: string; color: string }
 /** One column of a sheet the team has shaped (data-model §1). */
@@ -480,9 +481,11 @@ export interface AppNotification {
 // ─── Spec 013: Sheets (specs/013-spreadsheet-editing/data-model.md) ─────────
 
 /** A folder in the Sheets section. */
-export type SheetFolderKind = 'content' | 'video' | 'team' | 'brand'
+/** Spec 021: 'node' is a Space's or My tasks' own workbook (linked_key 'node:<node>'). */
+export type SheetFolderKind = 'content' | 'video' | 'team' | 'brand' | 'node'
 /** A tab in a folder: one of the two linked sheets, or a blank sheet. */
-export type SheetKind = 'linked_content' | 'linked_video' | 'blank'
+/** Spec 021: 'linked_tasks' is a Space's, brand's or My tasks' live Tasks tab (linked_key 'tasks:<node>'). */
+export type SheetKind = 'linked_content' | 'linked_video' | 'linked_tasks' | 'blank'
 /** Excel-style tab colours (FR-059a), stored as keys, drawn from SHEETS_UI.tabs. */
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray', 'black'] as const
 export type TabColor = typeof TAB_COLORS[number]
@@ -517,6 +520,8 @@ export interface SheetSummary {
   protectedBy: string | null
   rowCount: number
   colCount: number
+  /** Spec 021: a linked_tasks sheet's key ('tasks:<node>'), for comments and formats. */
+  linkedKey?: string | null
 }
 
 /** A blank sheet as the client holds it (data-model §4). */
@@ -682,7 +687,8 @@ export interface SheetView {
   advanced?: AdvancedFilter | null
   outline?: OutlineGroupRecord[]
 }
-export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'none' } | { by: 'col'; col: string }
+/** Spec 021 (T081): 'brand' groups a Tasks sheet by brand. */
+export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'brand' | 'none' } | { by: 'col'; col: string }
 
 // ─── Spec 015 stage 3: sort, filter, tables, conditional formatting ─────────
 

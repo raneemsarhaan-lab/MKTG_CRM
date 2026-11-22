@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { mapSheetColumn } from '@/lib/mappers'
 import {
-  BUILT_INS, COLUMN_KINDS, MAX_CUSTOM_COLUMNS, SHEET_SETS, builtInOf, checkName, cleanOptions, clampWidth,
+  COLUMN_KINDS, MAX_CUSTOM_COLUMNS, builtInOf, builtInsFor, isTaskSheet, setsFor, checkName, cleanOptions, clampWidth,
   convertValues, defaultShownIn, isCustomKey, normName, parseValue,
 } from '@/lib/sheet-columns'
 import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/types/index'
@@ -24,7 +24,14 @@ import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/typ
 type Fail = { success: false; error: string }
 type Tx = Prisma.TransactionClient
 
-const isSheet = (s: string): s is SheetId => s === 'content' || s === 'video'
+/**
+ * A sheet these actions may shape (spec 010; spec 021 T081): the Content or
+ * Video sheet, or a Tasks sheet. A My tasks sheet ('tasks:me:<id>') is its
+ * owner's alone, so its columns and values are private.
+ */
+const isSheet = (s: string, memberId?: string): s is SheetId =>
+  s === 'content' || s === 'video' || (isTaskSheet(s) && (!s.startsWith('tasks:me:') || s === `tasks:me:${memberId}`))
+const mine = (sheet: string, memberId: string) => !sheet.startsWith('tasks:me:') || sheet === `tasks:me:${memberId}`
 const isAdmin = (m: { access: string }) => m.access === 'admin' || m.access === 'superuser'
 const done = () => { revalidatePath('/board') }
 
@@ -37,12 +44,12 @@ async function records(tx: Tx, sheet: SheetId, memberId: string) {
   const live = await tx.sheetColumn.findMany({ where: { sheet, deleted_at: null }, orderBy: { position: 'asc' } })
   if (live.some(r => !isCustomKey(r.key))) {
     // A built-in added to the code since the first change gets its record now, after its predecessor.
-    const missing = BUILT_INS[sheet].filter(b => !live.some(r => r.key === b.key))
+    const missing = builtInsFor(sheet).filter(b => !live.some(r => r.key === b.key))
     if (!missing.length) return live
     const keys = live.map(r => r.key)
-    BUILT_INS[sheet].forEach((b, i) => {
+    builtInsFor(sheet).forEach((b, i) => {
       if (keys.includes(b.key)) return
-      const before = BUILT_INS[sheet].slice(0, i).reverse().find(x => keys.includes(x.key))
+      const before = builtInsFor(sheet).slice(0, i).reverse().find(x => keys.includes(x.key))
       keys.splice(before ? keys.indexOf(before.key) + 1 : 0, 0, b.key)
     })
     for (const b of missing) {
@@ -53,7 +60,7 @@ async function records(tx: Tx, sheet: SheetId, memberId: string) {
   }
   // Only custom columns so far (or none): put the built-ins first, in default order.
   let pos = 0
-  for (const b of BUILT_INS[sheet]) {
+  for (const b of builtInsFor(sheet)) {
     await tx.sheetColumn.upsert({
       where: { sheet_key: { sheet, key: b.key } },
       create: { sheet, key: b.key, position: pos++, created_by: memberId, updated_by: memberId },
@@ -73,7 +80,7 @@ async function renumber(tx: Tx, sheet: SheetId, keys: string[]) {
 
 /** Every other column's names, for the uniqueness check: [current, English default]. */
 function otherNames(rows: { key: string; name: string | null }[], sheet: SheetId, exceptKey?: string): string[][] {
-  const keys = new Set([...BUILT_INS[sheet].map(b => b.key), ...rows.map(r => r.key)])
+  const keys = new Set([...builtInsFor(sheet).map(b => b.key), ...rows.map(r => r.key)])
   return [...keys].filter(k => k !== exceptKey).map(k => {
     const r = rows.find(x => x.key === k)
     return [r?.name ?? '', builtInOf(sheet, k)?.en ?? ''].filter(Boolean)
@@ -97,7 +104,7 @@ export async function addColumn(sheet: string, input: {
 }): Promise<{ success: true; column: SheetColumnRecord } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (!isSheet(sheet)) return { success: false, error: 'bad_sheet' }
+  if (!isSheet(sheet, me.id)) return { success: false, error: 'bad_sheet' }
   if (!COLUMN_KINDS.includes(input.kind)) return { success: false, error: 'bad_kind' }
   const name = normName(input.name ?? '')
   try {
@@ -115,7 +122,7 @@ export async function addColumn(sheet: string, input: {
       const at = input.after && keys.includes(input.after) ? keys.indexOf(input.after) + 1
         : input.before && keys.includes(input.before) && input.before !== 'title' ? keys.indexOf(input.before) : keys.length
       keys.splice(Math.max(1, at), 0, key)
-      const set = input.set && SHEET_SETS[sheet].includes(input.set) ? input.set : null
+      const set = input.set && setsFor(sheet).includes(input.set) ? input.set : null
       await tx.sheetColumn.create({
         data: {
           id: newId, sheet, key, name, kind: input.kind, options: options as unknown as Prisma.InputJsonValue, position: keys.length,
@@ -136,7 +143,7 @@ export async function addColumn(sheet: string, input: {
 export async function renameColumn(sheet: string, key: string, name: string | null): Promise<{ success: true } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (!isSheet(sheet)) return { success: false, error: 'bad_sheet' }
+  if (!isSheet(sheet, me.id)) return { success: false, error: 'bad_sheet' }
   try {
     await prisma.$transaction(async tx => {
       await lock(tx, sheet)
@@ -161,7 +168,7 @@ export async function renameColumn(sheet: string, key: string, name: string | nu
 export async function moveColumn(sheet: string, key: string, beforeKey: string | null): Promise<{ success: true } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (!isSheet(sheet)) return { success: false, error: 'bad_sheet' }
+  if (!isSheet(sheet, me.id)) return { success: false, error: 'bad_sheet' }
   if (key === 'title' || beforeKey === 'title') return { success: false, error: 'title_fixed' }
   try {
     await prisma.$transaction(async tx => {
@@ -183,7 +190,7 @@ export async function moveColumn(sheet: string, key: string, beforeKey: string |
 export async function setColumnShown(sheet: string, key: string, set: string, shown: boolean): Promise<{ success: true } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (!isSheet(sheet) || !SHEET_SETS[sheet].includes(set)) return { success: false, error: 'bad_sheet' }
+  if (!isSheet(sheet, me.id) || !setsFor(sheet).includes(set)) return { success: false, error: 'bad_sheet' }
   if (key === 'title') return { success: false, error: 'title_fixed' }
   try {
     await prisma.$transaction(async tx => {
@@ -204,7 +211,7 @@ export async function setColumnShown(sheet: string, key: string, set: string, sh
 export async function resizeColumn(sheet: string, key: string, width: number): Promise<{ success: true } | Fail> {
   const me = await session()
   if (!me) return { success: false, error: 'not_authenticated' }
-  if (!isSheet(sheet)) return { success: false, error: 'bad_sheet' }
+  if (!isSheet(sheet, me.id)) return { success: false, error: 'bad_sheet' }
   if (!Number.isFinite(width)) return { success: false, error: 'bad_width' }
   try {
     await prisma.$transaction(async tx => {
@@ -232,7 +239,7 @@ export async function updateColumn(id: string, input: {
   try {
     const cleared = await prisma.$transaction(async tx => {
       const col = await tx.sheetColumn.findUnique({ where: { id } })
-      if (!col || col.deleted_at) throw new Error('not_found')
+      if (!col || col.deleted_at || !mine(col.sheet, me.id)) throw new Error('not_found')
       if (!isCustomKey(col.key) || !col.kind) throw new Error('built_in')
       const sheet = col.sheet as SheetId
       await lock(tx, sheet)
@@ -290,7 +297,7 @@ export async function deleteColumn(id: string): Promise<{ success: true; values:
   try {
     const values = await prisma.$transaction(async tx => {
       const col = await tx.sheetColumn.findUnique({ where: { id } })
-      if (!col || col.deleted_at) throw new Error('not_found')
+      if (!col || col.deleted_at || !mine(col.sheet, me.id)) throw new Error('not_found')
       if (!isCustomKey(col.key)) throw new Error('built_in')
       await lock(tx, col.sheet as SheetId)
       const n = await tx.sheetValue.count({ where: { column_id: id } })
@@ -310,7 +317,7 @@ export async function restoreColumn(id: string): Promise<{ success: true; column
   try {
     await prisma.$transaction(async tx => {
       const col = await tx.sheetColumn.findUnique({ where: { id } })
-      if (!col) throw new Error('not_found')
+      if (!col || !mine(col.sheet, me.id)) throw new Error('not_found')
       const sheet = col.sheet as SheetId
       await lock(tx, sheet)
       const rows = await records(tx, sheet, me.id)
@@ -351,6 +358,7 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
   if (!me) return { success: false, error: 'not_authenticated' }
   const vc = await valueContext(columnId)
   if (!vc) return { success: false, error: 'gone' }
+  if (!mine(vc.col.sheet, me.id)) return { success: false, error: 'gone' }
   const list = entries.slice(0, 500)
   const tasks = await prisma.task.findMany({
     where: { id: { in: list.map(e => e.taskId) } },

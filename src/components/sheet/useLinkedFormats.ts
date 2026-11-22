@@ -33,7 +33,7 @@ import { unionCells } from '@/lib/sheet-selection'
 export interface LinkedFormatsInput<R extends { key: string }> {
   /** Off outside the Sheets workbook's linked tab and the Content page (no `linked` prop). */
   enabled: boolean
-  sheetKey: 'linked_content' | 'linked_video'
+  sheetKey: 'linked_content' | 'linked_video' | `tasks:${string}`
   rows: R[]
   cols: GridCol[]
   active: ActiveCell | null

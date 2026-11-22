@@ -28,7 +28,7 @@ export interface BuiltInColumn {
 }
 
 /** The built-in columns of each sheet, in default order. Title is always first. */
-export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
+export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
   content: [
     { key: 'title', width: 300, en: 'Title' },
     { key: 'type', width: 130, en: 'Type' },
@@ -71,10 +71,26 @@ export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
   ],
 }
 /** The sets a sheet has: the Video sheet's three, or one for the Content sheet. */
-export const SHEET_SETS: Record<SheetId, string[]> = { content: ['all'], video: ['editing', 'copy', 'full', 'sheet'] }
+export const SHEET_SETS: Record<'content' | 'video', string[]> = { content: ['all'], video: ['editing', 'copy', 'full', 'sheet'] }
+
+/** Spec 021 (T081): a Space's, brand's or My tasks' Tasks sheet. */
+export const TASK_BUILT_INS: BuiltInColumn[] = [
+  { key: 'title', width: 300, en: 'Task' },
+  { key: 'brand', width: 170, en: 'Brand' },
+  { key: 'status', width: 150, en: 'Status' },
+  { key: 'assignee', width: 140, en: 'Assignee' },
+  { key: 'due', width: 110, en: 'Due' },
+  { key: 'type', width: 110, en: 'Type' },
+  { key: 'priority', width: 90, en: 'Priority' },
+  { key: 'platform', width: 110, en: 'Platform' },
+]
+export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
+export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
+export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (sheet === 'content' || sheet === 'video' ? BUILT_INS[sheet] : TASK_BUILT_INS)
+export const setsFor = (sheet: SheetId): string[] => (sheet === 'content' || sheet === 'video' ? SHEET_SETS[sheet] : ['all'])
 
 export const isCustomKey = (key: string) => key.startsWith('c:')
-export const builtInOf = (sheet: SheetId, key: string) => BUILT_INS[sheet].find(b => b.key === key)
+export const builtInOf = (sheet: SheetId, key: string) => builtInsFor(sheet).find(b => b.key === key)
 
 export interface LaidColumn {
   key: string
@@ -94,7 +110,7 @@ export interface LaidColumn {
  * slotted after its default predecessor, Title always first and shown.
  */
 export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string): LaidColumn[] {
-  const builtIns = BUILT_INS[sheet]
+  const builtIns = builtInsFor(sheet)
   const recs = records.filter(r => r.sheet === sheet && (!isCustomKey(r.key) || r.kind))
   const byKey = new Map(recs.map(r => [r.key, r]))
   let keys: string[]
@@ -129,7 +145,7 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
 /** Default visibility of a column in every set, the starting point for a first hide or show. */
 export function defaultShownIn(sheet: SheetId, key: string): string[] {
   const b = builtInOf(sheet, key)
-  return SHEET_SETS[sheet].filter(s => (b?.sets ? b.sets.includes(s) : true))
+  return setsFor(sheet).filter(s => (b?.sets ? b.sets.includes(s) : true))
 }
 
 export const clampWidth = (w: number) => Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(w)))
@@ -311,7 +327,7 @@ export type LayoutOp =
 export function materialise(sheet: SheetId, records: SheetColumnRecord[], who: { id: string; name: string }): SheetColumnRecord[] {
   const mine = records.filter(r => r.sheet === sheet)
   const others = records.filter(r => r.sheet !== sheet)
-  const laid = applyLayout(sheet, mine, SHEET_SETS[sheet][0])
+  const laid = applyLayout(sheet, mine, setsFor(sheet)[0])
   const now = new Date().toISOString()
   const full = laid.map((c, i): SheetColumnRecord => c.record
     ? { ...c.record, position: i }

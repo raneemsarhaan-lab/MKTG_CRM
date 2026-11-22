@@ -54,9 +54,10 @@ function pattern(p?: string | null): string {
 
 function summary(s: {
   id: string; folder_id: string; kind: string; name: string | null; position: number; tab_color: string | null
-  hidden: boolean; protected_by: string | null; row_count: number; col_count: number
+  hidden: boolean; protected_by: string | null; row_count: number; col_count: number; linked_key?: string | null
 }): SheetSummary {
   return {
+    ...(s.kind === 'linked_tasks' ? { linkedKey: s.linked_key ?? null } : {}),
     id: s.id, folderId: s.folder_id, kind: s.kind as SheetKind, name: s.name, position: s.position,
     color: (TAB_COLORS as readonly string[]).includes(s.tab_color ?? '') ? (s.tab_color as TabColor) : null,
     hidden: s.hidden, protectedBy: s.protected_by, rowCount: s.row_count, colCount: s.col_count,
@@ -97,7 +98,7 @@ export async function listFolders(): Promise<{ success: true; folders: FolderSum
   const [rows, member] = await Promise.all([
     prisma.sheetFolder.findMany({
       // Spec 021: a brand's own folder lives under its brand, not on the Sheets home.
-      where: { kind: { not: 'brand' } },
+      where: { kind: { notIn: ['brand', 'node'] } },
       include: { updater: { select: { name: true } }, _count: { select: { sheets: { where: { hidden: false } } } } },
     }),
     prisma.member.findUnique({ where: { id: m.id }, select: { sheet_pins: true, sheet_pins_set: true } }),
@@ -162,6 +163,55 @@ export async function ensureBrandSheetFolder(brandId: string): Promise<{ success
     const again = await prisma.sheetFolder.findUnique({ where: { brand_id: brandId }, select: { id: true } })
     return again ? { success: true, folderId: again.id } : fail('generic')
   }
+}
+
+/**
+ * Spec 021 (T081): the workbook behind a Space's, brand's or My tasks' Sheet tab —
+ * the same tabs, toolbar and formatting as /sheets. Its first tab is the live
+ * Tasks sheet (kind 'linked_tasks', linked_key 'tasks:<node>'); the team can add
+ * blank tabs beside it. 'me' means the caller's own (me:<memberId>).
+ */
+export async function ensureNodeWorkbook(nodeIn: string): Promise<{ success: true; folder: FolderSummary; sheets: SheetSummary[]; linkedKey: string } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const node = nodeIn === 'me' ? `me:${m.id}` : nodeIn
+  const ID = '[0-9a-f-]{36}'
+  if (!new RegExp(`^(space|brand|me):${ID}$`).test(node)) return fail('invalid')
+  const [kind, id] = node.split(':') as ['space' | 'brand' | 'me', string]
+  if (kind === 'me' && id !== m.id) return fail('not_authorized')
+  let name: string | null = null
+  if (kind === 'space') {
+    const space = await prisma.teamSpace.findUnique({ where: { id }, select: { name: true } })
+    if (!space) return fail('gone')
+    const lead = m.access === 'admin' || m.access === 'superuser'
+    if (!lead && !(await prisma.teamSpaceMember.findFirst({ where: { space_id: id, member_id: m.id } }))) return fail('not_authorized')
+    name = space.name
+  }
+  // The folder: a brand's own (it may already hold blank tabs), or the node's.
+  let folderId: string
+  if (kind === 'brand') {
+    const f = await ensureBrandSheetFolder(id)
+    if (!f.success) return f
+    folderId = f.folderId
+  } else {
+    const key = `node:${node}`
+    const found = await prisma.sheetFolder.findUnique({ where: { linked_key: key }, select: { id: true } })
+    folderId = found?.id ?? (await prisma.sheetFolder.create({ data: { kind: 'node', linked_key: key, name: kind === 'me' ? m.name : name, created_by: m.id, updated_by: m.id } })
+      .catch(async () => prisma.sheetFolder.findUniqueOrThrow({ where: { linked_key: key } }))).id
+  }
+  const linkedKey = `tasks:${node}`
+  if (!(await prisma.sheet.findUnique({ where: { linked_key: linkedKey }, select: { id: true } }))) {
+    await prisma.$transaction(async tx => {
+      await tx.sheet.updateMany({ where: { folder_id: folderId }, data: { position: { increment: 1 } } })
+      await tx.sheet.create({ data: { folder_id: folderId, kind: 'linked_tasks', linked_key: linkedKey, position: 0, created_by: m.id, updated_by: m.id } })
+    }).catch(() => null)
+  }
+  const [f, rows] = await Promise.all([
+    prisma.sheetFolder.findUniqueOrThrow({ where: { id: folderId }, include: { updater: { select: { name: true } }, _count: { select: { sheets: { where: { hidden: false } } } } } }),
+    prisma.sheet.findMany({ where: { folder_id: folderId }, orderBy: { position: 'asc' } }),
+  ])
+  const folder: FolderSummary = { id: f.id, kind: f.kind as FolderSummary['kind'], name: f.name, sheetCount: f._count.sheets, updatedAt: f.updated_at.toISOString(), updatedBy: f.updater?.name ?? null }
+  return { success: true, folder, sheets: rows.map(summary), linkedKey }
 }
 
 export async function renameFolder(id: string, name: string): Promise<{ success: true; name: string } | Fail> {
@@ -386,7 +436,7 @@ async function writeViewJson(tx: Tx, sheetId: string, v: ViewWrite) {
   // Spec 019: rows grouped by a task's theme, stage, assignee or type, or by a column.
   if ('groupBy' in v) {
     const g = v.groupBy as { by?: unknown; col?: unknown } | null | undefined
-    if (g && (g.by === 'theme' || g.by === 'stage' || g.by === 'assignee' || g.by === 'type' || g.by === 'none')) next.groupBy = { by: g.by }
+    if (g && (g.by === 'theme' || g.by === 'stage' || g.by === 'assignee' || g.by === 'type' || g.by === 'brand' || g.by === 'none')) next.groupBy = { by: g.by }
     else if (g && g.by === 'col' && typeof g.col === 'string' && /^[0-9a-f-]{36}$/i.test(g.col)) next.groupBy = { by: 'col', col: g.col }
     else delete next.groupBy
   }
@@ -961,7 +1011,7 @@ export async function setLinkedRowHeights(kind: 'linked_content' | 'linked_video
  * FR-070–FR-075): keyed by task id and column key, so they follow the task.
  */
 /** A linked sheet by id, or by its key ('linked_content', 'linked_video'), as the board's grids know it. */
-const linkedWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKey === 'linked_video' ? { linked_key: idOrKey } : { id: idOrKey })
+const linkedWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKey === 'linked_video' || idOrKey.startsWith('tasks:') ? { linked_key: idOrKey } : { id: idOrKey })
 
 export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success: true; extras: SheetExtras; sheetId: string } | Fail> {
   const m = await me()

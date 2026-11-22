@@ -31,7 +31,7 @@ type Row = {
   body: string; mentions: string[]; created_at: Date; edited_at: Date | null; deleted_at: Date | null; resolved_at: Date | null; resolved_by: string | null
 }
 
-const sheetWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKey === 'linked_video' ? { linked_key: idOrKey } : { id: idOrKey })
+const sheetWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKey === 'linked_video' || idOrKey.startsWith('tasks:') ? { linked_key: idOrKey } : { id: idOrKey })
 
 function toThread(root: Row, replies: Row[]): SheetCommentThread {
   const item = (c: Row) => ({

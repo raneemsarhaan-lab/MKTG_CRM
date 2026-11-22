@@ -1171,7 +1171,8 @@
       "defaultName": "Sheet {n}",
       "copyName": "{name} ({n})",
       "linkedTitle": "Linked to the board",
-      "protected": "Protected"
+      "protected": "Protected",
+      "tasks": "Tasks"
     },
     "crumb": "Sheets",
     "status": {
@@ -2865,7 +2866,9 @@
     "contentSheet": "Content",
     "videoSheet": "Video",
     "allTasksSheet": "All tasks",
-    "mySheets": "My sheets"
+    "mySheets": "My sheets",
+    "workbookLoading": "Opening the sheet…",
+    "workbookFailed": "This sheet couldn't open. Reload the page to try again."
   },
   "views": {
     "list": "List",
@@ -3026,6 +3029,9 @@
     "handoffOne": "Needs a hand-off: change it in its own cell to choose where it shows.",
     "pasteNote": "{done} changed · {refused} not changed (hover a cell to see why).",
     "notSaved": "Not saved ({reason}).",
-    "empty": "No tasks here yet."
+    "empty": "No tasks here yet.",
+    "rowsName": "Tasks on this page",
+    "rowsHelp": "Every task this page shows is a row. Change which tasks with the page's filters or a saved view.",
+    "groupDefault": "This page's groups"
   }
 }

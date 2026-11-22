@@ -11,6 +11,11 @@ import { configured as storageConfigured } from '@/lib/storage'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
 
+/** Columns no one else may load: My notes ('me:<id>') and other members' My tasks sheets. */
+const privateSheets = (memberId: string) => ({
+  NOT: [{ sheet: { startsWith: 'me:' } }, { AND: [{ sheet: { startsWith: 'tasks:me:' } }, { NOT: { sheet: `tasks:me:${memberId}` } }] }],
+})
+
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
   const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces] = await Promise.all([
@@ -73,8 +78,9 @@ export async function loadBoardData(member: SessionMember) {
     prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true } }),
     // Sheet columns the team has shaped, and custom values (spec 010).
     // Spec 021: a member's private My notes columns (sheet 'me:<id>') are never loaded for anyone's sheets.
-    prisma.sheetColumn.findMany({ where: { deleted_at: null, NOT: { sheet: { startsWith: 'me:' } } }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
-    prisma.sheetValue.findMany({ where: { column: { deleted_at: null, NOT: { sheet: { startsWith: 'me:' } } } }, select: { column_id: true, task_id: true, value: true } }),
+    // T081: a My tasks sheet's columns ('tasks:me:<id>') reach only their owner.
+    prisma.sheetColumn.findMany({ where: { deleted_at: null, ...privateSheets(member.id) }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
+    prisma.sheetValue.findMany({ where: { column: { deleted_at: null, ...privateSheets(member.id) } }, select: { column_id: true, task_id: true, value: true } }),
     // Row heights on the linked sheets (spec 013 FR-045), shared by the team.
     prisma.linkedRowHeight.findMany({ select: { sheet_kind: true, task_id: true, height: true } }),
     // Spec 021: team Spaces, who is in them, and the Shows in rows — three flat

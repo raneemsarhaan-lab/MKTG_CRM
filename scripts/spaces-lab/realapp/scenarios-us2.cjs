@@ -60,11 +60,11 @@ module.exports = (EMAIL, psql, ok) => {
         const want = psql(`select count(*) from tasks where brand_id='${b}' and status='publish' and kind='pipeline' and dropped_at is null`)
         ok(String((await page.$$('[data-library-item]')).length) === want, `Library lists published only (${want})`)
         await go(`/brands/${b}/sheet`)
-        ok(await page.$('.fx-board-page.is-sheet'), 'Sheet folder opens the Content sheet')
-        await go(`/brands/${b}/sheet?view=own`)
-        await page.click('[data-open-own-tabs]')
-        await page.waitForURL(/\/sheets\//, { timeout: 30000 })
-        ok(psql(`select count(*) from sheet_folders where brand_id='${b}' and kind='brand'`) === '1', "the brand's own folder exists once")
+        await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 60000 })
+        ok(psql(`select count(*) from sheet_folders where brand_id='${b}' and kind='brand'`) === '1', "the Sheet folder opens the brand's own workbook, once")
+        await go(`/brands/${b}/sheet?view=content`)
+        await page.waitForSelector('[data-node-workbook="content"] .fx-sh-workbook', { timeout: 60000 })
+        ok(await page.$('[data-node-workbook="content"] [data-content-sheet]'), 'its Content sheet tab opens the Content workbook')
       },
     },
     {

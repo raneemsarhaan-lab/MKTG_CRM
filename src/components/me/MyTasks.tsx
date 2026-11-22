@@ -18,6 +18,7 @@ import { BoardView } from '@/components/views/BoardView'
 import { CalendarView } from '@/components/views/CalendarView'
 import { TaskPanel } from '@/components/views/TaskPanel'
 import { TaskSheet } from '@/components/views/TaskSheet'
+import { NodeWorkbook } from '@/components/views/NodeWorkbook'
 import { viewTasks, viewOptions, type BoardData, type ViewTask } from '@/components/views/types'
 import { applyView } from '@/lib/view-config'
 
@@ -81,7 +82,9 @@ export function MyTasks({ data }: { data: BoardData }) {
         const groups = baseGroups.map(([l, g]) => [l, narrow(g)] as [string, ViewTask[]])
         if (tab === 'board') return <BoardView key={`${show}${view?.id ?? ''}`} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />
         // FR-013b: the same groups as the List, with a private My notes column.
-        if (tab === 'sheet') return <><TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={view?.config.fields} label={t('title')} /><TaskPanel data={data} /></>
+        // T081: My tasks' Sheet is my own workbook: the Tasks tab (with My notes), then my blank tabs.
+        if (tab === 'sheet') return <><NodeWorkbook key={view?.id} data={data} node="me"
+          linked={<TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={view?.config.fields} sheetKey={`tasks:me:${data.currentUser.id}`} label={t('title')} />} /><TaskPanel data={data} /></>
         if (tab === 'calendar') return <><CalendarView tasks={ids ? tasks.filter(x => ids.has(x.id)) : tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
         return (
           <div data-my-tasks>

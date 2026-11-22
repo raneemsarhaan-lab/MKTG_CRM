@@ -377,7 +377,7 @@ export function Workbook(p: WorkbookProps) {
 
   // ── names ───────────────────────────────────────────────────────────────
   const folderName = folder.kind === 'content' ? t('folder.content') : folder.kind === 'video' ? t('folder.video') : folder.name ?? ''
-  const nameOf = useCallback((s: SheetSummary) => (s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.name ?? ''), [t])
+  const nameOf = useCallback((s: SheetSummary) => (s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.kind === 'linked_tasks' ? t('sheet.tasks') : s.name ?? ''), [t])
   const pattern = t.raw('sheet.defaultName') as string
 
   // ── tabs ────────────────────────────────────────────────────────────────
@@ -726,12 +726,13 @@ export function Workbook(p: WorkbookProps) {
     ? t('protect.blocked', { name: p.names[open.protectedBy] ?? '…' })
     : null
   const status = outbox.status
-  const linkedFolder = folder.kind !== 'team'
+  // Spec 021: a brand's or a Space's workbook isn't "linked" as a folder; only its Tasks tab is.
+  const linkedFolder = folder.kind === 'content' || folder.kind === 'video'
   const statusText = status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
   // Spec 019: ⚙ Fields on team sheets and (stage 2) the Content sheet.
-  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video'
+  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video' || open?.kind === 'linked_tasks'
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>
@@ -900,7 +901,7 @@ export function Workbook(p: WorkbookProps) {
 
       {open && (
         <SheetComments
-          sheetRef={openBlank ? open.id : open.kind === 'linked_video' ? 'linked_video' : 'linked_content'}
+          sheetRef={openBlank ? open.id : open.kind === 'linked_tasks' ? open.linkedKey ?? open.id : open.kind === 'linked_video' ? 'linked_video' : 'linked_content'}
           source={fmtTarget}
           state={fmtState}
           names={p.names}

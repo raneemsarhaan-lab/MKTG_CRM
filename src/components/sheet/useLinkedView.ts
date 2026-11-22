@@ -52,7 +52,7 @@ export interface LinkedStore {
 
 export function useLinkedView<R extends { key: string }>(p: {
   enabled: boolean
-  sheetKey: 'linked_content' | 'linked_video'
+  sheetKey: 'linked_content' | 'linked_video' | `tasks:${string}`
   rows: R[]
   /** A row's part in a group: sorted and filtered (item), kept under its item (child), or left in place (fixed). */
   kind(row: R): 'item' | 'child' | 'fixed'

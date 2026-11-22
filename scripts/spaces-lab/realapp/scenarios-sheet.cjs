@@ -73,6 +73,78 @@ module.exports = (EMAIL, psql, ok) => {
 }
 
 // Saved views (spec 021 FR-012a, T039/T040).
+
+// T081: every sheet in a Space, brand or Me is a full workbook with the sheet features.
+module.exports.workbook = (EMAIL, psql, ok) => {
+  const spaceId = key => psql(`select id from team_spaces where key='${key}'`)
+  return [
+    {
+      id: 'workbook-space-tasks-tab', as: 'admin',
+      async run({ page, go }) {
+        const sp = spaceId('design')
+        psql(`delete from sheet_formats where sheet_id=(select id from sheets where linked_key='tasks:space:${sp}')`)
+        await go('/spaces/design?view=sheet')
+        await page.waitForSelector('[data-node-workbook] .fx-sh-workbook [data-task-sheet]', { timeout: 60000 })
+        ok(psql(`select kind from sheets where linked_key='tasks:space:${sp}'`) === 'linked_tasks', 'the Space has its Tasks sheet')
+        // Formatting from the toolbar saves on this sheet.
+        // The toolbar turns on once the sheet has said where its selection is.
+        const bold = page.locator('[data-fmt="b"]:visible').first()
+        for (let i = 0; i < 40 && (await bold.getAttribute('aria-disabled')) === 'true'; i++) await page.waitForTimeout(250)
+        await page.waitForTimeout(500)
+        await bold.click()
+        await page.waitForTimeout(1500)
+        ok(psql(`select count(*) from sheet_formats f join sheets s on s.id=f.sheet_id where s.linked_key='tasks:space:${sp}'`) === '1', 'Bold saves on the Tasks sheet')
+        // A regular column through ＋.
+        const name = `Lab col ${Date.now() % 100000}`
+        await page.click('[data-task-sheet] [data-add-field]')
+        await page.getByRole('menuitem', { name: /Spreadsheet column/ }).click()
+        await page.fill('[data-column-editor] input[type="text"]', name)
+        await page.click('[data-column-editor] button[type="submit"]')
+        await page.waitForTimeout(1500)
+        ok(psql(`select count(*) from sheet_columns where sheet='tasks:space:${sp}' and name='${name}' and deleted_at is null`) === '1', 'a regular column is added to this sheet')
+        ok(psql(`select count(*) from sheet_columns where sheet='content' and name='${name}'`) === '0', "the Content sheet's columns are untouched")
+        // Fields › Group by Brand groups the rows and is saved on this sheet.
+        await page.click('[data-fields-btn]')
+        await page.selectOption('[data-group-by]', 'brand')
+        await page.waitForTimeout(1500)
+        ok(/"brand"/.test(psql(`select view::text from sheets where linked_key='tasks:space:${sp}'`)), 'Group by Brand is saved on this sheet')
+        ok(await page.$('[data-task-sheet] [data-group-row]'), 'the rows are grouped')
+      },
+    },
+    {
+      id: 'workbook-blank-tab-beside-tasks', as: 'admin',
+      async run({ page, go }) {
+        const b = psql('select id from brands order by name limit 1')
+        await go(`/brands/${b}?view=sheet`)
+        await page.waitForSelector('[data-node-workbook] .fx-sh-workbook', { timeout: 60000 })
+        const folder = psql(`select id from sheet_folders where brand_id='${b}'`)
+        ok(psql(`select count(*) from sheets where folder_id='${folder}' and kind='linked_tasks'`) === '1', "the brand's workbook has one Tasks tab")
+        ok(psql(`select count(*) from sheet_folders where brand_id='${b}'`) === '1', 'the brand keeps one folder')
+      },
+    },
+    {
+      id: 'workbook-me-private', as: 'content',
+      async run({ page, go }) {
+        const me = psql(`select id from members where role='Content Creator' limit 1`)
+        await go('/me?view=sheet')
+        await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 60000 })
+        ok(psql(`select count(*) from sheets where linked_key='tasks:me:${me}'`) === '1', 'My tasks has its own Tasks sheet')
+        ok(psql(`select count(*) from sheet_folders where linked_key='node:me:${me}' and kind='node'`) === '1', 'and its own folder')
+        const listed = psql(`select count(*) from sheet_folders where kind='node'`)
+        ok(listed !== '0', 'node folders exist')
+      },
+    },
+    {
+      id: 'workbook-content-space-is-content-folder', as: 'admin',
+      async run({ page, go }) {
+        await go('/spaces/content?view=sheet')
+        await page.waitForSelector('[data-node-workbook="content"] .fx-sh-workbook', { timeout: 60000 })
+        ok(await page.$('[data-node-workbook="content"] [data-content-sheet]'), "the Content Space's Sheet is the Content folder's workbook")
+      },
+    },
+  ]
+}
+
 module.exports.views = (EMAIL, psql, ok) => [
   {
     id: 'views-personal-saved-and-reloaded', as: 'admin',

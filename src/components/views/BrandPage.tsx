@@ -9,14 +9,14 @@
  *   - Sheet: today's Content and Video sheets with only its rows, plus its own blank tabs;
  *   - Library: everything it has published.
  */
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { ContentTheme, Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
-import { ensureBrandSheetFolder } from '@/actions/sheets'
 import { TaskSheet } from './TaskSheet'
+import { NodeWorkbook } from './NodeWorkbook'
+import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyView } from '@/lib/view-config'
 import { BrandAssets } from '@/components/brands/BrandAssets'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
@@ -39,9 +39,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
 }) {
   const t = useTranslations('spaces')
   const tv = useTranslations('views')
-  const router = useRouter()
   const selectTask = useUIStore(s => s.selectTask)
-  const [opening, setOpening] = useState(false)
   const brand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
   const name = brand?.name ?? t('noBrand')
   const color = brand?.color ?? PIPE.textFaint
@@ -53,14 +51,6 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
     .sort((a, b) => a.name.localeCompare(b.name))
   const folderName = folder ? t(`folders.${FOLDER_KEY[folder]}`) : null
   const withPanel = (node: React.ReactNode) => <>{node}<TaskPanel data={data} /></>
-
-  async function openOwnTabs() {
-    if (!brandId) return
-    setOpening(true)
-    const res = await ensureBrandSheetFolder(brandId).catch(() => null)
-    setOpening(false)
-    if (res?.success) router.push(`/sheets/${res.folderId}`)
-  }
 
   const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0] }
 
@@ -96,17 +86,13 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   if (folder === 'sheet') {
     return (
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('sheetLede')}
-        tabs={[{ key: 'content', label: t('contentSheet') }, { key: 'video', label: t('videoSheet') }, { key: 'tasks', label: t('allTasksSheet') }, { key: 'own', label: t('ownTabs'), disabled: !brandId }]}
-        render={tab => tab === 'tasks'
-          ? withPanel(<TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand label={`${name} · ${t('allTasksSheet')}`} />)
-          : tab === 'own'
-          ? <div style={{ padding: '18px 38px' }}>
-              <button type="button" data-open-own-tabs disabled={opening} onClick={() => void openOwnTabs()}
-                style={{ border: 'none', background: '#C8F24E', color: '#111111', borderRadius: 10, padding: '9px 14px', fontFamily: 'inherit', fontWeight: 800, cursor: 'pointer' }}>
-                {t('openOwnTabs', { name })}
-              </button>
-            </div>
-          : <BoardView data={data} scopeTasks={scope} start={tab === 'video' ? 'sheet' : 'content'} sheetScope={scope} themeScope={themeScope} />} />
+        tabs={[{ key: 'tasks', label: t('allTasksSheet'), disabled: !brandId }, { key: 'content', label: t('contentSheet') }, { key: 'video', label: t('videoSheet') }]}
+        render={tab => tab === 'tasks' && brandId
+          // T081: the brand's own workbook: its Tasks tab, then the brand's blank tabs.
+          ? withPanel(<NodeWorkbook data={data} node={`brand:${brandId}`}
+              linked={<TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand sheetKey={`tasks:brand:${brandId}`} label={`${name} · ${t('allTasksSheet')}`} />} />)
+          : <NodeWorkbook key={tab} data={data} folder={tab === 'video' ? 'video' : 'content'}
+              linked={<KanbanBoard {...data} surface="sheets" sheetsView={tab === 'video' ? 'sheet' : 'content'} scopeTasks={scope} sheetScope={scope} themeScope={themeScope} />} />} />
     )
   }
 
@@ -122,7 +108,10 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />
         return withPanel(tab === 'sheet'
-          ? <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} label={name} />
+          ? (brandId
+            ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
+                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+            : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} label={name} />)
           : tab === 'calendar'
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
             : tab === 'workload'
