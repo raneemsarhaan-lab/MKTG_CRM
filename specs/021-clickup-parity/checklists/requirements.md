@@ -13,11 +13,11 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — 3 open: Space mapping (US1), custom statuses vs the locked pipeline (US3), scope (Assumptions)
+- [x] No [NEEDS CLARIFICATION] markers remain (resolved 2026-11-22: Space per brand with team Folders; status words mapped to the pipeline, as in sheets; scope US1–US4)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
-- [x] All acceptance scenarios are defined (US1–US6; US7–US9 are recorded for direction and deferred to their own specs)
+- [x] All acceptance scenarios are defined (US1–US4; US5–US9 recorded for direction, deferred to their own specs)
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded (parity map: Have / This spec / Later / Not planned)
 - [x] Dependencies and assumptions identified
@@ -32,4 +32,4 @@
 ## Notes
 
 - Iteration 1: removed code references (an import script path, a database column name, "tombstones") from the Context, parity map and Edge Cases; reworded FR-034 to remove "on the server".
-- The 3 open markers wait on the user's answers. Then re-run validation, and run `/speckit-clarify` or `/speckit-plan`.
+- Iteration 2: applied the three answers. Removed the US5/US6 requirements from scope and renumbered FR-001–FR-026. Every item passes.
