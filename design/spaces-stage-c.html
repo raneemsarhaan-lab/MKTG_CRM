@@ -1,0 +1,494 @@
+<title>Momentum Stage C</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600&display=swap">
+<style>
+/* Layout: one long review page; each part pairs the control (left) with what it changes (right), stacking on phones. Momentum's own tokens. */
+:root {
+  --ink: #1B1A13; --muted: #6F7276; --faint: #A3A5A8; --line: #E1E1E0; --soft: #F7F7F5; --panel: #FFFFFF; --bg: #EFEFEC;
+  --lime: #C8F24E; --on-lime: #111111; --sel: #EEF8D3; --coral: #F5334F; --coral-soft: #FDE7EA; --violet: #8F6FE8; --cyan: #3E7BEA; --mint: #2F8F3F;
+  --c-content: #3E7BEA; --c-design: #8F6FE8; --c-video: #1E9E8A; --c-plan: #2AA7D8;
+  --shadow: 0 14px 40px rgba(20,20,16,.10);
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --arabic: 'Noto Sans Arabic', 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 900 }
+h2 { font-size: 22px; font-weight: 800 }
+h3 { font-size: 14.5px; font-weight: 800 }
+p { margin: 0 }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 72ch; font-size: 15px; color: var(--muted) }
+.muted { color: var(--muted) }
+.small { font-size: 12px }
+.ar { font-family: var(--arabic); direction: rtl }
+.jump { display: flex; flex-wrap: wrap; gap: 8px }
+.jump a { text-decoration: none; color: var(--ink); font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.jump a:hover { background: var(--sel) }
+
+section.part { background: var(--panel); border-radius: 18px; padding: 24px; display: grid; gap: 18px; border: 1px solid var(--line) }
+.part-head { display: grid; gap: 6px }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--muted) }
+.pair { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr) } }
+.frame { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; min-width: 0 }
+.frame-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--soft) }
+.frame-body { padding: 14px; display: grid; gap: 10px; min-width: 0 }
+.cap { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600 }
+.btn.primary { background: var(--lime); border-color: var(--lime); color: var(--on-lime); font-weight: 800 }
+.btn:disabled { opacity: .45; cursor: not-allowed }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.seg button { border: none; background: var(--panel); padding: 6px 12px; font-size: 12.5px; font-weight: 600 }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel) }
+.note { font-size: 12.5px; color: var(--muted); border-inline-start: 3px solid var(--lime); padding: 2px 0 2px 10px }
+.bad { color: var(--coral); font-weight: 600 }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none }
+
+/* Status words panel */
+.words { display: grid; gap: 2px }
+.wrow { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px 4px; border-radius: 8px }
+.wrow.clash { background: var(--coral-soft) }
+.wrow label { display: grid; gap: 0; font-size: 12px; font-weight: 700 }
+.wrow label .ar { font-size: 11px; font-weight: 400; color: var(--muted) }
+.wrow input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--panel); font-size: 13px }
+.wsep { margin: 8px 4px 2px; }
+.list-group { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; padding: 6px 0 2px }
+.list-group .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: var(--soft) }
+.list-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px }
+.mini-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(110px, 1fr); gap: 8px; overflow-x: auto; padding-bottom: 4px }
+.col { background: var(--soft); border-radius: 10px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 96px }
+.col h4 { margin: 0; font-size: 11.5px; font-weight: 700; display: flex; justify-content: space-between }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; font-size: 12px; display: grid; gap: 4px }
+.card .meta { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 11px }
+.sla { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: #FFF1D6; color: #8A5A00 }
+.col.simple { background: transparent; border: 1.5px dashed var(--line) }
+.cell-try { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.cell-try input { flex: 1 1 180px; min-width: 0; border: 2px solid var(--cyan); border-radius: 6px; padding: 6px 9px; background: var(--panel); font-size: 13px }
+.result { font-size: 12.5px; min-height: 1.5em }
+
+/* Simple tasks */
+.form { display: grid; gap: 12px }
+.field { display: grid; gap: 5px; font-size: 12px; font-weight: 700; color: var(--muted) }
+.field .val { font-size: 13.5px; font-weight: 500; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--panel) }
+.kind-help { font-size: 12.5px; color: var(--ink); background: var(--soft); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.steps button { border: none; border-inline-end: 1px solid var(--line); background: var(--panel); padding: 9px 6px; font-size: 13px; font-weight: 600; color: var(--muted) }
+.steps button:last-child { border-inline-end: none }
+.steps button.done { background: var(--sel); color: var(--ink) }
+.steps button[aria-current="step"] { background: var(--ink); color: var(--panel) }
+.toast { display: flex; align-items: center; gap: 10px; background: var(--lime); color: var(--on-lime); border-radius: 10px; padding: 9px 12px; font-weight: 700; font-size: 13px }
+.subs { display: grid; gap: 6px }
+.sub { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px }
+.kind { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap }
+.kind.pipe { border-color: transparent; background: var(--soft) }
+.skips { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px }
+.skip { font-size: 12.5px; padding: 9px 11px; border-radius: 10px; background: var(--soft); display: grid; gap: 2px }
+.skip b { font-size: 12.5px }
+
+/* Brand switches */
+.switches { display: grid; gap: 2px }
+.sw { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line) }
+.sw:last-child { border-bottom: none }
+.sw b { font-size: 13px; display: block }
+.sw span { font-size: 12px; color: var(--muted) }
+.toggle { position: relative; width: 38px; height: 22px; border-radius: 999px; border: none; background: var(--line); padding: 0; flex: none }
+.toggle::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); transition: inset-inline-start .15s }
+.toggle[aria-checked="true"] { background: var(--ink) }
+.toggle[aria-checked="true"]::after { inset-inline-start: 19px }
+@media (prefers-reduced-motion: reduce) { .toggle::after { transition: none } }
+.tbl-wrap { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 12.5px }
+th, td { text-align: start; padding: 7px 9px; border-bottom: 1px solid var(--line); white-space: nowrap }
+th { font-size: 11.5px; color: var(--muted); font-weight: 700; background: var(--soft) }
+td.off { background: repeating-linear-gradient(135deg, var(--soft) 0 6px, transparent 6px 12px); color: var(--faint) }
+.panel-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line) }
+.panel-row:last-child { border-bottom: none }
+.panel-row dt { color: var(--muted); font-size: 12px; font-weight: 600 }
+.panel-row dd { margin: 0 }
+dl { margin: 0 }
+
+/* Decisions */
+.decisions { display: grid; gap: 10px; counter-reset: d; padding: 0; margin: 0; list-style: none }
+.decisions li { counter-increment: d; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel) }
+.decisions li::before { content: counter(d); font-family: var(--display); font-weight: 800; font-size: 15px; width: 28px; height: 28px; border-radius: 8px; background: var(--lime); color: var(--on-lime); display: grid; place-items: center }
+.decisions b { display: block; font-size: 13.5px; margin-bottom: 2px }
+.decisions p { font-size: 13px; color: var(--muted) }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <span class="eyebrow">Spec 021 · Stage C · design for approval</span>
+    <h1>Team words, simple tasks and brand switches</h1>
+    <p class="lede">Three changes that sit on top of Stages A and B. Each part below pairs the control with what it changes, using sample data from the Forefront workspace. Everything is clickable. Nothing here is built yet: Stage C UI work waits for your approval of this page.</p>
+    <nav class="jump" aria-label="Parts">
+      <a href="#words">1 · Status words per team</a>
+      <a href="#simple">2 · Simple tasks</a>
+      <a href="#switches">3 · Brand switches</a>
+      <a href="#decide">What to confirm</a>
+    </nav>
+  </header>
+
+  <!-- 1 · STATUS WORDS -->
+  <section class="part" id="words" aria-labelledby="h-words">
+    <div class="part-head">
+      <span class="tag">US3 · admins and superusers edit</span>
+      <h2 id="h-words">1 · Each team says the stages in its own words</h2>
+      <p class="lede">The Video team writes its words next to the 11 stages. The Video Space's List, Sheet and Calendar show them. Every Board, brand page and Everything keep the original names, so the approval chain, stage owners, SLA and celebrations never change.</p>
+    </div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head">
+          <span style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--c-video)"></span><h3>Video · Status words</h3></span>
+          <span class="small muted">Opened from the Space header</span>
+        </div>
+        <div class="frame-body">
+          <p class="small muted">Separate words with commas. The first one is shown; any of them can be typed. Case and spacing are ignored.</p>
+          <div class="words" id="words-list"></div>
+          <p class="cap wsep">Simple tasks</p>
+          <div class="words" id="words-simple"></div>
+          <p class="result" id="clash" role="status" aria-live="polite"></p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center">
+            <button class="btn" type="button" id="w-reset">Use the board names</button>
+            <span style="display:flex;gap:8px"><button class="btn" type="button">Cancel</button><button class="btn primary" type="button" id="w-save">Save words</button></span>
+          </div>
+          <p class="note">In the Content and Video Spaces these are the same words the Content and Video sheets already use. Changing them here changes the sheet too.</p>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:16px;min-width:0">
+        <div class="frame">
+          <div class="frame-head"><h3>Video Space › List</h3><span class="small muted">team words</span></div>
+          <div class="frame-body" id="w-list"></div>
+        </div>
+        <div class="frame">
+          <div class="frame-head"><h3>Type into a Sheet status cell</h3><span class="small muted">"Podcast ep. 14" is at Scheduled</span></div>
+          <div class="frame-body">
+            <div class="cell-try">
+              <label for="try" class="small" style="font-weight:700">Status</label>
+              <input id="try" value="live" autocomplete="off">
+            </div>
+            <p class="result" id="try-out" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="frame">
+          <div class="frame-head"><h3>Video Space › Board</h3><span class="small muted">original names, always</span></div>
+          <div class="frame-body">
+            <div class="mini-board" id="w-board"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · SIMPLE TASKS -->
+  <section class="part" id="simple" aria-labelledby="h-simple">
+    <div class="part-head">
+      <span class="tag">US5 · kind chosen once, at creation</span>
+      <h2 id="h-simple">2 · Simple tasks: To Do › In progress › Done</h2>
+      <p class="lede">Planning and admin work becomes a simple task. It has no stage owners, no SLA and no approvals. Anyone who may edit it moves it, and Done celebrates for its assignee. Deliverables stay pipeline tasks, exactly as today.</p>
+    </div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><h3>New task · from the Planning Space</h3><span class="small muted">TaskForm</span></div>
+        <div class="frame-body form">
+          <div class="field">Name<span class="val">Plan the Q1 content calendar</span></div>
+          <div class="field">
+            <span id="kind-label">Kind</span>
+            <div class="seg" role="group" aria-labelledby="kind-label">
+              <button type="button" data-kind="pipeline" aria-pressed="false">Pipeline</button>
+              <button type="button" data-kind="simple" aria-pressed="true">Simple</button>
+            </div>
+          </div>
+          <div class="kind-help" id="kind-help"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field">Brand<span class="val">Forefront Consulting</span></div>
+            <div class="field">Assignee<span class="val">Noran</span></div>
+          </div>
+          <p class="note">The Planning Space's default kind is Simple, so the switch starts there. Admins set each Space's default in Settings › Spaces. After saving, the kind can't change, like the C-Check choice today.</p>
+        </div>
+      </div>
+
+      <div class="frame">
+        <div class="frame-head"><h3>Task panel · simple task</h3><span class="kind">Simple</span></div>
+        <div class="frame-body">
+          <h3 style="font-size:17px">Plan the Q1 content calendar</h3>
+          <p class="small muted">Forefront Consulting · Planning · no SLA</p>
+          <div class="steps" role="group" aria-label="Status" id="steps">
+            <button type="button" data-s="0">To Do</button>
+            <button type="button" data-s="1">In progress</button>
+            <button type="button" data-s="2">Done</button>
+          </div>
+          <div class="toast" id="cheer" hidden role="status">Done. Nice work, Noran: the plan is finished. <span class="small" style="font-weight:600">(the same celebration as Published)</span></div>
+          <p class="cap">Subtasks · each keeps its own kind</p>
+          <div class="subs">
+            <div class="sub"><span>Launch copy</span><span style="display:flex;gap:6px;align-items:center"><span class="kind pipe">C-In Progress</span><span class="sla">SLA 1d</span></span></div>
+            <div class="sub"><span>Launch key visual</span><span class="kind pipe">Ready For Design</span></div>
+            <div class="sub"><span>Book the studio</span><span class="kind">Simple · To Do</span></div>
+          </div>
+          <p class="small muted">Moving the plan to Done doesn't move any subtask, and the other way round.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="frame-head">
+        <h3>Planning Space › Board</h3>
+        <div class="seg" role="group" aria-label="Kind filter">
+          <button type="button" data-kf="all" aria-pressed="true">All</button>
+          <button type="button" data-kf="pipeline" aria-pressed="false">Pipeline</button>
+          <button type="button" data-kf="simple" aria-pressed="false">Simple</button>
+        </div>
+      </div>
+      <div class="frame-body">
+        <div class="mini-board" id="s-board"></div>
+        <p class="small muted">Simple tasks sit in three dashed columns after Published. The columns only appear when simple tasks are in view. Dragging between them moves only that task's simple status.</p>
+      </div>
+    </div>
+
+    <div class="skips" aria-label="What simple tasks stay out of">
+      <div class="skip"><b>No SLA badge</b><span class="muted">and never counted as breached</span></div>
+      <div class="skip"><b>Not in the Inbox</b><span class="muted">or the review and check queues</span></div>
+      <div class="skip"><b>Not in the Content or Video sheet</b><span class="muted">they show on Space and brand Sheets</span></div>
+      <div class="skip"><b>Not in a brand's Library</b><span class="muted">it lists published deliverables</span></div>
+      <div class="skip"><b>Counted in Workload</b><span class="muted">open ones add their hours; Done ones don't</span></div>
+    </div>
+  </section>
+
+  <!-- 3 · BRAND SWITCHES -->
+  <section class="part" id="switches" aria-labelledby="h-sw">
+    <div class="part-head">
+      <span class="tag">US4 · admins only · data is kept</span>
+      <h2 id="h-sw">3 · Switch features off for a small brand</h2>
+      <p class="lede">The Strategy Community doesn't need platforms, hours or SLA. An admin switches them off. Those fields disappear for that brand's tasks everywhere, including team Spaces, while Forefront keeps them. Switching back on brings every earlier value back.</p>
+    </div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head">
+          <h3>Settings › Brands › The Strategy Community</h3>
+          <span class="small muted">also from a gear on the brand page</span>
+        </div>
+        <div class="frame-body">
+          <div class="switches" id="switches-list"></div>
+          <p class="note">New brands start with the workspace defaults, set at the top of Settings › Brands. Each brand can then differ.</p>
+        </div>
+      </div>
+      <div style="display:grid;gap:16px;min-width:0">
+        <div class="frame">
+          <div class="frame-head"><h3>Task panel · "Member spotlight"</h3><span class="small muted">The Strategy Community</span></div>
+          <div class="frame-body"><dl id="sw-panel"></dl></div>
+        </div>
+        <div class="frame">
+          <div class="frame-head"><h3>Content Space › Sheet</h3><span class="small muted">brands mixed</span></div>
+          <div class="frame-body"><div class="tbl-wrap"><table id="sw-table"></table></div>
+            <p class="small muted">A column stays, because Forefront uses it. Cells of a brand with the feature off are empty and hatched, and hovering one says "Platform is off for The Strategy Community". They can't be typed into.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DECISIONS -->
+  <section class="part" id="decide" aria-labelledby="h-dec">
+    <div class="part-head">
+      <h2 id="h-dec">What to confirm</h2>
+      <p class="lede">These are the calls this design makes where the spec leaves room. Approve them as they are, or tell me which to change.</p>
+    </div>
+    <ol class="decisions">
+      <li><div><b>Team words show alone; the board name is on hover.</b><p>The Video Space's List says "Editing", and hovering it says "D-In Progress". The alternative shows both, "Editing · D-In Progress", which is clearer for newcomers but busier.</p></div></li>
+      <li><div><b>Status words open from a button in the Space header.</b><p>Only admins and superusers see the button. Users see the words but can't change them.</p></div></li>
+      <li><div><b>Simple statuses get team words too.</b><p>Planning could say "Backlog, Doing, Shipped". The three statuses keep their own order and behaviour.</p></div></li>
+      <li><div><b>The kind is picked in the create form and never changes.</b><p>The Space's default preselects it (Planning: Simple; the others: Pipeline). To change kind later, a member creates a new task.</p></div></li>
+      <li><div><b>Simple tasks get three dashed columns after Published on every Board.</b><p>They appear only when simple tasks are in view. The Kind filter (All, Pipeline, Simple) sits in the Board header and in saved views.</p></div></li>
+      <li><div><b>A switched-off field shows as an empty hatched cell in mixed views.</b><p>The task panel and the create form leave it out entirely for that brand. Filters and bulk actions skip that brand's tasks for that field.</p></div></li>
+      <li><div><b>The C-Check switch only affects new tasks.</b><p>Existing tasks keep their own 10 or 11 stages, as the spec requires.</p></div></li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  const STAGES = [
+    ['todo', 'To Do', 'افكار للتنفيذ', 'Idea'],
+    ['c-prog', 'C-In Progress', 'كتابة المحتوى', 'Scripting'],
+    ['c-final', 'C-Review', 'مراجعة المحتوى', 'Script review'],
+    ['c-check', 'C-Check', 'موافقة نهائية على المحتوى', 'Islam check'],
+    ['r-design', 'Ready For Design', 'جاهز للتصميم', 'Ready to shoot'],
+    ['d-prog', 'D-In Progress', 'تصميم', 'Editing'],
+    ['d-check', 'D-Check', 'مراجعة التصميم', 'Rough cut review'],
+    ['final-check', 'F-Check', 'المراجعة النهائية', 'Final cut'],
+    ['ready-publish', 'Ready to Publish', 'جاهز للنشر', 'Ready to post'],
+    ['scheduled', 'Scheduled', 'مجدول', 'Scheduled'],
+    ['publish', 'Published', 'تم النشر', 'Live, Posted'],
+  ]
+  const SIMPLE = [['s-todo', 'To Do', 'للتنفيذ', ''], ['s-prog', 'In progress', 'قيد التنفيذ', ''], ['s-done', 'Done', 'تم', '']]
+  const TASKS = [
+    ['Podcast ep. 14 with guest CFO', 'scheduled', 'Karim'],
+    ['Ep. 13 cut-downs', 'd-prog', 'Karim'],
+    ['Launch teaser video', 'r-design', 'Karim'],
+    ['Talk clip: on patience', 'publish', 'Karim'],
+  ]
+  const $ = id => document.getElementById(id)
+  const norm = s => s.trim().toLowerCase().replace(/\s+/g, ' ')
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+  // ── 1 · status words ──
+  const rows = (list, host) => {
+    host.innerHTML = list.map(([id, en, ar, w]) => `
+      <div class="wrow" data-row="${id}">
+        <label for="w-${id}">${en}<span class="ar" lang="ar">${ar}</span></label>
+        <input id="w-${id}" data-id="${id}" value="${esc(w)}" placeholder="${en}" autocomplete="off">
+      </div>`).join('')
+  }
+  rows(STAGES, $('words-list'))
+  rows(SIMPLE, $('words-simple'))
+  const ALL = [...STAGES, ...SIMPLE]
+  const wordsOf = id => (document.querySelector(`input[data-id="${id}"]`).value.split(',').map(s => s.trim()).filter(Boolean))
+  const shown = id => wordsOf(id)[0] || ALL.find(s => s[0] === id)[1]
+
+  function render() {
+    // clash check
+    const seen = new Map(), clash = new Set()
+    let msg = ''
+    for (const [id, en] of ALL) for (const w of wordsOf(id)) {
+      const k = norm(w)
+      if (seen.has(k) && seen.get(k)[0] !== id) { clash.add(id); clash.add(seen.get(k)[0]); msg ||= `"${w}" is used for both ${seen.get(k)[1]} and ${en}. Give each word to one stage.` }
+      else seen.set(k, [id, en])
+    }
+    document.querySelectorAll('.wrow').forEach(r => r.classList.toggle('clash', clash.has(r.dataset.row)))
+    $('clash').innerHTML = msg ? `<span class="bad">${esc(msg)}</span>` : ''
+    $('w-save').disabled = !!msg
+
+    // list
+    $('w-list').innerHTML = STAGES.filter(([id]) => TASKS.some(t => t[1] === id)).map(([id, en]) => `
+      <div class="list-group"><span class="pill" title="${en}"><span class="dot" style="background:var(--c-video)"></span>${esc(shown(id))}</span><span class="muted">${TASKS.filter(t => t[1] === id).length}</span></div>
+      ${TASKS.filter(t => t[1] === id).map(t => `<div class="list-row"><span>${esc(t[0])}</span><span class="muted">${t[2]}</span></div>`).join('')}`).join('')
+
+    // board: original names
+    $('w-board').innerHTML = STAGES.filter(([id]) => ['r-design', 'd-prog', 'scheduled', 'publish'].includes(id)).map(([id, en]) => `
+      <div class="col"><h4>${en}<span class="muted">${TASKS.filter(t => t[1] === id).length}</span></h4>
+      ${TASKS.filter(t => t[1] === id).map(t => `<div class="card">${esc(t[0])}</div>`).join('')}</div>`).join('')
+    tryWord()
+  }
+  function tryWord() {
+    const v = norm($('try').value)
+    if (!v) { $('try-out').textContent = ''; return }
+    const hit = STAGES.find(([id, en]) => norm(en) === v || wordsOf(id).some(w => norm(w) === v))
+    if (hit) {
+      const [id, en] = hit
+      $('try-out').innerHTML = id === 'scheduled'
+        ? `Already there: "${esc(shown(id))}" is Scheduled.`
+        : `Moves to <b>${en}</b> under the Board's rules${id === 'publish' ? ', with the Published celebration and SLA reset' : ''}. The cell shows "${esc(shown(id))}".`
+    } else {
+      $('try-out').innerHTML = `<span class="bad">"${esc($('try').value.trim())}" isn't a status here.</span> Try: ${STAGES.map(([id]) => esc(shown(id))).join(', ')}.`
+    }
+  }
+  document.addEventListener('input', e => { if (e.target.matches('.wrow input')) render() })
+  $('try').addEventListener('input', tryWord)
+  $('w-reset').addEventListener('click', () => { document.querySelectorAll('.wrow input').forEach(i => { i.value = '' }); render() })
+  render()
+
+  // ── 2 · simple tasks ──
+  const HELP = {
+    simple: '<b>Simple task.</b> To Do › In progress › Done. No stage owners, no SLA, no approvals. Anyone who may edit it moves it.',
+    pipeline: '<b>Pipeline task.</b> The 11 stages with their owners, SLA and approvals. Published is final. Exactly as today.',
+  }
+  const setKind = k => {
+    document.querySelectorAll('[data-kind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === k)))
+    $('kind-help').innerHTML = HELP[k]
+  }
+  document.querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => setKind(b.dataset.kind)))
+  setKind('simple')
+
+  let step = 1
+  const paintSteps = () => {
+    document.querySelectorAll('#steps button').forEach(b => {
+      const i = +b.dataset.s
+      b.classList.toggle('done', i < step)
+      if (i === step) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current')
+    })
+    $('cheer').hidden = step !== 2
+  }
+  document.querySelectorAll('#steps button').forEach(b => b.addEventListener('click', () => { step = +b.dataset.s; paintSteps() }))
+  paintSteps()
+
+  const BOARD = [
+    { col: 'C-In Progress', kind: 'pipeline', items: [['Launch copy', 'Noran', true]] },
+    { col: 'Ready For Design', kind: 'pipeline', items: [['Launch key visual', 'Omar', false]] },
+    { col: 'Published', kind: 'pipeline', items: [['Client win announcement', 'Noran', false]] },
+    { col: 'To Do', kind: 'simple', items: [['Book the studio', 'Samaa', false]] },
+    { col: 'In progress', kind: 'simple', items: [['Plan the Q1 content calendar', 'Noran', false]] },
+    { col: 'Done', kind: 'simple', items: [['Collect brand fonts', 'Omar', false]] },
+  ]
+  const paintBoard = f => {
+    document.querySelectorAll('[data-kf]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kf === f)))
+    $('s-board').innerHTML = BOARD.filter(c => f === 'all' || c.kind === f).map(c => `
+      <div class="col ${c.kind === 'simple' ? 'simple' : ''}"><h4>${c.col}<span class="muted">${c.items.length}</span></h4>
+      ${c.items.map(([n, who, sla]) => `<div class="card">${esc(n)}<div class="meta">${who}${sla ? '<span class="sla">SLA 1d</span>' : ''}${c.kind === 'simple' ? '<span class="kind">Simple</span>' : ''}</div></div>`).join('')}</div>`).join('')
+  }
+  document.querySelectorAll('[data-kf]').forEach(b => b.addEventListener('click', () => paintBoard(b.dataset.kf)))
+  paintBoard('all')
+
+  // ── 3 · brand switches ──
+  const FEATURES = [
+    ['priorities', 'Priorities', 'Low, Medium, High on tasks, cards, filters and sort', true],
+    ['platform', 'Platform', 'where it is posted: LinkedIn, Instagram…', false],
+    ['type', 'Content type', 'Post, Article, Video… (also sets which SLA row applies)', true],
+    ['pillars', 'Pillars', 'the pillar under each content theme', true],
+    ['hours', 'Hour estimates', 'hours on tasks, Workload and Capacity', false],
+    ['covers', 'Cover images', 'the image on cards and the task panel', true],
+    ['clips', 'Video clips', 'clips under a video in the Video sheet', true],
+    ['sla', 'SLA tracking', 'badges and breach counts for this brand', false],
+    ['ccheck', 'Islam Check stage', 'new tasks include C-Check (existing tasks keep theirs)', true],
+  ]
+  const on = Object.fromEntries(FEATURES.map(f => [f[0], f[3]]))
+  const paintSwitches = () => {
+    $('switches-list').innerHTML = FEATURES.map(([k, n, d]) => `
+      <div class="sw"><div><b id="sw-${k}">${n}</b><span>${d}</span></div>
+      <button type="button" class="toggle" role="switch" aria-checked="${on[k]}" aria-labelledby="sw-${k}" data-sw="${k}"></button></div>`).join('')
+    const P = [
+      ['Stage', on.ccheck ? 'C-In Progress → C-Review → C-Check → …' : 'C-In Progress → C-Review → Ready For Design → …'],
+      ['Assignee', 'Samaa'],
+      ...(on.priorities ? [['Priority', 'Medium']] : []),
+      ...(on.type ? [['Type', 'Post']] : []),
+      ...(on.platform ? [['Platform', 'LinkedIn']] : []),
+      ...(on.hours ? [['Hours', '3 h']] : []),
+      ...(on.sla ? [['SLA', '<span class="sla">due in 1d</span>']] : []),
+    ]
+    $('sw-panel').innerHTML = P.map(([a, b]) => `<div class="panel-row"><dt>${a}</dt><dd>${b}</dd></div>`).join('')
+    const cell = (k, v) => on[k] ? `<td>${v}</td>` : `<td class="off" title="${FEATURES.find(f => f[0] === k)[1]} is off for The Strategy Community" aria-label="off for this brand"></td>`
+    $('sw-table').innerHTML = `
+      <thead><tr><th>Task</th><th>Brand</th><th>Status</th><th>Priority</th><th>Platform</th><th>Hours</th></tr></thead>
+      <tbody>
+        <tr><td>Q1 outlook carousel</td><td>Forefront Consulting</td><td>C-Review</td><td>Medium</td><td>LinkedIn</td><td>4 h</td></tr>
+        <tr><td>Member spotlight</td><td>The Strategy Community</td><td>To Do</td>${cell('priorities', 'Medium')}${cell('platform', 'LinkedIn')}${cell('hours', '3 h')}</tr>
+        <tr><td>Hiring post: analysts</td><td>Forefront Consulting</td><td>C-In Progress</td><td>High</td><td>LinkedIn</td><td>2 h</td></tr>
+      </tbody>`
+  }
+  $('switches-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-sw]')
+    if (!b) return
+    on[b.dataset.sw] = !on[b.dataset.sw]
+    paintSwitches()
+    document.querySelector(`[data-sw="${b.dataset.sw}"]`).focus()
+  })
+  paintSwitches()
+})()
+</script>
