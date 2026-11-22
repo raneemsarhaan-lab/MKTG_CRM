@@ -7,14 +7,16 @@
  * second path around `allowedStages`.
  */
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import type { Task } from '@/types/index'
+import type { ContentTheme, Task } from '@/types/index'
 import type { BoardData } from './types'
 
-export function BoardView({ data, scopeTasks, spaceId, start = 'board' }: {
+export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope }: {
   data: BoardData
   scopeTasks: (t: Task) => boolean
   spaceId?: string
   start?: 'board' | 'content' | 'sheet'
+  sheetScope?: (t: Task) => boolean
+  themeScope?: (theme: ContentTheme) => boolean
 }) {
   return (
     <KanbanBoard
@@ -23,6 +25,8 @@ export function BoardView({ data, scopeTasks, spaceId, start = 'board' }: {
       sheetsView={start}
       scopeTasks={scopeTasks}
       spaceId={spaceId}
+      sheetScope={sheetScope}
+      themeScope={themeScope}
     />
   )
 }

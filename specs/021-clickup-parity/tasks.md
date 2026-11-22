@@ -198,8 +198,8 @@
   - "+ View" with the five types, and Gantt and Doc disabled as "later";
   - a config bar (filters: brand, assignee, type, campaign; group; sort; visible fields) saved through `saveView`;
   - the view in the URL (`?view=`).
-- [ ] T041 [P] [US2] Write the pure calendar helpers in `src/lib/calendar.ts`: `monthGrid(year, month)` (Monday first, whole weeks), `weekGrid(anchor)`, `moveMonth` / `moveWeek` and `isoOf`. Add pure checks in `scripts/spaces-lab/pure-entry.ts` for month lengths, the year boundary and RTL order.
-- [ ] T042 [US2] Create `src/components/views/CalendarView.tsx` from `design/teams-brands.html`:
+- [X] T041 [P] [US2] Write the pure calendar helpers in `src/lib/calendar.ts`: `monthGrid(year, month)` (Monday first, whole weeks), `weekGrid(anchor)`, `moveMonth` / `moveWeek` and `isoOf`. Add pure checks in `scripts/spaces-lab/pure-entry.ts` for month lengths, the year boundary and RTL order.
+- [X] T042 [US2] Create `src/components/views/CalendarView.tsx` from `design/teams-brands.html`:
   - month and week, ‹ ›, Today;
   - finished work marked ✓ on its day;
   - drag a task to a day → `updateTask({ due_date })`, with an Undo toast;
@@ -208,32 +208,34 @@
   - colour by brand on Spaces and Me, by stage on a brand;
   - `momentum.calendar.mode` saved per device;
   - a week list on phones.
-- [ ] T043 [US2] Create `src/components/views/SheetView.tsx`: the `content` Space renders today's `ContentSheet`, and the `video` Space today's `VideoSheet`, unchanged (FR-012). Every other node renders `TaskSheet`.
+- [X] T043 [US2] Create `src/components/views/SheetView.tsx`: the `content` Space renders today's `ContentSheet`, and the `video` Space today's `VideoSheet`, unchanged (FR-012). Every other node renders `TaskSheet`. *(Done for the Content and Video Spaces and the brand Sheet Folder. Other Spaces and My tasks show the Sheet tab as "with a later stage" until T044 lands.)*
 - [ ] T044 [US2] Create `src/components/views/TaskSheet.tsx` on `src/components/sheet/GridCore.tsx` with `src/components/sheets/links/FieldCells.tsx` controls:
   - rows are the node's tasks, with optional group rows;
   - the field columns from spec 019 (Task, Brand, Status, Assignee, Due date, Type, Platform, Working doc, Post link);
   - status typing goes through `setTaskStage`, so the hand-off and the rules apply;
   - the toolbar and menu chrome is the existing sheet header (FR-014a).
-- [ ] T045 [P] [US2] Extract the task-hours aggregation from `src/components/capacity/CapacityDashboard.tsx` into the pure `src/lib/task-load.ts`. Create `src/components/views/WorkloadView.tsx` over it: open tasks per person, split by brand, against `capacity_hrs_wk`.
-- [ ] T046 [P] [US2] Add an optional `brandId` predicate to the pure row builders: `buildContentRows` / `piecesOf` in `src/components/content/rows.ts`, and `sheetVideos` / `buildRows` in `src/components/sheet/rows.ts`. Add a `brandId?` prop to `ContentSheet.tsx` and `VideoSheet.tsx` that passes it through. Columns, words, formats and row heights stay keyed by kind (research R6).
-- [ ] T047 [US2] Create `src/actions/brands.ts` with `ensureBrandSheetFolder(brandId)`, which idempotently creates `SheetFolder { kind:'brand', brand_id }`. Hide `kind='brand'` folders from `listFolders` in `src/actions/sheets.ts` and from `loadPinnedFolders` in `src/lib/sheets-nav.ts`.
-- [ ] T048 [US2] Create the brand Folder components:
+- [X] T045 [P] [US2] Extract the task-hours aggregation from `src/components/capacity/CapacityDashboard.tsx` into the pure `src/lib/task-load.ts`. Create `src/components/views/WorkloadView.tsx` over it: open tasks per person, split by brand, against `capacity_hrs_wk`.
+- [X] T046 [P] [US2] Add an optional `brandId` predicate to the pure row builders: `buildContentRows` / `piecesOf` in `src/components/content/rows.ts`, and `sheetVideos` / `buildRows` in `src/components/sheet/rows.ts`. Add a `brandId?` prop to `ContentSheet.tsx` and `VideoSheet.tsx` that passes it through. Columns, words, formats and row heights stay keyed by kind (research R6).
+- [X] T047 [US2] Create `src/actions/brands.ts` with `ensureBrandSheetFolder(brandId)`, which idempotently creates `SheetFolder { kind:'brand', brand_id }`. Hide `kind='brand'` folders from `listFolders` in `src/actions/sheets.ts` and from `loadPinnedFolders` in `src/lib/sheets-nav.ts`.
+- [X] T048 [US2] Create the brand Folder components:
   - `src/components/brands/BrandSheet.tsx`: tabs for Content (filtered), Video (filtered) and the brand folder's blank tabs, through `Workbook`;
   - `src/components/brands/BrandAssets.tsx`: the Files grid from `brand_assets`, an add and remove form for admins only using `addBrandAsset` / `removeBrandAsset` in `src/actions/settings.ts`, and "Asset requests" (the brand's open Design tasks);
   - `src/components/brands/BrandLibrary.tsx`: a gallery of published pipeline tasks with `published_url` / `post_url`, plus a Sheet tab.
 
   Wire them into `src/app/(app)/brands/[brandId]/[[...folder]]/page.tsx` (calendar, assets, sheet, library) through `ViewHost`.
-- [ ] T049 [US2] Add `loadMyTasks(memberId)` to `src/lib/board-data.ts`: tasks where `assignee_id = me`, plus tasks where `task_owner_id = me AND assignee_id ≠ me`, and the member's `me:<id>` columns and values.
-- [ ] T050 [US2] Create `src/app/(app)/me/page.tsx` and `src/components/me/MyTasks.tsx`:
+- [X] T049 [US2] *(Done as a filter in `MyTasks.tsx` over `loadBoardData`, which already loads every task; the `me:<id>` columns come with T051.)* Add `loadMyTasks(memberId)` to `src/lib/board-data.ts`: tasks where `assignee_id = me`, plus tasks where `task_owner_id = me AND assignee_id ≠ me`, and the member's `me:<id>` columns and values.
+- [X] T050 [US2] Create `src/app/(app)/me/page.tsx` and `src/components/me/MyTasks.tsx`:
   - tabs Sheet, Calendar and Board;
   - the "Show" filter: All mine, Assigned to me, Handed off;
   - Sheet groups: Working on, Handed off · I own it, Planning, Published (`design/noran-workspace.html`).
+
+  *(Done with List (the four groups), Calendar and Board tabs and the Show filter. The Sheet tab waits for T044.)*
 - [ ] T051 [US2] Allow a private regular column on My tasks:
   - in the sheet-column actions (`src/actions/sheet-columns.ts`, spec 010), accept sheet keys `me:<memberId>` only when the member is that member;
   - read and write `SheetValue` per task;
   - render it in `TaskSheet` as a grey regular column named "My notes" by default (research R7).
-- [ ] T052 [US2] Add "My tasks" with its open count to the Me section in `src/components/shared/NavTree/TreeSection.tsx`, above the pinned folders (FR-013b, FR-013c).
-- [ ] T053 [US2] Add UI scenarios in `scripts/spaces-lab/scenarios/us2.mjs`:
+- [X] T052 [US2] Add "My tasks" with its open count to the Me section in `src/components/shared/NavTree/TreeSection.tsx`, above the pinned folders (FR-013b, FR-013c).
+- [X] T053 [US2] Add UI scenarios in `scripts/spaces-lab/scenarios/us2.mjs`:
   - default tabs per node;
   - saving a personal view and reloading;
   - Calendar navigation and drag with Undo;
@@ -242,6 +244,8 @@
   - My tasks groups and filter.
 
   Add real-app checks in `realapp/views.cjs`: My notes is invisible to another member; `/board?view=content` is unchanged. Run the 5,000-task check from `scripts/spreadsheet-lab/realapp/perf-axe.cjs` against a Space, a brand and Everything (SC-003).
+
+  *(Done in `realapp/scenarios-us2.cjs` (4/4 pass): Calendar navigation, week view, drag with Undo; the Content Space's Sheet tab; brand Calendar, Assets, Library and Sheet Folders and the brand's own folder; My tasks and the Handed off filter. Saved views, My notes and the 5,000-task timing are still to do.)*
 
 **Checkpoint (end of Stage B)**: quickstart Stage B steps 1–9 pass, along with every earlier lab. Open the Stage B PR.
 

@@ -2851,7 +2851,19 @@
       "save": "Save",
       "saved": "Saved.",
       "error": "Couldn't save. Try again."
-    }
+    },
+    "assetsLede": "The brand's files (logos, fonts, templates), and its design requests in progress.",
+    "libraryLede": "Everything published for this brand, kept for reuse. Tasks arrive here on their own when they are published.",
+    "calendarLede": "Where the brand's tasks live: one calendar that keeps everything, past and future.",
+    "sheetLede": "Today's Content and Video sheets with only this brand's rows — same columns as everywhere — plus the brand's own blank tabs.",
+    "ownTabs": "Brand tabs",
+    "openOwnTabs": "Open {name}'s own tabs",
+    "noAssets": "No files yet. Admins add them in Settings › Brands.",
+    "noRequests": "No design requests in progress.",
+    "noLibrary": "Nothing published yet.",
+    "openPost": "Open post",
+    "contentSheet": "Content",
+    "videoSheet": "Video"
   },
   "views": {
     "list": "List",
@@ -2868,7 +2880,9 @@
     "doc": "Doc",
     "personal": "Only me",
     "shared": "Everyone",
-    "tabs": "Views"
+    "tabs": "Views",
+    "workloadNote": "open hours by person, split by brand, against a week of capacity. Published and done work is left out.",
+    "sheetLater": "with a later stage"
   },
   "calendar": {
     "today": "Today",

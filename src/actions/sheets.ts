@@ -96,6 +96,8 @@ export async function listFolders(): Promise<{ success: true; folders: FolderSum
   await ensureLinked()
   const [rows, member] = await Promise.all([
     prisma.sheetFolder.findMany({
+      // Spec 021: a brand's own folder lives under its brand, not on the Sheets home.
+      where: { kind: { not: 'brand' } },
       include: { updater: { select: { name: true } }, _count: { select: { sheets: { where: { hidden: false } } } } },
     }),
     prisma.member.findUnique({ where: { id: m.id }, select: { sheet_pins: true, sheet_pins_set: true } }),
@@ -130,6 +132,36 @@ export async function createFolder(name: string, opts: { sheetPattern?: string }
   })
   touched()
   return { success: true, ...out }
+}
+
+/**
+ * Spec 021 (research R6): a brand's own blank tabs, in one folder per brand,
+ * made on first open with a blank "Sheet 1". Idempotent. Any member may open
+ * it, as with every folder today.
+ */
+export async function ensureBrandSheetFolder(brandId: string): Promise<{ success: true; folderId: string } | Fail> {
+  const m = await me()
+  if (!m) return fail('not_authenticated')
+  const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { id: true, name: true } })
+  if (!brand) return fail('gone')
+  const existing = await prisma.sheetFolder.findUnique({ where: { brand_id: brandId }, select: { id: true } })
+  if (existing) return { success: true, folderId: existing.id }
+  try {
+    const out = await prisma.$transaction(async tx => {
+      const folder = await tx.sheetFolder.create({ data: { kind: 'brand', brand_id: brandId, name: brand.name, created_by: m.id, updated_by: m.id } })
+      const sheet = await tx.sheet.create({
+        data: { folder_id: folder.id, kind: 'blank', name: nextSheetName([], pattern(undefined)), position: 0, created_by: m.id, updated_by: m.id },
+      })
+      await seedGrid(tx, sheet.id)
+      return folder.id
+    })
+    touched()
+    return { success: true, folderId: out }
+  } catch {
+    // Two first opens at once: the unique brand_id lets one win.
+    const again = await prisma.sheetFolder.findUnique({ where: { brand_id: brandId }, select: { id: true } })
+    return again ? { success: true, folderId: again.id } : fail('generic')
+  }
 }
 
 export async function renameFolder(id: string, name: string): Promise<{ success: true; name: string } | Fail> {

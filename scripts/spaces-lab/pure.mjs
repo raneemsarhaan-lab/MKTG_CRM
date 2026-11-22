@@ -90,4 +90,18 @@ check('pure-fixtures-sane', () => {
   ok(lab.tasks.every(t => lab.taskSpaces.some(r => r.task_id === t.id)), 'every task shows somewhere')
 })
 
+check('pure-calendar-grids', () => {
+  const nov = m.monthGrid(2026, 10)
+  eq(nov[0].iso, '2026-10-26', 'November 2026 starts on Monday 26 Oct')
+  ok(nov.length % 7 === 0, 'whole weeks')
+  eq(nov.filter(d => d.inMonth).length, 30, '30 days in November')
+  eq(nov.at(-1).iso, '2026-12-06', 'ends on Sunday 6 Dec')
+  const feb = m.monthGrid(2027, 1)
+  eq(feb.filter(d => d.inMonth).length, 28, 'February 2027')
+  eq(m.moveMonth(2026, 11, 1), { year: 2027, month: 0 }, 'December → January crosses the year')
+  eq(m.moveMonth(2027, 0, -1), { year: 2026, month: 11 }, 'and back')
+  eq(m.weekGrid('2026-11-22').map(d => d.iso), ['2026-11-16','2026-11-17','2026-11-18','2026-11-19','2026-11-20','2026-11-21','2026-11-22'], 'Sunday belongs to the week before')
+  eq(m.moveWeek('2026-12-28', 1), '2027-01-04', 'week across the year')
+})
+
 if (failed) process.exitCode = 1

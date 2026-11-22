@@ -88,6 +88,12 @@ interface KanbanBoardProps {
   scopeTasks?: (t: Task) => boolean
   /** Spec 021: "+ Task" from a Space adds it to that Space (FR-028). */
   spaceId?: string
+  /**
+   * Spec 021 (research R6): a brand's Sheet is today's Content and Video
+   * sheets with only that brand's rows — same columns, words and formats.
+   */
+  sheetScope?: (t: Task) => boolean
+  themeScope?: (theme: ContentTheme) => boolean
   /** Spec 021: live team Spaces, their members, and Shows in rows. */
   spaces?: TeamSpace[]
   spaceMembers?: SpaceMember[]
@@ -116,6 +122,8 @@ export function KanbanBoard({
   linkedRowHeights,
   scopeTasks,
   spaceId,
+  sheetScope,
+  themeScope,
   spaces = [],
   spaceMembers = [],
   taskSpaces = [],
@@ -1078,8 +1086,8 @@ export function KanbanBoard({
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
         <ContentSheet
-          tasks={tasks}
-          themes={themes}
+          tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
+          themes={themeScope ? themes.filter(themeScope) : themes}
           me={currentUser}
           members={members}
           contentTypes={types}
@@ -1103,7 +1111,7 @@ export function KanbanBoard({
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
         <VideoSheet
-          tasks={tasks}
+          tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           me={currentUser}
           members={members}
           contentTypes={types}
