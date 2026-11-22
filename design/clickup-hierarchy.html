@@ -186,6 +186,31 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .frow div { display: grid; gap: 2px }
 .frow small { color: var(--muted); font-size: 11.5px }
 
+.col.simple { border-style: dashed }
+.kindsep { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; display: flex; gap: 8px; align-items: center }
+.kindsep::after { content: ""; flex: 1; height: 1px; background: var(--line) }
+.tag.simple { background: color-mix(in srgb, var(--cyan) 20%, transparent); color: var(--ink) }
+.subof { font-size: 11px; color: var(--muted) }
+/* Sheet view: the existing spreadsheet look (specs 013-020) */
+.xl { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel) }
+.xl-menu { display: flex; gap: 14px; padding: 7px 12px 2px; font-size: 12.5px; flex-wrap: wrap }
+.xl-tools { display: flex; gap: 4px; align-items: center; margin: 4px 8px 6px; padding: 4px 8px; background: var(--soft); border-radius: 999px; flex-wrap: wrap; font-size: 12px }
+.xl-tools span { padding: 2px 7px; border-radius: 6px; color: var(--muted); font-weight: 600 }
+.xl-tools .sep { width: 1px; height: 16px; background: var(--line); padding: 0 }
+.xl-bar { display: flex; align-items: center; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12.5px }
+.xl-bar .nbox { width: 64px; padding: 5px 8px; border-inline-end: 1px solid var(--line); font-weight: 600; font-variant-numeric: tabular-nums }
+.xl-bar .fx { padding: 5px 8px; color: var(--muted); font-style: italic; border-inline-end: 1px solid var(--line) }
+.xl-bar .fv { padding: 5px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.xl-grid { overflow-x: auto }
+.xl-grid table { border-radius: 0; min-width: 900px }
+.xl-grid th, .xl-grid td { border: 1px solid var(--line); padding: 4px 8px; font-size: 12.5px }
+.xl-grid th { text-transform: none; letter-spacing: 0; font-size: 12.5px }
+.xl-grid th.cl { text-align: center; background: var(--soft); text-transform: none; letter-spacing: 0; font-weight: 600; padding: 2px }
+.xl-grid th.fld { background: color-mix(in srgb, var(--violet) 16%, var(--panel)); color: var(--ink) }
+.xl-grid th.reg { background: var(--soft); color: var(--muted) }
+.xl-grid td.rn { background: var(--soft); color: var(--muted); text-align: center; width: 36px; font-variant-numeric: tabular-nums }
+.xl-grid td.sel { box-shadow: inset 0 0 0 2px var(--cyan) }
+.xl-grid td.grp { background: var(--soft); font-weight: 700 }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -228,12 +253,13 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   <header class="top">
     <span class="eyebrow">Spec 021 · Preview of what we're building now</span>
     <h1>Momentum Spaces</h1>
-    <p class="lede">ClickUp's way of organizing work, built on Momentum's pipeline. <b>Brand Spaces</b> hold <b>team Folders</b>, and team Folders hold <b>Lists</b>. Any level can open as a list, board, table, calendar or workload. Each team names the nine stages in its own words, as the sheets already do. Each brand can switch off the features it doesn't use. Click around: the data is sample data.</p>
+    <p class="lede">ClickUp's way of organizing work, built on Momentum's pipeline. <b>Brand Spaces</b> hold <b>team Folders</b>, and team Folders hold <b>Lists</b>. Any level can open as a list, board, sheet, calendar or workload. Each team names the nine stages in its own words, as the sheets already do. Work that isn't a deliverable, such as planning, is a simple task with three statuses. Each brand can switch off the features it doesn't use. Click around: the data is sample data.</p>
     <div class="chips">
       <span class="chip now"><b>US1</b> Brand › Team › List</span>
       <span class="chip now"><b>US2</b> Views at any level</span>
       <span class="chip now"><b>US3</b> Status words</span>
       <span class="chip now"><b>US4</b> Space features</span>
+      <span class="chip now"><b>US5</b> Pipeline and simple tasks</span>
       <span class="chip later">Later: richer tasks · Gantt · sprints · goals · docs · forms · automations</span>
     </div>
   </header>
@@ -262,6 +288,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
         <div class="itm"><b>Project or content theme</b><small>Ramadan 2027, Strategy, Newsjacking…</small></div>
         <div class="itm"><b>Task with no project</b><small>Sits on the board with only a brand</small></div>
         <div class="itm"><b>Task with no brand</b><small>Grouped under "No brand" today</small></div>
+        <div class="itm"><b>Every task</b><small>Moves through the nine stages</small></div>
         <div class="itm"><b>Pillar, stage, owner, SLA clock</b><small>On every task</small></div>
       </div>
       <div class="arrow" aria-hidden="true">→</div>
@@ -271,6 +298,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
         <div class="itm"><b>List</b><small>In the brand's Marketing Folder, keeping its plan on the Projects screen</small></div>
         <div class="itm"><b>"General" List</b><small>In the brand's Marketing Folder</small></div>
         <div class="itm"><b>"No brand" Space</b><small>With a General List</small></div>
+        <div class="itm"><b>Pipeline task</b><small>Simple tasks are new; teams create them from then on</small></div>
         <div class="itm"><b>Unchanged</b><small>Board, Content sheet and Video sheet keep their addresses</small></div>
       </div>
     </div>
@@ -282,10 +310,10 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
       <p class="muted">The full parity map is in the spec. This is the short version.</p>
     </div>
     <div class="scope">
-      <div class="sc now"><h3>This spec <small>US1–US4</small></h3><ul>
-        <li>Space per brand, Folder per team, Subfolders, Lists</li><li>Private Spaces, Folders and Lists</li><li>List, Board, Table, Calendar and Workload views on any level</li><li>Everything view</li><li>Status words mapped to the nine stages, inherited from the Folder</li><li>Feature switches per Space</li></ul></div>
+      <div class="sc now"><h3>This spec <small>US1–US5</small></h3><ul>
+        <li>Space per brand, Folder per team, Subfolders, Lists</li><li>Private Spaces, Folders and Lists</li><li>List, Board, Table, Calendar and Workload views on any level</li><li>Everything view</li><li>Status words mapped to the nine stages, inherited from the Folder</li><li>Feature switches per Space</li><li>Two kinds of task: pipeline (nine stages, SLA) and simple (To Do › In progress › Done)</li><li>The Sheet view keeps today's spreadsheet experience</li></ul></div>
       <div class="sc"><h3>Have already</h3><ul>
-        <li>Kanban board and pipeline</li><li>Sheets with task fields</li><li>Workload and Capacity</li><li>Subtasks, followers, @mentions</li><li>Daily hours</li><li>Installable app, Arabic and English</li></ul></div>
+        <li>Kanban board and pipeline</li><li>Sheets with task fields</li><li>Subtasks</li><li>Workload and Capacity</li><li>Subtasks, followers, @mentions</li><li>Daily hours</li><li>Installable app, Arabic and English</li></ul></div>
       <div class="sc"><h3>Later <small>own specs</small></h3><ul>
         <li>Multiple assignees, tags, start dates, checklists</li><li>Dependencies, templates, recurring tasks</li><li>Gantt with critical path</li><li>Sprints, Goals, Dashboards</li><li>Docs, Forms, Automations</li><li>Proofing, Guest role</li></ul></div>
       <div class="sc"><h3>Not planned</h3><ul>
@@ -308,7 +336,14 @@ const STAGES = [
   { id: 'final-check', en: 'Final Check',     owner: 'Marketing Manager', c: '#F59E0B' },
   { id: 'publish',     en: 'Published',       owner: 'Final',             c: '#22C55E' },
 ];
-const SI = Object.fromEntries(STAGES.map((s, i) => [s.id, i]));
+const SIMPLE = [
+  { id: 's-todo',  en: 'To Do',       owner: 'Assignee', c: '#94A3B8', simple: true },
+  { id: 's-doing', en: 'In progress', owner: 'Assignee', c: '#0EA5E9', simple: true },
+  { id: 's-done',  en: 'Done',        owner: 'Assignee', c: '#3FA34D', simple: true },
+];
+const ALL = STAGES.concat(SIMPLE);
+const SI = Object.fromEntries(ALL.map((s, i) => [s.id, i]));
+const ST = (id) => ALL[SI[id]];
 const PEOPLE = {
   RS: { n: 'Raneem', c: '#7C3AED' }, SA: { n: 'Samaa', c: '#0E7C7B' }, NO: { n: 'Noran', c: '#D4537E' },
   OM: { n: 'Omar', c: '#378ADD' }, LA: { n: 'Laila', c: '#B45309' }, KA: { n: 'Karim', c: '#475569' },
@@ -321,6 +356,7 @@ const nodes = [
   { id: 'ff-content', type: 'folder', parent: 'ff', name: 'Content', follow: true },
   { id: 'ff-li', type: 'list', parent: 'ff-content', name: 'LinkedIn posts', follow: true },
   { id: 'ff-art', type: 'list', parent: 'ff-content', name: 'Articles', follow: true },
+  { id: 'ff-plan', type: 'list', parent: 'ff-content', name: 'Planning', follow: true, kind: 'simple' },
   { id: 'ff-design', type: 'folder', parent: 'ff', name: 'Design', follow: false,
     words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready', 'Designing', 'Client review', 'Approved', 'Posted']) },
   { id: 'ff-ram', type: 'subfolder', parent: 'ff-design', name: 'Ramadan 2027', follow: true },
@@ -373,7 +409,16 @@ let tasks = [
   ['Year in review', 'ipb-li', 'todo', 'LA', '2026-12-29', 'LinkedIn', 'Post', 'Low', 'Personal', 3],
   ['Office photos', 'nb-gen', 'todo', 'OM', null, null, 'Other', 'Low', null, 2],
 ].map((t, i) => ({ id: 't' + i, name: t[0], list: t[1], stage: t[2], who: t[3], due: t[4], platform: t[5], type: t[6],
-  priority: t[7], pillar: t[8], hours: t[9], breached: !!t[10], cover: !!t[11], clips: t[12] || 0 }));
+  priority: t[7], pillar: t[8], hours: t[9], breached: !!t[10], cover: !!t[11], clips: t[12] || 0, kind: 'pipeline', parent: null }));
+[
+  { name: 'Q1 content calendar', list: 'ff-plan', stage: 's-doing', who: 'RS', due: '2026-12-01', kind: 'simple', hours: 6, priority: 'High' },
+  { id: 'tp', name: 'Ramadan launch plan', list: 'ff-plan', stage: 's-todo', who: 'RS', due: '2026-12-10', kind: 'simple', hours: 4, priority: 'High' },
+  { name: 'Launch copy', list: 'ff-plan', parent: 'tp', stage: 'c-prog', who: 'NO', due: '2026-12-17', type: 'Post', platform: 'LinkedIn', hours: 3, priority: 'High', pillar: 'Seasonal' },
+  { name: 'Launch key visual', list: 'ff-plan', parent: 'tp', stage: 'r-design', who: 'OM', due: '2026-12-19', type: 'Design', platform: 'Instagram', hours: 8, priority: 'High', pillar: 'Seasonal', cover: true },
+  { name: 'Launch teaser', list: 'ff-plan', parent: 'tp', stage: 'todo', who: 'KA', due: '2026-12-23', type: 'Video', platform: 'YouTube', hours: 12, priority: 'Medium', pillar: 'Seasonal' },
+  { name: 'Book recording studio', list: 'ff-pod', stage: 's-done', who: 'KA', due: '2026-11-28', kind: 'simple', hours: 1, priority: 'Low' },
+  { name: 'Venue contract', list: 'tsc-meet', stage: 's-doing', who: 'SA', due: '2026-12-03', kind: 'simple', hours: 2, priority: 'Medium' },
+].forEach((e, i) => tasks.push({ id: 'x' + i, kind: 'pipeline', parent: null, platform: null, type: null, pillar: null, breached: false, cover: false, clips: 0, ...e }));
 
 const FEATURES = [
   ['priorities', 'Priorities', 'High, Medium, Low on every task'],
@@ -390,7 +435,7 @@ const feats = {};
 nodes.filter(n => n.type === 'space').forEach(s => { feats[s.id] = Object.fromEntries(FEATURES.map(f => [f[0], true])); });
 feats.tsc.clips = false; feats.tsc.covers = false; feats.nb.sla = false;
 
-const S = { node: 'ff', view: 'list', role: 'admin', panel: null, mixedOwn: false, menu: false, last: null };
+const S = { node: 'ff', view: 'list', role: 'admin', panel: null, mixedOwn: false, menu: false, kind: 'all', mine: false, cell: null };
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -408,7 +453,7 @@ const listsUnder = (id) => {
   if (id === 'everything') return nodes.filter(n => n.type === 'list' && canSee(n)).map(n => n.id);
   const out = []; const walk = (x) => { if (!canSee(N[x])) return; if (N[x].type === 'list') out.push(x); kids(x).forEach(k => walk(k.id)); }; walk(id); return out;
 };
-const scopeTasks = () => { const ls = new Set(listsUnder(S.node)); return tasks.filter(t => ls.has(t.list)); };
+const scopeTasks = () => { const ls = new Set(listsUnder(S.node)); return tasks.filter(t => ls.has(t.list) && (S.kind === 'all' || t.kind === S.kind) && (!S.mine || t.who === me())); };
 const effWords = (id) => {
   const n = N[id];
   if (n.type === 'space') return n.words || {};
@@ -425,16 +470,16 @@ const firstWord = (words, sid) => ((words[sid] || '').split(',').map(x => x.trim
 const allWords = (words, sid) => (words[sid] || '').split(',').map(x => x.trim()).filter(Boolean);
 const isMixed = () => new Set(listsUnder(S.node).map(l => JSON.stringify(effWords(l)))).size > 1;
 const useOwn = () => !isMixed() || S.mixedOwn;
-const label = (listId, sid) => (useOwn() && firstWord(effWords(listId), sid)) || STAGES[SI[sid]].en;
+const label = (listId, sid) => (useOwn() && firstWord(effWords(listId), sid)) || ST(sid).en;
 const scopeLabel = (sid) => {
   const ls = listsUnder(S.node);
-  if (!ls.length || isMixed()) return STAGES[SI[sid]].en;
-  return firstWord(effWords(ls[0]), sid) || STAGES[SI[sid]].en;
+  if (!ls.length || isMixed()) return ST(sid).en;
+  return firstWord(effWords(ls[0]), sid) || ST(sid).en;
 };
 const F = (t, f) => feats[spaceOf(t.list)][f];
 const av = (who) => `<span class="av" style="background:${PEOPLE[who].c}" title="${PEOPLE[who].n}">${PEOPLE[who].n[0]}</span>`;
 const fmt = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'No date';
-const pill = (t) => `<span class="pill" style="--c:${STAGES[SI[t.stage]].c}">${esc(label(t.list, t.stage))}</span>`;
+const pill = (t) => `<span class="pill" style="--c:${ST(t.stage).c}">${esc(label(t.list, t.stage))}</span>`;
 const countUnder = (id) => { const ls = new Set(listsUnder(id)); return tasks.filter(t => ls.has(t.list)).length; };
 
 let toastTimer;
@@ -459,7 +504,7 @@ const IC = {
   vcal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   vwl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
 };
-const VIEWS = [['list', 'List', 'vlist'], ['board', 'Board', 'vboard'], ['table', 'Table', 'vtable'], ['calendar', 'Calendar', 'vcal'], ['workload', 'Workload', 'vwl']];
+const VIEWS = [['list', 'List', 'vlist'], ['board', 'Board', 'vboard'], ['table', 'Sheet', 'vtable'], ['calendar', 'Calendar', 'vcal'], ['workload', 'Workload', 'vwl']];
 
 /* ---------- tree ---------- */
 function renderTree() {
@@ -499,7 +544,7 @@ function renderMain() {
   let h = `<div class="mhead">
     <div class="crumbs">${crumbs}</div>
     <div class="titlerow">
-      <h2>${esc(n.name)} <span class="tag">${typeName}</span></h2>
+      <h2>${esc(n.name)} <span class="tag">${typeName}</span>${n.type === 'list' ? `<span class="tag ${n.kind === 'simple' ? 'simple' : ''}">New tasks: ${n.kind === 'simple' ? 'Simple' : 'Pipeline'}</span>` : ''}</h2>
       <div class="actions">
         <span class="mini">Viewing as</span><div class="seg" role="group" aria-label="Viewing as">${roleSeg}</div>
       </div>
@@ -507,6 +552,8 @@ function renderMain() {
     <div class="actions">
       ${isEvery ? '' : `<button type="button" class="btn" id="openWords" ${canWords ? '' : 'disabled title="Users can\'t edit status words"'}>${IC.words} Status words</button>`}
       ${isEvery ? '' : `<button type="button" class="btn" id="openFeat" ${canSpace ? '' : 'disabled title="Only admins change Space features"'}>${IC.gear} ${esc(N[spaceOf(S.node)].name)} features</button>`}
+      <span class="mini">Kind</span><div class="seg" role="group" aria-label="Kind">${[['all', 'All'], ['pipeline', 'Pipeline'], ['simple', 'Simple']].map(k => `<button type="button" data-kind="${k[0]}" class="${S.kind === k[0] ? 'on' : ''}">${k[1]}</button>`).join('')}</div>
+      <button type="button" class="switch" id="mineSw" role="switch" aria-checked="${S.mine}"><span class="track"></span>Only mine</button>
     </div>
     <div class="tabs" role="tablist">
       ${VIEWS.map(v => `<button type="button" role="tab" data-view="${v[0]}" class="${S.view === v[0] ? 'on' : ''}" aria-selected="${S.view === v[0]}">${IC[v[2]]}${v[1]}</button>`).join('')}
@@ -533,6 +580,8 @@ function renderMain() {
     if (S.node !== 'everything' && !canSee(N[S.node])) S.node = spaceOf(S.node);
     render(); toast(S.role === 'user' ? 'Noran isn\'t on the private "Monthly meetup" List, so it\'s gone from her tree and views.' : `Viewing as ${PEOPLE[me()].n} (${ROLES[S.role].label}).`);
   });
+  m.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { S.kind = b.dataset.kind; renderMain(); });
+  $('#mineSw').onclick = () => { S.mine = !S.mine; renderMain(); };
   m.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { S.view = b.dataset.view; S.menu = false; renderMain(); });
   $('#addView').onclick = (e) => { e.stopPropagation(); S.menu = !S.menu; renderMain(); };
   m.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { S.view = b.dataset.add; S.menu = false; renderMain(); toast(`View saved on ${esc(n.name)}. Everyone who opens it sees the same filters.`); });
@@ -552,19 +601,27 @@ function renderView() {
 const showList = () => S.node === 'everything' || N[S.node].type !== 'list';
 function metaBits(t) {
   return [
+    t.kind === 'simple' ? '<span class="tag simple">Simple</span>' : '',
     F(t, 'type') && t.type ? `<span class="tag">${esc(t.type)}</span>` : '',
     F(t, 'platform') && t.platform ? `<span class="mini">${esc(t.platform)}</span>` : '',
     F(t, 'priorities') ? `<span class="prio ${t.priority}">${t.priority}</span>` : '',
     F(t, 'sla') && t.breached ? '<span class="sla">SLA</span>' : '',
   ].join('');
 }
+const subLine = (t) => {
+  if (t.parent) return `<span class="subof">↳ subtask of ${esc(tasks.find(x => x.id === t.parent).name)}</span>`;
+  const n = tasks.filter(x => x.parent === t.id).length;
+  return n ? `<span class="subof">${n} subtasks</span>` : '';
+};
 function vList(v, ts) {
-  let h = '';
-  STAGES.forEach(s => {
+  let h = ''; let sep = { p: false, s: false };
+  ALL.forEach(s => {
     const g = ts.filter(t => t.stage === s.id); if (!g.length) return;
+    if (!s.simple && !sep.p && ts.some(t => t.kind === 'simple')) { h += '<p class="kindsep">Pipeline tasks · nine stages, SLA</p>'; sep.p = true; }
+    if (s.simple && !sep.s) { h += '<p class="kindsep">Simple tasks · no stages, no SLA</p>'; sep.s = true; }
     h += `<div class="grp"><div class="grp-h"><span class="pill" style="--c:${s.c}">${esc(scopeLabel(s.id))}</span><span class="ct">${g.length}</span></div>`;
     g.forEach(t => {
-      h += `<div class="row"><div class="tn"><b>${esc(t.name)}</b>${showList() ? `<span class="mini">${esc(path(t.list).map(p => p.name).slice(-2).join(' › '))}</span>` : ''}</div>
+      h += `<div class="row"><div class="tn"><b>${esc(t.name)}</b>${subLine(t)}${showList() ? `<span class="mini">${esc(path(t.list).map(p => p.name).slice(-2).join(' › '))}</span>` : ''}</div>
         <div class="meta">${metaBits(t)}</div>${isMixed() && S.mixedOwn ? pill(t) : '<span></span>'}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`;
     });
     h += '</div>';
@@ -573,49 +630,63 @@ function vList(v, ts) {
 }
 function vBoard(v, ts) {
   let h = '<div class="board">';
-  STAGES.forEach(s => {
+  const hasP = ts.some(t => t.kind === 'pipeline'), hasS = ts.some(t => t.kind === 'simple');
+  ALL.filter(s => s.simple ? hasS : hasP).forEach(s => {
     const g = ts.filter(t => t.stage === s.id);
-    h += `<div class="col"><div class="col-h"><span class="pill" style="--c:${s.c}">${esc(scopeLabel(s.id))}</span><span class="mini">${g.length}</span></div>
+    h += `<div class="col ${s.simple ? 'simple' : ''}"><div class="col-h"><span class="pill" style="--c:${s.c}">${esc(scopeLabel(s.id))}</span><span class="mini">${g.length}</span></div>
       <span class="own">Owner: ${s.owner}</span>`;
     g.forEach(t => {
-      h += `<div class="card">${F(t, 'covers') && t.cover ? `<div class="cv" style="--c:${N[spaceOf(t.list)].color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>
+      h += `<div class="card">${F(t, 'covers') && t.cover ? `<div class="cv" style="--c:${N[spaceOf(t.list)].color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>${subLine(t)}
         <div class="cf">${metaBits(t)}${F(t, 'clips') && t.clips ? `<span class="tag">${t.clips} clips</span>` : ''}</div>
         <div class="cf">${av(t.who)}<span class="mini">${fmt(t.due)}</span>${isMixed() && S.mixedOwn ? pill(t) : ''}</div></div></div>`;
     });
     h += '</div>';
   });
-  v.innerHTML = h + '</div><p class="mini" style="margin-top:10px">Drag reorders within a column. Stage moves go through Advance, with the same checks as today\'s Board.</p>';
+  v.innerHTML = h + '</div><p class="mini" style="margin-top:10px">Drag reorders within a column. Stage moves go through Advance, with the same checks as today\'s Board. Dashed columns are simple tasks: anyone who can edit them moves them.</p>';
 }
 function vTable(v, ts) {
   const any = (f) => ts.some(t => F(t, f));
   const cols = [['type', 'Type'], ['platform', 'Platform'], ['pillars', 'Pillar'], ['priorities', 'Priority'], ['hours', 'Hours']].filter(c => any(c[0]));
-  let h = `<p class="mini" style="margin-bottom:10px">Type one of this List's status words into a Status cell and press Enter. Try "Live" on a Video task.</p>
-    <div class="tblwrap"><table><thead><tr><th>Task</th>${showList() ? '<th>List</th>' : ''}<th class="fld">Status</th><th>Assignee</th><th>Due</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}</tr></thead><tbody>`;
-  ts.forEach(t => {
+  const heads = [['Task', 'fld']].concat(showList() ? [['List', 'reg']] : [], [['Status', 'fld'], ['Assignee', 'fld'], ['Due date', 'fld']], cols.map(c => [c[1], 'fld']), [['Notes', 'reg']]);
+  const L = (i) => String.fromCharCode(65 + i);
+  const notes = { t0: 'Needs CFO quote', t9: 'Guest confirmed', x1: 'Kick-off on Sunday' };
+  let h = `<p class="mini" style="margin-bottom:10px">Today's spreadsheet, unchanged: menus, toolbar, formatting, keyboard, paste from Excel. Purple headings are task fields; grey ones are regular columns. Type a status word into a Status cell and press Enter. Try "Live" on a Video task.</p>
+    <div class="xl"><div class="xl-menu"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span><span>Tools</span></div>
+    <div class="xl-tools" aria-hidden="true"><span>↶</span><span>↷</span><span class="sep"></span><span>100%</span><span class="sep"></span><span>Inter ▾</span><span>11 ▾</span><span class="sep"></span><span><b>B</b></span><span><i>I</i></span><span><s>S</s></span><span>A</span><span class="sep"></span><span>Fill</span><span>Borders</span><span>Merge</span><span class="sep"></span><span>Sort</span><span>Filter</span><span>⚙ Fields</span></div>
+    <div class="xl-bar"><span class="nbox" id="nbox">${S.cell ? S.cell.ref : 'A1'}</span><span class="fx">fx</span><span class="fv" id="fv">${S.cell ? esc(S.cell.val) : 'Task'}</span></div>
+    <div class="xl-grid"><table><thead><tr><th class="cl"></th>${heads.map((_, i) => `<th class="cl">${L(i)}</th>`).join('')}</tr>
+    <tr><td class="rn">1</td>${heads.map(x => `<th class="${x[1]}">${x[0]}</th>`).join('')}</tr></thead><tbody>`;
+  ts.forEach((t, r) => {
     const val = (k) => {
-      if (!F(t, k)) return '<span class="mini">·</span>';
+      if (!F(t, k)) return '';
       return esc({ type: t.type, platform: t.platform, pillars: t.pillar, priorities: t.priority, hours: t.hours }[k] ?? '');
     };
-    h += `<tr><td><b style="font-weight:600">${esc(t.name)}</b> ${F(t, 'sla') && t.breached ? '<span class="sla">SLA</span>' : ''}</td>
-      ${showList() ? `<td class="mini">${esc(N[t.list].name)}</td>` : ''}
-      <td class="st"><span class="dot" style="background:${STAGES[SI[t.stage]].c}"></span><input id="st-${t.id}" data-t="${t.id}" value="${esc(label(t.list, t.stage))}" aria-label="Status of ${esc(t.name)}"></td>
-      <td>${av(t.who)} <span class="mini">${PEOPLE[t.who].n}</span></td><td class="mini">${fmt(t.due)}</td>${cols.map(c => `<td>${val(c[0])}</td>`).join('')}</tr>`;
+    const cells = [`<b style="font-weight:600">${t.parent ? '↳ ' : ''}${esc(t.name)}</b> ${t.kind === 'simple' ? '<span class="tag simple">Simple</span>' : ''} ${F(t, 'sla') && t.breached ? '<span class="sla">SLA</span>' : ''}`]
+      .concat(showList() ? [`<span class="mini">${esc(N[t.list].name)}</span>`] : [],
+        [`<span class="dot" style="background:${ST(t.stage).c}"></span><input id="st-${t.id}" data-t="${t.id}" value="${esc(label(t.list, t.stage))}" aria-label="Status of ${esc(t.name)}">`,
+         `${av(t.who)} <span class="mini">${PEOPLE[t.who].n}</span>`, `<span class="mini">${fmt(t.due)}</span>`], cols.map(c => val(c[0])), [esc(notes[t.id] || '')]);
+    h += `<tr><td class="rn">${r + 2}</td>${cells.map((c, i) => `<td class="${heads[i][0] === 'Status' ? 'st' : ''}" data-ref="${L(i)}${r + 2}">${c}</td>`).join('')}</tr>`;
   });
-  v.innerHTML = h + '</tbody></table></div>';
+  v.innerHTML = h + '</tbody></table></div></div>';
+  v.querySelectorAll('td[data-ref]').forEach(td => td.addEventListener('mousedown', () => {
+    v.querySelectorAll('td.sel').forEach(x => x.classList.remove('sel')); td.classList.add('sel');
+    const inp = td.querySelector('input'); S.cell = { ref: td.dataset.ref, val: inp ? inp.value : td.textContent.trim() };
+    $('#nbox').textContent = S.cell.ref; $('#fv').textContent = S.cell.val;
+  }));
   v.querySelectorAll('input[data-t]').forEach(inp => {
     const commit = () => {
       const t = tasks.find(x => x.id === inp.dataset.t); const typed = inp.value.trim().toLowerCase().replace(/\s+/g, ' ');
       if (!typed || typed === label(t.list, t.stage).toLowerCase()) { inp.value = label(t.list, t.stage); return; }
-      const words = effWords(t.list); let hit = null;
-      STAGES.forEach(s => { const opts = allWords(words, s.id).concat([s.en]); if (opts.some(o => o.toLowerCase().replace(/\s+/g, ' ') === typed)) hit = s.id; });
+      const words = effWords(t.list); let hit = null; const pool = t.kind === 'simple' ? SIMPLE : STAGES;
+      pool.forEach(s => { const opts = allWords(words, s.id).concat([s.en]); if (opts.some(o => o.toLowerCase().replace(/\s+/g, ' ') === typed)) hit = s.id; });
       if (!hit) {
-        const valid = STAGES.map(s => firstWord(words, s.id) || s.en).join(', ');
+        const valid = pool.map(s => firstWord(words, s.id) || s.en).join(', ');
         toast(`"${esc(inp.value)}" isn't a status in ${esc(N[t.list].name)}. Use: ${esc(valid)}.`); inp.value = label(t.list, t.stage); return;
       }
-      if (t.stage === 'publish') { toast('Published is final. This task can\'t move.'); inp.value = label(t.list, t.stage); return; }
+      if (t.kind === 'pipeline' && t.stage === 'publish') { toast('Published is final. This task can\'t move.'); inp.value = label(t.list, t.stage); return; }
       const prev = t.stage; t.stage = hit;
       render();
-      toast(`Moved to <b>${STAGES[SI[hit]].en}</b> on the board, shown here as "${esc(label(t.list, hit))}".${hit === 'publish' ? ' 🎉' : ''}`, () => { t.stage = prev; });
+      toast(t.kind === 'simple' ? `Marked <b>${ST(hit).en}</b>.${hit === 's-done' ? ' 🎉 Done celebrates for the assignee.' : ''}` : `Moved to <b>${ST(hit).en}</b> on the board, shown here as "${esc(label(t.list, hit))}".${hit === 'publish' ? ' 🎉' : ''}`, () => { t.stage = prev; });
     };
     inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } if (e.key === 'Escape') { inp.value = label(tasks.find(x => x.id === inp.dataset.t).list, tasks.find(x => x.id === inp.dataset.t).stage); inp.blur(); } };
     inp.onblur = commit;
@@ -629,13 +700,13 @@ function vCal(v, ts) {
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const ev = ts.filter(t => t.due === iso);
     h += `<div class="day ${d.getMonth() !== 11 ? 'out' : ''} ${iso === today ? 'today' : ''}" data-day="${iso}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' ' + d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
-      ${ev.map(t => `<div class="ev" draggable="true" data-t="${t.id}" style="--c:${STAGES[SI[t.stage]].c}" title="${esc(t.name)} · ${esc(label(t.list, t.stage))}">${esc(t.name)}</div>`).join('')}</div>`;
+      ${ev.map(t => `<div class="ev" draggable="true" data-t="${t.id}" style="--c:${ST(t.stage).c}" title="${esc(t.name)} · ${esc(label(t.list, t.stage))}">${esc(t.name)}</div>`).join('')}</div>`;
   }
   h += '</div></div>';
   const before = ts.filter(t => t.due && t.due < '2026-11-30');
   const none = ts.filter(t => !t.due);
   h += `<div class="nodate"><span class="mini"><b>December 2026.</b> Drag a task to another day to change its due date.</span></div>`;
-  if (none.length || before.length) h += `<div class="nodate"><span class="mini">${none.length ? 'No date:' : ''}</span>${none.map(t => `<span class="ev" draggable="true" data-t="${t.id}" style="--c:${STAGES[SI[t.stage]].c}">${esc(t.name)}</span>`).join('')}${before.length ? `<span class="mini">· ${before.length} due earlier in November</span>` : ''}</div>`;
+  if (none.length || before.length) h += `<div class="nodate"><span class="mini">${none.length ? 'No date:' : ''}</span>${none.map(t => `<span class="ev" draggable="true" data-t="${t.id}" style="--c:${ST(t.stage).c}">${esc(t.name)}</span>`).join('')}${before.length ? `<span class="mini">· ${before.length} due earlier in November</span>` : ''}</div>`;
   v.innerHTML = h;
   v.querySelectorAll('.ev').forEach(e => e.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', e.dataset.t); });
   v.querySelectorAll('.day').forEach(d => {
@@ -649,12 +720,12 @@ function vCal(v, ts) {
   });
 }
 function vWork(v, ts) {
-  const by = {}; ts.filter(t => t.stage !== 'publish').forEach(t => { (by[t.who] = by[t.who] || []).push(t); });
+  const by = {}; ts.filter(t => t.stage !== 'publish' && t.stage !== 's-done').forEach(t => { (by[t.who] = by[t.who] || []).push(t); });
   const cap = 40;
-  let h = '<div class="wl"><p class="mini">Open hours by person for the tasks in this view, against a 40-hour week. Published tasks are left out.</p>';
+  let h = '<div class="wl"><p class="mini">Open hours by person for the tasks in this view, against a 40-hour week. Published and done tasks are left out; simple tasks count too.</p>';
   Object.keys(by).sort((a, b) => by[b].reduce((s, t) => s + t.hours, 0) - by[a].reduce((s, t) => s + t.hours, 0)).forEach(w => {
     const hrs = by[w].filter(t => F(t, 'hours')).reduce((s, t) => s + t.hours, 0);
-    const segs = by[w].filter(t => F(t, 'hours')).map(t => `<span style="width:${Math.min(100, t.hours / cap * 100)}%;background:${STAGES[SI[t.stage]].c}" title="${esc(t.name)} · ${t.hours}h"></span>`).join('');
+    const segs = by[w].filter(t => F(t, 'hours')).map(t => `<span style="width:${Math.min(100, t.hours / cap * 100)}%;background:${ST(t.stage).c}" title="${esc(t.name)} · ${t.hours}h"></span>`).join('');
     h += `<div class="wlr"><div class="who">${av(w)}${PEOPLE[w].n}</div><div class="bar">${segs}</div><div class="h">${hrs}h · ${by[w].length} tasks</div></div>`;
   });
   v.innerHTML = h + '</div>';
@@ -674,6 +745,9 @@ function wordsPanel() {
     </div><div class="sheet-b">
     ${STAGES.map(s => `<div class="wrow"><div class="sn"><span class="pill" style="--c:${s.c}">${s.en}</span><small>Owner: ${s.owner}</small></div>
       <input id="w-${s.id}" data-s="${s.id}" value="${esc(shown[s.id] || '')}" placeholder="${follow ? 'Uses ' + esc(s.en) : s.en}" ${follow ? 'disabled' : ''} aria-label="Words for ${s.en}"></div>`).join('')}
+    <p class="kindsep">Simple tasks</p>
+    ${SIMPLE.map(s => `<div class="wrow"><div class="sn"><span class="pill" style="--c:${s.c}">${s.en}</span><small>Anyone who can edit</small></div>
+      <input id="w-${s.id}" data-s="${s.id}" value="${esc(shown[s.id] || '')}" placeholder="${follow ? 'Uses ' + esc(s.en) : s.en}" ${follow ? 'disabled' : ''} aria-label="Words for simple status ${s.en}"></div>`).join('')}
     <p class="foot">${follow ? `Following ${esc(parentName)}. Changes there show here.` : `${users} List${users === 1 ? '' : 's'} use these words.`} Owners, SLA and celebrations come from the board stage; words only change what you see and type.</p>
     </div></div>`;
 }
@@ -698,7 +772,8 @@ function bindPanel() {
     document.querySelectorAll('.wrow input').forEach(inp => inp.onchange = () => {
       const words = n.words || (n.words = {});
       const vals = inp.value.split(',').map(x => x.trim()).filter(Boolean);
-      const clash = STAGES.find(s => s.id !== inp.dataset.s && allWords(words, s.id).some(w => vals.some(v => v.toLowerCase() === w.toLowerCase())));
+      const grp = SIMPLE.some(x => x.id === inp.dataset.s) ? SIMPLE : STAGES;
+      const clash = grp.find(s => s.id !== inp.dataset.s && allWords(words, s.id).some(w => vals.some(v => v.toLowerCase() === w.toLowerCase())));
       if (clash) { toast(`"${esc(inp.value)}" is already used for ${clash.en}. One word can't mean two stages.`); inp.value = words[inp.dataset.s] || ''; return; }
       words[inp.dataset.s] = vals.join(', ');
       render(); S.panel = 'words'; renderMain();
