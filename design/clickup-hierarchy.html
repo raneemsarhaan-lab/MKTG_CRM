@@ -126,7 +126,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end }
 
 /* Board view */
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: 210px; gap: 12px; align-items: start; padding-bottom: 6px }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: 224px; gap: 12px; align-items: start; padding-bottom: 6px }
 .col { background: var(--soft); border-radius: 14px; padding: 10px; display: grid; gap: 8px; border: 1px solid var(--line) }
 .col-h { display: flex; justify-content: space-between; align-items: center; gap: 6px }
 .col-h .own { font-size: 10px; color: var(--muted) }
@@ -211,6 +211,12 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .xl-grid td.rn { background: var(--soft); color: var(--muted); text-align: center; width: 36px; font-variant-numeric: tabular-nums }
 .xl-grid td.sel { box-shadow: inset 0 0 0 2px var(--cyan) }
 .xl-grid td.grp { background: var(--soft); font-weight: 700 }
+.col.orig { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); padding: 12px 8px 10px; gap: 10px }
+.col.orig.simple { border-style: dashed; border-top-style: solid }
+.col .cn { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.col .cc { min-width: 22px; height: 22px; border-radius: 6px; background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted); display: grid; place-items: center; padding: 0 5px }
+.col .ar { font-size: 11px; color: var(--muted); direction: rtl; text-align: right; margin-top: -6px }
+.col .addt { border: 0; background: none; color: #7C3AED; font-weight: 700; font-size: 12.5px; padding: 4px 0 0 }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -253,7 +259,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   <header class="top">
     <span class="eyebrow">Spec 021 · Preview of what we're building now</span>
     <h1>Momentum Spaces</h1>
-    <p class="lede">ClickUp's way of organizing work, built on Momentum's pipeline. <b>Brand Spaces</b> hold <b>team Folders</b>, and team Folders hold <b>Lists</b>. Any level can open as a list, board, sheet, calendar or workload. Each team names the nine stages in its own words, as the sheets already do. Work that isn't a deliverable, such as planning, is a simple task with three statuses. Each brand can switch off the features it doesn't use. Click around: the data is sample data.</p>
+    <p class="lede">ClickUp's way of organizing work, built on Momentum's pipeline. <b>Brand Spaces</b> hold <b>team Folders</b>, and team Folders hold <b>Lists</b>. Any level can open as a list, board, sheet, calendar or workload. Each team names the pipeline stages in its own words, outside the Board, as the sheets already do. Work that isn't a deliverable, such as planning, is a simple task with three statuses. Each brand can switch off the features it doesn't use. Click around: the data is sample data.</p>
     <div class="chips">
       <span class="chip now"><b>US1</b> Brand › Team › List</span>
       <span class="chip now"><b>US2</b> Views at any level</span>
@@ -288,7 +294,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
         <div class="itm"><b>Project or content theme</b><small>Ramadan 2027, Strategy, Newsjacking…</small></div>
         <div class="itm"><b>Task with no project</b><small>Sits on the board with only a brand</small></div>
         <div class="itm"><b>Task with no brand</b><small>Grouped under "No brand" today</small></div>
-        <div class="itm"><b>Every task</b><small>Moves through the nine stages</small></div>
+        <div class="itm"><b>Every task</b><small>Moves through the pipeline stages</small></div>
         <div class="itm"><b>Pillar, stage, owner, SLA clock</b><small>On every task</small></div>
       </div>
       <div class="arrow" aria-hidden="true">→</div>
@@ -311,7 +317,7 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
     </div>
     <div class="scope">
       <div class="sc now"><h3>This spec <small>US1–US5</small></h3><ul>
-        <li>Space per brand, Folder per team, Subfolders, Lists</li><li>Private Spaces, Folders and Lists</li><li>List, Board, Table, Calendar and Workload views on any level</li><li>Everything view</li><li>Status words mapped to the nine stages, inherited from the Folder</li><li>Feature switches per Space</li><li>Two kinds of task: pipeline (nine stages, SLA) and simple (To Do › In progress › Done)</li><li>The Sheet view keeps today's spreadsheet experience</li></ul></div>
+        <li>Space per brand, Folder per team, Subfolders, Lists</li><li>Private Spaces, Folders and Lists</li><li>List, Board, Table, Calendar and Workload views on any level</li><li>Everything view</li><li>Status words mapped to the pipeline stages, inherited from the Folder; Boards keep the original process</li><li>Feature switches per Space</li><li>Two kinds of task: pipeline (the 11 stages, SLA) and simple (To Do › In progress › Done)</li><li>The Sheet view keeps today's spreadsheet experience</li></ul></div>
       <div class="sc"><h3>Have already</h3><ul>
         <li>Kanban board and pipeline</li><li>Sheets with task fields</li><li>Subtasks</li><li>Workload and Capacity</li><li>Subtasks, followers, @mentions</li><li>Daily hours</li><li>Installable app, Arabic and English</li></ul></div>
       <div class="sc"><h3>Later <small>own specs</small></h3><ul>
@@ -326,15 +332,17 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 (() => {
 'use strict';
 const STAGES = [
-  { id: 'todo',        en: 'To Do',           owner: 'Assignee',          c: '#64748B' },
-  { id: 'c-prog',      en: 'Writing',         owner: 'Assignee',          c: '#3B82F6' },
-  { id: 'c-final',     en: 'Content Review',  owner: 'Marketing Manager', c: '#2E6FB0' },
-  { id: 'c-check',     en: 'Islam Check',     owner: 'Managing Director', c: '#1F5A94' },
-  { id: 'r-design',    en: 'Ready to Design', owner: 'Assignee',          c: '#8B5CF6' },
-  { id: 'd-prog',      en: 'Designing',       owner: 'Assignee',          c: '#7C3AED' },
-  { id: 'd-check',     en: 'Design Review',   owner: 'Brand Director',    c: '#5B3FB5' },
-  { id: 'final-check', en: 'Final Check',     owner: 'Marketing Manager', c: '#F59E0B' },
-  { id: 'publish',     en: 'Published',       owner: 'Final',             c: '#22C55E' },
+  { id: 'todo',          en: 'To Do',            ar: 'افكار للتنفيذ',              owner: 'Assignee',          c: '#8B5CF6' },
+  { id: 'c-prog',        en: 'C-In Progress',    ar: 'كتابة المحتوى',              owner: 'Assignee',          c: '#2563EB' },
+  { id: 'c-final',       en: 'C-Review',         ar: 'مراجعة المحتوى',             owner: 'Marketing Manager', c: '#7C3AED' },
+  { id: 'c-check',       en: 'C-Check',          ar: 'موافقة نهائية على المحتوى',  owner: 'Managing Director', c: '#F97316' },
+  { id: 'r-design',      en: 'Ready For Design', ar: 'جاهز للتصميم',               owner: 'Assignee',          c: '#F59E0B' },
+  { id: 'd-prog',        en: 'D-In Progress',    ar: 'تصميم',                      owner: 'Assignee',          c: '#0EA5A5' },
+  { id: 'd-check',       en: 'D-Check',          ar: 'مراجعة التصميم',             owner: 'Brand Director',    c: '#0891B2' },
+  { id: 'final-check',   en: 'F-Check',          ar: 'المراجعة النهائية',          owner: 'Marketing Manager', c: '#6366F1' },
+  { id: 'ready-publish', en: 'Ready to Publish', ar: 'جاهز للنشر',                 owner: 'Assignee',          c: '#10B981' },
+  { id: 'scheduled',     en: 'Scheduled',        ar: 'مجدول',                      owner: 'Assignee',          c: '#14B8A6' },
+  { id: 'publish',       en: 'Published',        ar: 'تم النشر',                   owner: 'Final',             c: '#16A34A' },
 ];
 const SIMPLE = [
   { id: 's-todo',  en: 'To Do',       owner: 'Assignee', c: '#94A3B8', simple: true },
@@ -358,14 +366,14 @@ const nodes = [
   { id: 'ff-art', type: 'list', parent: 'ff-content', name: 'Articles', follow: true },
   { id: 'ff-plan', type: 'list', parent: 'ff-content', name: 'Planning', follow: true, kind: 'simple' },
   { id: 'ff-design', type: 'folder', parent: 'ff', name: 'Design', follow: false,
-    words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready', 'Designing', 'Client review', 'Approved', 'Posted']) },
+    words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready', 'Designing', 'Client review', 'Approved', 'Ready to post', 'Scheduled', 'Posted']) },
   { id: 'ff-ram', type: 'subfolder', parent: 'ff-design', name: 'Ramadan 2027', follow: true },
   { id: 'ff-ramvis', type: 'list', parent: 'ff-ram', name: 'Campaign visuals', follow: true },
   { id: 'ff-assets', type: 'list', parent: 'ff-design', name: 'Brand assets', follow: true },
   { id: 'ff-video', type: 'folder', parent: 'ff', name: 'Video', follow: false,
-    words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Shooting, Editing', 'Rough cut review', 'Final cut', 'Live, Posted']) },
+    words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Shooting, Editing', 'Rough cut review', 'Final cut', 'Ready to post', 'Scheduled', 'Live, Posted']) },
   { id: 'ff-pod', type: 'list', parent: 'ff-video', name: 'Podcast', follow: false,
-    words: W(['Guest idea', 'Prep notes', 'Prep review', 'Islam check', 'Booked', 'Recording, Editing', 'Edit review', 'Final cut', 'Live']) },
+    words: W(['Guest idea', 'Prep notes', 'Prep review', 'Islam check', 'Booked', 'Recording, Editing', 'Edit review', 'Final cut', 'Ready to air', 'Scheduled', 'Live']) },
   { id: 'ff-reels', type: 'list', parent: 'ff-video', name: 'Reels', follow: true },
   { id: 'om', type: 'space', name: 'Omnisight', color: '#0E7C7B', words: null },
   { id: 'om-mk', type: 'folder', parent: 'om', name: 'Marketing', follow: true },
@@ -373,7 +381,7 @@ const nodes = [
   { id: 'om-launch', type: 'list', parent: 'om-mk', name: 'Product launch', follow: true },
   { id: 'tsc', type: 'space', name: 'The Strategy Community', color: '#7A5A2E', words: null },
   { id: 'tsc-ev', type: 'folder', parent: 'tsc', name: 'Events', follow: false,
-    words: W(['Idea', 'Planning', 'Plan review', 'MD sign-off', 'Venue booked', 'Running', 'Wrap-up review', 'Final check', 'Done']) },
+    words: W(['Idea', 'Planning', 'Plan review', 'MD sign-off', 'Venue booked', 'Running', 'Wrap-up review', 'Final check', 'Announced', 'Scheduled', 'Done']) },
   { id: 'tsc-meet', type: 'list', parent: 'tsc-ev', name: 'Monthly meetup', follow: true, private: ['RS', 'SA'] },
   { id: 'tsc-ct', type: 'folder', parent: 'tsc', name: 'Content', follow: true },
   { id: 'tsc-news', type: 'list', parent: 'tsc-ct', name: 'Newsletter', follow: true },
@@ -397,14 +405,14 @@ let tasks = [
   ['Logo lockups refresh', 'ff-assets', 'd-check', 'OM', '2026-12-04', null, 'Design', 'Low', 'Brand', 5, true, true],
   ['Ep. 14 with guest CFO', 'ff-pod', 'd-prog', 'KA', '2026-12-09', 'YouTube', 'Video', 'High', 'Thought leadership', 14, false, false, 4],
   ['Ep. 15 booking', 'ff-pod', 'r-design', 'KA', '2026-12-16', 'YouTube', 'Video', 'Medium', 'Thought leadership', 3],
-  ['Ep. 13 cut-downs', 'ff-reels', 'final-check', 'LA', '2026-12-02', 'Instagram', 'Reel', 'Medium', 'Proof', 4],
+  ['Ep. 13 cut-downs', 'ff-reels', 'scheduled', 'LA', '2026-12-02', 'Instagram', 'Reel', 'Medium', 'Proof', 4],
   ['Behind the scenes reel', 'ff-reels', 'publish', 'LA', '2026-11-18', 'TikTok', 'Reel', 'Low', 'Culture', 3],
   ['Webinar recap post', 'om-gen', 'c-prog', 'SA', '2026-12-07', 'LinkedIn', 'Post', 'Medium', 'Proof', 2],
   ['Launch landing page copy', 'om-launch', 'c-final', 'NO', '2026-12-11', 'Website', 'Other', 'High', 'Product', 6, true],
   ['Launch teaser video', 'om-launch', 'todo', 'KA', '2026-12-21', 'YouTube', 'Video', 'High', 'Product', 16],
   ['December meetup: venue', 'tsc-meet', 'r-design', 'SA', '2026-12-05', null, 'Other', 'High', 'Community', 4],
   ['December meetup: speakers', 'tsc-meet', 'c-prog', 'RS', '2026-12-12', null, 'Other', 'Medium', 'Community', 3],
-  ['Issue 22', 'tsc-news', 'd-prog', 'NO', '2026-12-15', 'Email', 'Email', 'Medium', 'Community', 5],
+  ['Issue 22', 'tsc-news', 'ready-publish', 'NO', '2026-12-15', 'Email', 'Email', 'Medium', 'Community', 5],
   ['Leadership lesson #8', 'ipb-li', 'c-check', 'LA', '2026-12-04', 'LinkedIn', 'Post', 'Medium', 'Personal', 2],
   ['Year in review', 'ipb-li', 'todo', 'LA', '2026-12-29', 'LinkedIn', 'Post', 'Low', 'Personal', 3],
   ['Office photos', 'nb-gen', 'todo', 'OM', null, null, 'Other', 'Low', null, 2],
@@ -429,7 +437,7 @@ const FEATURES = [
   ['covers', 'Cover images', 'Picture strip on board cards'],
   ['clips', 'Video clips', 'Clips under a video'],
   ['sla', 'SLA tracking', 'Overdue-in-stage badges'],
-  ['islam', 'Islam Check stage', 'New tasks get the nine-stage pipeline'],
+  ['islam', 'Islam Check stage', 'New tasks include C-Check, the Islam Check stage'],
 ];
 const feats = {};
 nodes.filter(n => n.type === 'space').forEach(s => { feats[s.id] = Object.fromEntries(FEATURES.map(f => [f[0], true])); });
@@ -569,7 +577,7 @@ function renderMain() {
       <button type="button" class="switch" id="mixSw" role="switch" aria-checked="${S.mixedOwn}"><span class="track"></span>Show each List's words</button></div>`;
   } else if (src) {
     const own = src.id === S.node;
-    h += `<div class="note"><span>${own ? 'Status words are set here' : `Status words come from <b>${esc(src.name)}</b>`}. Owners, SLA and celebrations still come from the nine board stages.</span></div>`;
+    h += `<div class="note"><span>${own ? 'Status words are set here' : `Status words come from <b>${esc(src.name)}</b>`}. Owners, SLA and celebrations still come from the board's stages, and Boards keep the original names.</span></div>`;
   }
   h += `<div class="view" id="view"></div>`;
   if (S.panel === 'words') h += wordsPanel();
@@ -617,7 +625,7 @@ function vList(v, ts) {
   let h = ''; let sep = { p: false, s: false };
   ALL.forEach(s => {
     const g = ts.filter(t => t.stage === s.id); if (!g.length) return;
-    if (!s.simple && !sep.p && ts.some(t => t.kind === 'simple')) { h += '<p class="kindsep">Pipeline tasks · nine stages, SLA</p>'; sep.p = true; }
+    if (!s.simple && !sep.p && ts.some(t => t.kind === 'simple')) { h += '<p class="kindsep">Pipeline tasks · the process as built, SLA</p>'; sep.p = true; }
     if (s.simple && !sep.s) { h += '<p class="kindsep">Simple tasks · no stages, no SLA</p>'; sep.s = true; }
     h += `<div class="grp"><div class="grp-h"><span class="pill" style="--c:${s.c}">${esc(scopeLabel(s.id))}</span><span class="ct">${g.length}</span></div>`;
     g.forEach(t => {
@@ -633,16 +641,16 @@ function vBoard(v, ts) {
   const hasP = ts.some(t => t.kind === 'pipeline'), hasS = ts.some(t => t.kind === 'simple');
   ALL.filter(s => s.simple ? hasS : hasP).forEach(s => {
     const g = ts.filter(t => t.stage === s.id);
-    h += `<div class="col ${s.simple ? 'simple' : ''}"><div class="col-h"><span class="pill" style="--c:${s.c}">${esc(scopeLabel(s.id))}</span><span class="mini">${g.length}</span></div>
-      <span class="own">Owner: ${s.owner}</span>`;
+    h += `<div class="col orig ${s.simple ? 'simple' : ''}" style="--c:${s.c}"><div class="col-h"><span class="cn">${esc(s.en)}</span><span class="cc">${g.length}</span></div><div class="ar">${s.simple ? 'مهمة بسيطة' : s.ar}</div>`;
     g.forEach(t => {
       h += `<div class="card">${F(t, 'covers') && t.cover ? `<div class="cv" style="--c:${N[spaceOf(t.list)].color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>${subLine(t)}
         <div class="cf">${metaBits(t)}${F(t, 'clips') && t.clips ? `<span class="tag">${t.clips} clips</span>` : ''}</div>
         <div class="cf">${av(t.who)}<span class="mini">${fmt(t.due)}</span>${isMixed() && S.mixedOwn ? pill(t) : ''}</div></div></div>`;
     });
-    h += '</div>';
+    h += '<button type="button" class="addt">+ Add task</button></div>';
   });
-  v.innerHTML = h + '</div><p class="mini" style="margin-top:10px">Drag reorders within a column. Stage moves go through Advance, with the same checks as today\'s Board. Dashed columns are simple tasks: anyone who can edit them moves them.</p>';
+  v.innerHTML = h + '</div><p class="mini" style="margin-top:10px">Every Board shows the process as built, with its original stage names, whatever words the team uses elsewhere. Drag reorders within a column. Stage moves go through Advance, with the same checks as today\'s Board. Dashed columns are simple tasks: anyone who can edit them moves them.</p>';
+  { const first = [...v.querySelectorAll('.col')].find(c => c.querySelector('.cc') && c.querySelector('.cc').textContent !== '0'); if (first) v.scrollLeft += first.getBoundingClientRect().left - v.getBoundingClientRect().left - 16; }
 }
 function vTable(v, ts) {
   const any = (f) => ts.some(t => F(t, f));

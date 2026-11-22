@@ -34,3 +34,4 @@
 - Iteration 1: removed code references (an import script path, a database column name, "tombstones") from the Context, parity map and Edge Cases; reworded FR-034 to remove "on the server".
 - Iteration 2: applied the three answers. Removed the US5/US6 requirements from scope and renumbered FR-001–FR-026. Every item passes.
 - Iteration 3: added US5 (pipeline tasks and simple tasks, FR-027–FR-034), kept subtasks in the model, made the Sheet view the existing spreadsheet (FR-014a), and recorded the visual style. US5 depends on a constitution amendment to §II and §V. Every item passes.
+- Iteration 4: the spec now names the pipeline as built (11 stages, from the app) instead of the constitution's outdated nine, and every Board view shows that original process (FR-013a). Status words apply to List, Sheet and Calendar only. Every item passes.

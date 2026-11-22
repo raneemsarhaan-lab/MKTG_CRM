@@ -211,6 +211,12 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 .xl-grid td.rn { background: var(--soft); color: var(--muted); text-align: center; width: 36px; font-variant-numeric: tabular-nums }
 .xl-grid td.sel { box-shadow: inset 0 0 0 2px var(--cyan) }
 .xl-grid td.grp { background: var(--soft); font-weight: 700 }
+.col.orig { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); padding: 12px 8px 10px; gap: 10px }
+.col.orig.simple { border-style: dashed; border-top-style: solid }
+.col .cn { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.col .cc { min-width: 22px; height: 22px; border-radius: 6px; background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted); display: grid; place-items: center; padding: 0 5px }
+.col .ar { font-size: 11px; color: var(--muted); direction: rtl; text-align: right; margin-top: -6px }
+.col .addt { border: 0; background: none; color: #7C3AED; font-weight: 700; font-size: 12.5px; padding: 4px 0 0 }
 .toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
 .toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
 
@@ -320,9 +326,17 @@ td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
 (() => {
 'use strict';
 const STAGES = [
-  { id: 'todo', en: 'To Do', c: '#64748B' }, { id: 'c-prog', en: 'Writing', c: '#3B82F6' }, { id: 'c-final', en: 'Content Review', c: '#2E6FB0' },
-  { id: 'c-check', en: 'Islam Check', c: '#1F5A94' }, { id: 'r-design', en: 'Ready to Design', c: '#8B5CF6' }, { id: 'd-prog', en: 'Designing', c: '#7C3AED' },
-  { id: 'd-check', en: 'Design Review', c: '#5B3FB5' }, { id: 'final-check', en: 'Final Check', c: '#F59E0B' }, { id: 'publish', en: 'Published', c: '#22C55E' },
+  { id: 'todo',          en: 'To Do',            ar: 'افكار للتنفيذ',              owner: 'Assignee',          c: '#8B5CF6' },
+  { id: 'c-prog',        en: 'C-In Progress',    ar: 'كتابة المحتوى',              owner: 'Assignee',          c: '#2563EB' },
+  { id: 'c-final',       en: 'C-Review',         ar: 'مراجعة المحتوى',             owner: 'Marketing Manager', c: '#7C3AED' },
+  { id: 'c-check',       en: 'C-Check',          ar: 'موافقة نهائية على المحتوى',  owner: 'Managing Director', c: '#F97316' },
+  { id: 'r-design',      en: 'Ready For Design', ar: 'جاهز للتصميم',               owner: 'Assignee',          c: '#F59E0B' },
+  { id: 'd-prog',        en: 'D-In Progress',    ar: 'تصميم',                      owner: 'Assignee',          c: '#0EA5A5' },
+  { id: 'd-check',       en: 'D-Check',          ar: 'مراجعة التصميم',             owner: 'Brand Director',    c: '#0891B2' },
+  { id: 'final-check',   en: 'F-Check',          ar: 'المراجعة النهائية',          owner: 'Marketing Manager', c: '#6366F1' },
+  { id: 'ready-publish', en: 'Ready to Publish', ar: 'جاهز للنشر',                 owner: 'Assignee',          c: '#10B981' },
+  { id: 'scheduled',     en: 'Scheduled',        ar: 'مجدول',                      owner: 'Assignee',          c: '#14B8A6' },
+  { id: 'publish',       en: 'Published',        ar: 'تم النشر',                   owner: 'Final',             c: '#16A34A' },
 ];
 const SIMPLE = [{ id: 's-todo', en: 'To Do', c: '#94A3B8', simple: true }, { id: 's-doing', en: 'In progress', c: '#0EA5E9', simple: true }, { id: 's-done', en: 'Done', c: '#3FA34D', simple: true }];
 const ALL = STAGES.concat(SIMPLE); const SI = Object.fromEntries(ALL.map((s, i) => [s.id, i])); const ST = (id) => ALL[SI[id]];
@@ -333,17 +347,17 @@ const AS = [['RS', 'Raneem · admin'], ['OM', 'Omar · designer'], ['KA', 'Karim
 const DESIGN_ST = ['r-design', 'd-prog', 'd-check'];
 const CONTENT_ST = ['todo', 'c-prog', 'c-final', 'c-check'];
 const TEAMS = [
-  { id: 'tm-content', name: 'Content', color: '#3B82F6', members: ['RS', 'NO', 'SA'], ruleText: 'Pipeline tasks at To Do, Writing, Content Review or Islam Check, from every brand',
+  { id: 'tm-content', name: 'Content', color: '#3B82F6', members: ['RS', 'NO', 'SA'], ruleText: 'Pipeline tasks at To Do, C-In Progress, C-Review or C-Check, from every brand',
     rule: (t) => t.kind === 'pipeline' && CONTENT_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
-    words: W(['To write', 'Writing', 'Edit', 'Islam check', 'To design', 'In design', 'Design review', 'Final check', 'Published']) },
-  { id: 'tm-design', name: 'Design', color: '#7C3AED', members: ['RS', 'OM', 'LA'], ruleText: 'Pipeline tasks at Ready to Design, Designing or Design Review, from every brand',
+    words: W(['To write', 'Writing', 'Edit', 'Islam check', 'To design', 'In design', 'Design review', 'Final check', 'Ready', 'Scheduled', 'Published']) },
+  { id: 'tm-design', name: 'Design', color: '#7C3AED', members: ['RS', 'OM', 'LA'], ruleText: 'Pipeline tasks at Ready For Design, D-In Progress or D-Check, from every brand',
     rule: (t) => t.kind === 'pipeline' && DESIGN_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
-    words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready for design', 'Designing', 'Design review', 'Final check', 'Posted']) },
+    words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready for design', 'Designing', 'Design review', 'Final check', 'Ready to post', 'Scheduled', 'Posted']) },
   { id: 'tm-video', name: 'Video', color: '#0E9F9A', members: ['RS', 'KA'], ruleText: 'Video and Reel tasks at any stage, from every brand',
     rule: (t) => ['Video', 'Reel'].includes(t.type),
-    words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Editing', 'Rough cut review', 'Final cut', 'Live']) },
+    words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Editing', 'Rough cut review', 'Final cut', 'Ready to post', 'Scheduled', 'Live']) },
   { id: 'tm-plan', name: 'Planning', color: '#0EA5E9', members: ['RS', 'NO', 'SA'], ruleText: 'Simple tasks (planning, admin, events), from every brand',
-    rule: (t) => t.kind === 'simple', words: W(['', '', '', '', '', '', '', '', '', 'Not started', 'Doing', 'Done']) },
+    rule: (t) => t.kind === 'simple', words: W(['', '', '', '', '', '', '', '', '', '', '', 'Not started', 'Doing', 'Done']) },
 ];
 const BRANDS = [
   { id: 'ff', name: 'Forefront Consulting', color: '#B4322F', cal: ['December 2026', 'Ramadan 2027'] },
@@ -360,12 +374,12 @@ let tasks = [
   ['ff', 0, 'Client win announcement', 'publish', 'NO', '2026-11-20', 'Post', 'LinkedIn', false, true],
   ['ff', 0, 'Why strategy fails in year two', 'd-prog', 'OM', '2026-12-10', 'Article', 'Website', false, true],
   ['ff', 0, 'Podcast ep. 14 with guest CFO', 'd-prog', 'KA', '2026-12-09', 'Video', 'YouTube'],
-  ['ff', 0, 'Ep. 13 cut-downs', 'final-check', 'KA', '2026-12-02', 'Reel', 'Instagram'],
+  ['ff', 0, 'Ep. 13 cut-downs', 'scheduled', 'KA', '2026-12-02', 'Reel', 'Instagram'],
   ['ff', 1, 'Ramadan hero key visual', 'd-prog', 'OM', '2026-12-14', 'Design', 'Instagram', false, true],
   ['ff', 1, 'Iftar invite cards', 'r-design', 'LA', '2026-12-18', 'Design', 'Instagram', false, true],
   ['ff', 1, 'Ramadan launch plan', 's-doing', 'RS', '2026-12-08', null, null, false, false, 'simple'],
   ['ff', 1, 'Ramadan teaser', 'todo', 'KA', '2026-12-23', 'Video', 'YouTube'],
-  ['om', 0, 'Webinar recap post', 'c-prog', 'SA', '2026-12-07', 'Post', 'LinkedIn'],
+  ['om', 0, 'Webinar recap post', 'ready-publish', 'SA', '2026-12-07', 'Post', 'LinkedIn'],
   ['om', 0, 'Case study: retail client', 'publish', 'NO', '2026-11-24', 'Article', 'Website', false, true],
   ['om', 1, 'Launch landing page copy', 'c-final', 'NO', '2026-12-11', 'Other', 'Website', true],
   ['om', 1, 'Launch banner set', 'd-check', 'LA', '2026-12-15', 'Design', 'LinkedIn', false, true],
@@ -481,11 +495,11 @@ function renderMain() {
     sub = `<div class="actions"><span class="mini">${p.folder ? ex[p.folder] : 'Every task for this brand, from its Calendars. Each brand has the same four Folders.'}</span></div>`;
   }
   const vs = viewsFor(p); if (!vs.some(v => v[0] === S.view)) S.view = vs[0][0];
-  const groupable = ['board', 'list'].includes(S.view) && !['assets', 'lib'].includes(p.folder);
+  const groupable = S.view === 'list' && !['assets', 'lib'].includes(p.folder);
   m.innerHTML = `<div class="mhead"><div class="crumbs">${crumbs}</div>
     <div class="titlerow"><h2>${title}</h2><div class="actions"><span class="mini">Viewing as</span><div class="seg" role="group" aria-label="Viewing as">${AS.map(a => `<button type="button" data-as="${a[0]}" class="${S.as === a[0] ? 'on' : ''}">${a[1]}</button>`).join('')}</div></div></div>
     ${sub}
-    ${groupable ? `<div class="actions"><span class="mini">Group by</span><div class="seg" role="group" aria-label="Group by">${[['brand', 'Brand'], ['stage', 'Status']].map(g => `<button type="button" data-g="${g[0]}" class="${S.group === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div>${p.kind === 'team' ? '<span class="mini">Status names are this team\'s words.</span>' : ''}</div>` : ''}
+    ${groupable ? `<div class="actions"><span class="mini">Group by</span><div class="seg" role="group" aria-label="Group by">${[['brand', 'Brand'], ['stage', 'Status']].map(g => `<button type="button" data-g="${g[0]}" class="${S.group === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div>${p.kind === 'team' ? '<span class="mini">Lists and sheets use this team\'s words; Boards keep the original stage names.</span>' : ''}</div>` : ''}
     <div class="tabs" role="tablist">${vs.map(v => `<button type="button" role="tab" data-view="${v[0]}" class="${S.view === v[0] ? 'on' : ''}" aria-selected="${S.view === v[0]}">${v[1]}</button>`).join('')}</div></div>
     <div class="view" id="view"></div>`;
   m.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { S.view = b.dataset.view; renderMain(); });
@@ -507,11 +521,13 @@ function card(t, p) {
 }
 const stagesIn = (ts) => ALL.filter(s => ts.some(t => t.stage === s.id));
 function vBoard(v, ts, p) {
-  if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
   let h = '<div class="board">';
-  if (S.group === 'brand') BRANDS.forEach(b => { const g = ts.filter(t => t.brand === b.id); h += `<div class="col"><div class="col-h"><span style="display:inline-flex;gap:6px;align-items:center;font-weight:700">${brandSq(b, true)}${esc(b.name)}</span><span class="mini">${g.length}</span></div>${g.map(t => card(t, p).replace('<div class="cf">' + av(t.who), `<div class="cf">${pill(t.stage)}</div><div class="cf">` + av(t.who))).join('')}</div>`; });
-  else stagesIn(ts).forEach(s => { const g = ts.filter(t => t.stage === s.id); h += `<div class="col ${s.simple ? 'simple' : ''}"><div class="col-h">${pill(s.id)}<span class="mini">${g.length}</span></div>${g.map(t => card(t, p)).join('')}</div>`; });
-  v.innerHTML = h + '</div>';
+  const cols = STAGES.concat(ts.some(t => t.kind === 'simple') ? SIMPLE : []);
+  cols.forEach(s => { const g = ts.filter(t => t.stage === s.id);
+    h += `<div class="col orig ${s.simple ? 'simple' : ''}" style="--c:${s.c}"><div class="col-h"><span class="cn">${esc(s.en)}</span><span class="cc">${g.length}</span></div><div class="ar">${s.simple ? 'مهمة بسيطة' : s.ar}</div>` + g.map(t => card(t, p)).join('') + '<button type="button" class="addt">+ Add task</button></div>'; });
+  v.innerHTML = h + '</div><p class="mini" style="margin-top:10px">Every Board shows the process as built: the same columns, names and order as today\'s Board, in every team Space and brand.</p>';
+  { const first = [...v.querySelectorAll('.col')].find(c => c.querySelector('.cc') && c.querySelector('.cc').textContent !== '0'); if (first) v.scrollLeft += first.getBoundingClientRect().left - v.getBoundingClientRect().left - 16; }
+
 }
 function vList(v, ts, p) {
   if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }

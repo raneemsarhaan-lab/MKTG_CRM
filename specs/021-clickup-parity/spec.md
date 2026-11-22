@@ -28,6 +28,26 @@ This spec brings that model to Momentum. It adds a hierarchy and views that can 
 - **Later**: its own spec, after this one;
 - **Not planned**.
 
+### The pipeline as built
+
+Every pipeline task moves through the process the team built, as today's Board shows it. There are 11 stages, in this order:
+
+| # | Stage | Arabic | Owner |
+|---|---|---|---|
+| 1 | To Do | افكار للتنفيذ | Assignee |
+| 2 | C-In Progress | كتابة المحتوى | Assignee |
+| 3 | C-Review | مراجعة المحتوى | Marketing Manager |
+| 4 | C-Check | موافقة نهائية على المحتوى | Managing Director |
+| 5 | Ready For Design | جاهز للتصميم | Assignee |
+| 6 | D-In Progress | تصميم | Assignee |
+| 7 | D-Check | مراجعة التصميم | Brand Director |
+| 8 | F-Check | المراجعة النهائية | Marketing Manager |
+| 9 | Ready to Publish | جاهز للنشر | Assignee |
+| 10 | Scheduled | مجدول | Assignee |
+| 11 | Published | تم النشر | Final |
+
+C-Check is the Islam Check stage. Tasks created without it have 10 stages. The constitution's §II table still lists nine stages under older names; it is out of date and is corrected in the same amendment US5 needs.
+
 ### Parity map
 
 | ClickUp feature | Momentum today | Decision |
@@ -37,7 +57,7 @@ This spec brings that model to Momentum. It adds a hierarchy and views that can 
 | Private Spaces, Folders, Lists | No | **This spec** (US1) |
 | Custom statuses, inherited from Folder | Fixed 9-stage pipeline; sheets map their own words to it (spec 019) | **This spec** (US3), as status words mapped to the pipeline |
 | ClickApps (per-Space feature switches) | No | **This spec** (US4) |
-| Simple tasks with their own short workflow | No: every task goes through the nine stages | **This spec** (US5): pipeline tasks and simple tasks |
+| Simple tasks with their own short workflow | No: every task goes through the pipeline stages | **This spec** (US5): pipeline tasks and simple tasks |
 | List view | Sheets (Content, Video, team sheets) | **This spec**: as a view at any level (US2) |
 | Board (Kanban) | Board | Have; becomes a view at any level (US2) |
 | Table view | Sheets, with task fields (spec 019) | Have; becomes the Sheet view at any level, unchanged (US2) |
@@ -61,7 +81,7 @@ This spec brings that model to Momentum. It adds a hierarchy and views that can 
 | Assigned comments | No | Later |
 | Docs (wikis, nested pages, Doc as a view) | Task briefs only | Later (US9) |
 | Forms, Automations | Paste plan only | Later (US10) |
-| Proofing (annotate images, PDFs, video) | Attachments with preview | Later (strong fit for Design Review) |
+| Proofing (annotate images, PDFs, video) | Attachments with preview | Later (strong fit for D-Check) |
 | Chat, Whiteboards, Clips, Meetings Hub | No | Not planned |
 | Goals, Dashboards, Sprints | Aspiring / Focus plan; Overview, Capacity | Later (US8) |
 | Time tracking, timesheets, estimates | Daily hours (spec 014), hour estimates | Have; per-task tracking Later |
@@ -76,12 +96,12 @@ This spec brings that model to Momentum. It adds a hierarchy and views that can 
 
 - **Q: What is a Space?**
   A: **One Space per brand.** Inside each brand's Space, **Folders are per team**. Lists sit inside the team Folders.
-- **Q: How do custom statuses relate to the locked nine-stage pipeline?**
-  A: **As in the sheets (spec 019 US7).** A Folder or List writes its own words for the pipeline stages, and each word maps to one canonical stage. The nine stages, their owners, SLA and celebrations stay underneath, unchanged.
+- **Q: How do custom statuses relate to the locked pipeline?**
+  A: **As in the sheets (spec 019 US7).** A Folder or List writes its own words for the pipeline stages, and each word maps to one canonical stage. The pipeline stages, their owners, SLA and celebrations stay underneath, unchanged.
 - **Q: How much does this spec deliver?**
   A: **The foundation only: US1–US4.** Richer tasks (US6), Gantt (US7), and Sprints, Goals, Dashboards, Docs, Forms and Automations (US8–US10) each get their own spec later. (US5 was added in a later question, below.)
-- **Q: Planning tasks don't fit the nine stages. What then?**
-  A: **Two kinds of tasks.** **Pipeline tasks** are linked to the pipeline: nine stages, stage owners, SLA and celebrations, as today. **Simple tasks** are not linked to it: To Do › In progress › Done, for planning, admin and event work. This needs a constitution amendment to §II before it is built.
+- **Q: Planning tasks don't fit the pipeline stages. What then?**
+  A: **Two kinds of tasks.** **Pipeline tasks** are linked to the pipeline: pipeline stages, stage owners, SLA and celebrations, as today. **Simple tasks** are not linked to it: To Do › In progress › Done, for planning, admin and event work. This needs a constitution amendment to §II before it is built.
 - **Q: What happens to subtasks?**
   A: **They stay part of the model** (Task › Subtask), as today: the task panel's "New subtask" creates a real task under its parent, and video clips sit under their video.
 
@@ -143,7 +163,7 @@ View types in this spec:
 1. **Given** any node in the tree, **When** a member adds a view, **Then** they choose its type and name, and it shows only tasks at or below that node.
 2. **Given** a view, **When** filters, grouping, sorting or visible fields change, **Then** the view keeps them for everyone who opens it (shared view). A member can also save a **personal** view that only they see.
 3. **Given** a Calendar view, **When** a task is dragged to another day, **Then** its due date changes under the usual edit rules, and undo reverts it.
-4. **Given** a Board view grouped by stage, **When** a task is moved to another stage, **Then** the move follows the board's existing move rules: ownership, Published is terminal, and the celebration. No view creates a second path around them.
+4. **Given** a Board view, **Then** its columns are the pipeline as built, in order, with their original names, as on today's Board. **When** a task is moved to another stage, **Then** the move follows the board's existing move rules: ownership, Published is terminal, and the celebration. No view creates a second path around them.
 5. **Given** the Everything view, **When** a private List exists that the member is not in, **Then** none of its tasks appear.
 6. **Given** a member opens a node with no views yet, **Then** a default List view is shown.
 7. **Given** today's screens (Board, Content sheet, Video sheet), **Then** they stay reachable at the same addresses. They are presented as saved views on Everything, and they keep their row source and grouping.
@@ -152,7 +172,7 @@ View types in this spec:
 
 ### User Story 3 - Each team's own status words, mapped to the pipeline (Priority: P1)
 
-Each team describes progress in its own words. The Video team says "Scripting › Shooting › Editing › Final cut › Live". The Design team says "Brief in › Designing › Client review › Approved › Posted". Underneath, every task still moves through the same nine stages, with the same owners, SLA and celebrations.
+Each team describes progress in its own words. The Video team says "Scripting › Shooting › Editing › Final cut › Live". The Design team says "Brief in › Designing › Client review › Approved › Posted". Underneath, every task still moves through the same pipeline stages, with the same owners, SLA and celebrations.
 
 This works as in the sheets (spec 019 US7). On a Space, a Folder or a List, a member with edit rights opens **Status words**. There, they write their words next to each pipeline stage, separated by commas. The first word is the one shown.
 
@@ -163,7 +183,7 @@ This works as in the sheets (spec 019 US7). On a Space, a Folder or a List, a me
 
 **Why this priority**: This is ClickUp's inherited statuses, made to fit Momentum's fixed approval chain (constitution §II).
 
-**Independent Test**: On the Video Folder, write "Scripting" for Writing, "Editing" for Designing and "Live" for Published. Create two Lists in it: both show those words. Change "Editing" to "Edit bay" on the Folder: both Lists show "Edit bay". Move a task to "Live" from a Video List: on the Board it is Published, and it got the same celebration and SLA reset as a move on the Board.
+**Independent Test**: On the Video Folder, write "Scripting" for C-In Progress, "Editing" for D-In Progress and "Live" for Published. Create two Lists in it: both show those words. Change "Editing" to "Edit bay" on the Folder: both Lists show "Edit bay". Move a task to "Live" from a Video List: on the Board it is Published, and it got the same celebration and SLA reset as a move on the Board.
 
 **Acceptance Scenarios**:
 
@@ -174,7 +194,7 @@ This works as in the sheets (spec 019 US7). On a Space, a Folder or a List, a me
 5. **Given** two words for the same stage ("Live, Posted"), **Then** both set that stage, and the first is shown.
 6. **Given** any List, **Then** its stage owners, SLA thresholds, Published-is-terminal and celebrations are those of the mapped stage, exactly as on today's Board.
 7. **Given** a task moved between Lists with different words, **Then** its stage is unchanged, and it shows the new List's word for that stage.
-8. **Given** the Content and Video sheets' built-in words (Writing, Content Review, Editing, Final Cut…), **Then** they appear as prefilled words on the matching Lists and can be edited.
+8. **Given** the Content and Video sheets' built-in words (C-In Progress, C-Review, Editing, Final Cut…), **Then** they appear as prefilled words on the matching Lists and can be edited.
 
 ---
 
@@ -190,7 +210,7 @@ An admin opens a brand Space's settings and sees a list of **features** with on/
 - Cover images
 - Video clips
 - SLA tracking
-- Islam Check stage (today's nine-stage choice, per Space)
+- Islam Check stage, C-Check (today's C-Check choice, per Space)
 
 Switching a feature off hides its controls, columns and filters in that Space. Its data is kept, and switching it back on restores it. Later specs (US6) add their features to this list.
 
@@ -215,16 +235,16 @@ A content creator has two kinds of work. "Q1 outlook carousel" is a deliverable:
 
 When creating a task, the member picks its kind:
 
-- **Pipeline task** (linked to the pipeline): the nine stages, stage owners, SLA, Published is final, and celebrations, exactly as today.
+- **Pipeline task** (linked to the pipeline): the pipeline stages, stage owners, SLA, Published is final, and celebrations, exactly as today.
 - **Simple task** (not linked): three statuses, **To Do › In progress › Done**. It has no stage owners, no SLA and no approval chain. Whoever may edit the task may move it.
 
-Each List has a **default kind** for new tasks, such as "Simple" on a "Planning" List. The member can change the kind while creating the task. After that the kind is fixed, as the nine-stage choice is today.
+Each List has a **default kind** for new tasks, such as "Simple" on a "Planning" List. The member can change the kind while creating the task. After that the kind is fixed, as the C-Check choice is today.
 
 A parent and its subtasks can be different kinds. A simple task "Ramadan launch plan" can have pipeline subtasks "Launch copy", "Launch key visual" and "Launch teaser". Each subtask moves through the pipeline with its own assignee. The plan itself is just ticked through To Do › In progress › Done.
 
 **Why this priority**: Without it, planning and admin work either stays outside Momentum or clutters the board and SLA figures with tasks that never pass through design or review.
 
-**Independent Test**: In a "Planning" List with default kind Simple, create "Plan Q1 calendar". It shows To Do › In progress › Done, with no SLA badge. Add a pipeline subtask "Launch copy": it shows Writing, Content Review and the rest, with its SLA badge. Move the plan to Done: the subtask's stage doesn't change. Open the Board: the plan is not counted in any stage column or SLA figure.
+**Independent Test**: In a "Planning" List with default kind Simple, create "Plan Q1 calendar". It shows To Do › In progress › Done, with no SLA badge. Add a pipeline subtask "Launch copy": it shows C-In Progress, C-Review and the rest, with its SLA badge. Move the plan to Done: the subtask's stage doesn't change. Open the Board: the plan is not counted in any stage column or SLA figure.
 
 **Acceptance Scenarios**:
 
@@ -233,7 +253,7 @@ A parent and its subtasks can be different kinds. A simple task "Ramadan launch 
 3. **Given** a simple task, **When** its assignee moves it to Done, **Then** they get a celebration, as for advancing a stage they own.
 4. **Given** a saved task, **Then** its kind can't be changed. A member who needs the other kind creates a new task.
 5. **Given** a view holding both kinds, **Then** pipeline stages and simple statuses show as separate groups (Board columns, List groups), pipeline first, and a **Kind** filter offers All, Pipeline or Simple.
-6. **Given** status words on a Folder or List, **Then** they can rename the three simple statuses as well as the nine stages, under the same rules.
+6. **Given** status words on a Folder or List, **Then** they can rename the three simple statuses as well as the pipeline stages, under the same rules.
 7. **Given** Workload and Capacity, **Then** open simple tasks count their hour estimates like pipeline tasks. Done simple tasks don't count, as Published ones don't.
 8. **Given** a parent and its subtasks, **Then** each keeps its own kind, and moving one never moves another.
 
@@ -286,6 +306,7 @@ The hierarchy and views in this spec must leave room for each: a view type can b
 - **FR-011**: Every view MUST change tasks only through the same rules as the board: stage ownership, Published is terminal, celebrations and SLA reset. No view type MAY add a way around them.
 - **FR-012**: Today's Board, Content sheet and Video sheet MUST stay reachable at their current addresses and behave as they do now.
 - **FR-013**: The Everything view MUST list every task the member may see across all Spaces, and only those.
+- **FR-013a**: Every Board view, at every level (Space, Folder, Subfolder, List, team view, Everything), MUST show the pipeline as built: its stages as columns in their original order, with their original English and Arabic names, owners and look, exactly as today's Board. Status words MUST NOT rename Board columns; they apply in the List, Sheet and Calendar views. Simple tasks, when shown, sit in their own three columns after the pipeline.
 - **FR-014a**: The Sheet view MUST be the existing spreadsheet, not a new or simpler table. It keeps its menu bar and toolbar, name box, cell editing, keyboard navigation, copy and paste (including from Excel and Google Sheets), formatting, merges, frozen panes, sort and filter, comments, multi-area selection, the power tips, and the Fields drawer with task field and regular columns. Opened on a Space, Folder or List, it shows that node's tasks as linked rows.
 - **FR-014**: Calendar MUST offer month and week layouts. Dragging a task to a day sets its due date, and tasks without a date are listed apart.
 
@@ -294,8 +315,8 @@ The hierarchy and views in this spec must leave room for each: a view type can b
 - **FR-015**: A Space, Folder or List MUST be able to hold status words: for each pipeline stage, zero or more words, with the first one shown. Admins and superusers MAY edit them; users MAY NOT.
 - **FR-016**: A new List MUST inherit the words of its nearest parent. A List MAY follow its parent, receiving later changes, or keep its own copy.
 - **FR-017**: Typing, pasting or filling a word into a status cell MUST set the mapped stage, ignoring case and spacing, under the usual move rules. Unknown words MUST be refused.
-- **FR-018**: The nine canonical stages, their owners, SLA thresholds, Published-is-terminal and celebrations MUST stay unchanged and apply through the mapping (constitution §II, §V). Words change only what is shown and typed.
-- **FR-019**: Views of one List or Folder MUST show its words. Views mixing Lists with different words MUST show the board's names, with an option to show each List's words.
+- **FR-018**: The pipeline stages, their owners, SLA thresholds, Published-is-terminal and celebrations MUST stay unchanged and apply through the mapping (constitution §II, §V). Words change only what is shown and typed.
+- **FR-019**: List, Sheet and Calendar views of one List or Folder MUST show its words. Board views always show the pipeline's own names (FR-013a). Views mixing Lists with different words MUST show the board's names, with an option to show each List's words.
 
 **Per-Space features (US4)**
 
@@ -312,7 +333,7 @@ The hierarchy and views in this spec must leave room for each: a view type can b
 
 **Task kinds (US5)**
 
-- **FR-027**: Every task MUST be either a pipeline task (nine stages, owners, SLA, celebrations, Published is final) or a simple task (To Do › In progress › Done). The kind MUST be chosen at creation and MUST NOT change afterwards.
+- **FR-027**: Every task MUST be either a pipeline task (pipeline stages, owners, SLA, celebrations, Published is final) or a simple task (To Do › In progress › Done). The kind MUST be chosen at creation and MUST NOT change afterwards.
 - **FR-028**: Each List MUST have a default kind for new tasks, which admins and superusers set. New Lists default to Pipeline.
 - **FR-029**: Simple tasks MUST have no SLA, no stage owners and no approval steps. Any member who may edit the task MAY change its status.
 - **FR-030**: Moving a simple task to Done MUST celebrate for its assignee.
@@ -351,8 +372,8 @@ The hierarchy and views in this spec must leave room for each: a view type can b
 - **Teams are Folders, not a member attribute.** Members are not assigned to teams. A team Folder is where that team's Lists live; anyone with access to the Space can see it unless it is private.
 - **Starting layout.** Each Space starts with a single "Marketing" Folder, because today's data has no team grouping. Admins split it into team Folders and move Lists after release.
 - **Roles.** The three tiers (admin, superuser, user) stay. A **Guest** role for outside clients is out of scope; it needs its own security review.
-- **The content pipeline stays intact.** Every pipeline task runs on the nine stages under its List's words. Stages can't be skipped or reordered by words; only the per-Space Islam Check switch removes a stage, as today's nine-stage choice does.
-- **Constitution amendment first.** Simple tasks are a second workflow beside the nine stages. Constitution §II (and §V, for the Done celebration) must be amended before US5 is built. The pipeline itself doesn't change.
+- **The content pipeline stays intact.** Every pipeline task runs on the pipeline stages under its List's words. Stages can't be skipped or reordered by words; only the per-Space Islam Check switch removes a stage, as today's C-Check choice does.
+- **Constitution amendment first.** Simple tasks are a second workflow beside the pipeline stages. Constitution §II (and §V, for the Done celebration) must be amended before US5 is built. The pipeline itself doesn't change.
 - **Subtasks.** They stay as today: a subtask is a real task under a parent, living in its parent's List and following that List's privacy.
 - **Nine-stage choice.** It moves from a single workspace setting to a per-Space switch. The workspace value becomes the default, and each task's choice stays fixed at creation.
 - **Today's screens stay.** Overview, Board, Projects, Team, Capacity, Hours, Settings and Sheets keep working. Nothing is removed in this spec.
