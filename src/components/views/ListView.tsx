@@ -13,6 +13,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor } from '@/lib/utils'
 import { featureOn } from '@/lib/brand-features'
+import { SIMPLE_STATUSES } from '@/lib/simple-status'
 import type { ViewTask } from './types'
 
 type Group = 'brand' | 'stage'
@@ -34,6 +35,7 @@ interface ListViewProps {
 
 export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, initialGroup, onOpen }: ListViewProps) {
   const t = useTranslations('spaces')
+  const tSheet = useTranslations('taskSheet')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members])
   const live = tasks.filter(x => !x.dropped_at)
@@ -42,7 +44,15 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
   const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'brand'
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),
        { key: 'none', head: <span>{t('noBrand')}</span>, rows: live.filter(x => !x.brand_id) }]
-    : NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} />, rows: live.filter(x => x.status === s && x.kind !== 'simple') }))
+    : [
+        ...NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} />, rows: live.filter(x => x.status === s && x.kind !== 'simple') })),
+        // Spec 021 (US5): simple tasks group by their own three statuses, after the pipeline.
+        ...SIMPLE_STATUSES.map(st => ({
+          key: st,
+          head: <span data-simple-group={st} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 9px', borderRadius: 999, border: `1.5px dashed ${PIPE.border}`, fontSize: 12.5, fontWeight: 700 }}>{tSheet(`simple.${st}`)}</span>,
+          rows: live.filter(x => x.kind === 'simple' && (x.simple_status ?? 's-todo') === st),
+        })),
+      ]
 
   return (
     <div data-list-view style={{ padding: '14px 26px 30px 38px', display: 'flex', flexDirection: 'column', gap: 14 }}>

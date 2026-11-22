@@ -11,9 +11,12 @@ import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAtta
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
-  setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo, removeAttachment,
+  setTaskStage, setSimpleStatus, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo, removeAttachment,
 } from '@/actions/tasks'
 import { writeClipField } from '@/actions/sheet-links'
+import { SIMPLE_STATUSES, isSimpleStatus } from '@/lib/simple-status'
+import { PIPE } from '@/lib/pipeline-tokens'
+import type { SimpleStatus } from '@/types/index'
 import { useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
@@ -158,6 +161,8 @@ export function KanbanBoard({
   const setCelebration = useUIStore(s => s.setCelebration)
   const openHandoff    = useUIStore(s => s.openHandoff)
   const tSpaces        = useTranslations('spaces')
+  const tSheet         = useTranslations('taskSheet')
+  const tViews         = useTranslations('views')
   const tHandoff       = useTranslations('handoff')
   const searchParams   = useSearchParams()
 
@@ -322,6 +327,8 @@ export function KanbanBoard({
     [scopedTasks, filters, currentUser.id, slaConfig, today],
   )
 
+  const simpleTasks = useMemo(() => sortTasks(filteredTasks, sortBy).filter(t => t.kind === 'simple'), [filteredTasks, sortBy])
+  const [kindShow, setKindShow] = useState<'all' | 'pipeline' | 'simple'>('all')
   const tasksByStage = useMemo(() => {
     const map: Record<string, FullTask[]> = {}
     ALL_STAGES.forEach(s => { map[s] = [] })
@@ -337,6 +344,10 @@ export function KanbanBoard({
   /** A drop lands either on a column (its stage id) or on a card in one. */
   function stageOfDropTarget(overId: string): StageId | null {
     if ((ALL_STAGES as string[]).includes(overId)) return overId as StageId
+    // Spec 021 (US5): a simple column, or a simple card in one, is its simple status.
+    if (isSimpleStatus(overId)) return overId as unknown as StageId
+    const card = tasks.find(t => t.id === overId)
+    if (card?.kind === 'simple') return (card.simple_status ?? 's-todo') as unknown as StageId
     return (tasks.find(t => t.id === overId)?.status as StageId) ?? null
   }
 
@@ -354,6 +365,28 @@ export function KanbanBoard({
 
     const dragged = tasks.find(t => t.id === active.id)
     if (!dragged) return
+
+    // Spec 021 (US5): simple tasks move only between their three columns, pipeline tasks never into them.
+    const target = stageOfDropTarget(over.id as string) as string | null
+    if (dragged.kind === 'simple' || isSimpleStatus(target)) {
+      if (dragged.kind !== 'simple') { setDragError(tViews('pipelineOnly')); return }
+      if (!isSimpleStatus(target)) { setDragError(tViews('simpleOnly')); return }
+      const from = (dragged.simple_status ?? 's-todo') as SimpleStatus
+      if (target === from) return
+      setDragError('')
+      setTasks(prev => prev.map(t => (t.id === dragged.id ? { ...t, simple_status: target } : t)))
+      startTransition(async () => {
+        const res = await setSimpleStatus(dragged.id, target).catch(() => ({ success: false, shouldCelebrate: false, error: 'generic' }))
+        if (!res.success) {
+          setTasks(prev => prev.map(t => (t.id === dragged.id ? { ...t, simple_status: from } : t)))
+          setDragError('Could not move that task')
+          return
+        }
+        router.refresh()
+        if (res.shouldCelebrate) setCelebration({ taskName: dragged.name, stageLabel: tSheet('simple.s-done') })
+      })
+      return
+    }
 
     const fromStage = dragged.status as StageId
     const toStage   = stageOfDropTarget(over.id as string)
@@ -1079,6 +1112,7 @@ export function KanbanBoard({
       members={members}
       spaceId={spaceId ?? null}
       spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
+      spaceKinds={Object.fromEntries(spaces.map(x => [x.id, x.default_kind]))}
     />
   )
 
@@ -1217,12 +1251,22 @@ export function KanbanBoard({
             columns at 244px is about seven screens wide, and shrinking them
             makes a worse tool rather than a smaller one; stacked, each stage
             is a heading with its cards at full width under it. */}
+        {simpleTasks.length > 0 && (
+          <div role="group" aria-label={tViews('kind')} data-kind-filter style={{ display: 'inline-flex', margin: '12px 0 0 38px', border: `1px solid ${PIPE.border}`, borderRadius: 10, overflow: 'hidden' }}>
+            {(['all', 'pipeline', 'simple'] as const).map(k => (
+              <button key={k} type="button" data-kind-show={k} aria-pressed={kindShow === k} onClick={() => setKindShow(k)}
+                style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, padding: '5px 11px', background: kindShow === k ? PIPE.ink : '#FFFFFF', color: kindShow === k ? '#FFFFFF' : PIPE.ink }}>
+                {tViews(k === 'all' ? 'kindAll' : k === 'pipeline' ? 'kindPipeline' : 'kindSimple')}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="fx-board-cols" style={{
           display: 'grid', gridAutoFlow: 'column', gridAutoColumns: '244px',
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
         }}>
-          {shownStages.map(stageId => {
+          {kindShow !== 'simple' && shownStages.map(stageId => {
             const stage      = STAGE_META[stageId]
             const stageTasks = tasksByStage[stageId] ?? []
 
@@ -1246,6 +1290,22 @@ export function KanbanBoard({
               />
             )
           })}
+          {/* Spec 021 (US5): simple tasks' three dashed columns, after the pipeline, when any are in view. */}
+          {kindShow !== 'pipeline' && simpleTasks.length > 0 && SIMPLE_STATUSES.map(st => (
+            <KanbanColumn
+              key={st}
+              dashed
+              stage={{ id: st as unknown as StageId, label_en: tSheet(`simple.${st}`), label_ar: '', phase: 'simple', color: PIPE.border, owner_role: null, terminal_flag: false }}
+              tasks={simpleTasks.filter(t => (t.simple_status ?? 's-todo') === st)}
+              currentUser={currentUser}
+              members={members}
+              slaConfig={slaConfig}
+              today={today}
+              highlight={(overStage as string | null) === st && activeDragId !== null}
+              onSelectTask={id => selectTask(id)}
+              onAddTask={() => setShowTaskForm(true)}
+            />
+          ))}
         </div>
 
         {/* The dragged card itself — a sortable item does not follow the

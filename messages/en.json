@@ -2922,7 +2922,15 @@
     "onlyMeMark": "only me",
     "notSaved": "Not saved ({reason}).",
     "nameHelp": "Up to 40 characters.",
-    "shown": "{n} of {total} tasks"
+    "shown": "{n} of {total} tasks",
+    "kind": "Kind",
+    "kindAll": "All",
+    "kindPipeline": "Pipeline",
+    "kindSimple": "Simple",
+    "simpleOnly": "A simple task moves between To Do, In progress and Done only.",
+    "pipelineOnly": "Only simple tasks go in these columns.",
+    "getsSimple": "A simple task: To Do › In progress › Done. No SLA, no approvals.",
+    "getsPipeline": "A pipeline task: the stages with their owners, SLA and approvals."
   },
   "calendar": {
     "today": "Today",

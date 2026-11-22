@@ -290,12 +290,12 @@
 
 **Independent Test**: "+ Task" in the Planning Space creates a simple task with no SLA badge. It isn't in the Inbox, review queues, the Content or Video sheets, or the Library. Done celebrates for the assignee. A simple parent's Done doesn't move its pipeline subtasks (spec US5; quickstart Stage C steps 5–6).
 
-- [ ] T060 [US5] In `src/actions/tasks.ts`:
+- [X] T060 *(Done: kind comes from the Space it is created in (`kindForSpace`); `setSimpleStatus`; moves refuse simple tasks, bulk stage changes skip them.)* [US5] In `src/actions/tasks.ts`:
   - `createTask` / `createTasks` take the kind from the Space the task is created in (`default_kind`), else 'pipeline' (design decision: no separate kind switch). A simple task gets `simple_status='s-todo'` and `status='todo'`.
   - `updateTask` refuses `kind` changes.
   - `moveTask`, `setTaskStage` and bulk status patches refuse or skip simple tasks.
   - Add `setSimpleStatus(taskId, status)`, guarded by `canAct`, which returns `shouldCelebrate` for the assignee on 's-done'.
-- [ ] T061 [US5] Make pipeline readers skip `kind='simple'`:
+- [X] T061 *(Done: Board stage columns, `getAlertStatus` (simple → On Track, no badge), Inbox queues, stage-holder notifications, Content and Video sheet rows, home pipeline figures. The Library already filtered them. The List groups simple tasks by their three statuses after the pipeline.)* [US5] Make pipeline readers skip `kind='simple'`:
   - `tasksByStage` in `src/components/kanban/KanbanBoard.tsx`;
   - `getAlertStatus` callers in `src/lib/alert-status.ts`;
   - the Inbox sections in `src/components/inbox/`;
@@ -305,9 +305,9 @@
   - the Library query.
 
   Guard the unguarded `STAGE_META[status]` lookups in `TaskModal.tsx:629,1957` for simple tasks.
-- [ ] T062 [US5] In `BoardView` (`src/components/views/BoardView.tsx` / `KanbanBoard.tsx`), render three dashed columns (To Do, In progress, Done) after the pipeline when simple tasks are in view. Moving between them calls `setSimpleStatus`. Add the Kind filter (All, Pipeline, Simple) to the `ViewHost` config bar.
-- [ ] T063 [US5] In `src/components/kanban/TaskModal.tsx`, simple tasks show a three-step status control instead of the stage pill and Advance, and no SLA badge. In `src/components/shared/TaskForm.tsx`, the "Show in" Space picker decides the kind, with a line naming the stages the task will get. Play the celebration on `shouldCelebrate` from `setSimpleStatus`.
-- [ ] T064 [US5] Add UI scenarios in `scripts/spaces-lab/scenarios/us5.mjs`:
+- [X] T062 *(Done: three dashed columns after the pipeline when simple tasks are in view; drag between them calls `setSimpleStatus`; a Kind filter (All, Pipeline, Simple) above the columns. Not yet in the saved-view config bar.)* [US5] In `BoardView` (`src/components/views/BoardView.tsx` / `KanbanBoard.tsx`), render three dashed columns (To Do, In progress, Done) after the pipeline when simple tasks are in view. Moving between them calls `setSimpleStatus`. Add the Kind filter (All, Pipeline, Simple) to the `ViewHost` config bar.
+- [X] T063 *(Done: the three-step control in TaskModal with the celebration on Done; cards show "Simple" instead of an SLA chip; TaskForm says which stages the task will get from its Space.)* [US5] In `src/components/kanban/TaskModal.tsx`, simple tasks show a three-step status control instead of the stage pill and Advance, and no SLA badge. In `src/components/shared/TaskForm.tsx`, the "Show in" Space picker decides the kind, with a line naming the stages the task will get. Play the celebration on `shouldCelebrate` from `setSimpleStatus`.
+- [X] T064 *(Done in `scripts/spaces-lab/realapp/scenarios-us5.cjs`: create in Planning → simple; dashed columns, no SLA badge, not on the Content sheet; Done saves and leaves a pipeline subtask where it was. Not yet: an Inbox check and a bulk-skip check.)* [US5] Add UI scenarios in `scripts/spaces-lab/scenarios/us5.mjs`:
   - create from Planning → simple;
   - no SLA badge;
   - absent from the Inbox and the Content sheet;

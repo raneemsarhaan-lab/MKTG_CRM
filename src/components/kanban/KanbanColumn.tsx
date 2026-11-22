@@ -29,11 +29,13 @@ interface KanbanColumnProps {
   selecting?: boolean
   onToggleSelect?: (id: string, shiftKey: boolean) => void
   onSelectAll?: (stageId: StageId, on: boolean) => void
+  /** Spec 021 (US5): a simple-status column, drawn dashed after the pipeline. */
+  dashed?: boolean
 }
 
 export function KanbanColumn({
   stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask,
-  selectedIds, selecting, onToggleSelect, onSelectAll,
+  selectedIds, selecting, onToggleSelect, onSelectAll, dashed = false,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const active = isOver || Boolean(highlight)
@@ -52,10 +54,11 @@ export function KanbanColumn({
       role="region"
       aria-label={`${stage.label_en} column`}
       ref={setNodeRef}
+      data-simple-column={dashed ? stage.id : undefined}
       style={{
-        background: '#FFFFFF',
-        border: `1px solid ${active ? accent : PIPE.border}`,
-        borderTop: `3px solid ${accent}`,
+        background: dashed ? 'transparent' : '#FFFFFF',
+        border: `${dashed ? '1.5px dashed' : '1px solid'} ${active ? accent : PIPE.border}`,
+        borderTop: dashed ? `1.5px dashed ${active ? accent : PIPE.border}` : `3px solid ${accent}`,
         borderRadius: 14,
         overflow: 'hidden',
         boxShadow: active ? `0 0 0 3px ${accent}22` : 'none',

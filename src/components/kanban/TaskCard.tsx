@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
+import { useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
@@ -87,6 +88,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   slaConfig: SLAConfig
   today: Date
 }) {
+  const tViews   = useTranslations('views')
   const alert    = getAlertStatus(task, slaConfig, today)
   const chip     = CHIP[alert]
   const daysLeft = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
@@ -192,7 +194,10 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
 
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
-        <Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip>
+        {/* Spec 021 (US5): a simple task has no SLA, so its card says what it is instead. */}
+        {task.kind === 'simple'
+          ? <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={700}>{tViews('kindSimple')}</Chip>
+          : <Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip>}
         {task.content_type_label && (
           <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
             {task.content_type_label}

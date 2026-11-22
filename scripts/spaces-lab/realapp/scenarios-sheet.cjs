@@ -66,7 +66,7 @@ module.exports = (EMAIL, psql, ok) => {
         const me = psql(`select id from members where role='Content Creator' limit 1`)
         ok(psql(`select v.value from sheet_values v join sheet_columns c on c.id=v.column_id where c.sheet='me:${me}' and v.task_id='${t}'`) === 'call the client first', 'the note is saved to my own column')
         await go('/board?view=sheet')
-        ok(!(await page.content()).includes('call the client first'), "the note never shows on the team's sheets")
+        ok(!(await page.content()).includes('call the client first'), "the note never shows on the team's sheets (nor in the page's data)")
       },
     },
   ]

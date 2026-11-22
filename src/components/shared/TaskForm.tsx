@@ -1,4 +1,5 @@
 'use client'
+import { useTranslations } from 'next-intl'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -52,6 +53,8 @@ interface TaskFormProps {
   spaceId?:     string | null
   /** Spec 021: the Spaces the creator could choose from when not created from one. */
   spaceChoices?: { id: string; name: string }[]
+  /** Spec 021: each Space's default kind — a new task takes the stages of the Space it's created in. */
+  spaceKinds?: Record<string, string>
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email'] as const
@@ -96,7 +99,8 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [] }: TaskFormProps) {
+export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceKinds = {} }: TaskFormProps) {
+  const tViews = useTranslations('views')
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -395,6 +399,12 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                   <PillOption key={x.id} selected={x.id === showIn} onClick={() => { setShowIn(x.id); closePill() }}>{x.name}</PillOption>
                 ))}
               </FieldPill>
+            )}
+
+            {showIn && (
+              <span data-gets-stages style={{ flexBasis: '100%', fontSize: 12, color: CU.muted }}>
+                {spaceKinds[showIn] === 'simple' ? tViews('getsSimple') : tViews('getsPipeline')}
+              </span>
             )}
 
             <FieldPill label="Due date" value={shortDate(form.due_date)} active width={220}
