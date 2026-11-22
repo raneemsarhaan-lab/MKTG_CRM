@@ -80,5 +80,24 @@ module.exports = (EMAIL, psql, ok) => {
         ok(String(await page.$$eval('[data-my-tasks] [data-row]', els => els.length)) === handed, 'Handed off filter')
       },
     },
+    {
+      id: 'us2-calendar-no-date-panel', as: 'admin',
+      async run({ page, go }) {
+        const t = seedTask('Undated lab', 'Post', 'c-prog', false, 'Content Creator')
+        const d = seedTask('Undated done lab', 'Post', 'publish', false, 'Content Creator')
+        psql(`update tasks set due_date=null where id in ('${t}','${d}')`)
+        await go('/spaces/content?view=calendar')
+        ok(await page.$(`[data-cal-undated] [data-undated-task="${t}"]`), 'an undated task is in the No date panel')
+        ok(!(await page.$(`[data-cal-undated] [data-undated-task="${d}"]`)), 'finished undated tasks are hidden by default')
+        const today = new Date()
+        await page.dragAndDrop(`[data-undated-task="${t}"] [data-cal-task]`, `[data-day="${iso(today)}"]`)
+        await page.waitForTimeout(1500)
+        ok(psql(`select due_date::text from tasks where id='${t}'`) === iso(today), 'dragging from the panel onto a day sets the date')
+        await go('/spaces/content?view=calendar')
+        await page.dragAndDrop(`[data-day="${iso(today)}"] [data-cal-task="${t}"]`, '[data-cal-undated] h3')
+        await page.waitForTimeout(1500)
+        ok(psql(`select coalesce(due_date::text,'none') from tasks where id='${t}'`) === 'none', 'dropping on the panel clears the date')
+      },
+    },
   ]
 }

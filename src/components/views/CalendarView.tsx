@@ -41,6 +41,9 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   const [moved, setMoved] = useState<Record<string, string | null>>({})
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  // The No date panel (user, 2026-11-22): undated tasks beside the calendar, to drag onto a day.
+  const [find, setFind] = useState('')
+  const [showDone, setShowDone] = useState(false)
 
   useEffect(() => {
     try { const v = window.localStorage.getItem(MODE_KEY); if (v === 'week' || v === 'month') setMode(v) } catch { /* preference */ }
@@ -56,9 +59,15 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   const byDay = useMemo(() => {
     const m = new Map<string, ViewTask[]>()
     for (const x of live) { const d = dueOf(x); if (d) m.set(d, [...(m.get(d) ?? []), x]) }
+    // A steady order inside a day, so chips don't shuffle under the pointer after a save.
+    for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name))
     return m
   }, [live, moved]) // eslint-disable-line react-hooks/exhaustive-deps
-  const undated = live.filter(x => !dueOf(x))
+  const undatedAll = live.filter(x => !dueOf(x))
+  const undatedDone = undatedAll.filter(done).length
+  const undated = undatedAll
+    .filter(x => showDone || !done(x))
+    .filter(x => !find.trim() || x.name.toLowerCase().includes(find.trim().toLowerCase()))
 
   const days = mode === 'month' ? monthGrid(ym.year, ym.month) : weekGrid(anchor)
   const heading = mode === 'month'
@@ -72,7 +81,8 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   }
   function goToday() { const n = new Date(); setYm({ year: n.getFullYear(), month: n.getMonth() }); setAnchor(today) }
 
-  function drop(taskId: string, iso: string) {
+  /** A day's date, or null to clear it (dropped on the No date panel). */
+  function drop(taskId: string, iso: string | null) {
     const task = tasks.find(x => x.id === taskId)
     if (!task) return
     const before = dueOf(task)
@@ -82,9 +92,9 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
       const res = await updateTask(taskId, { due_date: iso }).catch(() => ({ success: false }))
       if (!res.success) { setMoved(m => { const n = { ...m }; delete n[taskId]; return n }); return }
       router.refresh()
-      const label = dayOf(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+      const label = iso ? dayOf(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : ''
       setToast({
-        text: t('moved', { name: task.name, date: label }),
+        text: iso ? t('moved', { name: task.name, date: label }) : t('cleared', { name: task.name }),
         undo: () => start(async () => {
           setMoved(m => ({ ...m, [taskId]: before }))
           await updateTask(taskId, { due_date: before ?? null })
@@ -135,7 +145,8 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
           </label>
         )}
       </div>
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-start' }}>
+      <div style={{ overflowX: 'auto', flex: '1 1 640px', minWidth: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))', minWidth: 770, border: `1px solid ${PIPE.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {dow.map((d, i) => <div key={i} style={{ fontSize: 11, fontWeight: 700, color: PIPE.textMuted, padding: '6px 8px', background: PIPE.surface, borderBottom: `1px solid ${PIPE.border}`, textTransform: 'uppercase', letterSpacing: '.06em' }}>{d}</div>)}
           {days.map((d, i) => (
@@ -156,12 +167,32 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
           ))}
         </div>
       </div>
-      {undated.length > 0 && (
-        <div data-cal-undated style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: PIPE.textMuted }}>{t('noDate')}:</span>
-          {undated.map(x => <span key={x.id} style={{ maxWidth: 220 }}>{chip(x)}</span>)}
+      <aside data-cal-undated aria-label={t('noDate')}
+        onDragOver={e => { e.preventDefault(); setOver('none') }}
+        onDragLeave={() => setOver(o => (o === 'none' ? null : o))}
+        onDrop={e => { e.preventDefault(); setOver(null); drop(e.dataTransfer.getData('text/plain'), null) }}
+        style={{ flex: '0 1 260px', minWidth: 220, position: 'sticky', top: 12, display: 'flex', flexDirection: 'column', gap: 8,
+          border: `1px ${over === 'none' ? 'dashed' : 'solid'} ${over === 'none' ? '#9DBF35' : PIPE.border}`, borderRadius: 12, padding: 10,
+          background: over === 'none' ? '#F4FBD6' : PIPE.surface, maxHeight: 'calc(100vh - 40px)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: PIPE.ink }}>{t('noDate')}</h3>
+          <span style={{ fontSize: 12, color: PIPE.textMuted }}>{undatedAll.length - (showDone ? 0 : undatedDone)}</span>
         </div>
-      )}
+        <input type="search" data-cal-find value={find} onChange={e => setFind(e.target.value)} placeholder={t('find')} aria-label={t('find')}
+          style={{ border: `1px solid ${PIPE.border}`, borderRadius: 8, padding: '6px 9px', fontFamily: 'inherit', fontSize: 12.5, background: '#FFFFFF' }} />
+        {undatedDone > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: PIPE.textMuted, cursor: 'pointer' }}>
+            <input type="checkbox" data-cal-show-done checked={showDone} onChange={e => setShowDone(e.target.checked)} />
+            {t('showDone', { n: undatedDone })}
+          </label>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', minHeight: 0 }}>
+          {undated.map(x => <span key={x.id} data-undated-task={x.id}>{chip(x)}</span>)}
+          {!undated.length && <p style={{ margin: 0, fontSize: 12, color: PIPE.textMuted }}>{undatedAll.length ? t('noMatch') : t('allDated')}</p>}
+        </div>
+        <p style={{ margin: 0, fontSize: 11.5, color: PIPE.textMuted }}>{t('dragHint')}</p>
+      </aside>
+      </div>
       <p style={{ margin: 0, fontSize: 12, color: PIPE.textMuted }}>{t('note')}</p>
       {toast && (
         <div role="status" style={{ position: 'fixed', bottom: 22, insetInlineStart: '50%', transform: 'translateX(-50%)', zIndex: 300, background: '#17181A', color: '#F1F1EC', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>

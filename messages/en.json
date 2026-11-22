@@ -2944,7 +2944,13 @@
     "all": "All",
     "moved": "\"{name}\" is now due {date}.",
     "undo": "Undo",
-    "note": "One calendar that keeps everything: move back and forward through any month. Finished work stays on its day, marked ✓."
+    "note": "One calendar that keeps everything: move back and forward through any month. Finished work stays on its day, marked ✓.",
+    "find": "Find a task",
+    "showDone": "Show done ({n})",
+    "cleared": "\"{name}\" has no date now.",
+    "noMatch": "No undated task matches.",
+    "allDated": "Every task here has a date.",
+    "dragHint": "Drag a task onto a day to give it a date. Drop one here to clear its date."
   },
   "handoff": {
     "title": "Where should this task show?",
