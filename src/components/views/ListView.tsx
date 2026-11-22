@@ -66,7 +66,8 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
           </h2>
           {g.rows.map(task => {
             const who = task.assignee_id ? byId.get(task.assignee_id) : undefined
-            const sla = task.kind !== 'simple' && featureOn(task.brand, 'sla') ? getAlertStatus(task, slaConfig, today) : 'On Track'
+            // Published work can't be late; simple tasks have no SLA.
+            const sla = task.kind !== 'simple' && task.status !== 'publish' && featureOn(task.brand, 'sla') ? getAlertStatus(task, slaConfig, today) : 'On Track'
             const late = sla === 'Overdue' || sla === 'Stuck' || sla === 'Will Miss'
             return (
               <button key={task.id} type="button" data-row={task.id} onClick={() => onOpen(task.id)}
