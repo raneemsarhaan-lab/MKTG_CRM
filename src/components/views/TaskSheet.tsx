@@ -29,9 +29,10 @@ import { ROW_NO_WIDTH } from '@/components/sheet/columns'
 import { useUIStore } from '@/store/useUIStore'
 import type { SheetId, StageId, Task } from '@/types/index'
 import { STAGE_META, NINE_STAGE } from '@/lib/stage-meta'
-import { matchMember, matchPriority, matchStage, readDay } from '@/lib/sheet-links'
+import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
+import { matchSimpleWord, matchWord, wordOf, SIMPLE_KEYS, type SimpleKey, type SpaceWords } from '@/lib/space-words'
 import { canActOn } from '@/lib/task-access'
-import { setTaskStage, updateTask, type TaskPatch } from '@/actions/tasks'
+import { setSimpleStatus, setTaskStage, updateTask, type TaskPatch } from '@/actions/tasks'
 import { myNotes, setMyNote } from '@/actions/my-notes'
 import { handoffRequest } from '@/components/handoff/request'
 import { LinkedFormatsContext } from '@/components/sheets/format/context'
@@ -66,10 +67,12 @@ interface TaskSheetProps {
   fields?: string[] | null
   /** T081: the Tasks sheet's key ('tasks:<node>') in its workbook: formats, rules, view and columns live there. */
   sheetKey?: string
+  /** Spec 021 (US3): a team Space's status words; cells show them and typing one moves the task. */
+  words?: SpaceWords
   label: string
 }
 
-export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, sheetKey, label }: TaskSheetProps) {
+export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, sheetKey, words, label }: TaskSheetProps) {
   const t = useTranslations('taskSheet')
   const tf = useTranslations('sheets.fields')
   const tcol = useTranslations('sheet.columns')
@@ -113,11 +116,15 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const brands = data.brands
   const brandName = useMemo(() => new Map(brands.map(b => [b.id, b.name])), [brands])
   const memberName = useMemo(() => new Map(data.members.map(m => [m.id, m.name])), [data.members])
-  const stageWord = (s: string) => {
+  const boardWord = (s: string) => {
     const m = STAGE_META[s as StageId]
     return m ? (locale === 'ar' ? m.label_ar : m.label_en) : s
   }
-  const stages = useMemo(() => Object.entries(STAGE_META).map(([id, m]) => ({ id, names: [m.label_en, m.label_ar] })), [])
+  // US3: a Space's word shows alone; the board name is on hover.
+  const stageWord = (s: string) => wordOf(s, words) ?? boardWord(s)
+  const simpleBoard = (s: string) => t(`simple.${s as SimpleKey}`)
+  const simpleWord = (s: string) => wordOf(s, words) ?? simpleBoard(s)
+  const simpleNames = useMemo(() => Object.fromEntries(SIMPLE_KEYS.map(k => [k, [t(`simple.${k}`)]])) as Record<SimpleKey, string[]>, [t])
   const may = (x: ViewTask) => canActOn({ task_owner_id: x.task_owner_id, assignee_id: x.assignee_id ?? null }, me)
 
   // ── columns (spec 010): this sheet's own layout and regular columns ──
@@ -141,7 +148,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     switch (col) {
       case 'title': return x.name
       case 'brand': return brandName.get(x.brand_id) ?? ''
-      case 'status': return x.kind === 'simple' ? t(`simple.${x.simple_status ?? 's-todo'}`) : stageWord(x.status)
+      case 'status': return x.kind === 'simple' ? simpleWord(x.simple_status ?? 's-todo') : stageWord(x.status)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
       case 'type': return x.content_type_label ?? ''
@@ -236,9 +243,19 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       case 'platform':
         return patch(x, { platform: text }, { platform: text })
       case 'status': {
-        if (x.kind === 'simple') return t('simpleHere')
-        const to = matchStage(text, stages) as StageId | null
-        if (!to) return t('unknownStage', { text })
+        if (x.kind === 'simple') {
+          // US3/US5: a simple task takes its three statuses, by name or by the Space's words.
+          const st = matchSimpleWord(text, words, simpleNames)
+          if (!st) return t('unknownStageList', { text, list: SIMPLE_KEYS.map(simpleWord).join(', ') })
+          if (st === (x.simple_status ?? 's-todo')) return null
+          setOver(o => ({ ...o, [x.id]: { ...(o[x.id] ?? {}), simple_status: st } }))
+          const r = await setSimpleStatus(x.id, st).catch(() => ({ success: false, shouldCelebrate: false, error: 'generic' as const }))
+          if (r.success) { router.refresh(); return null }
+          setOver(o => { const n = { ...o }; delete n[x.id]; return n })
+          return r.error === 'not_authorized' ? t('readOnly') : t('notSaved', { reason: r.error ?? 'generic' })
+        }
+        const to = matchWord(text, words)
+        if (!to) return t('unknownStageList', { text, list: NINE_STAGE.map(stageWord).join(', ') })
         if (to === x.status) return null
         setOver(o => ({ ...o, [x.id]: { ...(o[x.id] ?? {}), status: to } }))
         const res = await setTaskStage(x.id, to).catch(() => ({ success: false, shouldCelebrate: false, error: 'generic' as const }))
@@ -304,6 +321,10 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
       if (col === 'due' && x.due_date) return <span className="fx-sheet-ellipsis">{new Date(`${x.due_date}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
       const s = shown(x, col)
+      if (col === 'status' && s) {
+        const board = x.kind === 'simple' ? simpleBoard(x.simple_status ?? 's-todo') : boardWord(x.status)
+        return <span className="fx-sheet-ellipsis" data-status-word={s} title={board !== s ? board : undefined}>{s}</span>
+      }
       return s ? <span className="fx-sheet-ellipsis">{s}</span> : null
     },
     isDraft: () => false,
@@ -314,7 +335,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
       if (!may(row.task)) return t('readOnly')
-      return col === 'status' && row.task.kind === 'simple' ? t('simpleHere') : null
+      return null
     },
     onCommit: async (row, col, value) => (row.kind === 'task' ? commit(row.task, col, value) : null),
     onCancelDraft: () => {},

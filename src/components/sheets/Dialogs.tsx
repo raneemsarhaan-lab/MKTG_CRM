@@ -9,8 +9,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 
-export function Modal({ title, children, onCancel, attr, body }: {
+export function Modal({ title, children, onCancel, attr, body, width }: {
   title: string
+  /** A wider dialog than the default, in px (still full width on phones). */
+  width?: number
   children: ReactNode
   onCancel(): void
   attr?: string
@@ -39,7 +41,7 @@ export function Modal({ title, children, onCancel, attr, body }: {
   return (
     <div className="fx-sh-scrim" onPointerDown={e => { if (e.target === e.currentTarget) onCancel() }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={body ? `${id}-b` : undefined}
-           className="fx-sh-dialog" onKeyDown={onKeyDown} {...(attr ? { [attr]: '' } : {})}>
+           className="fx-sh-dialog" onKeyDown={onKeyDown} style={width ? { width: `min(${width}px, 100%)` } : undefined} {...(attr ? { [attr]: '' } : {})}>
         <h2 id={`${id}-t`}>{title}</h2>
         {body && <p id={`${id}-b`}>{body}</p>}
         {children}

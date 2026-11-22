@@ -2868,7 +2868,22 @@
     "allTasksSheet": "All tasks",
     "mySheets": "My sheets",
     "workbookLoading": "Opening the sheet…",
-    "workbookFailed": "This sheet couldn't open. Reload the page to try again."
+    "workbookFailed": "This sheet couldn't open. Reload the page to try again.",
+    "words": {
+      "open": "Status words",
+      "title": "{space} · Status words",
+      "help": "Separate words with commas. The first one is shown; any of them can be typed. Case and spacing are ignored. Boards, brand pages and Everything keep the board names.",
+      "simpleHead": "Simple tasks",
+      "reset": "Use the board names",
+      "cancel": "Cancel",
+      "save": "Save words",
+      "saving": "Saving…",
+      "linkedNote": "These are the same words the {space} sheet uses. Changing them here changes the sheet too.",
+      "clash": "\"{word}\" is used for both {a} and {b}. Give each word to one stage.",
+      "notAllowed": "Only admins and superusers can change a Space's words.",
+      "failed": "The words weren't saved. Try again.",
+      "boardName": "Board name: {name}"
+    }
   },
   "views": {
     "list": "List",
@@ -3032,6 +3047,7 @@
     "empty": "No tasks here yet.",
     "rowsName": "Tasks on this page",
     "rowsHelp": "Every task this page shows is a row. Change which tasks with the page's filters or a saved view.",
-    "groupDefault": "This page's groups"
+    "groupDefault": "This page's groups",
+    "unknownStageList": "“{text}” isn't a status here. Try: {list}."
   }
 }

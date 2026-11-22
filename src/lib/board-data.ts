@@ -8,6 +8,8 @@
 import { prisma } from '@/lib/prisma'
 import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
+import { linkedKeyOf, wordsFor } from '@/lib/space-words'
+import type { SheetTaskMap } from '@/types/index'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
 
@@ -18,7 +20,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -88,6 +90,8 @@ export async function loadBoardData(member: SessionMember) {
     prisma.teamSpace.findMany({ where: { archived_at: null }, orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] }),
     prisma.teamSpaceMember.findMany({ select: { space_id: true, member_id: true } }),
     prisma.taskSpace.findMany({ select: { task_id: true, space_id: true, added_via: true } }),
+    // Spec 021 (US3, R5): the Content and Video Spaces' words are their sheet's words.
+    prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -110,7 +114,12 @@ export async function loadBoardData(member: SessionMember) {
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
     linkedRowHeights,
-    spaces: spaces.map(mapSpace),
+    spaces: spaces.map(mapSpace).map(sp => {
+      const lk = linkedKeyOf(sp.key)
+      if (!lk) return sp
+      const v = (linkedViews.find(x => x.linked_key === lk)?.view ?? {}) as { words?: SheetTaskMap['words']; show?: SheetTaskMap['show'] }
+      return { ...sp, words: wordsFor(sp, v) }
+    }),
     spaceMembers,
     taskSpaces: taskSpaces as import('@/types/index').TaskSpace[],
     inbox: {

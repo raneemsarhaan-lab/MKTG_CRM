@@ -124,4 +124,27 @@ check('pure-view-config', () => {
   eq(names({ sort: 'name' }), ['A', 'B', 'C'], 'name')
 })
 
+check('pure-space-words', () => {
+  const w = m.cleanSpaceWords({ 'd-prog': ' Editing ,  editing, Cutting ', 'c-check': [' Script  review '], bogus: ['x'], 's-done': 'Shipped' })
+  eq(w, { 'c-check': ['Script review'], 'd-prog': ['Editing', 'Cutting'], 's-done': ['Shipped'] }, 'trimmed, once each, known values only')
+  eq(m.wordOf('d-prog', w), 'Editing', 'the first word is shown')
+  eq(m.wordOf('todo', w), null, 'no word, board name')
+  eq(m.matchWord('  cutting ', w), 'd-prog', 'any word can be typed, case and spacing ignored')
+  eq(m.matchWord('D-In Progress', w), 'd-prog', 'the board name still works')
+  eq(m.matchWord('shipped', w), null, 'a simple word never moves a pipeline task')
+  eq(m.matchWord('nonsense', w), null, 'unknown')
+  const names = { 's-todo': ['To Do'], 's-doing': ['In progress'], 's-done': ['Done'] }
+  eq(m.matchSimpleWord('SHIPPED', w, names), 's-done', 'simple words')
+  eq(m.matchSimpleWord('in progress', w, names), 's-doing', 'simple names')
+  eq(m.findClash(w), null, 'no clash')
+  const c1 = m.findClash({ 'd-prog': ['Review'], 'c-check': ['review'] })
+  eq(c1 && [c1.a, c1.b], ['d-prog', 'c-check'], 'one word for two stages')
+  const c2 = m.findClash({ 'd-prog': ['C-Check'] })
+  eq(c2 && c2.a, 'c-check', "another stage's board name")
+  eq(m.findClash({ 'd-prog': ['D-In Progress'] }), null, 'its own board name is fine')
+  eq(m.wordsFor({ key: 'design', words: { 'd-check': ['Client review'] } }), { 'd-check': ['Client review'] }, 'a team Space keeps its own')
+  eq(m.wordsFor({ key: 'content', words: { todo: ['x'] } }, { words: { stage: { todo: ['Idea'] } } }), { todo: ['Idea'] }, "Content reads its sheet's words")
+  eq(m.wordsFor({ key: 'video', words: {} }, { words: { stage: { todo: ['Idea'] } }, show: 'board' }), {}, 'a sheet showing board names gives none')
+})
+
 if (failed) process.exitCode = 1

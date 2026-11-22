@@ -266,16 +266,16 @@
   - a switched-off feature is an empty hatched cell in mixed views;
   - the C-Check switch affects new tasks only.
   Settled 2026-11-22: option A. A team's words are only other names for the 11 stages; no sub-steps inside a stage.)* Write the Stage C design (Status words panel, brand feature switches, simple task controls in TaskModal and on the Board) in `design/spaces-stage-c.html`, starting from the panels in `design/clickup-hierarchy.html`, and get the user's approval before any Stage C UI work (constitution §IV).
-- [ ] T055 [P] [US3] Write the pure `src/lib/space-words.ts`:
+- [X] T055 *(Done: `src/lib/space-words.ts`: cleanSpaceWords, wordsFor, wordOf, matchWord, matchSimpleWord, findClash; lab check pure-space-words.)* [P] [US3] Write the pure `src/lib/space-words.ts`:
   - `wordsFor(space, linkedViews)`: Content and Video read their sheet's `view.words`; others read `team_spaces.words`; built-in names come from `content.stage.*` / `sheet.stage.*`;
   - `matchWord`, which wraps `matchStage` (`src/lib/sheet-links.ts:133`);
   - `findClash(words)`.
 
   Add pure checks in `scripts/spaces-lab/pure-entry.ts`.
-- [ ] T056 [US3] Add `setSpaceWords(id, words)` to `src/actions/spaces.ts` (admins and superusers). For 'content' and 'video' it writes the linked sheet's `view.words` through the `applyLinkedFormats` path (`src/actions/sheets.ts:949-969`); otherwise it writes `team_spaces.words`. It rejects with `clash`.
-- [ ] T057 [US3] Create `src/components/spaces/SpaceWords.tsx`, a "Status words" panel opened from the Space header in `ViewHost`: rows for the 11 stages (and the 3 simple statuses), comma-separated words, and the board name and Arabic name as hints. It is hidden for users.
-- [ ] T058 [US3] Show the Space's words in `ListView`, `TaskSheet` (status cells, and typing a word through `matchWord` → `setTaskStage`) and `CalendarView` tooltips when the node is a Space. Brand, Everything and every `BoardView` keep the original names (FR-013a, FR-016).
-- [ ] T059 [US3] Add UI scenarios in `scripts/spaces-lab/scenarios/us3.mjs`:
+- [X] T056 *(Done. Board data gives the Content and Video Spaces their sheet's stage words, so every view reads `space.words`.)* [US3] Add `setSpaceWords(id, words)` to `src/actions/spaces.ts` (admins and superusers). For 'content' and 'video' it writes the linked sheet's `view.words` through the `applyLinkedFormats` path (`src/actions/sheets.ts:949-969`); otherwise it writes `team_spaces.words`. It rejects with `clash`.
+- [X] T057 *(Done: the "Status words" button in the Space header; simple rows are left out for Content and Video, whose words are the sheet's.)* [US3] Create `src/components/spaces/SpaceWords.tsx`, a "Status words" panel opened from the Space header in `ViewHost`: rows for the 11 stages (and the 3 simple statuses), comma-separated words, and the board name and Arabic name as hints. It is hidden for users.
+- [X] T058 *(Done: the word shows alone, the board name on hover. The Sheet also takes a simple task's words through `setSimpleStatus`, and an unknown word lists the valid ones.)* [US3] Show the Space's words in `ListView`, `TaskSheet` (status cells, and typing a word through `matchWord` → `setTaskStage`) and `CalendarView` tooltips when the node is a Space. Brand, Everything and every `BoardView` keep the original names (FR-013a, FR-016).
+- [X] T059 *(Done in `scripts/spaces-lab/realapp/scenarios-us3.cjs`: 5 scenarios, all passing.)* [US3] Add UI scenarios in `scripts/spaces-lab/scenarios/us3.mjs`:
   - write a word, then type it in the Sheet → the stage moves;
   - the Board is unchanged;
   - a clash is refused;

@@ -21,12 +21,14 @@ import type { ViewTask } from './types'
 const MODE_KEY = 'momentum.calendar.mode'
 const done = (t: ViewTask) => (t.kind === 'simple' ? t.simple_status === 's-done' : t.status === 'publish')
 
-export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], onOpen }: {
+export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen }: {
   tasks: ViewTask[]
   brands: Brand[]
   colorBy?: 'brand' | 'stage'
   /** Projects to filter by (a brand's campaigns). */
   campaigns?: { id: string; name: string }[]
+  /** Spec 021 (US3): a task's status in the Space's words, added to a chip's tooltip. */
+  statusName?: (x: ViewTask) => string
   onOpen: (id: string) => void
 }) {
   const t = useTranslations('calendar')
@@ -110,7 +112,7 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
     <button key={x.id} type="button" draggable data-cal-task={x.id}
       onDragStart={e => e.dataTransfer.setData('text/plain', x.id)}
       onClick={() => onOpen(x.id)}
-      title={x.name}
+      title={statusName ? `${x.name} · ${statusName(x)}` : x.name}
       style={{ display: 'block', width: '100%', textAlign: 'start', border: 'none', cursor: 'grab', fontFamily: 'inherit',
         fontSize: 11.5, fontWeight: 600, padding: '3px 6px', borderRadius: 7, color: PIPE.ink, opacity: done(x) ? 0.62 : 1,
         background: `color-mix(in srgb, ${color(x)} 18%, #FFFFFF)`, borderInlineStart: `3px solid ${color(x)}`,
