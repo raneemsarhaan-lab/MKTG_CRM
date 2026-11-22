@@ -71,3 +71,21 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
 
 /** How many filters a view uses (for the config bar's badge). */
 export const filterCount = (c: ViewConfig) => Object.values(c.filters).reduce((n, v) => n + (v?.length ? 1 : 0), 0)
+
+/** A member's tab choices on one page (spec 021): home view, pinned tabs first, hidden tabs tucked away. */
+export interface TabPrefs { home: string | null; pinned: string[]; hidden: string[] }
+export const EMPTY_TAB_PREFS: TabPrefs = { home: null, pinned: [], hidden: [] }
+
+export function cleanTabPrefs(raw: unknown): TabPrefs {
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
+  const keys = (v: unknown) => strings(v, 60).slice(0, 40)
+  const pinned = keys(o.pinned)
+  return { home: typeof o.home === 'string' && o.home.length <= 60 ? o.home : null, pinned, hidden: keys(o.hidden).filter(k => !pinned.includes(k)) }
+}
+
+/** Tab order: pinned first (in pin order), then the rest in their own order; hidden ones left out. */
+export function arrangeTabs<T extends { key: string }>(tabs: T[], p: TabPrefs): { shown: T[]; hidden: T[] } {
+  const live = tabs.filter(x => !p.hidden.includes(x.key))
+  const pinned = p.pinned.map(k => live.find(x => x.key === k)).filter((x): x is T => !!x)
+  return { shown: [...pinned, ...live.filter(x => !p.pinned.includes(x.key))], hidden: tabs.filter(x => p.hidden.includes(x.key)) }
+}

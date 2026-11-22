@@ -18,8 +18,8 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { PIPE } from '@/lib/pipeline-tokens'
 import type { SavedView, ViewType } from '@/types/index'
-import { cleanConfig, filterCount, VIEW_FIELDS, VIEW_FILTERS, VIEW_SORTS, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
-import { deleteView, listViews, reorderViews, saveView } from '@/actions/views'
+import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, VIEW_FIELDS, VIEW_FILTERS, VIEW_SORTS, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
+import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
 
 export interface ViewTab { key: string; label: string; disabled?: boolean; note?: string }
 export interface OpenView { id: string; type: ViewType; config: ViewConfig }
@@ -62,6 +62,11 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const [drafts, setDrafts] = useState<Record<string, ViewConfig>>({})
   const [adding, setAdding] = useState(false)
   const [say, setSay] = useState('')
+  // Home, pinned and hidden tabs (user, 2026-11-22), this member's own per page.
+  const [prefs, setPrefs] = useState<TabPrefs>(EMPTY_TAB_PREFS)
+  const [tabMenu, setTabMenu] = useState<{ key: string; x: number; y: number } | null>(null)
+  const [hiddenMenu, setHiddenMenu] = useState<{ x: number; y: number } | null>(null)
+  const firstLoad = useRef(true)
   const live = tabs.filter(x => !x.disabled)
   const savedKey = (v: SavedView) => `v:${v.id}`
   const pick = (v: string | null, list = views) =>
@@ -74,6 +79,13 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     const r = await listViews(node).catch(() => null)
     if (!r?.success) return
     setViews(r.views)
+    setPrefs(r.prefs)
+    // Without a ?view= in the address, the page opens on this member's home view.
+    if (firstLoad.current) {
+      firstLoad.current = false
+      const home = r.prefs.home
+      if (!select && !params.get('view') && home && (live.some(x => x.key === home) || r.views.some(v => savedKey(v) === home))) { setTab(home); return }
+    }
     if (select) choose(select)
     else setTab(cur => (cur.startsWith('v:') && !r.views.some(v => savedKey(v) === cur) ? pick(params.get('view'), r.views) : pick(cur, r.views)))
   }
@@ -90,6 +102,18 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   }
 
   const open = views.find(v => savedKey(v) === tab) ?? null
+  const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
+  const arranged = node ? arrangeTabs(allTabs, prefs) : { shown: allTabs, hidden: [] as typeof allTabs }
+  function updatePrefs(next: TabPrefs) {
+    setPrefs(next)
+    setTabMenu(null)
+    if (node) void setTabPrefs(node, next).catch(() => null)
+    if (next.hidden.includes(tab)) {
+      const home = next.home && !next.hidden.includes(next.home) ? next.home : arrangeTabs(allTabs, next).shown.find(x => !x.disabled)?.key
+      if (home) choose(home)
+    }
+  }
+  const menuAt = (e: React.MouseEvent<HTMLElement>) => { const r = e.currentTarget.getBoundingClientRect(); return { x: r.left, y: r.bottom + 4 } }
   const config = open ? drafts[open.id] ?? cleanConfig(open.config) : null
   const mayChange = (v: SavedView) => (v.owner_id ? true : !!v.mine || lead)
   const typeLabel = (k: string) => tabs.find(x => x.key === k)?.label ?? t(k as 'list')
@@ -116,29 +140,44 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
         {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary }}>{sub}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
           <div role="tablist" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
-            {[...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))].map(x => (
+            {arranged.shown.map(x => (
+              <span key={x.key} style={{ display: 'inline-flex', alignItems: 'center' }} className="fx-view-tab">
               <button
-                key={x.key}
                 type="button"
                 role="tab"
                 data-view-tab={x.key}
                 aria-selected={tab === x.key}
-                disabled={'disabled' in x ? x.disabled : false}
-                title={'note' in x ? x.note : undefined}
+                disabled={x.disabled}
+                title={x.note}
                 onClick={() => choose(x.key)}
+                onContextMenu={node ? e => { e.preventDefault(); setTabMenu({ key: x.key, x: e.clientX, y: e.clientY }) } : undefined}
                 style={{
-                  border: 'none', background: 'none', cursor: 'disabled' in x && x.disabled ? 'default' : 'pointer', fontFamily: 'inherit',
-                  padding: '9px 12px 11px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-                  color: tab === x.key ? PIPE.ink : 'disabled' in x && x.disabled ? PIPE.textFaintest : PIPE.textMuted,
+                  border: 'none', background: 'none', cursor: x.disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+                  padding: '9px 6px 11px 12px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+                  color: tab === x.key ? PIPE.ink : x.disabled ? PIPE.textFaintest : PIPE.textMuted,
                   borderBottom: `2px solid ${tab === x.key ? PIPE.ink : 'transparent'}`,
                 }}
               >
+                {prefs.pinned.includes(x.key) && <svg role="img" aria-label={t('pinnedMark')} viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginInlineEnd: 4, verticalAlign: '-1px' }}><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" /></svg>}
                 {x.label}
-                {'note' in x && x.note && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>{x.note}</span>}
-                {'personal' in x && x.personal && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>· {t('onlyMeMark')}</span>}
+                {prefs.home === x.key && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 600, color: PIPE.textMuted }}>· {t('homeMark')}</span>}
+                {x.note && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>{x.note}</span>}
+                {x.personal && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>· {t('onlyMeMark')}</span>}
               </button>
+              {node && !x.disabled && (
+                <button type="button" data-tab-menu={x.key} aria-label={t('tabOptions', { name: x.label })} aria-haspopup="menu"
+                  onClick={e => setTabMenu({ key: x.key, ...menuAt(e) })}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: PIPE.textFaint, padding: '9px 6px 11px 0', fontSize: 13, borderBottom: `2px solid ${tab === x.key ? PIPE.ink : 'transparent'}` }}>⋯</button>
+              )}
+              </span>
             ))}
           </div>
+          {arranged.hidden.length > 0 && (
+            <button type="button" data-hidden-views aria-haspopup="menu" onClick={e => setHiddenMenu(menuAt(e))}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '9px 10px 11px', fontSize: 12.5, fontWeight: 600, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>
+              {t('hiddenViews', { n: arranged.hidden.length })} ▾
+            </button>
+          )}
           {node && viewTypes?.length ? (
             <button type="button" data-add-view aria-expanded={adding} onClick={() => setAdding(v => !v)}
               style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '9px 10px 11px', fontSize: 13, fontWeight: 700, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>
@@ -147,6 +186,21 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           ) : null}
         </div>
       </header>
+      {tabMenu && (() => {
+        const k = tabMenu.key
+        const pinned = prefs.pinned.includes(k)
+        const lastShown = arranged.shown.filter(x => !x.disabled).length <= 1
+        const items: { key: string; label: string; disabled?: boolean; run: () => void }[] = [
+          { key: 'home', label: prefs.home === k ? t('homeOff') : t('makeHome'), run: () => updatePrefs({ ...prefs, home: prefs.home === k ? null : k }) },
+          { key: 'pin', label: pinned ? t('unpin') : t('pin'), run: () => updatePrefs({ ...prefs, pinned: pinned ? prefs.pinned.filter(x => x !== k) : [...prefs.pinned, k] }) },
+          { key: 'hide', label: t('hide'), disabled: lastShown, run: () => updatePrefs({ ...prefs, pinned: prefs.pinned.filter(x => x !== k), hidden: [...prefs.hidden, k], home: prefs.home === k ? null : prefs.home }) },
+        ]
+        return <TabMenu at={tabMenu} items={items} label={t('tabOptions', { name: allTabs.find(x => x.key === k)?.label ?? '' })} onClose={() => setTabMenu(null)} />
+      })()}
+      {hiddenMenu && (
+        <TabMenu at={hiddenMenu} label={t('hiddenViews', { n: arranged.hidden.length })} onClose={() => setHiddenMenu(null)}
+          items={arranged.hidden.map(x => ({ key: x.key, label: t('showView', { name: x.label }), run: () => { setHiddenMenu(null); updatePrefs({ ...prefs, hidden: prefs.hidden.filter(h => h !== x.key) }); choose(x.key) } }))} />
+      )}
       {adding && node && viewTypes && (
         <NewView types={viewTypes} typeLabel={typeLabel} onCancel={() => setAdding(false)}
           onCreate={async (name, type, personal) => {
@@ -322,4 +376,32 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
 function FieldName({ f }: { f: string }) {
   const t = useTranslations('taskSheet')
   return <>{t(`col.${f as 'brand'}`)}</>
+}
+
+function TabMenu({ at, items, label, onClose }: {
+  at: { x: number; y: number }; label: string; onClose: () => void
+  items: { key: string; label: string; disabled?: boolean; run: () => void }[]
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+    const away = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) onClose() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key) }
+  }, [onClose])
+  return (
+    <div ref={ref} role="menu" aria-label={label} data-tab-options
+      style={{ position: 'fixed', top: at.y, left: Math.min(at.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 220), zIndex: 400, minWidth: 200,
+        background: '#FFFFFF', border: `1px solid ${PIPE.border}`, borderRadius: 10, boxShadow: '0 12px 34px rgba(20,20,20,.16)', padding: 5 }}>
+      {items.map(i => (
+        <button key={i.key} type="button" role="menuitem" data-tab-option={i.key} disabled={i.disabled} onClick={i.run}
+          style={{ display: 'block', width: '100%', textAlign: 'start', border: 'none', background: 'none', borderRadius: 7, padding: '7px 10px',
+            fontFamily: 'inherit', fontSize: 13, cursor: i.disabled ? 'default' : 'pointer', color: i.disabled ? PIPE.textFaintest : PIPE.ink }}>
+          {i.label}
+        </button>
+      ))}
+    </div>
+  )
 }

@@ -9,7 +9,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
-import { cleanConfig } from '@/lib/view-config'
+import { cleanConfig, cleanTabPrefs, type TabPrefs } from '@/lib/view-config'
 import { loadViews, validNode, VIEW_TYPES } from '@/lib/views-data'
 import type { SavedView, ViewType } from '@/types/index'
 
@@ -25,10 +25,22 @@ async function mayUseNode(node: string, m: Who): Promise<boolean> {
 const mayChange = (v: { owner_id: string | null; created_by: string | null }, m: Who) =>
   v.owner_id ? v.owner_id === m.id : v.created_by === m.id || lead(m)
 
-export async function listViews(node: string): Promise<{ success: true; views: SavedView[] } | Fail> {
+export async function listViews(node: string): Promise<{ success: true; views: SavedView[]; prefs: TabPrefs } | Fail> {
   const m = await getSessionMember()
   if (!m) return { success: false, error: 'not_authenticated' }
-  return { success: true, views: await loadViews(node, m.id) }
+  const all = (m.view_prefs ?? {}) as Record<string, unknown>
+  return { success: true, views: await loadViews(node, m.id), prefs: cleanTabPrefs(all[node]) }
+}
+
+/** This member's home, pinned and hidden tabs on one page. Only ever their own. */
+export async function setTabPrefs(node: string, prefs: TabPrefs): Promise<{ success: true; prefs: TabPrefs } | Fail> {
+  const m = await getSessionMember()
+  if (!m) return { success: false, error: 'not_authenticated' }
+  if (!validNode(node)) return { success: false, error: 'invalid' }
+  const clean = cleanTabPrefs(prefs)
+  const all = { ...((m.view_prefs ?? {}) as Record<string, unknown>), [node]: clean }
+  await prisma.member.update({ where: { id: m.id }, data: { view_prefs: all as object } })
+  return { success: true, prefs: clean }
 }
 
 export async function saveView(input: { id?: string; node: string; type: ViewType; name: string; config: unknown; personal: boolean }): Promise<{ success: true; id: string } | Fail> {

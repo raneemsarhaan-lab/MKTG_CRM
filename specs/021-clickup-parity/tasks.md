@@ -357,6 +357,10 @@
 - [ ] T077 Calendar: typing on a day offers Link task. Create sets that due date, and its Space choice shows the stages the task will get; linking an existing task moves its due date there, with Undo. On a Space's calendar, tasks show that Space's words (user, 2026-11-22).
 - [ ] T078 Real-app checks: add a Task link field, link, create from the picker in Planning (simple) and Content (pipeline), calendar link moves the date, one task per field.
 
+- [X] T079 *(User, 2026-11-22.)* View tabs: each tab's ⋯ menu (or right-click) offers Make home view, Pin and Hide; hidden tabs sit under "Hidden (n)" with Show. Per member and per page, stored in `members.view_prefs`; `setTabPrefs` in `src/actions/views.ts`; pure `arrangeTabs` / `cleanTabPrefs` in `src/lib/view-config.ts`. Checked in `views-home-pin-hide`.
+- [X] T080 *(User, 2026-11-22.)* Calendar: undated tasks in a side panel with search and Show done; drag onto a day to date it, drop on the panel to clear the date, with Undo. Checked in `us2-calendar-no-date-panel`.
+- [ ] T081 *(User, 2026-11-22.)* Every sheet in a Space, brand Folder or Me gets the sheet features already built for the Content and Video sheets (specs 010–020): columns (add, hide, reorder, widths, regular columns), sort, filter and rules, group, formatting, fills and the power tips. Build `TaskSheet` on the same linked-sheet hooks as `ContentGrid` instead of its own small grid.
+
 ---
 
 ## Phase 9: Polish & Cross-Cutting Concerns

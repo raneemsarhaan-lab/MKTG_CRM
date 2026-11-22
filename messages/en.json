@@ -2931,7 +2931,17 @@
     "simpleOnly": "A simple task moves between To Do, In progress and Done only.",
     "pipelineOnly": "Only simple tasks go in these columns.",
     "getsSimple": "A simple task: To Do › In progress › Done. No SLA, no approvals.",
-    "getsPipeline": "A pipeline task: the stages with their owners, SLA and approvals."
+    "getsPipeline": "A pipeline task: the stages with their owners, SLA and approvals.",
+    "tabOptions": "Options for {name}",
+    "makeHome": "Make home view",
+    "homeOff": "Stop opening here first",
+    "homeMark": "home",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinnedMark": "Pinned",
+    "hide": "Hide",
+    "hiddenViews": "Hidden ({n})",
+    "showView": "Show {name}"
   },
   "calendar": {
     "today": "Today",

@@ -131,4 +131,30 @@ module.exports.views = (EMAIL, psql, ok) => [
       ok(!(await page.$('[data-view-save]')), "a user can't change someone else's shared view")
     },
   },
+  {
+    id: 'views-home-pin-hide', as: 'design',
+    async run({ page, go }) {
+      const me = psql(`select id from members where role='Graphic Designer' limit 1`)
+      psql(`update members set view_prefs='{}' where id='${me}'`)
+      await go('/spaces/design')
+      await page.click('[data-tab-menu="calendar"]')
+      await page.click('[data-tab-option="home"]')
+      await page.waitForTimeout(800)
+      await go('/spaces/design')
+      ok((await page.getAttribute('[data-view-tab="calendar"]', 'aria-selected')) === 'true', 'the page opens on the home view')
+      await page.click('[data-tab-menu="workload"]')
+      await page.click('[data-tab-option="pin"]')
+      const first = await page.$eval('[role="tablist"] [data-view-tab]', el => el.getAttribute('data-view-tab'))
+      ok(first === 'workload', `a pinned view comes first: ${first}`)
+      await page.click('[data-tab-menu="board"]')
+      await page.click('[data-tab-option="hide"]')
+      ok(!(await page.$('[data-view-tab="board"]')), 'a hidden view leaves the tabs')
+      await page.waitForTimeout(800)
+      const saved = psql(`select view_prefs::text from members where id='${me}'`)
+      ok(/"home": "calendar"/.test(saved) && /"pinned": \["workload"\]/.test(saved) && /"hidden": \["board"\]/.test(saved), `saved for this member: ${saved}`)
+      await page.click('[data-hidden-views]')
+      await page.click('[data-tab-option="board"]')
+      ok(await page.$('[data-view-tab="board"]'), 'Show brings it back')
+    },
+  },
 ]
