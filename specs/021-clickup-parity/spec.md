@@ -117,6 +117,25 @@ C-Check is the Islam Check stage. Tasks created without it have 10 stages. The c
 - **Q: A content creator's task will become a video. How and when does it reach the Video Space?**
   A: **It shows in both Spaces.** It never leaves the Content Space. It is added to the Video Space either when a video editor (a member of the Video Space) is assigned, or at Ready For Design, when a box asks where the task should show.
 
+### Session 2026-11-22 (planning: conflicts with the current app)
+
+- **Q: Members at "user" access can't create tasks today. Who may create them?**
+  A: **Users create their own.** A user may create tasks they own, from a team Space they belong to or from a sheet row. Admins and superusers keep creating tasks for anyone.
+- **Q: Bulk moves and plan pastes can push many tasks into Ready For Design at once. What happens to those without a Design or Video Space?**
+  A: **They are refused.** The bulk move or paste skips them and says "Open the task to hand it off". Other tasks still move.
+- **Q: How is team Space membership set?**
+  A: **Started from job roles, then editable.** Video Editor goes into Video, Graphic Designer into Design, and Content Creator and Digital Marketing Specialist into Content. Admins add or remove anyone afterwards.
+- **Q: What does the Content and Video Spaces' Sheet tab show?**
+  A: **Today's Content sheet and Video sheet, unchanged.** Their List, Board and Calendar show the Space's own tasks.
+- **Q: How does a brand's Sheet work, given the linked sheets share one layout?**
+  A: **A brand filter with shared columns.** A brand's Sheet opens today's Content and Video sheets filtered to that brand, plus the brand's own blank tabs. Columns added on the Content sheet appear for every brand.
+- **Q: How private are a member's own sheet folders?**
+  A: **As today.** Every member can see every folder, and anyone can edit them. My sheets is the member's pinned list.
+- **Q: The names "Team" (the /team page) and "My tasks / Team tasks" (the Board toggle) already exist. How are they resolved?**
+  A: **The old ones are renamed.** The /team page becomes **Plan**, and the Board toggle becomes **Mine / Everyone**. "Teams" and "My tasks" mean only the new things.
+- **Q: The constitution is out of date. When is it updated?**
+  A: **First.** Version 3.0.0 is this feature's first task. It covers the 11 stages as built, simple tasks and the current stack.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Brands hold the work; team Spaces show it (Priority: P1)
@@ -337,8 +356,8 @@ The structure and views in this spec must leave room for each: a view type can b
 - **FR-002**: Every task MUST live in exactly one brand, in its Calendar. A subtask lives in its parent's brand.
 - **FR-003**: Every task MUST have a **Shows in** list of team Spaces, and MUST appear in each of those Spaces' views as the same task.
 - **FR-004**: Brands and team Spaces MUST support create, rename, reorder, archive and restore by admins. Delete MUST be admin-only, need a typed confirmation, and work only on archived nodes.
-- **FR-005**: Each team Space MUST have members, chosen by admins. A team Space MUST be visible only to its members and admins. Brands MUST be visible to every member, as the Board is today.
-- **FR-006**: Assets MUST show the brand's files and its open design requests. Library MUST show the brand's published pipeline tasks, automatically, with their post links. Sheet MUST be the brand's workbook, with linked tabs for its content and video tasks and blank tabs.
+- **FR-005**: Each team Space MUST have members. On release, members are added from their job roles: Video Editor to Video, Graphic Designer to Design, and Content Creator and Digital Marketing Specialist to Content and Planning. Admins may add or remove anyone afterwards. A team Space MUST be visible only to its members and admins. Brands MUST be visible to every member, as the Board is today.
+- **FR-006**: Assets MUST show the brand's files and its open design requests. Library MUST show the brand's published pipeline tasks, automatically, with their post links. Sheet MUST open today's Content and Video sheets filtered to the brand, with the same columns as the all-brand sheets, plus the brand's own blank tabs.
 - **FR-007**: Campaigns (today's projects and content themes) MUST be a filter in a brand's Calendar and views, not a separate place where tasks live. Projects keep their plan on the Projects screen.
 - **FR-008**: On release, every task MUST be placed in its brand's Calendar ("No brand" where it has none), and given a starting Shows in list:
   - Content, for every pipeline task;
@@ -353,11 +372,12 @@ The structure and views in this spec must leave room for each: a view type can b
 - **FR-009**: A member MUST be able to open List, Board, Sheet, Calendar and Workload views on any brand, brand Folder, team Space and Everything. Assets MUST also open as Files, and Library as a Gallery.
 - **FR-010**: Each view MUST keep its own filters, grouping, sorting, visible fields and column order. Views MUST be shared by default. A member MAY save a personal view only they see.
 - **FR-011**: Every view MUST change tasks only through the same rules as the board: stage ownership, Published is terminal, celebrations and SLA reset. No view type MAY add a way around them.
-- **FR-012**: Today's Board, Content sheet and Video sheet MUST stay reachable at their current addresses and behave as they do now.
+- **FR-012**: Today's Board, Content sheet and Video sheet MUST stay reachable at their current addresses and behave as they do now. The Content Space's Sheet tab MUST be today's Content sheet, and the Video Space's Sheet tab today's Video sheet, unchanged. Their other views show the Space's own tasks.
+- **FR-012a**: The /team page MUST be renamed **Plan**, and the Board's scope toggle **Mine / Everyone**. Their behaviour doesn't change.
 - **FR-013**: The Everything view MUST list every task the member may see, and only those.
 - **FR-013a**: Every Board view, everywhere, MUST show the pipeline as built: its stages as columns in their original order, with their original English and Arabic names and look, exactly as today's Board. Status words MUST NOT rename Board columns. Simple tasks, when shown, sit in their own three columns after the pipeline.
 - **FR-013b**: Each member MUST have **My tasks**: every task assigned to them, plus every task they own that someone else is now working on, across all brands and team Spaces. It MUST open as Sheet, Calendar and Board, with a filter: All mine, Assigned to me, Handed off. Regular columns a member adds to their My tasks Sheet (such as "My notes") belong to that member only.
-- **FR-013c**: A member's pinned Sheets folders MUST show in the sidebar under **Me**, above Teams and Brands. They open today's Sheets workbook unchanged: blank, unlinked tabs, formatting, keyboard, tab management. As today (specs 016 and 019), a row can be linked to a task, or turned into a new task with one click, and the row stays linked.
+- **FR-013c**: A member's pinned Sheets folders MUST show in the sidebar under **Me**, above Teams and Brands. Folder visibility and editing stay as today. They open today's Sheets workbook unchanged: blank, unlinked tabs, formatting, keyboard, tab management. As today (specs 016 and 019), a row can be linked to a task, or turned into a new task with one click, and the row stays linked.
 - **FR-014**: The Calendar MUST be one continuous calendar, as a regular calendar is: every task with a date sits on its day, past and future. Members move back and forward through any month or week, and Today returns to the current date. Finished work stays on its day, marked done. Campaigns are a filter, not separate Lists. Dragging a task to a day sets its due date, and tasks without a date are listed apart.
 - **FR-014a**: The Sheet view MUST be the existing spreadsheet, not a new or simpler table. It keeps its menu bar and toolbar, name box, cell editing, keyboard navigation, copy and paste (including from Excel and Google Sheets), formatting, merges, frozen panes, sort and filter, comments, multi-area selection, the power tips, and the Fields drawer with task field and regular columns.
 
@@ -385,12 +405,14 @@ The structure and views in this spec must leave room for each: a view type can b
 
 **Shows in and the hand-off (US6)**
 
+- **FR-027a**: A member at user access MAY create tasks they own, from a team Space they belong to, from a brand, or from a sheet row. Admins and superusers MAY create tasks for anyone, as today.
 - **FR-028**: A task created from a team Space MUST show in that Space. A task created from a brand MUST show in the creator's team Space, or in the one they choose if they belong to several.
 - **FR-029**: Setting a task's assignee to a member of a team Space MUST add that Space to the task's Shows in list. A Space whose default kind is Simple (such as Planning) is added this way only for simple tasks. Changing the assignee MUST NOT remove any Space.
-- **FR-030**: Advancing a pipeline task to Ready For Design MUST open the hand-off box when the task shows in neither Design nor Video. The box MUST:
+- **FR-030**: Moving a pipeline task from before Ready For Design to Ready For Design or later MUST open the hand-off box when the task shows in no production Space. This applies to every one-task path: Advance, the stage menu, Board drag, Inbox and a sheet cell. The box MUST:
   - pre-tick Video for Video and Reel tasks, and Design otherwise;
   - require at least one Space and an assignee from the ticked Spaces' members;
   - complete the move only on confirm, and leave the task unchanged on cancel.
+- **FR-030a**: Bulk moves and plan pastes MUST refuse every task that would need the hand-off box. They MUST name how many tasks were refused and say "Open the task to hand it off", and still apply the other tasks. A pasted plan row that would create a new task at Ready For Design or later, without a production Space, MUST be skipped the same way.
 - **FR-031**: Confirming the hand-off MUST move the task, add the ticked Spaces, set the assignee, and notify the assignee and make them a follower, as assigning does today.
 - **FR-032**: A task MUST NOT leave a team Space automatically. A member who may edit the task MAY remove a Space from its Shows in list by hand.
 - **FR-033**: Which team Spaces count as production Spaces for the hand-off (Design and Video to start) MUST be an admin setting.
@@ -434,12 +456,12 @@ The structure and views in this spec must leave room for each: a view type can b
 - **Scope.** This spec covers US1–US6. US7–US11 get their own specs. AI features, Chat, Whiteboards, Clips, Meetings, Box, Map and Mind Map views, third-party integrations and webhooks are not planned.
 - **Four fixed Folders.** Every brand has exactly Calendar, Assets, Sheet and Library. Brands can't add Folders in this spec.
 - **Library fills itself.** It lists published pipeline tasks automatically; nobody curates it by hand.
-- **A sheet per brand.** Each brand's Sheet Folder is its own workbook. The Content and Video sheets that span all brands become the Content and Video Spaces' Sheet views, at their current addresses.
-- **"Video editor role" means membership of the Video Space.** Members aren't given a team on their profile. Their team Spaces are what count. Members' job roles (Marketing Manager, Brand Director…) still decide who owns review stages.
+- **A sheet per brand.** Each brand's Sheet Folder shows today's Content and Video sheets filtered to the brand, sharing their columns, plus the brand's own blank tabs. The all-brand Content and Video sheets are the Content and Video Spaces' Sheet tabs, at their current addresses.
+- **"Video editor role" means membership of the Video Space**, which starts from the member's job role (FR-005) and is then editable. Job roles still decide who owns review stages.
 - **Starting Spaces.** Content, Design, Video and Planning are created on release. Admins add members and may add more Spaces.
 - **Roles.** The three tiers (admin, superuser, user) stay. A **Guest** role for outside clients is out of scope; it needs its own security review.
 - **The content pipeline stays intact.** Every pipeline task runs on the pipeline stages. Words can't skip or reorder stages. Only the per-brand Islam Check switch removes a stage, as today's C-Check choice does.
-- **Constitution amendment first.** Simple tasks are a second workflow beside the pipeline. Constitution §II (and §V, for the Done celebration) must be amended before US5 is built, and the §II stage table corrected to the 11 stages as built.
+- **Constitution 3.0.0 first.** This feature's first task updates the constitution. It covers the 11 stages as built, simple tasks as a second workflow (§II), the Done celebration (§V), users creating their own tasks (§III), and the current stack (Next.js 16, Prisma and Postgres, the custom session, no Supabase or row-level security).
 - **Subtasks.** They stay as today: a subtask is a real task under a parent, in its parent's brand. It has its own Shows in list.
 - **Nine-stage choice.** It moves from a single workspace setting to a per-brand switch. The workspace value becomes the default, and each task's choice stays fixed at creation.
 - **Today's screens stay.** Overview, Board, Projects, Team, Capacity, Hours, Settings and Sheets keep working. Nothing is removed in this spec.
