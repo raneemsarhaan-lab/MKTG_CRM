@@ -236,14 +236,15 @@ dl { margin: 0 }
             <button type="button" data-s="1">In progress</button>
             <button type="button" data-s="2">Done</button>
           </div>
+          <p class="small muted">Click a step to move the task. Black is where it is now; green is done already. These three buttons replace the stage pill and Advance.</p>
           <div class="toast" id="cheer" hidden role="status">Done. Nice work, Noran: the plan is finished. <span class="small" style="font-weight:600">(the same celebration as Published)</span></div>
-          <p class="cap">Subtasks · each keeps its own kind</p>
+          <p class="cap">Subtasks</p>
           <div class="subs">
-            <div class="sub"><span>Launch copy</span><span style="display:flex;gap:6px;align-items:center"><span class="kind pipe">C-In Progress</span><span class="sla">SLA 1d</span></span></div>
-            <div class="sub"><span>Launch key visual</span><span class="kind pipe">Ready For Design</span></div>
+            <div class="sub"><span>Launch copy</span><span style="display:flex;gap:6px;align-items:center"><span class="kind pipe">Pipeline · C-In Progress</span><span class="sla">SLA 1d</span></span></div>
+            <div class="sub"><span>Launch key visual</span><span class="kind pipe">Pipeline · Ready For Design</span></div>
             <div class="sub"><span>Book the studio</span><span class="kind">Simple · To Do</span></div>
           </div>
-          <p class="small muted">Moving the plan to Done doesn't move any subtask, and the other way round.</p>
+          <p class="small muted">The copy and the key visual are deliverables, so they go through the normal pipeline with their SLA. Booking the studio is a chore, so it's simple. Each task moves on its own: marking the plan Done doesn't finish its subtasks.</p>
         </div>
       </div>
     </div>
