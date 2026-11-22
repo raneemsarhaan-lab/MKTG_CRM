@@ -354,7 +354,7 @@
 - [ ] T074 [P] Field definitions per view node: reuse `SheetColumn` with `sheet` = `space:<id>` / `brand:<id>` / `me:<memberId>` and a new kind `task`. Values in `SheetValue` hold one task id. Keep these out of the content/video loaders, as with My notes. Actions in `src/actions/view-fields.ts` (add, rename, remove, set value), with view-node permissions like saved views.
 - [ ] T075 A "＋ Field" menu on `TaskSheet` and `ListView` (Text, Number, Date, Person, Choice, Checkbox, Web link, Task link), and Task link chips on Board cards and in `TaskModal`.
 - [ ] T076 `LinkTaskPicker`: opens from typing in a Task link cell (or Ctrl+K on one), searches tasks with the typed words, picks one, or "Create new task" with a Space picker that shows the stages the task will get. Used by Task link fields in team views and blank sheets (replacing the one-row path through Board ▾).
-- [ ] T077 Calendar: typing on a day offers Link task. Create sets that due date; linking an existing task moves its due date there, with Undo.
+- [ ] T077 Calendar: typing on a day offers Link task. Create sets that due date, and its Space choice shows the stages the task will get; linking an existing task moves its due date there, with Undo. On a Space's calendar, tasks show that Space's words (user, 2026-11-22).
 - [ ] T078 Real-app checks: add a Task link field, link, create from the picker in Planning (simple) and Content (pipeline), calendar link moves the date, one task per field.
 
 ---

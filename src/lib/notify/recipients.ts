@@ -11,6 +11,7 @@ import { effective, type KindSettings } from './settings'
 
 export interface RTask {
   id: string
+  kind?: string | null
   status: string
   nine_stage: boolean
   task_owner_id: string
@@ -32,6 +33,8 @@ export type NotifyEvent =
 
 /** Everyone who holds the task's current stage. */
 export function stageHolders(task: RTask, members: RMember[]): string[] {
+  // Spec 021 (US5): a simple task has no stage holders.
+  if (task.kind === 'simple') return []
   return members.filter(m => holdsStage(task, m)).map(m => m.id)
 }
 

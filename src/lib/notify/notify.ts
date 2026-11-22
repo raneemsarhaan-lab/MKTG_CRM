@@ -40,7 +40,7 @@ async function settingsLoader(db: Tx, memberIds: string[]): Promise<(id: string)
 export async function notify(db: Tx, event: NotifyEvent, extra: NotifyExtra = {}): Promise<string[]> {
   const task = await db.task.findUnique({
     where: { id: event.taskId },
-    select: { id: true, name: true, status: true, nine_stage: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true },
+    select: { id: true, name: true, status: true, nine_stage: true, kind: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true },
   })
   if (!task) return []
   // Archived tasks are quiet (spec edge case), except the paste summary which is about new tasks.

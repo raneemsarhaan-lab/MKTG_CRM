@@ -2978,8 +2978,8 @@
     },
     "simple": {
       "s-todo": "To Do",
-      "s-prog": "In progress",
-      "s-done": "Done"
+      "s-done": "Done",
+      "s-doing": "In progress"
     },
     "priority": {
       "Low": "Low",

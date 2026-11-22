@@ -325,7 +325,8 @@ export function KanbanBoard({
   const tasksByStage = useMemo(() => {
     const map: Record<string, FullTask[]> = {}
     ALL_STAGES.forEach(s => { map[s] = [] })
-    sortTasks(filteredTasks, sortBy).forEach(t => { if (map[t.status]) map[t.status].push(t) })
+    // Spec 021 (US5): simple tasks sit in their own three columns, never in a stage.
+    sortTasks(filteredTasks, sortBy).forEach(t => { if (t.kind !== 'simple' && map[t.status]) map[t.status].push(t) })
     return map
   }, [filteredTasks, sortBy])
 

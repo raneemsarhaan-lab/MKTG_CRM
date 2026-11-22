@@ -118,7 +118,8 @@ export function ageOf(iso: string, now: Date): { unit: 'now' | 'm' | 'h' | 'd'; 
 
 // ── rules ───────────────────────────────────────────────────────────────────
 
-const live = (t: InboxTask) => !t.dropped_at && t.status !== 'publish'
+// Spec 021 (US5): simple tasks never reach the Inbox's queues.
+const live = (t: InboxTask) => !t.dropped_at && t.status !== 'publish' && t.kind !== 'simple'
 /** Whose work it is: the board's "Only me" rule (R3). */
 export const isYours = (t: Pick<Task, 'assignee_id' | 'task_owner_id'>, memberId: string) =>
   (t.assignee_id ?? t.task_owner_id) === memberId

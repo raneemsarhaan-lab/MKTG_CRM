@@ -67,7 +67,9 @@ export function videosWithClips(tasks: SheetTask[]): { video: SheetTask; clips: 
  * isn't published, so a new video's band is there to add clips to. Most
  * recently worked on first.
  */
-export function sheetVideos(tasks: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
+export function sheetVideos(all: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
+  // Spec 021 (US5): simple tasks are never videos or clips on the Video sheet.
+  const tasks = all.filter(t => (t as { kind?: string }).kind !== 'simple')
   const withClips = videosWithClips(tasks)
   const has = new Set(withClips.map(g => g.video.id))
   const empty = tasks

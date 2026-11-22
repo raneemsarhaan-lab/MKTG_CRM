@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
-import { addAssigneeSpaces, addSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
+import { addAssigneeSpaces, addSpaces, handoffFor, kindForSpace, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
+import { isSimpleStatus } from '@/lib/simple-status'
+import type { SimpleStatus } from '@/types/index'
 import { needsHandoff } from '@/lib/spaces'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
@@ -45,6 +47,8 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
+  // Spec 021 (US5): simple tasks never move through the pipeline (setSimpleStatus moves them).
+  if (task.kind === 'simple') return { success: false, shouldCelebrate: false, error: 'simple_task' }
   const nextStage = nextStageId(task.status as StageId, task.nine_stage)
   if (!nextStage) return { success: false, shouldCelebrate: false, error: 'terminal' }
   if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
@@ -99,6 +103,7 @@ export async function setTaskStage(
   const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
+  if (task.kind === 'simple') return { success: false, shouldCelebrate: false, error: 'simple_task' }
   const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
   const fromIdx = path.indexOf(task.status as StageId)
   const toIdx   = path.indexOf(stageId)
@@ -777,7 +782,8 @@ export async function bulkUpdateTasks(
 
     if (patch.status !== undefined) {
       const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
-      if (!path.includes(patch.status) || task.dropped_at) { refused++; continue }
+      // Spec 021 (US5): a stage means nothing to a simple task; it is skipped, not changed.
+      if (task.kind === 'simple' || !path.includes(patch.status) || task.dropped_at) { refused++; continue }
 
       // The same rule as a drag or the sheet's menu (src/lib/stage-moves.ts).
       if (patch.status !== task.status) {
@@ -908,9 +914,14 @@ export async function createTask(
   if (!userMayCreate(member, input.task_owner_id, input.assignee_id)) return { success: false, error: 'not_authorized' }
 
   const nineStage = await nineStageFor(input.brand_id)
+  // Spec 021 (approved design): the task takes the stages of the Space it is created in.
+  const spaceCtx = await loadSpaceContext()
+  const kind = kindForSpace(input.space_id, spaceCtx)
 
   const task = await prisma.task.create({
     data: {
+      kind,
+      simple_status:      kind === 'simple' ? 's-todo' : null,
       name:               input.name,
       description:        input.description?.trim() || null,
       brand_id:           input.brand_id || null,
@@ -931,8 +942,7 @@ export async function createTask(
     },
   })
   // Spec 021 (FR-028, FR-029): the Space it was created from (or the creator's), then the assignee's.
-  const spaceCtx = await loadSpaceContext()
-  await addSpaces(prisma, task.id, spacesOnCreate(member.id, 'pipeline', input.space_id, spaceCtx), 'created', member.id)
+  await addSpaces(prisma, task.id, spacesOnCreate(member.id, kind, input.space_id, spaceCtx), 'created', member.id)
   await addAssigneeSpaces(prisma, task, task.assignee_id, member.id, spaceCtx)
   // Spec 012: the people on it follow; the stage's holders and a new assignee hear about it.
   await notifyAfter(async tx => {
@@ -1009,12 +1019,16 @@ export async function createTasks(
   const nineStage = await nineStageFor(shared.brand_id)
   const now = new Date()
   const due = new Date(shared.due_date)
+  const spaceCtx = await loadSpaceContext()
+  const kind = kindForSpace(shared.space_id, spaceCtx)
 
   try {
     const ids = clean.map(() => crypto.randomUUID())
     const result = await prisma.task.createMany({
       data: clean.map((name, i) => ({
         id: ids[i],
+        kind,
+        simple_status: kind === 'simple' ? 's-todo' : null,
         name,
         description:        shared.description?.trim() || null,
         brand_id:           shared.brand_id,
@@ -1036,11 +1050,10 @@ export async function createTasks(
     })
 
     // Spec 021 (FR-028, FR-029): each new task's starting Spaces.
-    const spaceCtx = await loadSpaceContext()
-    const startIds = spacesOnCreate(member.id, 'pipeline', shared.space_id, spaceCtx)
+    const startIds = spacesOnCreate(member.id, kind, shared.space_id, spaceCtx)
     for (const id of ids) {
       await addSpaces(prisma, id, startIds, 'created', member.id)
-      await addAssigneeSpaces(prisma, { id, kind: 'pipeline' }, shared.assignee_id ?? shared.task_owner_id, member.id, spaceCtx)
+      await addAssigneeSpaces(prisma, { id, kind }, shared.assignee_id ?? shared.task_owner_id, member.id, spaceCtx)
     }
 
     // Spec 012: a pasted list is one notification per stage holder, not one per task.
@@ -1271,4 +1284,28 @@ export async function loadAttachments(taskId: string): Promise<{
     size_bytes: r.size_bytes, content_type: r.content_type,
     uploaded_by: r.uploaded_by, uploaded_at: r.uploaded_at.toISOString(),
   }))
+}
+
+// ─── setSimpleStatus ─────────────────────────────────────────────────────────
+
+/**
+ * Spec 021 (US5, FR-024): move a simple task between To Do, In progress and
+ * Done, forward or back. No stage owners, no SLA: anyone who may edit the task
+ * may move it. Reaching Done celebrates (shouldCelebrate), as Published does.
+ * Never touches the parent or subtasks (FR-025).
+ */
+export async function setSimpleStatus(taskId: string, status: SimpleStatus): Promise<MoveTaskResult> {
+  const member = await getSessionMember()
+  if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
+  if (!isSimpleStatus(status)) return { success: false, shouldCelebrate: false, error: 'invalid' }
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
+  if (task.kind !== 'simple') return { success: false, shouldCelebrate: false, error: 'not_simple' }
+  if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
+  if (!canAct(task, member)) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  if (task.simple_status === status) return { success: true, shouldCelebrate: false }
+  await prisma.task.update({ where: { id: taskId }, data: { simple_status: status, stage_date: new Date(), updated_at: new Date() } })
+  revalidatePath('/board')
+  revalidatePath('/', 'layout')
+  return { success: true, shouldCelebrate: status === 's-done' }
 }

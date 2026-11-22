@@ -47,12 +47,16 @@ const REVIEW_STAGES:  StageId[] = ['c-final', 'c-check', 'd-check', 'final-check
  * current stage, so a task sitting in `publish` carries the day it was
  * published.
  */
-export function weekMomentum(tasks: Task[], today: Date): {
+/** Spec 021 (US5, FR-026): pipeline figures leave simple tasks out. */
+const pipelineOnly = (tasks: Task[]) => tasks.filter(t => (t as { kind?: string }).kind !== 'simple')
+
+export function weekMomentum(all: Task[], today: Date): {
   pct: number
   completed: number
   planned: number
   delta: number
 } {
+  const tasks = pipelineOnly(all)
   const thisFrom = startOfWeek(today)
   const thisTo   = addDays(thisFrom, 7)
   const lastFrom = addDays(thisFrom, -7)
@@ -80,9 +84,10 @@ export function weekMomentum(tasks: Task[], today: Date): {
  * figure above it. The other three are current standings, which is what makes
  * "Published" a larger number than "Completed" rather than a contradiction.
  */
-export function statCounts(tasks: Task[], today: Date): {
+export function statCounts(all: Task[], today: Date): {
   completed: number; inProgress: number; review: number; published: number
 } {
+  const tasks = pipelineOnly(all)
   const from = startOfWeek(today)
   const to   = addDays(from, 7)
   return {
@@ -127,6 +132,8 @@ export function attentionItems(
 
   for (const t of tasks) {
     if (t.status === 'publish') continue
+    // Spec 021 (US5): a simple task in To Do isn't "stuck in a stage"; Done ones are finished.
+    if ((t as { kind?: string }).kind === 'simple' && (t as { simple_status?: string }).simple_status === 's-done') continue
     if ((t.assignee_id ?? t.task_owner_id) !== memberId) continue
 
     const days = t.due_date ? calDaysBetween(today, new Date(t.due_date as string)) : null

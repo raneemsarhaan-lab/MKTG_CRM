@@ -21,6 +21,8 @@ export function getAlertStatus(
   slaConfig: SLAConfig,
   today: Date
 ): AlertStatus {
+  // Spec 021 (US5, FR-024): a simple task has no SLA, so it is never at risk or breached.
+  if ((task as { kind?: string }).kind === 'simple') return 'On Track'
   const stageDate = new Date(task.stage_date)
 
   const stageDays = businessDaysBetween(stageDate, today)
