@@ -56,6 +56,7 @@ export function readDate(text: string, now = new Date()): string | null | '' {
 
 export function ContentSheet(p: ContentSheetProps) {
   const t = useTranslations('content')
+  const tHandoff = useTranslations('handoff')
   const ts = useTranslations('sheet')
   const ta = useTranslations('attachments')
   const names = useStageNames('content')
@@ -186,7 +187,7 @@ export function ContentSheet(p: ContentSheetProps) {
     const res = await p.api.bulkUpdate(bulkTasks.map(x => x.id), patch)
     setBulkBusy(false)
     if (!res.success && !res.changed) { say(t('notSaved', { reason: why(res.error) })); return }
-    say(bulkMessage(res.changed, res.refused), res.changed ? () => void bulkUndo(key, before) : undefined)
+    say([bulkMessage(res.changed, res.refused), res.handoff ? tHandoff('refused', { n: res.handoff }) : ''].filter(Boolean).join(' · '), res.changed ? () => void bulkUndo(key, before) : undefined)
   }
   async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[]) {
     if (key === 'status') {

@@ -1,5 +1,8 @@
 'use server'
 
+import { needsHandoff } from '@/lib/spaces'
+import { addAssigneeSpaces, addSpaces, loadSpaceContext } from '@/lib/spaces-server'
+
 /**
  * The Content sheet's server actions (spec 009, contracts/server.md).
  *
@@ -77,6 +80,8 @@ export interface AddPlanResult {
   problems?: { row: number; code: string }[]
   /** Custom values written (spec 010). */
   values?: number
+  /** Spec 021 (FR-030a): rows skipped because they would need the hand-off box. */
+  handoff?: number
 }
 
 /**
@@ -100,12 +105,15 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
     return first.length === 1 ? first[0].id : null
   }
   const types = (await prisma.contentType.findMany({ select: { label: true } })).map(t => t.label)
+  // Spec 021: pasted pieces show in the Content Space; a paste never opens the hand-off box.
+  const spaceCtx = await loadSpaceContext()
+  const contentSpace = spaceCtx.spaces.find(x => x.key === 'content')?.id
 
   try {
     const out = await prisma.$transaction(async tx => {
       // $executeRaw: the lock returns void, which $queryRaw cannot read back.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
-      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0 }
+      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0, handoff: 0 }
       const columns = await pasteColumns(tx, 'content', members)
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
@@ -193,6 +201,10 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
             ...(!task.post_url && links.post ? { post_url: links.post } : {}),
             ...(!task.published_url && links.published ? { published_url: links.published } : {}),
           }
+          if (opts.useSheetTitleStatus && !status.archived && status.stage !== task.status) {
+            const shown = (await tx.taskSpace.findMany({ where: { task_id: taskId }, select: { space_id: true } })).map(x => x.space_id)
+            if (needsHandoff(task, status.stage, shown, spaceCtx.spaces)) { res.handoff++; continue }
+          }
           if (opts.useSheetTitleStatus) {
             data.name = title
             if (status.archived) data.dropped_at = task.dropped_at ?? now
@@ -224,6 +236,8 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           continue
         }
 
+        // A new piece pasted at Ready For Design or later would need a hand-off: skipped (FR-030a).
+        if (!status.archived && needsHandoff({ status: 'todo', nine_stage: false, kind: 'pipeline' }, status.stage, [], spaceCtx.spaces)) { res.handoff++; continue }
         const owner = memberByName(r.owner) ?? member.id
         const task = await tx.task.create({
           data: {
@@ -237,6 +251,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
         if (links.doc) await setRoleLink(tx, task.id, 'working_doc', links.doc, member.id)
         if (links.design) await setRoleLink(tx, task.id, 'design', links.design, member.id)
         res.values += await writePastedValues(tx, columns, task.id, r.custom, member.id, { onlyEmpty: false })
+        if (contentSpace) await addSpaces(tx, task.id, [contentSpace], 'created', member.id)
         res.created.push(task.id)
       }
       return res
@@ -291,6 +306,13 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
       hours_estimate: 0, priority: 'Medium', created_by: member.id,
     },
   })
+  // Spec 021: a piece is content work — it shows in the Content Space, and in its assignee's.
+  {
+    const ctx = await loadSpaceContext()
+    const content = ctx.spaces.find(x => x.key === 'content')?.id
+    if (content) await addSpaces(prisma, task.id, [content], 'created', member.id)
+    await addAssigneeSpaces(prisma, task, task.assignee_id, member.id, ctx)
+  }
   // Spec 012: the theme's people follow it; the stage holders and a new assignee hear about it.
   await notifyAfter(async tx => {
     for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)

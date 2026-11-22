@@ -378,6 +378,8 @@ export interface UIStore {
   pendingDeletes: Record<string, PendingDelete>
   /** The member turned celebrations on (off by default); while off, setCelebration ignores new ones. */
   celebrationsOn: boolean
+  /** Spec 021: the hand-off box, when open. */
+  handoff: HandoffRequest | null
 
   setCelebration: (payload: CelebrationPayload | null) => void
   setCelebrationsOn: (on: boolean) => void
@@ -386,6 +388,24 @@ export interface UIStore {
   setProfileOpen: (open: boolean) => void
   putPendingDelete: (entry: PendingDelete) => void
   dropPendingDelete: (attachmentId: string) => void
+  /** Opens the hand-off box; false (and nothing changes) when one is already open. */
+  openHandoff: (req: HandoffRequest) => boolean
+  closeHandoff: () => void
+}
+
+/** Spec 021: everything the hand-off box needs, gathered by whoever got `needs_handoff`. */
+export interface HandoffRequest {
+  taskId: string
+  taskName: string
+  target: StageId
+  /** Names of the Spaces the task already shows in. */
+  shownIn: string[]
+  /** Production Spaces to offer. */
+  spaces: { id: string; key: string; name: string; color: string }[]
+  /** Pre-ticked Space ids. */
+  ticked: string[]
+  /** Members of each production Space, by Space id. */
+  candidates: Record<string, { id: string; name: string; role: string }[]>
 }
 
 export interface MoveTaskResult {

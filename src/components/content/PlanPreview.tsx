@@ -72,6 +72,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   onClose(message?: string): void
 }) {
   const t = useTranslations('content')
+  const th = useTranslations('handoff')
   const tc = useTranslations('sheet.columns')
   const [cells, setCells] = useState<PastedCell[][]>(initialCells ?? [])
   const [text, setText] = useState('')
@@ -165,7 +166,9 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
     const skipped = (res.skipped?.length ?? 0) + (res.problems?.length ?? 0)
     onClose([t('paste.done', { created: res.created?.length ?? 0, updated: res.updated?.length ?? 0 }),
       res.values ? tc('paste.filled', { n: res.values }) : '',
-      skipped ? t('paste.skipped', { count: skipped }) : ''].filter(Boolean).join(' · '))
+      skipped ? t('paste.skipped', { count: skipped }) : '',
+      // Spec 021 (FR-030a): rows a paste won't hand off.
+      res.handoff ? th('refused', { n: res.handoff }) : ''].filter(Boolean).join(' · '))
   }
 
   return (

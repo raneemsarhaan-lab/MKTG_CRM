@@ -51,6 +51,7 @@ const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage
 
 export function VideoSheet(p: VideoSheetProps) {
   const t = useTranslations('sheet')
+  const tHandoff = useTranslations('handoff')
   const ta = useTranslations('attachments')
   const tl = useTranslations('sheets.links')
   const names = useStageNames()
@@ -334,7 +335,8 @@ export function VideoSheet(p: VideoSheetProps) {
     const res = await p.api.bulkUpdate(bulkTasks.map(x => x.id), patch)
     setBulkBusy(false)
     if (!res.success && !res.changed) { say(t('notSaved', { reason: why(res.error) })); return }
-    const text = res.refused ? t('bulk.doneSome', { n: res.changed, m: res.refused }) : t('bulk.done', { n: res.changed })
+    const text = [res.refused ? t('bulk.doneSome', { n: res.changed, m: res.refused }) : t('bulk.done', { n: res.changed }),
+      res.handoff ? tHandoff('refused', { n: res.handoff }) : ''].filter(Boolean).join(' · ')
     say(text, res.changed ? () => void bulkUndo(key, before) : undefined)
   }
   async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[]) {

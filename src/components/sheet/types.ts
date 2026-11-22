@@ -59,7 +59,7 @@ export interface SheetApi {
    */
   removeFile?(taskId: string, attachmentId: string): { undo(): void; commit(): Promise<Result> } | null
   /** The board's bulk save (design/video-sheet-bulk-bar.html): every clip at once, with the board's rules. */
-  bulkUpdate?(taskIds: string[], patch: BulkPatch): Promise<{ success: boolean; changed: number; refused: number; error?: string }>
+  bulkUpdate?(taskIds: string[], patch: BulkPatch): Promise<{ success: boolean; changed: number; refused: number; handoff?: number; error?: string }>
   /** "+ Video": a new video, ready for clips. */
   addVideo?(name: string): Promise<Result & { id?: string }>
   /** Spec 013 FR-044: a row's height on a linked sheet, shared by the team (null: the default). */

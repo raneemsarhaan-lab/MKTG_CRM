@@ -4,6 +4,7 @@ import type { Member, NavTree, PinnedFolder } from '@/types/index'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
+import { HandoffDialog } from '@/components/handoff/HandoffDialog'
 import { NotifyProvider } from '@/components/notifications/NotifyProvider'
 import { notifyApi } from '@/components/notifications/api'
 import { HoursReminderApp } from '@/components/hours/pages'
@@ -61,6 +62,9 @@ export function AppShell({ member, pins = [], tree = null, children }: AppShellP
 
       {/* The forgotten-day hours reminder (spec 014), once for the app. */}
       <HoursReminderApp />
+
+      {/* Spec 021: the hand-off box — global, mounts once */}
+      <HandoffDialog />
 
       {/* Celebration overlay — global, mounts once */}
       <CelebrationOverlay />

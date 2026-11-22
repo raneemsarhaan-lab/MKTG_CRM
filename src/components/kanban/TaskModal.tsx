@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
 import type { Brand, TeamSpace, TaskSpace } from '@/types/index'
 import { ShowsIn } from './ShowsIn'
+import { handoffRequest } from '@/components/handoff/request'
 import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
@@ -554,6 +555,7 @@ export function TaskModal({
   const stageBtnRef  = useRef<HTMLButtonElement>(null)
   const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
+  const openHandoff = useUIStore(s => s.openHandoff)
   const selectTask     = useUIStore(s => s.selectTask)
 
   // From an attachment notification: open Attachments and bring it into view.
@@ -767,6 +769,9 @@ export function TaskModal({
     if (!canAdvance) return
     startTransition(async () => {
       const result = await moveTask(task.id)
+      // Spec 021 (FR-030): into the design half with no production Space → the hand-off box.
+      const handoff = handoffRequest(result, task, spaces, taskSpaces, members, tSpaces)
+      if (handoff) { openHandoff(handoff); return }
       if (result.success) {
         router.refresh()
         if (result.shouldCelebrate && nextMeta) {
@@ -927,6 +932,8 @@ export function TaskModal({
     setError('')
     startTransition(async () => {
       const r = await setTaskStage(task.id, next)
+      const handoff = handoffRequest(r, task, spaces, taskSpaces, members, tSpaces)
+      if (handoff) { openHandoff(handoff); return }
       if (!r.success) {
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'

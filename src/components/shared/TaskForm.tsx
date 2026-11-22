@@ -48,6 +48,10 @@ interface TaskFormProps {
   brands:       Brand[]
   contentTypes: ContentType[]
   members:      Member[]
+  /** Spec 021 (FR-028): created from this Space. */
+  spaceId?:     string | null
+  /** Spec 021: the Spaces the creator could choose from when not created from one. */
+  spaceChoices?: { id: string; name: string }[]
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email'] as const
@@ -92,7 +96,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFormProps) {
+export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [] }: TaskFormProps) {
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -128,9 +132,11 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
     cover_image_url: '',
   })
 
-  // Mirrors requireTaskCreator() in the server action — the check that counts
-  // is the server one; this only avoids rendering a form that cannot submit.
-  if (currentUser.access === 'user') return null
+  // Spec 021 (research R10): a user creates tasks for themselves — they own
+  // them and are the only assignee they can pick. The server checks the same.
+  const isUser = currentUser.access === 'user'
+  const assignable = isUser ? members.filter(m => m.id === currentUser.id) : members
+  const [showIn, setShowIn] = useState<string | null>(spaceId ?? spaceChoices?.[0]?.id ?? null)
 
   function patch<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(p => ({ ...p, [k]: v }))
@@ -173,6 +179,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         priority:           form.priority,
         project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
+        space_id:           showIn,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create those tasks'); return }
       router.refresh()
@@ -200,6 +207,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
         priority:           form.priority,
         project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
+        space_id:           showIn,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create task'); return }
 
@@ -367,7 +375,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
 
             <FieldPill label="Assignee" value={assignee?.name} active
                        icon={<Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />}>
-              {closePill => members.map(m => (
+              {closePill => assignable.map(m => (
                 <PillOption
                   key={m.id}
                   selected={m.id === form.assignee_id}
@@ -378,6 +386,16 @@ export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFor
                 </PillOption>
               ))}
             </FieldPill>
+
+            {/* Spec 021 (FR-028): which of the creator's Spaces it shows in, when not created from one. */}
+            {!spaceId && spaceChoices.length > 1 && (
+              <FieldPill label="Show in" value={spaceChoices.find(x => x.id === showIn)?.name} active
+                         icon={<Icon d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />}>
+                {closePill => spaceChoices.map(x => (
+                  <PillOption key={x.id} selected={x.id === showIn} onClick={() => { setShowIn(x.id); closePill() }}>{x.name}</PillOption>
+                ))}
+              </FieldPill>
+            )}
 
             <FieldPill label="Due date" value={shortDate(form.due_date)} active width={220}
                        icon={<Icon d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}>

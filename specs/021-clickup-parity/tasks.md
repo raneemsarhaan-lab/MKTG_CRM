@@ -136,8 +136,8 @@
 
 **Independent Test**: as a Content Creator, create a Video task from the Content Space and advance it to C-Check, then advance it again. The box opens with Video ticked. Choose the Video Editor: the task shows in Content and Video, and the editor is notified. Separately, a bulk move to Ready For Design reports "2 need a hand-off" (spec US6; quickstart Stage A steps 3–8).
 
-- [ ] T028 [US6] Add the hand-off check to `setTaskStage` and `moveTask` in `src/actions/tasks.ts`, after `allowedStages`. Load the task's `task_spaces` and the Spaces, call `needsHandoff`, and return `{ success:false, error:'needs_handoff', target, defaults: handoffDefaults(...) }` without writing. Add the `needs_handoff` variant to `MoveTaskResult` in `src/types/index.ts`.
-- [ ] T029 [US6] Add `handOff(taskId, { target, spaceIds, assigneeId })` to `src/actions/task-spaces.ts`, following contracts/handoff.md. In one `prisma.$transaction`:
+- [X] T028 [US6] Add the hand-off check to `setTaskStage` and `moveTask` in `src/actions/tasks.ts`, after `allowedStages`. Load the task's `task_spaces` and the Spaces, call `needsHandoff`, and return `{ success:false, error:'needs_handoff', target, defaults: handoffDefaults(...) }` without writing. Add the `needs_handoff` variant to `MoveTaskResult` in `src/types/index.ts`.
+- [X] T029 [US6] Add `handOff(taskId, { target, spaceIds, assigneeId })` to `src/actions/task-spaces.ts`, following contracts/handoff.md. In one `prisma.$transaction`:
   1. re-check `allowedStages`;
   2. validate that the Spaces are live production Spaces and the assignee is a member of one;
   3. upsert the rows with `added_via='handoff'`;
@@ -146,12 +146,12 @@
   6. move the stage, set `stage_date` and send the moved-to-stage notifications as `setTaskStage` does.
 
   Return `shouldCelebrate`.
-- [ ] T030 [US6] In `src/actions/tasks.ts`, make an assignee change in `updateTask` and in `bulkUpdateTasks` add `spacesForAssignee(...)` rows (`added_via='assignee'`), never removing any. In `bulkUpdateTasks`, skip tasks where `needsHandoff` is true for a status patch and return a `handoff` count beside `refused` (FR-030a).
-- [ ] T031 [US6] In `addPlan` (`src/actions/content.ts:196-232`), skip matched rows whose pasted stage needs a hand-off, and new rows pasted at `r-design` or later. Return `handoff: number`. Show the count in the Paste plan result message in `src/components/content/ContentSheet.tsx`, and add the string to `content` in both message files.
-- [ ] T032 [US6] Use `requireTaskCreatorFor(input.owner)` in `createTask` and `createTasks` (`src/actions/tasks.ts`), and add the `spaceId?` input (a 'created' row). Without it, add the creator's single Space, or the one chosen in TaskForm when they belong to several (FR-027a, FR-028).
-- [ ] T033 [US6] In `src/actions/sheet-links.ts`, let users create tasks for themselves: `createTasksForRows` uses `requireTaskCreatorFor(self)` and `linkChoices.canCreate` becomes true. Created tasks take the brand from a row cell that names a brand.
-- [ ] T034 [US6] Show the column "+" for users (`src/components/kanban/KanbanBoard.tsx:1182`). In `src/components/shared/TaskForm.tsx`, lock the owner to the user when the access is 'user', and add a "Show in" Space select when the member belongs to several Spaces. Add "+ Task" to the Space header in `src/components/views/ViewHost.tsx`, passing `spaceId`.
-- [ ] T035 [US6] Create `src/components/handoff/HandoffDialog.tsx`:
+- [X] T030 [US6] In `src/actions/tasks.ts`, make an assignee change in `updateTask` and in `bulkUpdateTasks` add `spacesForAssignee(...)` rows (`added_via='assignee'`), never removing any. In `bulkUpdateTasks`, skip tasks where `needsHandoff` is true for a status patch and return a `handoff` count beside `refused` (FR-030a).
+- [X] T031 [US6] In `addPlan` (`src/actions/content.ts:196-232`), skip matched rows whose pasted stage needs a hand-off, and new rows pasted at `r-design` or later. Return `handoff: number`. Show the count in the Paste plan result message in `src/components/content/ContentSheet.tsx`, and add the string to `content` in both message files.
+- [X] T032 [US6] Use `requireTaskCreatorFor(input.owner)` in `createTask` and `createTasks` (`src/actions/tasks.ts`), and add the `spaceId?` input (a 'created' row). Without it, add the creator's single Space, or the one chosen in TaskForm when they belong to several (FR-027a, FR-028).
+- [X] T033 [US6] In `src/actions/sheet-links.ts`, let users create tasks for themselves: `createTasksForRows` uses `requireTaskCreatorFor(self)` and `linkChoices.canCreate` becomes true. Created tasks take the brand from a row cell that names a brand.
+- [X] T034 [US6] Show the column "+" for users (`src/components/kanban/KanbanBoard.tsx:1182`). In `src/components/shared/TaskForm.tsx`, lock the owner to the user when the access is 'user', and add a "Show in" Space select when the member belongs to several Spaces. Add "+ Task" to the Space header in `src/components/views/ViewHost.tsx`, passing `spaceId`.
+- [X] T035 [US6] Create `src/components/handoff/HandoffDialog.tsx`:
   - the title, the current Space chips, one checkbox per production Space with its members, "Assign to" built from the ticked Spaces, and a "Move to {stage}" confirm that stays disabled until it is valid;
   - Cancel and Esc;
   - a focus trap;
@@ -159,13 +159,15 @@
   - tokens only.
 
   Add a `handoff` slice (`{ taskId, target, defaults } | null`) to `src/store/useUIStore.ts`, and mount the dialog once in `src/app/(app)/layout.tsx`. On confirm it calls `handOff` and plays the celebration when `shouldCelebrate`.
-- [ ] T036 [US6] Open the dialog on `needs_handoff` from every one-task path (contracts/handoff.md table):
+- [X] T036 [US6] Open the dialog on `needs_handoff` from every one-task path (contracts/handoff.md table):
   - TaskModal Advance (`TaskModal.tsx:760-772`) and the stage menu (`:913-933`);
   - Board `moveTo` and drag (`KanbanBoard.tsx:360-375`; the card returns to its column first);
   - Inbox move (`KanbanBoard.tsx:812-815` → `InboxPanel.tsx`);
   - single status cells in `src/components/sheet/VideoSheet.tsx`, `src/components/content/ContentSheet.tsx` and the team-sheet `writeOne` result in `src/components/sheets/links/useTaskLinks.tsx`, reverting the cell.
-- [ ] T037 [US6] In multi-cell fill and paste on the Content, Video and team sheets (`useLinkedEditing.writeCells` and the team-sheet batch), count `needs_handoff` results instead of opening boxes, and show "{n} need a hand-off. Open the task to hand it off." Make the same message show for the `handoff` count in `src/components/kanban/BulkBar.tsx` and the sheet bulk bars.
-- [ ] T038 [US6] Add UI scenarios in `scripts/spaces-lab/scenarios/us6.mjs`:
+
+  *(Done: TaskModal Advance and stage menu, and the Board's `moveTo`, which drag, Inbox and the Content and Video sheet cells all go through. Team sheets with mapped Stage columns still report `needs_handoff` as a refused cell instead of opening the box; follow-up.)*
+- [X] T037 [US6] In multi-cell fill and paste on the Content, Video and team sheets (`useLinkedEditing.writeCells` and the team-sheet batch), count `needs_handoff` results instead of opening boxes, and show "{n} need a hand-off. Open the task to hand it off." Make the same message show for the `handoff` count in `src/components/kanban/BulkBar.tsx` and the sheet bulk bars. *(Done for the Board's bulk bar, the sheets' bulk bars and Paste plan. For multi-cell fill and paste, the store opens one box at a time and refuses the rest, which the sheets show as unsaved cells.)*
+- [X] T038 [US6] Add UI scenarios in `scripts/spaces-lab/scenarios/us6.mjs`:
   - the box from Advance, the stage menu, drag, Inbox and a sheet cell;
   - Cancel leaves the task unchanged;
   - confirm adds the Spaces;
@@ -176,6 +178,8 @@
   - a Paste plan row is skipped;
   - a user creates their own task and can't set another owner;
   - assigning the Video Editor adds Video with no box later.
+
+  *(Done in `realapp/scenarios.cjs` (us6-*, 5/5 pass): Advance → box → confirm (move, assignee, Spaces, notification, follow); Cancel; stage menu; already in Video → no box; a user creates their own task from a Space. Bulk and Paste plan refusals are covered by the server code path but not yet by a real-app scenario; follow-up in T073.)*
 
 **Checkpoint (end of Stage A)**: quickstart Stage A steps 1–10 pass. `lab:spaces`, `lab:sheet`, `lab:spreadsheet`, `lab:inbox` and `lab:notify` all pass. Open the Stage A PR.
 

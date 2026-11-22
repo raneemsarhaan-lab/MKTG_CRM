@@ -12,6 +12,7 @@ export const useUIStore = create<UIStore>((set) => ({
   profileOpen:    false,
   pendingDeletes: {},
   celebrationsOn: false,
+  handoff:        null,
 
   // Celebrations are off unless the member turns them on: a new one is dropped while off.
   setCelebration:  (payload: CelebrationPayload | null) => set(s => (payload && !s.celebrationsOn ? s : { celebration: payload })),
@@ -22,6 +23,14 @@ export const useUIStore = create<UIStore>((set) => ({
   // Attachment deletes in their Undo window (spec 007). The timers live in
   // src/lib/pending-deletes.ts, never here: a timeout handle is not state.
   putPendingDelete:  entry => set(s => ({ pendingDeletes: { ...s.pendingDeletes, [entry.attachment.id]: entry } })),
+  // Spec 021: the hand-off box. One at a time — a second request while one is
+  // open is refused, so a multi-cell paste can't stack boxes.
+  openHandoff: req => {
+    let opened = false
+    set(s => (s.handoff ? s : ((opened = true), { handoff: req })))
+    return opened
+  },
+  closeHandoff: () => set({ handoff: null }),
   dropPendingDelete: id => set(s => {
     if (!(id in s.pendingDeletes)) return s
     const next = { ...s.pendingDeletes }

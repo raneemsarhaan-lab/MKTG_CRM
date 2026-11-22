@@ -46,6 +46,7 @@ import { snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
+import { handoffRequest } from '@/components/handoff/request'
 
 type FullTask = Task & {
   brand: Brand
@@ -147,6 +148,9 @@ export function KanbanBoard({
   const showTaskForm   = useUIStore(s => s.showTaskForm)
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const setCelebration = useUIStore(s => s.setCelebration)
+  const openHandoff    = useUIStore(s => s.openHandoff)
+  const tSpaces        = useTranslations('spaces')
+  const tHandoff       = useTranslations('handoff')
   const searchParams   = useSearchParams()
 
   // My Board's "+ Add task" links here with ?new=1 — open the composer on
@@ -369,7 +373,8 @@ export function KanbanBoard({
     setDragError('')
     startTransition(async () => {
       const res = await moveTo(dragged, toStage)
-      if (!res.success) {
+      // Spec 021: a hand-off opens its box instead of an error.
+      if (!res.success && res.error !== 'needs_handoff') {
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
@@ -394,6 +399,10 @@ export function KanbanBoard({
     try { res = await setTaskStage(task.id, toStage) } catch { res = { success: false, shouldCelebrate: false, error: 'generic' } }
     if (!res.success) {
       setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, ...from } : t)))
+      // Spec 021 (FR-030): drag, Inbox and sheet cells all land here — the box
+      // opens for the task, and the card/cell stays where it was until confirmed.
+      const req = handoffRequest(res, task, spaces, taskSpaces, members, tSpaces)
+      if (req) openHandoff(req)
       return res
     }
     router.refresh()
@@ -951,7 +960,7 @@ export function KanbanBoard({
    * note has a bar left to sit in, since the bar disappears at zero.
    */
   function runBulk(
-    fn: () => Promise<{ changed: number; refused: number; error?: string }>,
+    fn: () => Promise<{ changed: number; refused: number; handoff?: number; error?: string }>,
     clearAfter = false,
   ) {
     setBulkBusy(true)
@@ -960,11 +969,11 @@ export function KanbanBoard({
       const res = await fn()
       setBulkBusy(false)
       if (res.error) { setBulkNote(res.error); return }
-      setBulkNote(
-        res.refused > 0
-          ? `${res.changed} changed · ${res.refused} not yours`
-          : `${res.changed} changed`,
-      )
+      setBulkNote([
+        res.refused > 0 ? `${res.changed} changed · ${res.refused} not yours` : `${res.changed} changed`,
+        // Spec 021 (FR-030a): bulk moves skip tasks that need a hand-off, and say so.
+        res.handoff ? tHandoff('refused', { n: res.handoff }) : '',
+      ].filter(Boolean).join(' · '))
       if (clearAfter) setSelected(new Set())
       router.refresh()
       setTimeout(() => setBulkNote(''), 5000)
@@ -1029,7 +1038,7 @@ export function KanbanBoard({
         </>
       }
       account={<UserMenu member={currentUser} variant="header" />}
-      canCreate={currentUser.access !== 'user'}
+      canCreate
       onNewTask={() => setShowTaskForm(true)}
     />
   )
@@ -1051,12 +1060,16 @@ export function KanbanBoard({
       buttonRef={inboxBtn}
     />
   )
+  // Spec 021: the creator's own pipeline Spaces, for "Show in" when not created from a Space.
+  const mySpaces = spaces.filter(x => x.default_kind !== 'simple' && spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
   const taskForm = showTaskForm && (
     <TaskForm
       currentUser={currentUser}
       brands={brands}
       contentTypes={contentTypes}
       members={members}
+      spaceId={spaceId ?? null}
+      spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
     />
   )
 
@@ -1215,7 +1228,8 @@ export function KanbanBoard({
                 today={today}
                 highlight={overStage === stageId && activeDragId !== null}
                 onSelectTask={id => selectTask(id)}
-                onAddTask={currentUser.access !== 'user' ? () => setShowTaskForm(true) : undefined}
+                // Spec 021 (FR-027a): everyone may create tasks they own.
+                onAddTask={() => setShowTaskForm(true)}
                 selectedIds={selected}
                 selecting={selected.size > 0}
                 onToggleSelect={toggleSelect}
