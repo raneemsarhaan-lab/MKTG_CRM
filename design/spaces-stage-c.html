@@ -156,6 +156,13 @@ dl { margin: 0 }
 .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
 .flow span.step { padding: 4px 10px; border-radius: 999px; background: var(--soft); font-weight: 600 }
 
+
+.fieldmenu { display: grid; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); max-width: 260px }
+.fieldmenu span { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px }
+.fieldmenu span:last-child { border-bottom: none }
+.fieldmenu .new { background: var(--sel); font-weight: 700 }
+.views4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px }
+
 /* Decisions */
 .decisions { display: grid; gap: 10px; counter-reset: d; padding: 0; margin: 0; list-style: none }
 .decisions li { counter-increment: d; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel) }
@@ -342,7 +349,7 @@ dl { margin: 0 }
   <!-- 4 · LINK OR CREATE FROM WHERE YOU TYPE -->
   <section class="part" id="link" aria-labelledby="h-link">
     <div class="part-head">
-      <span class="tag">Sheets and Calendar · both kinds of task</span>
+      <span class="tag">The Task link field · any view · and the Calendar</span>
       <h2 id="h-link">4 · Link a task, or create one, right where you type</h2>
       <p class="lede">You don't go to a menu to make a task. You type in a sheet's <b>Task link</b> column, or on a calendar day, and <b>Link task</b> appears under what you typed. It opens the task list, already searching for your words. Pick an existing task to link it, or choose <b>Create new task</b> at the bottom and pick the Space it belongs to. The task gets that Space's stages.</p>
       <div class="flow" aria-label="The steps"><span class="step">Type</span>›<span class="step">Link task</span>›<span class="step">Pick a task</span><span class="muted">or</span><span class="step">Create new task · pick its Space › it gets that Space's stages</span></div>
@@ -366,6 +373,38 @@ dl { margin: 0 }
         </div>
       </div>
     </div>
+
+    <div class="part-head" style="margin-top:6px">
+      <h3>Task link is a field you can add to any view</h3>
+      <p class="lede">It sits in the <b>＋ Field</b> menu next to Text, Date and Person. Add it to a Space's Sheet or List, a brand page, My tasks or a blank sheet. Wherever it shows, typing in it offers Link task. In a blank sheet it links a row to a task; on a task view it links that task to other tasks, such as a deliverable to its plan.</p>
+    </div>
+    <div class="views4">
+      <div class="frame">
+        <div class="frame-head"><h3>＋ Field</h3><span class="small muted">any view</span></div>
+        <div class="frame-body">
+          <div class="fieldmenu" aria-label="Field types">
+            <span>Text</span><span>Number</span><span>Date</span><span>Person</span><span>Choice</span><span>Checkbox</span><span>Web link</span>
+            <span class="new">↗ Task link <span class="muted small" style="font-weight:600">links to tasks</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-head"><h3>Design Space › List</h3><span class="small muted">field "Part of"</span></div>
+        <div class="frame-body">
+          <div class="list-row"><span>Launch key visual</span><span class="linkchip">↗ Ramadan launch plan</span></div>
+          <div class="list-row"><span>Launch banner set</span><span class="linkchip">↗ Ramadan launch plan</span></div>
+          <div class="list-row"><span>Meetup poster</span><span class="muted small">＋ Link task</span></div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-head"><h3>Board card and task panel</h3><span class="small muted">the same field</span></div>
+        <div class="frame-body">
+          <div class="card" style="max-width:220px">Launch key visual<div class="meta">Omar <span class="linkchip">↗ Ramadan launch plan</span></div></div>
+          <dl><div class="panel-row"><dt>Part of</dt><dd><span class="linkchip">↗ Ramadan launch plan</span> <span class="muted small">＋ Link task</span></dd></div></dl>
+          <p class="small muted">Clicking a link opens that task. Boards still sort cards by stage only.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- DECISIONS -->
@@ -382,7 +421,8 @@ dl { margin: 0 }
       <li><div><b>Simple tasks get three dashed columns after Published on every Board.</b><p>They appear only when simple tasks are in view. The Kind filter (All, Pipeline, Simple) sits in the Board header and in saved views.</p></div></li>
       <li><div><b>A switched-off field shows as an empty hatched cell in mixed views.</b><p>The task panel and the create form leave it out entirely for that brand. Filters and bulk actions skip that brand's tasks for that field.</p></div></li>
       <li><div><b>The C-Check switch only affects new tasks.</b><p>Existing tasks keep their own 10 or 11 stages, as the spec requires.</p></div></li>
-      <li><div><b>Link task appears only in a sheet's Task link column, and on calendar days.</b><p>Every other column stays a plain spreadsheet cell. It replaces going through the Board ▾ menu for one row; the menu stays for linking or creating many rows at once.</p></div></li>
+      <li><div><b>Task link is a field type you add to any view, and Link task appears only in it (and on calendar days).</b><p>Every other field stays a plain cell. You name the field yourself ("Part of", "Related", "Task"). In a blank sheet it links a row to a task; on Space, brand and My tasks views it links a task to other tasks. The Board ▾ menu stays for linking or creating many rows at once.</p></div></li>
+      <li><div><b>A Task link field can hold several tasks.</b><p>"Ramadan launch plan" can link to the copy, the key visual and the teaser at once. The other choice is one task per field, which is simpler to read in a sheet.</p></div></li>
       <li><div><b>Create new task, inside the task list, asks which Space it belongs to.</b><p>It starts on your own Space (or the one you're in), with your words as the name, you as the assignee and, on the calendar, that day as the due date. The task gets that Space's stages.</p></div></li>
       <li><div><b>Once a task shows in more Spaces, each shows its own words for the same stage.</b><p>A task handed from Content to Video is "Review" in Content and "Script review" in Video, because underneath it's one stage, C-Review. Boards show "C-Review".</p></div></li>
       <li><div><b>On the calendar, linking an existing task moves its due date to that day.</b><p>The alternative is to only show it there without changing the date, which a calendar can't really do.</p></div></li>
