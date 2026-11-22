@@ -538,7 +538,11 @@ What happened on your tasks, behind the bell beside the Inbox (spec 012, `specs/
 - **Scheduler.** `src/instrumentation.ts` starts `src/lib/notify/scheduler.ts` on the one `next start` process (`NOTIFY_SCHEDULER=0` turns it off): every minute instant emails; hourly due reminders (`due_reminders` keeps it to once); 08:30 daily summaries; 03:00 clean-up of notifications older than 90 days. `POST /api/notifications/tick` with `x-notify-secret: $NOTIFY_TICK_SECRET` is the fallback.
 - **Environment on Cranl.**
   - Phone alerts: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `npx web-push generate-vapid-keys`), `VAPID_SUBJECT` (`mailto:` address).
-  - Email: `RESEND_API_KEY`, `EMAIL_FROM` (a sender verified in Resend), and `APP_URL` (or `NEXTAUTH_URL`) for links.
+  - Email (`src/lib/notify/email.ts`), set up as on the Forefront website:
+    - **Provider.** `RESEND_API_KEY` uses Resend. `SMTP_HOST`, `SMTP_PORT` (default 587; 465 means TLS, or set `SMTP_SECURE`), `SMTP_USER` and `SMTP_PASS` use any SMTP provider, such as MailerSend or Google Workspace. Resend wins if both are set. With neither, nothing is sent and Notification settings says email isn't set up.
+    - **Sender.** `EMAIL_FROM_ADDRESS` and `EMAIL_FROM_NAME`, which default to `no-reply@forefront.consulting` and "Forefront Consulting". The older `EMAIL_FROM` still works when neither is set. The sending domain must be verified with the provider, or every email fails.
+    - **Pace.** Sends go out at 2 a second (`EMAIL_RATE_PER_SEC`), Resend's default limit. A "too fast" or temporary refusal (429, 5xx, SMTP 4xx, a dropped connection) is tried up to 4 times. A permanent one, such as a bad sender or login, fails at once and is logged as `[notify] email refused`.
+    - **Links.** `APP_URL` (or `NEXTAUTH_URL`) for the links in emails.
   - Optional: `NOTIFY_TZ` (default `Africa/Cairo`), `NOTIFY_SCHEDULER`, `NOTIFY_TICK_SECRET`.
   - Without the keys, the bell, toasts and settings still work; the device row says alerts aren't set up and settings say email isn't.
 - **Launch backfill.** `scripts/notifications-backfill.ts`, run by `scripts/backfill.sh`: followers for live tasks, and unread mentions from the last 7 days as notifications. Safe to run twice.
