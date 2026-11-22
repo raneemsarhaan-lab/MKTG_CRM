@@ -191,8 +191,8 @@
 
 **Independent Test**: in the Video Space, Board has the 11 original columns. Dragging a task to another day on Forefront › Calendar changes it everywhere. `/me` lists Noran's tasks across brands; her "My notes" is invisible to others. Forefront › Sheet shows only Forefront rows with the shared columns (spec US2; quickstart Stage B).
 
-- [ ] T039 [P] [US2] Create `src/actions/views.ts` with `saveView`, `deleteView` and `reorderViews` (contracts/server-actions.md permissions), and `loadViews(node, memberId)` in `src/lib/views-data.ts`.
-- [ ] T040 [US2] Complete `src/components/views/ViewHost.tsx`:
+- [X] T039 [P] [US2] *(Done, plus `listViews(node)` so the page loads its views without a server round-trip through every route. Shared views: anyone may add one, and the creator, an admin or a superuser may change it. On a Space, only its members (or leads) save views. The pure rules are in `src/lib/view-config.ts` (`cleanConfig`, `applyView`) and checked in `pure-view-config`.)* Create `src/actions/views.ts` with `saveView`, `deleteView` and `reorderViews` (contracts/server-actions.md permissions), and `loadViews(node, memberId)` in `src/lib/views-data.ts`.
+- [X] T040 [US2] *(Done on the Space, brand and My tasks pages: saved views as tabs (personal ones marked "only me"), "+ View" with List, Board, Sheet, Calendar and Workload (Gantt and Doc disabled as "later"), a config bar (Brand, Assignee, Type and Campaign filters with "No one" and "No campaign", Group for List, Sort for List and Sheet, Fields for Sheet), Save, Delete and ‹ › reorder, read-only for others' shared views, and `?view=v:<id>` links. Brand Folders don't take saved views yet. Checked in `scripts/spaces-lab/realapp/scenarios-sheet.cjs` (views-*).)* Complete `src/components/views/ViewHost.tsx`:
   - default tabs per node (contracts/routes.md);
   - saved views as tabs, shared and personal;
   - "+ View" with the five types, and Gantt and Doc disabled as "later";

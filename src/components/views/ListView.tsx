@@ -27,12 +27,14 @@ interface ListViewProps {
   canGroupByBrand?: boolean
   /** The shown name of a stage — a Space's own words, or the board's (US3). */
   stageName?: (s: StageId) => string
+  /** A saved view's grouping. */
+  initialGroup?: Group | null
   onOpen: (id: string) => void
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, onOpen }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, initialGroup, onOpen }: ListViewProps) {
   const t = useTranslations('spaces')
-  const [group, setGroup] = useState<Group>(canGroupByBrand ? 'brand' : 'stage')
+  const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members])
   const live = tasks.filter(x => !x.dropped_at)
   const name = (s: StageId) => stageName?.(s) ?? STAGE_META[s]?.label_en ?? s

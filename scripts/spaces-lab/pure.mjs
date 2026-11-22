@@ -104,4 +104,24 @@ check('pure-calendar-grids', () => {
   eq(m.moveWeek('2026-12-28', 1), '2027-01-04', 'week across the year')
 })
 
+check('pure-view-config', () => {
+  const c = m.cleanConfig({ filters: { brand: ['b1', 5, 'b1'], bogus: ['x'] }, group: 'weird', sort: 'due', fields: ['status', 'nope'] })
+  eq(c, { filters: { brand: ['b1'] }, group: null, sort: 'due', fields: ['status'] }, 'bad values are dropped')
+  eq(m.cleanConfig(null), m.EMPTY_CONFIG, 'nothing is the empty config')
+  const ts = [
+    { name: 'B', status: 'd-prog', brand_id: 'b1', assignee_id: 'm1', content_type_label: 'Post', project_id: null, due_date: '2026-12-10', priority: 'Low' },
+    { name: 'A', status: 'todo', brand_id: 'b2', assignee_id: null, content_type_label: 'Video', project_id: 'p1', due_date: null, priority: 'High' },
+    { name: 'C', status: 'c-prog', brand_id: 'b1', assignee_id: 'm2', content_type_label: 'Post', project_id: 'p1', due_date: '2026-12-01', priority: 'Medium' },
+  ]
+  const names = (cfg) => m.applyView(ts, m.cleanConfig(cfg)).map(x => x.name)
+  eq(names({}), ['B', 'A', 'C'], 'no config keeps everything in place')
+  eq(names({ filters: { brand: ['b1'] } }), ['B', 'C'], 'brand filter')
+  eq(names({ filters: { assignee: ['__none'] } }), ['A'], 'No one')
+  eq(names({ filters: { campaign: ['p1'], type: ['Post'] } }), ['C'], 'filters combine')
+  eq(names({ sort: 'due' }), ['C', 'B', 'A'], 'due date, undated last')
+  eq(names({ sort: 'priority' }), ['A', 'C', 'B'], 'priority High first')
+  eq(names({ sort: 'stage' }), ['A', 'C', 'B'], 'pipeline order')
+  eq(names({ sort: 'name' }), ['A', 'B', 'C'], 'name')
+})
+
 if (failed) process.exitCode = 1

@@ -18,7 +18,8 @@ import { BoardView } from '@/components/views/BoardView'
 import { CalendarView } from '@/components/views/CalendarView'
 import { TaskPanel } from '@/components/views/TaskPanel'
 import { TaskSheet } from '@/components/views/TaskSheet'
-import { viewTasks, type BoardData, type ViewTask } from '@/components/views/types'
+import { viewTasks, viewOptions, type BoardData, type ViewTask } from '@/components/views/types'
+import { applyView } from '@/lib/view-config'
 
 type Show = 'all' | 'assigned' | 'handed'
 const finished = (t: Task) => (t.kind === 'simple' ? t.simple_status === 's-done' : t.status === 'publish')
@@ -38,7 +39,7 @@ export function MyTasks({ data }: { data: BoardData }) {
   const tasks = viewTasks(data).filter(x => !x.dropped_at && scope(x))
   const open = (id: string) => selectTask(id)
 
-  const groups: [string, ViewTask[]][] = [
+  const baseGroups: [string, ViewTask[]][] = [
     [t('working'), tasks.filter(x => x.assignee_id === me && !finished(x) && x.kind !== 'simple')],
     [t('handedGroup'), tasks.filter(x => x.assignee_id !== me && !finished(x))],
     [t('planning'), tasks.filter(x => x.kind === 'simple' && !finished(x))],
@@ -69,11 +70,19 @@ export function MyTasks({ data }: { data: BoardData }) {
         { key: 'board', label: tv('board') },
         { key: 'sheet', label: tv('sheet') },
       ]}
-      render={tab => {
-        if (tab === 'board') return <BoardView key={show} data={data} scopeTasks={scope} />
+      node="me"
+      viewTypes={['list', 'calendar', 'board', 'sheet']}
+      options={viewOptions(data, tasks)}
+      render={(tab, view) => {
+        // A saved view: the same groups, narrowed and ordered by the view.
+        const ids = view ? new Set(applyView(tasks, view.config).map(x => x.id)) : null
+        const order = view ? applyView(tasks, view.config).map(x => x.id) : null
+        const narrow = (g: ViewTask[]) => (ids && order ? g.filter(x => ids.has(x.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)) : g)
+        const groups = baseGroups.map(([l, g]) => [l, narrow(g)] as [string, ViewTask[]])
+        if (tab === 'board') return <BoardView key={`${show}${view?.id ?? ''}`} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />
         // FR-013b: the same groups as the List, with a private My notes column.
-        if (tab === 'sheet') return <><TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes label={t('title')} /><TaskPanel data={data} /></>
-        if (tab === 'calendar') return <><CalendarView tasks={tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
+        if (tab === 'sheet') return <><TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={view?.config.fields} label={t('title')} /><TaskPanel data={data} /></>
+        if (tab === 'calendar') return <><CalendarView tasks={ids ? tasks.filter(x => ids.has(x.id)) : tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
         return (
           <div data-my-tasks>
             {groups.filter(([, g]) => g.length).map(([label, g]) => (

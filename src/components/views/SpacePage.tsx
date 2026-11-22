@@ -20,7 +20,8 @@ import { CalendarView } from './CalendarView'
 import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
 import { TaskSheet } from './TaskSheet'
-import { viewTasks, type BoardData } from './types'
+import { viewTasks, viewOptions, type BoardData } from './types'
+import { applyView } from '@/lib/view-config'
 
 export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
   const t = useTranslations('spaces')
@@ -54,17 +55,25 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
         { key: 'calendar', label: tv('calendar') },
         { key: 'workload', label: tv('workload') },
       ]}
-      render={tab => {
-        if (tab === 'board') return <BoardView data={data} scopeTasks={scope} spaceId={spaceId} />
-        if (tab === 'sheet' && sheetStart) return <BoardView data={data} scopeTasks={scope} spaceId={spaceId} start={sheetStart} />
+      node={`space:${spaceId}`}
+      viewTypes={['list', 'board', 'sheet', 'calendar', 'workload']}
+      options={viewOptions(data, tasks)}
+      lead={data.currentUser.access !== 'user'}
+      render={(tab, view) => {
+        // A saved view narrows the Space's tasks by its filters and orders them by its sort.
+        const shownTasks = view ? applyView(tasks, view.config) : tasks
+        const ids = view ? new Set(shownTasks.map(x => x.id)) : null
+        const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
+        if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={inView} spaceId={spaceId} />
+        if (tab === 'sheet' && sheetStart) return <BoardView key={view?.id} data={data} scopeTasks={inView} spaceId={spaceId} start={sheetStart} />
         // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
         const body = tab === 'sheet'
-          ? <TaskSheet data={data} tasks={tasks.filter(x => !x.dropped_at)} label={label} />
+          ? <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} label={label} />
           : tab === 'calendar'
-          ? <CalendarView tasks={tasks} brands={data.brands} colorBy="brand" onOpen={open} />
-          : tab === 'workload'
-            ? <WorkloadView tasks={tasks} members={data.members} brands={data.brands} />
-            : <ListView tasks={tasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand onOpen={open} />
+            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" onOpen={open} />
+            : tab === 'workload'
+              ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
+              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand initialGroup={view?.config.group} onOpen={open} />
         return <>{body}<TaskPanel data={data} /></>
       }}
     />

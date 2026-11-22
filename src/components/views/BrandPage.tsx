@@ -17,6 +17,7 @@ import type { ContentTheme, Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { ensureBrandSheetFolder } from '@/actions/sheets'
 import { TaskSheet } from './TaskSheet'
+import { applyView } from '@/lib/view-config'
 import { BrandAssets } from '@/components/brands/BrandAssets'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
@@ -25,7 +26,7 @@ import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
 import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
-import { viewTasks, type BoardData } from './types'
+import { viewTasks, viewOptions, type BoardData } from './types'
 
 export type BrandFolderSlug = 'calendar' | 'assets' | 'sheet' | 'library'
 const FOLDER_KEY = { calendar: 'cal', assets: 'assets', sheet: 'sheet', library: 'lib' } as const
@@ -112,14 +113,21 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   return (
     <ViewHost {...common} title={name} tag={t('brandTag')} sub={t('brandAll')}
       tabs={[{ key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'workload', label: tv('workload') }]}
-      render={tab => tab === 'board'
-        ? <BoardView data={data} scopeTasks={scope} />
-        : withPanel(tab === 'sheet'
-          ? <TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand label={name} />
+      node={brandId ? `brand:${brandId}` : undefined}
+      viewTypes={['list', 'board', 'sheet', 'calendar', 'workload']}
+      options={viewOptions(data, all, { brand: true })}
+      lead={data.currentUser.access !== 'user'}
+      render={(tab, view) => {
+        const shownTasks = view ? applyView(all, view.config) : all
+        const ids = view ? new Set(shownTasks.map(x => x.id)) : null
+        if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />
+        return withPanel(tab === 'sheet'
+          ? <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} label={name} />
           : tab === 'calendar'
-          ? <CalendarView tasks={all} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
-          : tab === 'workload'
-            ? <WorkloadView tasks={all} members={data.members} brands={data.brands} />
-            : <ListView tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />)} />
+            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
+            : tab === 'workload'
+              ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
+              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)
+      }} />
   )
 }

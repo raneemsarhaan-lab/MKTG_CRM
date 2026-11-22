@@ -47,10 +47,12 @@ interface TaskSheetProps {
   hideBrand?: boolean
   /** The private My notes column (My tasks). */
   notes?: boolean
+  /** A saved view's shown fields (Task always shows); null = all. */
+  fields?: string[] | null
   label: string
 }
 
-export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, label }: TaskSheetProps) {
+export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, label }: TaskSheetProps) {
   const t = useTranslations('taskSheet')
   const tSpaces = useTranslations('spaces')
   const locale = useLocale()
@@ -96,7 +98,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
 
   // Row numbers count tasks only; group rows show none.
   const numbers = useMemo(() => { let n = 0; return new Map(rows.filter(r => r.kind === 'task').map(r => [r.key, ++n])) }, [rows])
-  const cols: GridCol[] = [...BASE_COLS.filter(c => !(hideBrand && c === 'brand')), ...(notes ? ['notes'] : [])]
+  const cols: GridCol[] = [...BASE_COLS.filter(c => !(hideBrand && c === 'brand') && (c === 'title' || !fields || fields.includes(c))), ...(notes ? ['notes'] : [])]
   const may = (x: ViewTask) => canActOn({ task_owner_id: x.task_owner_id, assignee_id: x.assignee_id ?? null }, me)
 
   const shown = (x: ViewTask, col: GridCol): string => {

@@ -181,6 +181,8 @@ export interface SavedView {
   /** Null for a shared view. */
   owner_id: string | null
   position: number
+  /** The reader created it (may edit a shared view). */
+  mine?: boolean
 }
 
 /** What the hand-off box needs to open (contracts/handoff.md). */

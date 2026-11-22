@@ -71,3 +71,64 @@ module.exports = (EMAIL, psql, ok) => {
     },
   ]
 }
+
+// Saved views (spec 021 FR-012a, T039/T040).
+module.exports.views = (EMAIL, psql, ok) => [
+  {
+    id: 'views-personal-saved-and-reloaded', as: 'admin',
+    async run({ page, go }) {
+      const design = psql(`select id from team_spaces where key='design'`)
+      psql(`delete from saved_views where node='space:${design}'`)
+      await go('/spaces/design')
+      await page.click('[data-add-view]')
+      await page.fill('[data-new-view-name]', 'Lab sheet')
+      await page.click('[data-new-view-type="sheet"]')
+      await page.click('[data-new-view-create]')
+      await page.waitForSelector('[data-view-config]')
+      ok(psql(`select count(*) from saved_views where node='space:${design}' and name='Lab sheet' and owner_id is not null and type='sheet'`) === '1', 'a personal view is saved')
+      await page.click('[data-view-fields] summary')
+      await page.uncheck('[data-view-field="platform"]')
+      await page.click('[data-view-save]')
+      await page.waitForTimeout(1200)
+      ok(/"platform"/.test(psql(`select config::text from saved_views where name='Lab sheet'`)) === false, 'fields saved without Platform')
+      const id = psql(`select id from saved_views where name='Lab sheet'`)
+      await go(`/spaces/design?view=v:${id}`)
+      await page.waitForSelector(`[data-saved-view="${id}"] [data-task-sheet]`)
+      ok(!(await page.$('[data-task-sheet] [data-cell$="|platform"]')), 'reloading opens the view with its fields')
+      ok(await page.$('[data-new-view-type]') === null, 'the + View form is closed')
+    },
+  },
+  {
+    id: 'views-shared-filter-and-readonly', as: 'admin',
+    async run({ page, go, browser }) {
+      const b = psql('select id from brands order by name limit 1')
+      psql(`delete from saved_views where node='brand:${b}'`)
+      await go(`/brands/${b}`)
+      await page.click('[data-add-view]')
+      await page.fill('[data-new-view-name]', 'Lab shared list')
+      await page.click('[data-new-view-personal="false"]')
+      await page.click('[data-new-view-create]')
+      await page.waitForSelector('[data-view-config]')
+      await page.click('[data-view-filter="type"] summary')
+      const want = psql(`select content_type_label from tasks where brand_id='${b}' and dropped_at is null and content_type_label is not null group by 1 order by count(*) desc limit 1`)
+      await page.check(`[data-view-filter="type"] [data-view-option="${want}"]`)
+      await page.click('[data-view-save]')
+      await page.waitForTimeout(1200)
+      ok(psql(`select owner_id is null from saved_views where name='Lab shared list'`) === 't', 'shared view has no owner')
+      const rows = await page.$$eval('[data-saved-view] [data-row]', els => els.length)
+      const n = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_type_label='${want}'`)
+      ok(String(rows) === n, `the filter narrows the list: ${rows} vs ${n}`)
+    },
+  },
+  {
+    id: 'views-shared-readonly-for-users', as: 'content',
+    async run({ page, go }) {
+      const b = psql('select id from brands order by name limit 1')
+      const id = psql(`select id from saved_views where name='Lab shared list'`)
+      ok(!!id, 'the shared view from the previous scenario exists')
+      await go(`/brands/${b}?view=v:${id}`)
+      await page.waitForSelector('[data-view-readonly]')
+      ok(!(await page.$('[data-view-save]')), "a user can't change someone else's shared view")
+    },
+  },
+]
