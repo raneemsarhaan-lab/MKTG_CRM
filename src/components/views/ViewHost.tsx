@@ -21,13 +21,15 @@ interface ViewHostProps {
   tag: string
   /** Square colour beside the title (brand or Space colour). */
   color?: string
+  /** The letter in that square; defaults to the title's first. */
+  mark?: string
   sub?: React.ReactNode
   actions?: React.ReactNode
   tabs: ViewTab[]
   render: (tab: string) => React.ReactNode
 }
 
-export function ViewHost({ crumbs, title, tag, color, sub, actions, tabs, render }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render }: ViewHostProps) {
   const t = useTranslations('views')
   const params = useSearchParams()
   const live = tabs.filter(x => !x.disabled)
@@ -55,7 +57,7 @@ export function ViewHost({ crumbs, title, tag, color, sub, actions, tabs, render
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em', color: PIPE.ink }}>
-            {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{title[0]}</span>}
+            {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{mark ?? title[0]}</span>}
             {title}
             <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textMuted, letterSpacing: 0 }}>{tag}</span>
           </h1>

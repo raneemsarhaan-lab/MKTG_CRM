@@ -60,7 +60,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
     if (res?.success) router.push(`/sheets/${res.folderId}`)
   }
 
-  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color }
+  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0] }
 
   if (folder === 'calendar') {
     return (
