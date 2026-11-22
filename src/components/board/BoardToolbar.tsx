@@ -3,7 +3,7 @@
 /**
  * The Board view's toolbar (spec 011 FR-030–FR-035), the header's third row:
  *
- *   My tasks | Team tasks  ┊  All brands ▾  Filters  (N no project assigned)      Board | Sheet  ┊  Display options
+ *   My tasks | Team tasks  ┊  All brands ▾  Filters  Sort ▾  (N no project assigned)      Board | Sheet  ┊  Display options
  *
  * Each control keeps what it did before; the brand logos became one
  * dropdown, and the dark "Board" label that did nothing is gone. The Sheet
@@ -15,7 +15,7 @@ import type { Brand } from '@/types/index'
 import { BrandMenu } from './BrandMenu'
 import { ViewPair } from './ViewPair'
 
-export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, view, onView, display }: {
+export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display }: {
   scope: 'me' | 'team'
   onScope(s: 'me' | 'team'): void
   brands: Brand[]
@@ -25,6 +25,8 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
   noProject: number | null
   /** The Filters button (BoardFilters' FiltersButton). */
   filters: ReactNode
+  /** The Sort button (SortMenu) — how a column orders its own cards. */
+  sort: ReactNode
   view: 'board' | 'sheet'
   onView(v: 'board' | 'sheet'): void
   /** Display options (the View menu). */
@@ -43,6 +45,7 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
       <span className="fx-hd-vr" aria-hidden="true" />
       <BrandMenu brands={brands} selected={brandIds} onChange={onBrandIds} />
       {filters}
+      {sort}
       {noProject !== null && (
         <span className={`fx-hd-note${noProject > 0 ? ' is-warn' : ''}`} data-no-project="">
           {noProject > 0 ? t('noProject', { n: noProject }) : t('allAttached')}

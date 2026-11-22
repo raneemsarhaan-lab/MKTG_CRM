@@ -18,18 +18,18 @@ export const us6 = [
     async run(t) {
       await t.page.locator('body').click({ position: { x: 5, y: 5 } })
       const order = []
-      for (let i = 0; i < 13; i++) {
+      for (let i = 0; i < 14; i++) {
         await t.page.keyboard.press('Tab')
         order.push(await t.page.evaluate(() => {
           const e = document.activeElement
           return e?.getAttribute('data-tab') ? 'tab' : e?.hasAttribute('data-header-search') ? 'search' : e?.hasAttribute('data-bell') ? 'bell' : e?.hasAttribute('data-inbox-button') ? 'inbox'
             : e?.hasAttribute('data-account') ? 'account' : e?.hasAttribute('data-new-task') ? 'new' : e?.getAttribute('data-scope') ? 'scope'
-            : e?.hasAttribute('data-brand-menu') ? 'brands' : e?.hasAttribute('data-filters') ? 'filters' : e?.closest('[data-view-pair]') ? 'pair'
-            : e?.hasAttribute('data-display-options') ? 'display' : e?.tagName
+            : e?.hasAttribute('data-brand-menu') ? 'brands' : e?.hasAttribute('data-filters') ? 'filters' : e?.hasAttribute('data-sort-menu') ? 'sort'
+            : e?.closest('[data-view-pair]') ? 'pair' : e?.hasAttribute('data-display-options') ? 'display' : e?.tagName
         }))
       }
       const seen = order.filter((x, i) => order.indexOf(x) === i)
-      t.eq(seen.slice(0, 11), ['tab', 'search', 'bell', 'inbox', 'account', 'new', 'scope', 'brands', 'filters', 'pair', 'display'], 'screen order (the bell before the Inbox, spec 012)')
+      t.eq(seen.slice(0, 12), ['tab', 'search', 'bell', 'inbox', 'account', 'new', 'scope', 'brands', 'filters', 'sort', 'pair', 'display'], 'screen order (the bell before the Inbox, spec 012)')
     },
   },
   {
@@ -45,7 +45,7 @@ export const us6 = [
   {
     id: 'h6-menus-keyboard',
     async run(t) {
-      for (const sel of ['[data-filters]', '[data-display-options]']) {
+      for (const sel of ['[data-filters]', '[data-sort-menu]', '[data-display-options]']) {
         await t.page.locator(sel).focus()
         await t.page.keyboard.press('Enter')
         await t.idle()
