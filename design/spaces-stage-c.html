@@ -125,6 +125,37 @@ td.off { background: repeating-linear-gradient(135deg, var(--soft) 0 6px, transp
 .panel-row dd { margin: 0 }
 dl { margin: 0 }
 
+
+/* 4 · link or create from where you type */
+.field .seg { justify-self: start }
+.sheet-mock { border: 1px solid var(--line); border-radius: 10px; overflow: visible; font-size: 13px; position: relative }
+.sheet-mock .r { display: grid; grid-template-columns: 34px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .8fr); border-bottom: 1px solid var(--line) }
+.sheet-mock .r:last-child { border-bottom: none }
+.sheet-mock .r > div { padding: 7px 9px; border-inline-end: 1px solid var(--line); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.sheet-mock .r > div:last-child { border-inline-end: none }
+.sheet-mock .h > div { background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted) }
+.sheet-mock .no { color: var(--faint); text-align: center }
+.sheet-mock .typing { outline: 2px solid var(--cyan); outline-offset: -2px; background: var(--panel) }
+.linkchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 6px; background: var(--sel); color: var(--ink) }
+.offer { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 8px 6px 10px; border-radius: 10px; background: var(--ink); color: var(--panel); font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow) }
+.offer button { border: none; border-radius: 7px; padding: 4px 10px; background: var(--lime); color: var(--on-lime); font-weight: 800; font-size: 12px }
+.offer kbd { font-family: var(--body); font-size: 11px; opacity: .7 }
+.picker { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; display: grid }
+.picker input { border: none; border-bottom: 1px solid var(--line); padding: 10px 12px; font-size: 13.5px; background: var(--panel) }
+.picker .opt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 12px; border: none; background: none; text-align: start; font-size: 13px; border-bottom: 1px solid var(--line) }
+.picker .opt:hover, .picker .opt:focus-visible { background: var(--hover, var(--soft)) }
+.picker .opt small { display: block; color: var(--muted); font-size: 11.5px }
+.picker .create { color: var(--ink); font-weight: 700; background: var(--soft); border-bottom: none }
+.quick { display: grid; gap: 10px; padding: 12px; border-top: 1px solid var(--line); background: var(--soft) }
+.quick .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.cal-mini { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 11.5px }
+.cal-mini > div { min-height: 64px; padding: 5px; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; align-content: start; gap: 3px; min-width: 0 }
+.cal-mini .dn { font-weight: 700; color: var(--muted) }
+.cal-mini .ev { background: var(--soft); border-radius: 5px; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.cal-mini .on { outline: 2px solid var(--cyan); outline-offset: -2px }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
+.flow span.step { padding: 4px 10px; border-radius: 999px; background: var(--soft); font-weight: 600 }
+
 /* Decisions */
 .decisions { display: grid; gap: 10px; counter-reset: d; padding: 0; margin: 0; list-style: none }
 .decisions li { counter-increment: d; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel) }
@@ -142,6 +173,7 @@ dl { margin: 0 }
       <a href="#words">1 · Status words per team</a>
       <a href="#simple">2 · Simple tasks</a>
       <a href="#switches">3 · Brand switches</a>
+      <a href="#link">4 · Link or create from where you type</a>
       <a href="#decide">What to confirm</a>
     </nav>
   </header>
@@ -306,6 +338,36 @@ dl { margin: 0 }
     </div>
   </section>
 
+
+  <!-- 4 · LINK OR CREATE FROM WHERE YOU TYPE -->
+  <section class="part" id="link" aria-labelledby="h-link">
+    <div class="part-head">
+      <span class="tag">Sheets and Calendar · both kinds of task</span>
+      <h2 id="h-link">4 · Link a task, or create one, right where you type</h2>
+      <p class="lede">You don't go to a menu to make a task. You type in a sheet row or on a calendar day, and <b>Link task</b> appears under what you typed. It opens the task list, already searching for your words. Pick an existing task to link it, or choose <b>Create new task</b> at the bottom. That's where you choose Simple or Pipeline.</p>
+      <div class="flow" aria-label="The steps"><span class="step">Type</span>›<span class="step">Link task</span>›<span class="step">Pick a task</span><span class="muted">or</span><span class="step">Create new task · Simple or Pipeline</span></div>
+    </div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><h3>Noran's sheet · "Q1 ideas"</h3><span class="small muted">a blank sheet in My sheets</span></div>
+        <div class="frame-body">
+          <div class="sheet-mock" id="lk-sheet"></div>
+          <div id="lk-offer"></div>
+          <div id="lk-picker"></div>
+          <p class="small muted">Link task also opens with <b>Ctrl+K</b> on any cell of the row. Press Esc to keep it as plain text: nothing is created unless you choose.</p>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-head"><h3>Calendar · December</h3><span class="small muted">type on a day</span></div>
+        <div class="frame-body">
+          <div class="cal-mini" id="lk-cal"></div>
+          <div id="lk-cal-offer"></div>
+          <p class="small muted">On the calendar, the day you typed on becomes the task's due date: a new task gets it, and linking an existing task moves its due date there, with Undo.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- DECISIONS -->
   <section class="part" id="decide" aria-labelledby="h-dec">
     <div class="part-head">
@@ -320,6 +382,9 @@ dl { margin: 0 }
       <li><div><b>Simple tasks get three dashed columns after Published on every Board.</b><p>They appear only when simple tasks are in view. The Kind filter (All, Pipeline, Simple) sits in the Board header and in saved views.</p></div></li>
       <li><div><b>A switched-off field shows as an empty hatched cell in mixed views.</b><p>The task panel and the create form leave it out entirely for that brand. Filters and bulk actions skip that brand's tasks for that field.</p></div></li>
       <li><div><b>The C-Check switch only affects new tasks.</b><p>Existing tasks keep their own 10 or 11 stages, as the spec requires.</p></div></li>
+      <li><div><b>Link task appears under what you type, in sheets and on the calendar.</b><p>It replaces going through the Board ▾ menu for one row. The menu stays for linking or creating many rows at once.</p></div></li>
+      <li><div><b>Create new task, inside the task list, is where you pick Simple or Pipeline.</b><p>It starts on your Space's default (Planning: Simple, the others: Pipeline), with your words as the name, you as the assignee and, on the calendar, that day as the due date.</p></div></li>
+      <li><div><b>On the calendar, linking an existing task moves its due date to that day.</b><p>The alternative is to only show it there without changing the date, which a calendar can't really do.</p></div></li>
     </ol>
   </section>
 </div>
@@ -491,5 +556,64 @@ dl { margin: 0 }
     document.querySelector(`[data-sw="${b.dataset.sw}"]`).focus()
   })
   paintSwitches()
+
+  // ── 4 · link or create from where you type ──
+  const EXIST = [
+    ['Q1 outlook carousel', 'Forefront Consulting', 'C-Review', 'pipeline'],
+    ['Q1 content calendar', 'Forefront Consulting', 'In progress', 'simple'],
+    ['Hiring post: analysts', 'Forefront Consulting', 'C-In Progress', 'pipeline'],
+    ['Year in review carousel', 'Islam Personal Branding', 'Ready For Design', 'pipeline'],
+  ]
+  const lk = { typed: 'Q1 hiring carousel', linked: null, open: false, create: false, kind: 'pipeline', q: 'Q1' }
+  const paintSheet = () => {
+    const rows = [['1', 'Founders day follow-up', '<span class="linkchip">↗ Founders day post</span>', 'Nov'], ['2', esc(lk.typed), lk.linked ? `<span class="linkchip">↗ ${esc(lk.linked)}</span>` : '', 'Dec'], ['3', '', '', '']]
+    $('lk-sheet').innerHTML = `<div class="r h"><div></div><div>Idea</div><div>Task</div><div>Month</div></div>` +
+      rows.map((r, i) => `<div class="r"><div class="no">${r[0]}</div><div class="${i === 1 && !lk.linked ? 'typing' : ''}">${r[1]}</div><div>${r[2]}</div><div>${r[3]}</div></div>`).join('')
+    $('lk-offer').innerHTML = lk.linked || lk.open ? '' : `<div class="offer">Make "${esc(lk.typed)}" a task? <button type="button" id="lk-go">↗ Link task</button><kbd>Ctrl+K</kbd></div>`
+    const go = $('lk-go'); if (go) go.onclick = () => { lk.open = true; lk.q = lk.typed; paintSheet() }
+    $('lk-picker').innerHTML = lk.open ? pickerHtml('lk', lk) : ''
+    if (lk.open) wirePicker('lk', lk, paintSheet, name => { lk.linked = name; lk.open = false; lk.create = false; paintSheet() })
+  }
+  function pickerHtml(id, st) {
+    const q = norm(st.q)
+    const hits = EXIST.filter(t => !q || norm(t[0]).split(' ').some(w => q.split(' ').some(x => x && w.startsWith(x))))
+    return `<div class="picker" role="dialog" aria-label="Link task">
+      <input id="${id}-q" value="${esc(st.q)}" aria-label="Search tasks" autocomplete="off">
+      ${hits.map(t => `<button type="button" class="opt" data-pick="${esc(t[0])}"><span>${esc(t[0])}<small>${t[1]} · ${t[2]}</small></span><span class="kind ${t[3] === 'pipeline' ? 'pipe' : ''}">${t[3] === 'pipeline' ? 'Pipeline' : 'Simple'}</span></button>`).join('') || `<p class="small muted" style="padding:10px 12px">No task matches "${esc(st.q)}".</p>`}
+      <button type="button" class="opt create" data-create="1"><span>＋ Create new task "${esc(st.q || st.typed)}"</span><span></span></button>
+      ${st.create ? `<div class="quick">
+        <div class="field">Kind
+          <div class="seg" role="group" aria-label="Kind"><button type="button" data-qk="pipeline" aria-pressed="${st.kind === 'pipeline'}">Pipeline</button><button type="button" data-qk="simple" aria-pressed="${st.kind === 'simple'}">Simple</button></div>
+        </div>
+        <p class="small">${st.kind === 'simple' ? 'To Do › In progress › Done. No SLA, no approvals.' : 'The 11 stages with their owners, SLA and approvals.'}</p>
+        <div class="row2"><div class="field">Brand<span class="val">Forefront Consulting</span></div><div class="field">Assignee<span class="val">Noran (me)</span></div></div>
+        ${st.day ? `<div class="field">Due<span class="val">Dec ${st.day}, 2026</span></div>` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-cancel="1">Cancel</button><button type="button" class="btn primary" data-make="1">Create and link</button></div>
+      </div>` : ''}
+    </div>`
+  }
+  function wirePicker(id, st, repaint, done) {
+    const q = $(`${id}-q`)
+    q.oninput = () => { st.q = q.value; const pos = q.selectionStart; repaint(); const n = $(`${id}-q`); n.focus(); n.setSelectionRange(pos, pos) }
+    q.onkeydown = e => { if (e.key === 'Escape') { st.open = false; st.create = false; repaint() } }
+    const host = q.closest('.picker')
+    host.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => done(b.dataset.pick))
+    host.querySelector('[data-create]').onclick = () => { st.create = true; repaint() }
+    host.querySelectorAll('[data-qk]').forEach(b => b.onclick = () => { st.kind = b.dataset.qk; repaint() })
+    const c = host.querySelector('[data-cancel]'); if (c) c.onclick = () => { st.create = false; repaint() }
+    const m = host.querySelector('[data-make]'); if (m) m.onclick = () => done(`${st.q || st.typed} (new, ${st.kind})`)
+  }
+  paintSheet()
+
+  const cal = { day: 10, typed: 'Ramadan teaser', open: false, create: false, kind: 'pipeline', q: '', linked: null }
+  const paintCal = () => {
+    const days = [7, 8, 9, 10, 11, 12, 13]
+    const ev = { 9: ['Podcast ep. 14'], 11: ['Launch landing page copy'] }
+    $('lk-cal').innerHTML = days.map(d => `<div class="${d === cal.day && !cal.linked ? 'on' : ''}"><span class="dn">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d - 7]} ${d}</span>${(ev[d] || []).map(n => `<span class="ev">${n}</span>`).join('')}${d === cal.day ? (cal.linked ? `<span class="ev" style="background:var(--sel)">↗ ${esc(cal.linked)}</span>` : `<span class="ev" style="background:var(--panel);border:1px dashed var(--line)">${esc(cal.typed)}</span>`) : ''}</div>`).join('')
+    $('lk-cal-offer').innerHTML = cal.linked ? '' : (cal.open ? pickerHtml('lc', cal) : `<div class="offer">On Thu 10: <button type="button" id="lc-go">↗ Link task</button><kbd>Ctrl+K</kbd></div>`)
+    const go = $('lc-go'); if (go) go.onclick = () => { cal.open = true; cal.q = cal.typed; paintCal() }
+    if (cal.open && !cal.linked) wirePicker('lc', cal, paintCal, name => { cal.linked = name; cal.open = false; cal.create = false; paintCal() })
+  }
+  paintCal()
 })()
 </script>
