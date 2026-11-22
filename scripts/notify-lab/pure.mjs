@@ -146,5 +146,55 @@ export async function runPure(bundle, root) {
     const read = l => JSON.parse(fs.readFileSync(path.join(root, 'messages', `${l}.json`), 'utf8')).notifications
     eq(flat(read('ar')).sort(), flat(read('en')).sort(), 'notifications.* in both languages')
   })
+  // Email provider and sender, as on the Forefront website.
+  check('email-provider', () => {
+    eq(h.emailProvider({}), null, 'nothing set: no provider')
+    eq(h.emailReady({}), false, 'and email is not set up')
+    eq(h.emailProvider({ SMTP_HOST: 'smtp.example', SMTP_PORT: '587' }), 'smtp', 'SMTP when its host is set')
+    eq(h.emailProvider({ RESEND_API_KEY: 'k', SMTP_HOST: 'smtp.example' }), 'resend', 'Resend wins when both are set')
+    eq(h.emailFrom({}), '"Forefront Consulting" <no-reply@forefront.consulting>', 'the default sender')
+    eq(h.emailFrom({ EMAIL_FROM_ADDRESS: 'team@forefront.consulting', EMAIL_FROM_NAME: 'Momentum' }), '"Momentum" <team@forefront.consulting>', 'EMAIL_FROM_ADDRESS and EMAIL_FROM_NAME')
+    eq(h.emailFrom({ EMAIL_FROM_ADDRESS: 'team@forefront.consulting' }), '"Forefront Consulting" <team@forefront.consulting>', 'the name defaults on its own')
+    eq(h.emailFrom({ EMAIL_FROM: 'Momentum <m@forefront.consulting>' }), 'Momentum <m@forefront.consulting>', 'the older EMAIL_FROM still works')
+    eq(h.emailFrom({ EMAIL_FROM: 'old@x.com', EMAIL_FROM_ADDRESS: 'new@forefront.consulting', EMAIL_FROM_NAME: '' }), 'new@forefront.consulting', 'the new names win; an empty name sends the bare address')
+    eq([h.emailRate({}), h.emailRate({ EMAIL_RATE_PER_SEC: '5' }), h.emailRate({ EMAIL_RATE_PER_SEC: 'x' })], [2, 5, 2], 'EMAIL_RATE_PER_SEC, default 2')
+  })
+  // Resend: a "too fast" (429) is tried again after its Retry-After; a bad sender (403) is not; sends keep the pace.
+  {
+    const saved = { fetch: globalThis.fetch, env: { ...process.env }, error: console.error }
+    try {
+      process.env.RESEND_API_KEY = 'test'; process.env.EMAIL_RATE_PER_SEC = '20'
+      delete process.env.EMAIL_FROM; delete process.env.EMAIL_FROM_ADDRESS; delete process.env.EMAIL_FROM_NAME
+      console.error = () => {}
+      const calls = []
+      let script = []
+      globalThis.fetch = async (url, init) => {
+        calls.push({ url, at: Date.now(), body: JSON.parse(init.body) })
+        const [status, after] = script.shift() ?? [200]
+        return new Response(status === 200 ? '{"id":"x"}' : 'nope', { status, headers: after ? { 'retry-after': String(after) } : {} })
+      }
+      script = [[429, 0.05], [200]]
+      const first = await h.sendEmail('a@example.test', 'S', '<p>x</p>')
+      const retried = calls.length
+      script = [[403]]
+      const refused = await h.sendEmail('b@example.test', 'S', '<p>x</p>')
+      const afterRefused = calls.length
+      script = []
+      const t0 = Date.now()
+      await Promise.all([1, 2, 3, 4].map(i => h.sendEmail(`c${i}@example.test`, 'S', '<p>x</p>')))
+      const span = Date.now() - t0
+      check('email-resend', () => {
+        eq(first, true, 'sent after a 429')
+        eq(retried, 2, 'one retry')
+        eq(calls[0].url, 'https://api.resend.com/emails', "Resend's API")
+        eq(calls[0].body.from, '"Forefront Consulting" <no-reply@forefront.consulting>', 'from the default sender')
+        eq([refused, afterRefused - retried], [false, 1], 'a 403 fails at once, not retried')
+        ok(span >= 140, `4 sends at 20/s take at least 150 ms (took ${span} ms)`)
+      })
+    } finally {
+      globalThis.fetch = saved.fetch; console.error = saved.error
+      for (const k of ['RESEND_API_KEY', 'EMAIL_RATE_PER_SEC']) if (saved.env[k] === undefined) delete process.env[k]; else process.env[k] = saved.env[k]
+    }
+  }
   return results
 }
