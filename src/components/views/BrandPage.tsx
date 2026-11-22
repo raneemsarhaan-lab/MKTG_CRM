@@ -16,6 +16,7 @@ import { useUIStore } from '@/store/useUIStore'
 import type { ContentTheme, Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { ensureBrandSheetFolder } from '@/actions/sheets'
+import { TaskSheet } from './TaskSheet'
 import { BrandAssets } from '@/components/brands/BrandAssets'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
@@ -94,8 +95,10 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   if (folder === 'sheet') {
     return (
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('sheetLede')}
-        tabs={[{ key: 'content', label: t('contentSheet') }, { key: 'video', label: t('videoSheet') }, { key: 'own', label: t('ownTabs'), disabled: !brandId }]}
-        render={tab => tab === 'own'
+        tabs={[{ key: 'content', label: t('contentSheet') }, { key: 'video', label: t('videoSheet') }, { key: 'tasks', label: t('allTasksSheet') }, { key: 'own', label: t('ownTabs'), disabled: !brandId }]}
+        render={tab => tab === 'tasks'
+          ? withPanel(<TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand label={`${name} · ${t('allTasksSheet')}`} />)
+          : tab === 'own'
           ? <div style={{ padding: '18px 38px' }}>
               <button type="button" data-open-own-tabs disabled={opening} onClick={() => void openOwnTabs()}
                 style={{ border: 'none', background: '#C8F24E', color: '#111111', borderRadius: 10, padding: '9px 14px', fontFamily: 'inherit', fontWeight: 800, cursor: 'pointer' }}>
@@ -108,10 +111,12 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
 
   return (
     <ViewHost {...common} title={name} tag={t('brandTag')} sub={t('brandAll')}
-      tabs={[{ key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }, { key: 'calendar', label: tv('calendar') }, { key: 'workload', label: tv('workload') }]}
+      tabs={[{ key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'workload', label: tv('workload') }]}
       render={tab => tab === 'board'
         ? <BoardView data={data} scopeTasks={scope} />
-        : withPanel(tab === 'calendar'
+        : withPanel(tab === 'sheet'
+          ? <TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand label={name} />
+          : tab === 'calendar'
           ? <CalendarView tasks={all} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
           : tab === 'workload'
             ? <WorkloadView tasks={all} members={data.members} brands={data.brands} />

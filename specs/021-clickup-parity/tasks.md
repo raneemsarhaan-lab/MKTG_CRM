@@ -208,8 +208,8 @@
   - colour by brand on Spaces and Me, by stage on a brand;
   - `momentum.calendar.mode` saved per device;
   - a week list on phones.
-- [X] T043 [US2] Create `src/components/views/SheetView.tsx`: the `content` Space renders today's `ContentSheet`, and the `video` Space today's `VideoSheet`, unchanged (FR-012). Every other node renders `TaskSheet`. *(Done for the Content and Video Spaces and the brand Sheet Folder. Other Spaces and My tasks show the Sheet tab as "with a later stage" until T044 lands.)*
-- [ ] T044 [US2] Create `src/components/views/TaskSheet.tsx` on `src/components/sheet/GridCore.tsx` with `src/components/sheets/links/FieldCells.tsx` controls:
+- [X] T043 [US2] Create `src/components/views/SheetView.tsx`: the `content` Space renders today's `ContentSheet`, and the `video` Space today's `VideoSheet`, unchanged (FR-012). Every other node renders `TaskSheet`. *(Done for the Content and Video Spaces and the brand Sheet Folder. Every other node renders `TaskSheet` (T044).)*
+- [X] T044 [US2] *(Done: typed cells for Task, Brand, Status, Assignee, Due, Type, Priority and Platform, with group rows, row numbers, multi-cell paste and clear (hand-offs refused one by one with a reason), and read-only for anyone but the owner, the assignee or an admin. A Status change that needs a hand-off opens the box. Enabled on the Design, Planning and other Spaces, on brand pages (Sheet tab, plus "All tasks" in the Sheet Folder) and on My tasks. Not yet: the Working doc and Post link columns, and the full sheet toolbar (filter, sort, formats), which come with T040's config bar.)* Create `src/components/views/TaskSheet.tsx` on `src/components/sheet/GridCore.tsx` with `src/components/sheets/links/FieldCells.tsx` controls:
   - rows are the node's tasks, with optional group rows;
   - the field columns from spec 019 (Task, Brand, Status, Assignee, Due date, Type, Platform, Working doc, Post link);
   - status typing goes through `setTaskStage`, so the hand-off and the rules apply;
@@ -229,8 +229,8 @@
   - the "Show" filter: All mine, Assigned to me, Handed off;
   - Sheet groups: Working on, Handed off · I own it, Planning, Published (`design/noran-workspace.html`).
 
-  *(Done with List (the four groups), Calendar and Board tabs and the Show filter. The Sheet tab waits for T044.)*
-- [ ] T051 [US2] Allow a private regular column on My tasks:
+  *(Done with List (the four groups), Sheet (same groups plus My notes), Calendar and Board tabs and the Show filter.)*
+- [X] T051 [US2] *(Done with dedicated actions in `src/actions/my-notes.ts` (`myNotes`, `setMyNote`) that only ever touch the caller's own `me:<id>` column, rather than widening `sheet-columns.ts`. `loadBoardData` and the mappable-column list exclude `me:` columns. Checked in `scripts/spaces-lab/realapp/scenarios-sheet.cjs`.)* Allow a private regular column on My tasks:
   - in the sheet-column actions (`src/actions/sheet-columns.ts`, spec 010), accept sheet keys `me:<memberId>` only when the member is that member;
   - read and write `SheetValue` per task;
   - render it in `TaskSheet` as a grey regular column named "My notes" by default (research R7).

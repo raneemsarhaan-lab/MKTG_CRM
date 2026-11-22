@@ -17,7 +17,7 @@ export const mayActOn = (t: { task_owner_id: string; assignee_id: string | null 
 
 /** The team's own Content and Video columns a sheet can map (spec 010), by id. */
 export async function teamColumns(): Promise<{ id: string; name: string; sheet: string }[]> {
-  const cols = await prisma.sheetColumn.findMany({ where: { deleted_at: null, kind: { not: null } }, select: { id: true, name: true, key: true, sheet: true }, orderBy: [{ sheet: 'asc' }, { position: 'asc' }] })
+  const cols = await prisma.sheetColumn.findMany({ where: { deleted_at: null, kind: { not: null }, sheet: { in: ['content', 'video'] } }, select: { id: true, name: true, key: true, sheet: true }, orderBy: [{ sheet: 'asc' }, { position: 'asc' }] })
   return cols.map(c => ({ id: c.id, name: c.name ?? c.key, sheet: c.sheet }))
 }
 

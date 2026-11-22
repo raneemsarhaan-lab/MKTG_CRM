@@ -2863,7 +2863,8 @@
     "noLibrary": "Nothing published yet.",
     "openPost": "Open post",
     "contentSheet": "Content",
-    "videoSheet": "Video"
+    "videoSheet": "Video",
+    "allTasksSheet": "All tasks"
   },
   "views": {
     "list": "List",
@@ -2923,5 +2924,44 @@
     "planning": "Planning · simple tasks",
     "published": "Published",
     "notes": "My notes"
+  },
+  "taskSheet": {
+    "col": {
+      "title": "Task",
+      "brand": "Brand",
+      "status": "Status",
+      "assignee": "Assignee",
+      "due": "Due",
+      "type": "Type",
+      "priority": "Priority",
+      "platform": "Platform",
+      "notes": "My notes"
+    },
+    "simple": {
+      "s-todo": "To Do",
+      "s-prog": "In progress",
+      "s-done": "Done"
+    },
+    "priority": {
+      "Low": "Low",
+      "Medium": "Medium",
+      "High": "High"
+    },
+    "notesHint": "My notes is yours alone: no one else sees this column.",
+    "readOnly": "Only the task's owner, its assignee or an admin can change this.",
+    "simpleHere": "A simple task's status changes from the task itself.",
+    "needName": "A task needs a name.",
+    "unknownMember": "No one on the team is called “{text}”.",
+    "ambiguous": "More than one person matches “{text}”. Type the full name.",
+    "unknownStage": "“{text}” isn't a stage.",
+    "notAllowed": "This task can't move to {stage} from here.",
+    "badDate": "“{text}” isn't a date.",
+    "badPriority": "Priority is Low, Medium or High.",
+    "unknownBrand": "No brand is called “{text}”.",
+    "unknownType": "No content type is called “{text}”.",
+    "handoffOne": "Needs a hand-off: change it in its own cell to choose where it shows.",
+    "pasteNote": "{done} changed · {refused} not changed (hover a cell to see why).",
+    "notSaved": "Not saved ({reason}).",
+    "empty": "No tasks here yet."
   }
 }

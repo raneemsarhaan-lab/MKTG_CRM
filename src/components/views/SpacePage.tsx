@@ -6,7 +6,7 @@
  * Calendar or Workload.
  *
  * The Content and Video Spaces' Sheet tab is today's Content sheet and Video
- * sheet, unchanged (FR-012). Other Spaces get theirs with a later stage.
+ * sheet, unchanged (FR-012). Other Spaces get the task Sheet (TaskSheet).
  */
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
@@ -19,6 +19,7 @@ import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
 import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
+import { TaskSheet } from './TaskSheet'
 import { viewTasks, type BoardData } from './types'
 
 export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
@@ -49,14 +50,17 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
       tabs={[
         { key: 'list', label: tv('list') },
         { key: 'board', label: tv('board') },
-        sheetStart ? { key: 'sheet', label: tv('sheet') } : { key: 'sheet', label: tv('sheet'), disabled: true, note: tv('sheetLater') },
+        { key: 'sheet', label: tv('sheet') },
         { key: 'calendar', label: tv('calendar') },
         { key: 'workload', label: tv('workload') },
       ]}
       render={tab => {
         if (tab === 'board') return <BoardView data={data} scopeTasks={scope} spaceId={spaceId} />
         if (tab === 'sheet' && sheetStart) return <BoardView data={data} scopeTasks={scope} spaceId={spaceId} start={sheetStart} />
-        const body = tab === 'calendar'
+        // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
+        const body = tab === 'sheet'
+          ? <TaskSheet data={data} tasks={tasks.filter(x => !x.dropped_at)} label={label} />
+          : tab === 'calendar'
           ? <CalendarView tasks={tasks} brands={data.brands} colorBy="brand" onOpen={open} />
           : tab === 'workload'
             ? <WorkloadView tasks={tasks} members={data.members} brands={data.brands} />

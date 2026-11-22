@@ -17,6 +17,7 @@ import { ListView } from '@/components/views/ListView'
 import { BoardView } from '@/components/views/BoardView'
 import { CalendarView } from '@/components/views/CalendarView'
 import { TaskPanel } from '@/components/views/TaskPanel'
+import { TaskSheet } from '@/components/views/TaskSheet'
 import { viewTasks, type BoardData, type ViewTask } from '@/components/views/types'
 
 type Show = 'all' | 'assigned' | 'handed'
@@ -66,10 +67,12 @@ export function MyTasks({ data }: { data: BoardData }) {
         { key: 'list', label: tv('list') },
         { key: 'calendar', label: tv('calendar') },
         { key: 'board', label: tv('board') },
-        { key: 'sheet', label: tv('sheet'), disabled: true, note: tv('sheetLater') },
+        { key: 'sheet', label: tv('sheet') },
       ]}
       render={tab => {
         if (tab === 'board') return <BoardView key={show} data={data} scopeTasks={scope} />
+        // FR-013b: the same groups as the List, with a private My notes column.
+        if (tab === 'sheet') return <><TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes label={t('title')} /><TaskPanel data={data} /></>
         if (tab === 'calendar') return <><CalendarView tasks={tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
         return (
           <div data-my-tasks>

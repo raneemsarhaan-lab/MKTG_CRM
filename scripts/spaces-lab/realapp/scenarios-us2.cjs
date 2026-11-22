@@ -45,7 +45,7 @@ module.exports = (EMAIL, psql, ok) => {
         await go('/spaces/content?view=sheet')
         ok(await page.$('.fx-board-page.is-sheet'), "the Content Space's Sheet tab is today's sheet")
         await go('/spaces/design?view=sheet')
-        ok(await page.$('[data-view-tab="sheet"][disabled]'), "other Spaces' Sheet tab waits for a later stage")
+        ok(await page.$('[data-task-sheet]'), "other Spaces' Sheet tab is the task Sheet")
       },
     },
     {

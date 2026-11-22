@@ -72,8 +72,9 @@ export async function loadBoardData(member: SessionMember) {
     prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
     prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true } }),
     // Sheet columns the team has shaped, and custom values (spec 010).
-    prisma.sheetColumn.findMany({ where: { deleted_at: null }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
-    prisma.sheetValue.findMany({ where: { column: { deleted_at: null } }, select: { column_id: true, task_id: true, value: true } }),
+    // Spec 021: a member's private My notes columns (sheet 'me:<id>') are never loaded for anyone's sheets.
+    prisma.sheetColumn.findMany({ where: { deleted_at: null, NOT: { sheet: { startsWith: 'me:' } } }, include: { updater: { select: { name: true } } }, orderBy: { position: 'asc' } }),
+    prisma.sheetValue.findMany({ where: { column: { deleted_at: null, NOT: { sheet: { startsWith: 'me:' } } } }, select: { column_id: true, task_id: true, value: true } }),
     // Row heights on the linked sheets (spec 013 FR-045), shared by the team.
     prisma.linkedRowHeight.findMany({ select: { sheet_kind: true, task_id: true, height: true } }),
     // Spec 021: team Spaces, who is in them, and the Shows in rows — three flat
