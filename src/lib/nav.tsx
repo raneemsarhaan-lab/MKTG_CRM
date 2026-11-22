@@ -22,9 +22,9 @@ export interface NavItem {
 
 export const NAV: readonly NavItem[] = [
   { href: '/overview', key: 'overview', adminOnly: false },
-  { href: '/board',    key: 'board',    adminOnly: false },
-  // Spec 013: third, so it is on a phone's bar; Team moves into More (R13).
-  { href: '/sheets',   key: 'sheets',   adminOnly: false },
+  // Spec 021: Board and Sheets left the main list. Work is reached through the
+  // tree (Me, Teams, Brands): each Space and brand has its own Board and Sheet,
+  // and blank sheets are under Me › My sheets. /board and /sheets still open.
   // Projects and Capacity are hidden from the bar (their pages still open by
   // address). The weekly Hours report moved onto Working Hours (/overview).
   { href: '/team',     key: 'team',     adminOnly: false },

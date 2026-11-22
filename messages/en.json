@@ -2864,7 +2864,8 @@
     "openPost": "Open post",
     "contentSheet": "Content",
     "videoSheet": "Video",
-    "allTasksSheet": "All tasks"
+    "allTasksSheet": "All tasks",
+    "mySheets": "My sheets"
   },
   "views": {
     "list": "List",

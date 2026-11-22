@@ -2864,7 +2864,8 @@
     "openPost": "فتح المنشور",
     "contentSheet": "المحتوى",
     "videoSheet": "الفيديو",
-    "allTasksSheet": "كل المهام"
+    "allTasksSheet": "كل المهام",
+    "mySheets": "أوراقي"
   },
   "views": {
     "list": "قائمة",

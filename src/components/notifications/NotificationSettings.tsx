@@ -84,7 +84,7 @@ export function NotificationSettings() {
 
   const head = (
     <>
-      <Link href="/board" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
+      <Link href="/me" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
       <h1>{tp('title')}</h1>
     </>
   )

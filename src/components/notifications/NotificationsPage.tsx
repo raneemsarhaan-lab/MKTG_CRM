@@ -46,7 +46,7 @@ export function NotificationsPage() {
 
   return (
     <div className="fx-nt-page" data-nt-history="">
-      <Link href="/board" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
+      <Link href="/me" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
       <h1>{t('history.title')}</h1>
       <div className="fx-nt-filters">
         <div className="fx-nt-chips" role="group" aria-label={t('history.kinds')}>

@@ -265,7 +265,7 @@
   - simple tasks get three dashed columns after Published, shown only when simple tasks are in view;
   - a switched-off feature is an empty hatched cell in mixed views;
   - the C-Check switch affects new tasks only.
-  Open: whether a team can have sub-steps inside one main stage (option B), or words are only names (option A, the current spec).)* Write the Stage C design (Status words panel, brand feature switches, simple task controls in TaskModal and on the Board) in `design/spaces-stage-c.html`, starting from the panels in `design/clickup-hierarchy.html`, and get the user's approval before any Stage C UI work (constitution §IV).
+  Settled 2026-11-22: option A. A team's words are only other names for the 11 stages; no sub-steps inside a stage.)* Write the Stage C design (Status words panel, brand feature switches, simple task controls in TaskModal and on the Board) in `design/spaces-stage-c.html`, starting from the panels in `design/clickup-hierarchy.html`, and get the user's approval before any Stage C UI work (constitution §IV).
 - [ ] T055 [P] [US3] Write the pure `src/lib/space-words.ts`:
   - `wordsFor(space, linkedViews)`: Content and Video read their sheet's `view.words`; others read `team_spaces.words`; built-in names come from `content.stage.*` / `sheet.stage.*`;
   - `matchWord`, which wraps `matchStage` (`src/lib/sheet-links.ts:133`);

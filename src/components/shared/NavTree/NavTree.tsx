@@ -97,6 +97,12 @@ export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTree
             </svg>
             {name(t('myTasks'))}{count(tree.myOpen)}
           </Link>
+          <Link href="/sheets" data-node="my-sheets" style={row(isOn('/sheets'))} aria-current={isOn('/sheets') ? 'page' : undefined}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" x2="21" y1="9" y2="9" /><line x1="3" x2="21" y1="15" y2="15" /><line x1="9" x2="9" y1="3" y2="21" />
+            </svg>
+            {name(t('mySheets'))}
+          </Link>
           {pins.length > 0 && <PinnedFolders pins={pins} pathname={pathname} />}
         </>
       )}
