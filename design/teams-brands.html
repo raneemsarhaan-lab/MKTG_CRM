@@ -1,0 +1,565 @@
+<title>Teams × Brands Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+/* Layout: header, matrix explainer, then one framed app (rail · Teams and Brands tree · views), then a comparison with the current spec. Momentum tokens (constitution §I). Earlier layout note: page header + scope chips, then one framed app (rail · tree · views), then release-day mapping and scope lists. Momentum tokens (constitution §I). */
+:root {
+  --ink: #1B1A13; --rail: #17181A; --lime: #C8F24E; --coral: #F5334F; --violet: #B79CF5;
+  --cyan: #5B93F5; --mint: #3FA34D; --muted: #6F7276; --soft: #F7F7F7; --panel: #FFFFFF; --line: #E1E1E0;
+  --bg: #EFEFEC; --hover: #F1F1EE; --sel: #EEF8D3; --sel-line: #C8F24E; --on-lime: #111111;
+  --shadow: 0 18px 50px rgba(20,20,16,.12);
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --hand: 'Caveat', 'Comic Sans MS', cursive;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --rail: #0C0D0E; --muted: #A2A5A9; --soft: #1C1D20; --panel: #222327; --line: #34363B;
+  --bg: #151618; --hover: #2A2C30; --sel: #2F3A17; --sel-line: #9DBF35; --shadow: 0 18px 50px rgba(0,0,0,.45); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --rail: #0C0D0E; --muted: #A2A5A9; --soft: #1C1D20; --panel: #222327; --line: #34363B;
+  --bg: #151618; --hover: #2A2C30; --sel: #2F3A17; --sel-line: #9DBF35; --shadow: 0 18px 50px rgba(0,0,0,.45); color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 60px }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 900 }
+h2 { font-size: 22px; font-weight: 800 }
+h3 { font-size: 15px; font-weight: 800 }
+p { margin: 0 }
+button { font: inherit; color: inherit; cursor: pointer }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px }
+.muted { color: var(--muted) }
+.hand { font-family: var(--hand); font-weight: 700; font-size: 20px; color: var(--violet) }
+
+/* Header */
+.top { display: grid; gap: 14px }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 70ch; font-size: 15px }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--panel) }
+.chip.now { background: var(--lime); color: var(--on-lime); border-color: transparent }
+.chip.later { color: var(--muted) }
+.chip b { font-weight: 800 }
+
+/* App frame */
+.app { display: grid; grid-template-columns: 66px 270px minmax(0, 1fr); gap: 0; background: var(--panel); border-radius: 26px; box-shadow: var(--shadow); min-height: 660px; overflow: hidden; position: relative; border: 1px solid var(--line) }
+.rail { background: var(--rail); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0 }
+.rail .logo { width: 38px; height: 38px; border-radius: 12px; background: #FFFFFF; display: grid; place-items: center; margin-bottom: 10px }
+.rail .ri { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; color: #8A8D91 }
+.rail .ri.on { background: var(--lime); color: #111111 }
+.rail svg { width: 18px; height: 18px }
+
+.tree { border-inline-end: 1px solid var(--line); background: var(--soft); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: auto; max-height: 760px }
+.tree-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 10px }
+.tree-head h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--body); font-weight: 700 }
+.tbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 3px 9px; font-size: 12px; font-weight: 600 }
+.tbtn[disabled] { opacity: .45; cursor: not-allowed }
+.node { display: flex; align-items: center; gap: 7px; width: 100%; text-align: start; border: 0; background: transparent; padding: 6px 8px; border-radius: 9px; font-size: 13px; min-width: 0 }
+.node:hover { background: var(--hover) }
+.node.on { background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line) }
+.node .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.node .ct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums }
+.node.space { font-weight: 700; margin-top: 8px }
+.node.folder { font-weight: 600 }
+.sq { width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; color: #FFFFFF; font-size: 10px; font-weight: 800; flex: none }
+.node svg { width: 15px; height: 15px; flex: none; color: var(--muted) }
+.lvl1 { padding-inline-start: 22px } .lvl2 { padding-inline-start: 36px } .lvl3 { padding-inline-start: 50px }
+.tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--hover); color: var(--muted); white-space: nowrap }
+.tag.words { background: color-mix(in srgb, var(--violet) 28%, transparent); color: var(--ink) }
+
+.main { display: flex; flex-direction: column; min-width: 0; position: relative }
+.mhead { padding: 18px 22px 0; display: grid; gap: 12px; border-bottom: 1px solid var(--line) }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted) }
+.crumbs b { color: var(--ink) }
+.titlerow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between }
+.titlerow h2 { display: flex; align-items: center; gap: 10px }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center }
+.btn:hover { background: var(--hover) }
+.btn.primary { background: var(--lime); border-color: transparent; color: var(--on-lime) }
+.btn[disabled] { opacity: .45; cursor: not-allowed }
+.btn svg { width: 14px; height: 14px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel) }
+.seg button { border: 0; background: transparent; padding: 5px 10px; font-size: 12px; font-weight: 600 }
+.seg button.on { background: var(--ink); color: var(--panel) }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none }
+.tabs button { border: 0; background: transparent; padding: 9px 12px 11px; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--ink) }
+.tabs svg { width: 14px; height: 14px }
+.addview { position: relative }
+.menu { position: absolute; top: 100%; inset-inline-start: 0; z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; min-width: 210px; display: grid }
+.menu button { border: 0; background: transparent; text-align: start; padding: 7px 10px; border-radius: 8px; font-size: 13px; display: flex; justify-content: space-between; gap: 10px }
+.menu button:hover:not([disabled]) { background: var(--hover) }
+.menu button[disabled] { color: var(--muted); cursor: default }
+
+.note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding: 10px 22px; border-bottom: 1px dashed var(--line); background: var(--soft) }
+.note .switch { margin-inline-start: auto }
+.view { padding: 16px 22px 24px; min-width: 0; overflow: auto; flex: 1 }
+
+/* Shared atoms */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: color-mix(in srgb, var(--c) 16%, transparent); white-space: nowrap }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c) }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 800; color: #FFFFFF; flex: none }
+.sla { font-size: 10.5px; font-weight: 800; color: #FFFFFF; background: var(--coral); border-radius: 6px; padding: 1px 6px }
+.prio { font-size: 11px; font-weight: 700 }
+.prio.High { color: var(--coral) } .prio.Medium { color: var(--muted) } .prio.Low { color: var(--mint) }
+.mini { font-size: 11.5px; color: var(--muted) }
+.empty { padding: 40px 10px; text-align: center; color: var(--muted) }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: none; border: 0; padding: 0 }
+.track { width: 32px; height: 18px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .15s }
+.track::after { content: ""; position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: #FFFFFF; transition: inset-inline-start .15s }
+.switch[aria-checked="true"] .track { background: var(--mint) }
+.switch[aria-checked="true"] .track::after { inset-inline-start: 16px }
+.switch[disabled] { opacity: .5; cursor: not-allowed }
+
+/* List view */
+.grp { margin-bottom: 14px }
+.grp-h { display: flex; align-items: center; gap: 10px; padding: 6px 0 }
+.grp-h .ct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums }
+.row { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto auto; gap: 14px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; background: var(--panel) }
+.row .tn { min-width: 0; display: grid; gap: 2px }
+.row .tn b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end }
+
+/* Board view */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: 210px; gap: 12px; align-items: start; padding-bottom: 6px }
+.col { background: var(--soft); border-radius: 14px; padding: 10px; display: grid; gap: 8px; border: 1px solid var(--line) }
+.col-h { display: flex; justify-content: space-between; align-items: center; gap: 6px }
+.col-h .own { font-size: 10px; color: var(--muted) }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0; overflow: hidden; display: grid }
+.card .cv { height: 44px; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 40%, var(--panel))) }
+.card .cb { padding: 9px 10px; display: grid; gap: 7px }
+.card b { font-weight: 600; font-size: 13px }
+.card .cf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
+
+/* Table view */
+.tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px }
+th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 9px 10px; border-bottom: 1px solid var(--line); background: var(--soft); white-space: nowrap }
+th.fld { color: var(--violet) }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap }
+tr:last-child td { border-bottom: 0 }
+td.st input { width: 150px; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 4px 7px; font: inherit; font-weight: 700; color: var(--ink) }
+td.st input:hover { border-color: var(--line) }
+td.st input:focus { border-color: var(--cyan); background: var(--panel); outline: none }
+td.st { position: relative }
+td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 2px; vertical-align: middle }
+
+/* Calendar */
+.cal { overflow-x: auto }
+.calgrid { display: grid; grid-template-columns: repeat(7, minmax(96px, 1fr)); min-width: 690px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden }
+.calgrid .dow { font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 8px; background: var(--soft); border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: .06em }
+.day { min-height: 92px; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 5px; display: flex; flex-direction: column; gap: 4px }
+.day:nth-child(7n) { border-inline-end: 0 }
+.day .dn { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums }
+.day.out { background: var(--soft) }
+.day.out .dn { opacity: .5 }
+.day.today .dn { background: var(--lime); color: var(--on-lime); border-radius: 6px; padding: 0 5px; align-self: flex-start; font-weight: 800 }
+.day.drop { background: var(--sel) }
+.ev { font-size: 11.5px; font-weight: 600; padding: 3px 6px; border-radius: 7px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border-inline-start: 3px solid var(--c); cursor: grab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.nodate { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+
+/* Workload */
+.wl { display: grid; gap: 12px; max-width: 760px }
+.wlr { display: grid; grid-template-columns: 150px minmax(0, 1fr) 90px; gap: 12px; align-items: center }
+.wlr .who { display: flex; gap: 8px; align-items: center; font-weight: 600 }
+.bar { height: 14px; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; display: flex }
+.bar span { height: 100% }
+.wlr .h { font-size: 12px; text-align: end; font-variant-numeric: tabular-nums }
+
+/* Slide-over panels */
+.sheet { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: min(440px, 100%); background: var(--panel); border-inline-start: 1px solid var(--line); box-shadow: var(--shadow); z-index: 40; display: flex; flex-direction: column }
+.sheet-h { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px }
+.sheet-h .x { position: absolute; top: 14px; inset-inline-end: 14px; border: 0; background: var(--hover); border-radius: 9px; width: 30px; height: 30px; font-size: 16px }
+.sheet-b { padding: 12px 18px 18px; overflow: auto; display: grid; gap: 8px; align-content: start }
+.wrow { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: center }
+.wrow .sn { display: grid; gap: 1px }
+.wrow .sn small { font-size: 10.5px; color: var(--muted) }
+.wrow input { width: 100%; border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 7px 9px; font: inherit; color: var(--ink) }
+.wrow input:disabled { color: var(--muted) }
+.foot { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px }
+.frow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line) }
+.frow div { display: grid; gap: 2px }
+.frow small { color: var(--muted); font-size: 11.5px }
+
+.col.simple { border-style: dashed }
+.kindsep { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; display: flex; gap: 8px; align-items: center }
+.kindsep::after { content: ""; flex: 1; height: 1px; background: var(--line) }
+.tag.simple { background: color-mix(in srgb, var(--cyan) 20%, transparent); color: var(--ink) }
+.subof { font-size: 11px; color: var(--muted) }
+/* Sheet view: the existing spreadsheet look (specs 013-020) */
+.xl { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel) }
+.xl-menu { display: flex; gap: 14px; padding: 7px 12px 2px; font-size: 12.5px; flex-wrap: wrap }
+.xl-tools { display: flex; gap: 4px; align-items: center; margin: 4px 8px 6px; padding: 4px 8px; background: var(--soft); border-radius: 999px; flex-wrap: wrap; font-size: 12px }
+.xl-tools span { padding: 2px 7px; border-radius: 6px; color: var(--muted); font-weight: 600 }
+.xl-tools .sep { width: 1px; height: 16px; background: var(--line); padding: 0 }
+.xl-bar { display: flex; align-items: center; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12.5px }
+.xl-bar .nbox { width: 64px; padding: 5px 8px; border-inline-end: 1px solid var(--line); font-weight: 600; font-variant-numeric: tabular-nums }
+.xl-bar .fx { padding: 5px 8px; color: var(--muted); font-style: italic; border-inline-end: 1px solid var(--line) }
+.xl-bar .fv { padding: 5px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.xl-grid { overflow-x: auto }
+.xl-grid table { border-radius: 0; min-width: 900px }
+.xl-grid th, .xl-grid td { border: 1px solid var(--line); padding: 4px 8px; font-size: 12.5px }
+.xl-grid th { text-transform: none; letter-spacing: 0; font-size: 12.5px }
+.xl-grid th.cl { text-align: center; background: var(--soft); text-transform: none; letter-spacing: 0; font-weight: 600; padding: 2px }
+.xl-grid th.fld { background: color-mix(in srgb, var(--violet) 16%, var(--panel)); color: var(--ink) }
+.xl-grid th.reg { background: var(--soft); color: var(--muted) }
+.xl-grid td.rn { background: var(--soft); color: var(--muted); text-align: center; width: 36px; font-variant-numeric: tabular-nums }
+.xl-grid td.sel { box-shadow: inset 0 0 0 2px var(--cyan) }
+.xl-grid td.grp { background: var(--soft); font-weight: 700 }
+.toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
+.toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
+
+/* Lower sections */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px; display: grid; gap: 18px }
+.map { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); gap: 10px; align-items: stretch }
+.map .side { display: grid; gap: 8px; align-content: start }
+.map .lbl { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.map .itm { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--soft); display: grid; gap: 2px }
+.map .itm b { font-weight: 700 }
+.map .itm small { color: var(--muted) }
+.map .arrow { display: grid; place-items: center; color: var(--muted); font-size: 20px }
+.scope { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px }
+.scope .sc { border-radius: 16px; padding: 16px; border: 1px solid var(--line); display: grid; gap: 10px; align-content: start }
+.scope .sc.now { background: var(--sel); border-color: var(--sel-line) }
+.scope ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px; font-size: 13px }
+.scope h3 { display: flex; justify-content: space-between; align-items: baseline }
+.scope h3 small { font-family: var(--body); font-weight: 600; color: var(--muted); font-size: 12px }
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: minmax(0, 1fr) }
+  .rail { display: none }
+  .tree { max-height: 300px; border-inline-end: 0; border-bottom: 1px solid var(--line) }
+  .scope { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width: 620px) {
+  .map { grid-template-columns: minmax(0, 1fr) }
+  .map .arrow { transform: rotate(90deg); height: 24px }
+  .scope { grid-template-columns: minmax(0, 1fr) }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 6px }
+  .meta { justify-content: flex-start }
+  .wlr { grid-template-columns: 110px minmax(0, 1fr) 70px }
+  .mhead, .view { padding-inline: 14px }
+  .note { padding-inline: 14px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+<style>
+.sect { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 12px 8px 4px; display: flex; justify-content: space-between; align-items: center }
+.sect small { text-transform: none; letter-spacing: 0; font-weight: 500 }
+.node.team { font-weight: 700 }
+.rule { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--cyan) 14%, transparent) }
+.matrix { overflow-x: auto }
+.matrix table { min-width: 620px; font-size: 13px }
+.matrix td, .matrix th { text-align: center; border-bottom: 1px solid var(--line); padding: 9px 10px }
+.matrix th:first-child, .matrix td:first-child { text-align: start }
+.matrix td.hit b { display: inline-grid; place-items: center; min-width: 28px; height: 24px; border-radius: 8px; background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line); font-variant-numeric: tabular-nums }
+.matrix td.zero { color: var(--muted) }
+.cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px }
+.cmp .sc { border-radius: 16px; padding: 16px; border: 1px solid var(--line); display: grid; gap: 8px; align-content: start }
+.cmp .sc.now { background: var(--sel); border-color: var(--sel-line) }
+.cmp ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px; font-size: 13px }
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px }
+.file { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); display: grid }
+.file .th { height: 84px; display: grid; place-items: center; font-family: var(--display); font-weight: 900; font-size: 22px; color: #FFFFFF; background: var(--c) }
+.file .fn { padding: 8px 10px; display: grid; gap: 2px; font-size: 12.5px }
+.file .fn b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px }
+.gal .card .cv { height: 70px }
+.gal a { color: var(--cyan); font-size: 12px; font-weight: 600; text-decoration: none }
+.sheettabs { display: flex; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--line); background: var(--soft); font-size: 12.5px; overflow-x: auto }
+.sheettabs button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px 8px 0 0; font-weight: 600; color: var(--muted); white-space: nowrap }
+.sheettabs button.on { background: var(--panel); color: var(--ink); box-shadow: inset 0 -2px 0 var(--mint) }
+@media (max-width: 620px) { .cmp { grid-template-columns: minmax(0, 1fr) } }
+</style>
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Spec 021 · Option B, for comparison</span>
+    <h1>Teams × Brands</h1>
+    <p class="lede"><b>Brands</b> hold the work, each with the same four Folders: <b>Calendars</b>, <b>Assets</b>, <b>Sheet</b> and <b>Library</b>. <b>Team Spaces</b> hold no tasks of their own. Each one is a lens that pulls its team's work from every brand. A task lives in one brand Folder and shows up in every team Space it belongs to. Click around: the data is sample data.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="mx">
+    <div style="display:grid;gap:6px">
+      <h2 id="mx">One task, one home, many team lenses</h2>
+      <p class="muted">Open tasks in this sample, by brand and team Space. A task can count in two columns: a LinkedIn post is in Content while it's written and in Design while it's designed.</p>
+    </div>
+    <div class="matrix" id="matrix"></div>
+  </section>
+
+  <section class="app" id="app" aria-label="Interactive preview">
+    <nav class="rail" aria-label="Momentum navigation (sample)">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="#17181A"><rect x="5" y="4" width="14" height="3.2" rx="1.2"/><rect x="5" y="10.4" width="10" height="3.2" rx="1.2"/><rect x="5" y="16.8" width="14" height="3.2" rx="1.2"/></svg></div>
+      <span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg></span>
+      <span class="ri on" title="Spaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span>
+      <span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+    </nav>
+    <aside class="tree" id="tree" aria-label="Teams and brands"></aside>
+    <div class="main" id="main"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="cp">
+    <div style="display:grid;gap:6px">
+      <h2 id="cp">How this differs from the spec as written</h2>
+      <p class="muted">If you choose this option, these are the changes to spec 021.</p>
+    </div>
+    <div class="cmp">
+      <div class="sc"><h3>Spec as written (Option A)</h3><ul>
+        <li>Space = a brand</li><li>Folder = a team inside that brand (Content, Design, Video)</li><li>A designer working on three brands opens three Design Folders, or builds a view on Everything</li><li>Status words are set per team Folder, so each brand repeats them</li><li>Teams can lay out each brand differently</li></ul></div>
+      <div class="sc now"><h3>This option (B)</h3><ul>
+        <li>Brand = where work lives, always with Calendars, Assets, Sheet and Library</li><li>Team Space = a lens across all brands: no tasks of its own, only a rule for which tasks it shows and who its members are</li><li>A designer opens one Space and sees every brand's design work</li><li>Status words are set once per team Space</li><li>Feature switches stay per brand</li><li>Hiding work from a team means leaving that team out of the Space, or making a brand Folder private</li></ul></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+const STAGES = [
+  { id: 'todo', en: 'To Do', c: '#64748B' }, { id: 'c-prog', en: 'Writing', c: '#3B82F6' }, { id: 'c-final', en: 'Content Review', c: '#2E6FB0' },
+  { id: 'c-check', en: 'Islam Check', c: '#1F5A94' }, { id: 'r-design', en: 'Ready to Design', c: '#8B5CF6' }, { id: 'd-prog', en: 'Designing', c: '#7C3AED' },
+  { id: 'd-check', en: 'Design Review', c: '#5B3FB5' }, { id: 'final-check', en: 'Final Check', c: '#F59E0B' }, { id: 'publish', en: 'Published', c: '#22C55E' },
+];
+const SIMPLE = [{ id: 's-todo', en: 'To Do', c: '#94A3B8', simple: true }, { id: 's-doing', en: 'In progress', c: '#0EA5E9', simple: true }, { id: 's-done', en: 'Done', c: '#3FA34D', simple: true }];
+const ALL = STAGES.concat(SIMPLE); const SI = Object.fromEntries(ALL.map((s, i) => [s.id, i])); const ST = (id) => ALL[SI[id]];
+const W = (a) => Object.fromEntries(ALL.map((s, i) => [s.id, a[i] || '']));
+const PEOPLE = { RS: { n: 'Raneem', c: '#7C3AED', r: 'Marketing Manager' }, NO: { n: 'Noran', c: '#D4537E', r: 'Content' }, SA: { n: 'Samaa', c: '#0E7C7B', r: 'Content' },
+  OM: { n: 'Omar', c: '#378ADD', r: 'Design' }, LA: { n: 'Laila', c: '#B45309', r: 'Design' }, KA: { n: 'Karim', c: '#475569', r: 'Video' } };
+const AS = [['RS', 'Raneem · admin'], ['OM', 'Omar · designer'], ['KA', 'Karim · video'], ['NO', 'Noran · content']];
+const DESIGN_ST = ['r-design', 'd-prog', 'd-check'];
+const CONTENT_ST = ['todo', 'c-prog', 'c-final', 'c-check'];
+const TEAMS = [
+  { id: 'tm-content', name: 'Content', color: '#3B82F6', members: ['RS', 'NO', 'SA'], ruleText: 'Pipeline tasks at To Do, Writing, Content Review or Islam Check, from every brand',
+    rule: (t) => t.kind === 'pipeline' && CONTENT_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
+    words: W(['To write', 'Writing', 'Edit', 'Islam check', 'To design', 'In design', 'Design review', 'Final check', 'Published']) },
+  { id: 'tm-design', name: 'Design', color: '#7C3AED', members: ['RS', 'OM', 'LA'], ruleText: 'Pipeline tasks at Ready to Design, Designing or Design Review, from every brand',
+    rule: (t) => t.kind === 'pipeline' && DESIGN_ST.includes(t.stage) && !['Video', 'Reel'].includes(t.type),
+    words: W(['Brief in', 'Copy', 'Copy review', 'Islam check', 'Ready for design', 'Designing', 'Design review', 'Final check', 'Posted']) },
+  { id: 'tm-video', name: 'Video', color: '#0E9F9A', members: ['RS', 'KA'], ruleText: 'Video and Reel tasks at any stage, from every brand',
+    rule: (t) => ['Video', 'Reel'].includes(t.type),
+    words: W(['Idea', 'Scripting', 'Script review', 'Islam check', 'Ready to shoot', 'Editing', 'Rough cut review', 'Final cut', 'Live']) },
+  { id: 'tm-plan', name: 'Planning', color: '#0EA5E9', members: ['RS', 'NO', 'SA'], ruleText: 'Simple tasks (planning, admin, events), from every brand',
+    rule: (t) => t.kind === 'simple', words: W(['', '', '', '', '', '', '', '', '', 'Not started', 'Doing', 'Done']) },
+];
+const BRANDS = [
+  { id: 'ff', name: 'Forefront Consulting', color: '#B4322F', cal: ['December 2026', 'Ramadan 2027'] },
+  { id: 'om', name: 'Omnisight', color: '#0E7C7B', cal: ['December 2026', 'Product launch'] },
+  { id: 'tsc', name: 'The Strategy Community', color: '#7A5A2E', cal: ['December 2026', 'Monthly meetup'] },
+  { id: 'ipb', name: 'Islam Personal Branding', color: '#1E293B', cal: ['December 2026'] },
+];
+const FOLDERS = [['cal', 'Calendars'], ['assets', 'Assets'], ['sheet', 'Sheet'], ['lib', 'Library']];
+const B = Object.fromEntries(BRANDS.map(b => [b.id, b]));
+const T = Object.fromEntries(TEAMS.map(t => [t.id, t]));
+
+let tasks = [
+  ['ff', 0, 'Q1 outlook carousel', 'c-final', 'SA', '2026-12-03', 'Post', 'LinkedIn', true],
+  ['ff', 0, 'Client win announcement', 'publish', 'NO', '2026-11-20', 'Post', 'LinkedIn', false, true],
+  ['ff', 0, 'Why strategy fails in year two', 'd-prog', 'OM', '2026-12-10', 'Article', 'Website', false, true],
+  ['ff', 0, 'Podcast ep. 14 with guest CFO', 'd-prog', 'KA', '2026-12-09', 'Video', 'YouTube'],
+  ['ff', 0, 'Ep. 13 cut-downs', 'final-check', 'KA', '2026-12-02', 'Reel', 'Instagram'],
+  ['ff', 1, 'Ramadan hero key visual', 'd-prog', 'OM', '2026-12-14', 'Design', 'Instagram', false, true],
+  ['ff', 1, 'Iftar invite cards', 'r-design', 'LA', '2026-12-18', 'Design', 'Instagram', false, true],
+  ['ff', 1, 'Ramadan launch plan', 's-doing', 'RS', '2026-12-08', null, null, false, false, 'simple'],
+  ['ff', 1, 'Ramadan teaser', 'todo', 'KA', '2026-12-23', 'Video', 'YouTube'],
+  ['om', 0, 'Webinar recap post', 'c-prog', 'SA', '2026-12-07', 'Post', 'LinkedIn'],
+  ['om', 0, 'Case study: retail client', 'publish', 'NO', '2026-11-24', 'Article', 'Website', false, true],
+  ['om', 1, 'Launch landing page copy', 'c-final', 'NO', '2026-12-11', 'Other', 'Website', true],
+  ['om', 1, 'Launch banner set', 'd-check', 'LA', '2026-12-15', 'Design', 'LinkedIn', false, true],
+  ['om', 1, 'Launch teaser video', 'r-design', 'KA', '2026-12-21', 'Video', 'YouTube'],
+  ['om', 1, 'Launch checklist with sales', 's-todo', 'RS', '2026-12-04', null, null, false, false, 'simple'],
+  ['tsc', 0, 'Newsletter issue 22', 'd-prog', 'LA', '2026-12-15', 'Email', 'Email', false, true],
+  ['tsc', 0, 'Member spotlight', 'todo', 'SA', '2026-12-20', 'Post', 'LinkedIn'],
+  ['tsc', 1, 'December meetup: venue', 's-doing', 'SA', '2026-12-05', null, null, false, false, 'simple'],
+  ['tsc', 1, 'Meetup highlights reel', 'todo', 'KA', '2026-12-16', 'Reel', 'Instagram'],
+  ['tsc', 1, 'Meetup poster', 'r-design', 'OM', '2026-12-06', 'Design', 'Instagram', false, true],
+  ['ipb', 0, 'Leadership lesson #8', 'c-check', 'NO', '2026-12-04', 'Post', 'LinkedIn'],
+  ['ipb', 0, 'Year in review carousel', 'r-design', 'OM', '2026-12-28', 'Post', 'LinkedIn', false, true],
+  ['ipb', 0, 'Talk clip: on patience', 'publish', 'KA', '2026-11-26', 'Reel', 'Instagram', false, true],
+].map((r, i) => ({ id: 't' + i, brand: r[0], cal: r[1], name: r[2], stage: r[3], who: r[4], due: r[5], type: r[6], platform: r[7], breached: !!r[8], cover: !!r[9], kind: r[10] || 'pipeline' }));
+const ASSETS = {
+  ff: [['Logo · primary', 'SVG'], ['Logo · white', 'SVG'], ['Brand fonts', 'ZIP'], ['LinkedIn post template', 'FIG'], ['Story template', 'FIG'], ['Brand guide 2026', 'PDF']],
+  om: [['Logo · primary', 'SVG'], ['Product screenshots', 'ZIP'], ['Deck template', 'PPTX']],
+  tsc: [['Logo · primary', 'PNG'], ['Event poster template', 'FIG'], ['Speaker card template', 'FIG']],
+  ipb: [['Signature mark', 'SVG'], ['Portrait set', 'ZIP'], ['Carousel template', 'FIG']],
+};
+
+const S = { node: 'tm-design', view: 'board', as: 'RS', group: 'brand', sheetTab: 0 };
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const av = (w) => `<span class="av" style="background:${PEOPLE[w].c}" title="${PEOPLE[w].n}">${PEOPLE[w].n[0]}</span>`;
+const fmt = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'No date';
+const brandSq = (b, small) => `<span class="sq" style="background:${b.color}${small ? ';width:16px;height:16px;font-size:9px' : ''}">${esc(b.name[0])}</span>`;
+const isAdmin = () => S.as === 'RS';
+const teamsFor = () => TEAMS.filter(t => isAdmin() || t.members.includes(S.as));
+const done = (t) => t.stage === 'publish' || t.stage === 's-done';
+
+/* node ids: team id | b:ff | b:ff:cal | b:ff:cal:0 | b:ff:assets | b:ff:sheet | b:ff:lib */
+function parse(id) { if (T[id]) return { kind: 'team', team: T[id] }; const [, b, f, i] = id.split(':'); return { kind: f ? 'folder' : 'brand', brand: B[b], folder: f, idx: i === undefined ? null : +i }; }
+function scope() {
+  const p = parse(S.node);
+  if (p.kind === 'team') return tasks.filter(t => p.team.rule(t));
+  let ts = tasks.filter(t => t.brand === p.brand.id);
+  if (p.folder === 'cal' && p.idx !== null) ts = ts.filter(t => t.cal === p.idx);
+  if (p.folder === 'lib') ts = ts.filter(done);
+  if (p.folder === 'assets') ts = ts.filter(t => t.type === 'Design' && !done(t));
+  return ts;
+}
+const teamWords = () => { const p = parse(S.node); return p.kind === 'team' ? p.team.words : null; };
+const label = (sid) => { const w = teamWords(); return (w && (w[sid] || '').trim()) || ST(sid).en; };
+const pill = (sid) => `<span class="pill" style="--c:${ST(sid).c}">${esc(label(sid))}</span>`;
+const teamsOf = (t) => TEAMS.filter(m => m.rule(t));
+
+let toastTimer;
+function toast(msg) { let el = $('.toast'); if (el) el.remove(); el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.innerHTML = msg; document.body.appendChild(el); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 4200); }
+
+const IC = {
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  assets: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  sheet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>',
+  lib: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 012-2h12v16H6a2 2 0 00-2 2zM18 17v4H6"/></svg>',
+  lens: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>',
+};
+
+function renderMatrix() {
+  const open = tasks.filter(t => !done(t));
+  let h = `<table><thead><tr><th>Brand</th>${TEAMS.map(t => `<th>${t.name}</th>`).join('')}<th>Open tasks</th></tr></thead><tbody>`;
+  BRANDS.forEach(b => {
+    const bt = open.filter(t => t.brand === b.id);
+    h += `<tr><td><span style="display:inline-flex;gap:8px;align-items:center">${brandSq(b, true)}${esc(b.name)}</span></td>` +
+      TEAMS.map(m => { const n = bt.filter(m.rule).length; return `<td class="${n ? 'hit' : 'zero'}">${n ? `<b>${n}</b>` : '·'}</td>`; }).join('') + `<td>${bt.length}</td></tr>`;
+  });
+  $('#matrix').innerHTML = h + '</tbody></table>';
+}
+
+function renderTree() {
+  let h = `<div class="sect">Teams <small>lenses across brands</small></div>`;
+  teamsFor().forEach(t => { h += btn(t.id, `<span class="sq" style="background:${t.color}">${t.name[0]}</span>`, t.name, 'team', tasks.filter(x => t.rule(x) && !done(x)).length); });
+  if (teamsFor().length < TEAMS.length) h += `<p class="mini" style="padding:2px 8px">${TEAMS.length - teamsFor().length} team Spaces you're not in are hidden.</p>`;
+  h += `<div class="sect">Brands <small>where work lives</small></div>`;
+  BRANDS.forEach(b => {
+    h += btn('b:' + b.id, brandSq(b), b.name, 'space', tasks.filter(t => t.brand === b.id && !done(t)).length);
+    FOLDERS.forEach(([f, name]) => {
+      const ct = f === 'assets' ? ASSETS[b.id].length : f === 'lib' ? tasks.filter(t => t.brand === b.id && done(t)).length : f === 'sheet' ? '' : tasks.filter(t => t.brand === b.id && !done(t)).length;
+      h += btn(`b:${b.id}:${f}`, IC[f], name, 'folder lvl1', ct);
+      if (f === 'cal') b.cal.forEach((c, i) => { h += btn(`b:${b.id}:cal:${i}`, IC.list, c, 'lvl2', tasks.filter(t => t.brand === b.id && t.cal === i && !done(t)).length); });
+    });
+  });
+  const tr = $('#tree'); tr.innerHTML = h;
+  tr.querySelectorAll('.node').forEach(x => x.onclick = () => {
+    S.node = x.dataset.id; const p = parse(S.node);
+    S.view = p.kind === 'team' ? 'board' : p.folder === 'assets' ? 'files' : p.folder === 'sheet' ? 'sheet' : p.folder === 'lib' ? 'gallery' : p.folder === 'cal' ? 'calendar' : 'list';
+    S.group = p.kind === 'team' ? 'brand' : 'stage'; render();
+  });
+}
+function btn(id, icon, name, cls, ct) { return `<button type="button" class="node ${cls} ${S.node === id ? 'on' : ''}" data-id="${id}" ${S.node === id ? 'aria-current="true"' : ''}>${icon}<span class="nm">${esc(name)}</span><span class="ct">${ct}</span></button>`; }
+
+function viewsFor(p) {
+  if (p.kind === 'team') return [['board', 'Board'], ['list', 'List'], ['sheet', 'Sheet'], ['calendar', 'Calendar'], ['workload', 'Workload']];
+  if (p.folder === 'assets') return [['files', 'Files'], ['list', 'Asset requests']];
+  if (p.folder === 'sheet') return [['sheet', 'Sheet']];
+  if (p.folder === 'lib') return [['gallery', 'Gallery'], ['sheet', 'Sheet']];
+  return [['calendar', 'Calendar'], ['list', 'List'], ['board', 'Board'], ['sheet', 'Sheet']];
+}
+function renderMain() {
+  const p = parse(S.node); const m = $('#main');
+  let title, crumbs, sub = '';
+  if (p.kind === 'team') {
+    title = `${p.team.name} <span class="tag">Team Space · lens</span>`; crumbs = `<span>Teams</span><span>›</span><b>${p.team.name}</b>`;
+    sub = `<div class="actions"><span class="rule">${IC.lens.replace('<svg', '<svg width="13" height="13"')} Shows: ${esc(p.team.ruleText)}</span>
+      <span class="mini">Members: ${p.team.members.map(w => PEOPLE[w].n).join(', ')}</span></div>`;
+  } else {
+    const fname = p.folder ? FOLDERS.find(f => f[0] === p.folder)[1] : null;
+    title = `${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)} <span class="tag">${p.idx !== null ? 'List' : p.folder ? 'Folder' : 'Brand'}</span>`;
+    crumbs = `<span>Brands</span><span>›</span>${p.folder ? `<span>${esc(p.brand.name)}</span><span>›</span>` : ''}${p.idx !== null ? `<span>Calendars</span><span>›</span>` : ''}<b>${esc(p.idx !== null ? p.brand.cal[p.idx] : fname || p.brand.name)}</b>`;
+    const ex = { cal: 'Where the brand\'s tasks live, one List per month or campaign.', assets: 'Brand files (logos, fonts, templates), plus design requests for new assets.', sheet: 'The brand\'s spreadsheets, with every tool the sheets have today.', lib: 'Everything published or done for this brand, kept for reuse. Tasks arrive here on their own when they finish.' };
+    sub = `<div class="actions"><span class="mini">${p.folder ? ex[p.folder] : 'Every task for this brand, from its Calendars. Each brand has the same four Folders.'}</span></div>`;
+  }
+  const vs = viewsFor(p); if (!vs.some(v => v[0] === S.view)) S.view = vs[0][0];
+  const groupable = ['board', 'list'].includes(S.view) && !['assets', 'lib'].includes(p.folder);
+  m.innerHTML = `<div class="mhead"><div class="crumbs">${crumbs}</div>
+    <div class="titlerow"><h2>${title}</h2><div class="actions"><span class="mini">Viewing as</span><div class="seg" role="group" aria-label="Viewing as">${AS.map(a => `<button type="button" data-as="${a[0]}" class="${S.as === a[0] ? 'on' : ''}">${a[1]}</button>`).join('')}</div></div></div>
+    ${sub}
+    ${groupable ? `<div class="actions"><span class="mini">Group by</span><div class="seg" role="group" aria-label="Group by">${[['brand', 'Brand'], ['stage', 'Status']].map(g => `<button type="button" data-g="${g[0]}" class="${S.group === g[0] ? 'on' : ''}">${g[1]}</button>`).join('')}</div>${p.kind === 'team' ? '<span class="mini">Status names are this team\'s words.</span>' : ''}</div>` : ''}
+    <div class="tabs" role="tablist">${vs.map(v => `<button type="button" role="tab" data-view="${v[0]}" class="${S.view === v[0] ? 'on' : ''}" aria-selected="${S.view === v[0]}">${v[1]}</button>`).join('')}</div></div>
+    <div class="view" id="view"></div>`;
+  m.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { S.view = b.dataset.view; renderMain(); });
+  m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { S.group = b.dataset.g; renderMain(); });
+  m.querySelectorAll('[data-as]').forEach(b => b.onclick = () => {
+    S.as = b.dataset.as; const p2 = parse(S.node);
+    if (p2.kind === 'team' && !teamsFor().includes(p2.team)) S.node = teamsFor()[0].id;
+    render(); toast(isAdmin() ? 'Raneem is an admin: she sees every team Space.' : `${PEOPLE[S.as].n} sees the ${teamsFor().map(t => t.name).join(' and ')} Space${teamsFor().length > 1 ? 's' : ''}, and every brand.`);
+  });
+  const v = $('#view'); const ts = scope();
+  ({ board: vBoard, list: vList, sheet: vSheet, calendar: vCal, workload: vWork, files: vFiles, gallery: vGal })[S.view](v, ts, p);
+}
+const metaTeams = (t) => teamsOf(t).map(m => `<span class="tag" style="background:color-mix(in srgb, ${m.color} 18%, transparent);color:var(--ink)">${m.name}</span>`).join('');
+function card(t, p) {
+  const b = B[t.brand];
+  return `<div class="card">${t.cover ? `<div class="cv" style="--c:${b.color}"></div>` : ''}<div class="cb"><b>${esc(t.name)}</b>
+    <div class="cf">${p.kind === 'team' ? `${brandSq(b, true)}<span class="mini">${esc(b.name)}</span>` : metaTeams(t)}</div>
+    <div class="cf">${av(t.who)}<span class="mini">${fmt(t.due)}</span>${t.type ? `<span class="tag">${esc(t.type)}</span>` : '<span class="tag simple">Simple</span>'}${t.breached ? '<span class="sla">SLA</span>' : ''}</div></div></div>`;
+}
+const stagesIn = (ts) => ALL.filter(s => ts.some(t => t.stage === s.id));
+function vBoard(v, ts, p) {
+  if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+  let h = '<div class="board">';
+  if (S.group === 'brand') BRANDS.forEach(b => { const g = ts.filter(t => t.brand === b.id); h += `<div class="col"><div class="col-h"><span style="display:inline-flex;gap:6px;align-items:center;font-weight:700">${brandSq(b, true)}${esc(b.name)}</span><span class="mini">${g.length}</span></div>${g.map(t => card(t, p).replace('<div class="cf">' + av(t.who), `<div class="cf">${pill(t.stage)}</div><div class="cf">` + av(t.who))).join('')}</div>`; });
+  else stagesIn(ts).forEach(s => { const g = ts.filter(t => t.stage === s.id); h += `<div class="col ${s.simple ? 'simple' : ''}"><div class="col-h">${pill(s.id)}<span class="mini">${g.length}</span></div>${g.map(t => card(t, p)).join('')}</div>`; });
+  v.innerHTML = h + '</div>';
+}
+function vList(v, ts, p) {
+  if (!ts.length) { v.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+  const groups = S.group === 'brand' && p.kind === 'team' ? BRANDS.map(b => [brandSq(b, true) + `<b>${esc(b.name)}</b>`, ts.filter(t => t.brand === b.id)]) : stagesIn(ts).map(s => [pill(s.id), ts.filter(t => t.stage === s.id)]);
+  v.innerHTML = groups.filter(g => g[1].length).map(([hd, g]) => `<div class="grp"><div class="grp-h">${hd}<span class="ct">${g.length}</span></div>${g.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(B[t.brand].name)} › ${esc(B[t.brand].cal[t.cal])}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('')}</div>`).join('');
+}
+function vSheet(v, ts, p) {
+  const tabs = p.folder === 'sheet' ? ['Content plan', 'Video sheet', 'Hashtags'] : null;
+  if (tabs && S.sheetTab === 1) ts = ts.filter(t => ['Video', 'Reel'].includes(t.type));
+  if (tabs && S.sheetTab === 2) ts = [];
+  const L = (i) => String.fromCharCode(65 + i);
+  const heads = [['Task', 'fld'], ['Brand', 'fld'], ['Status', 'fld'], ['Assignee', 'fld'], ['Due date', 'fld'], ['Type', 'fld'], ['Platform', 'fld'], ['Notes', 'reg']];
+  const rows = tabs && S.sheetTab === 2 ? [['#Leadership', 'Strategy posts'], ['#Ramadan2027', 'Campaign'], ['#FFInsights', 'Weekly series']].map(r => [r[0], r[1], '', '', '', '', '', '']) :
+    ts.map(t => [`<b style="font-weight:600">${esc(t.name)}</b>`, `<span class="mini">${esc(B[t.brand].name)}</span>`, `<span class="dot" style="background:${ST(t.stage).c}"></span> <b>${esc(label(t.stage))}</b>`, `${av(t.who)} <span class="mini">${PEOPLE[t.who].n}</span>`, `<span class="mini">${fmt(t.due)}</span>`, esc(t.type || ''), esc(t.platform || ''), '']);
+  const hd = tabs && S.sheetTab === 2 ? [['Hashtag', 'reg'], ['Use for', 'reg']].concat(Array(6).fill(['', 'reg'])) : heads;
+  v.innerHTML = `<div class="xl"><div class="xl-menu"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span><span>Tools</span></div>
+    <div class="xl-tools" aria-hidden="true"><span>↶</span><span>↷</span><span class="sep"></span><span>100%</span><span class="sep"></span><span>Inter ▾</span><span>11 ▾</span><span class="sep"></span><span><b>B</b></span><span><i>I</i></span><span><s>S</s></span><span>A</span><span class="sep"></span><span>Fill</span><span>Borders</span><span>Merge</span><span class="sep"></span><span>Sort</span><span>Filter</span><span>⚙ Fields</span></div>
+    <div class="xl-bar"><span class="nbox">A1</span><span class="fx">fx</span><span class="fv">${esc(hd[0][0])}</span></div>
+    <div class="xl-grid"><table><thead><tr><th class="cl"></th>${hd.map((_, i) => `<th class="cl">${L(i)}</th>`).join('')}</tr><tr><td class="rn">1</td>${hd.map(x => `<th class="${x[1]}">${x[0]}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => `<tr><td class="rn">${i + 2}</td>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    ${tabs ? `<div class="sheettabs">${tabs.map((t, i) => `<button type="button" data-tab="${i}" class="${S.sheetTab === i ? 'on' : ''}">${t}</button>`).join('')}<button type="button" aria-label="New sheet">+</button></div>` : ''}</div>
+    <p class="mini" style="margin-top:10px">${tabs ? 'The brand\'s workbook: linked tabs follow the tasks, and blank tabs are free-form, as in Sheets today.' : 'The same spreadsheet as today, filled with the tasks in this view.'}</p>`;
+  v.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { S.sheetTab = +b.dataset.tab; renderMain(); });
+}
+function vCal(v, ts) {
+  const first = new Date('2026-11-30T00:00'); const today = '2026-11-22';
+  let h = '<div class="cal"><div class="calgrid">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < 35; i++) {
+    const d = new Date(first); d.setDate(first.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    h += `<div class="day ${d.getMonth() !== 11 ? 'out' : ''} ${iso === today ? 'today' : ''}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' Dec' : ''}</span>${ts.filter(t => t.due === iso).map(t => `<div class="ev" style="--c:${B[t.brand].color}" title="${esc(t.name)} · ${esc(label(t.stage))}">${esc(t.name)}</div>`).join('')}</div>`;
+  }
+  v.innerHTML = h + '</div></div><p class="mini" style="margin-top:10px">December 2026. Each task is in its brand\'s colour.</p>';
+}
+function vWork(v, ts) {
+  const by = {}; ts.filter(t => !done(t)).forEach(t => { (by[t.who] = by[t.who] || []).push(t); });
+  v.innerHTML = '<div class="wl"><p class="mini">Open tasks in this team Space, by person, split by brand.</p>' + Object.keys(by).map(w => `<div class="wlr"><div class="who">${av(w)}${PEOPLE[w].n}</div><div class="bar">${by[w].map(t => `<span style="width:${100 / 8}%;background:${B[t.brand].color}" title="${esc(t.name)} · ${esc(B[t.brand].name)}"></span>`).join('')}</div><div class="h">${by[w].length} tasks</div></div>`).join('') + '</div>';
+}
+function vFiles(v, ts, p) {
+  const b = p.brand;
+  v.innerHTML = `<div class="files">${ASSETS[b.id].map(a => `<div class="file"><div class="th" style="--c:${b.color}">${esc(a[1])}</div><div class="fn"><b>${esc(a[0])}</b><span class="mini">${esc(a[1])} · ${esc(b.name)}</span></div></div>`).join('')}</div>
+    <h3 style="margin-bottom:8px">Asset requests in progress</h3>${ts.length ? ts.map(t => `<div class="row"><div class="tn"><b>${esc(t.name)}</b><span class="mini">${esc(b.cal[t.cal])}</span></div><div class="meta">${metaTeams(t)}</div>${pill(t.stage)}<div class="meta">${av(t.who)}<span class="mini">${fmt(t.due)}</span></div></div>`).join('') : '<p class="mini">None right now.</p>'}`;
+}
+function vGal(v, ts) {
+  if (!ts.length) { v.innerHTML = '<div class="empty">Nothing published yet.</div>'; return; }
+  v.innerHTML = `<div class="gal">${ts.map(t => `<div class="card"><div class="cv" style="--c:${B[t.brand].color}"></div><div class="cb"><b>${esc(t.name)}</b><div class="cf"><span class="tag">${esc(t.type || 'Simple')}</span><span class="mini">${esc(t.platform || '')} · ${fmt(t.due)}</span></div><div class="cf">${av(t.who)}<span class="mini">Open post ↗</span></div></div></div>`).join('')}</div>`;
+}
+function render() { renderMatrix(); renderTree(); renderMain(); }
+render();
+})();
+</script>
