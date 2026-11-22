@@ -1,0 +1,678 @@
+<title>Noran's Workspace Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+/* Layout: header with persona, then one framed app (rail · Me/Teams/Brands · My tasks or My sheets). Reuses the Teams × Brands tokens. Earlier note: then one framed app (rail · Teams and Brands tree · views), then a comparison with the current spec. Momentum tokens (constitution §I). Earlier layout note: page header + scope chips, then one framed app (rail · tree · views), then release-day mapping and scope lists. Momentum tokens (constitution §I). */
+:root {
+  --ink: #1B1A13; --rail: #17181A; --lime: #C8F24E; --coral: #F5334F; --violet: #B79CF5;
+  --cyan: #5B93F5; --mint: #3FA34D; --muted: #6F7276; --soft: #F7F7F7; --panel: #FFFFFF; --line: #E1E1E0;
+  --bg: #EFEFEC; --hover: #F1F1EE; --sel: #EEF8D3; --sel-line: #C8F24E; --on-lime: #111111;
+  --shadow: 0 18px 50px rgba(20,20,16,.12);
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --hand: 'Caveat', 'Comic Sans MS', cursive;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --rail: #0C0D0E; --muted: #A2A5A9; --soft: #1C1D20; --panel: #222327; --line: #34363B;
+  --bg: #151618; --hover: #2A2C30; --sel: #2F3A17; --sel-line: #9DBF35; --shadow: 0 18px 50px rgba(0,0,0,.45); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --rail: #0C0D0E; --muted: #A2A5A9; --soft: #1C1D20; --panel: #222327; --line: #34363B;
+  --bg: #151618; --hover: #2A2C30; --sel: #2F3A17; --sel-line: #9DBF35; --shadow: 0 18px 50px rgba(0,0,0,.45); color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 60px }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 900 }
+h2 { font-size: 22px; font-weight: 800 }
+h3 { font-size: 15px; font-weight: 800 }
+p { margin: 0 }
+button { font: inherit; color: inherit; cursor: pointer }
+button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px }
+.muted { color: var(--muted) }
+.hand { font-family: var(--hand); font-weight: 700; font-size: 20px; color: var(--violet) }
+
+/* Header */
+.top { display: grid; gap: 14px }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 70ch; font-size: 15px }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--panel) }
+.chip.now { background: var(--lime); color: var(--on-lime); border-color: transparent }
+.chip.later { color: var(--muted) }
+.chip b { font-weight: 800 }
+
+/* App frame */
+.app { display: grid; grid-template-columns: 66px 270px minmax(0, 1fr); gap: 0; background: var(--panel); border-radius: 26px; box-shadow: var(--shadow); min-height: 660px; overflow: hidden; position: relative; border: 1px solid var(--line) }
+.rail { background: var(--rail); display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0 }
+.rail .logo { width: 38px; height: 38px; border-radius: 12px; background: #FFFFFF; display: grid; place-items: center; margin-bottom: 10px }
+.rail .ri { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; color: #8A8D91 }
+.rail .ri.on { background: var(--lime); color: #111111 }
+.rail svg { width: 18px; height: 18px }
+
+.tree { border-inline-end: 1px solid var(--line); background: var(--soft); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow: auto; max-height: 760px }
+.tree-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 10px }
+.tree-head h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--body); font-weight: 700 }
+.tbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 3px 9px; font-size: 12px; font-weight: 600 }
+.tbtn[disabled] { opacity: .45; cursor: not-allowed }
+.node { display: flex; align-items: center; gap: 7px; width: 100%; text-align: start; border: 0; background: transparent; padding: 6px 8px; border-radius: 9px; font-size: 13px; min-width: 0 }
+.node:hover { background: var(--hover) }
+.node.on { background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line) }
+.node .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.node .ct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums }
+.node.space { font-weight: 700; margin-top: 8px }
+.node.folder { font-weight: 600 }
+.sq { width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; color: #FFFFFF; font-size: 10px; font-weight: 800; flex: none }
+.node svg { width: 15px; height: 15px; flex: none; color: var(--muted) }
+.lvl1 { padding-inline-start: 22px } .lvl2 { padding-inline-start: 36px } .lvl3 { padding-inline-start: 50px }
+.tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: var(--hover); color: var(--muted); white-space: nowrap }
+.tag.words { background: color-mix(in srgb, var(--violet) 28%, transparent); color: var(--ink) }
+
+.main { display: flex; flex-direction: column; min-width: 0; position: relative }
+.mhead { padding: 18px 22px 0; display: grid; gap: 12px; border-bottom: 1px solid var(--line) }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted) }
+.crumbs b { color: var(--ink) }
+.titlerow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between }
+.titlerow h2 { display: flex; align-items: center; gap: 10px }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center }
+.btn:hover { background: var(--hover) }
+.btn.primary { background: var(--lime); border-color: transparent; color: var(--on-lime) }
+.btn[disabled] { opacity: .45; cursor: not-allowed }
+.btn svg { width: 14px; height: 14px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel) }
+.seg button { border: 0; background: transparent; padding: 5px 10px; font-size: 12px; font-weight: 600 }
+.seg button.on { background: var(--ink); color: var(--panel) }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none }
+.tabs button { border: 0; background: transparent; padding: 9px 12px 11px; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap }
+.tabs button.on { color: var(--ink); border-bottom-color: var(--ink) }
+.tabs svg { width: 14px; height: 14px }
+.addview { position: relative }
+.menu { position: absolute; top: 100%; inset-inline-start: 0; z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 6px; min-width: 210px; display: grid }
+.menu button { border: 0; background: transparent; text-align: start; padding: 7px 10px; border-radius: 8px; font-size: 13px; display: flex; justify-content: space-between; gap: 10px }
+.menu button:hover:not([disabled]) { background: var(--hover) }
+.menu button[disabled] { color: var(--muted); cursor: default }
+
+.note { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding: 10px 22px; border-bottom: 1px dashed var(--line); background: var(--soft) }
+.note .switch { margin-inline-start: auto }
+.view { padding: 16px 22px 24px; min-width: 0; overflow: auto; flex: 1 }
+
+/* Shared atoms */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: color-mix(in srgb, var(--c) 16%, transparent); white-space: nowrap }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c) }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 800; color: #FFFFFF; flex: none }
+.sla { font-size: 10.5px; font-weight: 800; color: #FFFFFF; background: var(--coral); border-radius: 6px; padding: 1px 6px }
+.prio { font-size: 11px; font-weight: 700 }
+.prio.High { color: var(--coral) } .prio.Medium { color: var(--muted) } .prio.Low { color: var(--mint) }
+.mini { font-size: 11.5px; color: var(--muted) }
+.empty { padding: 40px 10px; text-align: center; color: var(--muted) }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: none; border: 0; padding: 0 }
+.track { width: 32px; height: 18px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background .15s }
+.track::after { content: ""; position: absolute; top: 2px; inset-inline-start: 2px; width: 14px; height: 14px; border-radius: 50%; background: #FFFFFF; transition: inset-inline-start .15s }
+.switch[aria-checked="true"] .track { background: var(--mint) }
+.switch[aria-checked="true"] .track::after { inset-inline-start: 16px }
+.switch[disabled] { opacity: .5; cursor: not-allowed }
+
+/* List view */
+.grp { margin-bottom: 14px }
+.grp-h { display: flex; align-items: center; gap: 10px; padding: 6px 0 }
+.grp-h .ct { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums }
+.row { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto auto; gap: 14px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; background: var(--panel) }
+.row .tn { min-width: 0; display: grid; gap: 2px }
+.row .tn b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end }
+
+/* Board view */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: 210px; gap: 12px; align-items: start; padding-bottom: 6px }
+.col { background: var(--soft); border-radius: 14px; padding: 10px; display: grid; gap: 8px; border: 1px solid var(--line) }
+.col-h { display: flex; justify-content: space-between; align-items: center; gap: 6px }
+.col-h .own { font-size: 10px; color: var(--muted) }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0; overflow: hidden; display: grid }
+.card .cv { height: 44px; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 40%, var(--panel))) }
+.card .cb { padding: 9px 10px; display: grid; gap: 7px }
+.card b { font-weight: 600; font-size: 13px }
+.card .cf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
+
+/* Table view */
+.tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px }
+th { text-align: start; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 9px 10px; border-bottom: 1px solid var(--line); background: var(--soft); white-space: nowrap }
+th.fld { color: var(--violet) }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap }
+tr:last-child td { border-bottom: 0 }
+td.st input { width: 150px; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 4px 7px; font: inherit; font-weight: 700; color: var(--ink) }
+td.st input:hover { border-color: var(--line) }
+td.st input:focus { border-color: var(--cyan); background: var(--panel); outline: none }
+td.st { position: relative }
+td.st .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 2px; vertical-align: middle }
+
+/* Calendar */
+.cal { overflow-x: auto }
+.calgrid { display: grid; grid-template-columns: repeat(7, minmax(96px, 1fr)); min-width: 690px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden }
+.calgrid .dow { font-size: 11px; font-weight: 700; color: var(--muted); padding: 6px 8px; background: var(--soft); border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: .06em }
+.day { min-height: 92px; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 5px; display: flex; flex-direction: column; gap: 4px }
+.day:nth-child(7n) { border-inline-end: 0 }
+.day .dn { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums }
+.day.out { background: var(--soft) }
+.day.out .dn { opacity: .5 }
+.day.today .dn { background: var(--lime); color: var(--on-lime); border-radius: 6px; padding: 0 5px; align-self: flex-start; font-weight: 800 }
+.day.drop { background: var(--sel) }
+.ev { font-size: 11.5px; font-weight: 600; padding: 3px 6px; border-radius: 7px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border-inline-start: 3px solid var(--c); cursor: grab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.nodate { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+
+/* Workload */
+.wl { display: grid; gap: 12px; max-width: 760px }
+.wlr { display: grid; grid-template-columns: 150px minmax(0, 1fr) 90px; gap: 12px; align-items: center }
+.wlr .who { display: flex; gap: 8px; align-items: center; font-weight: 600 }
+.bar { height: 14px; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; display: flex }
+.bar span { height: 100% }
+.wlr .h { font-size: 12px; text-align: end; font-variant-numeric: tabular-nums }
+
+/* Slide-over panels */
+.sheet { position: absolute; top: 0; bottom: 0; inset-inline-end: 0; width: min(440px, 100%); background: var(--panel); border-inline-start: 1px solid var(--line); box-shadow: var(--shadow); z-index: 40; display: flex; flex-direction: column }
+.sheet-h { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px }
+.sheet-h .x { position: absolute; top: 14px; inset-inline-end: 14px; border: 0; background: var(--hover); border-radius: 9px; width: 30px; height: 30px; font-size: 16px }
+.sheet-b { padding: 12px 18px 18px; overflow: auto; display: grid; gap: 8px; align-content: start }
+.wrow { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: center }
+.wrow .sn { display: grid; gap: 1px }
+.wrow .sn small { font-size: 10.5px; color: var(--muted) }
+.wrow input { width: 100%; border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 7px 9px; font: inherit; color: var(--ink) }
+.wrow input:disabled { color: var(--muted) }
+.foot { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px }
+.frow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line) }
+.frow div { display: grid; gap: 2px }
+.frow small { color: var(--muted); font-size: 11.5px }
+
+.col.simple { border-style: dashed }
+.kindsep { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; display: flex; gap: 8px; align-items: center }
+.kindsep::after { content: ""; flex: 1; height: 1px; background: var(--line) }
+.tag.simple { background: color-mix(in srgb, var(--cyan) 20%, transparent); color: var(--ink) }
+.subof { font-size: 11px; color: var(--muted) }
+/* Sheet view: the existing spreadsheet look (specs 013-020) */
+.xl { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel) }
+.xl-menu { display: flex; gap: 14px; padding: 7px 12px 2px; font-size: 12.5px; flex-wrap: wrap }
+.xl-tools { display: flex; gap: 4px; align-items: center; margin: 4px 8px 6px; padding: 4px 8px; background: var(--soft); border-radius: 999px; flex-wrap: wrap; font-size: 12px }
+.xl-tools span { padding: 2px 7px; border-radius: 6px; color: var(--muted); font-weight: 600 }
+.xl-tools .sep { width: 1px; height: 16px; background: var(--line); padding: 0 }
+.xl-bar { display: flex; align-items: center; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12.5px }
+.xl-bar .nbox { width: 64px; padding: 5px 8px; border-inline-end: 1px solid var(--line); font-weight: 600; font-variant-numeric: tabular-nums }
+.xl-bar .fx { padding: 5px 8px; color: var(--muted); font-style: italic; border-inline-end: 1px solid var(--line) }
+.xl-bar .fv { padding: 5px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
+.xl-grid { overflow-x: auto }
+.xl-grid table { border-radius: 0; min-width: 900px }
+.xl-grid th, .xl-grid td { border: 1px solid var(--line); padding: 4px 8px; font-size: 12.5px }
+.xl-grid th { text-transform: none; letter-spacing: 0; font-size: 12.5px }
+.xl-grid th.cl { text-align: center; background: var(--soft); text-transform: none; letter-spacing: 0; font-weight: 600; padding: 2px }
+.xl-grid th.fld { background: color-mix(in srgb, var(--violet) 16%, var(--panel)); color: var(--ink) }
+.xl-grid th.reg { background: var(--soft); color: var(--muted) }
+.xl-grid td.rn { background: var(--soft); color: var(--muted); text-align: center; width: 36px; font-variant-numeric: tabular-nums }
+.xl-grid td.sel { box-shadow: inset 0 0 0 2px var(--cyan) }
+.xl-grid td.grp { background: var(--soft); font-weight: 700 }
+.col.orig { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); padding: 12px 8px 10px; gap: 10px }
+.col.orig.simple { border-style: dashed; border-top-style: solid }
+.col .cn { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.col .cc { min-width: 22px; height: 22px; border-radius: 6px; background: var(--soft); font-size: 11.5px; font-weight: 700; color: var(--muted); display: grid; place-items: center; padding: 0 5px }
+.col .ar { font-size: 11px; color: var(--muted); direction: rtl; text-align: right; margin-top: -6px }
+.col .addt { border: 0; background: none; color: #7C3AED; font-weight: 700; font-size: 12.5px; padding: 4px 0 0 }
+.calbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px }
+.calbar .mon { font-family: var(--display); font-weight: 800; font-size: 16px; min-width: 150px; text-align: center; letter-spacing: -0.01em }
+.calbar .nav { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; width: 30px; height: 30px; font-size: 16px; line-height: 1 }
+.calbar .nav:hover { background: var(--hover) }
+.calgrid.week .day { min-height: 240px }
+.ev.pub { opacity: .62 }
+.card[data-open], .row[data-open] { cursor: pointer }
+.card[data-open]:hover, .row[data-open]:hover { box-shadow: 0 0 0 2px var(--sel-line) }
+.chipset { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end }
+.spc { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--c) 18%, transparent) }
+.spc button { border: 0; background: transparent; width: 20px; height: 20px; border-radius: 50%; color: var(--muted); font-size: 14px; line-height: 1 }
+.spc button:hover { background: var(--hover) }
+select { font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; max-width: 100% }
+.modal-bg { position: absolute; inset: 0; background: rgba(10,10,14,.38); display: grid; place-items: center; z-index: 60; padding: 16px }
+.modal { background: var(--panel); border-radius: 18px; padding: 20px; width: min(440px, 100%); display: grid; gap: 12px; box-shadow: var(--shadow); border: 1px solid var(--line) }
+.opt { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer }
+.opt small { color: var(--muted); margin-inline-start: auto }
+.opt:has(input:checked) { background: var(--sel); border-color: var(--sel-line) }
+.stline { display: grid; gap: 2px }
+.stline small { color: var(--muted) }
+.toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--rail); color: #F1F1EC; padding: 10px 16px; border-radius: 12px; font-size: 13px; z-index: 99; display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0,0,0,.3) }
+.toast button { border: 0; background: var(--lime); color: #111111; border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: 12px }
+
+/* Lower sections */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px; display: grid; gap: 18px }
+.map { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); gap: 10px; align-items: stretch }
+.map .side { display: grid; gap: 8px; align-content: start }
+.map .lbl { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.map .itm { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--soft); display: grid; gap: 2px }
+.map .itm b { font-weight: 700 }
+.map .itm small { color: var(--muted) }
+.map .arrow { display: grid; place-items: center; color: var(--muted); font-size: 20px }
+.scope { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px }
+.scope .sc { border-radius: 16px; padding: 16px; border: 1px solid var(--line); display: grid; gap: 10px; align-content: start }
+.scope .sc.now { background: var(--sel); border-color: var(--sel-line) }
+.scope ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px; font-size: 13px }
+.scope h3 { display: flex; justify-content: space-between; align-items: baseline }
+.scope h3 small { font-family: var(--body); font-weight: 600; color: var(--muted); font-size: 12px }
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: minmax(0, 1fr) }
+  .rail { display: none }
+  .tree { max-height: 300px; border-inline-end: 0; border-bottom: 1px solid var(--line) }
+  .scope { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width: 620px) {
+  .map { grid-template-columns: minmax(0, 1fr) }
+  .map .arrow { transform: rotate(90deg); height: 24px }
+  .scope { grid-template-columns: minmax(0, 1fr) }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 6px }
+  .meta { justify-content: flex-start }
+  .wlr { grid-template-columns: 110px minmax(0, 1fr) 70px }
+  .mhead, .view { padding-inline: 14px }
+  .note { padding-inline: 14px }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style><style>
+.sect { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 12px 8px 4px; display: flex; justify-content: space-between; align-items: center }
+.sect small { text-transform: none; letter-spacing: 0; font-weight: 500 }
+.node.team { font-weight: 700 }
+.rule { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--cyan) 14%, transparent) }
+.matrix { overflow-x: auto }
+.matrix table { min-width: 620px; font-size: 13px }
+.matrix td, .matrix th { text-align: center; border-bottom: 1px solid var(--line); padding: 9px 10px }
+.matrix th:first-child, .matrix td:first-child { text-align: start }
+.matrix td.hit b { display: inline-grid; place-items: center; min-width: 28px; height: 24px; border-radius: 8px; background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line); font-variant-numeric: tabular-nums }
+.matrix td.zero { color: var(--muted) }
+.cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px }
+.cmp .sc { border-radius: 16px; padding: 16px; border: 1px solid var(--line); display: grid; gap: 8px; align-content: start }
+.cmp .sc.now { background: var(--sel); border-color: var(--sel-line) }
+.cmp ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px; font-size: 13px }
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px }
+.file { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); display: grid }
+.file .th { height: 84px; display: grid; place-items: center; font-family: var(--display); font-weight: 900; font-size: 22px; color: #FFFFFF; background: var(--c) }
+.file .fn { padding: 8px 10px; display: grid; gap: 2px; font-size: 12.5px }
+.file .fn b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px }
+.gal .card .cv { height: 70px }
+.gal a { color: var(--cyan); font-size: 12px; font-weight: 600; text-decoration: none }
+.sheettabs { display: flex; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--line); background: var(--soft); font-size: 12.5px; overflow-x: auto }
+.sheettabs button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px 8px 0 0; font-weight: 600; color: var(--muted); white-space: nowrap }
+.sheettabs button.on { background: var(--panel); color: var(--ink); box-shadow: inset 0 -2px 0 var(--mint) }
+@media (max-width: 620px) { .cmp { grid-template-columns: minmax(0, 1fr) } }
+</style>
+<style>
+:root { --tab-green: #3FA34D; --tab-blue: #5B93F5; --tab-orange: #F59E0B; --tab-purple: #B79CF5; --tab-none: transparent }
+.persona { display: flex; gap: 14px; align-items: center; flex-wrap: wrap }
+.persona .big { width: 52px; height: 52px; border-radius: 50%; background: #D4537E; color: #FFFFFF; display: grid; place-items: center; font-family: var(--display); font-weight: 900; font-size: 22px }
+.persona .who { display: grid; gap: 2px }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+.three .sc { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: var(--panel); display: grid; gap: 6px; align-content: start }
+.three .sc b { font-family: var(--display); font-weight: 800; font-size: 15px }
+.three .sc p { font-size: 13px; color: var(--muted) }
+.dotc { width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--line); flex: none }
+.lnk { color: var(--cyan); font-weight: 600; font-size: 12.5px }
+.mk { border: 1px dashed var(--line); background: transparent; border-radius: 7px; padding: 2px 8px; font-size: 12px; font-weight: 600; color: #7C3AED }
+.mk:hover { background: var(--hover) }
+.xl-tools .tb, .xl-tools .sw { border: 0; border-radius: 6px; padding: 2px 7px; background: transparent; color: var(--muted); font-weight: 700 }
+.xl-tools .tb.on { background: var(--ink); color: var(--panel) }
+.xl-tools .sw { width: 16px; height: 16px; padding: 0; border: 1px solid var(--line) }
+.fvi { flex: 1; border: 0; background: transparent; padding: 5px 8px; font: inherit; color: var(--ink); min-width: 0 }
+.fvi:focus { outline: none; background: var(--soft) }
+.wbt { min-width: 820px }
+.wbt td { min-width: 96px; height: 28px; cursor: cell }
+.wbt td input { width: 100%; border: 0; outline: none; font: inherit; background: var(--panel); color: var(--ink); padding: 0 }
+#grid:focus { outline: none }
+.xl-grid th.cl.hl { background: color-mix(in srgb, var(--cyan) 18%, var(--soft)) }
+.sheettabs button { border-top: 3px solid var(--tc, transparent) }
+.tabren { border: 1px solid var(--cyan); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12.5px; width: 140px; background: var(--panel); color: var(--ink) }
+@media (max-width: 760px) { .three { grid-template-columns: minmax(0, 1fr) } }
+</style>
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Spec 021 · One person's experience</span>
+    <div class="persona"><span class="big">N</span><div class="who"><h1>Noran's day in Momentum</h1><span class="muted">Digital Media Specialist · Content and Planning Spaces · works across all four brands</span></div></div>
+    <div class="three">
+      <div class="sc"><b>My tasks</b><p>Everything assigned to her, plus what she created and handed to design or video. Open it as a sheet, a calendar or the Board.</p></div>
+      <div class="sc"><b>My sheets</b><p>Her own Sheets folder, pinned: blank, unlinked tabs she shapes her way, as in Sheets today.</p></div>
+      <div class="sc"><b>How they meet</b><p>A row in her sheet becomes a real task with one click, and stays linked. Edits in My tasks save to the task everywhere.</p></div>
+    </div>
+  </header>
+  <section class="app" id="app" aria-label="Noran's workspace (interactive)">
+    <nav class="rail" aria-label="Momentum navigation (sample)">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="#17181A"><rect x="5" y="4" width="14" height="3.2" rx="1.2"/><rect x="5" y="10.4" width="10" height="3.2" rx="1.2"/><rect x="5" y="16.8" width="14" height="3.2" rx="1.2"/></svg></div>
+      <span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-8 9 8M5 10v10h14V10"/></svg></span>
+      <span class="ri on" title="Spaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span>
+      <span class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+    </nav>
+    <aside class="tree" id="tree" aria-label="Noran's sidebar"></aside>
+    <div class="main" id="main"></div>
+  </section>
+</div>
+<script>
+(() => {
+'use strict';
+const ME = 'NO';
+const STAGES = [
+  { id: 'todo', en: 'To Do', ar: 'افكار للتنفيذ', c: '#8B5CF6' }, { id: 'c-prog', en: 'C-In Progress', ar: 'كتابة المحتوى', c: '#2563EB' },
+  { id: 'c-final', en: 'C-Review', ar: 'مراجعة المحتوى', c: '#7C3AED' }, { id: 'c-check', en: 'C-Check', ar: 'موافقة نهائية على المحتوى', c: '#F97316' },
+  { id: 'r-design', en: 'Ready For Design', ar: 'جاهز للتصميم', c: '#F59E0B' }, { id: 'd-prog', en: 'D-In Progress', ar: 'تصميم', c: '#0EA5A5' },
+  { id: 'd-check', en: 'D-Check', ar: 'مراجعة التصميم', c: '#0891B2' }, { id: 'final-check', en: 'F-Check', ar: 'المراجعة النهائية', c: '#6366F1' },
+  { id: 'ready-publish', en: 'Ready to Publish', ar: 'جاهز للنشر', c: '#10B981' }, { id: 'scheduled', en: 'Scheduled', ar: 'مجدول', c: '#14B8A6' },
+  { id: 'publish', en: 'Published', ar: 'تم النشر', c: '#16A34A' },
+];
+const SIMPLE = [{ id: 's-todo', en: 'To Do', ar: 'مهمة بسيطة', c: '#94A3B8', simple: true }, { id: 's-doing', en: 'In progress', ar: 'مهمة بسيطة', c: '#0EA5E9', simple: true }, { id: 's-done', en: 'Done', ar: 'مهمة بسيطة', c: '#3FA34D', simple: true }];
+const ALL = STAGES.concat(SIMPLE); const ST = (id) => ALL.find(s => s.id === id);
+const CONTENT_WORDS = { todo: 'To write', 'c-prog': 'Writing', 'c-final': 'Edit', 'c-check': 'Islam check' };
+const PEOPLE = { NO: { n: 'Noran', c: '#D4537E', r: 'Digital Media Specialist' }, KA: { n: 'Karim', c: '#475569', r: 'Video Editor' }, OM: { n: 'Omar', c: '#378ADD', r: 'Graphic Designer' }, LA: { n: 'Laila', c: '#B45309', r: 'Graphic Designer' } };
+const B = { ff: { name: 'Forefront Consulting', short: 'Forefront', color: '#B4322F' }, om: { name: 'Omnisight', short: 'Omnisight', color: '#0E7C7B' }, tsc: { name: 'The Strategy Community', short: 'TSC', color: '#7A5A2E' }, ipb: { name: 'Islam Personal Branding', short: 'IPB', color: '#1E293B' } };
+let tasks = [
+  ['Q1 outlook carousel', 'ff', 'c-final', 'NO', 'NO', '2026-12-03', 'Post', 'LinkedIn', true, 'Doc', '', 'Waiting on Raneem\'s edits'],
+  ['Hiring post: analysts', 'ff', 'c-prog', 'NO', 'NO', '2026-12-08', 'Post', 'LinkedIn', false, 'Doc', '', ''],
+  ['Leadership lesson #8', 'ipb', 'c-check', 'NO', 'NO', '2026-12-04', 'Post', 'LinkedIn', false, 'Doc', '', 'With Islam for sign-off'],
+  ['Launch landing page copy', 'om', 'c-final', 'NO', 'NO', '2026-12-11', 'Other', 'Website', false, 'Doc', '', ''],
+  ['Webinar recap post', 'om', 'ready-publish', 'NO', 'NO', '2026-12-07', 'Post', 'LinkedIn', false, 'Doc', '', 'Post Monday 10:00'],
+  ['Newsletter issue 22', 'tsc', 'scheduled', 'NO', 'NO', '2026-12-15', 'Email', 'Email', false, 'Doc', '', 'Scheduled in Mailer'],
+  ['New year message', 'ipb', 'todo', 'NO', 'NO', '2027-01-01', 'Post', 'LinkedIn', false, '', '', ''],
+  ['Podcast ep. 14 with guest CFO', 'ff', 'd-prog', 'KA', 'NO', '2026-12-09', 'Video', 'YouTube', false, 'Doc', '', 'Script is final'],
+  ['Ramadan hero key visual', 'ff', 'd-prog', 'OM', 'NO', '2026-12-14', 'Design', 'Instagram', false, 'Doc', '', ''],
+  ['Year in review carousel', 'ipb', 'r-design', 'LA', 'NO', '2026-12-28', 'Post', 'LinkedIn', false, 'Doc', '', ''],
+  ['Client win announcement', 'ff', 'publish', 'NO', 'NO', '2026-11-20', 'Post', 'LinkedIn', false, 'Doc', 'Post', ''],
+  ['Founders day post', 'ff', 'publish', 'NO', 'NO', '2026-11-10', 'Post', 'LinkedIn', false, 'Doc', 'Post', ''],
+  ['Q1 content calendar', 'ff', 's-doing', 'NO', 'NO', '2026-12-01', null, null, false, '', '', 'Draft in My sheets › Content ideas'],
+  ['Monthly analytics report', 'ff', 's-todo', 'NO', 'NO', '2026-12-05', null, null, false, '', '', 'Numbers in My sheets › Dec report'],
+].map((r, i) => ({ id: 't' + i, name: r[0], brand: r[1], stage: r[2], who: r[3], owner: r[4], due: r[5], type: r[6], platform: r[7], breached: r[8], doc: r[9], post: r[10], notes: r[11], kind: r[2].startsWith('s-') ? 'simple' : 'pipeline' }));
+const finished = (t) => t.stage === 'publish' || t.stage === 's-done';
+
+/* ---------- my sheets: blank workbooks, as in Sheets today ---------- */
+const WB = [
+  { name: 'Content ideas', color: 'green', rows: [
+    ['Idea', 'Brand', 'Format', 'Pillar', 'Hook', 'Status', 'Task'],
+    ['Q1 outlook carousel', 'Forefront', 'Post', 'Thought leadership', '5 shifts for 2027', 'Approved', 'link:t0'],
+    ['Ramadan Q&A reel', 'Forefront', 'Reel', 'Seasonal', 'Your top 3 questions', 'Approved', ''],
+    ['Founder story thread', 'IPB', 'Post', 'Personal', 'The year I almost quit', 'Maybe', ''],
+    ['Webinar recap post', 'Omnisight', 'Post', 'Proof', '3 takeaways', 'Approved', 'link:t4'],
+    ['Member wins roundup', 'TSC', 'Post', 'Community', 'December wins', 'Idea', ''],
+    ['Myth vs fact carousel', 'Forefront', 'Post', 'Frameworks', 'Strategy myths', 'Idea', ''],
+  ], fmt: { '1,5': { fill: 'g' }, '2,5': { fill: 'g' }, '4,5': { fill: 'g' }, '3,5': { fill: 'y' } } },
+  { name: 'Hashtag bank', color: 'blue', rows: [
+    ['Hashtag', 'Brand', 'Use for', 'Avg reach'],
+    ['#FFInsights', 'Forefront', 'Weekly insight posts', '4,200'], ['#Ramadan2027', 'Forefront', 'Campaign', '9,800'],
+    ['#StrategyCommunity', 'TSC', 'Events and recaps', '2,100'], ['#LeadershipLessons', 'IPB', 'Series', '6,300'], ['#OmnisightLaunch', 'Omnisight', 'Product launch', '—'],
+  ], fmt: {} },
+  { name: 'Competitor watch', color: 'orange', rows: [
+    ['Brand', 'Competitor', 'Post', 'Format', 'Likes', 'Notes'],
+    ['Forefront', 'Firm A', '2027 outlook report', 'PDF carousel', '1,240', 'Strong cover, long copy'],
+    ['Forefront', 'Firm B', 'CEO video series', 'Video', '3,900', 'Try a short version'],
+    ['Omnisight', 'Vendor C', 'Launch countdown', 'Story', '820', ''],
+  ], fmt: { '2,4': { b: true, fill: 'r' } } },
+  { name: 'Dec report', color: 'purple', rows: [
+    ['Metric', 'Forefront', 'Omnisight', 'TSC', 'IPB'],
+    ['Posts published', '6', '3', '2', '4'], ['Impressions', '48,200', '12,900', '7,400', '31,600'],
+    ['Engagement rate', '4.1%', '2.8%', '5.6%', '6.2%'], ['New followers', '310', '95', '60', '420'],
+  ], fmt: { '4,4': { b: true, fill: 'g' }, '3,4': { b: true } } },
+];
+const FILLS = { g: '#C8F24E', y: '#F59E0B', r: '#F5334F', c: '#5B93F5' };
+
+const S = { node: 'mytasks', view: 'sheet', who: 'all', tab: 0, sel: { r: 1, c: 0 }, edit: null, renaming: null, cellMy: null };
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const av = (w) => `<span class="av" style="background:${PEOPLE[w].c}" title="${PEOPLE[w].n}">${PEOPLE[w].n[0]}</span>`;
+const fmt = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'No date';
+const bsq = (b) => `<span class="sq" style="background:${B[b].color};width:16px;height:16px;font-size:9px">${B[b].name[0]}</span>`;
+const L = (i) => String.fromCharCode(65 + i);
+let toastTimer;
+function toast(msg, undo) {
+  let el = $('.toast'); if (el) el.remove();
+  el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status');
+  el.innerHTML = `<span>${msg}</span>` + (undo ? '<button type="button">Undo</button>' : '');
+  if (undo) el.querySelector('button').onclick = () => { undo(); el.remove(); render(); };
+  document.body.appendChild(el); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 4500);
+}
+const mine = () => tasks.filter(t => S.who === 'all' ? (t.who === ME || t.owner === ME) : S.who === 'assigned' ? t.who === ME : (t.owner === ME && t.who !== ME));
+
+/* ---------- sidebar ---------- */
+function renderTree() {
+  const open = tasks.filter(t => (t.who === ME || t.owner === ME) && !finished(t)).length;
+  let h = `<div class="sect">Me</div>
+    ${btn('mytasks', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/></svg>', 'My tasks', open)}
+    ${btn('mysheets', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>', 'My sheets', WB.length)}`;
+  if (S.node === 'mysheets') WB.forEach((w, i) => { h += `<button type="button" class="node lvl1 ${S.tab === i ? 'on' : ''}" data-tabnav="${i}"><span class="dotc" style="background:var(--tab-${w.color || 'none'})"></span><span class="nm">${esc(w.name)}</span></button>`; });
+  h += `<div class="sect">Teams</div>
+    ${btn('t-content', '<span class="sq" style="background:#3B82F6">C</span>', 'Content', '')}
+    ${btn('t-plan', '<span class="sq" style="background:#0EA5E9">P</span>', 'Planning', '')}
+    <div class="sect">Brands</div>
+    ${Object.keys(B).map(k => btn('b-' + k, `<span class="sq" style="background:${B[k].color}">${B[k].name[0]}</span>`, B[k].name, '')).join('')}`;
+  $('#tree').innerHTML = h;
+  document.querySelectorAll('#tree [data-id]').forEach(x => x.onclick = () => {
+    const id = x.dataset.id;
+    if (id === 'mytasks' || id === 'mysheets') { S.node = id; S.edit = null; render(); return; }
+    toast(`${x.querySelector('.nm').textContent} opens as in the Teams × Brands preview. This preview follows Noran's own pages.`);
+  });
+  document.querySelectorAll('#tree [data-tabnav]').forEach(x => x.onclick = () => { S.tab = +x.dataset.tabnav; S.sel = { r: 1, c: 0 }; S.edit = null; render(); });
+}
+function btn(id, icon, name, ct) { return `<button type="button" class="node ${S.node === id ? 'on' : ''}" data-id="${id}">${icon}<span class="nm">${esc(name)}</span><span class="ct">${ct}</span></button>`; }
+
+/* ---------- main ---------- */
+function renderMain() {
+  const m = $('#main');
+  if (S.node === 'mysheets') { renderWorkbook(m); return; }
+  const tabs = [['sheet', 'Sheet'], ['calendar', 'Calendar'], ['board', 'Board']];
+  m.innerHTML = `<div class="mhead"><div class="crumbs"><span>Me</span><span>›</span><b>My tasks</b></div>
+    <div class="titlerow"><h2>My tasks <span class="tag">Every brand, every Space</span></h2>
+      <div class="actions"><span class="mini">Show</span><div class="seg" role="group" aria-label="Show">${[['all', 'All mine'], ['assigned', 'Assigned to me'], ['owned', 'Handed off']].map(x => `<button type="button" data-who="${x[0]}" class="${S.who === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div></div></div>
+    <div class="actions"><span class="mini">Tasks assigned to Noran, plus the ones she created and handed to design or video. She owns those to the end.</span></div>
+    <div class="tabs" role="tablist">${tabs.map(v => `<button type="button" role="tab" data-view="${v[0]}" class="${S.view === v[0] ? 'on' : ''}" aria-selected="${S.view === v[0]}">${v[1]}</button>`).join('')}</div></div>
+    <div class="view" id="view"></div>`;
+  m.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { S.view = b.dataset.view; renderMain(); });
+  m.querySelectorAll('[data-who]').forEach(b => b.onclick = () => { S.who = b.dataset.who; renderMain(); });
+  const v = $('#view');
+  ({ sheet: mySheet, calendar: myCal, board: myBoard })[S.view](v, mine());
+}
+
+function mySheet(v, ts) {
+  const groups = [
+    ['Working on', ts.filter(t => t.who === ME && !finished(t) && t.kind === 'pipeline')],
+    ['Handed off · I own it', ts.filter(t => t.who !== ME && !finished(t))],
+    ['Planning · simple tasks', ts.filter(t => t.kind === 'simple' && !finished(t))],
+    ['Published', ts.filter(finished)],
+  ];
+  const heads = [['Task', 'fld'], ['Brand', 'fld'], ['Status', 'fld'], ['Assignee', 'fld'], ['Due date', 'fld'], ['Type', 'fld'], ['Platform', 'fld'], ['Working doc', 'fld'], ['Post link', 'fld'], ['My notes', 'reg']];
+  let r = 2;
+  let body = '';
+  groups.forEach(([g, list]) => {
+    if (!list.length) return;
+    body += `<tr><td class="rn">${r++}</td><td class="grp" colspan="${heads.length}">${esc(g)} <span class="mini">· ${list.length}</span></td></tr>`;
+    list.forEach(t => {
+      const st = ST(t.stage);
+      body += `<tr><td class="rn">${r}</td>
+        <td data-ref="A${r}"><b style="font-weight:600">${esc(t.name)}</b> ${t.breached ? '<span class="sla">SLA</span>' : ''}</td>
+        <td data-ref="B${r}"><span style="display:inline-flex;gap:6px;align-items:center">${bsq(t.brand)}<span class="mini">${esc(B[t.brand].short)}</span></span></td>
+        <td class="st" data-ref="C${r}"><span class="dot" style="background:${st.c}"></span><input id="st-${t.id}" data-st="${t.id}" value="${esc(st.en)}" aria-label="Status of ${esc(t.name)}"></td>
+        <td data-ref="D${r}">${av(t.who)} <span class="mini">${PEOPLE[t.who].n}</span></td>
+        <td data-ref="E${r}" class="mini">${fmt(t.due)}</td>
+        <td data-ref="F${r}">${t.type ? esc(t.type) : '<span class="tag simple">Simple</span>'}</td>
+        <td data-ref="G${r}" class="mini">${esc(t.platform || '')}</td>
+        <td data-ref="H${r}">${t.doc ? '<span class="lnk">Doc ↗</span>' : ''}</td>
+        <td data-ref="I${r}">${t.post ? '<span class="lnk">Post ↗</span>' : ''}</td>
+        <td class="st" data-ref="J${r}"><input id="nt-${t.id}" data-nt="${t.id}" value="${esc(t.notes)}" placeholder="" aria-label="My notes for ${esc(t.name)}" style="font-weight:400;width:200px"></td></tr>`;
+      r++;
+    });
+  });
+  v.innerHTML = `<p class="mini" style="margin-bottom:10px">Today's spreadsheet, filled with Noran's tasks. Purple columns are task fields and save to the task. "My notes" is a regular column, hers only. Type a stage (or the Content team's word, such as "Edit") into Status and press Enter.</p>
+    <div class="xl">${toolbar()}
+    <div class="xl-bar"><span class="nbox" id="nbox">A1</span><span class="fx">fx</span><span class="fv" id="fv">Task</span></div>
+    <div class="xl-grid"><table><thead><tr><th class="cl"></th>${heads.map((_, i) => `<th class="cl">${L(i)}</th>`).join('')}</tr>
+    <tr><td class="rn">1</td>${heads.map(x => `<th class="${x[1]}">${x[0]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+  v.querySelectorAll('td[data-ref]').forEach(td => td.addEventListener('mousedown', () => {
+    v.querySelectorAll('td.sel').forEach(x => x.classList.remove('sel')); td.classList.add('sel');
+    const inp = td.querySelector('input'); $('#nbox').textContent = td.dataset.ref; $('#fv').textContent = inp ? inp.value : td.textContent.trim();
+  }));
+  v.querySelectorAll('input[data-nt]').forEach(inp => { inp.onchange = () => { tasks.find(t => t.id === inp.dataset.nt).notes = inp.value; toast('Saved to your notes. Only you see this column.'); }; inp.onkeydown = (e) => { if (e.key === 'Enter') inp.blur(); }; });
+  v.querySelectorAll('input[data-st]').forEach(inp => {
+    const commit = () => {
+      const t = tasks.find(x => x.id === inp.dataset.st); const typed = inp.value.trim().toLowerCase();
+      if (typed === ST(t.stage).en.toLowerCase()) return;
+      const pool = t.kind === 'simple' ? SIMPLE : STAGES;
+      const hit = pool.find(s => s.en.toLowerCase() === typed || (CONTENT_WORDS[s.id] || '').toLowerCase() === typed);
+      if (!hit) { toast(`"${esc(inp.value)}" isn't a stage. Use a stage name, or a Content word: ${Object.values(CONTENT_WORDS).join(', ')}.`); inp.value = ST(t.stage).en; return; }
+      if (t.stage === 'publish') { toast('Published is final.'); inp.value = ST(t.stage).en; return; }
+      const prev = t.stage; t.stage = hit.id; render();
+      toast(`Moved to <b>${hit.en}</b>. The Board, the Content Space and ${esc(B[t.brand].short)}'s Calendar show it too.${hit.id === 'publish' || hit.id === 's-done' ? ' 🎉' : ''}`, () => { t.stage = prev; });
+    };
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } };
+    inp.onblur = commit;
+  });
+}
+function toolbar(active) {
+  const f = active ? (WB[S.tab].fmt[`${S.sel.r},${S.sel.c}`] || {}) : {};
+  return `<div class="xl-menu"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Data</span><span>Tools</span></div>
+    <div class="xl-tools"><span>↶</span><span>↷</span><span class="sep"></span><span>100%</span><span class="sep"></span><span>Inter ▾</span><span>11 ▾</span><span class="sep"></span>
+    ${active ? `<button type="button" class="tb ${f.b ? 'on' : ''}" id="tbB" title="Bold (Ctrl+B)"><b>B</b></button>` : '<span><b>B</b></span>'}<span><i>I</i></span><span><s>S</s></span><span class="sep"></span>
+    ${active ? Object.entries(FILLS).map(([k, c]) => `<button type="button" class="sw" data-fill="${k}" style="background:${c}" title="Fill"></button>`).join('') + '<button type="button" class="tb" data-fill="" title="No fill">⌀</button>' : '<span>Fill</span>'}
+    <span>Borders</span><span>Merge</span><span class="sep"></span><span>Sort</span><span>Filter</span>${active ? '' : '<span>⚙ Fields</span>'}</div>`;
+}
+
+/* ---------- my sheets workbook ---------- */
+function renderWorkbook(m) {
+  const w = WB[S.tab];
+  const ncols = Math.max(8, ...w.rows.map(r => r.length)); const nrows = Math.max(16, w.rows.length + 4);
+  const val = (r, c) => (w.rows[r] || [])[c] ?? '';
+  const isTaskCol = (c) => w.name === 'Content ideas' && c === 6;
+  let body = '';
+  for (let r = 0; r < nrows; r++) {
+    body += `<tr><td class="rn">${r + 1}</td>`;
+    for (let c = 0; c < ncols; c++) {
+      const f = w.fmt[`${r},${c}`] || {}; const sel = S.sel.r === r && S.sel.c === c;
+      const style = [r === 0 && val(0, c) ? 'font-weight:700' : '', f.b ? 'font-weight:700' : '', f.fill ? `background:${FILLS[f.fill]};color:#111` : '', r === 0 && val(0, c) && !f.fill ? 'background:var(--soft)' : ''].filter(Boolean).join(';');
+      let inner;
+      if (S.edit && S.edit.r === r && S.edit.c === c) inner = `<input id="cellEdit" value="${esc(S.edit.v)}" aria-label="Edit ${L(c)}${r + 1}">`;
+      else if (isTaskCol(c) && r > 0) {
+        const v = val(r, c);
+        if (v.startsWith('link:')) { const t = tasks.find(x => x.id === v.slice(5)); inner = t ? `<span class="lnk">↗ ${esc(t.name)}</span>` : ''; }
+        else inner = val(r, 0) ? `<button type="button" class="mk" data-mk="${r}">＋ Create task</button>` : '';
+      } else inner = esc(val(r, c));
+      body += `<td class="${sel ? 'sel' : ''}" data-r="${r}" data-c="${c}" style="${style}">${inner}</td>`;
+    }
+    body += '</tr>';
+  }
+  m.innerHTML = `<div class="mhead"><div class="crumbs"><span>Me</span><span>›</span><span>My sheets</span><span>›</span><b>${esc(w.name)}</b></div>
+    <div class="titlerow"><h2>My sheets <span class="tag">Sheets folder · pinned</span></h2></div>
+    <div class="actions"><span class="mini">Noran's own folder in Sheets, exactly as Sheets works today: free-form tabs, formatting, keyboard. Nothing here is a task until she links a row or presses "Create task".</span></div></div>
+    <div class="view"><div class="xl" id="wb">${toolbar(true)}
+      <div class="xl-bar"><span class="nbox">${L(S.sel.c)}${S.sel.r + 1}</span><span class="fx">fx</span><input class="fvi" id="fx" value="${esc(isTaskCol(S.sel.c) && S.sel.r > 0 ? '' : val(S.sel.r, S.sel.c))}" aria-label="Formula bar"></div>
+      <div class="xl-grid" id="grid" tabindex="0" aria-label="${esc(w.name)} grid"><table class="wbt"><thead><tr><th class="cl"></th>${Array.from({ length: ncols }, (_, i) => `<th class="cl ${S.sel.c === i ? 'hl' : ''}">${L(i)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>
+      <div class="sheettabs" role="tablist">${WB.map((x, i) => S.renaming === i ? `<input class="tabren" id="tabRen" value="${esc(x.name)}" aria-label="Sheet name">` : `<button type="button" role="tab" data-tab="${i}" class="${S.tab === i ? 'on' : ''}" style="--tc:var(--tab-${x.color || 'none'})" title="Double-click to rename">${esc(x.name)}</button>`).join('')}<button type="button" id="addTab" aria-label="New sheet">＋</button></div>
+    </div><p class="mini" style="margin-top:10px">Try it: click a cell and type, Enter moves down, Tab moves right, arrows move, Delete clears, Ctrl+B bolds. Double-click a tab to rename it, ＋ adds a sheet. In Content ideas, "Create task" turns an idea into a real task.</p></div>`;
+  bindWorkbook();
+}
+function setVal(r, c, v) { const w = WB[S.tab]; while (w.rows.length <= r) w.rows.push([]); const row = w.rows[r]; while (row.length <= c) row.push(''); row[c] = v; }
+function bindWorkbook() {
+  const w = WB[S.tab]; const grid = $('#grid');
+  const go = () => { renderWorkbook($('#main')); renderTree(); const g = $('#grid'); if (S.edit) { const i = $('#cellEdit'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } } else if (g) g.focus({ preventScroll: true }); };
+  const commit = () => { if (S.edit) { setVal(S.edit.r, S.edit.c, $('#cellEdit') ? $('#cellEdit').value : S.edit.v); S.edit = null; } };
+  const move = (dr, dc) => { S.sel = { r: Math.max(0, S.sel.r + dr), c: Math.max(0, Math.min(S.sel.c + dc, 25)) }; };
+  grid.querySelectorAll('td[data-r]').forEach(td => {
+    td.onmousedown = (e) => { if (e.target.closest('.mk')) return; const r = +td.dataset.r, c = +td.dataset.c; if (S.edit && S.edit.r === r && S.edit.c === c) return; e.preventDefault(); commit(); S.sel = { r, c }; go(); };
+    td.ondblclick = () => { const r = +td.dataset.r, c = +td.dataset.c; if (w.name === 'Content ideas' && c === 6 && r > 0) return; S.edit = { r, c, v: (w.rows[r] || [])[c] ?? '' }; go(); };
+  });
+  grid.onkeydown = (e) => {
+    const ed = S.edit;
+    if (ed) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); move(1, 0); go(); }
+      else if (e.key === 'Tab') { e.preventDefault(); commit(); move(0, e.shiftKey ? -1 : 1); go(); }
+      else if (e.key === 'Escape') { S.edit = null; go(); }
+      return;
+    }
+    const taskCell = w.name === 'Content ideas' && S.sel.c === 6 && S.sel.r > 0;
+    if (e.key.startsWith('Arrow')) { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0, e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0); go(); }
+    else if (e.key === 'Tab') { e.preventDefault(); move(0, e.shiftKey ? -1 : 1); go(); }
+    else if (e.key === 'Enter' && !taskCell) { e.preventDefault(); S.edit = { ...S.sel, v: (w.rows[S.sel.r] || [])[S.sel.c] ?? '' }; go(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && !taskCell) { e.preventDefault(); setVal(S.sel.r, S.sel.c, ''); go(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleBold(); go(); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !taskCell) { e.preventDefault(); S.edit = { ...S.sel, v: e.key }; go(); }
+  };
+  const ce = $('#cellEdit'); if (ce) ce.onblur = (e) => { if (!grid.contains(e.relatedTarget)) { commit(); renderWorkbook($('#main')); } };
+  const fx = $('#fx'); fx.onkeydown = (e) => { if (e.key === 'Enter') { setVal(S.sel.r, S.sel.c, fx.value); move(1, 0); go(); } };
+  function toggleBold() { const k = `${S.sel.r},${S.sel.c}`; w.fmt[k] = { ...(w.fmt[k] || {}), b: !(w.fmt[k] || {}).b }; }
+  const tb = $('#tbB'); if (tb) tb.onclick = () => { toggleBold(); go(); };
+  document.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => { const k = `${S.sel.r},${S.sel.c}`; w.fmt[k] = { ...(w.fmt[k] || {}), fill: b.dataset.fill || undefined }; go(); });
+  document.querySelectorAll('[data-tab]').forEach(b => {
+    b.onclick = () => { commit(); S.tab = +b.dataset.tab; S.sel = { r: 1, c: 0 }; renderMain(); renderTree(); };
+    b.ondblclick = () => { S.renaming = +b.dataset.tab; renderMain(); const i = $('#tabRen'); i.focus(); i.select(); };
+  });
+  const tr = $('#tabRen'); if (tr) { const done = () => { if (S.renaming === null) return; const v = tr.value.trim(); if (v && !WB.some((x, i) => i !== S.renaming && x.name.toLowerCase() === v.toLowerCase())) WB[S.renaming].name = v; else if (v) toast('Another sheet has that name.'); S.renaming = null; render(); }; tr.onkeydown = (e) => { if (e.key === 'Enter') done(); if (e.key === 'Escape') { S.renaming = null; render(); } }; tr.onblur = done; }
+  $('#addTab').onclick = () => { let n = 1; while (WB.some(x => x.name === `Sheet ${n}`)) n++; WB.push({ name: `Sheet ${n}`, rows: [], fmt: {} }); S.tab = WB.length - 1; S.sel = { r: 0, c: 0 }; render(); toast(`"Sheet ${n}" added. Double-click its tab to rename it.`); };
+  document.querySelectorAll('[data-mk]').forEach(b => b.onclick = () => {
+    const r = +b.dataset.mk; const row = w.rows[r];
+    const bk = Object.keys(B).find(k => B[k].short.toLowerCase() === String(row[1]).toLowerCase() || B[k].name.toLowerCase() === String(row[1]).toLowerCase()) || 'ff';
+    const t = { id: 'n' + Date.now(), name: row[0], brand: bk, stage: 'todo', who: ME, owner: ME, due: null, type: row[2] || 'Post', platform: row[2] === 'Reel' ? 'Instagram' : 'LinkedIn', breached: false, doc: '', post: '', notes: 'From My sheets › Content ideas', kind: 'pipeline' };
+    tasks.push(t); setVal(r, 6, 'link:' + t.id); render();
+    toast(`"${esc(t.name)}" is now a task in ${esc(B[bk].name)}'s Calendar and the Content Space, at To Do. It's in My tasks too. The row stays linked.`);
+  });
+}
+
+/* ---------- one continuous calendar ---------- */
+const TODAY = '2026-11-22';
+const CAL = { y: 2026, m: 10, mode: 'month', anchor: TODAY, camp: 'all' };
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const monday = (d) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+function calendar(v, ts, o) {
+  const camps = o.camps ? [...new Set(ts.map(o.camps).filter(Boolean))] : [];
+  if (CAL.camp !== 'all' && !camps.includes(CAL.camp)) CAL.camp = 'all';
+  const shown = ts.filter(t => CAL.camp === 'all' || o.camps(t) === CAL.camp);
+  const week = CAL.mode === 'week';
+  let start, cells, heading;
+  if (week) { start = monday(new Date(CAL.anchor + 'T00:00')); cells = 7; const e = new Date(start); e.setDate(e.getDate() + 6);
+    heading = `${start.getDate()} ${start.toLocaleDateString('en-GB', { month: 'short' })} – ${e.getDate()} ${e.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`; }
+  else { const first = new Date(CAL.y, CAL.m, 1); start = monday(first); const last = new Date(CAL.y, CAL.m + 1, 0);
+    cells = Math.ceil(((last - start) / 864e5 + 1) / 7) * 7; heading = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
+  let h = `<div class="calbar"><button type="button" class="nav" data-cal="prev" aria-label="Previous">‹</button><span class="mon">${heading}</span><button type="button" class="nav" data-cal="next" aria-label="Next">›</button>
+    <button type="button" class="btn" data-cal="today">Today</button>
+    <div class="seg" role="group" aria-label="Calendar layout">${[['month', 'Month'], ['week', 'Week']].map(x => `<button type="button" data-calmode="${x[0]}" class="${CAL.mode === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
+    ${camps.length ? `<span class="mini">Campaign</span><div class="seg" role="group" aria-label="Campaign">${['all'].concat(camps).map(c => `<button type="button" data-camp="${esc(c)}" class="${CAL.camp === c ? 'on' : ''}">${c === 'all' ? 'All' : esc(c)}</button>`).join('')}</div>` : ''}</div>
+    <div class="cal"><div class="calgrid ${week ? 'week' : ''}">` + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i); const iso = isoOf(d);
+    const out = !week && d.getMonth() !== CAL.m;
+    h += `<div class="day ${out ? 'out' : ''} ${iso === TODAY ? 'today' : ''}" data-day="${iso}"><span class="dn">${d.getDate()}${d.getDate() === 1 ? ' ' + d.toLocaleDateString('en-GB', { month: 'short' }) : ''}</span>
+      ${shown.filter(t => t.due === iso).map(t => { const fin = t.stage === 'publish' || t.stage === 's-done';
+        return `<div class="ev ${fin ? 'pub' : ''}" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}" title="${esc(t.name)} · ${esc(o.tip(t))}">${fin ? '✓ ' : ''}${esc(t.name)}</div>`; }).join('')}</div>`;
+  }
+  h += '</div></div>';
+  const none = shown.filter(t => !t.due);
+  if (none.length) h += `<div class="nodate"><span class="mini">No date:</span>${none.map(t => `<span class="ev" ${o.drag ? 'draggable="true"' : ''} data-t="${t.id}" style="--c:${o.color(t)}">${esc(t.name)}</span>`).join('')}</div>`;
+  h += `<p class="mini" style="margin-top:10px">One calendar that keeps everything: move back and forward through any month. Finished work stays on its day, marked ✓.${o.note ? ' ' + o.note : ''}</p>`;
+  v.innerHTML = h;
+  const go = (fn) => { fn(); o.rerender(); };
+  v.querySelector('[data-cal="prev"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() - 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m - 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="next"]').onclick = () => go(() => { if (week) { const a = new Date(CAL.anchor + 'T00:00'); a.setDate(a.getDate() + 7); CAL.anchor = isoOf(a); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); } else { const a = new Date(CAL.y, CAL.m + 1, 1); CAL.y = a.getFullYear(); CAL.m = a.getMonth(); CAL.anchor = isoOf(a); } });
+  v.querySelector('[data-cal="today"]').onclick = () => go(() => { CAL.anchor = TODAY; CAL.y = 2026; CAL.m = 10; });
+  v.querySelectorAll('[data-calmode]').forEach(b => b.onclick = () => go(() => { CAL.mode = b.dataset.calmode; if (CAL.mode === 'week' && (new Date(CAL.anchor + 'T00:00').getMonth() !== CAL.m)) CAL.anchor = isoOf(new Date(CAL.y, CAL.m, 1)); }));
+  v.querySelectorAll('[data-camp]').forEach(b => b.onclick = () => go(() => { CAL.camp = b.dataset.camp; }));
+  if (o.drag) {
+    v.querySelectorAll('.ev[draggable]').forEach(e => e.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', e.dataset.t); });
+    v.querySelectorAll('.day').forEach(d => {
+      d.ondragover = (e) => { e.preventDefault(); d.classList.add('drop'); };
+      d.ondragleave = () => d.classList.remove('drop');
+      d.ondrop = (e) => { e.preventDefault(); const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain')); if (t) o.onDrop(t, d.dataset.day); };
+    });
+  }
+}
+
+/* ---------- board and calendar ---------- */
+function myBoard(v, ts) {
+  const cols = STAGES.concat(ts.some(t => t.kind === 'simple') ? SIMPLE : []);
+  v.innerHTML = '<div class="board">' + cols.map(s => { const g = ts.filter(t => t.stage === s.id);
+    return `<div class="col orig ${s.simple ? 'simple' : ''}" style="--c:${s.c}"><div class="col-h"><span class="cn">${esc(s.en)}</span><span class="cc">${g.length}</span></div><div class="ar">${s.ar}</div>` +
+      g.map(t => `<div class="card"><div class="cb"><b>${esc(t.name)}</b><div class="cf">${bsq(t.brand)}<span class="mini">${esc(B[t.brand].short)}</span>${t.who !== ME ? `<span class="tag">Handed off</span>` : ''}</div><div class="cf">${av(t.who)}<span class="mini">${fmt(t.due)}</span>${t.type ? `<span class="tag">${esc(t.type)}</span>` : '<span class="tag simple">Simple</span>'}${t.breached ? '<span class="sla">SLA</span>' : ''}</div></div></div>`).join('') + '</div>'; }).join('') + '</div><p class="mini" style="margin-top:10px">The same original Board, showing only Noran\'s tasks.</p>';
+  const first = [...v.querySelectorAll('.col')].find(c => c.querySelector('.cc').textContent !== '0'); if (first) v.scrollLeft += first.getBoundingClientRect().left - v.getBoundingClientRect().left - 16;
+}
+function myCal(v, ts) {
+  calendar(v, ts, { color: (t) => B[t.brand].color, tip: (t) => `${B[t.brand].name} · ${ST(t.stage).en}`, drag: true, rerender: renderMain, note: 'Each task is in its brand\'s colour. Drag a task to another day to change its due date.',
+    onDrop: (t, day) => { const prev = t.due; t.due = day; renderMain(); toast(`"${esc(t.name)}" is now due ${fmt(t.due)}. The sheet and the brand's Calendar show it too.`, () => { t.due = prev; }); } });
+}
+function render() { renderTree(); renderMain(); }
+render();
+})();
+</script>

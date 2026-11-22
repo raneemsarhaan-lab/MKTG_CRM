@@ -11,7 +11,7 @@
 - **Part 1, methodology.** The hierarchy (Workspace › Space › Folder › Subfolder › List › Task › Subtask › Checklist). Four principles: one home, many places; modular complexity (ClickApps); views separate from structure; inherited statuses. The methods it supports: Scrum, Kanban, Waterfall, OKR-led.
 - **Part 2, features.** Task management, views, collaboration, planning and tracking, automation, AI, admin and integrations.
 
-**Design**: [design/teams-brands.html](../../design/teams-brands.html), an interactive preview of brands, team Spaces, views and the hand-off between teams. [design/clickup-hierarchy.html](../../design/clickup-hierarchy.html) is the earlier Brand › Team › List layout (Option A), kept for reference; its status words, Space features, task kinds and Sheet view still apply.
+**Design**: [design/teams-brands.html](../../design/teams-brands.html), an interactive preview of brands, team Spaces, views and the hand-off between teams. [design/clickup-hierarchy.html](../../design/clickup-hierarchy.html) is the earlier Brand › Team › List layout (Option A), kept for reference; its status words, Space features, task kinds and Sheet view still apply. [design/noran-workspace.html](../../design/noran-workspace.html) shows one member's own pages: My tasks and My sheets.
 
 ## Context
 
@@ -172,6 +172,8 @@ Assets also opens as **Files**, and Library as a **Gallery**. Each view keeps it
 
 **Independent Test**: In the Video Space, open Board, List, Sheet and Calendar. The Board has the 11 original columns. The List and Sheet use the Video team's words. Drag a task to another day in Forefront › Calendar: the Video Space's Calendar shows the new date. Open Everything: it lists tasks from every brand the member can see.
 
+A member's own work sits above both, under **Me**: **My tasks** (their tasks from every brand and Space, as a Sheet, Calendar or Board) and **My sheets** (their pinned Sheets folders, free-form, as Sheets works today).
+
 **Acceptance Scenarios**:
 
 1. **Given** any brand, Folder or team Space, **When** a member adds a view, **Then** it shows only that node's tasks.
@@ -179,7 +181,9 @@ Assets also opens as **Files**, and Library as a **Gallery**. Each view keeps it
 3. **Given** a Calendar, **When** a member moves back and forward, **Then** they can reach any month or week. Today returns to the current date, and finished work stays on its day, marked done.
 4. **Given** a Calendar, **When** a task is dragged to another day, **Then** its due date changes under the usual edit rules, and undo reverts it.
 5. **Given** a Board anywhere, **Then** its columns are the pipeline as built, in order, with their original English and Arabic names. **When** a task is moved, **Then** the board's existing move rules apply: ownership, Published is terminal, and the celebration.
-6. **Given** today's screens, **Then** they stay at the same addresses: the Board becomes the Board view on Everything, the Content sheet the Content Space's Sheet view, and the Video sheet the Video Space's Sheet view. Each keeps its row source and grouping.
+6. **Given** Noran opens My tasks as a Sheet, **When** she types "Edit" into a task's Status cell, **Then** the task moves to C-Review, and the Board, the Content Space and the brand's Calendar show it. A note she types in her own "My notes" column is seen by no one else.
+7. **Given** Noran's pinned "My sheets" folder, **When** she presses "Create task" on an idea row, **Then** a task is created in that brand at To Do, shows in the Content Space and My tasks, and the row links to it.
+8. **Given** today's screens, **Then** they stay at the same addresses: the Board becomes the Board view on Everything, the Content sheet the Content Space's Sheet view, and the Video sheet the Video Space's Sheet view. Each keeps its row source and grouping.
 
 ---
 
@@ -352,6 +356,8 @@ The structure and views in this spec must leave room for each: a view type can b
 - **FR-012**: Today's Board, Content sheet and Video sheet MUST stay reachable at their current addresses and behave as they do now.
 - **FR-013**: The Everything view MUST list every task the member may see, and only those.
 - **FR-013a**: Every Board view, everywhere, MUST show the pipeline as built: its stages as columns in their original order, with their original English and Arabic names and look, exactly as today's Board. Status words MUST NOT rename Board columns. Simple tasks, when shown, sit in their own three columns after the pipeline.
+- **FR-013b**: Each member MUST have **My tasks**: every task assigned to them, plus every task they own that someone else is now working on, across all brands and team Spaces. It MUST open as Sheet, Calendar and Board, with a filter: All mine, Assigned to me, Handed off. Regular columns a member adds to their My tasks Sheet (such as "My notes") belong to that member only.
+- **FR-013c**: A member's pinned Sheets folders MUST show in the sidebar under **Me**, above Teams and Brands. They open today's Sheets workbook unchanged: blank, unlinked tabs, formatting, keyboard, tab management. As today (specs 016 and 019), a row can be linked to a task, or turned into a new task with one click, and the row stays linked.
 - **FR-014**: The Calendar MUST be one continuous calendar, as a regular calendar is: every task with a date sits on its day, past and future. Members move back and forward through any month or week, and Today returns to the current date. Finished work stays on its day, marked done. Campaigns are a filter, not separate Lists. Dragging a task to a day sets its due date, and tasks without a date are listed apart.
 - **FR-014a**: The Sheet view MUST be the existing spreadsheet, not a new or simpler table. It keeps its menu bar and toolbar, name box, cell editing, keyboard navigation, copy and paste (including from Excel and Google Sheets), formatting, merges, frozen panes, sort and filter, comments, multi-area selection, the power tips, and the Fields drawer with task field and regular columns.
 
