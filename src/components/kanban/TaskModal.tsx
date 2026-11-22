@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
-import type { Brand } from '@/types/index'
+import type { Brand, TeamSpace, TaskSpace } from '@/types/index'
+import { ShowsIn } from './ShowsIn'
 import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
@@ -109,6 +110,9 @@ interface TaskModalProps {
    * switch; elsewhere the button navigates to the board's sheet.
    */
   onOpenSheet?: (videoId: string, rowId: string | null) => void
+  /** Spec 021: the live team Spaces, and every Shows in row (the panel picks this task's). */
+  spaces?: TeamSpace[]
+  taskSpaces?: TaskSpace[]
 }
 
 /* ── icons — 16px line set, ClickUp's weight ─────────────────────────── */
@@ -470,6 +474,7 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
+  spaces = [], taskSpaces = [],
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -618,6 +623,7 @@ export function TaskModal({
       ? { video: task.parent_task_id, row: task.id }
       : null
   const tsheet = useTranslations('sheet')
+  const tSpaces = useTranslations('spaces')
   function openSheet() {
     if (!sheetTarget) return
     if (onOpenSheet) { onOpenSheet(sheetTarget.video, sheetTarget.row); return }
@@ -1136,6 +1142,15 @@ export function TaskModal({
             options={members.map(m => ({ value: m.id, label: m.name }))}
             onCommit={v => applyPatch({ task_owner_id: v })}
           />
+        </Field>
+      ),
+    },
+    {
+      // Spec 021: the team Spaces this task shows in.
+      key: 'spaces', filled: true,
+      node: (
+        <Field key="spaces" icon="folder" label={tSpaces('showsIn')}>
+          <ShowsIn taskId={task.id} spaces={spaces} rows={taskSpaces} canEdit={canEdit} />
         </Field>
       ),
     },

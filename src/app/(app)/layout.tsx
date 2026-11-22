@@ -5,15 +5,18 @@ import { StaleBuildNotice } from '@/components/shared/StaleBuildNotice'
 import { PendingDeletes } from '@/components/shared/PendingDeletes'
 import { mapMember } from '@/lib/mappers'
 import { loadPinnedFolders } from '@/lib/sheets-nav'
+import { loadNavTree } from '@/lib/nav-tree'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const member = await getSessionMember()
   if (!member) redirect('/login')
   // The sidebar's pinned folders (spec 013). A failure here must never take the app down.
   const pins = await loadPinnedFolders(member).catch(() => [])
+  // Spec 021: the Me / Teams / Brands sections. Same rule: never fatal.
+  const tree = await loadNavTree(member).catch(() => null)
 
   return (
-    <AppShell member={mapMember(member)} pins={pins}>
+    <AppShell member={mapMember(member)} pins={pins} tree={tree}>
       {children}
       {/* Every deploy leaves open tabs holding action ids the new server does
           not know. Without this the only symptom is that nothing happens. */}

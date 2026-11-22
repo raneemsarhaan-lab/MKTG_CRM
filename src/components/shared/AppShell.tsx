@@ -1,6 +1,6 @@
 'use client'
 
-import type { Member, PinnedFolder } from '@/types/index'
+import type { Member, NavTree, PinnedFolder } from '@/types/index'
 import { Sidebar } from './Sidebar'
 import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
@@ -14,6 +14,8 @@ interface AppShellProps {
   member: Member
   /** Folders pinned under Sheets (spec 013). */
   pins?: PinnedFolder[]
+  /** Spec 021: the sidebar's Me / Teams / Brands sections. */
+  tree?: NavTree | null
   children: React.ReactNode
 }
 
@@ -36,7 +38,7 @@ interface AppShellProps {
  * Per-screen padding lives on the screen, not here: My Board specifies
  * 36px 44px 44px, which other screens do not share.
  */
-export function AppShell({ member, pins = [], children }: AppShellProps) {
+export function AppShell({ member, pins = [], tree = null, children }: AppShellProps) {
   // The member's own choice; celebrations stay off until they turn them on.
   const on = !!member.celebrations
   useEffect(() => { useUIStore.getState().setCelebrationsOn(on) }, [on])
@@ -50,12 +52,12 @@ export function AppShell({ member, pins = [], children }: AppShellProps) {
       minHeight: '100dvh',
       display: 'flex', background: '#FFFFFF',
     }}>
-      <Sidebar member={member} pins={pins} />
+      <Sidebar member={member} pins={pins} tree={tree} />
 
       <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
 
       {/* Rendered always, shown only at phone widths. */}
-      <TabBar member={member} />
+      <TabBar member={member} pins={pins} tree={tree} />
 
       {/* The forgotten-day hours reminder (spec 014), once for the app. */}
       <HoursReminderApp />

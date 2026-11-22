@@ -458,7 +458,7 @@ export interface AppNotification {
 // ─── Spec 013: Sheets (specs/013-spreadsheet-editing/data-model.md) ─────────
 
 /** A folder in the Sheets section. */
-export type SheetFolderKind = 'content' | 'video' | 'team'
+export type SheetFolderKind = 'content' | 'video' | 'team' | 'brand'
 /** A tab in a folder: one of the two linked sheets, or a blank sheet. */
 export type SheetKind = 'linked_content' | 'linked_video' | 'blank'
 /** Excel-style tab colours (FR-059a), stored as keys, drawn from SHEETS_UI.tabs. */
@@ -868,4 +868,14 @@ export interface HoursWeekReport {
   rows: HoursWeekRow[]
   dayTotals: Record<string, number>
   completeCount: number
+}
+
+/** Spec 021: what the sidebar's Me / Teams / Brands sections need (contracts/routes.md). */
+export interface NavTree {
+  /** Open tasks assigned to me or handed off by me. */
+  myOpen: number
+  spaces: { id: string; key: string; name: string; color: string; open: number }[]
+  brands: { id: string; name: string; color: string; open: number }[]
+  /** Open tasks with no brand; the "No brand" entry shows only when > 0. */
+  noBrandOpen: number
 }

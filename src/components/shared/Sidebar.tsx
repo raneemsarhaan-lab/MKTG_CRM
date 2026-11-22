@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import type { Member, PinnedFolder } from '@/types/index'
-import { PinnedFolders } from '@/components/sheets/PinnedFolders'
+import type { Member, NavTree as NavTreeData, PinnedFolder } from '@/types/index'
+import { NavTree } from './NavTree/NavTree'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { NavRail } from './NavRail'
 import { UserMenu } from './UserMenu'
@@ -29,7 +29,7 @@ import { NAV_ICON, navFor } from '@/lib/nav'
 
 const STORAGE_KEY = 'fluxo.sidebar.expanded'
 
-export function Sidebar({ member, pins = [] }: { member: Member; pins?: PinnedFolder[] }) {
+export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: PinnedFolder[]; tree?: NavTreeData | null }) {
   // Expanded is the handoff's default. The stored preference is read after
   // mount, never during render — reading localStorage while rendering would
   // make the server and client disagree and mismatch the whole tree.
@@ -74,6 +74,9 @@ export function Sidebar({ member, pins = [] }: { member: Member; pins?: PinnedFo
         </div>
       </div>
 
+      {/* Spec 021: the nav and the Me / Teams / Brands tree scroll together
+          between the wordmark and the Focus card. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginInline: -6, paddingInline: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.map(({ href, key }) => {
           const active = pathname.startsWith(href)
@@ -98,15 +101,16 @@ export function Sidebar({ member, pins = [] }: { member: Member; pins?: PinnedFo
               {t(key)}
             </Link>
           )
-          // Spec 013: the pinned folders sit under Sheets.
-          if (key !== 'sheets' || !pins.length) return link
-          return <div key={href}>{link}<PinnedFolders pins={pins} pathname={pathname} /></div>
+          // Spec 021: pinned folders moved from under Sheets to Me, in the tree below.
+          return link
         })}
       </nav>
+      {tree && <NavTree tree={tree} pins={pins} pathname={pathname} />}
+      </div>
 
       {/* Focus card — §3, margin-top:auto pins it above the user row */}
       <div style={{
-        marginTop: 'auto', border: `1px solid ${PIPE.border}`, borderRadius: 16,
+        flexShrink: 0, border: `1px solid ${PIPE.border}`, borderRadius: 16,
         padding: '18px 16px 14px', position: 'relative', background: '#FFFFFF',
       }}>
         <div style={{

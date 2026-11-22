@@ -7,7 +7,7 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId, TeamSpace, SpaceMember, TaskSpace as TaskSpaceRow } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
@@ -75,9 +75,22 @@ interface KanbanBoardProps {
    * Spec 013 R2: 'sheets' shows only one sheet, inside a Sheets folder's
    * workbook — no board header, no Inbox, and the address is the folder's.
    */
-  surface?: 'board' | 'sheets'
-  /** With surface 'sheets': the Content sheet or the video sheet. */
-  sheetsView?: 'content' | 'sheet'
+  surface?: 'board' | 'sheets' | 'view'
+  /** With surface 'sheets': the Content sheet or the video sheet. With 'view': the view to start on. */
+  sheetsView?: 'content' | 'sheet' | 'board'
+  /**
+   * Spec 021: with surface 'view' (a team Space, a brand, My tasks), only the
+   * tasks this returns true for are on the Board. The page around it draws its
+   * own header; the toolbar, columns, drag, bulk and the task panel are the
+   * Board's own, so every move keeps the same rules (FR-011, FR-013a).
+   */
+  scopeTasks?: (t: Task) => boolean
+  /** Spec 021: "+ Task" from a Space adds it to that Space (FR-028). */
+  spaceId?: string
+  /** Spec 021: live team Spaces, their members, and Shows in rows. */
+  spaces?: TeamSpace[]
+  spaceMembers?: SpaceMember[]
+  taskSpaces?: TaskSpaceRow[]
   /** Spec 013: the linked sheets' saved row heights, by task id. */
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
 }
@@ -100,8 +113,15 @@ export function KanbanBoard({
   surface = 'board',
   sheetsView = 'content',
   linkedRowHeights,
+  scopeTasks,
+  spaceId,
+  spaces = [],
+  spaceMembers = [],
+  taskSpaces = [],
 }: KanbanBoardProps) {
   const embedded = surface === 'sheets'
+  /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
+  const hosted = surface === 'view'
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
@@ -143,7 +163,7 @@ export function KanbanBoard({
    * switching never refetches the board.
    */
   const [view, setViewState] = useState<BoardView>(() => {
-    if (embedded) return sheetsView
+    if (embedded || hosted) return sheetsView
     const v = searchParams.get('view')
     return v === 'sheet' || v === 'content' ? v : 'board'
   })
@@ -156,7 +176,7 @@ export function KanbanBoard({
   const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
   const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
   useEffect(() => {
-    if (embedded) return
+    if (embedded || hosted) return
     const url = new URL(window.location.href)
     const want: Record<string, string | null> = {
       view: view === 'board' ? null : view,
@@ -235,13 +255,19 @@ export function KanbanBoard({
    * Read after mount like every other stored preference: reading
    * localStorage during render makes the server and client disagree.
    */
-  const [scope, setScope] = useState<'me' | 'team'>('me')
+  // Spec 021: a hosted Board (a Space, a brand) starts on Everyone — the page
+  // is already the narrowing — and remembers its own choice apart from /board.
+  const scopeKey = hosted ? 'momentum.view.scope' : 'momentum.board.scope'
+  const [scope, setScope] = useState<'me' | 'team'>(hosted ? 'team' : 'me')
   useEffect(() => {
-    if (window.localStorage.getItem('momentum.board.scope') === 'team') setScope('team')
-  }, [])
+    try {
+      const v = window.localStorage.getItem(scopeKey)
+      if (v === 'team' || v === 'me') setScope(v)
+    } catch { /* private mode */ }
+  }, [scopeKey])
   function chooseScope(next: 'me' | 'team') {
     setScope(next)
-    try { window.localStorage.setItem('momentum.board.scope', next) } catch { /* private mode */ }
+    try { window.localStorage.setItem(scopeKey, next) } catch { /* private mode */ }
   }
 
   /**
@@ -265,7 +291,10 @@ export function KanbanBoard({
    * the bell and bulk actions. Split once, here; only the video sheet reads
    * `tasks` with them in.
    */
-  const liveTasks = useMemo(() => tasks.filter(t => !t.dropped_at), [tasks])
+  const liveTasks = useMemo(
+    () => tasks.filter(t => !t.dropped_at && (!scopeTasks || scopeTasks(t))),
+    [tasks, scopeTasks],
+  )
 
   const scopedTasks = useMemo(
     () => (scope === 'me'
@@ -973,6 +1002,8 @@ export function KanbanBoard({
       initialCommentId={commentFor?.taskId === selectedTask.id ? commentFor.commentId : undefined}
       initialSection={sectionFor?.taskId === selectedTask.id ? sectionFor.section : undefined}
       onOpenSheet={openSheet}
+      spaces={spaces}
+      taskSpaces={taskSpaces}
       onClose={() => { setPreviewFor(null); setCommentFor(null); setSectionFor(null); selectTask(null) }}
     />
   )
@@ -1032,7 +1063,7 @@ export function KanbanBoard({
   if (view === 'content') {
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
-        {!embedded && header}
+        {!embedded && !hosted && header}
         <ContentSheet
           tasks={tasks}
           themes={themes}
@@ -1057,7 +1088,7 @@ export function KanbanBoard({
   if (view === 'sheet') {
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
-        {!embedded && header}
+        {!embedded && !hosted && header}
         <VideoSheet
           tasks={tasks}
           me={currentUser}
@@ -1097,7 +1128,7 @@ export function KanbanBoard({
       }}
     >
       <div className="fx-hd-wrap">
-        {header}
+        {!hosted && header}
         <BoardToolbar
           scope={scope}
           onScope={chooseScope}

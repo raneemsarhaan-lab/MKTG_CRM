@@ -83,41 +83,41 @@
 
 **Independent Test**: as a Video Editor, only the Video Space shows under Teams. The Video Space lists video work from all four brands, grouped by brand. Adding Design to a task's Shows in makes it appear in the Design Space. The Board "All" scope is unchanged (spec US1).
 
-- [ ] T015 [P] [US1] Create `src/actions/spaces.ts` per contracts/server-actions.md, each action with `requireAdmin` first:
+- [X] T015 [P] [US1] Create `src/actions/spaces.ts` per contracts/server-actions.md, each action with `requireAdmin` first:
   - `createSpace`, `updateSpace`, `setSpaceMembers`;
   - `archiveSpace` and `restoreSpace`;
   - `deleteSpace(id, confirmName)`: archived Spaces only, and the name must match.
-- [ ] T016 [P] [US1] Create `src/actions/task-spaces.ts` with `addTaskSpace(taskId, spaceId)` and `removeTaskSpace(taskId, spaceId)`. Both are guarded by `canAct` (`src/actions/tasks.ts:27-35`) and write `added_via='manual'` / `added_by`.
-- [ ] T017 [US1] Add `loadNavTree(member)` in `src/lib/nav-tree.ts`: the Spaces visible to the member (their memberships, or all for admins), each with its open-task count, plus brands with their open-task counts and a "No brand" entry when tasks have no brand. Call it in `src/app/(app)/layout.tsx` beside `loadPinnedFolders`.
-- [ ] T018 [US1] Restructure `src/components/shared/Sidebar.tsx` (contracts/routes.md):
+- [X] T016 [P] [US1] Create `src/actions/task-spaces.ts` with `addTaskSpace(taskId, spaceId)` and `removeTaskSpace(taskId, spaceId)`. Both are guarded by `canAct` (`src/actions/tasks.ts:27-35`) and write `added_via='manual'` / `added_by`.
+- [X] T017 [US1] Add `loadNavTree(member)` in `src/lib/nav-tree.ts`: the Spaces visible to the member (their memberships, or all for admins), each with its open-task count, plus brands with their open-task counts and a "No brand" entry when tasks have no brand. Call it in `src/app/(app)/layout.tsx` beside `loadPinnedFolders`.
+- [X] T018 [US1] Restructure `src/components/shared/Sidebar.tsx` (contracts/routes.md):
   - the nav, as today;
   - **Me**: the pinned folders, moved from under Sheets;
   - **Teams**;
   - **Brands**, each with Calendar, Assets, Sheet and Library links.
 
   Build it from new `src/components/shared/NavTree/TreeSection.tsx`, `SpaceItem.tsx` and `BrandItem.tsx`. Sections collapse (`momentum.sidebar.collapsed`, read after mount, in try/catch). On phones it is a drawer. Strings come from the `spaces` namespace.
-- [ ] T019 [US1] Add a `scopeTasks?: (t: Task) => boolean` prop and a `surface: 'board' | 'space' | 'brand' | 'me'` value to `src/components/kanban/KanbanBoard.tsx`. When set, it filters tasks before `tasksByStage` and keeps `moveTo`, drag, bulk and the modal unchanged. `/board` passes nothing and behaves as today.
-- [ ] T020 [P] [US1] Create `src/components/views/ListView.tsx`: rows grouped by stage, or by brand on a Space. Each row shows the brand mark, stage pill, assignee, due date and SLA badge. Clicking a row opens TaskModal through the same `selectedTaskId` store key as the Board.
-- [ ] T021 [P] [US1] Create `src/components/views/BoardView.tsx`, which renders `KanbanBoard` with `scopeTasks` and the original columns (FR-013a), and `src/components/views/ViewHost.tsx` with default tabs only (List and Board in this phase; contracts/routes.md).
-- [ ] T022 [US1] Create `src/app/(app)/spaces/[key]/page.tsx`:
+- [X] T019 [US1] Add a `scopeTasks?: (t: Task) => boolean` prop and a `surface: 'board' | 'space' | 'brand' | 'me'` value to `src/components/kanban/KanbanBoard.tsx`. When set, it filters tasks before `tasksByStage` and keeps `moveTo`, drag, bulk and the modal unchanged. `/board` passes nothing and behaves as today.
+- [X] T020 [P] [US1] Create `src/components/views/ListView.tsx`: rows grouped by stage, or by brand on a Space. Each row shows the brand mark, stage pill, assignee, due date and SLA badge. Clicking a row opens TaskModal through the same `selectedTaskId` store key as the Board.
+- [X] T021 [P] [US1] Create `src/components/views/BoardView.tsx`, which renders `KanbanBoard` with `scopeTasks` and the original columns (FR-013a), and `src/components/views/ViewHost.tsx` with default tabs only (List and Board in this phase; contracts/routes.md).
+- [X] T022 [US1] Create `src/app/(app)/spaces/[key]/page.tsx`:
   - Return 404 for an unknown or archived key, or for a non-admin who isn't a member.
   - Load `loadBoardData`, then render `ViewHost` with `scopeTasks = t => taskSpaces has (t.id, space.id)`.
   - The header shows the Space name, its members and "Shows: …" text from `design/teams-brands.html`.
-- [ ] T023 [US1] Create `src/app/(app)/brands/[brandId]/[[...folder]]/page.tsx`:
+- [X] T023 [US1] Create `src/app/(app)/brands/[brandId]/[[...folder]]/page.tsx`:
   - Brand level only in this phase (List and Board of `brand_id = id`).
   - `none` means `brand_id IS NULL`.
   - Unknown brands return 404.
   - Folder segments render a "coming in Stage B" placeholder until US2.
-- [ ] T024 [US1] Create `src/components/kanban/ShowsIn.tsx`: Space chips with × (remove) and "+ Add" (Spaces the member can see), and a hint showing why each Space is there (`added_via`). Mount it in `src/components/kanban/TaskModal.tsx` under the stage row, editable when `canEdit`.
-- [ ] T025 [US1] Create `src/components/settings/SpacesSettings.tsx`, a "Spaces" tab in `src/components/settings/SettingsView.tsx`:
+- [X] T024 [US1] Create `src/components/kanban/ShowsIn.tsx`: Space chips with × (remove) and "+ Add" (Spaces the member can see), and a hint showing why each Space is there (`added_via`). Mount it in `src/components/kanban/TaskModal.tsx` under the stage row, editable when `canEdit`.
+- [X] T025 [US1] Create `src/components/settings/SpacesSettings.tsx`, a "Spaces" tab in `src/components/settings/SettingsView.tsx`:
   - list, create and rename Spaces; set colour, production and default kind;
   - members (a multi-select of members);
   - archive and restore;
   - delete with a typed name.
 
   Admin only (the page is already admin-only).
-- [ ] T026 [US1] Point the nav label in `src/lib/nav.tsx` and the Board toggle in `src/components/board/BoardToolbar.tsx` at the renamed messages from T003. `/team` keeps its address (FR-012a).
-- [ ] T027 [US1] Add UI scenarios in `scripts/spaces-lab/scenarios/us1.mjs`:
+- [X] T026 [US1] Point the nav label in `src/lib/nav.tsx` and the Board toggle in `src/components/board/BoardToolbar.tsx` at the renamed messages from T003. `/team` keeps its address (FR-012a).
+- [X] T027 [US1] Add UI scenarios in `scripts/spaces-lab/scenarios/us1.mjs`: *(done as real-app scenarios in `scripts/spaces-lab/realapp/scenarios.cjs`, run with `realapp/run.cjs us1` against a seeded database: 8/8 pass. The Arabic and phone-drawer checks are still to do and are folded into T073.)*
   - the sidebar per role (admin sees 4 Spaces, Video Editor 1);
   - the Space page grouping by brand;
   - Shows in add and remove;
