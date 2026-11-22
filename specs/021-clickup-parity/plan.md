@@ -6,6 +6,8 @@
 
 - [design/teams-brands.html](../../design/teams-brands.html): the sidebar, team Spaces, brand Folders, Calendar, Board and the hand-off box.
 - [design/noran-workspace.html](../../design/noran-workspace.html): Me › My tasks (Sheet, Calendar, Board) and My sheets.
+**Approval**: the first two previews were reviewed and revised with the user on 2026-11-22, and the user then started implementation (T005).
+
 - [design/clickup-hierarchy.html](../../design/clickup-hierarchy.html): the Status words panel, the feature switches panel, simple tasks and the Sheet view look. Its Brand › Team › List tree is superseded.
 
 ## Summary

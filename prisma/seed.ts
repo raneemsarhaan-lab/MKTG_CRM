@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { ROLE_SPACES, membersBySpace, startingSpaces } from '../src/lib/spaces'
 
 const prisma = new PrismaClient()
 
@@ -232,6 +233,49 @@ async function main() {
       'UPDATE tasks SET assignee_id = task_owner_id WHERE assignee_id IS NULL',
     )
     return `${rows} tasks`
+  })
+
+  /**
+   * Spec 021 (research R3): the four team Spaces, with members started from
+   * their job roles. Admins edit membership afterwards, so this runs once —
+   * a later role change must not move anyone, and a Space an admin renamed
+   * must not come back.
+   */
+  await once('spaces-v1', 'created the team Spaces and their members', async () => {
+    const defs = [
+      { key: 'content',  name: 'Content',  color: '#3B82F6', is_production: false, default_kind: 'pipeline', sort_order: 0 },
+      { key: 'design',   name: 'Design',   color: '#7C3AED', is_production: true,  default_kind: 'pipeline', sort_order: 1 },
+      { key: 'video',    name: 'Video',    color: '#0E9F9A', is_production: true,  default_kind: 'pipeline', sort_order: 2 },
+      { key: 'planning', name: 'Planning', color: '#0EA5E9', is_production: false, default_kind: 'simple',   sort_order: 3 },
+    ]
+    for (const d of defs) await prisma.teamSpace.upsert({ where: { key: d.key }, update: {}, create: d })
+    const spaces = await prisma.teamSpace.findMany({ select: { id: true, key: true } })
+    const idOf = Object.fromEntries(spaces.map(x => [x.key, x.id]))
+    const members = await prisma.member.findMany({ select: { id: true, role: true } })
+    const rows = members.flatMap(m => (ROLE_SPACES[m.role] ?? []).filter(k => idOf[k]).map(k => ({ space_id: idOf[k], member_id: m.id })))
+    if (rows.length) await prisma.teamSpaceMember.createMany({ data: rows, skipDuplicates: true })
+    return `${spaces.length} Spaces, ${rows.length} memberships`
+  })
+
+  /**
+   * Spec 021 (FR-008): every existing task gets its starting Shows in list.
+   * Creates rows only (skipDuplicates), so running it twice changes nothing,
+   * and no task's stage, owner, dates or SLA clock is touched.
+   */
+  await once('task-spaces-v1', 'gave every task its starting team Spaces', async () => {
+    const before = await prisma.task.count()
+    const spaces = (await prisma.teamSpace.findMany()).map(x => ({ ...x, archived_at: x.archived_at }))
+    const members = membersBySpace(await prisma.teamSpaceMember.findMany({ select: { space_id: true, member_id: true } }))
+    const tasks = await prisma.task.findMany({
+      select: { id: true, status: true, nine_stage: true, kind: true, content_type_label: true, assignee_id: true },
+    })
+    const rows = tasks.flatMap(t => startingSpaces(t, spaces, members).map(space_id => ({ task_id: t.id, space_id, added_via: 'migration' })))
+    for (let i = 0; i < rows.length; i += 1000) {
+      await prisma.taskSpace.createMany({ data: rows.slice(i, i + 1000), skipDuplicates: true })
+    }
+    const after = await prisma.task.count()
+    if (after !== before) throw new Error(`task count changed during task-spaces-v1: ${before} → ${after}`)
+    return `${rows.length} rows for ${tasks.length} tasks`
   })
 
   // Workspace settings

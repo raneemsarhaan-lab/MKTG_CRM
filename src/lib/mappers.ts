@@ -43,6 +43,24 @@ export function mapBrand(b: any): Brand {
     color:       b.color,
     logo_url:    b.logo_url    ?? undefined,
     description: b.description ?? undefined,
+    features:    (b.features && typeof b.features === 'object' ? b.features : {}) as import('@/types/index').BrandFeatures,
+    nine_stage_default: b.nine_stage_default ?? null,
+  }
+}
+
+/** Spec 021: a team Space row. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapSpace(s: any): import('@/types/index').TeamSpace {
+  return {
+    id:            s.id,
+    key:           s.key,
+    name:          s.name,
+    color:         s.color,
+    is_production: !!s.is_production,
+    default_kind:  s.default_kind === 'simple' ? 'simple' : 'pipeline',
+    words:         (s.words && typeof s.words === 'object' ? s.words : {}) as Record<string, string[]>,
+    sort_order:    s.sort_order ?? 0,
+    archived_at:   s.archived_at ? toIsoStr(s.archived_at) : null,
   }
 }
 
@@ -127,6 +145,8 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     published_url:      t.published_url ?? null,
     post_url:           t.post_url ?? null,
     pillar_id:          t.pillar_id ?? null,
+    kind:               t.kind === 'simple' ? 'simple' : 'pipeline',
+    simple_status:      t.simple_status ?? null,
     dropped_at:         t.dropped_at ? toIsoStr(t.dropped_at) : null,
     clip:               t.clip
       ? {

@@ -117,6 +117,78 @@ export interface Brand {
   color: string
   logo_url?: string
   description?: string
+  /** Spec 021 (R11): feature switch overrides; a missing key means the workspace default. */
+  features?: BrandFeatures
+  /** Spec 021 (R11): the brand's "with C-Check" default for new tasks; null = the workspace default. */
+  nine_stage_default?: boolean | null
+}
+
+// ─── Spec 021: brands, team Spaces and views ─────────────────────────────────
+
+/** A task's workflow (R1). Fixed at creation. */
+export type TaskKind = 'pipeline' | 'simple'
+
+/** A simple task's status: To Do › In progress › Done. */
+export type SimpleStatus = 's-todo' | 's-doing' | 's-done'
+
+/** The per-brand feature switches (US4). */
+export type BrandFeatureKey = 'priorities' | 'platform' | 'type' | 'pillars' | 'hours' | 'covers' | 'clips' | 'sla'
+export type BrandFeatures = Partial<Record<BrandFeatureKey, boolean>>
+
+/** A brand's four fixed Folders. */
+export type BrandFolderKey = 'cal' | 'assets' | 'sheet' | 'lib'
+
+/** Why a task shows in a Space. */
+export type TaskSpaceVia = 'created' | 'assignee' | 'handoff' | 'manual' | 'migration'
+
+/** A team Space: a lens on one team's work across every brand. */
+export interface TeamSpace {
+  id: string
+  key: string
+  name: string
+  color: string
+  is_production: boolean
+  default_kind: TaskKind
+  /** { [stageId | simpleStatus]: words } — unused for 'content' and 'video' (R5). */
+  words: Record<string, string[]>
+  sort_order: number
+  archived_at: string | null
+}
+
+export interface SpaceMember {
+  space_id: string
+  member_id: string
+}
+
+/** One Shows in row. */
+export interface TaskSpace {
+  task_id: string
+  space_id: string
+  added_via: TaskSpaceVia
+}
+
+export type ViewType = 'list' | 'board' | 'sheet' | 'calendar' | 'workload' | 'files' | 'gallery'
+
+/** 'everything' | 'me' | 'space:<id>' | 'brand:<id>' | 'brand:<id>:<folder>' */
+export type ViewNode = string
+
+export interface SavedView {
+  id: string
+  node: ViewNode
+  type: ViewType
+  name: string
+  config: Record<string, unknown>
+  /** Null for a shared view. */
+  owner_id: string | null
+  position: number
+}
+
+/** What the hand-off box needs to open (contracts/handoff.md). */
+export interface HandoffDefaults {
+  /** Production Spaces pre-ticked for this task. */
+  spaceIds: string[]
+  /** Members of each production Space, by Space id. */
+  candidates: Record<string, string[]>
 }
 
 export interface ContentType {
@@ -186,6 +258,10 @@ export interface Task {
   pillar_id?: string | null
   /** The social post's link (spec 009). */
   post_url?: string | null
+  /** Spec 021: 'pipeline' unless created as a simple task. */
+  kind?: TaskKind
+  /** Spec 021: a simple task's status; null for pipeline tasks. */
+  simple_status?: SimpleStatus | null
 }
 
 /** A theme of the Content sheet: a project flagged as a content stream (spec 009). */
@@ -316,6 +392,9 @@ export interface MoveTaskResult {
   success: boolean
   shouldCelebrate: boolean
   error?: string
+  /** Spec 021: set with error 'needs_handoff' — the stage asked for and what the box pre-ticks. */
+  target?: StageId
+  handoff?: HandoffDefaults
 }
 
 export interface WorkspaceSettings {

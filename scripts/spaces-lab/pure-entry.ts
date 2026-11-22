@@ -1,0 +1,6 @@
+// The pure modules pure.mjs checks in Node (spec 021).
+export * from '@/lib/spaces'
+export * from '@/lib/brand-features'
+export * from '@/lib/simple-status'
+export { NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
+export { makeLab } from './fixtures'

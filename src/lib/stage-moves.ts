@@ -46,6 +46,13 @@ export function allowedStages(task: MoveTask, member: MoveMember): StageId[] {
   return path.filter(s => s !== task.status)
 }
 
+/**
+ * Spec 021: the first stage of the design half. A pipeline task crossing from
+ * before it to it or later must show in a production team Space (the hand-off,
+ * src/lib/spaces.ts `needsHandoff`).
+ */
+export const DESIGN_HALF_START: StageId = 'r-design'
+
 /** The stage after the current one on the task's path, if any. */
 export function nextOnPath(task: Pick<MoveTask, 'status' | 'nine_stage'>): StageId | null {
   const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE

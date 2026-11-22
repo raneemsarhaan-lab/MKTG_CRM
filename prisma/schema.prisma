@@ -75,6 +75,12 @@ model Member {
   push_subscriptions      PushSubscription[]
   email_digests           EmailDigest[]
 
+  /// Spec 021: team Space memberships, Shows in rows this member added, saved views.
+  space_memberships TeamSpaceMember[]
+  task_spaces_added TaskSpace[]       @relation("TaskSpaceAdder")
+  views_owned       SavedView[]       @relation("SavedViewOwner")
+  views_created     SavedView[]       @relation("SavedViewCreator")
+
   work_days         WorkDay[] @relation("WorkDayMember")
   work_days_updated WorkDay[] @relation("WorkDayUpdater")
 
@@ -88,10 +94,15 @@ model Brand {
   logo_url    String?
   description String?
   created_at  DateTime @default(now()) @db.Timestamptz(6)
+  /// Spec 021 (R11): feature switch overrides, e.g. { "platform": false }. A missing key means the workspace default (on).
+  features           Json     @default("{}")
+  /// Spec 021 (R11): this brand's "with C-Check" default for new tasks. Null = the workspace default.
+  nine_stage_default Boolean?
 
-  tasks    Task[]
-  assets   BrandAsset[]
-  projects Project[]
+  tasks        Task[]
+  assets       BrandAsset[]
+  projects     Project[]
+  sheet_folder SheetFolder?
 
   @@map("brands")
 }
@@ -317,6 +328,10 @@ model Task {
   pillar_id            String?   @db.Uuid
   /// The social post's link (LinkedIn), beside published_url (spec 009).
   post_url             String?   @db.Text
+  /// Spec 021 (R1): 'pipeline' | 'simple'. Fixed at creation. Simple tasks keep status 'todo' only for the foreign key.
+  kind                 String    @default("pipeline")
+  /// Spec 021: 's-todo' | 's-doing' | 's-done' for simple tasks; null for pipeline tasks.
+  simple_status        String?
 
   pillar             ContentPillar?    @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
   parent             Task?             @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
@@ -343,6 +358,7 @@ model Task {
   notifications      Notification[]
   followers          TaskFollower[]
   due_reminders      DueReminder[]
+  spaces             TaskSpace[]
 
   @@map("tasks")
 }
@@ -518,6 +534,8 @@ model WorkspaceSettings {
   /// Spec 020 (tip 17): the workspace's own fill-handle lists (Custom Lists),
   /// as { id, name, items }[]. Admins edit them; every member's fill uses them.
   fill_lists                Json      @default("[]")
+  /// Spec 021 (R11): default feature switches for brands; a missing key means on.
+  brand_feature_defaults    Json      @default("{}")
 
   updated_at DateTime @default(now()) @db.Timestamptz(6)
 
@@ -765,8 +783,10 @@ model EmailDigest {
 /// team folder of blank sheets. Opened as one workbook.
 model SheetFolder {
   id         String   @id @default(uuid()) @db.Uuid
-  /// 'content' · 'video' · 'team'
+  /// 'content' · 'video' · 'team' · 'brand' (spec 021: a brand's own blank tabs)
   kind       String
+  /// Spec 021 (R6): set only on kind 'brand', one folder per brand.
+  brand_id   String?  @unique @db.Uuid
   /// 'content' or 'video' for the two linked folders, null for team folders: one of each (R11).
   linked_key String?  @unique
   /// Team folders only; linked folders take their name from the translations.
@@ -778,6 +798,7 @@ model SheetFolder {
 
   creator Member? @relation("SheetFolderCreator", fields: [created_by], references: [id], onDelete: SetNull)
   updater Member? @relation("SheetFolderUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  brand   Brand?  @relation(fields: [brand_id], references: [id], onDelete: Cascade)
   sheets  Sheet[]
 
   @@map("sheet_folders")
@@ -1039,4 +1060,86 @@ model WorkDay {
   @@id([member_id, date])
   @@index([date])
   @@map("work_days")
+}
+
+/// Spec 021: a team Space — a lens on one team's work across every brand.
+/// Tasks never live in a Space; `task_spaces` lists which tasks show in it.
+model TeamSpace {
+  id            String    @id @default(uuid()) @db.Uuid
+  /// Stable key: 'content', 'design', 'video', 'planning', or one made from the name.
+  key           String    @unique
+  name          String
+  color         String    @default("#64748B")
+  /// Design and Video: tasks are handed to these at Ready For Design (FR-030, FR-033).
+  is_production Boolean   @default(false)
+  /// 'pipeline' | 'simple': the kind of task created from this Space (FR-023).
+  default_kind  String    @default("pipeline")
+  /// { [stageId | simpleStatus]: string[] }. Unused for 'content' and 'video', whose words live on their linked sheet (R5).
+  words         Json      @default("{}")
+  sort_order    Int       @default(0)
+  archived_at   DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  members TeamSpaceMember[]
+  tasks   TaskSpace[]
+
+  @@map("team_spaces")
+}
+
+/// Spec 021 (R3): who belongs to a team Space. Filled from job roles once, then edited by admins.
+model TeamSpaceMember {
+  space_id  String   @db.Uuid
+  member_id String   @db.Uuid
+  added_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  space  TeamSpace @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  member Member    @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@id([space_id, member_id])
+  @@index([member_id])
+  @@map("team_space_members")
+}
+
+/// Spec 021 (R2): Shows in — a task appears in every Space it has a row for.
+/// Rows are added on creation, assignment, hand-off or by hand, and only ever
+/// removed by hand (FR-032).
+model TaskSpace {
+  task_id   String   @db.Uuid
+  space_id  String   @db.Uuid
+  /// 'created' | 'assignee' | 'handoff' | 'manual' | 'migration'
+  added_via String
+  added_by  String?  @db.Uuid
+  added_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  task  Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  space TeamSpace @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  adder Member?   @relation("TaskSpaceAdder", fields: [added_by], references: [id], onDelete: SetNull)
+
+  @@id([task_id, space_id])
+  @@index([space_id])
+  @@map("task_spaces")
+}
+
+/// Spec 021 (R7): a saved way of looking at a node — shared (owner_id null) or personal.
+model SavedView {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// 'everything' | 'me' | 'space:<id>' | 'brand:<id>' | 'brand:<id>:<folder>'
+  node       String
+  /// 'list' | 'board' | 'sheet' | 'calendar' | 'workload' | 'files' | 'gallery'
+  type       String
+  name       String
+  /// { filters, group, sort, fields, order, campaign? }
+  config     Json     @default("{}")
+  owner_id   String?  @db.Uuid
+  position   Int      @default(0)
+  created_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  owner   Member? @relation("SavedViewOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  creator Member? @relation("SavedViewCreator", fields: [created_by], references: [id], onDelete: SetNull)
+
+  @@index([node, owner_id])
+  @@map("saved_views")
 }

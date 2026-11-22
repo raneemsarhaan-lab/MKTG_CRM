@@ -6,14 +6,14 @@
  * Server-only: it reads the database directly.
  */
 import { prisma } from '@/lib/prisma'
-import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -76,6 +76,11 @@ export async function loadBoardData(member: SessionMember) {
     prisma.sheetValue.findMany({ where: { column: { deleted_at: null } }, select: { column_id: true, task_id: true, value: true } }),
     // Row heights on the linked sheets (spec 013 FR-045), shared by the team.
     prisma.linkedRowHeight.findMany({ select: { sheet_kind: true, task_id: true, height: true } }),
+    // Spec 021: team Spaces, who is in them, and the Shows in rows — three flat
+    // arrays beside the tasks, never a query per task (plan: SC-003).
+    prisma.teamSpace.findMany({ where: { archived_at: null }, orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] }),
+    prisma.teamSpaceMember.findMany({ select: { space_id: true, member_id: true } }),
+    prisma.taskSpace.findMany({ select: { task_id: true, space_id: true, added_via: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -90,7 +95,7 @@ export async function loadBoardData(member: SessionMember) {
     initialTasks: tasks.map(mapTask) as any,
     currentUser: mapMember(member),
     members: members.map(mapMember),
-    brands: brands.map(b => ({ id: b.id, name: b.name, color: b.color, logo_url: b.logo_url ?? undefined, description: b.description ?? undefined })),
+    brands: brands.map(mapBrand),
     contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label })),
     slaConfig: mapSlaConfig(slaRows),
     themes: themes.map(mapTheme),
@@ -98,6 +103,9 @@ export async function loadBoardData(member: SessionMember) {
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
     linkedRowHeights,
+    spaces: spaces.map(mapSpace),
+    spaceMembers,
+    taskSpaces: taskSpaces as import('@/types/index').TaskSpace[],
     inbox: {
       readIds:  reads.map(r => r.comment_id),
       snoozes:  Object.fromEntries(snoozes.map(z => [z.task_id, z.until.toISOString()])),

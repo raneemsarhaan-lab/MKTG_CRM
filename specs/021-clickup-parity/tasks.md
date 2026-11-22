@@ -19,26 +19,27 @@
 
 ## Phase 1: Setup (Stage 0 and shared scaffolding)
 
-- [ ] T001 Rewrite `.specify/memory/constitution.md` as version 3.0.0, following research.md R9:
+- [X] T001 Rewrite `.specify/memory/constitution.md` as version 3.0.0, following research.md R9:
   - **Stack**: Next.js 16, Prisma 5 with Postgres on Cranl, the custom HMAC session; no Supabase and no RLS.
   - **§II**: the 11 stages and owners from `src/lib/stage-meta.ts`, with C-Check optional per task and the default set per brand. Simple tasks (To Do › In progress › Done) as a second workflow.
   - **§III**: users may create tasks they own. Spaces and brand features are admin-only.
   - **§V**: the Done celebration for simple tasks.
   - **§VI**: without the Supabase wording.
   - A new sync report at the top.
-- [ ] T002 [P] Correct HANDOVER.md: Board drag moves tasks across columns through `allowedStages` (`KanbanBoard.tsx:308-351`). Fix §7 "Drag and drop is reorder-only", ground rule 7, and the lines near 80, 1165 and 1214 that repeat it.
-- [ ] T003 [P] Add the `spaces`, `views`, `calendar`, `handoff` and `me` namespaces in English and Arabic, with every label used in `design/teams-brands.html` and `design/noran-workspace.html`. Change `nav.team` to "Plan", `header.mine` to "Mine" and `header.team` to "Everyone" in both languages. Files: `messages/en.json`, `messages/ar.json`.
-- [ ] T004 [P] Create the lab skeleton in `scripts/spaces-lab/`, copying the shape of `scripts/inbox-lab`:
+- [X] T002 [P] Correct HANDOVER.md: Board drag moves tasks across columns through `allowedStages` (`KanbanBoard.tsx:308-351`). Fix §7 "Drag and drop is reorder-only", ground rule 7, and the lines near 80, 1165 and 1214 that repeat it.
+- [X] T003 [P] Add the `spaces`, `views`, `calendar`, `handoff` and `me` namespaces in English and Arabic, with every label used in `design/teams-brands.html` and `design/noran-workspace.html`. Change `nav.team` to "Plan", `header.mine` to "Mine" and `header.team` to "Everyone" in both languages. Files: `messages/en.json`, `messages/ar.json`.
+- [X] T004 [P] Create the lab skeleton in `scripts/spaces-lab/`, copying the shape of `scripts/inbox-lab`:
   - `build.sh`, `pure-entry.ts`, `scenarios.mjs`, `entry.tsx`, `fixtures.ts`, `gen.mjs`, `index.html`, `scenarios/index.mjs`, `realapp/run.cjs`.
   - Fixtures: 4 brands, the 4 Spaces, the 7 seeded roles, and 30 tasks across stages and types.
   - Add `"lab:spaces"` to `package.json`.
-- [ ] T005 Get the user's approval of `design/teams-brands.html` (Stage A: sidebar, Space pages, Shows in, hand-off box) and `design/noran-workspace.html` (Stage B: My tasks, My sheets) as the design files (constitution §IV). Note the approval date in plan.md.
+  - *(Done: build, pure checks, runner and fixtures. The UI entry, `gen.mjs`, `index.html` and `ui-runner.mjs` arrive with the first UI scenarios, T027.)*
+- [X] T005 Get the user's approval of `design/teams-brands.html` (Stage A: sidebar, Space pages, Shows in, hand-off box) and `design/noran-workspace.html` (Stage B: My tasks, My sheets) as the design files (constitution §IV). Note the approval date in plan.md. *(2026-11-22: both previews were reviewed and revised with the user in this session, and the user started implementation. Recorded in plan.md.)*
 
 ---
 
 ## Phase 2: Foundational (Stage A; blocks every story)
 
-- [ ] T006 Add the models and fields from data-model.md to `prisma/schema.prisma`:
+- [X] T006 Add the models and fields from data-model.md to `prisma/schema.prisma`:
   - `TeamSpace` → `team_spaces`;
   - `TeamSpaceMember` → `team_space_members`;
   - `TaskSpace` → `task_spaces`, with an index on `space_id`;
@@ -49,8 +50,8 @@
   - `SheetFolder.brand_id` (unique, cascade).
 
   Run `npx prisma validate`.
-- [ ] T007 Add the types to `src/types/index.ts`: `TaskKind`, `SimpleStatus`, `TeamSpace`, `TaskSpace`, `SpaceMember`, `SavedView`, `ViewType`, `ViewNode`, `BrandFeatures` and `BrandFolderKey`. Extend `Task` with `kind` and `simple_status`, and `BoardData` with `spaces`, `spaceMembers` and `taskSpaces`. Map the new fields in `src/lib/mappers.ts`.
-- [ ] T008 [P] Write the pure helpers in `src/lib/spaces.ts` (contracts/handoff.md):
+- [X] T007 Add the types to `src/types/index.ts`: `TaskKind`, `SimpleStatus`, `TeamSpace`, `TaskSpace`, `SpaceMember`, `SavedView`, `ViewType`, `ViewNode`, `BrandFeatures` and `BrandFolderKey`. Extend `Task` with `kind` and `simple_status`, and `BoardData` with `spaces`, `spaceMembers` and `taskSpaces`. Map the new fields in `src/lib/mappers.ts`.
+- [X] T008 [P] Write the pure helpers in `src/lib/spaces.ts` (contracts/handoff.md):
   - `startingSpaces(task, spaces, membersBySpace)`: the FR-008 rules;
   - `spacesForAssignee(task, assigneeId, spaces, members)`: skips Spaces whose `default_kind` is 'simple' for pipeline tasks;
   - `needsHandoff(task, target, shownIn, spaces)`;
@@ -58,14 +59,14 @@
   - `isProduction(space)`.
 
   Also export `DESIGN_HALF_START = 'r-design'` from `src/lib/stage-moves.ts`.
-- [ ] T009 [P] Write the pure helpers `featureOn(brand, key, defaults)` in `src/lib/brand-features.ts`, and `SIMPLE_STATUSES` and `nextSimple(status)` in `src/lib/simple-status.ts`.
-- [ ] T010 Add `once('spaces-v1')` to `prisma/seed.ts` (research R3):
+- [X] T009 [P] Write the pure helpers `featureOn(brand, key, defaults)` in `src/lib/brand-features.ts`, and `SIMPLE_STATUSES` and `nextSimple(status)` in `src/lib/simple-status.ts`.
+- [X] T010 Add `once('spaces-v1')` to `prisma/seed.ts` (research R3):
   - Create Content (pipeline), Design (pipeline, production), Video (pipeline, production) and Planning (simple), with token colours.
   - Add members by role: Video Editor → Video; Graphic Designer → Design; Content Creator and Digital Marketing Specialist → Content and Planning.
-- [ ] T011 Add `once('task-spaces-v1')` to `prisma/seed.ts`: for every task, insert `startingSpaces(...)` rows with `added_via='migration'` using `createMany({ skipDuplicates: true })`. Log the task count before and after, and stop if they differ (FR-008, SC-001).
-- [ ] T012 Extend `loadBoardData` in `src/lib/board-data.ts` to return `spaces` (not archived), `spaceMembers` and `taskSpaces` as flat arrays, plus `kind` and `simple_status` on each task (plan: no per-task queries).
-- [ ] T013 Add `requireTaskCreatorFor(ownerId)` to `src/lib/authz.ts` (research R10): admins and superusers may create for anyone; users only when `ownerId` is themselves.
-- [ ] T014 [P] Add the pure checks to `scripts/spaces-lab/pure-entry.ts` and `scenarios.mjs`:
+- [X] T011 Add `once('task-spaces-v1')` to `prisma/seed.ts`: for every task, insert `startingSpaces(...)` rows with `added_via='migration'` using `createMany({ skipDuplicates: true })`. Log the task count before and after, and stop if they differ (FR-008, SC-001).
+- [X] T012 Extend `loadBoardData` in `src/lib/board-data.ts` to return `spaces` (not archived), `spaceMembers` and `taskSpaces` as flat arrays, plus `kind` and `simple_status` on each task (plan: no per-task queries).
+- [X] T013 Add `requireTaskCreatorFor(ownerId)` to `src/lib/authz.ts` (research R10): admins and superusers may create for anyone; users only when `ownerId` is themselves.
+- [X] T014 [P] Add the pure checks to `scripts/spaces-lab/pure-entry.ts` and `scenarios.mjs`:
   - the `startingSpaces` table: pipeline, Video at D-In Progress, Post at D-Check, an assignee in Video, a simple task;
   - `spacesForAssignee`, including the Planning skip;
   - the `needsHandoff` matrix on both paths (with and without C-Check);

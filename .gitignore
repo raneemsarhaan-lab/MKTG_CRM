@@ -39,3 +39,5 @@ scripts/notify-lab/out/
 # Spec 013 lab build output
 scripts/spreadsheet-lab/out/
 scripts/hours-lab/out/
+# Spaces lab build output (spec 021)
+scripts/spaces-lab/out/

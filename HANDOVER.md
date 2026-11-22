@@ -77,7 +77,7 @@ The app was deployed to Cranl and hung on an infinite loading spinner — the pa
 | ORM | **Prisma v5** | ⚠️ Must be v5 — see warning below |
 | Auth | **Custom HMAC session** | `src/lib/session.ts` — NextAuth was removed, see §6 |
 | Password hashing | bcryptjs | 10 rounds |
-| Drag & drop | @dnd-kit | Within-column reorder only |
+| Drag & drop | @dnd-kit | Reorder within a column; moves across columns go through `allowedStages` |
 | State | Zustand | `useUIStore` |
 | i18n | next-intl | Arabic + English, full RTL |
 | Styling | Tailwind v4 + CSS variables | Tokens in `src/lib/tokens.ts` |
@@ -283,9 +283,11 @@ When someone advances a task out of a stage they own, a confetti overlay plus so
 
 This was previously broadcast over Supabase Realtime so it appeared in other tabs. That code is removed. The current behaviour matches the original intent more closely than the Realtime version did.
 
-### Drag and drop is reorder-only
+### Drag and drop: reorder within a column, move across columns
 
-@dnd-kit allows reordering **within** a column. Cross-column drags are rejected — `handleDragEnd` returns early when the source and target stages differ. Stage changes happen only through the task modal's explicit Advance action, so they always pass through the permission check.
+@dnd-kit reorders cards **within** a column (local only, not saved). Dragging a card to **another** column moves the task through `moveTo` → `setTaskStage`, so it passes the same `allowedStages` check as Advance and the stage menu (`KanbanBoard.tsx` `handleDragEnd`). A column that isn't on the task's path refuses the drop. Since spec 021, a move into the design half without a production team Space opens the hand-off box instead of moving.
+
+*(Corrected 2026-11-22: this section used to say cross-column drags were rejected. They have been allowed for some time.)*
 
 ### SLA and alert status
 
@@ -1162,7 +1164,7 @@ Run through this after the first successful deploy.
 **Tasks**
 - [ ] "+ New task" creates a task in the correct column
 - [ ] Advancing a stage fires the celebration, for that person only, when they have turned Celebrations on (off by default)
-- [ ] Reordering within a column works; dragging across columns does nothing
+- [ ] Reordering within a column works; dragging across columns moves the task only to stages the member may move it to
 - [ ] A task in Published cannot be moved out
 - [ ] Comments save and appear
 
@@ -1211,7 +1213,7 @@ Run through this after the first successful deploy.
 4. **Ownership is by role, never by name** — §7.
 5. **Published is terminal.** Do not add an escape hatch.
 6. **The nine-stage choice lives in exactly one place** — `workspace_settings.nine_stage_default`, immutable per-task after creation — §8.
-7. **Stage changes go through the modal's Advance action,** never through drag — that is where the permission check lives.
+7. **Every stage change goes through `allowedStages`** (`src/lib/stage-moves.ts`), whichever screen it comes from: Advance, the stage menu, Board drag, Inbox, sheets and bulk moves. Never add a path that writes `status` without it.
 8. **The reference UI files are the source of truth** for layout and design. Do not invent layout decisions that contradict them.
 9. **Every server action carries its own permission check.** There is no RLS
    behind it — that call is the entire gate, and a missing one is a privilege

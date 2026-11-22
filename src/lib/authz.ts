@@ -57,6 +57,18 @@ export async function requireTaskCreator(): Promise<Guard> {
 }
 
 /**
+ * Spec 021 (research R10): who may create a task owned by `ownerId`.
+ * Admins and superusers may create for anyone. A user may create tasks they
+ * own themselves — never for someone else.
+ */
+export async function requireTaskCreatorFor(ownerId: string | null | undefined): Promise<Guard> {
+  const member = await getSessionMember()
+  if (!member) return { error: 'not_authenticated' }
+  if (member.access === 'user' && ownerId && ownerId !== member.id) return { error: 'not_authorized' }
+  return { member }
+}
+
+/**
  * The team hours report belongs to the Marketing Manager: the workspace's
  * supervising role (Settings, "Marketing Manager" unless changed), matched on
  * the member's role. Being an admin is not enough.
