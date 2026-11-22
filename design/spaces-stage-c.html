@@ -243,10 +243,10 @@ dl { margin: 0 }
         <div class="frame-body form">
           <div class="field">Name<span class="val">Plan the Q1 content calendar</span></div>
           <div class="field">
-            <span id="kind-label">Kind</span>
+            <span id="kind-label">Space</span>
             <div class="seg" role="group" aria-labelledby="kind-label">
-              <button type="button" data-kind="pipeline" aria-pressed="false">Pipeline</button>
-              <button type="button" data-kind="simple" aria-pressed="true">Simple</button>
+              <button type="button" data-kind="pipeline" aria-pressed="false">Content</button>
+              <button type="button" data-kind="simple" aria-pressed="true">Planning</button>
             </div>
           </div>
           <div class="kind-help" id="kind-help"></div>
@@ -254,7 +254,7 @@ dl { margin: 0 }
             <div class="field">Brand<span class="val">Forefront Consulting</span></div>
             <div class="field">Assignee<span class="val">Noran</span></div>
           </div>
-          <p class="note">The Planning Space's default kind is Simple, so the switch starts there. Admins set each Space's default in Settings › Spaces. After saving, the kind can't change, like the C-Check choice today.</p>
+          <p class="note">There is no separate Simple/Pipeline switch: the Space decides. It starts on the Space you're in (here Planning). Admins set which Spaces are simple in Settings › Spaces. After saving, the task's kind can't change, like the C-Check choice today.</p>
         </div>
       </div>
 
@@ -344,8 +344,8 @@ dl { margin: 0 }
     <div class="part-head">
       <span class="tag">Sheets and Calendar · both kinds of task</span>
       <h2 id="h-link">4 · Link a task, or create one, right where you type</h2>
-      <p class="lede">You don't go to a menu to make a task. You type in a sheet row or on a calendar day, and <b>Link task</b> appears under what you typed. It opens the task list, already searching for your words. Pick an existing task to link it, or choose <b>Create new task</b> at the bottom. That's where you choose Simple or Pipeline.</p>
-      <div class="flow" aria-label="The steps"><span class="step">Type</span>›<span class="step">Link task</span>›<span class="step">Pick a task</span><span class="muted">or</span><span class="step">Create new task · Simple or Pipeline</span></div>
+      <p class="lede">You don't go to a menu to make a task. You type in a sheet's <b>Task link</b> column, or on a calendar day, and <b>Link task</b> appears under what you typed. It opens the task list, already searching for your words. Pick an existing task to link it, or choose <b>Create new task</b> at the bottom and pick the Space it belongs to. The task gets that Space's stages.</p>
+      <div class="flow" aria-label="The steps"><span class="step">Type</span>›<span class="step">Link task</span>›<span class="step">Pick a task</span><span class="muted">or</span><span class="step">Create new task · pick its Space › it gets that Space's stages</span></div>
     </div>
     <div class="pair">
       <div class="frame">
@@ -354,7 +354,7 @@ dl { margin: 0 }
           <div class="sheet-mock" id="lk-sheet"></div>
           <div id="lk-offer"></div>
           <div id="lk-picker"></div>
-          <p class="small muted">Link task also opens with <b>Ctrl+K</b> on any cell of the row. Press Esc to keep it as plain text: nothing is created unless you choose.</p>
+          <p class="small muted">Link task appears only in a <b>Task link</b> column; typing in Idea or Month stays plain text, as in any spreadsheet. On a Task link cell, <b>Ctrl+K</b> opens the list too. Esc closes it: nothing is linked or created unless you choose.</p>
         </div>
       </div>
       <div class="frame">
@@ -378,12 +378,13 @@ dl { margin: 0 }
       <li><div><b>Team words show alone; the board name is on hover.</b><p>The Video Space's List says "Editing", and hovering it says "D-In Progress". The alternative shows both, "Editing · D-In Progress", which is clearer for newcomers but busier.</p></div></li>
       <li><div><b>Status words open from a button in the Space header.</b><p>Only admins and superusers see the button. Users see the words but can't change them.</p></div></li>
       <li><div><b>Simple statuses get team words too.</b><p>Planning could say "Backlog, Doing, Shipped". The three statuses keep their own order and behaviour.</p></div></li>
-      <li><div><b>The kind is picked in the create form and never changes.</b><p>The Space's default preselects it (Planning: Simple; the others: Pipeline). To change kind later, a member creates a new task.</p></div></li>
+      <li><div><b>A new task takes the stages of the Space it's created in.</b><p>Created in Planning, it's a simple task (To Do › In progress › Done). Created in Content or Video, it's a pipeline task in that Space's words. There's no separate kind switch, and the kind never changes after saving.</p></div></li>
       <li><div><b>Simple tasks get three dashed columns after Published on every Board.</b><p>They appear only when simple tasks are in view. The Kind filter (All, Pipeline, Simple) sits in the Board header and in saved views.</p></div></li>
       <li><div><b>A switched-off field shows as an empty hatched cell in mixed views.</b><p>The task panel and the create form leave it out entirely for that brand. Filters and bulk actions skip that brand's tasks for that field.</p></div></li>
       <li><div><b>The C-Check switch only affects new tasks.</b><p>Existing tasks keep their own 10 or 11 stages, as the spec requires.</p></div></li>
-      <li><div><b>Link task appears under what you type, in sheets and on the calendar.</b><p>It replaces going through the Board ▾ menu for one row. The menu stays for linking or creating many rows at once.</p></div></li>
-      <li><div><b>Create new task, inside the task list, is where you pick Simple or Pipeline.</b><p>It starts on your Space's default (Planning: Simple, the others: Pipeline), with your words as the name, you as the assignee and, on the calendar, that day as the due date.</p></div></li>
+      <li><div><b>Link task appears only in a sheet's Task link column, and on calendar days.</b><p>Every other column stays a plain spreadsheet cell. It replaces going through the Board ▾ menu for one row; the menu stays for linking or creating many rows at once.</p></div></li>
+      <li><div><b>Create new task, inside the task list, asks which Space it belongs to.</b><p>It starts on your own Space (or the one you're in), with your words as the name, you as the assignee and, on the calendar, that day as the due date. The task gets that Space's stages.</p></div></li>
+      <li><div><b>Once a task shows in more Spaces, each shows its own words for the same stage.</b><p>A task handed from Content to Video is "Review" in Content and "Script review" in Video, because underneath it's one stage, C-Review. Boards show "C-Review".</p></div></li>
       <li><div><b>On the calendar, linking an existing task moves its due date to that day.</b><p>The alternative is to only show it there without changing the date, which a calendar can't really do.</p></div></li>
     </ol>
   </section>
@@ -473,8 +474,8 @@ dl { margin: 0 }
 
   // ── 2 · simple tasks ──
   const HELP = {
-    simple: '<b>Simple task.</b> To Do › In progress › Done. No stage owners, no SLA, no approvals. Anyone who may edit it moves it.',
-    pipeline: '<b>Pipeline task.</b> The 11 stages with their owners, SLA and approvals. Published is final. Exactly as today.',
+    simple: '<b>Gets Planning\'s stages:</b> To Do › In progress › Done. A simple task: no stage owners, no SLA, no approvals. Anyone who may edit it moves it.',
+    pipeline: '<b>Gets Content\'s stages:</b> the pipeline in Content\'s words (Idea › Writing › Review › …), with its owners, SLA and approvals. Published is final.',
   }
   const setKind = k => {
     document.querySelectorAll('[data-kind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === k)))
@@ -564,11 +565,18 @@ dl { margin: 0 }
     ['Hiring post: analysts', 'Forefront Consulting', 'C-In Progress', 'pipeline'],
     ['Year in review carousel', 'Islam Personal Branding', 'Ready For Design', 'pipeline'],
   ]
-  const lk = { typed: 'Q1 hiring carousel', linked: null, open: false, create: false, kind: 'pipeline', q: 'Q1' }
+  // A new task shows in the Space picked here and takes that Space's stages (its kind and its words).
+  const SP = {
+    content: { name: 'Content', kind: 'pipeline', words: 'Idea › Writing › Review › Islam check › Ready for design › … › Published' },
+    video: { name: 'Video', kind: 'pipeline', words: 'Idea › Scripting › Script review › … › Editing › Rough cut review › Final cut › … › Live' },
+    planning: { name: 'Planning', kind: 'simple', words: 'To Do › In progress › Done' },
+  }
+  const lk = { typed: 'Q1 hiring carousel', linked: null, open: false, create: false, space: 'content', q: 'Q1' }
   const paintSheet = () => {
-    const rows = [['1', 'Founders day follow-up', '<span class="linkchip">↗ Founders day post</span>', 'Nov'], ['2', esc(lk.typed), lk.linked ? `<span class="linkchip">↗ ${esc(lk.linked)}</span>` : '', 'Dec'], ['3', '', '', '']]
-    $('lk-sheet').innerHTML = `<div class="r h"><div></div><div>Idea</div><div>Task</div><div>Month</div></div>` +
-      rows.map((r, i) => `<div class="r"><div class="no">${r[0]}</div><div class="${i === 1 && !lk.linked ? 'typing' : ''}">${r[1]}</div><div>${r[2]}</div><div>${r[3]}</div></div>`).join('')
+    // Only the Task link column offers Link task; the other columns are plain spreadsheet cells.
+    const rows = [['1', 'Founders day follow-up', '<span class="linkchip">↗ Founders day post</span>', 'Nov'], ['2', 'Hiring series for Q1', lk.linked ? `<span class="linkchip">↗ ${esc(lk.linked)}</span>` : esc(lk.typed), 'Dec'], ['3', '', '', '']]
+    $('lk-sheet').innerHTML = `<div class="r h"><div></div><div>Idea</div><div>Task link</div><div>Month</div></div>` +
+      rows.map((r, i) => `<div class="r"><div class="no">${r[0]}</div><div>${r[1]}</div><div class="${i === 1 && !lk.linked ? 'typing' : ''}">${r[2]}</div><div>${r[3]}</div></div>`).join('')
     $('lk-offer').innerHTML = lk.linked || lk.open ? '' : `<div class="offer">Make "${esc(lk.typed)}" a task? <button type="button" id="lk-go">↗ Link task</button><kbd>Ctrl+K</kbd></div>`
     const go = $('lk-go'); if (go) go.onclick = () => { lk.open = true; lk.q = lk.typed; paintSheet() }
     $('lk-picker').innerHTML = lk.open ? pickerHtml('lk', lk) : ''
@@ -582,10 +590,10 @@ dl { margin: 0 }
       ${hits.map(t => `<button type="button" class="opt" data-pick="${esc(t[0])}"><span>${esc(t[0])}<small>${t[1]} · ${t[2]}</small></span><span class="kind ${t[3] === 'pipeline' ? 'pipe' : ''}">${t[3] === 'pipeline' ? 'Pipeline' : 'Simple'}</span></button>`).join('') || `<p class="small muted" style="padding:10px 12px">No task matches "${esc(st.q)}".</p>`}
       <button type="button" class="opt create" data-create="1"><span>＋ Create new task "${esc(st.q || st.typed)}"</span><span></span></button>
       ${st.create ? `<div class="quick">
-        <div class="field">Kind
-          <div class="seg" role="group" aria-label="Kind"><button type="button" data-qk="pipeline" aria-pressed="${st.kind === 'pipeline'}">Pipeline</button><button type="button" data-qk="simple" aria-pressed="${st.kind === 'simple'}">Simple</button></div>
+        <div class="field">Space
+          <div class="seg" role="group" aria-label="Space">${Object.entries(SP).map(([k, v]) => `<button type="button" data-qs="${k}" aria-pressed="${st.space === k}">${v.name}</button>`).join('')}</div>
         </div>
-        <p class="small">${st.kind === 'simple' ? 'To Do › In progress › Done. No SLA, no approvals.' : 'The 11 stages with their owners, SLA and approvals.'}</p>
+        <div class="kind-help"><span>Gets <b>${SP[st.space].name}</b>'s stages${SP[st.space].kind === 'simple' ? ' (a simple task: no SLA, no approvals)' : ' (the pipeline, with its owners, SLA and approvals)'}:</span><span class="muted">${SP[st.space].words}</span></div>
         <div class="row2"><div class="field">Brand<span class="val">Forefront Consulting</span></div><div class="field">Assignee<span class="val">Noran (me)</span></div></div>
         ${st.day ? `<div class="field">Due<span class="val">Dec ${st.day}, 2026</span></div>` : ''}
         <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-cancel="1">Cancel</button><button type="button" class="btn primary" data-make="1">Create and link</button></div>
@@ -599,13 +607,13 @@ dl { margin: 0 }
     const host = q.closest('.picker')
     host.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => done(b.dataset.pick))
     host.querySelector('[data-create]').onclick = () => { st.create = true; repaint() }
-    host.querySelectorAll('[data-qk]').forEach(b => b.onclick = () => { st.kind = b.dataset.qk; repaint() })
+    host.querySelectorAll('[data-qs]').forEach(b => b.onclick = () => { st.space = b.dataset.qs; repaint() })
     const c = host.querySelector('[data-cancel]'); if (c) c.onclick = () => { st.create = false; repaint() }
-    const m = host.querySelector('[data-make]'); if (m) m.onclick = () => done(`${st.q || st.typed} (new, ${st.kind})`)
+    const m = host.querySelector('[data-make]'); if (m) m.onclick = () => done(`${st.q || st.typed} (new · ${SP[st.space].name})`)
   }
   paintSheet()
 
-  const cal = { day: 10, typed: 'Ramadan teaser', open: false, create: false, kind: 'pipeline', q: '', linked: null }
+  const cal = { day: 10, typed: 'Ramadan teaser', open: false, create: false, space: 'video', q: '', linked: null }
   const paintCal = () => {
     const days = [7, 8, 9, 10, 11, 12, 13]
     const ev = { 9: ['Podcast ep. 14'], 11: ['Launch landing page copy'] }
