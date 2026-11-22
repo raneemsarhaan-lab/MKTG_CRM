@@ -955,6 +955,14 @@
     "filters": "Filters",
     "filtersN": "Filters · {n}",
     "display": "Display options",
+    "sortLabel": "Sort by",
+    "sort": {
+      "due": "Due date",
+      "priority": "Priority",
+      "name": "Name (A–Z)",
+      "created": "Newest created",
+      "updated": "Recently updated"
+    },
     "board": "Board",
     "sheet": "Sheet",
     "viewLabel": "View",

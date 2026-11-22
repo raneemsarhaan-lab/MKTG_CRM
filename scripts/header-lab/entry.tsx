@@ -23,6 +23,7 @@ import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
 import { ViewPair } from '@/components/board/ViewPair'
 import { FiltersButton, EMPTY_FILTERS, activeFilterCount, type BoardFilterState } from '@/components/kanban/BoardFilters'
+import { SortMenu, DEFAULT_SORT, type SortKey } from '@/components/board/SortMenu'
 import { InboxButton } from '@/components/inbox/InboxButton'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { ViewMenu } from '@/components/inbox/ViewMenu'
@@ -79,6 +80,7 @@ function Host() {
   const [view, setView] = useState<BoardView>(initialView)
   const [last, setLast] = useState<'board' | 'sheet'>(initialView === 'sheet' ? 'sheet' : 'board')
   const [filters, setFilters] = useState<BoardFilterState>(EMPTY_FILTERS)
+  const [sortBy, setSortBy] = useState<SortKey>(DEFAULT_SORT)
   const [scope, setScope] = useState<'me' | 'team'>('me')
   const [showWeek, setShowWeek] = useState(window.__header.showWeek)
   const [upstream, setUpstream] = useState(true)
@@ -110,6 +112,7 @@ function Host() {
             brands={BRANDS} brandIds={filters.brandIds} onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
             noProject={noProject}
             filters={<FiltersButton filters={filters} onChange={setFilters} tasks={TASKS} members={MEMBERS} />}
+            sort={<SortMenu value={sortBy} onChange={setSortBy} />}
             view="board" onView={go}
             display={<ViewMenu showWeek={showWeek} onShowWeek={setShowWeek} upstream={upstream} onUpstream={setUpstream} />}
           />

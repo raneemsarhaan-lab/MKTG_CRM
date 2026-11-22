@@ -29,6 +29,7 @@ import {
 } from './BoardFilters'
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
+import { SortMenu, sortTasks, DEFAULT_SORT, SORT_KEYS, type SortKey } from '@/components/board/SortMenu'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
 import { HeroCards } from './HeroCards'
@@ -244,6 +245,22 @@ export function KanbanBoard({
   }
 
   /**
+   * How a column orders its own cards (spec: multiple sort options,
+   * user-selectable). Read after mount and remembered per browser, the same
+   * way as `scope` above — the server's own default order already matches
+   * 'due', so there is no first-paint flash while this settles.
+   */
+  const [sortBy, setSortBy] = useState<SortKey>(DEFAULT_SORT)
+  useEffect(() => {
+    const stored = window.localStorage.getItem('momentum.board.sort')
+    if (stored && (SORT_KEYS as string[]).includes(stored)) setSortBy(stored as SortKey)
+  }, [])
+  function chooseSort(next: SortKey) {
+    setSortBy(next)
+    try { window.localStorage.setItem('momentum.board.sort', next) } catch { /* private mode */ }
+  }
+
+  /**
    * Dropped clips (spec 008 FR-060) leave the board, the metrics, the alerts,
    * the bell and bulk actions. Split once, here; only the video sheet reads
    * `tasks` with them in.
@@ -267,9 +284,9 @@ export function KanbanBoard({
   const tasksByStage = useMemo(() => {
     const map: Record<string, FullTask[]> = {}
     ALL_STAGES.forEach(s => { map[s] = [] })
-    filteredTasks.forEach(t => { if (map[t.status]) map[t.status].push(t) })
+    sortTasks(filteredTasks, sortBy).forEach(t => { if (map[t.status]) map[t.status].push(t) })
     return map
-  }, [filteredTasks])
+  }, [filteredTasks, sortBy])
 
   function handleDragStart({ active }: DragStartEvent) {
     setActiveDragId(active.id as string)
@@ -1089,6 +1106,7 @@ export function KanbanBoard({
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}
           filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
+          sort={<SortMenu value={sortBy} onChange={chooseSort} />}
           view="board"
           onView={v => setView(v)}
           display={
