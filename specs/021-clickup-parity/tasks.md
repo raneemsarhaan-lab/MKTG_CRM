@@ -257,7 +257,15 @@
 
 **Independent Test**: in the Design Space, write "Client review" for D-Check. Typing it in the Space's Sheet moves a task to D-Check, and the Board still says "D-Check". The Content Space's words are the Content sheet's words (spec US3; quickstart Stage C steps 1–2).
 
-- [ ] T054 [US3] Write the Stage C design (Status words panel, brand feature switches, simple task controls in TaskModal and on the Board) in `design/spaces-stage-c.html`, starting from the panels in `design/clickup-hierarchy.html`, and get the user's approval before any Stage C UI work (constitution §IV).
+- [X] T054 [US3] *(Approved by the user on 2026-11-22: https://claude.ai/artifact/BrQekSRHViGhKCrqmCdMkm, `design/spaces-stage-c.html`. Decisions:
+  - team words show alone, with the board name on hover;
+  - a new task takes the stages of the Space it's created in (Planning: simple; Content and Video: pipeline in that Space's words). There is no separate kind switch in the forms; the Space picker decides, and the kind never changes;
+  - Task link is a custom field type for any view, holding one task. Link task appears only in a Task link field and on calendar days;
+  - on the calendar, linking an existing task moves its due date to that day, with Undo;
+  - simple tasks get three dashed columns after Published, shown only when simple tasks are in view;
+  - a switched-off feature is an empty hatched cell in mixed views;
+  - the C-Check switch affects new tasks only.
+  Open: whether a team can have sub-steps inside one main stage (option B), or words are only names (option A, the current spec).)* Write the Stage C design (Status words panel, brand feature switches, simple task controls in TaskModal and on the Board) in `design/spaces-stage-c.html`, starting from the panels in `design/clickup-hierarchy.html`, and get the user's approval before any Stage C UI work (constitution §IV).
 - [ ] T055 [P] [US3] Write the pure `src/lib/space-words.ts`:
   - `wordsFor(space, linkedViews)`: Content and Video read their sheet's `view.words`; others read `team_spaces.words`; built-in names come from `content.stage.*` / `sheet.stage.*`;
   - `matchWord`, which wraps `matchStage` (`src/lib/sheet-links.ts:133`);
@@ -283,7 +291,7 @@
 **Independent Test**: "+ Task" in the Planning Space creates a simple task with no SLA badge. It isn't in the Inbox, review queues, the Content or Video sheets, or the Library. Done celebrates for the assignee. A simple parent's Done doesn't move its pipeline subtasks (spec US5; quickstart Stage C steps 5–6).
 
 - [ ] T060 [US5] In `src/actions/tasks.ts`:
-  - `createTask` / `createTasks` accept `kind`, defaulting to the Space's `default_kind`, else 'pipeline'. A simple task gets `simple_status='s-todo'` and `status='todo'`.
+  - `createTask` / `createTasks` take the kind from the Space the task is created in (`default_kind`), else 'pipeline' (design decision: no separate kind switch). A simple task gets `simple_status='s-todo'` and `status='todo'`.
   - `updateTask` refuses `kind` changes.
   - `moveTask`, `setTaskStage` and bulk status patches refuse or skip simple tasks.
   - Add `setSimpleStatus(taskId, status)`, guarded by `canAct`, which returns `shouldCelebrate` for the assignee on 's-done'.
@@ -298,7 +306,7 @@
 
   Guard the unguarded `STAGE_META[status]` lookups in `TaskModal.tsx:629,1957` for simple tasks.
 - [ ] T062 [US5] In `BoardView` (`src/components/views/BoardView.tsx` / `KanbanBoard.tsx`), render three dashed columns (To Do, In progress, Done) after the pipeline when simple tasks are in view. Moving between them calls `setSimpleStatus`. Add the Kind filter (All, Pipeline, Simple) to the `ViewHost` config bar.
-- [ ] T063 [US5] In `src/components/kanban/TaskModal.tsx`, simple tasks show a three-step status control instead of the stage pill and Advance, and no SLA badge. In `src/components/shared/TaskForm.tsx`, add a kind choice that defaults from the Space. Play the celebration on `shouldCelebrate` from `setSimpleStatus`.
+- [ ] T063 [US5] In `src/components/kanban/TaskModal.tsx`, simple tasks show a three-step status control instead of the stage pill and Advance, and no SLA badge. In `src/components/shared/TaskForm.tsx`, the "Show in" Space picker decides the kind, with a line naming the stages the task will get. Play the celebration on `shouldCelebrate` from `setSimpleStatus`.
 - [ ] T064 [US5] Add UI scenarios in `scripts/spaces-lab/scenarios/us5.mjs`:
   - create from Planning → simple;
   - no SLA badge;
@@ -336,6 +344,18 @@
   - Islam Check off → new tasks have 10 stages, existing ones keep 11.
 
 **Checkpoint (end of Stage C)**: quickstart Stage C steps 1–6 pass, along with every earlier lab. Open the Stage C PR.
+
+---
+
+## Phase 8b: Task link field and Link task (Stage C, from the approved design)
+
+**Goal**: a Task link custom field for any view, holding one task, with Link task → pick a task or Create new task (in a chosen Space, taking its stages), in Task link fields and on calendar days.
+
+- [ ] T074 [P] Field definitions per view node: reuse `SheetColumn` with `sheet` = `space:<id>` / `brand:<id>` / `me:<memberId>` and a new kind `task`. Values in `SheetValue` hold one task id. Keep these out of the content/video loaders, as with My notes. Actions in `src/actions/view-fields.ts` (add, rename, remove, set value), with view-node permissions like saved views.
+- [ ] T075 A "＋ Field" menu on `TaskSheet` and `ListView` (Text, Number, Date, Person, Choice, Checkbox, Web link, Task link), and Task link chips on Board cards and in `TaskModal`.
+- [ ] T076 `LinkTaskPicker`: opens from typing in a Task link cell (or Ctrl+K on one), searches tasks with the typed words, picks one, or "Create new task" with a Space picker that shows the stages the task will get. Used by Task link fields in team views and blank sheets (replacing the one-row path through Board ▾).
+- [ ] T077 Calendar: typing on a day offers Link task. Create sets that due date; linking an existing task moves its due date there, with Undo.
+- [ ] T078 Real-app checks: add a Task link field, link, create from the picker in Planning (simple) and Content (pipeline), calendar link moves the date, one task per field.
 
 ---
 

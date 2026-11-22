@@ -173,9 +173,9 @@ dl { margin: 0 }
 
 <div class="wrap">
   <header style="display:grid;gap:12px">
-    <span class="eyebrow">Spec 021 · Stage C · design for approval</span>
+    <span class="eyebrow">Spec 021 · Stage C · design approved Nov 22, 2026</span>
     <h1>Team words, simple tasks and brand switches</h1>
-    <p class="lede">Three changes that sit on top of Stages A and B. Each part below pairs the control with what it changes, using sample data from the Forefront workspace. Everything is clickable. Nothing here is built yet: Stage C UI work waits for your approval of this page.</p>
+    <p class="lede">Three changes that sit on top of Stages A and B. Each part below pairs the control with what it changes, using sample data from the Forefront workspace. Everything is clickable. Approved for building; one question (two steps inside one main stage) is still open.</p>
     <nav class="jump" aria-label="Parts">
       <a href="#words">1 · Status words per team</a>
       <a href="#simple">2 · Simple tasks</a>
@@ -422,10 +422,10 @@ dl { margin: 0 }
       <li><div><b>A switched-off field shows as an empty hatched cell in mixed views.</b><p>The task panel and the create form leave it out entirely for that brand. Filters and bulk actions skip that brand's tasks for that field.</p></div></li>
       <li><div><b>The C-Check switch only affects new tasks.</b><p>Existing tasks keep their own 10 or 11 stages, as the spec requires.</p></div></li>
       <li><div><b>Task link is a field type you add to any view, and Link task appears only in it (and on calendar days).</b><p>Every other field stays a plain cell. You name the field yourself ("Part of", "Related", "Task"). In a blank sheet it links a row to a task; on Space, brand and My tasks views it links a task to other tasks. The Board ▾ menu stays for linking or creating many rows at once.</p></div></li>
-      <li><div><b>A Task link field can hold several tasks.</b><p>"Ramadan launch plan" can link to the copy, the key visual and the teaser at once. The other choice is one task per field, which is simpler to read in a sheet.</p></div></li>
+      <li><div><b>A Task link field holds one task.</b><p>Each deliverable links to its plan ("Part of → Ramadan launch plan"). To link more, add another Task link field. <i>Confirmed.</i></p></div></li>
       <li><div><b>Create new task, inside the task list, asks which Space it belongs to.</b><p>It starts on your own Space (or the one you're in), with your words as the name, you as the assignee and, on the calendar, that day as the due date. The task gets that Space's stages.</p></div></li>
       <li><div><b>Once a task shows in more Spaces, each shows its own words for the same stage.</b><p>A task handed from Content to Video is "Review" in Content and "Script review" in Video, because underneath it's one stage, C-Review. Boards show "C-Review".</p></div></li>
-      <li><div><b>On the calendar, linking an existing task moves its due date to that day.</b><p>The alternative is to only show it there without changing the date, which a calendar can't really do.</p></div></li>
+      <li><div><b>On the calendar, linking an existing task moves its due date to that day.</b><p>With Undo. <i>Confirmed.</i></p></div></li>
     </ol>
   </section>
 </div>
