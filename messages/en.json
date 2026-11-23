@@ -349,6 +349,7 @@
       "tooLarge": "Too large · {size}",
       "tooLargeDetail": "{size}, over the {limit} limit",
       "retry": "Retry",
+      "retryUpload": "Retry uploading {name}",
       "linkLabel": "Drive or web link",
       "attach": "Attach",
       "attached": "Link attached",
@@ -407,7 +408,7 @@
       "adding": "Adding…"
     },
     "newClip": {
-      "placeholder": "Clip title, then Enter",
+      "placeholder": "Clip title, then Enter…",
       "added": "Clip added · To Do",
       "label": "New clip title"
     },
@@ -467,7 +468,7 @@
       "editorAfter": "after {name}",
       "editorSets": "shown in Full and {set}",
       "name": "Name",
-      "namePlaceholder": "e.g. Hook",
+      "namePlaceholder": "e.g. Hook…",
       "kind": "Kind",
       "options": "Options",
       "addOption": "+ Option",
@@ -538,6 +539,8 @@
         "long": "Too long: 2,000 characters at most"
       },
       "clear": "Clear",
+      "valueCleared": "{name} cleared",
+      "saving": "Saving…",
       "checked": "Yes",
       "unchecked": "No",
       "combo": {
@@ -682,7 +685,11 @@
       "remove": "Remove pillar",
       "newName": "Pillar name",
       "removed": "Pillar removed. Its pieces stay in the theme.",
-      "saved": "Pillar saved"
+      "saved": "Pillar saved",
+      "removeConfirm": "Remove the pillar {name}? {n, plural, =0 {It has no pieces.} one {Its piece stays in the theme with no pillar.} other {Its # pieces stay in the theme with no pillar.}}",
+      "removeOk": "Remove",
+      "restored": "Pillar back, with its pieces",
+      "restoredSome": "Pillar back. {n, plural, one {# piece} other {# pieces}} couldn’t be put back in it."
     },
     "editor": {
       "title": "Edit {name}",
@@ -695,7 +702,8 @@
       "month": "month",
       "audience": "Target audience",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "saving": "Saving…"
     },
     "audience": {
       "c-level": "C-Level of large companies",
@@ -786,7 +794,12 @@
       "owner": "Owner",
       "links": "Links",
       "problem": "Problem",
-      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link"
+      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link",
+      "archived": "Archived",
+      "more": "Showing {shown} of {n}. All {n} are added.",
+      "discardAsk": "Close and lose the pasted rows and your fixes?",
+      "keepEditing": "Keep editing",
+      "discard": "Close without adding"
     },
     "problem": {
       "noTitle": "No title",
@@ -815,7 +828,9 @@
       "dropped": "Restore the piece first.",
       "not_authenticated": "Your session ended. Sign in again.",
       "bad_date": "Use a date like 2026-11-20",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "emptyTitle": "A title can’t be empty, so the old one was kept.",
+      "emptyName": "Type a name first."
     },
     "menu": {
       "next": "Next",
@@ -1145,6 +1160,75 @@
     "back": "Back to the board"
   },
   "sheets": {
+    "ux": {
+      "loading": "Loading the sheet…",
+      "retry": "Try again",
+      "save": "Save",
+      "pasting": "Pasting…",
+      "searchMenus": "Search the menus…",
+      "found": "{n, plural, one {# command found} other {# commands found}}",
+      "valuesFor": "{name} values",
+      "leaveRow": "Leave out row {n}",
+      "backRow": "Bring back row {n}",
+      "commentPosted": "Comment posted.",
+      "newComment": "New comment from {name}.",
+      "repeatBad": "Type the rows as $1:$1 or 1:3.",
+      "ok": {
+        "resize": "Resize",
+        "move": "Move",
+        "copy": "Copy",
+        "unhide": "Unhide",
+        "paste": "Paste",
+        "apply": "Apply",
+        "sort": "Sort",
+        "addRule": "Add rule",
+        "saveRule": "Save rule",
+        "go": "Go",
+        "select": "Select",
+        "fill": "Fill",
+        "dedupe": "Remove duplicates",
+        "createTable": "Create table",
+        "insert": "Insert",
+        "filter": "Filter"
+      },
+      "ph": {
+        "search": "Search…",
+        "fields": "Search fields…",
+        "tasks": "Search all tasks…",
+        "optional": "Optional, e.g. 100…",
+        "source": "To do, Doing, Done…",
+        "entries": "One entry per line…",
+        "link": "Paste a link…",
+        "words": "e.g. editing in progress…",
+        "eg": "e.g. {ex}…",
+        "comment": "Add a comment, type @ to mention someone…"
+      },
+      "keys": {
+        "click": "click",
+        "drag": "drag",
+        "wheel": "wheel",
+        "space": "Space"
+      },
+      "hue": {
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "lime": "Lime",
+        "green": "Green",
+        "teal": "Teal",
+        "blue": "Blue",
+        "purple": "Purple",
+        "pink": "Pink",
+        "brown": "Brown",
+        "grey": "Grey",
+        "black": "Black",
+        "white": "White"
+      },
+      "shade": {
+        "light": "Light {name}",
+        "dark": "Dark {name}"
+      }
+    },
     "nav": "Sheets",
     "pinned": "Pinned folders",
     "new": "New",
@@ -1249,7 +1333,10 @@
       "archiveRowsNote": "Archived pieces leave the board and can be brought back with Show archived or Undo.",
       "archive": "Archive",
       "newClip": "New clip in this video",
-      "newPiece": "New piece in this theme"
+      "newPiece": "New piece in this theme",
+      "deletedRows": "{n, plural, one {Row deleted} other {# rows deleted}}",
+      "deletedCols": "{n, plural, one {Column deleted} other {# columns deleted}}",
+      "cleared": "{n, plural, one {Cell cleared} other {# cells cleared}}"
     },
     "tabs": {
       "label": "Sheets in {folder}",
@@ -1630,6 +1717,10 @@
         "clearFormats": "Clear formats",
         "clearContents": "Clear contents",
         "clearComments": "Clear comments",
+        "clearCommentsTitle": "{n, plural, one {Delete the comment thread on this cell?} other {Delete the comment threads on # cells?}}",
+        "clearCommentsBody": "This can’t be undone.",
+        "clearCommentsOk": "Delete comments",
+        "clearCommentsKeep": "Keep comments",
         "fillDown": "Down",
         "fillRight": "Right",
         "find": "Find…",

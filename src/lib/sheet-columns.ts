@@ -8,6 +8,7 @@
 import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/types/index'
 import { isWebLink } from '@/lib/content-plan'
 import { CHOICE_COLORS } from '@/lib/tokens'
+import { intlLocale } from '@/lib/sheet-format'
 
 export const COLUMN_KINDS: ColumnKind[] = ['text', 'number', 'date', 'link', 'person', 'choice', 'checkbox']
 export const MAX_CUSTOM_COLUMNS = 30
@@ -192,7 +193,20 @@ export function readPastedValues(
 export interface ValueCtx {
   members?: { id: string; name: string }[]
   options?: ChoiceOption[]
+  /**
+   * The reader's language, for a Number or Date shown in a cell. Absent: English,
+   * which is what a kind change and the server read back (convertValues).
+   */
+  lang?: string
 }
+
+/**
+ * The locale the video and content sheets show numbers and dates in: the app's
+ * (`intlLocale`), with Western digits in Arabic as their specs ask (008 "times
+ * and lengths stay in Western digits", 010 "Number: Western digits"), so one
+ * sheet never mixes digit styles.
+ */
+export const sheetLocale = (lang: string) => `${intlLocale(lang)}-u-nu-latn`
 export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long'
 export type Parsed = { ok: true; value: string } | { ok: false; code: ParseCode }
 
@@ -257,9 +271,9 @@ export function formatValue(kind: ColumnKind, value: string, ctx: ValueCtx = {})
     case 'checkbox': return value === '1' ? 'yes' : ''
     case 'date': {
       const d = new Date(`${value}T00:00:00`)
-      return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(sheetLocale(ctx.lang ?? 'en'), { day: 'numeric', month: 'short', year: 'numeric' })
     }
-    case 'number': return Number(value).toLocaleString('en')
+    case 'number': return Number(value).toLocaleString(ctx.lang ? sheetLocale(ctx.lang) : 'en')
     default: return value
   }
 }

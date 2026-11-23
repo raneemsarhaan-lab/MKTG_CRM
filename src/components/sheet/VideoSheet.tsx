@@ -63,6 +63,7 @@ export function VideoSheet(p: VideoSheetProps) {
   const [mine, setMine] = useState(false)
   const [more, setMore] = useState(false)
   const moreRef = useRef<HTMLDivElement | null>(null)
+  const moreBtnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     try {
       if (window.localStorage.getItem('momentum.sheet.dropped') === '0') setShowDropped(false)
@@ -71,7 +72,13 @@ export function VideoSheet(p: VideoSheetProps) {
   useEffect(() => {
     if (!more) return
     const off = (e: PointerEvent) => { if (!moreRef.current?.contains(e.target as Node)) setMore(false) }
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false) }
+    // Esc closes the panel and focus goes back to ⋯, not to the page.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const a = document.activeElement
+      setMore(false)
+      if (!a || a === document.body || moreRef.current?.contains(a)) moreBtnRef.current?.focus()
+    }
     document.addEventListener('pointerdown', off)
     document.addEventListener('keydown', esc)
     return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc) }
@@ -247,7 +254,11 @@ export function VideoSheet(p: VideoSheetProps) {
         return cl.typeCombo(task, anchor, p.contentTypes, label => setType(task, label))
       case 'files': {
         const { links, files } = splitFiles(task.attachments)
+        const failed = filesState[task.id]
         const items: MenuItem[] = [
+          // A failed upload is retried from here too: the cell's own Retry is for the mouse.
+          ...(can && failed?.kind === 'failed' && failed.retryable ? [{ key: 'retry', text: t('files.retryUpload', { name: failed.name }), label: t('files.retryUpload', { name: failed.name }),
+            onSelect: pick(() => { void upload(task.id, failed.file) }) }] : []),
           ...links.map(l => ({ key: `l${l.id}`, text: t('files.openLink', { host: hostOf(l.url) }), label: t('files.openLink', { host: hostOf(l.url) }),
             onSelect: pick(() => { window.open(l.url, '_blank', 'noopener,noreferrer') }) })),
           ...files.map(f => ({ key: `f${f.id}`, text: t('files.preview', { name: f.filename }), label: t('files.preview', { name: f.filename }),
@@ -509,7 +520,7 @@ export function VideoSheet(p: VideoSheetProps) {
           <button type="button" className="fx-sheet-btn fx-vs-addvideo" data-add-video="" onClick={e => setPopup({ kind: 'video', anchor: e.currentTarget })}>{t('addVideo')}</button>
         )}
         <div className="fx-vs-more" ref={moreRef}>
-          <button type="button" className="fx-vs-more-btn" data-sheet-more="" aria-haspopup="true" aria-expanded={more}
+          <button ref={moreBtnRef} type="button" className="fx-vs-more-btn" data-sheet-more="" aria-haspopup="true" aria-expanded={more}
                   aria-label={t('more')} title={t('more')} onClick={() => setMore(v => !v)}>⋯</button>
           {more && (
             <div className="fx-vs-more-panel" role="group" aria-label={t('more')} data-more-panel="">
@@ -620,6 +631,7 @@ export function VideoSheet(p: VideoSheetProps) {
               title={t('links.edit', { label: t(`links.${popup.mode}`), name: popupTask.name })}
               initial={clipLink(popupTask, popup.mode) ?? ''}
               saveLabel={t('links.save')}
+              savingLabel={t('columns.saving')}
               skipLabel={t('links.cancel')}
               badLink={t('err.bad_link')}
               placeholder="https://…"
@@ -639,6 +651,7 @@ export function VideoSheet(p: VideoSheetProps) {
             title={popup.mode === 'files' ? t('files.linkLabel') : popup.mode === 'prompt' ? t('published.prompt') : t('published.edit', { name: popupTask.name })}
             initial={popup.mode === 'published' ? popupTask.published_url ?? '' : ''}
             saveLabel={popup.mode === 'files' ? t('files.attach') : t('published.save')}
+            savingLabel={t('columns.saving')}
             skipLabel={popup.mode === 'prompt' ? t('published.skip') : t('files.cancel')}
             badLink={t('err.bad_link')}
             placeholder={popup.mode === 'files' ? 'https://drive.google.com/…' : 'https://www.instagram.com/reel/…'}

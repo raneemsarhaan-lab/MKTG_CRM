@@ -5,8 +5,9 @@
  * opens this bottom sheet with tabs, Text · Fill · Borders · Align · Number,
  * with 44 px targets. The same commands as the desktop toolbar.
  */
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { tabKeys, useColorName, useFocusReturn } from '../a11y'
 import { BORDER_PRESETS, FONTS, FONT_SIZES, DEFAULT_FONT, DEFAULT_SIZE, STANDARD_COLORS, THEME_COLORS } from '@/lib/sheet-format'
 import { useFormatActions, DEFAULT_LINE, NUM_MENU, numKey } from './FormatToolbar'
 import { PresetIcon } from './BorderPicker'
@@ -20,23 +21,33 @@ export function FormatSheet({ state, target, onClose, onFormatCells, onFind, onR
   const st = a.st
   const [tab, setTab] = useState<typeof TABS[number]>('text')
   const off = !state || !!state.readOnly
+  const uid = useId()
+  const colorName = useColorName()
+  const ref = useRef<HTMLDivElement>(null)
+  // Opening moves focus into the sheet (its tab); closing gives it back to the Format button.
+  useFocusReturn()
+  useEffect(() => { requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus()) }, [])
   const b = (key: string, label: string, inner: React.ReactNode, on: () => void, pressed?: boolean, wide?: boolean) => (
     <button key={key} type="button" className={`fx-fmt-b${wide ? ' is-wide' : ''}`} data-fmt={key} title={label} aria-pressed={pressed}
-            aria-disabled={off || undefined} onClick={() => { if (!off) on() }}>{inner}{inner !== label && <span className="sr-only">{label}</span>}</button>
+            aria-disabled={off || undefined} onClick={() => { if (!off) on() }}>
+      {inner !== label ? <><span className="fx-fmt-in" aria-hidden="true">{inner}</span><span className="sr-only">{label}</span></> : inner}
+    </button>
   )
-  const swatch = (k: 'color' | 'fill', c: string) => (
-    <button key={k + c} type="button" className={`fx-fmt-sw is-big${(k === 'fill' ? st.fill : st.color) === c ? ' is-cur' : ''}`} style={{ background: c }}
-            aria-label={`${k === 'fill' ? t('ctl.fill') : t('ctl.textColor')} ${c}`} onClick={() => { if (!off) a.patch({ [k]: c }, k) }} />
+  const swatch = (k: 'color' | 'fill', c: string, i: number) => (
+    <button key={`${k}${i}${c}`} type="button" className={`fx-fmt-sw is-big${(k === 'fill' ? st.fill : st.color) === c ? ' is-cur' : ''}`} style={{ background: c }}
+            aria-pressed={(k === 'fill' ? st.fill : st.color) === c}
+            aria-label={`${k === 'fill' ? t('ctl.fill') : t('ctl.textColor')}: ${colorName(c)}`} onClick={() => { if (!off) a.patch({ [k]: c }, k) }} />
   )
   return (
-    <div className="fx-fmt-sheet" role="dialog" aria-label={t('bar')} data-format-sheet=""
+    <div ref={ref} className="fx-fmt-sheet" role="dialog" aria-label={t('bar')} data-format-sheet=""
          onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }}>
       <span className="fx-fmt-grab" aria-hidden="true" />
       {off && state?.readOnly && <p className="fx-fmt-why">{state.readOnly}</p>}
-      <div className="fx-fmt-stabs" role="tablist">
-        {TABS.map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} data-phone-tab={x} onClick={() => setTab(x)}>{x === 'edit' ? t('groups.editing') : x === 'styles' ? t('groups.styles') : t(`phone.tabs.${x}`)}</button>)}
+      <div className="fx-fmt-stabs" role="tablist" aria-label={t('bar')} onKeyDown={tabKeys}>
+        {TABS.map(x => <button key={x} type="button" role="tab" id={`${uid}-tab-${x}`} aria-selected={tab === x} aria-controls={`${uid}-panel`} tabIndex={tab === x ? 0 : -1}
+                               data-phone-tab={x} onClick={() => setTab(x)}>{x === 'edit' ? t('groups.editing') : x === 'styles' ? t('groups.styles') : t(`phone.tabs.${x}`)}</button>)}
       </div>
-      <div className="fx-fmt-sbody">
+      <div className="fx-fmt-sbody" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-${tab}`}>
         {tab === 'text' && (
           <>
             <div className="fx-fmt-row">
@@ -56,13 +67,13 @@ export function FormatSheet({ state, target, onClose, onFormatCells, onFind, onR
                 </select></label>
             </div>
             <span className="fx-fmt-cap">{t('ctl.textColor')}</span>
-            <div className="fx-fmt-swrow">{b('auto', t('color.auto'), t('color.auto'), () => a.patch({ color: null }, 'color'), !st.color, true)}{STANDARD_COLORS.map(c => swatch('color', c))}</div>
+            <div className="fx-fmt-swrow">{b('auto', t('color.auto'), t('color.auto'), () => a.patch({ color: null }, 'color'), !st.color, true)}{STANDARD_COLORS.map((c, i) => swatch('color', c, i))}</div>
           </>
         )}
         {tab === 'fill' && (
           <>
             {b('nofill', t('color.noFill'), t('color.noFill'), () => a.patch({ fill: null }, 'fill'), !st.fill, true)}
-            <div className="fx-fmt-swrow">{[...THEME_COLORS, ...STANDARD_COLORS].map(c => swatch('fill', c))}</div>
+            <div className="fx-fmt-swrow">{[...THEME_COLORS, ...STANDARD_COLORS].map((c, i) => swatch('fill', c, i))}</div>
           </>
         )}
         {tab === 'borders' && (

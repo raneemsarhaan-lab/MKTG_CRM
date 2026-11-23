@@ -56,7 +56,7 @@ export function BorderPicker({ anchor, line, onLine, onPick, onClose }: {
             </button>
           ))}
         </div>
-        <h5>{t('border.style')}</h5>
+        <h3>{t('border.style')}</h3>
         <div className="fx-fmt-lines" role="group" aria-label={t('border.style')} onKeyDown={e => gridKeys(e, 6)}>
           {LINES.map(w => (
             <button key={w} type="button" data-line={w} aria-pressed={cur.w === w} aria-label={t(`border.lines.${w}`)} title={t(`border.lines.${w}`)}
@@ -65,7 +65,7 @@ export function BorderPicker({ anchor, line, onLine, onPick, onClose }: {
             </button>
           ))}
         </div>
-        <h5>{t('border.colour')}</h5>
+        <h3>{t('border.colour')}</h3>
         <div className="fx-fmt-swg" role="group" aria-label={t('border.colour')} onKeyDown={e => gridKeys(e, 10)}>
           {['#000000', ...STANDARD_COLORS.slice(0, 9)].map((c, i) => {
             const name = i === 0 ? t('color.auto') : t(`color.stdNames.${STD_KEYS[i - 1]}`)

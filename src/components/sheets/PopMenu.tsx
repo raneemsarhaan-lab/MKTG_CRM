@@ -11,13 +11,16 @@
  * the reason shows under it.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { noteOpener } from './a11y'
 
 export type PopItem =
   | { kind?: 'item'; key: string; label: string; kbd?: string; disabled?: boolean; why?: string; danger?: boolean; checked?: boolean; onSelect(): void
       /** Spec 020: Excel's access key (press it to choose the item); an "&" in the label underlines its letter. */
       ak?: string
       /** Spec 018: opens a submenu (shows ▸). */
-      sub?: boolean }
+      sub?: boolean
+      /** With `checked`: one choice of several (a radio item) rather than an on/off item. */
+      radio?: boolean }
   | { kind: 'sep'; key: string }
   /** Anything else in the menu: the tab colour swatches. Its buttons join the arrow keys. */
   | { kind: 'node'; key: string; node: ReactNode }
@@ -57,7 +60,7 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
     setPos({ left, top })
   }, [at.x, at.y])
 
-  const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]') ?? [])]
+  const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]') ?? [])]
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -70,16 +73,19 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
     closeRef.current()
     if (restore && returnTo?.isConnected) requestAnimationFrame(() => returnTo.focus())
   }
+  /** An item chosen: a window it opens hands focus back to the menu's button. */
+  const choose = (it: { onSelect(): void }) => { noteOpener(returnTo); close(false); it.onSelect() }
 
   useEffect(() => {
     const down = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close(false) }
     // Opening can scroll the grid (selecting a whole column brings its cell into view): ignore that.
     const opened = Date.now()
     const scroll = (e: Event) => { if (Date.now() - opened > 400 && ref.current && !ref.current.contains(e.target as Node)) close(false) }
+    const resize = () => close(false)
     document.addEventListener('pointerdown', down, true)
-    window.addEventListener('resize', () => close(false))
+    window.addEventListener('resize', resize)
     document.addEventListener('scroll', scroll, true)
-    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('scroll', scroll, true) }
+    return () => { document.removeEventListener('pointerdown', down, true); window.removeEventListener('resize', resize); document.removeEventListener('scroll', scroll, true) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -97,12 +103,12 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
     // Excel's access keys (by the key's place too, so they work on an Arabic keyboard).
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
       const hit = items.find(it => it.kind !== 'sep' && it.kind !== 'node' && it.ak && (e.key.toLowerCase() === it.ak.toLowerCase() || e.code === `Key${it.ak.toUpperCase()}`))
-      if (hit && hit.kind !== 'sep' && hit.kind !== 'node') { e.preventDefault(); if (!hit.disabled) { close(false); hit.onSelect() } return }
+      if (hit && hit.kind !== 'sep' && hit.kind !== 'node') { e.preventDefault(); if (!hit.disabled) choose(hit); return }
     }
     if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey) {
       const now = Date.now()
       typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : '') + e.key.toLowerCase(), at: now }
-      const hit = list.find(b => (b.textContent ?? '').trim().toLowerCase().startsWith(typed.current.text))
+      const hit = list.find(b => (b.textContent ?? '').replace(/^\s*✓\s*/, '').trim().toLowerCase().startsWith(typed.current.text))
       if (hit) { e.preventDefault(); hit.focus() }
     }
   }
@@ -126,17 +132,18 @@ export function PopMenu({ at, label, items, onClose, returnTo, attr }: {
           <div key={it.key} role="none">
             <button
               type="button"
-              role="menuitem"
+              role={it.checked === undefined ? 'menuitem' : it.radio ? 'menuitemradio' : 'menuitemcheckbox'}
+              aria-checked={it.checked}
               tabIndex={-1}
               data-item={it.key}
               aria-disabled={it.disabled || undefined}
               aria-describedby={whyId}
               aria-haspopup={it.sub ? 'menu' : undefined}
               className={`${it.danger ? 'is-danger' : ''}${it.disabled ? ' is-disabled' : ''}`}
-              onClick={() => { if (it.disabled) return; close(false); it.onSelect() }}
-              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !it.disabled) { e.preventDefault(); close(false); it.onSelect() } }}
+              onClick={() => { if (it.disabled) return; choose(it) }}
+              onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !it.disabled) { e.preventDefault(); choose(it) } }}
             >
-              <span>{it.checked ? '✓ ' : ''}{akLabel(it.label)}</span>
+              <span>{it.checked && <span aria-hidden="true">✓ </span>}{akLabel(it.label)}</span>
               {it.kbd && <kbd>{it.kbd}</kbd>}
               {it.sub && <span className="fx-sh-subarrow" aria-hidden="true" />}
             </button>

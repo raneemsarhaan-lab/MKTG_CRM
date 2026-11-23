@@ -8,29 +8,37 @@
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
+import { focusBack, opener } from './a11y'
 
-export function Modal({ title, children, onCancel, attr, body }: {
+export function Modal({ title, children, onCancel, attr, body, className, attrs }: {
   title: string
   children: ReactNode
   onCancel(): void
   attr?: string
   body?: string
+  /** More classes on the dialog box. */
+  className?: string
+  /** Data attributes with values (`data-values-dialog="stage"`). */
+  attrs?: Record<string, string>
 }) {
   const id = useId()
   const ref = useRef<HTMLDivElement>(null)
-  const back = useRef<HTMLElement | null>(null)
   useEffect(() => {
-    back.current = document.activeElement as HTMLElement | null
+    // Opened from a menu, the menu is gone by now: focus goes back to its button, or to the grid.
+    const back = opener()
     requestAnimationFrame(() => {
-      const el = ref.current?.querySelector<HTMLElement>('[data-autofocus], input, select, [role="option"][aria-selected="true"], button.is-go, button')
+      const box = ref.current
+      const el = box?.querySelector<HTMLElement>('[data-autofocus]')
+        ?? box?.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [role="listbox"][tabindex="0"], [tabindex="0"]')
+        ?? box?.querySelector<HTMLElement>('button.is-go:not(:disabled), button:not(:disabled)')
       el?.focus()
     })
-    return () => { const b = back.current; if (b?.isConnected) requestAnimationFrame(() => b.focus()) }
+    return () => focusBack(back)
   }, [])
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onCancel(); return }
     if (e.key !== 'Tab') return
-    const list = [...(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]') ?? [])]
+    const list = [...(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? [])].filter(x => x.tabIndex >= 0 && !x.closest('[hidden]'))
     if (!list.length) return
     const first = list[0], last = list[list.length - 1]
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
@@ -39,7 +47,7 @@ export function Modal({ title, children, onCancel, attr, body }: {
   return (
     <div className="fx-sh-scrim" onPointerDown={e => { if (e.target === e.currentTarget) onCancel() }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={body ? `${id}-b` : undefined}
-           className="fx-sh-dialog" onKeyDown={onKeyDown} {...(attr ? { [attr]: '' } : {})}>
+           className={`fx-sh-dialog${className ? ` ${className}` : ''}`} onKeyDown={onKeyDown} {...(attr ? { [attr]: '' } : {})} {...(attrs ?? {})}>
         <h2 id={`${id}-t`}>{title}</h2>
         {body && <p id={`${id}-b`}>{body}</p>}
         {children}
@@ -55,8 +63,9 @@ export function ConfirmDialog({ title, body, ok, cancel, danger, onOk, onCancel,
   return (
     <Modal title={title} body={body} onCancel={onCancel} attr={attr}>
       <div className="fx-sh-dialog-row">
-        <button type="button" onClick={onCancel}>{cancel}</button>
-        <button type="button" className={danger ? 'is-danger' : 'is-go'} data-autofocus="" data-ok="" onClick={onOk}>{ok}</button>
+        {/* A destructive confirm opens on Cancel, so a reflexive Enter keeps the data. */}
+        <button type="button" data-autofocus={danger ? '' : undefined} onClick={onCancel}>{cancel}</button>
+        <button type="button" className={danger ? 'is-danger' : 'is-go'} data-autofocus={danger ? undefined : ''} data-ok="" onClick={onOk}>{ok}</button>
       </div>
     </Modal>
   )
@@ -76,29 +85,32 @@ export function ResizeDialog({ kind, value, onOk, onCancel }: {
     <Modal title={kind === 'row' ? t('resize.rowTitle') : t('resize.colTitle')} onCancel={onCancel} attr="data-resize-dialog">
       <label className="fx-sh-field">
         <span>{kind === 'row' ? t('resize.height', { min, max }) : t('resize.width', { min, max })}</span>
-        <input type="number" inputMode="numeric" min={min} max={max} value={v} data-autofocus=""
+        <input type="number" inputMode="numeric" min={min} max={max} value={v} data-autofocus="" name="size" autoComplete="off"
                onChange={e => setV(e.target.value)}
                onKeyDown={e => { if (e.key === 'Enter' && ok) { e.preventDefault(); onOk(Math.round(n)) } }} />
       </label>
       <div className="fx-sh-dialog-row">
         <button type="button" className="is-start" onClick={() => onOk(null)}>{t('resize.reset')}</button>
         <button type="button" onClick={onCancel}>{t('resize.cancel')}</button>
-        <button type="button" className="is-go" disabled={!ok} onClick={() => onOk(Math.round(n))}>{t('resize.ok')}</button>
+        <button type="button" className="is-go" disabled={!ok} onClick={() => onOk(Math.round(n))}>{t('ux.ok.resize')}</button>
       </div>
     </Modal>
   )
 }
 
-/** A keyboard list box: ↑/↓ choose, Enter confirms. */
-function ListBox({ label, options, value, onChange, onEnter, attr }: {
+/** A keyboard list box: ↑/↓, Home and End choose, Enter confirms (double-click too). */
+export function ListBox({ label, options, value, onChange, onEnter, attr, className }: {
   label: string
-  options: { id: string; label: string }[]
+  options: { id: string; label: ReactNode; className?: string; dir?: string; data?: Record<string, string> }[]
   value: string
   onChange(id: string): void
-  onEnter(): void
+  onEnter?(): void
   attr?: string
+  /** More classes on the list. */
+  className?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const uid = useId()
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
   }, [value])
@@ -109,14 +121,14 @@ function ListBox({ label, options, value, onChange, onEnter, attr }: {
     if (e.key === 'ArrowUp') return go(i - 1)
     if (e.key === 'Home') return go(0)
     if (e.key === 'End') return go(options.length - 1)
-    if (e.key === 'Enter') { e.preventDefault(); onEnter() }
+    if (e.key === 'Enter' && onEnter) { e.preventDefault(); onEnter() }
   }
-  const active = options.find(o => o.id === value)
+  const at = options.findIndex(o => o.id === value)
   return (
-    <div ref={ref} role="listbox" aria-label={label} tabIndex={0} className="fx-sh-listbox" onKeyDown={onKeyDown}
-         aria-activedescendant={active ? `opt-${active.id}` : undefined} {...(attr ? { [attr]: '' } : {})}>
-      {options.map(o => (
-        <div key={o.id} id={`opt-${o.id}`} role="option" aria-selected={o.id === value} data-option={o.id}
+    <div ref={ref} role="listbox" aria-label={label} tabIndex={0} className={`fx-sh-listbox${className ? ` ${className}` : ''}`} onKeyDown={onKeyDown}
+         aria-activedescendant={at >= 0 ? `${uid}-${at}` : undefined} {...(attr ? { [attr]: '' } : {})}>
+      {options.map((o, i) => (
+        <div key={o.id} id={`${uid}-${i}`} role="option" aria-selected={o.id === value} data-option={o.id} className={o.className} dir={o.dir} {...(o.data ?? {})}
              onClick={() => onChange(o.id)} onDoubleClick={onEnter}>{o.label}</div>
       ))}
     </div>
@@ -162,7 +174,7 @@ export function MoveCopyDialog({ folders, folderId, sheetsOf, linked, count, onO
       </label>
       <div className="fx-sh-dialog-row">
         <button type="button" onClick={onCancel}>{t('moveCopy.cancel')}</button>
-        <button type="button" className="is-go" data-ok="" disabled={!list || (!copy && to === folderId && count === 0)} onClick={done}>{t('moveCopy.ok')}</button>
+        <button type="button" className="is-go" data-ok="" disabled={!list || (!copy && to === folderId && count === 0)} onClick={done}>{copy ? t('ux.ok.copy') : t('ux.ok.move')}</button>
       </div>
     </Modal>
   )
@@ -185,7 +197,7 @@ export function UnhideDialog({ hidden, onOk, onCancel }: {
       </div>
       <div className="fx-sh-dialog-row">
         <button type="button" onClick={onCancel}>{t('unhide.cancel')}</button>
-        <button type="button" className="is-go" data-ok="" disabled={!pick} onClick={() => onOk(pick)}>{t('unhide.ok')}</button>
+        <button type="button" className="is-go" data-ok="" disabled={!pick} onClick={() => onOk(pick)}>{t('ux.ok.unhide')}</button>
       </div>
     </Modal>
   )

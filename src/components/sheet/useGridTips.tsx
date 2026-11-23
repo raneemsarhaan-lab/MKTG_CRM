@@ -402,6 +402,8 @@ export function useGridTips<R extends { key: string }>(m: GridModel<R>, p: {
     zoom: z,
     onZoom: v => zoomBus.set?.(v),
     fillInfo, onFill: (req, again) => { void onFill(req, again) }, onFillMenu, pickList,
+    // Ctrl+; types a value the cell then saves, so it stays in a form every column reads back:
+    // ISO 2026-11-23 (Date columns and Due take it in either language) and 24-hour 14:30.
     nowText: kind => { const d = new Date(), p2 = (n: number) => String(n).padStart(2, '0'); return kind === 'date' ? `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}` : `${p2(d.getHours())}:${p2(d.getMinutes())}` },
     controlLabels: { handle: tt('handle'), options: tt('fillOptions'), dropdown: tt('dropdown') },
     onRepeat: repeat,

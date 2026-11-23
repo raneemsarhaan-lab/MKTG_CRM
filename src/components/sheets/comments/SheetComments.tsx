@@ -14,8 +14,10 @@
  *   a thread selects its cell.
  * - Phones: the thread and the panel open full screen.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
+import { intlLocale } from '@/lib/sheet-format'
+import { focusBack, opener, tabKeys, useFocusReturn } from '../a11y'
 import type { SheetCommentThread } from '@/types/index'
 import { addComment, clearCellComments, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
 import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, selectCell, type FormatSource, type FormatState } from '../format/bus'
@@ -62,6 +64,7 @@ export function SheetComments(p: SheetCommentsProps) {
   const [sheetId, setSheetId] = useState<string | null>(null)
   const [open, setOpen] = useState<Open | null>(null)
   const [tab, setTab] = useState<'open' | 'resolved'>('open')
+  const uid = useId()
   const ref = useRef(p)
   ref.current = p
   const initialDone = useRef(false)
@@ -204,18 +207,15 @@ export function SheetComments(p: SheetCommentsProps) {
         />
       )}
       {p.panelOpen && (
-        <aside className={`fx-cmt-panel${p.phone ? ' is-full' : ''}`} data-comments-panel="" aria-label={t('title')}>
-          <header>
-            <h2>{t('title')}</h2>
-            <button type="button" className="fx-cmt-ico" aria-label={t('close')} title={t('close')} onClick={() => p.setPanelOpen(false)}>✕</button>
-          </header>
-          <div className="fx-cmt-tabs" role="tablist">
+        <Panel phone={p.phone} onClose={() => p.setPanelOpen(false)}>
+          <div className="fx-cmt-tabs" role="tablist" aria-label={t('title')} onKeyDown={tabKeys}>
             {(['open', 'resolved'] as const).map(k => {
               const n = threads.filter(th => (k === 'open') !== !!th.resolved).length
-              return <button key={k} type="button" role="tab" aria-selected={tab === k} data-cmt-tab={k} onClick={() => setTab(k)}>{t(k === 'open' ? 'openCount' : 'resolvedCount', { n })}</button>
+              return <button key={k} type="button" role="tab" id={`${uid}-tab-${k}`} aria-selected={tab === k} aria-controls={`${uid}-list`} tabIndex={tab === k ? 0 : -1}
+                             data-cmt-tab={k} onClick={() => setTab(k)}>{t(k === 'open' ? 'openCount' : 'resolvedCount', { n })}</button>
             })}
           </div>
-          <div className="fx-cmt-list">
+          <div className="fx-cmt-list" role="tabpanel" id={`${uid}-list`} aria-labelledby={`${uid}-tab-${tab}`}>
             {threads.filter(th => (tab === 'open') !== !!th.resolved).map(th => {
               const first = th.comments.find(c => !c.deleted) ?? th.comments[0]
               const last = th.comments[th.comments.length - 1]
@@ -235,9 +235,30 @@ export function SheetComments(p: SheetCommentsProps) {
             })}
             {!threads.some(th => (tab === 'open') !== !!th.resolved) && <p className="fx-cmt-empty">{tab === 'open' ? t('emptyOpen') : t('emptyResolved')}</p>}
           </div>
-        </aside>
+        </Panel>
       )}
     </>
+  )
+}
+
+/**
+ * The comments panel: opening it moves focus to its tabs, Esc or ✕ closes it,
+ * and focus goes back to the Comments button.
+ */
+function Panel({ phone, onClose, children }: { phone: boolean; onClose(): void; children: React.ReactNode }) {
+  const t = useTranslations('sheets.comments')
+  const box = useRef<HTMLElement>(null)
+  useFocusReturn()
+  useEffect(() => { requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus()) }, [])
+  return (
+    <aside ref={box} className={`fx-cmt-panel${phone ? ' is-full' : ''}`} data-comments-panel="" aria-label={t('title')}
+           onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); onClose() } }}>
+      <header>
+        <h2>{t('title')}</h2>
+        <button type="button" className="fx-cmt-ico" aria-label={t('close')} title={t('close')} onClick={onClose}>✕</button>
+      </header>
+      {children}
+    </aside>
   )
 }
 
@@ -246,7 +267,7 @@ function when(iso: string, locale: 'en' | 'ar', t: ReturnType<typeof useTranslat
   if ('text' in r) return r.text
   if (r.key === 'time.now') return t('justNow')
   const n = r.values.n ?? 0
-  return new Intl.RelativeTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', { numeric: 'auto', style: 'short' })
+  return new Intl.RelativeTimeFormat(intlLocale(locale), { numeric: 'auto', style: 'short' })
     .format(r.key === 'time.m' ? -n : r.key === 'time.h' ? -n : -1, r.key === 'time.m' ? 'minute' : r.key === 'time.h' ? 'hour' : 'day')
 }
 
@@ -269,6 +290,7 @@ function ThreadBox(p: {
   onResolve(): void
 }) {
   const t = useTranslations('sheets.comments')
+  const tu = useTranslations('sheets.ux')
   const box = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const [text, setText] = useState('')
@@ -277,6 +299,12 @@ function ThreadBox(p: {
   const [menu, setMenu] = useState<string | null>(null)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const ta = useRef<HTMLTextAreaElement>(null)
+  const uid = useId()
+  /** Where focus goes when the thread closes: what had it before (the grid's cell). */
+  const back = useRef<HTMLElement | null>(null)
+  useEffect(() => () => focusBack(back.current), [])
+  /** A comment's ⋯ button, for focus after its menu, Edit or Delete closes. */
+  const moreOf = (id: string) => box.current?.querySelector<HTMLElement>(`[data-cmt-id="${CSS.escape(id)}"] .fx-cmt-more > button`) ?? ta.current
 
   const place = useCallback(() => {
     if (p.phone) return
@@ -290,14 +318,44 @@ function ThreadBox(p: {
     const top = Math.max(8, Math.min(r.top, window.innerHeight - h - 8))
     setPos(old => (old && old.left === left && old.top === top ? old : { left, top }))
   }, [p.phone, p.source, p.anchorKey])
-  useLayoutEffect(() => { place() })
+  // Placed when it opens and whenever its size changes (not on every keystroke).
+  useLayoutEffect(() => {
+    place()
+    const b = box.current
+    if (!b || p.phone) return
+    const ro = new ResizeObserver(() => place())
+    ro.observe(b)
+    return () => ro.disconnect()
+  }, [place, p.phone])
   useEffect(() => {
     const on = () => place()
     window.addEventListener('resize', on)
     document.addEventListener('scroll', on, true)
     return () => { window.removeEventListener('resize', on); document.removeEventListener('scroll', on, true) }
   }, [place])
-  useEffect(() => { if (p.focus) requestAnimationFrame(() => ta.current?.focus()) }, [p.focus])
+  useEffect(() => {
+    if (!p.focus) return
+    if (!box.current?.contains(document.activeElement)) back.current = opener()
+    requestAnimationFrame(() => ta.current?.focus())
+  }, [p.focus])
+  // New comments are read out: someone else's by name, your own as posted.
+  const [news, setNews] = useState('')
+  const seen = useRef(p.thread?.comments.length ?? 0)
+  useEffect(() => {
+    const list = p.thread?.comments ?? []
+    if (list.length > seen.current) {
+      const last = list[list.length - 1]
+      setNews(last.authorId === p.me.id ? tu('commentPosted') : tu('newComment', { name: p.names[last.authorId ?? ''] ?? '…' }))
+    }
+    seen.current = list.length
+  }, [p.thread?.comments.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Edit: the box takes focus; Delete's question too, on Cancel.
+  const editRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => { if (editing) requestAnimationFrame(() => editRef.current?.focus()) }, [editing?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const confirmRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (confirmDel) requestAnimationFrame(() => confirmRef.current?.querySelector<HTMLElement>('button')?.focus()) }, [confirmDel])
+  const endEdit = (id: string) => { setEditing(null); requestAnimationFrame(() => moreOf(id)?.focus()) }
+  const endConfirm = (id: string) => { setConfirmDel(null); requestAnimationFrame(() => moreOf(id)?.focus()) }
 
   // The @mention picker: names matching what follows the last "@".
   const caretAt = useRef(0)
@@ -326,7 +384,8 @@ function ThreadBox(p: {
   return (
     <div ref={box} className={`fx-cmt-thread${p.phone ? ' is-full' : ''}`} role="dialog" aria-label={t('thread', { cell: p.cell })} data-comment-thread=""
          style={p.phone ? undefined : pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden', left: 0, top: 0 }}
-         onPointerDown={p.onPin} onFocus={p.onPin}
+         onPointerDown={p.onPin}
+         onFocus={e => { if (!back.current && e.relatedTarget instanceof HTMLElement && !box.current?.contains(e.relatedTarget)) back.current = e.relatedTarget; p.onPin() }}
          onKeyDown={e => { if (e.key === 'Escape' && !matches.length) { e.stopPropagation(); p.onClose() } }}>
       <header>
         {p.phone && <button type="button" className="fx-cmt-ico" aria-label={t('back')} onClick={p.onClose}>‹</button>}
@@ -349,9 +408,12 @@ function ThreadBox(p: {
             {editing?.id === c.id
               ? (
                 <div className="fx-cmt-edit">
-                  <textarea value={editing.body} aria-label={t('edit')} onChange={e => setEditing({ id: c.id, body: e.target.value })}
-                            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void p.onEdit(c.id, editing.body).then(ok => { if (ok) setEditing(null) }) } }} />
-                  <span><button type="button" onClick={() => setEditing(null)}>{t('cancel')}</button><button type="button" className="is-go" onClick={() => void p.onEdit(c.id, editing.body).then(ok => { if (ok) setEditing(null) })}>{t('save')}</button></span>
+                  <textarea ref={editRef} value={editing.body} aria-label={t('edit')} name="comment-edit" onChange={e => setEditing({ id: c.id, body: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void p.onEdit(c.id, editing.body).then(ok => { if (ok) endEdit(c.id) }) }
+                              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endEdit(c.id) }
+                            }} />
+                  <span><button type="button" onClick={() => endEdit(c.id)}>{t('cancel')}</button><button type="button" className="is-go" onClick={() => void p.onEdit(c.id, editing.body).then(ok => { if (ok) endEdit(c.id) })}>{t('save')}</button></span>
                 </div>
               )
               : <p>{c.deleted ? t('deleted') : <Body text={c.body} names={Object.values(p.names)} />}</p>}
@@ -359,17 +421,18 @@ function ThreadBox(p: {
               <span className="fx-cmt-more">
                 <button type="button" className="fx-cmt-ico" aria-label={t('more')} aria-haspopup="menu" aria-expanded={menu === c.id} onClick={() => setMenu(m => (m === c.id ? null : c.id))}>⋯</button>
                 {menu === c.id && (
-                  <span className="fx-cmt-menu" role="menu" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setMenu(null) } }}>
-                    {mine(c.authorId) && <button type="button" role="menuitem" data-cmt-edit="" onClick={() => { setMenu(null); setEditing({ id: c.id, body: c.body }) }}>{t('edit')}</button>}
-                    <button type="button" role="menuitem" data-cmt-delete="" onClick={() => { setMenu(null); setConfirmDel(c.id) }}>{t('delete')}</button>
-                  </span>
+                  <CommentMenu label={t('more')} onClose={() => { setMenu(null); requestAnimationFrame(() => moreOf(c.id)?.focus()) }}>
+                    {mine(c.authorId) && <button type="button" role="menuitem" tabIndex={-1} data-cmt-edit="" onClick={() => { setMenu(null); setEditing({ id: c.id, body: c.body }) }}>{t('edit')}</button>}
+                    <button type="button" role="menuitem" tabIndex={-1} data-cmt-delete="" onClick={() => { setMenu(null); setConfirmDel(c.id) }}>{t('delete')}</button>
+                  </CommentMenu>
                 )}
               </span>
             )}
             {confirmDel === c.id && (
-              <div className="fx-cmt-confirm" role="alertdialog" aria-label={t('deleteTitle')}>
-                <span>{t('deleteTitle')} {t('deleteBody')}</span>
-                <span><button type="button" onClick={() => setConfirmDel(null)}>{t('cancel')}</button><button type="button" className="is-danger" data-ok="" onClick={() => { setConfirmDel(null); p.onDelete(c.id) }}>{t('delete')}</button></span>
+              <div ref={confirmRef} className="fx-cmt-confirm" role="alertdialog" aria-label={t('deleteTitle')} aria-describedby={`${uid}-del`}
+                   onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endConfirm(c.id) } }}>
+                <span id={`${uid}-del`}>{t('deleteTitle')} {t('deleteBody')}</span>
+                <span><button type="button" onClick={() => endConfirm(c.id)}>{t('cancel')}</button><button type="button" className="is-danger" data-ok="" onClick={() => { setConfirmDel(null); p.onDelete(c.id); requestAnimationFrame(() => ta.current?.focus()) }}>{t('delete')}</button></span>
               </div>
             )}
           </div>
@@ -377,15 +440,17 @@ function ThreadBox(p: {
       </div>
       <div className="fx-cmt-reply">
         {matches.length > 0 && (
-          <div className="fx-cmt-mentions" role="listbox" aria-label={t('mentionHint')}>
+          <div className="fx-cmt-mentions" role="listbox" id={`${uid}-people`} aria-label={t('mentionHint')}>
             {matches.map(([id, n], i) => (
-              <button key={id} type="button" role="option" aria-selected={i === pick} onMouseDown={e => { e.preventDefault(); choose(n) }}>
+              <button key={id} id={`${uid}-person-${i}`} type="button" role="option" tabIndex={-1} aria-selected={i === pick} onMouseDown={e => { e.preventDefault(); choose(n) }}>
                 <span className="fx-cmt-av is-sm" style={{ background: colorOf(id) }} aria-hidden="true">{n.slice(0, 1)}</span>{n}
               </button>
             ))}
           </div>
         )}
-        <textarea ref={ta} value={text} data-cmt-input="" rows={2} aria-label={th ? t('reply') : t('new')} placeholder={th ? t('replyPlaceholder') : t('placeholder')}
+        <textarea ref={ta} value={text} data-cmt-input="" rows={2} aria-label={th ? t('reply') : t('new')} placeholder={th ? t('replyPlaceholder') : tu('ph.comment')}
+                  name="comment" aria-autocomplete="list" aria-controls={matches.length ? `${uid}-people` : undefined} aria-expanded={matches.length > 0}
+                  aria-activedescendant={matches.length ? `${uid}-person-${Math.min(pick, matches.length - 1)}` : undefined}
                   onChange={e => { setText(e.target.value); caretAt.current = e.target.selectionStart; setPick(0) }}
                   onSelect={e => { caretAt.current = (e.target as HTMLTextAreaElement).selectionStart }}
                   onKeyDown={e => {
@@ -394,12 +459,30 @@ function ThreadBox(p: {
                     if (matches.length && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setText(text + ' '); return }
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void submit() }
                   }} />
+        <p className="sr-only" role="status">{news}</p>
         <div className="fx-cmt-row">
           <small>{t('sendKey')}</small>
           <button type="button" className="fx-cmt-send" data-cmt-send="" disabled={!text.trim() || busy} onClick={() => void submit()}>{th ? t('reply') : t('send')}</button>
         </div>
       </div>
     </div>
+  )
+}
+
+/** A comment's ⋯ menu: focus on its first item, ↑/↓ between them, Esc or Tab closes back to ⋯. */
+function CommentMenu({ label, onClose, children }: { label: string; onClose(): void; children: React.ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => { requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()) }, [])
+  return (
+    <span ref={ref} className="fx-cmt-menu" role="menu" aria-label={label}
+          onKeyDown={e => {
+            const list = [...(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
+            const i = list.indexOf(document.activeElement as HTMLElement)
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); list[(i + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length]?.focus() }
+            else if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); onClose() }
+          }}>
+      {children}
+    </span>
   )
 }
 

@@ -25,6 +25,9 @@ import {
 import type { PasteColumns } from '@/components/sheet/types'
 import type { AddPlanResult, PlanRowInput } from './types'
 
+/** Rows shown per New / Matched table; the rest are counted (they're all still added). */
+const SHOWN_ROWS = 200
+
 interface Fix { title?: string; status?: string; links: Partial<Record<LinkColumn, string>>; leftOut?: boolean; move?: boolean; asNew?: boolean }
 
 /** A pasted row with the person's fixes applied, and its own problems checked again. */
@@ -82,6 +85,11 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   const boxRef = useRef<HTMLTextAreaElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => { boxRef.current?.focus() }, [])
+  /** Esc or a click outside with rows or fixes in the box: asked first, in the footer. */
+  const [asking, setAsking] = useState(false)
+  const keepRef = useRef<HTMLButtonElement>(null)
+  const askedFrom = useRef<HTMLElement | null>(null)
+  useEffect(() => { if (asking) keepRef.current?.focus() }, [asking])
 
   // Keyed by content: the host rebuilds these lists on every render.
   const targetsKey = JSON.stringify(columns?.targets ?? [])
@@ -97,6 +105,12 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
     [read, fixes, ctx],
   )
   const fix = (i: number, patch: Partial<Fix>) => setFixes(f => ({ ...f, [i]: { ...f[i], ...patch, links: { ...(f[i]?.links ?? {}), ...(patch.links ?? {}) } } }))
+  /** A web address typed over a cell that wasn't one. */
+  const linkInput = (i: number, column: LinkColumn) => ({
+    type: 'url', inputMode: 'url' as const, name: `link-${column}-${i}`, autoComplete: 'off', spellCheck: false, dir: 'ltr',
+    'aria-label': t(`links.${column}`), placeholder: 'https://…', defaultValue: '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => fix(i, { links: { [column]: e.target.value } }),
+  })
 
   const fresh = rows.filter(r => r.kind === 'fresh' && !fixes[r.index]?.leftOut)
   const linked = rows.filter(r => r.kind === 'linked' && !fixes[r.index]?.leftOut)
@@ -156,6 +170,19 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
     }
   }
 
+  /** Closing by Esc or the backdrop: straight away when there's nothing to lose, otherwise asked first. */
+  function tryClose() {
+    if (asking) return
+    if (!rows.length && !Object.keys(fixes).length) { onClose(); return }
+    askedFrom.current = document.activeElement as HTMLElement | null
+    setAsking(true)
+  }
+  function keepEditing() {
+    setAsking(false)
+    const back = askedFrom.current
+    requestAnimationFrame(() => (back?.isConnected ? back : boxRef.current)?.focus())
+  }
+
   async function add() {
     if (!sending.length || busy) return
     setBusy(true); setError(null)
@@ -169,7 +196,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   }
 
   return (
-    <div className="fx-sheet-dlg" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fx-sheet-dlg" onMouseDown={e => { if (e.target === e.currentTarget) tryClose() }}>
       <div
         ref={dialogRef}
         className="fx-sheet-dlg-in fx-content-dlg"
@@ -178,7 +205,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
         aria-labelledby="fx-plan-title"
         data-plan-preview=""
         onKeyDown={e => {
-          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() }
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (asking) keepEditing(); else tryClose() }
           if (e.key === 'Tab') {
             const els = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('textarea, input, select, button:not([disabled])') ?? [])
             const i = els.indexOf(document.activeElement as HTMLElement)
@@ -192,7 +219,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
           <p>{t('paste.intro')}</p>
         </div>
         <div className="fx-sheet-dlg-body">
-          <textarea ref={boxRef} value={text} aria-label={t('paste.box')} placeholder={t('paste.placeholder')}
+          <textarea ref={boxRef} name="plan" autoComplete="off" spellCheck={false} value={text} aria-label={t('paste.box')} placeholder={t('paste.placeholder')}
                     onPaste={onPaste} onChange={e => { setText(e.target.value); setCells(cellsFromText(e.target.value)) }} />
           {cells.length > 0 && !rows.length && <p className="fx-sheet-counts">{t('paste.none')}</p>}
           {rows.length > 0 && (
@@ -271,13 +298,14 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                           <td className="fx-content-problem">{r.problems.map(problemText).join(' · ')}</td>
                           <td className="fx-content-fixes">
                             {r.problems.map(p => {
-                              if (p.code === 'noTitle') return <input key="t" aria-label={t('paste.piece')} disabled={f?.leftOut} onChange={e => fix(r.index, { title: e.target.value })} />
-                              if (p.code === 'badLink') return <input key={p.column} aria-label={t(`links.${p.column}`)} placeholder="https://…" disabled={f?.leftOut} defaultValue="" onChange={e => fix(r.index, { links: { [p.column]: e.target.value } })} />
+                              if (p.code === 'noTitle') return <input key="t" name={`title-${r.index}`} autoComplete="off" aria-label={t('paste.piece')} disabled={f?.leftOut} onChange={e => fix(r.index, { title: e.target.value })} />
+                              if (p.code === 'badLink') return <input key={p.column} {...linkInput(r.index, p.column)} disabled={f?.leftOut} />
+                              // The sheet's own words are what's sent (readStatus reads them); each is shown in the reader's language.
                               if (p.code === 'badStatus') return (
-                                <select key="s" aria-label={t('paste.status')} disabled={f?.leftOut} defaultValue="" onChange={e => fix(r.index, { status: e.target.value })}>
+                                <select key="s" name={`status-${r.index}`} aria-label={t('paste.status')} disabled={f?.leftOut} defaultValue="" onChange={e => fix(r.index, { status: e.target.value })}>
                                   <option value="" disabled>{p.status || '—'}</option>
-                                  {Object.values(CONTENT_STAGE_WORDS).map(w => <option key={w} value={w}>{w}</option>)}
-                                  <option value="Archived">Archived</option>
+                                  {(Object.entries(CONTENT_STAGE_WORDS) as [StageId, string][]).map(([id, w]) => <option key={w} value={w}>{t(`stage.${id}`)}</option>)}
+                                  <option value="Archived">{t('paste.archived')}</option>
                                 </select>
                               )
                               if (p.code === 'missingTask') return <button key="n" type="button" className="fx-sheet-btn" onClick={() => fix(r.index, { asNew: true })}>{t('paste.newSection')}</button>
@@ -304,12 +332,9 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                     {warnings.map(r => (
                       <tr key={r.index} data-plan-row={r.index}>
                         <td>{r.title}</td>
-                        <td className="fx-content-problem">{r.problems.filter(p => p.code === 'badLink').map(p => `${problemText(p)}: "${r.badLinks[(p as { column: LinkColumn }).column]}"`).join(' · ')}</td>
+                        <td className="fx-content-problem">{r.problems.filter(p => p.code === 'badLink').map(p => `${problemText(p)}: “${r.badLinks[(p as { column: LinkColumn }).column]}”`).join(' · ')}</td>
                         <td className="fx-content-fixes">
-                          {r.problems.map(p => p.code === 'badLink' && (
-                            <input key={p.column} aria-label={t(`links.${p.column}`)} placeholder="https://…" defaultValue=""
-                                   onChange={e => fix(r.index, { links: { [p.column]: e.target.value } })} />
-                          ))}
+                          {r.problems.map(p => p.code === 'badLink' && <input key={p.column} {...linkInput(r.index, p.column)} />)}
                         </td>
                       </tr>
                     ))}
@@ -326,17 +351,17 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                 <table className="fx-sheet-ptab" data-plan-section={label as string}>
                   <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.theme')}</th><th>{t('paste.type')}</th><th>{t('paste.status')}</th><th>{t('paste.owner')}</th><th>{t('paste.links')}</th><th /></tr></thead>
                   <tbody>
-                    {(list as Classified[]).map(r => (
+                    {(list as Classified[]).slice(0, SHOWN_ROWS).map(r => (
                       <tr key={r.index} data-plan-row={r.index}>
                         <td>{r.title}</td>
                         <td>{r.pillar ? `${r.theme} · ${r.pillar}` : r.theme}</td>
                         <td>{r.type ?? '—'}</td>
-                        <td>{r.status ? (r.status.archived ? 'Archived' : t(`stage.${r.status.stage}`)) : ''}</td>
+                        <td>{r.status ? (r.status.archived ? t('paste.archived') : t(`stage.${r.status.stage}`)) : ''}</td>
                         <td>{r.owner}{r.problems.some(p => p.code === 'unknownOwner') && <span className="fx-sheet-muted"> ({t('problem.unknownOwner', { name: r.owner })})</span>}</td>
-                        <td>{LINK_COLUMNS.filter(k => r.links[k]).length}</td>
+                        <td className="fx-cs-tnum">{LINK_COLUMNS.filter(k => r.links[k]).length}</td>
                         <td>{r.otherTheme && (
                           <label className="fx-content-check">
-                            <input type="checkbox" checked={!!fixes[r.index]?.move} onChange={e => fix(r.index, { move: e.target.checked })} />
+                            <input type="checkbox" name={`move-${r.index}`} checked={!!fixes[r.index]?.move} onChange={e => fix(r.index, { move: e.target.checked })} />
                             {t('paste.inTheme', { theme: r.otherTheme })} · {t('paste.moveHere')}
                           </label>
                         )}</td>
@@ -345,20 +370,29 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                   </tbody>
                 </table>
               </div>
+              {(list as Classified[]).length > SHOWN_ROWS && (
+                <p className="fx-sheet-muted" data-plan-more="">{t('paste.more', { shown: SHOWN_ROWS, n: (list as Classified[]).length })}</p>
+              )}
             </section>
           ))}
           {existing.length > 0 && <p className="fx-sheet-muted">{t('paste.existingSection')}: {existing.map(r => r.title).join(' · ')}</p>}
         </div>
         <div className="fx-sheet-dlg-foot">
+          {asking ? <>
+            <span className="fx-sheet-note" role="alert" data-plan-discard="">{t('paste.discardAsk')}</span>
+            <button ref={keepRef} type="button" className="fx-sheet-btn" onClick={keepEditing}>{t('paste.keepEditing')}</button>
+            <button type="button" className="fx-sheet-btn is-danger" data-plan-discard-ok="" onClick={() => onClose()}>{t('paste.discard')}</button>
+          </> : <>
           {error && <span className="fx-sheet-note" role="alert">{error}</span>}
           <label className="fx-content-check fx-content-usesheet">
-            <input type="checkbox" checked={useSheet} onChange={e => setUseSheet(e.target.checked)} data-use-sheet="" />
+            <input type="checkbox" name="useSheet" checked={useSheet} onChange={e => setUseSheet(e.target.checked)} data-use-sheet="" />
             {t('paste.useSheet')}
           </label>
           <button type="button" className="fx-sheet-btn" onClick={() => onClose()}>{t('paste.close')}</button>
           <button type="button" className="fx-sheet-btn is-primary" data-plan-add="" disabled={!sending.length || busy} onClick={() => void add()}>
             {busy ? t('paste.adding') : pieces.length || !valueCount ? t('paste.add', { count: pieces.length }) : tc('paste.fill', { n: valueCount })}
           </button>
+          </>}
         </div>
       </div>
     </div>

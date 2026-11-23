@@ -6,7 +6,7 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
 import { SheetMenu, SheetPopover, type MenuItem } from '@/components/sheet/SheetMenu'
@@ -33,6 +33,7 @@ type Popup =
   | { kind: 'menu'; label: string; anchor: HTMLElement; items: MenuItem[] }
   | { kind: 'link'; anchor: HTMLElement; taskId: string; col: LinkCol; prompt?: 'published' | 'post' }
   | { kind: 'archive'; anchor: HTMLElement; task: Task }
+  | { kind: 'removePillar'; anchor: HTMLElement; theme: ContentTheme; pillar: ContentTheme['pillars'][number] }
   | { kind: 'theme'; anchor: HTMLElement; theme: ContentTheme }
   | { kind: 'name'; anchor: HTMLElement; title: string; initial?: string; save(name: string): Promise<string | null> }
 
@@ -65,9 +66,11 @@ export function ContentSheet(p: ContentSheetProps) {
 
   // ── view state ──────────────────────────────────────────────────────────
   const [mine, setMine] = useState(false)
-  const [showArchived, setShowArchived] = useState(() => {
-    try { return typeof window === 'undefined' || window.localStorage.getItem('momentum.content.archived') !== '0' } catch { return true }
-  })
+  // Shown until the browser says otherwise: read after mount, so the server's first render and the browser's match.
+  const [showArchived, setShowArchived] = useState(true)
+  useEffect(() => {
+    try { if (window.localStorage.getItem('momentum.content.archived') === '0') setShowArchived(false) } catch { /* private mode */ }
+  }, [])
   function toggleArchived() {
     setShowArchived(v => {
       try { window.localStorage.setItem('momentum.content.archived', v ? '0' : '1') } catch { /* private mode */ }
@@ -159,6 +162,26 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return }
     say(t('archive.archived'), () => { void restore(task) })
   }
+  /**
+   * Remove pillar, after its confirm: the pieces stay in the theme with no
+   * pillar. Undo adds a pillar of the same name back (at the end of the
+   * theme's pillars) and puts the pieces that had it back in it.
+   */
+  async function removePillar(theme: ContentTheme, pillar: ContentTheme['pillars'][number]) {
+    closePopup(true)
+    const had = p.tasks.filter(x => x.pillar_id === pillar.id).map(x => x.id)
+    const r = await p.api.removePillar(pillar.id)
+    if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return }
+    say(t('pillar.removed'), () => {
+      void (async () => {
+        const back = await p.api.savePillar(theme.id, { name: pillar.name })
+        if (!back.success || !back.id) { say(t('notSaved', { reason: why(back.error) })); return }
+        let missed = 0
+        for (const id of had) { const u = await p.api.updatePiece(id, { pillar_id: back.id }); if (!u.success) missed++ }
+        say(missed ? t('pillar.restoredSome', { n: missed }) : t('pillar.restored'))
+      })()
+    })
+  }
   async function restore(task: Task) {
     const r = await p.api.restore(task.id)
     if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return }
@@ -248,9 +271,8 @@ export function ContentSheet(p: ContentSheetProps) {
           kind: 'name', anchor, title: t('pillar.newName'), initial: pl.name,
           save: async name => { const r = await p.api.savePillar(th.id, { id: pl.id, name }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
         }) })
-        items.push({ key: 'remove', text: t('pillar.remove'), label: t('pillar.remove'), tone: 'danger', onSelect: pick(() => {
-          void p.api.removePillar(pl.id).then(r => say(r.success ? t('pillar.removed') : t('notSaved', { reason: why(r.error) })))
-        }) })
+        items.push({ key: 'remove', text: t('pillar.remove'), label: t('pillar.remove'), tone: 'danger',
+          onSelect: () => setPopup({ kind: 'removePillar', anchor, theme: th, pillar: pl }) })
       }
       return menu(t('pillar.menu', { name: pl.name }), items)
     }
@@ -342,7 +364,7 @@ export function ContentSheet(p: ContentSheetProps) {
     if (cl.custom.is(col)) return cl.custom.commit(task, col, value)
     if (row.kind !== 'piece') return null
     if (col === 'title') {
-      if (!value.trim()) return t('err.generic')
+      if (!value.trim()) return t('err.emptyTitle')
       const r = await p.api.update(task.id, { name: value.trim() })
       return r.success ? null : why(r.error)
     }
@@ -523,6 +545,17 @@ export function ContentSheet(p: ContentSheetProps) {
             <span className="fx-sheet-pop-row">
               <button type="button" className="fx-sheet-btn" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
               <button type="button" className="fx-sheet-btn is-danger" data-autofocus="" onClick={() => void archive(popup.task)}>{t('archive.archive')}</button>
+            </span>
+          </div>
+        </SheetPopover>
+      )}
+      {popup?.kind === 'removePillar' && (
+        <SheetPopover anchor={popup.anchor} label={t('pillar.remove')} onClose={closePopup}>
+          <div className="fx-sheet-pop-form" data-remove-pillar-confirm="">
+            <span>{t('pillar.removeConfirm', { name: popup.pillar.name, n: p.tasks.filter(x => x.pillar_id === popup.pillar.id).length })}</span>
+            <span className="fx-sheet-pop-row">
+              <button type="button" className="fx-sheet-btn" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
+              <button type="button" className="fx-sheet-btn is-danger" data-autofocus="" onClick={() => void removePillar(popup.theme, popup.pillar)}>{t('pillar.removeOk')}</button>
             </span>
           </div>
         </SheetPopover>

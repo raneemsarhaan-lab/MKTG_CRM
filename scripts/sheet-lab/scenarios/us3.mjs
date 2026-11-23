@@ -79,6 +79,8 @@ export const us3 = [
       t.assert(await input.evaluate(e => e === document.activeElement), 'title cell ready to type in')
       await t.page.keyboard.press('Escape')
       t.eq((await t.rows()).filter(r => r.startsWith('d:')).length, 0, 'Esc on an empty draft adds nothing')
+      await t.idle(50)
+      t.eq(await t.page.evaluate(() => document.activeElement?.getAttribute('data-cell')), 'a:v1|title', 'focus goes back to + Clip (UI review)')
       await t.cell('a:v1', 'title').click()
       await t.page.keyboard.type('A brand new clip')
       await t.page.keyboard.press('Enter')

@@ -18,6 +18,7 @@ export function RemoveDuplicatesDialog({ cols, header: header0, range, onOk, onC
   cols: { key: string; name: string }[]; header: boolean; range: string; onOk(cols: string[], header: boolean): void; onCancel(): void
 }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [header, setHeader] = useState(header0)
   const [on, setOn] = useState<Set<string>>(() => new Set(cols.map(c => c.key)))
   const flip = (k: string) => setOn(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
@@ -35,7 +36,7 @@ export function RemoveDuplicatesDialog({ cols, header: header0, range, onOk, onC
       </div>
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!on.size} onClick={() => onOk(cols.filter(c => on.has(c.key)).map(c => c.key), header)}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!on.size} onClick={() => onOk(cols.filter(c => on.has(c.key)).map(c => c.key), header)}>{tu('ok.dedupe')}</button>
       </Row>
     </Modal>
   )
@@ -82,7 +83,7 @@ export function TextToColumnsDialog({ values, range, onOk, onCancel }: { values:
               {box('tab', t('clean.tab'))}{box('semicolon', t('clean.semicolon'))}
               {box('comma', t('clean.comma'))}{box('space', t('clean.space'))}
               <span className="fx-tip-other">{box('other', t('clean.other'))}
-                <input type="text" maxLength={1} value={typeof delims.other === 'string' ? delims.other : ''} aria-label={t('clean.other')} data-split-other="" dir="ltr"
+                <input type="text" maxLength={1} value={typeof delims.other === 'string' ? delims.other : ''} aria-label={t('clean.other')} data-split-other="" dir="ltr" name="split-other" autoComplete="off" spellCheck={false}
                        onChange={e => setDelims(d => ({ ...d, other: e.target.value || undefined }))} /></span>
             </div>
           </fieldset>
@@ -97,7 +98,7 @@ export function TextToColumnsDialog({ values, range, onOk, onCancel }: { values:
       )}
       {step === 2 && mode === 'fixed' && (
         <label className="fx-sh-field"><span>{t('clean.breaks')}</span>
-          <input type="text" value={breaksText} data-split-breaks="" dir="ltr" onChange={e => setBreaksText(e.target.value)} />
+          <input type="text" value={breaksText} data-split-breaks="" dir="ltr" name="split-breaks" autoComplete="off" spellCheck={false} onChange={e => setBreaksText(e.target.value)} />
           <small className="fx-fc-hint">{t('clean.breaksHint')}</small></label>
       )}
       {step === 3 && (
@@ -136,16 +137,17 @@ export function TextToColumnsDialog({ values, range, onOk, onCancel }: { values:
 /** Ctrl+T: Create Table, the block around the cell. */
 export function CreateTableDialog({ range, onOk, onCancel }: { range: string; onOk(ref: string, header: boolean): void; onCancel(): void }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [ref, setRef] = useState(`=$${range.replace(/([A-Z]+)(\d+)/g, '$1$$$2').replace(':', ':$')}`)
   const [header, setHeader] = useState(true)
   return (
     <Modal title={t('table.create')} onCancel={onCancel} attr="data-create-table">
       <label className="fx-sh-field"><span>{t('table.where')}</span>
-        <input type="text" value={ref} dir="ltr" data-table-ref="" onChange={e => setRef(e.target.value)} /></label>
+        <input type="text" value={ref} dir="ltr" data-table-ref="" name="table-range" autoComplete="off" spellCheck={false} translate="no" onChange={e => setRef(e.target.value)} /></label>
       <label className="fx-sh-check"><input type="checkbox" checked={header} data-table-header="" onChange={e => setHeader(e.target.checked)} />{t('table.hasHeaders')}</label>
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!ref.trim()} onClick={() => onOk(ref.replace(/\$/g, '').replace(/^=/, ''), header)}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!ref.trim()} onClick={() => onOk(ref.replace(/\$/g, '').replace(/^=/, ''), header)}>{tu('ok.createTable')}</button>
       </Row>
     </Modal>
   )
@@ -154,6 +156,7 @@ export function CreateTableDialog({ range, onOk, onCancel }: { range: string; on
 /** Table › Insert Slicer: a box of buttons for each column picked. */
 export function InsertSlicersDialog({ cols, onOk, onCancel }: { cols: { key: string; name: string }[]; onOk(cols: string[]): void; onCancel(): void }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [on, setOn] = useState<Set<string>>(() => new Set())
   return (
     <Modal title={t('table.slicers')} body={t('table.slicersSub')} onCancel={onCancel} attr="data-insert-slicers">
@@ -165,7 +168,7 @@ export function InsertSlicersDialog({ cols, onOk, onCancel }: { cols: { key: str
       </div>
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!on.size} onClick={() => onOk(cols.filter(c => on.has(c.key)).map(c => c.key))}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!on.size} onClick={() => onOk(cols.filter(c => on.has(c.key)).map(c => c.key))}>{tu('ok.insert')}</button>
       </Row>
     </Modal>
   )
@@ -178,6 +181,7 @@ export function AdvancedFilterDialog({ range, active, onOk, onClear, onCancel }:
   onClear(): void; onCancel(): void
 }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [action, setAction] = useState<'inPlace' | 'copy'>('inPlace')
   const [list, setList] = useState(range)
   const [criteria, setCriteria] = useState('')
@@ -193,15 +197,15 @@ export function AdvancedFilterDialog({ range, active, onOk, onClear, onCancel }:
         <label className="fx-sh-check"><input type="radio" name="af" checked={action === 'inPlace'} data-adv-action="inPlace" onChange={() => setAction('inPlace')} />{t('adv.inPlace')}</label>
         <label className="fx-sh-check"><input type="radio" name="af" checked={action === 'copy'} data-adv-action="copy" onChange={() => setAction('copy')} />{t('adv.copy')}</label>
       </div>
-      <label className="fx-sh-field"><span>{t('adv.list')}</span><input type="text" value={list} dir="ltr" data-adv-list="" onChange={e => setList(e.target.value)} /></label>
-      <label className="fx-sh-field"><span>{t('adv.criteria')}</span><input type="text" value={criteria} dir="ltr" data-adv-criteria="" placeholder="F1:G3" onChange={e => setCriteria(e.target.value)} /></label>
+      <label className="fx-sh-field"><span>{t('adv.list')}</span><input type="text" value={list} dir="ltr" data-adv-list="" name="filter-range" autoComplete="off" spellCheck={false} translate="no" onChange={e => setList(e.target.value)} /></label>
+      <label className="fx-sh-field"><span>{t('adv.criteria')}</span><input type="text" value={criteria} dir="ltr" data-adv-criteria="" placeholder={tu('ph.eg', { ex: 'F1:G3' })} name="criteria-range" autoComplete="off" spellCheck={false} translate="no" onChange={e => setCriteria(e.target.value)} /></label>
       {action === 'copy' && (
         <div className="fx-tip-grid2">
           <label className="fx-sh-field"><span>{t('adv.copyTo')}</span>
             <select value={dest} data-adv-dest="" onChange={e => setDest(e.target.value as 'sheet' | 'cell')}>
               <option value="sheet">{t('adv.newSheet')}</option><option value="cell">{t('adv.cellHere')}</option>
             </select></label>
-          {dest === 'cell' && <label className="fx-sh-field"><span>{t('adv.cell')}</span><input type="text" value={to} dir="ltr" data-adv-to="" placeholder="I1" onChange={e => setTo(e.target.value)} /></label>}
+          {dest === 'cell' && <label className="fx-sh-field"><span>{t('adv.cell')}</span><input type="text" value={to} dir="ltr" data-adv-to="" placeholder={tu('ph.eg', { ex: 'I1' })} name="copy-to" autoComplete="off" spellCheck={false} translate="no" onChange={e => setTo(e.target.value)} /></label>}
         </div>
       )}
       <label className="fx-sh-check"><input type="checkbox" checked={unique} data-adv-unique="" onChange={e => setUnique(e.target.checked)} />{t('adv.unique')}</label>
@@ -209,7 +213,7 @@ export function AdvancedFilterDialog({ range, active, onOk, onClear, onCancel }:
         {active && <button type="button" data-adv-clear="" onClick={onClear}>{t('adv.clear')}</button>}
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
         <button type="button" className="is-lime" data-ok="" disabled={!ok}
-                onClick={() => onOk({ list: strip(list), criteria: strip(criteria), copy: action === 'inPlace' ? 'none' : dest, to: dest === 'cell' ? strip(to) : undefined, unique })}>{t('ok')}</button>
+                onClick={() => onOk({ list: strip(list), criteria: strip(criteria), copy: action === 'inPlace' ? 'none' : dest, to: dest === 'cell' ? strip(to) : undefined, unique })}>{tu('ok.filter')}</button>
       </Row>
     </Modal>
   )

@@ -7,8 +7,9 @@
  * - Sort, New rule and Manage rules dialogs (FR-032, FR-045).
  * The sheets carry out what they send over the format bus.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { optionKeys, stopOf, useColorName } from '../a11y'
 import type { CellStyle, ColFilter, ConditionalRule, FilterOp, RuleArgs, RuleKind, SortKey } from '@/types/index'
 import { ICON_SETS, RULE_KINDS } from '@/types/index'
 import { toCss } from '@/lib/sheet-format'
@@ -48,7 +49,7 @@ export function TableMenu({ anchor, target, state, onClose }: { anchor: HTMLElem
       {off && <p className="fx-st-why">{off}</p>}
       {TABLE_LEVELS.map(level => (
         <div key={level}>
-          <h5 className="fx-st-h">{t(`levels.${level}`)}</h5>
+          <h3 className="fx-st-h">{t(`levels.${level}`)}</h3>
           <div className="fx-st-gallery is-tables" onKeyDown={e => gridKeys(e, 6)}>
             {TABLE_STYLES.filter(s => s.level === level).map((s, i) => (
               <button key={s.key} type="button" className={`fx-st-table${state?.table?.style === s.key ? ' is-cur' : ''}`} data-table-style={s.key}
@@ -83,6 +84,8 @@ export interface FilterMenuProps {
 
 export function FilterMenu(p: FilterMenuProps) {
   const t = useTranslations('sheets.format.st3')
+  const tu = useTranslations('sheets.ux')
+  const colorName = useColorName()
   const all = p.values.map(v => v.value)
   const [ticked, setTicked] = useState<Set<string>>(() => new Set(p.current?.values ?? all))
   const [search, setSearch] = useState('')
@@ -111,7 +114,7 @@ export function FilterMenu(p: FilterMenuProps) {
             <span>{t('byColor')}</span>
             {p.fills.slice(0, 12).map(c => (
               <button key={c} type="button" className={`fx-flt-sw${color === c ? ' is-cur' : ''}`} style={{ background: c }} data-flt-color={c}
-                      aria-pressed={color === c} aria-label={`${t('byColor')} ${c}`} onClick={() => setColor(x => (x === c ? undefined : c))} />
+                      aria-pressed={color === c} aria-label={`${t('byColor')}: ${colorName(c)}`} title={colorName(c)} onClick={() => setColor(x => (x === c ? undefined : c))} />
             ))}
           </div>
         )}
@@ -121,10 +124,10 @@ export function FilterMenu(p: FilterMenuProps) {
             {FILTER_OPS.map(o => <option key={o} value={o}>{t(`ops.${o}`)}</option>)}
           </select>
         </label>
-        {needsA && <input type="text" className="fx-flt-in" value={a} data-flt-a="" dir="auto" aria-label={t('value')} onChange={e => setA(e.target.value)} />}
-        {op === 'between' && <input type="text" className="fx-flt-in" value={b} data-flt-b="" dir="auto" aria-label={t('and')} onChange={e => setB(e.target.value)} />}
+        {needsA && <input type="text" className="fx-flt-in" value={a} data-flt-a="" dir="auto" name="filter-value" autoComplete="off" aria-label={t('value')} onChange={e => setA(e.target.value)} />}
+        {op === 'between' && <input type="text" className="fx-flt-in" value={b} data-flt-b="" dir="auto" name="filter-value-2" autoComplete="off" aria-label={t('and')} onChange={e => setB(e.target.value)} />}
         <hr />
-        <input type="search" className="fx-flt-in" value={search} placeholder={t('search')} aria-label={t('search')} onChange={e => setSearch(e.target.value)} />
+        <input type="search" className="fx-flt-in" value={search} placeholder={tu('ph.search')} aria-label={t('search')} name="filter-search" autoComplete="off" onChange={e => setSearch(e.target.value)} />
         <div className="fx-flt-list">
           <label className="fx-fc-chk"><input type="checkbox" checked={allOn} data-flt-all=""
                  onChange={() => setTicked(s => { const n = new Set(s); for (const v of shown) { if (allOn) n.delete(v.value); else n.add(v.value) } return n })} />{t('selectAll')}</label>
@@ -136,7 +139,7 @@ export function FilterMenu(p: FilterMenuProps) {
         </div>
         <div className="fx-flt-foot">
           <button type="button" data-flt-clear="" onClick={() => p.onApply(null)}>{t('clearFrom', { col: p.title })}</button>
-          <button type="button" className="is-go" data-flt-ok="" onClick={ok}>{t('ok')}</button>
+          <button type="button" className="is-go" data-flt-ok="" onClick={ok}>{tu('ok.apply')}</button>
         </div>
       </div>
     </Pop>
@@ -147,6 +150,7 @@ export function FilterMenu(p: FilterMenuProps) {
 
 export function SortDialog({ state, target, onClose }: { state: FormatState; target: FormatSource; onClose(): void }) {
   const t = useTranslations('sheets.format.st3')
+  const tu = useTranslations('sheets.ux')
   const cols = state.sortCols ?? []
   const [levels, setLevels] = useState<SortKey[]>([{ col: cols.find(c => c.key === state.colKey)?.key ?? cols[0]?.key ?? '', dir: 'asc' }])
   const [header, setHeader] = useState(state.sortHeader ?? false)
@@ -184,7 +188,7 @@ export function SortDialog({ state, target, onClose }: { state: FormatState; tar
         </span>
         <span>
           <button type="button" onClick={onClose}>{t('cancel')}</button>
-          <button type="button" className="is-go" data-ok="" onClick={() => { sendFormat(target, { kind: 'sort', keys: levels.filter(l => l.col), header }); onClose() }}>{t('ok')}</button>
+          <button type="button" className="is-go" data-ok="" onClick={() => { sendFormat(target, { kind: 'sort', keys: levels.filter(l => l.col), header }); onClose() }}>{tu('ok.sort')}</button>
         </span>
       </div>
     </Modal>
@@ -230,6 +234,8 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
   onClose(): void
 }) {
   const t = useTranslations('sheets.format.st3')
+  const tu = useTranslations('sheets.ux')
+  const colorName = useColorName()
   const name = useRuleName()
   const [kind, setKind] = useState<RuleKind>(edit?.kind ?? start ?? 'gt')
   const [args, setArgs] = useState<RuleArgs>(edit?.args ?? { a: '', when: 'past', n: 10, colors: [] })
@@ -245,13 +251,18 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
   const [whole, setWhole] = useState(!!edit?.args.row)
   const [testCol, setTestCol] = useState(edit?.args.col ?? (rowCols.some(c => c.key === state.colKey) ? state.colKey : rowCols[0]?.key ?? ''))
   const cuts = args.cuts ?? DEFAULT_CUTS
+  // Number boxes as typed: emptied or half-typed, they wait (OK stays off) rather than snap to 1 or 0.
+  const [nText, setNText] = useState(String(args.n ?? 10))
+  const [cutText, setCutText] = useState<[string, string]>(() => [String(cuts[0]), String(cuts[1])])
+  const nOk = /^\s*\d+\s*$/.test(nText) && Number(nText) >= 1 && Number(nText) <= 1000
+  const cutsOk = cutText.every(x => x.trim() !== '' && Number.isFinite(Number(x)))
   const base: RuleArgs = kind === 'bar' ? { colors: [bar] } : kind === 'scale' ? { colors: SCALES.find(s => s.key === scale)!.colors }
     : kind === 'icons' ? { set: args.set ?? 'arrows3', cuts, by: args.by ?? 'percent', ...(args.reverse ? { reverse: true } : {}), ...(args.iconOnly ? { iconOnly: true } : {}) }
     : kind === 'between' ? { a: args.a ?? '', b: args.b ?? '' } : kind === 'date' ? { when: args.when ?? 'past' }
     : kind === 'top' || kind === 'bottom' ? { n: args.n ?? 10, ...(args.percent ? { percent: true } : {}) }
     : kind === 'dup' || kind === 'unique' ? {} : { a: args.a ?? '' }
   const final: RuleArgs = style !== null && whole && testCol ? { ...base, row: true, col: testCol } : base
-  const ready = (!['gt', 'lt', 'eq', 'contains'].includes(kind) || !!final.a?.trim()) && (kind !== 'icons' || cuts[0] >= cuts[1])
+  const ready = (!['gt', 'lt', 'eq', 'contains'].includes(kind) || !!final.a?.trim()) && (kind !== 'icons' || (cutsOk && cuts[0] >= cuts[1])) && ((kind !== 'top' && kind !== 'bottom') || nOk)
   function save() {
     if (!ready) return
     if (edit && onSave) onSave({ ...edit, kind, args: final, style })
@@ -262,17 +273,17 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
     <Modal title={edit ? t('editRule') : t('newRule')} onCancel={onClose} attr="data-rule-dialog">
       <div className="fx-rule">
         <div className="fx-fc-fld"><span>{t('ruleKind')}</span>
-          <div className="fx-fc-lb" role="listbox" aria-label={t('ruleKind')}>
-            {RULE_KINDS.map(k => (
-              <button key={k} type="button" role="option" aria-selected={kind === k} data-rule-kind={k} onClick={() => setKind(k)}>{t(`kinds.${k}`)}</button>
+          <div className="fx-fc-lb" role="listbox" aria-label={t('ruleKind')} onKeyDown={e => optionKeys(e)}>
+            {RULE_KINDS.map((k, i) => (
+              <button key={k} type="button" role="option" aria-selected={kind === k} tabIndex={stopOf(i, RULE_KINDS.indexOf(kind))} data-rule-kind={k} onClick={() => setKind(k)}>{t(`kinds.${k}`)}</button>
             ))}
           </div>
         </div>
         <div className="fx-rule-side">
           {['gt', 'lt', 'eq', 'contains', 'between'].includes(kind) && (
-            <label className="fx-fc-fld"><span>{kind === 'between' ? t('from') : t('value')}</span><input type="text" value={args.a ?? ''} data-rule-a="" dir="auto" onChange={e => set({ a: e.target.value })} /></label>
+            <label className="fx-fc-fld"><span>{kind === 'between' ? t('from') : t('value')}</span><input type="text" value={args.a ?? ''} data-rule-a="" dir="auto" name="rule-value" autoComplete="off" onChange={e => set({ a: e.target.value })} /></label>
           )}
-          {kind === 'between' && <label className="fx-fc-fld"><span>{t('and')}</span><input type="text" value={args.b ?? ''} data-rule-b="" dir="auto" onChange={e => set({ b: e.target.value })} /></label>}
+          {kind === 'between' && <label className="fx-fc-fld"><span>{t('and')}</span><input type="text" value={args.b ?? ''} data-rule-b="" dir="auto" name="rule-value-2" autoComplete="off" onChange={e => set({ b: e.target.value })} /></label>}
           {kind === 'date' && (
             <label className="fx-fc-fld"><span>{t('dateIs')}</span>
               <select value={args.when ?? 'past'} data-rule-when="" onChange={e => set({ when: e.target.value as RuleArgs['when'] })}>
@@ -281,13 +292,14 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
           )}
           {(kind === 'top' || kind === 'bottom') && (
             <div className="fx-fc-two">
-              <label className="fx-fc-fld"><span>{t('howMany')}</span><input type="number" min={1} max={1000} value={args.n ?? 10} data-rule-n="" onChange={e => set({ n: Number(e.target.value) || 1 })} /></label>
+              <label className="fx-fc-fld"><span>{t('howMany')}</span><input type="number" inputMode="numeric" min={1} max={1000} value={nText} data-rule-n="" name="rule-count" autoComplete="off" aria-invalid={!nOk || undefined}
+                                                                                   onChange={e => { setNText(e.target.value); if (/^\s*\d+\s*$/.test(e.target.value)) set({ n: Number(e.target.value) }) }} /></label>
               <label className="fx-fc-chk"><input type="checkbox" checked={!!args.percent} onChange={e => set({ percent: e.target.checked })} />{t('percent')}</label>
             </div>
           )}
           {kind === 'bar' && (
             <div className="fx-fc-fld"><span>{t('barColour')}</span>
-              <div className="fx-rule-swatches">{BAR_COLORS.map(c => <button key={c} type="button" className={`fx-flt-sw${bar === c ? ' is-cur' : ''}`} style={{ background: c }} aria-pressed={bar === c} aria-label={c} onClick={() => setBar(c)} />)}</div>
+              <div className="fx-rule-swatches">{BAR_COLORS.map(c => <button key={c} type="button" className={`fx-flt-sw${bar === c ? ' is-cur' : ''}`} style={{ background: c }} aria-pressed={bar === c} aria-label={colorName(c)} title={colorName(c)} onClick={() => setBar(c)} />)}</div>
             </div>
           )}
           {kind === 'scale' && (
@@ -316,8 +328,13 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
                   <div key={i} className="fx-rule-cut">
                     <b style={{ color: glyph.color }} aria-hidden="true">{glyph.glyph}</b>
                     <span>{i === 0 ? tt('icons.when') : tt('icons.whenBelow', { n: cuts[0] })}</span>
-                    <input type="number" value={cuts[i]} data-icon-cut={i} aria-label={tt('icons.cut', { n: i + 1 })}
-                           onChange={e => { const v = Number(e.target.value); const nc: [number, number] = [...cuts] as [number, number]; nc[i] = Number.isFinite(v) ? v : 0; set({ cuts: nc }) }} />
+                    <input type="number" value={cutText[i]} data-icon-cut={i} aria-label={tt('icons.cut', { n: i + 1 })} name={`icon-cut-${i}`} autoComplete="off"
+                           aria-invalid={cutText[i].trim() === '' || undefined}
+                           onChange={e => {
+                             const s = e.target.value, v = Number(s)
+                             setCutText(ct => { const n: [string, string] = [...ct]; n[i] = s; return n })
+                             if (s.trim() !== '' && Number.isFinite(v)) { const nc: [number, number] = [...cuts] as [number, number]; nc[i] = v; set({ cuts: nc }) }
+                           }} />
                     {i === 0 && (
                       <select value={args.by ?? 'percent'} data-icon-by="" aria-label={tt('icons.type')} onChange={e => set({ by: e.target.value as 'percent' | 'number' })}>
                         <option value="percent">{tt('icons.percent')}</option><option value="number">{tt('icons.number')}</option>
@@ -352,7 +369,7 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
       </div>
       <div className="fx-sh-dialog-row">
         <button type="button" onClick={onClose}>{t('cancel')}</button>
-        <button type="button" className="is-go" data-ok="" disabled={!ready} onClick={save}>{t('ok')}</button>
+        <button type="button" className="is-go" data-ok="" disabled={!ready} onClick={save}>{edit ? tu('ok.saveRule') : tu('ok.addRule')}</button>
       </div>
     </Modal>
   )
@@ -360,7 +377,18 @@ export function RuleDialog({ state, target, start, edit, onSave, onClose }: {
 
 export function ManageRulesDialog({ state, target, onNew, onClose }: { state: FormatState; target: FormatSource; onNew(): void; onClose(): void }) {
   const t = useTranslations('sheets.format.st3')
+  const tu = useTranslations('sheets.ux')
   const name = useRuleName()
+  const body = useRef<HTMLTableSectionElement>(null)
+  /** ↑/↓, Home and End pick a rule; the picked row is the table's one Tab stop. */
+  const rowKeys = (e: React.KeyboardEvent, i: number) => {
+    const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : null
+    if (to === null || e.altKey || e.ctrlKey || e.metaKey) return
+    e.preventDefault()
+    const j = Math.max(0, Math.min(list.length - 1, to))
+    setSel(j)
+    body.current?.querySelectorAll<HTMLElement>('tr')[j]?.focus()
+  }
   const [list, setList] = useState<(ConditionalRule & { where: string })[]>(state.rules ?? [])
   const [sel, setSel] = useState(0)
   const [editing, setEditing] = useState<(ConditionalRule & { where: string }) | null>(null)
@@ -392,10 +420,10 @@ export function ManageRulesDialog({ state, target, onNew, onClose }: { state: Fo
         <div className="fx-rules-wrap">
           <table className="fx-rules">
             <thead><tr><th scope="col">{t('ruleCol')}</th><th scope="col">{t('look')}</th><th scope="col">{t('appliesTo')}</th></tr></thead>
-            <tbody>
+            <tbody ref={body}>
               {list.map((r, i) => (
-                <tr key={r.id} aria-selected={i === sel} className={i === sel ? 'is-sel' : ''} data-rule-row={i} tabIndex={0}
-                    onClick={() => setSel(i)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(i) } }}>
+                <tr key={r.id} aria-current={i === sel ? 'true' : undefined} className={i === sel ? 'is-sel' : ''} data-rule-row={i} tabIndex={i === sel ? 0 : -1}
+                    onClick={() => setSel(i)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSel(i) } else rowKeys(e, i) }}>
                   <td>{name(r)}</td><td><RuleSample rule={r} /></td><td dir="auto">{r.where}</td>
                 </tr>
               ))}
@@ -405,7 +433,7 @@ export function ManageRulesDialog({ state, target, onNew, onClose }: { state: Fo
       )}
       <div className="fx-sh-dialog-row">
         <button type="button" onClick={onClose}>{t('cancel')}</button>
-        <button type="button" className="is-go" data-ok="" onClick={ok}>{t('ok')}</button>
+        <button type="button" className="is-go" data-ok="" onClick={ok}>{tu('ok.apply')}</button>
       </div>
     </Modal>
   )

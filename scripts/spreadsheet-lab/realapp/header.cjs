@@ -90,7 +90,7 @@ const pick = async (page, menuAttr, item) => page.click(`[${menuAttr}] [data-ite
     ok(JSON.stringify(styleAt(ids.sheet, 1, 2)) === '{}', 'each step undoes; eight undos clear it all', JSON.stringify(styleAt(ids.sheet, 1, 2)))
     await page.click('[data-fmt="sizeUp"]'); await saved(page)
     ok(styleAt(ids.sheet, 1, 2).size === 11, 'size + makes 11')
-    await page.fill('[data-fmt="size"]', '14'); await saved(page)
+    await page.fill('[data-fmt="size"]', '14'); await page.press('[data-fmt="size"]', 'Enter'); await saved(page)
     ok(styleAt(ids.sheet, 1, 2).size === 14, 'typing 14 in the size box makes 14')
     await page.click('[data-fmt="sizeDn"]'); await saved(page)
     ok(styleAt(ids.sheet, 1, 2).size === 13, 'size − makes 13')
@@ -183,7 +183,7 @@ const pick = async (page, menuAttr, item) => page.click(`[${menuAttr}] [data-ite
     const nh = (await page.locator('[data-format-bar]').boundingBox()).height
     ok(await page.locator('[data-fmt="more"]').isVisible() && nh <= 46, 'groups move under ⋮; the strip stays one row', `${nh}px, hidden: ${await page.locator('[data-format-bar] .fx-fmt-g[hidden]').count()}`)
     await page.click('[data-fmt="more"]')
-    ok(await page.locator('[data-more-menu] [role="menuitem"]').count() >= 2, '⋮ lists the hidden tools')
+    ok(await page.locator('[data-more-menu] [role^="menuitem"]').count() >= 2, '⋮ lists the hidden tools')
     await page.keyboard.press('Escape')
     await page.setViewportSize({ width: 1360, height: 860 }); await page.waitForTimeout(400)
     ok(!(await page.locator('[data-fmt="more"]').count()), 'and come back when there is room')
