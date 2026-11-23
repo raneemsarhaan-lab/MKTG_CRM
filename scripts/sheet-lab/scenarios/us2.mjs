@@ -21,6 +21,7 @@ export const us2 = [
       await t.focusCell('c:c07', 'reviewer')
       await t.page.keyboard.press('ArrowLeft')
       await t.page.keyboard.press('ArrowLeft')
+      await t.page.keyboard.press('ArrowLeft')   // across Link task (spec 022)
       t.eq(await t.active(), 'c:c07|status', 'keyboard reached the status cell')
       const tip = t.page.locator('[data-cell="c:c07|status"] .fx-sheet-tip')
       t.assert(await tip.isVisible(), 'tooltip on keyboard focus (FR-012)')

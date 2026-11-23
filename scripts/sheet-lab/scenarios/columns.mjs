@@ -195,7 +195,7 @@ export const columns = [
       await pick(t, 'left')
       await t.idle(200)
       const h = await heads(t)
-      t.assert(h.indexOf('Assignee') === h.indexOf('Copy status') - 1, `moved left (${h.slice(0, 5)})`)
+      t.assert(h.indexOf('Assignee') === h.indexOf('Link task') - 1, `moved left (${h.slice(0, 5)})`)
       await t.cell(`k:${POST1}`, 'status').click()
       t.assert((await t.menuItems()).length > 0, 'built-in cells work wherever they sit')
     },
