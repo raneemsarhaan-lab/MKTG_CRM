@@ -196,9 +196,9 @@ export async function reopenThread(id: string) { return setResolved(id, false) }
 /**
  * Clear › Comments (spec 015 FR-042): the comments on these cells, soft
  * deleted. Members clear their own; admins clear all. What someone else
- * wrote is left and counted. Not on the undo stack, as in Excel (R6).
+ * wrote is left and counted. On the sheet's undo stack (FR-048, user 2026-11-23).
  */
-export async function clearCellComments(sheet: string, keys: string[]): Promise<{ success: true; cleared: number; skipped: number } | Fail> {
+export async function clearCellComments(sheet: string, keys: string[]): Promise<{ success: true; cleared: number; skipped: number; ids: string[] } | Fail> {
   const me = await getSessionMember()
   if (!me) return fail('not_authenticated')
   const s = await prisma.sheet.findUnique({ where: sheetWhere(sheet), select: { id: true } })
@@ -206,13 +206,13 @@ export async function clearCellComments(sheet: string, keys: string[]): Promise<
   // Private sheets (My tasks, a Space's) only for those who may open them.
   if (!(await mayUseSheet(s.id, me))) return fail('not_authorized')
   const pairs = keys.slice(0, 20_000).map(k => { const i = k.lastIndexOf('|'); return i > 0 ? [k.slice(0, i), k.slice(i + 1)] : null }).filter((x): x is string[] => !!x)
-  if (!pairs.length) return { success: true, cleared: 0, skipped: 0 }
+  if (!pairs.length) return { success: true, cleared: 0, skipped: 0, ids: [] }
   const rows = await prisma.$queryRaw<{ id: string; author_id: string | null }[]>`
     SELECT id, author_id FROM sheet_comments WHERE sheet_id = ${s.id}::uuid AND deleted_at IS NULL AND (row_key, col_key) IN (
       SELECT * FROM unnest(${pairs.map(p => p[0])}::text[], ${pairs.map(p => p[1])}::text[]))`
   const mine = rows.filter(r => me.access === 'admin' || r.author_id === me.id).map(r => r.id)
   if (mine.length) await prisma.sheetComment.updateMany({ where: { id: { in: mine } }, data: { deleted_at: new Date() } })
-  return { success: true, cleared: mine.length, skipped: rows.length - mine.length }
+  return { success: true, cleared: mine.length, skipped: rows.length - mine.length, ids: mine }
 }
 
 /**
@@ -252,4 +252,40 @@ export async function copyCellComments(pairs: { from: string; to: { sheet: strin
     }
   }
   return { success: true, threads: out }
+}
+
+/**
+ * Undo and redo of comment actions (spec 015 FR-048; user, 2026-11-23). Each op
+ * puts comments back the way they were: shown or removed, a text, a thread
+ * resolved or open. The same rules as the actions themselves: your own
+ * comments (an admin's: any) for live and edit; anyone with the sheet for resolve.
+ * Nobody is notified again.
+ */
+export async function applyCommentOps(ops: import('@/lib/sheet-undo').CommentOp[]): Promise<{ success: true; done: number } | Fail> {
+  const me = await getSessionMember()
+  if (!me) return fail('not_authenticated')
+  let done = 0
+  const usable = new Map<string, boolean>()
+  const may = async (sheetId: string) => { if (!usable.has(sheetId)) usable.set(sheetId, await mayUseSheet(sheetId, me)); return usable.get(sheetId)! }
+  for (const o of (Array.isArray(ops) ? ops : []).slice(0, 500)) {
+    if (o.op === 'live') {
+      const rows = await prisma.sheetComment.findMany({ where: { id: { in: (o.ids ?? []).slice(0, 5_000) } }, select: { id: true, sheet_id: true, author_id: true } })
+      const ok: string[] = []
+      for (const r of rows) if ((await may(r.sheet_id)) && (r.author_id === me.id || me.access === 'admin')) ok.push(r.id)
+      if (ok.length) { await prisma.sheetComment.updateMany({ where: { id: { in: ok } }, data: { deleted_at: o.after ? null : new Date() } }); done += ok.length }
+    } else if (o.op === 'edit') {
+      const c = await prisma.sheetComment.findUnique({ where: { id: o.id } })
+      if (!c || c.author_id !== me.id || !(await may(c.sheet_id))) continue
+      const b = await checkBody(o.after)
+      if (!('ok' in b)) continue
+      await prisma.sheetComment.update({ where: { id: o.id }, data: { body: b.body, mentions: b.mentions, edited_at: new Date() } })
+      done++
+    } else if (o.op === 'resolve') {
+      const c = await prisma.sheetComment.findUnique({ where: { id: o.id }, select: { sheet_id: true, root_id: true } })
+      if (!c || c.root_id || !(await may(c.sheet_id))) continue
+      await prisma.sheetComment.update({ where: { id: o.id }, data: o.after ? { resolved_at: new Date(), resolved_by: me.id } : { resolved_at: null, resolved_by: null } })
+      done++
+    }
+  }
+  return { success: true, done }
 }

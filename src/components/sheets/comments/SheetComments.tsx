@@ -18,7 +18,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocale, useTranslations } from 'next-intl'
 import type { SheetCommentThread } from '@/types/index'
 import { addComment, clearCellComments, copyCellComments, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
-import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, COMMENTS_PASTE, selectCell, type FormatSource, type FormatState } from '../format/bus'
+import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, COMMENTS_PASTE, COMMENTS_RELOAD, recordCommentStep, selectCell, type FormatSource, type FormatState } from '../format/bus'
 import { relativeTime } from '@/lib/notify/message'
 
 const AVATAR = ['#DB2777', '#2563EB', '#0E7C7C', '#B45309', '#7C3AED', '#15803D', '#C81E3A', '#4B5563']
@@ -120,6 +120,7 @@ export function SheetComments(p: SheetCommentsProps) {
       if (d.source !== cur.source || !cur.sheetRef || !d.keys.length) return
       const r = await api.clear(cur.sheetRef, d.keys)
       if (!r.success) { cur.say(errText(r.error)); return }
+      if (r.ids.length) recordCommentStep(cur.source, cur.sheetRef, 'commentsClear', [{ op: 'live', ids: r.ids, before: true, after: false }])
       if (r.skipped) cur.say(t('clearSkipped', { n: r.skipped }))
       setOpen(null)
       void load()
@@ -137,11 +138,20 @@ export function SheetComments(p: SheetCommentsProps) {
       const to = cur.sheetRef
       const r = await api.copy(d.pairs.map(x => ({ from: x.from, to: { sheet: to, rowKey: x.rowKey, colKey: x.colKey } })))
       if (!r.success) { cur.say(errText(r.error)); return }
+      const ids = r.threads.flatMap(th => th.comments.map(c => c.id))
+      if (ids.length) recordCommentStep(cur.source, to, 'commentsPaste', [{ op: 'live', ids, before: false, after: true }])
       if (r.threads.length) void load()
     }
     document.addEventListener(COMMENTS_PASTE, on)
     return () => document.removeEventListener(COMMENTS_PASTE, on)
   }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // After an undo or redo of a comment action, the threads as they are now.
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent<{ source: FormatSource }>).detail.source === ref.current.source) void load() }
+    document.addEventListener(COMMENTS_RELOAD, on)
+    return () => document.removeEventListener(COMMENTS_RELOAD, on)
+  }, [load])
 
   // Hovering a corner marker shows its thread.
   useEffect(() => {
@@ -192,6 +202,9 @@ export function SheetComments(p: SheetCommentsProps) {
       : await api.add(p.sheetRef, { rowKey, colKey, body: text, cell: cellLabel })
     if (!res.success) { p.say(errText(res.error)); return false }
     replace(res.thread, res.thread.id)
+    // Undo removes what was just written: a new thread's first comment, or the reply.
+    const added = thread ? res.thread.comments[res.thread.comments.length - 1]?.id : res.thread.id
+    if (added) recordCommentStep(p.source, p.sheetRef, thread ? 'commentReply' : 'commentAdd', [{ op: 'live', ids: [added], before: false, after: true }])
     setOpen(o => (o ? { ...o, draft: false, mode: 'pinned' } : o))
     return true
   }
@@ -207,13 +220,26 @@ export function SheetComments(p: SheetCommentsProps) {
           onPin={() => setOpen(o => (o ? { ...o, mode: 'pinned' } : o))}
           onClose={() => setOpen(null)}
           onSend={send}
-          onEdit={async (id, body) => { const r = await api.edit(id, body, cellLabel); if (!r.success) { p.say(errText(r.error)); return false } replace(r.thread, r.thread.id); return true }}
-          onDelete={async id => { const r = await api.del(id); if (!r.success) { p.say(errText(r.error)); return } replace(r.thread, thread?.id ?? ''); if (!r.thread) setOpen(null) }}
+          onEdit={async (id, body) => {
+            const before = thread?.comments.find(c => c.id === id)?.body ?? ''
+            const r = await api.edit(id, body, cellLabel); if (!r.success) { p.say(errText(r.error)); return false }
+            replace(r.thread, r.thread.id)
+            const after = r.thread.comments.find(c => c.id === id)?.body ?? body
+            if (p.sheetRef && before !== after) recordCommentStep(p.source, p.sheetRef, 'commentEdit', [{ op: 'edit', id, before, after }])
+            return true
+          }}
+          onDelete={async id => {
+            const r = await api.del(id); if (!r.success) { p.say(errText(r.error)); return }
+            replace(r.thread, thread?.id ?? ''); if (!r.thread) setOpen(null)
+            if (p.sheetRef) recordCommentStep(p.source, p.sheetRef, 'commentDelete', [{ op: 'live', ids: [id], before: true, after: false }])
+          }}
           onResolve={async () => {
             if (!thread) return
-            const r = thread.resolved ? await api.reopen(thread.id) : await api.resolve(thread.id)
+            const was = !!thread.resolved
+            const r = was ? await api.reopen(thread.id) : await api.resolve(thread.id)
             if (!r.success) { p.say(errText(r.error)); return }
             replace(r.thread, r.thread.id)
+            if (p.sheetRef) recordCommentStep(p.source, p.sheetRef, was ? 'commentReopen' : 'commentResolve', [{ op: 'resolve', id: thread.id, before: was, after: !was }])
             if (r.thread.resolved) setOpen(null)
           }}
         />

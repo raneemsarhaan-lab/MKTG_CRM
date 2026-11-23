@@ -10,6 +10,8 @@
  * apply on screen, push on the stack, queue for the server (R5, R6). The
  * linked tab is the board's own sheet, passed in by the page.
  */
+import { applyCommentOps } from '@/actions/sheet-comments'
+import { COMMENT_RECORD, reloadComments } from './format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
@@ -201,6 +203,7 @@ export function Workbook(p: WorkbookProps) {
     setStacks(s => ({ ...s, [id]: u.stack }))
     outbox.enqueue(id, toServer(back))
     replayFields(id, back)
+    replayComments(back)
   }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
   const doRedo = useCallback(() => {
     const id = openRef.current
@@ -211,7 +214,25 @@ export function Workbook(p: WorkbookProps) {
     setStacks(s => ({ ...s, [id]: r.stack }))
     outbox.enqueue(id, toServer(fwd))
     replayFields(id, fwd)
+    replayComments(fwd)
   }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Spec 015 FR-048: comment actions undo and redo through the comments panel's actions. */
+  function replayComments(changes: BlankChange[]) {
+    const ops = changes.flatMap(ch => (ch.kind === 'comments' ? ch.ops : []))
+    if (!ops.length) return
+    void applyCommentOps(ops).then(r => { if (!r.success) say(t('grid.reason.commentUndo')); reloadComments('blank') }).catch(() => reloadComments('blank'))
+  }
+  // A comment action on the open blank sheet is a step of its undo stack (not re-applied: it's done).
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ source: string; sheet: string; label: string; ops: import('@/lib/sheet-undo').CommentOp[] }>).detail
+      if (d.source !== 'blank' || d.sheet !== openRef.current || !d.ops.length) return
+      const id = d.sheet
+      setStacks(s => ({ ...s, [id]: push(s[id] ?? emptyStack(), makeStep(d.label, [{ kind: 'comments', ops: d.ops }])) }))
+    }
+    document.addEventListener(COMMENT_RECORD, on)
+    return () => document.removeEventListener(COMMENT_RECORD, on)
+  }, [])
 
   // The linked tab's history, from its grid (it lives in the board's sheet, not here).
   const [linkedHist, setLinkedHist] = useState({ canUndo: false, canRedo: false })

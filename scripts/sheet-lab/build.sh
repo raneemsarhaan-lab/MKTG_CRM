@@ -14,6 +14,7 @@ node "$LAB/gen.mjs" "$ROOT" "$OUT"
   --bundle --outfile="$OUT/bundle.js" --jsx=automatic --format=iife \
   --alias:@/actions/media="$LAB/media-stub.ts" \
   --alias:@/actions/space-stages="$LAB/space-stages-stub.ts" \
+  --alias:@/actions/sheet-comments="$LAB/comments-stub.ts" \
   --alias:next/navigation="$LAB/nav-stub.ts" \
   --alias:@="$ROOT/src" \
   --define:process.env.NODE_ENV='"development"' \

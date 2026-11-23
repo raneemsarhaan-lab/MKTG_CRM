@@ -61,5 +61,70 @@ module.exports = (EMAIL, psql, ok) => {
         }
       },
     },
+    {
+      id: '015-comment-undo-and-redo', as: 'admin',
+      async run({ page, go }) {
+        const t = psql(`insert into tasks (id,name,brand_id,content_type_label,task_owner_id,assignee_id,initiator_role,nine_stage,status,stage_date,priority,updated_at)
+          select gen_random_uuid(), 'Lab 015 undo ' || floor(random()*1e6)::text, (select id from brands order by name limit 1), 'Post',
+            m.id, m.id, m.role, true, 'c-prog', now(), 'Medium', now() from members m where m.email='${EMAIL.admin}' returning id`).split(/\n/)[0]
+        psql(`insert into task_spaces (task_id, space_id, added_via) values ('${t}', '${space('planning')}', 'manual') on conflict do nothing`)
+        const live = () => psql(`select count(*) from sheet_comments where row_key='${t}' and col_key='title' and deleted_at is null`)
+        try {
+          await go('/spaces/planning?view=sheet')
+          const cell = `[data-task-sheet] [data-cell$="${t}|title"]`
+          await page.waitForSelector(cell, { timeout: 60000 })
+          await page.locator(cell).click()
+          await page.keyboard.press('Control+Alt+m')
+          await page.waitForSelector('[data-cmt-input]', { timeout: 10000 })
+          await page.fill('[data-cmt-input]', 'Undo me')
+          await page.click('[data-cmt-send]')
+          await page.waitForTimeout(2000)
+          ok(live() === '1', 'the comment was added')
+          await page.keyboard.press('Escape')
+          await page.locator(cell).click()
+          await page.keyboard.press('Control+z')
+          await page.waitForTimeout(2500)
+          ok(live() === '0', 'Ctrl+Z removes it')
+          await page.keyboard.press('Control+y')
+          await page.waitForTimeout(2500)
+          ok(live() === '1', 'Ctrl+Y brings it back')
+        } finally {
+          psql(`delete from sheet_comments where row_key='${t}'`)
+          psql(`update tasks set dropped_at=now() where id='${t}'`)
+        }
+      },
+    },
+    {
+      id: '015-comment-undo-on-blank-sheet', as: 'admin',
+      async run({ page, go }) {
+        const folder = psql(`insert into sheet_folders (id, kind, name) values (gen_random_uuid(), 'team', 'Lab 015 ' || floor(random()*1e6)) returning id`).split(/\n/)[0]
+        const sheet = psql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'Undo', 0, 5, 5) returning id`).split(/\n/)[0]
+        psql(`insert into sheet_rows (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 5) g`)
+        psql(`insert into sheet_cols (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 5) g`)
+        const live = () => psql(`select count(*) from sheet_comments where sheet_id='${sheet}' and deleted_at is null`)
+        try {
+          await go(`/sheets/${folder}?sheet=${sheet}`)
+          const first = page.locator(`[data-blank-sheet="${sheet}"] .fx-sheet-tr[data-row]`).nth(0).locator('.fx-sheet-td').nth(1)
+          await first.waitFor({ timeout: 60000 })
+          await first.click()
+          await page.keyboard.press('Control+Alt+m')
+          await page.waitForSelector('[data-cmt-input]', { timeout: 10000 })
+          await page.fill('[data-cmt-input]', 'Undo me too')
+          await page.click('[data-cmt-send]')
+          await page.waitForTimeout(2000)
+          ok(live() === '1', 'the comment was added')
+          await page.keyboard.press('Escape')
+          await first.click()
+          await page.keyboard.press('Control+z')
+          await page.waitForTimeout(2500)
+          ok(live() === '0', 'Ctrl+Z removes it')
+          await page.keyboard.press('Control+y')
+          await page.waitForTimeout(2500)
+          ok(live() === '1', 'Ctrl+Y brings it back')
+        } finally {
+          psql(`delete from sheet_folders where id='${folder}'`)
+        }
+      },
+    },
   ]
 }

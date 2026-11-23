@@ -480,7 +480,7 @@ export function ContentGrid(p: ContentGridProps) {
     },
   })
   const le = useLinkedEditing<ContentRow>({
-    applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
+    sheetKey: 'linked_content', applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,

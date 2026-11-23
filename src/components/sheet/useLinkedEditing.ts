@@ -13,7 +13,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CellWrite, GridCol, WriteResult, WriteWhy } from './GridCore'
-import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type FormatsChange, type LinkedChange, type RulesChange, type Stack, type ViewChange } from '@/lib/sheet-undo'
+import { emptyStack, makeStep, push, redo as redoStack, undo as undoStack, type CommentOp, type FormatsChange, type LinkedChange, type RulesChange, type Stack, type ViewChange } from '@/lib/sheet-undo'
+import { applyCommentOps } from '@/actions/sheet-comments'
+import { COMMENT_RECORD, reloadComments } from '@/components/sheets/format/bus'
 import type { CellStyle } from '@/types/index'
 import { validateStyle } from '@/lib/sheet-format'
 
@@ -39,6 +41,8 @@ export interface LinkedEditingInput<R extends { key: string }> {
   /** Spec 015 FR-041/FR-070: a paste carries the copied cells' looks — the task a row is, and a cell's current look. */
   taskOf?(row: R): string | null
   styleOf?(row: R, col: GridCol): CellStyle | null
+  /** Spec 015 FR-048: this sheet's name as the comments panel knows it, so its comment actions join this undo stack. */
+  sheetKey?: string
   /** Spec 015 stage 3: put the sheet's rules, or its sort and filter, back (undo and redo). */
   applyExtra?(change: RulesChange | ViewChange): Promise<boolean>
 }
@@ -158,6 +162,10 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
         if (ref.current.applyFormats && !(await ref.current.applyFormats(change.items))) skipped.invalid = (skipped.invalid ?? 0) + change.items.length
       } else if (change.kind === 'rules' || change.kind === 'view') {
         if (ref.current.applyExtra && !(await ref.current.applyExtra(change))) skipped.invalid = (skipped.invalid ?? 0) + 1
+      } else if (change.kind === 'comments') {
+        const r = await applyCommentOps(change.ops).catch(() => ({ success: false as const }))
+        if (!r.success) skipped.invalid = (skipped.invalid ?? 0) + 1
+        reloadComments('linked')
       } else if (change.kind === 'dropRows' || change.kind === 'restoreRows') {
         const fn = change.kind === 'dropRows' ? ref.current.drop : ref.current.restore
         if (!fn) continue
@@ -196,6 +204,19 @@ export function useLinkedEditing<R extends { key: string }>(p: LinkedEditingInpu
   }, [apply])
 
   /** Spec 015: a formatting change already applied and saved, remembered as one undo step. */
+  // Spec 015 FR-048: a comment action on this sheet is a step of its undo stack (it's already done).
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ source: string; sheet: string; label: string; ops: CommentOp[] }>).detail
+      const mine = ref.current.sheetKey
+      if (d.source !== 'linked' || !mine || d.sheet !== mine || !d.ops.length) return
+      stack.current = push(stack.current, makeStep(d.label, [{ kind: 'comments', ops: d.ops }]))
+      setTick(t => t + 1)
+    }
+    document.addEventListener(COMMENT_RECORD, on)
+    return () => document.removeEventListener(COMMENT_RECORD, on)
+  }, [])
+
   const recordFormats = useCallback((label: string, items: FormatsChange['items']) => {
     if (!items.length) return
     stack.current = push(stack.current, makeStep(label, [{ kind: 'formats', items }]))

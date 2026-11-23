@@ -92,6 +92,8 @@ export function applyChange(doc: SheetDoc, ch: BlankChange): SheetDoc {
       const ex = doc.extras ?? emptyExtras()
       return { ...doc, extras: { ...ex, tables: ch.after } }
     }
+    // Comment actions are replayed through the comments panel (spec 015 FR-048), not the doc.
+    case 'comments': return doc
     case 'commentMoves': {
       // The threads' markers follow their cells.
       const ex = doc.extras ?? emptyExtras()
@@ -190,6 +192,7 @@ export function toServer(chs: BlankChange[]): SheetChanges {
       case 'taskMap': out.taskMap = ch.after; break
       case 'rowTasks': out.rowTasks = lastByRow([...(out.rowTasks ?? []), ...ch.rows.map(r => ({ rowId: r.rowId, taskId: r.after }))]); break
       case 'taskFields': break
+      case 'comments': break
     }
   }
   return out

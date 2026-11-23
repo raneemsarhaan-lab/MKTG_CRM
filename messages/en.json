@@ -1242,7 +1242,8 @@
         "protected": "the sheet is protected",
         "gone": "{n, plural, one {# row or column was removed} other {# rows or columns were removed}}",
         "invalid": "{n, plural, one {# value isn't valid} other {# values aren't valid}}",
-        "limit": "{n, plural, one {# cell was past the sheet's size limit} other {# cells were past the sheet's size limit}}"
+        "limit": "{n, plural, one {# cell was past the sheet's size limit} other {# cells were past the sheet's size limit}}",
+        "commentUndo": "That comment change couldn't be undone. Try again."
       }
     },
     "menu": {

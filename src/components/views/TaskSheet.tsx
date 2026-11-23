@@ -432,7 +432,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
   })
   const le = useLinkedEditing<Row>({
-    applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
+    sheetKey: sheet, applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText: model.isText, textValue: model.textValue,
     commit: (row, col, v) => (row.kind === 'task' ? commit(row.task, col, v) : Promise.resolve(null)),

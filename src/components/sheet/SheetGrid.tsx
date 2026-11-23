@@ -520,7 +520,7 @@ export function SheetGrid(p: SheetGridProps) {
     },
   })
   const le = useLinkedEditing<SheetRow>({
-    applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => rowTask(row)?.id ?? null,
+    sheetKey: 'linked_video', applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => rowTask(row)?.id ?? null,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
