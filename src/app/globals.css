@@ -1395,6 +1395,9 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 .fx-sheet-td { cursor: default; outline: none; }
 .fx-sheet-td.is-action { cursor: pointer; }
 .fx-sheet-td.is-active { box-shadow: inset 0 0 0 2px var(--sheet-focus); z-index: 3; }
+/* The active cell's own ring is its focus indicator; the general sheet
+   :focus-visible outline on top of it drew a second line around the cell. */
+.fx-sheet-td.is-active:focus-visible { outline: none; }
 .fx-sheet-td.is-frozen-no.is-active, .fx-sheet-td.is-frozen-title.is-active { z-index: 3; }
 .fx-sheet-tr:hover > .fx-sheet-td:not(.is-frozen-no) { background: var(--sheet-hover); }
 .fx-sheet-tr.is-video > .fx-sheet-td:not(.is-frozen-no) { background: var(--sheet-video-row); font-weight: 600; }
