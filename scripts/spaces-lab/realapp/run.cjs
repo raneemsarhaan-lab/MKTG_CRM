@@ -49,6 +49,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-dates.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-023-a.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-search.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-mytasks.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {
@@ -59,7 +60,8 @@ const SCENARIOS = [
   for (const sc of SCENARIOS.filter(s => !filters.length || filters.some(f => s.id.includes(f)))) {
     const s = await signIn(browser, sc.as)
     try {
-      await sc.run({ ...s, BASE, go: async p => { const r = await s.page.goto(BASE + p, { waitUntil: 'networkidle', timeout: 120000 }); await s.page.waitForTimeout(300); return r } })
+      // signInAs: a second member's page, for checks across people (e.g. private to-dos).
+      await sc.run({ ...s, BASE, signInAs: who => signIn(browser, who), go: async p => { const r = await s.page.goto(BASE + p, { waitUntil: 'networkidle', timeout: 120000 }); await s.page.waitForTimeout(300); return r } })
       if (s.errors.length) throw new Error(`page error: ${s.errors[0]}`)
       console.log(`PASS ${sc.id}`)
     } catch (e) {

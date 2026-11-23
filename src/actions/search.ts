@@ -20,6 +20,7 @@ export interface TaskResult {
   hit: Hit
 }
 export interface AssetResult { id: string; filename: string; url: string | null; where: 'task' | 'brand'; taskId?: string; taskName?: string; brand: { id: string; name: string; color: string } | null; hit: Hit }
+export interface TodoResult { id: string; name: string; day: string | null; done: boolean; hit: Hit }
 export interface SearchResult {
   success: true
   query: string
@@ -28,6 +29,8 @@ export interface SearchResult {
   suggestion: string | null
   tasks: TaskResult[]; taskCount: number
   assets: AssetResult[]; assetCount: number
+  /** My to-dos only (they are private). */
+  todos: TodoResult[]; todoCount: number
   /** Nothing matched: the tasks nearest the search, by spelling. */
   nearest: TaskResult[]
 }
@@ -39,10 +42,10 @@ export async function searchWorkspace(raw: string, opts: { spaceKey?: string | n
   if (!me) return { success: false, error: 'not_authenticated' }
   const q = parseQuery(String(raw ?? '').slice(0, 200))
   const limit = Math.min(Math.max(opts.limit ?? 5, 1), 200)
-  const empty: SearchResult = { success: true, query: q.raw, exact: q.exact, suggestion: null, tasks: [], taskCount: 0, assets: [], assetCount: 0, nearest: [] }
+  const empty: SearchResult = { success: true, query: q.raw, exact: q.exact, suggestion: null, tasks: [], taskCount: 0, assets: [], assetCount: 0, todos: [], todoCount: 0, nearest: [] }
   if (!q.words.length) return empty
 
-  const [tasks, spaces, brandAssets] = await Promise.all([
+  const [tasks, spaces, brandAssets, myTodos] = await Promise.all([
     prisma.task.findMany({
       where: { dropped_at: null },
       select: {
@@ -56,6 +59,7 @@ export async function searchWorkspace(raw: string, opts: { spaceKey?: string | n
     }),
     prisma.teamSpace.findMany({ select: { id: true, key: true, name: true } }),
     prisma.brandAsset.findMany({ select: { id: true, filename: true, url: true, brand: { select: { id: true, name: true, color: true } } } }),
+    prisma.todo.findMany({ where: { owner_id: me.id, OR: [{ done_at: null }, { done_at: { gte: new Date(Date.now() - 30 * 86_400_000) } }] } }),
   ])
   const spaceById = new Map(spaces.map(s => [s.id, s]))
   const ctxSpace = opts.spaceKey ? spaces.find(s => s.key === opts.spaceKey)?.id ?? null : null
@@ -99,6 +103,11 @@ export async function searchWorkspace(raw: string, opts: { spaceKey?: string | n
   ]
   const assets = rank(assetRows, q, ctx)
 
+  // My to-dos: the name, then the note (as Description).
+  const todoRows = myTodos.map(x => ({ id: x.id, name: x.name, text: x.note ? [{ field: 'description' as const, value: x.note }] : [], other: [],
+    open: !x.done_at, brand_id: null, space_ids: [], publish_date: x.day ? x.day.toISOString().slice(0, 10) : null }))
+  const todos = rank(todoRows, q, ctx)
+
   // "Did you mean": only from words the workspace uses (task names, Caption, TOV, brands).
   const vocab = vocabulary([...rows.map(r => r.name), ...rows.flatMap(r => r.text.filter(x => x.field !== 'description').map(x => x.value)), ...new Set(rows.map(r => r.brand?.name ?? ''))])
   const typo = ranked.length ? didYouMean(q, vocab) : null
@@ -110,6 +119,7 @@ export async function searchWorkspace(raw: string, opts: { spaceKey?: string | n
     tasks: ranked.slice(0, limit).map(r => result(r.task, r.hit)), taskCount: ranked.length,
     assets: assets.slice(0, limit).map(a => ({ id: a.task.id, filename: a.task.name, url: a.task.url, where: a.task.where, taskId: a.task.taskId, taskName: a.task.taskName, brand: a.task.brand, hit: a.hit })),
     assetCount: assets.length,
-    nearest: ranked.length || assets.length ? [] : closest(rows, q).map(r => result(r, { id: r.id, level: 7, sub: 0, field: 'name', bold: [] })),
+    todos: todos.slice(0, limit).map(r => ({ id: r.task.id, name: r.task.name, day: r.task.publish_date, done: !r.task.open, hit: r.hit })), todoCount: todos.length,
+    nearest: ranked.length || assets.length || todos.length ? [] : closest(rows, q).map(r => result(r, { id: r.id, level: 7, sub: 0, field: 'name', bold: [] })),
   }
 }

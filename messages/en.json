@@ -9,7 +9,9 @@
     "team": "Plan",
     "sheets": "Sheets",
     "hours": "Hours",
-    "taskTypes": "Task types"
+    "taskTypes": "Task types",
+    "myTasks": "My tasks",
+    "overdueN": "{n} overdue"
   },
   "greeting": {
     "morning": "Good morning",
@@ -3425,5 +3427,79 @@
     "in_name": "in the name",
     "onTask": "On {task}",
     "inBrand": "{brand} brand files"
+  },
+  "myTasks": {
+    "hello": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}"
+    },
+    "lede": "{open, plural, =0 {Nothing open.} one {# open} other {# open}}{overdue, plural, =0 {.} one {, # of them overdue.} other {, # of them overdue.}}",
+    "views": "Board and sheet views",
+    "dateLabel": "Show tasks as of",
+    "backToToday": "Today",
+    "lists": "Lists",
+    "tiles": {
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "overdue": "Overdue",
+      "all": "All"
+    },
+    "sub": "{open} shown · {todos, plural, one {# to-do} other {# to-dos}}",
+    "groupBy": "Group by",
+    "group": {
+      "date": "Date",
+      "brand": "Brand",
+      "space": "Space"
+    },
+    "sections": {
+      "overdue": "Overdue",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "week": "This week",
+      "later": "Later",
+      "none": "No date",
+      "personal": "Personal"
+    },
+    "personal": "Personal to-dos",
+    "noBrand": "No brand",
+    "noSpace": "No Space",
+    "todayWord": "Today",
+    "empty": {
+      "today": "Nothing due today.",
+      "upcoming": "Nothing due in the next 7 days.",
+      "overdue": "Nothing overdue.",
+      "all": "Nothing open. Add a to-do below."
+    },
+    "newTodo": "New to-do",
+    "newTodoIn": "New to-do in {section}",
+    "complete": "Complete {name}",
+    "reopen": "Mark {name} as not done",
+    "flagged": "Flagged",
+    "private": "To-dos are private to you.",
+    "showDone": "Show completed",
+    "hideDone": "Hide completed",
+    "noneDone": "Nothing completed in the last 30 days.",
+    "published": "Published",
+    "name": "To-do",
+    "note": "Note",
+    "notePh": "Add a note",
+    "date": "Date",
+    "flag": "Flag",
+    "unflag": "Unflag",
+    "makeTask": "Make it a task",
+    "delete": "Delete",
+    "done": "Done",
+    "makeTaskTitle": "Make it a task",
+    "makeTaskLede": "“{name}” becomes a pipeline task at To Do, assigned to you. Its note becomes the description and its date the publishing date.",
+    "brand": "Brand",
+    "space": "Space",
+    "cancel": "Cancel",
+    "makeTaskGo": "Create task",
+    "makeFailed": "Couldn't create the task. Check the brand and Space.",
+    "madeTask": "Task created.",
+    "notSaved": "Couldn't save that. Try again.",
+    "notMoved": "Couldn't move that task.",
+    "moved": "{name} moved on."
   }
 }

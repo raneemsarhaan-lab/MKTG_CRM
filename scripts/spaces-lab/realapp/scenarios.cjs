@@ -21,7 +21,7 @@ module.exports = (EMAIL, psql, ok) => {
         await go('/board')
         const nodes = await page.$$eval('[data-nav-tree] [data-node^="space:"]', els => els.map(e => e.getAttribute('data-node')))
         ok(['space:content', 'space:design', 'space:video', 'space:planning'].every(k => nodes.includes(k)), `admin sees all Spaces, got ${nodes}`)
-        ok(await page.$('[data-nav-tree] [data-node="me"]'), 'Me › My tasks link')
+        ok(await page.$('nav a[href="/my-tasks"]'), 'My tasks at the top of the sidebar')
       },
     },
     {

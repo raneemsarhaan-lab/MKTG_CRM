@@ -109,6 +109,11 @@ export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: Pi
                 {NAV_ICON[key]}
               </svg>
               {t(key)}
+              {key === 'myTasks' && tree?.myTasks && (
+                <span data-nav-count="" style={{ marginInlineStart: 'auto', fontSize: 12, fontWeight: 600, color: PIPE.textMuted, fontVariantNumeric: 'tabular-nums' }}>
+                  {tree.myTasks.open}{tree.myTasks.overdue > 0 && <> · <span style={{ color: '#D22040', fontWeight: 800 }} title={t('overdueN', { n: tree.myTasks.overdue })}>{tree.myTasks.overdue}</span></>}
+                </span>
+              )}
             </Link>
           )
           // Spec 021: pinned folders moved from under Sheets to Me, in the tree below.

@@ -83,6 +83,8 @@ model Member {
   /// Spec 021: team Space memberships, Shows in rows this member added, saved views.
   space_memberships TeamSpaceMember[]
   task_spaces_added TaskSpace[]       @relation("TaskSpaceAdder")
+  /// My tasks: personal to-dos, private to their owner.
+  todos             Todo[]
   views_owned       SavedView[]       @relation("SavedViewOwner")
   views_created     SavedView[]       @relation("SavedViewCreator")
 
@@ -1299,4 +1301,23 @@ model Milestone {
 
   @@index([day])
   @@map("milestones")
+}
+
+/// My tasks (user, 2026-11-23): a personal to-do. Private to its owner: no stages,
+/// SLA, approvals or board; never in Spaces, brands, sheets, reports or workload.
+model Todo {
+  id         String    @id @default(uuid()) @db.Uuid
+  owner_id   String    @db.Uuid
+  name       String
+  note       String?
+  day        DateTime? @db.Date
+  flagged    Boolean   @default(false)
+  done_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  owner Member @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_id, done_at])
+  @@map("todos")
 }

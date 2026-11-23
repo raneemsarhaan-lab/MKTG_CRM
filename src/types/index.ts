@@ -258,6 +258,8 @@ export interface TaskFieldDef {
 }
 export interface TaskTypeFieldLink { type_label: string; field_id: string; required_from: StageId | null; default_value: unknown; position: number }
 export interface TaskFieldValueRow { task_id: string; field_id: string; value: unknown }
+/** My tasks: a personal to-do, private to its owner. */
+export interface Todo { id: string; name: string; note: string | null; day: string | null; flagged: boolean; done_at: string | null; created_at: string }
 /** Spec 023 (R6): a brand's calendar marker — not a task. */
 export interface Milestone { id: string; brand_id: string; name: string; day: string }
 
@@ -985,6 +987,8 @@ export interface HoursWeekReport {
 export interface NavTree {
   /** Open tasks assigned to me or handed off by me. */
   myOpen: number
+  /** My tasks page (user, 2026-11-23): open tasks and to-dos that are mine, and how many are overdue. */
+  myTasks?: { open: number; overdue: number }
   spaces: { id: string; key: string; name: string; color: string; open: number }[]
   brands: { id: string; name: string; color: string; open: number }[]
   /** Open tasks with no brand; the "No brand" entry shows only when > 0. */

@@ -10,7 +10,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import { searchWorkspace, type AssetResult, type SearchResult, type TaskResult } from '@/actions/search'
+import { searchWorkspace, type AssetResult, type SearchResult, type TaskResult, type TodoResult } from '@/actions/search'
 import { normalize } from '@/lib/search'
 import { STAGE_META } from '@/lib/stage-meta'
 import { formatDay } from '@/lib/due-dates'
@@ -46,7 +46,7 @@ export function SearchDialog() {
   const [text, setText] = useState('')
   const [res, setRes] = useState<SearchResult | null>(null)
   const [busy, setBusy] = useState(false)
-  const [all, setAll] = useState<'tasks' | 'assets' | null>(null)
+  const [all, setAll] = useState<'tasks' | 'assets' | 'todos' | null>(null)
   const [cursor, setCursor] = useState(0)
   const input = useRef<HTMLInputElement>(null)
   const seq = useRef(0)
@@ -59,7 +59,7 @@ export function SearchDialog() {
     return () => { window.removeEventListener(OPEN_SEARCH, show); window.removeEventListener('keydown', key) }
   }, [])
 
-  const run = useCallback((q: string, more: 'tasks' | 'assets' | null) => {
+  const run = useCallback((q: string, more: 'tasks' | 'assets' | 'todos' | null) => {
     const id = ++seq.current
     if (!q.trim()) { setRes(null); setBusy(false); return }
     setBusy(true)
@@ -94,7 +94,7 @@ export function SearchDialog() {
   const flat = useMemo(() => {
     if (!res) return [] as (() => void)[]
     const list = res.tasks.length ? res.tasks : res.nearest
-    return [...list.map(x => () => openTask(x.id, x.space)), ...res.assets.map(a => () => openAsset(a))]
+    return [...list.map(x => () => openTask(x.id, x.space)), ...res.todos.map(() => () => { close(); router.push('/my-tasks') }), ...res.assets.map(a => () => openAsset(a))]
   }, [res]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
@@ -140,7 +140,22 @@ export function SearchDialog() {
       </button>
     )
   }
-  const group = (key: 'tasks' | 'assets', title: string, n: number, rows: ReactNode[]) => n > 0 && (
+  const todoRow = (x: TodoResult): ReactNode => {
+    const i = ++idx
+    return (
+      <button key={x.id} type="button" role="option" aria-selected={cursor === i} data-search-todo={x.id} onMouseEnter={() => setCursor(i)} onClick={() => { close(); router.push('/my-tasks') }}
+        style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto', gap: 10, alignItems: 'start', width: '100%', textAlign: 'start', border: 'none',
+          background: cursor === i ? '#F4FBD6' : 'transparent', borderRadius: 10, padding: '9px 10px', cursor: 'pointer', font: 'inherit' }}>
+        <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', border: '1.6px solid #C9CACC', marginTop: 2, background: x.done ? '#3E7BEA' : 'transparent' }} />
+        <span style={{ minWidth: 0, display: 'grid', gap: 2 }}>
+          <span style={{ fontSize: 14, color: PIPE.ink, textDecoration: x.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Bold text={x.name} words={x.hit.field === 'name' ? x.hit.bold : []} /></span>
+          {x.hit.snippet && <span style={{ fontSize: 12.5, color: PIPE.textSecondary }}><Bold text={x.hit.snippet} words={x.hit.bold} /></span>}
+        </span>
+        <span style={{ fontSize: 12, color: PIPE.textMuted, whiteSpace: 'nowrap' }}>{x.day ? formatDay(x.day, locale) : ''}</span>
+      </button>
+    )
+  }
+  const group = (key: 'tasks' | 'assets' | 'todos', title: string, n: number, rows: ReactNode[]) => n > 0 && (
     <section data-search-group={key} style={{ display: 'grid', gap: 2 }}>
       <h3 style={{ margin: '10px 10px 4px', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: PIPE.textMuted, display: 'flex', justifyContent: 'space-between' }}>
         <span>{title} <span style={{ fontWeight: 600 }}>{n}</span></span>
@@ -151,7 +166,7 @@ export function SearchDialog() {
     </section>
   )
 
-  const nothing = res && !res.tasks.length && !res.assets.length
+  const nothing = res && !res.tasks.length && !res.assets.length && !res.todos.length
   return (
     <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) close() }}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(20,19,15,.28)', display: 'grid', justifyItems: 'center', alignItems: 'start',
@@ -190,6 +205,7 @@ export function SearchDialog() {
             </div>
           )}
           {res && group('tasks', t('tasks'), res.taskCount, res.tasks.map(taskRow))}
+          {res && group('todos', t('todos'), res.todoCount, res.todos.map(todoRow))}
           {res && group('assets', t('assets'), res.assetCount, res.assets.map(assetRow))}
           {res?.exact && <p style={{ margin: '10px 10px 0', fontSize: 12, color: PIPE.textFaint }}>{t('exactNote')}</p>}
         </div>

@@ -337,4 +337,21 @@ check('pure-search', () => {
   ok(S.closest(tasks, S.parseQuery('Ramdaan nihgts')).length > 0, 'never an empty screen')
 })
 
+// My tasks (user, 2026-11-23): what's mine, sections, tiles, a new to-do's date.
+check('pure-my-tasks', () => {
+  const M = m.myTasks, today = '2026-11-23'
+  eq(['2026-11-20', '2026-11-23', '2026-11-24', '2026-11-29', '2026-11-30', null].map(d => M.sectionOf(d, today)), ['overdue', 'today', 'tomorrow', 'week', 'later', 'none'], 'sections')
+  eq(M.sectionDay('tomorrow', today), '2026-11-24', 'a to-do added under Tomorrow is due tomorrow')
+  eq(M.sectionDay('none', today), null, '…under No date has none')
+  eq(M.tileCounts(['2026-11-20', '2026-11-23', '2026-11-25', '2026-12-30', null], today), { today: 1, upcoming: 1, overdue: 1, all: 5 }, 'tiles')
+  const me = { id: 'me', role: 'Marketing Manager' }
+  eq(M.stagesHeldBy('Marketing Manager'), ['c-final', 'final-check'], 'the review stages a role holds')
+  const reviewStage = 'c-final'
+  ok(M.isMine({ status: 'c-prog', assignee_id: 'me' }, me), 'assigned to me')
+  ok(!M.isMine({ status: 'c-prog', assignee_id: 'x' }, me), 'someone else\'s working stage')
+  ok(M.isMine({ status: reviewStage, assignee_id: 'x' }, me), 'waiting in a review stage my role holds')
+  ok(!M.isMine({ status: 'publish', assignee_id: 'me' }, me), 'published is not open')
+  ok(!M.isMine({ status: 'c-prog', assignee_id: 'me', dropped_at: '2026-01-01' }, me), 'dropped is not open')
+})
+
 if (failed) process.exitCode = 1

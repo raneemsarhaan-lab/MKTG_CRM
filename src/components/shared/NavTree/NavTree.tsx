@@ -91,12 +91,7 @@ export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTree
       {header('me', t('me'))}
       {!collapsed.includes('me') && (
         <>
-          <Link href="/me" data-node="me" style={row(isOn('/me'))} aria-current={isOn('/me') ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M9 11l3 3 8-8" /><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
-            </svg>
-            {name(t('myTasks'))}{count(tree.myOpen)}
-          </Link>
+          {/* My tasks moved to the top of the sidebar (user, 2026-11-23); its board and sheet views stay at /me. */}
           <Link href="/sheets" data-node="my-sheets" style={row(isOn('/sheets'))} aria-current={isOn('/sheets') ? 'page' : undefined}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" x2="21" y1="9" y2="9" /><line x1="3" x2="21" y1="15" y2="15" /><line x1="9" x2="9" y1="3" y2="21" />
