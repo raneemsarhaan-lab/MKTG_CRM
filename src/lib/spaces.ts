@@ -62,10 +62,12 @@ export function spacesForAssignee(
   members: MembersBySpace,
 ): string[] {
   if (!assigneeId) return []
-  const kind = kindOf(task)
+  // Every task starts simple now (user, 2026-11-23), so the kind no longer decides
+  // placement: an assignee's Planning-type Space is skipped for every task.
+  void kindOf(task)
   return spaces
     .filter(s => live(s) && (members[s.id] ?? []).includes(assigneeId))
-    .filter(s => kind === 'simple' || s.default_kind !== 'simple')
+    .filter(s => s.default_kind !== 'simple')
     .map(s => s.id)
 }
 
@@ -130,10 +132,11 @@ export function handoffDefaults(
 }
 
 /** The default Spaces for a member creating a task outside any Space (FR-028). */
-export function creatorSpaces(memberId: string, kind: TaskKind, spaces: SpaceLike[], members: MembersBySpace): string[] {
+export function creatorSpaces(memberId: string, _kind: TaskKind, spaces: SpaceLike[], members: MembersBySpace): string[] {
+  // The same for every task (user, 2026-11-23): the creator's working Spaces, not Planning.
   return spaces
     .filter(s => live(s) && (members[s.id] ?? []).includes(memberId))
-    .filter(s => (kind === 'simple' ? s.default_kind === 'simple' : s.default_kind !== 'simple'))
+    .filter(s => s.default_kind !== 'simple')
     .map(s => s.id)
 }
 

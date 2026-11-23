@@ -4,7 +4,7 @@ import { datesFor, newTaskDates } from '@/lib/due-dates-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
-import { addAssigneeSpaces, addSpaces, handoffFor, kindForSpace, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
+import { addAssigneeSpaces, addSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
 import { isSimpleStatus } from '@/lib/simple-status'
 import type { SimpleStatus } from '@/types/index'
 import { needsHandoff } from '@/lib/spaces'
@@ -346,6 +346,9 @@ export async function createSubtask(
     data: {
       name:               trimmed,
       parent_task_id:     parent.id,
+      // A subtask takes its parent's kind: a simple task's subtasks are simple, a video's clips are pipeline.
+      kind:               parent.kind,
+      simple_status:      parent.kind === 'simple' ? 's-todo' : null,
       brand_id:           parent.brand_id,
       content_type_label: parent.content_type_label,
       platform:           parent.platform,
@@ -921,7 +924,8 @@ export async function createTask(
   const nineStage = await nineStageFor(input.brand_id)
   // Spec 021 (approved design): the task takes the stages of the Space it is created in.
   const spaceCtx = await loadSpaceContext()
-  const kind = kindForSpace(input.space_id, spaceCtx)
+  // User, 2026-11-23: every new task starts simple; a Task link makes it a pipeline task.
+  const kind = 'simple' as const
 
   const task = await prisma.task.create({
     data: {
@@ -1024,7 +1028,7 @@ export async function createTasks(
   const now = new Date()
   const shareDates = await newTaskDates(shared.publish_date, shared.due_date)
   const spaceCtx = await loadSpaceContext()
-  const kind = kindForSpace(shared.space_id, spaceCtx)
+  const kind = 'simple' as const
 
   try {
     const ids = clean.map(() => crypto.randomUUID())

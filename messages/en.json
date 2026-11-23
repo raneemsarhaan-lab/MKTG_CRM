@@ -581,7 +581,7 @@
         "me": "{name} (me)",
         "due": "Due",
         "getsSimple": "Gets {space}'s stages (a simple task: no SLA, no approvals):",
-        "getsPipeline": "Gets {space}'s stages (the pipeline, with its owners, SLA and approvals):",
+        "getsPipeline": "Linked here, it becomes a pipeline task (owners, SLA and approvals), shown in {space}:",
         "cancel": "Cancel",
         "make": "Create and link",
         "making": "Creating…",
@@ -3033,7 +3033,8 @@
     "pinnedMark": "Pinned",
     "hide": "Hide",
     "hiddenViews": "Hidden ({n})",
-    "showView": "Show {name}"
+    "showView": "Show {name}",
+    "startsSimple": "It starts as a simple task (To Do › In progress › Done). Linking it from a Task link makes it a pipeline task."
   },
   "calendar": {
     "today": "Today",

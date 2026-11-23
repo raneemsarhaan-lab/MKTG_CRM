@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
+import { makePipeline } from '@/lib/task-kind-server'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { mapSheetColumn } from '@/lib/mappers'
@@ -393,6 +394,8 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
     values[e.taskId] = p.value
     saved++
   }
+  // A task linked to through a Task link field becomes a pipeline task (user, 2026-11-23).
+  if (vc.kind === 'task') await makePipeline(Object.values(values))
   done()
   return { success: true, saved, values, refused }
 }

@@ -64,13 +64,7 @@ export function SpacesSettings({ members }: { members: Member[] }) {
               <input type="checkbox" checked={r.is_production} onChange={e => run(() => updateSpace(r.id, { is_production: e.target.checked }))} />
               {t('production')}
             </label>
-            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-              {t('defaultKind')}
-              <select value={r.default_kind} onChange={e => run(() => updateSpace(r.id, { default_kind: e.target.value === 'simple' ? 'simple' : 'pipeline' }))} style={input}>
-                <option value="pipeline">{t('pipeline')}</option>
-                <option value="simple">{t('simple')}</option>
-              </select>
-            </label>
+            {/* No default kind (user, 2026-11-23): every task starts simple; a Task link makes it a pipeline task. */}
           </div>
           <details>
             <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{t('members')} · {r.memberIds.length}</summary>

@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
+import { makePipeline } from '@/lib/task-kind-server'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { initial, needsRenumber } from '@/lib/sheet-positions'
@@ -751,6 +752,8 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
         if (ok.length) {
           await tx.$executeRaw`UPDATE sheet_rows s SET task_id = t.tid FROM unnest(${ok.map(x => x.rowId)}::uuid[], ${ok.map(x => x.taskId)}::text[]::uuid[]) AS t(rid, tid)
             WHERE s.id = t.rid AND s.sheet_id = ${sheetId}::uuid`
+          // A task a sheet row links to becomes a pipeline task (user, 2026-11-23).
+          await makePipeline(ok.map(x => x.taskId), tx)
         }
       }
 

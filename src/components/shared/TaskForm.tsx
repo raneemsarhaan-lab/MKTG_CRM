@@ -420,7 +420,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
 
             {showIn && (
               <span data-gets-stages style={{ flexBasis: '100%', fontSize: 12, color: CU.muted }}>
-                {spaceKinds[showIn] === 'simple' ? tViews('getsSimple') : tViews('getsPipeline')}
+                {tViews('startsSimple')}
               </span>
             )}
 

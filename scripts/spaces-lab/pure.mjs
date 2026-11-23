@@ -31,7 +31,7 @@ check('pure-starting-spaces-table', () => {
 check('pure-spaces-for-assignee', () => {
   eq(m.spacesForAssignee({ kind: 'pipeline' }, 'karim', lab.spaces, lab.bySpace), [S.video], 'editor')
   eq(m.spacesForAssignee({ kind: 'pipeline' }, 'noran', lab.spaces, lab.bySpace), [S.content], 'Planning skipped for pipeline')
-  eq(sorted(m.spacesForAssignee({ kind: 'simple' }, 'noran', lab.spaces, lab.bySpace)), sorted([S.content, S.planning]), 'simple keeps Planning')
+  eq(m.spacesForAssignee({ kind: 'simple' }, 'noran', lab.spaces, lab.bySpace), [S.content], 'every task skips Planning (kind no longer decides)')
   eq(m.spacesForAssignee({ kind: 'pipeline' }, 'raneem', lab.spaces, lab.bySpace), [], 'an admin outside every Space adds none')
   eq(m.spacesForAssignee({ kind: 'pipeline' }, null, lab.spaces, lab.bySpace), [], 'no assignee')
   const archived = lab.spaces.map(s => s.key === 'video' ? { ...s, archived_at: '2026-11-01' } : s)
@@ -66,7 +66,7 @@ check('pure-handoff-defaults', () => {
 
 check('pure-creator-spaces', () => {
   eq(m.creatorSpaces('noran', 'pipeline', lab.spaces, lab.bySpace), [S.content], 'pipeline task → Content')
-  eq(m.creatorSpaces('noran', 'simple', lab.spaces, lab.bySpace), [S.planning], 'simple task → Planning')
+  eq(m.creatorSpaces('noran', 'simple', lab.spaces, lab.bySpace), [S.content], 'a new (simple) task → the creator\'s working Space')
   eq(m.creatorSpaces('raneem', 'pipeline', lab.spaces, lab.bySpace), [], 'admin outside every Space')
 })
 

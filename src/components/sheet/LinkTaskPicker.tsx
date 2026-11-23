@@ -84,7 +84,8 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
   }, [ctx.tasks, q, exclude, current])
 
   const sp = ctx.spaces.find(x => x.id === space)
-  const simple = sp?.default_kind === 'simple'
+  // Made here, it is linked at once, so it is a pipeline task whichever Space it shows in (user, 2026-11-23).
+  const simple = false
   const name = (q || typed).trim()
   const stageLine = (() => {
     if (!sp) return ''

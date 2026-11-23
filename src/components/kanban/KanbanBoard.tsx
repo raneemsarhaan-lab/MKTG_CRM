@@ -1138,7 +1138,7 @@ export function KanbanBoard({
     />
   )
   // Spec 021: the creator's own pipeline Spaces, for "Show in" when not created from a Space.
-  const mySpaces = spaces.filter(x => x.default_kind !== 'simple' && spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
+  const mySpaces = spaces.filter(x => spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
   const taskForm = showTaskForm && (
     <TaskForm
       currentUser={currentUser}
