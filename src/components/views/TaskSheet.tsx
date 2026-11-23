@@ -31,7 +31,9 @@ import { useUIStore } from '@/store/useUIStore'
 import type { SheetId, StageId, Task } from '@/types/index'
 import { STAGE_META, NINE_STAGE } from '@/lib/stage-meta'
 import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
-import { matchWord, wordOf, type SpaceWords } from '@/lib/space-words'
+import { matchSpaceStage } from '@/lib/space-stages'
+import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
+import { stagesForSpace } from '@/lib/space-stages'
 import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
 import { formatDay, isOverdue } from '@/lib/due-dates'
 import { ManualMark } from '@/components/shared/DueDates'
@@ -72,12 +74,12 @@ interface TaskSheetProps {
   fields?: string[] | null
   /** T081: the Tasks sheet's key ('tasks:<node>') in its workbook: formats, rules, view and columns live there. */
   sheetKey?: string
-  /** Spec 021 (US3): a team Space's status words; cells show them and typing one moves the task. */
-  words?: SpaceWords
+  /** Spec 022 (US4): a team Space's stages; cells show them and typing one moves the task (or its sub-stage). */
+  stages?: SpaceStagesApi | null
   label: string
 }
 
-export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, sheetKey, words, label }: TaskSheetProps) {
+export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, sheetKey, stages, label }: TaskSheetProps) {
   const t = useTranslations('taskSheet')
   const tf = useTranslations('sheets.fields')
   const tcol = useTranslations('sheet.columns')
@@ -131,7 +133,10 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     return m ? (locale === 'ar' ? m.label_ar : m.label_en) : s
   }
   // US3: a Space's word shows alone; the board name is on hover.
-  const stageWord = (s: string) => wordOf(s, words) ?? boardWord(s)
+  const stageWord = (s: string) => stages?.stageName(s) ?? boardWord(s)
+  const stageOf = (x: ViewTask) => stages?.name(x) ?? boardWord(x.status)
+  // Without a Space, typed names are the original stages' (English or Arabic).
+  const plain = useMemo(() => stagesForSpace('-', [], locale), [locale])
   const may = (x: ViewTask) => canActOn({ task_owner_id: x.task_owner_id, assignee_id: x.assignee_id ?? null }, me)
 
   // ── columns (spec 010): this sheet's own layout and regular columns ──
@@ -143,7 +148,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     onNote: (k, n) => setCellNotes(c => ({ ...c, [k]: n ?? undefined })),
     // Spec 021: Task link fields pick from every task, and create in a Space.
     taskLinks: {
-      tasks: viewTasks(data), spaces: data.spaces, brands: data.brands, me, workspaceNineStage: data.workspaceNineStage,
+      tasks: viewTasks(data), spaces: data.spaces, brands: data.brands, me, workspaceNineStage: data.workspaceNineStage, spaceStages: data.spaceStages,
       defaultSpaceId: /^tasks:space:/.test(sheet) ? sheet.slice('tasks:space:'.length) : null,
       openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask,
     },
@@ -167,7 +172,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     switch (col) {
       case 'title': return x.name
       case 'brand': return brandName.get(x.brand_id) ?? ''
-      case 'status': return stageWord(x.status)
+      case 'status': return stageOf(x)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
       case 'publish': return x.publish_date ?? ''
@@ -186,11 +191,12 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     if (groupBy && groupBy !== 'none' && groupBy !== 'theme' && groupBy !== 'col') {
       const by = new Map<string, { label: string; order: string; items: ViewTask[] }>()
       for (const x of tasks) {
-        const k = groupBy === 'stage' ? x.status
+        const sub = groupBy === 'stage' ? stages?.of(x) : undefined
+        const k = groupBy === 'stage' ? sub?.id ?? x.status
           : groupBy === 'assignee' ? x.assignee_id ?? '' : groupBy === 'brand' ? x.brand_id ?? '' : x.content_type_label ?? ''
         const labelOf = groupBy === 'stage' ? shown(x, 'status') : groupBy === 'assignee' ? shown(x, 'assignee') || tf('bandUnassigned')
           : groupBy === 'brand' ? shown(x, 'brand') : x.content_type_label || tf('bandNoType')
-        const order = groupBy === 'stage' ? String(NINE_STAGE.indexOf(x.status as StageId)).padStart(3, '0') : (k ? `0${labelOf.toLowerCase()}` : '1')
+        const order = groupBy === 'stage' ? `${String(NINE_STAGE.indexOf(x.status as StageId)).padStart(3, '0')}${sub?.position ?? 0}` : (k ? `0${labelOf.toLowerCase()}` : '1')
         const g = by.get(k) ?? { label: labelOf, order, items: [] }
         g.items.push(x)
         by.set(k, g)
@@ -271,12 +277,21 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       case 'platform':
         return patch(x, { platform: text }, { platform: text })
       case 'status': {
-        const to = matchWord(text, words)
-        if (!to) return t('unknownStageList', { text, list: NINE_STAGE.map(stageWord).join(', ') })
-        if (to === x.status) return null
+        const entry = stages ? stages.match(text) : matchSpaceStage(text, plain)
+        if (!entry) return t('unknownStageList', { text, list: (stages?.entries.map(e => e.name) ?? NINE_STAGE.map(stageWord)).join(', ') })
+        const to = entry.stage_id
+        // Spec 022 (US4): a step of the same stage changes only this Space.
+        if (to === x.status) {
+          if (!stages) return null
+          const err = await stages.sub(x, entry)
+          return err ? t('notSaved', { reason: err }) : null
+        }
         setOver(o => ({ ...o, [x.id]: { ...(o[x.id] ?? {}), status: to } }))
         const res = await setTaskStage(x.id, to).catch(() => ({ success: false, shouldCelebrate: false, error: 'generic' as const }))
-        if (res.success) { router.refresh(); return null }
+        if (res.success) {
+          if (stages && entry.position > 0) await stages.sub({ ...x, status: to }, entry)
+          router.refresh(); return null
+        }
         setOver(o => { const n = { ...o }; delete n[x.id]; return n })
         if (res.error === 'needs_handoff') {
           if (bulk.current) return t('handoffOne')
@@ -284,7 +299,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
           const req = handoffRequest(res, x, data.spaces, data.taskSpaces, data.members, tSpaces)
           if (req) { openHandoff(req); return null }
         }
-        if (res.error === 'waiting_on_media' || res.error === 'follows_content') return tMedia(res.error)
+        if (['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '')) return tMedia(res.error as 'follows_media')
         return res.error === 'not_authorized' || res.error === 'stage_not_in_pipeline' ? t('notAllowed', { stage: stageWord(to) }) : t('notSaved', { reason: res.error ?? 'generic' })
       }
     }

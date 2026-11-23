@@ -6,7 +6,7 @@
  * task; removing it changes nothing else (FR-032).
  */
 import { MEDIA_BOARDS, spaceForBoard } from '@/lib/media'
-import { createLinkedMedia } from '@/lib/media-server'
+import { createLinkedMedia, dropStaleSubStages } from '@/lib/media-server'
 import { defaultAssigneeFor, type SpaceLike } from '@/lib/spaces'
 import type { MediaBoard } from '@/types/index'
 import { revalidatePath } from 'next/cache'
@@ -99,6 +99,7 @@ export async function handOff(
     })
     return createLinkedMedia(tx, task, resolved, { id: member.id, role: member.role })
   })
+  await dropStaleSubStages([taskId])
   await notifyAfter(async tx => {
     const out: string[] = []
     for (const c of created) {

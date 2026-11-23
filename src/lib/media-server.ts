@@ -8,9 +8,12 @@ import { prisma } from '@/lib/prisma'
 import type { MediaBoard, StageId } from '@/types/index'
 import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/media'
 import { addSpaces } from '@/lib/spaces-server'
+import { allowedStages } from '@/lib/stage-moves'
 import { notify, notifyAfter } from '@/lib/notify/notify'
 
 type Db = PrismaClient | Prisma.TransactionClient
+const ORDER: StageId[] = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
+const STAGE_AT = (s: string) => ORDER.indexOf(s as StageId)
 
 /** Why the media rules refuse moving `task` to `target`, or null. */
 export async function mediaGate(
@@ -35,20 +38,14 @@ export async function syncContent(contentTaskId: string, actorId: string): Promi
     where: { content_task_id: content.id }, select: { id: true, status: true, stage_date: true, media_board: true, content_task_id: true, dropped_at: true },
   }))
   if (!media.length) return
-  // Linked before Ready For Design (R10): the content task isn't pulled forward, and the
-  // media tasks' SLA starts when it gets there.
-  const BEFORE = ['todo', 'c-prog', 'c-final', 'c-check']
-  if (BEFORE.includes(content.status)) return
-  // Reached Ready For Design with its media already linked by hand: that was its link (R5, once).
+  // While linked, the row's Status follows its linked tasks (user, 2026-11-23): the earliest
+  // stage among those that haven't passed D-Check, else F-Check. This replaces R10's "not
+  // pulled forward before Ready For Design". Being linked counts as its link (R5, once).
   await prisma.task.updateMany({ where: { id: content.id, auto_linked_at: null }, data: { auto_linked_at: new Date() } })
-  if (content.status === 'r-design') {
-    const early = media.filter(m => m.status === 'r-design' && m.stage_date < content.stage_date)
-    if (early.length) await prisma.task.updateMany({ where: { id: { in: early.map(m => m.id) } }, data: { stage_date: content.stage_date } })
-  }
   const waiting = contentStageFrom(media)
   let stage = content.status as StageId
   if (waiting && waiting !== stage) stage = waiting
-  else if (!waiting && ['r-design', 'd-prog', 'd-check'].includes(stage)) stage = 'final-check'
+  else if (!waiting && STAGE_AT(stage) < STAGE_AT('final-check')) stage = 'final-check'
   if (stage !== content.status) {
     await prisma.task.update({ where: { id: content.id }, data: { status: stage, stage_date: new Date(), updated_at: new Date() } })
     await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId, taskId: content.id }))
@@ -58,12 +55,55 @@ export async function syncContent(contentTaskId: string, actorId: string): Promi
   if (following.length) {
     await prisma.task.updateMany({ where: { id: { in: following.map(m => m.id) } }, data: { status: stage, stage_date: new Date(), updated_at: new Date() } })
   }
+  await dropStaleSubStages([content.id, ...media.map(m => m.id)])
+}
+
+/**
+ * A move of a content task that is waiting on its media (user, 2026-11-23):
+ * changing its Status moves its linked tasks that haven't passed D-Check, with
+ * their own stage permissions; the content task then follows them. Null when
+ * the content task isn't waiting (the normal move applies).
+ *   - before Ready For Design: refused ('follows_media'; unlink to set it by hand);
+ *   - past F-Check: refused ('waiting_on_media');
+ *   - a linked task the member may not move: refused ('not_authorized', with its board).
+ */
+export async function moveThroughMedia(
+  content: { id: string; media_board: string | null },
+  target: StageId,
+  member: Parameters<typeof allowedStages>[1] & { id: string },
+): Promise<{ success: true; moved: number } | { success: false; error: string; board?: string } | null> {
+  if (content.media_board) return null
+  const linked = await prisma.task.findMany({ where: { content_task_id: content.id, dropped_at: null, media_board: { not: null } } })
+  const open = linked.filter(m => !passedDCheck(m))
+  if (!open.length) return null
+  if (STAGE_AT(target) < STAGE_AT('r-design')) return { success: false, error: 'follows_media' }
+  if (STAGE_AT(target) > STAGE_AT('final-check')) return { success: false, error: 'waiting_on_media' }
+  const toMove = open.filter(m => m.status !== target)
+  for (const m of toMove) {
+    if (!allowedStages(m as never, member).includes(target)) return { success: false, error: 'not_authorized', board: m.media_board ?? undefined }
+  }
+  for (const m of toMove) {
+    await prisma.task.update({ where: { id: m.id }, data: { status: target, stage_date: new Date(), updated_at: new Date() } })
+    await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId: m.id }))
+  }
+  await syncContent(content.id, member.id)
+  return { success: true, moved: toMove.length }
+}
+
+/**
+ * Spec 022 (US4, R7): a sub-stage is remembered only while the task stays in
+ * that stage. Once it leaves, the row goes, so coming back starts at the first step.
+ */
+export async function dropStaleSubStages(taskIds: string[], db: Db = prisma) {
+  if (!taskIds.length) return
+  await db.$executeRaw`delete from task_space_stages s using tasks t where s.task_id = t.id and t.id = any(${taskIds}::uuid[]) and s.stage_id <> t.status`
 }
 
 /** After any move of `task`: keep its content task (or itself, if it is one) in step. */
 export async function afterMove(task: { id: string; media_board: string | null; content_task_id: string | null }, actorId: string) {
   if (task.media_board && task.content_task_id) await syncContent(task.content_task_id, actorId)
   else if (!task.media_board) await syncContent(task.id, actorId)
+  await dropStaleSubStages([task.id])
 }
 
 /**

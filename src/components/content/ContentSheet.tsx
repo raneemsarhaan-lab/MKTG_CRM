@@ -58,6 +58,14 @@ export function readDate(text: string, now = new Date()): string | null | '' {
 export function ContentSheet(p: ContentSheetProps) {
   const t = useTranslations('content')
   const tHandoff = useTranslations('handoff')
+  const tSp = useTranslations('spaces')
+  /** Spec 022: a linked row whose tasks haven't all passed D-Check moves only from Ready For Design to F-Check. */
+  const linkedLimit = (task: Task) => {
+    const open = p.tasks.some(x => x.content_task_id === task.id && !!x.media_board && !x.dropped_at && !['final-check', 'ready-publish', 'scheduled', 'publish'].includes(x.status))
+    const band: string[] = ['r-design', 'd-prog', 'd-check', 'final-check']
+    return open ? (s: StageId) => band.includes(s) : null
+  }
+
   const ts = useTranslations('sheet')
   const ta = useTranslations('attachments')
   const names = useStageNames('content')
@@ -114,7 +122,10 @@ export function ContentSheet(p: ContentSheetProps) {
     setNotes(prev => ({ ...prev, [key]: note ?? undefined }))
     if (note) setTimeout(() => setNotes(prev => (prev[key] === note ? { ...prev, [key]: undefined } : prev)), 4000)
   }, [])
-  const why = (code?: string) => (code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
+  const tMediaErr = useTranslations('media')
+  // Spec 022: a linked row's Status follows its linked tasks; these say why a move was refused.
+  const MEDIA_ERRORS = ['waiting_on_media', 'follows_content', 'follows_media']
+  const why = (code?: string) => (code && MEDIA_ERRORS.includes(code) ? tMediaErr(code as 'follows_media') : code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
   const cl = useSheetColumns({
@@ -281,7 +292,8 @@ export function ContentSheet(p: ContentSheetProps) {
         return menu(t('archive.rowMenu', { name: task.name }), items)
       }
       case 'status': {
-        const items = statusMenuItems(task, me, isClip ? ts : t, isClip ? videoNames : names, to => { closePopup(true); void move(task, to, anchor, isClip) })
+        const items = statusMenuItems(task, me, isClip ? ts : t, isClip ? videoNames : names, to => { closePopup(true); void move(task, to, anchor, isClip) },
+          !isClip && p.stages ? { api: p.stages, stepLabel: tSp('stages.step'), pick: e => { closePopup(true); void p.stages!.sub(task, e) } } : null, isClip ? null : linkedLimit(task))
         if (!items.length) { onNote(`${row.key}|status`, t('noMoves')); return }
         return menu(ts('menu.statusFor', { name: task.name }), items)
       }
@@ -445,6 +457,7 @@ export function ContentSheet(p: ContentSheetProps) {
           <div className="fx-sheet-scroll">
             <ContentGrid
               media={ml}
+              stages={p.stages}
               rows={rows}
               me={me}
               members={p.members}

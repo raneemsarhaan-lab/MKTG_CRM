@@ -10,8 +10,6 @@ import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
 import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
-import { linkedKeyOf, wordsFor } from '@/lib/space-words'
-import type { SheetTaskMap } from '@/types/index'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
 
@@ -135,12 +133,7 @@ export async function loadBoardData(member: SessionMember) {
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
     linkedRowHeights,
-    spaces: spaces.map(mapSpace).map(sp => {
-      const lk = linkedKeyOf(sp.key)
-      if (!lk) return sp
-      const v = (linkedViews.find(x => x.linked_key === lk)?.view ?? {}) as { words?: SheetTaskMap['words']; show?: SheetTaskMap['show'] }
-      return { ...sp, words: wordsFor(sp, v) }
-    }),
+    spaces: spaces.map(mapSpace),
     spaceMembers,
     taskSpaces: taskSpaces as import('@/types/index').TaskSpace[],
     inbox: {

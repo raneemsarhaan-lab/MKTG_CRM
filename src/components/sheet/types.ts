@@ -67,6 +67,8 @@ export interface SheetApi {
 }
 
 export interface VideoSheetProps {
+  /** Spec 022 (US4): the linked Space's stages. */
+  stages?: import('@/components/spaces/useSpaceStages').SpaceStagesApi | null
   /** Every task, dropped ones included: the sheet filters. */
   tasks: Task[]
   me: Member

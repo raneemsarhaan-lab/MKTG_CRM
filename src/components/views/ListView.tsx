@@ -28,13 +28,15 @@ interface ListViewProps {
   canGroupByBrand?: boolean
   /** The shown name of a stage — a Space's own words, or the board's (US3). */
   stageName?: (s: StageId) => string
+  /** Spec 022 (US4): a Space's stages — groups and pills per Space stage. */
+  spaceStages?: import('@/components/spaces/useSpaceStages').SpaceStagesApi | null
   /** The shown name of a simple status — a Space's own words, or the default (US3). */
   /** A saved view's grouping. */
   initialGroup?: Group | null
   onOpen: (id: string) => void
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, initialGroup, onOpen }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, spaceStages, initialGroup, onOpen }: ListViewProps) {
   const t = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
@@ -46,7 +48,9 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),
        { key: 'none', head: <span>{t('noBrand')}</span>, rows: live.filter(x => !x.brand_id) }]
     : [
-        ...NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} board={STAGE_META[s]?.label_en} />, rows: live.filter(x => x.status === s) })),
+        ...(spaceStages?.own
+          ? spaceStages.entries.map(e => ({ key: e.id, head: <Pill stage={e.stage_id} label={e.name} board={STAGE_META[e.stage_id]?.label_en} />, rows: live.filter(x => spaceStages.of(x)?.id === e.id) }))
+          : NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} board={STAGE_META[s]?.label_en} />, rows: live.filter(x => x.status === s) }))),
       ]
 
   return (
@@ -86,7 +90,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {late && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '1px 6px', borderRadius: 6, background: ALERT_BADGE_STYLES[sla].bg, color: ALERT_BADGE_STYLES[sla].text }}>SLA</span>}
-                  {group === 'brand' && <Pill stage={task.status} label={name(task.status)} board={STAGE_META[task.status]?.label_en} />}
+                  {group === 'brand' && <Pill stage={task.status} label={spaceStages?.name(task) ?? name(task.status)} board={STAGE_META[task.status]?.label_en} />}
                   {who && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
                   {/* Publishing and due dates, each labelled (spec: both on every task). */}
                   <span style={{ minWidth: 44, textAlign: 'end' }}>{task.publish_date || task.due_date ? <TaskDates task={task} /> : <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>—</span>}</span>

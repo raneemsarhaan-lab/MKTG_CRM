@@ -9,7 +9,6 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, requireTaskCreator } from '@/lib/authz'
-import { cleanSpaceWords, findClash, linkedKeyOf, type Clash } from '@/lib/space-words'
 import type { TaskKind } from '@/types/index'
 
 type Result<T = object> = ({ success: true } & T) | { success: false; error: string }
@@ -75,38 +74,6 @@ export async function updateSpace(id: string, patch: Partial<SpaceInput & { sort
   const row = await prisma.teamSpace.update({ where: { id }, data }).catch(() => null)
   if (!row) return { success: false, error: 'not_found' }
   revalidateSpaces(row.key)
-  return { success: true }
-}
-
-/**
- * Spec 021 (US3): a Space's status words. Admins and superusers. Content and
- * Video keep theirs on their sheet (R5), so the sheet and the Space always
- * agree; every other Space keeps them on the Space. Ambiguous words are refused.
- */
-export async function setSpaceWords(id: string, words: unknown): Promise<Result | { success: false; error: 'clash'; clash: Clash }> {
-  const auth = await requireTaskCreator()
-  if (auth.error) return { success: false, error: auth.error }
-  const space = await prisma.teamSpace.findUnique({ where: { id } })
-  if (!space || space.archived_at) return { success: false, error: 'not_found' }
-  const clean = cleanSpaceWords(words)
-  const clash = findClash(clean)
-  if (clash) return { success: false, error: 'clash', clash }
-  const linkedKey = linkedKeyOf(space.key)
-  if (linkedKey) {
-    // The sheet's stage words; its Type and Priority words are left as they are.
-    const stage = Object.fromEntries(Object.entries(clean).filter(([k]) => !k.startsWith('s-')))
-    const sheet = await prisma.sheet.findUnique({ where: { linked_key: linkedKey }, select: { id: true, view: true } })
-    if (!sheet) return { success: false, error: 'not_found' }
-    const view = { ...((sheet.view ?? {}) as Record<string, unknown>) }
-    const all = { ...((view.words ?? {}) as Record<string, unknown>) }
-    if (Object.keys(stage).length) all.stage = stage; else delete all.stage
-    if (Object.keys(all).length) view.words = all; else delete view.words
-    await prisma.sheet.update({ where: { id: sheet.id }, data: { view: view as object } })
-    revalidatePath('/sheets')
-  } else {
-    await prisma.teamSpace.update({ where: { id }, data: { words: clean, updated_at: new Date() } })
-  }
-  revalidateSpaces(space.key)
   return { success: true }
 }
 

@@ -11,6 +11,7 @@
  * assignee.
  */
 import { useLocale, useTranslations } from 'next-intl'
+import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import type { ContentTheme, Member, Task, TaskAttachment, TaskField, WordField } from '@/types/index'
 import { GridCore, type ActiveCell, type GridCol, type GridModel } from '@/components/sheet/GridCore'
 import { StatusContent, useStageNames } from '@/components/sheet/StatusCell'
@@ -69,6 +70,8 @@ export function shortDate(ymd: string | null | undefined): string {
 export interface ContentGridProps {
   /** Spec 022 (R19): the Link task cell (chips, the list, Undo), from the sheet. */
   media?: { render(task: Task): React.ReactNode; open(task: Task, anchor: HTMLElement, typed?: string): void; text(task: Task): string }
+  /** Spec 022 (US4): the linked Space's stages — names shown and typed here. */
+  stages?: SpaceStagesApi | null
   rows: ContentRow[]
   me: Member
   members: Member[]
@@ -123,9 +126,24 @@ export function ContentGrid(p: ContentGridProps) {
   const boardName = (id: string) => { const m = STAGE_META[id as StageId]; return m ? (locale.startsWith('ar') ? m.label_ar : m.label_en) : id }
   /** A piece's stage as this sheet calls it: its own word, the Content sheet's word, or the board's name. */
   const stageWord = (id: string) => {
+    if (p.stages) return p.stages.stageName(id)
     const v = viewRef.current
     if (v.show === 'board') return boardName(id)
     return v.words?.stage?.[id]?.[0] ?? stageNames.video(id as StageId)
+  }
+  /** A task's stage here: its Space stage (a sub-stage when split), else the stage's word. */
+  const stageOf = (task: Task) => (p.stages ? p.stages.name(task) : stageWord(task.status))
+  /** Spec 022 (US4): a typed Space stage — a sub-stage move within the stage, else a real move then its sub-stage. */
+  function commitSpaceStage(row: { task: Task }, col: GridCol, value: string): Promise<string | null> | null {
+    const st = p.stages
+    const entry = st?.match(value)
+    if (!st || !entry) return null
+    const task = row.task
+    if (entry.stage_id === task.status) return st.sub(task, entry).then(err => (err ? tf('notAStage', { text: value.trim() }) : null))
+    return p.onCommit(row as never, col, entry.stage_id).then(err => {
+      if (!err && entry.position > 0) void st.sub({ ...task, status: entry.stage_id }, entry)
+      return err
+    })
   }
   const typeWord = (label: string) => shownWord(label, viewRef.current.words?.type, viewRef.current.show, label)
   /** Typed or pasted text in Status or Type, as the value it stands for (null: not one). */
@@ -207,6 +225,7 @@ export function ContentGrid(p: ContentGridProps) {
 
   /** Status and Type read typed and pasted words as the value they stand for; the rest goes to the sheet as before. */
   function commitWord(row: ContentRow, col: GridCol, value: string): Promise<string | null> {
+    if (col === 'status' && row.kind === 'piece') { const done = commitSpaceStage(row, col, value); if (done) return done }
     if ((col === 'status' || col === 'type') && (row.kind === 'piece' || row.kind === 'clip')) {
       const v = readWord(col, value)
       if (v === null) return Promise.resolve(tf(col === 'status' ? 'notAStage' : 'notAType', { text: value.trim() }))
@@ -360,7 +379,7 @@ export function ContentGrid(p: ContentGridProps) {
           )
         }
         case 'type':     return typePill(task.content_type_label)
-        case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} name={isClip ? undefined : stageWord(task.status)} />
+        case 'status':   return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} ns={isClip ? 'sheet' : 'content'} name={isClip ? undefined : stageOf(task)} />
         case 'assignee': return <EditorContent member={task.assignee_id ? byId.get(task.assignee_id) : undefined} t={ts} />
         case 'pillar': {
           if (isClip) return null
@@ -406,7 +425,7 @@ export function ContentGrid(p: ContentGridProps) {
     const task = taskOf(row)
     if (task && !isCustom(col)) {
       switch (col) {
-        case 'status': return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageWord(task.status)
+        case 'status': return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageOf(task)
         case 'media': return row.kind === 'piece' ? p.media?.text(task) ?? '' : ''
         case 'assignee': return task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''
         case 'type': return task.content_type_label ? typeWord(task.content_type_label) : ''
@@ -512,7 +531,8 @@ export function ContentGrid(p: ContentGridProps) {
     const i = laid.indexOf(c), name = colLabel(c.key) || t('col.archive')
     return {
       key: c.key, name, icon: c.kind ? 'regular' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
-      values: c.key === 'status' ? 'stage' : c.key === 'type' ? 'type' : undefined,
+      // Spec 022 (US4): stage names come from the Space's Stages; the sheet keeps its Type words.
+      values: c.key === 'status' && !p.stages ? 'stage' : c.key === 'type' ? 'type' : undefined,
       up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
       upLabel: tc('moveUp', { name }), downLabel: tc('moveDown', { name }),
     }

@@ -949,7 +949,7 @@ export function TaskModal({
       if (!r.success) {
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
-          : r.error === 'waiting_on_media' || r.error === 'follows_content' ? tMedia(r.error)
+          : ['waiting_on_media', 'follows_content', 'follows_media'].includes(r.error ?? '') ? tMedia(r.error as 'follows_media')
           : r.error ?? 'Could not move that task')
         return
       }

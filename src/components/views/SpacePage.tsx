@@ -13,8 +13,8 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { StageId, Task } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { wordOf } from '@/lib/space-words'
-import { SpaceWordsButton } from '@/components/spaces/SpaceWords'
+import { SpaceStagesButton } from '@/components/spaces/SpaceStages'
+import { useSpaceStages } from '@/components/spaces/useSpaceStages'
 import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { ViewHost } from './ViewHost'
 import { ListView } from './ListView'
@@ -50,9 +50,10 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   // Spec 021 (US3): this Space's own words for the stages. Boards keep the board names.
   const locale = useLocale()
   const tSheet = useTranslations('taskSheet')
-  const words = space.words
-  const stageName = (s: StageId) => wordOf(s, words) ?? (locale === 'ar' ? STAGE_META[s]?.label_ar : STAGE_META[s]?.label_en) ?? s
-  const statusName = (x: Task) => stageName(x.status as StageId)
+  // Spec 022 (US4): this Space's stages (renamed or split); boards elsewhere keep the original names.
+  const ss = useSpaceStages(spaceId, data.spaceStages, data.taskSpaceStages)
+  const stageName = (s: StageId) => ss?.stageName(s) ?? (locale === 'ar' ? STAGE_META[s]?.label_ar : STAGE_META[s]?.label_en) ?? s
+  const statusName = (x: Task) => ss?.name(x) ?? stageName(x.status as StageId)
 
   return (
     <ViewHost
@@ -60,7 +61,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
       title={label}
       tag={t('spaceTag')}
       color={space.color}
-      actions={<>{space.media_board && <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} />}{data.currentUser.access !== 'user' && <SpaceWordsButton space={space} />}</>}
+      actions={<>{space.media_board && <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} />}{data.currentUser.access !== 'user' && <SpaceStagesButton space={space} rows={data.spaceStages} />}</>}
       sub={<span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <span data-space-rule>{rule}</span>
         <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
@@ -90,13 +91,13 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
         // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
         const body = tab === 'sheet'
           ? <NodeWorkbook key={view?.id} data={data} node={`space:${spaceId}`}
-              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} sheetKey={`tasks:space:${spaceId}`} words={words} label={label} />} />
+              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} />} />
           : tab === 'calendar'
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open}
                 link={board ? undefined : { spaceId, media: viewTasks(data) }} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} initialGroup={view?.config.group} onOpen={open} />
+              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} spaceStages={ss} initialGroup={view?.config.group} onOpen={open} />
         return <>{body}<TaskPanel data={data} /></>
       }}
     />

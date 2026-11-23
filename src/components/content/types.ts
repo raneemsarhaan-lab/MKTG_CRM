@@ -21,6 +21,8 @@ export interface ContentApi extends SheetApi {
 }
 
 export interface ContentSheetProps {
+  /** Spec 022 (US4): the linked Space's stages. */
+  stages?: import('@/components/spaces/useSpaceStages').SpaceStagesApi | null
   tasks: Task[]
   themes: ContentTheme[]
   me: Member

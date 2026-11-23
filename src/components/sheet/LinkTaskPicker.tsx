@@ -8,6 +8,7 @@
  *
  * Esc closes it; nothing is linked or created unless you choose.
  */
+import { firstOf, stagesForSpace } from '@/lib/space-stages'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import type { Member, TeamSpace } from '@/types/index'
@@ -35,6 +36,8 @@ export interface TaskLinkCtx {
   defaultSpaceId?: string | null
   /** The workspace's C-Check default, for the stage line. */
   workspaceNineStage?: boolean
+  /** Spec 022 (US4): Space stages, for the stage line in the Space's own names. */
+  spaceStages?: import('@/types/index').SpaceStage[]
   openTask(id: string): void
   /** Makes a task (the page passes `createTask`, so this file stays free of server code). */
   create?(input: { name: string; brand_id: string; content_type_label: string; task_owner_id: string; assignee_id: string; due_date: string | null; space_id: string | null }): Promise<{ success: boolean; id?: string; error?: string }>
@@ -88,7 +91,8 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
   const name = (q || typed).trim()
   const stageLine = (() => {
     if (!sp) return ''
-    const word = (k: string, board: string) => sp.words?.[k]?.[0] ?? board
+    const entries = stagesForSpace(sp.id, ctx.spaceStages ?? [], locale)
+    const word = (k: string, board: string) => firstOf(entries, k)?.name ?? board
     const b = ctx.brands.find(x => x.id === brand)
     const nine = b?.nine_stage_default ?? ctx.workspaceNineStage ?? false
     return (nine ? NINE_STAGE : EIGHT_STAGE).map(k => word(k, locale === 'ar' ? STAGE_META[k].label_ar : STAGE_META[k].label_en)).join(' › ')

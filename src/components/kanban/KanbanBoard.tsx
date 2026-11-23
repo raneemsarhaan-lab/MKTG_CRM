@@ -8,7 +8,8 @@ import {
   PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId, TeamSpace, SpaceMember, TaskSpace as TaskSpaceRow } from '@/types/index'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId, TeamSpace, SpaceMember, TaskSpace as TaskSpaceRow, SpaceStage, TaskSpaceStage } from '@/types/index'
+import { useSpaceStages } from '@/components/spaces/useSpaceStages'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
@@ -116,6 +117,9 @@ interface KanbanBoardProps {
   boardKey?: string
   /** The member's saved sort per board. */
   boardSorts?: Record<string, string>
+  /** Spec 022 (US4): Space stages and tasks' sub-stages. */
+  spaceStages?: SpaceStage[]
+  taskSpaceStages?: TaskSpaceStage[]
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -147,11 +151,18 @@ export function KanbanBoard({
   dueRule,
   boardKey,
   boardSorts,
+  spaceStages = [],
+  taskSpaceStages = [],
 }: KanbanBoardProps) {
   const embedded = surface === 'sheets'
   /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
   const hosted = surface === 'view'
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
+  // Spec 022 (US4): a Space's Board shows its own stages; the Content and Video sheets read their Spaces'.
+  const ss = useSpaceStages(hosted && spaceId ? spaceId : null, spaceStages, taskSpaceStages)
+  const spaceStageCols = !!ss?.own
+  const contentStages = useSpaceStages(spaces.find(x => x.key === 'content')?.id ?? null, spaceStages, taskSpaceStages)
+  const videoStages = useSpaceStages(spaces.find(x => x.key === 'video')?.id ?? null, spaceStages, taskSpaceStages)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
   const [filters, setFilters]     = useState<BoardFilterState>(EMPTY_FILTERS)
@@ -356,12 +367,21 @@ export function KanbanBoard({
     return map
   }, [filteredTasks, sortBy])
 
+  const tasksByEntry = useMemo(() => {
+    const map: Record<string, FullTask[]> = {}
+    if (!ss) return map
+    ss.entries.forEach(e => { map[e.id] = [] })
+    sortTasks(filteredTasks, sortBy).forEach(t => { const e = ss.of(t); if (e && map[e.id]) map[e.id].push(t) })
+    return map
+  }, [filteredTasks, sortBy, ss]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleDragStart({ active }: DragStartEvent) {
     setActiveDragId(active.id as string)
   }
 
   /** A drop lands either on a column (its stage id) or on a card in one. */
   function stageOfDropTarget(overId: string): StageId | null {
+    if (overId.startsWith('ss:')) return (ss?.entries.find(e => `ss:${e.id}` === overId)?.stage_id as StageId) ?? null
     if ((ALL_STAGES as string[]).includes(overId)) return overId as StageId
     return (tasks.find(t => t.id === overId)?.status as StageId) ?? null
   }
@@ -384,6 +404,28 @@ export function KanbanBoard({
     const fromStage = dragged.status as StageId
     const toStage   = stageOfDropTarget(over.id as string)
     if (!toStage) return
+
+    // Spec 022 (US4): a Space stage column. Within one original stage it's a sub-stage move
+    // (only this Space changes); to another stage it's a real move, then its sub-stage.
+    if (spaceStageCols && ss) {
+      const overId = over.id as string
+      const entry = overId.startsWith('ss:') ? ss.entries.find(e => `ss:${e.id}` === overId) : ss.of(tasks.find(t => t.id === overId) ?? dragged)
+      if (entry && toStage === fromStage) {
+        if (ss.of(dragged)?.id !== entry.id) void ss.sub(dragged, entry).then(err => { if (err) setDragError(tSpaces('stages.otherStage')) })
+        return
+      }
+      if (entry && entry.position > 0) {
+        const path = dragged.nine_stage ? NINE_STAGE : EIGHT_STAGE
+        if (!path.includes(toStage)) { setDragError(`${STAGE_META[toStage].label_en} isn't part of this task's pipeline`); return }
+        setDragError('')
+        startTransition(async () => {
+          const res = await moveTo(dragged, toStage)
+          if (res.success) await ss.sub({ ...dragged, status: toStage }, entry)
+          else if (res.error !== 'needs_handoff') setDragError(['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '') ? tMedia(res.error as 'follows_media') : 'Could not move that task')
+        })
+        return
+      }
+    }
 
     // Same column — a reorder. Position isn't persisted (there is no order
     // column), so this stays local and is discarded on the next server render.
@@ -413,7 +455,7 @@ export function KanbanBoard({
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
-            : res.error === 'waiting_on_media' || res.error === 'follows_content' ? tMedia(res.error)
+            : ['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '') ? tMedia(res.error as 'follows_media')
             : 'Could not move that task',
         )
       }
@@ -522,7 +564,7 @@ export function KanbanBoard({
     records: colRecords, values: colValues, api: columnsApi,
     // Spec 021: Task link fields on the Content and Video sheets.
     taskLinks: {
-      tasks, spaces, brands, me: currentUser, workspaceNineStage,
+      tasks, spaces, brands, me: currentUser, workspaceNineStage, spaceStages,
       openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask,
     },
   }
@@ -781,6 +823,17 @@ export function KanbanBoard({
 
   // "Now" is the server's day until mount, so the first render matches; then
   // the device's own clock, ticking each minute for "today" and "late".
+  // User, 2026-11-23: a linked row's Status follows its task, so moves made elsewhere
+  // show here without a reload — on focus, and every 30 seconds while visible and idle.
+  useEffect(() => {
+    const busy = () => { const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) || !!document.querySelector('[role="dialog"], [role="listbox"], [role="menu"]') }
+    const tick = () => { if (document.visibilityState === 'visible' && !busy()) router.refresh() }
+    const onVisible = () => { if (document.visibilityState === 'visible') tick() }
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', onVisible)
+    const id = window.setInterval(tick, 30_000)
+    return () => { window.removeEventListener('focus', tick); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(id) }
+  }, [router])
   const [now, setNow] = useState<Date>(today)
   useEffect(() => {
     setNow(new Date())
@@ -1135,6 +1188,7 @@ export function KanbanBoard({
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
         <ContentSheet
+          stages={contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           themes={themeScope ? themes.filter(themeScope) : themes}
           me={currentUser}
@@ -1160,6 +1214,7 @@ export function KanbanBoard({
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
         <VideoSheet
+          stages={videoStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           me={currentUser}
           members={members}
@@ -1272,7 +1327,26 @@ export function KanbanBoard({
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
         }}>
-          {shownStages.map(stageId => {
+          {spaceStageCols && ss && ss.entries.filter(e => shownStages.includes(e.stage_id) || (!isPhone && stagesInScope.includes(e.stage_id))).map(e => (
+            <KanbanColumn
+              key={e.id}
+              stage={STAGE_META[e.stage_id]}
+              spaceStage={{ id: e.id, name: e.name }}
+              tasks={tasksByEntry[e.id] ?? []}
+              currentUser={currentUser}
+              members={members}
+              slaConfig={slaConfig}
+              today={today}
+              highlight={overStage === e.stage_id && activeDragId !== null}
+              onSelectTask={id => selectTask(id)}
+              onAddTask={() => setShowTaskForm(true)}
+              selectedIds={selected}
+              selecting={selected.size > 0}
+              onToggleSelect={toggleSelect}
+              onSelectAll={selectStage}
+            />
+          ))}
+          {!spaceStageCols && shownStages.map(stageId => {
             const stage      = STAGE_META[stageId]
             const stageTasks = tasksByStage[stageId] ?? []
 

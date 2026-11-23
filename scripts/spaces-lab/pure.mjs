@@ -154,27 +154,32 @@ check('pure-view-config', () => {
   eq(names({ sort: 'name' }), ['A', 'B', 'C'], 'name')
 })
 
-check('pure-space-words', () => {
-  const w = m.cleanSpaceWords({ 'd-prog': ' Editing ,  editing, Cutting ', 'c-check': [' Script  review '], bogus: ['x'], 's-done': 'Shipped' })
-  eq(w, { 'c-check': ['Script review'], 'd-prog': ['Editing', 'Cutting'], 's-done': ['Shipped'] }, 'trimmed, once each, known values only')
-  eq(m.wordOf('d-prog', w), 'Editing', 'the first word is shown')
-  eq(m.wordOf('todo', w), null, 'no word, board name')
-  eq(m.matchWord('  cutting ', w), 'd-prog', 'any word can be typed, case and spacing ignored')
-  eq(m.matchWord('D-In Progress', w), 'd-prog', 'the board name still works')
-  eq(m.matchWord('shipped', w), null, 'a simple word never moves a pipeline task')
-  eq(m.matchWord('nonsense', w), null, 'unknown')
-  const names = { 's-todo': ['To Do'], 's-doing': ['In progress'], 's-done': ['Done'] }
-  eq(m.matchSimpleWord('SHIPPED', w, names), 's-done', 'simple words')
-  eq(m.matchSimpleWord('in progress', w, names), 's-doing', 'simple names')
-  eq(m.findClash(w), null, 'no clash')
-  const c1 = m.findClash({ 'd-prog': ['Review'], 'c-check': ['review'] })
-  eq(c1 && [c1.a, c1.b], ['d-prog', 'c-check'], 'one word for two stages')
-  const c2 = m.findClash({ 'd-prog': ['C-Check'] })
-  eq(c2 && c2.a, 'c-check', "another stage's board name")
-  eq(m.findClash({ 'd-prog': ['D-In Progress'] }), null, 'its own board name is fine')
-  eq(m.wordsFor({ key: 'design', words: { 'd-check': ['Client review'] } }), { 'd-check': ['Client review'] }, 'a team Space keeps its own')
-  eq(m.wordsFor({ key: 'content', words: { todo: ['x'] } }, { words: { stage: { todo: ['Idea'] } } }), { todo: ['Idea'] }, "Content reads its sheet's words")
-  eq(m.wordsFor({ key: 'video', words: {} }, { words: { stage: { todo: ['Idea'] } }, show: 'board' }), {}, 'a sheet showing board names gives none')
+check('pure-space-stages', () => {
+  // Spec 022 US4: validation, the remembered sub-stage, typed names.
+  const all = m.ALL_STAGES.map(s => ({ stage_id: s, name: null }))
+  eq(m.validateStages(all), [], 'every stage, unnamed: fine')
+  ok(m.validateStages(all.filter(r => r.stage_id !== 'd-prog')).some(p => p.kind === 'missing' && p.stage === 'd-prog'), 'a stage with no step is refused')
+  const split = [...all.filter(r => r.stage_id !== 'd-prog'), { stage_id: 'd-prog', name: 'Sketch' }, { stage_id: 'd-prog', name: 'Final art' }]
+  eq(m.validateStages(split), [], 'a split with two names')
+  ok(m.validateStages([...all.filter(r => r.stage_id !== 'd-prog'), { stage_id: 'd-prog', name: 'Sketch' }, { stage_id: 'd-prog', name: ' sketch ' }]).some(p => p.kind === 'duplicate'), 'the same name twice is refused')
+  ok(m.validateStages([...all.filter(r => r.stage_id !== 'd-prog'), { stage_id: 'd-prog', name: 'D-Check' }]).some(p => p.kind === 'original'), "another stage's name is refused")
+  ok(m.validateStages([...all.filter(r => r.stage_id !== 'd-prog'), { stage_id: 'd-prog', name: null }, { stage_id: 'd-prog', name: null }]).some(p => p.kind === 'duplicate'), 'two unnamed steps of one stage clash')
+  const rows = [{ id: 'a', space_id: 'S', stage_id: 'd-prog', name: 'Sketch', position: 0, aliases: [] }, { id: 'b', space_id: 'S', stage_id: 'd-prog', name: 'Final art', position: 1, aliases: ['Polish'] },
+    { id: 'c', space_id: 'S', stage_id: 'c-prog', name: 'Writing', position: 0, aliases: [] }]
+  const entries = m.stagesForSpace('S', rows, 'en')
+  eq(entries.length, 12, '11 stages, one split in two')
+  eq(entries.find(e => e.stage_id === 'todo').name, 'To Do', 'an unnamed stage shows its original name')
+  ok(m.hasOwnStages(entries) && !m.hasOwnStages(m.stagesForSpace('X', rows, 'en')), 'own stages only where named or split')
+  const task = { id: 't', status: 'd-prog' }
+  eq(m.spaceStageOf(task, 'S', entries, []).id, 'a', 'no row: the first step')
+  eq(m.spaceStageOf(task, 'S', entries, [{ task_id: 't', space_id: 'S', space_stage_id: 'b', stage_id: 'd-prog' }]).id, 'b', 'remembered while still in that stage')
+  eq(m.spaceStageOf({ id: 't', status: 'd-check' }, 'S', entries, [{ task_id: 't', space_id: 'S', space_stage_id: 'b', stage_id: 'd-prog' }]).stage_id, 'd-check', 'left the stage: the row no longer counts')
+  eq(m.spaceStageOf(task, 'S', entries, [{ task_id: 't', space_id: 'S', space_stage_id: 'b', stage_id: 'd-check' }]).id, 'a', 're-entering starts at the first step')
+  eq(m.matchSpaceStage('final  ART', entries).id, 'b', 'a name, case and spacing ignored')
+  eq(m.matchSpaceStage('polish', entries).id, 'b', 'an alias')
+  eq(m.matchSpaceStage('D-In Progress', entries).id, 'a', "an original name: that stage's first step")
+  eq(m.matchSpaceStage('writing', entries).stage_id, 'c-prog', 'a renamed stage')
+  eq(m.stagesFromWords({ 'd-prog': ['Editing', 'Cutting'] }).find(r => r.stage_id === 'd-prog'), { stage_id: 'd-prog', name: 'Editing', position: 0, aliases: ['Cutting'] }, 'status words become a named stage with aliases')
 })
 
 check('pure-brand-features', () => {

@@ -2909,21 +2909,6 @@
     "mySheets": "My sheets",
     "workbookLoading": "Opening the sheet…",
     "workbookFailed": "This sheet couldn't open. Reload the page to try again.",
-    "words": {
-      "open": "Status words",
-      "title": "{space} · Status words",
-      "help": "Separate words with commas. The first one is shown; any of them can be typed. Case and spacing are ignored. Boards, brand pages and Everything keep the board names.",
-      "simpleHead": "Simple tasks",
-      "reset": "Use the board names",
-      "cancel": "Cancel",
-      "save": "Save words",
-      "saving": "Saving…",
-      "linkedNote": "These are the same words the {space} sheet uses. Changing them here changes the sheet too.",
-      "clash": "\"{word}\" is used for both {a} and {b}. Give each word to one stage.",
-      "notAllowed": "Only admins and superusers can change a Space's words.",
-      "failed": "The words weren't saved. Try again.",
-      "boardName": "Board name: {name}"
-    },
     "features": {
       "open": "Features",
       "title": "{brand} · features",
@@ -2961,6 +2946,32 @@
       "failed": "Couldn't save. Try again.",
       "notAllowed": "Only admins can change a brand's features.",
       "hidden": "Off for {brand}"
+    },
+    "stages": {
+      "open": "Stages",
+      "title": "{space} · Stages",
+      "help": "Rename a stage for this Space, or split it into steps with ＋ Split. Each step belongs to one original stage, and every stage keeps at least one. Leave a name empty to use the original name.",
+      "split": "Split",
+      "remove": "Remove this step",
+      "earlier": "Move earlier",
+      "later": "Move later",
+      "nameFor": "{stage}, step {n}",
+      "also": "Also typed as: {words}",
+      "reset": "Use the original names",
+      "cancel": "Cancel",
+      "save": "Save stages",
+      "saving": "Saving…",
+      "rule": "Moving between steps of one stage changes only this Space: no stage change, no SLA restart, no approval. Moving to the next stage is a real move. The main board and brand pages keep the original names.",
+      "duplicate": "\"{name}\" is used twice. Give each step its own name.",
+      "original": "\"{name}\" is the name of another stage. Choose a different name.",
+      "tooMany": "A stage can have at most {n} steps.",
+      "missing": "Every stage needs at least one step.",
+      "notAllowed": "Only admins and superusers can change a Space's stages.",
+      "failed": "The stages weren't saved. Try again.",
+      "original_label": "{name} · {stage}",
+      "moved": "Moved to {name}.",
+      "otherStage": "That step belongs to another stage.",
+      "step": "Another step of this stage"
     }
   },
   "views": {
@@ -3233,6 +3244,7 @@
     "undo": "Undo",
     "calNeedName": "Type the content task’s name first.",
     "calMade": "{name} is on the calendar, linked.",
-    "unlinkedTag": "Unlinked"
+    "unlinkedTag": "Unlinked",
+    "follows_media": "This row follows its linked task, so it can’t go back before Ready For Design. Unlink it to set Status by hand."
   }
 }

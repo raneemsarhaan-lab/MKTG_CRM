@@ -49,24 +49,35 @@ export function MediaChips({ media, onOpen, onChange, onUnlink, compact = false 
   const t = useTranslations('media')
   const stage = useStageLabel()
   if (!media.length) return null
+  // User, 2026-11-23: each linked task as its name (a link that opens it), then its board and
+  // stage — "Carousel – Q4 results · Design · F-Check" — with ⇄ and ×. One per board.
   return (
-    <span className="fx-tasklink" style={{ flexWrap: 'wrap', gap: 4 }}>
-      {media.map(m => (
-        <span key={m.id} data-media-chip={m.media_board ?? ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 1, maxWidth: '100%' }}>
-          <button type="button" tabIndex={-1} className="fx-tasklink-name" data-media-open={m.id} title={m.name}
-                  style={{ color: BOARD_COLOR[m.media_board ?? 'design'], background: `color-mix(in srgb, ${BOARD_COLOR[m.media_board ?? 'design']} 12%, transparent)` }}
-                  onClick={e => { e.stopPropagation(); onOpen(m.id) }}>
-            <span>{t(m.media_board ?? 'design')}{compact ? '' : ` · ${stage(m.status)}`}</span>
-          </button>
-          {onChange && <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-media-change="" aria-label={t('change')} title={t('change')} onClick={e => { e.stopPropagation(); onChange(m, (e.currentTarget.closest('[data-cell]') as HTMLElement | null) ?? e.currentTarget) }}>⇄</button>}
-          {onUnlink && <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-media-unlink="" aria-label={t('unlink')} title={t('unlink')} onClick={e => { e.stopPropagation(); onUnlink(m) }}>×</button>}
-        </span>
-      ))}
+    <span className="fx-tasklink" data-media-links="" style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, minWidth: 0, width: '100%', overflow: 'hidden' }}>
+      {media.map(m => {
+        const color = BOARD_COLOR[m.media_board ?? 'design']
+        return (
+          <span key={m.id} data-media-chip={m.media_board ?? ''} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, minWidth: 0, flex: '0 1 auto', overflow: 'hidden' }}>
+            <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: color, flex: 'none' }} />
+            <a href={`?task=${m.id}`} tabIndex={-1} data-media-open={m.id} title={m.name}
+               onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); e.stopPropagation(); onOpen(m.id) }}
+               style={{ flex: '0 1 auto', minWidth: 28, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--fx-link, #2F5BD3)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer' }}>
+              {m.name}
+            </a>
+            {!compact && (
+              <span data-media-where="" title={`${t(m.media_board ?? 'design')} · ${stage(m.status)}`}
+                    style={{ flex: 'none', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color, fontWeight: 600, fontSize: '0.92em' }}>
+                · {t(m.media_board ?? 'design')} · {stage(m.status)}
+              </span>
+            )}
+            {onChange && <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-media-change="" aria-label={t('change')} title={t('change')} style={{ flex: 'none' }} onClick={e => { e.stopPropagation(); onChange(m, (e.currentTarget.closest('[data-cell]') as HTMLElement | null) ?? e.currentTarget) }}>⇄</button>}
+            {onUnlink && <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-media-unlink="" aria-label={t('unlink')} title={t('unlink')} style={{ flex: 'none' }} onClick={e => { e.stopPropagation(); onUnlink(m) }}>×</button>}
+          </span>
+        )
+      })}
     </span>
   )
 }
 
-/** The Link task list: unlinked Design and Video tasks, then Create task. */
 export function MediaLinkPicker({ typed, options, onPick, onCreate, onClose }: {
   typed: string
   options: MediaTaskLike[]

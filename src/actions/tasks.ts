@@ -1,7 +1,7 @@
 'use server'
 
 import { datesFor, newTaskDates } from '@/lib/due-dates-server'
-import { afterMove, mediaGate } from '@/lib/media-server'
+import { afterMove, mediaGate, moveThroughMedia } from '@/lib/media-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
@@ -57,6 +57,12 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   // Own-stage check, shared with the board, the sheet and bulk moves
   // (src/lib/stage-moves.ts): a working stage belongs to the assignee or the
   // owner, a review stage to its role; admin and superuser may override.
+  const throughNext = await moveThroughMedia(task, nextStage, member)
+  if (throughNext) {
+    if (!throughNext.success) return { success: false, shouldCelebrate: false, error: throughNext.error }
+    revalidatePath('/board'); revalidatePath('/overview')
+    return { success: true, shouldCelebrate: false }
+  }
   const isOwnStage = holdsStage(task, member)
   if (!allowedStages(task, member).includes(nextStage)) {
     return { success: false, shouldCelebrate: false, error: 'not_authorized' }
@@ -116,6 +122,15 @@ export async function setTaskStage(
   if (toIdx === -1) return { success: false, shouldCelebrate: false, error: 'stage_not_in_pipeline' }
   if (toIdx === fromIdx) return { success: true, shouldCelebrate: false }
   if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
+
+  // Spec 022 (user, 2026-11-23): a linked row's Status follows its linked tasks, so moving
+  // it moves them — with their own stage permissions, approvals and SLA.
+  const through = await moveThroughMedia(task, stageId, member)
+  if (through) {
+    if (!through.success) return { success: false, shouldCelebrate: false, error: through.error }
+    revalidatePath('/board'); revalidatePath('/overview'); revalidatePath('/', 'layout')
+    return { success: true, shouldCelebrate: false }
+  }
 
   // The shared rule (src/lib/stage-moves.ts): the sheet's status menu offers
   // exactly this list, so the two can never disagree (spec 008 SC-003).

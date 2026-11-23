@@ -38,13 +38,15 @@ interface KanbanColumnProps {
   onSelectAll?: (stageId: StageId, on: boolean) => void
   /** Spec 021 (US5): a simple-status column, drawn dashed after the pipeline. */
   dashed?: boolean
+  /** Spec 022 (US4): a Space stage column — its own drop id and name, the original stage underneath. */
+  spaceStage?: { id: string; name: string }
 }
 
 export function KanbanColumn({
   stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask,
-  selectedIds, selecting, onToggleSelect, onSelectAll, dashed = false,
+  selectedIds, selecting, onToggleSelect, onSelectAll, dashed = false, spaceStage,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage.id })
+  const { setNodeRef, isOver } = useDroppable({ id: spaceStage ? `ss:${spaceStage.id}` : stage.id })
   const active = isOver || Boolean(highlight)
   const accent = PIPE_ACCENT[stage.id] ?? PIPE.purpleStroke
 
@@ -59,8 +61,9 @@ export function KanbanColumn({
     // holding one card would otherwise offer a 100px-tall place to aim at.
     <div
       role="region"
-      aria-label={`${stage.label_en} column`}
+      aria-label={`${spaceStage?.name ?? stage.label_en} column`}
       ref={setNodeRef}
+      data-space-stage={spaceStage?.id}
       data-simple-column={dashed ? stage.id : undefined}
       style={{
         background: dashed ? 'transparent' : '#FFFFFF',
@@ -82,7 +85,7 @@ export function KanbanColumn({
             color: PIPE.textPrimary, textTransform: 'uppercase',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {stage.label_en}
+            {spaceStage?.name ?? stage.label_en}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             {onSelectAll && tasks.length > 0 && (
@@ -114,9 +117,9 @@ export function KanbanColumn({
         </div>
         <div style={{
           marginTop: 4, fontSize: 11, fontWeight: 500, color: PIPE.placeholder,
-          direction: 'rtl', textAlign: 'right',
+          ...(spaceStage ? {} : { direction: 'rtl', textAlign: 'right' }),
         }}>
-          {stage.label_ar}
+          {spaceStage ? stage.label_en : stage.label_ar}
         </div>
       </div>
 

@@ -65,7 +65,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click(`[data-media-option="${m}"]`)
           await page.waitForTimeout(2500)
           ok(psql(`select content_task_id from tasks where id='${m}'`) === c, 'picking the unlinked Design task links it')
-          ok(psql(`select status from tasks where id='${c}'`) === 'c-check', 'linked before Ready For Design: the content task stays where it is')
+          ok(psql(`select status from tasks where id='${c}'`) === 'r-design', "linked: the row's Status follows the Design task (user, 2026-11-23)")
           await page.waitForSelector(`[data-task-sheet] [data-cell$="${c}|media"] [data-media-chip="design"]`, { timeout: 15000 })
 
           await openLink(page, go, c2, `new ${n}`)

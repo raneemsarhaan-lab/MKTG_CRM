@@ -6,6 +6,7 @@
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
 import { useLocale, useTranslations } from 'next-intl'
+import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import type { ContentTheme, Member, SheetColumn, SLAConfig, Task, TaskField, WordField } from '@/types/index'
 import type { MutableRefObject } from 'react'
 import { contentTypeColor } from '@/lib/tokens'
@@ -70,6 +71,8 @@ const TEXT_COLS: GridCol[] = ['title', 'clipNo', 'source', 'fileName', 'in', 'ou
 export interface SheetGridProps {
   /** Spec 022 (R19): the Link task cell on a video's row, from the sheet. */
   media?: { render(task: Task): React.ReactNode; open(task: Task, anchor: HTMLElement, typed?: string): void; text(task: Task): string }
+  /** Spec 022 (US4): the linked Space's stages — names shown and typed here. */
+  stages?: SpaceStagesApi | null
   rows: SheetRow[]
   /** The shaped layout (spec 010): columns, widths, names, custom cells. */
   columns: SheetColumnsHook
@@ -139,9 +142,24 @@ export function SheetGrid(p: SheetGridProps) {
   const boardName = (id: string) => { const m = STAGE_META[id as StageId]; return m ? (locale.startsWith('ar') ? m.label_ar : m.label_en) : id }
   /** A stage as this sheet calls it: its own word, the Video sheet's word, or the board's name. */
   const stageWord = (id: string) => {
+    if (p.stages) return p.stages.stageName(id)
     const v = viewRef.current
     if (v.show === 'board') return boardName(id)
     return v.words?.stage?.[id]?.[0] ?? stageNames.video(id as StageId)
+  }
+  /** A task's stage here: its Space stage (a sub-stage when split), else the stage's word. */
+  const stageOf = (task: Task) => (p.stages ? p.stages.name(task) : stageWord(task.status))
+  /** Spec 022 (US4): a typed Space stage — a sub-stage move within the stage, else a real move then its sub-stage. */
+  function commitSpaceStage(row: { task: Task }, col: GridCol, value: string): Promise<string | null> | null {
+    const st = p.stages
+    const entry = st?.match(value)
+    if (!st || !entry) return null
+    const task = row.task
+    if (entry.stage_id === task.status) return st.sub(task, entry).then(err => (err ? tf('notAStage', { text: value.trim() }) : null))
+    return p.onCommit(row as never, col, entry.stage_id).then(err => {
+      if (!err && entry.position > 0) void st.sub({ ...task, status: entry.stage_id }, entry)
+      return err
+    })
   }
   /** Typed or pasted text in Status, as the stage it stands for (null: not one). */
   function readStage(text: string): string | null {
@@ -155,6 +173,8 @@ export function SheetGrid(p: SheetGridProps) {
     const lfc = linkedOf(col)
     if (lfc) return row.kind === 'clip' && p.boardField ? p.boardField(row.task, lfc, value) : Promise.resolve(null)
     if (col === 'status' && (row.kind === 'clip' || row.kind === 'video')) {
+      const done = commitSpaceStage(row, col, value)
+      if (done) return done
       const v = readStage(value)
       if (!v) return Promise.resolve(tf('notAStage', { text: value.trim() }))
       if (v === row.task.status) return Promise.resolve(null)
@@ -329,7 +349,7 @@ export function SheetGrid(p: SheetGridProps) {
         case 'clipNo':   return task.clip?.clip_no == null ? '' : String(task.clip.clip_no)
         case 'source':   return task.clip?.source ?? ''
         case 'fileName': return task.clip?.file_name ?? ''
-        case 'status':   return row.kind === 'video' || row.kind === 'clip' ? stageWord(task.status) : ''
+        case 'status':   return row.kind === 'video' || row.kind === 'clip' ? stageOf(task) : ''
         case 'in':       return formatClipTime(task.clip?.in_ms)
         case 'out':      return formatClipTime(task.clip?.out_ms)
         case 'due':      return row.kind === 'clip' ? dueText(task.due_date) : ''
@@ -403,7 +423,7 @@ export function SheetGrid(p: SheetGridProps) {
         case 'reviewer': { const r = isVideo ? undefined : reviewerOf(task); return r ? <EditorContent member={r} t={t} /> : null }
         case 'due':    return isVideo ? '' : dueText(task.due_date)
         case 'inStage': { const s = isVideo ? null : inStage(task); return s ? s.text : <span className="fx-sheet-muted">–</span> }
-        case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} name={stageWord(task.status)} />
+        case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} name={stageOf(task)} />
         case 'editor': return <EditorContent member={task.assignee_id ? membersById.get(task.assignee_id) : undefined} t={t} />
         case 'source': return isVideo ? '' : <span className="fx-sheet-ellipsis">{task.clip?.source ?? ''}</span>
         case 'fileName': return isVideo ? '' : <span className="fx-sheet-ellipsis" title={task.clip?.file_name ?? undefined}>{task.clip?.file_name ?? ''}</span>
@@ -448,7 +468,7 @@ export function SheetGrid(p: SheetGridProps) {
     const task = rowTask(row)
     if (task && !cl.custom.is(col)) {
       switch (col) {
-        case 'status': return stageWord(task.status)
+        case 'status': return stageOf(task)
         case 'editor': return task.assignee_id ? membersById.get(task.assignee_id)?.name ?? '' : ''
         case 'media': return row.kind === 'video' ? p.media?.text(task) ?? '' : ''
         case 'type': return task.content_type_label ?? ''
@@ -553,7 +573,8 @@ export function SheetGrid(p: SheetGridProps) {
     const i = laid.indexOf(c), name = colLabel(c.key) || t('col.drop')
     return {
       key: c.key, name, icon: c.kind ? 'regular' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
-      values: c.key === 'status' ? 'stage' : undefined,
+      // Spec 022 (US4): stage names come from the Space's Stages.
+      values: c.key === 'status' && !p.stages ? 'stage' : undefined,
       up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
       upLabel: tc('moveUp', { name }), downLabel: tc('moveDown', { name }),
     }

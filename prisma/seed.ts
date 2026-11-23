@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { ROLE_SPACES, membersBySpace, startingSpaces } from '../src/lib/spaces'
+import { stagesFromWords } from '../src/lib/space-stages'
+import { contentStageFrom, passedDCheck } from '../src/lib/media'
 
 const prisma = new PrismaClient()
 
@@ -352,6 +354,54 @@ async function main() {
       await prisma.taskSpace.delete({ where: { task_id_space_id: { task_id: t.id, space_id: r.space_id } } })
     }
     return `${made} media tasks from ${rows.length} hand-offs`
+  })
+
+  /**
+   * Spec 022 (R8): status words become Space stages. Per Space and original
+   * stage, one Space stage named by the first word, the other words as
+   * aliases. Content and Video take theirs from their sheet's stage words.
+   * Stages with no words need no row: they show the original name.
+   */
+  await once('space-stages-v1', 'turned status words into Space stages', async () => {
+    const spaces = await prisma.teamSpace.findMany({ select: { id: true, key: true, words: true } })
+    const sheets = await prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } })
+    let n = 0
+    for (const sp of spaces) {
+      if (await prisma.spaceStage.count({ where: { space_id: sp.id } })) continue
+      const lk = sp.key === 'content' ? 'linked_content' : sp.key === 'video' ? 'linked_video' : null
+      const view = (lk ? sheets.find(x => x.linked_key === lk)?.view : null) as { words?: { stage?: Record<string, string[]> }; show?: string } | null
+      const words = lk ? (view?.show === 'board' ? {} : view?.words?.stage ?? {}) : ((sp.words ?? {}) as Record<string, string[]>)
+      const rows = stagesFromWords(words).filter(r => r.name)
+      if (!rows.length) continue
+      await prisma.spaceStage.createMany({ data: rows.map(r => ({ space_id: sp.id, ...r })) })
+      n += rows.length
+    }
+    return `${n} named Space stages`
+  })
+
+  /**
+   * User, 2026-11-23: a linked row's Status follows its linked tasks. Rows already
+   * linked take it now: the earliest stage among the linked tasks that haven't
+   * passed D-Check, else F-Check (linked tasks past D-Check then follow it).
+   */
+  await once('content-follows-media-v1', 'set linked rows to their linked tasks’ stage', async () => {
+    const order = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
+    const media = await prisma.task.findMany({ where: { content_task_id: { not: null }, media_board: { not: null }, dropped_at: null }, select: { id: true, status: true, content_task_id: true } })
+    const ids = [...new Set(media.map(m => m.content_task_id!))]
+    let n = 0
+    for (const id of ids) {
+      const c = await prisma.task.findUnique({ where: { id }, select: { id: true, status: true, dropped_at: true, media_board: true } })
+      if (!c || c.dropped_at || c.media_board) continue
+      const mine = media.filter(m => m.content_task_id === id)
+      let stage = contentStageFrom(mine) ?? (order.indexOf(c.status) < order.indexOf('final-check') ? 'final-check' : c.status)
+      if (stage !== c.status) {
+        await prisma.task.update({ where: { id }, data: { status: stage, stage_date: new Date(), auto_linked_at: new Date() } })
+        n++
+      }
+      const follow = mine.filter(m => passedDCheck(m) && m.status !== stage && order.indexOf(stage) >= order.indexOf('final-check'))
+      if (follow.length) await prisma.task.updateMany({ where: { id: { in: follow.map(m => m.id) } }, data: { status: stage } })
+    }
+    return `${n} of ${ids.length} linked rows moved`
   })
 
   // Workspace settings

@@ -219,10 +219,10 @@ description: "Tasks for 022 — task methodology"
 - Renaming C-In Progress to "Writing" shows on the Content sheet.
 
 ### Tests for US4
-- [ ] T039 [P] [US4] Pure check `pure-space-stages` in `scripts/spaces-lab/pure.mjs`:
+- [X] T039 [P] [US4] Pure check `pure-space-stages` in `scripts/spaces-lab/pure.mjs`:
   - validation (every stage covered, unique names, one stage per row);
   - `spaceStageOf(task, space, rows)`: a remembered row counts only while `status` matches, else the first.
-- [ ] T040 [P] [US4] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us4.cjs`:
+- [X] T040 [P] [US4] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us4.cjs`:
   - split and rename in Space settings; a mapping missing a stage is refused;
   - a sub-stage move by a Space member leaves `status`, `stage_date` and other Spaces unchanged;
   - re-entering the stage starts at the first sub-stage;
@@ -230,20 +230,20 @@ description: "Tasks for 022 — task methodology"
   - `/board` shows the original names.
 
 ### Implementation for US4
-- [ ] T041 [P] [US4] Create `src/lib/space-stages.ts` (pure): `validateStages`, `spaceStageOf`, `stagesForSpace` (ordered, with fallback names), `matchSpaceStage(text, rows)` (names + aliases, en/ar original names), replacing `src/lib/space-words.ts` call sites.
-- [ ] T042 [US4] Create `src/actions/space-stages.ts` with `saveSpaceStages` (admin, superuser) and `moveSubStage` (Space access; `other_stage` refusal) per contract.
-- [ ] T043 [US4] `src/components/spaces/SpaceStages.tsx` (new, replaces `SpaceWords.tsx`): the 11 originals with their Space stages, rename, ＋ split, reorder, remove (not the last) `[data-space-stage-row]` `[data-space-stage-add]`. Opened from the Space header for admins and superusers (per T002).
-- [ ] T044 [US4] Space views by Space stage in `src/components/views/SpacePage.tsx`, `ListView.tsx`, `CalendarView.tsx` (chip tooltip) and the Space Board (`src/components/views/BoardView.tsx` → `KanbanBoard` columns per Space stage):
+- [X] T041 [P] [US4] Create `src/lib/space-stages.ts` (pure): `validateStages`, `spaceStageOf`, `stagesForSpace` (ordered, with fallback names), `matchSpaceStage(text, rows)` (names + aliases, en/ar original names), replacing `src/lib/space-words.ts` call sites.
+- [X] T042 [US4] Create `src/actions/space-stages.ts` with `saveSpaceStages` (admin, superuser) and `moveSubStage` (Space access; `other_stage` refusal) per contract.
+- [X] T043 [US4] `src/components/spaces/SpaceStages.tsx` (new, replaces `SpaceWords.tsx`): the 11 originals with their Space stages, rename, ＋ split, reorder, remove (not the last) `[data-space-stage-row]` `[data-space-stage-add]`. Opened from the Space header for admins and superusers (per T002).
+- [X] T044 [US4] Space views by Space stage in `src/components/views/SpacePage.tsx`, `ListView.tsx`, `CalendarView.tsx` (chip tooltip) and the Space Board (`src/components/views/BoardView.tsx` → `KanbanBoard` columns per Space stage):
   - a drag or menu between Space stages of one original stage calls `moveSubStage`; otherwise the normal move;
   - `[data-space-stage]` on columns and pills.
-- [ ] T045 [US4] Sheets read their Space's stages:
+- [X] T045 [US4] Sheets read their Space's stages:
   - `src/components/views/TaskSheet.tsx`;
   - Content and Video sheets via `src/components/content/ContentGrid.tsx` / `src/components/sheet/SheetGrid.tsx` status words (`stageWord`);
   - typing a Space stage name moves to it (sub-stage or real move).
   - Retire the sheets' own words settings (`view.words`, the Words panel) in `src/components/sheet/useLinkedView.ts` and its menu.
-- [ ] T046 [US4] Migration `once('space-stages-v1')` in `prisma/seed.ts`: per Space and original stage, one row named by the first status word (else null), other words as aliases. Content/Video take theirs from `sheets.view.words.stage` (R8).
-- [ ] T047 [US4] Remove `setSpaceWords`, `src/components/spaces/SpaceWords.tsx`, `src/lib/space-words.ts` (after T041), `scenarios-us3.cjs`, `pure-space-words`, and the `spaces.words` strings. Keep the `words` columns (R16).
-- [ ] T048 [US4] Strings for Space stages in `messages/en.json` and `messages/ar.json`.
+- [X] T046 [US4] Migration `once('space-stages-v1')` in `prisma/seed.ts`: per Space and original stage, one row named by the first status word (else null), other words as aliases. Content/Video take theirs from `sheets.view.words.stage` (R8).
+- [X] T047 [US4] Remove `setSpaceWords`, `src/components/spaces/SpaceWords.tsx`, `src/lib/space-words.ts` (after T041), `scenarios-us3.cjs`, `pure-space-words`, and the `spaces.words` strings. Keep the `words` columns (R16).
+- [X] T048 [US4] Strings for Space stages in `messages/en.json` and `messages/ar.json`.
 
 **Checkpoint**: US4 tests pass; US1–US3 still green.
 
