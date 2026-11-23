@@ -3,15 +3,14 @@
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
-import type { Brand, TeamSpace, TaskSpace, SimpleStatus, BrandFeatureKey } from '@/types/index'
+import type { Brand, TeamSpace, TaskSpace, BrandFeatureKey } from '@/types/index'
 import { featureOn } from '@/lib/brand-features'
-import { SIMPLE_STATUSES } from '@/lib/simple-status'
 import { ShowsIn } from './ShowsIn'
 import { handoffRequest } from '@/components/handoff/request'
 import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
-  moveTask, setTaskStage, setSimpleStatus, addComment, updateTask, createSubtask,
+  moveTask, setTaskStage, addComment, updateTask, createSubtask,
   addAttachments, renameAttachment, loadAttachments, setCoverThumb,
   type TaskPatch,
 } from '@/actions/tasks'
@@ -1688,20 +1687,6 @@ export function TaskModal({
                 columnGap: 28, rowGap: 2,
               }}>
                 <Prop icon="status" label="Status">
-                  {/* Spec 021 (US5): a simple task shows To Do › In progress › Done instead of the stage pill and Advance. */}
-                  {task.kind === 'simple' ? (
-                    <SimpleSteps
-                      status={(task.simple_status ?? 's-todo') as SimpleStatus}
-                      canEdit={canEdit && !task.dropped_at}
-                      label={s => tSheet(`simple.${s}`)}
-                      onPick={next => startTransition(async () => {
-                        const r = await setSimpleStatus(task.id, next).catch(() => ({ success: false, shouldCelebrate: false, error: 'generic' }))
-                        if (!r.success) { setError(r.error === 'not_authorized' ? 'Only the task\'s owner, its assignee or an admin can move it.' : r.error ?? 'Could not move that task'); return }
-                        router.refresh()
-                        if (r.shouldCelebrate) setCelebration({ taskName: task.name, stageLabel: tSheet('simple.s-done') })
-                      })}
-                    />
-                  ) : (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', position: 'relative' }}>
                     {/* The pill is the picker. The arrow button beside it still
                         does the common thing in one click — this is for the
@@ -1783,7 +1768,6 @@ export function TaskModal({
                       </button>
                     )}
                   </span>
-                  )}
                 </Prop>
 
                 {/* Assignee is who is doing it; Owner sits in Fields below and
@@ -2422,25 +2406,3 @@ function MenuItem({ icon, label, onClick }: { icon: IconName; label: string; onC
   )
 }
 
-/** Spec 021 (US5): the three-step control for a simple task (design/spaces-stage-c.html). */
-function SimpleSteps({ status, canEdit, label, onPick }: {
-  status: SimpleStatus; canEdit: boolean; label: (s: SimpleStatus) => string; onPick: (s: SimpleStatus) => void
-}) {
-  const at = SIMPLE_STATUSES.indexOf(status)
-  return (
-    <span role="group" aria-label="Status" data-simple-steps
-      style={{ display: 'inline-grid', gridTemplateColumns: 'repeat(3, auto)', border: `1px solid ${CU.line}`, borderRadius: 8, overflow: 'hidden' }}>
-      {SIMPLE_STATUSES.map((s, i) => (
-        <button key={s} type="button" data-simple-step={s} aria-current={i === at ? 'step' : undefined} disabled={!canEdit || i === at}
-          onClick={() => onPick(s)}
-          style={{
-            border: 'none', borderInlineEnd: i < 2 ? `1px solid ${CU.line}` : 'none', padding: '5px 11px', fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
-            cursor: canEdit && i !== at ? 'pointer' : 'default',
-            background: i === at ? CU.ink : i < at ? CU.greenSoft : '#FFFFFF', color: i === at ? '#FFFFFF' : i < at ? CU.ink : CU.label,
-          }}>
-          {label(s)}
-        </button>
-      ))}
-    </span>
-  )
-}

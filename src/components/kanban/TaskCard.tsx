@@ -98,7 +98,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const daysLeft = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
   // Published or done work is never overdue (and shows no count).
   const overdue  = isOverdue(task as Parameters<typeof isOverdue>[0])
-  const open     = task.kind === 'simple' ? task.simple_status !== 's-done' : task.status !== 'publish'
+  const open     = task.status !== 'publish'
   const dueLabel = daysLeft === null || !open
     ? ''
     : overdue ? `${Math.abs(daysLeft)}d over`
@@ -205,10 +205,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
 
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
-        {/* Spec 021 (US5): a simple task has no SLA, so its card says what it is instead. */}
-        {task.kind === 'simple'
-          ? <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={700}>{tViews('kindSimple')}</Chip>
-          : featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
+        {featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
         {linkNames.map(n => (
           <span key={n} data-card-task-link="" title={n} style={{ display: 'inline-flex', alignItems: 'center', maxWidth: 170, height: 22, padding: '0 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: 'color-mix(in srgb, #5B5FC7 10%, transparent)', color: '#3B3F9E' }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>

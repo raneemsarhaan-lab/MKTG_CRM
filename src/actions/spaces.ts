@@ -28,8 +28,13 @@ export interface SpaceInput {
   name: string
   color: string
   is_production: boolean
-  default_kind: TaskKind
+  /** Spec 022: unused (every task is a pipeline task); kept so older callers compile. */
+  default_kind?: TaskKind
+  /** Spec 022 (R9): the role new tasks made in this Space go to; null for none. */
+  default_assignee_role?: string | null
 }
+
+const cleanRole = (r: string | null | undefined) => (typeof r === 'string' && r.trim() ? r.trim().slice(0, 60) : null)
 
 export async function createSpace(input: SpaceInput): Promise<Result<{ id: string; key: string }>> {
   const auth = await requireAdmin()
@@ -42,7 +47,7 @@ export async function createSpace(input: SpaceInput): Promise<Result<{ id: strin
   const row = await prisma.teamSpace.create({
     data: {
       key, name, color: input.color, is_production: !!input.is_production,
-      default_kind: input.default_kind === 'simple' ? 'simple' : 'pipeline',
+      default_assignee_role: cleanRole(input.default_assignee_role),
       sort_order: (last._max.sort_order ?? -1) + 1,
     },
   })
@@ -64,7 +69,8 @@ export async function updateSpace(id: string, patch: Partial<SpaceInput & { sort
     data.color = patch.color
   }
   if (patch.is_production !== undefined) data.is_production = !!patch.is_production
-  if (patch.default_kind !== undefined) data.default_kind = patch.default_kind === 'simple' ? 'simple' : 'pipeline'
+  // Spec 022: applies to tasks created from now on.
+  if (patch.default_assignee_role !== undefined) data.default_assignee_role = cleanRole(patch.default_assignee_role)
   if (patch.sort_order !== undefined) data.sort_order = Math.trunc(patch.sort_order)
   const row = await prisma.teamSpace.update({ where: { id }, data }).catch(() => null)
   if (!row) return { success: false, error: 'not_found' }
@@ -154,7 +160,7 @@ export async function deleteSpace(id: string, confirmName: string): Promise<Resu
 
 /** Every Space, archived included, with members — for Settings. */
 export async function listSpacesForSettings(): Promise<Result<{
-  spaces: { id: string; key: string; name: string; color: string; is_production: boolean; default_kind: string; archived: boolean; memberIds: string[] }[]
+  spaces: { id: string; key: string; name: string; color: string; is_production: boolean; default_assignee_role: string | null; archived: boolean; memberIds: string[] }[]
 }>> {
   const auth = await requireAdmin()
   if (auth.error) return { success: false, error: auth.error }
@@ -163,7 +169,7 @@ export async function listSpacesForSettings(): Promise<Result<{
     success: true,
     spaces: rows.map(r => ({
       id: r.id, key: r.key, name: r.name, color: r.color, is_production: r.is_production,
-      default_kind: r.default_kind, archived: !!r.archived_at, memberIds: r.members.map(m => m.member_id),
+      default_assignee_role: r.default_assignee_role ?? null, archived: !!r.archived_at, memberIds: r.members.map(m => m.member_id),
     })),
   }
 }

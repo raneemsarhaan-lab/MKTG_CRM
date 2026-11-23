@@ -278,6 +278,23 @@ async function main() {
     return `${rows.length} rows for ${tasks.length} tasks`
   })
 
+  /**
+   * Spec 022 (FR-001, R16): every task is a pipeline task. Simple tasks move
+   * to To Do, C-In Progress or Published; To Do and C-In Progress start their
+   * SLA today. Marked migrated_simple: no celebration, not a new post in the
+   * brand Library or Calendar. No notifications. The kind columns stay.
+   */
+  await once('simple-to-pipeline-v1', 'made every simple task a pipeline task', async () => {
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0)
+    const base = { kind: 'pipeline', simple_status: null, migrated_simple: true, updated_at: new Date() }
+    const todo = await prisma.task.updateMany({ where: { kind: 'simple', OR: [{ simple_status: 's-todo' }, { simple_status: null }] }, data: { ...base, status: 'todo', stage_date: today } })
+    const doing = await prisma.task.updateMany({ where: { kind: 'simple', simple_status: 's-doing' }, data: { ...base, status: 'c-prog', stage_date: today } })
+    const done = await prisma.task.updateMany({ where: { kind: 'simple', simple_status: 's-done' }, data: { ...base, status: 'publish' } })
+    const left = await prisma.task.count({ where: { kind: 'simple' } })
+    if (left) throw new Error(`simple-to-pipeline-v1 left ${left} simple tasks`)
+    return `${todo.count} to To Do, ${doing.count} to C-In Progress, ${done.count} to Published`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

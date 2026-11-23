@@ -23,7 +23,7 @@ import { viewTasks, viewOptions, type BoardData, type ViewTask } from '@/compone
 import { applyView } from '@/lib/view-config'
 
 type Show = 'all' | 'assigned' | 'handed'
-const finished = (t: Task) => (t.kind === 'simple' ? t.simple_status === 's-done' : t.status === 'publish')
+const finished = (t: Task) => t.status === 'publish'
 
 export function MyTasks({ data }: { data: BoardData }) {
   const t = useTranslations('me')
@@ -41,9 +41,8 @@ export function MyTasks({ data }: { data: BoardData }) {
   const open = (id: string) => selectTask(id)
 
   const baseGroups: [string, ViewTask[]][] = [
-    [t('working'), tasks.filter(x => x.assignee_id === me && !finished(x) && x.kind !== 'simple')],
+    [t('working'), tasks.filter(x => x.assignee_id === me && !finished(x))],
     [t('handedGroup'), tasks.filter(x => x.assignee_id !== me && !finished(x))],
-    [t('planning'), tasks.filter(x => x.kind === 'simple' && !finished(x))],
     [t('published'), tasks.filter(finished)],
   ]
 

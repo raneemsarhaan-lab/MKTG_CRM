@@ -14,7 +14,6 @@ import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor } from '@/lib/utils'
 import { featureOn } from '@/lib/brand-features'
 import { TaskDates } from '@/components/shared/DueDates'
-import { SIMPLE_STATUSES } from '@/lib/simple-status'
 import type { ViewTask } from './types'
 
 type Group = 'brand' | 'stage'
@@ -30,13 +29,12 @@ interface ListViewProps {
   /** The shown name of a stage — a Space's own words, or the board's (US3). */
   stageName?: (s: StageId) => string
   /** The shown name of a simple status — a Space's own words, or the default (US3). */
-  simpleName?: (s: 's-todo' | 's-doing' | 's-done') => string
   /** A saved view's grouping. */
   initialGroup?: Group | null
   onOpen: (id: string) => void
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, simpleName, initialGroup, onOpen }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, initialGroup, onOpen }: ListViewProps) {
   const t = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
@@ -48,14 +46,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),
        { key: 'none', head: <span>{t('noBrand')}</span>, rows: live.filter(x => !x.brand_id) }]
     : [
-        ...NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} board={STAGE_META[s]?.label_en} />, rows: live.filter(x => x.status === s && x.kind !== 'simple') })),
-        // Spec 021 (US5): simple tasks group by their own three statuses, after the pipeline.
-        ...SIMPLE_STATUSES.map(st => ({
-          key: st,
-          head: <span data-simple-group={st} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '2px 9px', borderRadius: 999, border: `1.5px dashed ${PIPE.border}`, fontSize: 12.5, fontWeight: 700 }}
-            title={simpleName && simpleName(st) !== tSheet(`simple.${st}`) ? tSheet(`simple.${st}`) : undefined}>{simpleName?.(st) ?? tSheet(`simple.${st}`)}</span>,
-          rows: live.filter(x => x.kind === 'simple' && (x.simple_status ?? 's-todo') === st),
-        })),
+        ...NINE_STAGE.map(s => ({ key: s, head: <Pill stage={s} label={name(s)} board={STAGE_META[s]?.label_en} />, rows: live.filter(x => x.status === s) })),
       ]
 
   return (
@@ -83,7 +74,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
           {g.rows.map(task => {
             const who = task.assignee_id ? byId.get(task.assignee_id) : undefined
             // Published work can't be late; simple tasks have no SLA.
-            const sla = task.kind !== 'simple' && task.status !== 'publish' && featureOn(task.brand, 'sla') ? getAlertStatus(task, slaConfig, today) : 'On Track'
+            const sla = task.status !== 'publish' && featureOn(task.brand, 'sla') ? getAlertStatus(task, slaConfig, today) : 'On Track'
             const late = sla === 'Overdue' || sla === 'Stuck' || sla === 'Will Miss'
             return (
               <button key={task.id} type="button" data-row={task.id} onClick={() => onOpen(task.id)}
@@ -95,7 +86,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {late && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '1px 6px', borderRadius: 6, background: ALERT_BADGE_STYLES[sla].bg, color: ALERT_BADGE_STYLES[sla].text }}>SLA</span>}
-                  {group === 'brand' && task.kind !== 'simple' && <Pill stage={task.status} label={name(task.status)} board={STAGE_META[task.status]?.label_en} />}
+                  {group === 'brand' && <Pill stage={task.status} label={name(task.status)} board={STAGE_META[task.status]?.label_en} />}
                   {who && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
                   {/* Publishing and due dates, each labelled (spec: both on every task). */}
                   <span style={{ minWidth: 44, textAlign: 'end' }}>{task.publish_date || task.due_date ? <TaskDates task={task} /> : <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>—</span>}</span>

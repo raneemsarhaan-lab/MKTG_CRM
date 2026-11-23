@@ -12,7 +12,6 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import type { Member, TeamSpace } from '@/types/index'
 import { EIGHT_STAGE, NINE_STAGE, STAGE_META } from '@/lib/stage-meta'
-import { SIMPLE_KEYS } from '@/lib/space-words'
 import { normTitle } from '@/lib/sheet-links'
 
 export interface PickTask {
@@ -84,20 +83,18 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
   }, [ctx.tasks, q, exclude, current])
 
   const sp = ctx.spaces.find(x => x.id === space)
-  // Made here, it is linked at once, so it is a pipeline task whichever Space it shows in (user, 2026-11-23).
+  // Spec 022: every task is a pipeline task.
   const simple = false
   const name = (q || typed).trim()
   const stageLine = (() => {
     if (!sp) return ''
     const word = (k: string, board: string) => sp.words?.[k]?.[0] ?? board
-    if (simple) return SIMPLE_KEYS.map(k => word(k, ts(`simple.${k}`))).join(' › ')
     const b = ctx.brands.find(x => x.id === brand)
     const nine = b?.nine_stage_default ?? ctx.workspaceNineStage ?? false
     return (nine ? NINE_STAGE : EIGHT_STAGE).map(k => word(k, locale === 'ar' ? STAGE_META[k].label_ar : STAGE_META[k].label_en)).join(' › ')
   })()
 
   const stageOf = (x: PickTask) => {
-    if (x.kind === 'simple') return ts(`simple.${(x.simple_status ?? 's-todo') as 's-todo'}`)
     const m = STAGE_META[x.status as keyof typeof STAGE_META]
     return m ? (locale === 'ar' ? m.label_ar : m.label_en) : x.status
   }
@@ -149,7 +146,6 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
               <span className="fx-sheet-ellipsis">{x.name}</span>
               <small>{[x.brand?.name ?? t('noBrand'), stageOf(x)].join(' · ')}</small>
             </span>
-            <span className={`fx-linkpick-kind${x.kind === 'simple' ? '' : ' is-pipe'}`}>{x.kind === 'simple' ? t('simple') : t('pipeline')}</span>
           </button>
         ))}
         {!hits.length && <p className="fx-linkpick-none">{t('noMatch', { q })}</p>}

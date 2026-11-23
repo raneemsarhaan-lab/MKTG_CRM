@@ -5,8 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
 import { addAssigneeSpaces, addSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
-import { isSimpleStatus } from '@/lib/simple-status'
-import type { SimpleStatus } from '@/types/index'
+import { defaultAssigneeFor } from '@/lib/spaces'
 import { needsHandoff } from '@/lib/spaces'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
@@ -346,9 +345,6 @@ export async function createSubtask(
     data: {
       name:               trimmed,
       parent_task_id:     parent.id,
-      // A subtask takes its parent's kind: a simple task's subtasks are simple, a video's clips are pipeline.
-      kind:               parent.kind,
-      simple_status:      parent.kind === 'simple' ? 's-todo' : null,
       brand_id:           parent.brand_id,
       content_type_label: parent.content_type_label,
       platform:           parent.platform,
@@ -904,6 +900,15 @@ function userMayCreate(member: { id: string; access: string }, owner: string, as
   return owner === member.id && (!assignee || assignee === member.id)
 }
 
+/** Spec 022 (R9): the member who gets a new task made in this Space, or null. */
+async function spaceDefaultAssignee(spaceId: string | null | undefined, ctx: Awaited<ReturnType<typeof loadSpaceContext>>): Promise<string | null> {
+  if (!spaceId) return null
+  const space = await prisma.teamSpace.findUnique({ where: { id: spaceId }, select: { id: true, default_assignee_role: true } })
+  if (!space?.default_assignee_role) return null
+  const members = await prisma.member.findMany({ where: { role: space.default_assignee_role }, select: { id: true, name: true, role: true } })
+  return defaultAssigneeFor(space, members, ctx.members[spaceId] ?? [])
+}
+
 /** "With C-Check" for a new task: the brand's default first (R11), else the workspace's. */
 async function nineStageFor(brandId: string | null | undefined): Promise<boolean> {
   const [brand, ws] = await Promise.all([
@@ -924,13 +929,16 @@ export async function createTask(
   const nineStage = await nineStageFor(input.brand_id)
   // Spec 021 (approved design): the task takes the stages of the Space it is created in.
   const spaceCtx = await loadSpaceContext()
-  // User, 2026-11-23: every new task starts simple; a Task link makes it a pipeline task.
-  const kind = 'simple' as const
+  // Spec 022: every task is a pipeline task.
+  const kind = 'pipeline' as const
+  // Spec 022 (R9): no assignee given → the Space's default assignee role (users keep their own tasks).
+  const assignee = input.assignee_id !== undefined ? input.assignee_id
+    : member.access === 'user' ? null
+    : await spaceDefaultAssignee(input.space_id, spaceCtx)
 
   const task = await prisma.task.create({
     data: {
       kind,
-      simple_status:      kind === 'simple' ? 's-todo' : null,
       name:               input.name,
       description:        input.description?.trim() || null,
       brand_id:           input.brand_id || null,
@@ -938,7 +946,7 @@ export async function createTask(
       platform:           input.platform   ?? null,
       project_id:         input.project_id ?? null,
       task_owner_id:      input.task_owner_id,
-      assignee_id:        input.assignee_id ?? input.task_owner_id,
+      assignee_id:        assignee ?? input.task_owner_id,
       initiator_role:     member.role,
       nine_stage:         nineStage,
       status:             'todo',
@@ -1028,7 +1036,7 @@ export async function createTasks(
   const now = new Date()
   const shareDates = await newTaskDates(shared.publish_date, shared.due_date)
   const spaceCtx = await loadSpaceContext()
-  const kind = 'simple' as const
+  const kind = 'pipeline' as const
 
   try {
     const ids = clean.map(() => crypto.randomUUID())
@@ -1036,7 +1044,6 @@ export async function createTasks(
       data: clean.map((name, i) => ({
         id: ids[i],
         kind,
-        simple_status: kind === 'simple' ? 's-todo' : null,
         name,
         description:        shared.description?.trim() || null,
         brand_id:           shared.brand_id,
@@ -1294,26 +1301,3 @@ export async function loadAttachments(taskId: string): Promise<{
   }))
 }
 
-// ─── setSimpleStatus ─────────────────────────────────────────────────────────
-
-/**
- * Spec 021 (US5, FR-024): move a simple task between To Do, In progress and
- * Done, forward or back. No stage owners, no SLA: anyone who may edit the task
- * may move it. Reaching Done celebrates (shouldCelebrate), as Published does.
- * Never touches the parent or subtasks (FR-025).
- */
-export async function setSimpleStatus(taskId: string, status: SimpleStatus): Promise<MoveTaskResult> {
-  const member = await getSessionMember()
-  if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
-  if (!isSimpleStatus(status)) return { success: false, shouldCelebrate: false, error: 'invalid' }
-  const task = await prisma.task.findUnique({ where: { id: taskId } })
-  if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
-  if (task.kind !== 'simple') return { success: false, shouldCelebrate: false, error: 'not_simple' }
-  if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
-  if (!canAct(task, member)) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
-  if (task.simple_status === status) return { success: true, shouldCelebrate: false }
-  await prisma.task.update({ where: { id: taskId }, data: { simple_status: status, stage_date: new Date(), updated_at: new Date() } })
-  revalidatePath('/board')
-  revalidatePath('/', 'layout')
-  return { success: true, shouldCelebrate: status === 's-done' }
-}

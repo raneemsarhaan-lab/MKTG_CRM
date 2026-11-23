@@ -9,7 +9,6 @@
  * (research R5). This file only routes, checks the sheet, and keeps snapshots.
  */
 import { revalidatePath } from 'next/cache'
-import { makePipeline } from '@/lib/task-kind-server'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import type { LinkedTask, SheetTaskMap, StageId, TaskField, TaskFieldResult, TaskFieldValues, TaskFieldWrite } from '@/types/index'
@@ -372,8 +371,6 @@ export async function createTasksForRows(sheetId: string, rows: { rowId: string;
   if (created.length) {
     await prisma.$executeRaw`UPDATE sheet_rows s SET task_id = t.tid FROM unnest(${created.map(x => x.rowId)}::uuid[], ${created.map(x => x.taskId)}::text[]::uuid[]) AS t(rid, tid)
       WHERE s.id = t.rid AND s.sheet_id = ${sheetId}::uuid`
-    // Made from linked rows, so they are pipeline tasks (user, 2026-11-23).
-    await makePipeline(created.map(x => x.taskId))
     await writeSnapshots(sheetId, s.m.id, created.map(c => ({ rowId: c.rowId, colId: s.map!.taskCol, value: c.link })))
   }
   return { success: true, created, problems, tasks: await linkedTasks(created.map(c => c.taskId), s.map, s.m) }

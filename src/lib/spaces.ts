@@ -156,3 +156,22 @@ export const ROLE_SPACES: Record<string, string[]> = {
 }
 
 export const VIA_ORDER: TaskSpaceVia[] = ['created', 'migration', 'assignee', 'handoff', 'manual']
+
+/**
+ * Spec 022 (R9): who a new task made in a Space goes to — the member holding
+ * the Space's default assignee role, the first of them in the Space's member
+ * list (by name) when several do; null when the Space has no role or nobody
+ * holds it (the caller then uses the creator).
+ */
+export function defaultAssigneeFor(
+  space: { id: string; default_assignee_role?: string | null } | null | undefined,
+  members: { id: string; name: string; role: string }[],
+  spaceMemberIds: string[],
+): string | null {
+  const role = space?.default_assignee_role
+  if (!space || !role) return null
+  const holders = members.filter(m => m.role === role)
+  const inSpace = holders.filter(m => spaceMemberIds.includes(m.id)).sort((a, b) => a.name.localeCompare(b.name))
+  const pick = inSpace[0] ?? [...holders].sort((a, b) => a.name.localeCompare(b.name))[0]
+  return pick?.id ?? null
+}

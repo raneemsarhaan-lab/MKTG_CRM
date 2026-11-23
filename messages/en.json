@@ -2886,7 +2886,10 @@
       "deleteConfirm": "Type the Space's name to delete it. Its tasks stay in their brands.",
       "save": "Save",
       "saved": "Saved.",
-      "error": "Couldn't save. Try again."
+      "error": "Couldn't save. Try again.",
+      "defaultRole": "Default assignee",
+      "defaultRoleHint": "New tasks made in this Space go to the member with this role. Changing it affects new tasks only.",
+      "noDefaultRole": "— the creator —"
     },
     "assetsLede": "The brand's files (logos, fonts, templates), and its design requests in progress.",
     "libraryLede": "Everything published for this brand, kept for reuse. Tasks arrive here on their own when they are published.",

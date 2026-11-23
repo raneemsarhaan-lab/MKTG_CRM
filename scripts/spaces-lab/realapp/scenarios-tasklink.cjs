@@ -60,66 +60,6 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: 'tasklink-linking-makes-pipeline', as: 'admin',
-      async run({ page, go }) {
-        cleanup()
-        const plan = `Lab linked plan ${Date.now() % 100000}`, piece = `Lab linked piece ${Date.now() % 100000}`
-        const simple = psql(`insert into tasks (id,name,brand_id,task_owner_id,assignee_id,initiator_role,status,kind,simple_status,stage_date,updated_at)
-          select gen_random_uuid(), 'Lab simple to link ' || floor(random()*1e6)::text, (select id from brands order by name limit 1), m.id, m.id, m.role, 'todo', 'simple', 's-doing', now(), now()
-          from members m where m.role='Marketing Manager' limit 1 returning id`).split(/\n/)[0]
-        const simpleName = psql(`select name from tasks where id='${simple}'`)
-        try {
-          await go('/spaces/design?view=sheet')
-          const col = await addField(page, `Lab link create ${Date.now() % 100000}`)
-          const row = taskIn('design', 'Meetup poster'), row2 = taskIn('design', 'Newsletter issue 22'), row3 = taskIn('design', 'Year in review carousel')
-          // Created from Link task, in Planning or in Content: linked at once, so a pipeline task either way.
-          for (const [r, name, space] of [[row, plan, 'planning'], [row2, piece, 'content']]) {
-            const cell = `[data-task-sheet] [data-cell$="${r}|c:${col}"]`
-            await page.locator(cell).click()
-            await page.keyboard.type(name)
-            await page.waitForSelector('[data-link-picker]')
-            await page.click('[data-link-create]')
-            await page.click(`[data-link-space="${space}"]`)
-            ok((await page.getAttribute('[data-link-gets]', 'data-link-gets')) === 'pipeline', `the picker says it becomes a pipeline task (${space})`)
-            await page.click('[data-link-make]')
-            await page.waitForTimeout(2500)
-          }
-          ok(psql(`select kind||':'||status from tasks where name='${plan}'`) === 'pipeline:todo', 'created and linked in Planning → pipeline, at To Do')
-          ok(psql(`select kind||':'||status from tasks where name='${piece}'`) === 'pipeline:todo', 'created and linked in Content → pipeline, at To Do')
-          ok(nameOfValue(col, row) === plan && nameOfValue(col, row2) === piece, 'each new task is linked')
-          ok(psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where t.name='${plan}' and ts.space_id='${spaceId('planning')}'`) === '1', 'it shows in the Space it was made in')
-          // An existing simple task becomes a pipeline task when it is linked.
-          const cell3 = `[data-task-sheet] [data-cell$="${row3}|c:${col}"]`
-          await page.locator(cell3).click()
-          await page.keyboard.type(simpleName.slice(0, 18))
-          await page.waitForSelector(`[data-link-picker] [data-pick-task="${simple}"]`)
-          await page.click(`[data-link-picker] [data-pick-task="${simple}"]`)
-          await page.waitForTimeout(1800)
-          ok(psql(`select kind||':'||status||':'||coalesce(simple_status,'') from tasks where id='${simple}'`) === 'pipeline:todo:', 'linking a simple task makes it a pipeline task at To Do')
-          await page.locator(`${cell3} [data-tasklink-unlink]`).click({ force: true })
-          await page.waitForTimeout(1500)
-          ok(psql(`select kind from tasks where id='${simple}'`) === 'pipeline', 'unlinking keeps it on the pipeline')
-        } finally {
-          cleanup()
-          psql(`update tasks set dropped_at=now() where name in ('${plan}', '${piece}') or id='${simple}'`)
-        }
-      },
-    },
-    {
-      id: 'tasklink-new-tasks-start-simple', as: 'admin',
-      async run({ page, go }) {
-        const name = `Lab content form ${Date.now()}`
-        await go('/spaces/content?view=board')
-        await page.getByRole('button', { name: 'Add task' }).first().click()
-        await page.fill('input[placeholder="Task name — or paste a list"]', name)
-        ok(/simple task/i.test(await page.textContent('[data-gets-stages]') ?? ''), 'the form says it starts simple')
-        await page.locator('button', { hasText: /^Create Task$/i }).first().click()
-        await page.waitForTimeout(2000)
-        ok(psql(`select kind||':'||coalesce(simple_status,'') from tasks where name='${name}'`) === 'simple:s-todo', 'made in Content with the form → simple')
-        psql(`update tasks set dropped_at=now() where name='${name}'`)
-      },
-    },
-    {
       id: 'tasklink-panel-and-card', as: 'admin',
       async run({ page, go }) {
         cleanup()

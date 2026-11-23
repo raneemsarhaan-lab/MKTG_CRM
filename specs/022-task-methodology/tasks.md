@@ -34,7 +34,7 @@ description: "Tasks for 022 — task methodology"
   - Space settings › Stages (rename, split, reorder, remove);
   - Settings › Spaces default role;
   - Settings › SLA & Workflow boards per content type.
-- [ ] T003 Publish the design for review and record the user's approval of the design and of research R10–R14 at the top of `specs/022-task-methodology/research.md`. **Gate: Phases 4–8 UI tasks wait for this.**
+- [X] T003 *(Approved 2026-11-23.)* Publish the design for review and record the user's approval of the design and of research R10–R14 at the top of `specs/022-task-methodology/research.md`. **Gate: Phases 4–8 UI tasks wait for this.**
 
 ---
 
@@ -70,41 +70,41 @@ description: "Tasks for 022 — task methodology"
 - A task that was simple "Done" is now Published, with no celebration and not in the Library or on the FFNT Calendar.
 
 ### Tests for US1
-- [ ] T009 [P] [US1] Pure check `pure-default-assignee` in `scripts/spaces-lab/pure.mjs`: role resolved to the first Space member holding it (by name); none → the creator (R9).
-- [ ] T010 [P] [US1] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-022-us1.cjs` (register in `run.cjs`):
+- [X] T009 [P] [US1] Pure check `pure-default-assignee` in `scripts/spaces-lab/pure.mjs`: role resolved to the first Space member holding it (by name); none → the creator (R9).
+- [X] T010 *(Done: `scenarios-022-us1.cjs`, 3 scenarios; C-Check per brand stays covered by `us4-islam-check-new-tasks-only`.)* [P] [US1] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-022-us1.cjs` (register in `run.cjs`):
   - create in Content gives the Content Creator, at To Do, pipeline;
   - change the default role in Settings: only the next task follows;
   - C-Check off for a brand gives the next task 10 stages; a task in C-Check still finishes it;
   - a migrated task (seeded simple "s-done") is Published, absent from `/brands/<id>/library` and the brand Calendar.
 
 ### Implementation for US1
-- [ ] T011 [US1] Revert commit `4fcbc23`'s rule:
+- [X] T011 [US1] Revert commit `4fcbc23`'s rule:
   - remove `src/lib/task-kind-server.ts` and its calls in `src/actions/sheet-columns.ts`, `src/actions/sheets.ts` and `src/actions/sheet-links.ts`;
   - `createTask` / `createTasks` in `src/actions/tasks.ts` always create `kind='pipeline'`;
   - subtasks no longer copy a kind.
-- [ ] T012 [US1] Add `defaultAssigneeFor(spaceId, ctx)` (pure) in `src/lib/spaces.ts` and use it in `createTask` / `createTasks` (`src/actions/tasks.ts`) when no assignee is given; load the role in `loadSpaceContext` (`src/lib/spaces-server.ts`).
-- [ ] T013 [US1] Add `default_assignee_role` to `updateSpace` / `createSpace` (admin-only) in `src/actions/spaces.ts`, and a role picker `[data-space-default-role]` per Space in `src/components/settings/SpacesSettings.tsx` (per T002).
-- [ ] T014 [US1] TaskForm (`src/components/shared/TaskForm.tsx`):
+- [X] T012 [US1] Add `defaultAssigneeFor(spaceId, ctx)` (pure) in `src/lib/spaces.ts` and use it in `createTask` / `createTasks` (`src/actions/tasks.ts`) when no assignee is given; load the role in `loadSpaceContext` (`src/lib/spaces-server.ts`).
+- [X] T013 [US1] Add `default_assignee_role` to `updateSpace` / `createSpace` (admin-only) in `src/actions/spaces.ts`, and a role picker `[data-space-default-role]` per Space in `src/components/settings/SpacesSettings.tsx` (per T002).
+- [X] T014 *(Done: `spaceAssignees` replaces `spaceKinds`.)* [US1] TaskForm (`src/components/shared/TaskForm.tsx`):
   - preselect the Space's default assignee;
   - remove `data-gets-stages` simple wording and `spaceKinds`;
   - update callers in `src/components/kanban/KanbanBoard.tsx`.
-- [ ] T015 [US1] Remove simple-task UI:
+- [X] T015 [US1] Remove simple-task UI:
   - the dashed simple columns, the Kind filter and `setSimpleStatus` calls in `src/components/kanban/KanbanBoard.tsx` / `KanbanColumn.tsx`;
   - the simple groups and `simpleName` in `src/components/views/ListView.tsx`;
   - the three-step control in `src/components/kanban/TaskModal.tsx`;
   - the simple branches in `src/components/views/TaskSheet.tsx` and `src/components/views/SpacePage.tsx`;
   - the "Simple" chip in `src/components/kanban/TaskCard.tsx`.
-- [ ] T016 [US1] Remove simple-task server paths:
+- [X] T016 *(Done for every live path: setSimpleStatus, moves, creation, UI. The library guards that can no longer fire are deleted in T059.)* [US1] Remove simple-task server paths:
   - `setSimpleStatus` and the simple guards in `src/actions/tasks.ts`;
   - `kind === 'simple'` branches in `src/lib/alert-status.ts`, `src/lib/stage-moves.ts`, `src/lib/spaces.ts`, `src/lib/inbox.ts`, `src/lib/task-load.ts`, `src/lib/due-dates.ts` (`isOverdue`), `src/components/content/rows.ts` and `src/lib/home-metrics.ts`.
   - Keep the DB columns (R16).
-- [ ] T017 [US1] Migration `once('simple-to-pipeline-v1')` in `prisma/seed.ts`:
+- [X] T017 [US1] Migration `once('simple-to-pipeline-v1')` in `prisma/seed.ts`:
   - s-todo → todo, s-doing → c-prog, s-done → publish;
   - `kind='pipeline'`, `simple_status=null`, `migrated_simple=true`;
   - `stage_date` = today for todo and c-prog;
   - no notifications.
-- [ ] T018 [US1] Skip `migrated_simple` tasks in the celebration path (`src/actions/tasks.ts` `shouldCelebrate`), in `src/components/brands/BrandLibrary.tsx` / the Library filter in `src/components/views/BrandPage.tsx`, and on the brand Calendar's published markers (`src/components/views/CalendarView.tsx`).
-- [ ] T019 [US1] Remove `spaces.words`-unrelated simple strings and keys from `messages/en.json` and `messages/ar.json` (simple statuses, kind filter, startsSimple) and the `pure-simple-status` check from `scripts/spaces-lab/pure.mjs`; replace `scenarios-us5.cjs` with a note pointing to US1 tests.
+- [X] T018 *(Done: Library and brand Calendar skip them; Published is terminal, so they never celebrate.)* [US1] Skip `migrated_simple` tasks in the celebration path (`src/actions/tasks.ts` `shouldCelebrate`), in `src/components/brands/BrandLibrary.tsx` / the Library filter in `src/components/views/BrandPage.tsx`, and on the brand Calendar's published markers (`src/components/views/CalendarView.tsx`).
+- [X] T019 *(Done: pure-simple-status and scenarios-us5 replaced; the two "start simple" Task link scenarios removed. Unused message keys go in T059.)* [US1] Remove `spaces.words`-unrelated simple strings and keys from `messages/en.json` and `messages/ar.json` (simple statuses, kind filter, startsSimple) and the `pure-simple-status` check from `scripts/spaces-lab/pure.mjs`; replace `scenarios-us5.cjs` with a note pointing to US1 tests.
 
 **Checkpoint**: US1 tests pass; `lab:spaces`, `lab:sheet`, typecheck green.
 

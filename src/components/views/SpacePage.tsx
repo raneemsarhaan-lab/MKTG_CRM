@@ -47,8 +47,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const tSheet = useTranslations('taskSheet')
   const words = space.words
   const stageName = (s: StageId) => wordOf(s, words) ?? (locale === 'ar' ? STAGE_META[s]?.label_ar : STAGE_META[s]?.label_en) ?? s
-  const simpleName = (s: 's-todo' | 's-doing' | 's-done') => wordOf(s, words) ?? tSheet(`simple.${s}`)
-  const statusName = (x: Task) => (x.kind === 'simple' ? simpleName((x.simple_status ?? 's-todo') as 's-todo') : stageName(x.status as StageId))
+  const statusName = (x: Task) => stageName(x.status as StageId)
 
   return (
     <ViewHost
@@ -91,7 +90,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} simpleName={simpleName} initialGroup={view?.config.group} onOpen={open} />
+              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} initialGroup={view?.config.group} onOpen={open} />
         return <>{body}<TaskPanel data={data} /></>
       }}
     />

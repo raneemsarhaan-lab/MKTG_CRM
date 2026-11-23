@@ -68,11 +68,11 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
           ? <BoardView data={data} scopeTasks={scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
           : withPanel(tab === 'list'
             ? <ListView tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
-            : <CalendarView tasks={all} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" />)} />
+            : <CalendarView tasks={all.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" />)} />
     )
   }
   if (folder === 'assets') {
-    const requests = all.filter(x => x.content_type_label === 'Design' && x.status !== 'publish' && x.kind !== 'simple')
+    const requests = all.filter(x => x.content_type_label === 'Design' && x.status !== 'publish')
     return (
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('assetsLede')}
         tabs={[{ key: 'files', label: tv('files') }, { key: 'requests', label: tv('requests') }]}
@@ -80,7 +80,8 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
     )
   }
   if (folder === 'library') {
-    const published = all.filter(x => x.status === 'publish' && x.kind !== 'simple' && !x.dropped_at)
+    // Spec 022: tasks migrated from simple tasks aren't new posts.
+    const published = all.filter(x => x.status === 'publish' && !x.dropped_at && !x.migrated_simple)
     return (
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('libraryLede')}
         tabs={[{ key: 'gallery', label: tv('gallery') }, { key: 'list', label: tv('list') }]}

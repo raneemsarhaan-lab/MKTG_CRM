@@ -15,7 +15,7 @@ import {
   archiveSpace, createSpace, deleteSpace, listSpacesForSettings, restoreSpace, setSpaceMembers, updateSpace,
 } from '@/actions/spaces'
 
-type Row = { id: string; key: string; name: string; color: string; is_production: boolean; default_kind: string; archived: boolean; memberIds: string[] }
+type Row = { id: string; key: string; name: string; color: string; is_production: boolean; default_assignee_role: string | null; archived: boolean; memberIds: string[] }
 
 const card: React.CSSProperties = { background: '#fff', borderRadius: 14, padding: '16px 18px', boxShadow: '0 1px 3px rgba(16,16,11,.06)', display: 'grid', gap: 12 }
 const input: React.CSSProperties = { border: '1px solid #E1E1E0', borderRadius: 8, padding: '7px 10px', fontFamily: 'inherit', fontSize: 13.5 }
@@ -64,7 +64,15 @@ export function SpacesSettings({ members }: { members: Member[] }) {
               <input type="checkbox" checked={r.is_production} onChange={e => run(() => updateSpace(r.id, { is_production: e.target.checked }))} />
               {t('production')}
             </label>
-            {/* No default kind (user, 2026-11-23): every task starts simple; a Task link makes it a pipeline task. */}
+            {/* Spec 022 (R9): who new tasks made in this Space go to, by role. New tasks only. */}
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} title={t('defaultRoleHint')}>
+              {t('defaultRole')}
+              <select data-space-default-role={r.key} value={r.default_assignee_role ?? ''} style={input}
+                      onChange={e => run(() => updateSpace(r.id, { default_assignee_role: e.target.value || null }))}>
+                <option value="">{t('noDefaultRole')}</option>
+                {[...new Set(members.map(m => m.role))].sort().map(role => <option key={role} value={role}>{role}</option>)}
+              </select>
+            </label>
           </div>
           <details>
             <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>{t('members')} · {r.memberIds.length}</summary>
@@ -93,7 +101,7 @@ export function SpacesSettings({ members }: { members: Member[] }) {
         </div>
       ))}
       <form style={{ ...card, gridTemplateColumns: 'auto 1fr auto', alignItems: 'center' }}
-        onSubmit={e => { e.preventDefault(); if (draft.name.trim()) run(async () => { const r = await createSpace({ name: draft.name, color: draft.color, is_production: false, default_kind: 'pipeline' }); if (r.success) setDraft({ name: '', color: '#5B93F5' }); return r }) }}>
+        onSubmit={e => { e.preventDefault(); if (draft.name.trim()) run(async () => { const r = await createSpace({ name: draft.name, color: draft.color, is_production: false }); if (r.success) setDraft({ name: '', color: '#5B93F5' }); return r }) }}>
         <input aria-label={t('color')} type="color" value={draft.color} onChange={e => setDraft(d => ({ ...d, color: e.target.value }))} style={{ width: 34, height: 30, border: 'none', background: 'none' }} />
         <input aria-label={t('name')} placeholder={t('name')} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} style={input} />
         <button type="submit" style={btn(true)} disabled={busy || !draft.name.trim()}>{t('add')}</button>

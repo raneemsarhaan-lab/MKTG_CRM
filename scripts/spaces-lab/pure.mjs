@@ -79,11 +79,13 @@ check('pure-feature-on', () => {
   eq(m.cleanFeatures({ platform: false, bogus: true, sla: 'no' }), { platform: false }, 'cleaned')
 })
 
-check('pure-simple-status', () => {
-  eq(m.nextSimple('s-todo'), 's-doing', 'todo → doing')
-  eq(m.nextSimple('s-doing'), 's-done', 'doing → done')
-  eq(m.nextSimple('s-done'), null, 'done is the end')
-  ok(m.isSimpleStatus('s-doing') && !m.isSimpleStatus('todo'), 'guard')
+check('pure-default-assignee', () => {
+  const members = [{ id: 'm1', name: 'Samaa', role: 'Content Creator' }, { id: 'm2', name: 'Aya', role: 'Content Creator' }, { id: 'm3', name: 'Omar', role: 'Graphic Designer' }]
+  eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: 'Content Creator' }, members, ['m1']), 'm1', 'the role holder who is in the Space')
+  eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: 'Content Creator' }, members, ['m1', 'm2']), 'm2', 'several in the Space: the first by name')
+  eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: 'Content Creator' }, members, []), 'm2', 'none in the Space: the first holder by name')
+  eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: 'Video Editor' }, members, []), null, 'nobody holds it: null (the creator)')
+  eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: null }, members, ['m1']), null, 'no role: null')
 })
 
 check('pure-fixtures-sane', () => {

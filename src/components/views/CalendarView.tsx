@@ -21,7 +21,7 @@ import type { ViewTask } from './types'
 
 const BY_KEY = 'momentum.calendar.by'
 const MODE_KEY = 'momentum.calendar.mode'
-const done = (t: ViewTask) => (t.kind === 'simple' ? t.simple_status === 's-done' : t.status === 'publish')
+const done = (t: ViewTask) => t.status === 'publish'
 
 export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due' }: {
   /** Which date places a task on a day until the person picks: a brand's Calendar starts on publishing dates. */

@@ -1,5 +1,7 @@
 # Research: task methodology (022)
 
+**Approved by the user on 2026-11-23**: the design (`design/task-methodology.html`, version 3) and the defaults R10–R13, with R14 (anyone can unlink) and R19 (Link task in content sheets and calendars) as the user decided.
+
 Each item: **Decision**, **Rationale**, **Alternatives considered**.
 
 ## R1. A media task is its own task row

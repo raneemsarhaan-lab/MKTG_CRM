@@ -56,7 +56,8 @@ interface TaskFormProps {
   /** Spec 021: the Spaces the creator could choose from when not created from one. */
   spaceChoices?: { id: string; name: string }[]
   /** Spec 021: each Space's default kind — a new task takes the stages of the Space it's created in. */
-  spaceKinds?: Record<string, string>
+  /** Spec 022 (R9): each Space's default assignee (member id), preselected for admins and superusers. */
+  spaceAssignees?: Record<string, string | null>
   /** The due-date rule, for the due date shown while it's still automatic. */
   dueRule?: DueRule
 }
@@ -103,7 +104,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceKinds = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
+export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceAssignees = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
   const tDates = useTranslations('dates')
   const locale = useLocale()
   const tViews = useTranslations('views')
@@ -133,7 +134,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
     // The owner is whoever raises the task — they are accountable for it.
     // The assignee starts as them too and is the thing intake actually picks.
     task_owner_id: currentUser.id,
-    assignee_id:   currentUser.id,
+    // Spec 022 (R9): the Space's default assignee for admins and superusers; users take their own tasks.
+    assignee_id:   (currentUser.access !== 'user' && spaceId ? spaceAssignees[spaceId] : null) ?? currentUser.id,
     // Publishing date first; the due date follows it until someone sets it by hand.
     publish_date: '',
     due_date: '',
@@ -416,12 +418,6 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                   <PillOption key={x.id} selected={x.id === showIn} onClick={() => { setShowIn(x.id); closePill() }}>{x.name}</PillOption>
                 ))}
               </FieldPill>
-            )}
-
-            {showIn && (
-              <span data-gets-stages style={{ flexBasis: '100%', fontSize: 12, color: CU.muted }}>
-                {tViews('startsSimple')}
-              </span>
             )}
 
             <FieldPill label={tDates('publish')} value={form.publish_date ? formatDay(form.publish_date, locale) : tDates('none')} active width={220}
