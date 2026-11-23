@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { ALL_STAGES, STAGE_META } from '@/lib/stage-meta'
 import type { Brand, ContentType, Member, StageId } from '@/types/index'
@@ -32,7 +32,7 @@ interface BulkBarProps {
   /** Which choices, in order (default: the board's). */
   fields?:   BulkField[]
   /** Words for the count, each choice and the remove button (default: the board's English). */
-  labels?:   Partial<Record<BulkField | 'count' | 'remove' | 'confirm' | 'cancel' | 'clear' | 'noBrand' | 'setDue' | 'noPillar' | 'pillarOff', string>>
+  labels?:   Partial<Record<BulkField | 'count' | 'remove' | 'confirm' | 'cancel' | 'clear' | 'noBrand' | 'setDue' | 'noPillar' | 'pillarOff' | 'saving', string>>
   members:   Member[]
   brands:    Brand[]
   types:     ContentType[]
@@ -59,12 +59,51 @@ const BTN: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-function Menu({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+const ITEMS = '[role="menuitem"]:not([disabled])'
+
+/**
+ * A choice's list, opened above its button.
+ *
+ * Focus moves to the first item on open; ↑ ↓ Home End move between items;
+ * Esc and Tab close it (the bar puts focus back on the button). The due date
+ * is a small form rather than a list, so it is a dialog and keeps its own
+ * keys — arrows belong to the date field there, and Tab has to reach its
+ * button.
+ */
+function Menu({ children, onClose, label, kind = 'menu' }: {
+  children: React.ReactNode; onClose: () => void; label: string; kind?: 'menu' | 'dialog'
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>(kind === 'menu' ? ITEMS : 'input, button:not([disabled])')?.focus()
+  }, [kind])
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (kind !== 'menu') return
+    if (e.key === 'Tab') { onClose(); return }
+    const items = Array.from(ref.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])
+    if (!items.length) return
+    const i = items.indexOf(document.activeElement as HTMLElement)
+    const next =
+      e.key === 'ArrowDown' ? (i + 1) % items.length
+      : e.key === 'ArrowUp' ? (i - 1 + items.length) % items.length
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? items.length - 1
+      : -1
+    if (next === -1) return
+    e.preventDefault()
+    items[next].focus()
+  }
+
   return (
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80 }} />
       <div
-        role="menu"
+        ref={ref}
+        role={kind}
+        aria-label={label}
+        onKeyDown={onKeyDown}
         style={{
           position: 'absolute', bottom: '100%', insetInlineStart: 0, marginBottom: 8, zIndex: 81,
           minWidth: 210, maxHeight: 320, overflowY: 'auto',
@@ -83,8 +122,10 @@ function Item({ onClick, children, stage }: { onClick: () => void; children: Rea
     <button
       type="button"
       role="menuitem"
+      tabIndex={-1}
       data-bulk-stage={stage}
       onClick={onClick}
+      className="fx-focus"
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
         padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent',
@@ -93,6 +134,8 @@ function Item({ onClick, children, stage }: { onClick: () => void; children: Rea
       }}
       onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+      onFocus={e => (e.currentTarget.style.background = '#F4F4F2')}
+      onBlur={e => (e.currentTarget.style.background = 'transparent')}
     >
       {children}
     </button>
@@ -104,15 +147,21 @@ export function BulkBar({
 }: BulkBarProps) {
   const L = {
     count: `${count} selected`, stage: 'Stage', assignee: 'Assignee', owner: 'Owner', brand: 'Brand', type: 'Type', priority: 'Priority',
-    due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', pillar: 'Pillar', noPillar: 'No pillar', pillarOff: 'Pick pieces from one theme', ...labels,
+    due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', pillar: 'Pillar', noPillar: 'No pillar', pillarOff: 'Pick pieces from one theme', saving: 'Saving…', ...labels,
   }
   const [menu, setMenu]       = useState<MenuKind>(null)
   const [dueDraft, setDue]    = useState('')
   const [confirming, setConf] = useState(false)
+  const triggers = useRef<Partial<Record<BulkField, HTMLButtonElement | null>>>({})
 
   if (count === 0) return null
 
-  const close = () => setMenu(null)
+  /** Closing a list hands focus back to the button that opened it. */
+  const close = () => {
+    const k = menu
+    setMenu(null)
+    if (k) triggers.current[k]?.focus()
+  }
   const apply = (patch: BulkPatch) => { close(); onApply(patch) }
   const toggle = (k: BulkField) => setMenu(m => (m === k ? null : k))
 
@@ -150,14 +199,17 @@ export function BulkBar({
           <div style={{ padding: 6, display: 'grid', gap: 6 }}>
             <input
               type="date" value={dueDraft} onChange={e => setDue(e.target.value)} data-bulk-due=""
+              name="due_date" aria-label={L.due}
+              className="fx-focus"
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 8,
                 border: `1px solid ${PIPE.borderInput}`, fontSize: 13,
-                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                fontFamily: 'inherit', boxSizing: 'border-box',
               }}
             />
             <button
               type="button" disabled={!dueDraft} onClick={() => apply({ due_date: dueDraft })}
+              className="fx-hov fx-focus"
               style={{
                 padding: '8px 10px', borderRadius: 8, border: 'none',
                 background: PIPE.ink, color: PIPE.limePrimary, fontWeight: 700,
@@ -172,23 +224,36 @@ export function BulkBar({
     })()
     // Pillar spans one theme only: across themes the button is greyed out and says why.
     const off = k === 'pillar' && !pillars
+    // Held, not disabled, while a change is saving: a disabled button drops
+    // focus, and focus has just been handed back to this one.
+    const held = off || busy
     return (
       <div key={k} style={{ position: 'relative' }}>
-        <button type="button" style={off ? { ...BTN, opacity: 0.45, cursor: 'not-allowed' } : BTN} disabled={busy} aria-disabled={off || undefined}
-                title={off ? L.pillarOff : undefined} data-bulk={k} aria-expanded={menu === k} onClick={() => { if (!off) toggle(k) }}>
-          {L[k]} ▾
+        <button type="button" ref={el => { triggers.current[k] = el }}
+                style={off ? { ...BTN, opacity: 0.45, cursor: 'not-allowed' } : busy ? { ...BTN, cursor: 'progress' } : BTN}
+                className={held ? 'fx-focus' : 'fx-hov-light fx-focus'} aria-disabled={held || undefined}
+                aria-haspopup={k === 'due' ? 'dialog' : 'menu'}
+                title={off ? L.pillarOff : undefined} data-bulk={k} aria-expanded={menu === k} onClick={() => { if (!held) toggle(k) }}>
+          {L[k]} <span aria-hidden="true">▾</span>
         </button>
-        {menu === k && <Menu onClose={close}>{list}</Menu>}
+        {menu === k && <Menu onClose={close} label={L[k]} kind={k === 'due' ? 'dialog' : 'menu'}>{list}</Menu>}
       </div>
     )
   }
 
   return (
     <div style={{
-      position: 'fixed', insetInline: 0, bottom: 22, zIndex: 70,
+      // Clear of the home indicator on a notched phone.
+      position: 'fixed', insetInline: 0, bottom: 'calc(22px + env(safe-area-inset-bottom, 0px))', zIndex: 70,
       display: 'flex', justifyContent: 'center', pointerEvents: 'none',
     }}>
-      <div data-bulk-bar="" role="toolbar" aria-label={L.count} style={{
+      <div data-bulk-bar="" role="toolbar" aria-label={L.count}
+           // Esc with a list open closes the list and nothing else — the
+           // board's own Esc would otherwise clear the whole selection.
+           onKeyDown={e => {
+             if (e.key === 'Escape' && menu) { e.preventDefault(); e.stopPropagation(); close() }
+           }}
+           style={{
         pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10,
         background: PIPE.navy, borderRadius: 14, padding: '10px 12px',
         boxShadow: '0 18px 44px rgba(20,19,60,.34)', flexWrap: 'wrap',
@@ -197,8 +262,15 @@ export function BulkBar({
         <span data-bulk-count="" style={{
           display: 'inline-flex', alignItems: 'center', height: 36, padding: '0 12px',
           borderRadius: 10, background: PIPE.limePrimary, color: PIPE.ink,
-          fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
+          fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', gap: 7,
         }}>
+          {busy && (
+            <span aria-hidden="true" style={{
+              width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
+              border: '2px solid rgba(20,19,26,.25)', borderTopColor: PIPE.ink,
+              animation: 'fx-spin .8s linear infinite',
+            }} />
+          )}
           {L.count}
         </span>
 
@@ -210,29 +282,37 @@ export function BulkBar({
             <button
               type="button" disabled={busy} data-bulk-confirm=""
               onClick={() => { setConf(false); onDelete() }}
+              className="fx-hov fx-focus"
               style={{ ...BTN, background: '#D22040', border: '1px solid #D22040', fontWeight: 800 }}
             >
               {L.confirm}
             </button>
-            <button type="button" style={BTN} onClick={() => setConf(false)}>{L.cancel}</button>
+            <button type="button" className="fx-hov-light fx-focus" style={BTN} onClick={() => setConf(false)}>{L.cancel}</button>
           </>
         ) : (
-          <button type="button" disabled={busy} data-bulk-remove="" onClick={() => setConf(true)} style={{ ...BTN, color: '#FF9DAE' }}>
+          <button type="button" disabled={busy} data-bulk-remove="" onClick={() => setConf(true)} className="fx-hov-light fx-focus" style={{ ...BTN, color: '#FF9DAE' }}>
             {L.remove}
           </button>
         )}
 
-        {note && (
-          <span data-bulk-note="" style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}>
-            {note}
-          </span>
-        )}
+        {/* Always mounted, so a screen reader is listening before the text
+            arrives: "Saving…" while a change runs, then its result. Shown
+            only when there is a result to show — the spinner on the count
+            says "saving" to the eye. */}
+        <span
+          role="status" aria-live="polite" data-bulk-note=""
+          className={note && !busy ? undefined : 'sr-only'}
+          style={{ fontSize: 12, color: 'rgba(255,255,255,.72)', whiteSpace: 'nowrap' }}
+        >
+          {busy ? L.saving : note}
+        </span>
 
         <button
           type="button" onClick={onClear} aria-label={L.clear} data-bulk-clear=""
+          className="fx-hov-light fx-focus"
           style={{ ...BTN, padding: '0 10px', color: 'rgba(255,255,255,.72)' }}
         >
-          ✕
+          <span aria-hidden="true">✕</span>
         </button>
       </div>
     </div>

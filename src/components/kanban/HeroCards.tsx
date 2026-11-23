@@ -1,7 +1,9 @@
 'use client'
 
+import { useLocale } from 'next-intl'
 import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
+import { intlLocale } from '@/lib/sheet-format'
 import { quoteOfDay, statCounts, weekMomentum } from '@/lib/home-metrics'
 
 /**
@@ -35,12 +37,13 @@ function CardTitle({ icon, children, trailing }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
       {icon}
-      <div style={{
-        fontWeight: 800, fontSize: 12.5, letterSpacing: '0.06em',
+      {/* A heading for the card, drawn as the small uppercase label it was. */}
+      <h2 style={{
+        margin: 0, fontWeight: 800, fontSize: 12.5, letterSpacing: '0.06em',
         color: PIPE.textPrimary, textTransform: 'uppercase',
       }}>
         {children}
-      </div>
+      </h2>
       {trailing && <div style={{ marginInlineStart: 'auto', display: 'flex' }}>{trailing}</div>}
     </div>
   )
@@ -104,6 +107,12 @@ export function HeroCards({ tasks, today }: HeroProps) {
 
   const up = momentum.delta >= 0
 
+  // Percentages in the reader's own figures and sign. 'always' keeps the
+  // "+0%" a flat week has always shown.
+  const loc   = intlLocale(useLocale())
+  const pct   = new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 0 })
+  const delta = new Intl.NumberFormat(loc, { style: 'percent', maximumFractionDigits: 0, signDisplay: 'always' })
+
   const doneRatio = momentum.planned > 0
     ? Math.min(1, momentum.completed / momentum.planned)
     : 0
@@ -146,7 +155,7 @@ export function HeroCards({ tasks, today }: HeroProps) {
                 fontFamily: 'var(--font-accent)', fontWeight: 700, fontSize: 62,
                 lineHeight: 0.95, color: PIPE.ink,
               }}>
-                {momentum.pct}%
+                {pct.format(momentum.pct / 100)}
               </div>
               <svg width="104" height="10" viewBox="0 0 104 10" fill="none" aria-hidden="true">
                 <path d="M3 7C24 3 74 2.4 101 5" stroke={PIPE.purpleStroke} strokeWidth="3" strokeLinecap="round" />
@@ -166,7 +175,7 @@ export function HeroCards({ tasks, today }: HeroProps) {
                      style={{ transform: up ? 'none' : 'rotate(180deg)' }}>
                   <path d="M12 19V5M5 12l7-7 7 7" />
                 </svg>
-                {up ? '+' : ''}{momentum.delta}%
+                {delta.format(momentum.delta / 100)}
               </div>
               <div style={{ marginTop: 3, fontWeight: 500, fontSize: 11.5, color: PIPE.textFaint }}>
                 vs last week
@@ -222,12 +231,12 @@ export function HeroCards({ tasks, today }: HeroProps) {
                 <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19" />
               </g>
             </svg>
-            <span style={{
-              fontWeight: 800, fontSize: 12.5, letterSpacing: '0.06em',
+            <h2 style={{
+              margin: 0, fontWeight: 800, fontSize: 12.5, letterSpacing: '0.06em',
               textTransform: 'uppercase', color: '#FFFFFF',
             }}>
               Daily Spark
-            </span>
+            </h2>
           </div>
 
           <svg width="34" height="26" viewBox="0 0 34 26" fill="rgba(255,255,255,0.85)" aria-hidden="true"

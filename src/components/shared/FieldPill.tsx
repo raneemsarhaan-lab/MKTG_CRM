@@ -171,14 +171,23 @@ export function FieldPill({ label, value, icon, active, variant = 'field', iconO
   )
 }
 
-/** A single selectable row inside a pill popover. */
+/**
+ * A single selectable row inside a pill popover.
+ *
+ * `pressed` is for rows that toggle on and off independently (a multi-select
+ * filter): it exposes the on/off state as aria-pressed. Single-choice rows
+ * leave it out, as before. The hover tint is held back from a selected row,
+ * whose own tint already says more.
+ */
 export function PillOption({
-  selected, onClick, children,
-}: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+  selected, pressed, onClick, children,
+}: { selected: boolean; pressed?: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={pressed}
+      className={selected ? undefined : 'fx-hov-tint'}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
         padding: '8px 10px', borderRadius: 8, border: 'none',
@@ -197,11 +206,12 @@ export function PillInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
+      className={props.className ? `fx-focus ${props.className}` : 'fx-focus'}
       style={{
         width: '100%', padding: '8px 10px', borderRadius: 8,
         border: `1px solid ${CU.line}`, background: '#fff',
         color: CU.ink, fontSize: 13, fontFamily: 'inherit',
-        outline: 'none', boxSizing: 'border-box',
+        boxSizing: 'border-box',
         ...props.style,
       }}
     />

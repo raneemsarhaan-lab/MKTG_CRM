@@ -107,6 +107,11 @@ export const blocks = [
       await t.page.mouse.move(h.x + 3, h.y + 10)
       await t.page.mouse.down()
       await t.page.mouse.move(h.x + 3 + 120, h.y + 10, { steps: 6 })
+      // The table follows the pointer while the button is still down, not
+      // only on release.
+      await t.page.waitForTimeout(120)
+      const live = await t.editor().locator('table tr').first().locator('th').evaluateAll(els => els.map(e => e.getBoundingClientRect().width))
+      t.assert(live[0] > before[0] + 100 && live[1] < before[1] - 100, `columns resize live, mid-drag (${before} → ${live})`)
       await t.page.mouse.up()
       await t.page.waitForTimeout(150)
       const after = await t.editor().locator('table tr').first().locator('th').evaluateAll(els => els.map(e => e.getBoundingClientRect().width))

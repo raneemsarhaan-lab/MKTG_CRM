@@ -561,7 +561,7 @@ export function ContentSheet(p: ContentSheetProps) {
           labels={{
             count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.assignee'), type: t('bulk.type'),
             pillar: t('bulk.pillar'), due: t('bulk.date'), remove: t('bulk.archive'), confirm: t('bulk.archiveConfirm', { n: bulkTasks.length }),
-            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'), noPillar: t('bulk.noPillar'), pillarOff: t('bulk.pillarOff'),
+            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'), noPillar: t('bulk.noPillar'), pillarOff: t('bulk.pillarOff'), saving: t('bulk.saving'),
           }}
           members={p.members}
           brands={[]}

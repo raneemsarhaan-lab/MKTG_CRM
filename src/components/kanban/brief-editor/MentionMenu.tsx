@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
 import type { MentionState } from './extensions'
@@ -19,6 +19,8 @@ export function MentionMenu({ state, active, onClose }: {
 }) {
   const t = useTranslations('briefEditor')
   const ref = useRef<HTMLDivElement>(null)
+  // Read once when the menu opens, not on every keystroke that moves it.
+  const [rtl] = useState(() => typeof document !== 'undefined' && getComputedStyle(document.documentElement).direction === 'rtl')
   useOverlay('mention', true, onClose, { root: () => ref.current })
 
   useEffect(() => {
@@ -27,7 +29,6 @@ export function MentionMenu({ state, active, onClose }: {
 
   const rect = state.rect
   if (!rect) return null
-  const rtl = typeof document !== 'undefined' && getComputedStyle(document.documentElement).direction === 'rtl'
   const below = rect.bottom + 6
   const fitsBelow = below + 260 < window.innerHeight
 

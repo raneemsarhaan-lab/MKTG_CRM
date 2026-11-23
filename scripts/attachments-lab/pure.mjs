@@ -50,8 +50,8 @@ export async function runPure(bundle) {
     eq(h.limitFor(false), h.MAX_INLINE_BYTES, 'inline limit without')
     if (h.MAX_INLINE_BYTES < 5_000_000 || h.MAX_INLINE_BYTES > 5_400_000) throw new Error('inline limit is about 5 MB')
     eq(h.limitLabelKey(false), 'limitInline', 'never printed as 5.2 MB')
-    eq(h.formatBytes(225_280), '220 KB', 'KB')
-    eq(h.formatBytes(13_002_342), '12.4 MB', 'MB with one decimal')
+    eq(h.formatBytes(225_280), '220\u00a0KB', 'KB')
+    eq(h.formatBytes(13_002_342), '12.4\u00a0MB', 'MB with one decimal')
   })
   check('pure-comment-token', () => {
     const id = '0d9f7c1e-1111-4222-8333-444455556666'

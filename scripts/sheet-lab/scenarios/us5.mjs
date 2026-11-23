@@ -43,7 +43,7 @@ export const us5 = [
       await pick(t, 'c:c03', mp4('master.mp4', 7 * 1024 * 1024))
       await t.idle(150)
       const cell = await t.text('c:c03', 'files')
-      t.assert(cell.includes('Too large · 7.0 MB'), `refused: ${cell}`)
+      t.assert(cell.includes('Too large · 7.0\u00a0MB'), `refused: ${cell}`)
       t.eq((await t.lab()).uploads.length, 0, 'nothing uploaded, nothing read')
       await t.page.locator('[data-cell="c:c03|files"] [data-link-instead]').click()
       const pop = t.page.locator('[data-sheet-pop] input')
