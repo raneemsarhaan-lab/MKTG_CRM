@@ -48,3 +48,24 @@ export const PIPE_ACCENT: Record<string, string> = {
   'scheduled':     '#14B8A6',
   'publish':       '#16A34A',
 }
+
+/**
+ * Each stage's colour, darkened towards ink just enough for 4.5:1 on white:
+ * the column header's count and select box, where
+ * the plain accent would be too faint to read (amber 2.2:1). The lightest
+ * accents, amber and green, need the most. Same hue, so they still read as
+ * the stage.
+ */
+export const PIPE_ACCENT_INK: Record<string, string> = {
+  'todo':          '#7E54DE',
+  'c-prog':        '#2563EB',
+  'c-final':       '#7C3AED',
+  'c-check':       '#B25517',
+  'r-design':      '#9B6611',
+  'd-prog':        '#107C7E',
+  'd-check':       '#0A7995',
+  'final-check':   '#5D5FE0',
+  'ready-publish': '#11815E',
+  'scheduled':     '#147E75',
+  'publish':       '#16803E',
+}
