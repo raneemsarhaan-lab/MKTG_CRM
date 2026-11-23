@@ -889,6 +889,32 @@ Design: `design/content-sheet-bulk-bar.html`, approved.
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.
 
+### 7.x Task methodology (spec 022)
+
+One workflow for every task, with media boards and Space stages. Decisions and
+rationale: `specs/022-task-methodology/` (research R1–R19) and the approved
+design `design/task-methodology.html`.
+
+| Rule | Where it lives |
+|---|---|
+| Every task is a pipeline task (11 stages, 10 without C-Check). New tasks get the Space's default assignee role | `src/actions/tasks.ts` `createTask`; `src/lib/spaces.ts` `defaultAssigneeFor`; Settings › Spaces |
+| Design and Video are media boards (`team_spaces.media_board`); their tasks are media tasks (`tasks.media_board`, linked by `content_task_id`) | `src/lib/media.ts` (pure), `src/lib/media-server.ts` |
+| Ready For Design links a content task to media once (`auto_linked_at`): the box gives one person per board | `src/actions/task-spaces.ts` `handOff`, `src/components/handoff/HandoffDialog.tsx` |
+| A linked content task's stage follows its linked tasks: the earliest open one, then F-Check once all pass D-Check; after that the media tasks follow it. Moving a linked row moves its linked tasks (their permissions apply) | `syncContent`, `moveThroughMedia` in `src/lib/media-server.ts` |
+| Link task (sheets and calendars of content Spaces), Create task on boards, Unlink (anyone) | `src/actions/media.ts`, `src/components/media/MediaLinks.tsx` |
+| Space stages: rename or split per Space; a sub-stage move changes only that Space; leaving a stage forgets the sub-stage | `src/lib/space-stages.ts`, `src/actions/space-stages.ts`, `src/components/spaces/SpaceStages.tsx`, `useSpaceStages.ts` |
+| Shows in: created-in, creator's and assignee's Spaces; a reassign drops what only the old assignee brought; content tasks never go to a board | `src/lib/spaces.ts`, `changeAssigneeSpaces` in `src/lib/spaces-server.ts` |
+| SLA: working days on Cairo days, the Settings › Due Dates weekend; no SLA before `entry_stage` | `src/lib/utils.ts` `businessDaysBetween`, `src/lib/alert-status.ts` |
+| Task link field is now called "Related task" | `messages/*.json` `sheet.columns.kinds.task` |
+
+One-time data changes, all in `prisma/seed.ts` `once()`: `simple-to-pipeline-v1`,
+`space-default-roles-v1`, `content-type-boards-v1`, `media-tasks-v1`,
+`due-dates-v1` (was `scripts/due-dates-migrate.ts`), `space-stages-v1`,
+`content-follows-media-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-022-*.cjs`
+and the pure checks in `scripts/spaces-lab/pure.mjs`.
+
+---
+
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.

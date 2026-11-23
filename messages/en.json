@@ -478,7 +478,7 @@
         "person": "Person",
         "choice": "Choice",
         "checkbox": "Checkbox",
-        "task": "Task link"
+        "task": "Related task"
       },
       "kindHelp": {
         "text": "Any words",
@@ -488,7 +488,7 @@
         "person": "One team member",
         "choice": "One option from a list",
         "checkbox": "Yes or no",
-        "task": "One task, linked"
+        "task": "One related task"
       },
       "reviewFit": "{n, plural, =0 {No values to convert.} one {The value fits {kind}.} other {All # values fit {kind}.}}",
       "reviewClear": "{bad} of {n} values won't fit {kind} and will be cleared: {examples}",
@@ -3049,8 +3049,7 @@
     "pinnedMark": "Pinned",
     "hide": "Hide",
     "hiddenViews": "Hidden ({n})",
-    "showView": "Show {name}",
-    "startsSimple": "It starts as a simple task (To Do › In progress › Done). Linking it from a Task link makes it a pipeline task."
+    "showView": "Show {name}"
   },
   "calendar": {
     "today": "Today",

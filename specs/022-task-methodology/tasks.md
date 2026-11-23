@@ -290,21 +290,21 @@ description: "Tasks for 022 — task methodology"
 
 ## Phase 9: Polish & cross-cutting
 
-- [ ] T057 [P] Rename the Task link field to **Related task**:
+- [X] T057 [P] Rename the Task link field to **Related task**:
   - `sheet.columns.kinds.task`, `kindHelp.task`, `taskLink.*` titles in `messages/en.json` / `messages/ar.json`;
   - picker title in `src/components/sheet/LinkTaskPicker.tsx`;
   - ＋ Field item in `src/components/views/TaskSheet.tsx`;
   - update `scenarios-tasklink.cjs` labels (R18).
-- [ ] T058 [P] Move the due-date migration into `once('due-dates-v1')` in `prisma/seed.ts`, skipping when `workspace_settings.due_dates_migrated_at` is set. Remove its step from `scripts/migrate.sh` (R15).
-- [ ] T059 [P] Remove now-unused code: `kindForSpace`, `TaskKind` / `SimpleStatus` uses, `default_kind` reads, `src/lib/simple-status.ts`, `SpacesSettings` default kind remnants.
-- [ ] T060 Arabic review of every new string (`messages/ar.json`) against the design file's Arabic copy.
+- [X] T058 [P] Move the due-date migration into `once('due-dates-v1')` in `prisma/seed.ts`, skipping when `workspace_settings.due_dates_migrated_at` is set. Remove its step from `scripts/migrate.sh` (R15).
+- [X] T059 [P] Remove now-unused code: `kindForSpace`, `TaskKind` / `SimpleStatus` uses, `default_kind` reads, `src/lib/simple-status.ts`, `SpacesSettings` default kind remnants.
+- [X] T060 Arabic review of every new string (`messages/ar.json`) against the design file's Arabic copy.
 - [ ] T061 Full regression:
   - typecheck;
   - `lab:spaces`, `lab:sheet`, `lab:inbox`, `lab:notify`, `lab:spreadsheet`;
   - every real-app scenario;
   - quickstart 1–14 by hand;
   - previews in `design/previews/022/`.
-- [ ] T062 Update `HANDOVER.md` (the methodology in brief, migrations, where each rule lives) and mark spec 021 US3/US5/T074–T078 superseded in `specs/021-clickup-parity/tasks.md`.
+- [X] T062 Update `HANDOVER.md` (the methodology in brief, migrations, where each rule lives) and mark spec 021 US3/US5/T074–T078 superseded in `specs/021-clickup-parity/tasks.md`.
 
 ---
 

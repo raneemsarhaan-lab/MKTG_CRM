@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { ROLE_SPACES, membersBySpace, startingSpaces } from '../src/lib/spaces'
 import { stagesFromWords } from '../src/lib/space-stages'
+import { calcDueDate, dayDate, dayOf, ruleFromSettings } from '../src/lib/due-dates'
 import { contentStageFrom, passedDCheck } from '../src/lib/media'
 
 const prisma = new PrismaClient()
@@ -354,6 +355,52 @@ async function main() {
       await prisma.taskSpace.delete({ where: { task_id_space_id: { task_id: t.id, space_id: r.space_id } } })
     }
     return `${made} media tasks from ${rows.length} hand-offs`
+  })
+
+  /**
+   * Publishing and due dates (spec 022 R15; was scripts/due-dates-migrate.ts):
+   * Content pieces' planned dates (due_date) become publishing dates and get a
+   * due date from the rule; every other due date is kept as set by hand; a
+   * publishing date with no due date gets one. Skipped where it already ran
+   * (due_dates_migrated_at is set).
+   */
+  await once('due-dates-v1', 'moved planned dates to publishing dates and marked due dates', async () => {
+    const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+    if (ws?.due_dates_migrated_at) return 'already migrated'
+  const rule = ruleFromSettings(ws)
+
+    const themes = new Set((await prisma.project.findMany({ where: { is_theme: true }, select: { id: true } })).map(p => p.id))
+    const tasks = await prisma.task.findMany({
+      select: { id: true, project_id: true, parent_task_id: true, kind: true, status: true, content_type_label: true, due_date: true, publish_date: true, stage_date: true },
+    })
+    const videos = new Set(tasks.filter(t => t.content_type_label === 'Video' && !t.parent_task_id).map(t => t.id))
+    const isPiece = (t: typeof tasks[number]) =>
+      !!t.project_id && themes.has(t.project_id) && t.kind !== 'simple' && !(t.parent_task_id && videos.has(t.parent_task_id))
+
+    let pieces = 0, manual = 0, calculated = 0
+    for (const t of tasks) {
+      const due = dayOf(t.due_date), publish = dayOf(t.publish_date)
+      if (isPiece(t) && due && !publish) {
+        if (t.status === 'publish') {
+          await prisma.task.update({ where: { id: t.id }, data: { publish_date: t.stage_date ?? dayDate(due), due_manual: true } })
+        } else {
+          await prisma.task.update({ where: { id: t.id }, data: { publish_date: dayDate(due), due_date: dayDate(calcDueDate(due, rule)), due_manual: false } })
+        }
+        pieces++
+      } else if (due) {
+        await prisma.task.update({ where: { id: t.id }, data: { due_manual: true } })
+        manual++
+      } else if (publish) {
+        await prisma.task.update({ where: { id: t.id }, data: { due_date: dayDate(calcDueDate(publish, rule)), due_manual: false } })
+        calculated++
+      }
+    }
+    await prisma.workspaceSettings.upsert({
+      where: { id: 1 },
+      update: { due_dates_migrated_at: new Date() },
+      create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: false, due_dates_migrated_at: new Date() },
+    })
+    return `${pieces} Content pieces moved to publishing dates, ${manual} kept as set by hand, ${calculated} calculated`
   })
 
   /**

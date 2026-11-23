@@ -89,12 +89,3 @@ export function spacesOnCreate(memberId: string, kind: TaskKind, spaceId: string
   return creatorSpaces(memberId, kind, ctx.spaces, ctx.members)
 }
 
-/**
- * Spec 021 (approved Stage C design): a new task takes the stages of the Space
- * it is created in — simple in a Space whose default kind is Simple (Planning),
- * else the pipeline. There is no separate kind choice.
- */
-export function kindForSpace(spaceId: string | null | undefined, ctx: SpaceContext): TaskKind {
-  const s = spaceId ? ctx.spaces.find(x => x.id === spaceId) : null
-  return s?.default_kind === 'simple' ? 'simple' : 'pipeline'
-}

@@ -253,6 +253,8 @@
 
 ## Phase 6: User Story 3 - Each team's own status words (P1, Stage C)
 
+> **Superseded by spec 022 US4 (Space stages).** Status words became Space stages (`once('space-stages-v1')`); `space-words.ts`, `SpaceWords.tsx` and `setSpaceWords` are removed.
+
 **Goal**: words per team Space, shown in its List, Sheet and Calendar; typing a word moves the task; Boards keep the original names.
 
 **Independent Test**: in the Design Space, write "Client review" for D-Check. Typing it in the Space's Sheet moves a task to D-Check, and the Board still says "D-Check". The Content Space's words are the Content sheet's words (spec US3; quickstart Stage C steps 1–2).
@@ -285,6 +287,8 @@
 ---
 
 ## Phase 7: User Story 5 - Pipeline tasks and simple tasks (P1, Stage C)
+
+> **Superseded by spec 022 US1.** Every task is a pipeline task; simple tasks were migrated (`once('simple-to-pipeline-v1')`).
 
 **Goal**: simple tasks (To Do › In progress › Done) that never touch pipeline behaviour, with a default kind per Space and a Done celebration.
 
@@ -350,6 +354,8 @@
 ## Phase 8b: Task link field and Link task (Stage C, from the approved design)
 
 **Goal**: a Task link custom field for any view, holding one task, with Link task → pick a task or Create new task (in a chosen Space, taking its stages), in Task link fields and on calendar days.
+
+> T074–T078 (the Task link field) are superseded in part by spec 022: the field is now called **Related task**, and media links use Link task (spec 022 US3).
 
 - [X] T074 *(Done as a new field kind `task` in the existing column system (`sheet_columns` / `sheet_values`), so it works on Space, brand and My tasks sheets and on the Content and Video sheets. One task id per value; the server refuses unknown tasks and a task linking to itself.)* [P] Field definitions per view node: reuse `SheetColumn` with `sheet` = `space:<id>` / `brand:<id>` / `me:<memberId>` and a new kind `task`. Values in `SheetValue` hold one task id. Keep these out of the content/video loaders, as with My notes. Actions in `src/actions/view-fields.ts` (add, rename, remove, set value), with view-node permissions like saved views.
 - [X] T075 *(Done: ＋ Field offers "⇢ Task link" directly; the card shows "↗ name" chips; the task panel lists the task's Task link fields under Fields. Not yet: the List view (it shows no custom fields).)* A "＋ Field" menu on `TaskSheet` and `ListView` (Text, Number, Date, Person, Choice, Checkbox, Web link, Task link), and Task link chips on Board cards and in `TaskModal`.
