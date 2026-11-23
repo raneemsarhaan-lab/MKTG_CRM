@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay,
-  PointerSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
+  MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId } from '@/types/index'
@@ -25,7 +25,8 @@ import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardOverlay } from './TaskCard'
 import {
-  FiltersButton, EMPTY_FILTERS, applyBoardFilters, activeFilterCount, type BoardFilterState,
+  FiltersButton, applyBoardFilters, activeFilterCount, filtersFromParams, writeFiltersToUrl,
+  type BoardFilterState,
 } from './BoardFilters'
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
@@ -105,7 +106,6 @@ export function KanbanBoard({
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
-  const [filters, setFilters]     = useState<BoardFilterState>(EMPTY_FILTERS)
   const [dragError, setDragError] = useState('')
   const [selected, setSelected]   = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy]   = useState(false)
@@ -128,6 +128,15 @@ export function KanbanBoard({
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const setCelebration = useUIStore(s => s.setCelebration)
   const searchParams   = useSearchParams()
+
+  /**
+   * Board filters live in the address too (?q=, &brand=, &assignee=, &due=…),
+   * so a filtered board can be linked to and survives a reload. Read once
+   * here; written below with the history API like ?view and ?task. Inside a
+   * Sheets folder the address is the folder's, so they stay local there.
+   */
+  const [filters, setFilters] = useState<BoardFilterState>(() =>
+    filtersFromParams(surface === 'sheets' ? new URLSearchParams() : searchParams))
 
   // My Board's "+ Add task" links here with ?new=1 — open the composer on
   // arrival so the action works from off-board.
@@ -171,6 +180,18 @@ export function KanbanBoard({
     }
     if (changed) window.history.replaceState(null, '', url)
   }, [view, sheetVideo, sheetRow])
+  // replaceState, not pushState: a filter is a refinement of this page, not
+  // a place to go Back to. Typing in search is debounced, and the write is
+  // guarded, because Safari throws once a page replaces its history too often.
+  useEffect(() => {
+    if (embedded) return
+    const id = window.setTimeout(() => {
+      const url = new URL(window.location.href)
+      if (!writeFiltersToUrl(url, filters)) return
+      try { window.history.replaceState(null, '', url) } catch { /* rate-limited; the next change writes it */ }
+    }, 250)
+    return () => window.clearTimeout(id)
+  }, [filters, embedded])
   /** "Open sheet" from a task panel: a video's sheet, with a clip's row highlighted. */
   function openSheet(videoId: string, rowId: string | null) {
     selectTask(null)
@@ -210,17 +231,25 @@ export function KanbanBoard({
     else                window.history.replaceState(null, '', url)
   }, [selectedTaskId])
 
+  // Back can land on an entry written with other filters (a task opened, the
+  // filters changed, then Back), so they are read again along with ?task.
   useEffect(() => {
     function onPop() {
-      const id = new URL(window.location.href).searchParams.get('task')
-      selectTask(id)
+      const params = new URL(window.location.href).searchParams
+      selectTask(params.get('task'))
+      if (!embedded) setFilters(filtersFromParams(params))
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [selectTask])
+  }, [selectTask, embedded])
 
+  // Mouse and touch apart, so each gets the start it needs: a mouse drags
+  // after 5px of travel; a finger has to press and hold first, so a swipe
+  // that starts on a full-width card (the phone's stacked board) scrolls the
+  // page instead of picking the card up.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     // Space picks a card up and drops it; Enter is kept for opening the task.
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -348,7 +377,7 @@ export function KanbanBoard({
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
-            : 'Could not move that task',
+            : 'Could not move that task. Try again, or reload the board if it keeps happening.',
         )
       }
     })
@@ -1137,14 +1166,27 @@ export function KanbanBoard({
       {dragError && (
         <div
           role="alert"
-          onClick={() => setDragError('')}
           style={{
-            margin: '10px 26px 0 38px', padding: '7px 12px', borderRadius: 10,
+            margin: '10px 26px 0 38px', padding: '5px 6px 5px 12px', borderRadius: 10,
             background: '#FDE7EA', color: '#D22040', fontSize: 12.5,
-            fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+            fontWeight: 700, flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 8,
           }}
         >
-          {dragError}
+          <span style={{ flex: 1, minWidth: 0 }}>{dragError}</span>
+          <button
+            type="button"
+            onClick={() => setDragError('')}
+            aria-label="Dismiss"
+            className="fx-focus fx-hov-tint"
+            style={{
+              flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: 'none',
+              background: 'transparent', color: 'inherit', cursor: 'pointer',
+              fontSize: 13, fontWeight: 800, lineHeight: 1, fontFamily: 'inherit', padding: 0,
+            }}
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
         </div>
       )}
 

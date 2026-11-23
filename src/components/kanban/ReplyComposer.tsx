@@ -68,9 +68,13 @@ export function ReplyComposer({ members, meId, replyingTo, onSend, onCancel }: {
     if (!body || busy) return
     setBusy(true); setError('')
     const mentions = members.filter(m => picked.includes(m.id) && body.includes(`@${m.name}`)).map(m => m.id)
-    const r = await onSend(body, mentions)
+    // A thrown send (a dropped connection) counts as a failed one: before, it
+    // left the composer disabled under its busy label for good.
+    const r = await onSend(body, mentions).catch(() => ({ success: false }))
     setBusy(false)
-    if (!r.success) { setError(r.error ?? 'Could not post that reply'); return }
+    // The server's reasons are codes or English; what matters here is that the
+    // reply is still in the box and can be sent again.
+    if (!r.success) { setError(t('replyError')); requestAnimationFrame(() => ref.current?.focus()); return }
     setText(''); setPicked([])
   }
 
@@ -87,6 +91,7 @@ export function ReplyComposer({ members, meId, replyingTo, onSend, onCancel }: {
         </div>
       )}
       <textarea ref={ref} value={text} rows={2} disabled={busy}
+                name="reply" autoComplete="off"
                 aria-label={t('replyingTo', { name: replyingTo })}
                 placeholder={t('replyPlaceholder')}
                 onChange={e => { setText(e.target.value); const tk = tokenAt(e.target); setQuery(tk ? tk.q : null) }}
@@ -105,7 +110,9 @@ export function ReplyComposer({ members, meId, replyingTo, onSend, onCancel }: {
       {error && <p className="fx-nt-composer-err" role="alert">{error}</p>}
       <div className="fx-nt-composer-acts">
         <button type="button" className="fx-nt-link" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="fx-nt-go" data-reply-send="" disabled={busy || !text.trim()} onClick={() => void send()}>{t('reply')}</button>
+        <button type="button" className="fx-nt-go fx-hov" data-reply-send="" disabled={busy || !text.trim()} onClick={() => void send()}>
+          {busy ? t('replySending') : t('reply')}
+        </button>
       </div>
     </div>
   )

@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { Member, TaskAttachment } from '@/types/index'
 import { attachmentKind, attachmentSrc, extensionOf, isImageAttachment } from '@/lib/attachments'
 import { FILE_KIND_COLORS } from '@/lib/tokens'
+import { intlLocale } from '@/lib/sheet-format'
 import { AttIcon } from './icons'
 import { ageLabel } from './order'
 import { formatBytes } from './limits'
@@ -51,6 +52,11 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
   ownerName: string
 }) {
   const t = useTranslations('attachments')
+  const locale = intlLocale(useLocale())
+  // The page's direction, read once: it doesn't change while the preview is
+  // open, and reading computed style on every render (every zoom step) forced
+  // a style recalculation each time.
+  const [rtl] = useState(() => typeof document !== 'undefined' && getComputedStyle(document.documentElement).direction === 'rtl')
   const a = list[Math.min(Math.max(index, 0), list.length - 1)]
   const rootRef  = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -177,7 +183,6 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
   useEffect(() => { closeRef.current?.focus() }, [])
 
   const image = !!a && isImageAttachment(a)
-  const rtl = typeof document !== 'undefined' && getComputedStyle(document.documentElement).direction === 'rtl'
   const go = (i: number) => { if (i >= 0 && i < list.length) onIndex(i) }
 
   // On the window, in the capture phase: the task panel also closes on Esc,
@@ -224,7 +229,8 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
   const isPdf = ext === 'pdf'
   const who   = (a.uploaded_by && members.find(m => m.id === a.uploaded_by)?.name) || ownerName
   const age   = ageLabel(a.uploaded_at, new Date())
-  const meta  = [firstName(who), t(age.key, 'n' in age ? { n: age.n } : {}), formatBytes(a.size_bytes)].filter(Boolean).join(' · ')
+  const meta  = [firstName(who), t(age.key, 'n' in age ? { n: age.n } : {}), formatBytes(a.size_bytes, locale)].filter(Boolean).join(' · ')
+  const pct   = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(scale)
 
   /** A click on the dark area closes; a click on the file or a control doesn't. */
   function onBackdrop(e: React.MouseEvent) {
@@ -328,7 +334,7 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
             </button>
             <input type="range" min={MIN * 100} max={Math.round(max * 100)} step={5} value={Math.round(scale * 100)}
-                   aria-label={t('zoomBar')} aria-valuetext={`${Math.round(scale * 100)}%`} data-zoom-slider=""
+                   aria-label={t('zoomBar')} aria-valuetext={pct} data-zoom-slider=""
                    style={{ ['--pos' as string]: `${((scale - MIN) / (max - MIN)) * 100}%` }}
                    onChange={e => zoomTo(Number(e.target.value) / 100)} />
             <button type="button" onClick={() => zoomTo(scale + 0.25)} disabled={scale >= max - 0.001}
@@ -336,7 +342,7 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>
             </button>
             <button type="button" className="fx-att-pv-pct" onClick={() => zoomTo(1)} title={t('zoomFit')}
-                    aria-label={`${Math.round(scale * 100)}%, ${t('zoomFit')}`} data-zoom-pct="">{Math.round(scale * 100)}%</button>
+                    aria-label={`${pct}, ${t('zoomFit')}`} data-zoom-pct="">{pct}</button>
             <button type="button" onClick={fitWidth} aria-label={t('zoomWidth')} title={t('zoomWidth')} data-zoom-width="">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" /></svg>
             </button>
@@ -355,8 +361,9 @@ export function AttachmentPreview({ list, index, onIndex, onClose, members, owne
             <button key={f.id} type="button" aria-current={i === index} aria-label={f.filename} title={f.filename}
                     onClick={() => go(i)}>
               {isImageAttachment(f)
+                // Sized to the 44 × 55 strip button inside its 2px border.
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={attachmentSrc(f) ?? ''} alt="" />
+                ? <img src={attachmentSrc(f) ?? ''} alt="" width={40} height={51} loading="lazy" decoding="async" />
                 : (extensionOf(f.filename) || 'file').toUpperCase().slice(0, 4)}
             </button>
           ))}

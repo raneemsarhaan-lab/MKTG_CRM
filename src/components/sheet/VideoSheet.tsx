@@ -668,7 +668,7 @@ export function VideoSheet(p: VideoSheetProps) {
           labels={{
             count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.owner'), owner: t('bulk.reviewer'),
             type: t('bulk.type'), priority: t('bulk.priority'), due: t('bulk.due'), remove: t('bulk.drop'), confirm: t('bulk.dropConfirm', { n: bulkTasks.length }),
-            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'),
+            cancel: t('bulk.cancel'), clear: t('bulk.clear'), setDue: t('bulk.setDue'), saving: t('bulk.saving'),
           }}
           members={p.members}
           brands={[]}

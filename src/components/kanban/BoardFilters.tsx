@@ -1,13 +1,14 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PillOption, PillInput } from '@/components/shared/FieldPill'
 import { HeaderMenu } from '@/components/board/HeaderMenu'
 import { COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { calDaysBetween } from '@/lib/utils'
+import { intlLocale } from '@/lib/sheet-format'
 import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
 
 /**
@@ -65,6 +66,66 @@ export function activeFilterCount(f: BoardFilterState): number {
     (f.onlyMine        ? 1 : 0) +
     (f.withAttachments ? 1 : 0)
   )
+}
+
+// ─── In the address ──────────────────────────────────────────────────────────
+// The board keeps its filters in the query string so a filtered view can be
+// linked to and survives a reload. Lists repeat their key (&type=Reel&type=Post)
+// rather than joining with commas, because a content type may contain one.
+
+const DUE_PRESETS: DuePreset[] = ['any', 'overdue', 'today', 'week', 'none']
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+const LIST_PARAMS = {
+  brandIds: 'brand', ownerIds: 'assignee', contentTypes: 'type',
+  platforms: 'platform', priorities: 'priority', alerts: 'sla',
+} as const
+
+/** Every query key the filters own, and nothing else. */
+const FILTER_PARAMS = ['q', ...Object.values(LIST_PARAMS), 'due', 'from', 'to', 'mine', 'files']
+
+type ParamSource = Pick<URLSearchParams, 'get' | 'getAll'>
+
+/** The filters an address asks for. Anything unrecognised is ignored. */
+export function filtersFromParams(p: ParamSource): BoardFilterState {
+  const list = (k: string) => [...new Set(p.getAll(k).filter(Boolean))]
+  const day  = (k: string) => { const v = p.get(k) ?? ''; return ISO_DAY.test(v) ? v : '' }
+  const due  = p.get('due') as DuePreset | null
+  return {
+    search:          p.get('q') ?? '',
+    brandIds:        list(LIST_PARAMS.brandIds),
+    ownerIds:        list(LIST_PARAMS.ownerIds),
+    contentTypes:    list(LIST_PARAMS.contentTypes),
+    platforms:       list(LIST_PARAMS.platforms),
+    priorities:      list(LIST_PARAMS.priorities).filter(v => PRIORITY_OPTIONS.includes(v)),
+    alerts:          list(LIST_PARAMS.alerts).filter((v): v is AlertStatus => (ALERT_OPTIONS as string[]).includes(v)),
+    duePreset:       due && DUE_PRESETS.includes(due) ? due : 'any',
+    dueFrom:         day('from'),
+    dueTo:           day('to'),
+    onlyMine:        p.get('mine') === '1',
+    withAttachments: p.get('files') === '1',
+  }
+}
+
+/** Write the filters into `url`'s query. Returns whether anything changed. */
+export function writeFiltersToUrl(url: URL, f: BoardFilterState): boolean {
+  const want = new URLSearchParams()
+  if (f.search) want.set('q', f.search)
+  for (const [field, key] of Object.entries(LIST_PARAMS) as [keyof typeof LIST_PARAMS, string][]) {
+    f[field].forEach(v => want.append(key, v))
+  }
+  if (f.duePreset !== 'any') want.set('due', f.duePreset)
+  if (f.dueFrom) want.set('from', f.dueFrom)
+  if (f.dueTo) want.set('to', f.dueTo)
+  if (f.onlyMine) want.set('mine', '1')
+  if (f.withAttachments) want.set('files', '1')
+
+  const sp = url.searchParams
+  const same = FILTER_PARAMS.every(k => sp.getAll(k).join('\u0000') === want.getAll(k).join('\u0000'))
+  if (same) return false
+  FILTER_PARAMS.forEach(k => sp.delete(k))
+  want.forEach((v, k) => sp.append(k, v))
+  return true
 }
 
 export function applyBoardFilters<T extends Task>(
@@ -155,6 +216,7 @@ function FilterIcon() {
  */
 export function FiltersButton({ filters, onChange, tasks, members }: FiltersButtonProps) {
   const t = useTranslations('header')
+  const locale = useLocale()
   const set = <K extends keyof BoardFilterState>(key: K, value: BoardFilterState[K]) =>
     onChange({ ...filters, [key]: value })
 
@@ -182,10 +244,15 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const count = activeFilterCount(filters)
   const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
 
+  // The range reads as dates, in the reader's language, not as ISO strings.
+  // The values are calendar days, so they are formatted at UTC midnight to
+  // keep a time zone from moving them a day.
+  const dayFmt = new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  const showDay = (d: string) => (d ? dayFmt.format(new Date(`${d}T00:00:00Z`)) : '…')
   const dueText = filters.duePreset !== 'any'
     ? ({ overdue: 'Overdue', today: 'Due today', week: 'Next 7 days', none: 'No due date' } as const)[filters.duePreset]
     : filters.dueFrom || filters.dueTo
-      ? `${filters.dueFrom || '…'} → ${filters.dueTo || '…'}`
+      ? `${showDay(filters.dueFrom)} → ${showDay(filters.dueTo)}`
       : null
 
   return (
@@ -199,6 +266,9 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
       <div className="fx-hd-filters">
         <PillSection label="Search">
           <PillInput
+            name="q"
+            aria-label="Search tasks"
+            autoComplete="off"
             value={filters.search}
             placeholder="Name, owner, project…"
             onChange={e => set('search', e.target.value)}
@@ -207,7 +277,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
         <PillSection label="Assignee">
           {members.filter(m => usedOwnerIds.has(m.id)).map(m => (
-            <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)}
+            <PillOption key={m.id} selected={filters.ownerIds.includes(m.id)} pressed={filters.ownerIds.includes(m.id)}
                         onClick={() => toggle('ownerIds', m.id)}>
               <Check on={filters.ownerIds.includes(m.id)} /> {memberName(m.id)}
             </PillOption>
@@ -216,7 +286,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
         <PillSection label="Content type">
           {usedTypes.map(v => (
-            <PillOption key={v} selected={filters.contentTypes.includes(v)}
+            <PillOption key={v} selected={filters.contentTypes.includes(v)} pressed={filters.contentTypes.includes(v)}
                         onClick={() => toggle('contentTypes', v)}>
               <Check on={filters.contentTypes.includes(v)} /> {v}
             </PillOption>
@@ -226,7 +296,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
         {usedPlatforms.length > 0 && (
           <PillSection label="Platform">
             {usedPlatforms.map(v => (
-              <PillOption key={v} selected={filters.platforms.includes(v)}
+              <PillOption key={v} selected={filters.platforms.includes(v)} pressed={filters.platforms.includes(v)}
                           onClick={() => toggle('platforms', v)}>
                 <Check on={filters.platforms.includes(v)} /> {v}
               </PillOption>
@@ -236,7 +306,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
         <PillSection label="Priority">
           {PRIORITY_OPTIONS.map(v => (
-            <PillOption key={v} selected={filters.priorities.includes(v)}
+            <PillOption key={v} selected={filters.priorities.includes(v)} pressed={filters.priorities.includes(v)}
                         onClick={() => toggle('priorities', v)}>
               <Check on={filters.priorities.includes(v)} /> {v}
             </PillOption>
@@ -245,7 +315,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
         <PillSection label="SLA status">
           {ALERT_OPTIONS.map(v => (
-            <PillOption key={v} selected={filters.alerts.includes(v)}
+            <PillOption key={v} selected={filters.alerts.includes(v)} pressed={filters.alerts.includes(v)}
                         onClick={() => toggleAlert(v)}>
               <Check on={filters.alerts.includes(v)} /> {v}
             </PillOption>
@@ -257,24 +327,24 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
             ['any', 'Any date'], ['overdue', 'Overdue'], ['today', 'Due today'],
             ['week', 'Next 7 days'], ['none', 'No due date'],
           ] as [DuePreset, string][]).map(([v, label]) => (
-            <PillOption key={v} selected={filters.duePreset === v}
+            <PillOption key={v} selected={filters.duePreset === v} pressed={filters.duePreset === v}
                         onClick={() => set('duePreset', v)}>
               <Check on={filters.duePreset === v} /> {label}
             </PillOption>
           ))}
           <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-            <PillInput type="date" value={filters.dueFrom}
+            <PillInput type="date" name="from" aria-label="Due from" value={filters.dueFrom}
                        onChange={e => set('dueFrom', e.target.value)} />
-            <PillInput type="date" value={filters.dueTo}
+            <PillInput type="date" name="to" aria-label="Due to" value={filters.dueTo}
                        onChange={e => set('dueTo', e.target.value)} />
           </div>
         </PillSection>
 
         <PillSection label="Only">
-          <PillOption selected={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
+          <PillOption selected={filters.onlyMine} pressed={filters.onlyMine} onClick={() => set('onlyMine', !filters.onlyMine)}>
             <Check on={filters.onlyMine} /> My tasks
           </PillOption>
-          <PillOption selected={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
+          <PillOption selected={filters.withAttachments} pressed={filters.withAttachments} onClick={() => set('withAttachments', !filters.withAttachments)}>
             <Check on={filters.withAttachments} /> Has files
           </PillOption>
         </PillSection>
@@ -283,6 +353,7 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           <button
             type="button"
             onClick={() => onChange(EMPTY_FILTERS)}
+            className="fx-hov-tint"
             style={{
               width: '100%', marginTop: 8, padding: '8px 10px', borderRadius: 8,
               border: `1px solid ${PIPE.borderInput}`, background: '#fff',

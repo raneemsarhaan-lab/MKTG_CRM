@@ -80,7 +80,10 @@ export function KanbanColumn({
                 type="button"
                 onClick={() => onSelectAll(stage.id as StageId, !allSelected)}
                 title={allSelected ? `Deselect all in ${stage.label_en}` : `Select all in ${stage.label_en}`}
+                // One name for both states; aria-pressed says which it is in.
+                aria-label={`Select all in ${stage.label_en}`}
                 aria-pressed={allSelected}
+                className="fx-focus"
                 style={{
                   width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
                   border: `1.5px solid ${allSelected ? PIPE.purple : PIPE.borderInput}`,
@@ -89,7 +92,7 @@ export function KanbanColumn({
                   padding: 0, fontFamily: 'inherit',
                 }}
               >
-                {allSelected ? '✓' : ''}
+                <span aria-hidden="true">{allSelected ? '✓' : ''}</span>
               </button>
             )}
             <div style={{
@@ -135,9 +138,13 @@ export function KanbanColumn({
           <button
             type="button"
             onClick={onAddTask}
+            className="fx-hov-tint fx-focus"
             style={{
+              // The same 10px above the label as before, split between margin
+              // and padding so the hover tint has a little room round the text.
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              padding: '10px 0 2px', fontSize: 12.5, fontWeight: 700, color: PIPE.purple,
+              marginTop: 6, padding: '4px 0', borderRadius: 8,
+              fontSize: 12.5, fontWeight: 700, color: PIPE.purple,
               background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             }}
           >

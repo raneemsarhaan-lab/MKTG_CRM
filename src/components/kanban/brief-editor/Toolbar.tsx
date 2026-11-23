@@ -123,7 +123,7 @@ export function SaveStatusBadge({ status, labels, onRetry, compact }: {
       {compact && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />}
       <span role="status" aria-live="polite" style={hideText ? VISUALLY_HIDDEN : undefined}>{text}</span>
       {status === 'error' && (
-        <button type="button" onMouseDown={e => e.preventDefault()} onClick={onRetry}
+        <button type="button" className="fx-hov" onMouseDown={e => e.preventDefault()} onClick={onRetry}
                 style={{ height: 24, padding: '0 9px', border: 'none', borderRadius: 6, background: BRIEF_UI.error, color: COLORS.panel, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
           {labels.retry}
         </button>

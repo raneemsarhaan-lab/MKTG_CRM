@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { BRIEF_UI, COLORS } from '@/lib/tokens'
 import { normaliseUrl, youtubeId } from '@/lib/links'
 import type { TaskAttachment } from '@/types/index'
-import { ToolButton } from './Toolbar'
+import { ToolButton, VISUALLY_HIDDEN } from './Toolbar'
 import { useOverlay, useOverlayStack } from './useOverlayStack'
 
 /** Insert items that need a value before they can be inserted. */
@@ -22,14 +22,18 @@ const IMAGE_TIMEOUT_MS = 8000
  * a YouTube link. The audit found a mistyped image saved into the brief and
  * then lost on reopening (E4); a typed domain saved as a broken relative link
  * (E3); a YouTube link inserted as loose text (E10).
+ *
+ * An image also takes an optional description, stored as its alt text; left
+ * empty, the image is treated as decorative (alt="").
  */
 export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttachment, onCancel, returnFocusTo }: {
   kind: PromptKind
   initial?: string
   images: TaskAttachment[]
-  /** Receives the checked value: a normalised href for link/image/youtube. */
-  onConfirm: (value: string) => Promise<void> | void
-  onPickAttachment: (a: TaskAttachment) => void
+  /** Receives the checked value: a normalised href for link/image/youtube,
+   *  and for an image the description typed for it (may be empty). */
+  onConfirm: (value: string, extra?: { alt: string }) => Promise<void> | void
+  onPickAttachment: (a: TaskAttachment, alt: string) => void
   onCancel: () => void
   returnFocusTo?: HTMLElement | null
 }) {
@@ -37,6 +41,7 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
   const stack = useOverlayStack()
   const ref = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useState(initial)
+  const [alt, setAlt] = useState('')
   const [busy, setBusy] = useState(false)
   const [image, setImage] = useState<{ src: string; state: 'loading' | 'ok' | 'bad' } | null>(null)
   useOverlay(`prompt:${kind}`, true, onCancel, { returnFocusTo, root: () => ref.current })
@@ -82,8 +87,18 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
   async function confirm() {
     if (!ready) return
     setBusy(true)
-    try { await onConfirm(kind === 'subtask' ? v : value) } finally { setBusy(false) }
+    try { await onConfirm(kind === 'subtask' ? v : value, kind === 'image' ? { alt: alt.trim() } : undefined) } finally { setBusy(false) }
   }
+
+  // Enter confirms and Esc cancels from either field; neither reaches the
+  // editor or the task panel behind the strip.
+  function onFieldKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    e.stopPropagation()
+    if (e.key === 'Enter')  { e.preventDefault(); void confirm() }
+    if (e.key === 'Escape') { e.preventDefault(); if (!stack?.closeTop()) onCancel() }
+  }
+  const url = kind !== 'subtask'
+  const checking = kind === 'image' && image?.state === 'loading'
 
   return (
     <div ref={ref} data-overlay="" style={{
@@ -95,18 +110,18 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
       </label>
       <input
         id={`brief-prompt-${kind}`}
+        name={`brief-${kind}`}
         value={draft}
         autoFocus
         autoComplete="off"
+        inputMode={url ? 'url' : undefined}
+        spellCheck={url ? false : undefined}
+        autoCapitalize={url ? 'none' : undefined}
         placeholder={LABEL[kind][1]}
         aria-invalid={!!error}
         aria-describedby={error ? `brief-prompt-${kind}-err` : undefined}
         onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => {
-          e.stopPropagation()
-          if (e.key === 'Enter')  { e.preventDefault(); void confirm() }
-          if (e.key === 'Escape') { e.preventDefault(); if (!stack?.closeTop()) onCancel() }
-        }}
+        onKeyDown={onFieldKey}
         className="fx-focus"
         style={{
           flex: 1, minWidth: 180, height: 30, padding: '0 10px', borderRadius: 8,
@@ -114,7 +129,7 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
           fontFamily: 'inherit', boxSizing: 'border-box', color: BRIEF_UI.ink,
         }}
       />
-      <button type="button" onClick={() => void confirm()} disabled={!ready}
+      <button type="button" className="fx-hov" onClick={() => void confirm()} disabled={!ready} aria-busy={busy || undefined}
               style={{
                 height: 30, padding: '0 12px', border: 'none', borderRadius: 8,
                 background: BRIEF_UI.blue, color: COLORS.panel, fontWeight: 700, fontSize: 12.5,
@@ -129,12 +144,38 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
           {error}
         </div>
       )}
-      {kind === 'image' && image?.state === 'loading' && (
-        <div style={{ width: '100%', fontSize: 12, color: BRIEF_UI.label }}>{t('imageChecking')}</div>
+      {/* Mounted with the strip and only its text changes, so screen readers
+          announce "Checking the image…"; out of the layout while empty. */}
+      {kind === 'image' && (
+        <div role="status" style={checking ? { width: '100%', fontSize: 12, color: BRIEF_UI.label } : VISUALLY_HIDDEN}>
+          {checking ? t('imageChecking') : ''}
+        </div>
       )}
       {kind === 'image' && image?.state === 'ok' && (
         // eslint-disable-next-line @next/next/no-img-element -- a preview of an arbitrary address the person typed
         <img src={image.src} alt="" data-preview="" style={{ maxHeight: 120, maxWidth: '100%', borderRadius: 8 }} />
+      )}
+      {kind === 'image' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap' }}>
+          <label htmlFor="brief-prompt-image-alt" style={{ fontSize: 12.5, fontWeight: 600, color: BRIEF_UI.label }}>
+            {t('imageAltLabel')}
+          </label>
+          <input
+            id="brief-prompt-image-alt"
+            name="brief-image-alt"
+            value={alt}
+            autoComplete="off"
+            placeholder={t('imageAltPlaceholder')}
+            onChange={e => setAlt(e.target.value)}
+            onKeyDown={onFieldKey}
+            className="fx-focus"
+            style={{
+              flex: 1, minWidth: 180, height: 30, padding: '0 10px', borderRadius: 8,
+              border: '1px solid transparent', background: COLORS.panel, fontSize: 13,
+              fontFamily: 'inherit', boxSizing: 'border-box', color: BRIEF_UI.ink,
+            }}
+          />
+        </div>
       )}
 
       {kind === 'image' && images.length > 0 && (
@@ -144,8 +185,9 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
             <button
               key={a.id}
               type="button"
+              className="fx-hov"
               title={a.filename}
-              onClick={() => onPickAttachment(a)}
+              onClick={() => onPickAttachment(a, alt.trim())}
               style={{
                 height: 28, padding: '0 10px', border: 'none', borderRadius: 7,
                 background: COLORS.panel, color: BRIEF_UI.ink, fontSize: 12.5, cursor: 'pointer',

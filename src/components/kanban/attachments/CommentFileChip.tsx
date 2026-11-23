@@ -34,7 +34,8 @@ export function CommentFileChip({ file, name, onOpen, onRemove }: {
   }
   const thumb = file && isImageAttachment(file)
     // eslint-disable-next-line @next/next/no-img-element
-    ? <img src={attachmentSrc(file) ?? ''} alt="" style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }} />
+    ? <img src={attachmentSrc(file) ?? ''} alt="" width={22} height={22} loading="lazy" decoding="async"
+           style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }} />
     : (
       <span aria-hidden="true" style={{
         width: 22, height: 22, borderRadius: 5, flexShrink: 0, display: 'inline-grid', placeItems: 'center',
@@ -50,11 +51,11 @@ export function CommentFileChip({ file, name, onOpen, onRemove }: {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, maxWidth: '100%' }} data-file-chip={file?.id ?? 'deleted'}>
       {file && onOpen
-        ? <button type="button" onClick={e => { e.stopPropagation(); onOpen(file.id) }} title={label}
+        ? <button type="button" className="fx-hov-tint" onClick={e => { e.stopPropagation(); onOpen(file.id) }} title={label}
                   aria-label={t('openFile', { name: label })} style={chipStyle}>{thumb}{text}</button>
         : <span style={chipStyle} title={label}>{thumb}{text}</span>}
       {onRemove && (
-        <button type="button" onClick={onRemove} aria-label={t('takeOff', { name: label })} title={t('takeOff', { name: label })}
+        <button type="button" className="fx-hov-tint" onClick={onRemove} aria-label={t('takeOff', { name: label })} title={t('takeOff', { name: label })}
                 style={{
                   width: 22, height: 22, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer',
                   display: 'inline-grid', placeItems: 'center', color: BRIEF_UI.label, padding: 0,

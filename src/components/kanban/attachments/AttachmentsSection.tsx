@@ -349,10 +349,13 @@ export function AttachmentsSection({
       style={{ marginTop: 18 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingBottom: 12 }}>
-        <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} id={`att-title-${taskId}`}
+        {/* The padding and matching negative margin give the hover tint room
+            without moving the title. */}
+        <button type="button" className="fx-hov-tint" onClick={() => setOpen(v => !v)} aria-expanded={open} id={`att-title-${taskId}`}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'transparent',
-                  cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: BRIEF_UI.ink,
+                  cursor: 'pointer', padding: '3px 6px', margin: '-3px -6px', borderRadius: 7,
+                  fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: BRIEF_UI.ink,
                 }}>
           <span style={{ display: 'inline-flex', color: BRIEF_UI.label, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}>
             <AttIcon name="chevron" size={14} />

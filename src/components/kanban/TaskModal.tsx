@@ -20,6 +20,7 @@ import { useIsPhone } from '@/hooks/useMediaQuery'
 import { shortName } from '@/lib/attachments'
 import { makeUploader, uploadToStorage, shrinkImage } from '@/lib/attachment-upload'
 import { useTranslations } from 'next-intl'
+import { intlLocale } from '@/lib/sheet-format'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { AttachmentsSection, type AttachmentsHandle, type UploadFn } from './attachments/AttachmentsSection'
 import { CommentFileChip } from './attachments/CommentFileChip'
@@ -306,6 +307,7 @@ export function withRefs(
           type="button"
           onClick={() => onOpenTask?.(ref.id)}
           title={`Open ${ref.name}`}
+          className="fx-hov"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'baseline',
             background: '#F3EEFF', color: '#6D28D9', borderRadius: 5, border: 'none',
@@ -456,16 +458,51 @@ function BrandMotif() {
   )
 }
 
-const fmtDate = (d: string | Date) =>
-  new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+/* Dates and counts in the reader's language — `loc` is intlLocale() of the
+   active locale, the same en-GB / ar-EG pair the sheets format with. */
+const fmtDate = (d: string | Date, loc: string) =>
+  new Date(d).toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' })
 
-const fmtShort = (d: string | Date) =>
-  new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+const fmtShort = (d: string | Date, loc: string) =>
+  new Date(d).toLocaleDateString(loc, { day: 'numeric', month: 'short' })
 
-const fmtTime = (d: string | Date) =>
-  new Date(d).toLocaleString('en-GB', {
+const fmtTime = (d: string | Date, loc: string) =>
+  new Date(d).toLocaleString(loc, {
     day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
   })
+
+/** "3d", "1.5h": the narrow unit, in the locale's own digits. */
+const fmtUnit = (n: number, unit: 'day' | 'hour', loc: string) =>
+  new Intl.NumberFormat(loc, { style: 'unit', unit, unitDisplay: 'narrow', maximumFractionDigits: 2 }).format(n)
+
+/**
+ * What to tell someone when an action fails: what happened, and what to do.
+ *
+ * The actions answer with codes ("not_authorized") for the common refusals
+ * and with a sentence for anything specific to the input; a code is never
+ * shown as it stands. `fallback` covers everything else — usually a dropped
+ * connection — and says to try again.
+ */
+function errorText(code: string | undefined, fallback: string): string {
+  switch (code) {
+    case 'not_authenticated': return 'You’ve been signed out — sign in again, then retry.'
+    case 'not_authorized':    return 'You don’t have permission to do that — ask the task’s owner or an admin.'
+    case 'not_found':         return 'This task no longer exists — close it and refresh the board.'
+  }
+  return code && /\s/.test(code) ? code : fallback
+}
+
+/**
+ * The phone's Task / Activity tab rides in the address beside the open task
+ * (`?task=…&pane=activity`), so a shared link or a reload lands on the same
+ * half. Only beside this task's own `task=`: a host that doesn't put the task
+ * in the URL (the overview) never gets a stray parameter.
+ */
+function paneInUrl(taskId: string): 'task' | 'activity' {
+  if (typeof window === 'undefined') return 'task'
+  const q = new URL(window.location.href).searchParams
+  return q.get('task') === taskId && q.get('pane') === 'activity' ? 'activity' : 'task'
+}
 
 export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
@@ -496,7 +533,31 @@ export function TaskModal({
     onClose()
   }
   const [briefText, setBriefText]         = useState('')
+  // Errors about the task itself (a field, the stage, following). Comment and
+  // subtask errors sit beside their own box instead.
   const [error, setError]                 = useState('')
+  const [cmtError, setCmtError]           = useState('')
+  const [subtaskError, setSubtaskError]   = useState('')
+  // Unlinking a plan step asks first, in place (the row turns into the question).
+  const [confirmUnlink, setConfirmUnlink] = useState(false)
+  const unlinkBtnRef = useRef<HTMLButtonElement>(null)
+  // Enter or Esc in the rename box hands focus back to the title.
+  const titleRef     = useRef<HTMLButtonElement>(null)
+  const refocusTitle = useRef(false)
+  // The panel's own copy ("Created", "left", "overdue", the field names) is
+  // still hardcoded English, and ar-EG dates and digits inside English
+  // sentences read worse than English throughout. Format in English until the
+  // panel is translated; then this becomes intlLocale(useLocale()).
+  const loc = intlLocale('en')
+
+  /* One polite live region for the panel, always mounted, so confirmations
+     that only change a word on screen ("Copied") are also heard. Cleared
+     first, so the same message twice in a row is read twice. */
+  const [status, setStatus] = useState('')
+  function say(msg: string) {
+    setStatus('')
+    window.setTimeout(() => setStatus(msg), 60)
+  }
   const [editingName, setEditingName]     = useState(false)
   const [nameText, setNameText]           = useState('')
   const [showEmpty, setShowEmpty]         = useState(false)
@@ -530,9 +591,10 @@ export function TaskModal({
   const [sendHover, setSendHover]         = useState(false)
   /* Which half of the panel a phone is showing. Desktop shows both at once
      and never reads this. Reset to the task on open, because arriving in
-     somebody's comment thread is not what tapping a card asks for. */
+     somebody's comment thread is not what tapping a card asks for — unless
+     the address itself says `pane=activity` (a shared link, a reload). */
   const isPhone                           = useIsPhone()
-  const [pane, setPane]                   = useState<'task' | 'activity'>('task')
+  const [pane, setPane]                   = useState<'task' | 'activity'>(() => paneInUrl(task.id))
   const [picked, setPicked]               = useState<string[]>([])
   const [pickedTasks, setPickedTasks]     = useState<string[]>([])
   const [mentionOpen, setMentionOpen]     = useState(false)
@@ -547,6 +609,10 @@ export function TaskModal({
   const ta = useTranslations('attachments')
   const [pickerOpen, setPickerOpen]       = useState(false)
   const [isPending, startTransition]      = useTransition()
+  // Their own, so each button can say it's busy without the others claiming to.
+  const [addingSub, startAddSub]          = useTransition()
+  const [posting, startPost]              = useTransition()
+  const [advancing, startAdvance]         = useTransition()
 
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -555,6 +621,29 @@ export function TaskModal({
   const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
   const selectTask     = useUIStore(s => s.selectTask)
+
+  // The phone tab into the address (see paneInUrl). replaceState, as the
+  // board does for its own parameters: switching tabs is not a step to go
+  // Back through. Written only beside this task's `task=`, and taken out
+  // again when the panel closes.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('task') !== task.id) return
+    const want = isPhone && pane === 'activity' ? 'activity' : null
+    if (url.searchParams.get('pane') === want) return
+    if (want) url.searchParams.set('pane', want); else url.searchParams.delete('pane')
+    window.history.replaceState(null, '', url)
+  }, [pane, isPhone, task.id])
+  useEffect(() => () => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('pane')) return
+    url.searchParams.delete('pane')
+    window.history.replaceState(null, '', url)
+  }, [])
+
+  useEffect(() => {
+    if (!editingName && refocusTitle.current) { refocusTitle.current = false; titleRef.current?.focus() }
+  }, [editingName])
 
   // From an attachment notification: open Attachments and bring it into view.
   useEffect(() => {
@@ -584,9 +673,15 @@ export function TaskModal({
     if (!notify || following === null) return
     const next = !following
     setFollowing(next); setFollowBusy(true)
-    const r = await notify.api.setFollow(task.id, next)
+    const r = await notify.api.setFollow(task.id, next).catch(() => ({ success: false }))
     setFollowBusy(false)
-    if (!r.success) setFollowing(!next)
+    // The button flips back; say so, or it looks like the click didn't land.
+    if (!r.success) {
+      setFollowing(!next)
+      setError(next
+        ? 'Could not follow this task — check your connection and try again.'
+        : 'Could not unfollow this task — check your connection and try again.')
+    }
   }
 
   /* Replies (spec 012 R4): the thread being answered. */
@@ -687,6 +782,7 @@ export function TaskModal({
       // emoji and mention pickers still close before the panel does.
       if (emojiOpen) { setEmojiOpen(false); return }
       if (mentionOpen) { setMentionOpen(false); return }
+      if (confirmUnlink) { cancelUnlink(); return }
       // The brief editor handles its own Esc (closing its menus, then leaving
       // editing); it marks the event handled, and it must not also close the
       // whole panel.
@@ -759,22 +855,29 @@ export function TaskModal({
         try {
           const res = await updateTask(task.id, patch)
           if (res.success) { router.refresh(); after?.(); resolve(true); return }
-          setError(res.error ?? 'Could not save the change')
+          setError(errorText(res.error, 'Could not save the change — check your connection and try again.'))
           resolve(false)
         } catch {
-          setError('Could not save the change — check your connection')
+          setError('Could not save the change — check your connection and try again.')
           resolve(false)
         }
       })
     })
   }
 
-  async function handleCreateSubtask(name: string) {
-    const res = await createSubtask(task.id, name)
+  /** A field's change, confirmed out loud once it's stored ("Due date saved"). */
+  function saveField(label: string, patch: TaskPatch) {
+    return applyPatch(patch, () => say(`${label} saved`))
+  }
+
+  /** Also the brief editor's "turn this line into a subtask"; its errors show at the top. */
+  async function handleCreateSubtask(name: string, onError: (msg: string) => void = setError) {
+    const fallback = 'Could not add the subtask — check your connection and try again.'
+    const res = await createSubtask(task.id, name).catch(() => ({ success: false, error: undefined, id: undefined, name: undefined }))
     if (!res.success || !res.id) {
-      setError(res.error === 'not_authorized'
-        ? 'You cannot add subtasks to this task'
-        : res.error ?? 'Could not create the subtask')
+      onError(res.error === 'not_authorized'
+        ? 'You can’t add subtasks to this task — ask its owner or an admin.'
+        : errorText(res.error, fallback))
       return null
     }
     router.refresh()
@@ -784,24 +887,36 @@ export function TaskModal({
   function submitSubtask() {
     const name = subtaskName.trim()
     if (!name) { setAddingSubtask(false); return }
-    startTransition(async () => {
-      await handleCreateSubtask(name)
+    setSubtaskError('')
+    startAddSub(async () => {
+      const made = await handleCreateSubtask(name, setSubtaskError)
+      // A failed add keeps the name in the box, to try again.
+      if (!made) return
       setSubtaskName('')
       setAddingSubtask(false)
+      say(`Subtask added: ${made.name}`)
     })
   }
 
   function handleAdvance() {
     if (!canAdvance) return
-    startTransition(async () => {
-      const result = await moveTask(task.id)
-      if (result.success) {
-        router.refresh()
-        if (result.shouldCelebrate && nextMeta) {
-          setCelebration({ taskName: task.name, stageLabel: nextMeta.label_en })
-        }
-        onClose()
+    setError('')
+    startAdvance(async () => {
+      const fallback = 'Could not move the task — check your connection and try again.'
+      const result = await moveTask(task.id).catch(() => null)
+      if (!result?.success) {
+        setError(
+          result?.error === 'not_authorized' ? 'That stage belongs to someone else — ask an admin to move it.'
+          : result?.error === 'terminal'     ? 'This task is already at its last stage.'
+          : result?.error === 'dropped'      ? 'This clip was dropped, so it can’t move on — restore it on the video sheet first.'
+          : errorText(result?.error, fallback))
+        return
       }
+      router.refresh()
+      if (result.shouldCelebrate && nextMeta) {
+        setCelebration({ taskName: task.name, stageLabel: nextMeta.label_en })
+      }
+      onClose()
     })
   }
 
@@ -954,11 +1069,11 @@ export function TaskModal({
     if (next === task.status) return
     setError('')
     startTransition(async () => {
-      const r = await setTaskStage(task.id, next)
+      const r = await setTaskStage(task.id, next).catch(() => ({ success: false, error: undefined, shouldCelebrate: false }))
       if (!r.success) {
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
-          : r.error ?? 'Could not move that task')
+          : errorText(r.error, 'Could not move the task — check your connection and try again.'))
         return
       }
       router.refresh()
@@ -976,12 +1091,18 @@ export function TaskModal({
       .filter((f): f is TaskAttachment => !!f)
       .map(f => formatFileToken(f.filename, f.id))
     const text = [cmtText.trim(), ...tokens].filter(Boolean).join('\n')
-    if (!text) return
+    // ⌘Enter while one is on its way would post it twice.
+    if (!text || posting) return
     const ids   = mentioned.map(m => m.id)
     const links = linkedTasks.map(t => t.id)
-    startTransition(async () => {
-      const r = await addComment(task.id, text, ids, links)
-      if (!r.success) { setError(r.error ?? 'Could not post that comment'); return }
+    setCmtError('')
+    startPost(async () => {
+      const r = await addComment(task.id, text, ids, links).catch(() => ({ success: false, error: undefined }))
+      if (!r.success) {
+        setCmtError(errorText(r.error, 'Could not post your comment. It’s still in the box — check your connection and try again.'))
+        return
+      }
+      say('Comment posted')
       router.refresh()
       setCmtText('')
       setDraftFiles([])
@@ -994,15 +1115,27 @@ export function TaskModal({
 
   /* ── the plan ────────────────────────────────────────────────────────── */
 
+  /** Asked first: the × turns the row into "Unlink this task from the step?". */
   function handleUnlinkPlan() {
     if (!task.plan_step) return
     const stepId = task.plan_step.id
     setError('')
     startTransition(async () => {
-      const r = await unlinkStepFromTask(stepId)
-      if (!r.success) { setError(r.error ?? 'Could not unlink that step'); return }
+      const r = await unlinkStepFromTask(stepId).catch(() => ({ success: false, error: undefined }))
+      if (!r.success) {
+        setConfirmUnlink(false)
+        setError(errorText(r.error, 'Could not unlink the step — check your connection and try again.'))
+        return
+      }
+      setConfirmUnlink(false)
+      say('Unlinked from the plan step')
       router.refresh()
     })
+  }
+
+  function cancelUnlink() {
+    setConfirmUnlink(false)
+    requestAnimationFrame(() => unlinkBtnRef.current?.focus())
   }
 
   /** The brief editor's image paste and drop (spec 005 R5) use the same path. */
@@ -1089,10 +1222,14 @@ export function TaskModal({
     const value = what === 'id'
       ? task.id
       : `${window.location.origin}/board?task=${task.id}`
-    navigator.clipboard?.writeText(value)
-    setCopied(what)
     setMenuOpen(false)
-    window.setTimeout(() => setCopied(''), 1800)
+    const failed = () => setError(`Could not copy the ${what === 'id' ? 'ID' : 'link'} — your browser blocked it. Copy it from the address bar instead.`)
+    if (!navigator.clipboard) { failed(); return }
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(what)
+      say(what === 'id' ? 'Task ID copied' : 'Link copied')
+      window.setTimeout(() => setCopied(''), 1800)
+    }, failed)
   }
 
   /**
@@ -1115,7 +1252,8 @@ export function TaskModal({
             ) : ''}
             options={brands.map(b => ({ value: b.id, label: b.name }))}
             emptyLabel="–"
-            onCommit={v => applyPatch({ brand_id: v })}
+            ariaLabel="Brand"
+            onCommit={v => saveField('Brand', { brand_id: v })}
           />
         </Field>
       ),
@@ -1137,7 +1275,8 @@ export function TaskModal({
             ) : ''}
             options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
             emptyLabel="–"
-            onCommit={v => applyPatch({ content_type_label: v })}
+            ariaLabel="Type"
+            onCommit={v => saveField('Type', { content_type_label: v })}
           />
         </Field>
       ),
@@ -1150,7 +1289,8 @@ export function TaskModal({
             canEdit={canEdit} type="select" value={task.platform ?? ''} display={task.platform}
             options={PLATFORMS.map(p => ({ value: p, label: p }))}
             emptyLabel="–"
-            onCommit={v => applyPatch({ platform: v })}
+            ariaLabel="Platform"
+            onCommit={v => saveField('Platform', { platform: v })}
           />
         </Field>
       ),
@@ -1168,7 +1308,8 @@ export function TaskModal({
               </span>
             }
             options={members.map(m => ({ value: m.id, label: m.name }))}
-            onCommit={v => applyPatch({ task_owner_id: v })}
+            ariaLabel="Owner"
+            onCommit={v => saveField('Owner', { task_owner_id: v })}
           />
         </Field>
       ),
@@ -1184,6 +1325,7 @@ export function TaskModal({
         <Field key="project" icon="folder" label="Project">
           <span style={{
             position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8,
+            maxWidth: '100%', minWidth: 0,
             // The wrapper carries the stacking, not the popup: a z-index on the
             // popup alone is measured inside a parent that still sits below
             // everything after it in the panel.
@@ -1193,25 +1335,31 @@ export function TaskModal({
               <button
                 type="button"
                 onClick={() => canEdit && setPickerOpen(v => !v)}
-                title={canEdit ? 'Change the project' : task.project.name}
+                title={canEdit ? `Change the project (${task.project.name})` : task.project.name}
+                className={canEdit ? 'fx-hov' : undefined}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
                   border: 'none', borderRadius: 8, padding: '3px 10px',
                   background: CU.greenSoft, color: '#47755D',
                   font: 'inherit', fontSize: 14.5, fontWeight: 600,
                   cursor: canEdit ? 'pointer' : 'default',
+                  maxWidth: '100%', minWidth: 0,
                 }}
               >
                 <Icon name="folder" size={13} color={CU.green} width={2.2} />
-                {task.project.name}
+                {/* A long project name ends in … rather than pushing the row wide. */}
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {task.project.name}
+                </span>
               </button>
             ) : canEdit ? (
               <button
                 type="button"
                 onClick={() => setPickerOpen(v => !v)}
+                className="fx-hov-tint"
                 style={{
-                  border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
-                  font: 'inherit', fontSize: 15, color: CU.faint,
+                  border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px 6px',
+                  margin: '0 -6px', borderRadius: 6, font: 'inherit', fontSize: 15, color: CU.faint,
                 }}
               >
                 Put this under a project
@@ -1237,13 +1385,31 @@ export function TaskModal({
       key: 'planstep', filled: Boolean(task.plan_step),
       node: (
         <Field key="planstep" icon="link" label="Plan step">
-          {task.plan_step ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: CU.label }}>{task.plan_step.name}</span>
+          {task.plan_step && confirmUnlink ? (
+            // Asked in place, as the close guard asks: unlinking takes effect
+            // on the plan straight away, and there is no relink from here.
+            <span role="group" aria-label="Unlink from the plan step"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+              <span style={{ color: CU.text }}>Unlink this task from the step?</span>
+              <button type="button" onClick={handleUnlinkPlan} disabled={isPending}
+                      className="fx-hov"
+                      style={{ height: 28, padding: '0 12px', border: 'none', borderRadius: 7, background: COLORS.coral, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit', opacity: isPending ? 0.6 : 1 }}>
+                {isPending ? 'Unlinking…' : 'Unlink'}
+              </button>
+              <button type="button" onClick={cancelUnlink} autoFocus
+                      className="fx-hov-tint"
+                      style={{ height: 28, padding: '0 10px', border: 'none', borderRadius: 7, background: 'transparent', color: CU.text, fontWeight: 600, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Keep
+              </button>
+            </span>
+          ) : task.plan_step ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+              <span style={{ color: CU.label, minWidth: 0, overflowWrap: 'anywhere' }}>{task.plan_step.name}</span>
               {canEdit && (
-                <button type="button" onClick={handleUnlinkPlan}
+                <button type="button" ref={unlinkBtnRef} onClick={() => setConfirmUnlink(true)}
                         aria-label="Unlink from the plan step" title="Unlink from the plan step"
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'inline-flex' }}>
+                        className="fx-hov-tint"
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'inline-flex', borderRadius: 5 }}>
                   <Icon name="close" size={12} color={CU.faint} width={2.2} />
                 </button>
               )}
@@ -1263,7 +1429,8 @@ export function TaskModal({
             display={task.cover_image_url ? shortName(task.cover_image_url, 46) : ''}
             placeholder="https://…"
             emptyLabel="–"
-            onCommit={v => applyPatch({ cover_image_url: v })}
+            ariaLabel="Cover image"
+            onCommit={v => saveField('Cover image', { cover_image_url: v })}
           />
         </Field>
       ),
@@ -1272,7 +1439,7 @@ export function TaskModal({
       key: 'stage-since', filled: true,
       node: (
         <Field key="stage-since" icon="clock" label="In this stage since">
-          <span style={{ color: CU.text }}>{fmtDate(task.stage_date)}</span>
+          <span style={{ color: CU.text }}>{fmtDate(task.stage_date, loc)}</span>
         </Field>
       ),
     },
@@ -1373,7 +1540,7 @@ export function TaskModal({
                     <div key={r.id} className="fx-nt-reply" data-comment-id={r.id} data-reply-of={c.id}>
                       <span className="fx-nt-reply-head">
                         <strong style={{ fontWeight: 600 }}>{r.author?.name ?? 'Someone'}</strong>
-                        <time dateTime={r.created_at}>{fmtTime(r.created_at)}</time>
+                        <time dateTime={r.created_at}>{fmtTime(r.created_at, loc)}</time>
                       </span>
                       {commentBody(r, (r.mentions ?? []).includes(currentUser.id))}
                       <button type="button" className="fx-nt-reply-btn" data-reply={r.id}
@@ -1401,7 +1568,7 @@ export function TaskModal({
     return items.sort((a, b) => a.when.getTime() - b.when.getTime())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.created_at, task.stage_date, topComments, repliesOf, task.task_owner.name,
-      stageMeta.label_en, members, currentUser.id, allTasks, selectTask, replyTo, attachments, tn])
+      stageMeta.label_en, members, currentUser.id, allTasks, selectTask, replyTo, attachments, tn, loc])
 
   // ClickUp shows the first couple and hides the rest behind "Show more".
   const HEAD = 1
@@ -1439,6 +1606,8 @@ export function TaskModal({
           outline: 'none',
         }}
       >
+        <span role="status" aria-live="polite" className="sr-only">{status}</span>
+
         {/* ── TOP BAR — spans the whole panel ───────────────────────────── */}
         <div style={{
           height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
@@ -1466,6 +1635,7 @@ export function TaskModal({
                 <span style={{ color: CU.faint }}>/</span>
                 <button type="button" onClick={() => selectTask(task.parent!.id)}
                         title={`Open parent: ${task.parent.name}`}
+                        className="fx-hov-tint"
                         style={{
                           background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 15, fontWeight: 600, color: CU.blue,
@@ -1502,7 +1672,7 @@ export function TaskModal({
           )}
 
           <span className="fx-tm-created" style={{ fontSize: 14, color: CU.label, whiteSpace: 'nowrap', marginInlineEnd: 4 }}>
-            Created {fmtShort(task.created_at)}
+            Created {fmtShort(task.created_at, loc)}
           </span>
 
           {/* ⋯ menu */}
@@ -1520,8 +1690,8 @@ export function TaskModal({
                 }}>
                   <MenuSplit label="Copy link" onClick={() => copy('link')} />
                   <MenuSplit label="Copy ID" onClick={() => copy('id')} divider />
-                  <MenuSplit label="New tab" divider
-                             onClick={() => { window.open(`/board?task=${task.id}`, '_blank', 'noopener'); setMenuOpen(false) }} />
+                  <MenuSplit label="New tab" divider href={`/board?task=${task.id}`}
+                             onClick={() => setMenuOpen(false)} />
                 </div>
                 <MenuItem icon="subtask" label="Add subtask"
                           onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
@@ -1547,10 +1717,12 @@ export function TaskModal({
             </b>
             <span style={{ flex: 1 }} />
             <button type="button" onClick={() => setCloseGuard(null)} autoFocus
+                    className="fx-hov"
                     style={{ height: 30, padding: '0 14px', border: 'none', borderRadius: 8, background: CU.blue, color: COLORS.panel, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               Stay
             </button>
             <button type="button" onClick={() => { setCloseGuard(null); onClose() }}
+                    className="fx-hov-tint"
                     style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: 'transparent', color: CU.text, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
               Leave anyway
             </button>
@@ -1579,6 +1751,7 @@ export function TaskModal({
                 type="button"
                 aria-selected={pane === id}
                 onClick={() => setPane(id)}
+                className="fx-hov-tint"
                 style={{
                   border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   padding: '8px 14px', minHeight: 44, fontSize: 14.5,
@@ -1591,6 +1764,18 @@ export function TaskModal({
               </button>
             ))}
           </div>
+        )}
+
+        {/* On a phone the task's errors sit above both tabs: a failed follow
+            or stage move has to show from Activity too. On a desktop they
+            stay under the properties, below. */}
+        {isPhone && error && (
+          <p role="alert" style={{
+            margin: 0, padding: '9px 16px', flexShrink: 0, fontSize: 14, color: '#D22040',
+            background: alpha(COLORS.coral, 0.06), borderBottom: `1px solid ${CU.line}`,
+          }}>
+            {error}
+          </p>
         )}
 
         {/* ── BODY ──────────────────────────────────────────────────────── */}
@@ -1613,6 +1798,7 @@ export function TaskModal({
                 Task
               </span>
               <button type="button" onClick={() => copy('id')} title="Copy task ID"
+                      className="fx-hov"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
                         border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
@@ -1626,6 +1812,7 @@ export function TaskModal({
                 <button type="button" onClick={() => sectionRef.current?.reveal()}
                         aria-label={ta('goToAttachments')} title={ta('goToAttachments')}
                         data-att-count=""
+                        className="fx-hov"
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
                           border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
@@ -1637,6 +1824,7 @@ export function TaskModal({
               )}
               {sheetTarget && (
                 <button type="button" onClick={openSheet} data-open-sheet=""
+                        className="fx-hov"
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 9px',
                           border: 'none', background: CU.chipBg, borderRadius: 7, cursor: 'pointer',
@@ -1652,21 +1840,24 @@ export function TaskModal({
             </div>
 
             {/* scrolls */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 26px 40px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '18px 26px 40px' }}>
 
               {/* Title */}
               {editingName ? (
                 <input
                   value={nameText}
                   autoFocus
+                  aria-label="Task name"
+                  name="task-name"
+                  autoComplete="off"
                   onChange={e => setNameText(e.target.value)}
                   onBlur={() => {
                     setEditingName(false)
-                    if (nameText.trim() && nameText !== task.name) applyPatch({ name: nameText })
+                    if (nameText.trim() && nameText !== task.name) applyPatch({ name: nameText }, () => say('Task renamed'))
                   }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter')  { e.preventDefault(); e.currentTarget.blur() }
-                    if (e.key === 'Escape') { setNameText(task.name); setEditingName(false) }
+                    if (e.key === 'Enter')  { e.preventDefault(); refocusTitle.current = true; e.currentTarget.blur() }
+                    if (e.key === 'Escape') { refocusTitle.current = true; setNameText(task.name); setEditingName(false) }
                   }}
                   style={{
                     width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
@@ -1678,14 +1869,30 @@ export function TaskModal({
                 />
               ) : (
                 <h1
-                  onClick={() => { if (canEdit) { setNameText(task.name); setEditingName(true) } }}
-                  title={canEdit ? 'Click to rename' : undefined}
                   style={{
                     fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.25,
-                    color: CU.ink, margin: '0 0 22px', cursor: canEdit ? 'text' : 'default',
+                    color: CU.ink, margin: '0 0 22px', overflowWrap: 'anywhere',
                   }}
                 >
-                  {task.name}
+                  {/* Still the heading; the button inside is what makes the
+                      rename reachable from the keyboard as well as the mouse. */}
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      ref={titleRef}
+                      onClick={() => { setNameText(task.name); setEditingName(true) }}
+                      title="Rename this task"
+                      className="fx-focus fx-hov-tint"
+                      style={{
+                        display: 'block', width: 'calc(100% + 16px)', margin: '0 -8px', padding: '0 8px',
+                        border: 'none', borderRadius: 8, background: 'none', cursor: 'text',
+                        font: 'inherit', letterSpacing: 'inherit', color: 'inherit',
+                        textAlign: 'start', overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {task.name}
+                    </button>
+                  ) : task.name}
                 </h1>
               )}
 
@@ -1703,17 +1910,18 @@ export function TaskModal({
                       type="button"
                       ref={stageBtnRef}
                       onClick={() => setStageOpen(v => !v)}
-                      disabled={isPending}
+                      disabled={isPending || advancing}
                       aria-haspopup="listbox"
                       aria-expanded={stageOpen}
                       aria-label={`Stage: ${stageMeta.label_en}. Change it`}
                       title="Change the stage"
+                      className="fx-hov"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none',
                         background: stageMeta.color, color: '#fff', borderRadius: 5,
                         padding: '4px 8px 4px 10px', fontSize: 12.5, fontWeight: 800,
                         letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap',
-                        cursor: 'pointer', fontFamily: 'inherit', opacity: isPending ? 0.6 : 1,
+                        cursor: 'pointer', fontFamily: 'inherit', opacity: isPending || advancing ? 0.6 : 1,
                       }}
                     >
                       {stageMeta.label_en}
@@ -1723,7 +1931,7 @@ export function TaskModal({
                     {stageOpen && (
                       <div role="listbox" aria-label="Move to a stage" ref={stageMenuRef} style={{
                         position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0, zIndex: 5,
-                        minWidth: 232, maxHeight: 330, overflowY: 'auto',
+                        minWidth: 232, maxHeight: 330, overflowY: 'auto', overscrollBehavior: 'contain',
                         background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
                         boxShadow: '0 12px 34px rgba(20,20,20,.18)', padding: 6,
                       }}>
@@ -1760,19 +1968,29 @@ export function TaskModal({
 
                     {canAdvance && nextMeta && (
                       <button
+                        type="button"
                         onClick={handleAdvance}
-                        disabled={isPending}
+                        disabled={isPending || advancing}
                         title={`Move to ${nextMeta.label_en}`}
+                        aria-label={advancing ? `Moving to ${nextMeta.label_en}…`
+                          : `Move to ${nextMeta.label_en}${isOverride ? ' (admin override)' : ''}`}
+                        className="fx-hov"
                         style={{
                           border: 'none', background: isOverride ? CU.ink : CU.blueLight,
                           color: isOverride ? CU.green : CU.blue,
                           borderRadius: 8, cursor: 'pointer', padding: '5px 10px',
                           fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
-                          opacity: isPending ? 0.6 : 1, whiteSpace: 'nowrap',
+                          opacity: isPending || advancing ? 0.6 : 1, whiteSpace: 'nowrap',
                           boxShadow: isOverride ? 'none' : '0 1px 2px rgba(24,35,63,0.03)',
                         }}
                       >
-                        {isOverride ? '⚡ ' : ''}→ {nextMeta.label_en}
+                        {advancing ? 'Moving…' : (
+                          <>
+                            {isOverride && <span aria-hidden="true">⚡ </span>}
+                            <span aria-hidden="true">→ </span>
+                            {nextMeta.label_en}
+                          </>
+                        )}
                       </button>
                     )}
                   </span>
@@ -1794,7 +2012,8 @@ export function TaskModal({
                     emptyLabel="Nobody yet"
                     options={[{ value: '', label: '— nobody —' },
                               ...members.map(m => ({ value: m.id, label: m.name }))]}
-                    onCommit={v => applyPatch({ assignee_id: v || null })}
+                    ariaLabel="Assignee"
+                    onCommit={v => saveField('Assignee', { assignee_id: v || null })}
                   />
                 </Prop>
 
@@ -1807,8 +2026,9 @@ export function TaskModal({
                     <span style={{ flex: '0 1 auto', minWidth: 0 }}>
                       <InlineValue
                         canEdit={canEdit} type="date" value={task.due_date ?? ''}
-                        display={task.due_date ? fmtDate(task.due_date) : ''}
-                        onCommit={v => applyPatch({ due_date: v })}
+                        display={task.due_date ? fmtDate(task.due_date, loc) : ''}
+                        ariaLabel="Due date"
+                        onCommit={v => saveField('Due date', { due_date: v })}
                       />
                     </span>
                     {daysLeft !== null && (
@@ -1816,7 +2036,7 @@ export function TaskModal({
                         flexShrink: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
                         color: overdue ? '#D22040' : CU.faint,
                       }}>
-                        {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
+                        {fmtUnit(Math.abs(daysLeft), 'day', loc)} {overdue ? 'overdue' : 'left'}
                       </span>
                     )}
                   </span>
@@ -1834,7 +2054,8 @@ export function TaskModal({
                       </span>
                     }
                     options={PRIORITIES.map(p => ({ value: p, label: p }))}
-                    onCommit={v => applyPatch({ priority: v as 'Low' | 'Medium' | 'High' })}
+                    ariaLabel="Priority"
+                    onCommit={v => saveField('Priority', { priority: v as 'Low' | 'Medium' | 'High' })}
                   />
                 </Prop>
 
@@ -1842,8 +2063,9 @@ export function TaskModal({
                   <InlineValue
                     canEdit={canEdit} type="number" min={0} step={0.5}
                     value={task.hours_estimate}
-                    display={(task.hours_estimate ?? 0) > 0 ? `${task.hours_estimate}h` : ''}
-                    onCommit={v => applyPatch({ hours_estimate: parseFloat(v) })}
+                    display={(task.hours_estimate ?? 0) > 0 ? fmtUnit(task.hours_estimate, 'hour', loc) : ''}
+                    ariaLabel="Time estimate"
+                    onCommit={v => saveField('Time estimate', { hours_estimate: parseFloat(v) })}
                   />
                 </Prop>
 
@@ -1852,7 +2074,7 @@ export function TaskModal({
                 </Prop>
               </div>
 
-              {error && (
+              {!isPhone && error && (
                 <p role="alert" style={{ color: '#D22040', fontSize: 14, margin: '12px 0 0' }}>{error}</p>
               )}
 
@@ -1880,7 +2102,7 @@ export function TaskModal({
                   onDone={() => setEditingBrief(false)}
                   initialCursor={briefCursor}
                   attachments={attachments}
-                  onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
+                  onCreateSubtask={canEdit ? name => handleCreateSubtask(name) : undefined}
                 />
               ) : (
                 <>
@@ -1941,6 +2163,8 @@ export function TaskModal({
                       marginTop: briefOpen ? 8 : -38, marginBottom: 10, position: 'relative',
                     }}>
                       <button type="button" onClick={() => setBriefOpen(v => !v)}
+                              aria-expanded={briefOpen}
+                              className="fx-hov"
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 6, height: 30,
                                 padding: '0 12px', borderRadius: 10, cursor: 'pointer',
@@ -1958,17 +2182,21 @@ export function TaskModal({
 
               {/* ── Fields ───────────────────────────────────────────────── */}
               <div style={{ marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
-                <button type="button" onClick={() => setFieldsOpen(v => !v)}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
-                          background: 'transparent', cursor: 'pointer', padding: '0 0 10px',
-                          fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: CU.text,
-                        }}>
-                  <Icon name="chevron" size={14} color={CU.label}
-                        style={{ transform: fieldsOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
-                  Fields
-                  <BrandMotif />
-                </button>
+                <h2 style={{ margin: '0 0 10px', font: 'inherit' }}>
+                  <button type="button" onClick={() => setFieldsOpen(v => !v)}
+                          aria-expanded={fieldsOpen}
+                          className="fx-hov-tint"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
+                            background: 'transparent', cursor: 'pointer', padding: '2px 6px', margin: '-2px -6px',
+                            borderRadius: 8, fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: CU.text,
+                          }}>
+                    <Icon name="chevron" size={14} color={CU.label}
+                          style={{ transform: fieldsOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }} />
+                    Fields
+                    <BrandMotif />
+                  </button>
+                </h2>
 
                 {fieldsOpen && (
                   <div>
@@ -1976,10 +2204,12 @@ export function TaskModal({
                     {showEmpty && fields.filter(f => !f.filled).map(f => f.node)}
                     {emptyCount > 0 && (
                       <button type="button" onClick={() => setShowEmpty(v => !v)}
+                              aria-expanded={showEmpty}
+                              className="fx-hov-tint"
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
                                 background: 'transparent', cursor: 'pointer', padding: '9px 4px 4px',
-                                fontFamily: 'inherit', fontSize: 14.5, color: CU.label,
+                                borderRadius: 8, fontFamily: 'inherit', fontSize: 14.5, color: CU.label,
                               }}>
                         <Icon name={showEmpty ? 'chevronUp' : 'chevron'} size={14} color={CU.faint} />
                         {showEmpty
@@ -1994,14 +2224,15 @@ export function TaskModal({
               {/* ── Subtasks + actions ───────────────────────────────────── */}
               {(task.subtasks?.length ?? 0) > 0 && (
                 <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, marginBottom: 8 }}>
+                  <h2 style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, margin: '0 0 8px' }}>
                     Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
-                  </div>
+                  </h2>
                   <div style={{ display: 'grid', gap: 4 }}>
                     {task.subtasks!.map(s => {
                       const meta = STAGE_META[s.status]
                       return (
                         <button key={s.id} type="button" onClick={() => selectTask(s.id)}
+                                className="fx-hov"
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                                   padding: '9px 10px', borderRadius: 12, cursor: 'pointer',
@@ -2030,15 +2261,19 @@ export function TaskModal({
               {canEdit && (
                 <div style={{ marginTop: 10 }}>
                   {addingSubtask ? (
+                    <>
                     <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
                       <input
                         value={subtaskName}
                         autoFocus
+                        aria-label="Subtask name"
+                        name="subtask-name"
+                        autoComplete="off"
                         placeholder="Subtask name…"
                         onChange={e => setSubtaskName(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === 'Enter')  submitSubtask()
-                          if (e.key === 'Escape') { setSubtaskName(''); setAddingSubtask(false) }
+                          if (e.key === 'Enter')  { if (!addingSub) submitSubtask() }
+                          if (e.key === 'Escape') { setSubtaskName(''); setSubtaskError(''); setAddingSubtask(false) }
                         }}
                         style={{
                           flex: 1, minWidth: 0, height: 38, padding: '0 11px', fontFamily: 'inherit',
@@ -2046,15 +2281,21 @@ export function TaskModal({
                         }}
                         className="fx-focus"
                       />
-                      <button type="button" onClick={submitSubtask} disabled={isPending}
+                      <button type="button" onClick={submitSubtask} disabled={addingSub}
+                              className="fx-hov"
                               style={{
                                 height: 38, padding: '0 16px', border: 'none', borderRadius: 8,
-                                background: CU.blue, color: '#fff', cursor: 'pointer',
+                                background: CU.blue, color: '#fff', cursor: addingSub ? 'default' : 'pointer',
                                 fontFamily: 'inherit', fontSize: 15, fontWeight: 700,
+                                opacity: addingSub ? 0.7 : 1,
                               }}>
-                        Add
+                        {addingSub ? 'Adding…' : 'Add'}
                       </button>
                     </div>
+                    {subtaskError && (
+                      <p role="alert" style={{ color: '#D22040', fontSize: 14, margin: '4px 0 0' }}>{subtaskError}</p>
+                    )}
+                    </>
                   ) : (
                     <ActionRow label="Add subtask" onClick={() => setAddingSubtask(true)} />
                   )}
@@ -2083,7 +2324,7 @@ export function TaskModal({
                   marginTop: 22, padding: '11px 14px', borderRadius: 9,
                   background: '#F0FDF4', color: '#15803D', fontSize: 15, fontWeight: 600,
                 }}>
-                  ✓ Published — this task is complete
+                  <span aria-hidden="true">✓ </span>Published — this task is complete
                 </div>
               )}
             </div>
@@ -2103,16 +2344,20 @@ export function TaskModal({
               height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2,
               padding: '0 12px 0 18px', borderBottom: `1px solid ${CU.line}`,
             }}>
-              <span style={{ flex: 1, fontSize: 17.5, fontWeight: 700, color: CU.ink }}>Activity</span>
-              <IconButton name="search" label="Search activity" />
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingInlineEnd: 4 }}>
+              <h2 style={{ flex: 1, margin: 0, fontSize: 17.5, fontWeight: 700, color: CU.ink }}>Activity</h2>
+              {/* Search and filter buttons sat here, wired to nothing: left out,
+                  like every other control we hold no behaviour for. */}
+              <span title={`${task.comments.length} comments`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, paddingInlineEnd: 8 }}>
                 <Icon name="bell" size={17} color={CU.blue} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: CU.blue }}>{task.comments.length}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: CU.blue }}>
+                  {task.comments.length}
+                  <span className="sr-only"> comments</span>
+                </span>
               </span>
-              <IconButton name="filter" label="Filter activity" />
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 18px' }}>
               <div style={{ position: 'relative' }}>
                 {/* The connecting timeline line, drawn once behind every dot
                     rather than per row — a row's own height is not known
@@ -2129,10 +2374,11 @@ export function TaskModal({
                     {/* ClickUp folds the middle of a long log away */}
                     {collapsible && !showAllActivity && i === HEAD && (
                       <button type="button" onClick={() => setShowAllActivity(true)}
+                              className="fx-hov-tint"
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 8, border: 'none',
-                                background: 'transparent', cursor: 'pointer', padding: '4px 0 12px',
-                                fontFamily: 'inherit', fontSize: 15, color: CU.text,
+                                background: 'transparent', cursor: 'pointer', padding: '4px 6px 12px', margin: '0 -6px',
+                                borderRadius: 8, fontFamily: 'inherit', fontSize: 15, color: CU.text,
                               }}>
                         <Icon name="chevronR" size={14} color={CU.label} />
                         Show more {hiddenActivity > 0 && <span style={{ color: CU.faint }}>({hiddenActivity})</span>}
@@ -2148,7 +2394,7 @@ export function TaskModal({
                       }} />
                       <span style={{ fontSize: 15, color: CU.text, lineHeight: 1.5 }}>{a.node}</span>
                       <span style={{ fontSize: 13.5, color: CU.label, whiteSpace: 'nowrap', lineHeight: '20px' }}>
-                        {fmtTime(a.when)}
+                        {fmtTime(a.when, loc)}
                       </span>
                     </div>
                   </div>
@@ -2157,10 +2403,11 @@ export function TaskModal({
 
               {collapsible && showAllActivity && (
                 <button type="button" onClick={() => setShowAllActivity(false)}
+                        className="fx-hov-tint"
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8, border: 'none',
-                          background: 'transparent', cursor: 'pointer', padding: '0 0 8px',
-                          fontFamily: 'inherit', fontSize: 15, color: CU.text,
+                          background: 'transparent', cursor: 'pointer', padding: '2px 6px 8px', margin: '0 -6px',
+                          borderRadius: 8, fontFamily: 'inherit', fontSize: 15, color: CU.text,
                         }}>
                   <Icon name="chevronUp" size={14} color={CU.label} />
                   Hide
@@ -2169,7 +2416,12 @@ export function TaskModal({
             </div>
 
             {/* Composer */}
-            <div style={{ padding: '10px 14px 14px', flexShrink: 0, position: 'relative' }}>
+            {/* On a phone the composer is the bottom of the screen: it clears
+                the home indicator rather than sitting under it. */}
+            <div style={{
+              padding: isPhone ? '10px 14px calc(14px + env(safe-area-inset-bottom, 0px))' : '10px 14px 14px',
+              flexShrink: 0, position: 'relative',
+            }}>
 
               {/* Who you can name and what you can link to. Opens on the @
                   button, on typing an @, and on typing a # — and filters as
@@ -2179,7 +2431,7 @@ export function TaskModal({
                   position: 'absolute', insetInline: 14, bottom: '100%', marginBottom: 4, zIndex: 4,
                   background: '#fff', border: `1px solid ${CU.line}`, borderRadius: 10,
                   boxShadow: '0 10px 30px rgba(20,20,20,.16)', padding: 6,
-                  maxHeight: 268, overflowY: 'auto',
+                  maxHeight: 268, overflowY: 'auto', overscrollBehavior: 'contain',
                 }}>
                   {mentionMatches.length === 0 && (
                     <p style={{ margin: 0, padding: '10px 10px', fontSize: 14, color: CU.faint }}>
@@ -2259,6 +2511,11 @@ export function TaskModal({
                 </div>
               )}
 
+              {/* A failed post says so here, beside the comment that is still in the box. */}
+              {cmtError && (
+                <p role="alert" style={{ color: '#D22040', fontSize: 13.5, margin: '0 4px 8px' }}>{cmtError}</p>
+              )}
+
               {/* The borderless textarea and its buttons read as one box, so
                   the box carries the focus ring. */}
               <div className="fx-focus-within" style={{
@@ -2271,10 +2528,13 @@ export function TaskModal({
                   onChange={e => { setCmtText(e.target.value); syncMentionQuery(e.target) }}
                   onKeyDown={onComposerKey}
                   onBlur={() => window.setTimeout(() => setMentionOpen(false), 150)}
-                  placeholder="Write a comment — @ names, # links a task"
+                  aria-label="Comment"
+                  name="comment"
+                  autoComplete="off"
+                  placeholder="Write a comment — @ names, # links a task…"
                   rows={2}
                   style={{
-                    width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none',
+                    width: '100%', boxSizing: 'border-box', border: 'none',
                     resize: 'none', fontFamily: 'inherit', fontSize: 15.5, color: CU.text,
                     padding: '12px 14px 4px', background: 'transparent', borderRadius: 10,
                   }}
@@ -2334,22 +2594,31 @@ export function TaskModal({
                   <button
                     type="button"
                     onClick={handleComment}
-                    disabled={isPending || (!cmtText.trim() && !draftFiles.length)}
-                    aria-label="Send comment"
-                    title="Send — ⌘Enter"
+                    disabled={posting || (!cmtText.trim() && !draftFiles.length)}
+                    aria-label={posting ? 'Posting comment…' : 'Send comment'}
+                    title={posting ? 'Posting…' : 'Send — ⌘Enter'}
                     style={{
                       width: 34, height: 30, borderRadius: 9, border: 'none',
-                      cursor: cmtText.trim() || draftFiles.length ? 'pointer' : 'default',
+                      cursor: !posting && (cmtText.trim() || draftFiles.length) ? 'pointer' : 'default',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      background: sendHover && (cmtText.trim() || draftFiles.length) && !isPending ? CU.blue : CU.blueLight,
-                      opacity: isPending || (!cmtText.trim() && !draftFiles.length) ? 0.55 : 1,
+                      background: sendHover && (cmtText.trim() || draftFiles.length) && !posting ? CU.blue : CU.blueLight,
+                      opacity: !posting && !cmtText.trim() && !draftFiles.length ? 0.55 : 1,
                       transition: 'background .12s',
                     }}
                     onMouseEnter={() => setSendHover(true)}
                     onMouseLeave={() => setSendHover(false)}
                   >
-                    <Icon name="send" size={15}
-                          color={sendHover && (cmtText.trim() || draftFiles.length) && !isPending ? '#fff' : CU.blue} width={2} />
+                    {/* While posting, the arrow becomes a spinner. */}
+                    {posting ? (
+                      <span aria-hidden="true" style={{
+                        width: 13, height: 13, borderRadius: '50%', boxSizing: 'border-box',
+                        border: `2px solid ${CU.blue}`, borderTopColor: 'transparent',
+                        animation: 'fx-spin .8s linear infinite',
+                      }} />
+                    ) : (
+                      <Icon name="send" size={15}
+                            color={sendHover && (cmtText.trim() || draftFiles.length) ? '#fff' : CU.blue} width={2} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -2365,16 +2634,30 @@ export function TaskModal({
 
 /* ── menu pieces ─────────────────────────────────────────────────────── */
 
-function MenuSplit({ label, onClick, divider }: { label: string; onClick: () => void; divider?: boolean }) {
+/** One cell of the menu's top strip. With `href` it is a real link (New tab),
+ *  so it also middle-clicks, Cmd-clicks and copies like one — drawn the same. */
+function MenuSplit({ label, onClick, divider, href }: {
+  label: string; onClick: () => void; divider?: boolean; href?: string
+}) {
+  const style: React.CSSProperties = {
+    height: 34, border: 'none', background: '#fff', cursor: 'pointer',
+    fontFamily: 'inherit', fontSize: 13.5, color: CU.text,
+    borderInlineStart: divider ? `1px solid ${CU.line}` : 'none',
+  }
+  const hover = {
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = CU.hover },
+    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => { e.currentTarget.style.background = '#fff' },
+  }
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener" onClick={onClick} {...hover}
+         style={{ ...style, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+        {label}
+      </a>
+    )
+  }
   return (
-    <button type="button" onClick={onClick}
-            style={{
-              height: 34, border: 'none', background: '#fff', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 13.5, color: CU.text,
-              borderInlineStart: divider ? `1px solid ${CU.line}` : 'none',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = CU.hover }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
+    <button type="button" onClick={onClick} style={style} {...hover}>
       {label}
     </button>
   )

@@ -13,11 +13,17 @@ export type UploadUnavailableReason = 'not-created' | 'no-permission' | 'no-stor
 export interface ImageUploadContext {
   upload?: (file: File) => Promise<UploadResult>
   unavailableReason: UploadUnavailableReason
+  /** A note the person sees (and hears: it goes to a live region). */
   note: (msg: string) => void
+  /** Said to screen readers only: the placeholder already shows it. */
+  announce: (msg: string) => void
   pendingChanged: (n: number) => void
   text: {
     uploading: (name: string) => string
+    /** `error` is the host's own, readable reason. */
     failed: (name: string, error: string) => string
+    /** The upload threw: the raw error goes to the console, not the person. */
+    failedUnknown: (name: string) => string
     notAnImage: string
     tooBig: (name: string, mb: number) => string
     skipped: (max: number) => string
@@ -73,7 +79,9 @@ export const ImageUpload = Extension.create<{ ctx: { current: ImageUploadContext
           continue
         }
         const id = `upl-${Date.now()}-${seq++}`
-        view.dispatch(view.state.tr.setMeta(key, { add: { id, pos, label: ctx.text.uploading(file.name) } } satisfies Meta))
+        const label = ctx.text.uploading(file.name)
+        view.dispatch(view.state.tr.setMeta(key, { add: { id, pos, label } } satisfies Meta))
+        ctx.announce(label)
         setPending(pending + 1)
         queue = queue.then(() => run(id, file))
       }
@@ -82,16 +90,24 @@ export const ImageUpload = Extension.create<{ ctx: { current: ImageUploadContext
 
     async function run(id: string, file: File) {
       const ctx = ctxRef?.current
-      let result: UploadResult
+      // null: no readable reason (the uploader went away, or it threw).
+      let result: UploadResult | null
       try {
-        result = ctx?.upload ? await ctx.upload(file) : { ok: false, error: 'no uploader' }
+        result = ctx?.upload ? await ctx.upload(file) : null
       } catch (e) {
-        result = { ok: false, error: String((e as Error)?.message ?? e).slice(0, 160) }
+        console.error('[brief] image upload failed', file.name, e)
+        result = null
       }
       setPending(Math.max(0, pending - 1))
       if (editor.isDestroyed) return
       const where = findPlaceholder(editor.state, id)
       editor.view.dispatch(editor.state.tr.setMeta(key, { remove: id } satisfies Meta))
+      if (!result) {
+        // The uploader can disappear mid-queue (permission or task changed):
+        // say why, as a paste would now; otherwise a plain retry hint.
+        if (ctx) ctx.note(ctx.upload ? ctx.text.failedUnknown(file.name) : ctx.text.unavailable(ctx.unavailableReason))
+        return
+      }
       if (!result.ok) { ctx?.note(ctx.text.failed(file.name, result.error)); return }
       const at = where ?? blockSlot(editor.state, editor.state.selection.from)
       insertImageBlock(editor, at, result.url, result.filename)
@@ -169,11 +185,12 @@ function findPlaceholder(state: EditorState, id: string): number | null {
   return found.length ? found[0].from : null
 }
 
+/** No aria-live here: a region created together with its text is often not
+ *  announced. The editor announces the upload through its own live region. */
 function placeholderDom(label: string): HTMLElement {
   const el = document.createElement('div')
   el.className = 'fx-upload'
   el.setAttribute('contenteditable', 'false')
-  el.setAttribute('aria-live', 'polite')
   el.setAttribute('data-upload-placeholder', '')
   const spin = document.createElement('i')
   spin.setAttribute('aria-hidden', 'true')
