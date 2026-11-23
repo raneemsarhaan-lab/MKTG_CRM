@@ -996,7 +996,9 @@ export function KanbanBoard({
     setShowUpstream(v)
     try { window.localStorage.setItem('momentum.board.upstream', v ? '1' : '0') } catch { /* private mode */ }
   }
-  const stagesInScope = showUpstream
+  // Spec 022: a media board's tasks start at Ready For Design, so it has no writing columns.
+  const mediaBoardView = hosted && !!spaceId && !!spaces.find(x => x.id === spaceId)?.media_board
+  const stagesInScope = showUpstream && !mediaBoardView
     ? ALL_STAGES
     : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
 
@@ -1334,7 +1336,7 @@ export function KanbanBoard({
             <KanbanColumn
               key={e.id}
               stage={STAGE_META[e.stage_id]}
-              spaceStage={{ id: e.id, name: e.name }}
+              spaceStage={{ id: e.id, name: e.name, named: e.named }}
               tasks={tasksByEntry[e.id] ?? []}
               currentUser={currentUser}
               members={members}

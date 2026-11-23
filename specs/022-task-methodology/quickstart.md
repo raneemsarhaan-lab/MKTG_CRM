@@ -11,7 +11,8 @@
 2. **Default assignee**: create a task in the Content Space → assigned to the Content Creator. Change the role in Settings › Spaces → only the next task follows.
 3. **C-Check per brand**: switch it off for a brand → the next task has 10 stages; a task already in C-Check still finishes it.
 4. **Automatic link, one board**: move a Reel to Ready For Design → the box shows Video with the Video Space's default editor; confirm → a linked media task on the Video board.
-5. **Automatic link, both boards**: a type set to Design + Video → two media tasks. Pass D-Check on Design only → the content task can't move to F-Check. Pass Video's → the content task is at F-Check.
+5. **Automatic link, both boards**: a type set to Design + Video → two media tasks. Pass D-Check on Design only → the content task stays at Video's stage. Move the content row to F-Check → the Video task moves there with it (its permissions apply), and the row is at F-Check.
+5a. **Linked rows** (user, 2026-11-23): the Link task cell shows each linked task's name (opens it) and board, with ⇄ and ×; Status follows the linked task; a linked row's status menu offers Ready For Design to F-Check only; unlink keeps Status and makes it editable.
 6. **Create task**: on the Design board → an unlinked media task at Ready For Design; its SLA counts from there.
 7. **Link task**: in the Content sheet, type in a row's Link task cell → the list shows the unlinked Design task from check 6 → pick it → linked. Create task with Both → two linked media tasks. On a Content calendar day, type a name → Link task → the content task is made with that publishing date and linked.
 8. **Unlink**: as the designer (anyone may) → both tasks stay, unlinked, and move separately.

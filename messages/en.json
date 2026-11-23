@@ -2837,7 +2837,7 @@
       "content": "Tasks created by the content team or assigned to it. They stay here after the hand-off.",
       "design": "Tasks handed to Design at Ready For Design, or assigned to a designer.",
       "video": "Tasks handed to Video at Ready For Design, or assigned to a video editor.",
-      "planning": "Simple tasks for planning, admin and events.",
+      "planning": "Tasks for planning, admin and events — on the same pipeline as every task.",
       "other": "Tasks added to this Space by assignment, hand-off or by hand."
     },
     "spaceTag": "Team Space",

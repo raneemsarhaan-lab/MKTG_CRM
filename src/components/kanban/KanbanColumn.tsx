@@ -39,7 +39,7 @@ interface KanbanColumnProps {
   /** Spec 021 (US5): a simple-status column, drawn dashed after the pipeline. */
   dashed?: boolean
   /** Spec 022 (US4): a Space stage column — its own drop id and name, the original stage underneath. */
-  spaceStage?: { id: string; name: string }
+  spaceStage?: { id: string; name: string; named?: boolean }
 }
 
 export function KanbanColumn({
@@ -119,7 +119,7 @@ export function KanbanColumn({
           marginTop: 4, fontSize: 11, fontWeight: 500, color: PIPE.placeholder,
           ...(spaceStage ? {} : { direction: 'rtl', textAlign: 'right' }),
         }}>
-          {spaceStage ? stage.label_en : stage.label_ar}
+          {spaceStage ? (spaceStage.named ? stage.label_en : '') : stage.label_ar}
         </div>
       </div>
 

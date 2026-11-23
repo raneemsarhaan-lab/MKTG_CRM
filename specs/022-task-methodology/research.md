@@ -44,9 +44,9 @@ Each item: **Decision**, **Rationale**, **Alternatives considered**.
 - **Decision**: `team_spaces.default_assignee_role`. Resolved when a task is created: the first member of the Space (by name) holding the role; none → the creator. The new-task form preselects that person and can be changed.
 - **Rationale**: user answer 1; the tie and none cases need a rule.
 
-## R10. Linking by hand before Ready For Design *(recommended default, user may change)*
-- **Decision**: the media task shows at once in its board's Ready For Design column; its SLA starts when the content task reaches Ready For Design (its `stage_date` is set then).
-- **Rationale**: designers can see what's coming without being timed for it.
+## R10. Linking by hand before Ready For Design *(changed by the user, 2026-11-23)*
+- **Decision (current)**: while a row is linked, its Status follows its linked tasks — the earliest stage among those that haven't passed D-Check, then F-Check once all have. Linking a content task that is still being written moves it to its linked task's stage at once. Changing a linked row's Status moves the linked tasks that haven't passed D-Check (their own permissions apply); moving it back before Ready For Design is refused until it is unlinked. Unlinking keeps Status and makes it editable again. A one-time sync (`once('content-follows-media-v1')`) applied this to rows already linked.
+- **Earlier default (superseded)**: the media task waited at Ready For Design and the content task wasn't pulled forward; its SLA started when the content task reached Ready For Design.
 
 ## R11. Linking after D-Check *(recommended default)*
 - **Decision**: Link task shows only on content rows that haven't reached F-Check.
