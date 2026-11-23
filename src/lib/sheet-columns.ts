@@ -206,7 +206,7 @@ export interface ValueCtx {
  * and lengths stay in Western digits", 010 "Number: Western digits"), so one
  * sheet never mixes digit styles.
  */
-export const sheetLocale = (lang: string) => `${intlLocale(lang)}-u-nu-latn`
+export const sheetLocale = (lang: string) => intlLocale(lang)
 export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long'
 export type Parsed = { ok: true; value: string } | { ok: false; code: ParseCode }
 

@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   if (!res.success) return new Response('Forbidden', { status: 403 })
   const locale = (await cookies()).get('fluxo-locale')?.value === 'ar' ? 'ar' : 'en'
   const t = await getTranslations({ locale, namespace: 'hours' })
-  const fmt = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const fmt = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
   const csv = toCsv(res, {
     member: t('report.member'), total: t('report.total'), capacity: t('report.capacity'), dayTotal: t('report.dayTotal'),
     off: t('off'), missing: t('missing'), dayHeading: d => fmt.format(new Date(`${d}T00:00:00Z`)),
