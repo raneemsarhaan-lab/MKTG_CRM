@@ -162,7 +162,7 @@ export async function runPure(bundle, root) {
     const vid = C.applyLayout('video', [], 'copy')
     eq(vid.filter(c => c.shown).map(c => c.key), ['title', 'type', 'status', 'editor', 'published', 'clipNo'], 'Copy set defaults (redesign order)')
     const sheet = C.applyLayout('video', [], 'sheet')
-    eq(sheet.filter(c => c.shown).map(c => c.key), ['title', 'type', 'status', 'editor', 'reviewer', 'due', 'inStage', 'files', 'doc', 'design', 'task', 'post', 'published', 'drop'], "the redesign's set")
+    eq(sheet.filter(c => c.shown).map(c => c.key), ['title', 'type', 'status', 'media', 'editor', 'reviewer', 'due', 'inStage', 'files', 'doc', 'design', 'task', 'post', 'published', 'drop'], "the redesign's set")
     const fx = h.columnFixtures()
     const laid = C.applyLayout('content', fx.records, 'all')
     eq(laid[0].key, 'title', 'Title first')

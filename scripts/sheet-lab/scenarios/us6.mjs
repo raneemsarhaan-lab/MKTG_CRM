@@ -7,7 +7,7 @@ const reveal = (t, row, col) => t.cell(row, col).evaluate(el => {
   const sc = el.closest('.fx-sheet-scroll'), r = el.getBoundingClientRect(), s = sc.getBoundingClientRect()
   sc.scrollLeft += r.left - s.left - s.width / 2
 })
-const DEFAULT = ['Clip', 'Type', 'Stage', 'Owner', 'Reviewer', 'Due', 'In stage', 'File', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Drop or restore']
+const DEFAULT = ['Clip', 'Type', 'Stage', 'Link task', 'Owner', 'Reviewer', 'Due', 'In stage', 'File', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Drop or restore']
 
 export const us6 = [
   {
