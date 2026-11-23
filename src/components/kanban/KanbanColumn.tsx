@@ -1,17 +1,24 @@
 'use client'
 
 import { useDroppable } from '@dnd-kit/core'
+import { useLocale } from 'next-intl'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, StageMeta, StageId } from '@/types/index'
-import { PIPE, PIPE_ACCENT } from '@/lib/pipeline-tokens'
+import { PIPE, PIPE_ACCENT, PIPE_ACCENT_INK } from '@/lib/pipeline-tokens'
 import { TaskCard } from './TaskCard'
 
 /**
  * Pipeline column — handoff §7 "Column shell".
  *
- * 244px wide, white on a 1px #ECECF1 border with a 3px accent along the top,
- * an uppercase title against a count chip, and the Arabic label right-aligned
- * underneath. "Add task" closes the column body.
+ * 244px wide, on a 1px #ECECF1 border: an uppercase title against a count
+ * chip. "Add task" closes the column body.
+ *
+ * The header is a section washed with the stage's colour at 14%, a dot in the
+ * colour itself and the titles in ink; the body below takes the same colour
+ * at 6%, so stages tell apart at a glance while the white cards stand off it.
+ * Where the colour has to be read (the count) or seen as a control (the
+ * select box), it's the darkened shade (PIPE_ACCENT_INK): the light accents
+ * on white fall well short of 4.5:1 (amber 2.2:1).
  */
 
 interface KanbanColumnProps {
@@ -38,6 +45,10 @@ export function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const active = isOver || Boolean(highlight)
   const accent = PIPE_ACCENT[stage.id] ?? PIPE.purpleStroke
+  const ink = PIPE_ACCENT_INK[stage.id] ?? PIPE.ink
+  // The title in the reader's language. Arabic takes no extra tracking: it
+  // would pull the joined letters apart.
+  const arabic = useLocale() === 'ar'
 
   const allSelected = tasks.length > 0 && tasks.every(t => selectedIds?.has(t.id))
 
@@ -53,9 +64,9 @@ export function KanbanColumn({
       aria-label={`${stage.label_en} column`}
       ref={setNodeRef}
       style={{
-        background: '#FFFFFF',
+        // 0F = 6% of the stage colour.
+        background: `${accent}0F`,
         border: `1px solid ${active ? accent : PIPE.border}`,
-        borderTop: `3px solid ${accent}`,
         borderRadius: 14,
         overflow: 'hidden',
         boxShadow: active ? `0 0 0 3px ${accent}22` : 'none',
@@ -65,14 +76,24 @@ export function KanbanColumn({
         minWidth: 0,
       }}
     >
-      <div style={{ padding: '14px 10px 10px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{
-            fontSize: 12.5, fontWeight: 800, letterSpacing: '0.04em',
-            color: PIPE.textPrimary, textTransform: 'uppercase',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {stage.label_en}
+      {/* The header: the stage's colour as a light wash, a dot in the colour
+          itself, and the titles in ink. The count and the select box carry
+          the colour too, in its darker shade where it has to be read. */}
+      <div style={{ padding: '12px 10px 10px', flexShrink: 0, background: `${accent}24`, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+            {/* Level with the first line when a long title wraps. */}
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: accent, flexShrink: 0, marginTop: 5 }} />
+            <div style={{
+              // 15px keeps "READY FOR DESIGN" on one line beside the select box
+              // and a two-digit count in 244px, with the tracking eased to suit.
+              // A longer name (the Arabic for C-Check) wraps rather than being
+              // cut off.
+              fontSize: 15, lineHeight: 1.25, fontWeight: 800, letterSpacing: arabic ? 0 : '0.01em',
+              color: PIPE.ink, textTransform: 'uppercase', overflowWrap: 'break-word', minWidth: 0,
+            }}>
+              {arabic ? stage.label_ar : stage.label_en}
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             {onSelectAll && tasks.length > 0 && (
@@ -86,8 +107,8 @@ export function KanbanColumn({
                 className="fx-focus"
                 style={{
                   width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
-                  border: `1.5px solid ${allSelected ? PIPE.purple : PIPE.borderInput}`,
-                  background: allSelected ? PIPE.purple : '#FFFFFF',
+                  border: `1.5px solid ${ink}`,
+                  background: allSelected ? ink : '#FFFFFF',
                   color: '#FFFFFF', fontSize: 11, fontWeight: 900, lineHeight: '15px',
                   padding: 0, fontFamily: 'inherit',
                 }}
@@ -96,20 +117,15 @@ export function KanbanColumn({
               </button>
             )}
             <div style={{
-              minWidth: 22, height: 22, borderRadius: 6, background: PIPE.surface,
-              fontSize: 11.5, fontWeight: 700, color: PIPE.textMuted,
+              minWidth: 22, height: 22, borderRadius: 6, background: '#FFFFFF',
+              border: `1.5px solid ${accent}`, boxSizing: 'border-box',
+              fontSize: 11.5, fontWeight: 700, color: ink,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: '0 5px',
             }}>
               {tasks.length}
             </div>
           </div>
-        </div>
-        <div style={{
-          marginTop: 4, fontSize: 11, fontWeight: 500, color: PIPE.placeholder,
-          direction: 'rtl', textAlign: 'right',
-        }}>
-          {stage.label_ar}
         </div>
       </div>
 
