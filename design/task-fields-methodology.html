@@ -1,0 +1,331 @@
+<title>Task Types and Fields</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one review document; each point pairs "today" with "proposed", then its decisions. Momentum's own tokens, as in task-methodology.html. */
+:root {
+  --ink: #1B1A13; --muted: #6A6D71; --line: #E1E1E0; --soft: #F7F7F5; --panel: #FFFFFF; --bg: #EFEFEC;
+  --lime: #C8F24E; --on-lime: #111111; --sel: #EEF8D3; --cyan: #3E7BEA; --violet: #8F6FE8; --coral: #D22040; --amber: #B26A00;
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --muted: #A9ACB0; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618; --sel: #2F3A17;
+  --cyan: #7EA6F2; --violet: #B9A3F5; --coral: #FF6B81; --amber: #F2B35A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --muted: #A9ACB0; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618; --sel: #2F3A17;
+  --cyan: #7EA6F2; --violet: #B9A3F5; --coral: #FF6B81; --amber: #F2B35A; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 24px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 900 }
+h2 { font-size: 21px; font-weight: 800 }
+h3 { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted) }
+p { margin: 0 }
+a { color: var(--cyan) }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 74ch; font-size: 15px; color: var(--muted) }
+.jump { display: flex; flex-wrap: wrap; gap: 8px }
+.jump a { text-decoration: none; color: var(--ink); font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.jump a:hover { background: var(--sel) }
+section.part { background: var(--panel); border-radius: 18px; padding: 24px; display: grid; gap: 16px; border: 1px solid var(--line); scroll-margin-top: 16px }
+.head { display: grid; gap: 6px }
+.tag { display: inline-flex; width: fit-content; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--muted) }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr) } }
+.col { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.col.proposed { border-color: var(--lime); background: var(--sel) }
+ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px }
+li { min-width: 0 }
+.decisions { display: grid; gap: 8px }
+.q { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft) }
+.q b { font-size: 13.5px }
+.q .opts { display: flex; flex-wrap: wrap; gap: 6px }
+.opt { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.opt.rec { border-color: var(--ink); font-weight: 700 }
+.opt.rec::after { content: " · recommended"; font-weight: 500; color: var(--muted) }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+table { width: 100%; border-collapse: collapse; font-size: 13px }
+th, td { text-align: start; padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: top }
+th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-top: none }
+.scroll { overflow-x: auto }
+.order { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px }
+.step { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 4px; background: var(--panel) }
+.step b { font-family: var(--display); font-size: 13.5px }
+.note { font-size: 12.5px; color: var(--muted); border-inline-start: 3px solid var(--lime); padding: 2px 0 2px 10px }
+code { font-size: 12px; background: var(--soft); padding: 1px 5px; border-radius: 5px }
+</style>
+
+<div class="wrap">
+  <header style="display:grid; gap:10px">
+    <span class="eyebrow">Methodology · for review before the plan</span>
+    <h1>Task Types and Fields</h1>
+    <p class="lede">How Momentum takes on ClickUp's task model: task types with their own custom fields, statuses, priorities, tags, owners and assignees, start and due dates, templates and recurring tasks. Each point sets out what ClickUp does, what Momentum has today, and the rule proposed for Momentum. The decisions at the end of each point need your answer before the plan is written.</p>
+    <nav class="jump" aria-label="Points">
+      <a href="#types">1 · Task types</a><a href="#fields">2 · Custom fields by type</a><a href="#statuses">3 · Statuses</a>
+      <a href="#priorities">4 · Priorities</a><a href="#tags">5 · Tags</a><a href="#people">6 · Owners and assignees</a>
+      <a href="#dates">7 · Start and due dates</a><a href="#templates">8 · Templates</a><a href="#recurring">9 · Recurring tasks</a><a href="#order">Build order</a>
+    </nav>
+    <p class="note">Ground rules kept from earlier decisions: every task runs the one pipeline (spec 022); Space stages rename or split it per Space; brand feature switches can hide a field for a brand; English and Arabic for everything new.</p>
+  </header>
+
+  <!-- 1 -->
+  <section class="part" id="types">
+    <div class="head"><span class="tag">Point 1 · the foundation the other points hang on</span><h2>Task types</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul>
+        <li>Each workspace has task types: Task, Milestone, and custom ones (Bug, Request, Deliverable…), each with a name and an icon.</li>
+        <li>Since ClickUp 4.0, a task type carries its own custom fields.</li>
+        <li>A task picks its type when created; changing type changes which fields show.</li>
+      </ul></div>
+      <div class="col"><h3>Momentum today</h3><ul>
+        <li>Content types: Post, Carousel, Story, Reel, Video… (a label only).</li>
+        <li>A type already decides two things: its SLA days per stage, and which media board it goes to at Ready For Design (Design, Video or both).</li>
+        <li>No icon, colour, fields or default people per type.</li>
+      </ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>Content types become <b>Task types</b>, managed in Settings by admins: name (English and Arabic), icon, colour.</li>
+        <li>Each type owns: its custom fields (point 2), its SLA, its media boards, its default priority and tags, and an optional default template (point 8).</li>
+        <li>A <b>Milestone</b> type: a single date and no SLA, for launches and campaign dates on the calendar.</li>
+        <li>Existing content types are kept as task types with their SLA and boards; nothing about current tasks changes.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D1. Should a type be able to skip the media stages?</b><span>A text-only LinkedIn post has no design. Today every type goes to a board at Ready For Design.</span>
+        <div class="opts"><span class="opt rec">Yes: a type with no media board goes from C-Check straight to F-Check</span><span class="opt">No: every type passes through Ready For Design</span></div></div>
+      <div class="q"><b>D2. Non-content work (events, admin, meetings)</b>
+        <div class="opts"><span class="opt rec">Task types like any other, on the full pipeline</span><span class="opt">A "General" type that skips the content and media stages</span></div></div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="part" id="fields">
+    <div class="head"><span class="tag">Point 2</span><h2>Custom fields, set by task type</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul>
+        <li>Fields are defined once (workspace or Space) and attached to task types and locations.</li>
+        <li>A value belongs to the task, so it shows in every list, board, table and filter the task appears in.</li>
+        <li>Kinds: text, number, money, date, dropdown, labels (multi), checkbox, people, rating, progress, email, phone, URL, relationship, formula.</li>
+      </ul></div>
+      <div class="col"><h3>Momentum today</h3><ul>
+        <li>Custom columns live on one sheet each: text, number, date, link, person, choice, checkbox, related task.</li>
+        <li>The value is the sheet's, not the task's: it doesn't show in the task panel, on cards, or in another Space's sheet.</li>
+      </ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>A <b>field library</b> in Settings: each field has a name (EN/AR), kind and options.</li>
+        <li>Fields are <b>attached to task types</b>, each marked required or optional, with an optional default.</li>
+        <li>The value belongs to the <b>task</b>: shown in the task panel, as columns in every sheet the task is in, in filters, sorts and group-by, and optionally on the card.</li>
+        <li>Kinds: today's eight, plus money, multi-choice and rating.</li>
+        <li>Sheet-only columns stay for a team's own notes; any of them can be turned into a task field, keeping its values.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D3. Who creates fields and attaches them to types?</b>
+        <div class="opts"><span class="opt rec">Admins and superusers</span><span class="opt">Admins only</span></div></div>
+      <div class="q"><b>D4. Required fields: what happens when one is empty?</b>
+        <div class="opts"><span class="opt rec">The task can't leave its current stage until it's filled, with a message naming the field</span><span class="opt">Only a warning on the card</span></div></div>
+      <div class="q"><b>D5. Existing sheet columns</b>
+        <div class="opts"><span class="opt rec">Stay as they are; "Make it a task field" when wanted</span><span class="opt">Convert them all now</span></div></div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="part" id="statuses">
+    <div class="head"><span class="tag">Point 3</span><h2>Custom statuses</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul>
+        <li>Each Space, Folder or List has its own statuses, grouped as Not started, Active, Done and Closed.</li>
+        <li>Statuses are free: any names, any order.</li>
+      </ul></div>
+      <div class="col"><h3>Momentum today</h3><ul>
+        <li>One pipeline of 11 stages with owners, approvals and SLA.</li>
+        <li>Each Space renames or splits stages for itself (Space stages, spec 022).</li>
+      </ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>The pipeline stays the only status machine; custom statuses stay <b>Space stages</b>.</li>
+        <li>New: a task type can skip the media stages (D1).</li>
+        <li>Each stage gets a ClickUp-style group for reports: To Do = Not started; the C and D stages and F-Check = Active; Ready to Publish and Scheduled = Done; Published = Closed.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D6. Free statuses outside the pipeline</b>
+        <div class="opts"><span class="opt rec">No: Space stages only, so SLA and approvals keep working</span><span class="opt">Yes, for chosen task types</span></div></div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="part" id="priorities">
+    <div class="head"><span class="tag">Point 4</span><h2>Priorities</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><div class="row">
+        <span class="pill"><span class="dot" style="background:var(--coral)"></span>Urgent</span><span class="pill"><span class="dot" style="background:var(--amber)"></span>High</span>
+        <span class="pill"><span class="dot" style="background:var(--cyan)"></span>Normal</span><span class="pill"><span class="dot" style="background:var(--muted)"></span>Low</span><span class="pill">No priority</span></div></div>
+      <div class="col"><h3>Momentum today</h3><ul><li>Low, Medium, High; new tasks are Medium. A brand can switch priorities off.</li></ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>Urgent, High, Normal, Low and No priority, as in ClickUp; Medium becomes Normal.</li>
+        <li>Urgent sorts first on every board and sheet, and tells the assignee at once (push).</li>
+        <li>The task type sets the default for new tasks.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D7. Priority names</b>
+        <div class="opts"><span class="opt rec">Urgent / High / Normal / Low / none</span><span class="opt">Keep Low / Medium / High and add Urgent</span></div></div>
+      <div class="q"><b>D8. Does Urgent shorten the SLA?</b>
+        <div class="opts"><span class="opt rec">No: it only sorts first and notifies</span><span class="opt">Yes: half the stage's SLA days</span></div></div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="part" id="tags">
+    <div class="head"><span class="tag">Point 5</span><h2>Tags</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul><li>Coloured tags per Space; many per task; anyone can create one while tagging.</li></ul></div>
+      <div class="col"><h3>Momentum today</h3><ul><li>No tags. Grouping comes from fields: brand, type, pillar, campaign (project) and theme.</li></ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>Workspace tags with a colour, many per task.</li>
+        <li>Shown on cards and in the task panel, as a column in sheets, and in filters and group-by.</li>
+        <li>Typing a new tag name offers to create it. Admins can rename, merge or delete tags in Settings.</li>
+        <li>A brand switch turns tags off for that brand.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D9. Who may create a new tag?</b>
+        <div class="opts"><span class="opt rec">Everyone, while tagging</span><span class="opt">Admins and superusers only</span></div></div>
+      <div class="q"><b>D10. Tag scope</b>
+        <div class="opts"><span class="opt rec">One list for the workspace</span><span class="opt">Each brand has its own list</span></div></div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="part" id="people">
+    <div class="head"><span class="tag">Point 6</span><h2>Owners and assignees</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul>
+        <li>Several assignees per task, all equal.</li>
+        <li>No built-in "owner": teams add a People field for it. Watchers follow updates.</li>
+      </ul></div>
+      <div class="col"><h3>Momentum today</h3><ul>
+        <li><b>Owner</b>: answerable for the task; approves at review stages.</li>
+        <li><b>Assignee</b>: one person doing the work; drives My tasks, the Inbox, SLA badges and Shows in.</li>
+        <li>Followers get updates. Each media board's task has its own assignee.</li>
+      </ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>Keep one <b>Owner</b>.</li>
+        <li>Allow <b>several assignees</b>. The first is the lead, who gets SLA alerts and whose Spaces the task joins. Everyone assigned sees the task in My tasks and is notified.</li>
+        <li>Workload splits the hour estimate across the assignees.</li>
+        <li>A People field (point 2) covers extra roles such as Copywriter or Approver.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D11. Several assignees</b>
+        <div class="opts"><span class="opt rec">Yes, with the first as lead</span><span class="opt">Yes, all equal (as ClickUp)</span><span class="opt">No: one assignee plus "Collaborators"</span></div></div>
+      <div class="q"><b>D12. Does every assignee bring their Spaces (Shows in)?</b>
+        <div class="opts"><span class="opt rec">Only the lead's</span><span class="opt">Every assignee's</span></div></div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="part" id="dates">
+    <div class="head"><span class="tag">Point 7</span><h2>Start and due dates</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul><li>Start date and due date, each with an optional time; the span drives the calendar, Gantt and workload.</li></ul></div>
+      <div class="col"><h3>Momentum today</h3><ul>
+        <li>Publishing date and due date. The due date is set by the rule, 7 working days before publishing (Settings › Due Dates), or by hand.</li>
+        <li>No start date or times.</li>
+      </ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>Add an optional <b>start date</b>; the start can't fall after the due date.</li>
+        <li>The calendar can show tasks as spans from start to due.</li>
+        <li>Workload spreads the hour estimate over the working days between start and due (on the Settings weekend).</li>
+        <li>Times stay off; dates are Cairo days, as now.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D13. A default start date</b>
+        <div class="opts"><span class="opt rec">Empty unless set (or set by a template)</span><span class="opt">The day the task is created</span><span class="opt">Due date minus the type's total SLA days</span></div></div>
+      <div class="q"><b>D14. Times on dates</b>
+        <div class="opts"><span class="opt rec">No, dates only</span><span class="opt">Optional time on the publishing date</span></div></div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="part" id="templates">
+    <div class="head"><span class="tag">Point 8</span><h2>Templates</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul><li>Task templates save the fields, description, subtasks, checklists, assignees and dates relative to when the task is used. There are also List and Space templates.</li></ul></div>
+      <div class="col"><h3>Momentum today</h3><ul><li>No templates. Plans come in by Paste plan, and projects have steps.</li></ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li><b>Task templates</b>, each for one task type, hold:
+          <ul>
+            <li>the name pattern ("{Brand} · Monthly recap · {Month}") and the brief;</li>
+            <li>field values, priority and tags;</li>
+            <li>the assignee by role;</li>
+            <li>subtasks with dates set relative to the publishing date (for example, start 10 days before).</li>
+          </ul></li>
+        <li>Used from "+ Task", the sheets, the calendar, and recurring tasks.</li>
+        <li>A task can be saved as a template.</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D15. Who manages templates?</b>
+        <div class="opts"><span class="opt rec">Admins and superusers; others use them</span><span class="opt">Everyone, plus personal templates</span></div></div>
+      <div class="q"><b>D16. Does editing a template change tasks already made from it?</b>
+        <div class="opts"><span class="opt rec">No, only new tasks</span><span class="opt">Yes, open tasks update</span></div></div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="part" id="recurring">
+    <div class="head"><span class="tag">Point 9</span><h2>Recurring tasks</h2></div>
+    <div class="cols">
+      <div class="col"><h3>ClickUp</h3><ul><li>A task repeats on a schedule (daily, weekly, monthly, custom) or when it's closed. ClickUp either creates a new copy or reopens the same task.</li></ul></div>
+      <div class="col"><h3>Momentum today</h3><ul><li>"Standing" projects with a target count per period (for example, 8 posts a month). Nothing is created automatically.</li></ul></div>
+      <div class="col proposed"><h3>Proposed</h3><ul>
+        <li>A <b>repeat rule</b> on a task or template:
+          <ul>
+            <li>every N days or weeks on chosen weekdays, or monthly on a day;</li>
+            <li>it runs from the publishing date;</li>
+            <li>it can end on a date or after a number of times.</li>
+          </ul></li>
+        <li>The next task is <b>created ahead</b> by a lead time (for example, 14 days before its publishing date). It copies the type, brand, fields, tags, assignees and template subtasks, starts at To Do, and gets its due date from the rule.</li>
+        <li>Recurring tasks are marked ↻, with "Stop repeating" and "Skip next".</li>
+      </ul></div>
+    </div>
+    <div class="decisions">
+      <div class="q"><b>D17. When the next one is created</b>
+        <div class="opts"><span class="opt rec">A lead time before its publishing date</span><span class="opt">When the current one is published</span></div></div>
+      <div class="q"><b>D18. Standing projects</b>
+        <div class="opts"><span class="opt rec">Keep their targets; a project can hold recurring tasks that count towards them</span><span class="opt">Replace targets with recurring tasks</span></div></div>
+    </div>
+  </section>
+
+  <!-- Order -->
+  <section class="part" id="order">
+    <div class="head"><span class="tag">Build order once the decisions are in</span><h2>How the plan would be staged</h2></div>
+    <div class="order">
+      <div class="step"><span class="eyebrow">Stage A</span><b>Task types and the field library</b><span>Points 1–3: types with icons, fields attached by type, values on the task everywhere, skip-media types, status groups.</span></div>
+      <div class="step"><span class="eyebrow">Stage B</span><b>Priorities, tags and people</b><span>Points 4–6: the new priority set, tags, several assignees with a lead.</span></div>
+      <div class="step"><span class="eyebrow">Stage C</span><b>Dates</b><span>Point 7: start dates, spans on the calendar, workload over the span.</span></div>
+      <div class="step"><span class="eyebrow">Stage D</span><b>Templates and recurring</b><span>Points 8–9: templates per type, repeat rules, creation ahead of time.</span></div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Changes existing data</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td>Content types → task types</td><td>Same rows, with icon and colour added; SLA and boards kept.</td></tr>
+          <tr><td>Medium → Normal</td><td>One-time rename (if D7 is accepted).</td></tr>
+          <tr><td>Assignee → assignees</td><td>Today's assignee becomes the lead; nothing else changes.</td></tr>
+          <tr><td>Sheet columns</td><td>Kept; turned into task fields only when someone chooses to.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Answer by decision number (for example "D1 yes, D11 all equal"), or reply "recommended" to take every recommended option. The plan, tasks and design come next.</p>
+  </section>
+</div>
