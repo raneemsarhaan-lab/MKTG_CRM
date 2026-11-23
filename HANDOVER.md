@@ -953,6 +953,21 @@ One-time data changes, all in `prisma/seed.ts` `once()`: `task-types-v1`,
 `content-fields-v1`, `priority-normal-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-023-*.cjs`,
 `scenarios-search.cjs`, `scenarios-mytasks.cjs` and the pure checks in `scripts/spaces-lab/pure.mjs`.
 
+### 7.z Content sheet rows (sheet 2b)
+
+Rows are their own records; a row may stand for one task. Rules: `design/sheets-methodology.html` §2b.
+
+| Rule | Where it lives |
+|---|---|
+| A theme is the sheet's entry for a project (`content_themes`: order, pillar order); removing it leaves the project (its `is_theme` flag is kept in step) | `src/actions/content-rows.ts` `addSheetTheme`, `reorderThemes`, `removeSheetTheme` |
+| Rows (`content_rows`): plain (title, date, custom values) or linked (`task_id`); one level of children; ordered by `position` | `src/lib/content-rows.ts` (pure), `src/components/content/rows.ts` |
+| Every task in a theme's project gets a linked row; a linked row follows its task to another theme or pillar. Runs before the board data loads | `syncContentSheet` in `src/lib/content-rows-server.ts` |
+| Moving a linked row moves its task's theme and pillar; deleting it unlinks (the task leaves the theme) or deletes both | `moveRow`, `deleteRow` |
+| Tab / Shift+Tab on a row's number; drag rows, themes and pillars by their number | `onRowKey` and `rowDrag` in `GridCore.tsx`, used by `ContentSheet.tsx` |
+| Paste plan on a theme, pillar or + Row line makes plain rows (`addPlan` with `target`) | `src/actions/content.ts`, `PlanPreview.tsx` |
+
+Tests: `scripts/spaces-lab/realapp/scenarios-2b.cjs`, `pure-content-rows`. Without rows (the sheet lab), the sheet shows every piece as a row in date order, as before.
+
 ---
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)

@@ -40,6 +40,8 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const t = seed('Sheet handoff lab', 'c-check', 'Content Creator', 'Content Creator', 'content')
         psql(`delete from task_spaces where task_id='${t}' and space_id<>'${spaceId('content')}'`)
+        // First in the sheet's due-date order, so it's on screen however many tasks earlier runs left behind.
+        psql(`update tasks set due_date='2001-01-01', due_manual=true where id='${t}'`)
         await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
         await typeInto(page, t, 'status', 'Ready For Design')
         ok(await page.$('[data-handoff]'), 'the hand-off box opens')

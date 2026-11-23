@@ -24,6 +24,7 @@ import { ContentSheet } from '@/components/content/ContentSheet'
 import type { ContentApi } from '@/components/content/types'
 import { setLinkedRowHeights } from '@/actions/sheets'
 import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
+import * as contentRows from '@/actions/content-rows'
 import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -117,6 +118,8 @@ interface KanbanBoardProps {
   taskSpaces?: TaskSpaceRow[]
   /** Spec 013: the linked sheets' saved row heights, by task id. */
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
+  /** Sheet 2b: the Content sheet's rows. */
+  contentRows?: import('@/lib/content-rows').ContentRowRec[]
   /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
   workspaceNineStage?: boolean
   /** The due-date rule (Settings › Due Dates). */
@@ -157,6 +160,7 @@ function KanbanBoardInner({
   surface = 'board',
   sheetsView = 'content',
   linkedRowHeights,
+  contentRows: contentRows_,
   scopeTasks,
   spaceId,
   sheetScope,
@@ -818,6 +822,23 @@ function KanbanBoardInner({
       }
       return res
     },
+    // ── sheet 2b: rows, themes and pillars (each refreshes the page's data) ──
+    ...(() => {
+      const fail = { success: false as const, error: 'generic' }
+      const run = <A extends unknown[], R extends { success: boolean }>(fn: (...a: A) => Promise<R>) => async (...a: A): Promise<R> => {
+        const res = await fn(...a).catch(() => fail as unknown as R)
+        if (res.success) router.refresh()
+        return res
+      }
+      return {
+        addRow: run(contentRows.addRow), updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
+        indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
+        linkRowTask: run(contentRows.linkRowTask), reorderThemes: run(contentRows.reorderThemes), removeSheetTheme: run(contentRows.removeSheetTheme),
+        addPillarAt: run(contentRows.addPillarAt), reorderPillars: run(contentRows.reorderPillars), removePillarTo: run(contentRows.removePillarTo),
+        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme(input)),
+        themeCandidates: () => contentRows.themeCandidates().catch(() => []),
+      }
+    })(),
     async removePillar(id) {
       const res = await removePillar(id).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) {
@@ -1217,6 +1238,7 @@ function KanbanBoardInner({
           contentTypes={types}
           columns={columnsBundle}
           rowHeights={linkedRowHeights?.content}
+          rows={contentRows_}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}

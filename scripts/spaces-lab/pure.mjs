@@ -465,4 +465,22 @@ check('pure-recurrence', () => {
   eq(R.recurrenceKey('r1', '2026-12-13'), 'r1:2026-12-13', 'once per occurrence')
 })
 
+// Sheet 2b: Content sheet rows.
+check('pure-content-rows', () => {
+  const C = m.contentRows
+  const r = (id, o = {}) => ({ id, project_id: 'th', pillar_id: null, parent_id: null, position: 1, title: id, date: null, values: {}, task_id: null, created_by: null, ...o })
+  const rows = [r('a', { position: 1 }), r('b', { position: 2 }), r('c', { position: 3 }), r('k', { parent_id: 'a', position: 1 })]
+  eq(C.positionFor(C.groupRows(rows, 'th', null), { id: 'b', where: 'above' }), 1.5, 'insert above: between')
+  eq(C.positionFor(C.groupRows(rows, 'th', null), { id: 'c', where: 'below' }), 4, 'insert below the last')
+  eq(C.positionFor(C.groupRows(rows, 'th', null), null), 4, 'end of the group')
+  eq(C.indentTarget(rows, rows[1])?.id, 'a', 'Tab: the row above')
+  eq(C.indentTarget(rows, rows[0]), null, 'the first row stays')
+  eq(C.indentTarget([...rows, r('kb', { parent_id: 'b' })], rows[1]), null, 'a parent can\'t become a child (one level)')
+  ok(!C.mayNest(rows, rows[1], rows[3]), 'no child of a child')
+  ok(!C.mayNest(rows, rows[0], rows[1]), 'a parent with children can\'t nest')
+  ok(C.mayNest(rows, rows[2], rows[1]), 'a lone row nests under another')
+  eq(C.reorder(['x', 'y', 'z'], 'z', 'x', 'before'), ['z', 'x', 'y'], 'sheet-only order')
+  eq(C.orderPillars([{ id: 'p1', sort_order: 0 }, { id: 'p2', sort_order: 1 }, { id: 'p3', sort_order: 2 }], ['p3']).map(p => p.id), ['p3', 'p1', 'p2'], 'the sheet\'s pillar order first')
+})
+
 if (failed) process.exitCode = 1

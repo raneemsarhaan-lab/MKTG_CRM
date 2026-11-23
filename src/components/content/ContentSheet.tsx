@@ -31,6 +31,10 @@ import { useMakeField } from '@/components/fields/useMakeField'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
+import type { ContentRowRec } from '@/lib/content-rows'
+import { mayNest } from '@/lib/content-rows'
+import { ThemeAdd, DestinationPick, DeleteRowPrompt, LinkTaskPick, destinations } from './RowDialogs'
+import type { ContentDraft } from './rows'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -39,8 +43,13 @@ type Popup =
   | { kind: 'archive'; anchor: HTMLElement; task: Task }
   | { kind: 'theme'; anchor: HTMLElement; theme: ContentTheme }
   | { kind: 'name'; anchor: HTMLElement; title: string; initial?: string; save(name: string): Promise<string | null> }
+  // Sheet 2b
+  | { kind: 'themeAdd'; anchor: HTMLElement; at?: { projectId: string; where: 'above' | 'below' } | null; candidates: { id: string; name: string }[] }
+  | { kind: 'dest'; anchor: HTMLElement; theme: ContentTheme; pillar?: ContentTheme['pillars'][number] | null; rows: number }
+  | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
+  | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
 
-const KNOWN_ERRORS = ['may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
@@ -92,7 +101,7 @@ export function ContentSheet(p: ContentSheetProps) {
   const [groupMode, setGroupMode] = useState('theme')
   const noneCollapsed = useMemo(() => new Set<string>(), [])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [drafts, setDrafts] = useState<{ key: string; themeId: string; pillarId: string | null }[]>([])
+  const [drafts, setDrafts] = useState<ContentDraft[]>([])
   const [editDraft, setEditDraft] = useState<string | null>(null)
   const [active, setActive] = useState<ActiveCell | null>(null)
   const now = useMemo(() => new Date(), [])
@@ -100,8 +109,13 @@ export function ContentSheet(p: ContentSheetProps) {
     set(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
-    mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query,
-  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query])
+    mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query, recs: p.rows,
+  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows])
+  /** Sheet 2b: rows live on the server when the host has them; otherwise every piece is a row. */
+  const rowsOn = !!p.rows && !!p.api.addRow
+  const recs = p.rows ?? []
+  const childCount = (id: string) => recs.filter(r => r.parent_id === id).length
+  const recOf = (row: ContentRow): ContentRowRec | null => (row.kind === 'line' ? row.rec : row.kind === 'piece' ? row.rec : null)
   const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesOf(p.tasks, th.id))), [p.tasks, p.themes])
 
   // ── permissions ─────────────────────────────────────────────────────────
@@ -158,13 +172,107 @@ export function ContentSheet(p: ContentSheetProps) {
   }, [])
   const cellEl = (rowKey: string, col: string) => document.querySelector<HTMLElement>(`[data-cell="${rowKey}|${col}"]`)
 
-  function addPiece(theme: ContentTheme, pillarId: string | null) {
-    if (!mayAdd(theme)) { say(t('err.may_not_add')); return }
+  function addPiece(theme: ContentTheme, pillarId: string | null, parentId: string | null = null, anchor: ContentDraft['anchor'] = null) {
+    // Sheet 2b: anyone may add a row; before rows, a piece followed the theme's rule.
+    if (!rowsOn && !mayAdd(theme)) { say(t('err.may_not_add')); return }
     const key = Math.random().toString(36).slice(2, 9)
     setCollapsed(c => { const n = new Set(c); n.delete(theme.id); return n })
-    setDrafts(d => [...d, { key, themeId: theme.id, pillarId }])
+    setDrafts(d => [...d, { key, themeId: theme.id, pillarId, parentId, anchor }])
     setEditDraft(key)
   }
+  /** Insert a row above or below another (as its sibling: a child row's sibling is a child too). */
+  function insertBeside(row: ContentRow, where: 'above' | 'below') {
+    const rec = recOf(row)
+    if (!rec || row.kind === 'clip' || row.kind === 'group') return false
+    const theme = (row as { theme: ContentTheme }).theme
+    addPiece(theme, rec.pillar_id, rec.parent_id, { id: rec.id, where })
+    return true
+  }
+  const canEditRec = (rec: ContentRowRec) => {
+    if (!rec.task_id) return true
+    const task = p.tasks.find(x => x.id === rec.task_id)
+    return !task || canEdit(task)
+  }
+
+  // ── sheet 2b: rows, themes and pillars ───────────────────────────────────
+  const ok = (r: { success: boolean; error?: string }, done?: string) => { if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return false } if (done) say(done); return true }
+  async function indent(rec: ContentRowRec, dir: 'in' | 'out') {
+    if (!p.api.indentRow) return
+    ok(await p.api.indentRow(rec.id, dir), dir === 'in' ? t('rows.indented') : t('rows.outdented'))
+  }
+  async function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
+    const candidates = (await p.api.themeCandidates?.()) ?? []
+    setPopup({ kind: 'themeAdd', anchor, at, candidates })
+  }
+  function askDelete(rec: ContentRowRec, name: string, anchor: HTMLElement) {
+    const children = childCount(rec.id)
+    if (!rec.task_id && !children) { void p.api.deleteRow?.(rec.id, {}).then(r => ok(r, t('rows.deleted'))); return }
+    setPopup({ kind: 'delRow', anchor, rec, name, linked: !!rec.task_id, children })
+  }
+  function rowItems(row: ContentRow, anchor: HTMLElement): MenuItem[] {
+    const rec = recOf(row)
+    if (!rowsOn || !rec) return []
+    const pick = (fn: () => void) => () => { closePopup(true); fn() }
+    const editable = canEditRec(rec)
+    const parent = rec.parent_id ? recs.find(r => r.id === rec.parent_id) : null
+    const items: MenuItem[] = [
+      { key: 'above', text: t('rows.insertAbove'), label: t('rows.insertAbove'), onSelect: pick(() => insertBeside(row, 'above')) },
+      { key: 'below', text: t('rows.insertBelow'), label: t('rows.insertBelow'), onSelect: pick(() => insertBeside(row, 'below')) },
+    ]
+    if (!rec.parent_id && editable) items.push({ key: 'child', text: t('rows.addChildItem'), label: t('rows.addChildItem'), onSelect: pick(() => addPiece((row as { theme: ContentTheme }).theme, rec.pillar_id, rec.id)) })
+    if (editable && !rec.parent_id && !childCount(rec.id)) items.push({ key: 'indent', text: t('rows.makeChild'), label: t('rows.makeChild'), onSelect: pick(() => void indent(rec, 'in')) })
+    if (editable && parent) items.push({ key: 'outdent', text: t('rows.moveOut'), label: t('rows.moveOut'), onSelect: pick(() => void indent(rec, 'out')) })
+    if (!rec.task_id) {
+      items.push({ key: 'task', text: t('rows.makeTask'), label: t('rows.makeTask'), onSelect: pick(() => void p.api.rowToTask?.(rec.id).then(r => ok(r, t('rows.taskMade')))) })
+      items.push({ key: 'link', text: t('rows.linkTask'), label: t('rows.linkTask'), onSelect: () => setPopup({ kind: 'linkTask', anchor, rec }) })
+    }
+    if (editable) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
+    return items
+  }
+  /** Tab makes a row a child of the row above; Shift+Tab moves it back out (on the row's number). */
+  function onRowKey(row: ContentRow, col: GridCol, e: React.KeyboardEvent): boolean {
+    if (e.key !== 'Tab' || col !== 'rowNo' || !rowsOn) return false
+    const rec = recOf(row)
+    if (!rec) return false
+    if (!canEditRec(rec)) { onNote(`${row.key}|rowNo`, t('readOnly')); return true }
+    void indent(rec, e.shiftKey ? 'out' : 'in')
+    return true
+  }
+  type Where = 'before' | 'after' | 'on'
+  const rowDrag = rowsOn ? {
+    can: (row: ContentRow) => {
+      if (row.kind === 'theme') return admin
+      if (row.kind === 'pillar') return mayEditTheme(row.theme)
+      const rec = recOf(row)
+      return !!rec && canEditRec(rec)
+    },
+    accepts: (from: ContentRow, to: ContentRow, where: Where) => {
+      if (from.kind === 'theme') return to.kind === 'theme' && where !== 'on'
+      if (from.kind === 'pillar') return to.kind === 'pillar' && to.theme.id === from.theme.id && where !== 'on'
+      const rec = recOf(from)
+      if (!rec) return false
+      if (to.kind === 'theme' || to.kind === 'pillar') return where === 'on'
+      if (to.kind === 'add') return where === 'before'
+      const target = recOf(to)
+      if (!target || target.id === rec.id) return false
+      if (where === 'on') return mayNest(recs, rec, target)
+      // Between rows: a parent can't land among children (one level).
+      return !(target.parent_id && childCount(rec.id))
+    },
+    drop: (from: ContentRow, to: ContentRow, where: Where) => {
+      if (from.kind === 'theme' && to.kind === 'theme') { void p.api.reorderThemes?.(from.theme.id, to.theme.id, where === 'before' ? 'before' : 'after').then(r => ok(r, t('themes.moved'))); return }
+      if (from.kind === 'pillar' && to.kind === 'pillar') { void p.api.reorderPillars?.(from.theme.id, from.pillar.id, to.pillar.id, where === 'before' ? 'before' : 'after').then(r => ok(r, t('pillar.moved'))); return }
+      const rec = recOf(from)
+      if (!rec || !p.api.moveRow) return
+      if (to.kind === 'theme') { void p.api.moveRow(rec.id, { projectId: to.theme.id, pillarId: null }).then(r => ok(r, t('rows.moved', { to: to.theme.name }))); return }
+      if (to.kind === 'pillar') { void p.api.moveRow(rec.id, { projectId: to.theme.id, pillarId: to.pillar.id }).then(r => ok(r, t('rows.moved', { to: to.pillar.name }))); return }
+      if (to.kind === 'add') { void p.api.moveRow(rec.id, { projectId: to.theme.id, pillarId: to.pillarId, parentId: to.parentId }).then(r => ok(r)); return }
+      const target = recOf(to)
+      if (!target) return
+      if (where === 'on') { void p.api.moveRow(rec.id, { projectId: target.project_id, parentId: target.id }).then(r => ok(r, t('rows.nested'))); return }
+      void p.api.moveRow(rec.id, { projectId: target.project_id, pillarId: target.pillar_id, parentId: target.parent_id, anchor: { id: target.id, where: where === 'before' ? 'above' : 'below' } }).then(r => ok(r))
+    },
+  } : undefined
 
   async function move(task: Task, to: StageId, anchor: HTMLElement, isClip: boolean) {
     const rowKey = anchor.closest('[data-row]')?.getAttribute('data-row') ?? ''
@@ -263,10 +371,15 @@ export function ContentSheet(p: ContentSheetProps) {
         items.push({ key: 'edit', text: t('theme.edit'), label: t('theme.edit'), onSelect: () => setPopup({ kind: 'theme', anchor, theme: th }) })
         items.push({ key: 'pillar', text: t('theme.addPillar'), label: t('theme.addPillar'), onSelect: () => setPopup({
           kind: 'name', anchor, title: t('pillar.newName'),
-          save: async name => { const r = await p.api.savePillar(th.id, { name }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
+          save: async name => { const r = rowsOn ? await p.api.addPillarAt!(th.id, name) : await p.api.savePillar(th.id, { name }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
         }) })
       }
-      if (mayAdd(th)) items.push({ key: 'piece', text: t('addPiece'), label: t('addPiece'), onSelect: pick(() => addPiece(th, null)) })
+      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? t('rows.add') : t('addPiece'), label: rowsOn ? t('rows.add') : t('addPiece'), onSelect: pick(() => addPiece(th, null)) })
+      if (rowsOn && admin) {
+        items.push({ key: 'thAbove', text: t('themes.insertAbove'), label: t('themes.insertAbove'), onSelect: () => void openThemeAdd(anchor, { projectId: th.id, where: 'above' }) })
+        items.push({ key: 'thBelow', text: t('themes.insertBelow'), label: t('themes.insertBelow'), onSelect: () => void openThemeAdd(anchor, { projectId: th.id, where: 'below' }) })
+        items.push({ key: 'thRemove', text: t('themes.remove'), label: t('themes.remove'), tone: 'danger', onSelect: () => setPopup({ kind: 'dest', anchor, theme: th, rows: recs.filter(r => r.project_id === th.id && !r.parent_id).length }) })
+      }
       items.push({ key: 'collapse', text: row.collapsed ? t('theme.expand') : t('theme.collapse'), label: row.collapsed ? t('theme.expand') : t('theme.collapse'),
         onSelect: pick(() => toggle(setCollapsed, th.id)) })
       return menu(t('theme.menu', { name: th.name }), items)
@@ -274,17 +387,41 @@ export function ContentSheet(p: ContentSheetProps) {
     if (row.kind === 'pillar') {
       const th = row.theme, pl = row.pillar
       const items: MenuItem[] = []
-      if (mayAdd(th)) items.push({ key: 'piece', text: t('addPiece'), label: t('addPiece'), onSelect: pick(() => addPiece(th, pl.id)) })
+      if (rowsOn || mayAdd(th)) items.push({ key: 'piece', text: rowsOn ? t('rows.add') : t('addPiece'), label: rowsOn ? t('rows.add') : t('addPiece'), onSelect: pick(() => addPiece(th, pl.id)) })
+      if (rowsOn && mayEditTheme(th)) {
+        for (const where of ['above', 'below'] as const) {
+          items.push({ key: `pl-${where}`, text: t(where === 'above' ? 'pillar.insertAbove' : 'pillar.insertBelow'), label: t(where === 'above' ? 'pillar.insertAbove' : 'pillar.insertBelow'), onSelect: () => setPopup({
+            kind: 'name', anchor, title: t('pillar.newName'),
+            save: async name => { const r = await p.api.addPillarAt!(th.id, name, { pillarId: pl.id, where }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
+          }) })
+        }
+      }
       if (mayEditTheme(th)) {
         items.push({ key: 'rename', text: t('pillar.rename'), label: t('pillar.rename'), onSelect: () => setPopup({
           kind: 'name', anchor, title: t('pillar.newName'), initial: pl.name,
           save: async name => { const r = await p.api.savePillar(th.id, { id: pl.id, name }); if (!r.success) return why(r.error); closePopup(true); say(t('pillar.saved')); return null },
         }) })
-        items.push({ key: 'remove', text: t('pillar.remove'), label: t('pillar.remove'), tone: 'danger', onSelect: pick(() => {
-          void p.api.removePillar(pl.id).then(r => say(r.success ? t('pillar.removed') : t('notSaved', { reason: why(r.error) })))
-        }) })
+        items.push(rowsOn
+          ? { key: 'remove', text: t('pillar.remove'), label: t('pillar.remove'), tone: 'danger', onSelect: () => setPopup({ kind: 'dest', anchor, theme: th, pillar: pl, rows: recs.filter(r => r.pillar_id === pl.id && !r.parent_id).length }) }
+          : { key: 'remove', text: t('pillar.remove'), label: t('pillar.remove'), tone: 'danger', onSelect: pick(() => {
+            void p.api.removePillar(pl.id).then(r => say(r.success ? t('pillar.removed') : t('notSaved', { reason: why(r.error) })))
+          }) })
       }
       return menu(t('pillar.menu', { name: pl.name }), items)
+    }
+    if (row.kind === 'line') {
+      const rec = row.rec
+      if (col === 'rowNo') return menu(t('rows.menu', { name: rec.title }), rowItems(row, anchor))
+      if (col === 'status') return menu(t('rows.noTask'), rowItems(row, anchor).filter(i => i.key === 'task' || i.key === 'link'))
+      if (col === 'pillar') {
+        if (!canEditRec(rec)) { onNote(`${row.key}|pillar`, t('readOnly')); return }
+        const choose = (id: string | null) => () => { closePopup(true); void p.api.moveRow?.(rec.id, { projectId: rec.project_id, pillarId: id }).then(r => ok(r)) }
+        return menu(t('col.pillar'), [
+          ...row.theme.pillars.map(pl => ({ key: pl.id, text: pl.name, label: pl.name, tone: pl.id === rec.pillar_id ? ('next' as const) : undefined, onSelect: choose(pl.id) })),
+          { key: '', text: t('pillar.none'), label: t('pillar.none'), tone: !rec.pillar_id ? ('next' as const) : undefined, onSelect: choose(null) },
+        ])
+      }
+      return
     }
     if (row.kind !== 'piece' && row.kind !== 'clip') return
     const task = row.task
@@ -302,6 +439,7 @@ export function ContentSheet(p: ContentSheetProps) {
         items.push({ key: 'task', text: t('archive.openTask'), label: t('archive.openTask'), onSelect: pick(() => p.onOpenTask(task.id)) })
         const videoId = isClip ? row.video.id : row.clips.length || task.content_type_label === 'Video' ? task.id : null
         if (videoId) items.push({ key: 'video', text: t('archive.openVideo'), label: t('archive.openVideo'), onSelect: pick(() => p.onOpenVideoSheet(videoId)) })
+        if (!isClip) items.push(...rowItems(row, anchor))
         return menu(t('archive.rowMenu', { name: task.name }), items)
       }
       case 'status': {
@@ -324,6 +462,8 @@ export function ContentSheet(p: ContentSheetProps) {
         if (!can) { onNote(`${row.key}|pillar`, t('readOnly')); return }
         const choose = (id: string | null) => () => {
           closePopup(true)
+          const rec = row.kind === 'piece' ? row.rec : null
+          if (rowsOn && rec) { void p.api.moveRow!(rec.id, { projectId: rec.project_id, pillarId: id }).then(r => ok(r)); return }
           void p.api.updatePiece(task.id, { pillar_id: id }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
         }
         return menu(t('col.pillar'), [
@@ -362,12 +502,33 @@ export function ContentSheet(p: ContentSheetProps) {
   async function onCommit(row: ContentRow, col: GridCol, value: string): Promise<string | null> {
     if (row.kind === 'draft') {
       const key = row.key.slice(2)
+      const draft = drafts.find(x => x.key === key)
       setDrafts(d => d.filter(x => x.key !== key))
       const title = value.trim()
       if (!title) return null
+      if (rowsOn) {
+        const r = await p.api.addRow!({ projectId: row.theme.id, pillarId: row.pillarId, parentId: row.parentId, title, anchor: draft?.anchor ?? null })
+        if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return why(r.error) }
+        // Enter adds the row and starts the next one, just below it.
+        if (r.row) addPiece(row.theme, row.pillarId, row.parentId, { id: r.row.id, where: 'below' })
+        return null
+      }
       const r = await p.api.addPiece(row.theme.id, { title, pillarId: row.pillarId })
       if (!r.success) { say(t('notSaved', { reason: why(r.error) })); return why(r.error) }
       say(t('newPiece.added'))
+      return null
+    }
+    if (row.kind === 'line') {
+      const rec = row.rec
+      if (!p.api.updateRow) return null
+      if (col === 'title') { if (!value.trim()) return t('err.generic'); const r = await p.api.updateRow(rec.id, { title: value }); return r.success ? null : why(r.error) }
+      if (col === 'date') {
+        const d = readDate(value)
+        if (d === null) return t('date.badDate')
+        const r = await p.api.updateRow(rec.id, { date: d || null })
+        return r.success ? null : why(r.error)
+      }
+      if (cl.custom.is(col)) { const r = await p.api.updateRow(rec.id, { values: { [String(col)]: value || null } }); return r.success ? null : why(r.error) }
       return null
     }
     if (row.kind !== 'piece' && row.kind !== 'clip') return null
@@ -406,6 +567,7 @@ export function ContentSheet(p: ContentSheetProps) {
    * the cells.
    */
   function pasteAsRows(grid: string[][], row: ContentRow | null, col: GridCol | null): boolean {
+    if (row?.kind === 'line') return false
     if (!row || (row.kind !== 'piece' && row.kind !== 'clip')) return true
     const flat = grid.flat().filter(Boolean)
     // One value into a link column: the link rules (attach it, or say it isn't a link).
@@ -413,7 +575,13 @@ export function ContentSheet(p: ContentSheetProps) {
   }
   const skipText = useSkipText()
   const onSkipped = (s: Partial<Record<string, number>>) => { const m = skipText(s); if (m) say(m) }
-  const [paste, setPaste] = useState<{ cells: PastedCell[][] | null } | null>(null)
+  const [paste, setPaste] = useState<{ cells: PastedCell[][] | null; target?: { theme: ContentTheme; pillarId: string | null } | null } | null>(null)
+  /** Sheet 2b: a paste on a theme, pillar or "+ Row" line adds plain rows there. */
+  const pasteTarget = (row: ContentRow | null) => !rowsOn || !row ? null
+    : row.kind === 'theme' ? { theme: row.theme, pillarId: null }
+    : row.kind === 'pillar' ? { theme: row.theme, pillarId: row.pillar.id }
+    : row.kind === 'add' || row.kind === 'draft' ? { theme: row.theme, pillarId: row.pillarId }
+    : null
   function onPaste(e: React.ClipboardEvent, row: ContentRow | null, col: GridCol | null) {
     const html = e.clipboardData.getData('text/html')
     const plain = e.clipboardData.getData('text/plain')
@@ -426,7 +594,7 @@ export function ContentSheet(p: ContentSheetProps) {
       void saveLink(row.task.id, col as LinkCol, single).then(err => { if (err) onNote(`${row.key}|${col}`, err) })
       return
     }
-    if (looksLikeRows(cells)) { e.preventDefault(); setPaste({ cells }) }
+    if (looksLikeRows(cells) || pasteTarget(row)) { e.preventDefault(); setPaste({ cells, target: pasteTarget(row) }) }
   }
 
   // ── render ──────────────────────────────────────────────────────────────
@@ -445,10 +613,13 @@ export function ContentSheet(p: ContentSheetProps) {
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showArchived} data-show-archived="" onClick={toggleArchived}>{t('showArchived')}</button>
         {admin && (
-          <button type="button" className="fx-sheet-btn" data-add-theme="" onClick={e => setPopup({
-            kind: 'name', anchor: e.currentTarget, title: t('theme.newName'),
-            save: async name => { const r = await p.api.addTheme(name); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null },
-          })}>{t('addTheme')}</button>
+          <button type="button" className="fx-sheet-btn" data-add-theme="" onClick={e => {
+            if (rowsOn) { void openThemeAdd(e.currentTarget); return }
+            setPopup({
+              kind: 'name', anchor: e.currentTarget, title: t('theme.newName'),
+              save: async name => { const r = await p.api.addTheme(name); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null },
+            })
+          }}>{t('addTheme')}</button>
         )}
         <button type="button" className="fx-sheet-btn is-primary" data-paste-plan="" onClick={() => setPaste({ cells: null })}>{t('pastePlan')}</button>
       </div>
@@ -487,7 +658,14 @@ export function ContentSheet(p: ContentSheetProps) {
               onToggleTheme={id => toggle(setCollapsed, id)}
               onToggleVideo={id => toggle(setExpanded, id)}
               onAddPiece={addPiece}
-              onDelete={(row, anchor) => { if (row.kind === 'piece' && canEdit(row.task)) { if (row.task.dropped_at) void restore(row.task); else setPopup({ kind: 'archive', anchor, task: row.task }) } }}
+              onAddRow={row => addPiece(row.theme, row.pillarId, row.parentId)}
+              canEditLine={canEditRec}
+              onRowKey={onRowKey}
+              rowDrag={rowDrag}
+              onDelete={(row, anchor) => {
+                if (row.kind === 'line') { if (canEditRec(row.rec)) askDelete(row.rec, row.rec.title, anchor); return }
+                if (row.kind === 'piece' && canEdit(row.task)) { if (row.task.dropped_at) void restore(row.task); else setPopup({ kind: 'archive', anchor, task: row.task }) }
+              }}
               onPaste={onPaste}
               pasteAsRows={pasteAsRows}
               onSkipped={onSkipped}
@@ -496,9 +674,12 @@ export function ContentSheet(p: ContentSheetProps) {
                 drop: id => p.api.drop(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
                 restore: id => p.api.restore(id).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })); return r.success }),
                 insertRow: row => {
+                  if (rowsOn && (row.kind === 'piece' || row.kind === 'line') && insertBeside(row, 'below')) return true
                   if (row.kind === 'pillar') addPiece(row.theme, row.pillar.id)
                   else if (row.kind === 'piece') addPiece(row.theme, row.task.pillar_id ?? null)
-                  else if (row.kind === 'draft') addPiece(row.theme, row.pillarId)
+                  else if (row.kind === 'draft') addPiece(row.theme, row.pillarId, row.parentId)
+                  else if (row.kind === 'add') addPiece(row.theme, row.pillarId, row.parentId)
+                  else if (row.kind === 'line') addPiece(row.theme, row.rec.pillar_id, row.rec.parent_id)
                   else if (row.kind === 'group') return false
                   else addPiece(row.theme, null)
                   return true
@@ -576,11 +757,48 @@ export function ContentSheet(p: ContentSheetProps) {
         </SheetPopover>
       )}
 
+      {popup?.kind === 'themeAdd' && (
+        <SheetPopover anchor={popup.anchor} label={t('themes.addTitle')} onClose={closePopup}>
+          <ThemeAdd candidates={popup.candidates} members={p.members} onCancel={() => closePopup(true)}
+            onPick={async projectId => { const r = await p.api.addSheetTheme!({ projectId, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }}
+            onCreate={async patch => { const r = await p.api.addSheetTheme!({ newProject: { ...patch, name: patch.name ?? '' }, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }} />
+        </SheetPopover>
+      )}
+      {popup?.kind === 'dest' && (
+        <SheetPopover anchor={popup.anchor} label={popup.pillar ? t('pillar.remove') : t('themes.remove')} onClose={closePopup}>
+          <DestinationPick
+            title={popup.pillar ? t('rows.removePillar', { name: popup.pillar.name }) : t('rows.removeTheme', { name: popup.theme.name })}
+            rows={popup.rows}
+            options={destinations(p.themes, { themeId: popup.theme.id, pillarId: popup.pillar?.id ?? null }, (k, v) => t(k as 'rows.noPillarIn', v))}
+            onCancel={() => closePopup(true)}
+            onConfirm={async d => {
+              const dest = d ? { projectId: d.projectId, pillarId: d.pillarId } : null
+              const r = popup.pillar ? await p.api.removePillarTo!(popup.pillar.id, dest) : await p.api.removeSheetTheme!(popup.theme.id, dest)
+              if (!r.success) return why(r.error)
+              closePopup(true); say(popup.pillar ? t('pillar.removed') : t('themes.removed'))
+              return null
+            }} />
+        </SheetPopover>
+      )}
+      {popup?.kind === 'delRow' && (
+        <SheetPopover anchor={popup.anchor} label={t('rows.delete')} onClose={closePopup}>
+          <DeleteRowPrompt name={popup.name} linked={popup.linked} children={popup.children} onCancel={() => closePopup(true)}
+            onConfirm={async o => { const r = await p.api.deleteRow!(popup.rec.id, o); if (!r.success) return why(r.error); closePopup(true); say(t('rows.deleted')); return null }} />
+        </SheetPopover>
+      )}
+      {popup?.kind === 'linkTask' && (
+        <SheetPopover anchor={popup.anchor} label={t('rows.linkTask')} onClose={closePopup}>
+          <LinkTaskPick tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} onCancel={() => closePopup(true)}
+            onPick={async id => { const r = await p.api.linkRowTask!(popup.rec.id, id); if (!r.success) return why(r.error); closePopup(true); say(t('rows.linked')); return null }} />
+        </SheetPopover>
+      )}
+
       {paste && (
         <PlanPreview
           ctx={ctx}
           columns={{ targets: cl.pasteNames, values: cl.pasteColumns, addColumn: cl.addTextColumn }}
-          onAdd={(r, o) => p.api.addPlan(r, o)}
+          onAdd={(r, o) => p.api.addPlan(r, paste.target ? { ...o, target: { projectId: paste.target.theme.id, pillarId: paste.target.pillarId } } : o)}
+          target={paste.target ? { themeName: paste.target.theme.name, pillarName: paste.target.theme.pillars.find(x => x.id === paste.target!.pillarId)?.name ?? null, lines: recs.filter(r => !r.task_id) } : null}
           onClose={msg => {
             setPaste(null)
             if (msg) say(msg)

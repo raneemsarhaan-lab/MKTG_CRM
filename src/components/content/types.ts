@@ -4,13 +4,14 @@
  * supplies stubs with the same shape.
  */
 import type { BoardView, ContentTheme, LinkRole, Member, Task } from '@/types/index'
+import type { ContentRowRec } from '@/lib/content-rows'
 import type { SheetApi, Result, ColumnsBundle } from '@/components/sheet/types'
 import type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch } from '@/actions/content'
 
 export type { PlanRowInput, AddPlanResult, PiecePatch, ThemePatch }
 
 export interface ContentApi extends SheetApi {
-  addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean }): Promise<AddPlanResult>
+  addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean; target?: { projectId: string; pillarId?: string | null } | null }): Promise<AddPlanResult>
   addPiece(themeId: string, input: { title: string; pillarId?: string | null }): Promise<Result & { id?: string }>
   updatePiece(taskId: string, patch: PiecePatch): Promise<Result>
   setPieceLink(taskId: string, role: LinkRole, url: string): Promise<Result>
@@ -18,6 +19,21 @@ export interface ContentApi extends SheetApi {
   saveTheme(id: string, patch: ThemePatch): Promise<Result>
   savePillar(themeId: string, input: { id?: string; name: string }): Promise<Result & { id?: string }>
   removePillar(id: string): Promise<Result>
+  // ── Sheet 2b: rows, themes and pillars (optional: a host without them shows every piece as a row) ──
+  addRow?(input: { projectId: string; pillarId?: string | null; parentId?: string | null; title: string; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result & { row?: ContentRowRec }>
+  updateRow?(id: string, patch: { title?: string; date?: string | null; values?: Record<string, string | null> }): Promise<Result>
+  moveRow?(id: string, to: { projectId: string; pillarId?: string | null; parentId?: string | null; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result>
+  indentRow?(id: string, dir: 'in' | 'out'): Promise<Result>
+  deleteRow?(id: string, opts: { task?: 'unlink' | 'delete'; children?: 'up' | 'delete' }): Promise<Result>
+  rowToTask?(id: string): Promise<Result & { taskId?: string }>
+  linkRowTask?(id: string, taskId: string): Promise<Result>
+  addSheetTheme?(input: { projectId?: string; newProject?: ThemePatch & { name: string }; anchor?: { projectId: string; where: 'above' | 'below' } | null }): Promise<Result & { projectId?: string }>
+  reorderThemes?(projectId: string, target: string, where: 'before' | 'after'): Promise<Result>
+  removeSheetTheme?(projectId: string, dest: { projectId: string; pillarId?: string | null } | null): Promise<Result>
+  addPillarAt?(projectId: string, name: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null): Promise<Result & { id?: string }>
+  reorderPillars?(projectId: string, pillarId: string, target: string, where: 'before' | 'after'): Promise<Result>
+  removePillarTo?(pillarId: string, dest: { projectId: string; pillarId?: string | null } | null): Promise<Result>
+  themeCandidates?(): Promise<{ id: string; name: string }[]>
 }
 
 export interface ContentSheetProps {
@@ -39,4 +55,6 @@ export interface ContentSheetProps {
   columns: ColumnsBundle
   /** Spec 013: saved row heights by task id. */
   rowHeights?: Record<string, number>
+  /** Sheet 2b: the sheet's rows. Without them, every piece is a row in date order. */
+  rows?: ContentRowRec[]
 }

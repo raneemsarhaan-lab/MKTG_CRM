@@ -6,10 +6,11 @@
  * Server-only: it reads the database directly.
  */
 import { setWorkWeekend } from '@/lib/utils'
+import { syncContentSheet } from '@/lib/content-rows-server'
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
-import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone, mapTemplate } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone, mapTemplate, mapContentRow } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
@@ -21,7 +22,9 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones, tags, templates] = await Promise.all([
+  // Sheet 2b: every theme's pieces have rows, and linked rows follow their tasks.
+  await syncContentSheet().catch(e => console.error('[content] sync failed', e))
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones, tags, templates, contentRows] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -69,13 +72,15 @@ export async function loadBoardData(member: SessionMember) {
     prisma.brand.findMany({ orderBy: { name: 'asc' } }),
     prisma.contentType.findMany({ orderBy: { label: 'asc' } }),
     prisma.slaConfig.findMany(),
-    // The Content sheet's themes (spec 009): flagged projects, with their pillars.
-    prisma.project.findMany({
-      where: { is_theme: true },
-      orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+    // The Content sheet's themes (sheet 2b): the sheet's own list, in its order, each pointing at its project.
+    prisma.contentSheetTheme.findMany({
+      orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
       select: {
-        id: true, name: true, brand_id: true, owner_id: true, frequency_count: true, frequency_period: true, audience: true,
-        pillars: { select: { id: true, name: true, sort_order: true } },
+        id: true, position: true, pillar_order: true,
+        project: { select: {
+          id: true, name: true, brand_id: true, owner_id: true, frequency_count: true, frequency_period: true, audience: true,
+          pillars: { select: { id: true, name: true, sort_order: true } },
+        } },
       },
     }),
     // The Inbox (spec 006): this member's read mentions, live put-offs and prefs.
@@ -110,6 +115,8 @@ export async function loadBoardData(member: SessionMember) {
     prisma.tag.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true } }),
     // Spec 023 (US7): task templates, for + Task › From template.
     prisma.taskTemplate.findMany({ orderBy: [{ type_label: 'asc' }, { name: 'asc' }] }),
+    // Sheet 2b: the Content sheet's rows.
+    prisma.contentRow.findMany({ orderBy: [{ position: 'asc' }] }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -147,7 +154,8 @@ export async function loadBoardData(member: SessionMember) {
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),
-    themes: themes.map(mapTheme),
+    themes: themes.map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order })),
+    contentRows: contentRows.map(mapContentRow),
     hasStorage: storageConfigured(),
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,

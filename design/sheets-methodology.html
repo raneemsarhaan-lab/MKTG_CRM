@@ -64,6 +64,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
   <nav class="toc" aria-label="Contents">
     <a href="#where">1 · Where they open</a>
     <a href="#rows">2 · Rows</a>
+    <a href="#adding">2b · Adding and moving</a>
     <a href="#columns">3 · Columns</a>
     <a href="#status">4 · Status and stages</a>
     <a href="#editing">5 · Editing rules</a>
@@ -95,12 +96,13 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
         <div class="box">
           <h3 class="c">Content sheet</h3>
           <ul>
-            <li><b>Theme</b> row: the campaign, with its owner, frequency and audience.</li>
-            <li><b>Pillar</b> rows under it, each with its <b>pieces</b>; pieces without a pillar follow; then <b>+ Piece</b>.</li>
-            <li>A piece is a task in that theme, ordered by publishing date, then due date. A Video piece opens to show its clips.</li>
-            <li>New pieces start at To Do. The theme's owner owns it; whoever added it (if not the owner or an admin) is its assignee.</li>
-            <li><b>Paste plan</b>: paste rows from the Content Library; a preview sorts them into New, Matched by Task Link, Already in the sheet, and Problems. Pasting the same rows again adds nothing.</li>
-            <li><b>Archive</b> hides a piece from the board and greys it here; Restore brings it back to its stage.</li>
+            <li><b>Theme</b> row: a project shown on the sheet, with its owner, frequency and audience. The theme is the sheet's entry; the project stays when the theme is removed.</li>
+            <li><b>Pillar</b> rows under it, each with its rows and its own <b>+ Row</b>; rows without a pillar follow, then the theme's <b>+ Row</b>.</li>
+            <li>A <b>row</b> is a line of the plan. A <b>plain row</b> has a title, a date and custom values; a <b>linked row</b> stands for one task and shows its fields. A linked Video row opens to show its clips.</li>
+            <li><b>Child rows</b>: one level under a row, then <b>+ Child row</b>.</li>
+            <li><b>Create task</b> turns a plain row into a task at To Do (the theme's owner owns it; whoever made it, if not the owner or an admin, is its assignee). <b>Link a task</b> links an existing one.</li>
+            <li><b>Paste plan</b>: on a theme, pillar or + Row line it adds plain rows there; from the toolbar it reads the Content Library and sorts rows into New, Matched by Task Link, Already in the sheet and Problems. Pasting the same rows again adds nothing.</li>
+            <li><b>Archive</b> hides a linked row's task from the board and greys it here; Restore brings it back to its stage.</li>
           </ul>
         </div>
         <div class="box">
@@ -112,6 +114,30 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
             <li>A new clip is a Reel at To Do, owned by whoever adds it. <b>+ Video</b> is for admins and superusers.</li>
             <li><b>File</b>: upload (up to 200 MB with storage), paste a link, preview, or remove with Undo.</li>
             <li><b>Drop</b> works like Archive.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="part" id="adding">
+      <h2>2b · Adding, moving and removing</h2>
+      <div class="cols">
+        <div class="box">
+          <h3 class="c">Adding</h3>
+          <ul>
+            <li><b>Theme</b>: "+ Theme" at the top, or Insert theme above / below in a theme's menu. Pick an existing project or make a new one (name, owner, frequency, audience); the theme takes the project's name and opens with an empty + Row. Admins and superusers.</li>
+            <li><b>Pillar</b>: "+ Pillar" in a theme's menu, or Insert pillar above / below in a pillar's menu. A name only; it's added to the theme's project. Admins, superusers and the theme's owner.</li>
+            <li><b>Row</b>: + Row at the end of each theme or pillar; type, and Enter adds it and starts the next. Insert row above / below in a row's menu. Paste plan on a theme, pillar or + Row adds plain rows. Anyone with access to the Space.</li>
+            <li><b>Child row</b>: Add child row in a row's menu, then + Child row. Tab on a row's number makes it a child of the row above; Shift+Tab moves it back out. One level only. Anyone who can edit the parent.</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h3 class="c">Moving and removing</h3>
+          <ul>
+            <li>Drag a row by its number onto a theme or pillar to move it there; a linked row's task changes its theme or pillar to match. Dropped on another row (not between rows), it becomes that row's child.</li>
+            <li>Themes and pillars are reordered by dragging their rows. This changes the sheet only, not the projects.</li>
+            <li>Removing a theme or pillar asks where its rows go: another theme or pillar, or No pillar under the same theme. Rows are never deleted with their group. A removed theme leaves this sheet only; the project stays.</li>
+            <li>Deleting a linked row asks: unlink (the task stays in its Space, out of the theme) or delete both. Deleting a parent asks whether its children move up a level or are deleted with it.</li>
           </ul>
         </div>
       </div>

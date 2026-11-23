@@ -156,6 +156,9 @@ model Project {
   steps   ProjectStep[]
   tasks   Task[]
   pillars ContentPillar[]
+  /// Sheet 2b: the Content sheet's entry for this project, when it is a theme there.
+  sheet_theme  ContentSheetTheme?
+  content_rows ContentRow[]
 
   @@map("projects")
 }
@@ -411,6 +414,8 @@ model Task {
   assignees          TaskAssignee[]
 
   /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
+  /// Sheet 2b: the Content sheet row that stands for this task.
+  content_row          ContentRow?
   @@unique([content_task_id, media_board])
   @@map("tasks")
 }
@@ -436,6 +441,7 @@ model ContentPillar {
 
   project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
   tasks   Task[]
+  rows    ContentRow[]
 
   @@index([project_id])
   @@map("content_pillars")
@@ -1425,4 +1431,51 @@ model RepeatRule {
 
   @@index([stopped_at])
   @@map("repeat_rules")
+}
+
+/// Sheet 2b: a theme on the Content sheet. It points at a project (name, owner,
+/// frequency, audience, pillars) but is not the project: removing it removes it
+/// from the sheet only. Its order and its pillars' order are the sheet's own.
+model ContentSheetTheme {
+  id           String   @id @default(uuid()) @db.Uuid
+  project_id   String   @unique @db.Uuid
+  position     Float    @default(0)
+  /// Pillar ids in the sheet's order; pillars not listed follow by their own order.
+  pillar_order String[] @default([]) @db.Uuid
+  created_by   String?  @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([position])
+  @@map("content_themes")
+}
+
+/// Sheet 2b: a Content sheet row. A plain row is a line of the plan (title,
+/// date, custom values); a linked row stands for one task, whose fields the
+/// sheet shows. One level of child rows.
+model ContentRow {
+  id         String    @id @default(uuid()) @db.Uuid
+  /// The theme's project.
+  project_id String    @db.Uuid
+  pillar_id  String?   @db.Uuid
+  parent_id  String?   @db.Uuid
+  position   Float     @default(0)
+  title      String    @default("")
+  date       DateTime? @db.Date
+  /// A plain row's custom column values by column id.
+  values     Json      @default("{}")
+  task_id    String?   @unique @db.Uuid
+  created_by String?   @db.Uuid
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  project  Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  pillar   ContentPillar? @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
+  parent   ContentRow?    @relation("ContentRowChildren", fields: [parent_id], references: [id], onDelete: SetNull)
+  children ContentRow[]   @relation("ContentRowChildren")
+  task     Task?          @relation(fields: [task_id], references: [id], onDelete: SetNull)
+
+  @@index([project_id, position])
+  @@map("content_rows")
 }

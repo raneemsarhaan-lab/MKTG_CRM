@@ -90,7 +90,10 @@ module.exports = (EMAIL, psql, ok) => {
         ok(await page.$(`[data-cal-undated] [data-undated-task="${t}"]`), 'an undated task is in the No date panel')
         ok(!(await page.$(`[data-cal-undated] [data-undated-task="${d}"]`)), 'finished undated tasks are hidden by default')
         const today = new Date()
-        await page.dragAndDrop(`[data-undated-task="${t}"] [data-cal-task]`, `[data-day="${iso(today)}"]`)
+        // Only this task in the panel, so the list can't shift under the pointer (lab runs leave undated tasks behind).
+        await page.fill('[data-cal-find]', psql(`select name from tasks where id='${t}'`))
+        await page.waitForTimeout(300)
+        await page.dragAndDrop(`[data-undated-task="${t}"] [data-cal-task]`, `[data-day="${iso(today)}"]`, { targetPosition: { x: 30, y: 12 } })
         await page.waitForTimeout(1500)
         ok(psql(`select due_date::text from tasks where id='${t}'`) === iso(today), 'dragging from the panel onto a day sets the date')
         await go('/spaces/content?view=calendar')

@@ -191,6 +191,8 @@ export interface PlanContext {
   me: Pick<Member, 'id' | 'access'>
   /** The sheet's custom columns, to check pasted values (spec 010). */
   columns?: PasteValueColumn[]
+  /** Sheet 2b: the paste adds plain rows (anyone may); these plain rows are already in the sheet. */
+  plain?: { lines: { project_id: string; title: string }[] }
 }
 export type Classified = PlanRow & {
   kind: 'fresh' | 'linked' | 'existing' | 'problem'
@@ -240,7 +242,7 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
     const ownerId = memberByName(r.owner, ctx.members)
     if (r.owner && !ownerId) problems.push({ code: 'unknownOwner', name: r.owner })
     if (themeIsNew && !admin) problems.push({ code: 'newThemeAdmin', name: r.theme })
-    else if (theme && !mayAddTo(theme, ctx)) problems.push({ code: 'mayNotAdd', theme: theme.name })
+    else if (theme && !ctx.plain && !mayAddTo(theme, ctx)) problems.push({ code: 'mayNotAdd', theme: theme.name })
     let kind: Classified['kind'] = 'fresh'
     let otherTheme: string | null = null
     if (r.taskId) {
@@ -253,7 +255,7 @@ export function classifyPlan(rows: PlanRow[], ctx: PlanContext): Classified[] {
         }
       }
     } else if (theme) {
-      const titles = new Set(ctx.tasks.filter(t => t.project_id === theme.id).map(t => norm(t.name)))
+      const titles = new Set([...ctx.tasks.filter(t => t.project_id === theme.id).map(t => norm(t.name)), ...(ctx.plain?.lines ?? []).filter(l => l.project_id === theme.id).map(l => norm(l.title))])
       if (titles.has(norm(r.title))) kind = 'existing'
     }
     const key = norm(r.theme)

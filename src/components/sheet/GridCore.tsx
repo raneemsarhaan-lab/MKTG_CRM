@@ -81,6 +81,14 @@ export interface GridModel<R extends { key: string }> {
   /** Columns a row actually has; null = every column. A two-entry list spans its last cell. */
   colsOf?(row: R): GridCol[] | null
   rowProps(row: R, index: number): { className: string; level: number; expanded?: boolean; taskId?: string }
+  /** Sheet 2b: a key on a cell (not editing), before the grid's own keys; true = handled (e.g. Tab indents a row). */
+  onRowKey?(row: R, col: GridCol, e: React.KeyboardEvent): boolean
+  /** Sheet 2b: rows dragged by their row number, dropped before, after or on another row. */
+  rowDrag?: {
+    can(row: R): boolean
+    accepts(from: R, to: R, where: 'before' | 'after' | 'on'): boolean
+    drop(from: R, to: R, where: 'before' | 'after' | 'on'): void
+  }
   cellRole(row: R, col: GridCol): 'rowheader' | 'gridcell'
   cellClass(row: R, col: GridCol): string
   isText(row: R, col: GridCol): boolean
@@ -776,6 +784,20 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     return true
   }
 
+  // Sheet 2b: a row being dragged by its number, and where it would land.
+  const [rowDragKey, setRowDragKey] = useState<string | null>(null)
+  const [rowDrop, setRowDrop] = useState<{ key: string; where: 'before' | 'after' | 'on' } | null>(null)
+  function rowDropAt(e: React.DragEvent, row: R): 'before' | 'after' | 'on' | null {
+    const from = rowDragKey ? m.rows.find(r => r.key === rowDragKey) : null
+    if (!from || !m.rowDrag || from.key === row.key) return null
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = (e.clientY - box.top) / Math.max(1, box.height)
+    const first = y < 0.3 ? 'before' : y > 0.7 ? 'after' : 'on'
+    if (m.rowDrag.accepts(from, row, first)) return first
+    const edge = y < 0.5 ? 'before' : 'after'
+    return m.rowDrag.accepts(from, row, edge) ? edge : null
+  }
+
   function onGridKeyDown(e: React.KeyboardEvent) {
     const printable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey
     // An edit has started but its input hasn't mounted yet: keep the keys for it.
@@ -795,6 +817,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     const ci = allCols.indexOf(active.col)
     const row = m.rows[ri]
     if (!row) return
+    if (m.onRowKey?.(row, active.col, e)) { e.preventDefault(); return }
     const rtl = gridRef.current ? getComputedStyle(gridRef.current).direction === 'rtl' : false
     const ctrl = e.ctrlKey || e.metaKey
 
@@ -1413,8 +1436,20 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             aria-rowindex={i + 2}
             aria-level={rp.level}
             aria-expanded={rp.expanded}
-            className={`fx-sheet-tr ${rp.className}${active?.key === row.key ? ' is-active-row' : ''}${h ? ' is-tall' : ''}${i < F ? ' is-frozen-row' : ''}${i === F - 1 ? ' is-frozen-edge' : ''}`}
+            className={`fx-sheet-tr ${rp.className}${active?.key === row.key ? ' is-active-row' : ''}${h ? ' is-tall' : ''}${i < F ? ' is-frozen-row' : ''}${i === F - 1 ? ' is-frozen-edge' : ''}${rowDrop?.key === row.key ? ` is-drop-${rowDrop.where}` : ''}${rowDragKey === row.key ? ' is-row-dragging' : ''}`}
             data-row={row.key}
+            onDragOver={m.rowDrag && rowDragKey ? e => {
+              const where = rowDropAt(e, row)
+              if (!where) { if (rowDrop?.key === row.key) setRowDrop(null); return }
+              e.preventDefault(); e.dataTransfer.dropEffect = 'move'
+              if (rowDrop?.key !== row.key || rowDrop.where !== where) setRowDrop({ key: row.key, where })
+            } : undefined}
+            onDrop={m.rowDrag && rowDragKey ? e => {
+              const where = rowDropAt(e, row)
+              const from = m.rows.find(r => r.key === rowDragKey)
+              setRowDrop(null); setRowDragKey(null)
+              if (where && from) { e.preventDefault(); m.rowDrag!.drop(from, row, where) }
+            } : undefined}
             data-task={rp.taskId}
             style={{ ...(h ? { ['--row-h' as string]: `${h}px` } : {}), ...(i < F ? { position: 'sticky', top: frozenTop[i], zIndex: 3 } : {}) }}
           >
@@ -1461,6 +1496,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   data-cell={key}
                   data-row-key={row.key}
                   data-col={col}
+                  draggable={isNo && m.rowDrag?.can(row) ? true : undefined}
+                  data-row-handle={isNo && m.rowDrag?.can(row) ? '' : undefined}
+                  onDragStart={isNo && m.rowDrag?.can(row) ? e => { setRowDragKey(row.key); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.key) } : undefined}
+                  onDragEnd={isNo && m.rowDrag ? () => { setRowDragKey(null); setRowDrop(null) } : undefined}
                   aria-selected={m.selection ? (selected || isActive) : undefined}
                   aria-haspopup={menu && col !== 'drop' && col !== 'archive' ? 'menu' : undefined}
                   aria-readonly={!text && !menu ? true : undefined}

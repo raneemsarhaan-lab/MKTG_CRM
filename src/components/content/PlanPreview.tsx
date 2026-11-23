@@ -62,7 +62,9 @@ function toInput(r: Classified, move: boolean): PlanRowInput {
   }
 }
 
-export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCells }: {
+export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCells, target }: {
+  /** Sheet 2b: pasted on a theme, pillar or "+ Row" line: rows that name no theme go there, as plain rows. */
+  target?: { themeName: string; pillarName: string | null; lines: { project_id: string; title: string }[] } | null
   ctx: PlanContext
   columns?: PasteColumns
   /** Rows already pasted into the grid, or null to start with an empty box. */
@@ -88,9 +90,19 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   const targetsKey = JSON.stringify(columns?.targets ?? [])
   const valuesKey = JSON.stringify(columns?.values ?? [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const read = useMemo(() => readPlan(cells, columns?.targets ?? []), [cells, targetsKey])
+  const read = useMemo(() => {
+    // Sheet 2b: a plain list (no headings) pasted on a theme, pillar or "+ Row" is a list of titles.
+    const plain = !!target && !cells.some(r => r.some(c => /^(title|task|piece|name)$/i.test(c.text.trim()))) && Math.max(0, ...cells.map(r => r.length)) <= 2
+    const withHead = plain ? [[{ text: 'Title', href: null }, { text: '', href: null }] as PastedCell[], ...cells] : cells
+    const r = readPlan(withHead, columns?.targets ?? [])
+    if (!target) return r
+    return { ...r, rows: r.rows.map(x => {
+      const inTarget = !x.theme || x.theme.trim().toLowerCase() === target.themeName.trim().toLowerCase()
+      return { ...x, theme: x.theme || target.themeName, pillar: x.pillar || (inTarget ? target.pillarName ?? '' : '') }
+    }) }
+  }, [cells, targetsKey, target]) // eslint-disable-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const ctx = useMemo(() => ({ ...baseCtx, columns: columns?.values ?? [] }), [baseCtx, valuesKey])
+  const ctx = useMemo(() => ({ ...baseCtx, columns: columns?.values ?? [], plain: target ? { lines: target.lines } : undefined }), [baseCtx, valuesKey, target]) // eslint-disable-line react-hooks/exhaustive-deps
   const [adding, setAdding] = useState<string | null>(null)
   useEffect(() => { setFixes({}) }, [cells])
   const rows = useMemo(

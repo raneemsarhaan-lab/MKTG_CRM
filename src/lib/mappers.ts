@@ -1,3 +1,4 @@
+import { orderPillars } from '@/lib/content-rows'
 import type { Member, Brand, ContentType, Task, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
 
 function toDateStr(d: Date | string | null | undefined): string {
@@ -238,9 +239,22 @@ export function mapTheme(p: any): import('@/types/index').ContentTheme {
     frequency_count: p.frequency_count ?? null,
     frequency_period: p.frequency_period === 'week' || p.frequency_period === 'month' ? p.frequency_period : null,
     audience: (p.audience ?? []) as import('@/types/index').AudienceKey[],
+    // Sheet 2b: the sheet's own pillar order first, then the project's.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pillars: (p.pillars ?? []).map((x: any) => ({ id: x.id, name: x.name, sort_order: x.sort_order }))
-      .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order),
+    pillars: orderPillars((p.pillars ?? []).map((x: any) => ({ id: x.id, name: x.name, sort_order: x.sort_order })), p.pillar_order ?? []),
+    sheet_theme_id: p.sheet_theme_id ?? null,
+    position: typeof p.position === 'number' ? p.position : 0,
+  }
+}
+
+/** Sheet 2b: a Content sheet row. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapContentRow(r: any): import('@/lib/content-rows').ContentRowRec {
+  const values = r.values && typeof r.values === 'object' && !Array.isArray(r.values) ? r.values as Record<string, string> : {}
+  return {
+    id: r.id, project_id: r.project_id, pillar_id: r.pillar_id ?? null, parent_id: r.parent_id ?? null, position: Number(r.position) || 0,
+    title: r.title ?? '', date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date ? String(r.date).slice(0, 10) : null,
+    values, task_id: r.task_id ?? null, created_by: r.created_by ?? null,
   }
 }
 

@@ -77,6 +77,8 @@ export interface PlanRowInput {
 export interface AddPlanResult {
   success: boolean; error?: string
   created?: string[]; updated?: string[]; skipped?: string[]
+  /** Sheet 2b: plain rows added (a paste on a theme, pillar or "+ Row" line). */
+  rowsCreated?: string[]
   themesCreated?: string[]; pillarsCreated?: string[]
   problems?: { row: number; code: string }[]
   /** Custom values written (spec 010). */
@@ -90,7 +92,11 @@ export interface AddPlanResult {
  * under an advisory lock, so two pastes never create the same theme or piece
  * twice, and a second paste of the same rows adds nothing.
  */
-export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean }): Promise<AddPlanResult> {
+export async function addPlan(rows: PlanRowInput[], opts: {
+  useSheetTitleStatus: boolean
+  /** Sheet 2b: pasted on a theme, pillar or "+ Row" line — new lines become plain rows there (no tasks). */
+  target?: { projectId: string; pillarId?: string | null } | null
+}): Promise<AddPlanResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'Nothing to add' }
@@ -114,7 +120,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
     const out = await prisma.$transaction(async tx => {
       // $executeRaw: the lock returns void, which $queryRaw cannot read back.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
-      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0, handoff: 0 }
+      const res = { rowsCreated: [] as string[], created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0, handoff: 0 }
       const columns = await pasteColumns(tx, 'content', members)
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
@@ -127,7 +133,9 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
       for (const [i, r] of rows.entries()) {
         const row = i + 1
         const title = (r.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
-        const themeName = (r.theme ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
+        let themeName = (r.theme ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
+        // Sheet 2b: a paste on a theme, pillar or "+ Row" line fills that theme when the rows name none.
+        if (!themeName && opts.target) themeName = (await tx.project.findUnique({ where: { id: opts.target.projectId }, select: { name: true } }))?.name ?? ''
         if (!title) { res.problems.push({ row, code: 'noTitle' }); continue }
         if (!themeName) { res.problems.push({ row, code: 'noTheme' }); continue }
         const status = readStatus(r.status)
@@ -166,11 +174,16 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           }
           themeCache.set(tkey, theme)
         }
-        if (!(await mayAddPiece(tx, theme.id, member))) { res.problems.push({ row, code: 'mayNotAdd' }); continue }
+        // Sheet 2b: anyone may add plain rows; tasks follow the theme's rule.
+        if (!opts.target && !(await mayAddPiece(tx, theme.id, member))) { res.problems.push({ row, code: 'mayNotAdd' }); continue }
 
         // The pillar: matched by name within the theme, or created.
         let pillarId: string | null = null
         const pillarName = (r.pillar ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
+        if (!pillarName && opts.target?.pillarId && opts.target.projectId === theme.id) {
+          const tp = await tx.contentPillar.findUnique({ where: { id: opts.target.pillarId } })
+          if (tp?.project_id === theme.id) pillarId = tp.id
+        }
         if (pillarName) {
           const pillars = await tx.contentPillar.findMany({ where: { project_id: theme.id } })
           const p = pillars.find(x => norm(x.name) === norm(pillarName))
@@ -222,6 +235,10 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           continue
         }
 
+        // Sheet 2b: a plain row of the same title in this theme is already in the sheet too.
+        if (opts.target && await tx.contentRow.findFirst({ where: { project_id: theme.id, task_id: null, title: { equals: title, mode: 'insensitive' } }, select: { id: true } })) {
+          res.skipped.push(title); continue
+        }
         // Already in this theme by title: nothing to add (FR-035).
         const same = await tx.task.findFirst({
           where: { project_id: theme.id, name: { equals: title, mode: 'insensitive' } },
@@ -237,6 +254,15 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
           continue
         }
 
+        // Sheet 2b: on a theme, pillar or "+ Row" line, a new line is a plain row (its custom values kept on the row).
+        if (opts.target) {
+          const last = await tx.contentRow.findFirst({ where: { project_id: theme.id }, orderBy: { position: 'desc' }, select: { position: true } })
+          const values: Record<string, string> = {}
+          for (const [colId, v] of Object.entries(r.custom ?? {})) { const c = columns.get(colId); if (c && typeof v === 'string' && v.trim()) values[(await tx.sheetColumn.findUnique({ where: { id: c.id }, select: { key: true } }))?.key ?? colId] = v.trim().slice(0, 5000) }
+          const made = await tx.contentRow.create({ data: { project_id: theme.id, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id } })
+          res.rowsCreated.push(made.id)
+          continue
+        }
         // A new piece pasted at Ready For Design or later would need a hand-off: skipped (FR-030a).
         if (!status.archived && needsHandoff({ status: 'todo', nine_stage: false, kind: 'pipeline' }, status.stage, [], spaceCtx.spaces)) { res.handoff++; continue }
         const owner = memberByName(r.owner) ?? member.id

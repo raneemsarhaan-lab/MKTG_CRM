@@ -3235,3 +3235,12 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-linkpick-hint { margin: 0; font-size: 11px; color: var(--muted, #6B7280); }
 .fx-linkpick-actions .is-go { background: #14131A; color: #fff; border-color: #14131A; }
 .fx-linkpick-actions .is-go:disabled { opacity: .45; cursor: default; }
+
+/* Sheet 2b: dragging Content sheet rows by their number. */
+.fx-sheet-tr.is-drop-before { box-shadow: inset 0 2px 0 #3563E9; }
+.fx-sheet-tr.is-drop-after { box-shadow: inset 0 -2px 0 #3563E9; }
+.fx-sheet-tr.is-drop-on > .fx-sheet-td { background: #EEF3FF; }
+.fx-sheet-tr.is-row-dragging { opacity: .55; }
+.fx-sheet-td[data-row-handle] { cursor: grab; }
+.fx-content-child-indent { display: inline-block; width: 18px; flex-shrink: 0; }
+.fx-content-plain .fx-sheet-ellipsis { color: #3D4357; }

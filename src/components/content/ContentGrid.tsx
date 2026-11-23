@@ -90,6 +90,14 @@ export interface ContentGridProps {
   onToggleTheme(themeId: string): void
   onToggleVideo(taskId: string): void
   onAddPiece(theme: ContentTheme, pillarId: string | null): void
+  /** Sheet 2b: "+ Row" or "+ Child row" was clicked. */
+  onAddRow?(row: Extract<ContentRow, { kind: 'add' }>): void
+  /** Sheet 2b: whether the member may edit a plain row (its title, date and values). */
+  canEditLine?(rec: import('@/lib/content-rows').ContentRowRec): boolean
+  /** Sheet 2b: Tab / Shift+Tab and other row keys. */
+  onRowKey?(row: ContentRow, col: GridCol, e: React.KeyboardEvent): boolean
+  /** Sheet 2b: drag rows, themes and pillars by their number. */
+  rowDrag?: GridModel<ContentRow>['rowDrag']
   onDelete(row: ContentRow, anchor: HTMLElement): void
   onPaste(e: React.ClipboardEvent, row: ContentRow | null, col: GridCol | null): void
   /** The shaped layout (spec 010). */
@@ -168,8 +176,11 @@ export function ContentGrid(p: ContentGridProps) {
 
   const cl = p.columns
   const isCustom = (col: GridCol) => cl.custom.is(col)
+  const lineEdit = (row: ContentRow) => row.kind === 'line' && (p.canEditLine?.(row.rec) ?? true)
   const isText = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
+    // Sheet 2b: a plain row's title, date and custom columns are typed.
+    if (row.kind === 'line') return lineEdit(row) && (col === 'title' || col === 'date' || isCustom(col))
     if (isCustom(col)) return (row.kind === 'piece' || row.kind === 'clip') && cl.custom.isText(row.task, col)
     // Spec 019 stage 2: Status and Type take typed and pasted words too (the menus stay on click and Enter).
     if (col === 'status' && (row.kind === 'piece' || row.kind === 'clip')) return !row.task.dropped_at
@@ -179,6 +190,7 @@ export function ContentGrid(p: ContentGridProps) {
   const isMenu = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
     if (row.kind === 'theme' || row.kind === 'pillar') return col === 'title' || col === 'rowNo'
+    if (row.kind === 'line') return col === 'rowNo' || col === 'status' || col === 'pillar'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
     return ['rowNo', 'type', 'status', 'media', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
@@ -204,7 +216,7 @@ export function ContentGrid(p: ContentGridProps) {
         <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>
         <span className="fx-content-theme-name">{th.name}</span>
-        <span className="fx-sheet-muted"> · {row.pieces.filter(x => !x.dropped_at).length}</span>
+        <span className="fx-sheet-muted"> · {row.pieces.filter(x => !x.dropped_at).length + row.lines}</span>
       </span>
     )
   }
@@ -283,12 +295,15 @@ export function ContentGrid(p: ContentGridProps) {
         row.kind === 'theme' ? 'is-video fx-content-theme-row' : '',
         row.kind === 'pillar' || row.kind === 'group' ? 'fx-content-pillar-row' : '',
         row.kind === 'add' ? 'is-add' : '',
+        row.kind === 'line' ? 'fx-content-plain' : '',
         row.kind === 'draft' ? 'is-draft' : '',
         (row.kind === 'piece' || row.kind === 'clip') && row.task.dropped_at ? 'is-dropped' : '',
         row.kind === 'clip' ? 'fx-content-clip-row' : '',
       ].filter(Boolean).join(' '),
       level: row.kind === 'theme' ? 1 : row.kind === 'pillar' ? 2 : row.kind === 'clip' ? 4
-        : row.kind === 'piece' || row.kind === 'draft' ? (row.kind === 'piece' ? (row.task.pillar_id ? 3 : 2) : (row.pillarId ? 3 : 2)) : 2,
+        : row.kind === 'piece' ? (row.task.pillar_id ? 3 : 2) + row.depth
+        : row.kind === 'line' ? (row.rec.pillar_id ? 3 : 2) + row.depth
+        : row.kind === 'draft' ? (row.pillarId ? 3 : 2) + (row.parentId ? 1 : 0) : 2,
       expanded: row.kind === 'theme' ? !row.collapsed : row.kind === 'piece' && row.clips.length ? row.expanded : undefined,
       taskId: taskOf(row)?.id,
     }),
@@ -304,6 +319,12 @@ export function ContentGrid(p: ContentGridProps) {
     isText,
     isMenu,
     textValue: (row, col) => {
+      if (row.kind === 'line') {
+        if (col === 'title') return row.rec.title
+        if (col === 'date') return row.rec.date ?? ''
+        if (isCustom(col)) return row.rec.values[String(col)] ?? ''
+        return ''
+      }
       const task = taskOf(row)
       if (!task) return ''
       if (isCustom(col)) return cl.custom.textValue(task, col)
@@ -316,12 +337,14 @@ export function ContentGrid(p: ContentGridProps) {
     },
     describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
     isDraft: row => row.kind === 'draft',
-    inputLabel: (row, col) => (row.kind === 'draft' ? t('newPiece.label') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
-    inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('newPiece.placeholder') : col === 'date' ? '2026-11-20' : undefined),
+    inputLabel: (row, col) => (row.kind === 'draft' ? t('rows.newLabel') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
+    inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('rows.placeholder') : col === 'date' ? '2026-11-20' : undefined),
     inputDir: col => (col === 'date' ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       const task = taskOf(row)
       if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
+      // Sheet 2b: a plain row has no task yet: its task's cells wait for one.
+      if (row.kind === 'line') return col === 'title' || col === 'date' || isCustom(col) ? (lineEdit(row) ? null : t('readOnly')) : t('rows.needsTask')
       return row.kind === 'piece' && task && !task.dropped_at && (col === 'title' || col === 'date') && !p.canEdit(task) ? t('readOnly') : null
     },
     onCommit: (row, col, v) => commitWord(row, col, v),
@@ -329,7 +352,7 @@ export function ContentGrid(p: ContentGridProps) {
     onOpen: p.onOpen,
     onActivate: (row, col) => {
       if ((row.kind === 'piece' || row.kind === 'clip') && isCustom(col)) return cl.custom.activate(row.task, col, row.key)
-      if (row.kind === 'add') { if (col === 'title') p.onAddPiece(row.theme, null); return true }
+      if (row.kind === 'add') { if (col === 'title') { if (p.onAddRow) p.onAddRow(row); else p.onAddPiece(row.theme, row.pillarId) } return true }
       return false
     },
     onToggle: row => {
@@ -339,14 +362,50 @@ export function ContentGrid(p: ContentGridProps) {
     },
     onDelete: (row, col, anchor) => {
       if ((row.kind === 'piece' || row.kind === 'clip') && isCustom(col)) { cl.custom.clear(row.task, col, row.key); return true }
+      if (row.kind === 'line') {
+        if ((isCustom(col) || col === 'date') && lineEdit(row)) { void p.onCommit(row, col, ''); return true }
+        if (col === 'rowNo') { p.onDelete(row, anchor); return true }
+        return false
+      }
       if (row.kind !== 'piece') return false
       p.onDelete(row, anchor); return true
     },
     onPaste: p.onPaste,
     render: (row, col) => {
-      if (row.kind === 'add') return col === 'title' ? <span className="fx-sheet-plus">{t('addPiece')}</span> : null
+      if (row.kind === 'add') {
+        if (col !== 'title') return null
+        return (
+          <span className="fx-sheet-plus" data-add-row={row.parentId ? `child:${row.parentId}` : row.pillarId ?? 'theme'}>
+            {row.parentId && <span className="fx-content-child-indent" aria-hidden="true" />}
+            {row.parentId ? t('rows.addChild') : t('rows.add')}
+          </span>
+        )
+      }
       if (row.kind === 'draft') {
-        return col === 'rowNo' ? row.n : col === 'title' ? <span className="fx-sheet-muted">{t('newPiece.placeholder')}</span> : null
+        return col === 'rowNo' ? row.n : col === 'title' ? <span className="fx-sheet-muted">{t('rows.placeholder')}</span> : null
+      }
+      if (row.kind === 'line') {
+        const r = row.rec
+        if (isCustom(col)) return r.values[String(col)] ? <span className="fx-sheet-ellipsis">{r.values[String(col)]}</span> : null
+        switch (col) {
+          case 'rowNo': return row.n
+          case 'title': {
+            const deep = (r.pillar_id ? 2 : 1) + row.depth
+            return (
+              <span className="fx-sheet-title" data-line={r.id}>
+                {Array.from({ length: deep }, (_, i) => <span key={i} className="fx-sheet-indent" aria-hidden="true" />)}
+                <span className="fx-sheet-ellipsis" title={r.title}>{r.title}</span>
+              </span>
+            )
+          }
+          case 'date': return r.date ? <span className="fx-sheet-ellipsis">{formatDay(r.date, locale)}</span> : null
+          case 'pillar': {
+            const pl = row.theme.pillars.find(x => x.id === r.pillar_id)
+            return pl ? <span className="fx-sheet-ellipsis">{pl.name}</span> : <span className="fx-sheet-muted">{t('pillar.none')}</span>
+          }
+          case 'status': return <span className="fx-sheet-muted" data-line-status="">{t('rows.noTask')}</span>
+        }
+        return null
       }
       if (row.kind === 'theme') return col === 'rowNo' ? row.n : themeLine(row)
       if (row.kind === 'group') {
@@ -368,7 +427,7 @@ export function ContentGrid(p: ContentGridProps) {
         case 'rowNo': return row.n
         case 'media': return isClip ? null : p.media?.render(task) ?? null
         case 'title': {
-          const deep = isClip ? 3 : task.pillar_id ? 2 : 1
+          const deep = (isClip ? 3 : task.pillar_id ? 2 : 1) + (row.kind === 'piece' ? row.depth : 0)
           return (
             <span className="fx-sheet-title">
               {Array.from({ length: deep - (row.kind === 'piece' && row.clips.length ? 1 : 0) }, (_, i) => <span key={i} className="fx-sheet-indent" aria-hidden="true" />)}
@@ -441,7 +500,8 @@ export function ContentGrid(p: ContentGridProps) {
   }
   const lv = useLinkedView<ContentRow>({
     enabled: !!p.linked, sheetKey: 'linked_content', rows: p.rows,
-    kind: row => (row.kind === 'piece' ? 'item' : row.kind === 'clip' ? 'child' : 'fixed'),
+    // Sheet 2b: a child row stays under its parent when sorting and filtering, as a clip does.
+    kind: row => (row.kind === 'piece' || row.kind === 'line' ? (row.depth ? 'child' : 'item') : row.kind === 'clip' ? 'child' : 'fixed'),
     taskOf: row => taskOf(row)?.id ?? null, textValue: shownText, say: text => p.linked?.say(text),
   })
   viewRef.current = lv.store.view
@@ -452,6 +512,7 @@ export function ContentGrid(p: ContentGridProps) {
     if (by === 'theme' || by === 'col') return lv.rows
     if (by === 'none') return regroupContent(lv.rows, null)
     return regroupContent(lv.rows, task => {
+      if (!task) return { key: 'notask', label: t('rows.noTask'), order: '2' }
       if (by === 'stage') return { key: task.status, label: stageWord(task.status), order: String(STAGE_ORDER.indexOf(task.status)).padStart(3, '0') }
       if (by === 'assignee') { const n = task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''; return n ? { key: `a${task.assignee_id}`, label: n, order: `0${n.toLowerCase()}` } : { key: 'none', label: tf('bandUnassigned'), order: '1' } }
       const ty = task.content_type_label ?? ''
@@ -465,7 +526,7 @@ export function ContentGrid(p: ContentGridProps) {
     const h = model.header(col)
     const colName = h.label ?? (typeof h.text === 'string' ? h.text : col)
     const task = taskOf(row)
-    return task ? `${task.name} · ${colName}` : colName
+    return task ? `${task.name} · ${colName}` : row.kind === 'line' ? `${row.rec.title} · ${colName}` : colName
   }
   const lf = useLinkedFormats<ContentRow>({
     enabled: !!p.linked, sheetKey: 'linked_content', rows, cols: model.cols, active: p.active,
@@ -485,7 +546,7 @@ export function ContentGrid(p: ContentGridProps) {
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
-    isCellRow: row => row.kind === 'piece' || row.kind === 'clip',
+    isCellRow: row => row.kind === 'piece' || row.kind === 'clip' || row.kind === 'line',
     onSkipped: p.onSkipped,
     drop: p.linked?.drop, restore: p.linked?.restore,
   })
@@ -503,6 +564,8 @@ export function ContentGrid(p: ContentGridProps) {
   // Spec 015 FR-070: number formats show here too, and a copy carries them.
   withNumberFormats(model, lf.styleOf, locale, !!p.linked)
   withCommentPaste(model, { enabled: !!p.linked, sheet: 'linked_content', keyOf: (row, col) => { const id = taskOf(row)?.id; return id ? { rowKey: id, colKey: String(col) } : null }, paste: pairs => pasteCommentsTo('linked', pairs) })
+  if (p.onRowKey) model.onRowKey = p.onRowKey
+  if (p.rowDrag) model.rowDrag = p.rowDrag
   Object.assign(model, {
     cellStyle: lf.cellStyle, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,

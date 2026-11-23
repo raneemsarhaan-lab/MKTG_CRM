@@ -1,0 +1,160 @@
+'use client'
+
+/**
+ * Sheet 2b dialogs on the Content sheet: + Theme (an existing project or a new
+ * one), where a removed theme's or pillar's rows go, deleting a row (unlink or
+ * delete its task; children up a level or deleted), and linking a plain row
+ * to an existing task.
+ */
+import { useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import type { ContentTheme, Member, Task } from '@/types/index'
+import { ThemeEditor } from './ThemeEditor'
+import type { ThemePatch } from './types'
+
+export function ThemeAdd({ candidates, members, onPick, onCreate, onCancel }: {
+  candidates: { id: string; name: string }[]
+  members: Member[]
+  onPick(projectId: string): Promise<string | null>
+  onCreate(patch: ThemePatch): Promise<string | null>
+  onCancel(): void
+}) {
+  const t = useTranslations('content')
+  const [mode, setMode] = useState<'existing' | 'new'>(candidates.length ? 'existing' : 'new')
+  const [pick, setPick] = useState(candidates[0]?.id ?? '')
+  const [note, setNote] = useState<string | null>(null)
+  const blank: ContentTheme = { id: '', name: '', brand_id: null, owner_id: null, frequency_count: null, frequency_period: 'week', audience: [], pillars: [] }
+  return (
+    <div className="fx-sheet-pop-form" data-theme-add="">
+      <span role="radiogroup" aria-label={t('themes.addTitle')} className="fx-sheet-pop-row">
+        <label className="fx-content-check"><input type="radio" checked={mode === 'existing'} disabled={!candidates.length} onChange={() => setMode('existing')} data-theme-mode="existing" />{t('themes.existing')}</label>
+        <label className="fx-content-check"><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} data-theme-mode="new" />{t('themes.newProject')}</label>
+      </span>
+      {mode === 'existing' ? (
+        <form onSubmit={e => { e.preventDefault(); if (pick) void onPick(pick).then(setNote) }} className="fx-sheet-pop-form">
+          <label className="fx-sheet-pop-title">{t('themes.project')}
+            <select value={pick} onChange={e => setPick(e.target.value)} data-theme-project="">
+              {candidates.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <span className="fx-sheet-muted">{t('themes.takesName')}</span>
+          {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+          <span className="fx-sheet-pop-row">
+            <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
+            <button type="submit" className="fx-sheet-btn is-primary" disabled={!pick} data-theme-add-save="">{t('themes.add')}</button>
+          </span>
+        </form>
+      ) : (
+        <ThemeEditor theme={blank} members={members} onCancel={onCancel} onSave={onCreate} />
+      )}
+    </div>
+  )
+}
+
+export interface Destination { key: string; projectId: string; pillarId: string | null; label: string }
+
+/** Where rows go: other themes (and their pillars), or "No pillar" under the same theme. */
+export function destinations(themes: ContentTheme[], from: { themeId: string; pillarId?: string | null }, t: (k: string, v?: Record<string, string>) => string): Destination[] {
+  const out: Destination[] = []
+  for (const th of themes) {
+    if (!from.pillarId && th.id === from.themeId) continue
+    if (from.pillarId && th.id === from.themeId) out.push({ key: `${th.id}:`, projectId: th.id, pillarId: null, label: t('rows.noPillarIn', { theme: th.name }) })
+    else out.push({ key: `${th.id}:`, projectId: th.id, pillarId: null, label: th.name })
+    for (const pl of th.pillars) if (pl.id !== from.pillarId) out.push({ key: `${th.id}:${pl.id}`, projectId: th.id, pillarId: pl.id, label: `${th.name} › ${pl.name}` })
+  }
+  return out
+}
+
+export function DestinationPick({ title, rows, options, onConfirm, onCancel }: {
+  title: string; rows: number; options: Destination[]; onConfirm(d: Destination | null): Promise<string | null>; onCancel(): void
+}) {
+  const t = useTranslations('content')
+  const [key, setKey] = useState(options[0]?.key ?? '')
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <form className="fx-sheet-pop-form" data-destination="" onSubmit={e => {
+      e.preventDefault()
+      setBusy(true)
+      void onConfirm(options.find(o => o.key === key) ?? null).then(err => { setBusy(false); setNote(err) })
+    }}>
+      <span className="fx-sheet-pop-title">{title}</span>
+      {rows > 0 ? <>
+        <span>{t('rows.whereTo', { n: String(rows) })}</span>
+        <select value={key} onChange={e => setKey(e.target.value)} data-destination-pick="" aria-label={t('rows.whereTo', { n: String(rows) })}>
+          {options.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <span className="fx-sheet-muted">{t('rows.neverDeleted')}</span>
+      </> : <span className="fx-sheet-muted">{t('rows.noRows')}</span>}
+      {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+      <span className="fx-sheet-pop-row">
+        <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
+        <button type="submit" className="fx-sheet-btn is-danger" disabled={busy || (rows > 0 && !options.length)} data-destination-confirm="">{t('rows.remove')}</button>
+      </span>
+    </form>
+  )
+}
+
+export function DeleteRowPrompt({ name, linked, children, onConfirm, onCancel }: {
+  name: string; linked: boolean; children: number
+  onConfirm(o: { task?: 'unlink' | 'delete'; children?: 'up' | 'delete' }): Promise<string | null>; onCancel(): void
+}) {
+  const t = useTranslations('content')
+  const [task, setTask] = useState<'unlink' | 'delete'>('unlink')
+  const [kids, setKids] = useState<'up' | 'delete'>('up')
+  const [note, setNote] = useState<string | null>(null)
+  return (
+    <form className="fx-sheet-pop-form" data-delete-row="" onSubmit={e => {
+      e.preventDefault()
+      void onConfirm({ task: linked || (children && kids === 'delete') ? task : undefined, children: children ? kids : undefined }).then(setNote)
+    }}>
+      <span className="fx-sheet-pop-title">{t('rows.deleteTitle', { name })}</span>
+      {linked && (
+        <fieldset className="fx-content-fieldset">
+          <legend>{t('rows.linkedAsk')}</legend>
+          <label className="fx-content-check"><input type="radio" checked={task === 'unlink'} onChange={() => setTask('unlink')} data-delete-task="unlink" />{t('rows.unlink')}</label>
+          <label className="fx-content-check"><input type="radio" checked={task === 'delete'} onChange={() => setTask('delete')} data-delete-task="delete" />{t('rows.deleteBoth')}</label>
+        </fieldset>
+      )}
+      {children > 0 && (
+        <fieldset className="fx-content-fieldset">
+          <legend>{t('rows.childrenAsk', { n: String(children) })}</legend>
+          <label className="fx-content-check"><input type="radio" checked={kids === 'up'} onChange={() => setKids('up')} data-delete-children="up" />{t('rows.childrenUp')}</label>
+          <label className="fx-content-check"><input type="radio" checked={kids === 'delete'} onChange={() => setKids('delete')} data-delete-children="delete" />{t('rows.childrenDelete')}</label>
+        </fieldset>
+      )}
+      {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+      <span className="fx-sheet-pop-row">
+        <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
+        <button type="submit" className="fx-sheet-btn is-danger" data-delete-row-confirm="">{t('rows.delete')}</button>
+      </span>
+    </form>
+  )
+}
+
+/** Link a plain row to a task that isn't on the sheet yet. */
+export function LinkTaskPick({ tasks, taken, onPick, onCancel }: {
+  tasks: Task[]; taken: Set<string>; onPick(taskId: string): Promise<string | null>; onCancel(): void
+}) {
+  const t = useTranslations('content')
+  const [q, setQ] = useState('')
+  const [note, setNote] = useState<string | null>(null)
+  const list = useMemo(() => {
+    const k = q.trim().toLowerCase()
+    return tasks.filter(x => !x.media_board && !x.parent_task_id && !x.dropped_at && !taken.has(x.id) && (!k || x.name.toLowerCase().includes(k))).slice(0, 30)
+  }, [tasks, taken, q])
+  return (
+    <div className="fx-sheet-pop-form" data-link-row-task="">
+      <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder={t('rows.findTask')} aria-label={t('rows.findTask')} data-link-row-search="" />
+      <div role="listbox" aria-label={t('rows.linkTask')} style={{ maxHeight: 240, overflowY: 'auto', display: 'grid' }}>
+        {list.map(x => (
+          <button key={x.id} type="button" role="option" aria-selected={false} className="fx-sheet-btn" style={{ justifyContent: 'flex-start', textAlign: 'start' }}
+                  data-link-row-option={x.name} onClick={() => void onPick(x.id).then(setNote)}>{x.name}</button>
+        ))}
+        {!list.length && <span className="fx-sheet-muted">{t('rows.noTasks')}</span>}
+      </div>
+      {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+      <span className="fx-sheet-pop-row"><button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button></span>
+    </div>
+  )
+}

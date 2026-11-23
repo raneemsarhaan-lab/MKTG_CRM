@@ -381,6 +381,9 @@ export interface ContentTheme {
   frequency_period: FrequencyPeriod | null
   audience: AudienceKey[]
   pillars: { id: string; name: string; sort_order: number }[]
+  /** Sheet 2b: the theme's entry on the Content sheet (not the project) and its place there. */
+  sheet_theme_id?: string | null
+  position?: number
 }
 
 /** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */
