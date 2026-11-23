@@ -65,10 +65,9 @@ module.exports = (EMAIL, psql, ok) => {
           await panelStage(page, go, d, 'F-Check')
           ok(stage(d) === 'final-check', 'Design passes D-Check')
           ok(stage(t) === 'd-check', `the content task still waits on Video: ${stage(t)}`)
+          // User, 2026-11-23: moving the linked row moves the task it waits on (with that task's permissions).
           await typeStatus(page, go, 'planning', t, 'F-Check')
-          ok(stage(t) === 'd-check', 'moving the content task to F-Check by hand is refused')
-          ok(/Waiting on Design or Video/.test(await page.textContent('[data-sheet-say]') ?? ''), 'and says why')
-          await panelStage(page, go, v, 'F-Check')
+          ok(stage(v) === 'final-check', `the Video task moved with it: ${stage(v)}`)
           ok(stage(t) === 'final-check', `both passed: the content task is at F-Check: ${stage(t)}`)
         } finally { drop([t]); psql(`update content_types set media_boards='${before}' where label='Story'`) }
       },
