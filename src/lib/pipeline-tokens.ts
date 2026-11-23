@@ -50,8 +50,8 @@ export const PIPE_ACCENT: Record<string, string> = {
 }
 
 /**
- * Each stage's colour, darkened towards ink just enough for 4.5:1 on white
- * and on the column's tint: the column header's count and select box, where
+ * Each stage's colour, darkened towards ink just enough for 4.5:1 on white:
+ * the column header's count and select box, where
  * the plain accent would be too faint to read (amber 2.2:1). The lightest
  * accents, amber and green, need the most. Same hue, so they still read as
  * the stage.

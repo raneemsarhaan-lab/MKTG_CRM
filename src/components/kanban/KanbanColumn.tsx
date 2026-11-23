@@ -14,8 +14,9 @@ import { TaskCard } from './TaskCard'
  * chip. "Add task" closes the column body.
  *
  * The header is a section washed with the stage's colour at 14%, a dot in the
- * colour itself and the titles in ink; the body below takes the same colour
- * at 6%, so stages tell apart at a glance while the white cards stand off it.
+ * colour itself and the titles in ink; it alone carries the colour. The body
+ * below is the same light grey for every stage, so empty columns stay quiet
+ * and the white cards stand off it.
  * Where the colour has to be read (the count) or seen as a control (the
  * select box), it's the darkened shade (PIPE_ACCENT_INK): the light accents
  * on white fall well short of 4.5:1 (amber 2.2:1).
@@ -64,8 +65,9 @@ export function KanbanColumn({
       aria-label={`${stage.label_en} column`}
       ref={setNodeRef}
       style={{
-        // 0F = 6% of the stage colour.
-        background: `${accent}0F`,
+        // One neutral grey for every column: the header alone carries the
+        // stage colour, and the white cards still stand off the panel.
+        background: '#F6F6F9',
         border: `1px solid ${active ? accent : PIPE.border}`,
         borderRadius: 14,
         overflow: 'hidden',
