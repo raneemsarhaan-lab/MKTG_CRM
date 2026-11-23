@@ -29,6 +29,7 @@ import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useGridTips } from '@/components/sheet/useGridTips'
+import { formatDay } from '@/lib/due-dates'
 import { gateFeatureCells, gateFeatureStyle, type OffNote } from '@/components/sheet/featureCells'
 import { offFeatureFor } from '@/lib/brand-features'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
@@ -281,7 +282,7 @@ export function ContentGrid(p: ContentGridProps) {
       if (!task) return ''
       if (isCustom(col)) return cl.custom.textValue(task, col)
       if (col === 'title') return task.name
-      if (col === 'date') return task.due_date ?? ''
+      if (col === 'date') return task.publish_date ?? ''
       if (col === 'task') return `${typeof window !== 'undefined' ? window.location.origin : ''}/board?task=${task.id}`
       if (col === 'status') return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageWord(task.status)
       if (col === 'type') return task.content_type_label ? typeWord(task.content_type_label) : ''
@@ -371,8 +372,9 @@ export function ContentGrid(p: ContentGridProps) {
           )
         case 'date':
           if (isClip) return null
-          if (task.status === 'publish') return <span className="fx-sheet-ellipsis">{t('date.published', { date: shortDate(task.stage_date) })}</span>
-          return task.due_date ? <span className="fx-sheet-ellipsis">{t('date.due', { date: shortDate(task.due_date) })}</span> : null
+          // The Date column is the publishing date; a published piece says so.
+          if (task.status === 'publish') return <span className="fx-sheet-ellipsis" data-publish-cell={task.publish_date ?? task.stage_date}>{t('date.published', { date: formatDay(task.publish_date ?? task.stage_date, locale) })}</span>
+          return task.publish_date ? <span className="fx-sheet-ellipsis" data-publish-cell={task.publish_date}>{formatDay(task.publish_date, locale)}</span> : null
         case 'archive':
           return isClip || !can ? null : <span className="fx-sheet-dropb">{task.dropped_at ? t('archive.restore') : t('archive.archive')}</span>
       }
@@ -404,7 +406,7 @@ export function ContentGrid(p: ContentGridProps) {
         case 'type': return task.content_type_label ? typeWord(task.content_type_label) : ''
         case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find((x: ContentTheme['pillars'][number]) => x.id === task.pillar_id)?.name ?? '' : ''
         case 'doc': case 'design': case 'post': case 'published': return pieceLink(task, col) ?? ''
-        case 'date': return task.status === 'publish' ? task.stage_date ?? '' : task.due_date ?? ''
+        case 'date': return task.publish_date ?? (task.status === 'publish' ? task.stage_date ?? '' : '')
       }
     }
     return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())

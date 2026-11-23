@@ -40,4 +40,11 @@ step 300 fatal   "Seeding reference data and default users" \
 step 60  fatal   "Checking for an admin reset" \
   tsx scripts/reset-admin.ts
 
+# Publishing and due dates (one-time, records itself): Content pieces' planned
+# dates become publishing dates; every other due date is kept as set by hand.
+# Here rather than in backfill.sh so no one edits a publishing date before it
+# has marked those due dates, which would let the rule move them.
+step 120 optional "Migrating due dates (one-time)" \
+  tsx scripts/due-dates-migrate.ts
+
 echo "✅ Schema ready — starting the server."

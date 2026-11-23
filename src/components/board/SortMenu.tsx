@@ -14,20 +14,21 @@
 import { useTranslations } from 'next-intl'
 import type { Task } from '@/types/index'
 import { HeaderMenu, ChevronIcon } from './HeaderMenu'
+import { compareByDue, compareByPublish } from '@/lib/due-dates'
 
-export type SortKey = 'due' | 'priority' | 'name' | 'created' | 'updated'
+export type SortKey = 'due' | 'publish' | 'priority' | 'name' | 'created' | 'updated'
+/** Boards sort by due date, earliest first, unless a person picks otherwise for that board. */
 export const DEFAULT_SORT: SortKey = 'due'
-export const SORT_KEYS: readonly SortKey[] = ['due', 'priority', 'name', 'created', 'updated']
+export const SORT_KEYS: readonly SortKey[] = ['due', 'publish', 'priority', 'name', 'created', 'updated']
 
 const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 
+/** Due date, earliest first; no due date last; then publishing date, then created. */
 function byDue<T extends Task>(a: T, b: T): number {
-  if (a.due_date !== b.due_date) {
-    if (!a.due_date) return 1
-    if (!b.due_date) return -1
-    return a.due_date < b.due_date ? -1 : 1
-  }
-  return byCreated(a, b)
+  return compareByDue(a, b)
+}
+function byPublish<T extends Task>(a: T, b: T): number {
+  return compareByPublish(a, b)
 }
 
 function byPriority<T extends Task>(a: T, b: T): number {
@@ -52,6 +53,7 @@ export function sortTasks<T extends Task>(tasks: T[], sort: SortKey): T[] {
   const copy = [...tasks]
   switch (sort) {
     case 'due':      return copy.sort(byDue)
+    case 'publish':  return copy.sort(byPublish)
     case 'priority': return copy.sort(byPriority)
     case 'name':     return copy.sort(byName)
     case 'created':  return copy.sort(byCreated)
@@ -68,13 +70,16 @@ function SortIcon() {
   )
 }
 
-export function SortMenu({ value, onChange, noPriority = false }: {
+export function SortMenu({ value, onChange, noPriority = false, onReset }: {
   value: SortKey
   onChange(next: SortKey): void
   /** Spec 021 (US4): no brand on the board uses Priorities. */
   noPriority?: boolean
+  /** "Reset to default sort": back to due date, and the board forgets the choice. */
+  onReset?(): void
 }) {
   const t = useTranslations('header')
+  const tDates = useTranslations('dates')
 
   return (
     <HeaderMenu
@@ -90,6 +95,12 @@ export function SortMenu({ value, onChange, noPriority = false }: {
           {value === key && <span className="fx-hd-check" aria-hidden="true">✓</span>}
         </button>
       ))}
+      {onReset && (
+        <button type="button" className="fx-hd-opt" data-sort-reset="" disabled={value === DEFAULT_SORT} onClick={onReset}
+                style={{ borderTop: '1px solid var(--line, #E5E7EB)', marginTop: 4 }}>
+          <span className="fx-hd-opt-txt">{tDates('sortReset')}</span>
+        </button>
+      )}
     </HeaderMenu>
   )
 }

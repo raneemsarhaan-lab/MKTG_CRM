@@ -238,6 +238,10 @@ export interface Task {
   status: StageId
   stage_date: string
   due_date: string | null
+  /** The day the content goes live (Africa/Cairo). */
+  publish_date?: string | null
+  /** The due date was set by hand: a new publishing date doesn't move it. */
+  due_manual?: boolean
   hours_estimate: number
   cover_image_url?: string
   /** Auto-preview of the newest uploaded image. Not a user field. */

@@ -181,4 +181,36 @@ check('pure-task-link-values', () => {
   eq(m.formatValue('task', tasks[0].id, { tasks }), 'Ramadan launch plan', 'shown as its name')
 })
 
+check('pure-due-dates', () => {
+  const R = m.DEFAULT_RULE
+  eq(R, { daysBefore: 7, weekend: [5, 6], shift: 'earlier' }, 'defaults: 7 days, Friday and Saturday, earlier')
+  eq(m.calcDueDate('2026-12-15', R), '2026-12-08', 'Publishing Tue 15 Dec → Due Tue 8 Dec')
+  eq(m.weekday('2026-12-11'), 5, '11 Dec 2026 is a Friday')
+  eq(m.calcDueDate('2026-12-18', R), '2026-12-10', 'due lands on Fri 11 Dec → moves back to Thu 10 Dec')
+  eq(m.calcDueDate('2026-12-19', R), '2026-12-10', 'due lands on Sat 12 Dec → moves back to Thu 10 Dec')
+  eq(m.calcDueDate('2026-12-18', { ...R, shift: 'later' }), '2026-12-13', 'later: Fri 11 Dec → Sun 13 Dec')
+  eq(m.calcDueDate('2026-12-15', { ...R, daysBefore: 0 }), '2026-12-15', '0 days: the publishing day itself')
+  eq(m.calcDueDate('2026-03-05', R), '2026-02-26', 'across a month end (Thu 5 Mar → Thu 26 Feb)')
+  eq(m.calcDueDate('2027-01-05', R), '2026-12-29', 'across a year end')
+  eq(m.cleanRule({ daysBefore: 7, weekend: [0, 1, 2, 3, 4, 5, 6], shift: 'earlier' }).error, 'weekend_all', 'every day a weekend is refused')
+  eq(m.cleanRule({ daysBefore: -1, weekend: [5], shift: 'earlier' }).error, 'days', 'negative days refused')
+  eq(m.cleanRule({ daysBefore: 3, weekend: [6, 5, 5, 9], shift: 'later' }).rule, { daysBefore: 3, weekend: [5, 6], shift: 'later' }, 'cleaned')
+  eq(m.nextDueDate({ publish: '2026-12-15', due: '2026-12-01', manual: true }, R), '2026-12-01', 'a hand-set due date is kept')
+  eq(m.nextDueDate({ publish: '2026-12-15', due: '2026-12-01', manual: false }, R), '2026-12-08', 'an automatic one follows')
+  eq(m.nextDueDate({ publish: null, due: '2026-12-01', manual: false }, R), null, 'no publishing date, no automatic due date')
+  // Near-term: due lands in the past, still set, and the task is overdue.
+  const today = '2026-11-23'
+  const due = m.calcDueDate('2026-11-26', R)
+  eq(due, '2026-11-19', 'publishing in 3 days → due 4 days ago')
+  eq(m.isOverdue({ due_date: due, status: 'c-prog' }, today), true, '…and overdue')
+  eq(m.isOverdue({ due_date: due, status: 'publish' }, today), false, 'published work is never overdue')
+  eq(m.isOverdue({ due_date: due, kind: 'simple', simple_status: 's-done' }, today), false, 'done simple work is never overdue')
+  // Cairo: 23:30 UTC on 22 Nov is already 23 Nov in Cairo (UTC+2).
+  eq(m.cairoToday(new Date('2026-11-22T23:30:00Z')), '2026-11-23', 'today is Cairo\'s day')
+  eq(m.formatDay('2026-12-15', 'en', '2026-11-23'), 'Tue 15 Dec', 'one format: weekday, day, month')
+  eq(m.formatDay('2027-01-05', 'en', '2026-11-23'), 'Tue 5 Jan 2027', 'with the year when not this year')
+  const list = [{ id: 'a', due_date: null, created_at: '1' }, { id: 'b', due_date: '2026-12-10', publish_date: '2026-12-20', created_at: '2' }, { id: 'c', due_date: '2026-12-10', publish_date: '2026-12-17', created_at: '3' }, { id: 'd', due_date: '2026-12-01', created_at: '4' }]
+  eq([...list].sort(m.compareByDue).map(x => x.id), ['d', 'c', 'b', 'a'], 'due earliest first, ties by publishing date, undated last')
+})
+
 if (failed) process.exitCode = 1

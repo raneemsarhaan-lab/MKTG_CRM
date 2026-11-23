@@ -9,6 +9,7 @@
  * Month or week is a per-device preference (`momentum.calendar.mode`).
  */
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { cairoToday, formatDay, isOverdue } from '@/lib/due-dates'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Brand } from '@/types/index'
@@ -18,10 +19,13 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { dayOf, isoOf, monthGrid, moveMonth, moveWeek, weekGrid } from '@/lib/calendar'
 import type { ViewTask } from './types'
 
+const BY_KEY = 'momentum.calendar.by'
 const MODE_KEY = 'momentum.calendar.mode'
 const done = (t: ViewTask) => (t.kind === 'simple' ? t.simple_status === 's-done' : t.status === 'publish')
 
-export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen }: {
+export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due' }: {
+  /** Which date places a task on a day until the person picks: a brand's Calendar starts on publishing dates. */
+  defaultBy?: 'publish' | 'due'
   tasks: ViewTask[]
   brands: Brand[]
   colorBy?: 'brand' | 'stage'
@@ -35,7 +39,7 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   const locale = useLocale()
   const router = useRouter()
   const [, start] = useTransition()
-  const today = isoOf(new Date())
+  const today = cairoToday()
   const [mode, setMode] = useState<'month' | 'week'>('month')
   const [ym, setYm] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }))
   const [anchor, setAnchor] = useState(today)
@@ -46,10 +50,18 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   // The No date panel (user, 2026-11-22): undated tasks beside the calendar, to drag onto a day.
   const [find, setFind] = useState('')
   const [showDone, setShowDone] = useState(false)
+  // Publishing date or due date: both are on every task, labelled; the person picks which places it.
+  const [by, setBy] = useState<'publish' | 'due'>(defaultBy)
+  const tDates = useTranslations('dates')
 
   useEffect(() => {
     try { const v = window.localStorage.getItem(MODE_KEY); if (v === 'week' || v === 'month') setMode(v) } catch { /* preference */ }
-  }, [])
+    try { const b = window.localStorage.getItem(`${BY_KEY}.${defaultBy}`); if (b === 'publish' || b === 'due') setBy(b) } catch { /* preference */ }
+  }, [defaultBy])
+  function chooseBy(b: 'publish' | 'due') {
+    setBy(b); setMoved({})
+    try { window.localStorage.setItem(`${BY_KEY}.${defaultBy}`, b) } catch { /* preference */ }
+  }
   function chooseMode(m: 'month' | 'week') {
     setMode(m)
     try { window.localStorage.setItem(MODE_KEY, m) } catch { /* preference */ }
@@ -57,7 +69,8 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
 
   const brandOf = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
   const live = tasks.filter(x => !x.dropped_at && (campaign === 'all' || x.project_id === campaign))
-  const dueOf = (x: ViewTask) => (x.id in moved ? moved[x.id] : x.due_date ? x.due_date.slice(0, 10) : null)
+  const field = by === 'publish' ? 'publish_date' : 'due_date'
+  const dueOf = (x: ViewTask) => (x.id in moved ? moved[x.id] : x[field] ? x[field]!.slice(0, 10) : null)
   const byDay = useMemo(() => {
     const m = new Map<string, ViewTask[]>()
     for (const x of live) { const d = dueOf(x); if (d) m.set(d, [...(m.get(d) ?? []), x]) }
@@ -91,15 +104,15 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
     if (before === iso) return
     setMoved(m => ({ ...m, [taskId]: iso }))
     start(async () => {
-      const res = await updateTask(taskId, { due_date: iso }).catch(() => ({ success: false }))
+      const res = await updateTask(taskId, { [field]: iso }).catch(() => ({ success: false }))
       if (!res.success) { setMoved(m => { const n = { ...m }; delete n[taskId]; return n }); return }
       router.refresh()
       const label = iso ? dayOf(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : ''
       setToast({
-        text: iso ? t('moved', { name: task.name, date: label }) : t('cleared', { name: task.name }),
+        text: iso ? t(by === 'publish' ? 'movedPublish' : 'moved', { name: task.name, date: label }) : t('cleared', { name: task.name }),
         undo: () => start(async () => {
           setMoved(m => ({ ...m, [taskId]: before }))
-          await updateTask(taskId, { due_date: before ?? null })
+          await updateTask(taskId, { [field]: before ?? null })
           router.refresh()
           setToast(null)
         }),
@@ -112,10 +125,12 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
     <button key={x.id} type="button" draggable data-cal-task={x.id}
       onDragStart={e => e.dataTransfer.setData('text/plain', x.id)}
       onClick={() => onOpen(x.id)}
-      title={statusName ? `${x.name} · ${statusName(x)}` : x.name}
+      data-overdue={isOverdue(x) ? 'true' : undefined}
+      title={[x.name, statusName?.(x), x.publish_date ? `${tDates('publishShort')} ${formatDay(x.publish_date, locale)}` : '', x.due_date ? `${tDates('dueShort')} ${formatDay(x.due_date, locale)}${x.due_manual ? ' ✎' : ''}` : ''].filter(Boolean).join(' · ')}
       style={{ display: 'block', width: '100%', textAlign: 'start', border: 'none', cursor: 'grab', fontFamily: 'inherit',
         fontSize: 11.5, fontWeight: 600, padding: '3px 6px', borderRadius: 7, color: PIPE.ink, opacity: done(x) ? 0.62 : 1,
         background: `color-mix(in srgb, ${color(x)} 18%, #FFFFFF)`, borderInlineStart: `3px solid ${color(x)}`,
+        ...(isOverdue(x) ? { boxShadow: 'inset 0 0 0 1px #D22040' } : {}),
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
       {done(x) ? '✓ ' : ''}{x.name}
     </button>
@@ -136,6 +151,17 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
               {t(m)}
             </button>
           ))}
+        </div>
+        <div role="group" aria-label={t('by')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: PIPE.textMuted }}>
+          {t('by')}
+          <span style={{ display: 'inline-flex', border: `1px solid ${PIPE.border}`, borderRadius: 9, overflow: 'hidden' }}>
+            {(['publish', 'due'] as const).map(b => (
+              <button key={b} type="button" data-cal-by={b} aria-pressed={by === b} onClick={() => chooseBy(b)}
+                style={{ border: 'none', padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', background: by === b ? PIPE.ink : '#FFFFFF', color: by === b ? '#FFFFFF' : PIPE.ink }}>
+                {t(b === 'publish' ? 'byPublish' : 'byDue')}
+              </button>
+            ))}
+          </span>
         </div>
         {campaigns.length > 0 && (
           <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12.5, color: PIPE.textMuted }}>

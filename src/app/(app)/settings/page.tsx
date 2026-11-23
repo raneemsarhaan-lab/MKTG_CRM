@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { mapMember, mapSlaConfig } from '@/lib/mappers'
 import { SettingsView } from '@/components/settings/SettingsView'
 import { cleanFeatures } from '@/lib/brand-features'
+import { ruleFromSettings } from '@/lib/due-dates'
 import type { WorkspaceSettings } from '@/types/index'
 
 export default async function SettingsPage() {
@@ -57,6 +58,7 @@ export default async function SettingsPage() {
         slaConfig={mapSlaConfig(slaRows)}
         workspaceSettings={workspaceSettings}
         brandFeatureDefaults={cleanFeatures(wsRow?.brand_feature_defaults)}
+        dueRule={ruleFromSettings(wsRow)}
       />
     </div>
   )

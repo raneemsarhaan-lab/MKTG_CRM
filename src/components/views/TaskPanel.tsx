@@ -31,6 +31,7 @@ export function TaskPanel({ data }: { data: BoardData }) {
       stages={[]}
       slaConfig={data.slaConfig}
       today={data.today}
+      dueDaysBefore={data.dueRule.daysBefore}
       brands={data.brands}
       members={data.members}
       contentTypes={data.contentTypes}

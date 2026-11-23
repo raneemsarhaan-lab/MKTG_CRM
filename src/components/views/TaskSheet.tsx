@@ -33,6 +33,8 @@ import { STAGE_META, NINE_STAGE } from '@/lib/stage-meta'
 import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
 import { matchSimpleWord, matchWord, wordOf, SIMPLE_KEYS, type SimpleKey, type SpaceWords } from '@/lib/space-words'
 import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
+import { formatDay, isOverdue } from '@/lib/due-dates'
+import { ManualMark } from '@/components/shared/DueDates'
 import { canActOn } from '@/lib/task-access'
 import { setSimpleStatus, setTaskStage, updateTask, type TaskPatch } from '@/actions/tasks'
 import { myNotes, setMyNote } from '@/actions/my-notes'
@@ -80,6 +82,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const tcol = useTranslations('sheet.columns')
   const tSpaces = useTranslations('spaces')
   const tFeat = useTranslations('spaces.features')
+  const tDates = useTranslations('dates')
   const locale = useLocale()
   const router = useRouter()
   const selectTask = useUIStore(s => s.selectTask)
@@ -164,6 +167,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       case 'status': return x.kind === 'simple' ? simpleWord(x.simple_status ?? 's-todo') : stageWord(x.status)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
+      case 'publish': return x.publish_date ?? ''
       case 'type': return x.content_type_label ?? ''
       case 'priority': return x.priority ? t(`priority.${x.priority}`) : ''
       case 'platform': return x.platform ?? ''
@@ -238,9 +242,16 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
         return m.id === x.assignee_id ? null : patch(x, { assignee_id: m.id }, { assignee_id: m.id })
       }
       case 'due': {
-        if (!text) return patch(x, { due_date: null }, { due_date: null })
+        // Typed by a person: set by hand (✎); "Reset to auto" is in the task panel.
+        if (!text) return patch(x, { due_date: null }, { due_date: null, due_manual: true })
         const d = readDay(text)
-        return d ? patch(x, { due_date: d }, { due_date: d }) : t('badDate', { text })
+        return d ? patch(x, { due_date: d }, { due_date: d, due_manual: true }) : t('badDate', { text })
+      }
+      case 'publish': {
+        // A new publishing date moves an automatic due date (worked out on the server; the refresh brings it).
+        if (!text) return patch(x, { publish_date: null }, { publish_date: null })
+        const d = readDay(text)
+        return d ? patch(x, { publish_date: d }, { publish_date: d }) : t('badDate', { text })
       }
       case 'priority': {
         const p = matchPriority(text)
@@ -342,7 +353,11 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (isCustom(col)) return cl.custom.render(x as unknown as Task, col)
       if (offFeatureFor(x.brand, col)) return <span data-feature-off={offFeatureFor(x.brand, col)!} title={tFeat('hidden', { brand: x.brand?.name ?? '' })} aria-label={tFeat('hidden', { brand: x.brand?.name ?? '' })} style={{ display: 'block', width: '100%', height: '100%' }} />
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
-      if (col === 'due' && x.due_date) return <span className="fx-sheet-ellipsis">{new Date(`${x.due_date}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+      if (col === 'due' && x.due_date) {
+        const late = isOverdue(x)
+        return <span className="fx-sheet-ellipsis" data-due-cell={x.due_date} style={late ? { color: '#D22040' } : undefined}>{formatDay(x.due_date, locale)}{x.due_manual && <ManualMark label={tDates('manual')} />}</span>
+      }
+      if (col === 'publish' && x.publish_date) return <span className="fx-sheet-ellipsis" data-publish-cell={x.publish_date}>{formatDay(x.publish_date, locale)}</span>
       const s = shown(x, col)
       if (col === 'status' && s) {
         const board = x.kind === 'simple' ? simpleBoard(x.simple_status ?? 's-todo') : boardWord(x.status)
@@ -352,8 +367,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
     isDraft: () => false,
     inputLabel: (row, col) => (row.kind === 'task' ? `${row.task.name} · ${headerText(col)}` : headerText(col)),
-    inputPlaceholder: (_row, col) => (col === 'due' ? '2026-12-01' : undefined),
-    inputDir: col => (col === 'due' ? 'ltr' : undefined),
+    inputPlaceholder: (_row, col) => (col === 'due' || col === 'publish' ? '2026-12-01' : undefined),
+    inputDir: col => (col === 'due' || col === 'publish' ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)

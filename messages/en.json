@@ -680,7 +680,7 @@
       "post": "LinkedIn Link",
       "published": "Published Link",
       "pillar": "Pillar",
-      "date": "Date",
+      "date": "Publishing date",
       "archive": "Archive or restore"
     },
     "theme": {
@@ -995,7 +995,8 @@
       "priority": "Priority",
       "name": "Name (A–Z)",
       "created": "Newest created",
-      "updated": "Recently updated"
+      "updated": "Recently updated",
+      "publish": "Publishing date"
     },
     "board": "Board",
     "sheet": "Sheet",
@@ -3001,7 +3002,8 @@
       "due": "Due date",
       "name": "Name",
       "priority": "Priority",
-      "stage": "Stage"
+      "stage": "Stage",
+      "publish": "Publishing date"
     },
     "fields": "Fields",
     "save": "Save view",
@@ -3050,7 +3052,11 @@
     "cleared": "\"{name}\" has no date now.",
     "noMatch": "No undated task matches.",
     "allDated": "Every task here has a date.",
-    "dragHint": "Drag a task onto a day to give it a date. Drop one here to clear its date."
+    "dragHint": "Drag a task onto a day to give it a date. Drop one here to clear its date.",
+    "by": "Show by",
+    "byPublish": "Publishing date",
+    "byDue": "Due date",
+    "movedPublish": "\"{name}\" now publishes {date}. Its due date follows unless set by hand."
   },
   "handoff": {
     "title": "Where should this task show?",
@@ -3085,11 +3091,12 @@
       "brand": "Brand",
       "status": "Status",
       "assignee": "Assignee",
-      "due": "Due",
+      "due": "Due date",
       "type": "Type",
       "priority": "Priority",
       "platform": "Platform",
-      "notes": "My notes"
+      "notes": "My notes",
+      "publish": "Publishing date"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3121,5 +3128,55 @@
     "rowsHelp": "Every task this page shows is a row. Change which tasks with the page's filters or a saved view.",
     "groupDefault": "This page's groups",
     "unknownStageList": "“{text}” isn't a status here. Try: {list}."
+  },
+  "dates": {
+    "publish": "Publishing date",
+    "publishShort": "Publishing",
+    "due": "Due date",
+    "dueShort": "Due",
+    "manual": "Set by hand",
+    "manualHint": "Set by hand: a new publishing date won't move it.",
+    "autoHint": "Worked out from the publishing date ({days} days before, off weekends).",
+    "reset": "Reset to auto",
+    "resetDone": "Due date worked out again from the publishing date.",
+    "overdue": "{n}d overdue",
+    "left": "{n}d left",
+    "today": "Due today",
+    "none": "No date",
+    "sortReset": "Reset to default sort",
+    "sortSaved": "Sorted by {name} on this board.",
+    "settings": {
+      "tab": "Due Dates",
+      "title": "Due dates",
+      "help": "A task's due date is worked out from its publishing date. People can still set it by hand; those stay as they are.",
+      "daysBefore": "Days before publishing date",
+      "weekend": "Weekend days",
+      "shift": "If the due date falls on a weekend",
+      "earlier": "Move earlier",
+      "later": "Move later",
+      "example": "Example",
+      "exampleLine": "Publishing {publish} → Due {due}",
+      "exampleShift": "lands on {day}, moves to {due}",
+      "save": "Save",
+      "saving": "Saving…",
+      "allWeekend": "At least one day must be a working day.",
+      "badDays": "Use a whole number from 0 to 365.",
+      "confirmTitle": "Update due dates?",
+      "confirmBody": "{n, plural, =0 {No open task needs a new due date.} one {# open task will get a new due date.} other {# open tasks will get a new due date.}} Due dates set by hand, and published or done tasks, stay as they are.",
+      "confirm": "Save and update",
+      "cancel": "Cancel",
+      "saved": "Saved. {n, plural, =0 {No due dates changed.} one {# due date updated.} other {# due dates updated.}}",
+      "failed": "Couldn't save: {reason}",
+      "timezone": "Dates are days in Cairo (Africa/Cairo).",
+      "days": {
+        "0": "Sun",
+        "1": "Mon",
+        "2": "Tue",
+        "3": "Wed",
+        "4": "Thu",
+        "5": "Fri",
+        "6": "Sat"
+      }
+    }
   }
 }

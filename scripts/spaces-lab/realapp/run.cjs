@@ -41,6 +41,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-us3.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-us4.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-tasklink.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-dates.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {

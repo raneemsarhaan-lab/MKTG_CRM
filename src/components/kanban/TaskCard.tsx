@@ -6,6 +6,8 @@ import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn } from '@/lib/brand-features'
 import { useTaskLinkNames } from './TaskLinks'
+import { TaskDates } from '@/components/shared/DueDates'
+import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import { useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
@@ -93,9 +95,11 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const tViews   = useTranslations('views')
   const alert    = getAlertStatus(task, slaConfig, today)
   const chip     = CHIP[alert]
-  const daysLeft = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
-  const overdue  = daysLeft !== null && daysLeft < 0
-  const dueLabel = daysLeft === null
+  const daysLeft = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
+  // Published or done work is never overdue (and shows no count).
+  const overdue  = isOverdue(task as Parameters<typeof isOverdue>[0])
+  const open     = task.kind === 'simple' ? task.simple_status !== 's-done' : task.status !== 'publish'
+  const dueLabel = daysLeft === null || !open
     ? ''
     : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
@@ -195,6 +199,9 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       }}>
         {task.name}
       </div>
+
+      {/* Publishing and due dates, each labelled (✎ on a due date set by hand). */}
+      <div style={{ marginTop: 5 }}><TaskDates task={task} size={10.5} /></div>
 
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>

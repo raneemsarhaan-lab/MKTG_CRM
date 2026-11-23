@@ -1,5 +1,6 @@
 'use server'
 
+import { datesFor } from '@/lib/due-dates-server'
 import { needsHandoff } from '@/lib/spaces'
 import { addAssigneeSpaces, addSpaces, loadSpaceContext } from '@/lib/spaces-server'
 
@@ -327,6 +328,8 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
 export interface PiecePatch {
   pillar_id?: string | null
   due_date?: string | null
+  /** The Content sheet's Date: the day the piece goes live. Moves an automatic due date. */
+  publish_date?: string | null
   post_url?: string | null
   published_url?: string | null
 }
@@ -346,11 +349,10 @@ export async function updatePiece(taskId: string, patch: PiecePatch): Promise<{ 
     }
     data.pillar_id = patch.pillar_id || null
   }
-  if (patch.due_date !== undefined) {
-    if (patch.due_date && !/^\d{4}-\d{2}-\d{2}$/.test(patch.due_date)) return { success: false, error: 'bad_date' }
-    const d = patch.due_date ? new Date(`${patch.due_date}T00:00:00Z`) : null
-    if (d && Number.isNaN(d.getTime())) return { success: false, error: 'bad_date' }
-    data.due_date = d
+  if (patch.due_date !== undefined || patch.publish_date !== undefined) {
+    const dates = await datesFor(task, { due_date: patch.due_date, publish_date: patch.publish_date })
+    if (typeof dates === 'string') return { success: false, error: 'bad_date' }
+    Object.assign(data, dates)
   }
   for (const k of ['post_url', 'published_url'] as const) {
     const v = patch[k]

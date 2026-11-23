@@ -23,6 +23,8 @@ export interface BulkPatch {
   content_type_label?: string
   priority?:           'Low' | 'Medium' | 'High'
   due_date?:           string
+  /** The Content sheet's Date: the publishing date (its due date follows unless set by hand). */
+  publish_date?:       string
 }
 
 /** The choices the bar can offer. The board shows its six; the Video sheet picks its own (design/video-sheet-bulk-bar.html). */

@@ -99,7 +99,7 @@ export const content = [
     id: 'cus1-2', hash: C,
     async run(t) {
       const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
-      t.eq(heads, ['Title', 'Type', 'Status', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Date', 'Archive or restore'], 'piece columns')
+      t.eq(heads, ['Title', 'Type', 'Status', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Publishing date', 'Archive or restore'], 'piece columns')
       t.eq(await t.page.getAttribute('[data-cell="t:th-strategy|title"]', 'class').then(c => c.includes('is-span')), true, 'the theme row spans the columns')
     },
   },
@@ -443,8 +443,9 @@ export const content = [
       await t.page.locator('[data-cell="k:v1|date"] input').fill('20/11/2026')
       await t.page.keyboard.press('Enter')
       await t.idle(150)
-      t.eq((await t.task('v1')).due_date, '2026-11-20', 'due date')
-      t.assert((await t.text('k:v1', 'date')).includes('Due 20 Nov'), 'shown')
+      // The Date column is the publishing date (its due date is worked out on the server).
+      t.eq((await t.task('v1')).publish_date, '2026-11-20', 'publishing date')
+      t.assert((await t.text('k:v1', 'date')).includes('20 Nov'), 'shown')
       await t.cell('k:v1', 'pillar').click()
       await t.page.locator('[data-menu-item="pl-ai"]').click()
       await t.idle(150)

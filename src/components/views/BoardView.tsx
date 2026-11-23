@@ -10,7 +10,9 @@ import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import type { ContentTheme, Task } from '@/types/index'
 import type { BoardData } from './types'
 
-export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope }: {
+export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope, boardKey }: {
+  /** Which board, for the member's saved sort. */
+  boardKey?: string
   data: BoardData
   scopeTasks: (t: Task) => boolean
   spaceId?: string
@@ -27,6 +29,7 @@ export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetSco
       spaceId={spaceId}
       sheetScope={sheetScope}
       themeScope={themeScope}
+      boardKey={boardKey}
     />
   )
 }

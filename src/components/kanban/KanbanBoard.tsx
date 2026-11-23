@@ -33,6 +33,7 @@ import {
 } from './BoardFilters'
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
+import { setBoardSort } from '@/actions/views'
 import { SortMenu, sortTasks, DEFAULT_SORT, SORT_KEYS, type SortKey } from '@/components/board/SortMenu'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
@@ -108,6 +109,12 @@ interface KanbanBoardProps {
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
   /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
   workspaceNineStage?: boolean
+  /** The due-date rule (Settings › Due Dates). */
+  dueRule?: import('@/lib/due-dates').DueRule
+  /** Which board this is, for the member's saved sort ('board', 'space:<id>', 'brand:<id>', 'me'). */
+  boardKey?: string
+  /** The member's saved sort per board. */
+  boardSorts?: Record<string, string>
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -136,6 +143,9 @@ export function KanbanBoard({
   spaceMembers = [],
   taskSpaces = [],
   workspaceNineStage = false,
+  dueRule,
+  boardKey,
+  boardSorts,
 }: KanbanBoardProps) {
   const embedded = surface === 'sheets'
   /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
@@ -299,14 +309,17 @@ export function KanbanBoard({
    * way as `scope` above — the server's own default order already matches
    * 'due', so there is no first-paint flash while this settles.
    */
-  const [sortBy, setSortBy] = useState<SortKey>(DEFAULT_SORT)
-  useEffect(() => {
-    const stored = window.localStorage.getItem('momentum.board.sort')
-    if (stored && (SORT_KEYS as string[]).includes(stored)) setSortBy(stored as SortKey)
-  }, [])
+  // Saved per person per board, on the server, so it follows them across sessions and devices.
+  const board = boardKey ?? (spaceId ? `space:${spaceId}` : 'board')
+  const savedSort = boardSorts?.[board]
+  const [sortBy, setSortBy] = useState<SortKey>(savedSort && (SORT_KEYS as string[]).includes(savedSort) ? savedSort as SortKey : DEFAULT_SORT)
   function chooseSort(next: SortKey) {
     setSortBy(next)
-    try { window.localStorage.setItem('momentum.board.sort', next) } catch { /* private mode */ }
+    void setBoardSort(board, next === DEFAULT_SORT ? null : next)
+  }
+  function resetSort() {
+    setSortBy(DEFAULT_SORT)
+    void setBoardSort(board, null)
   }
 
   /**
@@ -723,7 +736,7 @@ export function KanbanBoard({
       if (!before) return { success: false, error: 'not_found' }
       patchTask(taskId, patch as Partial<FullTask>)
       const res = await updatePiece(taskId, patch).catch(() => ({ success: false as const, error: 'generic' }))
-      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, post_url: before.post_url, published_url: before.published_url })
+      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, publish_date: before.publish_date, post_url: before.post_url, published_url: before.published_url })
       else router.refresh()
       return res
     },
@@ -1055,6 +1068,7 @@ export function KanbanBoard({
       stages={[]}
       slaConfig={slaConfig}
       today={today}
+      dueDaysBefore={dueRule?.daysBefore}
       brands={brands}
       members={members}
       contentTypes={contentTypes}
@@ -1134,6 +1148,7 @@ export function KanbanBoard({
       spaceId={spaceId ?? null}
       spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
       spaceKinds={Object.fromEntries(spaces.map(x => [x.id, x.default_kind]))}
+      dueRule={dueRule}
     />
   )
 
@@ -1215,7 +1230,7 @@ export function KanbanBoard({
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}
           filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
-          sort={<SortMenu value={sortBy} onChange={chooseSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
+          sort={<SortMenu value={sortBy} onChange={chooseSort} onReset={resetSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
           view="board"
           onView={v => setView(v)}
           display={

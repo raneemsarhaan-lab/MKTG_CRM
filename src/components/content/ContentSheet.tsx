@@ -179,8 +179,10 @@ export function ContentSheet(p: ContentSheetProps) {
   const bulkMessage = (changed: number, refused: number) =>
     (refused ? t('bulk.doneSome', { n: changed, m: refused }) : t('bulk.done', { n: changed }))
   /** The board's bulk save, then one Undo that puts every changed piece back as it was. */
-  async function bulkApply(patch: BulkPatch) {
+  async function bulkApply(given: BulkPatch) {
     if (!p.api.bulkUpdate || !bulkTasks.length) return
+    // The Content sheet's Date is the publishing date: a bulk date sets that, and due dates follow.
+    const patch: BulkPatch = given.due_date !== undefined ? { publish_date: given.due_date } : given
     const key = Object.keys(patch)[0] as keyof BulkPatch
     const before = bulkTasks.map(x => ({ id: x.id, old: (x as unknown as Record<string, unknown>)[key] as string | null | undefined }))
     setBulkBusy(true)
@@ -196,7 +198,7 @@ export function ContentSheet(p: ContentSheetProps) {
       const groups = new Map<string, string[]>()
       for (const b of before) { const k = b.old ?? ''; groups.set(k, [...(groups.get(k) ?? []), b.id]) }
       for (const [old, ids] of groups) {
-        const value = key === 'due_date' ? (old ? old.slice(0, 10) : '') : old
+        const value = key === 'due_date' || key === 'publish_date' ? (old ? old.slice(0, 10) : '') : old
         await p.api.bulkUpdate?.(ids, { [key]: value } as BulkPatch)
       }
     }
@@ -361,7 +363,7 @@ export function ContentSheet(p: ContentSheetProps) {
     if (col === 'date') {
       const d = readDate(value)
       if (d === null) return t('date.badDate')
-      const r = await p.api.updatePiece(task.id, { due_date: d || null })
+      const r = await p.api.updatePiece(task.id, { publish_date: d || null })
       return r.success ? null : why(r.error)
     }
     return null

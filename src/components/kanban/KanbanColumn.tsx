@@ -1,7 +1,14 @@
 'use client'
 
 import { useDroppable } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, type SortingStrategy } from '@dnd-kit/sortable'
+
+/**
+ * Cards keep the board's sort (due date by default): dragging one only moves
+ * it to another stage, never reorders it within a column, so cards don't
+ * shuffle out of the way while it is carried.
+ */
+const keepOrder: SortingStrategy = () => null
 import type { Task, Member, SLAConfig, StageMeta, StageId } from '@/types/index'
 import { PIPE, PIPE_ACCENT } from '@/lib/pipeline-tokens'
 import { TaskCard } from './TaskCard'
@@ -117,7 +124,7 @@ export function KanbanColumn({
         padding: '0 6px 10px', display: 'flex', flexDirection: 'column', gap: 10,
         flex: 1, minHeight: 96, overflowY: 'auto',
       }}>
-        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={tasks.map(t => t.id)} strategy={keepOrder}>
           {tasks.map(task => (
             <TaskCard
               key={task.id}

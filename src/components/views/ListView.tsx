@@ -13,6 +13,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { initials, avatarColor } from '@/lib/utils'
 import { featureOn } from '@/lib/brand-features'
+import { TaskDates } from '@/components/shared/DueDates'
 import { SIMPLE_STATUSES } from '@/lib/simple-status'
 import type { ViewTask } from './types'
 
@@ -96,7 +97,8 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                   {late && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '1px 6px', borderRadius: 6, background: ALERT_BADGE_STYLES[sla].bg, color: ALERT_BADGE_STYLES[sla].text }}>SLA</span>}
                   {group === 'brand' && task.kind !== 'simple' && <Pill stage={task.status} label={name(task.status)} board={STAGE_META[task.status]?.label_en} />}
                   {who && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
-                  <span style={{ fontSize: 11.5, color: PIPE.textMuted, minWidth: 44, textAlign: 'end' }}>{task.due_date ? new Date(task.due_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</span>
+                  {/* Publishing and due dates, each labelled (spec: both on every task). */}
+                  <span style={{ minWidth: 44, textAlign: 'end' }}>{task.publish_date || task.due_date ? <TaskDates task={task} /> : <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>—</span>}</span>
                 </span>
               </button>
             )

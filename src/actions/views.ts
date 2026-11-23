@@ -43,6 +43,23 @@ export async function setTabPrefs(node: string, prefs: TabPrefs): Promise<{ succ
   return { success: true, prefs: clean }
 }
 
+/**
+ * This member's sort on one board ('board', 'space:<id>', 'brand:<id>', 'me').
+ * Null goes back to the default (due date, earliest first) and forgets the choice.
+ */
+export async function setBoardSort(board: string, sort: string | null): Promise<{ success: true } | Fail> {
+  const m = await getSessionMember()
+  if (!m) return { success: false, error: 'not_authenticated' }
+  if (typeof board !== 'string' || !/^(board|me|(space|brand):[0-9a-f-]{36})$/.test(board)) return { success: false, error: 'invalid' }
+  if (sort !== null && !['due', 'publish', 'priority', 'name', 'created', 'updated'].includes(sort)) return { success: false, error: 'invalid' }
+  const row = await prisma.member.findUnique({ where: { id: m.id }, select: { board_sorts: true } })
+  const all = { ...((row?.board_sorts ?? {}) as Record<string, string>) }
+  if (sort === null) delete all[board]
+  else all[board] = sort
+  await prisma.member.update({ where: { id: m.id }, data: { board_sorts: all } })
+  return { success: true }
+}
+
 export async function saveView(input: { id?: string; node: string; type: ViewType; name: string; config: unknown; personal: boolean }): Promise<{ success: true; id: string } | Fail> {
   const m = await getSessionMember()
   if (!m) return { success: false, error: 'not_authenticated' }

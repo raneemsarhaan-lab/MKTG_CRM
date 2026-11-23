@@ -7,6 +7,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
+import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
 import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 import { linkedKeyOf, wordsFor } from '@/lib/space-words'
@@ -78,7 +79,7 @@ export async function loadBoardData(member: SessionMember) {
     // The Inbox (spec 006): this member's read mentions, live put-offs and prefs.
     prisma.mentionRead.findMany({ where: { member_id: member.id }, select: { comment_id: true } }),
     prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
-    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true } }),
+    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true, board_sorts: true } }),
     // Sheet columns the team has shaped, and custom values (spec 010).
     // Spec 021: a member's private My notes columns (sheet 'me:<id>') are never loaded for anyone's sheets.
     // T081: a My tasks sheet's columns ('tasks:me:<id>') reach only their owner.
@@ -94,15 +95,15 @@ export async function loadBoardData(member: SessionMember) {
     // Spec 021 (US3, R5): the Content and Video Spaces' words are their sheet's words.
     prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } }),
     // Spec 021 (US4, R11): the workspace's default feature switches for brands.
-    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true, due_days_before: true, due_weekend_days: true, due_weekend_shift: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
   const values: Record<string, Record<string, string>> = {}
   for (const v of sheetValues) (values[v.column_id] ??= {})[v.task_id] = v.value
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // Today is Cairo's day, at UTC midnight like every stored date (src/lib/due-dates.ts).
+  const today = dayDate(cairoToday())
 
   // Spec 021 (US4): brands carry their switches resolved, and so does each task's brand.
   const brandFeatureDefaults = cleanFeatures(ws?.brand_feature_defaults)
@@ -118,6 +119,10 @@ export async function loadBoardData(member: SessionMember) {
     brands: resolvedBrands,
     brandFeatureDefaults,
     workspaceNineStage: ws?.nine_stage_default ?? false,
+    // This member's sort per board; a missing board means due date (the default).
+    boardSorts: (prefs?.board_sorts ?? {}) as Record<string, string>,
+    // The due-date rule (Settings › Due Dates).
+    dueRule: ruleFromSettings(ws),
     contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label })),
     slaConfig: mapSlaConfig(slaRows),
     themes: themes.map(mapTheme),

@@ -26,7 +26,8 @@ export function piecesOf(tasks: Task[], themeId: string): Task[] {
 }
 
 export function comparePieces(a: Task, b: Task): number {
-  const da = a.due_date ?? '9999', db = b.due_date ?? '9999'
+  // By publishing date (the Content sheet's Date), then due date.
+  const da = a.publish_date ?? a.due_date ?? '9999', db = b.publish_date ?? b.due_date ?? '9999'
   if (da !== db) return da < db ? -1 : 1
   return a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1
 }

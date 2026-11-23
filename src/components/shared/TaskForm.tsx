@@ -1,5 +1,6 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { cairoToday, calcDueDate, DEFAULT_RULE, formatDay, type DueRule } from '@/lib/due-dates'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -56,6 +57,8 @@ interface TaskFormProps {
   spaceChoices?: { id: string; name: string }[]
   /** Spec 021: each Space's default kind — a new task takes the stages of the Space it's created in. */
   spaceKinds?: Record<string, string>
+  /** The due-date rule, for the due date shown while it's still automatic. */
+  dueRule?: DueRule
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email'] as const
@@ -100,7 +103,9 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceKinds = {} }: TaskFormProps) {
+export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceKinds = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
+  const tDates = useTranslations('dates')
+  const locale = useLocale()
   const tViews = useTranslations('views')
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const router = useRouter()
@@ -118,7 +123,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   // (fresh initial content) after "Create and add another" clears the brief.
   const [descKey, setDescKey] = useState(0)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = cairoToday()
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -129,7 +134,10 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
     // The assignee starts as them too and is the thing intake actually picks.
     task_owner_id: currentUser.id,
     assignee_id:   currentUser.id,
-    due_date: today,
+    // Publishing date first; the due date follows it until someone sets it by hand.
+    publish_date: '',
+    due_date: '',
+    due_touched: false,
     hours_estimate: 2,
     priority: 'Medium' as typeof PRIORITIES[number],
     project_id: '',
@@ -179,7 +187,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
-        due_date:           form.due_date,
+        publish_date:       form.publish_date || null,
+        due_date:           form.due_touched ? form.due_date || null : null,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
         project_id:         form.project_id || null,
@@ -207,7 +216,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
-        due_date:           form.due_date,
+        publish_date:       form.publish_date || null,
+        due_date:           form.due_touched ? form.due_date || null : null,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
         project_id:         form.project_id || null,
@@ -230,6 +240,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   }
 
   const brand  = brands.find(b => b.id === form.brand_id)
+  // The due date as it will be saved: set by hand, or from the publishing date.
+  const shownDue = form.due_touched ? form.due_date : form.publish_date ? calcDueDate(form.publish_date, dueRule) : ''
   // Spec 021 (US4): the chosen brand's switched-off fields aren't offered.
   const on = (k: BrandFeatureKey) => featureOn(brand, k)
   const assignee = members.find(m => m.id === form.assignee_id)
@@ -412,16 +424,38 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               </span>
             )}
 
-            <FieldPill label="Due date" value={shortDate(form.due_date)} active width={220}
+            <FieldPill label={tDates('publish')} value={form.publish_date ? formatDay(form.publish_date, locale) : tDates('none')} active width={220}
                        icon={<Icon d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}>
               {closePill => (
                 <PillInput
                   type="date"
-                  value={form.due_date}
-                  min={today}
-                  onChange={e => patch('due_date', e.target.value)}
+                  value={form.publish_date}
+                  data-form-publish=""
+                  onChange={e => patch('publish_date', e.target.value)}
                   onBlur={closePill}
                 />
+              )}
+            </FieldPill>
+
+            {/* Worked out from the publishing date until set by hand (then ✎). */}
+            <FieldPill label={tDates('due')} value={shownDue ? `${formatDay(shownDue, locale)}${form.due_touched ? ' ✎' : ''}` : tDates('none')} active width={220}
+                       icon={<Icon d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}>
+              {closePill => (
+                <>
+                  <PillInput
+                    type="date"
+                    value={shownDue}
+                    data-form-due=""
+                    onChange={e => setForm(f => ({ ...f, due_date: e.target.value, due_touched: true }))}
+                    onBlur={closePill}
+                  />
+                  {form.due_touched && (
+                    <button type="button" data-form-due-reset="" onClick={() => setForm(f => ({ ...f, due_date: '', due_touched: false }))}
+                            style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', color: CU.muted }}>
+                      {tDates('reset')}
+                    </button>
+                  )}
+                </>
               )}
             </FieldPill>
 

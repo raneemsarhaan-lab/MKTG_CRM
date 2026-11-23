@@ -23,7 +23,9 @@ import { Brief } from '@/components/shared/Brief'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { shortName } from '@/lib/attachments'
 import { makeUploader, uploadToStorage, shrinkImage } from '@/lib/attachment-upload'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { cairoToday, daysBetween, formatDay, isOverdue } from '@/lib/due-dates'
+import { ManualMark } from '@/components/shared/DueDates'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { AttachmentsSection, type AttachmentsHandle, type UploadFn } from './attachments/AttachmentsSection'
 import { CommentFileChip } from './attachments/CommentFileChip'
@@ -88,6 +90,8 @@ interface TaskModalProps {
   task: FullTask
   /** Spec 021: the task's Task link fields ("Part of ↗ …" with ⇄ and ×), shown under Fields. */
   linksSection?: React.ReactNode
+  /** The workspace's days-before for the due-date rule (the hover on an automatic due date). */
+  dueDaysBefore?: number
   currentUser: Member
   stages: Stage[]
   slaConfig: SLAConfig
@@ -479,7 +483,7 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
-  spaces = [], taskSpaces = [], linksSection,
+  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -629,6 +633,8 @@ export function TaskModal({
       ? { video: task.parent_task_id, row: task.id }
       : null
   const tsheet = useTranslations('sheet')
+  const tDates = useTranslations('dates')
+  const locale = useLocale()
   const tSpaces = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
   function openSheet() {
@@ -646,8 +652,9 @@ export function TaskModal({
   // The board's query includes the relation; a panel opened from elsewhere may
   // only have the id, so fall back to the member list.
   const assignee  = task.assignee ?? members.find(m => m.id === task.assignee_id) ?? null
-  const daysLeft  = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
-  const overdue   = daysLeft !== null && daysLeft < 0
+  // Days are Cairo days (src/lib/due-dates.ts); published or done work is never overdue.
+  const daysLeft  = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
+  const overdue   = isOverdue(task as Parameters<typeof isOverdue>[0])
 
   /**
    * The task's files as the Attachments section has them (spec 007). The
@@ -1799,26 +1806,44 @@ export function TaskModal({
                   />
                 </Prop>
 
-                <Prop icon="calendar" label="Due date">
+                {/* Publishing date: set by people. It moves an automatic due date. */}
+                <Prop icon="calendar" label={tDates('publish')}>
+                  <span data-publish-date={task.publish_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
+                    <InlineValue
+                      canEdit={canEdit} type="date" value={task.publish_date ?? ''}
+                      display={task.publish_date ? formatDay(task.publish_date, locale) : ''}
+                      onCommit={v => applyPatch({ publish_date: v || null })}
+                    />
+                  </span>
+                </Prop>
+
+                <Prop icon="calendar" label={tDates('due')}>
                   {/* The InlineValue button fills its parent, so it gets a
                       shrink-to-fit box of its own — otherwise it claims the
                       whole row and knocks the overdue count onto a line by
                       itself, which then drags the label out of alignment. */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <span style={{ flex: '0 1 auto', minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap' }}>
+                    <span data-due-date={task.due_date ?? ''} data-due-manual={task.due_manual ? 'true' : 'false'} style={{ flex: '0 1 auto', minWidth: 0 }}
+                          title={task.due_date ? (task.due_manual ? tDates('manualHint') : task.publish_date ? tDates('autoHint', { days: dueDaysBefore }) : undefined) : undefined}>
                       <InlineValue
                         canEdit={canEdit} type="date" value={task.due_date ?? ''}
-                        display={task.due_date ? fmtDate(task.due_date) : ''}
-                        onCommit={v => applyPatch({ due_date: v })}
+                        display={task.due_date ? <>{formatDay(task.due_date, locale)}{task.due_manual && <ManualMark label={tDates('manual')} />}</> : ''}
+                        onCommit={v => applyPatch({ due_date: v || null })}
                       />
                     </span>
-                    {daysLeft !== null && (
-                      <span style={{
+                    {daysLeft !== null && (task.status !== 'publish') && (
+                      <span data-due-count="" style={{
                         flexShrink: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
                         color: overdue ? '#D22040' : CU.faint,
                       }}>
-                        {Math.abs(daysLeft)}d {overdue ? 'overdue' : 'left'}
+                        {overdue ? tDates('overdue', { n: Math.abs(daysLeft) }) : daysLeft === 0 ? tDates('today') : tDates('left', { n: daysLeft })}
                       </span>
+                    )}
+                    {canEdit && task.due_manual && (
+                      <button type="button" data-due-reset="" onClick={() => void applyPatch({ due_reset: true })}
+                              style={{ border: 'none', background: 'none', padding: '0 2px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: CU.label, textDecoration: 'underline', cursor: 'pointer' }}>
+                        {tDates('reset')}
+                      </button>
                     )}
                   </span>
                 </Prop>

@@ -8,10 +8,10 @@ import { NINE_STAGE } from '@/lib/stage-meta'
 
 export type ViewFilterKey = 'brand' | 'assignee' | 'type' | 'campaign'
 export type ViewGroup = 'stage' | 'brand'
-export type ViewSort = 'due' | 'name' | 'priority' | 'stage'
+export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage'
 export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign']
-export const VIEW_SORTS: ViewSort[] = ['due', 'name', 'priority', 'stage']
-export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'due', 'type', 'priority', 'platform'] as const
+export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
+export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'due', 'type', 'priority', 'platform'] as const
 
 export interface ViewConfig {
   filters: Partial<Record<ViewFilterKey, string[]>>
@@ -42,7 +42,7 @@ export function cleanConfig(raw: unknown): ViewConfig {
 
 export interface ViewableTask {
   name: string; status: string; brand_id: string; assignee_id?: string | null
-  content_type_label?: string | null; project_id?: string | null; due_date?: string | null; priority?: string | null
+  content_type_label?: string | null; project_id?: string | null; due_date?: string | null; publish_date?: string | null; priority?: string | null
 }
 
 const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
@@ -57,7 +57,9 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
   if (!c.sort) return out
   const key = (x: T): [number, string] => {
     switch (c.sort) {
-      case 'due': return x.due_date ? [0, x.due_date] : [1, '']
+      // Due date, earliest first, undated last; ties by publishing date.
+      case 'due': return x.due_date ? [0, `${x.due_date.slice(0, 10)}|${x.publish_date?.slice(0, 10) ?? '9999'}`] : [1, '']
+      case 'publish': return x.publish_date ? [0, `${x.publish_date.slice(0, 10)}|${x.due_date?.slice(0, 10) ?? '9999'}`] : [1, '']
       case 'priority': return [PRIORITY_RANK[x.priority ?? ''] ?? 3, '']
       case 'stage': return [NINE_STAGE.indexOf(x.status as never), '']
       default: return [0, x.name.toLowerCase()]

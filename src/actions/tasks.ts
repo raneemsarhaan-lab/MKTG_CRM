@@ -1,5 +1,6 @@
 'use server'
 
+import { datesFor, newTaskDates } from '@/lib/due-dates-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
@@ -218,7 +219,11 @@ export interface TaskPatch {
   task_owner_id?:      string
   /** Null hands the task back to nobody. */
   assignee_id?:        string | null
-  due_date?:           string | null   // ISO yyyy-mm-dd; null or '' clears it
+  due_date?:           string | null   // ISO yyyy-mm-dd; null or '' clears it. Marks it set by hand.
+  /** The day the content goes live (yyyy-mm-dd, Cairo); null clears it. Moves an automatic due date. */
+  publish_date?:       string | null
+  /** "Reset to auto": forget the hand-set due date and work it out from the publishing date. */
+  due_reset?:          boolean
   hours_estimate?:     number
   priority?:           'Low' | 'Medium' | 'High'
   cover_image_url?:    string
@@ -257,12 +262,10 @@ export async function updateTask(
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
   if (patch.priority !== undefined)           data.priority           = patch.priority
 
-  if (patch.due_date === null || patch.due_date === '') data.due_date = null
-  else if (patch.due_date !== undefined) {
-    const d = new Date(patch.due_date)
-    if (Number.isNaN(d.getTime())) return { success: false, error: 'Invalid due date' }
-    data.due_date = d
-  }
+  // Publishing and due dates: a due date set here is set by hand; a new publishing date moves an automatic one.
+  const dates = await datesFor(task, patch)
+  if (typeof dates === 'string') return { success: false, error: dates }
+  Object.assign(data, dates)
   if (patch.hours_estimate !== undefined) {
     const h = Number(patch.hours_estimate)
     if (!Number.isFinite(h) || h < 0 || h > 999) return { success: false, error: 'Invalid estimate' }
@@ -354,6 +357,8 @@ export async function createSubtask(
       status:             'todo',
       stage_date:         new Date(),
       due_date:           parent.due_date,
+      publish_date:       parent.publish_date,
+      due_manual:         parent.due_manual,
       hours_estimate:     0,
       priority:           parent.priority,
       created_by:         member.id,
@@ -806,12 +811,9 @@ export async function bulkUpdateTasks(
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
     if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
     if (patch.priority !== undefined)           data.priority           = patch.priority
-    if (patch.due_date === null || patch.due_date === '') data.due_date = null
-    else if (patch.due_date !== undefined) {
-      const d = new Date(patch.due_date)
-      if (Number.isNaN(d.getTime())) { refused++; continue }
-      data.due_date = d
-    }
+    const dates = await datesFor(task, { due_date: patch.due_date, publish_date: patch.publish_date })
+    if (typeof dates === 'string') { refused++; continue }
+    Object.assign(data, dates)
 
     if (Object.keys(data).length === 1) continue   // nothing but updated_at
     await prisma.task.update({ where: { id: task.id }, data })
@@ -877,8 +879,10 @@ interface CreateTaskInput {
   task_owner_id:      string
   /** Who will do it. Defaults to the owner when not given. */
   assignee_id?:       string | null
-  /** Spec 021 (Link task): a task made from a Task link may have no due date yet. */
+  /** Spec 021 (Link task): a task made from a Task link may have no due date yet. Given here, it's set by hand. */
   due_date?:          string | null
+  /** The day it goes live; with no due date given, the due date is worked out from it. */
+  publish_date?:      string | null
   platform?:          string
   project_id?:        string | null
   hours_estimate?:    number
@@ -935,7 +939,7 @@ export async function createTask(
       nine_stage:         nineStage,
       status:             'todo',
       stage_date:         new Date(),
-      due_date:           input.due_date ? new Date(input.due_date) : null,
+      ...(await newTaskDates(input.publish_date, input.due_date)),
       hours_estimate:     input.hours_estimate ?? 0,
       priority:           input.priority ?? 'Medium',
       cover_image_url:    input.cover_image_url ?? null,
@@ -1018,7 +1022,7 @@ export async function createTasks(
 
   const nineStage = await nineStageFor(shared.brand_id)
   const now = new Date()
-  const due = shared.due_date ? new Date(shared.due_date) : null
+  const shareDates = await newTaskDates(shared.publish_date, shared.due_date)
   const spaceCtx = await loadSpaceContext()
   const kind = kindForSpace(shared.space_id, spaceCtx)
 
@@ -1041,7 +1045,7 @@ export async function createTasks(
         nine_stage:         nineStage,
         status:             'todo',
         stage_date:         now,
-        due_date:           due,
+        ...shareDates,
         hours_estimate:     shared.hours_estimate ?? 0,
         priority:           shared.priority ?? 'Medium',
         cover_image_url:    shared.cover_image_url ?? null,

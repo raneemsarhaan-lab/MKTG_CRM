@@ -65,10 +65,10 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('calendarLede')}
         tabs={[{ key: 'calendar', label: tv('calendar') }, { key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }]}
         render={tab => tab === 'board'
-          ? <BoardView data={data} scopeTasks={scope} />
+          ? <BoardView data={data} scopeTasks={scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
           : withPanel(tab === 'list'
             ? <ListView tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
-            : <CalendarView tasks={all} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />)} />
+            : <CalendarView tasks={all} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" />)} />
     )
   }
   if (folder === 'assets') {
@@ -112,7 +112,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
       render={(tab, view) => {
         const shownTasks = view ? applyView(all, view.config) : all
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
-        if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />
+        if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
         return withPanel(tab === 'sheet'
           ? (brandId
             ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}

@@ -9,6 +9,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn, featureOnAny } from '@/lib/brand-features'
 import { calDaysBetween } from '@/lib/utils'
+import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
 
 /**
@@ -25,6 +26,7 @@ import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
  */
 
 export type DuePreset = 'any' | 'overdue' | 'today' | 'week' | 'none'
+export type PublishPreset = 'any' | 'today' | 'week' | 'none'
 
 export interface BoardFilterState {
   search:         string
@@ -37,13 +39,17 @@ export interface BoardFilterState {
   duePreset:      DuePreset
   dueFrom:        string
   dueTo:          string
+  /** The publishing date, filtered the same way (overdue doesn't apply). */
+  publishPreset?: PublishPreset
+  publishFrom?:   string
+  publishTo?:     string
   onlyMine:       boolean
   withAttachments: boolean
 }
 
 export const EMPTY_FILTERS: BoardFilterState = {
   search: '', brandIds: [], ownerIds: [], contentTypes: [], platforms: [],
-  priorities: [], alerts: [], duePreset: 'any', dueFrom: '', dueTo: '',
+  priorities: [], alerts: [], duePreset: 'any', dueFrom: '', dueTo: '', publishPreset: 'any', publishFrom: '', publishTo: '',
   onlyMine: false, withAttachments: false,
 }
 
@@ -63,6 +69,7 @@ export function activeFilterCount(f: BoardFilterState): number {
     (f.priorities.length   ? 1 : 0) +
     (f.alerts.length       ? 1 : 0) +
     (f.duePreset !== 'any' || f.dueFrom || f.dueTo ? 1 : 0) +
+    ((f.publishPreset ?? 'any') !== 'any' || f.publishFrom || f.publishTo ? 1 : 0) +
     (f.onlyMine        ? 1 : 0) +
     (f.withAttachments ? 1 : 0)
   )
@@ -102,7 +109,9 @@ export function applyBoardFilters<T extends Task>(
         if (t.due_date) return false
       } else {
         if (!t.due_date) return false
-        const days = calDaysBetween(ctx.today, new Date(t.due_date))
+        // Cairo days (src/lib/due-dates.ts); published or done work is never overdue.
+        const days = daysBetween(cairoToday(), t.due_date.slice(0, 10))
+        if (f.duePreset === 'overdue' && !isOverdue(t)) return false
         if (f.duePreset === 'overdue' && days >= 0)          return false
         if (f.duePreset === 'today'   && days !== 0)         return false
         if (f.duePreset === 'week'    && (days < 0 || days > 7)) return false
@@ -111,6 +120,17 @@ export function applyBoardFilters<T extends Task>(
 
     if (f.dueFrom && (!t.due_date || t.due_date < f.dueFrom)) return false
     if (f.dueTo   && (!t.due_date || t.due_date > f.dueTo))   return false
+
+    const pp = f.publishPreset ?? 'any', pub = t.publish_date?.slice(0, 10) ?? null
+    if (pp === 'none' && pub) return false
+    if (pp !== 'any' && pp !== 'none') {
+      if (!pub) return false
+      const days = daysBetween(cairoToday(), pub)
+      if (pp === 'today' && days !== 0) return false
+      if (pp === 'week' && (days < 0 || days > 7)) return false
+    }
+    if (f.publishFrom && (!pub || pub < f.publishFrom)) return false
+    if (f.publishTo   && (!pub || pub > f.publishTo))   return false
 
     return true
   })
@@ -187,6 +207,10 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const count = activeFilterCount(filters)
   const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
 
+  const pp = filters.publishPreset ?? 'any'
+  const publishText = pp !== 'any'
+    ? ({ today: 'Publishing today', week: 'Next 7 days', none: 'No publishing date' } as const)[pp]
+    : filters.publishFrom || filters.publishTo ? `${filters.publishFrom || '…'} → ${filters.publishTo || '…'}` : ''
   const dueText = filters.duePreset !== 'any'
     ? ({ overdue: 'Overdue', today: 'Due today', week: 'Next 7 days', none: 'No due date' } as const)[filters.duePreset]
     : filters.dueFrom || filters.dueTo
@@ -272,6 +296,23 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
                        onChange={e => set('dueFrom', e.target.value)} />
             <PillInput type="date" value={filters.dueTo}
                        onChange={e => set('dueTo', e.target.value)} />
+          </div>
+        </PillSection>
+
+        <PillSection label={`Publishing date${publishText ? ` · ${publishText}` : ''}`}>
+          {([
+            ['any', 'Any date'], ['today', 'Publishing today'], ['week', 'Next 7 days'], ['none', 'No publishing date'],
+          ] as [PublishPreset, string][]).map(([v, label]) => (
+            <PillOption key={v} selected={(filters.publishPreset ?? 'any') === v}
+                        onClick={() => onChange({ ...filters, publishPreset: v })}>
+              <Check on={(filters.publishPreset ?? 'any') === v} /> {label}
+            </PillOption>
+          ))}
+          <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+            <PillInput type="date" value={filters.publishFrom ?? ''} data-filter-publish-from=""
+                       onChange={e => onChange({ ...filters, publishFrom: e.target.value })} />
+            <PillInput type="date" value={filters.publishTo ?? ''} data-filter-publish-to=""
+                       onChange={e => onChange({ ...filters, publishTo: e.target.value })} />
           </div>
         </PillSection>
 
