@@ -83,8 +83,8 @@ export function RepeatEditor({ taskId, repeating, canEdit, spaceId }: { taskId: 
   return (
     <div ref={box} data-repeat="" data-repeat-on={on ? 'true' : 'false'} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
       <button type="button" data-repeat-open disabled={!canEdit || !view} onClick={edit}
-        style={{ border: 'none', background: 'transparent', padding: 0, font: 'inherit', fontSize: 14, color: on ? '#1F1F1C' : '#8A8A84', cursor: canEdit ? 'pointer' : 'default', textAlign: 'start' }}>
-        {on && view ? <>↻ {summary(view)}{view.next_publish && <span data-repeat-next={view.next_publish} style={{ color: '#8A8A84' }}> · {t('next', { day: formatDay(view.next_publish, locale) })}</span>}</> : t('none')}
+        style={{ border: 'none', background: 'transparent', padding: 0, font: 'inherit', fontSize: 14, color: on ? '#1F1F1C' : '#5E6166', cursor: canEdit ? 'pointer' : 'default', textAlign: 'start' }}>
+        {on && view ? <>↻ {summary(view)}{view.next_publish && <span data-repeat-next={view.next_publish} style={{ color: '#5E6166' }}> · {t('next', { day: formatDay(view.next_publish, locale) })}</span>}</> : t('none')}
       </button>
       {on && canEdit && <>
         <button type="button" data-repeat-skip style={{ ...btn(), padding: '3px 8px', fontSize: 12 }} disabled={pending} onClick={skip}>{t('skip')}</button>
@@ -92,13 +92,13 @@ export function RepeatEditor({ taskId, repeating, canEdit, spaceId }: { taskId: 
       {err && !open && <span role="alert" style={{ fontSize: 12.5, color: '#B42318' }}>{err}</span>}
       {open && draft && (
         <div role="dialog" aria-label={t('title')} data-repeat-dialog
-          style={{ position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0, zIndex: 20, width: 320, background: '#fff', border: '1px solid #E4E4DF', borderRadius: 12, padding: 12, boxShadow: '0 12px 30px rgba(0,0,0,.14)', display: 'grid', gap: 10 }}>
+          style={{ position: 'absolute', top: 'calc(100% + 6px)', insetInlineEnd: 0, zIndex: 20, width: 320, maxWidth: 'calc(100vw - 32px)', background: '#fff', border: '1px solid #E4E4DF', borderRadius: 12, padding: 12, boxShadow: '0 12px 30px rgba(0,0,0,.14)', display: 'grid', gap: 10 }}>
           {!draft.publish_date && <p style={{ margin: 0, fontSize: 12.5, color: '#B42318' }}>{t('needsPublish')}</p>}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             {t('every')}
-            <input type="number" min={1} max={99} style={{ ...input, width: 56 }} data-repeat-interval value={draft.interval}
+            <input type="number" min={1} max={99} aria-label={t('interval')} style={{ ...input, width: 56 }} data-repeat-interval value={draft.interval}
               onChange={e => setDraft({ ...draft, interval: Math.max(1, Math.trunc(Number(e.target.value) || 1)) })} />
-            <select style={input} data-repeat-freq value={draft.freq} onChange={e => setDraft({ ...draft, freq: e.target.value as RepeatView['freq'] })}>
+            <select style={input} aria-label={t('unit')} data-repeat-freq value={draft.freq} onChange={e => setDraft({ ...draft, freq: e.target.value as RepeatView['freq'] })}>
               <option value="days">{t('days')}</option>
               <option value="weeks">{t('weeks')}</option>
               <option value="monthly">{t('months')}</option>
@@ -116,7 +116,7 @@ export function RepeatEditor({ taskId, repeating, canEdit, spaceId }: { taskId: 
           )}
           {draft.freq === 'monthly' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>{t('onDay')}
-              <input type="number" min={1} max={31} style={{ ...input, width: 60 }} value={draft.month_day ?? ''} placeholder={draft.publish_date?.slice(8, 10)}
+              <input type="number" min={1} max={31} aria-label={t('onDay')} style={{ ...input, width: 60 }} value={draft.month_day ?? ''} placeholder={draft.publish_date?.slice(8, 10)}
                 onChange={e => setDraft({ ...draft, month_day: e.target.value ? Math.trunc(Number(e.target.value)) : null })} />
             </label>
           )}
@@ -124,9 +124,9 @@ export function RepeatEditor({ taskId, repeating, canEdit, spaceId }: { taskId: 
             <span style={{ fontWeight: 700, fontSize: 12, color: '#6B6B66' }}>{t('ends')}</span>
             <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="radio" checked={endMode === 'never'} onChange={() => setEndMode('never')} />{t('never')}</label>
             <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="radio" checked={endMode === 'on'} onChange={() => setEndMode('on')} />{t('onDate')}
-              <input type="date" style={input} disabled={endMode !== 'on'} value={draft.ends_on ?? ''} onChange={e => setDraft({ ...draft, ends_on: e.target.value || null })} /></label>
+              <input type="date" aria-label={t('endsOn')} style={input} disabled={endMode !== 'on'} value={draft.ends_on ?? ''} onChange={e => setDraft({ ...draft, ends_on: e.target.value || null })} /></label>
             <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="radio" checked={endMode === 'after'} onChange={() => setEndMode('after')} />{t('after')}
-              <input type="number" min={1} style={{ ...input, width: 60 }} disabled={endMode !== 'after'} value={draft.max_count ?? ''} onChange={e => setDraft({ ...draft, max_count: e.target.value ? Math.trunc(Number(e.target.value)) : null })} />{t('times')}</label>
+              <input type="number" min={1} aria-label={t('count')} style={{ ...input, width: 60 }} disabled={endMode !== 'after'} value={draft.max_count ?? ''} onChange={e => setDraft({ ...draft, max_count: e.target.value ? Math.trunc(Number(e.target.value)) : null })} />{t('times')}</label>
           </div>
           <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
             <span style={{ fontWeight: 700, fontSize: 12, color: '#6B6B66' }}>{t('lead')}</span>
@@ -135,7 +135,7 @@ export function RepeatEditor({ taskId, repeating, canEdit, spaceId }: { taskId: 
                 onChange={e => setDraft({ ...draft, lead: Math.trunc(Number(e.target.value) || 0) })} />
               {t('leadUnit')}
             </span>
-            <span style={{ fontSize: 11.5, color: '#8A8A84' }}>{t('leadHint', { min: draft.minLead })}</span>
+            <span style={{ fontSize: 11.5, color: '#5E6166' }}>{t('leadHint', { min: draft.minLead })}</span>
           </label>
           {err && <p role="alert" data-repeat-error style={{ margin: 0, fontSize: 12.5, color: '#B42318' }}>{err}</p>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

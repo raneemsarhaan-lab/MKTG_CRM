@@ -107,7 +107,7 @@ export function SearchDialog() {
     const i = ++idx
     const w = where(x.hit)
     return (
-      <button key={x.id} type="button" role="option" aria-selected={cursor === i} data-search-task={x.id} data-level={x.hit.level}
+      <button key={x.id} type="button" aria-current={cursor === i ? 'true' : undefined} data-search-task={x.id} data-level={x.hit.level}
         onMouseEnter={() => setCursor(i)} onClick={() => openTask(x.id, x.space)}
         style={{ display: 'grid', gridTemplateColumns: '10px minmax(0,1fr) auto', gap: 12, alignItems: 'start', width: '100%', textAlign: 'start', border: 'none',
           background: cursor === i ? '#F4FBD6' : 'transparent', borderRadius: 10, padding: '9px 10px', cursor: 'pointer', font: 'inherit', color: PIPE.textSecondary }}>
@@ -129,7 +129,7 @@ export function SearchDialog() {
   const assetRow = (a: AssetResult): ReactNode => {
     const i = ++idx
     return (
-      <button key={a.id} type="button" role="option" aria-selected={cursor === i} data-search-asset={a.id} onMouseEnter={() => setCursor(i)} onClick={() => openAsset(a)}
+      <button key={a.id} type="button" aria-current={cursor === i ? 'true' : undefined} data-search-asset={a.id} onMouseEnter={() => setCursor(i)} onClick={() => openAsset(a)}
         style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr)', gap: 10, alignItems: 'start', width: '100%', textAlign: 'start', border: 'none',
           background: cursor === i ? '#F4FBD6' : 'transparent', borderRadius: 10, padding: '9px 10px', cursor: 'pointer', font: 'inherit' }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PIPE.textMuted} strokeWidth="2" aria-hidden="true" style={{ marginTop: 2 }}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>
@@ -143,7 +143,7 @@ export function SearchDialog() {
   const todoRow = (x: TodoResult): ReactNode => {
     const i = ++idx
     return (
-      <button key={x.id} type="button" role="option" aria-selected={cursor === i} data-search-todo={x.id} onMouseEnter={() => setCursor(i)} onClick={() => { close(); router.push('/my-tasks') }}
+      <button key={x.id} type="button" aria-current={cursor === i ? 'true' : undefined} data-search-todo={x.id} onMouseEnter={() => setCursor(i)} onClick={() => { close(); router.push('/my-tasks') }}
         style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto', gap: 10, alignItems: 'start', width: '100%', textAlign: 'start', border: 'none',
           background: cursor === i ? '#F4FBD6' : 'transparent', borderRadius: 10, padding: '9px 10px', cursor: 'pointer', font: 'inherit' }}>
         <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: '50%', border: '1.6px solid #C9CACC', marginTop: 2, background: x.done ? '#3E7BEA' : 'transparent' }} />
@@ -182,12 +182,12 @@ export function SearchDialog() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: `1px solid ${PIPE.border}` }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={PIPE.textMuted} strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input ref={input} autoFocus value={text} onChange={e => { setText(e.target.value); setAll(null) }} placeholder={t('placeholder')} aria-label={t('title')}
-            data-search-input="" autoComplete="off" spellCheck={false} role="combobox" aria-expanded={!!res} aria-controls="fx-search-results"
+            data-search-input="" autoComplete="off" spellCheck={false} type="search" aria-controls="fx-search-results"
             style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', font: 'inherit', fontSize: 16, color: PIPE.ink, background: 'transparent' }} />
           {busy && <span aria-hidden="true" style={{ fontSize: 12, color: PIPE.textFaint }}>…</span>}
           <kbd style={{ fontSize: 11, color: PIPE.textMuted, border: `1px solid ${PIPE.border}`, borderRadius: 6, padding: '2px 6px', fontFamily: 'inherit' }}>Esc</kbd>
         </div>
-        <div id="fx-search-results" role="listbox" aria-label={t('results')} style={{ overflowY: 'auto', padding: '6px 8px 12px' }}>
+        <div id="fx-search-results" role="region" aria-live="polite" aria-label={t('results')} style={{ overflowY: 'auto', padding: '6px 8px 12px' }}>
           {!text.trim() && <p style={{ margin: '14px 12px', fontSize: 13, color: PIPE.textMuted }}>{t('hint')}</p>}
           {res?.suggestion && (
             <p data-search-suggestion="" style={{ margin: '10px 10px 4px', fontSize: 13.5, color: PIPE.textSecondary }}>

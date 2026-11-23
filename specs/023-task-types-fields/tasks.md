@@ -204,10 +204,10 @@
 
 ## Phase 12: Polish
 
-- [ ] T086 [P] Update the ClickUp parity map in `specs/021-clickup-parity/spec.md` (task types, custom fields, priorities, tags, start dates, templates, recurring: Built).
-- [ ] T087 [P] HANDOVER: a "Task types and fields (spec 023)" section — tables, rules, where each lives, `once()` markers; Arabic strings added to §14 for native review.
-- [ ] T088 Write `specs/023-task-types-fields/validation.md` with each quickstart step's result.
-- [ ] T089 Full regression across specs 021–023 (typecheck, `lab:spaces`, `lab:sheet`, `lab:spreadsheet`, `lab:inbox`, `lab:notify`, `lab:hours`, every real-app scenario, `axe-022.cjs` extended to the new screens), and SC-006 timing on 5,000 tasks on a production build.
+- [X] T086 [P] Update the ClickUp parity map in `specs/021-clickup-parity/spec.md` (task types, custom fields, priorities, tags, start dates, templates, recurring: Built).
+- [X] T087 [P] HANDOVER: a "Task types and fields (spec 023)" section — tables, rules, where each lives, `once()` markers; Arabic strings added to §14 for native review.
+- [X] T088 Write `specs/023-task-types-fields/validation.md` with each quickstart step's result.
+- [X] T089 (SC-006 timing not run here: needs the deployed production build; see validation.md) Full regression across specs 021–023 (typecheck, `lab:spaces`, `lab:sheet`, `lab:spreadsheet`, `lab:inbox`, `lab:notify`, `lab:hours`, every real-app scenario, `axe-022.cjs` extended to the new screens), and SC-006 timing on 5,000 tasks on a production build.
 
 ---
 

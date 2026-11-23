@@ -3670,6 +3670,10 @@
     "leadHint": "At least {min} working days: the type’s total SLA.",
     "save": "Save",
     "cancel": "Cancel",
-    "stop": "Stop repeating"
+    "stop": "Stop repeating",
+    "interval": "How often",
+    "unit": "Unit",
+    "endsOn": "End date",
+    "count": "Number of times"
   }
 }

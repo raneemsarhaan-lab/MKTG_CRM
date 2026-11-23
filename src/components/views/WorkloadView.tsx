@@ -25,16 +25,26 @@ export function WorkloadView({ tasks, members, brands }: { tasks: ViewTask[]; me
   const weekend = getWorkWeekend()
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
   const perDay = useMemo(() => dayLoad(tasks, days, weekend), [tasks, days, weekend])
-  const dayLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
+  const dayLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const weekLabel = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const dayHead = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' })
   const nav: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '2px 9px', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: PIPE.ink }
   return (
     <div data-workload-view style={{ padding: '18px 26px 30px 38px', display: 'grid', gap: 12, maxWidth: 820 }}>
       <div data-workload-week={weekStart} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: PIPE.textSecondary }}>
         <button type="button" style={nav} aria-label={t('weekPrev')} data-workload-nav="prev" onClick={() => setWeekStart(w => addDays(w, -7))}>‹</button>
-        <span style={{ fontWeight: 700, color: PIPE.ink }}>{t('weekOf', { day: dayLabel(weekStart) })}</span>
+        <span style={{ fontWeight: 700, color: PIPE.ink }}>{t('weekOf', { day: weekLabel(weekStart) })}</span>
         <button type="button" style={nav} aria-label={t('weekNext')} data-workload-nav="next" onClick={() => setWeekStart(w => addDays(w, 7))}>›</button>
         <span style={{ color: PIPE.textMuted }}>{t('weekNote')}</span>
       </div>
+      {rows.length > 0 && (
+        <div aria-hidden="true" style={{ display: 'grid', gridTemplateColumns: '170px minmax(0,1fr) 110px', gap: 12 }}>
+          <span />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
+            {days.map(d => <span key={d} style={{ fontSize: 10.5, fontWeight: 700, textAlign: 'center', color: PIPE.textSecondary, textTransform: 'uppercase', letterSpacing: '.04em' }}>{dayHead(d)} {Number(d.slice(8, 10))}</span>)}
+          </div>
+        </div>
+      )}
       {rows.length === 0 && <p style={{ color: PIPE.textMuted, fontSize: 13 }}>—</p>}
       {rows.map(r => {
         const m = members.find(x => x.id === r.memberId)

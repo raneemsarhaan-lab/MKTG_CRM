@@ -76,12 +76,12 @@ C-Check is the Islam Check stage. Tasks created without it have 10 stages. The c
 | Box, Map, Mind Map views | No | Not planned |
 | Task › Subtask | Subtasks, video clips, project sub-steps | Have |
 | Checklists inside a task | No | Later (US7) |
-| Priorities, assignees, due dates | Yes (one assignee + owner) | Have |
-| Start dates, tags, multiple assignees | No | Later (US7) |
+| Priorities, assignees, due dates | Yes (one assignee + owner) | **Built** (spec 023 Stage B): Urgent / High / Normal / Low / No priority; Urgent first and notifies |
+| Start dates, tags, multiple assignees | No | **Built** (spec 023 Stages B–C): workspace tags; several assignees with a lead; optional start dates, calendar spans, workload spread |
 | Watchers | Followers (spec 012) | Have |
-| Custom fields by task type | Sheet columns, content types | Later (US7) |
-| Task types | Content types (Post, Video, Reel…) | Have |
-| Task templates, recurring tasks | Paste plan; "standing" projects | Later (US7) |
+| Custom fields by task type | Sheet columns, content types | **Built** (spec 023 Stage A): field library attached to types, required from a stage, on cards, sheets and filters |
+| Task types | Content types (Post, Video, Reel…) | **Built** (spec 023 Stage A): EN/AR names, icons, colours, default priority, tags and template |
+| Task templates, recurring tasks | Paste plan; "standing" projects | **Built** (spec 023 Stage D): templates per type; repeat rules on publishing dates, made once per occurrence |
 | Dependencies, relationships, links | No | Partly built: **Related task** field (T074–T076) and media links (spec 022); dependencies Later (US7) |
 | Comments, threads, @mentions | Yes | Have |
 | Assigned comments | No | Later |

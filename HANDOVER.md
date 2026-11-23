@@ -929,6 +929,30 @@ One-time data changes, all in `prisma/seed.ts` `once()`: `simple-to-pipeline-v1`
 `content-follows-media-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-022-*.cjs`
 and the pure checks in `scripts/spaces-lab/pure.mjs`.
 
+### 7.y Task types and fields (spec 023)
+
+ClickUp's task model, in four stages. Decisions: `specs/023-task-types-fields/`
+(research, data model, contracts) and `design/023-description-fields.html`.
+
+| Rule | Where it lives |
+|---|---|
+| Task types are the content types, with EN/AR names, icon, colour, default priority, tags and template. Admins edit | `content_types`; `src/actions/task-types.ts`; Task types page `src/app/(app)/task-types/page.tsx`, `src/components/types/` |
+| Field library (text, number, date, link, person, choice, multi-choice, checkbox, related task, money, rating), attached to types; values belong to the task | `task_fields`, `task_type_fields`, `task_field_values`; `src/lib/task-fields.ts`, `src/actions/task-fields.ts`, `src/components/fields/` |
+| Required from a stage: only a move that crosses that stage is refused, naming the field; a brand's switched-off field never blocks | `missingRequired` in `src/lib/task-fields.ts`; `requiredGate` in `src/lib/media-server.ts`; `fieldOn` in `src/lib/brand-features.ts` |
+| Caption / TOV / Channels: description sections with placement (`options.place`) and a red "not added" mark | `PanelFields.tsx`, `CardFields.tsx` |
+| Status groups (Not started / Active / Done / Closed) for filters and list grouping; milestones are calendar markers, not tasks | `src/lib/view-config.ts`; `milestones`, `src/actions/milestones.ts`, `CalendarView.tsx` |
+| Priorities Urgent / High / Normal / Low / None (Medium reads Normal); Urgent sorts first and notifies (kind `urgent`) | `src/lib/priorities.ts`; `src/lib/notify/recipients.ts` |
+| Tags: workspace-wide with colours; anyone creates while tagging; admins rename, merge, delete; a brand switch | `tags`, `task_tags`; `src/lib/tags.ts`, `src/actions/tags.ts`, `TagPicker.tsx` |
+| Several assignees: the lead stays `tasks.assignee_id` (SLA, alerts, Shows in follow the lead); hours per person or an even share | `task_assignees`; `src/lib/assignees.ts`, `src/actions/assignees.ts`, `AssigneesPicker.tsx` |
+| Start date: optional, never after the due date; calendar Spans (per device); workload spreads hours over the span's working days | `tasks.start_date`; `src/lib/start-dates.ts`, `dayLoad` in `src/lib/task-load.ts`, `WorkloadView.tsx` |
+| Templates per type: name pattern, brief, priority, hours, assignee by role, subtasks dated from the publishing date, field values and tags. Admins and superusers manage them; everyone uses them. Editing changes new tasks only | `task_templates`; `src/lib/templates.ts`, `src/lib/templates-server.ts`, `src/actions/templates.ts`, `TemplatesSettings.tsx` (a tab on Task types), Template pill in `TaskForm.tsx`, ❖＋ on calendar days |
+| Recurring tasks: a repeat rule on publishing dates; each occurrence is made on its creation day (due date minus the lead time, at least the type's total SLA working days) by the hourly job, once (`tasks.recurrence_key`); Skip next, Stop repeating, ↻ | `repeat_rules`; `src/lib/recurrence.ts`, `src/lib/recurrence-server.ts` (`runRecurring`), `src/actions/recurrence.ts`, `RepeatEditor.tsx`; `/api/notifications/tick?job=recurring` runs it on demand with the tick secret |
+| Workspace search (ranking, close matches, Did you mean, Arabic normalisation) and My tasks (private to-dos) | `src/lib/search.ts`, `src/components/search/`; `todos`, `src/lib/my-tasks.ts`, `src/components/mytasks/` |
+
+One-time data changes, all in `prisma/seed.ts` `once()`: `task-types-v1`,
+`content-fields-v1`, `priority-normal-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-023-*.cjs`,
+`scenarios-search.cjs`, `scenarios-mytasks.cjs` and the pure checks in `scripts/spaces-lab/pure.mjs`.
+
 ---
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
@@ -1243,6 +1267,7 @@ Run through this after the first successful deploy.
 | Board header: Arabic strings | Medium | `header.*` in `messages/ar.json`; native review (spec 011) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
 | Spaces, views and methodology: Arabic strings | Medium | `spaces.*` (incl. `spaces.stages`), `views.*`, `calendar.*`, `handoff.*`, `me.*`, `media.*`, `dates.*` in `messages/ar.json`; native review (specs 021–022) |
+| Task types, fields, tags, templates, repeat, search, My tasks: Arabic strings | Medium | `types.*`, `fields.*`, `tags.*`, `priority.*`, `statusGroups.*`, `milestones.*`, `assignees.*`, `templates.*`, `repeat.*`, `search.*`, `myTasks.*`, `dates.start*` in `messages/ar.json`; native review (spec 023) |
 | Accessibility: contrast and board cards | Medium | axe (`scripts/spaces-lab/realapp/axe-022.cjs`) still flags grey secondary text on tinted backgrounds app-wide (darker `PIPE.textMuted`/`placeholder` would fix it; a design call) and board cards with buttons inside a button-like card |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |

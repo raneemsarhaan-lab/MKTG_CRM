@@ -33,7 +33,7 @@ type Group = 'date' | 'brand' | 'space'
 type Item = { kind: 'task'; id: string; day: string | null; task: ViewTask } | { kind: 'todo'; id: string; day: string | null; todo: Todo }
 
 const C = {
-  ink: '#14130F', text: '#24262B', muted: '#6F7276', faint: '#A3A5A8', hair: '#EEEEEA', line: '#E4E4E0', tile: '#F4F4F1',
+  ink: '#14130F', text: '#24262B', muted: '#5E6166', faint: '#A3A5A8', hair: '#EEEEEA', line: '#E4E4E0', tile: '#F4F4F1',
   lime: '#D7F75B', sel: '#F2FBD2', red: '#D22040', blue: '#3E7BEA', violet: '#7B5CF0', amber: '#E8772E',
 }
 const card: React.CSSProperties = { border: `1px solid ${C.line}`, borderRadius: 22, background: '#FFFFFF', padding: '20px 22px' }
@@ -156,12 +156,14 @@ export function MyTasksPage({ data, todos: initialTodos, today: realToday }: { d
     const next = nextOnPath(x as never)
     const canMove = !!next && allowedStages(x as never, me).includes(next)
     return (
-      <div key={x.id} className="fx-mt-row" data-mt-task={x.id} role="button" tabIndex={0}
-        onClick={() => selectTask(x.id)} onKeyDown={e => { if (e.key === 'Enter') selectTask(x.id) }}
+      // The row opens the task on click; its name is the keyboard's button (no buttons inside a button).
+      <div key={x.id} className="fx-mt-row" data-mt-task={x.id}
+        onClick={() => selectTask(x.id)}
         style={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr) auto', gap: 12, alignItems: 'start', padding: '10px 4px', borderBottom: `1px solid ${C.hair}`, cursor: 'pointer' }}>
         <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', margin: '6px 6px 0', background: brand?.color ?? C.faint }} />
         <span style={{ minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 14.5, color: C.ink, fontWeight: 500, lineHeight: 1.35 }}>{x.name}</span>
+          <button type="button" onClick={e => { e.stopPropagation(); selectTask(x.id) }}
+            style={{ display: 'block', border: 'none', background: 'none', padding: 0, textAlign: 'start', font: 'inherit', fontSize: 14.5, color: C.ink, fontWeight: 500, lineHeight: 1.35, cursor: 'pointer' }}>{x.name}</button>
           <span style={{ display: 'block', fontSize: 12.5, color: C.muted, marginTop: 2 }}>{[sp ? spaceLabel(sp, tSpaces) : null, stageName(x.status)].filter(Boolean).join(' · ')}</span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, whiteSpace: 'nowrap', paddingTop: 1, color: late ? C.red : C.muted, fontWeight: late ? 700 : 400, fontVariantNumeric: 'tabular-nums' }}>

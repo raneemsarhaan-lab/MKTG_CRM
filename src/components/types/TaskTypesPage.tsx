@@ -61,7 +61,8 @@ export function TaskTypesPage(p: Props) {
   const readOnly = tab === 'fields' || tab === 'templates' ? !p.canEditFields : !p.canEditTypes
 
   return (
-    <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
+    // A darker muted grey on this page: the app-wide one is under 4.5:1 on these greys (axe).
+    <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4', ['--muted' as string]: '#5E6166' } as React.CSSProperties}>
       <div className="fx-settings" style={{ maxWidth: 980, margin: '0 auto', padding: '32px 40px 60px' }}>
         <div style={{ marginBottom: 22 }}>
           <p style={{ fontWeight: 700, fontSize: '0.62rem', letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)', margin: '0 0 8px' }}>{t('eyebrow')}</p>
