@@ -68,6 +68,8 @@ const REVIEW_FROM = STAGE_ORDER.indexOf('d-check')
 const TEXT_COLS: GridCol[] = ['title', 'clipNo', 'source', 'fileName', 'in', 'out']
 
 export interface SheetGridProps {
+  /** Spec 022 (R19): the Link task cell on a video's row, from the sheet. */
+  media?: { render(task: Task): React.ReactNode; open(task: Task, anchor: HTMLElement, typed?: string): void; text(task: Task): string }
   rows: SheetRow[]
   /** The shaped layout (spec 010): columns, widths, names, custom cells. */
   columns: SheetColumnsHook
@@ -220,6 +222,7 @@ export function SheetGrid(p: SheetGridProps) {
     if (col === 'rowNo') return true
     if (linkedOf(col)) return false
     if (isCustom(col)) return cl.custom.isMenu(col)
+    if (col === 'media') return row.kind === 'video'
     if (row.kind === 'video') return false
     return ['status', 'editor', 'type', 'files', 'published', 'drop', 'doc', 'design', 'post', 'task'].includes(col)
   }
@@ -280,6 +283,8 @@ export function SheetGrid(p: SheetGridProps) {
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'clip' && row.kind !== 'video') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
+      // Spec 022: typing in a video's Link task cell opens the list.
+      if (col === 'media') { if (row.kind === 'video') p.media?.open(row.task, anchor, ch); return true }
       return isCustom(col) && !linkedOf(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
     },
     rowProps: row => {
@@ -383,6 +388,7 @@ export function SheetGrid(p: SheetGridProps) {
       if (isCustom(col)) return cl.custom.render(task, col)
       switch (col) {
         case 'rowNo': return row.n
+        case 'media': return isVideo ? p.media?.render(task) ?? null : null
         case 'title':
           if (isVideo && row.kind === 'video') return band(row)
           return (
@@ -444,6 +450,7 @@ export function SheetGrid(p: SheetGridProps) {
       switch (col) {
         case 'status': return stageWord(task.status)
         case 'editor': return task.assignee_id ? membersById.get(task.assignee_id)?.name ?? '' : ''
+        case 'media': return row.kind === 'video' ? p.media?.text(task) ?? '' : ''
         case 'type': return task.content_type_label ?? ''
         case 'length': return formatClipTime(clipLength(task.clip?.in_ms, task.clip?.out_ms))
         case 'reviewer': return row.kind === 'clip' ? reviewerOf(task)?.name ?? '' : ''

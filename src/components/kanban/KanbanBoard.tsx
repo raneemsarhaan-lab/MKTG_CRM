@@ -34,6 +34,7 @@ import { BoardToolbar } from '@/components/board/BoardToolbar'
 import { setBoardSort } from '@/actions/views'
 import { defaultAssigneeFor } from '@/lib/spaces'
 import { isLinkedMedia } from '@/lib/media'
+import { MediaIndexContext, MediaPanelSection, buildMediaIndex } from '@/components/media/MediaLinks'
 import { SortMenu, sortTasks, DEFAULT_SORT, SORT_KEYS, type SortKey } from '@/components/board/SortMenu'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
@@ -1056,15 +1057,18 @@ export function KanbanBoard({
       onOpenSheet={openSheet}
       spaces={spaces}
       taskSpaces={taskSpaces}
-      linksSection={
+      linksSection={<>
+        <MediaPanelSection key={`m-${selectedTask.id}`} task={selectedTask as never} tasks={tasks as never} onOpenTask={id => selectTask(id)} />
         <TaskLinksSection key={selectedTask.id} taskId={selectedTask.id} brandId={selectedTask.brand_id}
           fields={taskLinkFields(colRecords, colValues, selectedTask.id)} ctx={columnsBundle.taskLinks!}
           set={async (columnId, value) => (await columnsApi.setValue(columnId, selectedTask.id, value)).success} />
-      }
+      </>}
       onClose={() => { setPreviewFor(null); setCommentFor(null); setSectionFor(null); selectTask(null) }}
     />
   )
 
+  // Spec 022: media links for the cards.
+  const mediaIndex = useMemo(() => buildMediaIndex(tasks as never), [tasks])
   // Spec 021: each card's Task links, by name.
   const linkNames = useMemo(() => linkNamesByTask(colRecords, colValues, new Map(tasks.map(x => [x.id, x.name]))), [colRecords, colValues, tasks])
 
@@ -1187,6 +1191,7 @@ export function KanbanBoard({
 
   return (
     <TaskLinkNames.Provider value={linkNames}>
+    <MediaIndexContext.Provider value={mediaIndex}>
     <div
       className={selected.size > 0 ? 'fx-board-selecting' : undefined}
       style={{
@@ -1334,6 +1339,7 @@ export function KanbanBoard({
       {/* Task creation form */}
       {taskForm}
     </div>
+    </MediaIndexContext.Provider>
     </TaskLinkNames.Provider>
   )
 }

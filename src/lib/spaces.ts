@@ -17,6 +17,8 @@ export interface SpaceLike {
   is_production: boolean
   default_kind: TaskKind | string
   archived_at?: string | Date | null
+  /** Spec 022: a Design or Video board shows media tasks only. */
+  media_board?: string | null
 }
 
 export interface SpaceTask {
@@ -60,7 +62,7 @@ export function inDesignHalf(task: Pick<SpaceTask, 'status' | 'nine_stage'>): bo
  * every post into Planning.
  */
 export function spacesForAssignee(
-  task: Pick<SpaceTask, 'kind'>,
+  task: Pick<SpaceTask, 'kind'> & { media_board?: string | null },
   assigneeId: string | null | undefined,
   spaces: SpaceLike[],
   members: MembersBySpace,
@@ -69,9 +71,11 @@ export function spacesForAssignee(
   // Every task starts simple now (user, 2026-11-23), so the kind no longer decides
   // placement: an assignee's Planning-type Space is skipped for every task.
   void kindOf(task)
+  // Spec 022 (FR-007): a media task stays on its own board; a content task never goes to a board.
+  if (task.media_board) return []
   return spaces
     .filter(s => live(s) && (members[s.id] ?? []).includes(assigneeId))
-    .filter(s => s.default_kind !== 'simple')
+    .filter(s => s.default_kind !== 'simple' && !s.media_board)
     .map(s => s.id)
 }
 
@@ -137,9 +141,10 @@ export function handoffDefaults(
 /** The default Spaces for a member creating a task outside any Space (FR-028). */
 export function creatorSpaces(memberId: string, _kind: TaskKind, spaces: SpaceLike[], members: MembersBySpace): string[] {
   // The same for every task (user, 2026-11-23): the creator's working Spaces, not Planning.
+  // Spec 022 (FR-007): tasks made outside a Space are content tasks, so never on a Design/Video board.
   return spaces
     .filter(s => live(s) && (members[s.id] ?? []).includes(memberId))
-    .filter(s => s.default_kind !== 'simple')
+    .filter(s => s.default_kind !== 'simple' && !s.media_board)
     .map(s => s.id)
 }
 

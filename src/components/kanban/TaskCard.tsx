@@ -6,6 +6,7 @@ import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn } from '@/lib/brand-features'
 import { useTaskLinkNames } from './TaskLinks'
+import { CardMedia } from '@/components/media/MediaLinks'
 import { TaskDates } from '@/components/shared/DueDates'
 import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import { useTranslations } from 'next-intl'
@@ -206,6 +207,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
         {featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
+        {/* Spec 022: media links (content: per-board stage; media: its content task, or Unlinked). */}
+        <CardMedia task={task as never} />
         {linkNames.map(n => (
           <span key={n} data-card-task-link="" title={n} style={{ display: 'inline-flex', alignItems: 'center', maxWidth: 170, height: 22, padding: '0 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: 'color-mix(in srgb, #5B5FC7 10%, transparent)', color: '#3B3F9E' }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>

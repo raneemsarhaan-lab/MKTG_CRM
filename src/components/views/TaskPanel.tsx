@@ -9,6 +9,7 @@ import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { setValue } from '@/actions/sheet-columns'
 import { TaskLinksSection, taskLinkFields } from '@/components/kanban/TaskLinks'
+import { MediaPanelSection } from '@/components/media/MediaLinks'
 import { useUIStore } from '@/store/useUIStore'
 import { TaskModal } from '@/components/kanban/TaskModal'
 import { viewTasks, type BoardData } from './types'
@@ -39,13 +40,14 @@ export function TaskPanel({ data }: { data: BoardData }) {
       hasStorage={data.hasStorage}
       spaces={data.spaces}
       taskSpaces={data.taskSpaces}
-      linksSection={
+      linksSection={<>
+        <MediaPanelSection key={`m-${task.id}`} task={task as never} tasks={tasks as never} onOpenTask={id => selectTask(id)} />
         <TaskLinksSection key={task.id} taskId={task.id} brandId={task.brand_id}
           fields={taskLinkFields(data.sheetColumns, data.sheetValues, task.id)}
           ctx={{ tasks, spaces: data.spaces, brands: data.brands, me: data.currentUser, workspaceNineStage: data.workspaceNineStage,
             openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask }}
           set={async (columnId, value) => { const r = await setValue(columnId, task.id, value).catch(() => ({ success: false })); router.refresh(); return r.success }} />
-      }
+      </>}
       onClose={() => selectTask(null)}
     />
   )

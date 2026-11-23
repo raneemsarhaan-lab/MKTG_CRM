@@ -178,7 +178,7 @@ description: "Tasks for 022 — task methodology"
 - A designer assigned to an unlinked content task sees it in My tasks only.
 
 ### Tests for US3
-- [ ] T031 [P] [US3] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us3.cjs`:
+- [X] T031 [P] [US3] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us3.cjs`:
   - Create task on Design: `entry_stage='r-design'`, SLA counted from there;
   - typing in a Content sheet row's Link task cell lists the unlinked Design task; picking it links it (`content_task_id` set);
   - Create task from that list with Both makes two linked media tasks;
@@ -188,19 +188,19 @@ description: "Tasks for 022 — task methodology"
   - designer as assignee of an unlinked content task: in their My tasks, not on the Design board.
 
 ### Implementation for US3
-- [ ] T032 [US3] `createMediaTask(board, input)` and `unlinkMedia(mediaTaskId)` in `src/actions/media.ts` per contract (role checks: board Space members/superuser/admin for create; any signed-in member for unlink; R4, R14).
-- [ ] T033 [US3] `src/components/media/MediaActions.tsx` (new):
+- [X] T032 [US3] `createMediaTask(board, input)` and `unlinkMedia(mediaTaskId)` in `src/actions/media.ts` per contract (role checks: board Space members/superuser/admin for create; any signed-in member for unlink; R4, R14).
+- [X] T033 [US3] `src/components/media/MediaActions.tsx` (new):
   - the media board header gets Create task `[data-media-create]` (task form preset to the board), via `ViewHost` actions in `src/components/views/SpacePage.tsx`;
   - a `MediaLinkPicker` (built on `src/components/sheet/LinkTaskPicker.tsx`) lists `listUnlinkedMedia` results `[data-media-pick]` and Create task with the board choice `[data-media-board]`;
   - a built-in **Link task** column `[data-media-link]` on the Content, Video and Digital Media Space sheets (`src/components/views/TaskSheet.tsx`, `src/lib/sheet-columns.ts` TASK_BUILT_INS) and on the Content and Video sheets (`ContentGrid.tsx`, `SheetGrid.tsx`): chips with ⇄ and ×, typing or Ctrl+K opens the picker;
   - on those Spaces' calendars (`src/components/views/CalendarView.tsx`), typing on a day offers Link task → `linkFromCalendar` (per T002).
-- [ ] T034 [US3] Media boards show media tasks only:
+- [X] T034 [US3] Media boards show media tasks only:
   - in `src/components/views/SpacePage.tsx`, a Space with `media_board` scopes to `media_board = that board`;
   - in `src/components/kanban/TaskCard.tsx`, media cards show `[data-media-card]`, the content task name (`[data-media-linked]`, opens it), "with Content" read-only after D-Check, or an "Unlinked" tag.
-- [ ] T035 [US3] Content task chips `[data-media-chip]` (board + stage) on `src/components/kanban/TaskCard.tsx` and in `src/components/kanban/TaskModal.tsx`, with Unlink `[data-media-unlink]` beside each, for everyone.
-- [ ] T036 [US3] In `src/lib/spaces.ts`, `spacesForAssignee` and `creatorSpaces` never return a Space with `media_board` for a content task (FR-007). In `src/components/me/MyTasks.tsx`, keep tasks assigned to the member regardless of Space.
-- [ ] T037 [US3] Dropping a content task unlinks its media tasks in the same action (`src/actions/tasks.ts` drop path).
-- [ ] T038 [US3] Strings for Link task, Create task, Unlink, "with Content", "Unlinked" in `messages/en.json` and `messages/ar.json`.
+- [X] T035 [US3] Content task chips `[data-media-chip]` (board + stage) on `src/components/kanban/TaskCard.tsx` and in `src/components/kanban/TaskModal.tsx`, with Unlink `[data-media-unlink]` beside each, for everyone.
+- [X] T036 [US3] In `src/lib/spaces.ts`, `spacesForAssignee` and `creatorSpaces` never return a Space with `media_board` for a content task (FR-007). In `src/components/me/MyTasks.tsx`, keep tasks assigned to the member regardless of Space.
+- [X] T037 [US3] Dropping a content task unlinks its media tasks in the same action (`src/actions/tasks.ts` drop path).
+- [X] T038 [US3] Strings for Link task, Create task, Unlink, "with Content", "Unlinked" in `messages/en.json` and `messages/ar.json`.
 
 **Checkpoint**: US1–US3 tests pass. **MVP complete** (one pipeline, media boards working).
 

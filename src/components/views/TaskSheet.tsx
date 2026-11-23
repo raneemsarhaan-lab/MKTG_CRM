@@ -35,6 +35,7 @@ import { matchWord, wordOf, type SpaceWords } from '@/lib/space-words'
 import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
 import { formatDay, isOverdue } from '@/lib/due-dates'
 import { ManualMark } from '@/components/shared/DueDates'
+import { useMediaLinks } from '@/components/media/MediaLinks'
 import { canActOn } from '@/lib/task-access'
 import { setTaskStage, updateTask, type TaskPatch } from '@/actions/tasks'
 import { myNotes, setMyNote } from '@/actions/my-notes'
@@ -148,8 +149,11 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
   })
   const isCustom = (col: GridCol) => cl.custom.is(col)
+  // Spec 022 (R19): Link task is on content-side sheets, not on the Design and Video boards' own sheets.
+  const mediaSpace = /^tasks:space:/.test(sheet) && !!data.spaces.find(sp => `tasks:space:${sp.id}` === sheet)?.media_board
+  const ml = useMediaLinks({ tasks: viewTasks(data), onOpenTask: id => selectTask(id), say: sayNow })
   const cols: GridCol[] = [
-    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && (c === 'title' || isCustom(c) || !fields || fields.includes(c))),
+    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(c === 'media' && mediaSpace) && (c === 'title' || c === 'media' || isCustom(c) || !fields || fields.includes(c))),
     ...(notes ? [NOTES] : []),
   ]
 
@@ -157,6 +161,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const viewRef = useRef<LinkedView>({})
   const shown = (x: ViewTask, col: GridCol): string => {
     if (isCustom(col)) return cl.custom.textValue(x as unknown as Task, col)
+    if (col === 'media') return x.media_board ? '' : ml.text(x)
     // Spec 021 (US4): a field the task's brand has switched off shows nothing (its value is kept).
     if (offFeatureFor(x.brand, col)) return ''
     switch (col) {
@@ -289,10 +294,11 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const isText = (row: Row, col: GridCol) => {
     if (row.kind !== 'task' || col === 'rowNo') return false
     if (col === NOTES) return true
+    if (col === 'media') return false
     if (isCustom(col)) return cl.custom.isText(row.task as unknown as Task, col)
     return true
   }
-  const isMenu = (row: Row, col: GridCol) => row.kind === 'task' && isCustom(col) && cl.custom.isMenu(col)
+  const isMenu = (row: Row, col: GridCol) => row.kind === 'task' && ((col === 'media' && !row.task.media_board) || (isCustom(col) && cl.custom.isMenu(col)))
 
   // Row numbers count tasks only; group rows show none.
   const numbers = useMemo(() => { let n = 0; return new Map(baseRows.filter(r => r.kind === 'task').map(r => [r.key, ++n])) }, [baseRows])
@@ -323,7 +329,12 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     textValue: (row, col) => (row.kind === 'task' ? shown(row.task, col) : ''),
     isMenu,
     // Custom cells: a letter opens a Choice or Task link list; Space toggles a Checkbox; Delete clears (unlinks, with Undo).
-    onTypeAhead: (row, col, ch, anchor) => (row.kind === 'task' && isCustom(col) ? cl.custom.typeAhead(row.task as unknown as Task, col, ch, anchor, row.key) : false),
+    onTypeAhead: (row, col, ch, anchor) => {
+      if (row.kind !== 'task') return false
+      // Spec 022: typing in a Link task cell opens the list, already searching.
+      if (col === 'media') { if (!row.task.media_board) ml.open(row.task, anchor, ch); return true }
+      return isCustom(col) ? cl.custom.typeAhead(row.task as unknown as Task, col, ch, anchor, row.key) : false
+    },
     onActivate: (row, col) => (row.kind === 'task' && isCustom(col) ? cl.custom.activate(row.task as unknown as Task, col, row.key) : false),
     onDelete: (row, col) => {
       if (row.kind !== 'task' || !isCustom(col)) return false
@@ -339,6 +350,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       const x = row.task
       if (col === 'rowNo') return null
       if (isCustom(col)) return cl.custom.render(x as unknown as Task, col)
+      if (col === 'media') return x.media_board ? null : ml.render(x)
       if (offFeatureFor(x.brand, col)) return <span data-feature-off={offFeatureFor(x.brand, col)!} title={tFeat('hidden', { brand: x.brand?.name ?? '' })} aria-label={tFeat('hidden', { brand: x.brand?.name ?? '' })} style={{ display: 'block', width: '100%', height: '100%' }} />
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
       if (col === 'due' && x.due_date) {
@@ -368,6 +380,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     onCancelDraft: () => {},
     onOpen: (row, col, anchor) => {
       if (row.kind !== 'task') return
+      if (col === 'media') { if (!row.task.media_board) ml.open(row.task, anchor); return }
       if (isCustom(col)) { cl.custom.open(row.task as unknown as Task, col, anchor, row.key); return }
       selectTask(row.task.id)
     },
@@ -476,6 +489,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       {lf.node}
       {tips.node}
       {cl.layer}
+      {ml.layer}
       {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
       {drawer && inWorkbook && (() => {
         const laid = cl.laid.filter(c => !(hideBrand && c.key === 'brand'))

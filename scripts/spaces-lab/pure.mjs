@@ -102,6 +102,20 @@ check('pure-default-assignee', () => {
   eq(m.defaultAssigneeFor({ id: 'c', default_assignee_role: null }, members, ['m1']), null, 'no role: null')
 })
 
+check('pure-shows-in-media-boards', () => {
+  // Spec 022 FR-007: a content task never goes to a Design/Video board through its assignee or creator.
+  const spaces = [
+    { id: 'c', key: 'content', is_production: false, default_kind: 'pipeline' },
+    { id: 'd', key: 'design', is_production: true, default_kind: 'pipeline', media_board: 'design' },
+    { id: 'p', key: 'planning', is_production: false, default_kind: 'simple' },
+  ]
+  const members = { c: ['w'], d: ['w', 'g'], p: ['w'] }
+  eq(m.spacesForAssignee({ kind: 'pipeline' }, 'g', spaces, members), [], 'a designer assigned a content task: not on Design')
+  eq(m.spacesForAssignee({ kind: 'pipeline' }, 'w', spaces, members), ['c'], 'a writer in Content and Design: Content only')
+  eq(m.spacesForAssignee({ kind: 'pipeline', media_board: 'design' }, 'w', spaces, members), [], 'a media task stays on its board')
+  eq(m.creatorSpaces('w', 'pipeline', spaces, members), ['c'], 'created outside a Space: never on a board')
+})
+
 check('pure-fixtures-sane', () => {
   ok(lab.tasks.every(t => lab.taskSpaces.some(r => r.task_id === t.id)), 'every task shows somewhere')
 })

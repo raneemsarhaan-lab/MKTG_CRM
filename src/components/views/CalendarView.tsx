@@ -18,12 +18,15 @@ import { STAGE_COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { dayOf, isoOf, monthGrid, moveMonth, moveWeek, weekGrid } from '@/lib/calendar'
 import type { ViewTask } from './types'
+import { useCalendarLink, type MediaTaskLike } from '@/components/media/MediaLinks'
 
 const BY_KEY = 'momentum.calendar.by'
 const MODE_KEY = 'momentum.calendar.mode'
 const done = (t: ViewTask) => t.status === 'publish'
 
-export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due' }: {
+export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due', link }: {
+  /** Spec 022 (R19): Link task on a day — on content Spaces' calendars. */
+  link?: { spaceId: string; media: MediaTaskLike[] }
   /** Which date places a task on a day until the person picks: a brand's Calendar starts on publishing dates. */
   defaultBy?: 'publish' | 'due'
   tasks: ViewTask[]
@@ -53,6 +56,8 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   // Publishing date or due date: both are on every task, labelled; the person picks which places it.
   const [by, setBy] = useState<'publish' | 'due'>(defaultBy)
   const tDates = useTranslations('dates')
+  const tMedia = useTranslations('media')
+  const cal = useCalendarLink({ spaceId: link?.spaceId ?? null, media: link?.media ?? [], say: text => setToast({ text }) })
 
   useEffect(() => {
     try { const v = window.localStorage.getItem(MODE_KEY); if (v === 'week' || v === 'month') setMode(v) } catch { /* preference */ }
@@ -178,7 +183,13 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))', minWidth: 770, border: `1px solid ${PIPE.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {dow.map((d, i) => <div key={i} style={{ fontSize: 11, fontWeight: 700, color: PIPE.textMuted, padding: '6px 8px', background: PIPE.surface, borderBottom: `1px solid ${PIPE.border}`, textTransform: 'uppercase', letterSpacing: '.06em' }}>{d}</div>)}
           {days.map((d, i) => (
-            <div key={d.iso} data-day={d.iso}
+            <div key={d.iso} data-day={d.iso} className="fx-cal-day"
+              tabIndex={link ? 0 : undefined}
+              onKeyDown={link ? e => {
+                if (e.target !== e.currentTarget) return
+                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cal.open(d.iso, e.currentTarget, e.key) }
+                else if (e.key === 'Enter') { e.preventDefault(); cal.open(d.iso, e.currentTarget) }
+              } : undefined}
               onDragOver={e => { e.preventDefault(); setOver(d.iso) }}
               onDragLeave={() => setOver(o => (o === d.iso ? null : o))}
               onDrop={e => { e.preventDefault(); setOver(null); drop(e.dataTransfer.getData('text/plain'), d.iso) }}
@@ -191,6 +202,13 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
                 {d.day === 1 ? dayOf(d.iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : d.day}
               </span>
               {(byDay.get(d.iso) ?? []).map(chip)}
+              {link && (
+                <button type="button" className="fx-cal-link" data-cal-link={d.iso} aria-label={`${tMedia('linkTask')} · ${d.iso}`}
+                  onClick={e => cal.open(d.iso, e.currentTarget.parentElement as HTMLElement)}
+                  style={{ marginTop: 'auto', alignSelf: 'flex-start', border: 'none', background: 'transparent', color: PIPE.textMuted, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '1px 4px', borderRadius: 6 }}>
+                  ＋ {tMedia('linkTask')}
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -222,6 +240,7 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
       </aside>
       </div>
       <p style={{ margin: 0, fontSize: 12, color: PIPE.textMuted }}>{t('note')}</p>
+      {cal.layer}
       {toast && (
         <div role="status" style={{ position: 'fixed', bottom: 22, insetInlineStart: '50%', transform: 'translateX(-50%)', zIndex: 300, background: '#17181A', color: '#F1F1EC', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
           {toast.text}

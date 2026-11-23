@@ -9,6 +9,7 @@
  * video is a band with its clips' progress; lettered columns. Every change goes through the host's `api`, which is the board's own
  * code path, so the sheet can never do what the board would refuse.
  */
+import { useMediaLinks } from '@/components/media/MediaLinks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { SheetColumnSet, StageId, Task } from '@/types/index'
@@ -108,6 +109,8 @@ export function VideoSheet(p: VideoSheetProps) {
     setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
     toastTimer.current = setTimeout(() => setToast(null), undo ? 10000 : 3000)
   }, [])
+  // Spec 022 (R19): the Link task cell — a video's Design and Video tasks.
+  const ml = useMediaLinks({ tasks: p.tasks, onOpenTask: id => p.onOpenTask(id), say })
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const onNote = useCallback((key: string, note: string | null) => {
     setNotes(prev => ({ ...prev, [key]: note ?? undefined }))
@@ -212,6 +215,8 @@ export function VideoSheet(p: VideoSheetProps) {
   // ── opening a cell ──────────────────────────────────────────────────────
   function onOpen(row: SheetRow, col: GridCol, anchor: HTMLElement) {
     if (row.kind !== 'clip' && row.kind !== 'video') return
+    // Spec 022 (R19): a video's Link task cell opens the list.
+    if (col === 'media') { if (row.kind === 'video') ml.open(row.task, anchor); return }
     const task = row.task
     const can = canEdit(task)
     const menu = (label: string, items: MenuItem[]) => { if (items.length) setPopup({ kind: 'menu', label, anchor, items }) }
@@ -545,6 +550,7 @@ export function VideoSheet(p: VideoSheetProps) {
       {!empty && (
         <div className="fx-sheet-scroll">
           <SheetGrid
+            media={ml}
             setName={t(`sets.${set}`)}
             slaConfig={p.slaConfig}
             boardField={boardField}
@@ -595,6 +601,7 @@ export function VideoSheet(p: VideoSheetProps) {
         </div>
       )}
       {cl.layer}
+      {ml.layer}
 
       {singleVideo && !empty && clipsOf(p.tasks, singleVideo.id).length === 0 && (
         <p className="fx-sheet-hint">{t('empty')}</p>

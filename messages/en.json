@@ -303,7 +303,8 @@
       "doc": "Working Doc",
       "design": "Design Link",
       "task": "Task Link",
-      "post": "LinkedIn Link"
+      "post": "LinkedIn Link",
+      "media": "Link task"
     },
     "summary": {
       "clips": "{count, plural, one {# clip} other {# clips}}",
@@ -681,7 +682,8 @@
       "published": "Published Link",
       "pillar": "Pillar",
       "date": "Publishing date",
-      "archive": "Archive or restore"
+      "archive": "Archive or restore",
+      "media": "Link task"
     },
     "theme": {
       "pieces": "{count, plural, one {# piece} other {# pieces}}",
@@ -3104,7 +3106,8 @@
       "priority": "Priority",
       "platform": "Platform",
       "notes": "My notes",
-      "publish": "Publishing date"
+      "publish": "Publishing date",
+      "media": "Link task"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3192,11 +3195,44 @@
     "follows_content": "This media task passed D-Check, so it follows its content task now.",
     "linkedTo": "Content: {name}",
     "withContent": "With Content",
-    "unlinked": "Unlinked",
+    "unlinked": "Unlinked {name}.",
     "typeBoards": "Boards at Ready For Design",
     "typeBoardsHint": "Which media boards a task of each type is linked to when it reaches Ready For Design.",
     "design": "Design",
     "video": "Video",
-    "both": "Both"
+    "both": "Both",
+    "linkTask": "Link task",
+    "search": "Search Design and Video tasks",
+    "unlinkedOn": "Unlinked on Design and Video",
+    "noUnlinked": "No unlinked task matches.",
+    "create": "Create task",
+    "createNamed": "Create task \"{name}\"",
+    "boards": "Boards",
+    "change": "Change link",
+    "unlink": "Unlink",
+    "linked": "Linked {name}.",
+    "created": "Created and linked.",
+    "hint": "Type to search, ↑↓ to choose, Enter to link, Esc to close",
+    "err": {
+      "past_d_check": "This task is past D-Check, so nothing can be linked to it now.",
+      "already_linked": "That task, or a task on that board, is already linked.",
+      "not_found": "That task no longer exists.",
+      "no_board": "There's no Design or Video board yet.",
+      "generic": "Couldn't link it. Try again."
+    },
+    "col": "Link task",
+    "createOnBoard": "Create task",
+    "createTitle": "New {board} task",
+    "createName": "Task name",
+    "createGo": "Create",
+    "cancel": "Cancel",
+    "createBody": "An unlinked task that starts at Ready For Design. It waits in the Link task list until someone links it to a content task.",
+    "brand": "Brand",
+    "contentTask": "Content task",
+    "mediaRow": "Media",
+    "undo": "Undo",
+    "calNeedName": "Type the content task’s name first.",
+    "calMade": "{name} is on the calendar, linked.",
+    "unlinkedTag": "Unlinked"
   }
 }

@@ -714,7 +714,11 @@ export async function dropTask(taskId: string): Promise<{ success: boolean; erro
   if (task.dropped_at) return { success: true, dropped_at: task.dropped_at.toISOString() }
 
   const at = new Date()
-  await prisma.task.update({ where: { id: taskId }, data: { dropped_at: at, updated_at: at } })
+  await prisma.$transaction([
+    prisma.task.update({ where: { id: taskId }, data: { dropped_at: at, updated_at: at } }),
+    // Spec 022 (T037): dropping a content task unlinks its media tasks; they stay on their boards.
+    prisma.task.updateMany({ where: { content_task_id: taskId }, data: { content_task_id: null, updated_at: at } }),
+  ])
   revalidatePath('/board')
   revalidatePath('/overview')
   revalidatePath('/capacity')
@@ -947,6 +951,10 @@ export async function createTask(
     : member.access === 'user' ? null
     : await spaceDefaultAssignee(input.space_id, spaceCtx)
 
+  // Spec 022 (R4): a task made on a Design or Video board is an unlinked media task at Ready For Design.
+  const board = input.space_id ? spaceCtx.spaces.find(s => s.id === input.space_id)?.media_board ?? null : null
+  const media = board === 'design' || board === 'video' ? { media_board: board, status: 'r-design', entry_stage: 'r-design' } : {}
+
   const task = await prisma.task.create({
     data: {
       kind,
@@ -967,6 +975,7 @@ export async function createTask(
       priority:           input.priority ?? 'Medium',
       cover_image_url:    input.cover_image_url ?? null,
       created_by:         member.id,
+      ...media,
     },
   })
   // Spec 021 (FR-028, FR-029): the Space it was created from (or the creator's), then the assignee's.

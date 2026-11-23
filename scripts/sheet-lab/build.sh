@@ -12,6 +12,7 @@ node "$LAB/gen.mjs" "$ROOT" "$OUT"
 
 "$ROOT/node_modules/.bin/esbuild" "$LAB/entry.tsx" \
   --bundle --outfile="$OUT/bundle.js" --jsx=automatic --format=iife \
+  --alias:@/actions/media="$LAB/media-stub.ts" \
   --alias:@="$ROOT/src" \
   --define:process.env.NODE_ENV='"development"' \
   --log-level=warning

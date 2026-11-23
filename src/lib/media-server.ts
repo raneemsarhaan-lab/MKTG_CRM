@@ -29,12 +29,22 @@ export async function mediaGate(
  *   - media tasks past D-Check follow its stage.
  */
 export async function syncContent(contentTaskId: string, actorId: string): Promise<void> {
-  const content = await prisma.task.findUnique({ where: { id: contentTaskId }, select: { id: true, status: true, media_board: true, dropped_at: true } })
+  const content = await prisma.task.findUnique({ where: { id: contentTaskId }, select: { id: true, status: true, stage_date: true, media_board: true, dropped_at: true } })
   if (!content || content.media_board || content.dropped_at) return
   const media = linkedTo(content.id, await prisma.task.findMany({
-    where: { content_task_id: content.id }, select: { id: true, status: true, media_board: true, content_task_id: true, dropped_at: true },
+    where: { content_task_id: content.id }, select: { id: true, status: true, stage_date: true, media_board: true, content_task_id: true, dropped_at: true },
   }))
   if (!media.length) return
+  // Linked before Ready For Design (R10): the content task isn't pulled forward, and the
+  // media tasks' SLA starts when it gets there.
+  const BEFORE = ['todo', 'c-prog', 'c-final', 'c-check']
+  if (BEFORE.includes(content.status)) return
+  // Reached Ready For Design with its media already linked by hand: that was its link (R5, once).
+  await prisma.task.updateMany({ where: { id: content.id, auto_linked_at: null }, data: { auto_linked_at: new Date() } })
+  if (content.status === 'r-design') {
+    const early = media.filter(m => m.status === 'r-design' && m.stage_date < content.stage_date)
+    if (early.length) await prisma.task.updateMany({ where: { id: { in: early.map(m => m.id) } }, data: { stage_date: content.stage_date } })
+  }
   const waiting = contentStageFrom(media)
   let stage = content.status as StageId
   if (waiting && waiting !== stage) stage = waiting

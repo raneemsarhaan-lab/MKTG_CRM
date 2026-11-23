@@ -33,6 +33,8 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
     { key: 'title', width: 300, en: 'Title' },
     { key: 'type', width: 130, en: 'Type' },
     { key: 'status', width: 156, en: 'Status' },
+    // Spec 022 (R19): Link task — the piece's Design and Video tasks.
+    { key: 'media', width: 200, en: 'Link task' },
     { key: 'assignee', width: 130, en: 'Assignee' },
     { key: 'doc', width: 124, en: 'Working Doc' },
     { key: 'design', width: 116, en: 'Design Link' },
@@ -51,6 +53,8 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
     { key: 'title', width: 280, en: 'Clip', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full', 'sheet'] },
     { key: 'status', width: 160, en: 'Stage', sets: ['editing', 'copy', 'full', 'sheet'] },
+    // Spec 022 (R19): Link task on a video's own row — its Design and Video tasks.
+    { key: 'media', width: 200, en: 'Link task', sets: ['full', 'sheet'] },
     { key: 'editor', width: 150, en: 'Owner', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'reviewer', width: 150, en: 'Reviewer', sets: ['sheet'] },
     { key: 'due', width: 90, en: 'Due', sets: ['sheet'] },
@@ -78,6 +82,8 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'title', width: 300, en: 'Task' },
   { key: 'brand', width: 170, en: 'Brand' },
   { key: 'status', width: 150, en: 'Status' },
+  // Spec 022 (R19): Link task — this task's Design and Video tasks.
+  { key: 'media', width: 210, en: 'Link task' },
   { key: 'assignee', width: 140, en: 'Assignee' },
   { key: 'publish', width: 130, en: 'Publishing date' },
   { key: 'due', width: 130, en: 'Due date' },

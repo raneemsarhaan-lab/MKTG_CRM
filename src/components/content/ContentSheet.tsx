@@ -6,6 +6,7 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
+import { useMediaLinks } from '@/components/media/MediaLinks'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
@@ -106,6 +107,8 @@ export function ContentSheet(p: ContentSheetProps) {
     setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
     toastTimer.current = setTimeout(() => setToast(null), undo ? 10000 : 3000)
   }, [])
+  // Spec 022 (R19): the Link task cell — the piece's Design and Video tasks.
+  const ml = useMediaLinks({ tasks: p.tasks, onOpenTask: id => p.onOpenTask(id), say })
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const onNote = useCallback((key: string, note: string | null) => {
     setNotes(prev => ({ ...prev, [key]: note ?? undefined }))
@@ -225,6 +228,8 @@ export function ContentSheet(p: ContentSheetProps) {
   }
 
   function onOpen(row: ContentRow, col: GridCol, anchor: HTMLElement) {
+    // Spec 022 (R19): a piece's Link task cell opens the list.
+    if (col === 'media') { if (row.kind === 'piece') ml.open(row.task, anchor); return }
     const menu = (label: string, items: MenuItem[]) => { if (items.length) setPopup({ kind: 'menu', label, anchor, items }) }
     const pick = (fn: () => void) => () => { closePopup(true); fn() }
     if (row.kind === 'theme') {
@@ -439,6 +444,7 @@ export function ContentSheet(p: ContentSheetProps) {
         : (
           <div className="fx-sheet-scroll">
             <ContentGrid
+              media={ml}
               rows={rows}
               me={me}
               members={p.members}
@@ -488,6 +494,7 @@ export function ContentSheet(p: ContentSheetProps) {
           </div>
         )}
       {cl.layer}
+      {ml.layer}
 
       {popup?.kind === 'menu' && <SheetMenu anchor={popup.anchor} label={popup.label} items={popup.items} onClose={closePopup} />}
       {popup?.kind === 'link' && linkTask && (

@@ -36,7 +36,7 @@ import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
 
-export const CONTENT_COLS = ['title', 'type', 'status', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
+export const CONTENT_COLS = ['title', 'type', 'status', 'media', 'assignee', 'doc', 'design', 'task', 'post', 'published', 'pillar', 'date', 'archive'] as const
 export type ContentCol = typeof CONTENT_COLS[number]
 const WIDTHS: Record<string, number> = {
   title: 300, type: 130, status: 156, assignee: 130,
@@ -67,6 +67,8 @@ export function shortDate(ymd: string | null | undefined): string {
 }
 
 export interface ContentGridProps {
+  /** Spec 022 (R19): the Link task cell (chips, the list, Undo), from the sheet. */
+  media?: { render(task: Task): React.ReactNode; open(task: Task, anchor: HTMLElement, typed?: string): void; text(task: Task): string }
   rows: ContentRow[]
   me: Member
   members: Member[]
@@ -159,7 +161,7 @@ export function ContentGrid(p: ContentGridProps) {
     if (row.kind === 'theme' || row.kind === 'pillar') return col === 'title' || col === 'rowNo'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
-    return ['rowNo', 'type', 'status', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
+    return ['rowNo', 'type', 'status', 'media', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
   }
 
   /**
@@ -249,6 +251,8 @@ export function ContentGrid(p: ContentGridProps) {
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'piece' && row.kind !== 'clip') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
+      // Spec 022: typing in a piece's Link task cell opens the list, already searching.
+      if (col === 'media') { if (row.kind === 'piece') p.media?.open(row.task, anchor, ch); return true }
       return isCustom(col) ? cl.custom.typeAhead(row.task, col, ch, anchor, row.key) : false
     },
     colsOf: row => (row.kind === 'theme' || row.kind === 'pillar' || row.kind === 'group' ? ['rowNo', 'title'] : null),
@@ -340,6 +344,7 @@ export function ContentGrid(p: ContentGridProps) {
       if (isCustom(col)) return cl.custom.render(task, col)
       switch (col) {
         case 'rowNo': return row.n
+        case 'media': return isClip ? null : p.media?.render(task) ?? null
         case 'title': {
           const deep = isClip ? 3 : task.pillar_id ? 2 : 1
           return (
@@ -402,6 +407,7 @@ export function ContentGrid(p: ContentGridProps) {
     if (task && !isCustom(col)) {
       switch (col) {
         case 'status': return row.kind === 'clip' ? stageNames.video(task.status as StageId) : stageWord(task.status)
+        case 'media': return row.kind === 'piece' ? p.media?.text(task) ?? '' : ''
         case 'assignee': return task.assignee_id ? byId.get(task.assignee_id)?.name ?? '' : ''
         case 'type': return task.content_type_label ? typeWord(task.content_type_label) : ''
         case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find((x: ContentTheme['pillars'][number]) => x.id === task.pillar_id)?.name ?? '' : ''

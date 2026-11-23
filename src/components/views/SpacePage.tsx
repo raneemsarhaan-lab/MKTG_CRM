@@ -28,6 +28,7 @@ import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { viewTasks, viewOptions, type BoardData } from './types'
 import { applyView } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
+import { MediaCreateButton } from '@/components/media/MediaLinks'
 
 export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
   const t = useTranslations('spaces')
@@ -59,7 +60,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
       title={label}
       tag={t('spaceTag')}
       color={space.color}
-      actions={data.currentUser.access !== 'user' ? <SpaceWordsButton space={space} /> : undefined}
+      actions={<>{space.media_board && <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} />}{data.currentUser.access !== 'user' && <SpaceWordsButton space={space} />}</>}
       sub={<span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <span data-space-rule>{rule}</span>
         <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
@@ -91,7 +92,8 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
           ? <NodeWorkbook key={view?.id} data={data} node={`space:${spaceId}`}
               linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={view?.config.fields} sheetKey={`tasks:space:${spaceId}`} words={words} label={label} />} />
           : tab === 'calendar'
-            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open} />
+            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open}
+                link={board ? undefined : { spaceId, media: viewTasks(data) }} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
               : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} initialGroup={view?.config.group} onOpen={open} />
