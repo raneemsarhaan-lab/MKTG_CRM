@@ -3065,7 +3065,11 @@
     "hiddenViews": "Hidden ({n})",
     "showView": "Show {name}",
     "groupStatusGroup": "Status group",
-    "noTag": "No tag"
+    "noTag": "No tag",
+    "weekOf": "Week of {day}",
+    "weekPrev": "Previous week",
+    "weekNext": "Next week",
+    "weekNote": "Hours spread from each task’s start date to its due date, on working days."
   },
   "calendar": {
     "today": "Today",
@@ -3088,7 +3092,9 @@
     "by": "Show by",
     "byPublish": "Publishing date",
     "byDue": "Due date",
-    "movedPublish": "\"{name}\" now publishes {date}. Its due date follows unless set by hand."
+    "movedPublish": "\"{name}\" now publishes {date}. Its due date follows unless set by hand.",
+    "spans": "Spans",
+    "spansHint": "Show each task on every day from its start date"
   },
   "handoff": {
     "title": "Ready for media",
@@ -3134,7 +3140,8 @@
       "notes": "My notes",
       "publish": "Publishing date",
       "media": "Link task",
-      "tags": "Tags"
+      "tags": "Tags",
+      "start": "Start date"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3218,7 +3225,11 @@
         "5": "Fri",
         "6": "Sat"
       }
-    }
+    },
+    "start": "Start date",
+    "startShort": "Start",
+    "startAfterDue": "The start date can’t be after the due date.",
+    "startNone": "No start date"
   },
   "media": {
     "waiting_on_media": "Waiting on Design or Video: it moves to F-Check by itself when every linked media task has passed D-Check.",

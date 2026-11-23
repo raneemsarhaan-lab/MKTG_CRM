@@ -310,6 +310,8 @@ export interface Task {
   status: StageId
   stage_date: string
   due_date: string | null
+  /** Spec 023 (US6): optional start; never after the due date. */
+  start_date?: string | null
   /** The day the content goes live (Africa/Cairo). */
   publish_date?: string | null
   /** The due date was set by hand: a new publishing date doesn't move it. */

@@ -156,6 +156,7 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     status:             t.status,
     stage_date:         toDateStr(t.stage_date),
     due_date:           t.due_date ? toDateStr(t.due_date) : null,
+    start_date:         t.start_date ? toDateStr(t.start_date) : null,
     publish_date:       t.publish_date ? toDateStr(t.publish_date) : null,
     due_manual:         t.due_manual === true,
     media_board:        t.media_board === 'design' || t.media_board === 'video' ? t.media_board : null,

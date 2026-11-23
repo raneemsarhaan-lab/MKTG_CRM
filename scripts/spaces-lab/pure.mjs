@@ -434,6 +434,10 @@ check('pure-start-dates', () => {
   eq(Object.keys(S.spreadHours(8, '2026-12-03', '2026-12-08', wk)).length, 4, 'Friday and Saturday skipped')
   eq(S.spreadHours(6, null, '2026-12-10', wk), { '2026-12-10': 6 }, 'no start: on the due day')
   eq(S.spanDays('2026-12-06', '2026-12-10').length, 5, 'calendar span')
+  // Per person per day: two assignees share 10 h → 1 h a day each over five days.
+  const load = m.dayLoad([{ assignee_id: 'a', assignee_ids: ['a', 'b'], hours_estimate: 10, status: 'c-prog', start_date: '2026-12-06', due_date: '2026-12-10' }],
+    ['2026-12-06', '2026-12-10', '2026-12-11'], wk)
+  eq(load, { a: { '2026-12-06': 1, '2026-12-10': 1 }, b: { '2026-12-06': 1, '2026-12-10': 1 } }, 'day load, split and spread')
 })
 
 // Spec 023 Stage D: templates and recurring tasks.

@@ -6,6 +6,7 @@
 import { featureOn } from '@/lib/brand-features'
 import type { BrandFeatures } from '@/types/index'
 import { hoursSplit } from '@/lib/assignees'
+import { spreadHours } from '@/lib/start-dates'
 
 export interface LoadTask {
   assignee_id?: string | null
@@ -39,4 +40,31 @@ export function taskLoad(tasks: LoadTask[]): PersonLoad[] {
     }
   }
   return [...by.values()].sort((a, b) => b.hours - a.hours)
+}
+
+/**
+ * Spec 023 (US6, D14): hours per person per day. Each person's share is spread
+ * over the working days from the task's start to its due date (the Settings
+ * weekend skipped); without a start it sits on the due day. Undated tasks are
+ * left out. Only the days asked for are returned.
+ */
+export function dayLoad(
+  tasks: (LoadTask & { start_date?: string | null; due_date?: string | null })[],
+  days: string[],
+  weekend: number[],
+): Record<string, Record<string, number>> {
+  const want = new Set(days)
+  const out: Record<string, Record<string, number>> = {}
+  for (const t of tasks) {
+    if (!isOpen(t) || !t.due_date) continue
+    const split = hoursSplit({ ...t, hours_estimate: featureOn(t.brand, 'hours') ? Number(t.hours_estimate) || 0 : 0 })
+    for (const [id, h] of Object.entries(split)) {
+      for (const [day, v] of Object.entries(spreadHours(h, t.start_date?.slice(0, 10), t.due_date.slice(0, 10), weekend))) {
+        if (!want.has(day)) continue
+        const row = (out[id] ??= {})
+        row[day] = Math.round(((row[day] ?? 0) + v) * 100) / 100
+      }
+    }
+  }
+  return out
 }

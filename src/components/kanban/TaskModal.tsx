@@ -761,7 +761,7 @@ export function TaskModal({
         try {
           const res = await updateTask(task.id, patch)
           if (res.success) { router.refresh(); after?.(); resolve(true); return }
-          setError(res.error ?? 'Could not save the change')
+          setError(res.error === 'start_after_due' ? tDates('startAfterDue') : res.error ?? 'Could not save the change')
           resolve(false)
         } catch {
           setError('Could not save the change — check your connection')
@@ -1808,6 +1808,17 @@ export function TaskModal({
                       canEdit={canEdit} type="date" value={task.publish_date ?? ''}
                       display={task.publish_date ? formatDay(task.publish_date, locale) : ''}
                       onCommit={v => applyPatch({ publish_date: v || null })}
+                    />
+                  </span>
+                </Prop>
+
+                {/* Spec 023 (US6): optional start date; never after the due date. */}
+                <Prop icon="calendar" label={tDates('start')}>
+                  <span data-start-date={task.start_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
+                    <InlineValue
+                      canEdit={canEdit} type="date" value={task.start_date ?? ''}
+                      display={task.start_date ? formatDay(task.start_date, locale) : ''}
+                      onCommit={v => applyPatch({ start_date: v || null })}
                     />
                   </span>
                 </Prop>

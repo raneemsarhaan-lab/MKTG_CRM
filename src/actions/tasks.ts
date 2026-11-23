@@ -264,6 +264,8 @@ export interface TaskPatch {
   publish_date?:       string | null
   /** "Reset to auto": forget the hand-set due date and work it out from the publishing date. */
   due_reset?:          boolean
+  /** Spec 023 (US6): optional start date (yyyy-mm-dd); null clears it; refused after the due date. */
+  start_date?:         string | null
   hours_estimate?:     number
   priority?:           Priority
   cover_image_url?:    string
@@ -938,6 +940,8 @@ interface CreateTaskInput {
   assignee_id?:       string | null
   /** Spec 021 (Link task): a task made from a Task link may have no due date yet. Given here, it's set by hand. */
   due_date?:          string | null
+  /** Spec 023 (US6): an optional start date (from a template); dropped when after the due date. */
+  start_date?:        string | null
   /** The day it goes live; with no due date given, the due date is worked out from it. */
   publish_date?:      string | null
   platform?:          string
@@ -1014,7 +1018,7 @@ export async function createTask(
       nine_stage:         nineStage,
       status:             'todo',
       stage_date:         new Date(),
-      ...(await newTaskDates(input.publish_date, input.due_date)),
+      ...(await newTaskDates(input.publish_date, input.due_date, input.start_date)),
       hours_estimate:     input.hours_estimate ?? 0,
       // Spec 023 (T019): the type's default priority when none was chosen.
       priority:           input.priority ?? asPriority(typeRow?.default_priority) ?? 'Normal',

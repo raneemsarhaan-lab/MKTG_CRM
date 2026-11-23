@@ -18,11 +18,13 @@ import { updateTask } from '@/actions/tasks'
 import { STAGE_COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { dayOf, isoOf, monthGrid, moveMonth, moveWeek, weekGrid } from '@/lib/calendar'
+import { spanDays } from '@/lib/start-dates'
 import type { ViewTask } from './types'
 import { useCalendarLink, type MediaTaskLike } from '@/components/media/MediaLinks'
 
 const BY_KEY = 'momentum.calendar.by'
 const MODE_KEY = 'momentum.calendar.mode'
+const SPANS_KEY = 'momentum.calendar.spans'
 const done = (t: ViewTask) => t.status === 'publish'
 
 export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due', link, milestones }: {
@@ -58,6 +60,8 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   const [showDone, setShowDone] = useState(false)
   // Publishing date or due date: both are on every task, labelled; the person picks which places it.
   const [by, setBy] = useState<'publish' | 'due'>(defaultBy)
+  // Spec 023 (US6): "Spans" shows a task on every day from its start date (per device).
+  const [spans, setSpans] = useState(false)
   const tDates = useTranslations('dates')
   const tMedia = useTranslations('media')
   const tm = useTranslations('milestones')
@@ -71,7 +75,14 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   useEffect(() => {
     try { const v = window.localStorage.getItem(MODE_KEY); if (v === 'week' || v === 'month') setMode(v) } catch { /* preference */ }
     try { const b = window.localStorage.getItem(`${BY_KEY}.${defaultBy}`); if (b === 'publish' || b === 'due') setBy(b) } catch { /* preference */ }
+    try { setSpans(window.localStorage.getItem(SPANS_KEY) === '1') } catch { /* preference */ }
   }, [defaultBy])
+  function toggleSpans() {
+    setSpans(v => {
+      try { window.localStorage.setItem(SPANS_KEY, v ? '0' : '1') } catch { /* preference */ }
+      return !v
+    })
+  }
   function chooseBy(b: 'publish' | 'due') {
     setBy(b); setMoved({})
     try { window.localStorage.setItem(`${BY_KEY}.${defaultBy}`, b) } catch { /* preference */ }
@@ -92,6 +103,18 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
     for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name))
     return m
   }, [live, moved]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The days before the placing day that a task spans (start date → its day).
+  const spanByDay = useMemo(() => {
+    const m = new Map<string, ViewTask[]>()
+    if (!spans) return m
+    for (const x of live) {
+      const d = dueOf(x)
+      if (!d || !x.start_date) continue
+      for (const day of spanDays(x.start_date.slice(0, 10), d)) if (day !== d) m.set(day, [...(m.get(day) ?? []), x])
+    }
+    for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name))
+    return m
+  }, [live, moved, spans]) // eslint-disable-line react-hooks/exhaustive-deps
   const undatedAll = live.filter(x => !dueOf(x))
   const undatedDone = undatedAll.filter(done).length
   const undated = undatedAll
@@ -149,6 +172,15 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
       {done(x) ? '✓ ' : ''}{x.name}
     </button>
   )
+  const spanChip = (x: ViewTask, day: string) => (
+    <button key={`${x.id}:${day}`} type="button" data-cal-span={x.id} onClick={() => onOpen(x.id)}
+      title={[x.name, x.start_date ? `${tDates('startShort')} ${formatDay(x.start_date, locale)}` : ''].filter(Boolean).join(' · ')}
+      style={{ display: 'block', width: '100%', textAlign: 'start', border: `1px dashed ${color(x)}`, cursor: 'pointer', fontFamily: 'inherit',
+        fontSize: 11.5, fontWeight: 500, padding: '2px 6px', borderRadius: 7, color: PIPE.textSecondary, background: `color-mix(in srgb, ${color(x)} 7%, #FFFFFF)`,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      ↦ {x.name}
+    </button>
+  )
   const btn: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 9, padding: '5px 10px', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: PIPE.ink }
 
   return (
@@ -177,6 +209,10 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
             ))}
           </span>
         </div>
+        <button type="button" data-cal-spans aria-pressed={spans} onClick={toggleSpans} title={t('spansHint')}
+          style={{ ...btn, fontSize: 12.5, background: spans ? PIPE.ink : '#FFFFFF', color: spans ? '#FFFFFF' : PIPE.ink }}>
+          {t('spans')}
+        </button>
         {campaigns.length > 0 && (
           <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 12.5, color: PIPE.textMuted }}>
             {t('campaign')}
@@ -220,6 +256,7 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
                   <span aria-hidden="true" style={{ color: brandOf.get(m.brand_id)?.color ?? '#E8772E' }}>⚑</span>{m.name}
                 </button>
               ))}
+              {(spanByDay.get(d.iso) ?? []).map(x => spanChip(x, d.iso))}
               {(byDay.get(d.iso) ?? []).map(chip)}
               {milestones?.canEdit && milestones.brandIds.length > 0 && (
                 <button type="button" className="fx-cal-mark" data-milestone-add={d.iso} aria-label={`${tm('add')} · ${d.iso}`}

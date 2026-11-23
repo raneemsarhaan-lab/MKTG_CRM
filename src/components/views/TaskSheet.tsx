@@ -201,6 +201,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
       case 'publish': return x.publish_date ?? ''
+      case 'start': return x.start_date ?? ''
       case 'type': return x.content_type_label ?? ''
       case 'priority': return x.priority ? t(`priority.${x.priority}`) : ''
       case 'platform': return x.platform ?? ''
@@ -292,6 +293,14 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
         if (!text) return patch(x, { due_date: null }, { due_date: null, due_manual: true })
         const d = readDay(text)
         return d ? patch(x, { due_date: d }, { due_date: d, due_manual: true }) : t('badDate', { text })
+      }
+      case 'start': {
+        // Spec 023 (US6): never after the due date (the server refuses it too).
+        if (!text) return patch(x, { start_date: null }, { start_date: null })
+        const d = readDay(text)
+        if (!d) return t('badDate', { text })
+        if (x.due_date && d > x.due_date.slice(0, 10)) return tDates('startAfterDue')
+        return patch(x, { start_date: d }, { start_date: d })
       }
       case 'publish': {
         // A new publishing date moves an automatic due date (worked out on the server; the refresh brings it).
@@ -413,6 +422,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
         const late = isOverdue(x)
         return <span className="fx-sheet-ellipsis" data-due-cell={x.due_date} style={late ? { color: '#D22040' } : undefined}>{formatDay(x.due_date, locale)}{x.due_manual && <ManualMark label={tDates('manual')} />}</span>
       }
+      if (col === 'start' && x.start_date) return <span className="fx-sheet-ellipsis" data-start-cell={x.start_date}>{formatDay(x.start_date, locale)}</span>
       if (col === 'publish' && x.publish_date) return <span className="fx-sheet-ellipsis" data-publish-cell={x.publish_date}>{formatDay(x.publish_date, locale)}</span>
       const s = shown(x, col)
       if (col === 'status' && s) {
@@ -423,8 +433,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
     isDraft: () => false,
     inputLabel: (row, col) => (row.kind === 'task' ? `${row.task.name} · ${headerText(col)}` : headerText(col)),
-    inputPlaceholder: (_row, col) => (col === 'due' || col === 'publish' ? '2026-12-01' : undefined),
-    inputDir: col => (col === 'due' || col === 'publish' ? 'ltr' : undefined),
+    inputPlaceholder: (_row, col) => (col === 'due' || col === 'publish' || col === 'start' ? '2026-12-01' : undefined),
+    inputDir: col => (col === 'due' || col === 'publish' || col === 'start' ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)

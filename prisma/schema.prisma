@@ -311,6 +311,8 @@ model Task {
   status               String    @default("todo")
   stage_date           DateTime  @default(now()) @db.Date
   due_date             DateTime? @db.Date
+  /// Spec 023 (US6): optional; empty unless set by hand or by a template; never after the due date.
+  start_date           DateTime? @db.Date
   hours_estimate       Decimal   @default(0) @db.Decimal(5, 1)
   cover_image_url      String?
   /// A small preview of the newest image uploaded to this task.

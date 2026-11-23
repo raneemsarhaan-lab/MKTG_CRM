@@ -86,6 +86,7 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'media', width: 340, en: 'Link task' },
   { key: 'assignee', width: 140, en: 'Assignee' },
   { key: 'publish', width: 130, en: 'Publishing date' },
+  { key: 'start', width: 120, en: 'Start date' },
   { key: 'due', width: 130, en: 'Due date' },
   { key: 'type', width: 110, en: 'Type' },
   { key: 'priority', width: 90, en: 'Priority' },

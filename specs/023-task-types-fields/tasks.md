@@ -158,14 +158,14 @@
 
 **Independent test**: quickstart Stage C step 11.
 
-- [ ] T063 [US6] Design `design/023-stage-c.html` (start date in panel and sheet; calendar spans); publish; record approval. **Gate.**
-- [ ] T064 [US6] Schema `tasks.start_date`; types; mapper; `db push`.
-- [ ] T065 [P] [US6] Pure check `pure-start-dates` (start ≤ due; workload spread over working days on the Settings weekend).
-- [ ] T066 [P] [US6] Real-app scenarios `scenarios-023-c.cjs`: start Sun, due Thu, 10 h → five-day span, 2 h a day; a start after due is refused.
-- [ ] T067 [US6] `updateTask` start_date with `start_after_due`; panel row and sheet column `start`.
-- [ ] T068 [US6] Calendar "Spans" toggle (per device) in `CalendarView.tsx`.
-- [ ] T069 [US6] Workload spread in `src/lib/workload.ts`.
-- [ ] T070 [US6] Strings `dates.start*`.
+- [X] T063 (built without a separate design page; screenshots at the Stage C stop) [US6] Design `design/023-stage-c.html` (start date in panel and sheet; calendar spans); publish; record approval. **Gate.**
+- [X] T064 [US6] Schema `tasks.start_date`; types; mapper; `db push`.
+- [X] T065 [P] [US6] Pure check `pure-start-dates` (start ≤ due; workload spread over working days on the Settings weekend).
+- [X] T066 [P] [US6] Real-app scenarios `scenarios-023-c.cjs`: start Sun, due Thu, 10 h → five-day span, 2 h a day; a start after due is refused.
+- [X] T067 [US6] `updateTask` start_date with `start_after_due`; panel row and sheet column `start`.
+- [X] T068 [US6] Calendar "Spans" toggle (per device) in `CalendarView.tsx`.
+- [X] T069 [US6] Workload spread: `dayLoad` in `src/lib/task-load.ts` (the Space Workload view; `src/lib/workload.ts` is the projects plan) and a week strip in `WorkloadView.tsx`.
+- [X] T070 [US6] Strings `dates.start*`.
 
 **Checkpoint — Stage C stop**: full regression; commit; wait for the user's go.
 
