@@ -8,7 +8,7 @@ import type { MediaBoard } from '@/types/index'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import type { HandoffDefaults, StageId, TaskKind, TaskSpaceVia } from '@/types/index'
-import { creatorSpaces, defaultAssigneeFor, membersBySpace, needsHandoff, spacesForAssignee, type MembersBySpace, type SpaceLike } from '@/lib/spaces'
+import { creatorSpaces, defaultAssigneeFor, membersBySpace, needsHandoff, spacesForAssignee, spacesToDropOnAssigneeChange, type MembersBySpace, type SpaceLike } from '@/lib/spaces'
 
 type Db = Prisma.TransactionClient | typeof prisma
 
@@ -66,6 +66,18 @@ export async function addAssigneeSpaces(db: Db, task: { id: string; kind?: strin
   if (!assigneeId) return
   const c = ctx ?? await loadSpaceContext(db)
   await addSpaces(db, task.id, spacesForAssignee(task, assigneeId, c.spaces, c.members), 'assignee', by)
+}
+
+/** Spec 022 (US5): a new assignee — the old assignee's Spaces go (by the rule), the new one's come. */
+export async function changeAssigneeSpaces(db: Db, task: { id: string; kind?: string | null; media_board?: string | null }, oldId: string | null | undefined, newId: string | null | undefined, by: string, ctx?: SpaceContext) {
+  if (oldId === newId) return
+  const c = ctx ?? await loadSpaceContext(db)
+  const oldSpaces = oldId ? spacesForAssignee(task, oldId, c.spaces, c.members) : []
+  const newSpaces = newId ? spacesForAssignee(task, newId, c.spaces, c.members) : []
+  const rows = await db.taskSpace.findMany({ where: { task_id: task.id }, select: { space_id: true, added_via: true } })
+  const drop = spacesToDropOnAssigneeChange(rows, oldSpaces, newSpaces)
+  if (drop.length) await db.taskSpace.deleteMany({ where: { task_id: task.id, space_id: { in: drop }, added_via: 'assignee' } })
+  if (newId) await addSpaces(db, task.id, newSpaces, 'assignee', by)
 }
 
 /**

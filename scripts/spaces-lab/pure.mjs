@@ -116,6 +116,14 @@ check('pure-shows-in-media-boards', () => {
   eq(m.creatorSpaces('w', 'pipeline', spaces, members), ['c'], 'created outside a Space: never on a board')
 })
 
+check('pure-assignee-change-drops', () => {
+  // Spec 022 US5: the old assignee's Spaces go, unless created there, added by hand, or the new one brings it too.
+  const rows = [{ space_id: 'c', added_via: 'assignee' }, { space_id: 'p', added_via: 'created' }, { space_id: 'x', added_via: 'assignee' }, { space_id: 'm', added_via: 'manual' }]
+  eq(m.spacesToDropOnAssigneeChange(rows, ['c', 'p', 'm'], []), ['c'], 'only rows the old assignee brought')
+  eq(m.spacesToDropOnAssigneeChange(rows, ['c', 'x'], ['x']), ['c'], 'a Space the new assignee brings stays')
+  eq(m.spacesToDropOnAssigneeChange(rows, [], ['c']), [], 'nothing of the old assignee: nothing goes')
+})
+
 check('pure-fixtures-sane', () => {
   ok(lab.tasks.every(t => lab.taskSpaces.some(r => r.task_id === t.id)), 'every task shows somewhere')
 })

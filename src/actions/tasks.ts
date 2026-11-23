@@ -5,7 +5,7 @@ import { afterMove, mediaGate, moveThroughMedia } from '@/lib/media-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
-import { addAssigneeSpaces, addSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
+import { addAssigneeSpaces, addSpaces, changeAssigneeSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
 import { defaultAssigneeFor } from '@/lib/spaces'
 import { needsHandoff } from '@/lib/spaces'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
@@ -308,8 +308,8 @@ export async function updateTask(
 
   // Spec 012: a new assignee hears about it and follows; new mentions too.
   const newAssignee = patch.assignee_id !== undefined && patch.assignee_id && patch.assignee_id !== task.assignee_id ? patch.assignee_id : null
-  // Spec 021 (FR-029): and the task joins the assignee's Spaces. None is removed.
-  if (newAssignee) await addAssigneeSpaces(prisma, task, newAssignee, member.id)
+  // Spec 022 (US5): the task joins the new assignee's Spaces, and leaves the ones only the old assignee brought.
+  if (patch.assignee_id !== undefined && (patch.assignee_id || null) !== task.assignee_id) await changeAssigneeSpaces(prisma, task, task.assignee_id, patch.assignee_id || null, member.id)
   if (newAssignee || newlyMentioned.length) {
     await notifyAfter(async tx => {
       const ids: string[] = []
@@ -850,7 +850,7 @@ export async function bulkUpdateTasks(
     // Spec 012: each task's move and new assignee, as if done one by one.
     const moved = data.status !== undefined
     const assignee = data.assignee_id && data.assignee_id !== task.assignee_id ? data.assignee_id as string : null
-    if (assignee) await addAssigneeSpaces(prisma, task, assignee, member.id, spaceCtx)
+    if (assignee) await changeAssigneeSpaces(prisma, task, task.assignee_id, assignee, member.id, spaceCtx)
     if (moved || assignee) {
       await notifyAfter(async tx => {
         const ids: string[] = []

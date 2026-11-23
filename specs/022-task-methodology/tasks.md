@@ -259,10 +259,10 @@ description: "Tasks for 022 — task methodology"
 
 **Independent test** (quickstart 10): change the assignee; the old assignee's Space goes unless it was the created-in Space.
 
-- [ ] T049 [P] [US5] Pure check additions in `pure.mjs`: `spacesToDropOnAssigneeChange(rows, oldAssignee, createdIn)`.
-- [ ] T050 [P] [US5] Real-app scenario in `scripts/spaces-lab/realapp/scenarios-022-us5.cjs`: assignee change from a Content member to a Planning member drops Content (added for the assignee) but keeps it when Content was the created-in Space.
-- [ ] T051 [US5] In `updateTask` and `bulkUpdateTasks` (`src/actions/tasks.ts`), delete the old assignee's `added_via='assignee'` rows unless the Space also has a `created`/`manual` row (`src/lib/spaces-server.ts` helper).
-- [ ] T052 [US5] Confirm each Space lists a task once and in its stage names (`src/components/views/SpacePage.tsx`); brand pages unchanged (`BrandPage.tsx`).
+- [X] T049 [P] [US5] Pure check additions in `pure.mjs`: `spacesToDropOnAssigneeChange(rows, oldAssignee, createdIn)`.
+- [X] T050 [P] [US5] Real-app scenario in `scripts/spaces-lab/realapp/scenarios-022-us5.cjs`: assignee change from a Content member to a Planning member drops Content (added for the assignee) but keeps it when Content was the created-in Space.
+- [X] T051 [US5] In `updateTask` and `bulkUpdateTasks` (`src/actions/tasks.ts`), delete the old assignee's `added_via='assignee'` rows unless the Space also has a `created`/`manual` row (`src/lib/spaces-server.ts` helper).
+- [X] T052 [US5] Confirm each Space lists a task once and in its stage names (`src/components/views/SpacePage.tsx`); brand pages unchanged (`BrandPage.tsx`).
 
 **Checkpoint**: US5 tests pass.
 

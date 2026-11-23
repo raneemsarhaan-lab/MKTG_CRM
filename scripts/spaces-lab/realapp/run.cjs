@@ -43,6 +43,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-022-us2.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-022-us3.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-022-us4.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-022-us5.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-022-linked-rows.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-dates.cjs'))(EMAIL, psql, ok),
 ]

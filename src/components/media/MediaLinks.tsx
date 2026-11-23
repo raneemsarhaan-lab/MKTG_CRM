@@ -49,8 +49,9 @@ export function MediaChips({ media, onOpen, onChange, onUnlink, compact = false 
   const t = useTranslations('media')
   const stage = useStageLabel()
   if (!media.length) return null
-  // User, 2026-11-23: each linked task as its name (a link that opens it), then its board and
-  // stage — "Carousel – Q4 results · Design · F-Check" — with ⇄ and ×. One per board.
+  // User, 2026-11-23: each linked task as its name (a link that opens it), then its board —
+  // "Carousel – Q4 results · Design" — with ⇄ and ×. One per board. Its stage is in Status
+  // (and on hover), so the cell doesn't repeat it.
   return (
     <span className="fx-tasklink" data-media-links="" style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, minWidth: 0, width: '100%', overflow: 'hidden' }}>
       {media.map(m => {
@@ -66,7 +67,7 @@ export function MediaChips({ media, onOpen, onChange, onUnlink, compact = false 
             {!compact && (
               <span data-media-where="" title={`${t(m.media_board ?? 'design')} · ${stage(m.status)}`}
                     style={{ flex: 'none', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color, fontWeight: 600, fontSize: '0.92em' }}>
-                · {t(m.media_board ?? 'design')} · {stage(m.status)}
+                · {t(m.media_board ?? 'design')}
               </span>
             )}
             {onChange && <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-media-change="" aria-label={t('change')} title={t('change')} style={{ flex: 'none' }} onClick={e => { e.stopPropagation(); onChange(m, (e.currentTarget.closest('[data-cell]') as HTMLElement | null) ?? e.currentTarget) }}>⇄</button>}

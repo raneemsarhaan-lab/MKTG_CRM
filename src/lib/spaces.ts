@@ -148,6 +148,20 @@ export function creatorSpaces(memberId: string, _kind: TaskKind, spaces: SpaceLi
     .map(s => s.id)
 }
 
+/**
+ * Spec 022 (US5, FR-029): when the assignee changes, the Spaces the old
+ * assignee brought go — rows added for the assignee only, in the old
+ * assignee's Spaces, that the new assignee doesn't bring too. A Space the task
+ * was created in, added to by hand, or handed off to stays.
+ */
+export function spacesToDropOnAssigneeChange(
+  rows: { space_id: string; added_via: string }[],
+  oldSpaces: string[],
+  newSpaces: string[],
+): string[] {
+  return rows.filter(r => r.added_via === 'assignee' && oldSpaces.includes(r.space_id) && !newSpaces.includes(r.space_id)).map(r => r.space_id)
+}
+
 /** Group Space membership rows into the map the helpers take. */
 export function membersBySpace(rows: { space_id: string; member_id: string }[]): MembersBySpace {
   const out: MembersBySpace = {}

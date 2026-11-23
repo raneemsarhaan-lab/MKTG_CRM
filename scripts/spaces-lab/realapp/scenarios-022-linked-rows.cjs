@@ -78,7 +78,8 @@ module.exports = (EMAIL, psql, ok) => {
           const link = `${cell(s.c, 'media')} [data-media-open="${s.media[0]}"]`
           await page.waitForSelector(link, { timeout: 15000 })
           ok((await page.getAttribute(link, 'title'))?.startsWith('Carousel design'), 'the full name is on hover')
-          ok(/Design · D-Check/.test(await page.textContent(`${cell(s.c, 'media')} [data-media-where]`) ?? ''), 'board and stage follow the name')
+          const where = await page.textContent(`${cell(s.c, 'media')} [data-media-where]`) ?? ''
+          ok(/Design/.test(where) && !/D-Check/.test(where), `the board follows the name, without the stage: ${where}`)
           await page.click(link)
           // The open task is the Design task: its panel links back to this row's content task.
           await page.waitForSelector(`[data-media-section] [data-media-content="${s.c}"]`, { timeout: 15000 })
