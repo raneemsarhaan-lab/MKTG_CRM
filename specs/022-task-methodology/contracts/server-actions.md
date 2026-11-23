@@ -4,10 +4,16 @@ Every action checks its own permission (constitution §III). Results are `{ succ
 
 ## src/actions/media.ts (new)
 
-### `linkToMedia(contentTaskId, boards: ('design'|'video')[], people?: Record<board, memberId | null>)`
+### `listUnlinkedMedia(query)`
+- Who: any member. Returns the unlinked media tasks (Design and Video, not dropped), searched by name, for the Link task list.
+
+### `linkFromCalendar(spaceId, day, name, target)`
+- Who: any member who may create tasks. Makes the content task (`name`, publishing date `day`, in that Space) and calls `linkToMedia` with `target`.
+
+### `linkToMedia(contentTaskId, target: { mediaTaskId } | { create: { boards: ('design'|'video')[], people?: Record<board, memberId | null> } })`
 - Who: any member who may act on the content task, or a member of the board's Space.
 - Refuses: `not_content_task` (it is a media task), `past_d_check` (content task at F-Check or later, R11), `already_linked` (per board, skipped not failed).
-- Does: one linked media task per new board, at Ready For Design (its SLA clock starts when the content task reaches Ready For Design, R10); assignee = given person, else the board Space's default assignee.
+- Does: with `mediaTaskId`, links that unlinked media task to the content task (refused `already_linked` if it is linked, or if the content task already has a task on that board). With `create`, one linked media task per new board, at Ready For Design (its SLA clock starts when the content task reaches Ready For Design, R10); assignee = given person, else the board Space's default assignee.
 - Returns: `{ created: { board, taskId }[] }`.
 
 ### `createMediaTask(board, input: { name, brand_id, publish_date?, due_date?, assignee_id? })`

@@ -5,8 +5,8 @@ Each new screen needs its design file in `design/` approved first (constitution 
 | Where | What | Selectors for checks |
 |---|---|---|
 | Hand-off box (Ready For Design) | One row per needed board, each with a person picker (default: that Space's default assignee); Skip uses the defaults | `[data-handoff-board="design"]`, `[data-handoff-person]` |
-| Design / Video board header | **Link task** and **Create task** buttons | `[data-media-link]`, `[data-media-create]` |
-| Link task list | Search content tasks not on this board and before F-Check; pick Design, Video or both | `[data-media-pick]`, `[data-media-board]` |
+| Design / Video board header | **Create task** (unlinked, at Ready For Design) | `[data-media-create]` |
+| Link task (Content, Video, Digital Media sheets: Link task column; their calendars: a day) | Typing opens the list (or Ctrl+K): unlinked tasks from Design and Video, searched by the typed words, then Create task with Design / Video / Both; ⇄ change and × unlink beside a link, with Undo | `[data-media-link]`, `[data-media-pick]`, `[data-media-create]`, `[data-media-board]` |
 | Media card | Linked: content task name, opens it; after D-Check "with Content", read-only. Unlinked: an "Unlinked" tag | `[data-media-card]`, `[data-media-linked]` |
 | Content task card and panel | One chip per linked board with its stage; Unlink beside it, for everyone | `[data-media-chip="design"]`, `[data-media-unlink]` |
 | Space settings › Stages | 11 original stages; under each its Space stages: rename, split (+), reorder, remove (not the last) | `[data-space-stage-row]`, `[data-space-stage-add]` |

@@ -104,7 +104,7 @@ table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase
     <h1>One pipeline, media boards, Space stages</h1>
     <p class="lede">Every task runs the same 11 stages. Spaces decide who gets new work and what the stages are called in their own views. The Design and Video boards hold media tasks, linked to a content task or standing alone.</p>
     <nav class="jump" aria-label="Parts">
-      <a href="#pipeline">1 · One pipeline</a><a href="#handoff">2 · Ready For Design</a><a href="#media">3 · Media boards</a>
+      <a href="#pipeline">1 · One pipeline</a><a href="#handoff">2 · Ready For Design</a><a href="#media">3 · Media boards</a><a href="#linking">3b · Link task</a>
       <a href="#chips">4 · Content side</a><a href="#stages">5 · Space stages</a><a href="#types">6 · Boards per type</a><a href="#confirm">7 · To confirm</a>
     </nav>
   </header>
@@ -167,10 +167,10 @@ table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase
   </section>
 
   <section class="part" id="media">
-    <div class="part-head"><span class="tag">Design and Video Spaces</span><h2>3 · Media boards: Link task, Create task</h2></div>
+    <div class="part-head"><span class="tag">Design and Video Spaces</span><h2>3 · Media boards: their own work, and Create task</h2></div>
     <div class="frame">
       <div class="frame-head"><b><span class="dot" style="background:var(--c-design)"></span> Design · Board</b>
-        <span style="display:flex;gap:8px"><button class="btn" type="button" data-media-link>↗ Link task</button><button class="btn dark" type="button" data-media-create>＋ Create task</button></span></div>
+        <span style="display:flex;gap:8px"><button class="btn dark" type="button" data-media-create>＋ Create task</button></span></div>
       <div class="frame-body">
         <div class="mini-board">
           <div class="col"><h4>Ready For Design <small>2</small></h4>
@@ -187,25 +187,54 @@ table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase
         </div>
       </div>
     </div>
+    <ul class="rules">
+      <li>A media board shows its media tasks: linked ones (with their content task) and unlinked ones.</li>
+      <li><b>Create task</b> makes an unlinked media task that starts at Ready For Design and counts SLA from there. It waits in the Link task list on the content side until someone links it.</li>
+      <li>After its D-Check, a linked media task follows its content task, read-only here ("With Content").</li>
+      <li>Assigning a designer to a content task that isn't linked doesn't bring it here; it shows in their My tasks.</li>
+      <li class="ar">أنشئ مهمة · غير مرتبطة · مع المحتوى</li>
+    </ul>
+  </section>
+
+  <section class="part" id="linking">
+    <div class="part-head"><span class="tag">Content, Video and Digital Media Spaces · sheets and calendars</span><h2>3b · Link task, where you type</h2>
+      <p class="lede">As agreed for Stage C: you type in a sheet's Link task cell, or on a calendar day, and <b>Link task</b> appears. Its list shows the unlinked tasks from the Design and Video boards, then <b>Create task</b>.</p></div>
+    <div class="flow" aria-label="The steps"><span class="step">Type</span>›<span class="step">Link task</span>›<span class="step">Pick an unlinked Design or Video task</span><span class="muted">or</span><span class="step">Create task · Design, Video or both</span></div>
     <div class="pair">
-      <div class="box" role="dialog" aria-label="Link task">
-        <h3>Link a content task to media</h3>
-        <input class="search" type="search" value="ramad" aria-label="Search content tasks" data-media-pick>
-        <div class="opt hi"><span>Ramadan hero key visual<small>Forefront Consulting · C-In Progress</small></span><span class="chip">Content</span></div>
-        <div class="opt"><span>Ramadan recap reel<small>Omnisight · C-Review</small></span><span class="chip">Content</span></div>
-        <div class="row" data-media-board><span class="cap">Link to</span>
-          <span class="seg"><button type="button" aria-pressed="true">Design</button><button type="button" aria-pressed="false">Video</button><button type="button" aria-pressed="false">Both</button></span></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="button">Cancel</button><button class="btn primary" type="button">Link</button></div>
+      <div class="frame">
+        <div class="frame-head"><b><span class="dot" style="background:var(--c-content)"></span> Content · Sheet</b><span class="small muted">the Link task column</span></div>
+        <div class="frame-body">
+          <div class="list-row" style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.3fr);gap:8px;font-size:12.5px;font-weight:700;color:var(--muted)"><span>Task</span><span>Status</span><span>Link task</span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.3fr);gap:8px;font-size:13px;align-items:center"><span>Launch post</span><span>C-Review</span><span><span class="chip design">↗ Launch key visual</span> <button class="iconbtn" type="button" title="Change link">⇄</button><button class="iconbtn" type="button" title="Unlink">×</button></span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.3fr);gap:8px;font-size:13px;align-items:center"><span>Ramadan teaser</span><span>C-In Progress</span><span style="border:2px solid var(--cyan);border-radius:6px;padding:2px 6px">ramad|</span></div>
+          <div class="box" role="dialog" aria-label="Link task" data-media-pick style="max-width:none">
+            <input class="search" type="search" value="ramad" aria-label="Search unlinked tasks">
+            <span class="cap">Unlinked on Design and Video</span>
+            <div class="opt hi"><span>Ramadan hero key visual<small>Omar · Ready For Design</small></span><span class="chip design">Design</span></div>
+            <div class="opt"><span>Ramadan recap reel<small>Karim · D-In Progress</small></span><span class="chip video">Video</span></div>
+            <div class="opt" style="border-top:1px dashed var(--line);font-weight:700" data-media-create><span>＋ Create task "ramad"</span><span class="seg"><button type="button" aria-pressed="true">Design</button><button type="button" aria-pressed="false">Video</button><button type="button" aria-pressed="false">Both</button></span></div>
+          </div>
+        </div>
       </div>
-      <ul class="rules">
-        <li><b>Link task</b> lists content tasks not yet on this board and before F-Check. Pick Design, Video or both.</li>
-        <li>Linked before Ready For Design: the media task waits in Ready For Design; its SLA starts when the content task gets there.</li>
-        <li><b>Create task</b> makes an unlinked media task that starts at Ready For Design and counts SLA from there.</li>
-        <li>After its D-Check, a linked media task follows its content task, read-only here ("With Content").</li>
-        <li>Assigning a designer to a content task that isn't linked doesn't bring it here; it shows in their My tasks.</li>
-        <li class="ar">اربط مهمة · أنشئ مهمة · غير مرتبطة · مع المحتوى</li>
-      </ul>
+      <div class="frame">
+        <div class="frame-head"><b>Content · Calendar</b><span class="small muted">type on a day</span></div>
+        <div class="frame-body">
+          <div class="mini-board" style="grid-auto-columns:minmax(90px,1fr)">
+            <div class="col"><h4>Wed 9</h4><div class="card">Podcast ep. 14</div></div>
+            <div class="col" style="outline:2px solid var(--cyan)"><h4>Thu 10</h4><div class="card" style="border-style:dashed">Ramadan teaser|</div></div>
+            <div class="col"><h4>Fri 11</h4></div>
+          </div>
+          <div class="note">On Thu 10: <button class="btn" type="button">↗ Link task</button> <span class="small">Ctrl+K</span> opens the same list. Linking puts the task on that day; Create task gives it that day.</div>
+        </div>
+      </div>
     </div>
+    <ul class="rules">
+      <li>The list shows the <b>unlinked tasks from the Design and Video boards</b> (made there with Create task, or unlinked earlier), searched by what you typed.</li>
+      <li>Picking one links it to this row's content task. <b>Create task</b> makes a new media task on Design, Video or both, already linked.</li>
+      <li>Beside a link: ⇄ changes it, × unlinks it at once (anyone can), with Undo.</li>
+      <li>Link task shows only in the Link task column and on calendar days; every other cell stays a plain cell. Esc closes it: nothing is linked or created unless you choose.</li>
+      <li class="ar">اربط مهمة · مهام غير مرتبطة من التصميم والفيديو · أنشئ مهمة</li>
+    </ul>
   </section>
 
   <section class="part" id="chips">
@@ -290,8 +319,9 @@ table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase
 
   <section class="part" id="confirm">
     <div class="part-head"><span class="tag">Defaults chosen · change any</span><h2>7 · To confirm</h2></div>
-    <div class="q"><b>Linking before Ready For Design</b><span class="small muted">The media task shows at once in Ready For Design; its SLA starts when the content task gets there.</span></div>
-    <div class="q"><b>Linking after D-Check</b><span class="small muted">Link task only offers content tasks that haven't reached F-Check.</span></div>
+    <div class="q"><b>Linking before Ready For Design</b><span class="small muted">The media task stays where it is on its board; for SLA, a task created from Link task starts counting when the content task reaches Ready For Design.</span></div>
+    <div class="q"><b>Linking after D-Check</b><span class="small muted">Link task shows only on content rows that haven't reached F-Check.</span></div>
+    <div class="q"><b>On a calendar day</b><span class="small muted">The day you typed on is the content task's publishing date. A calendar day with no content row: Link task makes the content task (your words as the name) and links the chosen media task to it.</span></div>
     <div class="q"><b>One weekend</b><span class="small muted">SLA uses the weekend days in Settings › Due Dates (Friday and Saturday by default): working days Sunday to Thursday, Cairo days.</span></div>
     <div class="q"><b>Several members with the default role</b><span class="small muted">The first in the Space's member list; none → the creator.</span></div>
     <div class="q"><b>Who can unlink</b><span class="small muted">Anyone (decided).</span></div>

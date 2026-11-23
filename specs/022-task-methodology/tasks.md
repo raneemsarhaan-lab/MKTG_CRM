@@ -27,7 +27,8 @@ description: "Tasks for 022 — task methodology"
   - The Sync Impact Report is updated.
 - [X] T002 *(Done: published at https://claude.ai/artifact/T5nkwQbPesZSAKAcVRRFV5.)* Write `design/task-methodology.html` (tokens only, en + ar copy) covering every screen in `contracts/ui.md`:
   - the hand-off box with one person picker per board;
-  - Design/Video board header with Link task / Create task and the Link task list (board choice);
+  - Design/Video board header with Create task;
+  - Link task in the Content/Video/Digital Media sheets (Link task column) and calendars (a day): unlinked Design and Video tasks, then Create task (board choice);
   - media cards (linked, after D-Check "with Content", unlinked);
   - content card and panel chips with Unlink;
   - Space settings › Stages (rename, split, reorder, remove);
@@ -162,33 +163,37 @@ description: "Tasks for 022 — task methodology"
 
 ---
 
-## Phase 5: User Story 3 — Media boards: Link task, Create task, Unlink (P1)
+## Phase 5: User Story 3 — Link task where you type, Create task, Unlink (P1)
 
 **Goal**:
-- Design and Video boards hold media tasks only, with Link task and Create task.
+- Design and Video boards hold media tasks only, with Create task.
+- Link task lives in the Content, Video and Digital Media sheets and calendars: unlinked Design/Video tasks, then Create task.
 - Anyone can unlink.
 - Assigning a designer doesn't link.
 
 **Independent test** (quickstart 6–9):
 - Create task on Design gives an unlinked media task at Ready For Design.
-- Link task on Video attaches a content task.
+- Link task in the Content sheet lists that unlinked task and links it to the row.
 - Anyone can unlink; both tasks stay.
 - A designer assigned to an unlinked content task sees it in My tasks only.
 
 ### Tests for US3
 - [ ] T031 [P] [US3] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us3.cjs`:
   - Create task on Design: `entry_stage='r-design'`, SLA counted from there;
-  - Link task on Video for a content task at C-In Progress: the media task is in Ready For Design and its SLA starts when the content task reaches it;
-  - Link task doesn't offer content tasks at F-Check or later;
+  - typing in a Content sheet row's Link task cell lists the unlinked Design task; picking it links it (`content_task_id` set);
+  - Create task from that list with Both makes two linked media tasks;
+  - on a Content calendar day, Link task with a new name makes the content task with that publishing date and links the chosen media task;
+  - rows at F-Check or later show no Link task;
   - unlink as the Graphic Designer: both stay, unlinked, and move separately;
   - designer as assignee of an unlinked content task: in their My tasks, not on the Design board.
 
 ### Implementation for US3
 - [ ] T032 [US3] `createMediaTask(board, input)` and `unlinkMedia(mediaTaskId)` in `src/actions/media.ts` per contract (role checks: board Space members/superuser/admin for create; any signed-in member for unlink; R4, R14).
 - [ ] T033 [US3] `src/components/media/MediaActions.tsx` (new):
-  - Link task `[data-media-link]` opens a searchable list `[data-media-pick]` of content tasks not on this board and before F-Check, with the board choice `[data-media-board]`;
-  - Create task `[data-media-create]` opens the task form preset to the board.
-  - Rendered in the Design/Video Space header via `ViewHost` actions in `src/components/views/SpacePage.tsx` (per T002).
+  - the media board header gets Create task `[data-media-create]` (task form preset to the board), via `ViewHost` actions in `src/components/views/SpacePage.tsx`;
+  - a `MediaLinkPicker` (built on `src/components/sheet/LinkTaskPicker.tsx`) lists `listUnlinkedMedia` results `[data-media-pick]` and Create task with the board choice `[data-media-board]`;
+  - a built-in **Link task** column `[data-media-link]` on the Content, Video and Digital Media Space sheets (`src/components/views/TaskSheet.tsx`, `src/lib/sheet-columns.ts` TASK_BUILT_INS) and on the Content and Video sheets (`ContentGrid.tsx`, `SheetGrid.tsx`): chips with ⇄ and ×, typing or Ctrl+K opens the picker;
+  - on those Spaces' calendars (`src/components/views/CalendarView.tsx`), typing on a day offers Link task → `linkFromCalendar` (per T002).
 - [ ] T034 [US3] Media boards show media tasks only:
   - in `src/components/views/SpacePage.tsx`, a Space with `media_board` scopes to `media_board = that board`;
   - in `src/components/kanban/TaskCard.tsx`, media cards show `[data-media-card]`, the content task name (`[data-media-linked]`, opens it), "with Content" read-only after D-Check, or an "Unlinked" tag.

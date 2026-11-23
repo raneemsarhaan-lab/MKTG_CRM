@@ -31,13 +31,14 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 2. **Given** a content task with two linked media tasks, **When** only one has passed D-Check, **Then** the content task cannot move to F-Check; **When** both have, **Then** it moves to F-Check.
 3. **Given** a content task that was unlinked by hand after Ready For Design, **When** it moves again, **Then** no automatic link happens.
 
-### User Story 3 — Media boards: Link task, Create task, Unlink (P1)
+### User Story 3 — Link task where you type, Create task, Unlink (P1)
 
-**Independent test**: on the Design board, Create task makes an unlinked media task at Ready For Design; Link task attaches a content task to Design; anyone can unlink it.
+**Independent test**: on the Design board, Create task makes an unlinked media task at Ready For Design. In the Content sheet's Link task cell (or on a Content calendar day), typing opens Link task, which lists that unlinked task; picking it links it to the row's content task. Anyone can unlink it.
 
 **Acceptance scenarios**
 1. **Given** the Design board, **When** a designer uses Create task, **Then** an unlinked media task starts at Ready For Design, its SLA counting from there.
-2. **Given** a content task not linked to Video, **When** someone uses Link task on the Video board and picks it, **Then** a linked media task appears on the Video board.
+2. **Given** a content row in the Content, Video or Digital Media Space's sheet, **When** someone types in its Link task cell, **Then** Link task lists the unlinked tasks from the Design and Video boards, then Create task (Design, Video or both); picking one links it, Create task makes a new linked media task.
+2a. **Given** a content calendar day, **When** someone types on it, **Then** the same Link task list opens; the day becomes the content task's publishing date.
 3. **Given** a linked media task, **When** any member unlinks it, **Then** both tasks remain, unlinked, and move separately from then on.
 4. **Given** a content task that isn't linked, **When** a designer is made its assignee, **Then** it shows in the designer's My tasks and not on the Design board.
 
@@ -57,7 +58,7 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 **Acceptance scenarios**
 1. A task shows in: the Space it was created in, the creator's Space and the assignee's Space; once per Space, in that Space's stage names.
 2. **When** the assignee changes, **Then** the old assignee's Space is removed only if it was added for the assignee and isn't the Space it was created in.
-3. Design and Video Spaces are reached only by linking (automatic or Link task) or Create task, never through creator or assignee.
+3. Design and Video boards are reached only by linking (automatic at Ready For Design, or Link task in a content sheet or calendar) or by Create task on the board, never through creator or assignee.
 4. A brand shows every task of the brand.
 
 ### User Story 6 — SLA on working days (P2)
@@ -80,7 +81,7 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 - **FR-001** Every task MUST be a pipeline task with 11 stages, or 10 when its brand had C-Check off at creation. Simple tasks MUST be removed; existing simple tasks MUST migrate as in US1.3.
 - **FR-002** Each Space MUST have a default assignee role, set at creation and editable in its settings, applying to new tasks only.
 - **FR-003** A content task reaching Ready For Design for the first time MUST be linked automatically, once, to every media board its content type needs; the hand-off box MUST ask for a person per board, falling back to that board Space's default assignee.
-- **FR-004** A media board MUST offer Link task (pick content tasks not yet on that board; choose Design, Video or both) and Create task (an unlinked media task starting at Ready For Design).
+- **FR-004** A media board MUST offer Create task (an unlinked media task starting at Ready For Design). The sheets and calendars of the Content, Video and Digital Media Spaces MUST offer Link task where people type (a Link task column, a calendar day): a list of the unlinked tasks from the Design and Video boards, then Create task (Design, Video or both), with ⇄ change and × unlink beside a link. Link task appears nowhere else.
 - **FR-005** A content task with linked media tasks MUST NOT move past D-Check until every linked media task has passed D-Check, and MUST move to F-Check when they all have.
 - **FR-006** Any member MAY unlink (user, 2026-11-23). Unlinking MUST keep both tasks, their stage histories and fields.
 - **FR-007** Assigning a designer or editor to an unlinked content task MUST NOT put it on a media board.

@@ -47,7 +47,7 @@ Each item: **Decision**, **Rationale**, **Alternatives considered**.
 - **Rationale**: designers can see what's coming without being timed for it.
 
 ## R11. Linking after D-Check *(recommended default)*
-- **Decision**: Link task offers only content tasks that haven't reached F-Check.
+- **Decision**: Link task shows only on content rows that haven't reached F-Check.
 - **Rationale**: the gate (R2) has nothing to hold back after D-Check.
 
 ## R12. One weekend definition *(recommended default)*
@@ -74,3 +74,8 @@ Each item: **Decision**, **Rationale**, **Alternatives considered**.
 
 ## R18. Related task
 - **Decision**: the `task` column kind keeps its storage; every label becomes "Related task"; its picker title becomes "Pick a related task". It never changes a task's kind or links media.
+
+## R19. Where Link task lives *(user, 2026-11-23)*
+- **Decision**: Link task is where people type on the content side, as agreed for Stage C: a Link task column in the Content, Video and Digital Media Spaces' sheets, and a day on their calendars. Its list shows the unlinked tasks from the Design and Video boards, then Create task (Design, Video or both). Media boards keep only Create task.
+- **Calendar**: the day becomes the content task's publishing date; on a day with no content row, Link task makes the content task with the typed name.
+- **Relation to Related task**: Related task (the task-to-task field, R18) stays a separate field kind; the Link task column is built in and only links media.
