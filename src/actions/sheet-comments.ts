@@ -15,6 +15,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
+import { mayUseSheet } from '@/lib/sheet-access'
 import { mentionedIn } from '@/lib/notify/mentions'
 import { notifyAfter, notifySheet } from '@/lib/notify/notify'
 import { snippet } from '@/lib/notify/message'
@@ -82,6 +83,8 @@ export async function listThreads(sheet: string): Promise<{ success: true; sheet
   if (!me) return fail('not_authenticated')
   const s = await prisma.sheet.findUnique({ where: sheetWhere(sheet), select: { id: true } })
   if (!s) return fail('gone')
+  // Private sheets (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(s.id, me))) return fail('not_authorized')
   const all = await prisma.sheetComment.findMany({ where: { sheet_id: s.id }, orderBy: { created_at: 'asc' } })
   const replies = new Map<string, Row[]>()
   for (const c of all) if (c.root_id) replies.set(c.root_id, [...(replies.get(c.root_id) ?? []), c])
@@ -96,6 +99,8 @@ export async function listThreads(sheet: string): Promise<{ success: true; sheet
 export async function getThread(threadId: string): Promise<{ success: true; thread: SheetCommentThread } | Fail> {
   const me = await getSessionMember()
   if (!me) return fail('not_authenticated')
+  const root = await prisma.sheetComment.findUnique({ where: { id: threadId }, select: { sheet_id: true } })
+  if (!root || !(await mayUseSheet(root.sheet_id, me))) return fail('not_found')
   const t = await threadOf(threadId)
   return t ? { success: true, thread: t } : fail('not_found')
 }
@@ -106,6 +111,8 @@ export async function addComment(sheet: string, input: { rowKey: string; colKey:
   if (!me) return fail('not_authenticated')
   const s = await prisma.sheet.findUnique({ where: sheetWhere(sheet), select: { id: true } })
   if (!s) return fail('gone')
+  // Private sheets (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(s.id, me))) return fail('not_authorized')
   if (typeof input.rowKey !== 'string' || typeof input.colKey !== 'string' || !input.rowKey || !input.colKey || input.rowKey.length > KEY_MAX || input.colKey.length > KEY_MAX) return fail('invalid')
   const b = await checkBody(input.body)
   if (!('ok' in b)) return b
@@ -123,6 +130,7 @@ export async function replyComment(threadId: string, input: { body: string; cell
   if (!me) return fail('not_authenticated')
   const root = await prisma.sheetComment.findUnique({ where: { id: threadId } })
   if (!root || root.root_id) return fail('not_found')
+  if (!(await mayUseSheet(root.sheet_id, me))) return fail('not_authorized')
   const b = await checkBody(input.body)
   if (!('ok' in b)) return b
   const earlier = await prisma.sheetComment.findMany({ where: { OR: [{ id: threadId }, { root_id: threadId }], deleted_at: null }, select: { author_id: true } })
@@ -145,6 +153,7 @@ export async function editComment(id: string, body: string, cell?: string): Prom
   if (!me) return fail('not_authenticated')
   const c = await prisma.sheetComment.findUnique({ where: { id } })
   if (!c || c.deleted_at) return fail('not_found')
+  if (!(await mayUseSheet(c.sheet_id, me))) return fail('not_authorized')
   if (c.author_id !== me.id) return fail('not_author')
   const b = await checkBody(body)
   if (!('ok' in b)) return b
@@ -165,6 +174,7 @@ export async function deleteComment(id: string): Promise<{ success: true; thread
   if (!me) return fail('not_authenticated')
   const c = await prisma.sheetComment.findUnique({ where: { id } })
   if (!c || c.deleted_at) return fail('not_found')
+  if (!(await mayUseSheet(c.sheet_id, me))) return fail('not_authorized')
   if (c.author_id !== me.id && me.access !== 'admin') return fail('not_author')
   await prisma.sheetComment.update({ where: { id }, data: { deleted_at: new Date() } })
   return { success: true, thread: await threadOf(c.root_id ?? c.id) }
@@ -175,6 +185,7 @@ async function setResolved(id: string, on: boolean): Promise<{ success: true; th
   if (!me) return fail('not_authenticated')
   const root = await prisma.sheetComment.findUnique({ where: { id } })
   if (!root || root.root_id) return fail('not_found')
+  if (!(await mayUseSheet(root.sheet_id, me))) return fail('not_authorized')
   await prisma.sheetComment.update({ where: { id }, data: on ? { resolved_at: new Date(), resolved_by: me.id } : { resolved_at: null, resolved_by: null } })
   const t = await threadOf(id)
   return t ? { success: true, thread: t } : fail('not_found')
@@ -192,6 +203,8 @@ export async function clearCellComments(sheet: string, keys: string[]): Promise<
   if (!me) return fail('not_authenticated')
   const s = await prisma.sheet.findUnique({ where: sheetWhere(sheet), select: { id: true } })
   if (!s) return fail('gone')
+  // Private sheets (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(s.id, me))) return fail('not_authorized')
   const pairs = keys.slice(0, 20_000).map(k => { const i = k.lastIndexOf('|'); return i > 0 ? [k.slice(0, i), k.slice(i + 1)] : null }).filter((x): x is string[] => !!x)
   if (!pairs.length) return { success: true, cleared: 0, skipped: 0 }
   const rows = await prisma.$queryRaw<{ id: string; author_id: string | null }[]>`

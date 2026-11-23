@@ -9,6 +9,7 @@
  * cells are addressed by (row id, column id), so an insert never moves
  * someone else's edit, and only filled cells are stored.
  */
+import { mayUseFolder, mayUseSheet, mayUseSheets } from '@/lib/sheet-access'
 import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
@@ -258,6 +259,8 @@ export async function setPins(folderIds: string[]): Promise<{ success: true; pin
 export async function listSheets(folderId: string): Promise<{ success: true; sheets: SheetSummary[] } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseFolder(folderId, m))) return fail('not_authorized')
   const rows = await prisma.sheet.findMany({ where: { folder_id: folderId }, orderBy: { position: 'asc' } })
   return { success: true, sheets: rows.map(summary) }
 }
@@ -270,6 +273,8 @@ export async function listSheets(folderId: string): Promise<{ success: true; she
 export async function createSheet(folderId: string, opts: { before?: string | null; after?: string | null; pattern?: string } = {}): Promise<{ success: true; sheet: SheetSummary } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseFolder(folderId, m))) return fail('not_authorized')
   const folder = await prisma.sheetFolder.findUnique({ where: { id: folderId }, select: { id: true } })
   if (!folder) return fail('gone')
   const sheet = await prisma.$transaction(async tx => {
@@ -296,6 +301,8 @@ export async function createSheet(folderId: string, opts: { before?: string | nu
 export async function loadSheet(id: string): Promise<{ success: true; doc: SheetDoc; sheet: SheetSummary } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(id, m))) return fail('not_authorized')
   const sheet = await prisma.sheet.findUnique({ where: { id } })
   if (!sheet) return fail('gone')
   if (sheet.kind !== 'blank') return fail('linked')
@@ -622,6 +629,8 @@ export async function applySheetChanges(sheetId: string, changes: SheetChanges):
 > {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(sheetId, m))) return fail('not_authorized')
   const cells = changes.cells ?? []
   if (cells.length > MAX_CELLS_PER_CALL) return fail('too_many_cells')
   if (cells.some(c => c.value.length > MAX_CELL)) return fail('too_long')
@@ -797,6 +806,8 @@ const isLinkedKind = (k: string) => k !== 'blank'
 export async function renameSheet(id: string, name: string): Promise<{ success: true; name: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(id, m))) return fail('not_authorized')
   const sheet = await prisma.sheet.findUnique({ where: { id } })
   if (!sheet) return fail('gone')
   if (isLinkedKind(sheet.kind)) return fail('linked')
@@ -822,6 +833,8 @@ async function renumberFolder(tx: Tx, folderId: string, order?: string[]) {
 export async function deleteSheets(ids: string[]): Promise<{ success: true; deleted: string[] } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheets(ids, m))) return fail('not_authorized')
   const list = await prisma.sheet.findMany({ where: { id: { in: ids } } })
   if (!list.length) return { success: true, deleted: [] }
   if (list.some(s => isLinkedKind(s.kind))) return fail('linked')
@@ -853,6 +866,8 @@ export async function deleteSheets(ids: string[]): Promise<{ success: true; dele
 export async function moveSheets(ids: string[], folderId: string, beforeId: string | null, copy: boolean, opts: { pattern?: string } = {}): Promise<{ success: true; sheets: SheetSummary[] } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!((await mayUseSheets(ids, m)) && await mayUseFolder(folderId, m))) return fail('not_authorized')
   const [list, dest] = await Promise.all([
     prisma.sheet.findMany({ where: { id: { in: ids } }, orderBy: { position: 'asc' } }),
     prisma.sheetFolder.findUnique({ where: { id: folderId }, select: { id: true } }),
@@ -924,6 +939,8 @@ export async function moveSheets(ids: string[], folderId: string, beforeId: stri
 export async function colorSheets(ids: string[], color: TabColor | null): Promise<{ success: true } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheets(ids, m))) return fail('not_authorized')
   if (color !== null && !(TAB_COLORS as readonly string[]).includes(color)) return fail('generic')
   await prisma.sheet.updateMany({ where: { id: { in: ids } }, data: { tab_color: color, updated_by: m.id } })
   touched()
@@ -934,6 +951,8 @@ export async function colorSheets(ids: string[], color: TabColor | null): Promis
 export async function protectSheet(id: string, on: boolean): Promise<{ success: true; protectedBy: string | null } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(id, m))) return fail('not_authorized')
   const s = await prisma.sheet.findUnique({ where: { id } })
   if (!s) return fail('gone')
   if (isLinkedKind(s.kind)) return fail('linked')
@@ -949,6 +968,8 @@ export async function protectSheet(id: string, on: boolean): Promise<{ success: 
 export async function hideSheets(ids: string[], hidden: boolean): Promise<{ success: true } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheets(ids, m))) return fail('not_authorized')
   const list = await prisma.sheet.findMany({ where: { id: { in: ids } } })
   if (!list.length) return fail('gone')
   if (hidden && list.some(s => isLinkedKind(s.kind))) return fail('linked')
@@ -972,6 +993,8 @@ export async function hideSheets(ids: string[], hidden: boolean): Promise<{ succ
 export async function reorderSheets(folderId: string, ids: string[]): Promise<{ success: true } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseFolder(folderId, m))) return fail('not_authorized')
   const tabs = await prisma.sheet.findMany({ where: { folder_id: folderId }, select: { id: true } })
   const have = new Set(tabs.map(t => t.id))
   const order = [...ids.filter(id => have.has(id)), ...tabs.map(t => t.id).filter(id => !ids.includes(id))]
@@ -1016,6 +1039,8 @@ const linkedWhere = (idOrKey: string) => (idOrKey === 'linked_content' || idOrKe
 export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success: true; extras: SheetExtras; sheetId: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(sheetId, m))) return fail('not_authorized')
   const sheet = await prisma.sheet.findUnique({ where: linkedWhere(sheetId), select: { id: true, kind: true } })
   if (!sheet) return fail('gone')
   if (!isLinkedKind(sheet.kind)) return fail('not_linked')
@@ -1031,6 +1056,8 @@ export async function loadLinkedSheetExtras(sheetId: string): Promise<{ success:
 export async function applyLinkedFormats(sheetId: string, changes: { formats?: FormatWrite[]; merges?: unknown; rules?: SheetChanges['rules']; view?: Pick<ViewWrite, 'filter' | 'sort' | 'filterArea' | 'groupBy' | 'words' | 'show' | 'colFields'>; tables?: unknown }): Promise<{ success: true; updatedAt: string } | Fail> {
   const m = await me()
   if (!m) return fail('not_authenticated')
+  // Private workbooks (My tasks, a Space's) only for those who may open them.
+  if (!(await mayUseSheet(sheetId, m))) return fail('not_authorized')
   if (changes.merges || changes.tables) return fail('linked')
   const formats = changes.formats ?? []
   if (formats.length > MAX_FORMATS_PER_CALL) return fail('too_many_formats')
