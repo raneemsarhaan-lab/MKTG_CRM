@@ -513,16 +513,36 @@ export function BlankSheet(p: BlankSheetProps) {
     }
     return out
   }
+  /** Spec 015 T065: a merge whose edge row or column is deleted shrinks to what's left (gone at one cell). */
+  function mergesAfter(kind: 'rows' | 'cols', goneIds: Set<string>): BlankChange[] {
+    const list = extras.merges ?? []
+    if (!list.length) return []
+    const all = kind === 'rows' ? doc.rows : doc.cols, idx = kind === 'rows' ? rowIndex : colIndex
+    const [a, b] = kind === 'rows' ? ['top', 'bottom'] as const : ['left', 'right'] as const
+    const add: SheetMergeRecord[] = [], remove: SheetMergeRecord[] = []
+    for (const m of list) {
+      if (!goneIds.has(m[a]) && !goneIds.has(m[b])) continue
+      const i0 = idx.get(m[a]) ?? 0, i1 = idx.get(m[b]) ?? 0
+      const kept = all.slice(Math.min(i0, i1), Math.max(i0, i1) + 1).filter(x => !goneIds.has(x.id))
+      remove.push(m)
+      if (!kept.length) continue
+      const next = { ...m, id: p.newId(), [a]: kept[0].id, [b]: kept[kept.length - 1].id }
+      // One cell left: it's no longer a merge.
+      if (next.top === next.bottom && next.left === next.right) continue
+      add.push(next)
+    }
+    return remove.length ? [{ kind: 'merges', add, remove }] : []
+  }
   const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
   function deleteRowsAt(at: number[]) {
     const gone = at.map(i => vRows[i]).filter((x): x is NonNullable<typeof x> => !!x)
     const ids = new Set(gone.map(r => r.id))
-    applyR('deleteRows', [...tablesAfter('rows', ids), ...validationsAfter('rows', ids), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
+    applyR('deleteRows', [...tablesAfter('rows', ids), ...mergesAfter('rows', ids), ...validationsAfter('rows', ids), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
   }
   function deleteColsAt(at: number[]) {
     const gone = at.map(i => vCols[i]).filter((x): x is NonNullable<typeof x> => !!x)
     const ids = new Set(gone.map(c => c.id))
-    applyR('deleteCols', [...tablesAfter('cols', ids), ...validationsAfter('cols', ids), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
+    applyR('deleteCols', [...tablesAfter('cols', ids), ...mergesAfter('cols', ids), ...validationsAfter('cols', ids), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
   }
   function setHeights(ids: string[], h: number | null) {
     const list = doc.rows.filter(r => ids.includes(r.id) && r.height !== h).map(r => ({ id: r.id, before: r.height, after: h }))
