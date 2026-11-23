@@ -463,6 +463,34 @@ async function main() {
     return `${types.length} types`
   })
 
+  // Spec 023 (user, 2026-11-23): the content fields. Channels sits in the panel's top rows;
+  // Caption above the Description and TOV (Text on Visual) below it, both required before C-Review.
+  await once('content-fields-v1', 'added Caption, Channels and TOV to the content task types', async () => {
+    const norm = (x: string) => x.trim().toLowerCase()
+    const live = await prisma.taskField.findMany({ where: { retired_at: null } })
+    const make = async (name_en: string, name_ar: string, kind: string, options: object, position: number) =>
+      live.find(f => norm(f.name_en) === norm(name_en))
+      ?? await prisma.taskField.create({ data: { name_en, name_ar, kind, options, position } })
+    const caption = await make('Caption', 'الكابشن', 'text', { place: 'above' }, 0)
+    const channels = await make('Channels', 'القنوات', 'multi', { place: 'top', choices: [
+      { id: 'instagram', en: 'Instagram', ar: 'إنستغرام', color: '#D6409F' }, { id: 'facebook', en: 'Facebook', ar: 'فيسبوك', color: '#3E7BEA' },
+      { id: 'linkedin', en: 'LinkedIn', ar: 'لينكدإن', color: '#1E9E8A' }, { id: 'tiktok', en: 'TikTok', ar: 'تيك توك', color: '#4A5061' },
+      { id: 'x', en: 'X', ar: 'إكس', color: '#6B7280' }, { id: 'youtube', en: 'YouTube', ar: 'يوتيوب', color: '#D22040' },
+    ] }, 1)
+    const tov = await make('TOV', 'النص على التصميم', 'text', { place: 'below', hint: { en: 'Text on Visual · one line per slide', ar: 'النص على التصميم · سطر لكل شريحة' } }, 2)
+    const types = new Set((await prisma.contentType.findMany({ select: { label: true } })).map(t => t.label))
+    const plan: [string, string, string | null, number][] = []
+    for (const type of ['Post', 'Reel', 'Story']) plan.push([type, caption.id, 'c-final', 0], [type, channels.id, null, 1], [type, tov.id, 'c-final', 2])
+    plan.push(['Video', caption.id, 'c-final', 0], ['Video', channels.id, null, 1])
+    let n = 0
+    for (const [type_label, field_id, required_from, position] of plan) {
+      if (!types.has(type_label)) continue
+      await prisma.taskTypeField.upsert({ where: { type_label_field_id: { type_label, field_id } }, update: {}, create: { type_label, field_id, required_from, position } })
+      n++
+    }
+    return `${n} attachments`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

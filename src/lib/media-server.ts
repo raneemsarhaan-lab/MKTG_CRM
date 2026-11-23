@@ -23,7 +23,7 @@ const STAGE_AT = (s: string) => ORDER.indexOf(s as StageId)
  * set per call; every move path calls it before moving.
  */
 export async function requiredGate(
-  task: { id: string; content_type_label: string | null; media_board?: string | null },
+  task: { id: string; content_type_label: string | null; media_board?: string | null; status?: string | null },
   target: StageId,
   db: Db = prisma,
 ): Promise<{ missing: string[]; missing_ar: string[]; stage: StageId } | null> {
@@ -77,7 +77,7 @@ export async function syncContent(contentTaskId: string, actorId: string): Promi
   else if (!waiting && STAGE_AT(stage) < STAGE_AT('final-check')) stage = 'final-check'
   // Spec 023 (R4): a forward move waits while a field required by then is empty ("Waiting for Caption").
   if (stage !== content.status && STAGE_AT(stage) > STAGE_AT(content.status)) {
-    const full = await prisma.task.findUnique({ where: { id: content.id }, select: { id: true, content_type_label: true } })
+    const full = await prisma.task.findUnique({ where: { id: content.id }, select: { id: true, content_type_label: true, status: true } })
     if (full && await requiredGate(full, stage)) stage = content.status as StageId
   }
   if (stage !== content.status) {
@@ -112,7 +112,8 @@ export async function moveThroughMedia(
   if (!open.length) return null
   if (STAGE_AT(target) < STAGE_AT('r-design')) return { success: false, error: 'follows_media' }
   if (STAGE_AT(target) > STAGE_AT('final-check')) return { success: false, error: 'waiting_on_media' }
-  const req = await requiredGate({ id: content.id, content_type_label: (await prisma.task.findUnique({ where: { id: content.id }, select: { content_type_label: true } }))?.content_type_label ?? null }, target)
+  const row = await prisma.task.findUnique({ where: { id: content.id }, select: { content_type_label: true, status: true } })
+  const req = await requiredGate({ id: content.id, content_type_label: row?.content_type_label ?? null, status: row?.status ?? null }, target)
   if (req) return { success: false, ...requiredRefusal(req) } as never
   const toMove = open.filter(m => m.status !== target)
   for (const m of toMove) {

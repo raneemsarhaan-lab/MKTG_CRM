@@ -3327,7 +3327,20 @@
     "newFieldName": "اسم الحقل",
     "choicesHint": "الخيارات، مفصولة بفواصل",
     "forTypes": "لأنواع المهام",
-    "badValue": "هذه ليست قيمة صحيحة لـ {field}."
+    "badValue": "هذه ليست قيمة صحيحة لـ {field}.",
+    "required": "مطلوب",
+    "requiredBefore": "مطلوب قبل {stage}",
+    "notAdded": "لم تتم إضافة {field}",
+    "missingCard": "{field} ناقص",
+    "writeHere": "اكتب {field}…",
+    "descriptionLabel": "الوصف",
+    "add": "+ إضافة",
+    "removeOne": "إزالة {name}",
+    "cellReadOnly": "يمكنك تعديل المهام التي تملكها أو المكلّف بها فقط.",
+    "place": "في لوحة المهمة",
+    "placeTop": "الصفوف العلوية (مع الحالة)",
+    "placeAbove": "فوق الوصف",
+    "placeBelow": "تحت الوصف"
   },
   "types": {
     "eyebrow": "مساحة العمل",

@@ -3327,7 +3327,20 @@
     "newFieldName": "Field name",
     "choicesHint": "Choices, separated by commas",
     "forTypes": "For task types",
-    "badValue": "That isn't a valid {field}."
+    "badValue": "That isn't a valid {field}.",
+    "required": "Required",
+    "requiredBefore": "Required before {stage}",
+    "notAdded": "{field} not added",
+    "missingCard": "{field} missing",
+    "writeHere": "Write the {field}…",
+    "descriptionLabel": "Description",
+    "add": "+ Add",
+    "removeOne": "Remove {name}",
+    "cellReadOnly": "You can only change tasks you own or are assigned to.",
+    "place": "In the task panel",
+    "placeTop": "Top rows (with Status)",
+    "placeAbove": "Above the Description",
+    "placeBelow": "Below the Description"
   },
   "types": {
     "eyebrow": "Workspace",

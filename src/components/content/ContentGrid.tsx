@@ -258,7 +258,8 @@ export function ContentGrid(p: ContentGridProps) {
     label: t('gridLabel'),
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
-      const text = col === 'archive' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as ContentCol}`)))
+      // Spec 023: a task field column (f:<id>) is named by the field.
+      const text = col === 'archive' && !named ? '' : (named ?? (isCustom(col) ? (String(col).startsWith('f:') ? cl.nameOf(col) : '') : t(`col.${col as ContentCol}`)))
       // Spec 019 stage 2: a task field's heading has its icon before the name.
       const f = FIELD_OF[col]
       return {

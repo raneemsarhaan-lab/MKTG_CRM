@@ -160,14 +160,68 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(2500)
           ok(psql(`select status from tasks where id='${id}'`) === 'c-prog', 'the move was refused')
           const body = await page.textContent('body')
-          ok(body.includes(`${name} is required before C-Review`), 'the panel names the field and the stage')
-          psql(`insert into task_field_values (task_id, field_id, value) values ('${id}', '${fid}', '"done"')`)
+          ok(new RegExp(`${name}.* (is|are) required before C-Review`).test(body), 'the panel names the field and the stage')
+          psql(`insert into task_field_values (task_id, field_id, value) select '${id}', id, '"done"' from task_fields where id='${fid}' or (name_en in ('Caption','TOV') and retired_at is null)`)
           await go(`/spaces/planning?view=list&task=${id}`)
           await page.locator('button[aria-label^="Stage:"]').first().click()
           await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: 'C-Review' }).first().click()
           await page.waitForTimeout(2500)
           ok(psql(`select status from tasks where id='${id}'`) === 'c-final', 'filled, it moves')
         } finally { dropField(fid); dropTasks([id]) }
+      },
+    },
+    {
+      id: '023-panel-caption-tov-channels', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const theme = psql(`insert into projects (id, name, brand_id, is_theme) values (gen_random_uuid(), 'Lab theme ${n}', '${brand()}', true) returning id`).split(/\n/)[0]
+        const id = task(`Lab caption ${n}`, 'Post', 'c-prog')
+        psql(`update tasks set project_id='${theme}' where id='${id}'`)
+        psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${space('content')}', 'manual') on conflict do nothing`)
+        const f = name => psql(`select id from task_fields where name_en='${name}' and retired_at is null`)
+        ok(!!f('Caption') && !!f('TOV') && !!f('Channels'), 'Caption, TOV and Channels exist')
+        try {
+          await go(`/spaces/content?view=list&task=${id}`)
+          await page.waitForSelector('[data-field-section="Caption"]')
+          // Channels is a top row, before the Publishing date; Caption above the Description, TOV below.
+          const order = await page.evaluate(() => {
+            const at = sel => { const el = document.querySelector(sel); const box = el && (el.closest('.fx-prop') ?? el); return box ? box.getBoundingClientRect().top : -1 }
+            return { channels: at('[data-panel-field="Channels"]'), publish: at('[data-publish-date]'), caption: at('[data-field-section="Caption"]'), tov: at('[data-field-section="TOV"]') }
+          })
+          ok(order.channels > 0 && order.channels <= order.publish && order.caption < order.tov, `layout: ${JSON.stringify(order)}`)
+          ok(await page.isVisible('[data-field-section="Caption"] [data-field-missing="Caption"]'), 'Caption not added, in red')
+          ok((await page.getAttribute('[data-field-section="TOV"] [data-field-required-badge]', 'title')) === 'Required before C-Review', 'badge says the stage on hover')
+          // Channels: + Add only, then pick Instagram.
+          await page.click('[data-panel-field="Channels"] [data-chip-add]')
+          await page.click('[data-chip-option="Instagram"]')
+          await page.waitForTimeout(1500)
+          ok(psql(`select value::text from task_field_values where task_id='${id}' and field_id='${f('Channels')}'`) === '["instagram"]', 'channel saved')
+          // Clicking the red words opens the field; typing saves it.
+          await page.click('[data-field-missing="Caption"]')
+          await page.keyboard.type('Hello Ramadan')
+          await page.locator('[data-field-section="TOV"] span').first().click()
+          await page.waitForTimeout(1500)
+          ok(psql(`select value #>> '{}' from task_field_values where task_id='${id}' and field_id='${f('Caption')}'`) === 'Hello Ramadan', 'caption saved')
+          // Moving on is refused for TOV, and the TOV section is outlined.
+          await page.locator('button', { hasText: '→ C-Review' }).first().click()
+          await page.waitForTimeout(2000)
+          ok(psql(`select status from tasks where id='${id}'`) === 'c-prog', 'refused without TOV')
+          ok((await page.textContent('body')).includes('TOV is required before C-Review'), 'the message names TOV')
+          // Card and Content sheet show what's missing.
+          await go('/spaces/content?view=board')
+          await page.waitForSelector(`[data-task-card="${id}"]`)
+          ok(await page.isVisible(`[data-task-card="${id}"] [data-card-missing="TOV"]`), 'card: TOV missing')
+          ok(!(await page.$(`[data-task-card="${id}"] [data-card-missing="Caption"]`)), 'card: no Caption label once filled')
+          await go('/spaces/content?view=sheet')
+          await page.waitForSelector(`[data-cell*="${id}|f:${f('TOV')}"]`, { timeout: 60000 })
+          ok((await page.textContent(`[data-cell*="${id}|f:${f('TOV')}"]`)).includes('TOV not added'), 'sheet: TOV not added')
+          // Typing in the sheet fills the field.
+          await page.click(`[data-cell*="${id}|f:${f('TOV')}"]`)
+          await page.keyboard.type('Ramadan nights')
+          await page.keyboard.press('Enter')
+          await page.waitForTimeout(2000)
+          ok(psql(`select value #>> '{}' from task_field_values where task_id='${id}' and field_id='${f('TOV')}'`) === 'Ramadan nights', 'TOV saved from the sheet')
+        } finally { dropTasks([id]); psql(`delete from projects where id='${theme}'`) }
       },
     },
   ]

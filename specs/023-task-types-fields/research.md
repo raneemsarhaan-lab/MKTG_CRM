@@ -69,3 +69,10 @@ Decisions behind the plan. User decisions (D1–D18, Milestone, D14) are recorde
 ## R15. Fields inside the description (user, 2026-11-23: choice 1)
 - **Decision**: the task panel shows a type's fields as sections at the top of the description (Caption, Channels…), then the free-text Description. Writing in a section writes the task field (one value everywhere). Required sections say which stage needs them and are outlined when a move is refused. Sections can't be deleted; `/` adds a type field's section. Preview: `design/023-description-fields.html` (https://claude.ai/artifact/1EACx6hV8Yhuas6AzFzqqM), awaiting the user's look.
 - **Alternatives**: a separate Fields block under the description (choice 2); plain headings in the text (not a field).
+
+## R16. Channels, Caption, Description, TOV (user, 2026-11-23)
+- **Decision**: each field has a place in the task panel (`options.place`): the top rows (Channels, after Assignee: Status, Assignee, Channels, Publishing date, Due date), above the Description (Caption) or below it (TOV). Admins set it on the Task types page.
+- Seeded once (`content-fields-v1`): Caption (text), Channels (multi-choice: Instagram, Facebook, LinkedIn, TikTok, X, YouTube), TOV (text, "Text on Visual · one line per slide"). Post, Reel and Story have all three with Caption and TOV required before C-Review; Video has Caption (required) and Channels.
+- A required field has a "Required" badge (hover: "Required before C-Review"). Empty, the panel shows red words in its place ("Caption not added" / "لم تتم إضافة الكابشن"), cards a small red "Caption missing" (until published), sheets the red words in the cell.
+- Required means "crossing": a move is refused only when it passes the required stage; tasks already beyond it when the rule was added aren't held back.
+- Preview: `design/023-description-fields.html` (https://claude.ai/artifact/1EACx6hV8Yhuas6AzFzqqM).

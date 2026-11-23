@@ -249,7 +249,8 @@ export interface TaskFieldDef {
   name_en: string
   name_ar: string | null
   kind: FieldKind
-  options: { choices?: FieldOption[]; currency?: string; max?: number }
+  /** place: where the task panel shows it — the top rows, or above / below the Description (default above). */
+  options: { choices?: FieldOption[]; currency?: string; max?: number; place?: 'top' | 'above' | 'below'; hint?: { en: string; ar?: string | null } }
   on_card: boolean
   switchable: boolean
   position: number

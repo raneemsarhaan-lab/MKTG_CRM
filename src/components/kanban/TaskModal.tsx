@@ -41,6 +41,8 @@ import { ReplyComposer } from './ReplyComposer'
 import { mentionedIn } from '@/lib/notify/mentions'
 import { useMoveError } from '@/components/fields/moveErrors'
 import { TypePicker } from '@/components/types/TypePicker'
+import { DescriptionLabel, PanelFieldSections, PanelTopFields, REQUIRED_EVENT, hasSections } from '@/components/fields/PanelFields'
+import { useCardFields } from '@/components/fields/CardFields'
 import { TypeIcon } from '@/components/types/TypeIcon'
 import { typeName } from '@/lib/task-types'
 
@@ -686,6 +688,8 @@ export function TaskModal({
 
   const isAdmin     = currentUser.access === 'admin'
   const typeOf      = contentTypes.find(c => c.label === task.content_type_label)
+  const cardFields  = useCardFields()
+  const withSections = hasSections(task, cardFields?.fields, cardFields?.links)
   const isSuperuser = currentUser.access === 'superuser'
   const isPublished = task.status === 'publish'
 
@@ -796,8 +800,16 @@ export function TaskModal({
           setCelebration({ taskName: task.name, stageLabel: nextMeta.label_en })
         }
         onClose()
+      } else if (result.error !== 'needs_handoff') {
+        flagRequired(result)
+        setError(moveErr(result) ?? (result.error === 'not_authorized' ? 'That stage belongs to someone else — ask an admin to move it.' : 'Could not move that task'))
       }
     })
+  }
+
+  /** Spec 023: a refusal for required fields outlines their sections in the panel. */
+  function flagRequired(r: { error?: string; missing?: string[] }) {
+    if (r.error === 'required_fields' && r.missing?.length) window.dispatchEvent(new CustomEvent(REQUIRED_EVENT, { detail: { taskId: task.id, missing: r.missing } }))
   }
 
   /* ── naming people and linking tasks in a comment ────────────────────── */
@@ -953,6 +965,7 @@ export function TaskModal({
       const handoff = handoffRequest(r, task, spaces, taskSpaces, members, tSpaces)
       if (handoff) { openHandoff(handoff); return }
       if (!r.success) {
+        flagRequired(r)
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
           : moveErr(r) ?? r.error ?? 'Could not move that task')
@@ -1785,6 +1798,9 @@ export function TaskModal({
                   />
                 </Prop>
 
+                {/* Spec 023: fields placed in the top rows (Channels), after Assignee. */}
+                <PanelTopFields task={task} canEdit={canEdit} Row={({ label, children }) => <Prop icon="platform" label={label}>{children}</Prop>} />
+
                 {/* Publishing date: set by people. It moves an automatic due date. */}
                 <Prop icon="calendar" label={tDates('publish')}>
                   <span data-publish-date={task.publish_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
@@ -1862,6 +1878,10 @@ export function TaskModal({
               )}
 
               <div style={{ height: 1, background: CU.line, margin: '22px 0 18px' }} />
+
+              {/* ── Spec 023: field sections around the Description (Caption above, TOV below) ── */}
+              <PanelFieldSections task={task} canEdit={canEdit} place="above" />
+              {withSections && <DescriptionLabel />}
 
               {/* ── Description ──────────────────────────────────────────── */}
               {editingBrief ? (
@@ -1960,6 +1980,8 @@ export function TaskModal({
                   )}
                 </>
               )}
+
+              <PanelFieldSections task={task} canEdit={canEdit} place="below" />
 
               {/* ── Fields ───────────────────────────────────────────────── */}
               <div style={{ marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>

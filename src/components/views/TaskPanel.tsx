@@ -12,6 +12,7 @@ import { TaskLinksSection, taskLinkFields } from '@/components/kanban/TaskLinks'
 import { MediaPanelSection } from '@/components/media/MediaLinks'
 import { useUIStore } from '@/store/useUIStore'
 import { TaskModal } from '@/components/kanban/TaskModal'
+import { CardFieldsProvider } from '@/components/fields/CardFields'
 import { viewTasks, type BoardData } from './types'
 
 export function TaskPanel({ data }: { data: BoardData }) {
@@ -25,6 +26,9 @@ export function TaskPanel({ data }: { data: BoardData }) {
   const task = tasks.find(t => t.id === selectedTaskId)
   if (!task) return null
   return (
+    // Spec 023: the panel's task fields (Channels, Caption, TOV…) read the page's field data.
+    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members}
+      taskName={id => tasks.find(x => x.id === id)?.name}>
     <TaskModal
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       task={task as any}
@@ -50,5 +54,6 @@ export function TaskPanel({ data }: { data: BoardData }) {
       </>}
       onClose={() => selectTask(null)}
     />
+    </CardFieldsProvider>
   )
 }

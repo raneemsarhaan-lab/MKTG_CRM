@@ -7,9 +7,9 @@
  * custom fields marked "show on cards".
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { ContentType, Member, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
-import { applies, fieldName, formatValue, isEmpty } from '@/lib/task-fields'
+import { applies, fieldName, formatValue, isEmpty, requiredEmpty } from '@/lib/task-fields'
 import { PIPE } from '@/lib/pipeline-tokens'
 
 export interface CardFieldsData {
@@ -54,10 +54,13 @@ export function useCardShows() {
 }
 
 /** The custom field values a card shows, under its title. */
-export function CardFieldValues({ taskId, typeLabel }: { taskId: string; typeLabel: string | null | undefined }) {
+export function CardFieldValues({ taskId, typeLabel, status }: { taskId: string; typeLabel: string | null | undefined; status?: string }) {
   const c = useContext(Ctx)
   const locale = useLocale()
+  const t = useTranslations('fields')
   if (!c || !typeLabel) return null
+  // Required fields still empty: a small red label each ("Caption missing"), until it's published.
+  const missing = status === 'publish' ? [] : requiredEmpty({ id: taskId, content_type_label: typeLabel }, c.links, c.fields, id => c.values.get(taskId)?.get(id))
   const vals = c.values.get(taskId)
   const list = c.fields.filter(f => !f.retired && applies(typeLabel, f.id, c.links)
     && (c.shown ? c.shown.includes(`f:${f.id}`) : f.on_card))
@@ -67,9 +70,16 @@ export function CardFieldValues({ taskId, typeLabel }: { taskId: string; typeLab
     const text = formatValue(f, v, { locale, memberName: id => c.members.find(m => m.id === id)?.name, taskName: c.taskName })
     return text ? { f, text } : null
   }).filter((x): x is { f: TaskFieldDef; text: string } => !!x)
-  if (!rows.length) return null
+  if (!rows.length && !missing.length) return null
   return (
     <div data-card-fields style={{ display: 'grid', gap: 2, marginTop: 5 }}>
+      {missing.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 8px' }}>
+          {missing.map(({ field }) => (
+            <span key={field.id} data-card-missing={field.name_en} style={{ fontSize: 10.5, fontWeight: 700, color: '#D22040' }}>{t('missingCard', { field: fieldName(field, locale) })}</span>
+          ))}
+        </div>
+      )}
       {rows.map(({ f, text }) => (
         <div key={f.id} data-card-field={f.id} style={{ display: 'flex', gap: 5, fontSize: 10.5, lineHeight: 1.35, minWidth: 0 }}>
           <span style={{ color: PIPE.textFaint, fontWeight: 600, flexShrink: 0 }}>{fieldName(f, locale)}</span>

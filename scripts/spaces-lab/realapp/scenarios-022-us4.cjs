@@ -96,6 +96,9 @@ module.exports = (EMAIL, psql, ok) => {
           select gen_random_uuid(), '${name}', (select id from brands order by name limit 1), 'Post', m.id, m.id, m.role, true, 'c-prog', now(), 'Medium', now(), '${theme}'
           from members m where m.email='${EMAIL.admin}' returning id`).split(/\n/)[0]
         psql(`insert into task_spaces (task_id, space_id, added_via) values ('${t}', '${cs}', 'manual') on conflict do nothing`)
+        // Spec 023: this is about stage words; Post's required fields are filled.
+        psql(`insert into task_field_values (task_id, field_id, value) select '${t}', l.field_id, '"lab"' from task_type_fields l join task_fields f on f.id=l.field_id
+          where l.type_label='Post' and l.required_from is not null and f.kind='text' on conflict do nothing`)
         try {
           await go('/spaces/content?view=sheet')
           const cell = `[data-content-sheet] [data-cell*="${t}|status"]`

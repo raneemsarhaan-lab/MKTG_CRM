@@ -138,22 +138,36 @@ const at = (s: string) => ALL_STAGES.indexOf(s as StageId)
 
 /**
  * The empty fields that stop a move to `target` (FR-008): attached to the
- * task's type, required from a stage at or before `target`, and empty.
+ * task's type, required from a stage at or before `target`, and empty. With the
+ * task's stage, only a move that crosses the required stage is stopped: a task
+ * already past it (before the field was required) isn't held back.
  */
 export function missingRequired(
-  task: { id: string; content_type_label: string | null },
+  task: { id: string; content_type_label: string | null; status?: string | null },
   target: StageId | string,
   links: TaskTypeFieldLink[], fields: TaskFieldDef[], values: { task_id: string; field_id: string; value: unknown }[],
 ): TaskFieldDef[] {
   const t = at(target)
   if (t < 0) return []
+  const from = task.status ? at(task.status) : -1
   const out: TaskFieldDef[] = []
   for (const { field, link } of fieldsForType(task.content_type_label, links, fields)) {
-    if (!link.required_from || at(link.required_from) < 0 || at(link.required_from) > t) continue
+    if (!link.required_from || at(link.required_from) < 0 || at(link.required_from) > t || at(link.required_from) <= from) continue
     const v = values.find(x => x.task_id === task.id && x.field_id === field.id)?.value
     if (isEmpty(v)) out.push(field)
   }
   return out
+}
+
+/** Where a field shows in the task panel: the top rows, or a section above or below the Description. */
+export type FieldPlace = 'top' | 'above' | 'below'
+export const placeOf = (f: TaskFieldDef): FieldPlace => (f.options.place === 'top' || f.options.place === 'below' ? f.options.place : 'above')
+
+/** The required, empty fields of a task's type, whatever the stage (cards and sheets flag them). */
+export function requiredEmpty(
+  task: { id: string; content_type_label: string | null }, links: TaskTypeFieldLink[], fields: TaskFieldDef[], value: (fieldId: string) => unknown,
+): { field: TaskFieldDef; link: TaskTypeFieldLink }[] {
+  return fieldsForType(task.content_type_label, links, fields).filter(x => x.link.required_from && isEmpty(value(x.field.id)))
 }
 
 /** A new option id for a choice list. */

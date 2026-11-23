@@ -373,12 +373,16 @@ function FieldEditorForm({ field, onDone }: { field?: TaskFieldDef; onDone: (msg
   const [kind, setKind] = useState<FieldKind>(field?.kind ?? 'text')
   const [choices, setChoices] = useState<FieldOption[]>(field?.options.choices ?? [])
   const [currency, setCurrency] = useState(field?.options.currency ?? 'EGP')
+  const [place, setPlace] = useState<'top' | 'above' | 'below'>(field?.options.place ?? 'above')
   const [onCard, setOnCard] = useState(field?.on_card ?? false)
   const [switchable, setSwitchable] = useState(field?.switchable ?? false)
   const [err, setErr] = useState('')
   const [pending, start] = useTransition()
   const hasChoices = kind === 'choice' || kind === 'multi'
-  const options = useMemo(() => (hasChoices ? { choices: choices.filter(c => c.en.trim()) } : kind === 'money' ? { currency } : kind === 'rating' ? { max: 5 } : {}), [hasChoices, choices, kind, currency])
+  const options = useMemo(() => ({
+    ...(hasChoices ? { choices: choices.filter(c => c.en.trim()) } : kind === 'money' ? { currency } : kind === 'rating' ? { max: 5 } : {}),
+    place, ...(field?.options.hint ? { hint: field.options.hint } : {}),
+  }), [hasChoices, choices, kind, currency, place, field])
   const save = () => start(async () => {
     const payload = { name_en: name, name_ar: ar || null, kind, options, on_card: onCard, switchable }
     const r = field ? await updateField(field.id, payload) : await createField(payload)
@@ -396,6 +400,13 @@ function FieldEditorForm({ field, onDone }: { field?: TaskFieldDef; onDone: (msg
             {FIELD_KINDS.map(k => <option key={k} value={k}>{tk(k)}</option>)}
           </select>
           {field && field.kind !== kind && <span style={{ fontWeight: 400 }}>{tf('kindChangeNote')}</span>}
+        </label>
+        <label style={label}>{tf('place')}
+          <select style={input} value={place} onChange={e => setPlace(e.target.value as 'top' | 'above' | 'below')} data-field-input="place">
+            <option value="top">{tf('placeTop')}</option>
+            <option value="above">{tf('placeAbove')}</option>
+            <option value="below">{tf('placeBelow')}</option>
+          </select>
         </label>
         {kind === 'money' && (
           <label style={label}>{tf('currency')}

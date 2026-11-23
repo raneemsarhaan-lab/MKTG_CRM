@@ -402,6 +402,9 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (col === 'rowNo') return null
       if (isCustom(col)) return cl.custom.render(x as unknown as Task, col)
       if (col === 'media') return x.media_board ? null : ml.render(x)
+      // Spec 023: an empty required field says so in red ("Caption not added").
+      if (isField(col) && fieldApplies(x, col) && isEmpty(fieldValue(x, col)) && data.typeFields.some(l => l.type_label === x.content_type_label && l.field_id === String(col).slice(2) && l.required_from))
+        return <span className="fx-sheet-ellipsis" data-field-missing={fieldOf(col).name_en} style={{ color: '#D22040' }}>{tFields('notAdded', { field: fieldName(fieldOf(col), locale) })}</span>
       if (offFeatureFor(x.brand, col)) return <span data-feature-off={offFeatureFor(x.brand, col)!} title={tFeat('hidden', { brand: x.brand?.name ?? '' })} aria-label={tFeat('hidden', { brand: x.brand?.name ?? '' })} style={{ display: 'block', width: '100%', height: '100%' }} />
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
       if (col === 'due' && x.due_date) {

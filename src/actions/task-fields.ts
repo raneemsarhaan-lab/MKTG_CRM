@@ -35,6 +35,9 @@ function cleanOptions(kind: FieldKind, raw: unknown): TaskFieldDef['options'] {
   }
   if (kind === 'money') out.currency = typeof o.currency === 'string' && /^[A-Z]{3}$/.test(o.currency) ? o.currency : 'EGP'
   if (kind === 'rating') out.max = typeof o.max === 'number' && o.max >= 3 && o.max <= 10 ? Math.trunc(o.max) : 5
+  if (o.place === 'top' || o.place === 'below') out.place = o.place
+  const h = o.hint && typeof o.hint === 'object' ? o.hint as Record<string, unknown> : null
+  if (h && typeof h.en === 'string' && h.en.trim()) out.hint = { en: h.en.trim().slice(0, 80), ar: typeof h.ar === 'string' && h.ar.trim() ? h.ar.trim().slice(0, 80) : null }
   return out
 }
 

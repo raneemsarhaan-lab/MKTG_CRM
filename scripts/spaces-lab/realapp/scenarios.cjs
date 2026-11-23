@@ -9,6 +9,9 @@ module.exports = (EMAIL, psql, ok) => {
         (select id from members where role='Content Creator' limit 1), (select id from members where role='${assigneeRole}' limit 1),
         'Content Creator', ${nine}, '${status}', now(), 'Medium', 2, now() returning id`).split(/\n/)[0]
     psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${spaceId('content')}', 'manual')`)
+    // Spec 023: these scenarios are about moves, not fields — the type's required fields are filled.
+    psql(`insert into task_field_values (task_id, field_id, value) select '${id}', l.field_id, '"lab"' from task_type_fields l join task_fields f on f.id=l.field_id
+      where l.type_label='${type}' and l.required_from is not null and f.kind='text' on conflict do nothing`)
     return id
   }
   return [

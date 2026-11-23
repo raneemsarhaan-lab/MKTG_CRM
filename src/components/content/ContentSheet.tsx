@@ -26,6 +26,7 @@ import { PlanPreview } from './PlanPreview'
 import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
+import { useTaskFieldColumns } from '@/components/fields/taskFieldColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
@@ -136,10 +137,12 @@ export function ContentSheet(p: ContentSheetProps) {
   }
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
-  const cl = useSheetColumns({
+  const sheetCols = useSheetColumns({
     sheet: 'content', set: 'all', bundle: p.columns, me, members: p.members,
-    defaultName: key => t(`col.${key}` as 'col.title'), canEdit, say, onNote,
+    defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
   })
+  // Spec 023: Caption, Channels, TOV and the other task fields of the pieces' types, as columns.
+  const cl = useTaskFieldColumns(sheetCols, { tasks: p.tasks, canEdit })
   const setType = (task: Task, label: string) =>
     void p.api.update(task.id, { content_type_label: label }).then(r => { if (!r.success) say(t('notSaved', { reason: why(r.error) })) })
 

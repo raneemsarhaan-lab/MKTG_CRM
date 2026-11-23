@@ -68,7 +68,20 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
 .sh b { font-size: 12.5px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; color: var(--ink) }
 .sh .kind { color: var(--faint); font-weight: 500 }
 .need { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--soft); border: 1px solid var(--line); color: var(--muted) }
-.need.miss { background: var(--coral); border-color: var(--coral); color: #fff }
+.need { cursor: help }
+.missing { color: var(--coral); font-size: 14.5px; font-weight: 500; background: none; border: none; padding: 0; text-align: start; cursor: text }
+.missing:hover { text-decoration: underline }
+.cardmiss { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--coral) }
+.chips .addpop { position: relative }
+.pop { position: absolute; z-index: 5; top: calc(100% + 4px); inset-inline-start: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 4px; min-width: 150px }
+.pop button { display: flex; gap: 8px; align-items: center; width: 100%; border: none; background: transparent; padding: 6px 8px; border-radius: 7px; font-size: 13px; text-align: start }
+.pop button:hover { background: var(--soft) }
+.pop i { width: 8px; height: 8px; border-radius: 50%; display: inline-block }
+.mcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: grid; gap: 4px; max-width: 250px; font-size: 12.5px }
+.mcard .bm { font-size: 10.5px; font-weight: 700; color: var(--muted) }
+.mcard .tt { font-weight: 600; color: var(--ink) }
+.mcard .dates { font-size: 10.5px; color: var(--muted) }
+td.red { color: var(--coral) }
 .count { margin-inline-start: auto; color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11.5px }
 .grip { position: absolute; inset-inline-start: -16px; top: 9px; color: var(--faint); font-size: 12px; opacity: 0 }
 .sec:hover .grip { opacity: 1 }
@@ -110,13 +123,13 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
 <div class="wrap">
   <header style="display:grid;gap:10px">
     <span class="eyebrow">Spec 023 · Task panel · your choice 1</span>
-    <h1>Caption and Channels inside the description</h1>
-    <p class="lede">A Post's description opens with one section per field of the Post type, then the free-text Description you have today. Writing in a section fills that field, so the sheet column, the cards, the Fields button and the required check all read the same value. Everything on the left can be clicked and typed into.</p>
+    <h1>Caption, Description and TOV</h1>
+    <p class="lede">Channels sits in the top rows beside Status and Assignee. Below the divider: Caption, the free-text Description you have today, then TOV (the text that goes on the design). Writing in a section fills that field, so the sheet column, the cards, the Fields button and the required check all read the same value. Everything on the left can be clicked and typed into.</p>
     <div class="states" role="group" aria-label="Show">
       <span>Show:</span>
       <div class="seg" id="state">
         <button type="button" data-s="filled" aria-pressed="true">Filled in</button>
-        <button type="button" data-s="empty" aria-pressed="false">Caption empty, move refused</button>
+        <button type="button" data-s="empty" aria-pressed="false">Caption and TOV empty</button>
         <button type="button" data-s="slash" aria-pressed="false">Typing / in the description</button>
         <button type="button" data-s="ar" aria-pressed="false">In Arabic</button>
       </div>
@@ -134,28 +147,32 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
         <div class="props">
           <div class="prop"><span data-t="status">Status</span><span><button type="button" class="status" id="statusBtn"><span data-t="cprog">C-IN PROGRESS</span> ▾</button><br><button type="button" class="advance" id="advance">⚡ → <span data-t="creview">C-Review</span></button></span></div>
           <div class="prop"><span data-t="assignee">Assignee</span><span><span class="av">S</span>Samaa</span></div>
+          <div class="prop"><span data-t="channels">Channels</span><span class="chips" id="chips"></span></div>
           <div class="prop"><span data-t="publish">Publishing date</span><span>4 Mar 2026</span></div>
           <div class="prop"><span data-t="due">Due date</span><span>25 Feb 2026</span></div>
         </div>
-        <div class="refused" role="alert"><span aria-hidden="true">⛔</span><span data-t="refused">Caption is required before C-Review.</span></div>
+        <div class="refused" role="alert" id="refusedLine"><span aria-hidden="true">⛔</span><span data-t="refused">Caption is required before C-Review.</span></div>
         <hr class="div">
 
         <div class="desc" aria-label="Description">
           <section class="sec" id="secCaption" data-field="caption">
             <span class="grip" aria-hidden="true">⋮⋮</span>
-            <div class="sh"><b data-t="caption">Caption</b><span class="kind" data-t="text">Text</span><span class="need" id="needCaption" data-t="needed">Needed by C-Review</span><span class="count" id="count"></span></div>
+            <div class="sh"><b data-t="caption">Caption</b><span class="kind" data-t="text">Text</span><span class="need" id="needCaption" data-t="required" data-title="reqBefore" title="Required before C-Review">Required</span><span class="count" id="count"></span></div>
+            <button type="button" class="missing" id="missCaption" data-t="capMissing">Caption not added</button>
             <div class="text" id="caption" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Caption" data-ph="Write the caption…"></div>
           </section>
 
-          <section class="sec" data-field="channels">
-            <span class="grip" aria-hidden="true">⋮⋮</span>
-            <div class="sh"><b data-t="channels">Channels</b><span class="kind" data-t="multi">Multi-choice</span><span class="need" data-t="optional">Optional</span></div>
-            <div class="chips" id="chips"></div>
-          </section>
 
           <section class="sec" data-field="description">
             <div class="sh"><b data-t="description">Description</b><span class="kind" data-t="free">Free text, as today</span></div>
             <div class="text brief" id="brief" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Description"></div>
+          </section>
+
+          <section class="sec" id="secTov" data-field="tov">
+            <span class="grip" aria-hidden="true">⋮⋮</span>
+            <div class="sh"><b data-t="tov">TOV</b><span class="kind" data-t="tovKind">Text on Visual · one line per slide</span><span class="need" data-t="required" data-title="reqBefore" title="Required before C-Review">Required</span><span class="count" id="tovCount"></span></div>
+            <button type="button" class="missing" id="missTov" data-t="tovMissing">TOV not added</button>
+            <div class="text" id="tov" contenteditable="true" role="textbox" aria-multiline="true" aria-label="TOV" data-ph="Slide 1 text…"></div>
           </section>
           <p class="slashhint" data-t="hint">Type / for blocks and fields</p>
           <div class="slash" role="listbox" aria-label="Insert">
@@ -175,8 +192,9 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
       <div class="note">
         <h2>Where the sections come from</h2>
         <ul>
-          <li>The task's type decides them: a Post gets Caption and Channels, a Report gets Budget. Their order is the type's field order on the Task types page.</li>
-          <li>Description is always last and stays free text with bold, lists, tables, mentions and checklists, as today.</li>
+          <li>The task's type decides them: a Post gets Caption, Channels and TOV, a Report gets Budget.</li>
+          <li>Each field says where it sits: the top rows (Channels, beside Status and Assignee), above the Description (Caption) or below it (TOV). Admins set this on the Task types page.</li>
+          <li>Description stays free text with bold, lists, tables, mentions and checklists, as today.</li>
           <li>A field the type has but that's empty can be hidden from the description until needed, then brought back with <b>/</b>. A required field can't be hidden.</li>
         </ul>
       </div>
@@ -187,9 +205,23 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
           <tbody><tr><td>Ramadan nights teaser</td><td>Post</td><td id="sheetCaption"></td><td id="sheetChannels"></td></tr></tbody></table></div>
       </div>
       <div class="note">
+        <h2>Missing Caption or TOV, without opening the task</h2>
+        <p>Board cards carry a small red label for each required field that's still empty. Sheets show the same red words in the empty cell.</p>
+        <div class="mcard" aria-label="Board card">
+          <span class="bm">Forefront Consulting</span>
+          <span class="tt" data-t="title">Ramadan nights teaser</span>
+          <span class="dates">Publish 4 Mar · Due 25 Feb</span>
+          <span style="display:flex;gap:8px;flex-wrap:wrap"><span class="cardmiss" id="cardCap">Caption missing</span><span class="cardmiss" id="cardTov">TOV missing</span></span>
+        </div>
+        <div class="scroll"><table class="mini"><thead><tr><th>Title</th><th>Caption</th><th>TOV</th></tr></thead>
+          <tbody><tr><td>Ramadan nights teaser</td><td id="sheetCap2"></td><td id="sheetTov"></td></tr>
+          <tr><td>Iftar invite</td><td>Join us at sunset 🌅</td><td class="red">TOV not added</td></tr></tbody></table></div>
+      </div>
+      <div class="note">
         <h2>Required, and how a move is refused</h2>
         <ul>
-          <li>The section's tag says which stage needs it ("Needed by C-Review") and turns red while it's empty.</li>
+          <li>A required section has a "Required" badge; hovering it shows the stage, "Required before C-Review".</li>
+          <li>Empty, it shows red words in its place: "Caption not added", "TOV not added". Clicking them opens the field; they go as soon as there's text.</li>
           <li>Moving the task past that stage, from anywhere, is refused with "Caption is required before C-Review". The panel scrolls to the section and outlines it.</li>
         </ul>
       </div>
@@ -213,15 +245,18 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
   const EN = {
     post: 'Post', title: 'Ramadan nights teaser', status: 'Status', cprog: 'C-IN PROGRESS', creview: 'C-Review', assignee: 'Assignee', publish: 'Publishing date', due: 'Due date',
     refused: 'Caption is required before C-Review.', caption: 'Caption', text: 'Text', needed: 'Needed by C-Review', channels: 'Channels', multi: 'Multi-choice', optional: 'Optional',
-    description: 'Description', free: 'Free text, as today', hint: 'Type / for blocks and fields', g1: 'Fields of this Post', hashtags: 'Hashtags', adds: 'adds a section',
+    description: 'Description', free: 'Free text, as today', required: 'Required', reqBefore: 'Required before C-Review', capMissing: 'Caption not added', tovMissing: 'TOV not added',
+    tov: 'TOV', tovKind: 'Text on Visual · one line per slide', capCard: 'Caption missing', tovCard: 'TOV missing', hint: 'Type / for blocks and fields', g1: 'Fields of this Post', hashtags: 'Hashtags', adds: 'adds a section',
     shootday: 'Shoot day', date: 'Date', g2: 'Blocks', heading: 'Heading', checklist: 'Checklist', table: 'Table', add: '+ Add', ph: 'Write the caption…',
   }
   const AR = {
     post: 'منشور', title: 'إعلان ليالي رمضان', status: 'الحالة', cprog: 'كتابة المحتوى', creview: 'مراجعة المحتوى', assignee: 'المكلّف', publish: 'تاريخ النشر', due: 'تاريخ التسليم',
-    refused: 'الحقل «التعليق» مطلوب قبل مراجعة المحتوى.', caption: 'التعليق', text: 'نص', needed: 'مطلوب قبل مراجعة المحتوى', channels: 'القنوات', multi: 'خيارات متعددة', optional: 'اختياري',
-    description: 'الوصف', free: 'نص حر كما هو اليوم', hint: 'اكتب / لإضافة كتل وحقول', g1: 'حقول هذا المنشور', hashtags: 'الوسوم', adds: 'يضيف قسمًا',
+    refused: 'الحقل «الكابشن» مطلوب قبل مراجعة المحتوى.', caption: 'الكابشن', text: 'نص', needed: 'مطلوب قبل مراجعة المحتوى', channels: 'القنوات', multi: 'خيارات متعددة', optional: 'اختياري',
+    description: 'الوصف', free: 'نص حر كما هو اليوم', required: 'مطلوب', reqBefore: 'مطلوب قبل مراجعة المحتوى', capMissing: 'لم تتم إضافة الكابشن', tovMissing: 'لم تتم إضافة النص على التصميم',
+    tov: 'النص على التصميم', tovKind: 'سطر لكل شريحة', capCard: 'الكابشن ناقص', tovCard: 'النص على التصميم ناقص', hint: 'اكتب / لإضافة كتل وحقول', g1: 'حقول هذا المنشور', hashtags: 'الوسوم', adds: 'يضيف قسمًا',
     shootday: 'يوم التصوير', date: 'تاريخ', g2: 'كتل', heading: 'عنوان', checklist: 'قائمة مهام', table: 'جدول', add: '+ إضافة', ph: 'اكتب التعليق…',
   }
+  const TOV = { en: 'Ramadan nights\nLive every evening at 9\nFollow for the schedule', ar: 'ليالي رمضان\nمباشر كل مساء الساعة 9\nتابعونا لمعرفة المواعيد' }
   const CAPTION = { en: 'Ramadan nights, brighter together 🌙\nJoin us every evening at 9 for live sessions with our team.', ar: 'ليالي رمضان أجمل معًا 🌙\nانضموا إلينا كل مساء الساعة التاسعة في جلسات مباشرة مع فريقنا.' }
   const BRIEF = {
     en: '<p><b>Goal:</b> warm teaser for the Ramadan series; one carousel, three slides.</p><ul><li>Slide 1: the moon over the office skyline</li><li>Slide 2: session times</li><li>Slide 3: call to follow</li></ul><p>Tone: calm and welcoming. @Noran for the visuals.</p>',
@@ -244,25 +279,40 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
     })
     const rest = CH.filter(c => !picked.includes(c.id))
     if (rest.length) {
-      const add = document.createElement('button'); add.type = 'button'; add.className = 'add'; add.textContent = w.add
-      add.onclick = () => { picked.push(rest[0].id); sync() }
-      box.appendChild(add)
+      const wrap = document.createElement('span'); wrap.className = 'addpop'
+      const add = document.createElement('button'); add.type = 'button'; add.className = 'add'; add.textContent = w.add; add.setAttribute('aria-haspopup', 'listbox')
+      add.onclick = () => {
+        if (wrap.querySelector('.pop')) { wrap.querySelector('.pop').remove(); return }
+        const pop = document.createElement('div'); pop.className = 'pop'; pop.setAttribute('role', 'listbox')
+        rest.forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'option'); b.innerHTML = `<i style="background:${c.c}"></i>${lang === 'ar' ? c.ar : c.en}`; b.onclick = () => { picked.push(c.id); sync() }; pop.appendChild(b) })
+        wrap.appendChild(pop)
+      }
+      wrap.appendChild(add); box.appendChild(wrap)
     }
   }
   function sync() {
-    const w = words(), v = cap.innerText.trim()
+    const w = words(), v = cap.innerText.trim(), tv = $('tov').innerText.trim()
     $('count').textContent = v ? `${v.length} / 2,200` : ''
-    const need = $('needCaption')
-    need.classList.toggle('miss', !v)
+    $('tovCount').textContent = tv ? `${tv.length}` : ''
+    const editing = el => document.activeElement === el
+    $('missCaption').hidden = !!v || editing(cap); cap.hidden = !v && !editing(cap)
+    $('missTov').hidden = !!tv || editing($('tov')); $('tov').hidden = !tv && !editing($('tov'))
+    $('cardCap').hidden = !!v; $('cardTov').hidden = !!tv
+    $('cardCap').textContent = w.capCard; $('cardTov').textContent = w.tovCard
+    const sc = $('sheetCap2'); sc.textContent = v ? v.replace(/\n/g, ' ').slice(0, 30) + (v.length > 30 ? '…' : '') : w.capMissing; sc.className = v ? '' : 'red'
+    const st = $('sheetTov'); st.textContent = tv ? tv.replace(/\n/g, ' · ').slice(0, 30) + (tv.length > 30 ? '…' : '') : w.tovMissing; st.className = tv ? '' : 'red'
     $('secCaption').classList.toggle('req-empty', !v && panel.dataset.refused === 'true')
-    if (v && panel.dataset.refused === 'true') panel.dataset.refused = 'false'
-    $('sheetCaption').textContent = v.replace(/\n/g, ' ').slice(0, 40) + (v.length > 40 ? '…' : '')
+    $('secTov').classList.toggle('req-empty', !tv && panel.dataset.refused === 'true')
+    if (v && tv && panel.dataset.refused === 'true') panel.dataset.refused = 'false'
+    $('sheetCaption').textContent = v ? v.replace(/\n/g, ' ').slice(0, 40) + (v.length > 40 ? '…' : '') : w.capMissing
+    $('sheetCaption').className = v ? '' : 'red'
     $('sheetChannels').textContent = picked.map(id => { const c = CH.find(x => x.id === id); return lang === 'ar' ? c.ar : c.en }).join(', ')
     drawChips()
   }
   function words2dom() {
     const w = words()
     document.querySelectorAll('[data-t]').forEach(el => { const k = el.dataset.t; if (w[k]) el.textContent = w[k] })
+    document.querySelectorAll('[data-title]').forEach(el => { el.title = w[el.dataset.title] })
     cap.dataset.ph = w.ph
   }
   function show(s) {
@@ -270,21 +320,30 @@ hr.div { border: none; border-top: 1px solid var(--line); margin: 0 }
     lang = s === 'ar' ? 'ar' : 'en'
     panel.dir = lang === 'ar' ? 'rtl' : 'ltr'; panel.lang = lang
     panel.dataset.slash = String(s === 'slash')
-    panel.dataset.refused = String(s === 'empty')
+    panel.dataset.refused = 'false'
     cap.innerText = s === 'empty' ? '' : CAPTION[lang]
+    $('tov').innerText = s === 'empty' ? '' : TOV[lang]
     brief.innerHTML = BRIEF[lang] + (s === 'slash' ? '<p><span class="typed">/hash</span></p>' : '')
     picked = ['ig', 'li']
     words2dom(); sync()
-    if (s === 'empty') $('secCaption').classList.add('req-empty')
   }
   document.querySelectorAll('#state button').forEach(b => b.onclick = () => show(b.dataset.s))
   cap.addEventListener('input', sync)
+  $('tov').addEventListener('input', sync)
+  const openField = (btn, el) => { btn.hidden = true; el.hidden = false; el.focus() }
+  $('missCaption').onclick = () => openField($('missCaption'), cap)
+  $('missTov').onclick = () => openField($('missTov'), $('tov'))
+  cap.addEventListener('blur', sync); $('tov').addEventListener('blur', sync)
   cap.addEventListener('paste', e => { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')) })
   const tryMove = () => {
-    if (cap.innerText.trim()) { $('statusBtn').firstElementChild.textContent = lang === 'ar' ? 'مراجعة المحتوى' : 'C-REVIEW'; panel.dataset.refused = 'false'; return }
-    panel.dataset.refused = 'true'; $('secCaption').classList.add('req-empty'); $('secCaption').scrollIntoView({ block: 'center', behavior: 'smooth' }); cap.focus()
+    if (cap.innerText.trim() && $('tov').innerText.trim()) { $('statusBtn').firstElementChild.textContent = lang === 'ar' ? 'مراجعة المحتوى' : 'C-REVIEW'; panel.dataset.refused = 'false'; return }
+    const w = words(), noCap = !cap.innerText.trim(), noTov = !$('tov').innerText.trim()
+    $('refusedLine').lastElementChild.textContent = noCap && noTov ? (lang === 'ar' ? 'الحقلان «الكابشن» و«النص على التصميم» مطلوبان قبل مراجعة المحتوى.' : 'Caption and TOV are required before C-Review.') : noCap ? w.refused : (lang === 'ar' ? 'الحقل «النص على التصميم» مطلوب قبل مراجعة المحتوى.' : 'TOV is required before C-Review.')
+    panel.dataset.refused = 'true'
+    const sec = noCap ? $('secCaption') : $('secTov'); sec.classList.add('req-empty'); sec.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
   $('advance').onclick = tryMove
+  document.addEventListener('mousedown', e => { if (!e.target.closest('.addpop')) document.querySelectorAll('.pop').forEach(p => p.remove()) })
   show('filled')
 })()
 </script>
