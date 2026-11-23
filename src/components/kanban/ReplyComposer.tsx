@@ -97,7 +97,9 @@ export function ReplyComposer({ members, meId, replyingTo, onSend, onCancel }: {
                     return
                   }
                   if (matches.length && (e.key === 'Enter' || e.key === 'Tab')) { e.preventDefault(); pick(matches[index]); return }
-                  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (query !== null) setQuery(null); else onCancel(); return }
+                  // Esc closes the mention list, then an empty composer. A typed
+                  // reply stays: a stray Esc shouldn't discard it (Cancel still can).
+                  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (query !== null) setQuery(null); else if (!text.trim()) onCancel(); return }
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() }
                 }} />
       {error && <p className="fx-nt-composer-err" role="alert">{error}</p>}

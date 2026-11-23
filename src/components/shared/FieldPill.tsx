@@ -197,11 +197,12 @@ export function PillInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
+      className={props.className ? `fx-focus ${props.className}` : 'fx-focus'}
       style={{
         width: '100%', padding: '8px 10px', borderRadius: 8,
         border: `1px solid ${CU.line}`, background: '#fff',
         color: CU.ink, fontSize: 13, fontFamily: 'inherit',
-        outline: 'none', boxSizing: 'border-box',
+        boxSizing: 'border-box',
         ...props.style,
       }}
     />

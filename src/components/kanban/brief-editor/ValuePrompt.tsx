@@ -107,10 +107,11 @@ export function ValuePrompt({ kind, initial = '', images, onConfirm, onPickAttac
           if (e.key === 'Enter')  { e.preventDefault(); void confirm() }
           if (e.key === 'Escape') { e.preventDefault(); if (!stack?.closeTop()) onCancel() }
         }}
+        className="fx-focus"
         style={{
           flex: 1, minWidth: 180, height: 30, padding: '0 10px', borderRadius: 8,
           border: `1px solid ${error ? BRIEF_UI.error : 'transparent'}`, background: COLORS.panel, fontSize: 13,
-          fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', color: BRIEF_UI.ink,
+          fontFamily: 'inherit', boxSizing: 'border-box', color: BRIEF_UI.ink,
         }}
       />
       <button type="button" onClick={() => void confirm()} disabled={!ready}

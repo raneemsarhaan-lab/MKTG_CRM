@@ -182,6 +182,15 @@ export function AttachmentsSection({
     t: (k, v) => t(k, v),
   })
 
+  // Closing or reloading the tab mid-upload would drop the queue: ask first.
+  const uploading = queue.jobs.some(j => j.status === 'queued' || j.status === 'uploading')
+  useEffect(() => {
+    if (!uploading) return
+    function onBeforeUnload(e: BeforeUnloadEvent) { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [uploading])
+
   const addFiles = useCallback((list: File[], opts: { forComment?: boolean; source?: 'paste' | 'drop' | 'pick' } = {}) => {
     if (!list.length) return
     if (!canEdit) { setNote(t('readOnly')); return }

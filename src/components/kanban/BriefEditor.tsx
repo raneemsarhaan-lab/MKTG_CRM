@@ -507,7 +507,8 @@ export function BriefEditor({
         // No overflow: hidden here: it would stop the toolbar sticking (R13).
         borderRadius: 18, background: COLORS.panel,
         boxShadow: focused
-          ? `0 0 0 2px ${alpha(BRIEF_UI.blue, 0.08)}, 0 4px 20px ${alpha(BRIEF_UI.ink, 0.04)}`
+          // Strong enough to see where typing will land; at .08 it was invisible.
+          ? `0 0 0 2px ${alpha(BRIEF_UI.blue, 0.45)}, 0 4px 20px ${alpha(BRIEF_UI.ink, 0.04)}`
           : `0 2px 12px ${alpha(BRIEF_UI.ink, 0.05)}`,
         transition: 'box-shadow .12s',
       }}>

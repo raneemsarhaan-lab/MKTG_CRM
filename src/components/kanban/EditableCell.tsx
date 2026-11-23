@@ -43,7 +43,6 @@ const CONTROL: React.CSSProperties = {
   borderRadius: 6,
   padding: '2px 4px',
   fontFamily: 'inherit',
-  outline: 'none',
   boxSizing: 'border-box',
 }
 
@@ -96,6 +95,7 @@ export function InlineValue({
         onChange={e => { setDraft(e.target.value); onCommit(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
         onKeyDown={e => { if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) } }}
+        className="fx-focus"
         style={{ ...CONTROL, cursor: 'pointer' }}
       >
         {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -114,6 +114,7 @@ export function InlineValue({
           if (e.key === 'Enter')  { e.preventDefault(); commit() }
           if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) }
         }}
+        className="fx-focus"
         style={CONTROL}
       />
     )
@@ -192,6 +193,7 @@ export function EditableCell({
             onChange={e => { setDraft(e.target.value); onCommit(e.target.value); setEditing(false) }}
             onBlur={() => setEditing(false)}
             onKeyDown={e => { if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) } }}
+            className="fx-focus"
             style={{ ...CONTROL, cursor: 'pointer' }}
           >
             {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -210,6 +212,7 @@ export function EditableCell({
               if (e.key === 'Enter')  { e.preventDefault(); commit() }
               if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) }
             }}
+            className="fx-focus"
             style={CONTROL}
           />
         )

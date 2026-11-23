@@ -297,6 +297,22 @@ html {
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* ─── Keyboard focus for inline-styled controls ───────────────────────────────
+   Controls styled with inline `style` can't take a :focus-visible rule there,
+   and inline `outline: none` would beat any class rule — so those controls
+   drop the inline outline and carry one of these instead. `fx-focus-within`
+   rings a composite box (a borderless textarea and its buttons) as one unit. */
+.fx-focus:focus-visible,
+.fx-task-card:focus-visible {
+  outline: 2px solid var(--violet-accent);
+  outline-offset: 2px;
+}
+.fx-focus-within:focus-within {
+  outline: 2px solid var(--violet-accent);
+  outline-offset: 2px;
+}
+.fx-focus-within textarea:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   .fx-stat-card:hover { transform: none; }
 }

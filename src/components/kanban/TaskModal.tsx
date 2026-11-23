@@ -34,6 +34,7 @@ import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { useNotify } from '@/components/notifications/NotifyProvider'
 import { ReplyComposer } from './ReplyComposer'
 import { mentionedIn } from '@/lib/notify/mentions'
+import { useDialogFocus } from './useDialogFocus'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -478,7 +479,7 @@ export function TaskModal({
   // The brief editor's last reported save state (spec 005 FR-004): closing the
   // panel while a save has failed or an image is uploading asks first.
   const briefState = useRef<{ state: 'saved' | 'saving' | 'error'; pending: number }>({ state: 'saved', pending: 0 })
-  const [closeGuard, setCloseGuard] = useState<'unsaved' | 'uploading' | null>(null)
+  const [closeGuard, setCloseGuard] = useState<'unsaved' | 'uploading' | 'comment' | 'subtask' | null>(null)
   function requestClose() {
     // A click on the panel's close control is also a click outside the brief,
     // so the editor has already asked; don't ask twice.
@@ -486,6 +487,10 @@ export function TaskModal({
     const { state, pending } = briefState.current
     if (editingBrief && state === 'error') { setCloseGuard('unsaved'); return }
     if (editingBrief && pending > 0) { setCloseGuard('uploading'); return }
+    // Typed but not sent: closing would drop it silently. (A rename in progress
+    // is saved by its own blur, so it needs no guard.)
+    if (cmtText.trim() || draftFiles.length) { setCloseGuard('comment'); return }
+    if (addingSubtask && subtaskName.trim()) { setCloseGuard('subtask'); return }
     // Deletes still in their Undo window move to the bottom message (spec 007 FR-034).
     panelClosed(task.id)
     onClose()
@@ -678,6 +683,10 @@ export function TaskModal({
       if (e.key !== 'Escape') return
       if (menuOpen) { setMenuOpen(false); return }
       if (stageOpen) { setStageOpen(false); return }
+      // With focus on one of their options rather than the comment box, the
+      // emoji and mention pickers still close before the panel does.
+      if (emojiOpen) { setEmojiOpen(false); return }
+      if (mentionOpen) { setMentionOpen(false); return }
       // The brief editor handles its own Esc (closing its menus, then leaving
       // editing); it marks the event handled, and it must not also close the
       // whole panel.
@@ -690,6 +699,31 @@ export function TaskModal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  // Closing or reloading the tab with unsent work asks first: a comment or
+  // subtask still being typed, or a brief whose save is pending or failed.
+  // (The brief's last save state outlives the edit, so it only counts while
+  // the brief is open for editing — as in requestClose.)
+  const unsent = useRef({ draft: false, editingBrief: false })
+  unsent.current = {
+    draft: Boolean(cmtText.trim() || draftFiles.length || (addingSubtask && subtaskName.trim())),
+    editingBrief,
+  }
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      const { state, pending } = briefState.current
+      const briefAtRisk = unsent.current.editingBrief && (state !== 'saved' || pending > 0)
+      if (!unsent.current.draft && !briefAtRisk) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
+  // Focus moves into the panel on open, Tab stays inside it, and focus goes
+  // back to the card on close.
+  const dialog = useDialogFocus<HTMLDivElement>(`[data-task-card="${CSS.escape(task.id)}"]`)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -1388,13 +1422,21 @@ export function TaskModal({
       }}
     >
       <div
+        ref={dialog.ref}
         onClick={e => e.stopPropagation()}
+        onKeyDown={dialog.onKeyDown}
+        role="dialog"
+        aria-modal="true"
+        aria-label={task.name}
+        tabIndex={-1}
         className="fx-task-panel"
         style={{
           background: '#fff', borderRadius: 12, width: '100%', maxWidth: 1280,
           height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 2px 6px rgba(20,20,20,.06), 0 24px 68px rgba(20,20,20,.22)',
           color: CU.text, fontSize: 15.5,
+          // The panel takes focus only to hold it on open; it isn't a control.
+          outline: 'none',
         }}
       >
         {/* ── TOP BAR — spans the whole panel ───────────────────────────── */}
@@ -1498,7 +1540,10 @@ export function TaskModal({
             padding: '9px 16px', background: alpha(COLORS.coral, 0.08), borderBottom: `1px solid ${CU.line}`, fontSize: 13.5,
           }}>
             <b style={{ color: COLORS.coral }}>
-              {closeGuard === 'unsaved' ? 'Your last changes to the brief aren’t saved.' : 'An image is still uploading to the brief.'}
+              {closeGuard === 'unsaved'    ? 'Your last changes to the brief aren’t saved.'
+                : closeGuard === 'uploading' ? 'An image is still uploading to the brief.'
+                : closeGuard === 'comment'   ? 'Your comment isn’t sent yet — leaving discards it.'
+                : 'Your subtask isn’t added yet — leaving discards it.'}
             </b>
             <span style={{ flex: 1 }} />
             <button type="button" onClick={() => setCloseGuard(null)} autoFocus
@@ -1627,8 +1672,9 @@ export function TaskModal({
                     width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
                     fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: CU.ink,
                     border: `1px solid ${CU.line}`, borderRadius: 8, padding: '4px 8px',
-                    margin: '0 -8px 20px', outline: 'none',
+                    margin: '0 -8px 20px',
                   }}
+                  className="fx-focus"
                 />
               ) : (
                 <h1
@@ -1996,8 +2042,9 @@ export function TaskModal({
                         }}
                         style={{
                           flex: 1, minWidth: 0, height: 38, padding: '0 11px', fontFamily: 'inherit',
-                          fontSize: 15.5, border: `1px solid ${CU.line}`, borderRadius: 8, outline: 'none',
+                          fontSize: 15.5, border: `1px solid ${CU.line}`, borderRadius: 8,
                         }}
+                        className="fx-focus"
                       />
                       <button type="button" onClick={submitSubtask} disabled={isPending}
                               style={{
@@ -2212,7 +2259,9 @@ export function TaskModal({
                 </div>
               )}
 
-              <div style={{
+              {/* The borderless textarea and its buttons read as one box, so
+                  the box carries the focus ring. */}
+              <div className="fx-focus-within" style={{
                 border: 'none', borderRadius: 14, background: '#fff',
                 boxShadow: '0 4px 20px rgba(23,36,65,0.04)',
               }}>

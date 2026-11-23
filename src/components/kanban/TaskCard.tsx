@@ -294,7 +294,6 @@ export function TaskCard({
         // Pointer drags on touch devices are swallowed by scrolling without this.
         touchAction: 'none',
         userSelect: 'none',
-        outline: 'none',
       }}
       {...attributes}
       {...listeners}
@@ -304,11 +303,18 @@ export function TaskCard({
         if (selecting && onToggleSelect) { onToggleSelect(task.id, e.shiftKey); return }
         onSelect(task.id)
       }}
-      onKeyDown={e => { if (e.key === 'Enter') onSelect(task.id) }}
+      // Enter opens the task; every other key goes on to dnd-kit's keyboard
+      // sensor (Space picks the card up). Setting onKeyDown after {...listeners}
+      // replaces theirs, so it has to be passed on by hand.
+      onKeyDown={e => {
+        if (e.key === 'Enter') { onSelect(task.id); return }
+        listeners?.onKeyDown?.(e)
+      }}
       role="button"
       tabIndex={0}
       aria-label={`Task: ${task.name}`}
       className="fx-task-card"
+      data-task-card={task.id}
     >
       {onToggleSelect && (
         <span

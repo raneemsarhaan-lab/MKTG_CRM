@@ -150,10 +150,11 @@ export function BulkBar({
           <div style={{ padding: 6, display: 'grid', gap: 6 }}>
             <input
               type="date" value={dueDraft} onChange={e => setDue(e.target.value)} data-bulk-due=""
+              className="fx-focus"
               style={{
                 width: '100%', padding: '8px 10px', borderRadius: 8,
                 border: `1px solid ${PIPE.borderInput}`, fontSize: 13,
-                fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                fontFamily: 'inherit', boxSizing: 'border-box',
               }}
             />
             <button
