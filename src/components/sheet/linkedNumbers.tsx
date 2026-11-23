@@ -36,3 +36,25 @@ export function withNumberFormats<R>(model: Model<R>, styleOf: (row: R, col: Gri
   model.copyStyle = (row, col) => (col === 'rowNo' ? null : styleOf(row, col))
   model.copyShown = (row, col) => shownOf(row, col)?.shown ?? model.textValue(row, col)
 }
+
+/**
+ * Spec 015 FR-041 (user, 2026-11-23: "copy carries its comment thread"): a copy
+ * names each cell's comment address, and a paste asks the comments panel to
+ * copy those threads onto the cells it landed on.
+ */
+export function withCommentPaste<R>(
+  model: { rows: R[]; cols: GridCol[]; copyKey?(row: R, col: GridCol): string | null; pasteComments?(pairs: { from: string; r: number; c: number }[]): void },
+  opts: { enabled: boolean; sheet: string; keyOf(row: R, col: GridCol): { rowKey: string; colKey: string } | null; paste(pairs: { from: string; rowKey: string; colKey: string }[]): void },
+) {
+  if (!opts.enabled) return
+  model.copyKey = (row, col) => { const k = col === 'rowNo' ? null : opts.keyOf(row, col); return k ? `${opts.sheet}|${k.rowKey}|${k.colKey}` : null }
+  model.pasteComments = pairs => {
+    const out: { from: string; rowKey: string; colKey: string }[] = []
+    for (const p of pairs) {
+      const row = model.rows[p.r], col = model.cols[p.c]
+      const k = row && col && col !== 'rowNo' ? opts.keyOf(row, col) : null
+      if (k) out.push({ from: p.from, ...k })
+    }
+    if (out.length) opts.paste(out)
+  }
+}

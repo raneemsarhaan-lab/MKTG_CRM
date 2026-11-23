@@ -5,7 +5,8 @@
  * Video rows group their clips; "+ Clip" rows add one; drafts are clips not
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
-import { withNumberFormats } from '@/components/sheet/linkedNumbers'
+import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
+import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { useLocale, useTranslations } from 'next-intl'
 import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import type { ContentTheme, Member, SheetColumn, SLAConfig, Task, TaskField, WordField } from '@/types/index'
@@ -540,6 +541,7 @@ export function SheetGrid(p: SheetGridProps) {
   leRef.current = le
   // Spec 015 FR-070: number formats show here too, and a copy carries them.
   withNumberFormats(model, lf.styleOf, locale, !!p.linked)
+  withCommentPaste(model, { enabled: !!p.linked, sheet: 'linked_video', keyOf: (row, col) => { const id = rowTask(row)?.id; return id ? { rowKey: id, colKey: String(col) } : null }, paste: pairs => pasteCommentsTo('linked', pairs) })
   Object.assign(model, {
     cellStyle: lf.cellStyle, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,

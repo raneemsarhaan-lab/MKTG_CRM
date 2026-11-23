@@ -2157,7 +2157,8 @@
         "collapse": "Collapse the toolbar",
         "keytips": "Show the menus' key letters"
       },
-      "taskFields": "Task fields…"
+      "taskFields": "Task fields…",
+      "noComments": "The copied cells have no comments."
     },
     "fields": {
       "title": "Fields",
@@ -2674,7 +2675,8 @@
         "opSkipped": "{n, plural, one {# number changed} other {# numbers changed}}; {skipped, plural, one {# cell that isn't a number was left alone} other {# cells that aren't numbers were left alone}}.",
         "opDone": "{n, plural, one {# number changed} other {# numbers changed}}.",
         "needCopy": "Copy cells on this sheet first: Validation and Column widths come from them.",
-        "dvMixed": "The copied cells have different validation; copy cells that share one."
+        "dvMixed": "The copied cells have different validation; copy cells that share one.",
+        "noComments": "The copied cells have no comments."
       },
       "move": {
         "alertTitle": "This value isn't valid here",

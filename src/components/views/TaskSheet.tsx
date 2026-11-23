@@ -21,7 +21,8 @@
  * Its formats, rules and view live on the workbook's Tasks sheet ('tasks:<node>');
  * its columns are that sheet's (spec 010 records keyed by the same id).
  */
-import { withNumberFormats } from '@/components/sheet/linkedNumbers'
+import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
+import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { createTask } from '@/actions/tasks'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -466,6 +467,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   } satisfies Partial<GridModel<Row>>)
   // Spec 015 FR-070: number formats show here too, and a copy carries them.
   withNumberFormats(model, lf.styleOf, locale, inWorkbook)
+  withCommentPaste(model, { enabled: inWorkbook, sheet: sheet, keyOf: (row, col) => { const id = taskOf(row)?.id; return id ? { rowKey: id, colKey: String(col) } : null }, paste: pairs => pasteCommentsTo('linked', pairs) })
   const tips = useGridTips(model, { enabled: inWorkbook, writeCells, onUndo: le.onUndo, say: sayNow })
   Object.assign(model, tips.model)
 

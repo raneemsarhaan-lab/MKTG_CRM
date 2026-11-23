@@ -86,7 +86,7 @@ export interface FormatState {
   advancedOn?: boolean
 }
 
-export type PasteMode = 'all' | 'values' | 'formats' | 'noBorders' | 'validation' | 'widths'
+export type PasteMode = 'all' | 'values' | 'formats' | 'comments' | 'noBorders' | 'validation' | 'widths'
 export type CleanOp = 'trim' | 'upper' | 'lower' | 'proper' | 'toNumber' | 'blanks'
 export type SplitFormat = 'general' | 'text' | 'date' | 'skip'
 /** The dialogs the toolbar asks the workbook to open. */
@@ -106,7 +106,7 @@ export type FormatCmd =
   | { kind: 'paint'; style: CellStyle | null }
   | { kind: 'clear'; what: ClearWhat }
   | { kind: 'fill'; dir: 'down' | 'right' }
-  | { kind: 'pasteSpecial'; mode: PasteMode; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null; op?: PasteOp | null; skipBlanks?: boolean }
+  | { kind: 'pasteSpecial'; mode: PasteMode; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null; op?: PasteOp | null; skipBlanks?: boolean; keys?: (string | null)[][] | null }
   | { kind: 'find'; q: FindQuery; dir: 1 | -1 }
   | { kind: 'replace'; q: FindQuery; by: string; all: boolean }
   // Stage 3: Styles, Sort & Filter (FR-030–FR-032, FR-045, FR-046).
@@ -228,6 +228,11 @@ export const announceFind = (r: FindResult) => document.dispatchEvent(new Custom
 export const COMMENTS_CLEAR = 'momentum:comments-clear'
 export const clearComments = (source: FormatSource, keys: string[]) =>
   document.dispatchEvent(new CustomEvent(COMMENTS_CLEAR, { detail: { source, keys } }))
+
+/** Paste carries comments (spec 015 FR-041): copy the threads at `from` ("sheet|rowKey|colKey") to these cells. */
+export const COMMENTS_PASTE = 'momentum:comments-paste'
+export const pasteComments = (source: FormatSource, pairs: { from: string; rowKey: string; colKey: string }[]) =>
+  document.dispatchEvent(new CustomEvent(COMMENTS_PASTE, { detail: { source, pairs } }))
 
 /** Spec 020: the right-drag menu's Series… asks the workbook for the Series dialog. */
 export const SERIES_OPEN = 'momentum:series-open'

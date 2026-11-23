@@ -804,7 +804,7 @@ export function Workbook(p: WorkbookProps) {
           onPaste={async mode => {
             const clip = await readClipboard()
             if (!clip || !clip.grid.length) { say(t('format.edit.noClip')); return }
-            sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles })
+            sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles, keys: clip.keys })
           }}
           onPasteSpecial={() => setPasteSpecial(true)}
           onFind={replace => setFind({ replace })}

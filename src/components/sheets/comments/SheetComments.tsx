@@ -17,8 +17,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { SheetCommentThread } from '@/types/index'
-import { addComment, clearCellComments, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
-import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, selectCell, type FormatSource, type FormatState } from '../format/bus'
+import { addComment, clearCellComments, copyCellComments, deleteComment, editComment, listThreads, reopenThread, replyComment, resolveThread } from '@/actions/sheet-comments'
+import { announceMarks, COMMENT_MARKS_ASK, COMMENT_NEW, COMMENTS_CLEAR, COMMENTS_PASTE, selectCell, type FormatSource, type FormatState } from '../format/bus'
 import { relativeTime } from '@/lib/notify/message'
 
 const AVATAR = ['#DB2777', '#2563EB', '#0E7C7C', '#B45309', '#7C3AED', '#15803D', '#C81E3A', '#4B5563']
@@ -27,7 +27,7 @@ const net = { success: false as const, error: 'network' }
 const safe = <A extends unknown[], R>(fn: (...a: A) => Promise<R>) => (...a: A) => fn(...a).catch(() => net)
 const api = {
   list: safe(listThreads), add: safe(addComment), reply: safe(replyComment), edit: safe(editComment),
-  del: safe(deleteComment), resolve: safe(resolveThread), reopen: safe(reopenThread), clear: safe(clearCellComments),
+  del: safe(deleteComment), resolve: safe(resolveThread), reopen: safe(reopenThread), clear: safe(clearCellComments), copy: safe(copyCellComments),
 }
 const keyOf = (t: { rowKey: string; colKey: string }) => `${t.rowKey}|${t.colKey}`
 
@@ -126,6 +126,21 @@ export function SheetComments(p: SheetCommentsProps) {
     }
     document.addEventListener(COMMENTS_CLEAR, on)
     return () => document.removeEventListener(COMMENTS_CLEAR, on)
+  }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Paste carries comments (spec 015 FR-041): the copied cells' threads, onto the pasted cells.
+  useEffect(() => {
+    const on = async (e: Event) => {
+      const d = (e as CustomEvent<{ source: FormatSource; pairs: { from: string; rowKey: string; colKey: string }[] }>).detail
+      const cur = ref.current
+      if (d.source !== cur.source || !cur.sheetRef || !d.pairs.length) return
+      const to = cur.sheetRef
+      const r = await api.copy(d.pairs.map(x => ({ from: x.from, to: { sheet: to, rowKey: x.rowKey, colKey: x.colKey } })))
+      if (!r.success) { cur.say(errText(r.error)); return }
+      if (r.threads.length) void load()
+    }
+    document.addEventListener(COMMENTS_PASTE, on)
+    return () => document.removeEventListener(COMMENTS_PASTE, on)
   }, [load]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hovering a corner marker shows its thread.

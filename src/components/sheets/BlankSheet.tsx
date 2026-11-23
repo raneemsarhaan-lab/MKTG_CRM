@@ -16,6 +16,7 @@
  * letters still count every row and column, as in Excel (hide row 5 and the
  * next one is still 6).
  */
+import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { GridCore, type ActiveCell, type AreasNotice, type CellWrite, type FillInfo, type FillRequest, type GridModel, type GridRect, type MenuTarget, type MoveRequest, type WriteWhy } from '@/components/sheet/GridCore'
@@ -847,6 +848,12 @@ export function BlankSheet(p: BlankSheetProps) {
     onIncoming: to => dropCarry(to),
     onCopied: (q, grid) => { lastCopy.current = { rows: vRows.slice(q.r0, q.r1 + 1).map(r => r.id), cols: vCols.slice(q.c0, q.c1 + 1).map(c => c.id), grid } },
     copyStyle: (row, col) => styleOf(row.id, col),
+    // Spec 015 FR-041: a copy names its cells, and a paste carries their comment threads.
+    copyKey: (row, col) => (col === 'rowNo' ? null : `${p.doc.id}|${row.id}|${col}`),
+    pasteComments: pairs => {
+      const out = pairs.map(x => ({ from: x.from, rowKey: vRows[x.r]?.id ?? '', colKey: String(vCols[x.c]?.id ?? '') })).filter(x => x.rowKey && x.colKey)
+      if (out.length) pasteCommentsTo('blank', out)
+    },
     copyShown: (row, col) => { const v = value(row.id, col), st = styleOf(row.id, col); return st?.num ? display(v, st.num, locale) : v },
     marked: (row, col) => marks.has(`${row.id}|${col}`),
     cellSpan: (row, col) => {
@@ -1154,6 +1161,23 @@ export function BlankSheet(p: BlankSheetProps) {
     if (!grid.length) return
     const plan = pastePlan(grid, q)
     const one = grid.length === 1 && grid[0].length === 1
+    // Spec 015 FR-041: the copied cells' comment threads, onto the cells they land on (Comments, and All).
+    const keys = cmd.keys ? (cmd.transpose ? transpose(cmd.keys, null) : cmd.keys) : null
+    const carryComments = () => {
+      if (!keys) return 0
+      const out: { from: string; rowKey: string; colKey: string }[] = []
+      for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+        const k = one ? keys[0]?.[0] : keys[r]?.[c], row = vRows[q.r0 + r], col = vCols[q.c0 + c]
+        if (k && row && col) out.push({ from: k, rowKey: row.id, colKey: col.id })
+      }
+      if (out.length) pasteCommentsTo('blank', out)
+      return out.length
+    }
+    if (cmd.mode === 'comments') {
+      if (!carryComments()) p.onNotice(tt('ps.noComments'))
+      setSelectRect({ r0: q.r0, c0: q.c0, r1: q.r0 + plan.rows - 1, c1: q.c0 + plan.cols - 1 })
+      return
+    }
     // An operation: the copied number applied to each number in the selection; other cells are left and counted.
     if (cmd.op) {
       const by = one ? parseNumber(grid[0][0]) : null
@@ -1220,6 +1244,7 @@ export function BlankSheet(p: BlankSheetProps) {
       }
       const res = await writeCells(list, 'paste')
       p.onSkipped(res.skipped)
+      if (cmd.mode === 'all') carryComments()
     }
     setSelectRect({ r0: q.r0, c0: q.c0, r1: q.r0 + plan.rows - 1, c1: q.c0 + plan.cols - 1 })
   }

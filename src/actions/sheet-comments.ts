@@ -214,3 +214,42 @@ export async function clearCellComments(sheet: string, keys: string[]): Promise<
   if (mine.length) await prisma.sheetComment.updateMany({ where: { id: { in: mine } }, data: { deleted_at: new Date() } })
   return { success: true, cleared: mine.length, skipped: rows.length - mine.length }
 }
+
+/**
+ * Paste carries comments (spec 015 FR-041; user, 2026-11-23): the live threads
+ * on each copied cell are copied, with their replies, to the cell the paste
+ * landed on. `from` is "sheet|rowKey|colKey" as the clipboard carries it.
+ * Nobody is notified again. Returns the new threads (Undo deletes them).
+ */
+export async function copyCellComments(pairs: { from: string; to: { sheet: string; rowKey: string; colKey: string } }[]): Promise<{ success: true; threads: SheetCommentThread[] } | Fail> {
+  const me = await getSessionMember()
+  if (!me) return fail('not_authenticated')
+  const list = (Array.isArray(pairs) ? pairs : []).slice(0, 5_000)
+  const sheets = new Map<string, string | null>()
+  const sheetId = async (key: string) => {
+    if (!sheets.has(key)) {
+      const s = await prisma.sheet.findUnique({ where: sheetWhere(key), select: { id: true } }).catch(() => null)
+      sheets.set(key, s && (await mayUseSheet(s.id, me)) ? s.id : null)
+    }
+    return sheets.get(key) ?? null
+  }
+  const out: SheetCommentThread[] = []
+  for (const p of list) {
+    const [fromSheet, fromRow, fromCol] = String(p.from ?? '').split('|')
+    if (!fromSheet || !fromRow || !fromCol) continue
+    const { rowKey, colKey } = p.to ?? {}
+    if (typeof rowKey !== 'string' || typeof colKey !== 'string' || !rowKey || !colKey || rowKey.length > KEY_MAX || colKey.length > KEY_MAX) continue
+    const [src, dst] = [await sheetId(fromSheet), await sheetId(p.to.sheet)]
+    if (!src || !dst) continue
+    if (src === dst && fromRow === rowKey && fromCol === colKey) continue
+    const roots = await prisma.sheetComment.findMany({ where: { sheet_id: src, row_key: fromRow, col_key: fromCol, root_id: null, deleted_at: null }, orderBy: { created_at: 'asc' } })
+    for (const r of roots) {
+      const replies = await prisma.sheetComment.findMany({ where: { root_id: r.id, deleted_at: null }, orderBy: { created_at: 'asc' } })
+      const root = await prisma.sheetComment.create({ data: { sheet_id: dst, row_key: rowKey, col_key: colKey, author_id: r.author_id, body: r.body, mentions: r.mentions, resolved_at: r.resolved_at, resolved_by: r.resolved_by } })
+      for (const x of replies) await prisma.sheetComment.create({ data: { sheet_id: dst, row_key: rowKey, col_key: colKey, root_id: root.id, author_id: x.author_id, body: x.body, mentions: x.mentions } })
+      const t = await threadOf(root.id)
+      if (t) out.push(t)
+    }
+  }
+  return { success: true, threads: out }
+}
