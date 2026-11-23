@@ -31,6 +31,7 @@ import type { SheetId, StageId, Task } from '@/types/index'
 import { STAGE_META, NINE_STAGE } from '@/lib/stage-meta'
 import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
 import { matchSimpleWord, matchWord, wordOf, SIMPLE_KEYS, type SimpleKey, type SpaceWords } from '@/lib/space-words'
+import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
 import { canActOn } from '@/lib/task-access'
 import { setSimpleStatus, setTaskStage, updateTask, type TaskPatch } from '@/actions/tasks'
 import { myNotes, setMyNote } from '@/actions/my-notes'
@@ -77,6 +78,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const tf = useTranslations('sheets.fields')
   const tcol = useTranslations('sheet.columns')
   const tSpaces = useTranslations('spaces')
+  const tFeat = useTranslations('spaces.features')
   const locale = useLocale()
   const router = useRouter()
   const selectTask = useUIStore(s => s.selectTask)
@@ -145,6 +147,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const viewRef = useRef<LinkedView>({})
   const shown = (x: ViewTask, col: GridCol): string => {
     if (isCustom(col)) return cl.custom.textValue(x as unknown as Task, col)
+    // Spec 021 (US4): a field the task's brand has switched off shows nothing (its value is kept).
+    if (offFeatureFor(x.brand, col)) return ''
     switch (col) {
       case 'title': return x.name
       case 'brand': return brandName.get(x.brand_id) ?? ''
@@ -212,6 +216,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     }
     if (isCustom(col)) return cl.custom.commit(x as unknown as Task, col, value)
     if (!may(x)) return t('readOnly')
+    if (offFeatureFor(x.brand, col)) return tFeat('hidden', { brand: x.brand?.name ?? '' })
     switch (col) {
       case 'title':
         if (!text) return t('needName')
@@ -318,6 +323,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       const x = row.task
       if (col === 'rowNo') return null
       if (isCustom(col)) return cl.custom.render(x as unknown as Task, col)
+      if (offFeatureFor(x.brand, col)) return <span data-feature-off={offFeatureFor(x.brand, col)!} title={tFeat('hidden', { brand: x.brand?.name ?? '' })} aria-label={tFeat('hidden', { brand: x.brand?.name ?? '' })} style={{ display: 'block', width: '100%', height: '100%' }} />
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
       if (col === 'due' && x.due_date) return <span className="fx-sheet-ellipsis">{new Date(`${x.due_date}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
       const s = shown(x, col)
@@ -335,6 +341,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
       if (!may(row.task)) return t('readOnly')
+      if (offFeatureFor(row.task.brand, col)) return tFeat('hidden', { brand: row.task.brand?.name ?? '' })
       return null
     },
     onCommit: async (row, col, value) => (row.kind === 'task' ? commit(row.task, col, value) : null),
@@ -396,7 +403,12 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   })
   leRef.current = { ...le, writeCells }
   Object.assign(model, {
-    cellStyle: lf.cellStyle, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
+    // Spec 021 (US4): a switched-off field is a hatched, empty cell in a mixed view.
+    cellStyle: (row: Row, col: GridCol) => {
+      const fx = lf.cellStyle(row, col)
+      if (row.kind !== 'task' || !offFeatureFor(row.task.brand, col)) return fx
+      return { cell: { ...(fx?.cell ?? {}), ...FEATURE_OFF_CELL }, text: fx?.text ?? null, border: fx?.border ?? null }
+    }, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true,
     // A refused edit says why on the cell and in the line above the sheet.
     onCommit: async (row: Row, col: GridCol, v: string) => { const why = await le.onCommit(row, col, v); setSay(why ?? ''); return why },

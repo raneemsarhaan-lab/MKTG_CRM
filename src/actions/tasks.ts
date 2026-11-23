@@ -971,11 +971,10 @@ export async function addVideo(name: string): Promise<{ success: boolean; id?: s
   const member = auth.member
   const n = (typeof name === 'string' ? name : '').replace(/\s+/g, ' ').trim().slice(0, 200)
   if (!n) return { success: false, error: 'no_name' }
-  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
   const task = await prisma.task.create({
     data: {
       name: n, content_type_label: 'Video', task_owner_id: member.id, assignee_id: member.id, initiator_role: member.role,
-      nine_stage: ws?.nine_stage_default ?? false, status: 'todo', stage_date: new Date(), priority: 'Medium', created_by: member.id,
+      nine_stage: await nineStageFor(null), status: 'todo', stage_date: new Date(), priority: 'Medium', created_by: member.id,
     },
   })
   const spaceCtx = await loadSpaceContext()

@@ -7,6 +7,7 @@ import { HeaderMenu } from '@/components/board/HeaderMenu'
 import { COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
+import { featureOn, featureOnAny } from '@/lib/brand-features'
 import { calDaysBetween } from '@/lib/utils'
 import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
 
@@ -84,9 +85,10 @@ export function applyBoardFilters<T extends Task>(
     // The Assignee filter means who is doing it, which is what people mean
     // when they ask whose task it is.
     if (f.ownerIds.length     && !f.ownerIds.includes(t.assignee_id ?? t.task_owner_id)) return false
-    if (f.contentTypes.length && !f.contentTypes.includes(t.content_type_label)) return false
-    if (f.platforms.length    && !f.platforms.includes(t.platform ?? '')) return false
-    if (f.priorities.length   && !f.priorities.includes(t.priority)) return false
+    // Spec 021 (US4): a value switched off for the task's brand is hidden, so it matches nothing.
+    if (f.contentTypes.length && !(featureOn(t.brand, 'type') && f.contentTypes.includes(t.content_type_label))) return false
+    if (f.platforms.length    && !(featureOn(t.brand, 'platform') && f.platforms.includes(t.platform ?? ''))) return false
+    if (f.priorities.length   && !(featureOn(t.brand, 'priorities') && f.priorities.includes(t.priority))) return false
     if (f.withAttachments && (t.attachments?.length ?? 0) === 0) return false
 
     if (f.alerts.length) {
@@ -170,11 +172,14 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
   // Only offer values that exist on the board.
   const usedTypes = useMemo(
-    () => [...new Set(tasks.map(t => t.content_type_label).filter(Boolean))].sort(),
+    () => [...new Set(tasks.filter(t => featureOn(t.brand, 'type')).map(t => t.content_type_label).filter(Boolean))].sort(),
     [tasks])
   const usedPlatforms = useMemo(
-    () => [...new Set(tasks.map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
+    () => [...new Set(tasks.filter(t => featureOn(t.brand, 'platform')).map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
     [tasks])
+  // Spec 021 (US4): Priority and SLA status are offered while any brand on the board uses them.
+  const anyPriority = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'priorities'), [tasks])
+  const anySla = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'sla'), [tasks])
   const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.assignee_id ?? t.task_owner_id)), [tasks])
 
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
@@ -214,14 +219,14 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>
 
-        <PillSection label="Content type">
+        {usedTypes.length > 0 && <PillSection label="Content type">
           {usedTypes.map(v => (
             <PillOption key={v} selected={filters.contentTypes.includes(v)}
                         onClick={() => toggle('contentTypes', v)}>
               <Check on={filters.contentTypes.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>
+        </PillSection>}
 
         {usedPlatforms.length > 0 && (
           <PillSection label="Platform">
@@ -234,23 +239,23 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           </PillSection>
         )}
 
-        <PillSection label="Priority">
+        {anyPriority && <PillSection label="Priority">
           {PRIORITY_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.priorities.includes(v)}
                         onClick={() => toggle('priorities', v)}>
               <Check on={filters.priorities.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>
+        </PillSection>}
 
-        <PillSection label="SLA status">
+        {anySla && <PillSection label="SLA status">
           {ALERT_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.alerts.includes(v)}
                         onClick={() => toggleAlert(v)}>
               <Check on={filters.alerts.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>
+        </PillSection>}
 
         <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
           {([

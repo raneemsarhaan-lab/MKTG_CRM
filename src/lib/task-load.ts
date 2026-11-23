@@ -3,6 +3,9 @@
  * Counts open tasks' hour estimates per assignee, split by brand — published
  * pipeline tasks, done simple tasks and dropped clips are left out.
  */
+import { featureOn } from '@/lib/brand-features'
+import type { BrandFeatures } from '@/types/index'
+
 export interface LoadTask {
   assignee_id?: string | null
   brand_id?: string | null
@@ -11,6 +14,8 @@ export interface LoadTask {
   kind?: string | null
   simple_status?: string | null
   dropped_at?: string | null
+  /** Spec 021 (US4): the task's brand, whose Hour estimates switch decides if its hours count. */
+  brand?: { features?: BrandFeatures | null } | null
 }
 
 export interface PersonLoad { memberId: string; hours: number; tasks: number; byBrand: Record<string, number> }
@@ -23,7 +28,8 @@ export function taskLoad(tasks: LoadTask[]): PersonLoad[] {
   for (const t of tasks) {
     if (!t.assignee_id || !isOpen(t)) continue
     const p = by.get(t.assignee_id) ?? { memberId: t.assignee_id, hours: 0, tasks: 0, byBrand: {} }
-    const h = Number(t.hours_estimate) || 0
+    // Spec 021 (US4): hours a brand has switched off are hidden, so they add nothing.
+    const h = featureOn(t.brand, 'hours') ? Number(t.hours_estimate) || 0 : 0
     p.hours += h; p.tasks += 1
     const b = t.brand_id ?? 'none'
     p.byBrand[b] = (p.byBrand[b] ?? 0) + h

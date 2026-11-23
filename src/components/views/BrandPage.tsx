@@ -21,6 +21,7 @@ import { applyView } from '@/lib/view-config'
 import { BrandAssets } from '@/components/brands/BrandAssets'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
+import { BrandFeaturesButton } from '@/components/brands/BrandFeatures'
 import { ListView } from './ListView'
 import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
@@ -52,7 +53,12 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   const folderName = folder ? t(`folders.${FOLDER_KEY[folder]}`) : null
   const withPanel = (node: React.ReactNode) => <>{node}<TaskPanel data={data} /></>
 
-  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0] }
+  // Spec 021 (US4): admins switch the brand's features from its header.
+  const features = brand && data.currentUser.access === 'admin'
+    ? <BrandFeaturesButton brand={{ id: brand.id, name: brand.name, own: brand.own_features ?? {}, nine_stage_default: brand.nine_stage_default ?? null }}
+        defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage} />
+    : undefined
+  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: features }
 
   if (folder === 'calendar') {
     return (

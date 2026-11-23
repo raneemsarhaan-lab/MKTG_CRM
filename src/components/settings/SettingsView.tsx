@@ -26,9 +26,11 @@ interface SettingsViewProps {
   contentTypes: ContentType[]
   slaConfig: SLAConfig
   workspaceSettings: WorkspaceSettings
+  /** Spec 021 (US4): the switches a brand follows until it has its own. */
+  brandFeatureDefaults?: import('@/types/index').BrandFeatures
 }
 
-export function SettingsView({ seniorityLevels, workload, members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings }: SettingsViewProps) {
+export function SettingsView({ seniorityLevels, workload, members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings, brandFeatureDefaults = {} }: SettingsViewProps) {
   const [tab, setTab] = useState<Tab>('team')
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -98,7 +100,7 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
           <TeamSettings members={members} currentUserId={currentUserId} seniorityLevels={seniorityLevels} />
         )}
         {tab === 'spaces' && <SpacesSettings members={members} />}
-        {tab === 'brands' && <BrandSettings brands={brands} />}
+        {tab === 'brands' && <BrandSettings brands={brands} defaults={brandFeatureDefaults} workspaceNineStage={workspaceSettings.nine_stage_default} />}
         {tab === 'workload' && workload && (
           <WorkloadSettings settings={workload.settings} levels={workload.levels} roles={workload.roles} />
         )}

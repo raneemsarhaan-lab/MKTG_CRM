@@ -3,7 +3,8 @@ import { useTranslations } from 'next-intl'
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Member, Brand, ContentType } from '@/types/index'
+import type { Member, Brand, ContentType, BrandFeatureKey } from '@/types/index'
+import { featureOn } from '@/lib/brand-features'
 import { createTask, createTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { ProjectPicker } from '@/components/shared/ProjectPicker'
@@ -175,7 +176,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           form.platform,
+        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
         due_date:           form.due_date,
@@ -203,7 +204,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           form.platform,
+        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
         due_date:           form.due_date,
@@ -229,6 +230,8 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   }
 
   const brand  = brands.find(b => b.id === form.brand_id)
+  // Spec 021 (US4): the chosen brand's switched-off fields aren't offered.
+  const on = (k: BrandFeatureKey) => featureOn(brand, k)
   const assignee = members.find(m => m.id === form.assignee_id)
   const close  = () => setShowTaskForm(false)
 
@@ -299,27 +302,29 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               ))}
             </FieldPill>
 
-            <FieldPill
-              label="Type"
-              value={form.content_type_label}
-              active
-              icon={
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     strokeWidth="2" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
-                </svg>
-              }
-            >
-              {closePill => contentTypes.map(c => (
-                <PillOption
-                  key={c.id}
-                  selected={c.label === form.content_type_label}
-                  onClick={() => { patch('content_type_label', c.label); closePill() }}
-                >
-                  {c.label}
-                </PillOption>
-              ))}
-            </FieldPill>
+            {on('type') && (
+              <FieldPill
+                label="Type"
+                value={form.content_type_label}
+                active
+                icon={
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       strokeWidth="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+                  </svg>
+                }
+              >
+                {closePill => contentTypes.map(c => (
+                  <PillOption
+                    key={c.id}
+                    selected={c.label === form.content_type_label}
+                    onClick={() => { patch('content_type_label', c.label); closePill() }}
+                  >
+                    {c.label}
+                  </PillOption>
+                ))}
+              </FieldPill>
+            )}
           </div>
 
           {/* ── Title ────────────────────────────────────────────────────── */}
@@ -420,29 +425,31 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               )}
             </FieldPill>
 
-            <FieldPill
-              label="Priority"
-              value={form.priority}
-              active
-              icon={<span aria-hidden="true" style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: PRIORITY_COLOR[form.priority], display: 'inline-block',
-              }} />}
-              width={180}
-            >
-              {closePill => PRIORITIES.map(p => (
-                <PillOption
-                  key={p}
-                  selected={p === form.priority}
-                  onClick={() => { patch('priority', p); closePill() }}
-                >
-                  <span aria-hidden="true" style={{
-                    width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[p],
-                  }} />
-                  {p}
-                </PillOption>
-              ))}
-            </FieldPill>
+            {on('priorities') && (
+              <FieldPill
+                label="Priority"
+                value={form.priority}
+                active
+                icon={<span aria-hidden="true" style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: PRIORITY_COLOR[form.priority], display: 'inline-block',
+                }} />}
+                width={180}
+              >
+                {closePill => PRIORITIES.map(p => (
+                  <PillOption
+                    key={p}
+                    selected={p === form.priority}
+                    onClick={() => { patch('priority', p); closePill() }}
+                  >
+                    <span aria-hidden="true" style={{
+                      width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[p],
+                    }} />
+                    {p}
+                  </PillOption>
+                ))}
+              </FieldPill>
+            )}
 
             {/* Overflow — secondary fields, ClickUp's "…" */}
             <button
@@ -482,17 +489,19 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
             ) : (
               <>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <FieldPill label="Platform" value={form.platform} active width={190}>
-              {closePill => PLATFORMS.map(p => (
-                <PillOption
-                  key={p}
-                  selected={p === form.platform}
-                  onClick={() => { patch('platform', p); closePill() }}
-                >
-                  {p}
-                </PillOption>
-              ))}
-            </FieldPill>
+            {on('platform') && (
+              <FieldPill label="Platform" value={form.platform} active width={190}>
+                {closePill => PLATFORMS.map(p => (
+                  <PillOption
+                    key={p}
+                    selected={p === form.platform}
+                    onClick={() => { patch('platform', p); closePill() }}
+                  >
+                    {p}
+                  </PillOption>
+                ))}
+              </FieldPill>
+            )}
 
             {/* Project, where Campaign used to be. Campaign was free text that
                 grouped nothing — not one of the 316 tasks ever had a value in
@@ -530,21 +539,23 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               )}
             </span>
 
-            <FieldPill label="Estimate" value={`${form.hours_estimate}h`} active width={180}>
-              {closePill => (
-                <PillInput
-                  type="number"
-                  min={0.5}
-                  max={200}
-                  step={0.5}
-                  value={form.hours_estimate}
-                  onChange={e => patch('hours_estimate', parseFloat(e.target.value) || 1)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); closePill() } }}
-                />
-              )}
-            </FieldPill>
+            {on('hours') && (
+              <FieldPill label="Estimate" value={`${form.hours_estimate}h`} active width={180}>
+                {closePill => (
+                  <PillInput
+                    type="number"
+                    min={0.5}
+                    max={200}
+                    step={0.5}
+                    value={form.hours_estimate}
+                    onChange={e => patch('hours_estimate', parseFloat(e.target.value) || 1)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); closePill() } }}
+                  />
+                )}
+              </FieldPill>
+            )}
                 </div>
-                <div style={{ marginTop: 12 }}>
+                {on('covers') && <div style={{ marginTop: 12 }}>
                   <label style={{
                     display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
                     textTransform: 'uppercase', color: CU.muted, marginBottom: 6,
@@ -557,7 +568,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                     placeholder="https://…"
                     onChange={e => patch('cover_image_url', e.target.value)}
                   />
-                </div>
+                </div>}
                 <button
                   type="button"
                   onClick={() => setShowMore(false)}

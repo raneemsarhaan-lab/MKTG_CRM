@@ -2,7 +2,8 @@
 // research.md Decision 1, spec.md FR-023, FR-025
 // Never stored in DB; recomputed on every render from live data.
 
-import type { Task, SLAConfig, AlertStatus } from '@/types/index'
+import type { Task, SLAConfig, AlertStatus, BrandFeatures } from '@/types/index'
+import { featureOn } from '@/lib/brand-features'
 import { businessDaysBetween, calDaysBetween } from '@/lib/utils'
 
 /**
@@ -23,6 +24,8 @@ export function getAlertStatus(
 ): AlertStatus {
   // Spec 021 (US5, FR-024): a simple task has no SLA, so it is never at risk or breached.
   if ((task as { kind?: string }).kind === 'simple') return 'On Track'
+  // Spec 021 (US4): a brand with SLA tracking off has no badges and no breaches.
+  if (!featureOn((task as { brand?: { features?: BrandFeatures } }).brand, 'sla')) return 'On Track'
   const stageDate = new Date(task.stage_date)
 
   const stageDays = businessDaysBetween(stageDate, today)

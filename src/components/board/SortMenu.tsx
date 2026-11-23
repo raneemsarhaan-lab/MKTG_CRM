@@ -68,9 +68,11 @@ function SortIcon() {
   )
 }
 
-export function SortMenu({ value, onChange }: {
+export function SortMenu({ value, onChange, noPriority = false }: {
   value: SortKey
   onChange(next: SortKey): void
+  /** Spec 021 (US4): no brand on the board uses Priorities. */
+  noPriority?: boolean
 }) {
   const t = useTranslations('header')
 
@@ -81,7 +83,7 @@ export function SortMenu({ value, onChange }: {
       width={200}
       trigger={<><SortIcon /><span className="fx-hd-lbl-keep">{t(`sort.${value}`)}</span><ChevronIcon /></>}
     >
-      {SORT_KEYS.map(key => (
+      {SORT_KEYS.filter(key => !(noPriority && key === 'priority')).map(key => (
         <button key={key} type="button" className="fx-hd-opt" data-sort-option={key}
                 aria-pressed={value === key} onClick={() => onChange(key)}>
           <span className="fx-hd-opt-txt">{t(`sort.${key}`)}</span>

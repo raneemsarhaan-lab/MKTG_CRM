@@ -1,0 +1,72 @@
+'use server'
+
+/**
+ * Per-brand feature switches (spec 021 US4, FR-019–FR-021, research R11).
+ *
+ * A brand stores overrides only: `null` for a key puts it back on the
+ * workspace default. Switching a feature off hides it; no task value is ever
+ * touched, so switching it back on brings everything back unchanged (FR-020).
+ * Admins only.
+ */
+import { revalidatePath } from 'next/cache'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/authz'
+import { BRAND_FEATURES, cleanFeatures } from '@/lib/brand-features'
+import type { BrandFeatureKey, BrandFeatures } from '@/types/index'
+
+type Result = { success: true } | { success: false; error: string }
+
+function revalidateEverywhere() {
+  // Every view shows brand fields, so refresh the whole app shell.
+  revalidatePath('/', 'layout')
+}
+
+/** Change some of a brand's switches. `true`/`false` overrides; `null` follows the workspace default. */
+export async function setBrandFeatures(brandId: string, patch: Partial<Record<BrandFeatureKey, boolean | null>>): Promise<Result> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+  if (typeof brandId !== 'string' || !brandId) return { success: false, error: 'not_found' }
+  const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { features: true } })
+  if (!brand) return { success: false, error: 'not_found' }
+
+  const next: BrandFeatures = cleanFeatures(brand.features)
+  for (const k of BRAND_FEATURES) {
+    if (!patch || !(k in patch)) continue
+    const v = patch[k]
+    if (v === null) delete next[k]
+    else if (typeof v === 'boolean') next[k] = v
+  }
+  await prisma.brand.update({ where: { id: brandId }, data: { features: next as Prisma.InputJsonValue } })
+  revalidateEverywhere()
+  return { success: true }
+}
+
+/** The switches a brand starts with when it has no override (FR-021). */
+export async function setBrandFeatureDefaults(defaults: BrandFeatures): Promise<Result> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+  const clean = cleanFeatures(defaults)
+  await prisma.workspaceSettings.upsert({
+    where:  { id: 1 },
+    update: { brand_feature_defaults: clean as Prisma.InputJsonValue, updated_at: new Date() },
+    create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: false, brand_feature_defaults: clean as Prisma.InputJsonValue },
+  })
+  revalidateEverywhere()
+  return { success: true }
+}
+
+/**
+ * The brand's Islam Check (C-Check) default for tasks created from now on.
+ * `null` follows the workspace default. Existing tasks keep their own stages.
+ */
+export async function setBrandNineStage(brandId: string, value: boolean | null): Promise<Result> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+  if (value !== null && typeof value !== 'boolean') return { success: false, error: 'invalid' }
+  const found = await prisma.brand.findUnique({ where: { id: brandId }, select: { id: true } })
+  if (!found) return { success: false, error: 'not_found' }
+  await prisma.brand.update({ where: { id: brandId }, data: { nine_stage_default: value } })
+  revalidateEverywhere()
+  return { success: true }
+}

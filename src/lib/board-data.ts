@@ -6,6 +6,7 @@
  * Server-only: it reads the database directly.
  */
 import { prisma } from '@/lib/prisma'
+import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 import { linkedKeyOf, wordsFor } from '@/lib/space-words'
@@ -20,7 +21,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -92,6 +93,8 @@ export async function loadBoardData(member: SessionMember) {
     prisma.taskSpace.findMany({ select: { task_id: true, space_id: true, added_via: true } }),
     // Spec 021 (US3, R5): the Content and Video Spaces' words are their sheet's words.
     prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } }),
+    // Spec 021 (US4, R11): the workspace's default feature switches for brands.
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -101,12 +104,20 @@ export async function loadBoardData(member: SessionMember) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  // Spec 021 (US4): brands carry their switches resolved, and so does each task's brand.
+  const brandFeatureDefaults = cleanFeatures(ws?.brand_feature_defaults)
+  const resolvedBrands = brands.map(b => withResolvedFeatures(mapBrand(b), brandFeatureDefaults))
+  const brandById = new Map(resolvedBrands.map(b => [b.id, b]))
+  const viewTaskRows = tasks.map(mapTask).map(x => (x.brand_id && brandById.has(x.brand_id) ? { ...x, brand: brandById.get(x.brand_id) } : x))
+
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    initialTasks: tasks.map(mapTask) as any,
+    initialTasks: viewTaskRows as any,
     currentUser: mapMember(member),
     members: members.map(mapMember),
-    brands: brands.map(mapBrand),
+    brands: resolvedBrands,
+    brandFeatureDefaults,
+    workspaceNineStage: ws?.nine_stage_default ?? false,
     contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label })),
     slaConfig: mapSlaConfig(slaRows),
     themes: themes.map(mapTheme),

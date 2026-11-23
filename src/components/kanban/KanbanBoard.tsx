@@ -47,6 +47,7 @@ import { addColumn, renameColumn, moveColumn, setColumnShown, resizeColumn, upda
 import { applyOp, type LayoutOp } from '@/lib/sheet-columns'
 import { snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
+import { featureOnAny } from '@/lib/brand-features'
 import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskForm } from '@/components/shared/TaskForm'
 import { handoffRequest } from '@/components/handoff/request'
@@ -1193,7 +1194,7 @@ export function KanbanBoard({
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}
           filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
-          sort={<SortMenu value={sortBy} onChange={chooseSort} />}
+          sort={<SortMenu value={sortBy} onChange={chooseSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
           view="board"
           onView={v => setView(v)}
           display={
@@ -1332,6 +1333,7 @@ export function KanbanBoard({
 
       <BulkBar
         count={selected.size}
+        selectedBrands={liveTasks.filter(x => selected.has(x.id)).map(x => x.brand)}
         members={members}
         brands={brands}
         types={contentTypes}

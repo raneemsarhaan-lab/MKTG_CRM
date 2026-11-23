@@ -324,9 +324,9 @@
 
 **Independent Test**: switch Platform off for The Strategy Community. Its tasks show no Platform in TaskModal, cards, filters, sheets or Spaces, while Forefront's still do. Switch it back on and the values return (spec US4; quickstart Stage C steps 3–4).
 
-- [ ] T065 [P] [US4] Add `setBrandFeatures`, `setBrandFeatureDefaults` and `setBrandNineStage` (all admin-only) to `src/actions/brands.ts`. Include `features` and `nine_stage_default` in the brand data loaded by `loadBoardData` (`src/lib/board-data.ts`) and in `loadBrand`.
-- [ ] T066 [US4] Create `src/components/brands/BrandFeatures.tsx`, the switches panel, shown in `src/components/settings/BrandSettings.tsx` per brand and on the brand page header for admins. Workspace defaults go in the Settings Brands tab.
-- [ ] T067 [US4] Gate the fields with `featureOn(task.brand, key, defaults)`:
+- [X] T065 *(Done: `src/actions/brands.ts` (admin-only; `null` puts a switch back on the default). Board data and the capacity page resolve every brand's switches with the workspace defaults (`withResolvedFeatures`), so views ask `featureOn(task.brand, key)` alone; `own_features` keeps the overrides for the panel.)* [P] [US4] Add `setBrandFeatures`, `setBrandFeatureDefaults` and `setBrandNineStage` (all admin-only) to `src/actions/brands.ts`. Include `features` and `nine_stage_default` in the brand data loaded by `loadBoardData` (`src/lib/board-data.ts`) and in `loadBrand`.
+- [X] T066 *(Done: `BrandFeaturesList` / `BrandFeaturesButton`. Each switch saves at once and says whether it follows the default, with "Use default". In Settings › Brands per brand plus a "Defaults for brands" section; on the brand page header for admins.)* [US4] Create `src/components/brands/BrandFeatures.tsx`, the switches panel, shown in `src/components/settings/BrandSettings.tsx` per brand and on the brand page header for admins. Workspace defaults go in the Settings Brands tab.
+- [X] T067 *(Done: TaskModal fields, priority, estimate and a video's clip list; TaskForm pills and cover; card cover and type chip; filters, sort and bulk bar (offered while any brand in view uses them); the Library. Sheets: a switched-off cell is hatched, empty and read-only with "Off for <brand>" (`components/sheet/featureCells.tsx`) on the Tasks, Content and Video sheets; clips hidden under a brand's videos; hours left out of Workload and Capacity. Not yet: hiding a brand's pillar group rows on the Content sheet; the pillar cell is hatched.)* [US4] Gate the fields with `featureOn(task.brand, key, defaults)`:
   - TaskModal: platform `:1112-1119`, cover `:1224-1232`, priority `:1781-1791`, hours `:1798-1800`;
   - `src/components/shared/TaskForm.tsx`;
   - the TaskCard cover;
@@ -337,8 +337,8 @@
   - hours in `CapacityDashboard.tsx` / `task-load.ts`.
 
   Values are never cleared.
-- [ ] T068 [US4] Turning SLA tracking off for a brand hides that brand's SLA badges and leaves its tasks out of breach counts (`src/lib/alert-status.ts` callers, `home-metrics.ts`). Read `Brand.nine_stage_default` before the workspace default in `createTask`, `createTasks`, `addVideo` (`src/actions/tasks.ts`) and `src/actions/projects.ts:746`.
-- [ ] T069 [US4] Add UI scenarios in `scripts/spaces-lab/scenarios/us4.mjs`:
+- [X] T068 *(Done: `getAlertStatus` returns On Track for a brand with SLA off, so badges and breach counts follow everywhere; the card hides its SLA chip. `addVideo` and the project task read the brand's C-Check default first.)* [US4] Turning SLA tracking off for a brand hides that brand's SLA badges and leaves its tasks out of breach counts (`src/lib/alert-status.ts` callers, `home-metrics.ts`). Read `Brand.nine_stage_default` before the workspace default in `createTask`, `createTasks`, `addVideo` (`src/actions/tasks.ts`) and `src/actions/projects.ts:746`.
+- [X] T069 *(Done in `scripts/spaces-lab/realapp/scenarios-us4.cjs` (5 scenarios) and `pure-brand-features`.)* [US4] Add UI scenarios in `scripts/spaces-lab/scenarios/us4.mjs`:
   - switch off, the field disappears for that brand only, switch on, the values return;
   - SLA off removes badges;
   - Islam Check off → new tasks have 10 stages, existing ones keep 11.

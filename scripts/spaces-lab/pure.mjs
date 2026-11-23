@@ -147,4 +147,27 @@ check('pure-space-words', () => {
   eq(m.wordsFor({ key: 'video', words: {} }, { words: { stage: { todo: ['Idea'] } }, show: 'board' }), {}, 'a sheet showing board names gives none')
 })
 
+check('pure-brand-features', () => {
+  eq(m.featureOn(null, 'platform'), true, 'no brand: on')
+  eq(m.featureOn({ features: {} }, 'platform', { platform: false }), false, 'the workspace default')
+  eq(m.featureOn({ features: { platform: true } }, 'platform', { platform: false }), true, "the brand's own switch wins")
+  const r = m.resolveFeatures({ sla: false, bogus: true }, { clips: false })
+  eq([r.sla, r.clips, r.platform, Object.keys(r).length], [false, false, true, 8], 'every switch resolved')
+  const b = m.withResolvedFeatures({ id: 'b', features: { hours: false } }, { covers: false })
+  eq([b.own_features, b.features.hours, b.features.covers], [{ hours: false }, false, false], 'own overrides kept apart')
+  eq(m.featureOn(b, 'covers'), false, 'resolved brands need no defaults')
+  eq(m.featureOnAny([{ features: { type: false } }, { features: {} }], 'type'), true, 'any brand still uses it')
+  eq(m.featureOnAny([{ features: { type: false } }], 'type'), false, 'none do')
+  eq(m.offFeatureFor({ features: { priorities: false } }, 'priority'), 'priorities', 'a sheet column follows its switch')
+  eq(m.offFeatureFor({ features: { priorities: false } }, 'title'), null, 'other columns never hatch')
+  const load = m.taskLoad([
+    { assignee_id: 'a', brand_id: 'x', hours_estimate: 3, status: 'todo', brand: { features: { hours: false } } },
+    { assignee_id: 'a', brand_id: 'y', hours_estimate: 2, status: 'todo', brand: { features: {} } },
+  ])
+  eq([load[0].hours, load[0].tasks], [2, 2], 'hours switched off add nothing; the task still counts')
+  const t = { kind: 'pipeline', status: 'c-prog', stage_date: '2020-01-01', due_date: '2020-01-02', content_type_label: 'Design' }
+  eq(m.getAlertStatus({ ...t, brand: { features: {} } }, {}, new Date('2026-01-01')), 'Overdue', 'SLA on: late')
+  eq(m.getAlertStatus({ ...t, brand: { features: { sla: false } } }, {}, new Date('2026-01-01')), 'On Track', 'SLA off: no badge, no breach')
+})
+
 if (failed) process.exitCode = 1

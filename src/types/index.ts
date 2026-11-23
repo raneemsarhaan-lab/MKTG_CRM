@@ -120,6 +120,8 @@ export interface Brand {
   description?: string
   /** Spec 021 (R11): feature switch overrides; a missing key means the workspace default. */
   features?: BrandFeatures
+  /** Spec 021 (R11): the brand's own overrides, when `features` holds the resolved switches. */
+  own_features?: BrandFeatures
   /** Spec 021 (R11): the brand's "with C-Check" default for new tasks; null = the workspace default. */
   nine_stage_default?: boolean | null
 }

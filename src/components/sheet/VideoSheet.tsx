@@ -666,6 +666,7 @@ export function VideoSheet(p: VideoSheetProps) {
       {!bulkHidden && bulkTasks.length >= 2 && p.api.bulkUpdate && (
         <BulkBar
           count={bulkTasks.length}
+          selectedBrands={bulkTasks.map(x => x.brand)}
           fields={['stage', 'assignee', 'owner', 'type', 'priority', 'due']}
           labels={{
             count: t('bulk.count', { n: bulkTasks.length }), stage: t('bulk.stage'), assignee: t('bulk.owner'), owner: t('bulk.reviewer'),

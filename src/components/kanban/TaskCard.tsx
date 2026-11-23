@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
+import { featureOn } from '@/lib/brand-features'
 import { useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
@@ -110,8 +111,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
 
   return (
     <>
-      {/* Cover */}
-      <div style={{ position: 'relative', marginBottom: 9 }}>
+      {/* Cover — spec 021 (US4): none when the brand has Cover images off. */}
+      {featureOn(task.brand, 'covers') && <div data-card-cover style={{ position: 'relative', marginBottom: 9 }}>
         <ImageWithFallback
           src={cover}
           alt=""
@@ -138,7 +139,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           }
         />
 
-      </div>
+      </div>}
 
       {/* Brand, then the project it serves.
           Two short lines above the title so a column can be read for
@@ -197,8 +198,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         {/* Spec 021 (US5): a simple task has no SLA, so its card says what it is instead. */}
         {task.kind === 'simple'
           ? <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={700}>{tViews('kindSimple')}</Chip>
-          : <Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip>}
-        {task.content_type_label && (
+          : featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
+        {task.content_type_label && featureOn(task.brand, 'type') && (
           <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
             {task.content_type_label}
           </Chip>
@@ -286,6 +287,7 @@ export function TaskCard({
   return (
     <div
       ref={setNodeRef}
+      data-task-card={task.id}
       style={{
         ...SHELL,
         position: 'relative',

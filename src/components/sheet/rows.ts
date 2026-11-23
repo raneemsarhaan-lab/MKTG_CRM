@@ -5,6 +5,8 @@
  * video, with or without clip details (subtasks made before the sheet, or by
  * "New subtask", have none, and show blank cells).
  */
+import { featureOn } from '@/lib/brand-features'
+import type { BrandFeatures } from '@/types/index'
 import type { Task } from '@/types/index'
 
 export type SheetTask = Task
@@ -121,6 +123,11 @@ export function buildRows(tasks: SheetTask[], o: RowOptions): SheetRow[] {
     const videoHit = !q || matchesQuery(video.name, q)
     const clipHit = (c: SheetTask) => videoHit || matchesQuery(c.name, q) || matchesQuery(c.clip?.file_name, q)
     if (!videoHit && !clips.some(clipHit)) continue
+    // Spec 021 (US4): a brand with Video clips off shows its videos alone; the clips are kept.
+    if (!featureOn((video as { brand?: { features?: BrandFeatures } }).brand, 'clips')) {
+      if (videoHit) rows.push({ kind: 'video', key: `v:${video.id}`, task: video, clips: [], collapsed: true, n: n++ })
+      continue
+    }
     const collapsed = o.collapsed.has(video.id) && videoHit
     rows.push({ kind: 'video', key: `v:${video.id}`, task: video, clips, collapsed, n: n++ })
     if (collapsed) continue

@@ -2883,6 +2883,44 @@
       "notAllowed": "Only admins and superusers can change a Space's words.",
       "failed": "The words weren't saved. Try again.",
       "boardName": "Board name: {name}"
+    },
+    "features": {
+      "open": "Features",
+      "title": "{brand} · features",
+      "defaultsTitle": "Defaults for brands",
+      "help": "Switch a feature off to hide it on this brand's tasks everywhere, including team Spaces. Nothing is deleted: switch it back on and every value returns.",
+      "defaultsHelp": "What a brand uses until an admin changes its own switch.",
+      "names": {
+        "priorities": "Priorities",
+        "platform": "Platform",
+        "type": "Content type",
+        "pillars": "Pillars",
+        "hours": "Hour estimates",
+        "covers": "Cover images",
+        "clips": "Video clips",
+        "sla": "SLA tracking",
+        "cCheck": "Islam Check (C-Check)"
+      },
+      "hints": {
+        "priorities": "Priority on tasks, filters and sorting",
+        "platform": "Where a post goes",
+        "type": "Design, Video, Copy…",
+        "pillars": "Content pillars on the Content sheet",
+        "hours": "Estimates and the hours they add to workload",
+        "covers": "Card cover images",
+        "clips": "Clips under a video",
+        "sla": "Time-in-stage badges and breach counts",
+        "cCheck": "Applies to new tasks only; existing tasks keep their stages"
+      },
+      "on": "On",
+      "off": "Off",
+      "followsDefault": "Default ({state})",
+      "ownSetting": "Set for this brand",
+      "useDefault": "Use default",
+      "close": "Done",
+      "failed": "Couldn't save. Try again.",
+      "notAllowed": "Only admins can change a brand's features.",
+      "hidden": "Off for {brand}"
     }
   },
   "views": {

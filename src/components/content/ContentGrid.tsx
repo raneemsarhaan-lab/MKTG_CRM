@@ -29,6 +29,8 @@ import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useGridTips } from '@/components/sheet/useGridTips'
+import { gateFeatureCells, gateFeatureStyle, type OffNote } from '@/components/sheet/featureCells'
+import { offFeatureFor } from '@/lib/brand-features'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
@@ -378,12 +380,22 @@ export function ContentGrid(p: ContentGridProps) {
     },
   }
 
+  // Spec 021 (US4): a field the task's brand has switched off is a hatched, empty cell.
+  const tFeat = useTranslations('spaces.features')
+  const featureOff: OffNote<ContentRow> = (row, col) => {
+    const task = taskOf(row)
+    if (!task || !offFeatureFor(task.brand, isCustom(col) ? '' : col)) return null
+    return tFeat('hidden', { brand: task.brand?.name ?? '' })
+  }
+  gateFeatureCells(model, featureOff)
+
   // Spec 013: ranges, paste into cells, clear and undo, each cell through its own save.
   // Spec 015: formatting by task and column; undo through the sheet's own stack.
   const leRef = useRef<{ recordFormats(label: string, items: import('@/lib/sheet-format').FormatItem[]): void; record(label: string, changes: import('@/lib/sheet-undo').LinkedChange[]): void; writeCells(w: import('@/components/sheet/GridCore').CellWrite[], why: import('@/components/sheet/GridCore').WriteWhy): Promise<import('@/components/sheet/GridCore').WriteResult> } | null>(null)
   // Stage 3: the sheet's sort and filter (inside each group) and its rules; the grid shows the arranged rows.
   // They read what a cell shows: its text, or a pill's label.
   const shownText = (row: ContentRow, col: GridCol) => {
+    if (featureOff(row, col)) return ''
     const task = taskOf(row)
     if (task && !isCustom(col)) {
       switch (col) {
@@ -467,6 +479,7 @@ export function ContentGrid(p: ContentGridProps) {
   // Spec 020: zoom, the fill handle, Alt+↓ pick list and Ctrl+; on the board's sheets in the workbook.
   const tips = useGridTips(model, { enabled: !!p.linked, writeCells: le.writeCells, onUndo: le.onUndo, onSkipped: p.onSkipped, say: text => p.linked?.say(text) })
   Object.assign(model, tips.model)
+  gateFeatureStyle(model, featureOff)
   // The bulk bar (design/content-sheet-bulk-bar.html): which pieces the selection covers.
   const selectFmt = model.onSelect
   const lastPieces = useRef('')

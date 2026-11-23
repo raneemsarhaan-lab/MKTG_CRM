@@ -5,6 +5,7 @@
  * published, as a gallery, with the post link. It fills itself — nobody
  * curates it.
  */
+import { featureOn } from '@/lib/brand-features'
 import { useLocale, useTranslations } from 'next-intl'
 import { PIPE } from '@/lib/pipeline-tokens'
 import type { ViewTask } from '@/components/views/types'
@@ -25,7 +26,7 @@ export function BrandLibrary({ tasks, color, onOpen }: { tasks: ViewTask[]; colo
             <div style={{ padding: '9px 10px', display: 'grid', gap: 6 }}>
               <button type="button" onClick={() => onOpen(x.id)} style={{ textAlign: 'start', border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: 13.5, color: PIPE.ink }}>{x.name}</button>
               <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>
-                {[x.content_type_label, x.platform, x.due_date ? new Date(x.due_date).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : null].filter(Boolean).join(' · ')}
+                {[featureOn(x.brand, 'type') ? x.content_type_label : null, featureOn(x.brand, 'platform') ? x.platform : null, x.due_date ? new Date(x.due_date).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : null].filter(Boolean).join(' · ')}
               </span>
               {link && <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: PIPE.purple, textDecoration: 'none' }}>{t('openPost')} ↗</a>}
             </div>

@@ -39,6 +39,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-us5.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-sheet.cjs')).workbook(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-us3.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-us4.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {
@@ -54,7 +55,7 @@ const SCENARIOS = [
       console.log(`PASS ${sc.id}`)
     } catch (e) {
       failed++
-      console.log(`FAIL ${sc.id}: ${String(e.message ?? e).split('\n')[0]}`)
+      console.log(`FAIL ${sc.id}: ${process.env.LAB_VERBOSE ? String(e.message ?? e) : String(e.message ?? e).split("\n")[0]}`)
       await s.page.screenshot({ path: path.join(__dirname, `fail-${sc.id}.png`) }).catch(() => {})
     }
     await s.ctx.close()

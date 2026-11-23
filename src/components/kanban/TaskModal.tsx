@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
-import type { Brand, TeamSpace, TaskSpace, SimpleStatus } from '@/types/index'
+import type { Brand, TeamSpace, TaskSpace, SimpleStatus, BrandFeatureKey } from '@/types/index'
+import { featureOn } from '@/lib/brand-features'
 import { SIMPLE_STATUSES } from '@/lib/simple-status'
 import { ShowsIn } from './ShowsIn'
 import { handoffRequest } from '@/components/handoff/request'
@@ -1081,7 +1082,11 @@ export function TaskModal({
    * behind "Show N empty fields" — an imported task with six blank attributes
    * reads as a form to complete rather than a brief to work from.
    */
-  const fields: { key: string; filled: boolean; node: React.ReactNode }[] = [
+  // Spec 021 (US4): a field switched off for the task's brand is hidden, never cleared.
+  const taskBrand = brands.find(b => b.id === task.brand_id) ?? task.brand ?? null
+  const on = (k: BrandFeatureKey) => featureOn(taskBrand, k)
+  const FIELD_FEATURE: Record<string, BrandFeatureKey> = { type: 'type', platform: 'platform', cover: 'covers' }
+  const allFields: { key: string; filled: boolean; node: React.ReactNode }[] = [
     {
       key: 'brand', filled: Boolean(task.brand?.name),
       node: (
@@ -1267,6 +1272,7 @@ export function TaskModal({
       ),
     },
   ]
+  const fields = allFields.filter(f => !FIELD_FEATURE[f.key] || on(FIELD_FEATURE[f.key]))
   const emptyCount = fields.filter(f => !f.filled).length
 
   /**
@@ -1458,7 +1464,7 @@ export function TaskModal({
               </>
             )}
 
-            {task.content_type_label && (
+            {task.content_type_label && on('type') && (
               <>
                 <span style={{ color: CU.faint }}>/</span>
                 <span style={{
@@ -1815,7 +1821,7 @@ export function TaskModal({
                   </span>
                 </Prop>
 
-                <Prop icon="flag" label="Priority">
+                {on('priorities') && <Prop icon="flag" label="Priority">
                   <InlineValue
                     canEdit={canEdit} type="select" value={task.priority}
                     display={
@@ -1829,16 +1835,16 @@ export function TaskModal({
                     options={PRIORITIES.map(p => ({ value: p, label: p }))}
                     onCommit={v => applyPatch({ priority: v as 'Low' | 'Medium' | 'High' })}
                   />
-                </Prop>
+                </Prop>}
 
-                <Prop icon="clock" label="Time estimate">
+                {on('hours') && <Prop icon="clock" label="Time estimate">
                   <InlineValue
                     canEdit={canEdit} type="number" min={0} step={0.5}
                     value={task.hours_estimate}
                     display={(task.hours_estimate ?? 0) > 0 ? `${task.hours_estimate}h` : ''}
                     onCommit={v => applyPatch({ hours_estimate: parseFloat(v) })}
                   />
-                </Prop>
+                </Prop>}
 
                 <Prop icon="folder" label="Pipeline">
                   <span style={{ color: CU.label }}>{task.nine_stage ? '9-stage' : '8-stage'}</span>
@@ -1985,7 +1991,8 @@ export function TaskModal({
               </div>
 
               {/* ── Subtasks + actions ───────────────────────────────────── */}
-              {(task.subtasks?.length ?? 0) > 0 && (
+              {/* Spec 021 (US4): a video's clips are hidden when its brand has Video clips off. */}
+              {(task.subtasks?.length ?? 0) > 0 && !(task.content_type_label === 'Video' && !on('clips')) && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, marginBottom: 8 }}>
                     Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
