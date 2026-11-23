@@ -187,8 +187,8 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
 
 ## Phase 9: Polish and cross-cutting
 
-- [ ] T057 [P] Add a daily cleanup of orphaned `sheet_formats` and `sheet_comments` (rows, columns and tasks gone for more than 30 days) to `src/lib/notify/scheduler.ts` or a new `src/lib/sheet-cleanup.ts` called from it (research R1).
-- [ ] T058 [P] Performance pass on a 5,000-row formatted sheet: `toCss` cache hit rate, keystroke under 100 ms, Ctrl+A format under 1 s; record numbers in `validation.md`.
+- [X] T057 [P] Add a daily cleanup of orphaned `sheet_formats` and `sheet_comments` (rows, columns and tasks gone for more than 30 days) to `src/lib/notify/scheduler.ts` or a new `src/lib/sheet-cleanup.ts` called from it (research R1).
+- [X] T058 [P] Performance pass on a 5,000-row formatted sheet: `toCss` cache hit rate, keystroke under 100 ms, Ctrl+A format under 1 s; record numbers in `validation.md`.
 - [ ] T059 Run `/speckit-analyze`-style consistency check of spec, plan and tasks against what was built; close any gaps as new tasks.
 
 ---

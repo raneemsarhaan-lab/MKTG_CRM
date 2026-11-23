@@ -18,9 +18,11 @@
  *   every tick   instant emails (unread for 10 minutes)
  *   hourly       due tomorrow / overdue reminders
  *   08:30 team   daily summary emails
- *   03:00 team   clean-up: read notifications over 90 days, old reminder keys
+ *   03:00 team   clean-up: read notifications over 90 days, old reminder keys,
+ *                orphaned sheet formats and comments (spec 015)
  */
 import { prisma } from '@/lib/prisma'
+import { clearSheetOrphans } from '@/lib/sheet-cleanup'
 import type { NotificationKind, NotificationMeta } from '@/types/index'
 import { notify, deliver } from './notify'
 import { dueState, teamDay, teamClock, DEFAULT_TZ } from './days'
@@ -143,6 +145,8 @@ export async function runCleanup(now = new Date()): Promise<number> {
   const r = await prisma.notification.deleteMany({ where: { read_at: { not: null, lt: cutoff } } })
   await prisma.dueReminder.deleteMany({ where: { due_date: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
   await prisma.emailDigest.deleteMany({ where: { day: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
+  // Spec 015 (T057): formats and comment threads whose row, column or task is gone.
+  await clearSheetOrphans(now).catch(e => console.error('[cleanup] sheet orphans', e))
   return r.count
 }
 
