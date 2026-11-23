@@ -65,3 +65,7 @@ Decisions behind the plan. User decisions (D1–D18, Milestone, D14) are recorde
 
 ## R14. Order and gate
 - **Decision**: Stage A starts after the user confirms spec 022 has shipped. Each stage ends with a stop for review, as specs 021–022 did.
+
+## R15. Fields inside the description (user, 2026-11-23: choice 1)
+- **Decision**: the task panel shows a type's fields as sections at the top of the description (Caption, Channels…), then the free-text Description. Writing in a section writes the task field (one value everywhere). Required sections say which stage needs them and are outlined when a move is refused. Sections can't be deleted; `/` adds a type field's section. Preview: `design/023-description-fields.html` (https://claude.ai/artifact/1EACx6hV8Yhuas6AzFzqqM), awaiting the user's look.
+- **Alternatives**: a separate Fields block under the description (choice 2); plain headings in the text (not a field).
