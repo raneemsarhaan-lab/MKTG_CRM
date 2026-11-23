@@ -10,8 +10,7 @@ import { TaskCard } from './TaskCard'
 /**
  * Pipeline column — handoff §7 "Column shell".
  *
- * 244px wide, on a 1px #ECECF1 border: an uppercase title against a count
- * chip. "Add task" closes the column body.
+ * 244px wide, no outline: an uppercase title against a count chip. "Add task" closes the column body.
  *
  * The header is a section washed with the stage's colour at 14%, a dot in the
  * colour itself and the titles in ink; it alone carries the colour. The body
@@ -67,8 +66,10 @@ export function KanbanColumn({
       style={{
         // One neutral grey for every column: the header alone carries the
         // stage colour, and the white cards still stand off the panel.
-        background: '#F6F6F9',
-        border: `1px solid ${active ? accent : PIPE.border}`,
+        background: '#FAFAFC',
+        // No outline at rest; the stage colour draws it while a card is dragged
+        // over. Transparent, not none, so the column doesn't shift by a pixel.
+        border: `1px solid ${active ? accent : 'transparent'}`,
         borderRadius: 14,
         overflow: 'hidden',
         boxShadow: active ? `0 0 0 3px ${accent}22` : 'none',
