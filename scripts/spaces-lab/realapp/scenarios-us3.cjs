@@ -7,6 +7,7 @@ module.exports = (EMAIL, psql, ok) => {
         (select id from members where role='Content Creator' limit 1), (select id from members where role='Graphic Designer' limit 1),
         'Content Creator', true, '${status}', now(), 'Medium', 2, now() returning id`).split(/\n/)[0]
     psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${spaceId(space)}', 'manual') on conflict do nothing`)
+    if (['design', 'video'].includes(space)) psql(`update tasks set media_board='${space}', entry_stage='r-design' where id='${id}'`)
     return id
   }
   const typeInto = async (page, taskId, col, text) => {

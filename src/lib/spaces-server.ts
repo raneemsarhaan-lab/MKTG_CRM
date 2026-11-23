@@ -3,10 +3,12 @@
  * The rules themselves are the pure ones in src/lib/spaces.ts; this only
  * loads what they need and writes the rows they decide.
  */
+import { MEDIA_BOARDS, boardsFor, spaceForBoard } from '@/lib/media'
+import type { MediaBoard } from '@/types/index'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import type { HandoffDefaults, StageId, TaskKind, TaskSpaceVia } from '@/types/index'
-import { creatorSpaces, handoffDefaults, membersBySpace, needsHandoff, spacesForAssignee, type MembersBySpace, type SpaceLike } from '@/lib/spaces'
+import { creatorSpaces, defaultAssigneeFor, membersBySpace, needsHandoff, spacesForAssignee, type MembersBySpace, type SpaceLike } from '@/lib/spaces'
 
 type Db = Prisma.TransactionClient | typeof prisma
 
@@ -25,15 +27,26 @@ export async function loadSpaceContext(db: Db = prisma): Promise<SpaceContext> {
  * (FR-030), or null when it doesn't.
  */
 export async function handoffFor(
-  task: { id: string; status: string; nine_stage: boolean; kind?: string | null; content_type_label?: string | null },
+  task: { id: string; status: string; nine_stage: boolean; kind?: string | null; content_type_label?: string | null; media_board?: string | null; auto_linked_at?: Date | string | null },
   target: StageId,
   ctx?: SpaceContext,
 ): Promise<HandoffDefaults | null> {
-  if (task.kind === 'simple') return null
+  if (!needsHandoff(task, target, [], [])) return null
   const c = ctx ?? await loadSpaceContext()
-  const shown = (await prisma.taskSpace.findMany({ where: { task_id: task.id }, select: { space_id: true } })).map(r => r.space_id)
-  if (!needsHandoff(task, target, shown, c.spaces)) return null
-  return handoffDefaults(task, c.spaces, c.members)
+  // Spec 022 (R5, R6): the boards the content type needs, each with its Space's default assignee.
+  const [types, roleHolders] = await Promise.all([
+    prisma.contentType.findMany({ select: { label: true, media_boards: true } }),
+    prisma.member.findMany({ select: { id: true, name: true, role: true } }),
+  ])
+  const need = boardsFor(task.content_type_label, types)
+  const offered = MEDIA_BOARDS.map(board => ({ board, space: spaceForBoard(board, c.spaces as (SpaceLike & { key: string; media_board?: string | null; default_assignee_role?: string | null })[]) }))
+    .filter((x): x is { board: MediaBoard; space: SpaceLike & { key: string; media_board?: string | null; default_assignee_role?: string | null } } => !!x.space)
+  if (!offered.length) return null
+  return {
+    spaceIds: offered.filter(x => need.includes(x.board)).map(x => x.space.id),
+    candidates: Object.fromEntries(offered.map(x => [x.space.id, c.members[x.space.id] ?? []])),
+    boards: offered.map(x => ({ board: x.board, spaceId: x.space.id, suggested: defaultAssigneeFor(x.space, roleHolders, c.members[x.space.id] ?? []) })),
+  }
 }
 
 /** Add Shows in rows (never removes any). */

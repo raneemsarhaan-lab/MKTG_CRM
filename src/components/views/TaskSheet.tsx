@@ -83,6 +83,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const tSpaces = useTranslations('spaces')
   const tFeat = useTranslations('spaces.features')
   const tDates = useTranslations('dates')
+  const tMedia = useTranslations('media')
   const locale = useLocale()
   const router = useRouter()
   const selectTask = useUIStore(s => s.selectTask)
@@ -278,6 +279,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
           const req = handoffRequest(res, x, data.spaces, data.taskSpaces, data.members, tSpaces)
           if (req) { openHandoff(req); return null }
         }
+        if (res.error === 'waiting_on_media' || res.error === 'follows_content') return tMedia(res.error)
         return res.error === 'not_authorized' || res.error === 'stage_not_in_pipeline' ? t('notAllowed', { stage: stageWord(to) }) : t('notSaved', { reason: res.error ?? 'generic' })
       }
     }

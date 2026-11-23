@@ -120,44 +120,44 @@ description: "Tasks for 022 — task methodology"
 **Independent test** (quickstart 4–5): a Reel at Ready For Design produces a linked Video media task with the chosen editor. With a type set to Design + Video, the content task reaches F-Check only after both media tasks pass D-Check.
 
 ### Tests for US2
-- [ ] T020 [P] [US2] Pure check `pure-media-gate` in `scripts/spaces-lab/pure.mjs`:
+- [X] T020 [P] [US2] Pure check `pure-media-gate` in `scripts/spaces-lab/pure.mjs`:
   - `contentStageFrom(media[])` = earliest of r-design/d-prog/d-check;
   - `mayLeaveDCheck` only when all passed;
   - `boardsFor(type)` from `media_boards`.
-- [ ] T021 [P] [US2] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us2.cjs`:
+- [X] T021 *(Done: `scenarios-022-us2.cjs`, 3 scenarios; older hand-off, count and seed scenarios updated to media boards.)* [P] [US2] Real-app scenarios `scripts/spaces-lab/realapp/scenarios-022-us2.cjs`:
   - Reel to Ready For Design: the box shows Video with the default editor; confirm creates the media task;
   - a Design+Video type gives two media tasks; D-Check passed on one only refuses the content move; both passed puts the content task at F-Check;
   - skip in the box gives each board Space's default assignee;
   - a second time at Ready For Design (after a move back) never links again.
 
 ### Implementation for US2
-- [ ] T022 [P] [US2] Create `src/lib/media.ts` (pure): `boardsFor(type, contentTypes)`, `contentStageFrom(mediaTasks)`, `allMediaPassed(mediaTasks)`, `followsContent(mediaTask)` (R2, R3, R6).
-- [ ] T023 [US2] In `src/lib/stage-moves.ts` (`allowedStages`):
+- [X] T022 [P] [US2] Create `src/lib/media.ts` (pure): `boardsFor(type, contentTypes)`, `contentStageFrom(mediaTasks)`, `allMediaPassed(mediaTasks)`, `followsContent(mediaTask)` (R2, R3, R6).
+- [X] T023 *(Done as `mediaBlock` in `src/lib/media.ts`, checked by every server move path through `mediaGate` (`moveTask`, `setTaskStage`, bulk). The stage menus still list every allowed stage; a refused move says why.)* [US2] In `src/lib/stage-moves.ts` (`allowedStages`):
   - refuse moves of a content task past D-Check while linked media tasks haven't passed (`waiting_on_media`);
   - refuse moves of a linked media task after its D-Check (`follows_content`).
   - Feed media tasks in through the existing context argument.
-- [ ] T024 [US2] Create `src/actions/media.ts` with `linkToMedia(contentTaskId, boards, people?)` per `contracts/server-actions.md`:
+- [X] T024 *(Done as `createLinkedMedia` in `src/lib/media-server.ts`, called by the hand-off; `linkToMedia` for Link task lands with US3.)* [US2] Create `src/actions/media.ts` with `linkToMedia(contentTaskId, boards, people?)` per `contracts/server-actions.md`:
   - permission check;
   - one media task per board at `r-design`, `media_board` set, `content_task_id` set;
   - its `stage_date` set when the content task reaches Ready For Design (R10);
   - it shows in that board's Space;
   - sets `auto_linked_at` when called from the hand-off.
-- [ ] T025 [US2] In `moveTask` (`src/actions/tasks.ts`):
+- [X] T025 *(Done: `syncContent` keeps the content task at the earliest media stage, moves it to F-Check when all pass, and media past D-Check follow it.)* [US2] In `moveTask` (`src/actions/tasks.ts`):
   - a content task entering `r-design` with `auto_linked_at` null returns `{ handoff: { boards, suggested } }`;
   - a linked media task passing D-Check: if it's the last, move the content task to F-Check in the same call (notify its owner);
   - while media tasks are open, keep the content task's stage = `contentStageFrom(...)`.
-- [ ] T026 [US2] Hand-off box in `src/components/handoff/` (`request.ts` and the dialog):
+- [X] T026 [US2] Hand-off box in `src/components/handoff/` (`request.ts` and the dialog):
   - one row per board `[data-handoff-board]` with a person picker `[data-handoff-person]` defaulting to the board Space's default assignee;
   - Confirm and Skip both call `linkToMedia` (per T002).
-- [ ] T027 [US2] `setContentTypeBoards(label, boards)` (admin) in `src/actions/settings.ts`, and the per-type board choice `[data-type-boards]` in `src/components/settings/WorkflowSettings.tsx`.
-- [ ] T028 [US2] Migrations in `prisma/seed.ts`:
+- [X] T027 [US2] `setContentTypeBoards(label, boards)` (admin) in `src/actions/settings.ts`, and the per-type board choice `[data-type-boards]` in `src/components/settings/WorkflowSettings.tsx`.
+- [X] T028 [US2] Migrations in `prisma/seed.ts`:
   - `once('content-type-boards-v1')`: Video and Reel → `{video}`, others → `{design}`;
   - `once('space-default-roles-v1')`: Content → Content Creator, Design → Graphic Designer, Video → Video Editor, plus `media_board` on Design/Video.
-- [ ] T029 [US2] Migration `once('media-tasks-v1')` in `prisma/seed.ts`:
+- [X] T029 [US2] Migration `once('media-tasks-v1')` in `prisma/seed.ts`:
   - content tasks at `r-design` or later that show in Design/Video get one linked media task per board (same stage, or following if past D-Check), with the current assignee;
   - `auto_linked_at` is set;
   - their Design/Video `task_spaces` rows are removed.
-- [ ] T030 [US2] Strings for the box, gate refusals (`waiting_on_media`, `follows_content`) and type boards in `messages/en.json` and `messages/ar.json`.
+- [X] T030 [US2] Strings for the box, gate refusals (`waiting_on_media`, `follows_content`) and type boards in `messages/en.json` and `messages/ar.json`.
 
 **Checkpoint**: US2 tests pass, US1 still green.
 

@@ -35,7 +35,8 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'us1-space-lists-shows-in', as: 'admin',
       async run({ page, go }) {
         await go('/spaces/video')
-        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null`)
+        // Spec 022: the Video board lists its media tasks.
+        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and t.media_board='video'`)
         const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)
         ok(String(rows) === want, `Video lists its Shows in tasks: ${rows} vs ${want}`)
         ok(await page.$('[data-group="brand"][aria-pressed="true"]'), 'grouped by brand by default')
@@ -68,7 +69,8 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const b = firstBrand()
         await go(`/brands/${b}`)
-        const want = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null`)
+        // Spec 022: linked media tasks show through their content task.
+        const want = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_task_id is null`)
         const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)
         ok(String(rows) === want, `brand lists its tasks: ${rows} vs ${want}`)
         ok((await go('/brands/not-a-brand')).status() === 404, 'unknown brand is 404')
@@ -108,11 +110,14 @@ module.exports = (EMAIL, psql, ok) => {
         await page.waitForSelector('[data-handoff]', { state: 'detached' })
         await page.waitForTimeout(800)
         ok(psql(`select status from tasks where id='${t}'`) === 'r-design', 'moved to Ready For Design')
-        ok(psql(`select m.role from tasks t join members m on m.id=t.assignee_id where t.id='${t}'`) === 'Video Editor', 'assigned to the video editor')
-        const spaces = psql(`select string_agg(s.key||':'||ts.added_via, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${t}'`)
-        ok(spaces === 'content:manual,video:handoff', `stays in Content, adds Video: ${spaces}`)
-        ok(Number(psql(`select count(*) from notifications n join members m on m.id=n.recipient_id where n.task_id='${t}' and n.kind='assigned' and m.role='Video Editor'`)) > 0, 'the editor is notified')
-        ok(Number(psql(`select count(*) from task_followers f join members m on m.id=f.member_id where f.task_id='${t}' and m.role='Video Editor'`)) > 0, 'the editor follows')
+        // Spec 022 (R5): the content task keeps its assignee; a linked Video media task goes to the editor.
+        const m = psql(`select id from tasks where content_task_id='${t}' and media_board='video'`)
+        ok(!!m, 'a linked Video media task was made')
+        ok(psql(`select r.role from tasks x join members r on r.id=x.assignee_id where x.id='${m}'`) === 'Video Editor', 'assigned to the video editor')
+        const spaces = psql(`select string_agg(s.key||':'||ts.added_via, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${m}'`)
+        ok(spaces === 'video:handoff', `the media task is on the Video board: ${spaces}`)
+        ok(Number(psql(`select count(*) from notifications n join members r on r.id=n.recipient_id where n.task_id='${m}' and n.kind='assigned' and r.role='Video Editor'`)) > 0, 'the editor is notified')
+        ok(Number(psql(`select count(*) from task_followers f join members r on r.id=f.member_id where f.task_id='${m}' and r.role='Video Editor'`)) > 0, 'the editor follows')
       },
     },
     {
@@ -126,7 +131,7 @@ module.exports = (EMAIL, psql, ok) => {
         await page.click('[data-handoff-cancel]')
         await page.waitForSelector('[data-handoff]', { state: 'detached' })
         ok(psql(`select status from tasks where id='${t}'`) === 'c-final', 'still at C-Review')
-        ok(psql(`select count(*) from task_spaces where task_id='${t}'`) === '1', 'no Space added')
+        ok(psql(`select count(*) from tasks where content_task_id='${t}'`) === '0', 'no media task made')
       },
     },
     {
@@ -142,14 +147,15 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: 'us6-already-in-video-no-box', as: 'admin',
+      id: 'us6-already-linked-no-box', as: 'admin',
       async run({ page, go }) {
-        const t = seedTask('Handoff lab assigned editor', 'Video', 'c-final', false, 'Video Editor')
-        psql(`insert into task_spaces (task_id, space_id, added_via) values ('${t}', '${spaceId('video')}', 'assignee') on conflict do nothing`)
+        // Spec 022 (R5): the automatic link happens once; after that, no box.
+        const t = seedTask('Handoff lab linked once', 'Video', 'c-final', false, 'Content Creator')
+        psql(`update tasks set auto_linked_at=now() where id='${t}'`)
         await go(`/spaces/content?task=${t}`)
         await page.getByRole('button', { name: /→ Ready For Design/ }).click()
         await page.waitForTimeout(1500)
-        ok(!(await page.$('[data-handoff]')), 'no box when it already shows in Video')
+        ok(!(await page.$('[data-handoff]')), 'no box when it was linked before')
         ok(psql(`select status from tasks where id='${t}'`) === 'r-design', 'moved straight on')
       },
     },

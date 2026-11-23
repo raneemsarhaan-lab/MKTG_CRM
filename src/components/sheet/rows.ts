@@ -71,7 +71,8 @@ export function videosWithClips(tasks: SheetTask[]): { video: SheetTask; clips: 
  */
 export function sheetVideos(all: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
   // Spec 021 (US5): simple tasks are never videos or clips on the Video sheet.
-  const tasks = all.filter(t => (t as { kind?: string }).kind !== 'simple')
+  // Spec 022: media tasks live on their boards, never as videos or clips here.
+  const tasks = all.filter(t => !(t as { media_board?: string | null }).media_board)
   const withClips = videosWithClips(tasks)
   const has = new Set(withClips.map(g => g.video.id))
   const empty = tasks

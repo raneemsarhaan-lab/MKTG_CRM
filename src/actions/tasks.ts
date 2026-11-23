@@ -1,6 +1,7 @@
 'use server'
 
 import { datesFor, newTaskDates } from '@/lib/due-dates-server'
+import { afterMove, mediaGate } from '@/lib/media-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
@@ -61,7 +62,11 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
     return { success: false, shouldCelebrate: false, error: 'not_authorized' }
   }
 
-  // Spec 021 (FR-030): into the design half with no production Space → the hand-off box.
+  // Spec 022 (R2, R3): a content task waits for its media tasks; a linked media task past D-Check follows content.
+  const blockNext = await mediaGate(task, nextStage)
+  if (blockNext) return { success: false, shouldCelebrate: false, error: blockNext }
+
+  // Spec 022 (R5): a content task's first move into Ready For Design links it to media → the hand-off box.
   const handoff = await handoffFor(task, nextStage)
   if (handoff) return { success: false, shouldCelebrate: false, error: 'needs_handoff', target: nextStage, handoff }
 
@@ -73,6 +78,7 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
     data:  { status: nextStage, stage_date: new Date(), updated_at: new Date() },
   })
   await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
+  await afterMove(task, member.id)
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -118,7 +124,9 @@ export async function setTaskStage(
     return { success: false, shouldCelebrate: false, error: 'not_authorized' }
   }
 
-  // Spec 021 (FR-030): into the design half with no production Space → the hand-off box.
+  const blockTo = await mediaGate(task, stageId)
+  if (blockTo) return { success: false, shouldCelebrate: false, error: blockTo }
+
   const handoff = await handoffFor(task, stageId)
   if (handoff) return { success: false, shouldCelebrate: false, error: 'needs_handoff', target: stageId, handoff }
 
@@ -127,6 +135,7 @@ export async function setTaskStage(
     data:  { status: stageId, stage_date: new Date(), updated_at: new Date() },
   })
   await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
+  await afterMove(task, member.id)
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -794,6 +803,7 @@ export async function bulkUpdateTasks(
         if (!allowedStages(task, member).includes(patch.status)) { refused++; continue }
         // Spec 021 (FR-030a): a bulk move never opens a box — it skips the task and counts it.
         if (needsHandoff(task, patch.status, shownOf(task.id), spaceCtx.spaces)) { handoff++; continue }
+        if (await mediaGate(task, patch.status)) { refused++; continue }
         data.status = patch.status
         data.stage_date = new Date()
       }
@@ -816,6 +826,7 @@ export async function bulkUpdateTasks(
 
     if (Object.keys(data).length === 1) continue   // nothing but updated_at
     await prisma.task.update({ where: { id: task.id }, data })
+    if (data.status !== undefined) await afterMove(task, member.id)
     changed++
     // Spec 012: each task's move and new assignee, as if done one by one.
     const moved = data.status !== undefined

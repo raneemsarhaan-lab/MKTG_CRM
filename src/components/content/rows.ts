@@ -22,7 +22,7 @@ export type ContentRow =
 export function piecesOf(tasks: Task[], themeId: string): Task[] {
   const videos = new Set(tasks.filter(isVideoTask).map(t => t.id))
   // Spec 021 (US5): simple tasks are never pieces on the Content sheet.
-  return tasks.filter(t => t.project_id === themeId && t.kind !== 'simple' && !(t.parent_task_id && videos.has(t.parent_task_id)))
+  return tasks.filter(t => t.project_id === themeId && !t.media_board && !(t.parent_task_id && videos.has(t.parent_task_id)))
 }
 
 export function comparePieces(a: Task, b: Task): number {

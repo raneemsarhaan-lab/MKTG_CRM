@@ -57,7 +57,7 @@ module.exports = (EMAIL, psql, ok) => {
         await go(`/brands/${b}/assets`)
         ok(await page.$('[data-brand-files]'), 'Assets folder')
         await go(`/brands/${b}/library`)
-        const want = psql(`select count(*) from tasks where brand_id='${b}' and status='publish' and kind='pipeline' and dropped_at is null`)
+        const want = psql(`select count(*) from tasks where brand_id='${b}' and status='publish' and dropped_at is null and content_task_id is null and not migrated_simple`)
         ok(String((await page.$$('[data-library-item]')).length) === want, `Library lists published only (${want})`)
         await go(`/brands/${b}/sheet`)
         await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 60000 })

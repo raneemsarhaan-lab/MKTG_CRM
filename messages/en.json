@@ -3063,17 +3063,21 @@
     "movedPublish": "\"{name}\" now publishes {date}. Its due date follows unless set by hand."
   },
   "handoff": {
-    "title": "Where should this task show?",
-    "body": "\"{name}\" is ready for production. It stays in {spaces}; choose who picks it up next.",
+    "title": "Ready for media",
+    "body": "\"{name}\" goes to these boards. Pick who takes each; anyone you leave on Default gets it from the board's default assignee.",
     "itsBrand": "its brand",
     "assignTo": "Assign to",
-    "confirm": "Move to {stage}",
+    "confirm": "Link and move to {stage}",
     "cancel": "Cancel",
     "cancelled": "Cancelled. The task stays where it was.",
     "done": "{stage}. It now shows in {spaces}. {name} was notified and follows it.",
     "refused": "{n, plural, one {# task needs} other {# tasks need}} a hand-off. Open the task to hand it off.",
     "noMembers": "No one is in the ticked Spaces yet.",
-    "error": "Couldn't hand it off. Try again."
+    "error": "Couldn't hand it off. Try again.",
+    "personFor": "Who takes it on {space}",
+    "defaultPerson": "Default assignee",
+    "default": "default",
+    "skip": "Skip (use defaults)"
   },
   "me": {
     "title": "My tasks",
@@ -3182,5 +3186,17 @@
         "6": "Sat"
       }
     }
+  },
+  "media": {
+    "waiting_on_media": "Waiting on Design or Video: it moves to F-Check by itself when every linked media task has passed D-Check.",
+    "follows_content": "This media task passed D-Check, so it follows its content task now.",
+    "linkedTo": "Content: {name}",
+    "withContent": "With Content",
+    "unlinked": "Unlinked",
+    "typeBoards": "Boards at Ready For Design",
+    "typeBoardsHint": "Which media boards a task of each type is linked to when it reaches Ready For Design.",
+    "design": "Design",
+    "video": "Video",
+    "both": "Both"
   }
 }

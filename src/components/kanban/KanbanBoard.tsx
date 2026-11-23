@@ -33,6 +33,7 @@ import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
 import { setBoardSort } from '@/actions/views'
 import { defaultAssigneeFor } from '@/lib/spaces'
+import { isLinkedMedia } from '@/lib/media'
 import { SortMenu, sortTasks, DEFAULT_SORT, SORT_KEYS, type SortKey } from '@/components/board/SortMenu'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
@@ -176,6 +177,7 @@ export function KanbanBoard({
   const setCelebration = useUIStore(s => s.setCelebration)
   const openHandoff    = useUIStore(s => s.openHandoff)
   const tSpaces        = useTranslations('spaces')
+  const tMedia         = useTranslations('media')
   const tSheet         = useTranslations('taskSheet')
   const tViews         = useTranslations('views')
   const tHandoff       = useTranslations('handoff')
@@ -327,7 +329,8 @@ export function KanbanBoard({
    * `tasks` with them in.
    */
   const liveTasks = useMemo(
-    () => tasks.filter(t => !t.dropped_at && (!scopeTasks || scopeTasks(t))),
+    // Spec 022: on Everything (no scope), linked media tasks show through their content task.
+    () => tasks.filter(t => !t.dropped_at && (scopeTasks ? scopeTasks(t) : !isLinkedMedia(t))),
     [tasks, scopeTasks],
   )
 
@@ -409,6 +412,7 @@ export function KanbanBoard({
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
+            : res.error === 'waiting_on_media' || res.error === 'follows_content' ? tMedia(res.error)
             : 'Could not move that task',
         )
       }

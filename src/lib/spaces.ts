@@ -25,6 +25,10 @@ export interface SpaceTask {
   kind?: TaskKind | string | null
   content_type_label?: string | null
   assignee_id?: string | null
+  /** Spec 022: set on a media task. */
+  media_board?: string | null
+  /** Spec 022 (R5): set once a content task has been linked at Ready For Design. */
+  auto_linked_at?: string | Date | null
 }
 
 /** Space id → member ids. */
@@ -97,19 +101,18 @@ export function startingSpaces(task: SpaceTask, spaces: SpaceLike[], members: Me
  * or later, while it shows in no live production Space.
  */
 export function needsHandoff(
-  task: Pick<SpaceTask, 'status' | 'nine_stage' | 'kind'>,
+  task: Pick<SpaceTask, 'status' | 'nine_stage' | 'kind' | 'media_board' | 'auto_linked_at'>,
   target: StageId | string,
-  shownIn: string[],
-  spaces: SpaceLike[],
+  _shownIn: string[],
+  _spaces: SpaceLike[],
 ): boolean {
-  if (kindOf(task) !== 'pipeline') return false
+  // Spec 022 (R5): a content task's first move into Ready For Design or later links it to media, once.
+  if (task.media_board || task.auto_linked_at) return false
   const from = indexOn(task, task.status)
   const to = indexOn(task, target)
   const gate = indexOn(task, DESIGN_HALF_START)
   if (from < 0 || to < 0 || gate < 0) return false
-  if (!(from < gate && to >= gate)) return false
-  const shown = new Set(shownIn)
-  return !spaces.some(s => isProduction(s) && shown.has(s.id))
+  return from < gate && to >= gate
 }
 
 /**

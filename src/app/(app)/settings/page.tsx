@@ -54,7 +54,7 @@ export default async function SettingsPage() {
           nine_stage_default: b.nine_stage_default ?? null,
           assets: b.assets.map(a => ({ id: a.id, filename: a.filename, url: a.url })),
         }))}
-        contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
+        contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label, media_boards: ct.media_boards }))}
         slaConfig={mapSlaConfig(slaRows)}
         workspaceSettings={workspaceSettings}
         brandFeatureDefaults={cleanFeatures(wsRow?.brand_feature_defaults)}

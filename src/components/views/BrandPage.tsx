@@ -18,6 +18,7 @@ import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyView } from '@/lib/view-config'
+import { isLinkedMedia } from '@/lib/media'
 import { BrandAssets } from '@/components/brands/BrandAssets'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
@@ -44,7 +45,8 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   const brand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
   const name = brand?.name ?? t('noBrand')
   const color = brand?.color ?? PIPE.textFaint
-  const scope = useMemo(() => (task: Task) => (brandId ? task.brand_id === brandId : !task.brand_id), [brandId])
+  // Spec 022: linked media tasks show through their content task, not as cards of their own.
+  const scope = useMemo(() => (task: Task) => (brandId ? task.brand_id === brandId : !task.brand_id) && !isLinkedMedia(task), [brandId])
   const themeScope = useMemo(() => (th: ContentTheme) => (brandId ? th.brand_id === brandId : !th.brand_id), [brandId])
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)

@@ -10,6 +10,7 @@ module.exports = (EMAIL, psql, ok) => {
         (select id from members where role='Content Creator' limit 1), (select id from members where role='Graphic Designer' limit 1),
         'Content Creator', ${extra.nine ? 'true' : 'false'}, 'd-prog', now() - interval '20 days', ${due}, 'High', 2, now() returning id`).split(/\n/)[0]
     psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${spaceId('design')}', 'manual') on conflict do nothing`)
+    psql(`update tasks set media_board='design', entry_stage='r-design' where id='${id}'`)
     return id
   }
   const reset = () => {

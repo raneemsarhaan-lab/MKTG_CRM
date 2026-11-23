@@ -220,11 +220,15 @@ export interface HandoffDefaults {
   spaceIds: string[]
   /** Members of each production Space, by Space id. */
   candidates: Record<string, string[]>
+  /** Spec 022: each media board with its Space and suggested person (the Space's default assignee). */
+  boards?: { board: MediaBoard; spaceId: string; suggested: string | null }[]
 }
 
 export interface ContentType {
   id: string
   label: string
+  /** Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design. */
+  media_boards?: string[]
 }
 
 export interface Stage {
@@ -451,6 +455,8 @@ export interface HandoffRequest {
   ticked: string[]
   /** Members of each production Space, by Space id. */
   candidates: Record<string, { id: string; name: string; role: string }[]>
+  /** Spec 022: each media board's Space and suggested person (its default assignee). */
+  suggested?: Record<string, string | null>
 }
 
 export interface MoveTaskResult {

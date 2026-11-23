@@ -8,6 +8,7 @@ module.exports = (EMAIL, psql, ok) => {
         'Content Creator', false, '${extra.status ?? 'd-prog'}', now(), '${extra.priority ?? 'Medium'}', 2, now(),
         ${extra.publish ? `'${extra.publish}'` : 'null'}, ${extra.due ? `'${extra.due}'` : 'null'}, ${extra.manual ? 'true' : 'false'} returning id`).split(/\n/)[0]
     psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${spaceId('design')}', 'manual') on conflict do nothing`)
+    psql(`update tasks set media_board='design', entry_stage='r-design' where id='${id}'`)
     return id
   }
   const dates = id => psql(`select coalesce(publish_date::text,'') || '|' || coalesce(due_date::text,'') || '|' || due_manual from tasks where id='${id}'`)

@@ -414,3 +414,17 @@ export async function saveDueRule(input: DueRuleInput): Promise<{ success: true;
   revalidatePath('/', 'layout')
   return { success: true, updated: moves.length }
 }
+
+// ─── Media boards per content type (spec 022 R6) ──────────────────────────────
+
+/** Which media boards a task of this type is linked to at Ready For Design. Admins only. */
+export async function setContentTypeBoards(label: string, boards: string[]): Promise<{ success: boolean; error?: string }> {
+  const auth = await requireAdmin()
+  if (auth.error) return { success: false, error: auth.error }
+  const clean = [...new Set((boards ?? []).filter(b => b === 'design' || b === 'video'))]
+  if (!clean.length) return { success: false, error: 'invalid' }
+  const r = await prisma.contentType.updateMany({ where: { label }, data: { media_boards: clean } })
+  if (!r.count) return { success: false, error: 'not_found' }
+  revalidatePath('/settings')
+  return { success: true }
+}

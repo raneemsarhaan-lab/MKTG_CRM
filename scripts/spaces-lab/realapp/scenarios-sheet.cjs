@@ -7,6 +7,7 @@ module.exports = (EMAIL, psql, ok) => {
         (select id from members where role='${ownerRole}' limit 1), (select id from members where role='${assigneeRole}' limit 1),
         '${ownerRole}', true, '${status}', now(), 'Medium', 2, now() returning id`).split(/\n/)[0]
     psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${spaceId(space)}', 'manual') on conflict do nothing`)
+    if (['design', 'video'].includes(space)) psql(`update tasks set media_board='${space}', entry_stage='r-design' where id='${id}'`)
     return id
   }
   const typeInto = async (page, taskId, col, text) => {
@@ -182,13 +183,13 @@ module.exports.views = (EMAIL, psql, ok) => [
       await page.click('[data-new-view-create]')
       await page.waitForSelector('[data-view-config]')
       await page.click('[data-view-filter="type"] summary')
-      const want = psql(`select content_type_label from tasks where brand_id='${b}' and dropped_at is null and content_type_label is not null group by 1 order by count(*) desc limit 1`)
+      const want = psql(`select content_type_label from tasks where brand_id='${b}' and dropped_at is null and content_task_id is null and content_type_label is not null group by 1 order by count(*) desc limit 1`)
       await page.check(`[data-view-filter="type"] [data-view-option="${want}"]`)
       await page.click('[data-view-save]')
       await page.waitForTimeout(1200)
       ok(psql(`select owner_id is null from saved_views where name='Lab shared list'`) === 't', 'shared view has no owner')
       const rows = await page.$$eval('[data-saved-view] [data-row]', els => els.length)
-      const n = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_type_label='${want}'`)
+      const n = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_task_id is null and content_type_label='${want}'`)
       ok(String(rows) === n, `the filter narrows the list: ${rows} vs ${n}`)
     },
   },

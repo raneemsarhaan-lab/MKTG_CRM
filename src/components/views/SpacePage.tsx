@@ -27,6 +27,7 @@ import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { viewTasks, viewOptions, type BoardData } from './types'
 import { applyView } from '@/lib/view-config'
+import { isLinkedMedia } from '@/lib/media'
 
 export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
   const t = useTranslations('spaces')
@@ -34,7 +35,10 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const selectTask = useUIStore(s => s.selectTask)
   const space = data.spaces.find(s => s.id === spaceId)!
   const shown = useMemo(() => new Set(data.taskSpaces.filter(r => r.space_id === spaceId).map(r => r.task_id)), [data.taskSpaces, spaceId])
-  const scope = useMemo(() => (task: Task) => shown.has(task.id), [shown])
+  // Spec 022: a media board (Design, Video) shows its media tasks; other Spaces show content tasks,
+  // with linked media tasks seen through their content task's chips.
+  const board = space.media_board ?? null
+  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)), [shown, board])
   const tasks = viewTasks(data).filter(scope)
   const memberNames = data.spaceMembers.filter(r => r.space_id === spaceId)
     .map(r => data.members.find(m => m.id === r.member_id)?.name).filter(Boolean).join(', ')

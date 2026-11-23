@@ -295,6 +295,65 @@ async function main() {
     return `${todo.count} to To Do, ${doing.count} to C-In Progress, ${done.count} to Published`
   })
 
+  /** Spec 022 (R9): each Space's default assignee role; Design and Video are the media boards. */
+  await once('space-default-roles-v1', 'set default assignees and media boards', async () => {
+    const roles: Record<string, string> = { content: 'Content Creator', design: 'Graphic Designer', video: 'Video Editor' }
+    let n = 0
+    for (const [key, role] of Object.entries(roles)) {
+      const r = await prisma.teamSpace.updateMany({ where: { key, default_assignee_role: null }, data: { default_assignee_role: role } })
+      n += r.count
+    }
+    await prisma.teamSpace.updateMany({ where: { key: 'design' }, data: { media_board: 'design' } })
+    await prisma.teamSpace.updateMany({ where: { key: 'video' }, data: { media_board: 'video' } })
+    return `${n} Spaces`
+  })
+
+  /** Spec 022 (R6): Video and Reel go to the Video board at Ready For Design; every other type to Design. */
+  await once('content-type-boards-v1', 'set the media boards per content type', async () => {
+    const v = await prisma.contentType.updateMany({ where: { label: { in: ['Video', 'Reel'] } }, data: { media_boards: ['video'] } })
+    const d = await prisma.contentType.updateMany({ where: { label: { notIn: ['Video', 'Reel'] } }, data: { media_boards: ['design'] } })
+    return `${v.count} to Video, ${d.count} to Design`
+  })
+
+  /**
+   * Spec 022 (R1, R5): hand-offs already made become linked media tasks. A
+   * content task at Ready For Design or later that shows in the Design or
+   * Video Space gets one media task per board, at its stage, with its current
+   * assignee; it is marked as linked, and those Design/Video rows go.
+   */
+  await once('media-tasks-v1', 'turned earlier hand-offs into linked media tasks', async () => {
+    const half = ['r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
+    const boards = await prisma.teamSpace.findMany({ where: { media_board: { not: null } }, select: { id: true, media_board: true } })
+    if (!boards.length) return 'no media boards'
+    const rows = await prisma.taskSpace.findMany({
+      where: { space_id: { in: boards.map(b => b.id) }, task: { media_board: null, dropped_at: null, status: { in: half } } },
+      include: { task: true },
+    })
+    let made = 0
+    for (const r of rows) {
+      const board = boards.find(b => b.id === r.space_id)!.media_board!
+      const t = r.task
+      const exists = await prisma.task.findFirst({ where: { content_task_id: t.id, media_board: board }, select: { id: true } })
+      if (!exists) {
+        const m = await prisma.task.create({
+          data: {
+            name: t.name, brand_id: t.brand_id, content_type_label: t.content_type_label, platform: t.platform,
+            task_owner_id: t.task_owner_id, assignee_id: t.assignee_id, initiator_role: t.initiator_role, created_by: t.created_by,
+            nine_stage: t.nine_stage, priority: t.priority, status: t.status, stage_date: t.stage_date,
+            publish_date: t.publish_date, due_date: t.due_date, due_manual: t.due_manual,
+            media_board: board, content_task_id: t.id, entry_stage: 'r-design',
+          },
+          select: { id: true },
+        })
+        await prisma.taskSpace.createMany({ data: [{ task_id: m.id, space_id: r.space_id, added_via: 'handoff' }], skipDuplicates: true })
+        made++
+      }
+      await prisma.task.update({ where: { id: t.id }, data: { auto_linked_at: t.auto_linked_at ?? new Date() } })
+      await prisma.taskSpace.delete({ where: { task_id_space_id: { task_id: t.id, space_id: r.space_id } } })
+    }
+    return `${made} media tasks from ${rows.length} hand-offs`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

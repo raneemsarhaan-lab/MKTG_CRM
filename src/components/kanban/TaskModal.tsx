@@ -633,6 +633,7 @@ export function TaskModal({
       : null
   const tsheet = useTranslations('sheet')
   const tDates = useTranslations('dates')
+  const tMedia = useTranslations('media')
   const locale = useLocale()
   const tSpaces = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
@@ -948,6 +949,7 @@ export function TaskModal({
       if (!r.success) {
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
+          : r.error === 'waiting_on_media' || r.error === 'follows_content' ? tMedia(r.error)
           : r.error ?? 'Could not move that task')
         return
       }

@@ -29,7 +29,7 @@ module.exports = (EMAIL, psql, ok) => {
           const col = await addField(page, name)
           ok(psql(`select kind from sheet_columns where id='${col}'`) === 'task', 'the ＋ Field menu adds a Task link field')
           const row = taskIn('design', 'Meetup poster')
-          const target = psql(`select id from tasks where name='Ramadan hero key visual'`)
+          const target = psql(`select id from tasks where name='Ramadan hero key visual' and media_board is null`)
           const cell = `[data-task-sheet] [data-cell$="${row}|c:${col}"]`
           await page.locator(cell).click()
           await page.keyboard.type('Ramad')
@@ -65,7 +65,7 @@ module.exports = (EMAIL, psql, ok) => {
         cleanup()
         try {
           const row = taskIn('design', 'Meetup poster')
-          const target = psql(`select id from tasks where name='Ramadan hero key visual'`)
+          const target = psql(`select id from tasks where name='Ramadan hero key visual' and media_board is null`)
           const col = psql('select gen_random_uuid()')
           psql(`insert into sheet_columns (id, sheet, key, name, position, kind, options, shown_default, shown_in, updated_at)
             values ('${col}', 'tasks:space:${spaceId('design')}', 'c:${col}', 'Lab link Part of', 99, 'task', '[]', true, '{}', now())`)
