@@ -127,13 +127,6 @@ export function longDate(iso: string): string {
   return `${MONTHS[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()}`
 }
 
-/** "MMMM D, YYYY" — the header date pill (§4). */
-export function pillDate(d: Date): string {
-  const full = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-                'August', 'September', 'October', 'November', 'December']
-  return `${full[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
-}
-
 /** Time-derived greeting word: <12 morning, 12–17 afternoon, else evening (§4). */
 export function greetingWord(hour: number): 'morning' | 'afternoon' | 'evening' {
   if (hour < 12) return 'morning'

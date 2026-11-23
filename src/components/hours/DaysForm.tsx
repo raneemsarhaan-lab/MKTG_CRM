@@ -104,7 +104,7 @@ export function DaysForm({ api, today, initial, missing, onSaved, start, clear, 
             <div key={l.date} className={`fx-hr-line${err ? ' is-bad' : ''}`} data-day-line={l.date}>
               <label htmlFor={id}>{dayName(l.date)}</label>
               <span className="fx-hr-field">
-                <input id={id} inputMode="decimal" autoComplete="off" value={l.off ? '' : l.value} disabled={l.off}
+                <input id={id} name={`hours-${l.date}`} inputMode="decimal" autoComplete="off" value={l.off ? '' : l.value} disabled={l.off}
                        autoFocus={autoFocus && i === 0}
                        aria-invalid={!!err || undefined} aria-describedby={err ? `${id}-e` : undefined}
                        aria-label={t('fieldDay', { day: dayName(l.date) })}
@@ -128,11 +128,11 @@ export function DaysForm({ api, today, initial, missing, onSaved, start, clear, 
           ? (
             <label className="fx-hr-pick">
               <span>{t('remind.addPick')}</span>
-              <input type="date" min={addDays(today, -MAX_BACK_DAYS)} max={today} data-add-pick=""
+              <input type="date" name="add-day" min={addDays(today, -MAX_BACK_DAYS)} max={today} data-add-pick=""
                      onChange={e => { if (e.target.value) addDay(e.target.value) }} />
             </label>
           )
-          : <button type="button" className="fx-hr-link" data-add-day="" onClick={() => addDay()}>＋ {t('remind.add')}</button>}
+          : <button type="button" className="fx-hr-link" data-add-day="" onClick={() => addDay()}><span aria-hidden="true">＋ </span>{t('remind.add')}</button>}
         {left.length > 0 && <span className="fx-hr-pill">{t('remind.more', { n: left.length })}</span>}
         {lines.length > 1 && <button type="button" className="fx-hr-chip" data-same-all="" onClick={sameForAll}>{t('remind.same')}</button>}
       </div>

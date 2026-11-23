@@ -403,7 +403,7 @@ html { -webkit-tap-highlight-color: transparent; }
      is the whole fix; the switch drops under the greeting and sits left with
      it rather than hanging off the edge. */
   .fx-greeting { flex-wrap: wrap; }
-  .fx-greeting > div:last-child { text-align: left !important; }
+  .fx-greeting > div:last-child { text-align: start !important; }
 
   /* The greeting is set at 44px for a 1280px canvas. */
   .fx-greeting h1 { font-size: 34px !important; }
@@ -2465,11 +2465,13 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-hr-quick { display: flex; gap: 6px; flex-wrap: wrap; }
 .fx-hr-chip { border: 1px solid #E3E3EA; background: var(--inbox-panel); border-radius: 999px; padding: 0 14px; min-height: 38px; cursor: pointer; font: 600 13.5px var(--font-body); color: var(--inbox-text); font-variant-numeric: tabular-nums; }
 [dir="rtl"] .fx-hr-chip, [dir="rtl"] .fx-hr-save, [dir="rtl"] .fx-hr-field input { font-family: inherit; }
-.fx-hr-chip:hover { background: var(--inbox-surface); }
+.fx-hr-chip:hover:not(:disabled) { background: var(--inbox-surface); }
+.fx-hr-chip:disabled { opacity: .55; cursor: default; }
 .fx-hr-chip.is-off { color: var(--hr-off-ink); }
 .fx-hr-chip.is-on { background: var(--hr-off-fill); border-color: var(--hr-off-ink); color: #14131A; }
 .fx-hr-save { border: 0; background: #14131A; color: #fff; border-radius: 999px; padding: 0 20px; min-height: 42px; font: 700 14px var(--font-body); cursor: pointer; }
 .fx-hr-save:disabled { opacity: .55; cursor: default; }
+.fx-hr-save:hover:not(:disabled) { background: #2C2A36; }
 .fx-hr-status { margin: 0; font-size: 13px; color: var(--hr-ok); font-weight: 600; min-height: 18px; }
 .fx-hr-status.is-bad { color: var(--hr-bad); }
 .fx-hr-striphead { font-size: 12px; font-weight: 600; color: #5A5F6C; }
@@ -2524,6 +2526,9 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-hr-weeknav > span:not(.is-dim) { font-weight: 700; font-size: 13.5px; padding-inline: 6px; font-variant-numeric: tabular-nums; }
 [dir="rtl"] .fx-hr-weeknav a, [dir="rtl"] .fx-hr-weeknav .is-dim { transform: scaleX(-1); }
 .fx-hr-dl { margin-inline-start: auto; background: var(--inbox-lime); color: #14131A; border-radius: 999px; padding: 9px 16px; font: 700 13.5px var(--font-heading); text-decoration: none; }
+.fx-hr-dl:hover { filter: brightness(0.94); }
+.fx-hr-link:hover, .fx-hr-later:hover { text-decoration: underline; }
+.fx-hr-tog:hover:not([aria-pressed="true"]) { background: var(--inbox-surface); }
 .fx-hr-sum { margin: 0; font-size: 13.5px; color: #5A5F6C; }
 .fx-hr-tbl { overflow-x: auto; border: 1px solid var(--inbox-border); border-radius: 14px; }
 .fx-hr-tbl:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 2px; }
