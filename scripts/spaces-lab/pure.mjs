@@ -271,4 +271,70 @@ check('pure-due-dates', () => {
   eq([...list].sort(m.compareByDue).map(x => x.id), ['d', 'c', 'b', 'a'], 'due earliest first, ties by publishing date, undated last')
 })
 
+// Workspace search (user, 2026-11-23): ranking, close matches, Arabic, "Did you mean".
+check('pure-search', () => {
+  const S = m.search
+  const T = (id, name, extra = {}) => ({ id, name, text: [], other: [], open: true, brand_id: 'b1', space_ids: [], publish_date: null, ...extra })
+  const ctx = { today: '2026-11-23' }
+  const ids = (q, list, c = ctx) => S.rank(list, S.parseQuery(q), c).map(r => r.task.id)
+  const level = (q, t) => S.matchTask(t, S.parseQuery(q))?.level ?? null
+  const tasks = [
+    T('teaser-other', 'Ramadan nights teaser for Eid'),
+    T('exact', 'Ramadan nights teaser'),
+    T('order', 'Teaser of the Ramadan nights'),
+    T('caption', 'Iftar post', { text: [{ field: 'caption', value: 'Ramadan nights teaser for the week' }] }),
+    T('quote', 'Client quote'), T('quotes', 'Customer quotes'),
+    T('campaign', 'Spring campaign launch'),
+    T('at', 'Meet at noon'),
+  ]
+  eq(ids('Ramadan nights teaser', tasks)[0], 'exact', 'the exact name is first')
+  eq(ids('ramadan NIGHTS teaser', tasks)[0], 'exact', 'case doesn\'t matter')
+  eq(level('teaser ramadan', T('x', 'Ramadan nights teaser')), 3, 'words in any order')
+  ok(ids('teaser ramadan', tasks).indexOf('order') > -1, 'finds the task with the words in another order')
+  eq(level('Ramadan nights teaser', tasks[3]), 4, 'Caption with the full text is level 4')
+  eq(level('teaser week ramadan', tasks[3]), 5, 'all words in Caption, any order, is level 5')
+  const r = ids('Ramdan', tasks)
+  ok(r.includes('exact') && r.includes('order'), 'Ramdan finds Ramadan tasks')
+  eq(level('Ramdan', tasks[1]), 6, '…as close matches')
+  const qoute = ids('qoute', tasks)
+  ok(qoute.includes('quote') && qoute.includes('quotes'), 'qoute finds quote and quotes')
+  ok(ids('quotes', tasks).includes('quote'), 'quotes finds quote')
+  const qoutes = ids('qoutes', tasks)
+  ok(qoutes.includes('quote') && qoutes.includes('quotes'), 'qoutes finds both')
+  ok(ids('campiagn', tasks).includes('campaign'), 'campiagn finds campaign (two letters swapped)')
+  eq(S.wordCost('quate', 'quote'), 1, 'one wrong letter'); eq(S.wordCost('qute', 'quote'), 1, 'one missing letter')
+  eq(S.wordCost('quoote', 'quote'), 1, 'one extra letter'); eq(S.wordCost('qoute', 'quote'), 1, 'two letters swapped')
+  eq(S.wordCost('campagin', 'campaign'), 1, 'swapped'); eq(S.wordCost('kampaing', 'campaign'), 2, '7+ letters allow two mistakes'); eq(S.wordCost('kampaing', 'campaigns'), 2, '…with endings')
+  eq(S.wordCost('qate', 'quote'), null, 'two mistakes in a 5-letter word is too many')
+  ok(!ids('ad', tasks).includes('at'), 'ad does not match at (short words exact)')
+  eq(S.wordCost('ram', 'ramadan'), 0.5, 'a partial word of 3+ letters')
+  // Closer spellings first: one mistake before two.
+  const two = [T('two', 'campaign'), T('one', 'campaigns brief')]
+  eq(ids('campaing', [T('far', 'cmpaign'), T('near', 'campaign')])[0], 'near', 'one mistake ranks above two')
+  // Exact phrase.
+  const ex = ids('"Ramadan nights"', [...tasks, T('split', 'Nights of Ramadan')])
+  ok(ex.includes('exact') && ex.includes('teaser-other') && ex.includes('order') && !ex.includes('split'), 'quoted: the phrase only')
+  eq(ids('"Ramdan nights"', tasks), [], 'quoted: no close matches')
+  // Arabic.
+  eq(level('اعلان', T('a', 'إعلان رمضان')), 2, 'اعلان finds إعلان')
+  eq(level('رمضان', T('b', 'خطة رمضانَ')), 3, 'رمضان finds رمضانَ (diacritics ignored)')
+  eq(S.normalize('مدرسة ـــ مستشفى'), 'مدرسه  مستشفي', 'ة→ه, ى→ي, tatweel dropped')
+  eq(level('teaser رمضان', T('c', 'Teaser رمضان')), 1, 'mixed Arabic and English')
+  // Tie-breaks inside a level: open first, then this page's brand, then nearest publishing date.
+  const tie = [
+    T('pub', 'Brief one', { open: false }), T('other-brand', 'Brief two', { brand_id: 'b2' }),
+    T('here-late', 'Brief three', { publish_date: '2026-12-30' }), T('here-soon', 'Brief four', { publish_date: '2026-11-25' }),
+    T('here-past', 'Brief five', { publish_date: '2026-11-20' }),
+  ]
+  eq(ids('brief', tie, { ...ctx, brandId: 'b1' }), ['here-soon', 'here-late', 'here-past', 'other-brand', 'pub'], 'open, this brand, upcoming then recent')
+  // Other fields are level 7, under everything else.
+  eq(level('forefront', T('d', 'Post', { other: [{ field: 'brand', value: 'Forefront Consulting' }] })), 7, 'brand match is level 7')
+  // Did you mean: only from the workspace's words.
+  const vocab = S.vocabulary(['Client quote', 'Customer quotes', 'Spring campaign'])
+  eq(S.didYouMean(S.parseQuery('qoute'), vocab), 'quote', 'Did you mean quote?')
+  eq(S.didYouMean(S.parseQuery('quotes'), vocab), null, 'a real word (by its plural) needs no suggestion')
+  eq(S.didYouMean(S.parseQuery('zebra'), vocab), null, 'nothing close, no suggestion')
+  ok(S.closest(tasks, S.parseQuery('Ramdaan nihgts')).length > 0, 'never an empty screen')
+})
+
 if (failed) process.exitCode = 1

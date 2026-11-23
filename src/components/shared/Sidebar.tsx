@@ -12,6 +12,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { NavRail } from './NavRail'
 import { UserMenu } from './UserMenu'
 import { NAV_ICON, navFor } from '@/lib/nav'
+import { openSearch } from '@/components/search/SearchDialog'
 
 /**
  * Expanded sidebar — Pipeline handoff §3.
@@ -37,6 +38,7 @@ export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: Pi
   const [ready, setReady]       = useState(false)
   const pathname = usePathname()
   const t = useTranslations('nav')
+  const ts = useTranslations('search')
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY)
@@ -78,6 +80,14 @@ export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: Pi
           between the wordmark and the Focus card. */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginInline: -6, paddingInline: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <nav aria-label="Main navigation" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {/* Workspace search: tasks, to-dos and assets (⌘K). */}
+        <button type="button" data-sidebar-search="" onClick={openSearch} aria-keyshortcuts="Control+K Meta+K"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, border: `1px solid ${PIPE.border}`, background: '#FFFFFF',
+            color: PIPE.textMuted, fontSize: 13.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 4 }}>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <span style={{ flex: 1, textAlign: 'start' }}>{ts('open')}</span>
+          <kbd style={{ fontSize: 10.5, fontFamily: 'inherit', color: PIPE.textFaint }}>⌘K</kbd>
+        </button>
         {items.map(({ href, key }) => {
           const active = pathname.startsWith(href)
           const link = (

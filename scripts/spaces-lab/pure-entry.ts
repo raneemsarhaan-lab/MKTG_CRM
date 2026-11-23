@@ -13,3 +13,4 @@ export { DEFAULT_RULE, calcDueDate, cleanRule, nextDueDate, isOverdue, cairoToda
 export * from '@/lib/media'
 export { ALL_STAGES } from '@/lib/stage-meta'
 export { businessDaysBetween, subtractBusinessDays } from '@/lib/utils'
+export * as search from '@/lib/search'

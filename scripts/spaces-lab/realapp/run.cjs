@@ -48,6 +48,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-022-linked-rows.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-dates.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-023-a.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-search.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {

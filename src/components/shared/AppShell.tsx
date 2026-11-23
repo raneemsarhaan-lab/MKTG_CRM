@@ -2,6 +2,7 @@
 
 import type { Member, NavTree, PinnedFolder } from '@/types/index'
 import { Sidebar } from './Sidebar'
+import { SearchDialog } from '@/components/search/SearchDialog'
 import { TabBar } from './TabBar'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { HandoffDialog } from '@/components/handoff/HandoffDialog'
@@ -62,6 +63,9 @@ export function AppShell({ member, pins = [], tree = null, children }: AppShellP
 
       {/* The forgotten-day hours reminder (spec 014), once for the app. */}
       <HoursReminderApp />
+
+      {/* Workspace search (⌘K / Ctrl+K, or Search in the sidebar) — global, mounts once */}
+      <SearchDialog />
 
       {/* Spec 021: the hand-off box — global, mounts once */}
       <HandoffDialog />
