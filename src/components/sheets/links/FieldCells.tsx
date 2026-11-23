@@ -18,6 +18,7 @@ import { shownWord } from '@/lib/sheet-links'
 import { StagePill } from '@/components/sheet/StatusCell'
 import { PersonChip } from '@/components/sheet/PersonChip'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
+import { intlLocale } from '@/lib/sheet-format'
 
 export interface FieldChoices {
   people: { id: string; name: string; color: string | null; avatar: string | null }[]
@@ -47,6 +48,9 @@ export function siteName(url: string): string {
   } catch { return url.replace(/^https?:\/\//, '').slice(0, 40) }
 }
 
+/** Today on this device's calendar, yyyy-mm-dd (a due date is a local day, not a UTC one). */
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+
 /** What a field cell shows on a linked row. */
 export function FieldValue({ field, raw, map, people, plain }: { field: TaskField; raw: string; map: SheetTaskMap; people: FieldChoices['people']; /** The Content look: the Content sheet's underlined "Open task". */ plain?: boolean }) {
   const locale = useLocale()
@@ -63,18 +67,18 @@ export function FieldValue({ field, raw, map, people, plain }: { field: TaskFiel
     case 'pillar': case 'theme':
       return raw ? <span className="fx-fd-chip">{raw}</span> : null
     case 'priority':
-      return raw ? <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[raw] }}>⚑ {shownWord(raw, map.words?.priority, map.show, raw)}</span> : null
+      return raw ? <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[raw] }}><span aria-hidden="true">⚑ </span>{shownWord(raw, map.words?.priority, map.show, raw)}</span> : null
     case 'due': {
       if (!raw) return null
       const d = new Date(`${raw}T00:00`)
-      const late = raw < new Date().toISOString().slice(0, 10)
-      return <span className={`fx-fd-due${late ? ' is-late' : ''}`}>{Number.isNaN(+d) ? raw : d.toLocaleDateString(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' })}</span>
+      const late = raw < today()
+      return <span className={`fx-fd-due${late ? ' is-late' : ''}`}>{Number.isNaN(+d) ? raw : new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short' }).format(d)}</span>
     }
     case 'task':
       if (raw && plain) return <a className="fx-sheet-link fx-sheet-ellipsis" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
                                   onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')}</a>
       return raw ? <a className="fx-sheet-link fx-lk-open" href={raw} target="_blank" rel="noopener noreferrer" tabIndex={-1} data-open-task=""
-                      onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')} ↗</a> : null
+                      onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>{t('openTask')} <span aria-hidden="true">↗</span></a> : null
     default:
       if (field.startsWith('link:')) {
         return raw
@@ -117,7 +121,7 @@ export function FieldEditor({ field, task, anchor, choices, map, onPick, onClose
   } else if (field === 'type') {
     items = choices.types.map(x => ({ key: x, text: x, label: <span className="fx-content-type" style={{ background: contentTypeColor(x) }}>{shownWord(x, map.words?.type, map.show, x)}</span>, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
   } else if (field === 'priority') {
-    items = PRIORITIES.map(x => ({ key: x, text: x, label: <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[x] }}>⚑ {shownWord(x, map.words?.priority, map.show, x)}</span>, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
+    items = PRIORITIES.map(x => ({ key: x, text: x, label: <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[x] }}><span aria-hidden="true">⚑ </span>{shownWord(x, map.words?.priority, map.show, x)}</span>, tone: x === raw ? 'next' as const : undefined, onSelect: () => pick(x) }))
   } else if (field === 'theme') {
     items = choices.projects.filter(p => p.isTheme !== false).map(p => ({ key: p.id, text: p.name, label: <span className="fx-fd-chip">{p.name}</span>, tone: p.name === raw ? 'next' as const : undefined, onSelect: () => pick(p.name) }))
   } else if (field === 'pillar') {
@@ -131,6 +135,7 @@ export function FieldEditor({ field, task, anchor, choices, map, onPick, onClose
 /** A date or a link: a small box under the cell. */
 function InputPop({ field, value, anchor, onSave, onClose }: { field: TaskField; value: string; anchor: HTMLElement; onSave(v: string): void; onClose(restore: boolean): void }) {
   const t = useTranslations('sheets.fields')
+  const tu = useTranslations('sheets.ux')
   const ref = useRef<HTMLDivElement>(null)
   const [v, setV] = useState(value)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -149,11 +154,12 @@ function InputPop({ field, value, anchor, onSave, onClose }: { field: TaskField;
   return (
     <div ref={ref} className="fx-fd-pop" role="dialog" aria-label={t(`names.${field}`)} data-field-pop={field} style={pos ? pos : { left: -9999, top: -9999 }}
          onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(true) } }}>
-      <input autoFocus type={date ? 'date' : 'url'} value={v} placeholder={date ? '' : t('pasteLink')} aria-label={t(`names.${field}`)}
+      <input autoFocus type={date ? 'date' : 'url'} value={v} placeholder={date ? '' : tu('ph.link')} aria-label={t(`names.${field}`)}
+             name={date ? 'due' : 'link'} autoComplete="off" spellCheck={false}
              onChange={e => setV(e.target.value)}
              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onSave(v.trim()) } }} />
       <div className="fx-fd-pop-row">
-        {value && !date && <a href={value} target="_blank" rel="noopener noreferrer" className="fx-fd-open">{t('openLink')} ↗</a>}
+        {value && !date && <a href={value} target="_blank" rel="noopener noreferrer" className="fx-fd-open">{t('openLink')} <span aria-hidden="true">↗</span></a>}
         {value && <button type="button" onClick={() => onSave('')}>{t('clear')}</button>}
         <button type="button" className="is-go" onClick={() => onSave(v.trim())}>{t('save')}</button>
       </div>

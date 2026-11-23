@@ -144,6 +144,9 @@ export function PastePreview({ videoName, existingFileNames, initialCells, colum
             ref={boxRef}
             value={text}
             aria-label={t('paste.box')}
+            name="pasted-rows"
+            autoComplete="off"
+            spellCheck={false}
             placeholder={t('paste.placeholder')}
             onPaste={onPaste}
             onChange={e => { setText(e.target.value); setCells(cellsFromText(e.target.value)) }}
@@ -213,7 +216,7 @@ export function PastePreview({ videoName, existingFileNames, initialCells, colum
                       <tr key={c.file_name} className={'fixed' in c ? 'is-fixed' : undefined}>
                         <td className="fx-sheet-num">{String(c.clip_no).padStart(2, '0')}</td>
                         <td>{c.title}</td>
-                        <td className="fx-sheet-mono">{c.source}</td>
+                        <td className="fx-sheet-mono" translate="no">{c.source}</td>
                         <td className="fx-sheet-num">{formatClipTime(c.in_ms)} → {formatClipTime(c.out_ms)}</td>
                         <td className="fx-sheet-num">{formatClipTime(c.out_ms - c.in_ms)}</td>
                         <td>{c.link ? hostOf(c.link) : <span className="fx-sheet-muted">{t('paste.noLink')}</span>}</td>
@@ -237,11 +240,12 @@ export function PastePreview({ videoName, existingFileNames, initialCells, colum
                       const set = (patch: Partial<Fix>) => setFixes(prev => prev.map((x, j) => (j === i ? { ...x, ...patch } : x)))
                       return (
                         <tr key={i} className={f.leftOut ? 'is-out' : parseClipFileName(f.file_name) ? 'is-fixed' : undefined}>
-                          <td className="fx-sheet-muted fx-sheet-pasted" title={u.cells.join(' · ')}>{u.cells.join(' · ')}</td>
-                          <td><input value={f.title} disabled={f.leftOut} aria-label={t('col.title')}
+                          <td className="fx-sheet-muted fx-sheet-pasted" translate="no" title={u.cells.join(' · ')}>{u.cells.join(' · ')}</td>
+                          <td><input value={f.title} disabled={f.leftOut} aria-label={t('col.title')} name={`title-${i}`} autoComplete="off"
                                      onChange={e => set({ title: e.target.value })} /></td>
-                          <td><input value={f.file_name} disabled={f.leftOut} aria-label={t('col.fileName')}
-                                     placeholder={t('paste.fileHint')} className="fx-sheet-mono"
+                          <td><input value={f.file_name} disabled={f.leftOut} aria-label={t('col.fileName')} name={`file-name-${i}`}
+                                     autoComplete="off" spellCheck={false} translate="no" dir="ltr"
+                                     placeholder={`${t('paste.fileHint')}…`} className="fx-sheet-mono"
                                      onChange={e => set({ file_name: e.target.value })} /></td>
                           <td><button type="button" className="fx-sheet-btn" onClick={() => set({ leftOut: !f.leftOut })}>
                             {f.leftOut ? t('paste.keep') : t('paste.leaveOut')}

@@ -15,11 +15,11 @@
  * A sheet passes its built-in default names and plugs the returned pieces
  * into its grid model, toolbar and popups.
  */
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
+  MAX_CUSTOM_COLUMNS, SHEET_SETS, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, sheetLocale, type LaidColumn, type PasteValueColumn,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -98,7 +98,7 @@ export function useSheetColumns(o: UseSheetColumns) {
 
   const when = (iso: string) => {
     const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+    const rtf = new Intl.RelativeTimeFormat(sheetLocale(locale), { numeric: 'auto' })
     if (Math.abs(mins) < 60) return rtf.format(-Math.max(0, mins), 'minute')
     const h = Math.round(mins / 60)
     if (h < 24) return rtf.format(-h, 'hour')
@@ -201,13 +201,13 @@ export function useSheetColumns(o: UseSheetColumns) {
       if (!c?.kind) return null
       const v = valueOf(task, key)
       if (c.kind === 'checkbox') {
-        return <span className={`fx-sheet-check${v ? ' is-on' : ''}`} data-checked={v ? 'true' : 'false'}>{v ? '✓' : ''}<span className="fx-sheet-sr">{v ? t('checked') : t('unchecked')}</span></span>
+        return <span className={`fx-sheet-check${v ? ' is-on' : ''}`} data-checked={v ? 'true' : 'false'}><span aria-hidden="true">{v ? '✓' : ''}</span><span className="fx-sheet-sr">{v ? t('checked') : t('unchecked')}</span></span>
       }
       if (!v) return null
       switch (c.kind) {
         case 'text': return <span className="fx-sheet-ellipsis" title={v}>{v}</span>
-        case 'number': return <span>{formatValue('number', v)}</span>
-        case 'date': return <span className="fx-sheet-ellipsis">{formatValue('date', v)}</span>
+        case 'number': return <span>{formatValue('number', v, { lang: locale })}</span>
+        case 'date': return <span className="fx-sheet-ellipsis">{formatValue('date', v, { lang: locale })}</span>
         case 'link': return <a className="fx-sheet-link fx-sheet-ellipsis" href={v} target="_blank" rel="noopener noreferrer" tabIndex={-1} onClick={e => e.stopPropagation()}>{siteName(v) || v}</a>
         case 'person': return <PersonChip member={o.members.find(m => m.id === v)} />
         case 'choice': {
@@ -254,10 +254,20 @@ export function useSheetColumns(o: UseSheetColumns) {
       void custom.set(task, key, valueOf(task, key) ? '' : '1', rowKey)
       return true
     },
-    clear: (task: Task, key: string, rowKey: string) => {
+    /**
+     * Delete on a cell no one types into (Choice, Person, Link, Checkbox). It is
+     * never final: `onCleared` puts the old value on the sheet's undo stack, or,
+     * for a sheet without one, the message offers Undo.
+     */
+    clear: async (task: Task, key: string, rowKey: string, onCleared?: (before: string) => void) => {
       const note = custom.readOnlyNote(task, key)
       if (note) { o.onNote(`${rowKey}|${key}`, note); return }
-      void custom.set(task, key, '', rowKey)
+      const before = valueOf(task, key)
+      if (!before) return
+      const r = await api.setValue(key.slice(2), task.id, '')
+      if (!r.success) { o.onNote(`${rowKey}|${key}`, err(r.error)); return }
+      if (onCleared) onCleared(before)
+      else o.say(t('valueCleared', { name: nameOf(key) }), () => void custom.set(task, key, before, rowKey))
     },
     /** A letter typed on a Choice cell opens its type-ahead with that letter. */
     typeAhead: (task: Task, key: string, ch: string, anchor: HTMLElement, rowKey: string) => {
@@ -361,8 +371,8 @@ export function useSheetColumns(o: UseSheetColumns) {
     const c = popup.col
     layer = (
       <SheetPopover anchor={popup.anchor} label={t('nameLabel')} onClose={close}>
-        <RenameForm initial={nameOf(c.key)} placeholder={c.builtIn ? o.defaultName(c.key) : ''} label={t('nameLabel')}
-                    saveLabel={t('renameSave')} cancelLabel={t('cancel')} onCancel={() => close(true)}
+        <RenameForm initial={nameOf(c.key)} placeholder={c.builtIn ? `${o.defaultName(c.key)}…` : ''} label={t('nameLabel')}
+                    saveLabel={t('renameSave')} savingLabel={t('saving')} cancelLabel={t('cancel')} onCancel={() => close(true)}
                     onSave={async name => {
                       const bad = nameError(name, c.key)
                       if (bad) return bad
@@ -418,7 +428,7 @@ export function useSheetColumns(o: UseSheetColumns) {
             const label = nameOf(c.key) || o.defaultName(c.key)
             return (
               <div key={c.key} className="fx-col-prow" data-panel-col={c.key}>
-                <input type="checkbox" id={`fx-colshow-${c.key}`} checked={c.shown} disabled={c.key === 'title'} aria-describedby={`fx-colwho-${c.key}`}
+                <input type="checkbox" id={`fx-colshow-${c.key}`} name={`show-${c.key}`} checked={c.shown} disabled={c.key === 'title'} aria-describedby={`fx-colwho-${c.key}`}
                        data-autofocus={i === 1 ? '' : undefined}
                        onChange={e => void run(api.setShown(sheet, c.key, set, e.target.checked), t(e.target.checked ? 'shownCol' : 'hidden', { name: label }))} />
                 <label htmlFor={`fx-colshow-${c.key}`}>
@@ -457,7 +467,7 @@ export function useSheetColumns(o: UseSheetColumns) {
     const { col: c, task, rowKey } = popup
     layer = (
       <SheetPopover anchor={popup.anchor} label={nameOf(c.key)} onClose={close}>
-        <LinkPrompt title={nameOf(c.key)} initial={valueOf(task, c.key)} saveLabel={t('save')} skipLabel={t('cancel')}
+        <LinkPrompt title={nameOf(c.key)} initial={valueOf(task, c.key)} saveLabel={t('save')} savingLabel={t('saving')} skipLabel={t('cancel')}
                     badLink={t('invalid.link')} placeholder="https://…" onSkip={() => close(true)}
                     onSave={async url => {
                       const r = await api.setValue(c.key.slice(2), task.id, url)
@@ -517,23 +527,35 @@ export function useSheetColumns(o: UseSheetColumns) {
   }
 }
 
-function RenameForm({ initial, placeholder, label, saveLabel, cancelLabel, onSave, onCancel }: {
-  initial: string; placeholder: string; label: string; saveLabel: string; cancelLabel: string
+function RenameForm({ initial, placeholder, label, saveLabel, savingLabel, cancelLabel, onSave, onCancel }: {
+  initial: string; placeholder: string; label: string; saveLabel: string; savingLabel: string; cancelLabel: string
   onSave(name: string): Promise<string | null>; onCancel(): void
 }) {
   const [v, setV] = useState(initial)
   const [note, setNote] = useState<string | null>(null)
+  // One save at a time: a second Enter while the first is on its way does nothing.
+  const [busy, setBusy] = useState(false)
+  const noteId = useId()
   return (
-    <form className="fx-sheet-pop-form" data-column-rename="" onSubmit={async e => { e.preventDefault(); setNote(await onSave(v)) }}>
+    <form className="fx-sheet-pop-form" data-column-rename="" aria-busy={busy || undefined}
+          onSubmit={async e => {
+            e.preventDefault()
+            if (busy) return
+            setBusy(true)
+            const fail = await onSave(v)
+            setBusy(false)
+            setNote(fail)
+          }}>
       <label className="fx-sheet-pop-title">
         {label}
-        <input type="text" value={v} maxLength={40} placeholder={placeholder} aria-invalid={note ? true : undefined}
+        <input type="text" name="column-name" autoComplete="off" value={v} maxLength={40} placeholder={placeholder}
+               aria-invalid={note ? true : undefined} aria-describedby={note ? noteId : undefined}
                onFocus={e => e.currentTarget.select()} onChange={e => { setV(e.target.value); setNote(null) }} />
       </label>
-      {note && <span className="fx-sheet-note" role="alert">{note}</span>}
+      {note && <span className="fx-sheet-note" id={noteId} role="alert">{note}</span>}
       <span className="fx-sheet-pop-row">
         <button type="button" className="fx-sheet-btn" onClick={onCancel}>{cancelLabel}</button>
-        <button type="submit" className="fx-sheet-btn is-primary">{saveLabel}</button>
+        <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{busy ? savingLabel : saveLabel}</button>
       </span>
     </form>
   )

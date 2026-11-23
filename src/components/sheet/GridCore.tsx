@@ -92,6 +92,8 @@ export interface GridModel<R extends { key: string }> {
   inputLabel(row: R, col: GridCol): string
   inputPlaceholder?(row: R, col: GridCol): string | undefined
   inputDir?(col: GridCol): 'ltr' | undefined
+  /** A code-like column (file names, sources, times): its editor neither spellchecks nor gets translated. */
+  inputCode?(col: GridCol): boolean
   /** A note when someone tries to type into a cell they may not edit. */
   readOnlyNote?(row: R, col: GridCol): string | null
   onCommit(row: R, col: GridCol, value: string): Promise<string | null>
@@ -487,7 +489,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     return lo
   }
   const z = m.zoom && m.zoom > 0 ? m.zoom : 1
-  const first = windowed ? Math.max(0, find(view.top / z - 26) - OVERSCAN) : 0
+  /** The sticky heading row; its height (26px, 46px with column letters) is measured, not assumed. */
+  const headRef = useRef<HTMLDivElement>(null)
+  const headH = () => headRef.current?.getBoundingClientRect().height ?? (m.letters ? 46 : 26) * z
+  const first = windowed ? Math.max(0, find(view.top / z - (m.letters ? 46 : 26)) - OVERSCAN) : 0
   const last = windowed ? Math.min(m.rows.length, find((view.top + view.height) / z) + OVERSCAN + 1) : m.rows.length
 
   useLayoutEffect(() => {
@@ -498,17 +503,49 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const i = rowIndex.get(active.key)
       const sc = scroller()
       if (windowed && tops && i !== undefined && sc) {
-        const y = tops[i] * z, h = (tops[i + 1] - tops[i]) * z
-        if (y < sc.scrollTop + 26) sc.scrollTop = Math.max(0, y - 26)
+        // Rows sit under the heading row; frozen rows stick below it and cover what scrolls under them.
+        const head = headH(), frozen = F && i >= F ? (tops[F] - tops[0]) * z : 0
+        const y = head + tops[i] * z, h = (tops[i + 1] - tops[i]) * z
+        if (y < sc.scrollTop + head + frozen) sc.scrollTop = Math.max(0, y - head - frozen)
         else if (y + h > sc.scrollTop + sc.clientHeight) sc.scrollTop = y + h - sc.clientHeight + 4
         setView({ top: sc.scrollTop, height: sc.clientHeight })
       }
       return
     }
     wantFocus.current = false
-    el.focus({ preventScroll: false })
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    el.focus({ preventScroll: true })
+    reveal(el)
   })
+
+  /**
+   * Scroll a cell fully into view: past the edges, as scrollIntoView does, and
+   * out from under what sticks (the heading row, frozen rows, the row number,
+   * the title and frozen columns), which scrollIntoView can't see.
+   */
+  function reveal(el: HTMLElement) {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const sc = scroller(), grid = gridRef.current
+    if (!sc || !grid) return
+    const b = el.getBoundingClientRect()
+    const rowEl = el.parentElement
+    let top = headRef.current?.getBoundingClientRect().bottom ?? b.top
+    if (rowEl && !rowEl.classList.contains('is-frozen-row')) {
+      grid.querySelectorAll<HTMLElement>(':scope > .is-frozen-row').forEach(r => { top = Math.max(top, r.getBoundingClientRect().bottom) })
+    }
+    if (b.top < top) sc.scrollTop -= top - b.top
+    // Sideways: only a cell that scrolls can be covered by the sticky cells beside it.
+    if (!rowEl || getComputedStyle(el).position === 'sticky') return
+    const rtl = getComputedStyle(grid).direction === 'rtl'
+    let edge: number | null = null
+    for (const c of Array.from(rowEl.children) as HTMLElement[]) {
+      if (c === el || getComputedStyle(c).position !== 'sticky') continue
+      const r = c.getBoundingClientRect()
+      edge = rtl ? Math.min(edge ?? r.left, r.left) : Math.max(edge ?? r.right, r.right)
+    }
+    if (edge === null) return
+    if (!rtl && b.left < edge) sc.scrollLeft -= edge - b.left
+    if (rtl && b.right > edge) sc.scrollLeft += b.right - edge
+  }
 
   // A new draft row starts in edit mode.
   useEffect(() => {
@@ -568,9 +605,15 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     if (!cur) return
     const { key, col } = cur
     setEditing(null)
-    const row = m.rows.find(r => r.key === key)
+    const ri = m.rows.findIndex(r => r.key === key)
+    const row = m.rows[ri]
     if (!row) return
-    if (m.isDraft(row)) m.onCancelDraft(row)
+    if (m.isDraft(row)) {
+      m.onCancelDraft(row)
+      // Focus goes back where the draft came from: its "+ Clip" / "+ Piece" row below, else the row above.
+      const next = m.rows.slice(ri + 1).find(r => !m.isDraft(r)) ?? m.rows.slice(0, ri).reverse().find(r => !m.isDraft(r))
+      if (next) focusCell(next, col)
+    }
     else focusCell(row, col)
   }
 
@@ -614,6 +657,22 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     }
     focusCell(m.rows[ri], col)
   }
+
+  // ── notes, said aloud ───────────────────────────────────────────────────────
+  const liveRef = useRef<HTMLDivElement>(null)
+  const [said, setSaid] = useState('')
+  const notesBefore = useRef(notes)
+  useEffect(() => {
+    const before = notesBefore.current
+    notesBefore.current = notes
+    const fresh = Object.entries(notes).find(([k, v]) => v && before[k] !== v)?.[1]
+    if (!fresh) return
+    // The sheet may already be saying it ("Not saved: …" in its toast): once is enough.
+    const elsewhere = Array.from(document.querySelectorAll('[aria-live], [role="status"], [role="alert"]'))
+      .some(el => el !== liveRef.current && !gridRef.current?.contains(el) && !!el.textContent?.includes(fresh))
+    // The same note twice in a row still changes the region's text, so it is said again.
+    if (!elsewhere) setSaid(s => (s === fresh ? `${fresh}\u00a0` : fresh))
+  }, [notes])
 
   // ── clipboard (spec 013 R4, FR-020–FR-026) ────────────────────────────────
   const readText = (row: R, col: GridCol) => {
@@ -847,7 +906,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const cc = Math.max(0, Math.min(m.cols.length - 1, c))
       setFocusEnd({ key: m.rows[rr].key, col: m.cols[cc] })
       const el = cells.current.get(cellKey(m.rows[rr].key, m.cols[cc]))
-      el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      if (el) reveal(el)
     }
     /** Left/right on a spanning row: step over the span. */
     const sideways = (dir: 1 | -1) => {
@@ -1301,7 +1360,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const F = Math.min(m.frozenRows ?? 0, m.rows.length)
   const FC = Math.min(m.frozenCols ?? 0, m.cols.length)
   const frozenTop: number[] = []
-  for (let i = 0, y = 26; i < F; i++) { frozenTop.push(y); y += heightOf(m.rows[i]) ?? ROW_H }
+  for (let i = 0, y = m.letters ? 46 : 26; i < F; i++) { frozenTop.push(y); y += heightOf(m.rows[i]) ?? ROW_H }
   const frozenStart: number[] = []
   for (let c = 0, x = m.rowNoWidth; c < FC; c++) { frozenStart.push(x); x += widthOf(m.cols[c]) }
   const firstW = Math.max(first, F)
@@ -1313,13 +1372,15 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     c >= 0 && c < FC ? { position: 'sticky', insetInlineStart: frozenStart[c], zIndex: 2 } : undefined
 
   return (
+    <>
     <div
       ref={gridRef}
       // A treegrid: group rows expand and collapse (aria-level, aria-expanded).
       role="treegrid"
       aria-label={m.label}
       aria-rowcount={m.rows.length + 1}
-      aria-colcount={allCols.length}
+      // The ＋ heading after the last column is a column too.
+      aria-colcount={allCols.length + (m.tailHeader ? 1 : 0)}
       aria-multiselectable={m.selection || undefined}
       className={`fx-sheet-grid${m.selection ? ' is-selectable' : ''}${fillDrag ? ' is-filling' : ''}${moving ? ` is-moving${moving.kind === 'copy' ? ' is-copying' : ''}` : ''}`}
       onPointerMove={canMove && !moveDrag && !fillDrag ? e => {
@@ -1334,7 +1395,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       style={{ ['--sheet-cols' as string]: template, ...(z !== 1 ? { zoom: z } : {}) }}
       onKeyDown={onGridKeyDown}
     >
-      <div role="row" aria-rowindex={1} className={`fx-sheet-tr is-head${m.letters ? ' is-lettered' : ''}`}>
+      <div ref={headRef} role="row" aria-rowindex={1} className={`fx-sheet-tr is-head${m.letters ? ' is-lettered' : ''}`}>
         <div role="columnheader" className="fx-sheet-th is-frozen-no" aria-label="#"
              onClick={() => { if (m.selection && m.rows.length) selectBlock({ r0: 0, c0: 0, r1: m.rows.length - 1, c1: m.cols.length - 1 }) }}>{m.corner?.()}</div>
         {m.cols.map((col, c) => {
@@ -1394,6 +1455,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
         const spans = own !== allCols && own.length < allCols.length
         const h = heightOf(row)
         const rowOn = m.selection && showSel && areas.some(q => i >= q.r0 && i <= q.r1)
+        // A group heading drawn above the row isn't a cell, so screen readers would skip it:
+        // it is hidden from them and read as the description of the row's cells instead.
+        const band = m.rowBand?.(row, i)
+        const bandId = band ? `${row.key}-band` : ''
         return (
           <div
             key={row.key}
@@ -1406,7 +1471,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
             data-task={rp.taskId}
             style={{ ...(h ? { ['--row-h' as string]: `${h}px` } : {}), ...(i < F ? { position: 'sticky', top: frozenTop[i], zIndex: 3 } : {}) }}
           >
-            {(() => { const band = m.rowBand?.(row, i); return band ? <div className="fx-sheet-band" role="presentation" data-band="" style={{ height: m.rowBandHeight?.(row, i) ?? BAND_H }}>{band}</div> : null })()}
+            {band ? <div className="fx-sheet-band" id={bandId} aria-hidden="true" data-band="" style={{ height: m.rowBandHeight?.(row, i) ?? BAND_H }}>{band}</div> : null}
             {own.map((col, ci) => {
               const key = cellKey(row.key, col)
               const isActive = active?.key === row.key && active.col === col
@@ -1452,7 +1517,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   aria-selected={m.selection ? (selected || isActive) : undefined}
                   aria-haspopup={menu && col !== 'drop' && col !== 'archive' ? 'menu' : undefined}
                   aria-readonly={!text && !menu ? true : undefined}
-                  aria-describedby={[m.describedBy?.(row, col) ?? '', note ? `${key}-note` : ''].filter(Boolean).join(' ') || undefined}
+                  aria-describedby={[bandId, m.describedBy?.(row, col) ?? '', note ? `${key}-note` : ''].filter(Boolean).join(' ') || undefined}
                   // Only the cell itself: a button inside it (Auto Fill Options) taking focus mustn't move the selection.
                   onFocus={e => { if (e.target === e.currentTarget && !isActive) setActive({ key: row.key, col }) }}
                   onPointerDown={m.selection ? e => {
@@ -1539,6 +1604,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           value={editing.value}
                           rows={Math.max(1, editing.value.split('\n').length)}
                           aria-label={m.inputLabel(row, col)}
+                          name={`cell-${col}`}
+                          autoComplete="off"
+                          spellCheck={m.inputCode?.(col) ? false : undefined}
+                          translate={m.inputCode?.(col) ? 'no' : undefined}
                           dir="auto"
                           onFocus={e => {
                             const el = e.currentTarget
@@ -1572,6 +1641,10 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                           autoFocus
                           value={editing.value}
                           aria-label={m.inputLabel(row, col)}
+                          name={`cell-${col}`}
+                          autoComplete="off"
+                          spellCheck={m.inputCode?.(col) ? false : undefined}
+                          translate={m.inputCode?.(col) ? 'no' : undefined}
                           placeholder={m.inputPlaceholder?.(row, col)}
                           dir={m.inputDir?.(col)}
                           onFocus={e => {
@@ -1639,5 +1712,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       })}
       {windowed && tops && last < m.rows.length && <div className="fx-sheet-spacer" aria-hidden="true" style={{ height: tops[m.rows.length] - tops[last] }} />}
     </div>
+    {/* A cell's note (a refused value, a read-only cell) is said here: the note itself isn't a live region. */}
+    <div ref={liveRef} className="sr-only" role="status" aria-live="polite" data-grid-live="">{said}</div>
+    </>
   )
 }

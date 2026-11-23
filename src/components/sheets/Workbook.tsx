@@ -47,6 +47,8 @@ import { loadFillLists, saveFillLists } from '@/actions/settings'
 import type { FillList } from '@/lib/sheet-fill'
 import { STATUS_EVENT, ZOOM_EVENT, tipsBus, zoomBus } from '@/components/sheet/GridCore'
 import { LINKED_SPECIAL } from '@/components/sheet/useGridTips'
+import { intlLocale } from '@/lib/sheet-format'
+import { useRovingToolbar } from './a11y'
 
 export interface WorkbookProps {
   api: SheetsApi
@@ -104,6 +106,16 @@ export function Workbook(p: WorkbookProps) {
     } catch { /* private mode */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { if (openId) localStorage.setItem(lastKey(folder.id), openId) } catch { /* private mode */ } }, [openId, folder.id])
+  // The open tab is in the address (?sheet=), so a reload or a shared link opens it; other parameters stay.
+  useEffect(() => {
+    if (!openId) return
+    try {
+      const u = new URL(window.location.href)
+      if (u.searchParams.get('sheet') === openId) return
+      u.searchParams.set('sheet', openId)
+      window.history.replaceState(window.history.state, '', u)
+    } catch { /* an address the browser won't change: the tab still opens */ }
+  }, [openId])
 
   // ── documents and history ───────────────────────────────────────────────
   const [docs, setDocsState] = useState<Record<string, SheetDoc>>({})
@@ -166,17 +178,21 @@ export function Workbook(p: WorkbookProps) {
   const open = sheets.find(s => s.id === openId)
   const openBlank = open?.kind === 'blank'
 
-  useEffect(() => {
-    if (!open || !openBlank || docsRef.current[open.id] || loading.current.has(open.id)) return
-    const id = open.id
+  const loadDoc = useCallback((id: string) => {
+    if (docsRef.current[id] || loading.current.has(id)) return
     loading.current.add(id)
+    setLoadError(e => { if (!(id in e)) return e; const n = { ...e }; delete n[id]; return n })
     void api.loadSheet(id).then(res => {
       loading.current.delete(id)
-      if (res.success) { setDocs(d => ({ ...d, [id]: res.doc })); setLoadError(e => { const n = { ...e }; delete n[id]; return n }) }
+      if (res.success) setDocs(d => ({ ...d, [id]: res.doc }))
       else if (res.error === 'gone') setGone(id)
       else setLoadError(e => ({ ...e, [id]: res.error }))
     })
-  }, [open, openBlank, api])
+  }, [api])
+  useEffect(() => {
+    if (!open || !openBlank || loadError[open.id]) return
+    loadDoc(open.id)
+  }, [open, openBlank, loadDoc]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Spec 016: a doc change that isn't an undo step (values from the board). */
   const patchDoc = useCallback((id: string, fn: (d: SheetDoc) => SheetDoc) => setDocs(d => (d[id] ? { ...d, [id]: fn(d[id]) } : d)), [])
@@ -277,6 +293,9 @@ export function Workbook(p: WorkbookProps) {
   const [formatCells, setFormatCells] = useState(false)
   const [phoneFormat, setPhoneFormat] = useState(false)
   const [phone, setPhone] = useState(false)
+  /** The phone's tools row: one Tab stop, ←/→ between its buttons. */
+  const toolsRef = useRef<HTMLDivElement>(null)
+  useRovingToolbar(toolsRef, phone)
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 640px)')
     const on = () => setPhone(mq.matches)
@@ -361,7 +380,9 @@ export function Workbook(p: WorkbookProps) {
   const setSbShowKey = (k: SbKey) => setSbShow(x => { const n = { ...x, [k]: !x[k] }; try { localStorage.setItem(SB_KEY, JSON.stringify(n)) } catch { /* not kept */ } return n })
   /** Status-bar figures as the member reads numbers (at most 2 decimals, grouped). */
   const curStats = openBlank ? (sel && sel.count > 1 ? sel.stats ?? null : null) : (linkedStats && linkedStats.cells > 1 ? linkedStats : null)
-  const fmtNum = (n: number) => new Intl.NumberFormat(locale.startsWith('ar') ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 2 }).format(n)
+  const fmtNum = (n: number) => new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 2 }).format(n)
+  const fmtInt = (n: number) => new Intl.NumberFormat(intlLocale(locale)).format(n)
+  const fmtPct = (n: number) => new Intl.NumberFormat(intlLocale(locale), { style: 'percent', maximumFractionDigits: 0 }).format(n / 100)
   const [skip, setSkip] = useState<string | null>(null)
   const skipTimer = useRef<number | undefined>(undefined)
   const onSkipped = useCallback((s: Partial<Record<string, number>>) => {
@@ -630,7 +651,7 @@ export function Workbook(p: WorkbookProps) {
     const b = anchor.getBoundingClientRect()
     setTabMenu({
       at: { x: b.left, y: b.top - 4 }, anchor, attr: 'data-all-menu', label: t('tabs.all'),
-      items: visible.map(s => ({ key: s.id, label: nameOf(s), checked: s.id === openId, onSelect: () => onOpen(s.id, { ctrl: false, shift: false }) })),
+      items: visible.map(s => ({ key: s.id, label: nameOf(s), checked: s.id === openId, radio: true, onSelect: () => onOpen(s.id, { ctrl: false, shift: false }) })),
     })
   }
 
@@ -735,8 +756,9 @@ export function Workbook(p: WorkbookProps) {
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>
-      {readOnly && <span className="fx-sh-lock" data-readonly="">🔒 {readOnly}{doc?.extras?.formats.some(f => f.style.unlocked) ? ` ${tt('protect.inputsOpen')}` : ''}</span>}
-      {skip && <span className="fx-sh-skip" data-skip-note="" role="status">{skip}</span>}
+      {readOnly && <span className="fx-sh-lock" data-readonly=""><span aria-hidden="true">🔒 </span>{readOnly}{doc?.extras?.formats.some(f => f.style.unlocked) ? ` ${tt('protect.inputsOpen')}` : ''}</span>}
+      {/* The live region stays; only its text comes and goes, so it is read when it does. */}
+      <span className="fx-sh-skip-live" role="status">{skip && <span className="fx-sh-skip" data-skip-note="">{skip}</span>}</span>
       {fieldsHere && (
         <button type="button" className="fx-sh-ib is-text" data-fields-btn="" title={t('fields.title')} onClick={() => openFields()}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
@@ -764,13 +786,13 @@ export function Workbook(p: WorkbookProps) {
           <Link href="/sheets">{t('crumb')}</Link>
           <span aria-hidden="true">›</span>
           <h1>{folderName}</h1>
-          {linkedFolder && <span className="fx-sh-linked">🔗 {t('home.linkedBadge')}</span>}
+          {linkedFolder && <span className="fx-sh-linked"><span aria-hidden="true">🔗 </span>{t('home.linkedBadge')}</span>}
         </nav>
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
               title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>
         {!phone && <div className="fx-sh-top-tools">{headTools}</div>}
       </div>
-      {phone && <div className="fx-sh-tools" role="toolbar" aria-label={folderName}>
+      {phone && <div className="fx-sh-tools" role="toolbar" aria-label={folderName} ref={toolsRef}>
         <button type="button" className="fx-sh-ib" data-undo="" aria-label={t('toolbar.undoKey')} title={t('toolbar.undoKey')}
                 disabled={openBlank ? !stack || !canUndo(stack) : !linkedHist.canUndo}
                 onClick={() => (openBlank ? doUndo() : linkedUndo('undo'))}>↶</button>
@@ -815,7 +837,7 @@ export function Workbook(p: WorkbookProps) {
           onFields={fieldsHere ? () => openFields() : undefined}
           onTip={k => setTip(k)} />
       )}
-      {painter && <p className="fx-painter-note" role="status" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}
+      <div role="status">{painter && <p className="fx-painter-note" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}</div>
 
       <div className={`fx-sh-panel${painter ? ' is-painting' : ''}`} id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
         {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
@@ -827,8 +849,11 @@ export function Workbook(p: WorkbookProps) {
                         links={api} patch={fn => patchDoc(doc.id, fn)}
                         fillLists={fillItems} zoom={zoom} onZoom={setZoom} canRedo={!!stack && canRedo(stack)} onStatus={setStatusMode} />
           : loadError[openId]
-            ? <div className="fx-sh-empty" role="alert">{errText(loadError[openId])}</div>
-            : <div className="fx-sh-skeleton" data-sheet-loading="" aria-busy="true" />)}
+            ? <div className="fx-sh-empty" role="alert">
+                {errText(loadError[openId])}{' '}
+                <button type="button" className="fx-sh-retry" data-load-retry="" onClick={() => loadDoc(openId)}>{t('ux.retry')}</button>
+              </div>
+            : <div className="fx-sh-skeleton" data-sheet-loading="" role="status" aria-busy="true"><span className="sr-only">{t('ux.loading')}</span></div>)}
       </div>
 
       <TabBar
@@ -860,8 +885,8 @@ export function Workbook(p: WorkbookProps) {
           return (
             <span className="fx-sb-stats" data-sb-stats="">
               {sbShow.avg && st.nums > 0 && <span className="fx-sb-chip" data-sb-avg="">{tt('avg')} <b>{fmtNum(st.avg ?? 0)}</b></span>}
-              {sbShow.count && <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{st.count}</b></span>}
-              {sbShow.nums && <span className="fx-sb-chip" data-sb-nums="">{tt('sb.numsShort')} <b>{st.nums}</b></span>}
+              {sbShow.count && <span className="fx-sb-chip" data-sb-count="">{tt('count')} <b>{fmtInt(st.count)}</b></span>}
+              {sbShow.nums && <span className="fx-sb-chip" data-sb-nums="">{tt('sb.numsShort')} <b>{fmtInt(st.nums)}</b></span>}
               {sbShow.min && st.nums > 0 && st.min !== null && <span className="fx-sb-chip" data-sb-min="">{tt('sb.minShort')} <b>{fmtNum(st.min)}</b></span>}
               {sbShow.max && st.nums > 0 && st.max !== null && <span className="fx-sb-chip" data-sb-max="">{tt('sb.maxShort')} <b>{fmtNum(st.max)}</b></span>}
               {sbShow.sum && st.nums > 0 && <span className="fx-sb-chip" data-sb-sum="">{tt('sum')} <b>{fmtNum(st.sum)}</b></span>}
@@ -871,11 +896,11 @@ export function Workbook(p: WorkbookProps) {
         {!phone && sbShow.zoom && (
           <span className="fx-sb-zoom" data-sb-zoom="">
             <button type="button" className="fx-sb-zb" data-zoom-out="" aria-label={tt('zoomOut')} title={tt('zoomOut')} disabled={zoom <= 0.5} onClick={() => setZoom(zoom - 0.1)}>−</button>
-            <input type="range" min={50} max={200} step={10} value={Math.round(zoom * 100)} aria-label={tt('zoom')} data-zoom-slider=""
+            <input type="range" min={50} max={200} step={10} value={Math.round(zoom * 100)} aria-label={tt('zoom')} aria-valuetext={fmtPct(Math.round(zoom * 100))} data-zoom-slider=""
                    onChange={e => setZoom(Number(e.target.value) / 100)} />
             <button type="button" className="fx-sb-zb" data-zoom-in="" aria-label={tt('zoomIn')} title={tt('zoomIn')} disabled={zoom >= 2} onClick={() => setZoom(zoom + 0.1)}>+</button>
             <button type="button" className="fx-sb-pct" data-zoom-pct="" aria-haspopup="menu" title={tt('zoomMenu')}
-                    onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(); setZoomMenu({ x: getComputedStyle(el).direction === 'rtl' ? r.left : r.right - 120, y: r.top - 8, el }) }}>{Math.round(zoom * 100)}%</button>
+                    onClick={ev => { const el = ev.currentTarget, r = el.getBoundingClientRect(); setZoomMenu({ x: getComputedStyle(el).direction === 'rtl' ? r.left : r.right - 120, y: r.top - 8, el }) }}>{fmtPct(Math.round(zoom * 100))}</button>
           </span>
         )}
         <button type="button" className="fx-sb-more" data-sb-customize="" aria-haspopup="menu" aria-label={tt('sb.title')} title={tt('sb.title')}
@@ -886,7 +911,7 @@ export function Workbook(p: WorkbookProps) {
           items={[
             { kind: 'node', key: 'h', node: <div role="presentation" className="fx-st-h">{tt('sb.title')}</div> },
             ...(['avg', 'count', 'nums', 'min', 'max', 'sum'] as const).map(k => {
-              const st = curStats, v = !st ? '' : k === 'avg' ? (st.nums ? fmtNum(st.avg ?? 0) : '') : k === 'count' ? String(st.count) : k === 'nums' ? String(st.nums) : k === 'sum' ? (st.nums ? fmtNum(st.sum) : '') : (st[k] !== null && st.nums ? fmtNum(st[k]!) : '')
+              const st = curStats, v = !st ? '' : k === 'avg' ? (st.nums ? fmtNum(st.avg ?? 0) : '') : k === 'count' ? fmtInt(st.count) : k === 'nums' ? fmtInt(st.nums) : k === 'sum' ? (st.nums ? fmtNum(st.sum) : '') : (st[k] !== null && st.nums ? fmtNum(st[k]!) : '')
               return { key: k, label: tt(`sb.${k}`), kbd: v || undefined, checked: sbShow[k], onSelect: () => setSbShowKey(k) }
             }),
             { kind: 'sep', key: 's' },
@@ -895,7 +920,7 @@ export function Workbook(p: WorkbookProps) {
       )}
       {zoomMenu && (
         <PopMenu at={{ x: zoomMenu.x, y: zoomMenu.y }} label={tt('zoom')} attr="data-zoom-menu" returnTo={zoomMenu.el} onClose={() => setZoomMenu(null)}
-          items={[200, 150, 125, 100, 75, 50].map(n => ({ key: String(n), label: `${n}%`, checked: Math.round(zoom * 100) === n, onSelect: () => setZoom(n / 100) }))} />
+          items={[200, 150, 125, 100, 75, 50].map(n => ({ key: String(n), label: fmtPct(n), checked: Math.round(zoom * 100) === n, radio: true, onSelect: () => setZoom(n / 100) }))} />
       )}
 
       {open && (
@@ -914,8 +939,10 @@ export function Workbook(p: WorkbookProps) {
               const ri = doc.rows.findIndex(x => x.id === r), ci = doc.cols.findIndex(x => x.id === c)
               return ri >= 0 && ci >= 0 ? blankCellName(ri, ci) : null
             }
-            const title = document.querySelector<HTMLElement>(`[data-linked-pane] .fx-sheet-tr[data-task="${CSS.escape(r)}"] [data-col="title"]`)?.innerText.trim()
-            const head = document.querySelector<HTMLElement>(`[data-linked-pane] [data-col-head="${CSS.escape(c)}"]`)?.innerText.trim()
+            // textContent and the heading's label, not innerText: this runs while rendering, and innerText lays the page out.
+            const title = document.querySelector<HTMLElement>(`[data-linked-pane] .fx-sheet-tr[data-task="${CSS.escape(r)}"] [data-col="title"]`)?.textContent?.replace(/\s+/g, ' ').trim()
+            const hd = document.querySelector<HTMLElement>(`[data-linked-pane] [data-col-head="${CSS.escape(c)}"]`)
+            const head = (hd?.getAttribute('aria-label') ?? hd?.textContent ?? '').replace(/\s+/g, ' ').trim()
             return title ? `${title}${head ? ` · ${head}` : ''}` : null
           }}
           phone={phone}
@@ -1034,8 +1061,11 @@ export function Workbook(p: WorkbookProps) {
                              if (r.success) { setFillLists(f => ({ ...f, lists: r.lists })); say(tt('lists.saved')) } else say(t('err.generic'))
                            }} />
       )}
-      {toast && <div className="fx-sh-toast" role="status" data-sheets-toast="">{toast}
-        {toastUndo && <button type="button" className="fx-sh-toast-undo" data-toast-undo="" onClick={() => { setToast(null); if (openBlank) doUndo() }}>{t('undo')}</button>}</div>}
+      {/* The live region stays mounted; the note in it comes and goes, so screen readers hear each one. */}
+      <div className="fx-sh-live" role="status">
+        {toast && <div className="fx-sh-toast" data-sheets-toast="">{toast}
+          {toastUndo && <button type="button" className="fx-sh-toast-undo" data-toast-undo="" onClick={() => { setToast(null); if (openBlank) doUndo() }}>{t('undo')}</button>}</div>}
+      </div>
     </div>
   )
 }

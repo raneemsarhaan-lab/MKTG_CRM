@@ -3231,3 +3231,79 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-vs-prio::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
 .fx-vs-prio.is-high { color: #B42318; } .fx-vs-prio.is-medium { color: #92400E; } .fx-vs-prio.is-low { color: #4B5563; }
 .fx-vs-addvideo { white-space: nowrap; }
+
+/* ─── Sheets: hover, scroll containment, touch (UI review) ────────────────────
+   Hover: a slight darken on bordered and filled buttons, an underline on the
+   text-only ones (toast Undo). Scroll containment: popups and drawers that
+   scroll stop there instead of carrying on into the grid or the page. Touch:
+   grid cells edit on double-tap, which must not zoom. */
+.fx-sheet-btn, .fx-sheet-tog, .fx-sheet-back, .fx-col-ib, .fx-vs-more-btn, .fx-flt-btn,
+.fx-sh-dialog-row button, .fx-sh-cta { transition: filter 120ms ease-out; }
+.fx-sheet-btn:hover:not(:disabled), .fx-sheet-tog:hover:not(:disabled), .fx-sheet-back:hover,
+.fx-col-ib:hover:not(:disabled), .fx-vs-more-btn:hover, .fx-flt-btn:hover,
+.fx-sh-dialog-row button:hover:not(:disabled), .fx-sh-cta:hover { filter: brightness(0.94); }
+.fx-sheet-toast-in button:hover, .fx-sh-toast button:hover { text-decoration: underline; }
+
+.fx-sheet-menu, .fx-sheet-combo-list, .fx-col-panel, .fx-sheet-dlg-body, .fx-sh-menu, .fx-fmt-pop,
+.fx-fmt-sheet, .fx-cmt-list, .fx-cmt-items, .fx-fd-scroll, .fx-sh-listbox, .fx-fc-lb, .fx-flt-list,
+.fx-mb-search ul, .fx-slicers, .fx-slicer-items { overscroll-behavior: contain; }
+
+[role="gridcell"], [role="rowheader"], [role="columnheader"] { touch-action: manipulation; }
+
+/* ─── Sheets fixes: video sheet grid (src/components/sheet) ─── */
+/* Upload progress grows by scaleX from the inline start (compositor-only), not by width. */
+.fx-sheet-prog i.is-pct { width: 100%; transform-origin: left center; transition: transform .2s ease-out; }
+[dir="rtl"] .fx-sheet-prog i.is-pct { transform-origin: right center; }
+@media (prefers-reduced-motion: reduce) { .fx-sheet-prog i.is-pct { transition: none; } }
+/* Retry and Paste a link instead are real buttons now, drawn as the link-like words they were. */
+button.fx-sheet-fbtn { border: 0; background: none; padding: 0; font-family: inherit; }
+button.fx-sheet-fbtn:hover { color: var(--sheet-ink); }
+/* ↗ on a video's band is a real link: no underline, darker on hover. */
+a.fx-sheet-open { text-decoration: none; }
+a.fx-sheet-open:hover { color: var(--sheet-ink); }
+.fx-sheet-combo-opt:hover:not(:disabled) { background: var(--sheet-hover); }
+/* Alt+↓'s pick list can hold 500 values: those scrolled out of the menu skip layout and paint. */
+.fx-sh-menu[data-pick-list] > [role="none"] { content-visibility: auto; contain-intrinsic-size: auto 160px auto 34px; }
+
+/* ─── Sheets fixes: workbook (src/components/sheets) ─── */
+/* Live regions that stay mounted (toasts, the skipped-cells note): only their text comes and goes. */
+.fx-sh-live { position: absolute; }
+.fx-sh-skip-live:not(:empty) { margin-inline-start: auto; }
+.fx-sh-skip-live:empty { position: absolute; }
+/* A toolbar button's picture is hidden from screen readers; the wrapper leaves its layout alone. */
+.fx-fmt-in { display: contents; }
+/* The pickers' section headings are h3 now (they were h5, skipping levels). */
+.fx-fmt-pop h3 { margin: 8px 2px 4px; font: 700 11px var(--font-body); color: var(--inbox-muted); letter-spacing: .05em; text-transform: uppercase; }
+[dir="rtl"] .fx-fmt-pop h3 { letter-spacing: 0; }
+/* Find and Replace: the fields sit in the tab panel. */
+.fx-find-body { display: grid; gap: 10px; }
+/* A sheet that didn't load offers Try again. */
+.fx-sh-retry { margin-inline-start: 8px; border: 1px solid var(--inbox-border); background: var(--inbox-panel); color: var(--inbox-text); border-radius: 999px; padding: 4px 12px; font: 600 13px var(--font-body); cursor: pointer; }
+.fx-sh-retry:hover { background: var(--inbox-surface); }
+.fx-sh-retry:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 2px; }
+/* Hover on the workbook's own buttons. */
+.fx-find-row button, .fx-flt-foot button, .fx-cmt-send, .fx-tip-btn, .fx-tip-btns > button, .fx-fmt-done, .fx-fd-go,
+.fx-fc-presets button, .fx-fc-lines button, .fx-fc-nofill { transition: filter 120ms ease-out; }
+.fx-find-row button:hover:not(:disabled), .fx-flt-foot button:hover, .fx-cmt-send:hover:not(:disabled), .fx-tip-btn:hover:not(:disabled),
+.fx-tip-btns > button:hover:not(:disabled), .fx-fmt-done:hover, .fx-fd-go:hover:not(:disabled),
+.fx-fc-presets button:hover, .fx-fc-lines button:hover, .fx-fc-nofill:hover { filter: brightness(0.94); }
+.fx-fc-tabs button:hover, .fx-cmt-tabs button:hover { color: var(--inbox-text); }
+.fx-fmt-stabs button:hover { filter: brightness(0.96); }
+.fx-fc-lb button:hover:not([aria-selected="true"]) { background: var(--inbox-surface); }
+.fx-fd-values:hover { background: var(--inbox-surface); }
+.fx-lk-lnk:hover, .fx-fd-link:hover:not(:disabled) { text-decoration: underline; }
+.fx-fd-drawer .fx-fd-add:hover:not(:disabled) { background: var(--inbox-surface); }
+.fx-sh-pin-more:hover { background: var(--inbox-surface); }
+/* Option lists and tabs with a roving Tab stop show where it is. */
+.fx-fc-lb button:focus-visible, .fx-fc-tabs button:focus-visible, .fx-cmt-tabs button:focus-visible, .fx-fmt-stabs button:focus-visible,
+.fx-lk-trow:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: -2px; }
+/* The filter menu lists up to 500 values: those scrolled out of view skip layout and paint. */
+.fx-flt-list .fx-fc-chk { content-visibility: auto; contain-intrinsic-size: auto 26px; }
+
+/* ─── Sheets fixes: blank sheet and content (BlankSheet, src/components/content) ─── */
+/* Digits that line up down a column: number- and date-formatted cells, a table's Total row, Content dates, counts. */
+.fx-cs-tnum { font-variant-numeric: tabular-nums; }
+/* Slicer values (up to 5,000) and the Alt+↓ pick list (up to 500): rows off screen skip layout and paint until scrolled to. */
+.fx-slicer-items button { content-visibility: auto; contain-intrinsic-size: auto 29px; transition: border-color 120ms ease-out, color 120ms ease-out, filter 120ms ease-out; }
+.fx-slicer-items button:hover { border-color: color-mix(in srgb, var(--inbox-purple, #7C3AED) 45%, transparent); color: var(--sheet-ink); filter: brightness(0.96); }
+.fx-sh-menu[data-pick-list] > [role="none"] { content-visibility: auto; contain-intrinsic-size: auto 34px; }

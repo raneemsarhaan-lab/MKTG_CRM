@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useLocale, useTranslations } from 'next-intl'
 import type { FolderSummary } from '@/types/index'
 import { validateFolderName, FOLDER_NAME_MAX } from '@/lib/sheet-names'
 import type { SheetsApi } from './types'
@@ -25,6 +25,7 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
   now: string
 }) {
   const t = useTranslations('sheets')
+  const locale = useLocale()
   const format = useFormatter()
   const router = useRouter()
   const [folders, setFolders] = useState(initialFolders)
@@ -40,7 +41,9 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
   const now = new Date(nowIso)
 
   const linked = folders.filter(f => f.kind !== 'team')
-  const team = folders.filter(f => f.kind === 'team').sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }))
+  // The member's language, not the device's, so the server's order and the browser's match.
+  const collator = new Intl.Collator(locale, { sensitivity: 'base' })
+  const team = folders.filter(f => f.kind === 'team').sort((a, b) => collator.compare(a.name ?? '', b.name ?? ''))
   const nameOf = (f: FolderSummary) => (f.kind === 'content' ? t('folder.content') : f.kind === 'video' ? t('folder.video') : f.name ?? '')
   const errText = (e: string) => (t.has(`err.${e}`) ? t(`err.${e}`, { max: FOLDER_NAME_MAX }) : t('err.generic'))
   const say = (s: string) => { setToast(s); window.setTimeout(() => setToast(x => (x === s ? null : x)), 6000) }
@@ -129,13 +132,13 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
     <div key={f.id} className={`fx-sh-card${f.kind !== 'team' ? ' is-linked' : ''}`} data-folder={f.id}
          onContextMenu={e => { e.preventDefault(); openMenu(f, e.currentTarget, { x: e.clientX, y: e.clientY }) }}>
       {renaming === f.id
-        ? <NameInput label={t('home.folderName')} initial={f.name ?? ''} ok={t('home.create')} cancel={t('home.cancel')}
+        ? <NameInput label={t('home.folderName')} initial={f.name ?? ''} ok={t('ux.save')} cancel={t('home.cancel')}
                      onDone={v => (v === null ? (setRenaming(null), Promise.resolve(null)) : rename(f, v))} />
         : (
           <a className="fx-sh-card-link" href={`/sheets/${f.id}`} onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); router.push(`/sheets/${f.id}`) }}>
             <span className={`fx-sh-card-ic is-${f.kind}`} aria-hidden="true">{f.kind === 'content' ? '✎' : f.kind === 'video' ? '▶' : '▦'}</span>
             <span className="fx-sh-card-body">
-              <b>{nameOf(f)}{f.kind !== 'team' && <span className="fx-sh-linked"> 🔗 {t('home.linkedBadge')}</span>}</b>
+              <b>{nameOf(f)}{f.kind !== 'team' && <span className="fx-sh-linked"> <span aria-hidden="true">🔗 </span>{t('home.linkedBadge')}</span>}</b>
               <small>{t('home.sheets', { n: f.sheetCount })} · {edited(f)}</small>
             </span>
           </a>
@@ -144,7 +147,7 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
         <button type="button" className="fx-sh-card-menu" aria-label={`${t('folder.menu')}: ${nameOf(f)}`} aria-haspopup="menu" data-folder-menu={f.id}
                 onClick={e => openMenu(f, e.currentTarget)}>⋯</button>
       )}
-      {pins.includes(f.id) && <span className="fx-sh-pinned" aria-label={t('pinned')} title={t('pinned')}>📌</span>}
+      {pins.includes(f.id) && <span className="fx-sh-pinned" title={t('pinned')}><span aria-hidden="true">📌</span><span className="sr-only">{t('pinned')}</span></span>}
     </div>
   )
 
@@ -152,7 +155,7 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
     <div className="fx-sh-home" data-sheets-home="">
       <div className="fx-sh-home-head">
         <h1>{t('home.title')}</h1>
-        <button type="button" className="fx-sh-cta" data-new-folder="" onClick={() => setCreating(true)}>+ {t('home.newFolder')}</button>
+        <button type="button" className="fx-sh-cta" data-new-folder="" onClick={() => setCreating(true)}><span aria-hidden="true">+ </span>{t('home.newFolder')}</button>
       </div>
       <section aria-labelledby="fx-sh-linked-h">
         <h2 id="fx-sh-linked-h">{t('home.linked')}</h2>
@@ -170,17 +173,20 @@ export function SheetsHome({ api, initialFolders, initialPins, now: nowIso }: {
                            onDone={v => (v === null ? (setCreating(false), Promise.resolve(null)) : create(v))} />
               </div>
             )
-            : <button type="button" className="fx-sh-card is-add" onClick={() => setCreating(true)}>+ {t('home.newFolder')}</button>}
+            : <button type="button" className="fx-sh-card is-add" onClick={() => setCreating(true)}><span aria-hidden="true">+ </span>{t('home.newFolder')}</button>}
         </div>
       </section>
       {menu && <PopMenu at={menu.at} items={menu.items} label={t('folder.menu')} returnTo={menu.anchor} attr="data-folder-actions" onClose={() => setMenu(null)} />}
-      {pending && (
-        <div className="fx-sh-toast is-undo" role="status" data-folder-undo="">
-          <span>{t('folder.deleted', { name: nameOf(pending.folder) })}</span>
-          <button type="button" onClick={undoDelete}>{t('folder.undo')}</button>
-        </div>
-      )}
-      {toast && !pending && <div className="fx-sh-toast" role="status">{toast}</div>}
+      {/* One live region that stays; the notes in it come and go, so each is read. */}
+      <div className="fx-sh-live" role="status">
+        {pending && (
+          <div className="fx-sh-toast is-undo" data-folder-undo="">
+            <span>{t('folder.deleted', { name: nameOf(pending.folder) })}</span>
+            <button type="button" onClick={undoDelete}>{t('folder.undo')}</button>
+          </div>
+        )}
+        {toast && !pending && <div className="fx-sh-toast">{toast}</div>}
+      </div>
     </div>
   )
 }
@@ -204,14 +210,14 @@ function NameInput({ label, initial, ok, cancel, onDone }: {
   }
   return (
     <form className="fx-sh-namein" onSubmit={e => { e.preventDefault(); void save() }}>
-      <input ref={ref} value={v} aria-label={label} placeholder={label} maxLength={80} data-folder-name=""
+      <input ref={ref} value={v} aria-label={label} placeholder={`${label}…`} maxLength={80} data-folder-name="" name="folder-name" autoComplete="off"
              aria-invalid={!!err || undefined} aria-describedby={err ? 'fx-sh-namein-err' : undefined}
              onChange={e => { setV(e.target.value); setErr(null) }}
              onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); void onDone(null) } }} />
       {err && <span id="fx-sh-namein-err" className="fx-sh-err" role="alert">{err}</span>}
       <span className="fx-sh-namein-row">
         <button type="button" onClick={() => void onDone(null)}>{cancel}</button>
-        <button type="submit" className="is-go" disabled={busy}>{ok}</button>
+        <button type="submit" className="is-go" disabled={busy} aria-busy={busy || undefined}>{ok}</button>
       </span>
     </form>
   )

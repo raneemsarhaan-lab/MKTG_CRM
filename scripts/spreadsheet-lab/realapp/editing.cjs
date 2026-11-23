@@ -124,7 +124,9 @@ const writeClip = (page, html, text) => page.evaluate(([html, text]) => navigato
     await page.click('[data-undo]')
     await cellOf(page, 0, 0).click(); await page.keyboard.press('Control+Alt+m'); await page.locator('[data-cmt-input]').fill('A note to clear'); await page.keyboard.press('Control+Enter')
     await page.waitForSelector('[data-comment-thread] .fx-cmt'); await page.keyboard.press('Escape')
-    await cellOf(page, 0, 0).click(); await menu(page, 'clear', 'data-clear-menu', 3); await page.waitForTimeout(800)
+    // Comment threads can't be undone, so Clear › Comments asks first.
+    await cellOf(page, 0, 0).click(); await menu(page, 'clear', 'data-clear-menu', 3)
+    await page.click('[data-clear-comments] [data-ok]'); await page.waitForTimeout(800)
     ok(await cellOf(page, 0, 0).locator('[data-comment-marker]').count() === 0 && await text(page, 0, 0) === 'Q4 plan', 'Clear comments removes the thread only')
     await saved(page)
 

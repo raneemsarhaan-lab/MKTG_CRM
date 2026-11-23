@@ -6,39 +6,43 @@
  * Excel's options and wording, drawn as the app's own dialogs (Modal: Esc
  * cancels, Tab stays inside, focus goes back).
  */
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Modal } from '../Dialogs'
+import { ListBox, Modal } from '../Dialogs'
+import { tabKeys } from '../a11y'
 import type { ValidationAllow, ValidationOp, ValidationRecord, ValidationRule } from '@/types/index'
 import type { GoSpecial } from '@/lib/sheet-selection'
 import { BUILTIN_LISTS, FILL_LIST_LIMITS, type FillList, type SeriesSpec } from '@/lib/sheet-fill'
 import { cleanRule, listItems } from '@/lib/sheet-validate'
 
 const Row = ({ children }: { children: React.ReactNode }) => <div className="fx-sh-dialog-row">{children}</div>
+/** Custom Lists' "New list" choice. */
+const NEW_LIST = '__new'
 
 /** F5 / Ctrl+G: a cell or range by name, recent ones listed; Special… for Go To Special. */
 export function GoToDialog({ recent, onGo, onSpecial, onCancel }: { recent: string[]; onGo(ref: string): void; onSpecial(): void; onCancel(): void }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [ref, setRef] = useState(recent[0] ?? '')
   return (
     <Modal title={t('goto.title')} body={t('goto.sub')} onCancel={onCancel} attr="data-goto-dialog">
       {recent.length > 0 && (
         <div className="fx-sh-field">
-          <span className="fx-tip-cap">{t('goto.recent')}</span>
-          <div className="fx-sh-listbox" role="listbox" aria-label={t('goto.recent')}>
-            {recent.map(r => <div key={r} role="option" aria-selected={r === ref} tabIndex={-1} onClick={() => setRef(r)} onDoubleClick={() => onGo(r)} dir="ltr">{r}</div>)}
-          </div>
+          <span className="fx-tip-cap" aria-hidden="true">{t('goto.recent')}</span>
+          {/* ↑/↓ pick a recent place, Enter goes there (it was mouse-only). */}
+          <ListBox label={t('goto.recent')} value={ref} onChange={setRef} onEnter={() => { if (ref.trim()) onGo(ref.trim()) }}
+                   options={recent.map(r => ({ id: r, label: r, dir: 'ltr' }))} />
         </div>
       )}
       <label className="fx-sh-field">
         <span>{t('goto.ref')}</span>
-        <input value={ref} dir="ltr" data-autofocus="" data-goto-ref="" onChange={e => setRef(e.target.value)}
+        <input value={ref} dir="ltr" data-autofocus="" data-goto-ref="" name="goto-ref" autoComplete="off" spellCheck={false} translate="no" onChange={e => setRef(e.target.value)}
                onKeyDown={e => { if (e.key === 'Enter' && ref.trim()) { e.preventDefault(); onGo(ref.trim()) } }} />
       </label>
       <Row>
         <button type="button" className="is-start" data-goto-special="" onClick={onSpecial}>{t('goto.special')}…</button>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!ref.trim()} onClick={() => onGo(ref.trim())}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!ref.trim()} onClick={() => onGo(ref.trim())}>{tu('ok.go')}</button>
       </Row>
     </Modal>
   )
@@ -47,6 +51,7 @@ export function GoToDialog({ recent, onGo, onSpecial, onCancel }: { recent: stri
 /** Go To Special: Excel's choices; those that need formulas or objects stay greyed. */
 export function GoToSpecialDialog({ supported, onOk, onCancel }: { supported: GoSpecial[]; onOk(what: GoSpecial, numbers: boolean, text: boolean): void; onCancel(): void }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [what, setWhat] = useState<GoSpecial | 'formulas' | 'array' | 'objects' | 'precedents' | 'dependents'>('blanks')
   const [numbers, setNumbers] = useState(true), [text, setText] = useState(true)
   const [dvAll, setDvAll] = useState(true)
@@ -97,7 +102,7 @@ export function GoToSpecialDialog({ supported, onOk, onCancel }: { supported: Go
       </div>
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" data-autofocus="" onClick={go}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" data-autofocus="" onClick={go}>{tu('ok.select')}</button>
       </Row>
     </Modal>
   )
@@ -106,6 +111,7 @@ export function GoToSpecialDialog({ supported, onOk, onCancel }: { supported: Go
 /** Home › Fill › Series…: in rows or columns; linear, growth, date (by unit) or AutoFill; a step and a stop value. */
 export function SeriesDialog({ range, by: by0, onOk, onCancel }: { range: string; by: 'rows' | 'cols'; onOk(spec: SeriesSpec, by: 'rows' | 'cols'): void; onCancel(): void }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [by, setBy] = useState(by0)
   const [type, setType] = useState<SeriesSpec['type']>('linear')
   const [unit, setUnit] = useState<SeriesSpec['unit']>('day')
@@ -130,12 +136,12 @@ export function SeriesDialog({ range, by: by0, onOk, onCancel }: { range: string
         </fieldset>
       </div>
       <div className="fx-tip-two">
-        <label className="fx-sh-field"><span>{t('series.step')}</span><input value={step} inputMode="decimal" dir="ltr" data-series-step="" disabled={type === 'autofill'} onChange={e => setStep(e.target.value)} /></label>
-        <label className="fx-sh-field"><span>{t('series.stop')}</span><input value={stop} inputMode="decimal" dir="ltr" placeholder={t('series.optional')} disabled={type === 'autofill' || type === 'date'} onChange={e => setStop(e.target.value)} /></label>
+        <label className="fx-sh-field"><span>{t('series.step')}</span><input value={step} inputMode="decimal" dir="ltr" data-series-step="" name="series-step" autoComplete="off" disabled={type === 'autofill'} onChange={e => setStep(e.target.value)} /></label>
+        <label className="fx-sh-field"><span>{t('series.stop')}</span><input value={stop} inputMode="decimal" dir="ltr" placeholder={tu('ph.optional')} name="series-stop" autoComplete="off" disabled={type === 'autofill' || type === 'date'} onChange={e => setStop(e.target.value)} /></label>
       </div>
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!valid} onClick={() => onOk({ type, unit, step: stepN, stop: type === 'date' ? null : stopN, trend: false }, by)}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!valid} onClick={() => onOk({ type, unit, step: stepN, stop: type === 'date' ? null : stopN, trend: false }, by)}>{tu('ok.fill')}</button>
       </Row>
     </Modal>
   )
@@ -152,6 +158,8 @@ export function DataValidationDialog({ range, rule, mixed, inRule, onOk, onCance
   onOk(rule: ValidationRule | null, all: boolean): void; onCancel(): void
 }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
+  const uid = useId()
   const [tab, setTab] = useState<'settings' | 'input' | 'error'>('settings')
   const start = mixed ? null : rule
   const [allow, setAllow] = useState<ValidationAllow>(start?.allow ?? 'any')
@@ -176,14 +184,15 @@ export function DataValidationDialog({ range, rule, mixed, inRule, onOk, onCance
   const okDisabled = allow !== 'any' && !built
   return (
     <Modal title={t('dv.title')} body={t('dv.sub', { range })} onCancel={onCancel} attr="data-dv-dialog">
-      <div className="fx-fc-tabs" role="tablist">
+      <div className="fx-fc-tabs" role="tablist" aria-label={t('dv.title')} onKeyDown={tabKeys}>
         {(['settings', 'input', 'error'] as const).map(k => (
-          <button type="button" role="tab" key={k} aria-selected={tab === k} data-dv-tab={k} onClick={() => setTab(k)}>{t(`dv.tab.${k}`)}</button>
+          <button type="button" role="tab" key={k} id={`${uid}-tab-${k}`} aria-selected={tab === k} aria-controls={`${uid}-panel`} tabIndex={tab === k ? 0 : -1}
+                  data-dv-tab={k} onClick={() => setTab(k)}>{t(`dv.tab.${k}`)}</button>
         ))}
       </div>
       {mixed && tab === 'settings' && <p className="fx-tip-note" role="note">{t('dv.mixed')}</p>}
       {tab === 'settings' && (
-        <div className="fx-tip-body" role="tabpanel">
+        <div className="fx-tip-body" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-settings`}>
           <div className="fx-tip-cap">{t('dv.criteria')}</div>
           <div className="fx-tip-two">
             <label className="fx-sh-field"><span>{t('dv.allow')}</span>
@@ -202,42 +211,42 @@ export function DataValidationDialog({ range, rule, mixed, inRule, onOk, onCance
               <select value={op} onChange={e => setOp(e.target.value as ValidationOp)}>{OPS.map(x => <option key={x} value={x}>{t(`dv.ops.${x}`)}</option>)}</select>
             </label>
             <div className="fx-tip-two">
-              <label className="fx-sh-field"><span>{two ? t('dv.min') : allow === 'length' ? t('dv.length') : t('dv.value')}</span><input value={a} dir="ltr" placeholder={sample} data-dv-a="" onChange={e => setA(e.target.value)} /></label>
-              {two && <label className="fx-sh-field"><span>{t('dv.max')}</span><input value={b} dir="ltr" placeholder={sample} data-dv-b="" onChange={e => setB(e.target.value)} /></label>}
+              <label className="fx-sh-field"><span>{two ? t('dv.min') : allow === 'length' ? t('dv.length') : t('dv.value')}</span><input value={a} dir="ltr" placeholder={tu('ph.eg', { ex: sample })} data-dv-a="" name="dv-min" autoComplete="off" onChange={e => setA(e.target.value)} /></label>
+              {two && <label className="fx-sh-field"><span>{t('dv.max')}</span><input value={b} dir="ltr" placeholder={tu('ph.eg', { ex: sample })} data-dv-b="" name="dv-max" autoComplete="off" onChange={e => setB(e.target.value)} /></label>}
             </div>
           </>}
           {allow === 'list' && (
             <label className="fx-sh-field"><span>{t('dv.source')}</span>
-              <input value={source} placeholder={t('dv.sourceHint')} data-dv-source="" onChange={e => setSource(e.target.value)} />
+              <input value={source} placeholder={tu('ph.source')} data-dv-source="" name="dv-source" autoComplete="off" onChange={e => setSource(e.target.value)} />
             </label>
           )}
           {inRule && <label className="fx-sh-check"><input type="checkbox" checked={all} data-dv-all="" onChange={e => setAll(e.target.checked)} />{t('dv.applyAll')}</label>}
         </div>
       )}
       {tab === 'input' && (
-        <div className="fx-tip-body" role="tabpanel">
+        <div className="fx-tip-body" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-input`}>
           <label className="fx-sh-check"><input type="checkbox" checked={showIn} onChange={e => setShowIn(e.target.checked)} />{t('dv.showInput')}</label>
-          <label className="fx-sh-field"><span>{t('dv.inTitle')}</span><input value={inTitle} maxLength={32} disabled={!showIn} data-dv-in-title="" onChange={e => setInTitle(e.target.value)} /></label>
-          <label className="fx-sh-field"><span>{t('dv.inMsg')}</span><textarea className="fx-tip-ta" value={inMsg} maxLength={255} rows={3} disabled={!showIn} data-dv-in-msg="" onChange={e => setInMsg(e.target.value)} /></label>
+          <label className="fx-sh-field"><span>{t('dv.inTitle')}</span><input value={inTitle} maxLength={32} disabled={!showIn} data-dv-in-title="" name="dv-input-title" autoComplete="off" onChange={e => setInTitle(e.target.value)} /></label>
+          <label className="fx-sh-field"><span>{t('dv.inMsg')}</span><textarea className="fx-tip-ta" value={inMsg} name="dv-input-message" maxLength={255} rows={3} disabled={!showIn} data-dv-in-msg="" onChange={e => setInMsg(e.target.value)} /></label>
         </div>
       )}
       {tab === 'error' && (
-        <div className="fx-tip-body" role="tabpanel">
+        <div className="fx-tip-body" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-error`}>
           <label className="fx-sh-check"><input type="checkbox" checked={showErr} onChange={e => setShowErr(e.target.checked)} />{t('dv.showError')}</label>
           <label className="fx-sh-field"><span>{t('dv.style')}</span>
             <select value={style} disabled={!showErr} data-dv-style="" onChange={e => setStyle(e.target.value as 'stop' | 'warning' | 'info')}>
               {(['stop', 'warning', 'info'] as const).map(x => <option key={x} value={x}>{t(`dv.styles.${x}`)}</option>)}
             </select>
           </label>
-          <label className="fx-sh-field"><span>{t('dv.errTitle')}</span><input value={errTitle} maxLength={32} disabled={!showErr} data-dv-err-title="" onChange={e => setErrTitle(e.target.value)} /></label>
-          <label className="fx-sh-field"><span>{t('dv.errMsg')}</span><textarea className="fx-tip-ta" value={errMsg} maxLength={255} rows={3} disabled={!showErr} data-dv-err-msg="" onChange={e => setErrMsg(e.target.value)} /></label>
+          <label className="fx-sh-field"><span>{t('dv.errTitle')}</span><input value={errTitle} maxLength={32} disabled={!showErr} data-dv-err-title="" name="dv-error-title" autoComplete="off" onChange={e => setErrTitle(e.target.value)} /></label>
+          <label className="fx-sh-field"><span>{t('dv.errMsg')}</span><textarea className="fx-tip-ta" value={errMsg} name="dv-error-message" maxLength={255} rows={3} disabled={!showErr} data-dv-err-msg="" onChange={e => setErrMsg(e.target.value)} /></label>
         </div>
       )}
       <Row>
         <button type="button" className="is-start" data-dv-clear="" onClick={() => onOk(null, all)}>{t('dv.clearAll')}</button>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
         <button type="button" className="is-lime" data-ok="" disabled={okDisabled}
-                onClick={() => onOk(allow === 'any' && !built?.input ? null : built, all)}>{t('ok')}</button>
+                onClick={() => onOk(allow === 'any' && !built?.input ? null : built, all)}>{tu('ok.apply')}</button>
       </Row>
     </Modal>
   )
@@ -281,6 +290,7 @@ export function CustomListsDialog({ lists, canEdit, fromCells, onSave, onCancel 
   onSave(lists: FillList[]): void; onCancel(): void
 }) {
   const t = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [mine, setMine] = useState<FillList[]>(lists)
   const [sel, setSel] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -303,21 +313,19 @@ export function CustomListsDialog({ lists, canEdit, fromCells, onSave, onCancel 
     <Modal title={t('lists.title')} body={t('lists.sub')} onCancel={onCancel} attr="data-custom-lists">
       <div className="fx-tip-lists">
         <div className="fx-sh-field">
-          <span className="fx-tip-cap">{t('lists.lists')}</span>
-          <div className="fx-sh-listbox fx-tip-lb" role="listbox" aria-label={t('lists.lists')}>
-            <div role="option" aria-selected={sel === null} tabIndex={-1} className="fx-tip-new" onClick={() => pickList(null)}>＋ {t('lists.newList')}</div>
-            {BUILTIN_LISTS.map((l, i) => (
-              <div key={`b${i}`} role="option" aria-selected={sel === `b:${i}`} tabIndex={-1} className="is-fixed" onClick={() => pickList(`b:${i}`)}>
-                <span dir="auto">{short(l)}</span><small>{t('lists.builtin')}</small>
-              </div>
-            ))}
-            {mine.map(l => <div key={l.id} role="option" aria-selected={sel === l.id} tabIndex={-1} data-list={l.id} onClick={() => pickList(l.id)}><span dir="auto">{short(l.items)}</span></div>)}
-          </div>
+          <span className="fx-tip-cap" aria-hidden="true">{t('lists.lists')}</span>
+          {/* ↑/↓ pick a list (it was mouse-only). */}
+          <ListBox label={t('lists.lists')} className="fx-tip-lb" value={sel ?? NEW_LIST} onChange={id => pickList(id === NEW_LIST ? null : id)}
+                   options={[
+                     { id: NEW_LIST, className: 'fx-tip-new', label: <><span aria-hidden="true">＋ </span>{t('lists.newList')}</> },
+                     ...BUILTIN_LISTS.map((l, i) => ({ id: `b:${i}`, className: 'is-fixed', label: <><span dir="auto">{short(l)}</span><small>{t('lists.builtin')}</small></> })),
+                     ...mine.map(l => ({ id: l.id, data: { 'data-list': l.id }, label: <span dir="auto">{short(l.items)}</span> })),
+                   ]} />
         </div>
         <label className="fx-sh-field">
           <span className="fx-tip-cap">{t('lists.entries')}</span>
           <textarea className="fx-tip-ta is-tall" value={text} dir="auto" readOnly={!canEdit || !!builtinSel} data-list-entries=""
-                    placeholder={t('lists.entriesHint')} onChange={e => setText(e.target.value)} />
+                    placeholder={tu('ph.entries')} name="list-entries" onChange={e => setText(e.target.value)} />
         </label>
         <div className="fx-tip-side">
           <button type="button" className="fx-tip-btn" data-list-add="" disabled={!canEdit || !!builtinSel || items(text).length < FILL_LIST_LIMITS.minItems} onClick={add}>{cur ? t('lists.update') : t('lists.add')}</button>
@@ -333,7 +341,7 @@ export function CustomListsDialog({ lists, canEdit, fromCells, onSave, onCancel 
       {!canEdit && <p className="fx-tip-note">{t('lists.adminsOnly')}</p>}
       <Row>
         <button type="button" onClick={onCancel}>{t('cancel')}</button>
-        <button type="button" className="is-lime" data-ok="" disabled={!canEdit} onClick={() => onSave(mine)}>{t('ok')}</button>
+        <button type="button" className="is-lime" data-ok="" disabled={!canEdit} onClick={() => onSave(mine)}>{tu('save')}</button>
       </Row>
     </Modal>
   )

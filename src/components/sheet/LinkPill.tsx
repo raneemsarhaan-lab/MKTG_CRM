@@ -49,7 +49,8 @@ function Icon({ kind }: { kind: PillKind }) {
 /** One pill. With `href` it is a link that opens in a new tab (the cell's own click still selects it). */
 export function LinkPill({ kind, text, href, title }: { kind: PillKind; text: string; href?: string | null; title?: string }) {
   const cls = `fx-pill is-${kind}`
-  const body = <><Icon kind={kind} /><span className="fx-pill-text">{text}</span></>
+  // File names and web addresses stay as they are when the page is machine-translated.
+  const body = <><Icon kind={kind} /><span className="fx-pill-text" translate={kind === 'task' ? undefined : 'no'}>{text}</span></>
   return href
     ? <a className={cls} href={href} target="_blank" rel="noopener noreferrer" tabIndex={-1} title={title ?? href} onClick={e => e.stopPropagation()}>{body}</a>
     : <span className={cls} title={title ?? text}>{body}</span>

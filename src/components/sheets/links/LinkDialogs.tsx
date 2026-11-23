@@ -15,6 +15,25 @@ import { StagePill as BoardStagePill } from '@/components/sheet/StatusCell'
 import type { StageId } from '@/types/index'
 import { Modal } from '../Dialogs'
 import type { TaskHit } from '@/actions/sheet-links'
+import { intlLocale } from '@/lib/sheet-format'
+import { optionKeys, stopOf } from '../a11y'
+
+/** Counts and row numbers in the member's digits. */
+function useNum() {
+  const locale = useLocale()
+  return (n: number) => new Intl.NumberFormat(intlLocale(locale)).format(n)
+}
+/** A date typed as yyyy-mm-dd, as the member reads dates; anything else as typed. */
+function useDay() {
+  const locale = useLocale()
+  return (v: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return v
+    const d = new Date(`${v.trim()}T00:00:00Z`)
+    return Number.isNaN(+d) ? v : new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
+  }
+}
+/** Today plus `days`, on this device's calendar (not UTC's, which is a day off near midnight). */
+const localDay = (days = 0) => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 
 export const stageLabel = (id: string, lang: string) => {
   const m = STAGE_META[id as keyof typeof STAGE_META]
@@ -48,6 +67,7 @@ export function LinkDialog({ cols, map, teamCols, onSave, onUnlink, onReview, on
   onClose(): void
 }) {
   const t = useTranslations('sheets.links')
+  const num = useNum()
   const name = useFieldName(teamCols)
   const [step, setStep] = useState(map ? 2 : 1)
   const [taskCol, setTaskCol] = useState(map?.taskCol ?? cols[0]?.id ?? '')
@@ -129,9 +149,9 @@ export function LinkDialog({ cols, map, teamCols, onSave, onUnlink, onReview, on
         <>
           <p className="fx-fc-hint">{t('dialog.s3')}</p>
           <div className="fx-lk-result" data-link-result="">
-            <div><b>{res.linked}</b><small>{t('dialog.linked')}</small></div>
-            <div className={res.toChoose ? 'is-warn' : ''}><b>{res.toChoose}</b><small>{t('dialog.toChoose')}</small></div>
-            <div className={res.notFound ? 'is-warn' : ''}><b>{res.notFound}</b><small>{t('dialog.notFound')}</small></div>
+            <div><b>{num(res.linked)}</b><small>{t('dialog.linked')}</small></div>
+            <div className={res.toChoose ? 'is-warn' : ''}><b>{num(res.toChoose)}</b><small>{t('dialog.toChoose')}</small></div>
+            <div className={res.notFound ? 'is-warn' : ''}><b>{num(res.notFound)}</b><small>{t('dialog.notFound')}</small></div>
           </div>
         </>
       )}
@@ -147,10 +167,10 @@ export function LinkDialog({ cols, map, teamCols, onSave, onUnlink, onReview, on
 
 // ─── Choose a task / Add tasks ───────────────────────────────────────────────
 
-function TaskRow({ x, kind, on, onToggle }: { x: TaskHit; kind: 'radio' | 'tick'; on: boolean; onToggle(): void }) {
+function TaskRow({ x, kind, on, onToggle, tabIndex }: { x: TaskHit; kind: 'radio' | 'tick'; on: boolean; onToggle(): void; tabIndex?: number }) {
   const t = useTranslations('sheets.links')
   return (
-    <button type="button" role={kind === 'radio' ? 'radio' : 'checkbox'} aria-checked={on} className={`fx-lk-trow${on ? ' is-on' : ''}`} data-task-hit={x.id} onClick={onToggle}>
+    <button type="button" role={kind === 'radio' ? 'radio' : 'checkbox'} aria-checked={on} className={`fx-lk-trow${on ? ' is-on' : ''}`} data-task-hit={x.id} onClick={onToggle} tabIndex={tabIndex}>
       <span className={kind === 'radio' ? 'fx-lk-radio' : 'fx-lk-tick'} aria-hidden="true">{kind === 'tick' ? '✓' : ''}</span>
       <span className="fx-lk-tt"><b dir="auto">{x.name}</b><small dir="auto">{[x.project, x.assignee, x.dropped ? t('add.dropped') : ''].filter(Boolean).join(' · ')}</small></span>
       <StagePill stage={x.stage} />
@@ -167,6 +187,7 @@ export function ChooseTask({ text, row, choices, search, onPick, onClose }: {
   onClose(): void
 }) {
   const t = useTranslations('sheets.links')
+  const tu = useTranslations('sheets.ux')
   const [q, setQ] = useState(text)
   const [list, setList] = useState<TaskHit[]>(choices)
   const [sel, setSel] = useState<string | null>(choices[0]?.id ?? null)
@@ -178,9 +199,10 @@ export function ChooseTask({ text, row, choices, search, onPick, onClose }: {
   return (
     <Modal title={t('choose.title')} onCancel={onClose} attr="data-choose-task">
       <p className="fx-fc-hint">{t('choose.body', { text, n: choices.length || list.length, row })}</p>
-      <input type="search" className="fx-flt-in" value={q} data-autofocus="" aria-label={t('choose.search')} placeholder={t('choose.search')} onChange={e => setQ(e.target.value)} />
-      <div className="fx-lk-list" role="radiogroup" aria-label={t('choose.title')}>
-        {list.length ? list.map(x => <TaskRow key={x.id} x={x} kind="radio" on={sel === x.id} onToggle={() => setSel(x.id)} />) : <p className="fx-fc-hint">{t('choose.none')}</p>}
+      <input type="search" className="fx-flt-in" value={q} data-autofocus="" aria-label={t('choose.search')} placeholder={tu('ph.tasks')} name="task-search" autoComplete="off" onChange={e => setQ(e.target.value)} />
+      {/* One Tab stop; ↑/↓ choose, as radio buttons do. */}
+      <div className="fx-lk-list" role="radiogroup" aria-label={t('choose.title')} onKeyDown={e => optionKeys(e)}>
+        {list.length ? list.map((x, i) => <TaskRow key={x.id} x={x} kind="radio" on={sel === x.id} tabIndex={stopOf(i, list.findIndex(y => y.id === sel))} onToggle={() => setSel(x.id)} />) : <p className="fx-fc-hint">{t('choose.none')}</p>}
       </div>
       <div className="fx-sh-dialog-row">
         <button type="button" onClick={onClose}>{t('dialog.cancel')}</button>
@@ -199,6 +221,7 @@ export function AddTasks({ below, people, projects, search, onAdd, onClose }: {
   onClose(): void
 }) {
   const t = useTranslations('sheets.links')
+  const tu = useTranslations('sheets.ux')
   const locale = useLocale()
   const [q, setQ] = useState('')
   const [stage, setStage] = useState(''), [person, setPerson] = useState(''), [project, setProject] = useState('')
@@ -213,7 +236,7 @@ export function AddTasks({ below, people, projects, search, onAdd, onClose }: {
     <Modal title={t('add.title')} onCancel={onClose} attr="data-add-tasks">
       <p className="fx-fc-hint">{t('add.body', { row: below })}</p>
       <div className="fx-lk-search">
-        <input type="search" className="fx-flt-in" value={q} data-autofocus="" data-add-q="" aria-label={t('choose.search')} placeholder={t('choose.search')} onChange={e => setQ(e.target.value)} />
+        <input type="search" className="fx-flt-in" value={q} data-autofocus="" data-add-q="" aria-label={t('choose.search')} placeholder={tu('ph.tasks')} name="task-search" autoComplete="off" onChange={e => setQ(e.target.value)} />
         <select value={stage} aria-label={t('add.anyStage')} onChange={e => setStage(e.target.value)}>
           <option value="">{t('add.anyStage')}</option>
           {Object.keys(STAGE_META).map(id => <option key={id} value={id}>{stageLabel(id, locale)}</option>)}
@@ -249,9 +272,12 @@ export function CreateTasksPreview({ rows, people, onCreate, onClose }: {
   onClose(): void
 }) {
   const t = useTranslations('sheets.links')
+  const tu = useTranslations('sheets.ux')
+  const num = useNum()
+  const day = useDay()
   const [fix, setFix] = useState<Record<string, TaskFieldValues>>({})
   const [out, setOut] = useState<Set<string>>(new Set())
-  const [due, setDue] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10) })
+  const [due, setDue] = useState(() => localDay(7))
   const [busy, setBusy] = useState(false)
   const names = useMemo(() => new Set(people.map(p => p.name.trim().toLowerCase())), [people])
   const firstNames = useMemo(() => people.map(p => p.name.trim().toLowerCase().split(' ')[0]), [people])
@@ -274,9 +300,9 @@ export function CreateTasksPreview({ rows, people, onCreate, onClose }: {
       {!rows.length ? <p className="fx-fc-hint">{t('create.none')}</p> : (
         <>
           <div className="fx-lk-result">
-            <div><b>{ready.length}</b><small>{t('create.toCreate')}</small></div>
-            <div className={bad.length ? 'is-warn' : ''}><b>{bad.length}</b><small>{t('create.problems')}</small></div>
-            <div><b>{out.size}</b><small>{t('create.leftOut')}</small></div>
+            <div><b>{num(ready.length)}</b><small>{t('create.toCreate')}</small></div>
+            <div className={bad.length ? 'is-warn' : ''}><b>{num(bad.length)}</b><small>{t('create.problems')}</small></div>
+            <div><b>{num(out.size)}</b><small>{t('create.leftOut')}</small></div>
           </div>
           <div className="fx-rules-wrap">
             <table className="fx-lk-prev">
@@ -286,31 +312,31 @@ export function CreateTasksPreview({ rows, people, onCreate, onClose }: {
                   const v = val(r), p = out.has(r.rowId) ? null : problem(r), gone = out.has(r.rowId)
                   return (
                     <tr key={r.rowId} className={gone ? 'is-out' : ''} data-create-row={r.n}>
-                      <td>{r.n}</td>
+                      <td className="is-num">{num(r.n)}</td>
                       <td>
                         {p === 'noTitle' || fix[r.rowId]?.title !== undefined
-                          ? <input type="text" value={v.title ?? ''} aria-invalid={p === 'noTitle'} aria-label={`${t('create.colTitle')} ${r.n}`} data-fix-title={r.n} onChange={e => set(r.rowId, 'title', e.target.value)} />
+                          ? <input type="text" value={v.title ?? ''} aria-invalid={p === 'noTitle'} aria-label={`${t('create.colTitle')} ${num(r.n)}`} data-fix-title={r.n} name={`title-${r.n}`} autoComplete="off" onChange={e => set(r.rowId, 'title', e.target.value)} />
                           : <span dir="auto">{v.title}</span>}
                         {p === 'noTitle' && <span className="fx-lk-err">{t('create.noTitle')}</span>}
                       </td>
-                      <td className="is-num">{v.due || `${due} *`}{p === 'badDate' && <span className="fx-lk-err">{t('create.badDate')}</span>}</td>
+                      <td className="is-num">{v.due ? day(v.due) : <>{day(due)} <span aria-hidden="true">*</span></>}{p === 'badDate' && <span className="fx-lk-err">{t('create.badDate')}</span>}</td>
                       <td>
                         {p === 'unknown' || fix[r.rowId]?.assignee !== undefined
-                          ? <select value={knows(v.assignee ?? '') ? v.assignee ?? '' : ''} aria-label={`${t('create.colAssignee')} ${r.n}`} data-fix-who={r.n} onChange={e => set(r.rowId, 'assignee', e.target.value)}>
+                          ? <select value={knows(v.assignee ?? '') ? v.assignee ?? '' : ''} aria-label={`${t('create.colAssignee')} ${num(r.n)}`} data-fix-who={r.n} onChange={e => set(r.rowId, 'assignee', e.target.value)}>
                               <option value="">{t('create.pick')}</option>{people.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                             </select>
                           : <span dir="auto">{v.assignee}</span>}
                         {p === 'unknown' && <span className="fx-lk-err">{t('create.unknown', { name: r.values.assignee ?? '' })}</span>}
                       </td>
                       <td><StagePill stage="todo" /></td>
-                      <td><button type="button" className="fx-lk-lnk" data-leave={r.n} onClick={() => setOut(s => { const n = new Set(s); if (n.has(r.rowId)) n.delete(r.rowId); else n.add(r.rowId); return n })}>{gone ? t('create.back') : t('create.leave')}</button></td>
+                      <td><button type="button" className="fx-lk-lnk" data-leave={r.n} aria-label={gone ? tu('backRow', { n: num(r.n) }) : tu('leaveRow', { n: num(r.n) })} onClick={() => setOut(s => { const n = new Set(s); if (n.has(r.rowId)) n.delete(r.rowId); else n.add(r.rowId); return n })}>{gone ? t('create.back') : t('create.leave')}</button></td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-          <label className="fx-lk-due"><span>* {t('create.sharedDue')}</span><input type="date" value={due} data-shared-due="" onChange={e => setDue(e.target.value)} /></label>
+          <label className="fx-lk-due"><span><span aria-hidden="true">* </span>{t('create.sharedDue')}</span><input type="date" value={due} data-shared-due="" name="due" onChange={e => setDue(e.target.value)} /></label>
           <p className="fx-fc-hint">{t('create.undoNote')}</p>
         </>
       )}

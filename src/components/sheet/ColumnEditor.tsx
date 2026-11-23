@@ -6,8 +6,8 @@
  * a column that holds values first shows which would be cleared. Removing an
  * option in use asks what those rows should get.
  */
-import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useId, useRef, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import type { ChoiceOption, ColumnKind, Member } from '@/types/index'
 import { COLUMN_KINDS, convertValues, formatValue, nextChoiceColor } from '@/lib/sheet-columns'
 import { CHOICE_COLORS } from '@/lib/tokens'
@@ -27,13 +27,18 @@ export function ColumnEditor({ initial, values, members, heading, nameError, onS
   onCancel(): void
 }) {
   const t = useTranslations('sheet.columns')
+  const lang = useLocale()
   const [name, setName] = useState(initial?.name ?? '')
   const [kind, setKind] = useState<ColumnKind>(initial?.kind ?? 'text')
   const [options, setOptions] = useState<ChoiceOption[]>(() =>
     initial?.options.length ? initial.options.map(o => ({ ...o })) : [{ id: `new-${Date.now()}`, name: t('optionN', { n: 1 }), color: CHOICE_COLORS[0] }])
   const [replace, setReplace] = useState<Record<string, string | null>>({})
   const [err, setErr] = useState<string | null>(null)
+  /** The error is about the name: the name field is marked and takes focus. */
+  const [nameBad, setNameBad] = useState(false)
   const [busy, setBusy] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const errId = useId()
 
   const used = (id: string) => Object.values(values).filter(v => v === id).length
   const removed = (initial?.options ?? []).filter(o => kind === 'choice' && initial?.kind === 'choice' && !options.some(x => x.id === o.id) && used(o.id) > 0)
@@ -44,15 +49,17 @@ export function ColumnEditor({ initial, values, members, heading, nameError, onS
         const { cleared } = convertValues(initial.kind, kind, values, { members, options: initial.options }, { members, options })
         const n = Object.keys(values).length
         if (!cleared.length) return t('reviewFit', { n, kind: t(`kinds.${kind}`) })
-        const ex = cleared.slice(0, 2).map(id => `“${formatValue(initial.kind, values[id], { members, options: initial.options }).slice(0, 24)}”`).join(', ')
+        const ex = cleared.slice(0, 2).map(id => `“${formatValue(initial.kind, values[id], { members, options: initial.options, lang }).slice(0, 24)}”`).join(', ')
         return t('reviewClear', { bad: cleared.length, n, kind: t(`kinds.${kind}`), examples: cleared.length > 2 ? `${ex}…` : ex })
       })()
     : null
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
+    if (busy) return
     const bad = nameError(name)
-    if (bad) { setErr(bad); return }
+    if (bad) { setErr(bad); setNameBad(true); nameRef.current?.focus(); return }
+    setNameBad(false)
     if (kind === 'choice' && !options.some(o => o.name.trim())) { setErr(t('err.no_options')); return }
     if (unresolved.length) { setErr(t('err.option_in_use')); return }
     setBusy(true)
@@ -68,12 +75,13 @@ export function ColumnEditor({ initial, values, members, heading, nameError, onS
   const moveOpt = (i: number, d: number) => setOptions(os => { const n = [...os]; const [o] = n.splice(i, 1); n.splice(i + d, 0, o); return n })
 
   return (
-    <form className="fx-col-form" data-column-editor="" onSubmit={save}>
+    <form className="fx-col-form" data-column-editor="" onSubmit={save} aria-busy={busy || undefined}>
       <span className="fx-col-sub">{heading}</span>
       <label className="fx-col-label">
         {t('name')}
-        <input type="text" value={name} maxLength={40} placeholder={t('namePlaceholder')} data-autofocus=""
-               onChange={e => { setName(e.target.value); setErr(null) }} />
+        <input ref={nameRef} type="text" name="column-name" autoComplete="off" value={name} maxLength={40} placeholder={t('namePlaceholder')} data-autofocus=""
+               aria-invalid={nameBad || undefined} aria-describedby={nameBad && err ? errId : undefined}
+               onChange={e => { setName(e.target.value); setErr(null); setNameBad(false) }} />
       </label>
       <span className="fx-col-sub" id="fx-col-kind">{t('kind')}</span>
       <div className="fx-col-kinds" role="radiogroup" aria-labelledby="fx-col-kind"
@@ -101,7 +109,7 @@ export function ColumnEditor({ initial, values, members, heading, nameError, onS
             <div key={o.id} className="fx-col-opt">
               <button type="button" className="fx-col-swatch" style={{ background: o.color }} aria-label={t('optionColor', { name: o.name })}
                       onClick={() => setOptions(os => os.map(x => (x.id === o.id ? { ...x, color: CHOICE_COLORS[(CHOICE_COLORS.indexOf(x.color as typeof CHOICE_COLORS[number]) + 1) % CHOICE_COLORS.length] } : x)))} />
-              <input type="text" value={o.name} aria-label={t('optionN', { n: i + 1 })} maxLength={40}
+              <input type="text" name={`option-${i + 1}`} autoComplete="off" value={o.name} aria-label={t('optionN', { n: i + 1 })} maxLength={40}
                      onChange={e => setOptions(os => os.map(x => (x.id === o.id ? { ...x, name: e.target.value } : x)))} />
               <button type="button" className="fx-col-ib" aria-label={t('optionUp', { name: o.name })} disabled={i === 0} onClick={() => moveOpt(i, -1)}>↑</button>
               <button type="button" className="fx-col-ib" aria-label={t('optionDown', { name: o.name })} disabled={i === options.length - 1} onClick={() => moveOpt(i, 1)}>↓</button>
@@ -125,10 +133,10 @@ export function ColumnEditor({ initial, values, members, heading, nameError, onS
         </>
       )}
       {review && <div className="fx-col-review" role="status" data-kind-review="">{review}</div>}
-      <span className="fx-col-err" role="alert">{err}</span>
+      <span className="fx-col-err" id={errId} role="alert">{err}</span>
       <span className="fx-sheet-pop-row">
         <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('cancel')}</button>
-        <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{initial ? t('save') : t('addColumn')}</button>
+        <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{busy ? t('saving') : initial ? t('save') : t('addColumn')}</button>
       </span>
     </form>
   )

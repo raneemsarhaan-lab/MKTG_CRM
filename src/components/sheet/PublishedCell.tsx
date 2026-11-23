@@ -20,10 +20,12 @@ export function PublishedContent({ task, canEdit, t }: { task: Task; canEdit: bo
 }
 
 /** A link field with Save and Skip/Cancel, used inside a SheetPopover. */
-export function LinkPrompt({ title, initial, saveLabel, skipLabel, badLink, placeholder, onSave, onSkip }: {
+export function LinkPrompt({ title, initial, saveLabel, savingLabel, skipLabel, badLink, placeholder, onSave, onSkip }: {
   title: string
   initial?: string
   saveLabel: string
+  /** The Save button while the link is on its way ("Saving…"); absent: Save, disabled. */
+  savingLabel?: string
   skipLabel: string
   badLink: string
   placeholder: string
@@ -34,6 +36,7 @@ export function LinkPrompt({ title, initial, saveLabel, skipLabel, badLink, plac
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   async function save() {
+    if (busy) return
     const v = value.trim()
     if (v && !/^https?:\/\/\S+$/i.test(v)) { setNote(badLink); return }
     setBusy(true)
@@ -42,11 +45,12 @@ export function LinkPrompt({ title, initial, saveLabel, skipLabel, badLink, plac
     if (err) setNote(err)
   }
   return (
-    <form className="fx-sheet-pop-form" onSubmit={e => { e.preventDefault(); void save() }}>
+    <form className="fx-sheet-pop-form" aria-busy={busy || undefined} onSubmit={e => { e.preventDefault(); void save() }}>
       <label className="fx-sheet-pop-title">
         {title}
         <input
           type="text"
+          name="link"
           inputMode="url"
           autoComplete="off"
           spellCheck={false}
@@ -60,7 +64,7 @@ export function LinkPrompt({ title, initial, saveLabel, skipLabel, badLink, plac
       {note && <span className="fx-sheet-note" id="fx-sheet-pop-note" role="alert">{note}</span>}
       <span className="fx-sheet-pop-row">
         <button type="button" className="fx-sheet-btn" onClick={onSkip}>{skipLabel}</button>
-        <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{saveLabel}</button>
+        <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{busy && savingLabel ? savingLabel : saveLabel}</button>
       </span>
     </form>
   )

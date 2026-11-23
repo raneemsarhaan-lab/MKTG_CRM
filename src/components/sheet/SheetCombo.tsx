@@ -76,7 +76,9 @@ export function SheetCombo({ label, items, current, typed, placeholder, noMatch,
         aria-activedescendant={rows.length ? `fx-combo-${at}` : undefined}
         aria-label={label}
         placeholder={placeholder}
+        name="combo-search"
         autoComplete="off"
+        spellCheck={false}
         onChange={e => { setQ(e.target.value); setSel(0) }}
         onKeyDown={e => {
           if (e.key === 'ArrowDown') { e.preventDefault(); setSel((at + 1) % Math.max(1, rows.length)) }

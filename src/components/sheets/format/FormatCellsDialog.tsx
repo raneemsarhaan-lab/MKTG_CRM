@@ -16,6 +16,7 @@ import { Modal } from '../Dialogs'
 import { sendFormat, type FormatSource, type FormatState } from './bus'
 import { DEFAULT_LINE, numKey } from './FormatToolbar'
 import { PresetIcon } from './BorderPicker'
+import { NumField, optionKeys, stopOf, tabKeys, useColorName } from '../a11y'
 
 type Tab = 'number' | 'alignment' | 'font' | 'border' | 'fill' | 'protection'
 const TABS: Tab[] = ['number', 'alignment', 'font', 'border', 'fill', 'protection']
@@ -51,6 +52,8 @@ function catNum(cat: typeof CATS[number], prev: NumberFormat | undefined): Numbe
 export function FormatCellsDialog({ state, target, onClose }: { state: FormatState; target: FormatSource; onClose(): void }) {
   const t = useTranslations('sheets.format')
   const tt = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
+  const colorName = useColorName()
   const locale = useLocale()
   const uid = useId()
   const [tab, setTab] = useState<Tab>('number')
@@ -75,8 +78,8 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
   const fld = (label: string, input: React.ReactNode) => <label className="fx-fc-fld"><span>{label}</span>{input}</label>
   const lb = <T extends string | number>(label: string, list: readonly T[], cur: T, name: (x: T) => string, pick: (x: T) => void, style?: (x: T) => React.CSSProperties | undefined) => (
     <div className="fx-fc-fld"><span id={`${uid}-${idOf(label)}`}>{label}</span>
-      <div className="fx-fc-lb" role="listbox" aria-labelledby={`${uid}-${idOf(label)}`}>
-        {list.map(x => <button key={String(x)} type="button" role="option" aria-selected={cur === x} style={style?.(x)} onClick={() => pick(x)}>{name(x)}</button>)}
+      <div className="fx-fc-lb" role="listbox" aria-labelledby={`${uid}-${idOf(label)}`} onKeyDown={e => optionKeys(e)}>
+        {list.map((x, i) => <button key={String(x)} type="button" role="option" aria-selected={cur === x} tabIndex={stopOf(i, list.indexOf(cur))} style={style?.(x)} onClick={() => pick(x)}>{name(x)}</button>)}
       </div>
     </div>
   )
@@ -84,10 +87,13 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
   return (
     <Modal title={t('fc.titleAt', { cell: state.cell })} onCancel={onClose} attr="data-format-dialog">
       <div className="fx-fc">
-        <div className="fx-fc-tabs" role="tablist">
-          {TABS.filter(x => x !== 'protection' || target === 'blank').map(x => <button key={x} type="button" role="tab" aria-selected={tab === x} data-fc-tab={x} onClick={() => setTab(x)}>{x === 'protection' ? tt('protect.tab') : t(`fc.tabs.${x}`)}</button>)}
+        <div className="fx-fc-tabs" role="tablist" aria-label={t('fc.titleAt', { cell: state.cell })} onKeyDown={tabKeys}>
+          {TABS.filter(x => x !== 'protection' || target === 'blank').map(x => (
+            <button key={x} type="button" role="tab" id={`${uid}-tab-${x}`} aria-selected={tab === x} aria-controls={`${uid}-panel`} tabIndex={tab === x ? 0 : -1}
+                    data-fc-tab={x} onClick={() => setTab(x)}>{x === 'protection' ? tt('protect.tab') : t(`fc.tabs.${x}`)}</button>
+          ))}
         </div>
-        <div className="fx-fc-body" role="tabpanel">
+        <div className="fx-fc-body" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-tab-${tab}`}>
           {tab === 'number' && (
             <div className="fx-fc-two">
               {lb(t('fc.category'), CATS, cat, c => (c === 'shortDate' ? t('fc.date') : t(`num.${c}`)), c => setNum(catNum(c, d.num)))}
@@ -97,7 +103,7 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                 </div>
                 {d.num && ['number', 'currency', 'accounting', 'percent', 'scientific'].includes(d.num.kind) && (
                   <div className="fx-fc-row">
-                    {fld(t('fc.decimals'), <input type="number" min={0} max={10} value={d.num.dp ?? 2} data-fc-dp="" onChange={e => setNum({ ...d.num!, dp: Math.max(0, Math.min(10, Number(e.target.value) || 0)) })} />)}
+                    {fld(t('fc.decimals'), <NumField min={0} max={10} value={d.num.dp ?? 2} data-fc-dp="" name="decimals" onValue={n => setNum({ ...d.num!, dp: n })} />)}
                     {(d.num.kind === 'currency' || d.num.kind === 'accounting') && fld(t('fc.symbol'),
                       <select value={d.num.cur ?? 'EGP'} data-fc-cur="" onChange={e => setNum({ ...d.num!, cur: e.target.value as NumberFormat['cur'] })}>
                         {CURRENCIES.map(c => <option key={c} value={c}>{t(`cur.${c}`)}</option>)}
@@ -112,11 +118,12 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                 {cat === 'custom' && (
                   <div className="fx-fc-fld">
                     {fld(t('fc.type'), <input type="text" value={d.num?.pattern ?? ''} data-fc-pattern="" aria-invalid={!patternOk || undefined} dir="ltr" maxLength={60}
+                                              name="number-code" autoComplete="off" spellCheck={false} translate="no" aria-describedby={`${uid}-why`}
                                               onChange={e => setNum(customNum(e.target.value))} />)}
-                    <div className="fx-fc-lb is-codes" role="listbox" aria-label={t('fc.type')} dir="ltr">
-                      {CODES.map(c => <button key={c} type="button" role="option" aria-selected={d.num?.pattern === c} data-fc-code={c} onClick={() => setNum(customNum(c))}>{c}</button>)}
+                    <div className="fx-fc-lb is-codes" role="listbox" aria-label={t('fc.type')} dir="ltr" translate="no" onKeyDown={e => optionKeys(e)}>
+                      {CODES.map((c, i) => <button key={c} type="button" role="option" aria-selected={d.num?.pattern === c} tabIndex={stopOf(i, CODES.indexOf(d.num?.pattern ?? ''))} data-fc-code={c} onClick={() => setNum(customNum(c))}>{c}</button>)}
                     </div>
-                    <small className={patternOk ? 'fx-fc-hint' : 'fx-fc-bad'} role={patternOk ? undefined : 'alert'} data-fc-why={why ?? undefined}>
+                    <small id={`${uid}-why`} className={patternOk ? 'fx-fc-hint' : 'fx-fc-bad'} role={patternOk ? undefined : 'alert'} data-fc-why={why ?? undefined}>
                       {patternOk ? t('fc.customHint') : why ? t(`fc.why.${why}`) : t('fc.patternBad')}
                     </small>
                   </div>
@@ -134,8 +141,8 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                   {(['top', 'middle', 'bottom'] as const).map(x => <option key={x} value={x}>{t(`fc.v.${x}`)}</option>)}</select>)}
               </div>
               <div className="fx-fc-row">
-                {fld(t('fc.indent'), <input type="number" min={0} max={15} value={d.indent ?? 0} onChange={e => set({ indent: Math.max(0, Math.min(15, Number(e.target.value) || 0)) || undefined })} />)}
-                {fld(`${t('fc.orientation')} (${t('fc.degrees')})`, <input type="number" min={-90} max={90} value={typeof d.rot === 'number' ? d.rot : 0} onChange={e => set({ rot: Math.max(-90, Math.min(90, Number(e.target.value) || 0)) || undefined })} />)}
+                {fld(t('fc.indent'), <NumField min={0} max={15} value={d.indent ?? 0} name="indent" onValue={n => set({ indent: n || undefined })} />)}
+                {fld(`${t('fc.orientation')} (${t('fc.degrees')})`, <NumField min={-90} max={90} value={typeof d.rot === 'number' ? d.rot : 0} name="rotation" onValue={n => set({ rot: n || undefined })} />)}
               </div>
               <label className="fx-fc-chk"><input type="checkbox" checked={!!d.wrap} data-fc-wrap="" onChange={e => set({ wrap: e.target.checked ? true : undefined })} />{t('fc.wrap')}</label>
               <div className="fx-fc-sample"><small>{t('fc.preview')}</small>
@@ -207,9 +214,9 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
             <div className="fx-fc-stack">
               <span className="fx-fc-cap">{t('fc.bg')}</span>
               <button type="button" className="fx-fc-nofill" aria-pressed={!d.fill} onClick={() => set({ fill: undefined })}>{t('color.noFill')}</button>
-              <div className="fx-fmt-swg">
-                {[...THEME_COLORS, ...STANDARD_COLORS].map(c => (
-                  <button key={c} type="button" className={`fx-fmt-sw${d.fill === c ? ' is-cur' : ''}`} style={{ background: c }} aria-label={c} aria-pressed={d.fill === c} onClick={() => set({ fill: c })} />
+              <div className="fx-fmt-swg" role="group" aria-label={t('fc.bg')}>
+                {[...THEME_COLORS, ...STANDARD_COLORS].map((c, i) => (
+                  <button key={`${i}${c}`} type="button" className={`fx-fmt-sw${d.fill === c ? ' is-cur' : ''}`} style={{ background: c }} aria-label={colorName(c)} title={colorName(c)} aria-pressed={d.fill === c} onClick={() => set({ fill: c })} />
                 ))}
               </div>
               {fld(t('color.more'), <input type="color" value={d.fill ?? '#FFFFFF'} onChange={e => set({ fill: e.target.value.toUpperCase() })} />)}
@@ -219,7 +226,7 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
         </div>
         <div className="fx-sh-dialog-row">
           <button type="button" onClick={onClose}>{t('fc.cancel')}</button>
-          <button type="button" className="is-go" data-ok="" disabled={!patternOk || !!state.readOnly} onClick={ok}>{t('fc.ok')}</button>
+          <button type="button" className="is-go" data-ok="" disabled={!patternOk || !!state.readOnly} onClick={ok}>{tu('ok.apply')}</button>
         </div>
       </div>
     </Modal>
