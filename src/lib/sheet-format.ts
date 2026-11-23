@@ -391,6 +391,8 @@ export function display(text: string, num: NumberFormat | null | undefined, lang
   return s
 }
 
+/** Excel's red for negative numbers (FR-021), as a token for the sheets. */
+export const NEGATIVE_RED = STANDARD_COLORS[0]
 /** Negative numbers shown in red (FR-021). */
 export const showsRed = (text: string, num: NumberFormat | null | undefined) =>
   !!num && (num.neg === 'red' || num.neg === 'paren-red') && (parseNumber(text) ?? 0) < 0

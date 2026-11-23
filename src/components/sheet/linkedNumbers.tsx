@@ -6,7 +6,7 @@
  * left to the grid's own rendering.
  */
 import type { CellStyle } from '@/types/index'
-import { display, showsRed } from '@/lib/sheet-format'
+import { display, NEGATIVE_RED, showsRed } from '@/lib/sheet-format'
 import type { GridCol } from './GridCore'
 
 interface Model<R> {
@@ -31,7 +31,7 @@ export function withNumberFormats<R>(model: Model<R>, styleOf: (row: R, col: Gri
   model.render = (row, col, cellEl) => {
     const s = shownOf(row, col)
     if (!s) return base(row, col, cellEl)
-    return <span className="fx-sheet-ellipsis" data-num-shown="" title={s.raw} style={showsRed(s.raw, s.num) ? { color: '#C00000' } : undefined}>{s.shown}</span>
+    return <span className="fx-sheet-ellipsis" data-num-shown="" title={s.raw} style={showsRed(s.raw, s.num) ? { color: NEGATIVE_RED } : undefined}>{s.shown}</span>
   }
   model.copyStyle = (row, col) => (col === 'rowNo' ? null : styleOf(row, col))
   model.copyShown = (row, col) => shownOf(row, col)?.shown ?? model.textValue(row, col)
