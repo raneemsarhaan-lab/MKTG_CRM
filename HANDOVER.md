@@ -889,6 +889,22 @@ Design: `design/content-sheet-bulk-bar.html`, approved.
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.
 
+### 7.w Brands, team Spaces and views (spec 021)
+
+| Piece | Where it lives |
+|---|---|
+| Tables: `team_spaces`, `team_space_members`, `task_spaces` (Shows in, with `added_via`), `saved_views`, brand feature switches | `prisma/schema.prisma` |
+| Shows in: the Space a task is created in, else the creator's working Spaces, plus the assignee's (never Planning-type or media boards for content tasks); a reassign drops what only the old assignee brought | `src/lib/spaces.ts`, `src/lib/spaces-server.ts` |
+| Hand-off: the first move into Ready For Design opens the box (now: links media tasks, spec 022) | `src/lib/spaces.ts` `needsHandoff`, `src/actions/task-spaces.ts`, `src/components/handoff/` |
+| Views anywhere (List, Board, Sheet, Calendar, Workload) and saved views | `src/components/views/`, `src/actions/views.ts` |
+| Brand pages: Folders, the brand Sheet (Content and Video sheets filtered to the brand), Assets, Library | `src/components/views/BrandPage.tsx` |
+| Brand feature switches | `src/lib/brand-features.ts`, Settings and the brand header |
+| My notes (private column on My tasks) | `src/components/views/TaskSheet.tsx` (`notes`) |
+| Related task field (was "Task link") | `src/components/sheet/LinkTaskPicker.tsx`, `src/components/kanban/TaskLinks.tsx` |
+| One-time data changes | `prisma/seed.ts` `once()` markers for Spaces, members and Shows in |
+
+Status words (US3) and simple tasks (US5) were replaced by spec 022; see 7.x.
+
 ### 7.x Task methodology (spec 022)
 
 One workflow for every task, with media boards and Space stages. Decisions and
@@ -1226,6 +1242,8 @@ Run through this after the first successful deploy.
 | Sheet columns: Arabic strings | Medium | `sheet.columns.*` in `messages/ar.json`; native review (spec 010) |
 | Board header: Arabic strings | Medium | `header.*` in `messages/ar.json`; native review (spec 011) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
+| Spaces, views and methodology: Arabic strings | Medium | `spaces.*` (incl. `spaces.stages`), `views.*`, `calendar.*`, `handoff.*`, `me.*`, `media.*`, `dates.*` in `messages/ar.json`; native review (specs 021–022) |
+| Accessibility: contrast and board cards | Medium | axe (`scripts/spaces-lab/realapp/axe-022.cjs`) still flags grey secondary text on tinted backgrounds app-wide (darker `PIPE.textMuted`/`placeholder` would fix it; a design call) and board cards with buttons inside a button-like card |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 

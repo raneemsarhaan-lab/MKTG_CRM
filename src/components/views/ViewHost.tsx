@@ -133,20 +133,20 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, letterSpacing: '-0.02em', color: PIPE.ink }}>
             {color && <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#FFFFFF', fontSize: 12, fontWeight: 800 }}>{mark ?? title[0]}</span>}
             {title}
-            <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textMuted, letterSpacing: 0 }}>{tag}</span>
+            <span style={{ fontFamily: 'inherit', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary, letterSpacing: 0 }}>{tag}</span>
           </h1>
           {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>{actions}</div>}
         </div>
         {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary }}>{sub}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
-          <div role="tablist" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
+          {/* A toolbar of view buttons (each with its ⋯ menu), so the menus sit beside them legitimately. */}
+          <div role="toolbar" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
             {arranged.shown.map(x => (
               <span key={x.key} style={{ display: 'inline-flex', alignItems: 'center' }} className="fx-view-tab">
               <button
                 type="button"
-                role="tab"
                 data-view-tab={x.key}
-                aria-selected={tab === x.key}
+                aria-pressed={tab === x.key}
                 disabled={x.disabled}
                 title={x.note}
                 onClick={() => choose(x.key)}

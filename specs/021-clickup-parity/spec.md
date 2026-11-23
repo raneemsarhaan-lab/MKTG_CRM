@@ -59,18 +59,18 @@ C-Check is the Islam Check stage. Tasks created without it have 10 stages. The c
 
 | ClickUp feature | Momentum today | Decision |
 |---|---|---|
-| Workspace › Space › Folder › List hierarchy | Brands, Projects, Pillars; Sheet folders | **This spec** (US1): brands with four Folders, plus team Spaces |
-| One home, many places | No | **This spec** (US1, US6): a task lives in its brand and shows in several team Spaces |
-| Private Spaces | No | **This spec** (US1): team Spaces are seen by their members |
-| Custom statuses, inherited | Fixed pipeline; sheets map their own words to it (spec 019) | **This spec** (US3): each team Space's status words, mapped to the pipeline |
-| ClickApps (feature switches) | No | **This spec** (US4): per brand |
-| Simple tasks with their own short workflow | No: every task goes through the pipeline | **This spec** (US5) |
-| List view | Sheets (Content, Video, team sheets) | **This spec**: on any brand, Folder or team Space (US2) |
+| Workspace › Space › Folder › List hierarchy | Brands, Projects, Pillars; Sheet folders | **Built** (US1): brands with four Folders, plus team Spaces |
+| One home, many places | No | **Built** (US1, US6; Shows in rules refined by spec 022 US5) |
+| Private Spaces | No | **Built** (US1): team Spaces are seen by their members |
+| Custom statuses, inherited | Fixed pipeline; sheets map their own words to it (spec 019) | **Built**, then replaced by spec 022 US4: each Space renames or splits the stages (Space stages) |
+| ClickApps (feature switches) | No | **Built** (US4): per brand |
+| Simple tasks with their own short workflow | No: every task goes through the pipeline | Built (US5), then **removed by spec 022**: every task is a pipeline task |
+| List view | Sheets (Content, Video, team sheets) | **Built**: on any brand, Folder or team Space (US2) |
 | Board (Kanban) | Board | Have; becomes a view anywhere, always the original process (US2) |
 | Table view | Sheets, with task fields (spec 019) | Have; becomes the Sheet view anywhere, unchanged (US2) |
-| Calendar view | Due dates only, no calendar | **This spec** (US2): one continuous calendar |
+| Calendar view | Due dates only, no calendar | **Built** (US2): one continuous calendar, by publishing or due date |
 | Workload view | Capacity screen, Workload tab (spec 004) | Have; becomes a view anywhere (US2) |
-| Everything view | Board "All" scope | **This spec** (US2) |
+| Everything view | Board "All" scope | **Built** (US2) |
 | Gantt / Timeline, dependencies, critical path | Project steps have days and milestones, no chart | Later (US8) |
 | Activity view | Notifications and Inbox, no event log | Later (needs an event log, see HANDOVER §14) |
 | Box, Map, Mind Map views | No | Not planned |
@@ -82,7 +82,7 @@ C-Check is the Islam Check stage. Tasks created without it have 10 stages. The c
 | Custom fields by task type | Sheet columns, content types | Later (US7) |
 | Task types | Content types (Post, Video, Reel…) | Have |
 | Task templates, recurring tasks | Paste plan; "standing" projects | Later (US7) |
-| Dependencies, relationships, links | No | Later (US7) |
+| Dependencies, relationships, links | No | Partly built: **Related task** field (T074–T076) and media links (spec 022); dependencies Later (US7) |
 | Comments, threads, @mentions | Yes | Have |
 | Assigned comments | No | Later |
 | Docs (wikis, nested pages, Doc as a view) | Task briefs only | Later (US10) |

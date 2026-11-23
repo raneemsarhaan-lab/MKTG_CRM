@@ -198,14 +198,14 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
                 background: over === d.iso ? '#F4FBD6' : d.inMonth ? '#FFFFFF' : PIPE.surface }}>
               <span style={{ fontSize: 11, alignSelf: 'flex-start', padding: d.iso === today ? '0 5px' : 0, borderRadius: 6,
                 background: d.iso === today ? '#C8F24E' : 'transparent', fontWeight: d.iso === today ? 800 : 500,
-                color: d.inMonth ? PIPE.textMuted : PIPE.textFaintest, fontVariantNumeric: 'tabular-nums' }}>
+                color: d.inMonth ? PIPE.textSecondary : PIPE.textMuted, fontVariantNumeric: 'tabular-nums' }}>
                 {d.day === 1 ? dayOf(d.iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : d.day}
               </span>
               {(byDay.get(d.iso) ?? []).map(chip)}
               {link && (
                 <button type="button" className="fx-cal-link" data-cal-link={d.iso} aria-label={`${tMedia('linkTask')} · ${d.iso}`}
                   onClick={e => cal.open(d.iso, e.currentTarget.parentElement as HTMLElement)}
-                  style={{ marginTop: 'auto', alignSelf: 'flex-start', border: 'none', background: 'transparent', color: PIPE.textMuted, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '1px 4px', borderRadius: 6 }}>
+                  style={{ marginTop: 'auto', alignSelf: 'flex-start', border: 'none', background: 'transparent', color: PIPE.textSecondary, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '1px 4px', borderRadius: 6 }}>
                   ＋ {tMedia('linkTask')}
                 </button>
               )}

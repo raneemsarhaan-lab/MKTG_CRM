@@ -108,7 +108,7 @@ export function MediaLinkPicker({ typed, options, onPick, onCreate, onClose }: {
       <input value={q} aria-label={t('search')} placeholder={t('search')} autoComplete="off" data-media-search=""
              onChange={e => { setQ(e.target.value); setHi(0) }} />
       <span className="fx-linkpick-label">{t('unlinkedOn')}</span>
-      <div className="fx-linkpick-list" role="listbox">
+      <div className="fx-linkpick-list" role="listbox" aria-label={t('unlinkedOn')}>
         {hits.map((x, i) => (
           <button key={x.id} type="button" role="option" aria-selected={hi === i} data-media-option={x.id}
                   className={`fx-linkpick-opt${hi === i ? ' is-hi' : ''}`} onMouseEnter={() => setHi(i)} onClick={() => onPick(x.id, name)}>
@@ -116,7 +116,9 @@ export function MediaLinkPicker({ typed, options, onPick, onCreate, onClose }: {
             <span className="fx-linkpick-kind is-pipe" style={{ borderColor: BOARD_COLOR[x.media_board ?? 'design'], color: BOARD_COLOR[x.media_board ?? 'design'] }}>{t(x.media_board ?? 'design')}</span>
           </button>
         ))}
-        {!hits.length && <p className="fx-linkpick-none">{t('noUnlinked')}</p>}
+      </div>
+      {!hits.length && <p className="fx-linkpick-none">{t('noUnlinked')}</p>}
+      <div>
         <div className={`fx-linkpick-opt is-create${hi === hits.length ? ' is-hi' : ''}`} data-media-create="" onMouseEnter={() => setHi(hits.length)}>
           <button type="button" style={{ border: 'none', background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, textAlign: 'start' }} onClick={create}>
             ＋ {name ? t('createNamed', { name }) : t('create')}

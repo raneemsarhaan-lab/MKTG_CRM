@@ -141,7 +141,8 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
              role="combobox" aria-expanded="true" aria-controls="fx-linkpick-list"
              aria-activedescendant={!creating ? `fx-linkpick-${hi}` : undefined}
              onChange={e => { setQ(e.target.value); setHi(0) }} />
-      <div className="fx-linkpick-list" id="fx-linkpick-list" role="listbox" ref={listRef}>
+      {!hits.length && <p className="fx-linkpick-none">{t('noMatch', { q })}</p>}
+      <div className="fx-linkpick-list" id="fx-linkpick-list" role="listbox" aria-label={t('linkTask')} ref={listRef}>
         {hits.map((x, i) => (
           <button key={x.id} type="button" role="option" id={`fx-linkpick-${i}`} aria-selected={hi === i} data-pick-index={i}
                   data-pick-task={x.id} className={`fx-linkpick-opt${hi === i ? ' is-hi' : ''}${x.id === current ? ' is-current' : ''}`}
@@ -152,7 +153,6 @@ export function LinkTaskPicker({ ctx, typed, current, exclude, brandId, due, onP
             </span>
           </button>
         ))}
-        {!hits.length && <p className="fx-linkpick-none">{t('noMatch', { q })}</p>}
         {ctx.create && <button type="button" role="option" id={`fx-linkpick-${hits.length}`} aria-selected={hi === hits.length} data-pick-index={hits.length}
                 data-link-create="" className={`fx-linkpick-opt is-create${hi === hits.length ? ' is-hi' : ''}`}
                 onMouseEnter={() => setHi(hits.length)} onClick={() => setCreating(true)}>
