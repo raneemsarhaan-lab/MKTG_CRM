@@ -156,6 +156,32 @@ export interface TeamSpace {
   words: Record<string, string[]>
   sort_order: number
   archived_at: string | null
+  /** Spec 022 (R9): the role new tasks made in this Space are assigned to. */
+  default_assignee_role?: string | null
+  /** Spec 022: this Space is the Design or Video media board. */
+  media_board?: MediaBoard | null
+}
+
+/** Spec 022: a media board. */
+export type MediaBoard = 'design' | 'video'
+
+/** Spec 022 (R7): a Space's name for one original stage (one of possibly several). */
+export interface SpaceStage {
+  id: string
+  space_id: string
+  stage_id: StageId
+  /** Null shows the original stage's name. */
+  name: string | null
+  position: number
+  aliases: string[]
+}
+
+/** Spec 022 (R7): a task's sub-stage in one Space, valid while its stage is still stage_id. */
+export interface TaskSpaceStage {
+  task_id: string
+  space_id: string
+  space_stage_id: string
+  stage_id: StageId
 }
 
 export interface SpaceMember {
@@ -242,6 +268,16 @@ export interface Task {
   publish_date?: string | null
   /** The due date was set by hand: a new publishing date doesn't move it. */
   due_manual?: boolean
+  /** Spec 022 (R1): 'design' | 'video' for a media task; null for a content task. */
+  media_board?: MediaBoard | null
+  /** Spec 022: the content task a media task is linked to; null when unlinked. */
+  content_task_id?: string | null
+  /** Spec 022: the stage the task began at ('r-design' when made on a media board). */
+  entry_stage?: StageId
+  /** Spec 022 (R5): when the automatic link at Ready For Design ran (content tasks). */
+  auto_linked_at?: string | null
+  /** Spec 022: migrated from a simple task (never celebrates). */
+  migrated_simple?: boolean
   hours_estimate: number
   cover_image_url?: string
   /** Auto-preview of the newest uploaded image. Not a user field. */

@@ -1,30 +1,28 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 2.1.0 → 3.0.0 (2026-11-22)
-Type of bump: MAJOR — §II redefined (the 11 stages as built, plus a second
-  workflow for simple tasks) and the stack corrected to what runs in
-  production. Done as the first task of spec 021 (research R9).
+Version change: 3.0.0 → 4.0.0 (2026-11-23)
+Type of bump: MAJOR — §II redefined again: one workflow (simple tasks removed),
+  media tasks on the Design and Video boards, and SLA working days from
+  Settings on Cairo days. Done as the first task of spec 022 (T001).
 
 Modified principles:
-  - §II: the stage table now matches src/lib/stage-meta.ts — 11 stages with
-    their real labels (To Do … Ready to Publish, Scheduled, Published).
-    "Nine-stage" becomes "with C-Check": C-Check is optional per task, and its
-    default is set per brand (workspace default as the fallback). Simple tasks
-    (To Do › In progress › Done) are added as a second workflow with no SLA,
-    no stage owners and no terminal stage.
-  - §III: authorization is enforced in server actions and page guards; there is
-    no Postgres RLS (HANDOVER §6). Users may create tasks they own. Team Spaces
-    and brand feature switches are admin-only.
-  - §V: a simple task moved to Done celebrates for its assignee. Celebrations
-    remain opt-in per member and play the recorded sounds, with the Web Audio
-    patterns as the fallback (src/lib/celebration-audio.ts).
-  - §VI: Supabase and Zustand-persist wording removed. Data lives in Postgres,
-    read in server components and written through server actions.
-  - Tech stack: Next.js 16, Prisma 5 (pinned) + PostgreSQL on Cranl, custom
-    HMAC session, no Supabase, no Vercel.
-  - Board drag: cross-column drag is allowed and goes through allowedStages
-    (src/lib/stage-moves.ts); reorder within a column is local.
+  - §II: every task is a pipeline task (11 stages, or 10 when its brand had
+    C-Check off). Simple tasks are removed and migrated. Media tasks (Design,
+    Video) are added: linked to a content task (automatically once at Ready For
+    Design, or by hand) or unlinked. allowedStages holds a content task before
+    F-Check until every linked media task has passed D-Check, and keeps a linked
+    media task following its content task after D-Check. SLA counts the working
+    days of the Settings › Due Dates weekend, on Africa/Cairo days. The hand-off
+    creates linked media tasks. Space stages rename or split original stages in
+    a Space's own views only.
+  - §V: the simple-task celebration is removed; tasks migrated from simple
+    tasks never celebrate.
+  - §VI: `MediaBoard` joins the exhaustive unions; `TaskKind` and
+    `SimpleStatus` are retired. Space stages and sub-stage positions are shared
+    data in Postgres.
+  - Tech stack: drag-and-drop moves cards across columns only; cards are not
+    reordered within a column (boards sort by due date).
 
 Templates:
   ✅ .specify/templates/plan-template.md — no changes needed
@@ -32,13 +30,12 @@ Templates:
   ✅ .specify/templates/tasks-template.md — no changes needed
 
 Follow-up TODOs:
-  - d-check ownership → Islam (HANDOVER §14) still needs its own amendment and
-    a once() migration; this version records the current owner (Brand Director).
+  - d-check ownership → Islam (HANDOVER §14) still needs its own amendment.
 
-Previous report (2.1.0)
+Previous report (3.0.0)
 -----------------------
-§VI gained an explicit allowance for per-device view preferences in
-localStorage under `momentum.*` keys, outside the Zustand store.
+§II redefined (the 11 stages as built, plus simple tasks), stack corrected to
+what runs in production (spec 021, research R9).
 -->
 
 
@@ -88,10 +85,9 @@ redesigns expensive.
 
 ### II. Workflow Integrity
 
-Momentum has **two workflows**. A task's kind (`tasks.kind`) is chosen at
-creation and never changes.
+Momentum has **one workflow**: every task is a pipeline task.
 
-#### Pipeline tasks — the content pipeline
+#### The content pipeline
 
 The pipeline is the core model of the system and MUST NOT be altered without a
 constitution amendment. Its definition lives in `src/lib/stage-meta.ts`.
@@ -126,28 +122,37 @@ constitution amendment. Its definition lives in `src/lib/stage-meta.ts`.
   sheet cells and bulk moves. Admins and superusers override ownership. No
   screen may add a second path around it.
 - **Published is terminal.** Nothing moves a task out of `publish`.
-- **The hand-off.** A pipeline task moving from before Ready For Design to Ready
-  For Design or later MUST show in a production team Space (spec 021). Single
-  moves without one ask where the task should show; bulk moves skip it.
+- **Media tasks (spec 022).** The Design and Video boards hold media tasks
+  (`tasks.media_board`). A media task is *linked* to a content task
+  (`tasks.content_task_id`) or *unlinked*.
+  - A content task reaching Ready For Design for the first time is linked
+    automatically, once, to every board its content type needs; the hand-off
+    box asks for a person per board.
+  - A media board can Link task (by hand) or Create task (an unlinked media task
+    that starts at Ready For Design and counts SLA from there).
+  - Any member may unlink (user, 2026-11-23); both tasks keep their history
+    and move separately afterwards.
+  - `allowedStages` MUST hold a content task before F-Check until every linked
+    media task has passed D-Check, and MUST keep a linked media task following
+    its content task after D-Check.
+- **Space stages (spec 022).** A team Space may rename or split each original
+  stage in its own views. Each Space stage maps to exactly one original stage;
+  every original stage has at least one. A move between Space stages of one
+  original stage changes nothing outside that Space. The original stages stay
+  the source of truth for SLA, approvals, overdue, reports and the main board.
 
 **SLA enforcement:**
 - Every pipeline stage carries an SLA threshold per content type, stored in
   `sla_config`; admins edit it in Settings.
 - Breach is computed on render, never stored:
-  `businessDaysBetween(stage_date, today) > sla[stage][type]`.
+  `businessDaysBetween(stage_date, today) > sla[stage][type]`, counting the
+  working days of the Settings › Due Dates weekend (Friday and Saturday by
+  default) on Africa/Cairo days.
 - A brand may switch SLA tracking off; its tasks then show no breach.
 
-#### Simple tasks — work that is not a deliverable
-
-Planning, admin and event work uses three statuses, **To Do › In progress ›
-Done** (`tasks.simple_status`). Simple tasks have no SLA, no stage owners, no
-approval chain and no terminal stage. Anyone who may edit the task may move it.
-They MUST NOT appear in pipeline columns, SLA figures, review queues, the Inbox,
-the Content or Video sheets, or a brand's Library.
-
 **Rationale**: the pipeline encodes the agency's real approval chain; changing
-it risks corrupting task data and SLA. Simple tasks keep non-deliverable work
-out of that chain instead of bending it.
+it risks corrupting task data and SLA. One workflow, with media work split into
+linked media tasks, keeps every deliverable on that chain.
 
 ### III. Role-Based Feature Access
 
@@ -157,7 +162,7 @@ page guard that performs it; hiding a control in the UI is presentation only.
 | Tier        | Badge color               | Capabilities |
 |-------------|---------------------------|--------------|
 | `admin`     | lime `#C3F53D` / `#111`   | Everything: Settings, members, team Spaces and their members, brand feature switches, SLA. |
-| `superuser` | violet `#B79CF5` / `#111` | Full pipeline; creates tasks for anyone; edits team Space status words. No Settings. |
+| `superuser` | violet `#B79CF5` / `#111` | Full pipeline; creates tasks for anyone; edits team Space stages. No Settings. |
 | `user`      | neutral `#EDEDEA` / `#6B` | Creates tasks they own; acts on tasks they own or are assigned; moves the stages they hold. |
 
 Rules:
@@ -207,7 +212,7 @@ preserved in every refactor.
 - Pipeline tasks: it fires when a member advances a stage they personally own
   (working stages for the assignee/owner, review stages for the matching role).
   The server's move result (`shouldCelebrate`) is authoritative.
-- Simple tasks: it fires when the task's assignee moves it to Done.
+- Tasks migrated from simple tasks (spec 022) never celebrate.
 - Celebrations are opt-in per member (`celebrationsOn`).
 - Sound plays the recorded assets in `public/sounds/`; the four Web Audio
   patterns in `src/lib/celebration-audio.ts` are the fallback and MUST NOT be
@@ -231,10 +236,10 @@ identity and makes completing work feel rewarding.
   They MUST be read after mount, wrapped in try/catch, and the view MUST render
   correctly without them. They MUST NOT hold application data or anything
   another member needs to see; shared things (saved views, team Space words)
-  belong in Postgres.
+  belong in Postgres, as do team Space stages and each task's sub-stage.
 - **Types**: `StageId`, `ContentType`, `Priority`, `Platform`, `AccessLevel`,
-  `TaskKind`, `SimpleStatus` are exhaustive unions in `src/types/index.ts`;
-  adding a value updates that file first.
+  `MediaBoard` are exhaustive unions in `src/types/index.ts`; adding a value
+  updates that file first. (`TaskKind` and `SimpleStatus` are retired.)
 - **Session**: one signed cookie, `fluxo_session`, verified by the same HMAC
   function in middleware and on the server (`src/lib/session.ts`). Email and
   password login only; accounts are created by admins.
@@ -258,7 +263,7 @@ Adding or swapping a major dependency requires a constitution amendment.
 | Styling       | Tailwind CSS v4 + CSS variables from the token map             |
 | State         | Zustand v5, no `persist` — UI ephemera only                    |
 | i18n          | next-intl, Arabic + English, full RTL (cookie locale)          |
-| Drag-and-drop | @dnd-kit — reorder within a column, move across columns        |
+| Drag-and-drop | @dnd-kit — move across columns (no reorder within a column)    |
 | Icons         | Lucide React                                                   |
 | Fonts         | Google Fonts (Montserrat, Inter, Caveat)                       |
 | Deployment    | Cranl, from `main`                                             |
@@ -293,4 +298,4 @@ src/
 - Spec Kit skills (`/speckit-plan`, `/speckit-specify`, …) read this file to
   enforce compliance gates.
 
-**Version**: 3.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-22
+**Version**: 4.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23

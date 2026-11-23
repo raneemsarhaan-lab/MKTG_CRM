@@ -33,12 +33,12 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 
 ### User Story 3 — Media boards: Link task, Create task, Unlink (P1)
 
-**Independent test**: on the Design board, Create task makes an unlinked media task at Ready For Design; Link task attaches a content task to Design; a Content Creator can unlink it, a designer cannot.
+**Independent test**: on the Design board, Create task makes an unlinked media task at Ready For Design; Link task attaches a content task to Design; anyone can unlink it.
 
 **Acceptance scenarios**
 1. **Given** the Design board, **When** a designer uses Create task, **Then** an unlinked media task starts at Ready For Design, its SLA counting from there.
 2. **Given** a content task not linked to Video, **When** someone uses Link task on the Video board and picks it, **Then** a linked media task appears on the Video board.
-3. **Given** a linked media task, **When** a Content Creator or Digital Marketing Specialist unlinks it, **Then** both tasks remain, unlinked, and move separately from then on. **When** a designer tries, **Then** it is refused.
+3. **Given** a linked media task, **When** any member unlinks it, **Then** both tasks remain, unlinked, and move separately from then on.
 4. **Given** a content task that isn't linked, **When** a designer is made its assignee, **Then** it shows in the designer's My tasks and not on the Design board.
 
 ### User Story 4 — Space stages (P2)
@@ -82,7 +82,7 @@ A member creates a task in any Space. It is a pipeline task with that Space's de
 - **FR-003** A content task reaching Ready For Design for the first time MUST be linked automatically, once, to every media board its content type needs; the hand-off box MUST ask for a person per board, falling back to that board Space's default assignee.
 - **FR-004** A media board MUST offer Link task (pick content tasks not yet on that board; choose Design, Video or both) and Create task (an unlinked media task starting at Ready For Design).
 - **FR-005** A content task with linked media tasks MUST NOT move past D-Check until every linked media task has passed D-Check, and MUST move to F-Check when they all have.
-- **FR-006** Only Content Creators, Digital Marketing Specialists and admins MAY unlink. Unlinking MUST keep both tasks, their stage histories and fields.
+- **FR-006** Any member MAY unlink (user, 2026-11-23). Unlinking MUST keep both tasks, their stage histories and fields.
 - **FR-007** Assigning a designer or editor to an unlinked content task MUST NOT put it on a media board.
 - **FR-008** Each Space MUST be able to rename or split each original stage; each Space stage maps to exactly one original stage; every original stage MUST have at least one Space stage.
 - **FR-009** Moves between Space stages of one original stage MUST change only that Space's position, and MAY be made by anyone with access to the Space.

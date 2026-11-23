@@ -216,6 +216,8 @@ model ContentType {
   id         String   @id @default(uuid()) @db.Uuid
   label      String   @unique
   created_at DateTime @default(now()) @db.Timestamptz(6)
+  /// Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design.
+  media_boards String[] @default(["design"])
 
   tasks      Task[]      @relation("TaskContentType")
   sla_config SlaConfig[]
@@ -342,6 +344,16 @@ model Task {
   /// True once someone set the due date by hand: a new publishing date no
   /// longer moves it. "Reset to auto" clears it and recalculates.
   due_manual           Boolean   @default(false)
+  /// Spec 022 (R1): 'design' | 'video' for a media task; null for a content task.
+  media_board          String?
+  /// Spec 022: the content task a media task is linked to. Null: unlinked (or a content task).
+  content_task_id      String?   @db.Uuid
+  /// Spec 022: the stage the task began at ('r-design' for one made on a media board). SLA skips earlier stages.
+  entry_stage          String    @default("todo")
+  /// Spec 022 (R5): on a content task, when the automatic link at Ready For Design ran. Set once.
+  auto_linked_at       DateTime? @db.Timestamptz(6)
+  /// Spec 022: migrated from a simple task; never celebrates, not a new post in the Library or Calendar.
+  migrated_simple      Boolean   @default(false)
 
   pillar             ContentPillar?    @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
   parent             Task?             @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
@@ -369,7 +381,12 @@ model Task {
   followers          TaskFollower[]
   due_reminders      DueReminder[]
   spaces             TaskSpace[]
+  content_task       Task?             @relation("MediaTasks", fields: [content_task_id], references: [id], onDelete: SetNull)
+  media_tasks        Task[]            @relation("MediaTasks")
+  space_stages       TaskSpaceStage[]
 
+  /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
+  @@unique([content_task_id, media_board])
   @@map("tasks")
 }
 
@@ -1098,11 +1115,53 @@ model TeamSpace {
   archived_at   DateTime? @db.Timestamptz(6)
   created_at    DateTime  @default(now()) @db.Timestamptz(6)
   updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  /// Spec 022 (R9): the role new tasks made in this Space are assigned to.
+  default_assignee_role String?
+  /// Spec 022: 'design' | 'video' when this Space is that media board.
+  media_board   String?
 
   members TeamSpaceMember[]
   tasks   TaskSpace[]
+  stages  SpaceStage[]
+  task_stages TaskSpaceStage[]
 
   @@map("team_spaces")
+}
+
+/// Spec 022 (R7): a Space's name for one original stage; a stage may have several (a split).
+model SpaceStage {
+  id        String   @id @default(uuid()) @db.Uuid
+  space_id  String   @db.Uuid
+  stage_id  String
+  /// Null shows the original stage's name.
+  name      String?
+  /// Order within its original stage; 0 is the first.
+  position  Int      @default(0)
+  /// Other names that can be typed in sheets (carried over from status words).
+  aliases   String[] @default([])
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  space      TeamSpace        @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  task_rows  TaskSpaceStage[]
+
+  @@index([space_id, stage_id, position])
+  @@map("space_stages")
+}
+
+/// Spec 022 (R7): a task's sub-stage in one Space, valid only while its stage is still stage_id.
+model TaskSpaceStage {
+  task_id        String   @db.Uuid
+  space_id       String   @db.Uuid
+  space_stage_id String   @db.Uuid
+  stage_id       String
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  task        Task       @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  space       TeamSpace  @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  space_stage SpaceStage @relation(fields: [space_stage_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, space_id])
+  @@map("task_space_stages")
 }
 
 /// Spec 021 (R3): who belongs to a team Space. Filled from job roles once, then edited by admins.

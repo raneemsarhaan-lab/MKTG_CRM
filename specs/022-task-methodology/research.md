@@ -18,7 +18,7 @@ Each item: **Decision**, **Rationale**, **Alternatives considered**.
 - **Alternatives**: closing the media task at D-Check — the board would lose track of work still on its way out.
 
 ## R4. Unlink
-- **Decision**: clears `content_task_id`. The media task keeps its current stage and continues alone through the rest of the pipeline. The content task is released from the gate (R2) and moves normally. Allowed for Content Creator, Digital Marketing Specialist and admins, checked in the server action.
+- **Decision**: clears `content_task_id`. The media task keeps its current stage and continues alone through the rest of the pipeline. The content task is released from the gate (R2) and moves normally. Any member may unlink (user, 2026-11-23); the server action only checks the member is signed in and the task is live.
 - **Rationale**: the user's rule; both sides keep their history and fields.
 
 ## R5. The automatic link
@@ -57,8 +57,8 @@ Each item: **Decision**, **Rationale**, **Alternatives considered**.
 ## R13. Several members with the default role *(recommended default)*
 - **Decision**: as R9.
 
-## R14. Who can unlink *(recommended default)*
-- **Decision**: as R4 (plus admins).
+## R14. Who can unlink *(decided by the user, 2026-11-23)*
+- **Decision**: anyone can unlink.
 
 ## R15. Where the data changes run
 - **Decision**: the simple-task, status-word, hand-off and default-role migrations run as `once()` markers in `prisma/seed.ts` (constitution §VI). The due-date migration built on 2026-11-23 (`scripts/due-dates-migrate.ts` with a workspace flag) moves to a `once()` marker too.

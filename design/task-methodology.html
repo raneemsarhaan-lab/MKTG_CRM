@@ -1,0 +1,300 @@
+<title>Momentum Task Methodology</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600&display=swap">
+<style>
+/* Layout: one review page; each part pairs the screen (left) with what it does (right), stacking on phones. Momentum's own tokens (constitution §I). */
+:root {
+  --ink: #1B1A13; --muted: #6F7276; --faint: #A3A5A8; --line: #E1E1E0; --soft: #F7F7F5; --panel: #FFFFFF; --bg: #EFEFEC;
+  --lime: #C8F24E; --on-lime: #111111; --sel: #EEF8D3; --coral: #F5334F; --coral-soft: #FDE7EA; --violet: #8F6FE8; --cyan: #3E7BEA; --mint: #2F8F3F;
+  --c-content: #3E7BEA; --c-design: #8F6FE8; --c-video: #1E9E8A; --c-plan: #2AA7D8;
+  --shadow: 0 14px 40px rgba(20,20,16,.10);
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --arabic: 'Noto Sans Arabic', 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 900 }
+h2 { font-size: 22px; font-weight: 800 }
+h3 { font-size: 14.5px; font-weight: 800 }
+p { margin: 0 }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 72ch; font-size: 15px; color: var(--muted) }
+.muted { color: var(--muted) }
+.small { font-size: 12px }
+.ar { font-family: var(--arabic); direction: rtl }
+.jump { display: flex; flex-wrap: wrap; gap: 8px }
+.jump a { text-decoration: none; color: var(--ink); font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.jump a:hover { background: var(--sel) }
+section.part { background: var(--panel); border-radius: 18px; padding: 24px; display: grid; gap: 18px; border: 1px solid var(--line) }
+.part-head { display: grid; gap: 6px }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--muted) }
+.pair { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr) } }
+.frame { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; min-width: 0 }
+.frame-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--soft); flex-wrap: wrap }
+.frame-body { padding: 14px; display: grid; gap: 10px; min-width: 0 }
+.cap { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600 }
+.btn.primary { background: var(--lime); border-color: var(--lime); color: var(--on-lime); font-weight: 800 }
+.btn.dark { background: var(--ink); border-color: var(--ink); color: var(--panel); font-weight: 700 }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.seg button { border: none; background: var(--panel); padding: 6px 12px; font-size: 12.5px; font-weight: 600 }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel) }
+.note { font-size: 12.5px; color: var(--muted); border-inline-start: 3px solid var(--lime); padding: 2px 0 2px 10px }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block }
+ul.rules { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; font-size: 13.5px }
+.stages { display: flex; flex-wrap: wrap; gap: 6px }
+.stage { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line) }
+.stage.off { border-style: dashed; color: var(--muted) }
+.mini-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 8px; overflow-x: auto; padding-bottom: 4px }
+.col { background: var(--soft); border-radius: 10px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 110px }
+.col h4 { margin: 0; font-size: 11.5px; font-weight: 700; display: flex; justify-content: space-between; gap: 6px }
+.col h4 small { font-weight: 500; color: var(--muted) }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; font-size: 12.5px; display: grid; gap: 5px }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: 11px }
+.card.ro { opacity: .7 }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); border: 1px solid var(--line) }
+.chip.design { color: var(--c-design) } .chip.video { color: var(--c-video) }
+.chip.unl { border-style: dashed; color: var(--muted) }
+.iconbtn { border: none; background: transparent; color: var(--muted); padding: 0 3px; font-size: 12px; font-weight: 700 }
+.box { border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); background: var(--panel); padding: 16px; display: grid; gap: 12px; max-width: 460px }
+.row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px }
+.row select, .row input, .search { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--panel) }
+.opt { display: flex; justify-content: space-between; gap: 10px; padding: 7px 8px; border-radius: 8px; font-size: 13px }
+.opt.hi { background: var(--sel) }
+.opt small { display: block; color: var(--muted); font-size: 11px }
+.map { display: grid; gap: 4px }
+.map-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; padding: 6px 4px; border-top: 1px solid var(--line) }
+.map-row:first-child { border-top: none }
+.orig { font-size: 12px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center }
+.subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.sub { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px 3px 8px; font-size: 12.5px; background: var(--panel) }
+.sub b { font-weight: 600 }
+.add { border: 1px dashed var(--line); background: transparent; border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--muted); font-weight: 600 }
+table.types { width: 100%; border-collapse: collapse; font-size: 13px }
+table.types th, table.types td { text-align: start; padding: 7px 6px; border-top: 1px solid var(--line) }
+table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-top: none }
+.q { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft) }
+.q b { font-size: 13px }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
+.flow .step { padding: 3px 9px; border-radius: 999px; background: var(--sel); font-weight: 700 }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <span class="eyebrow">Spec 022 · Task methodology · design for approval</span>
+    <h1>One pipeline, media boards, Space stages</h1>
+    <p class="lede">Every task runs the same 11 stages. Spaces decide who gets new work and what the stages are called in their own views. The Design and Video boards hold media tasks, linked to a content task or standing alone.</p>
+    <nav class="jump" aria-label="Parts">
+      <a href="#pipeline">1 · One pipeline</a><a href="#handoff">2 · Ready For Design</a><a href="#media">3 · Media boards</a>
+      <a href="#chips">4 · Content side</a><a href="#stages">5 · Space stages</a><a href="#types">6 · Boards per type</a><a href="#confirm">7 · To confirm</a>
+    </nav>
+  </header>
+
+  <section class="part" id="pipeline">
+    <div class="part-head"><span class="tag">Settings › Spaces · every task</span><h2>1 · One pipeline, with each Space's default assignee</h2></div>
+    <div class="stages" aria-label="The 11 stages">
+      <span class="stage"><span class="dot" style="background:var(--muted)"></span>To Do</span>
+      <span class="stage"><span class="dot" style="background:var(--c-content)"></span>C-In Progress</span>
+      <span class="stage"><span class="dot" style="background:var(--c-content)"></span>C-Review</span>
+      <span class="stage off" title="Off for brands with C-Check off (new tasks only)"><span class="dot" style="background:var(--violet)"></span>C-Check</span>
+      <span class="stage"><span class="dot" style="background:var(--c-design)"></span>Ready For Design</span>
+      <span class="stage"><span class="dot" style="background:var(--c-design)"></span>D-In Progress</span>
+      <span class="stage"><span class="dot" style="background:var(--c-design)"></span>D-Check</span>
+      <span class="stage"><span class="dot" style="background:var(--mint)"></span>F-Check</span>
+      <span class="stage"><span class="dot" style="background:var(--mint)"></span>Ready to Publish</span>
+      <span class="stage"><span class="dot" style="background:var(--mint)"></span>Scheduled</span>
+      <span class="stage"><span class="dot" style="background:var(--lime)"></span>Published 🎉</span>
+    </div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><b>Settings › Spaces</b><span class="small muted">admins</span></div>
+        <div class="frame-body">
+          <div class="row"><span><span class="dot" style="background:var(--c-content)"></span> Content</span>
+            <label class="small">Default assignee <select data-space-default-role aria-label="Default assignee for Content"><option>Content Creator</option><option>Digital Marketing Specialist</option><option>— none —</option></select></label></div>
+          <div class="row"><span><span class="dot" style="background:var(--c-design)"></span> Design</span>
+            <label class="small">Default assignee <select aria-label="Default assignee for Design"><option>Graphic Designer</option></select></label></div>
+          <div class="row"><span><span class="dot" style="background:var(--c-video)"></span> Video</span>
+            <label class="small">Default assignee <select aria-label="Default assignee for Video"><option>Video Editor</option></select></label></div>
+          <p class="small muted">The member holding the role gets new tasks made in the Space. Changing it applies to new tasks only. <span class="ar">المسؤول الافتراضي</span></p>
+        </div>
+      </div>
+      <ul class="rules">
+        <li>Every task is a pipeline task: 11 stages, or 10 when its brand has C-Check off. The switch applies to new tasks; a task already in C-Check finishes it.</li>
+        <li>A task made in a Space takes that Space's default assignee. The new-task form shows that person, and it can be changed.</li>
+        <li>If several members hold the role, the first in the Space's member list gets it; if none does, the creator does.</li>
+        <li>Simple tasks are gone. Old ones move to To Do, C-In Progress or Published (no celebration, not added to the brand Calendar as new posts).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="part" id="handoff">
+    <div class="part-head"><span class="tag">The hand-off box · once per task</span><h2>2 · Ready For Design links the task to media</h2></div>
+    <div class="pair">
+      <div class="box" role="dialog" aria-label="Hand-off to media">
+        <h3>"Ramadan teaser" is ready for media</h3>
+        <p class="small muted">A Reel with a carousel: it goes to Design and Video. Pick who takes each.</p>
+        <div class="row" data-handoff-board="design"><span class="chip design">Design</span>
+          <select data-handoff-person aria-label="Designer"><option>Omar (default)</option><option>Another designer</option></select></div>
+        <div class="row" data-handoff-board="video"><span class="chip video">Video</span>
+          <select data-handoff-person aria-label="Editor"><option>Karim (default)</option></select></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="button">Skip (use defaults)</button><button class="btn primary" type="button">Link and assign</button></div>
+      </div>
+      <ul class="rules">
+        <li>It happens once, the first time the content task reaches Ready For Design. An unlink after that is respected.</li>
+        <li>One linked media task per board. Skip gives each board's default assignee.</li>
+        <li>Which boards: set per content type (part 6). Video and Reel go to Video, everything else to Design, unless a type says both.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="part" id="media">
+    <div class="part-head"><span class="tag">Design and Video Spaces</span><h2>3 · Media boards: Link task, Create task</h2></div>
+    <div class="frame">
+      <div class="frame-head"><b><span class="dot" style="background:var(--c-design)"></span> Design · Board</b>
+        <span style="display:flex;gap:8px"><button class="btn" type="button" data-media-link>↗ Link task</button><button class="btn dark" type="button" data-media-create>＋ Create task</button></span></div>
+      <div class="frame-body">
+        <div class="mini-board">
+          <div class="col"><h4>Ready For Design <small>2</small></h4>
+            <div class="card" data-media-card><b>Ramadan teaser</b><div class="meta"><span class="chip" data-media-linked>↗ Content: Ramadan teaser</span></div><div class="meta">Omar · Due Thu 10 Dec</div></div>
+            <div class="card" data-media-card><b>Office signage</b><div class="meta"><span class="chip unl">Unlinked</span></div><div class="meta">Omar · made on this board</div></div>
+          </div>
+          <div class="col"><h4>D-In Progress <small>1</small></h4>
+            <div class="card" data-media-card><b>Launch key visual</b><div class="meta"><span class="chip" data-media-linked>↗ Content: Launch post</span></div><div class="meta">Omar · 2d in stage</div></div>
+          </div>
+          <div class="col"><h4>D-Check <small>0</small></h4></div>
+          <div class="col"><h4>F-Check <small>1</small></h4>
+            <div class="card ro"><b>Iftar invite cards</b><div class="meta"><span class="chip">With Content</span></div><div class="meta">Follows the content task</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="box" role="dialog" aria-label="Link task">
+        <h3>Link a content task to media</h3>
+        <input class="search" type="search" value="ramad" aria-label="Search content tasks" data-media-pick>
+        <div class="opt hi"><span>Ramadan hero key visual<small>Forefront Consulting · C-In Progress</small></span><span class="chip">Content</span></div>
+        <div class="opt"><span>Ramadan recap reel<small>Omnisight · C-Review</small></span><span class="chip">Content</span></div>
+        <div class="row" data-media-board><span class="cap">Link to</span>
+          <span class="seg"><button type="button" aria-pressed="true">Design</button><button type="button" aria-pressed="false">Video</button><button type="button" aria-pressed="false">Both</button></span></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="button">Cancel</button><button class="btn primary" type="button">Link</button></div>
+      </div>
+      <ul class="rules">
+        <li><b>Link task</b> lists content tasks not yet on this board and before F-Check. Pick Design, Video or both.</li>
+        <li>Linked before Ready For Design: the media task waits in Ready For Design; its SLA starts when the content task gets there.</li>
+        <li><b>Create task</b> makes an unlinked media task that starts at Ready For Design and counts SLA from there.</li>
+        <li>After its D-Check, a linked media task follows its content task, read-only here ("With Content").</li>
+        <li>Assigning a designer to a content task that isn't linked doesn't bring it here; it shows in their My tasks.</li>
+        <li class="ar">اربط مهمة · أنشئ مهمة · غير مرتبطة · مع المحتوى</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="part" id="chips">
+    <div class="part-head"><span class="tag">Content Spaces · card and task panel</span><h2>4 · The content side: progress chips and Unlink</h2></div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><b>Content · Board · D-In Progress</b></div>
+        <div class="frame-body">
+          <div class="card" style="max-width:320px"><b>Ramadan teaser</b>
+            <div class="meta"><span class="chip design" data-media-chip="design">Design · D-Check ✓</span><span class="chip video" data-media-chip="video">Video · D-In Progress</span></div>
+            <div class="meta">Samaa · Publishing Tue 15 Dec · Due Tue 8 Dec</div>
+            <div class="meta">Waiting on Video before F-Check</div>
+          </div>
+          <div class="frame" style="max-width:420px">
+            <div class="frame-head"><b>Task panel · Media</b></div>
+            <div class="frame-body">
+              <div class="row"><span class="chip design">Design</span><span>Omar · D-Check passed <button class="iconbtn" type="button" data-media-unlink title="Unlink from Design">Unlink</button></span></div>
+              <div class="row"><span class="chip video">Video</span><span>Karim · D-In Progress <button class="iconbtn" type="button" title="Unlink from Video">Unlink</button></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul class="rules">
+        <li>The content task shows each linked board's progress. It moves to F-Check by itself when every linked media task has passed D-Check.</li>
+        <li><b>Unlink</b> is there for everyone. Both tasks stay; from then on each moves on its own.</li>
+        <li>Stage, SLA and approvals stay on the original stages for both sides.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="part" id="stages">
+    <div class="part-head"><span class="tag">Space header › Stages · admins and superusers</span><h2>5 · Space stages: rename or split</h2></div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><b>Design · Stages</b><button class="btn primary" type="button">Save</button></div>
+        <div class="frame-body map">
+          <div class="map-row" data-space-stage-row><span class="orig"><span class="dot" style="background:var(--c-design)"></span>Ready For Design</span><span class="subs"><span class="sub"><b>Brief in</b><button class="iconbtn" type="button" aria-label="Remove">×</button></span><button class="add" type="button" data-space-stage-add>＋ Split</button></span></div>
+          <div class="map-row"><span class="orig"><span class="dot" style="background:var(--c-design)"></span>D-In Progress</span><span class="subs"><span class="sub"><b>Sketch</b><button class="iconbtn" type="button" aria-label="Remove">×</button></span><span class="sub"><b>Final art</b><button class="iconbtn" type="button" aria-label="Remove">×</button></span><button class="add" type="button">＋ Split</button></span></div>
+          <div class="map-row"><span class="orig"><span class="dot" style="background:var(--c-design)"></span>D-Check</span><span class="subs"><span class="sub"><b>Client review</b><button class="iconbtn" type="button" aria-label="Remove">×</button></span><button class="add" type="button">＋ Split</button></span></div>
+          <div class="map-row"><span class="orig muted">The other 8 stages</span><span class="subs small muted">Keep their names here until renamed.</span></div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-head"><b>Design · Board</b><span class="small muted">in its own stage names</span></div>
+        <div class="frame-body">
+          <div class="mini-board">
+            <div class="col" data-space-stage><h4>Sketch <small>D-In Progress</small></h4><div class="card"><b>Launch key visual</b></div></div>
+            <div class="col" data-space-stage><h4>Final art <small>D-In Progress</small></h4><div class="card"><b>Meetup poster</b></div></div>
+            <div class="col" data-space-stage><h4>Client review <small>D-Check</small></h4></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="rules">
+      <li>Each Space stage maps to one original stage; every original stage keeps at least one. One Space stage can't cover two.</li>
+      <li>Sketch → Final art changes only this Space: no stage change, no SLA restart, no approval, no move in other Spaces. Anyone in the Space can do it.</li>
+      <li>Final art → Client review is a real move (D-In Progress → D-Check), with its owner and approvals.</li>
+      <li>Entering a stage always starts at its first Space stage. The main board and brand boards keep the original names. The Content and Video sheets use their Space's stages.</li>
+      <li class="ar">مراحل المساحة · تقسيم · إعادة تسمية</li>
+    </ul>
+  </section>
+
+  <section class="part" id="types">
+    <div class="part-head"><span class="tag">Settings › SLA &amp; Workflow · admins</span><h2>6 · Which boards each content type needs</h2></div>
+    <div class="pair">
+      <div class="frame">
+        <div class="frame-head"><b>Boards at Ready For Design</b></div>
+        <div class="frame-body" data-type-boards>
+          <table class="types"><thead><tr><th>Content type</th><th>Boards</th></tr></thead><tbody>
+            <tr><td>Post</td><td><span class="seg"><button type="button" aria-pressed="true">Design</button><button type="button" aria-pressed="false">Video</button><button type="button" aria-pressed="false">Both</button></span></td></tr>
+            <tr><td>Reel</td><td><span class="seg"><button type="button" aria-pressed="false">Design</button><button type="button" aria-pressed="true">Video</button><button type="button" aria-pressed="false">Both</button></span></td></tr>
+            <tr><td>Carousel + teaser</td><td><span class="seg"><button type="button" aria-pressed="false">Design</button><button type="button" aria-pressed="false">Video</button><button type="button" aria-pressed="true">Both</button></span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <ul class="rules">
+        <li>Defaults: Video and Reel → Video; every other type → Design.</li>
+        <li>A type set to Both gets two media tasks at Ready For Design, and its content task waits for both before F-Check.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="part" id="confirm">
+    <div class="part-head"><span class="tag">Defaults chosen · change any</span><h2>7 · To confirm</h2></div>
+    <div class="q"><b>Linking before Ready For Design</b><span class="small muted">The media task shows at once in Ready For Design; its SLA starts when the content task gets there.</span></div>
+    <div class="q"><b>Linking after D-Check</b><span class="small muted">Link task only offers content tasks that haven't reached F-Check.</span></div>
+    <div class="q"><b>One weekend</b><span class="small muted">SLA uses the weekend days in Settings › Due Dates (Friday and Saturday by default): working days Sunday to Thursday, Cairo days.</span></div>
+    <div class="q"><b>Several members with the default role</b><span class="small muted">The first in the Space's member list; none → the creator.</span></div>
+    <div class="q"><b>Who can unlink</b><span class="small muted">Anyone (decided).</span></div>
+    <p class="note">Approve as it is, or say which part to change. Nothing on screen is built until this is approved (constitution §IV).</p>
+  </section>
+</div>

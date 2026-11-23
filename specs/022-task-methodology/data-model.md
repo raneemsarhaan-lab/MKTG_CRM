@@ -23,7 +23,7 @@ All schema changes are additive (`prisma db push`). Nothing is dropped.
 ```
 created on board ──► unlinked, at Ready For Design ──► … ──► Published
 auto / Link task ──► linked, Ready For Design ──► D-In Progress ──► D-Check ──passes──► follows content (F-Check … Published)
-linked ──Unlink (Content, DMS, admin)──► unlinked, at its current stage ──► … ──► Published
+linked ──Unlink (any member)──► unlinked, at its current stage ──► … ──► Published
 ```
 
 **Content task while linked**: stage = earliest stage among its linked media tasks that haven't passed D-Check; moves past D-Check refused until all have passed; then moved to F-Check by the server.

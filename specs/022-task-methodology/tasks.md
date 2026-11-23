@@ -16,7 +16,7 @@ description: "Tasks for 022 — task methodology"
 
 **Purpose**: constitution amendment and the design file the UI must match (plan "Constitution Check": §II, §IV, §V).
 
-- [ ] T001 Amend `.specify/memory/constitution.md` to 4.0.0 (MAJOR):
+- [X] T001 *(Done: constitution 4.0.0.)* Amend `.specify/memory/constitution.md` to 4.0.0 (MAJOR):
   - §II has one workflow; the simple-task section is removed.
   - Media tasks are added, with the "waiting on media" and "follows content" rules inside `allowedStages`.
   - SLA counts working days by the Settings › Due Dates weekend, on Cairo days.
@@ -25,7 +25,7 @@ description: "Tasks for 022 — task methodology"
   - §VI adds `MediaBoard` to the type list.
   - The Tech stack note "reorder within a column" is corrected.
   - The Sync Impact Report is updated.
-- [ ] T002 Write `design/task-methodology.html` (tokens only, en + ar copy) covering every screen in `contracts/ui.md`:
+- [X] T002 *(Done: published at https://claude.ai/artifact/T5nkwQbPesZSAKAcVRRFV5.)* Write `design/task-methodology.html` (tokens only, en + ar copy) covering every screen in `contracts/ui.md`:
   - the hand-off box with one person picker per board;
   - Design/Video board header with Link task / Create task and the Link task list (board choice);
   - media cards (linked, after D-Check "with Content", unlinked);
@@ -41,16 +41,16 @@ description: "Tasks for 022 — task methodology"
 
 **Purpose**: schema, types and loaders every story reads.
 
-- [ ] T004 Add to `prisma/schema.prisma`:
+- [X] T004 *(Done; unique key per content task and board.)* Add to `prisma/schema.prisma`:
   - `tasks`: `media_board`, `content_task_id` (FK → tasks, set null; partial unique index with `media_board`), `entry_stage` (default `'todo'`), `auto_linked_at`, `migrated_simple`.
   - `team_spaces`: `default_assignee_role`, `media_board`.
   - `content_types`: `media_boards text[]` (default `{design}`).
   - New models `SpaceStage` (`space_stages`) and `TaskSpaceStage` (`task_space_stages`), as in `data-model.md`.
   - Run `prisma db push` and `prisma generate` locally.
-- [ ] T005 [P] Add `MediaBoard = 'design' | 'video'` and the fields `media_board`, `content_task_id`, `entry_stage`, `auto_linked_at`, `migrated_simple` on `Task`, `default_assignee_role`, `media_board` on `TeamSpace`, and `SpaceStage` / `TaskSpaceStage` types in `src/types/index.ts`.
-- [ ] T006 [P] Map the new fields in `src/lib/mappers.ts` (`mapTask`, `mapSpace`, new `mapSpaceStage`).
-- [ ] T007 Load `space_stages` and `task_space_stages` (two flat queries) and `content_types.media_boards` in `src/lib/board-data.ts`, returned as `spaceStages`, `taskSpaceStages`, and on `contentTypes`.
-- [ ] T008 [P] Export the new pure libs from `scripts/spaces-lab/pure-entry.ts` (empty modules created in later tasks are added there as they land).
+- [X] T005 [P] Add `MediaBoard = 'design' | 'video'` and the fields `media_board`, `content_task_id`, `entry_stage`, `auto_linked_at`, `migrated_simple` on `Task`, `default_assignee_role`, `media_board` on `TeamSpace`, and `SpaceStage` / `TaskSpaceStage` types in `src/types/index.ts`.
+- [X] T006 [P] Map the new fields in `src/lib/mappers.ts` (`mapTask`, `mapSpace`, new `mapSpaceStage`).
+- [X] T007 Load `space_stages` and `task_space_stages` (two flat queries) and `content_types.media_boards` in `src/lib/board-data.ts`, returned as `spaceStages`, `taskSpaceStages`, and on `contentTypes`.
+- [X] T008 *(Done as libs land.)* [P] Export the new pure libs from `scripts/spaces-lab/pure-entry.ts` (empty modules created in later tasks are added there as they land).
 
 **Checkpoint**: `npm run typecheck` passes; the app loads unchanged.
 
@@ -166,13 +166,13 @@ description: "Tasks for 022 — task methodology"
 
 **Goal**:
 - Design and Video boards hold media tasks only, with Link task and Create task.
-- Content and DMS (and admins) can unlink.
+- Anyone can unlink.
 - Assigning a designer doesn't link.
 
 **Independent test** (quickstart 6–9):
 - Create task on Design gives an unlinked media task at Ready For Design.
 - Link task on Video attaches a content task.
-- A Content Creator can unlink; a designer can't.
+- Anyone can unlink; both tasks stay.
 - A designer assigned to an unlinked content task sees it in My tasks only.
 
 ### Tests for US3
@@ -180,11 +180,11 @@ description: "Tasks for 022 — task methodology"
   - Create task on Design: `entry_stage='r-design'`, SLA counted from there;
   - Link task on Video for a content task at C-In Progress: the media task is in Ready For Design and its SLA starts when the content task reaches it;
   - Link task doesn't offer content tasks at F-Check or later;
-  - unlink as Content Creator: both stay, unlinked; as Graphic Designer: refused;
+  - unlink as the Graphic Designer: both stay, unlinked, and move separately;
   - designer as assignee of an unlinked content task: in their My tasks, not on the Design board.
 
 ### Implementation for US3
-- [ ] T032 [US3] `createMediaTask(board, input)` and `unlinkMedia(mediaTaskId)` in `src/actions/media.ts` per contract (role checks: board Space members/superuser/admin for create; Content Creator, DMS, admin for unlink; R4, R14).
+- [ ] T032 [US3] `createMediaTask(board, input)` and `unlinkMedia(mediaTaskId)` in `src/actions/media.ts` per contract (role checks: board Space members/superuser/admin for create; any signed-in member for unlink; R4, R14).
 - [ ] T033 [US3] `src/components/media/MediaActions.tsx` (new):
   - Link task `[data-media-link]` opens a searchable list `[data-media-pick]` of content tasks not on this board and before F-Check, with the board choice `[data-media-board]`;
   - Create task `[data-media-create]` opens the task form preset to the board.
@@ -192,7 +192,7 @@ description: "Tasks for 022 — task methodology"
 - [ ] T034 [US3] Media boards show media tasks only:
   - in `src/components/views/SpacePage.tsx`, a Space with `media_board` scopes to `media_board = that board`;
   - in `src/components/kanban/TaskCard.tsx`, media cards show `[data-media-card]`, the content task name (`[data-media-linked]`, opens it), "with Content" read-only after D-Check, or an "Unlinked" tag.
-- [ ] T035 [US3] Content task chips `[data-media-chip]` (board + stage) on `src/components/kanban/TaskCard.tsx` and in `src/components/kanban/TaskModal.tsx`, with Unlink `[data-media-unlink]` beside each for allowed roles.
+- [ ] T035 [US3] Content task chips `[data-media-chip]` (board + stage) on `src/components/kanban/TaskCard.tsx` and in `src/components/kanban/TaskModal.tsx`, with Unlink `[data-media-unlink]` beside each, for everyone.
 - [ ] T036 [US3] In `src/lib/spaces.ts`, `spacesForAssignee` and `creatorSpaces` never return a Space with `media_board` for a content task (FR-007). In `src/components/me/MyTasks.tsx`, keep tasks assigned to the member regardless of Space.
 - [ ] T037 [US3] Dropping a content task unlinks its media tasks in the same action (`src/actions/tasks.ts` drop path).
 - [ ] T038 [US3] Strings for Link task, Create task, Unlink, "with Content", "Unlinked" in `messages/en.json` and `messages/ar.json`.

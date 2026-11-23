@@ -61,7 +61,15 @@ export function mapSpace(s: any): import('@/types/index').TeamSpace {
     words:         (s.words && typeof s.words === 'object' ? s.words : {}) as Record<string, string[]>,
     sort_order:    s.sort_order ?? 0,
     archived_at:   s.archived_at ? toIsoStr(s.archived_at) : null,
+    default_assignee_role: s.default_assignee_role ?? null,
+    media_board:   s.media_board === 'design' || s.media_board === 'video' ? s.media_board : null,
   }
+}
+
+/** Spec 022: a Space stage row. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapSpaceStage(r: any): import('@/types/index').SpaceStage {
+  return { id: r.id, space_id: r.space_id, stage_id: r.stage_id, name: r.name ?? null, position: r.position ?? 0, aliases: Array.isArray(r.aliases) ? r.aliases : [] }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,6 +132,11 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     due_date:           t.due_date ? toDateStr(t.due_date) : null,
     publish_date:       t.publish_date ? toDateStr(t.publish_date) : null,
     due_manual:         t.due_manual === true,
+    media_board:        t.media_board === 'design' || t.media_board === 'video' ? t.media_board : null,
+    content_task_id:    t.content_task_id ?? null,
+    entry_stage:        t.entry_stage ?? 'todo',
+    auto_linked_at:     t.auto_linked_at ? toIsoStr(t.auto_linked_at) : null,
+    migrated_simple:    t.migrated_simple === true,
     hours_estimate:     Number(t.hours_estimate),
     cover_image_url:    t.cover_image_url ?? undefined,
     cover_thumb:        t.cover_thumb ?? undefined,

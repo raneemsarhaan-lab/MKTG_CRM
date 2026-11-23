@@ -15,7 +15,7 @@ Every action checks its own permission (constitution §III). Results are `{ succ
 - Does: an unlinked media task, `status = 'r-design'`, `entry_stage = 'r-design'`, shown on that board.
 
 ### `unlinkMedia(mediaTaskId)`
-- Who: Content Creator, Digital Marketing Specialist, admin (R14). Others: `not_authorized`.
+- Who: any signed-in member (R14, user 2026-11-23).
 - Does: clears `content_task_id`; if the content task was waiting (R2), it is released at its current stage.
 
 ## src/actions/tasks.ts (changed)

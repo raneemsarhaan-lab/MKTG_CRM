@@ -6,7 +6,7 @@
 
 ## Summary
 
-Every task becomes a pipeline task (11 stages, 10 without C-Check), taking its Space's default assignee role. Design and Video become media boards holding *media tasks*: linked to a content task (automatically once at Ready For Design, or by hand with Link task) or unlinked (Create task on the board, or after Unlink by Content/DMS). A content task linked to several boards waits until every media task passes D-Check, then moves to F-Check. Status words become real Space stages that can rename or split an original stage, with per-Space sub-stage moves that change nothing else. Simple tasks are removed and migrated. SLA counts Sunday–Thursday on Cairo days. The task-to-task field is renamed Related task.
+Every task becomes a pipeline task (11 stages, 10 without C-Check), taking its Space's default assignee role. Design and Video become media boards holding *media tasks*: linked to a content task (automatically once at Ready For Design, or by hand with Link task) or unlinked (Create task on the board, or after an Unlink, which anyone may do). A content task linked to several boards waits until every media task passes D-Check, then moves to F-Check. Status words become real Space stages that can rename or split an original stage, with per-Space sub-stage moves that change nothing else. Simple tasks are removed and migrated. SLA counts Sunday–Thursday on Cairo days. The task-to-task field is renamed Related task.
 
 Technical approach (research.md): a media task is its own task row (R1); the content task's stage is derived and gated inside the one move rule (R2); Space stages and sub-stage positions live in two new tables (R7); every data change runs once from `prisma/seed.ts` (R15).
 
@@ -38,7 +38,7 @@ Technical approach (research.md): a media task is its own task row (R1); the con
 |---|---|---|
 | I. Design system fidelity | ✅ | Tokens only; no new colours (media chips use stage colours). |
 | II. Workflow integrity | ⚠️ needs amendment | Removes the simple-task workflow; adds media tasks and the "waiting on media" gate to `allowedStages`; SLA days become Sunday–Thursday (Settings weekend). The amendment (constitution 4.0.0, MAJOR) is the first task, as spec 021 did with 3.0.0. All moves stay inside `allowedStages`. |
-| III. Role-based access | ✅ | Unlink (Content Creator, DMS, admin), Space stages (admin, superuser), default role and content-type boards (admin) are checked in their server actions. |
+| III. Role-based access | ✅ | Unlink (any member, user 2026-11-23), Space stages (admin, superuser), default role and content-type boards (admin) are checked in their server actions. |
 | IV. Design-driven development | ⏳ gate | `design/task-methodology.html` (hand-off box per board, media board actions, media chips, Space stages settings) must be approved before Phases 4–5 UI. |
 | V. Celebration system | ⚠️ amendment | The simple-task celebration rule goes; migrated tasks never celebrate. Pipeline celebration unchanged, including for media tasks. |
 | VI. State architecture | ✅ | Postgres for Space stages and sub-stage positions (shared); `once()` for data changes (R15 also moves the due-date migration there); `MediaBoard` union added to `src/types/index.ts`; `TaskKind`/`SimpleStatus` left unused, then removed. |

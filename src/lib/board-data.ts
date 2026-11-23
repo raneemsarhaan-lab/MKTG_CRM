@@ -8,7 +8,7 @@
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
-import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 import { linkedKeyOf, wordsFor } from '@/lib/space-words'
 import type { SheetTaskMap } from '@/types/index'
@@ -22,7 +22,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -96,6 +96,9 @@ export async function loadBoardData(member: SessionMember) {
     prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } }),
     // Spec 021 (US4, R11): the workspace's default feature switches for brands.
     prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true, due_days_before: true, due_weekend_days: true, due_weekend_shift: true } }),
+    // Spec 022: Space stages and each task's sub-stage — two flat arrays, never a query per task.
+    prisma.spaceStage.findMany({ orderBy: [{ space_id: 'asc' }, { stage_id: 'asc' }, { position: 'asc' }] }),
+    prisma.taskSpaceStage.findMany({ select: { task_id: true, space_id: true, space_stage_id: true, stage_id: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -123,7 +126,9 @@ export async function loadBoardData(member: SessionMember) {
     boardSorts: (prefs?.board_sorts ?? {}) as Record<string, string>,
     // The due-date rule (Settings › Due Dates).
     dueRule: ruleFromSettings(ws),
-    contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label })),
+    contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label, media_boards: ct.media_boards })),
+    spaceStages: spaceStages.map(mapSpaceStage),
+    taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),
     themes: themes.map(mapTheme),
     hasStorage: storageConfigured(),

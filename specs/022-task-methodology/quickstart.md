@@ -14,7 +14,7 @@
 5. **Automatic link, both boards**: a type set to Design + Video → two media tasks. Pass D-Check on Design only → the content task can't move to F-Check. Pass Video's → the content task is at F-Check.
 6. **Create task**: on the Design board → an unlinked media task at Ready For Design; its SLA counts from there.
 7. **Link task**: on the Video board, pick a content task at C-In Progress → its media task shows in Ready For Design; SLA starts when the content task reaches Ready For Design.
-8. **Unlink**: as Content Creator → both tasks stay, unlinked; as the designer → refused.
+8. **Unlink**: as the designer (anyone may) → both tasks stay, unlinked, and move separately.
 9. **Assignee is not a link**: make the designer the assignee of an unlinked content task → in their My tasks, not on the Design board.
 10. **Shows in**: change the assignee → the old assignee's Space goes unless it was the created-in Space.
 11. **Space stages**: split D-In Progress into Sketch and Final art in Design; move a task between them → stage, SLA, other Spaces unchanged. Move it to D-Check and back → it starts at Sketch.
