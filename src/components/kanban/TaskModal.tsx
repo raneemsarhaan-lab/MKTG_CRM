@@ -40,6 +40,8 @@ import { useNotify } from '@/components/notifications/NotifyProvider'
 import { ReplyComposer } from './ReplyComposer'
 import { mentionedIn } from '@/lib/notify/mentions'
 import { useMoveError } from '@/components/fields/moveErrors'
+import { RepeatEditor } from '@/components/templates/RepeatEditor'
+import { templateFromTask } from '@/actions/templates'
 import { TypePicker } from '@/components/types/TypePicker'
 import { DescriptionLabel, PanelFieldSections, PanelTopFields, REQUIRED_EVENT, hasSections } from '@/components/fields/PanelFields'
 import { useCardFields } from '@/components/fields/CardFields'
@@ -642,6 +644,8 @@ export function TaskModal({
       : null
   const tsheet = useTranslations('sheet')
   const tDates = useTranslations('dates')
+  const tRepeat = useTranslations('repeat')
+  const tTpl = useTranslations('templates')
   const tMedia = useTranslations('media')
   const moveErr = useMoveError()
   const locale = useLocale()
@@ -1537,6 +1541,20 @@ export function TaskModal({
                           onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
                 <MenuItem icon="openIn" label="Open the board behind this"
                           onClick={() => { setMenuOpen(false); requestClose() }} />
+                {/* Spec 023 (US7): admins and superusers save a task as a template of its type. */}
+                {currentUser.access !== 'user' && task.content_type_label && !task.parent_task_id && (
+                  <MenuItem icon="subtask" label={tTpl('saveAs')}
+                            onClick={() => {
+                              setMenuOpen(false)
+                              const name = window.prompt(tTpl('namePrompt'), task.name)
+                              if (!name?.trim()) return
+                              startTransition(async () => {
+                                const r = await templateFromTask(task.id, name.trim())
+                                if (r.success) { setCopied('template'); setTimeout(() => setCopied(''), 2500) }
+                                else setError(tTpl('failed'))
+                              })
+                            }} />
+                )}
               </div>
             )}
           </div>
@@ -1655,6 +1673,9 @@ export function TaskModal({
               )}
               {copied === 'link' && (
                 <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
+              )}
+              {copied === 'template' && (
+                <span data-template-saved="" style={{ fontSize: 13, color: CU.label }}>{tTpl('savedFromTask')}</span>
               )}
             </div>
 
@@ -1853,6 +1874,11 @@ export function TaskModal({
                     )}
                   </span>
                 </Prop>
+
+                {/* Spec 023 (US8): repeat this task on publishing dates. */}
+                {!task.parent_task_id && <Prop icon="calendar" label={tRepeat('title')}>
+                  <RepeatEditor taskId={task.id} repeating={!!task.repeat_rule_id} canEdit={canEdit} />
+                </Prop>}
 
                 {on('priorities') && <Prop icon="flag" label="Priority">
                   <InlineValue

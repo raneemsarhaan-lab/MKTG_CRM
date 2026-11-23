@@ -9,7 +9,7 @@ import { setWorkWeekend } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
-import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone, mapTemplate } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
@@ -21,7 +21,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones, tags] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones, tags, templates] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -108,6 +108,8 @@ export async function loadBoardData(member: SessionMember) {
     prisma.milestone.findMany({ orderBy: { day: 'asc' } }),
     // Spec 023 (R8): the workspace's tags.
     prisma.tag.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true } }),
+    // Spec 023 (US7): task templates, for + Task › From template.
+    prisma.taskTemplate.findMany({ orderBy: [{ type_label: 'asc' }, { name: 'asc' }] }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -141,6 +143,7 @@ export async function loadBoardData(member: SessionMember) {
     fieldValues: fieldValues as import('@/types/index').TaskFieldValueRow[],
     milestones: milestones.map(mapMilestone),
     tags: tags as import('@/types/index').Tag[],
+    templates: templates.map(mapTemplate),
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),

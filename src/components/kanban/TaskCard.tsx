@@ -125,6 +125,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const type = types?.find(x => x.label === task.content_type_label)
   const ctx = useCardFields()
   const tPri = useTranslations('priority')
+  const tRepeat = useTranslations('repeat')
   const tagList = (task.tag_ids ?? []).map(id => ctx?.tags.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   const people = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => ctx?.members.find(m => m.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   // Stable per task, so a card does not reshuffle its bars on every render.
@@ -233,6 +234,10 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         {/* Spec 023 (US4): up to three tags, then +N. */}
         {featureOn(task.brand, 'tags') && tagList.slice(0, 3).map(tg => <TagChip key={tg.id} tag={tg} small />)}
         {featureOn(task.brand, 'tags') && tagList.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, alignSelf: 'center' }}>+{tagList.length - 3}</span>}
+        {/* Spec 023 (US8): a repeating task. */}
+        {task.repeat_rule_id && (
+          <span data-repeat-mark="" title={tRepeat('mark')} aria-label={tRepeat('mark')} style={{ display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary }}>↻</span>
+        )}
         {task.priority === 'Urgent' && featureOn(task.brand, 'priorities') && (
           <span data-card-urgent="" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 800, padding: '4px 8px', borderRadius: 6, background: '#FDE7EA', color: '#D22040', whiteSpace: 'nowrap' }}>⚑ {tPri('Urgent')}</span>
         )}

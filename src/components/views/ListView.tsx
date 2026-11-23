@@ -54,6 +54,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
   const typeOf = (label: string | null | undefined) => custom?.types.find(x => x.label === label)
   const t = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
+  const tRepeat = useTranslations('repeat')
   const tg = useTranslations('statusGroups')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members])
@@ -103,7 +104,7 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                 style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'center', textAlign: 'start',
                   padding: '9px 12px', border: `1px solid ${PIPE.border}`, borderRadius: 12, background: '#FFFFFF', cursor: 'pointer', fontFamily: 'inherit' }}>
                 <span style={{ minWidth: 0, display: 'grid', gap: 2 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13.5, color: PIPE.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13.5, color: PIPE.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}{task.repeat_rule_id && <span data-repeat-mark="" title={tRepeat('mark')} aria-label={tRepeat('mark')} style={{ marginInlineStart: 6, color: PIPE.textSecondary }}>↻</span>}</span>
                   <span style={{ fontSize: 11.5, color: PIPE.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
                     {shows('brand') && (task.brand?.name ?? t('noBrand'))}
                     {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (() => {

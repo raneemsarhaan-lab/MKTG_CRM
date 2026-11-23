@@ -2,7 +2,7 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { cairoToday, calcDueDate, DEFAULT_RULE, formatDay, type DueRule } from '@/lib/due-dates'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Member, Brand, ContentType, BrandFeatureKey } from '@/types/index'
 import { featureOn } from '@/lib/brand-features'
@@ -15,6 +15,9 @@ import { shortDate } from '@/lib/myboard'
 import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
 import { PRIORITIES, PRIORITY_COLOR, asPriority } from '@/lib/priorities'
 import type { Priority } from '@/types/index'
+import type { TaskTemplate } from '@/types/index'
+import { listTemplates } from '@/actions/templates'
+import { fillPattern } from '@/lib/templates'
 
 /** The blue + lime brand palette, local to this form — see TaskModal's `CU`. */
 const CU = {
@@ -152,6 +155,24 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   const isUser = currentUser.access === 'user'
   const assignable = isUser ? members.filter(m => m.id === currentUser.id) : members
   const [showIn, setShowIn] = useState<string | null>(spaceId ?? spaceChoices?.[0]?.id ?? null)
+  // Spec 023 (US7): templates of the chosen type. undefined = the type's default; null = none.
+  const tTpl = useTranslations('templates')
+  const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  const [tplChoice, setTplChoice] = useState<string | null | undefined>(undefined)
+  useEffect(() => { listTemplates().then(setTemplates).catch(() => null) }, [])
+  const typeTemplates = templates.filter(x => x.type_label === form.content_type_label)
+  const typeDefault = contentTypes.find(c => c.label === form.content_type_label)?.default_template_id ?? null
+  const activeTpl = tplChoice === null ? null : typeTemplates.find(x => x.id === (tplChoice ?? typeDefault)) ?? null
+  function pickTemplate(id: string | null) {
+    setTplChoice(id)
+    const tpl = templates.find(x => x.id === id)
+    if (!tpl) return
+    const brandName = brands.find(b => b.id === form.brand_id)?.name ?? ''
+    if (!form.name.trim()) patch('name', fillPattern(tpl.name_pattern, { brand: brandName, type: tpl.type_label, date: form.publish_date || null }))
+    if (typeof tpl.values.hours === 'number') patch('hours_estimate', tpl.values.hours)
+    const p = asPriority(tpl.values.priority)
+    if (p && !form.priority_touched) patch('priority', p)
+  }
 
   function patch<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(p => ({ ...p, [k]: v }))
@@ -221,10 +242,12 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         publish_date:       form.publish_date || null,
         due_date:           form.due_touched ? form.due_date || null : null,
         hours_estimate:     form.hours_estimate,
-        priority:           form.priority,
+        // A template's priority wins until someone picks one by hand.
+        priority:           form.priority_touched || !activeTpl ? form.priority : undefined,
         project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
         space_id:           showIn,
+        template_id:        tplChoice === null ? null : activeTpl?.id,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create task'); return }
 
@@ -334,6 +357,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                     selected={c.label === form.content_type_label}
                     onClick={() => {
                       patch('content_type_label', c.label)
+                      setTplChoice(undefined)
                       const dflt = asPriority(c.default_priority)
                       if (dflt && !form.priority_touched) patch('priority', dflt)
                       closePill()
@@ -342,6 +366,24 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                     {c.label}
                   </PillOption>
                 ))}
+              </FieldPill>
+            )}
+
+            {typeTemplates.length > 0 && (
+              <FieldPill
+                label={tTpl('template')}
+                value={activeTpl ? activeTpl.name : tTpl('noTemplate')}
+                active={!!activeTpl}
+                icon={<span aria-hidden="true" style={{ fontSize: 12 }}>❖</span>}
+              >
+                {closePill => [
+                  <PillOption key="none" selected={!activeTpl} onClick={() => { setTplChoice(null); closePill() }}>{tTpl('noTemplate')}</PillOption>,
+                  ...typeTemplates.map(x => (
+                    <PillOption key={x.id} selected={activeTpl?.id === x.id} onClick={() => { pickTemplate(x.id); closePill() }}>
+                      <span data-form-template={x.name}>{x.name}{x.id === typeDefault ? ` · ${tTpl('isDefault')}` : ''}</span>
+                    </PillOption>
+                  )),
+                ]}
               </FieldPill>
             )}
           </div>

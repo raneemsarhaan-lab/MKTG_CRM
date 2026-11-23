@@ -21,6 +21,7 @@
  *   03:00 team   clean-up: read notifications over 90 days, old reminder keys,
  *                orphaned sheet formats and comments (spec 015)
  */
+import { runRecurring } from '@/lib/recurrence-server'
 import { prisma } from '@/lib/prisma'
 import { clearSheetOrphans } from '@/lib/sheet-cleanup'
 import type { NotificationKind, NotificationMeta } from '@/types/index'
@@ -150,7 +151,7 @@ export async function runCleanup(now = new Date()): Promise<number> {
   return r.count
 }
 
-let lastDue = 0, lastCleanupDay = ''
+let lastDue = 0, lastRecurring = 0, lastCleanupDay = ''
 /**
  * One tick: every job that is due now. Returns the jobs it ran. A job that
  * fails is logged and the others still run; the hourly and nightly ones are
@@ -167,6 +168,11 @@ export async function tick(now = new Date()): Promise<string[]> {
   if (now.getTime() - lastDue >= 55 * 60_000) {
     lastDue = now.getTime()
     await job('due', () => runDueReminders(now))
+  }
+  // Spec 023 (US8): recurring tasks whose creation day has come, hourly.
+  if (now.getTime() - lastRecurring >= 55 * 60_000) {
+    lastRecurring = now.getTime()
+    await job('recurring', () => runRecurring(now))
   }
   if (clock.h > 8 || (clock.h === 8 && clock.m >= 30)) await job('daily', () => runDailySummary(now))
   const day = teamDay(now, TZ())

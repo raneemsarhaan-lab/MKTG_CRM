@@ -94,6 +94,16 @@ export function mapTypeField(x: any): import('@/types/index').TaskTypeFieldLink 
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapTemplate(t: any): import('@/types/index').TaskTemplate {
+  const values = t.values && typeof t.values === 'object' && !Array.isArray(t.values) ? t.values : {}
+  return {
+    id: t.id, type_label: t.type_label, name: t.name, name_pattern: t.name_pattern, brief: t.brief ?? null,
+    values, subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+    updated_at: t.updated_at instanceof Date ? t.updated_at.toISOString() : String(t.updated_at ?? ''),
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapMilestone(m: any): import('@/types/index').Milestone {
   const d = m.day instanceof Date ? m.day.toISOString().slice(0, 10) : String(m.day).slice(0, 10)
   return { id: m.id, brand_id: m.brand_id, name: m.name, day: d }
@@ -157,6 +167,7 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     stage_date:         toDateStr(t.stage_date),
     due_date:           t.due_date ? toDateStr(t.due_date) : null,
     start_date:         t.start_date ? toDateStr(t.start_date) : null,
+    repeat_rule_id:     t.repeat_rule_id ?? null,
     publish_date:       t.publish_date ? toDateStr(t.publish_date) : null,
     due_manual:         t.due_manual === true,
     media_board:        t.media_board === 'design' || t.media_board === 'video' ? t.media_board : null,

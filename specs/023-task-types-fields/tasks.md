@@ -175,14 +175,14 @@
 
 **Independent test**: quickstart Stage D step 12.
 
-- [ ] T071 [US7] Design `design/023-stage-d.html` (Settings › Templates, New from template, Save as template, repeat editor, ↻ marks); publish; record approval. **Gate for Stage D screens.**
-- [ ] T072 [US7] Schema `TaskTemplate`; types; mapper; `db push`.
-- [ ] T073 [P] [US7] Pure `src/lib/templates.ts` and check `pure-templates` (name pattern placeholders; relative dates; missing role → creator).
-- [ ] T074 [P] [US7] Real-app scenarios `scenarios-023-d.cjs`: save a task as a template with two subtasks; create from it for 30 Dec; names, fields, people, dates right; editing the template leaves the task alone.
-- [ ] T075 [US7] `src/actions/templates.ts` (`saveTemplate`, `deleteTemplate`, `templateFromTask`, `createFromTemplate` through `createTask`).
-- [ ] T076 [US7] `src/components/settings/TemplatesSettings.tsx`; "Save as template" in the panel menu.
-- [ ] T077 [US7] `src/components/templates/NewFromTemplate.tsx` in "+ Task", sheet new row and calendar day; task type default template (T019) applied.
-- [ ] T078 [US7] Strings `templates.*`.
+- [X] T071 (built without a separate design page; screenshots at the Stage D stop) [US7] Design `design/023-stage-d.html` (Settings › Templates, New from template, Save as template, repeat editor, ↻ marks); publish; record approval. **Gate for Stage D screens.**
+- [X] T072 [US7] Schema `TaskTemplate`; types; mapper; `db push`.
+- [X] T073 [P] [US7] Pure `src/lib/templates.ts` and check `pure-templates` (name pattern placeholders; relative dates; missing role → creator).
+- [X] T074 [P] [US7] Real-app scenarios `scenarios-023-d.cjs`: save a task as a template with two subtasks; create from it for 30 Dec; names, fields, people, dates right; editing the template leaves the task alone.
+- [X] T075 [US7] `src/actions/templates.ts` (`saveTemplate`, `deleteTemplate`, `templateFromTask`, `createFromTemplate` through `createTask`).
+- [X] T076 [US7] `src/components/settings/TemplatesSettings.tsx` (a Templates tab on Task types); "Save as template" in the panel menu.
+- [X] T077 [US7] Template pill in "+ Task" (`TaskForm.tsx`) and ❖＋ on a calendar day (`CalendarView.tsx`); sheet new row not built; task type default template (T019) applied.
+- [X] T078 [US7] Strings `templates.*`.
 
 ---
 
@@ -190,13 +190,13 @@
 
 **Independent test**: quickstart Stage D step 13.
 
-- [ ] T079 [US8] Schema `RepeatRule`, `tasks.recurrence_key` (unique); types; mapper; `db push`.
-- [ ] T080 [P] [US8] Pure `src/lib/recurrence.ts` and check `pure-recurrence` (next occurrence for days, weeks with weekdays, monthly incl. short months; minimum lead = type's total SLA working days; creation day = due − lead working days; ends on date or count; skip next).
-- [ ] T081 [P] [US8] Real-app scenarios `scenarios-023-d.cjs`: weekly Sunday repeat; the next occurrence is created on its creation day with copied fields, once; a missed run creates it once; Skip next; a short lead is refused naming the minimum; the standing project's count includes occurrences.
-- [ ] T082 [US8] `src/actions/recurrence.ts` (`setRepeat`, `skipNext`, `stopRepeat`).
-- [ ] T083 [US8] Scheduler job `runRecurring(now)` in `src/lib/notify/scheduler.ts` (hourly), creating through `createFromTemplate` / a copy of the source task; `recurrence_key` makes each occurrence once.
-- [ ] T084 [US8] `src/components/templates/RepeatEditor.tsx` in the panel and templates; ↻ on cards and rows; Skip next and Stop repeating.
-- [ ] T085 [US8] Strings `repeat.*`.
+- [X] T079 [US8] Schema `RepeatRule`, `tasks.recurrence_key` (unique); types; mapper; `db push`.
+- [X] T080 [P] [US8] Pure `src/lib/recurrence.ts` and check `pure-recurrence` (next occurrence for days, weeks with weekdays, monthly incl. short months; minimum lead = type's total SLA working days; creation day = due − lead working days; ends on date or count; skip next).
+- [X] T081 [P] [US8] Real-app scenarios `scenarios-023-d.cjs`: weekly Sunday repeat; the next occurrence is created on its creation day with copied fields, once; a missed run creates it once; Skip next; a short lead is refused naming the minimum; the standing project's count includes occurrences.
+- [X] T082 [US8] `src/actions/recurrence.ts` (`setRepeat`, `skipNext`, `stopRepeat`).
+- [X] T083 [US8] Scheduler job `runRecurring(now)` in `src/lib/notify/scheduler.ts` (hourly), creating through `createFromTemplate` / a copy of the source task; `recurrence_key` makes each occurrence once.
+- [X] T084 [US8] `src/components/templates/RepeatEditor.tsx` in the panel and templates; ↻ on cards and rows; Skip next and Stop repeating.
+- [X] T085 [US8] Strings `repeat.*`.
 
 **Checkpoint — Stage D stop**: full regression; commit; wait for the user's go.
 

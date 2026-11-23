@@ -266,6 +266,18 @@ export interface Tag { id: string; name: string; color: string }
 export interface Todo { id: string; name: string; note: string | null; day: string | null; flagged: boolean; done_at: string | null; created_at: string }
 /** Spec 023 (R6): a brand's calendar marker — not a task. */
 export interface Milestone { id: string; brand_id: string; name: string; day: string }
+/** Spec 023 (US7): a task template. Subtask offsets are days from the publishing date. */
+export interface TaskTemplateSubtask { name: string; startOffset?: number | null; dueOffset?: number | null; assigneeRole?: string | null }
+export interface TaskTemplate {
+  id: string
+  type_label: string
+  name: string
+  name_pattern: string
+  brief: string | null
+  values: { fields?: Record<string, unknown>; priority?: string | null; tagIds?: string[]; assigneeRole?: string | null; projectId?: string | null; hours?: number | null }
+  subtasks: TaskTemplateSubtask[]
+  updated_at: string
+}
 
 export interface Stage {
   id: StageId
@@ -312,6 +324,8 @@ export interface Task {
   due_date: string | null
   /** Spec 023 (US6): optional start; never after the due date. */
   start_date?: string | null
+  /** Spec 023 (US8): the repeat rule this task belongs to; shows ↻. */
+  repeat_rule_id?: string | null
   /** The day the content goes live (Africa/Cairo). */
   publish_date?: string | null
   /** The due date was set by hand: a new publishing date doesn't move it. */

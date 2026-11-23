@@ -1,6 +1,8 @@
 'use server'
 
 import { datesFor, newTaskDates } from '@/lib/due-dates-server'
+import { applyTemplateExtras, loadTemplate } from '@/lib/templates-server'
+import { fillPattern } from '@/lib/templates'
 import { afterMove, mediaGate, moveThroughMedia, requiredGate, requiredRefusal } from '@/lib/media-server'
 import { withAssignees } from '@/lib/assignees-server'
 import { everyAssignee } from '@/lib/assignees'
@@ -951,6 +953,8 @@ interface CreateTaskInput {
   cover_image_url?:   string
   /** Spec 021 (FR-028): the Space it was created from. */
   space_id?:          string | null
+  /** Spec 023 (US7): a template to fill it from; null = none (not even the type's default). */
+  template_id?:       string | null
 }
 
 /**
@@ -1002,12 +1006,15 @@ export async function createTask(
   const board = input.space_id ? spaceCtx.spaces.find(s => s.id === input.space_id)?.media_board ?? null : null
   const media = board === 'design' || board === 'video' ? { media_board: board, status: 'r-design', entry_stage: 'r-design' } : {}
 
-  const typeRow = input.content_type_label ? await prisma.contentType.findUnique({ where: { label: input.content_type_label }, select: { default_priority: true, default_tag_ids: true } }) : null
+  const typeRow = input.content_type_label ? await prisma.contentType.findUnique({ where: { label: input.content_type_label }, select: { default_priority: true, default_tag_ids: true, default_template_id: true } }) : null
+  // Spec 023 (US7, T019): the template asked for, else the type's default one.
+  const tpl = input.template_id === null ? null : await loadTemplate(input.template_id ?? typeRow?.default_template_id)
+  const useTpl = tpl && tpl.type_label === input.content_type_label ? tpl : null
   const task = await prisma.task.create({
     data: {
       kind,
       name:               input.name,
-      description:        input.description?.trim() || null,
+      description:        input.description?.trim() || useTpl?.brief?.trim() || null,
       brand_id:           input.brand_id || null,
       content_type_label: input.content_type_label || null,
       platform:           input.platform   ?? null,
@@ -1019,9 +1026,9 @@ export async function createTask(
       status:             'todo',
       stage_date:         new Date(),
       ...(await newTaskDates(input.publish_date, input.due_date, input.start_date)),
-      hours_estimate:     input.hours_estimate ?? 0,
-      // Spec 023 (T019): the type's default priority when none was chosen.
-      priority:           input.priority ?? asPriority(typeRow?.default_priority) ?? 'Normal',
+      hours_estimate:     input.hours_estimate ?? (Number(useTpl?.values.hours) || 0),
+      // Spec 023 (T019): the template's or the type's default priority when none was chosen.
+      priority:           input.priority ?? asPriority(useTpl?.values.priority) ?? asPriority(typeRow?.default_priority) ?? 'Normal',
       cover_image_url:    input.cover_image_url ?? null,
       created_by:         member.id,
       ...media,
@@ -1042,6 +1049,12 @@ export async function createTask(
 
   // Spec 023 (T054): the type's default tags.
   if (typeRow?.default_tag_ids?.length) await prisma.taskTag.createMany({ data: typeRow.default_tag_ids.map(tag_id => ({ task_id: task.id, tag_id })), skipDuplicates: true }).catch(() => null)
+  // Spec 023 (US7): the template's field values, tags and subtasks.
+  if (useTpl) {
+    const brandName = input.brand_id ? (await prisma.brand.findUnique({ where: { id: input.brand_id }, select: { name: true } }))?.name ?? '' : ''
+    const publish = input.publish_date?.slice(0, 10) ?? null
+    await applyTemplateExtras(task.id, useTpl, member.id, x => fillPattern(x, { brand: brandName, type: input.content_type_label, date: publish }))
+  }
 
   revalidatePath('/board')
   revalidatePath('/', 'layout')

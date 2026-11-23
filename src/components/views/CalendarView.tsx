@@ -12,7 +12,8 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { cairoToday, formatDay, isOverdue } from '@/lib/due-dates'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Brand, Milestone } from '@/types/index'
+import type { Brand, Milestone, TaskTemplate } from '@/types/index'
+import { createFromTemplate, listTemplates } from '@/actions/templates'
 import { addMilestone, deleteMilestone, updateMilestone } from '@/actions/milestones'
 import { updateTask } from '@/actions/tasks'
 import { STAGE_COLORS } from '@/lib/tokens'
@@ -70,6 +71,11 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   useEffect(() => { setMarks(milestones?.list ?? []) }, [milestones?.list])
   const [markPop, setMarkPop] = useState<{ day: string; edit?: Milestone; at: DOMRect } | null>(null)
   const marksOn = (iso: string) => marks.filter(m => m.day === iso && (milestones?.brandIds ?? []).includes(m.brand_id))
+  // Spec 023 (US7): a task from a template, published on the day.
+  const tTpl = useTranslations('templates')
+  const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  useEffect(() => { listTemplates().then(setTemplates).catch(() => null) }, [])
+  const [tplPop, setTplPop] = useState<{ day: string; at: DOMRect } | null>(null)
   const cal = useCalendarLink({ spaceId: link?.spaceId ?? null, media: link?.media ?? [], say: text => setToast({ text }) })
 
   useEffect(() => {
@@ -265,6 +271,13 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
                   ⚑ ＋
                 </button>
               )}
+              {templates.length > 0 && (
+                <button type="button" className="fx-cal-mark" data-cal-template={d.iso} aria-label={`${tTpl('fromTemplate')} · ${d.iso}`} title={tTpl('fromTemplate')}
+                  onClick={e => setTplPop({ day: d.iso, at: e.currentTarget.getBoundingClientRect() })}
+                  style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: PIPE.textMuted, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '1px 4px', borderRadius: 6 }}>
+                  ❖ ＋
+                </button>
+              )}
               {link && (
                 <button type="button" className="fx-cal-link" data-cal-link={d.iso} aria-label={`${tMedia('linkTask')} · ${d.iso}`}
                   onClick={e => cal.open(d.iso, e.currentTarget.parentElement as HTMLElement)}
@@ -305,6 +318,18 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
       <p style={{ margin: 0, fontSize: 12, color: PIPE.textMuted }}>{t('note')}</p>
       {cal.layer}
       <style>{`.fx-cal-mark{opacity:0;transition:opacity .12s}.fx-cal-day:hover .fx-cal-mark,.fx-cal-mark:focus-visible{opacity:1}@media (hover:none){.fx-cal-mark{opacity:1}}`}</style>
+      {tplPop && (
+        <TemplatePopover pop={tplPop} templates={templates} brands={brands} onClose={() => setTplPop(null)}
+          onCreate={async (templateId, brandId) => {
+            const day = tplPop.day
+            setTplPop(null)
+            const r = await createFromTemplate(templateId, { brand_id: brandId, publish_date: day, space_id: link?.spaceId ?? null })
+            if (!r.success || !r.id) { setToast({ text: tTpl('failed') }); return }
+            router.refresh()
+            setToast({ text: tTpl('created', { date: dayOf(day).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) }) })
+            onOpen(r.id)
+          }} />
+      )}
       {markPop && milestones && (
         <MilestonePopover pop={markPop} brands={brands.filter(b => milestones.brandIds.includes(b.id))} onClose={() => setMarkPop(null)}
           onSave={async (name, day, brandId) => {
@@ -371,6 +396,40 @@ function MilestonePopover({ pop, brands, onClose, onSave, onDelete }: {
           {onDelete && <button type="button" onClick={onDelete} data-milestone-delete="" style={{ marginInlineEnd: 'auto', border: 'none', background: 'none', color: '#D22040', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{t('delete')}</button>}
           <button type="button" onClick={onClose} style={{ border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, cursor: 'pointer' }}>{t('cancel')}</button>
           <button type="submit" disabled={!name.trim()} data-milestone-save="" style={{ border: 'none', background: '#C8F24E', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>{t('save')}</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function TemplatePopover({ pop, templates, brands, onClose, onCreate }: {
+  pop: { day: string; at: DOMRect }; templates: TaskTemplate[]; brands: Brand[]
+  onClose: () => void; onCreate: (templateId: string, brandId: string) => void
+}) {
+  const t = useTranslations('templates')
+  const [tpl, setTpl] = useState(templates[0]?.id ?? '')
+  const [brand, setBrand] = useState(brands[0]?.id ?? '')
+  const field: React.CSSProperties = { border: `1px solid ${PIPE.border}`, borderRadius: 8, padding: '6px 8px', fontFamily: 'inherit', fontSize: 13, background: '#FFFFFF', width: '100%', boxSizing: 'border-box' }
+  const top = Math.min(pop.at.bottom + 6, (typeof window !== 'undefined' ? window.innerHeight : 800) - 220)
+  const left = Math.max(12, Math.min(pop.at.left, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280))
+  return (
+    <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 400 }}>
+      <form role="dialog" aria-label={t('fromTemplate')} data-template-form="" onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+        onSubmit={e => { e.preventDefault(); if (tpl && brand) onCreate(tpl, brand) }}
+        style={{ position: 'fixed', top, left, width: 260, background: '#FFFFFF', border: `1px solid ${PIPE.border}`, borderRadius: 12, boxShadow: '0 12px 30px rgba(0,0,0,.14)', padding: 12, display: 'grid', gap: 8 }}>
+        <strong style={{ fontSize: 13, color: PIPE.ink }}>❖ {t('fromTemplate')}</strong>
+        <span style={{ fontSize: 12, color: PIPE.textMuted }}>{t('publishingOn', { date: pop.day })}</span>
+        <select autoFocus value={tpl} onChange={e => setTpl(e.target.value)} aria-label={t('template')} style={field} data-template-pick="">
+          {templates.map(x => <option key={x.id} value={x.id}>{x.name} · {x.type_label}</option>)}
+        </select>
+        {brands.length > 1 && (
+          <select value={brand} onChange={e => setBrand(e.target.value)} aria-label={t('brand')} style={field} data-template-brand="">
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        )}
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={onClose} style={{ border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, cursor: 'pointer' }}>{t('cancel')}</button>
+          <button type="submit" disabled={!tpl || !brand} data-template-create="" style={{ border: 'none', background: '#C8F24E', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>{t('create')}</button>
         </div>
       </form>
     </div>

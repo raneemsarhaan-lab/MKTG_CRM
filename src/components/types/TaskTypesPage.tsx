@@ -23,6 +23,8 @@ import { attachField, createField, detachField, retireField, updateField } from 
 import { deleteTag, mergeTags, recolorTag, renameTag } from '@/actions/tags'
 import { TAG_COLORS } from '@/lib/tags'
 import { TypeIcon } from './TypeIcon'
+import { TemplatesSettings } from '@/components/settings/TemplatesSettings'
+import type { TaskTemplate } from '@/types/index'
 
 interface Props {
   types: ContentType[]
@@ -34,6 +36,9 @@ interface Props {
   canEditFields: boolean
   /** Spec 023 (US4): tags with how many tasks use each; admins manage them. */
   tags?: { id: string; name: string; color: string; count: number }[]
+  /** Spec 023 (US7): templates per type; admins and superusers edit. */
+  templates?: TaskTemplate[]
+  roles?: string[]
 }
 
 const PRIORITY_CHOICES = ['Urgent', 'High', 'Normal', 'Low', 'None'] as const
@@ -52,8 +57,8 @@ export function TaskTypesPage(p: Props) {
   const t = useTranslations('types')
   const tf = useTranslations('fields')
   const locale = useLocale()
-  const [tab, setTab] = useState<'types' | 'fields' | 'tags'>('types')
-  const readOnly = tab === 'fields' ? !p.canEditFields : !p.canEditTypes
+  const [tab, setTab] = useState<'types' | 'fields' | 'tags' | 'templates'>('types')
+  const readOnly = tab === 'fields' || tab === 'templates' ? !p.canEditFields : !p.canEditTypes
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
@@ -65,16 +70,17 @@ export function TaskTypesPage(p: Props) {
           <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '6px 0 0' }}>{t('intro')}</p>
         </div>
         <div role="tablist" className="fx-tabs" style={{ display: 'inline-flex', borderRadius: 10, padding: 4, background: '#EBEBEB', marginBottom: 20, gap: 2 }}>
-          {(['types', 'fields', 'tags'] as const).map(k => (
+          {(['types', 'fields', 'tags', 'templates'] as const).map(k => (
             <button key={k} role="tab" aria-selected={tab === k} data-types-tab={k} onClick={() => setTab(k)}
               style={{ fontSize: '0.82rem', fontWeight: 700, padding: '8px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 background: tab === k ? '#fff' : 'transparent', color: tab === k ? 'var(--ink)' : 'var(--muted)', boxShadow: tab === k ? '0 1px 3px rgba(16,16,11,.12)' : 'none' }}>
-              {k === 'types' ? t('tabTypes') : k === 'fields' ? t('tabFields') : t('tabTags')}
+              {k === 'types' ? t('tabTypes') : k === 'fields' ? t('tabFields') : k === 'tags' ? t('tabTags') : t('tabTemplates')}
             </button>
           ))}
         </div>
-        {readOnly && <p data-read-only style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 14px' }}>{tab === 'types' ? t('readOnly') : tab === 'tags' ? t('tagsReadOnly') : tf('readOnly')}</p>}
-        {tab === 'types' ? <TypesTab {...p} locale={locale} /> : tab === 'fields' ? <FieldsTab {...p} locale={locale} /> : <TagsTab tags={p.tags ?? []} canEdit={p.canEditTypes} />}
+        {readOnly && <p data-read-only style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 14px' }}>{tab === 'types' ? t('readOnly') : tab === 'tags' ? t('tagsReadOnly') : tab === 'templates' ? t('templatesReadOnly') : tf('readOnly')}</p>}
+        {tab === 'types' ? <TypesTab {...p} locale={locale} /> : tab === 'fields' ? <FieldsTab {...p} locale={locale} /> : tab === 'tags' ? <TagsTab tags={p.tags ?? []} canEdit={p.canEditTypes} />
+          : <TemplatesSettings templates={p.templates ?? []} types={p.types} roles={p.roles ?? []} canEdit={p.canEditFields} />}
       </div>
     </div>
   )
