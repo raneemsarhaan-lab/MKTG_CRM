@@ -10,6 +10,7 @@
  * (Samaa for the content plan) owns its pieces, and the sheet works by
  * assignee.
  */
+import { withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { useLocale, useTranslations } from 'next-intl'
 import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import type { ContentTheme, Member, Task, TaskAttachment, TaskField, WordField } from '@/types/index'
@@ -478,7 +479,7 @@ export function ContentGrid(p: ContentGridProps) {
     },
   })
   const le = useLinkedEditing<ContentRow>({
-    applyFormats: lf.applyFormats,
+    applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText: model.isText, textValue: model.textValue, commit: (row, col, v) => commitWord(row, col, v),
     readOnlyNote: (row, col) => model.readOnlyNote?.(row, col) ?? null,
@@ -497,6 +498,8 @@ export function ContentGrid(p: ContentGridProps) {
     heights: p.linked?.heights, saveHeights: p.linked?.saveHeights,
   })
   leRef.current = le
+  // Spec 015 FR-070: number formats show here too, and a copy carries them.
+  withNumberFormats(model, lf.styleOf, locale, !!p.linked)
   Object.assign(model, {
     cellStyle: lf.cellStyle, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,
     selection: true, onCommit: le.onCommit, writeCells: le.writeCells, onUndo: le.onUndo, onRedo: le.onRedo,

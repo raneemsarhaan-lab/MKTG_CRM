@@ -31,7 +31,7 @@
  * clips, pieces, themes or blank sheets.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { parseClipboard, pastePlan, serialise, toGrid, toStyles } from '@/lib/sheet-clipboard'
+import { parseClipboard, pastePlan, serialise, toGrid, toKeys, toStyles } from '@/lib/sheet-clipboard'
 import { edge as dataEdge, subtract, unionCells, copyLayout, MAX_AREAS, colLetters } from '@/lib/sheet-selection'
 import type { CellCss } from '@/lib/sheet-format'
 import type { CellStyle } from '@/types/index'
@@ -188,6 +188,10 @@ export interface GridModel<R extends { key: string }> {
   /** The look a copy carries to Excel and Google Sheets, and the text as shown (EGP 12,500.00). */
   copyStyle?(row: R, col: GridCol): CellStyle | null
   copyShown?(row: R, col: GridCol): string
+  /** Spec 015 FR-041: where a copied cell is, for its comments ("sheet|rowKey|colKey"); null when it can't hold one. */
+  copyKey?(row: R, col: GridCol): string | null
+  /** Spec 015 FR-041: a paste carries the copied cells' comment threads to the cells it lands on. */
+  pasteComments?(pairs: { from: string; r: number; c: number }[]): void
   /**
    * Merged cells (blank sheets): the top-left cell is drawn over the area,
    * `{ width, height }` in px; the cells under it are 'covered'.
@@ -655,6 +659,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       const { html, text } = serialise(each(readText, ''), {
         styles: m.copyStyle ? each(m.copyStyle, null) : undefined,
         shown: m.copyShown ? each(m.copyShown, '') : undefined,
+        keys: m.copyKey ? each(m.copyKey, null) : undefined,
       })
       e.clipboardData.setData('text/plain', text)
       e.clipboardData.setData('text/html', html)
@@ -698,6 +703,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
       }
       const res = await writes.current(list, 'paste')
       reportSkips(res)
+      // Spec 015 FR-041: the copied cells' comment threads land with them.
+      const keys = toKeys(clip)
+      if (keys && m.pasteComments && !one) {
+        const pairs: { from: string; r: number; c: number }[] = []
+        for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) { const k = keys[r]?.[c]; if (k) pairs.push({ from: k, r: q.r0 + r, c: q.c0 + c }) }
+        if (pairs.length) m.pasteComments(pairs)
+      } else if (keys && m.pasteComments && one && keys[0]?.[0]) m.pasteComments([{ from: keys[0][0] as string, r: q.r0, c: q.c0 }])
       // A cut's source empties once its paste lands (FR-021).
       const src = cutRect.current
       if (src) {

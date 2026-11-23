@@ -21,6 +21,7 @@
  * Its formats, rules and view live on the workbook's Tasks sheet ('tasks:<node>');
  * its columns are that sheet's (spec 010 records keyed by the same id).
  */
+import { withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { createTask } from '@/actions/tasks'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -430,7 +431,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
   })
   const le = useLinkedEditing<Row>({
-    applyFormats: lf.applyFormats,
+    applyFormats: lf.applyFormats, styleOf: lf.styleOf, taskOf: row => taskOf(row)?.id ?? null,
     applyExtra: ch => (ch.kind === 'rules' ? lv.store.saveRules(ch.after) : lv.store.saveView(ch.after as LinkedView)),
     rows, cols: model.cols, isText: model.isText, textValue: model.textValue,
     commit: (row, col, v) => (row.kind === 'task' ? commit(row.task, col, v) : Promise.resolve(null)),
@@ -463,6 +464,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     writeCells, onUndo: le.onUndo, onRedo: le.onRedo,
     ...(inWorkbook ? { contextMenu: lm.contextMenu, rowHeight: lm.rowHeight, onRowResize: lm.onRowResize } : {}),
   } satisfies Partial<GridModel<Row>>)
+  // Spec 015 FR-070: number formats show here too, and a copy carries them.
+  withNumberFormats(model, lf.styleOf, locale, inWorkbook)
   const tips = useGridTips(model, { enabled: inWorkbook, writeCells, onUndo: le.onUndo, say: sayNow })
   Object.assign(model, tips.model)
 

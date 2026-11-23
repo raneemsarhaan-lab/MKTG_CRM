@@ -24,6 +24,8 @@ export interface ClipCell {
    * paste never touches formatting.
    */
   style?: CellStyle | null
+  /** Spec 015 FR-041 (user, 2026-11-23): where a Momentum cell came from, so its comments can follow ("sheet|rowKey|colKey"). */
+  key?: string | null
 }
 
 type Parser = { parseFromString(s: string, type: 'text/html'): Document }
@@ -91,7 +93,8 @@ export function parseHtmlTable(html: string, parser: Parser): ClipCell[][] {
           else if (kind !== 'time') text = raw
         }
       }
-      out.push({ text, href: href && /^https?:/i.test(href) ? href : null, style })
+      const key = td.getAttribute('data-fx-cell')
+      out.push({ text, href: href && /^https?:/i.test(href) ? href : null, style, ...(key ? { key } : {}) })
       const span = Math.min(200, Number(td.getAttribute('colspan') ?? 1) || 1)
       for (let i = 1; i < span; i++) out.push({ text: '', href: null, style: null })
     }
@@ -160,6 +163,12 @@ export function toGrid(cells: ClipCell[][]): string[][] {
 const escHtml = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
 const quoteTsv = (s: string) => (/[\t\n\r"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
 
+/** Where each pasted cell came from in Momentum (for its comments); null when none did. */
+export function toKeys(cells: ClipCell[][]): (string | null)[][] | null {
+  if (!cells.some(r => r.some(c => !!c.key))) return null
+  return cells.map(r => r.map(c => c.key ?? null))
+}
+
 /** The styles of a paste, row by row; null when the clipboard had no HTML table. */
 export function toStyles(cells: ClipCell[][]): (CellStyle | null)[][] | null {
   if (!cells.some(r => r.some(c => c.style !== undefined))) return null
@@ -172,12 +181,13 @@ export function toStyles(cells: ClipCell[][]): (CellStyle | null)[][] | null {
  * each cell's look and the text as formatted (EGP 12,500.00), as Google
  * Sheets does; the tab-separated text keeps the values as typed (12500).
  */
-export function serialise(grid: string[][], opts: { styles?: (CellStyle | null)[][]; shown?: string[][] } = {}): { html: string; text: string } {
+export function serialise(grid: string[][], opts: { styles?: (CellStyle | null)[][]; shown?: string[][]; keys?: (string | null)[][] } = {}): { html: string; text: string } {
   const text = grid.map(r => r.map(quoteTsv).join('\t')).join('\n')
   const td = (r: number, c: number, v: string) => {
     const css = cssForClipboard(opts.styles?.[r]?.[c])
     const shown = opts.shown?.[r]?.[c] ?? v
-    return `<td${css ? ` style="${escHtml(css)}"` : ''}>${escHtml(shown).replace(/\r?\n/g, '<br>')}</td>`
+    const key = opts.keys?.[r]?.[c]
+    return `<td${css ? ` style="${escHtml(css)}"` : ''}${key ? ` data-fx-cell="${escHtml(key)}"` : ''}>${escHtml(shown).replace(/\r?\n/g, '<br>')}</td>`
   }
   const body = grid.map((row, r) => `<tr>${row.map((c, ci) => td(r, ci, c)).join('')}</tr>`).join('')
   const html = `<meta charset="utf-8"><table><tbody>${body}</tbody></table>`
