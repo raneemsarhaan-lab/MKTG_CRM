@@ -21,6 +21,7 @@ import type { SavedView, ViewType } from '@/types/index'
 import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, shownFields, VIEW_FILTERS, VIEW_SORTS, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
 import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
 import { FieldsMenu, type FieldsSetup } from '@/components/fields/FieldsMenu'
+import { STATUS_GROUPS } from '@/lib/status-groups'
 
 export interface ViewTab { key: string; label: string; disabled?: boolean; note?: string }
 export interface OpenView { id: string; type: ViewType; config: ViewConfig }
@@ -320,6 +321,7 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
   onChange: (c: ViewConfig) => void; onSave: () => void; onDelete: () => void; onMove: (dir: -1 | 1) => void
 }) {
   const t = useTranslations('views')
+  const tg = useTranslations('statusGroups')
   const none = useMemo(() => ({ assignee: t('noOne'), campaign: t('noCampaign') }) as Partial<Record<ViewFilterKey, string>>, [t])
   const setFilter = (k: ViewFilterKey, ids: string[]) => onChange({ ...config, filters: { ...config.filters, [k]: ids } })
   const sel: React.CSSProperties = { ...pill, paddingInlineEnd: 4 }
@@ -327,7 +329,8 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
     <div data-view-config role="toolbar" aria-label={t('filters')}
       style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 38px', borderBottom: `1px solid ${PIPE.border}` }}>
       {VIEW_FILTERS.map(k => {
-        const list = [...options[k], ...(none[k] ? [{ id: '__none', name: none[k]! }] : [])]
+        // Spec 023: status groups (Not started, Active, Done, Closed) are the same on every page.
+        const list = k === 'statusGroup' ? STATUS_GROUPS.map(g => ({ id: g, name: tg(g) })) : [...options[k], ...(none[k] ? [{ id: '__none', name: none[k]! }] : [])]
         if (!list.length) return null
         const on = config.filters[k] ?? []
         return (
@@ -350,7 +353,7 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
       {(view.type === 'list') && (
         <label style={{ fontSize: 12, color: PIPE.textMuted, display: 'inline-flex', gap: 6, alignItems: 'center' }}>{t('group')}
           <select data-view-group value={config.group ?? ''} style={sel} onChange={e => onChange({ ...config, group: (e.target.value || null) as ViewConfig['group'] })}>
-            <option value="">{t('groupDefault')}</option><option value="stage">{t('groupStage')}</option><option value="brand">{t('groupBrand')}</option>
+            <option value="">{t('groupDefault')}</option><option value="stage">{t('groupStage')}</option><option value="brand">{t('groupBrand')}</option><option value="statusGroup">{t('groupStatusGroup')}</option>
           </select>
         </label>
       )}

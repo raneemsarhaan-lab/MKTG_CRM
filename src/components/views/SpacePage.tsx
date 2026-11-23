@@ -99,6 +99,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
               linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} />} />
           : tab === 'calendar'
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open}
+                milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}
                 link={board ? undefined : { spaceId, media: viewTasks(data) }} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />

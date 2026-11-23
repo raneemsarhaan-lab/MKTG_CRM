@@ -30,6 +30,8 @@ import { cellsFromHtml, cellsFromText, looksLikeRows, type PastedCell } from './
 import { FILE_RE } from '@/lib/clip-file-name'
 import { useSkipText } from './skip-text'
 import type { VideoSheetProps } from './types'
+import { useTaskFieldColumns } from '@/components/fields/taskFieldColumns'
+import { useMakeField } from '@/components/fields/useMakeField'
 import { useSheetColumns } from './useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
 import { NamePrompt } from '@/components/content/ThemeEditor'
@@ -155,11 +157,15 @@ export function VideoSheet(p: VideoSheetProps) {
   // ── shaped columns (spec 010) ───────────────────────────────────────────
   // The grid fills in the column menu's "Link to a board field…" (it knows which columns are linked).
   const menuRef = useRef<((key: string, anchor: HTMLElement) => MenuItem[]) | null>(null)
-  const cl = useSheetColumns({
-    sheet: 'video', set, bundle: p.columns, me, members: p.members,
-    defaultName: key => t(`col.${key}` as 'col.title'), canEdit, say, onNote,
+  const makeField = useMakeField('video', me.access, text => say(text))
+  const sheetCols = useSheetColumns({
+    sheet: 'video', set, bundle: p.columns, me, members: p.members, makeField,
+    defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
     extraMenu: (key, anchor) => menuRef.current?.(key, anchor) ?? [],
   })
+  // Spec 023: the task fields of the videos' types (Caption, Channels…) as columns.
+  const videoTasks = useMemo(() => p.tasks.filter(x => !x.dropped_at && (x.content_type_label === 'Video' || !!x.parent_task_id)), [p.tasks])
+  const cl = useTaskFieldColumns(sheetCols, { tasks: videoTasks, canEdit })
   /** A column linked to a board field: the board's rules, and its words for a refusal. */
   const boardField = async (task: Task, field: string, value: string): Promise<string | null> => {
     if (!p.api.writeField) return t('err.generic')

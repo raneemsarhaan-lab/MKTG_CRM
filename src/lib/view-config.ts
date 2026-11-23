@@ -5,11 +5,12 @@
  * reader goes through `cleanConfig`, so a bad or old value never breaks a page.
  */
 import { NINE_STAGE } from '@/lib/stage-meta'
+import { statusGroupOf } from '@/lib/status-groups'
 
-export type ViewFilterKey = 'brand' | 'assignee' | 'type' | 'campaign'
-export type ViewGroup = 'stage' | 'brand'
+export type ViewFilterKey = 'brand' | 'assignee' | 'type' | 'campaign' | 'statusGroup'
+export type ViewGroup = 'stage' | 'brand' | 'statusGroup'
 export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage'
-export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign']
+export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign', 'statusGroup']
 export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
 export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'due', 'type', 'priority', 'platform'] as const
 
@@ -57,7 +58,7 @@ export function cleanConfig(raw: unknown): ViewConfig {
   const fields = o.fields === null || o.fields === undefined ? null : strings(o.fields).filter(isFieldKey)
   return {
     filters,
-    group: o.group === 'stage' || o.group === 'brand' ? o.group : null,
+    group: o.group === 'stage' || o.group === 'brand' || o.group === 'statusGroup' ? o.group : null,
     sort: VIEW_SORTS.includes(o.sort as ViewSort) ? o.sort as ViewSort : null,
     fields,
   }
@@ -76,7 +77,7 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
   const hit = (list: string[] | undefined, v: string | null | undefined) => !list?.length || list.includes(v || NONE)
   const out = tasks.filter(x =>
     hit(c.filters.brand, x.brand_id) && hit(c.filters.assignee, x.assignee_id) &&
-    hit(c.filters.type, x.content_type_label) && hit(c.filters.campaign, x.project_id))
+    hit(c.filters.type, x.content_type_label) && hit(c.filters.campaign, x.project_id) && hit(c.filters.statusGroup, statusGroupOf(x.status)))
   if (!c.sort) return out
   const key = (x: T): [number, string] => {
     switch (c.sort) {

@@ -89,7 +89,7 @@ export function MyTasks({ data }: { data: BoardData }) {
         // T081: My tasks' Sheet is my own workbook: the Tasks tab (with My notes), then my blank tabs.
         if (tab === 'sheet') return <><NodeWorkbook key={view?.id} data={data} node="me"
           linked={<TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={shownKeys} sheetKey={`tasks:me:${data.currentUser.id}`} label={t('title')} />} /><TaskPanel data={data} /></>
-        if (tab === 'calendar') return <><CalendarView tasks={ids ? tasks.filter(x => ids.has(x.id)) : tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
+        if (tab === 'calendar') return <><CalendarView tasks={ids ? tasks.filter(x => ids.has(x.id)) : tasks} brands={data.brands} colorBy="brand" onOpen={open} milestones={{ list: data.milestones, brandIds: [...new Set(tasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }} /><TaskPanel data={data} /></>
         return (
           <div data-my-tasks>
             {groups.filter(([, g]) => g.length).map(([label, g]) => (

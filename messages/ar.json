@@ -2978,7 +2978,8 @@
       "moved": "نُقلت إلى {name}.",
       "otherStage": "هذه الخطوة تتبع مرحلة أخرى.",
       "step": "خطوة أخرى من هذه المرحلة"
-    }
+    },
+    "groupStatusGroup": "مجموعة الحالة"
   },
   "views": {
     "list": "قائمة",
@@ -3009,7 +3010,8 @@
       "brand": "العلامة",
       "assignee": "المكلّف",
       "type": "النوع",
-      "campaign": "الحملة"
+      "campaign": "الحملة",
+      "statusGroup": "مجموعة الحالة"
     },
     "any": "أي",
     "noOne": "لا أحد",
@@ -3055,7 +3057,8 @@
     "pinnedMark": "مثبّت",
     "hide": "إخفاء",
     "hiddenViews": "مخفية ({n})",
-    "showView": "إظهار {name}"
+    "showView": "إظهار {name}",
+    "groupStatusGroup": "مجموعة الحالة"
   },
   "calendar": {
     "today": "اليوم",
@@ -3342,7 +3345,12 @@
     "place": "في لوحة المهمة",
     "placeTop": "الصفوف العلوية (مع الحالة)",
     "placeAbove": "فوق الوصف",
-    "placeBelow": "تحت الوصف"
+    "placeBelow": "تحت الوصف",
+    "makeField": "حوّله إلى حقل مهمة",
+    "madeField": "أصبح حقل مهمة. نُقلت {n, plural, one {قيمة واحدة} two {قيمتان} few {# قيم} many {# قيمة} other {# قيمة}} إلى المهام.",
+    "makeFieldFailed": "تعذّر تحويله إلى حقل مهمة.",
+    "brandFields": "حقول المهام",
+    "switchedOff": "متوقف لعلامة {brand}"
   },
   "types": {
     "eyebrow": "مساحة العمل",
@@ -3501,5 +3509,25 @@
     "notSaved": "تعذّر الحفظ. حاول مرة أخرى.",
     "notMoved": "تعذّر نقل المهمة.",
     "moved": "انتقلت {name} إلى المرحلة التالية."
+  },
+  "statusGroups": {
+    "not_started": "لم تبدأ",
+    "active": "قيد العمل",
+    "done": "منجزة",
+    "closed": "مغلقة"
+  },
+  "milestones": {
+    "flag": "معلم",
+    "add": "إضافة معلم",
+    "edit": "معلم",
+    "name": "الاسم",
+    "namePh": "مثال: إطلاق رمضان",
+    "day": "اليوم",
+    "brand": "العلامة",
+    "delete": "حذف",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "failed": "تعذّر حفظ المعلم.",
+    "deleted": "حُذف {name}."
   }
 }

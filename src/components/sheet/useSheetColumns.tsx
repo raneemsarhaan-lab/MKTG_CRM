@@ -60,6 +60,8 @@ export interface UseSheetColumns {
   extraMenu?(key: string, anchor: HTMLElement): MenuItem[]
   /** Spec 021: what Task link fields pick from and create in. */
   taskLinks?: TaskLinkCtx
+  /** Spec 023: "Make it a task field" on a team column (admins and superusers; rows are tasks). */
+  makeField?: { label: string; run(key: string): void }
 }
 
 export function useSheetColumns(given: UseSheetColumns) {
@@ -154,6 +156,8 @@ export function useSheetColumns(given: UseSheetColumns) {
     items.push(...(o.extraMenu?.(key, anchor) ?? []).map(it => ({ ...it, onSelect: () => { close(false); it.onSelect() } })))
     if (c.kind) {
       items.push({ key: 'edit', group: '   ', text: t('edit'), label: t('edit'), onSelect: () => setPopup({ kind: 'editor', anchor, col: c }) })
+      // Spec 023 (D5): a team column becomes a task field, keeping its values (admins, superusers).
+      if (o.makeField && c.kind !== 'task') items.push({ key: 'make-field', group: '   ', text: o.makeField.label, label: <span data-make-field="">{o.makeField.label}</span>, onSelect: pick(() => o.makeField!.run(key)) })
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => setPopup({ kind: 'delete', anchor, col: c }) })
     } else if (!title) {
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => void removeBuiltIn(key) })

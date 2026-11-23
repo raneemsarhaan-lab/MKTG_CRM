@@ -12,7 +12,8 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { cairoToday, formatDay, isOverdue } from '@/lib/due-dates'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Brand } from '@/types/index'
+import type { Brand, Milestone } from '@/types/index'
+import { addMilestone, deleteMilestone, updateMilestone } from '@/actions/milestones'
 import { updateTask } from '@/actions/tasks'
 import { STAGE_COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
@@ -24,7 +25,9 @@ const BY_KEY = 'momentum.calendar.by'
 const MODE_KEY = 'momentum.calendar.mode'
 const done = (t: ViewTask) => t.status === 'publish'
 
-export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due', link }: {
+export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [], statusName, onOpen, defaultBy = 'due', link, milestones }: {
+  /** Spec 023 (R6): brands' calendar markers — not tasks. Admins and superusers add, rename, move and delete. */
+  milestones?: { list: Milestone[]; brandIds: string[]; canEdit: boolean }
   /** Spec 022 (R19): Link task on a day — on content Spaces' calendars. */
   link?: { spaceId: string; media: MediaTaskLike[] }
   /** Which date places a task on a day until the person picks: a brand's Calendar starts on publishing dates. */
@@ -57,6 +60,12 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
   const [by, setBy] = useState<'publish' | 'due'>(defaultBy)
   const tDates = useTranslations('dates')
   const tMedia = useTranslations('media')
+  const tm = useTranslations('milestones')
+  // Spec 023: milestones shown on their day (optimistic copy while saving).
+  const [marks, setMarks] = useState<Milestone[]>(milestones?.list ?? [])
+  useEffect(() => { setMarks(milestones?.list ?? []) }, [milestones?.list])
+  const [markPop, setMarkPop] = useState<{ day: string; edit?: Milestone; at: DOMRect } | null>(null)
+  const marksOn = (iso: string) => marks.filter(m => m.day === iso && (milestones?.brandIds ?? []).includes(m.brand_id))
   const cal = useCalendarLink({ spaceId: link?.spaceId ?? null, media: link?.media ?? [], say: text => setToast({ text }) })
 
   useEffect(() => {
@@ -201,7 +210,24 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
                 color: d.inMonth ? PIPE.textSecondary : PIPE.textMuted, fontVariantNumeric: 'tabular-nums' }}>
                 {d.day === 1 ? dayOf(d.iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : d.day}
               </span>
+              {marksOn(d.iso).map(m => (
+                <button key={m.id} type="button" data-milestone={m.id} draggable={false}
+                  title={`${tm('flag')}: ${m.name} · ${brandOf.get(m.brand_id)?.name ?? ''}`}
+                  onClick={e => { if (milestones?.canEdit) setMarkPop({ day: d.iso, edit: m, at: e.currentTarget.getBoundingClientRect() }) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', border: 'none', cursor: milestones?.canEdit ? 'pointer' : 'default', fontFamily: 'inherit',
+                    fontSize: 11.5, fontWeight: 800, padding: '3px 6px', borderRadius: 7, color: '#7A2E0E', background: '#FFF1E3', textAlign: 'start',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span aria-hidden="true" style={{ color: brandOf.get(m.brand_id)?.color ?? '#E8772E' }}>⚑</span>{m.name}
+                </button>
+              ))}
               {(byDay.get(d.iso) ?? []).map(chip)}
+              {milestones?.canEdit && milestones.brandIds.length > 0 && (
+                <button type="button" className="fx-cal-mark" data-milestone-add={d.iso} aria-label={`${tm('add')} · ${d.iso}`}
+                  onClick={e => setMarkPop({ day: d.iso, at: e.currentTarget.getBoundingClientRect() })}
+                  style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: PIPE.textMuted, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '1px 4px', borderRadius: 6 }}>
+                  ⚑ ＋
+                </button>
+              )}
               {link && (
                 <button type="button" className="fx-cal-link" data-cal-link={d.iso} aria-label={`${tMedia('linkTask')} · ${d.iso}`}
                   onClick={e => cal.open(d.iso, e.currentTarget.parentElement as HTMLElement)}
@@ -241,6 +267,33 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
       </div>
       <p style={{ margin: 0, fontSize: 12, color: PIPE.textMuted }}>{t('note')}</p>
       {cal.layer}
+      <style>{`.fx-cal-mark{opacity:0;transition:opacity .12s}.fx-cal-day:hover .fx-cal-mark,.fx-cal-mark:focus-visible{opacity:1}@media (hover:none){.fx-cal-mark{opacity:1}}`}</style>
+      {markPop && milestones && (
+        <MilestonePopover pop={markPop} brands={brands.filter(b => milestones.brandIds.includes(b.id))} onClose={() => setMarkPop(null)}
+          onSave={async (name, day, brandId) => {
+            const edit = markPop.edit
+            setMarkPop(null)
+            if (edit) {
+              setMarks(ms => ms.map(m => (m.id === edit.id ? { ...m, name, day } : m)))
+              const r = await updateMilestone(edit.id, { name, day })
+              if (!r.success) { setMarks(milestones.list); setToast({ text: tm('failed') }); return }
+            } else {
+              const r = await addMilestone({ brand_id: brandId, name, day })
+              if (!r.success) { setToast({ text: tm('failed') }); return }
+              setMarks(ms => [...ms, r.milestone])
+            }
+            router.refresh()
+          }}
+          onDelete={markPop.edit ? async () => {
+            const gone = markPop.edit!
+            setMarkPop(null)
+            setMarks(ms => ms.filter(m => m.id !== gone.id))
+            const r = await deleteMilestone(gone.id)
+            if (!r.success) { setMarks(milestones.list); setToast({ text: tm('failed') }); return }
+            setToast({ text: tm('deleted', { name: gone.name }), undo: () => void addMilestone({ brand_id: gone.brand_id, name: gone.name, day: gone.day }).then(r2 => { if (r2.success) { setMarks(ms => [...ms, r2.milestone]); router.refresh() }; setToast(null) }) })
+            router.refresh()
+          } : undefined} />
+      )}
       {toast && (
         <div role="status" style={{ position: 'fixed', bottom: 22, insetInlineStart: '50%', transform: 'translateX(-50%)', zIndex: 300, background: '#17181A', color: '#F1F1EC', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
           {toast.text}
@@ -248,6 +301,41 @@ export function CalendarView({ tasks, brands, colorBy = 'brand', campaigns = [],
           <button type="button" aria-label="×" onClick={() => setToast(null)} style={{ border: 'none', background: 'transparent', color: '#F1F1EC', cursor: 'pointer' }}>×</button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Add, rename, move or delete a milestone (admins and superusers). */
+function MilestonePopover({ pop, brands, onClose, onSave, onDelete }: {
+  pop: { day: string; edit?: Milestone; at: DOMRect }; brands: Brand[]
+  onClose: () => void; onSave: (name: string, day: string, brandId: string) => void; onDelete?: () => void
+}) {
+  const t = useTranslations('milestones')
+  const [name, setName] = useState(pop.edit?.name ?? '')
+  const [day, setDay] = useState(pop.edit?.day ?? pop.day)
+  const [brand, setBrand] = useState(pop.edit?.brand_id ?? brands[0]?.id ?? '')
+  const field: React.CSSProperties = { border: `1px solid ${PIPE.border}`, borderRadius: 8, padding: '6px 8px', fontFamily: 'inherit', fontSize: 13, background: '#FFFFFF', width: '100%', boxSizing: 'border-box' }
+  const top = Math.min(pop.at.bottom + 6, (typeof window !== 'undefined' ? window.innerHeight : 800) - 260)
+  const left = Math.max(12, Math.min(pop.at.left, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280))
+  return (
+    <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 400 }}>
+      <form role="dialog" aria-label={pop.edit ? t('edit') : t('add')} data-milestone-form="" onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+        onSubmit={e => { e.preventDefault(); if (name.trim() && day && brand) onSave(name.trim(), day, brand) }}
+        style={{ position: 'fixed', top, left, width: 260, background: '#FFFFFF', border: `1px solid ${PIPE.border}`, borderRadius: 12, boxShadow: '0 12px 30px rgba(0,0,0,.14)', padding: 12, display: 'grid', gap: 8 }}>
+        <strong style={{ fontSize: 13, color: PIPE.ink }}>⚑ {pop.edit ? t('edit') : t('add')}</strong>
+        <input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder={t('namePh')} aria-label={t('name')} maxLength={80} style={field} data-milestone-name="" />
+        <input type="date" value={day} onChange={e => setDay(e.target.value)} aria-label={t('day')} style={field} data-milestone-day="" />
+        {!pop.edit && brands.length > 1 && (
+          <select value={brand} onChange={e => setBrand(e.target.value)} aria-label={t('brand')} style={field} data-milestone-brand="">
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        )}
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          {onDelete && <button type="button" onClick={onDelete} data-milestone-delete="" style={{ marginInlineEnd: 'auto', border: 'none', background: 'none', color: '#D22040', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{t('delete')}</button>}
+          <button type="button" onClick={onClose} style={{ border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, cursor: 'pointer' }}>{t('cancel')}</button>
+          <button type="submit" disabled={!name.trim()} data-milestone-save="" style={{ border: 'none', background: '#C8F24E', borderRadius: 8, padding: '5px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}>{t('save')}</button>
+        </div>
+      </form>
     </div>
   )
 }

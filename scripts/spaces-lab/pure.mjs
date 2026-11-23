@@ -354,4 +354,52 @@ check('pure-my-tasks', () => {
   ok(!M.isMine({ status: 'c-prog', assignee_id: 'me', dropped_at: '2026-01-01' }, me), 'dropped is not open')
 })
 
+// Spec 023 Stage A: task types, fields, the required rule, status groups, brand field switches.
+check('pure-task-types', () => {
+  const T = m.taskTypes
+  eq(T.typeName({ label: 'Reel', name_ar: 'ريل' }, 'ar'), 'ريل', 'Arabic name in Arabic')
+  eq(T.typeName({ label: 'Reel', name_ar: null }, 'ar'), 'Reel', 'falls back to English')
+  eq(T.defaultsFor({ id: 'x', label: 'Reel', default_priority: 'High', default_tag_ids: ['t1'] }), { priority: 'High', tagIds: ['t1'], templateId: null }, 'defaults for a new task')
+  ok(T.isTypeIcon('reel') && !T.isTypeIcon('nope'), 'icons are a fixed set')
+})
+check('pure-task-fields', () => {
+  const F = m.taskFields
+  const f = (kind, options = {}) => ({ id: 'f1', name_en: 'F', name_ar: null, kind, options, on_card: false, switchable: false, position: 0, retired: false })
+  const ch = f('multi', { choices: [{ id: 'ig', en: 'Instagram', ar: 'إنستغرام' }, { id: 'li', en: 'LinkedIn' }] })
+  eq(F.parseValue(f('number'), '1,250').value, 1250, 'number with a thousands comma')
+  eq(F.parseValue(f('number'), '١٢').value, 12, 'Arabic digits')
+  eq(F.parseValue(f('checkbox'), 'نعم').value, true, 'checkbox in Arabic')
+  eq(F.parseValue(ch, 'instagram, LinkedIn').value, ['ig', 'li'], 'multi-choice by names')
+  eq(F.parseValue(ch, 'إنستغرام').value, ['ig'], 'multi-choice by Arabic name')
+  eq(F.parseValue(ch, 'TikTok').ok, false, 'an unknown choice is refused')
+  eq(F.parseValue(f('text'), '  ').value, null, 'blank clears')
+  eq(F.formatValue(ch, ['ig', 'li'], { locale: 'en' }), 'Instagram, LinkedIn', 'formats choices')
+  eq(F.formatValue(f('money', { currency: 'EGP' }), 12500, { locale: 'en' }).replace(/\s/g, ' '), 'EGP 12,500.00', 'money with its currency')
+  eq(F.isEmpty(false), false, 'an unticked checkbox counts as answered')
+  const links = [{ type_label: 'Post', field_id: 'cap', required_from: 'c-final', default_value: null, position: 0 }]
+  const fields = [{ ...f('text'), id: 'cap', name_en: 'Caption' }]
+  const task = s => ({ id: 't', content_type_label: 'Post', status: s })
+  eq(F.missingRequired(task('c-prog'), 'c-final', links, fields, []).map(x => x.name_en), ['Caption'], 'blocks the move into the stage')
+  eq(F.missingRequired(task('c-prog'), 'd-prog', links, fields, []).length, 1, 'and any move past it')
+  eq(F.missingRequired(task('todo'), 'c-prog', links, fields, []).length, 0, 'not a move before it')
+  eq(F.missingRequired(task('r-design'), 'd-prog', links, fields, []).length, 0, 'a task already past the stage is not held back')
+  eq(F.missingRequired(task('c-prog'), 'c-final', links, fields, [{ task_id: 't', field_id: 'cap', value: 'Hi' }]).length, 0, 'filled, it moves')
+  eq(F.missingRequired({ ...task('c-prog'), content_type_label: 'Video' }, 'c-final', links, fields, []).length, 0, 'other types are not affected')
+  ok(F.applies('Post', 'cap', links) && !F.applies('Reel', 'cap', links), 'applies by type')
+  eq(F.placeOf({ ...f('multi'), options: { place: 'top' } }), 'top', 'placement'); eq(F.placeOf(f('text')), 'above', 'placement default')
+})
+check('pure-status-groups', () => {
+  const G = m.statusGroups
+  eq(['todo', 'c-prog', 'c-check', 'final-check', 'ready-publish', 'scheduled', 'publish'].map(G.statusGroupOf), ['not_started', 'active', 'active', 'active', 'done', 'done', 'closed'], 'every stage has a group')
+  ok(m.ALL_STAGES.every(s => G.STATUS_GROUPS.includes(G.statusGroupOf(s))), 'both paths covered')
+})
+check('pure-brand-field-switch', () => {
+  const fid = '11111111-2222-3333-4444-555555555555'
+  const field = { id: fid, switchable: true }
+  ok(m.fieldOn({ features: {} }, field), 'on unless switched off')
+  ok(!m.fieldOn({ features: { [`f:${fid}`]: false } }, field), 'switched off for the brand')
+  ok(m.fieldOn({ features: { [`f:${fid}`]: false } }, { id: fid, switchable: false }), 'a field that isn\'t switchable always shows')
+  eq(m.cleanBrandFeatures({ sla: false, [`f:${fid}`]: false, 'f:bad': false, junk: 1 }), { sla: false, [`f:${fid}`]: false }, 'only real switches are kept')
+})
+
 if (failed) process.exitCode = 1

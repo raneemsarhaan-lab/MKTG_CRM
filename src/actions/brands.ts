@@ -12,7 +12,7 @@ import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/authz'
-import { BRAND_FEATURES, cleanFeatures } from '@/lib/brand-features'
+import { BRAND_FEATURES, FIELD_SWITCH, cleanFeatures } from '@/lib/brand-features'
 import type { BrandFeatureKey, BrandFeatures } from '@/types/index'
 
 type Result = { success: true } | { success: false; error: string }
@@ -23,7 +23,7 @@ function revalidateEverywhere() {
 }
 
 /** Change some of a brand's switches. `true`/`false` overrides; `null` follows the workspace default. */
-export async function setBrandFeatures(brandId: string, patch: Partial<Record<BrandFeatureKey, boolean | null>>): Promise<Result> {
+export async function setBrandFeatures(brandId: string, patch: Partial<Record<BrandFeatureKey | `f:${string}`, boolean | null>>): Promise<Result> {
   const auth = await requireAdmin()
   if (auth.error) return { success: false, error: auth.error }
   if (typeof brandId !== 'string' || !brandId) return { success: false, error: 'not_found' }
@@ -36,6 +36,13 @@ export async function setBrandFeatures(brandId: string, patch: Partial<Record<Br
     const v = patch[k]
     if (v === null) delete next[k]
     else if (typeof v === 'boolean') next[k] = v
+  }
+  // Spec 023: switchable task fields, by `f:<field id>`.
+  for (const [k, v] of Object.entries(patch ?? {})) {
+    if (!FIELD_SWITCH.test(k)) continue
+    const key = k as `f:${string}`
+    if (v === null || v === true) delete next[key]
+    else if (v === false) next[key] = false
   }
   await prisma.brand.update({ where: { id: brandId }, data: { features: next as Prisma.InputJsonValue } })
   revalidateEverywhere()

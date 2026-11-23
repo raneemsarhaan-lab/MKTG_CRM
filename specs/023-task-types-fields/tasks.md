@@ -32,7 +32,7 @@
 - [X] T010 [P] Pure `src/lib/task-types.ts`: the icon set (about 24 names), `typeLabel(type, locale)`, `defaultsFor(type)`.
 - [X] T011 [P] Pure `src/lib/task-fields.ts`: kinds, `parseValue(kind, input)`, `formatValue(kind, value, locale)`, `isEmpty`, `fieldsFor(type, attachments, fields)`, `missingRequired(task, attachments, values, target)`, `applies(task, field)`.
 - [X] T012 [P] Pure `src/lib/status-groups.ts`: stage → Not started / Active / Done / Closed (research R5).
-- [ ] T013 Export the new pure helpers from `scripts/spaces-lab/pure-entry.ts`.
+- [X] T013 Export the new pure helpers from `scripts/spaces-lab/pure-entry.ts`.
 
 **Checkpoint**: Stage A data loads; nothing on screen has changed yet.
 
@@ -44,14 +44,14 @@
 **Independent test**: quickstart Stage A step 1.
 
 ### Tests for US1
-- [ ] T014 [P] [US1] Pure check `pure-task-types` in `scripts/spaces-lab/pure.mjs` (defaults for a new task; Arabic name fallback).
-- [ ] T015 [P] [US1] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-023-a.cjs`, registered in `run.cjs`: an admin renames Reel in Arabic and sets icon, colour and default priority; a new Reel task shows them; existing Reel tasks keep SLA and Video board; a user sees the page read-only.
+- [X] T014 [P] [US1] Pure check `pure-task-types` in `scripts/spaces-lab/pure.mjs` (defaults for a new task; Arabic name fallback).
+- [X] T015 [P] [US1] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-023-a.cjs`, registered in `run.cjs`: an admin renames Reel in Arabic and sets icon, colour and default priority; a new Reel task shows them; existing Reel tasks keep SLA and Video board; a user sees the page read-only.
 
 ### Implementation for US1
 - [X] T016 [US1] `src/actions/task-types.ts`: `saveTaskType` (admins; rename cascades; errors `exists`, `invalid`).
 - [X] T017 [US1] `src/components/settings/TaskTypesSettings.tsx` in Settings (per `design/023-stage-a.html`), replacing the content-type list; read-only for users.
 - [X] T018 [US1] Show the type's icon and colour on cards (`src/components/kanban/TaskCard.tsx`), sheet Type cells (`ContentGrid.tsx`, `SheetGrid.tsx`, `TaskSheet.tsx`) and the task panel (`src/components/kanban/TaskModal.tsx`); Arabic names in Arabic.
-- [ ] T019 [US1] Apply type defaults (priority now; tags in Stage B; template in Stage D) in `createTask` and `createTasks` (`src/actions/tasks.ts`) when not chosen.
+- [ ] T019 [US1] (moved to Stage B with the new priorities) Apply type defaults (priority now; tags in Stage B; template in Stage D) in `createTask` and `createTasks` (`src/actions/tasks.ts`) when not chosen.
 - [X] T020 [US1] Strings `types.*` in `messages/en.json` and `messages/ar.json`.
 
 ---
@@ -62,8 +62,8 @@
 **Independent test**: quickstart Stage A steps 2–5.
 
 ### Tests for US2
-- [ ] T021 [P] [US2] Pure checks `pure-task-fields` (every kind parses and formats; empty rules; `missingRequired` at, before and after the stage, on 10- and 11-stage paths; `applies`).
-- [ ] T022 [P] [US2] Real-app scenarios in `scenarios-023-a.cjs`:
+- [X] T021 [P] [US2] Pure checks `pure-task-fields` (every kind parses and formats; empty rules; `missingRequired` at, before and after the stage, on 10- and 11-stage paths; `applies`).
+- [X] T022 [P] [US2] Real-app scenarios in `scenarios-023-a.cjs`:
   - create "Caption", attach it to Post required from C-Review; fill it on the Content sheet, see it in the panel and the Planning sheet;
   - empty it; drag, stage menu, sheet typing, bulk and a linked row's move to C-Review are each refused, naming Caption and C-Review;
   - media passing D-Check leaves the content task waiting with "Waiting for Caption";
@@ -74,14 +74,14 @@
 - [X] T023 [US2] `src/actions/task-fields.ts`: `createField`, `updateField` (kind change converts or keeps as text), `retireField`, `restoreField`, `attachField`, `detachField`, `setFieldValue`, `setFieldValues`, `makeTaskField` (contracts/server-actions.md).
 - [X] T024 [US2] Move gate: `requiredGate(task, target)` in `src/lib/media-server.ts`, called with `mediaGate` in `setTaskStage`, `moveTask`, `bulkUpdateTasks` (`src/actions/tasks.ts`) and in `moveThroughMedia`; `syncContent` holds the content task when the field is missing (research R4). Refusal `required_fields` with the field names and stage.
 - [X] T025 [US2] Refusal messages on every path: board drag (`KanbanBoard.tsx`), panel stage menu (`TaskModal.tsx`), sheets (`ContentSheet.tsx`, `VideoSheet.tsx`, `TaskSheet.tsx`), bulk notes; in the Space's stage names where shown.
-- [ ] T026 [US2] `src/components/settings/FieldsSettings.tsx`: the library, New field, options with colours, attach to types with Required from (stage menu) and default value.
-- [ ] T027 [US2] `src/components/fields/FieldEditor.tsx` and `FieldCell.tsx`: one editor per kind (text, number, money, date, link, person, choice, multi, checkbox, rating, related task), used by the panel, sheets and cards.
-- [ ] T028 [US2] Task panel Fields section `src/components/fields/FieldsSection.tsx` in `TaskModal.tsx`, marking required fields with their stage.
-- [ ] T029 [US2] Sheets: task fields as `f:<id>` columns in `src/components/sheet/useSheetColumns.tsx` (shown when any row's type has the field), editing through `setFieldValues` (typing, paste, fill, undo), hatched cells where the field doesn't apply; Content, Video and task sheets.
-- [ ] T030 [US2] Make it a task field: column menu item in `src/components/sheet/useSheetColumns.tsx` (admins, superusers; task sheets only) calling `makeTaskField`.
-- [ ] T031 [US2] Cards: fields with `on_card` under the title (`TaskCard.tsx`); filters and group-by for fields (`BoardFilters.tsx`, `ListView.tsx`, sheet filters).
-- [ ] T032 [US2] Brand switch for switchable fields (`src/lib/brand-features.ts`): hidden for that brand everywhere.
-- [ ] T033 [US2] Strings `fields.*` in both message files.
+- [X] T026 [US2] `src/components/settings/FieldsSettings.tsx`: the library, New field, options with colours, attach to types with Required from (stage menu) and default value.
+- [X] T027 [US2] `src/components/fields/FieldEditor.tsx` and `FieldCell.tsx`: one editor per kind (text, number, money, date, link, person, choice, multi, checkbox, rating, related task), used by the panel, sheets and cards.
+- [X] T028 [US2] Task panel Fields section `src/components/fields/FieldsSection.tsx` in `TaskModal.tsx`, marking required fields with their stage.
+- [X] T029 [US2] Sheets: task fields as `f:<id>` columns in `src/components/sheet/useSheetColumns.tsx` (shown when any row's type has the field), editing through `setFieldValues` (typing, paste, fill, undo), hatched cells where the field doesn't apply; Content, Video and task sheets.
+- [X] T030 [US2] Make it a task field: column menu item in `src/components/sheet/useSheetColumns.tsx` (admins, superusers; task sheets only) calling `makeTaskField`.
+- [X] T031 [US2] Cards: fields with `on_card` under the title (`TaskCard.tsx`); fields on List rows; the Fields button (standard + custom + "+ Field"). Filters and group-by by a field's value are left for polish (T086).
+- [X] T032 [US2] Brand switch for switchable fields (`src/lib/brand-features.ts`): hidden for that brand everywhere.
+- [X] T033 [US2] Strings `fields.*` in both message files.
 
 ---
 
@@ -91,14 +91,14 @@
 **Independent test**: quickstart Stage A steps 6–7.
 
 ### Tests for US3
-- [ ] T034 [P] [US3] Pure check `pure-status-groups` (every stage of both paths; Space stages inherit).
-- [ ] T035 [P] [US3] Real-app scenarios in `scenarios-023-a.cjs`: group a Space's list by status group; add a Forefront milestone, see it on Forefront's and the Content Space's calendars, not draggable; a user can't add one.
+- [X] T034 [P] [US3] Pure check `pure-status-groups` (every stage of both paths; Space stages inherit).
+- [X] T035 [P] [US3] Real-app scenarios in `scenarios-023-a.cjs`: group a Space's list by status group; add a Forefront milestone, see it on Forefront's and the Content Space's calendars, not draggable; a user can't add one.
 
 ### Implementation for US3
-- [ ] T036 [US3] Status group in filters and list group-by (`BoardFilters.tsx`, `ListView.tsx`).
+- [X] T036 [US3] Status group in filters and list group-by (`BoardFilters.tsx`, `ListView.tsx`).
 - [X] T037 [US3] `src/actions/milestones.ts` (admins, superusers).
-- [ ] T038 [US3] Milestones in `src/components/views/CalendarView.tsx`: flag chips on their day, Add milestone on a day, rename/move/delete; brand, Space and My tasks calendars.
-- [ ] T039 [US3] Strings `milestones.*`, `statusGroups.*`.
+- [X] T038 [US3] Milestones in `src/components/views/CalendarView.tsx`: flag chips on their day, Add milestone on a day, rename/move/delete; brand, Space and My tasks calendars.
+- [X] T039 [US3] Strings `milestones.*`, `statusGroups.*`.
 
 **Checkpoint — Stage A stop**: run the full regression (typecheck, every lab, every real-app scenario, axe in Arabic and on a phone); commit; previews of the new screens; wait for the user's go.
 

@@ -136,7 +136,8 @@ export type SimpleStatus = 's-todo' | 's-doing' | 's-done'
 
 /** The per-brand feature switches (US4). */
 export type BrandFeatureKey = 'priorities' | 'platform' | 'type' | 'pillars' | 'hours' | 'covers' | 'clips' | 'sla'
-export type BrandFeatures = Partial<Record<BrandFeatureKey, boolean>>
+/** Spec 023: a switchable task field's switch is `f:<field id>`. */
+export type BrandFeatures = Partial<Record<BrandFeatureKey, boolean>> & { [field: `f:${string}`]: boolean | undefined }
 
 /** A brand's four fixed Folders. */
 export type BrandFolderKey = 'cal' | 'assets' | 'sheet' | 'lib'

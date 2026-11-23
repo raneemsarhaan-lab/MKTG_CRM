@@ -1,0 +1,216 @@
+<title>Content and Video Sheets</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a reference page in Momentum's tokens; a sticky contents rail beside numbered parts (the parts are a reading order, not a process). */
+:root {
+  --ink: #1B1A13; --text: #2A2C31; --muted: #6F7276; --faint: #A3A5A8; --line: #E4E4E0; --soft: #F6F6F3; --panel: #FFFFFF; --bg: #EFEFEC;
+  --lime: #C8F24E; --sel: #EEF8D3; --coral: #D22040; --coral-soft: #FDE7EA; --blue: #3E7BEA; --violet: #8F6FE8; --teal: #1E9E8A; --amber: #C99A06;
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif; --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --text: #DCDDE0; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618; --sel: #2F3A17; --coral-soft: #3A1F24; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --text: #DCDDE0; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618; --sel: #2F3A17; --coral-soft: #3A1F24; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 14.5px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 72px }
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px }
+@media (max-width: 880px) { .wrap { grid-template-columns: minmax(0, 1fr) } nav.toc { position: static !important } }
+h1, h2, h3 { font-family: var(--display); color: var(--ink); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 900 }
+h2 { font-size: 21px; font-weight: 800 }
+h3 { font-size: 14.5px; font-weight: 800; margin-top: 6px }
+p { margin: 0; max-width: 72ch }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { font-size: 16px; color: var(--muted); max-width: 70ch }
+header.top { grid-column: 1 / -1; display: grid; gap: 10px; margin-bottom: 6px }
+nav.toc { position: sticky; top: 16px; align-self: start; display: grid; gap: 2px; font-size: 13px }
+nav.toc a { color: var(--text); text-decoration: none; padding: 5px 10px; border-radius: 8px }
+nav.toc a:hover { background: var(--sel) }
+main { display: grid; gap: 18px; min-width: 0 }
+section.part { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; display: grid; gap: 12px; min-width: 0 }
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px }
+@media (max-width: 720px) { .cols { grid-template-columns: minmax(0, 1fr) } }
+.box { background: var(--soft); border-radius: 12px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0 }
+.box h3 { margin: 0 }
+ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 5px }
+li { max-width: 72ch }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 6px; background: var(--soft); border: 1px solid var(--line); color: var(--muted); white-space: nowrap }
+.c { color: var(--blue) } .v { color: var(--teal) }
+.scroll { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px }
+th, td { text-align: start; padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: none }
+td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
+.flow span { padding: 3px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); font-weight: 600 }
+.flow b { color: var(--faint); font-weight: 400 }
+.flow span.rev { background: var(--sel); border-color: transparent }
+.note { border-inline-start: 3px solid var(--lime); padding: 2px 0 2px 12px; color: var(--muted); font-size: 13.5px }
+.gap { border-inline-start: 3px solid var(--coral); padding: 6px 12px; background: var(--coral-soft); border-radius: 0 10px 10px 0; display: grid; gap: 4px }
+.gap b { color: var(--ink) }
+.red { color: var(--coral); font-weight: 600 }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Momentum · methodology · as built on 23 Nov 2026</span>
+    <h1>Content and Video sheets</h1>
+    <p class="lede">How the two linked sheets work today: what each row is, what each column holds, who may change what, how Status moves a task, and how they connect to the Design and Video boards. Every row is a real board task, so the sheet and the board are two views of the same work.</p>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#where">1 · Where they open</a>
+    <a href="#rows">2 · Rows</a>
+    <a href="#columns">3 · Columns</a>
+    <a href="#status">4 · Status and stages</a>
+    <a href="#editing">5 · Editing rules</a>
+    <a href="#format">6 · Formatting and comments</a>
+    <a href="#media">7 · Links to Design and Video</a>
+    <a href="#shared">8 · Shared or private</a>
+    <a href="#open">9 · Open points</a>
+  </nav>
+
+  <main>
+    <section class="part" id="where">
+      <h2>1 · What they're for, and where they open</h2>
+      <div class="cols">
+        <div class="box"><h3 class="c">Content sheet</h3><p>The content plan as a spreadsheet: campaigns (themes), their pillars and their pieces. Used by Content Creators, the Marketing Manager and theme owners.</p></div>
+        <div class="box"><h3 class="v">Video sheet</h3><p>Every video and its clips, with files, timings and review. Used by editors and the content team.</p></div>
+      </div>
+      <ul>
+        <li><b>Content Space › Sheet</b> and <b>Video Space › Sheet</b>: a workbook whose first, fixed tab is the linked sheet; blank tabs can sit beside it.</li>
+        <li><b>Brand › Sheet</b>: All tasks, Content sheet and Video sheet, limited to that brand.</li>
+        <li><b>Sheets</b> section: the Content and Video folders, with the linked sheet first.</li>
+        <li>From a task panel ("Open sheet") and from a content row's menu ("Open in video sheet").</li>
+      </ul>
+      <p class="note">Linked means an edit in the sheet goes through the board's own save, with the board's rules. A change on the board shows in the sheet straight away.</p>
+    </section>
+
+    <section class="part" id="rows">
+      <h2>2 · Rows</h2>
+      <div class="cols">
+        <div class="box">
+          <h3 class="c">Content sheet</h3>
+          <ul>
+            <li><b>Theme</b> row: the campaign, with its owner, frequency and audience.</li>
+            <li><b>Pillar</b> rows under it, each with its <b>pieces</b>; pieces without a pillar follow; then <b>+ Piece</b>.</li>
+            <li>A piece is a task in that theme, ordered by publishing date, then due date. A Video piece opens to show its clips.</li>
+            <li>New pieces start at To Do. The theme's owner owns it; whoever added it (if not the owner or an admin) is its assignee.</li>
+            <li><b>Paste plan</b>: paste rows from the Content Library; a preview sorts them into New, Matched by Task Link, Already in the sheet, and Problems. Pasting the same rows again adds nothing.</li>
+            <li><b>Archive</b> hides a piece from the board and greys it here; Restore brings it back to its stage.</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h3 class="v">Video sheet</h3>
+          <ul>
+            <li>Each <b>video</b> (a Video task) is a band: name, clip count, progress, stage mix and due date.</li>
+            <li>Its <b>clips</b> (subtasks) follow, ordered by clip number (01, 02…), then <b>+ Clip</b>.</li>
+            <li>Clip numbers come from the file name (<code>NN_SOURCE_in-out.mp4</code>), the # column or Paste clips.</li>
+            <li>A new clip is a Reel at To Do, owned by whoever adds it. <b>+ Video</b> is for admins and superusers.</li>
+            <li><b>File</b>: upload (up to 200 MB with storage), paste a link, preview, or remove with Undo.</li>
+            <li><b>Drop</b> works like Archive.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="part" id="columns">
+      <h2>3 · Columns</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Column</th><th>Sheet</th><th>Holds</th><th>Edited by</th></tr></thead>
+        <tbody>
+          <tr><td>Title</td><td>Both</td><td>The task's name</td><td>Typing</td></tr>
+          <tr><td>Type</td><td>Both</td><td>Task type, with its icon and colour</td><td>Type-ahead list; only admins add a new type</td></tr>
+          <tr><td>Status / Stage</td><td>Both</td><td>The task's stage, in the Space's words</td><td>Menu or typing (see part 4)</td></tr>
+          <tr><td>Link task</td><td>Both</td><td>The linked Design or Video task, by name and board</td><td>Any member</td></tr>
+          <tr><td>Assignee / Owner</td><td>Both</td><td>Who does it (the Video sheet calls the assignee "Owner")</td><td>Menu</td></tr>
+          <tr><td>Reviewer</td><td>Video</td><td>The task's owner, shown from Edit Review</td><td>Menu</td></tr>
+          <tr><td>Due, In stage</td><td>Video</td><td>Due date; time in the stage, red past its limit</td><td>Read only</td></tr>
+          <tr><td>Working Doc, Design Link</td><td>Both</td><td>Link attachments on the task</td><td>Paste a link</td></tr>
+          <tr><td>Task Link, LinkedIn, Published</td><td>Both</td><td>Opens the task; post links ("Missing link" on a published piece with none)</td><td>Paste a link</td></tr>
+          <tr><td>Pillar</td><td>Content</td><td>The theme's pillar</td><td>Menu</td></tr>
+          <tr><td>Publishing date</td><td>Content</td><td>Publishing date (the due date follows the rule)</td><td>Typing</td></tr>
+          <tr><td>#, Source, File name, In, Out, Length</td><td>Video</td><td>Clip details (hidden by default)</td><td>Typing; Out before In is refused</td></tr>
+          <tr><td>Caption, Channels, TOV</td><td>Both</td><td>Task fields of the row's type (spec 023)</td><td>The task's editors; empty and required shows <span class="red">"Caption not added"</span></td></tr>
+          <tr><td>Custom columns</td><td>Both</td><td>Text, Number, Date, Link, Person, Choice, Checkbox, Related task (up to 30)</td><td>Any member on a live row</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li><b>Columns</b> (or ⚙ Fields) opens a drawer: show or hide, reorder, Group by (Content: Theme, Stage, Assignee, Type, None; Video: Video, Stage, Editor) and the sheet's own words.</li>
+        <li><b>＋</b> after the last heading adds a hidden column back or a new column. Each heading's menu: rename, reset, insert, move, hide, delete; on a custom column, admins and superusers also get <b>Make it a task field</b>, which moves its values onto the tasks.</li>
+        <li>A task field cell is hatched where the row's type doesn't use the field, or where its brand has switched it off.</li>
+        <li>The layout is shared by the team; the drawer shows who changed it last.</li>
+      </ul>
+    </section>
+
+    <section class="part" id="status">
+      <h2>4 · Status and stages</h2>
+      <div class="flow" aria-label="The pipeline">
+        <span>To Do</span><b>→</b><span>C-In Progress</span><b>→</b><span class="rev">C-Review</span><b>→</b><span class="rev">C-Check</span><b>→</b><span>Ready For Design</span><b>→</b><span>D-In Progress</span><b>→</b><span class="rev">D-Check</span><b>→</b><span class="rev">F-Check</span><b>→</b><span>Ready to Publish</span><b>→</b><span>Scheduled</span><b>→</b><span>Published</span>
+      </div>
+      <ul>
+        <li>Change it from the menu (Next, Back to, Skip to) or by typing a stage: the Space's names, the sheet's own words (Writing, Content Review… / Script, Editing, Edit Review…) or the board names.</li>
+        <li><b>Who may move it:</b> whoever holds the current stage. Review stages (shaded) belong to a role: C-Review and F-Check to the Marketing Manager, C-Check to the Managing Director, D-Check to the Brand Director. Other stages belong to the task's assignee or owner. Admins and superusers can move any task.</li>
+        <li>Brands with C-Check switched off have 10 stages.</li>
+        <li><b>Required fields:</b> a move that crosses C-Review with Caption or TOV empty is refused: "Caption is required before C-Review". The same rule holds for the menu, typing, bulk moves and the board.</li>
+        <li>Moving a piece to Published asks for its Published link (and LinkedIn link for a Post).</li>
+      </ul>
+    </section>
+
+    <section class="part" id="editing">
+      <h2>5 · Editing rules</h2>
+      <div class="cols">
+        <div class="box"><h3>Who edits what</h3><ul>
+          <li>Task fields (title, type, assignee, pillar, dates, links, files, clip details, Caption, TOV): the task's owner, its assignee, admins and superusers. Anyone else sees "read only".</li>
+          <li>Custom columns, formatting and comments: any member, on a live row.</li>
+        </ul></div>
+        <div class="box"><h3>How</h3><ul>
+          <li>Click and type replaces; Enter, F2 or double-click edits.</li>
+          <li>Paste fills cells and counts what it skipped; a table on a theme row opens Paste plan; clip file names open Paste clips.</li>
+          <li>Fill handle, Ctrl+;, Alt+↓ pick list. Undo and redo follow the same rules.</li>
+          <li>Bulk bar (2+ rows): Content: Stage, Assignee, Type, Pillar, Date, Archive. Video: Stage, Owner, Reviewer, Type, Priority, Due, Drop. One Undo reverses it.</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <section class="part" id="format">
+      <h2>6 · Formatting and comments</h2>
+      <ul>
+        <li>Fills, fonts, number formats and colour rules are kept per task and column, so they follow the task through sorting, filtering and archiving.</li>
+        <li>Sort and filter work inside each theme or video and never change the board's order.</li>
+        <li>Cell comments are threads with @mentions, resolve and reopen. Paste Special: values, formats, comments, transpose.</li>
+      </ul>
+    </section>
+
+    <section class="part" id="media">
+      <h2>7 · Links to the Design and Video boards</h2>
+      <ul>
+        <li>At <b>Ready For Design</b> a box creates one linked task per board, once: Video and Reel go to the Video board, the rest to Design (set per type). It picks a person for each.</li>
+        <li><b>Link task</b> cell: type to find an unlinked Design or Video task, or create one. Each link shows the task's name and board, with ⇄ to change and × to unlink. No new links from F-Check on.</li>
+        <li>While linked tasks haven't passed D-Check, the content row's <b>Status follows them</b> (the earliest of their stages). Its menu offers Ready For Design to F-Check, and moving it moves them, with their own permissions. Once every linked task passes D-Check, the row moves to F-Check on its own; after that the linked tasks follow the row.</li>
+      </ul>
+    </section>
+
+    <section class="part" id="shared">
+      <h2>8 · Shared or private</h2>
+      <div class="cols">
+        <div class="box"><h3>Shared by everyone</h3><p>Column layout, custom columns and values, task fields, row heights, the sheet's sort, filter, group and words, formatting, colour rules and comments.</p></div>
+        <div class="box"><h3>Per person or device</h3><p>Mine (resets each visit), Show archived / Show dropped (remembered on the device), collapsed themes and videos.</p></div>
+      </div>
+    </section>
+
+    <section class="part" id="open">
+      <h2>9 · Open points</h2>
+      <p>Where the specs and the code differ, or a decision is still needed:</p>
+      <div class="gap"><b>Clips and required fields.</b> Clips are created as Reels, and Reels require Caption and TOV before C-Review, so every clip needs both. Should clips use their own type (e.g. "Clip") without TOV?</div>
+      <div class="gap"><b>Task field columns in the drawer.</b> Caption, Channels and TOV always sit at the end of the Content and Video sheets and can't be hidden or reordered from Columns yet.</div>
+      <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
+      <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>
+      <div class="gap"><b>+ Video for users.</b> The button is hidden from regular users, although the server lets them add a video they own.</div>
+      <div class="gap"><b>Older spec text.</b> Spec 008's per-member column sets (Editing, Copy, Full) became one shared set; spec 009 said whoever adds a piece owns it (the theme owner does); spec 010 said built-in columns can't be deleted (they can be hidden everywhere).</div>
+    </section>
+  </main>
+</div>

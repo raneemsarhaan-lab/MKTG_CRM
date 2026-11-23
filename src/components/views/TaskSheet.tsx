@@ -36,9 +36,10 @@ import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
 import { matchSpaceStage } from '@/lib/space-stages'
 import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import { stagesForSpace } from '@/lib/space-stages'
-import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
+import { FEATURE_OFF_CELL, fieldOn, offFeatureFor } from '@/lib/brand-features'
 import { applies, fieldName, formatValue, isEmpty, parseValue } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
+import { useMakeField } from '@/components/fields/useMakeField'
 import { formatDay, isOverdue } from '@/lib/due-dates'
 import { ManualMark } from '@/components/shared/DueDates'
 import { useMediaLinks } from '@/components/media/MediaLinks'
@@ -148,8 +149,9 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
 
   // ── columns (spec 010): this sheet's own layout and regular columns ──
   const bundle = useColumnsBundle(data.sheetColumns, data.sheetValues, me)
+  const makeField = useMakeField(sheet, me.access, text => setSay(text))
   const cl = useSheetColumns({
-    sheet, set: 'all', bundle, me, members: data.members,
+    sheet, set: 'all', bundle, me, members: data.members, makeField,
     defaultName: key => (key === NOTES ? t('col.notes') : key.startsWith('f:') ? (() => { const f = data.taskFields.find(x => x.id === key.slice(2)); return f ? fieldName(f, locale) : '' })() : t(`col.${key as 'title'}`)),
     canEdit: task => may(task as ViewTask), say: sayNow,
     onNote: (k, n) => setCellNotes(c => ({ ...c, [k]: n ?? undefined })),
@@ -170,7 +172,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const [fieldOver, setFieldOver] = useState<Record<string, unknown>>({})
   useEffect(() => { setFieldOver({}) }, [data.fieldValues])
   const fieldValue = (x: ViewTask, col: GridCol) => { const k = `${x.id}|${String(col).slice(2)}`; return k in fieldOver ? fieldOver[k] : baseValues.get(k) }
-  const fieldApplies = (x: ViewTask, col: GridCol) => applies(x.content_type_label, String(col).slice(2), data.typeFields)
+  const fieldApplies = (x: ViewTask, col: GridCol) => applies(x.content_type_label, String(col).slice(2), data.typeFields) && fieldOn(x.brand, fieldOf(col))
   // Spec 022 (R19): Link task is on content-side sheets, not on the Design and Video boards' own sheets.
   const mediaSpace = /^tasks:space:/.test(sheet) && !!data.spaces.find(sp => `tasks:space:${sp.id}` === sheet)?.media_board
   const ml = useMediaLinks({ tasks: viewTasks(data), onOpenTask: id => selectTask(id), say: sayNow })

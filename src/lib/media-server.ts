@@ -5,7 +5,8 @@
  */
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { MediaBoard, StageId } from '@/types/index'
+import type { BrandFeatures, MediaBoard, StageId } from '@/types/index'
+import { fieldOn } from '@/lib/brand-features'
 import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/media'
 import { addSpaces } from '@/lib/spaces-server'
 import { allowedStages } from '@/lib/stage-moves'
@@ -30,7 +31,11 @@ export async function requiredGate(
   if (!task.content_type_label) return null
   const links = (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label, required_from: { not: null } } })).map(mapTypeField)
   if (!links.length) return null
+  // Spec 023: a field the task's brand has switched off never stops a move.
+  const owner = await db.task.findUnique({ where: { id: task.id }, select: { brand: { select: { features: true } } } })
+  const features = (owner?.brand?.features ?? null) as BrandFeatures | null
   const fields = (await db.taskField.findMany({ where: { id: { in: links.map(l => l.field_id) } } })).map(mapTaskField)
+    .filter(f => fieldOn({ features }, f))
   const values = await db.taskFieldValue.findMany({ where: { task_id: task.id, field_id: { in: links.map(l => l.field_id) } }, select: { task_id: true, field_id: true, value: true } })
   const missing = missingRequired(task, target, links, fields, values)
   if (!missing.length) return null

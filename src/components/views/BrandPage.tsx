@@ -62,7 +62,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   // Spec 021 (US4): admins switch the brand's features from its header.
   const features = brand && data.currentUser.access === 'admin'
     ? <BrandFeaturesButton brand={{ id: brand.id, name: brand.name, own: brand.own_features ?? {}, nine_stage_default: brand.nine_stage_default ?? null }}
-        defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage} />
+        defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage}  fields={data.taskFields}/>
     : undefined
   const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: features }
 
@@ -74,7 +74,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
           ? <BoardView data={data} scopeTasks={scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
           : withPanel(tab === 'list'
             ? <ListView custom={custom} tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
-            : <CalendarView tasks={all.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" />)} />
+            : <CalendarView tasks={all.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />)} />
     )
   }
   if (folder === 'assets') {
@@ -127,7 +127,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
                 linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
             : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} label={name} />)
           : tab === 'calendar'
-            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
+            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
               : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)

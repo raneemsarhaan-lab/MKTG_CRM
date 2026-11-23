@@ -13,7 +13,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import type { BrandFeatureKey, BrandFeatures } from '@/types/index'
+import type { BrandFeatureKey, BrandFeatures, TaskFieldDef } from '@/types/index'
+import { useLocale } from 'next-intl'
+import { fieldName } from '@/lib/task-fields'
 import { BRAND_FEATURES } from '@/lib/brand-features'
 import { setBrandFeatureDefaults, setBrandFeatures, setBrandNineStage } from '@/actions/brands'
 import { PIPE } from '@/lib/pipeline-tokens'
@@ -29,7 +31,7 @@ export interface BrandFeaturesTarget {
   nine_stage_default: boolean | null
 }
 
-export function BrandFeaturesButton(props: { brand: BrandFeaturesTarget; defaults: BrandFeatures; workspaceNineStage: boolean }) {
+export function BrandFeaturesButton(props: { brand: BrandFeaturesTarget; defaults: BrandFeatures; workspaceNineStage: boolean; fields?: TaskFieldDef[] }) {
   const t = useTranslations('spaces.features')
   const [open, setOpen] = useState(false)
   return (
@@ -53,7 +55,9 @@ export function BrandFeaturesButton(props: { brand: BrandFeaturesTarget; default
 }
 
 /** One brand's switches (with Islam Check), or the workspace defaults when `brand` is absent. */
-export function BrandFeaturesList({ brand, defaults, workspaceNineStage }: { brand?: BrandFeaturesTarget; defaults: BrandFeatures; workspaceNineStage?: boolean }) {
+export function BrandFeaturesList({ brand, defaults, workspaceNineStage, fields = [] }: { brand?: BrandFeaturesTarget; defaults: BrandFeatures; workspaceNineStage?: boolean; fields?: TaskFieldDef[] }) {
+  const locale = useLocale()
+  const tf = useTranslations('fields')
   const t = useTranslations('spaces.features')
   const router = useRouter()
   const [, start] = useTransition()
@@ -128,6 +132,33 @@ export function BrandFeaturesList({ brand, defaults, workspaceNineStage }: { bra
           </div>
         )
       })}
+      {/* Spec 023: task fields a brand may switch off ("A brand can switch it off" on the field). */}
+      {brand && fields.filter(f => f.switchable && !f.retired).length > 0 && (
+        <div data-field-switches="" style={{ borderTop: `1px dashed ${PIPE.border}`, marginTop: 6, paddingTop: 6, display: 'grid', gap: 2 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: PIPE.textMuted, padding: '2px 4px' }}>{tf('brandFields')}</div>
+          {fields.filter(f => f.switchable && !f.retired).map(f => {
+            const key = `f:${f.id}` as const
+            const on = own[key] !== false
+            return (
+              <div key={f.id} data-feature-row={key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center', padding: '5px 4px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: PIPE.ink }}>{fieldName(f, locale)}</div>
+                <button type="button" role="switch" aria-checked={on} aria-label={fieldName(f, locale)} data-feature-switch={key}
+                  onClick={() => {
+                    const before = own
+                    const next = { ...own }
+                    if (on) next[key] = false; else delete next[key]
+                    setOwn(next)
+                    run(() => setBrandFeatures(brand.id, { [key]: on ? false : null }), () => setOwn(before))
+                  }}
+                  style={{ position: 'relative', width: 42, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', flex: 'none',
+                    background: on ? PIPE.ink : 'color-mix(in srgb, #8A8F98 35%, transparent)', transition: 'background .15s' }}>
+                  <span aria-hidden="true" style={{ position: 'absolute', top: 3, insetInlineStart: on ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#FFFFFF', transition: 'inset-inline-start .15s', boxShadow: '0 1px 2px rgba(0,0,0,.25)' }} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
       <p data-features-msg role="status" aria-live="polite" style={{ minHeight: 16, margin: '6px 0 0', fontSize: 12, fontWeight: 600, color: '#C2353A' }}>{error ?? ''}</p>
     </div>
   )

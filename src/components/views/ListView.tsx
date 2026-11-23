@@ -15,13 +15,14 @@ import { initials, avatarColor } from '@/lib/utils'
 import { featureOn } from '@/lib/brand-features'
 import { TaskDates } from '@/components/shared/DueDates'
 import type { ViewTask } from './types'
+import { STATUS_GROUPS, statusGroupOf } from '@/lib/status-groups'
 import type { ContentType, TaskFieldDef, TaskTypeFieldLink } from '@/types/index'
 import { useLocale } from 'next-intl'
 import { applies, fieldName, formatValue, isEmpty } from '@/lib/task-fields'
 import { typeName } from '@/lib/task-types'
 import { TypeIcon } from '@/components/types/TypeIcon'
 
-type Group = 'brand' | 'stage'
+type Group = 'brand' | 'stage' | 'statusGroup'
 
 interface ListViewProps {
   tasks: ViewTask[]
@@ -52,12 +53,15 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
   const typeOf = (label: string | null | undefined) => custom?.types.find(x => x.label === label)
   const t = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
+  const tg = useTranslations('statusGroups')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members])
   const live = tasks.filter(x => !x.dropped_at)
   const name = (s: StageId) => stageName?.(s) ?? STAGE_META[s]?.label_en ?? s
 
-  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'brand'
+  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'statusGroup'
+    ? STATUS_GROUPS.map(g => ({ key: g, head: <span data-status-group={g}>{tg(g)}</span>, rows: live.filter(x => statusGroupOf(x.status) === g) }))
+    : group === 'brand'
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),
        { key: 'none', head: <span>{t('noBrand')}</span>, rows: live.filter(x => !x.brand_id) }]
     : [
@@ -72,11 +76,11 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: PIPE.textMuted }}>
           {t('groupBy')}
           <div role="group" aria-label={t('groupBy')} style={{ display: 'inline-flex', border: `1px solid ${PIPE.border}`, borderRadius: 10, overflow: 'hidden' }}>
-            {(['brand', 'stage'] as const).map(g => (
+            {(['brand', 'stage', 'statusGroup'] as const).map(g => (
               <button key={g} type="button" data-group={g} aria-pressed={group === g} onClick={() => setGroup(g)}
                 style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, padding: '5px 10px',
                   background: group === g ? PIPE.ink : '#FFFFFF', color: group === g ? '#FFFFFF' : PIPE.ink }}>
-                {g === 'brand' ? t('groupBrand') : t('groupStatus')}
+                {g === 'brand' ? t('groupBrand') : g === 'stage' ? t('groupStatus') : t('groupStatusGroup')}
               </button>
             ))}
           </div>

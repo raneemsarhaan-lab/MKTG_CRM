@@ -16,6 +16,8 @@ import { STAGE_META } from '@/lib/stage-meta'
 import { fieldName, fieldsForType, formatValue, isEmpty, parseValue, placeOf, type FieldPlace } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
 import { useCardFields } from './CardFields'
+import { fieldOn } from '@/lib/brand-features'
+import type { BrandFeatures } from '@/types/index'
 
 export const FIELD_RED = '#D22040'
 /** Sent by the panel when a move is refused: the sections it names are outlined and scrolled to. */
@@ -23,14 +25,15 @@ export const REQUIRED_EVENT = 'fx-required-fields'
 
 type Entry = { field: TaskFieldDef; link: TaskTypeFieldLink; value: unknown }
 
-function usePanelFields(task: { id: string; content_type_label: string | null }) {
+function usePanelFields(task: { id: string; content_type_label: string | null; brand?: { features?: BrandFeatures | null } | null }) {
   const c = useCardFields()
   const router = useRouter()
   const [local, setLocal] = useState<Record<string, unknown>>({})
   const base = c?.values.get(task.id)
   useEffect(() => { setLocal({}) }, [base])
   const entries: Entry[] = useMemo(() => (c ? fieldsForType(task.content_type_label, c.links, c.fields) : [])
-    .map(x => ({ ...x, value: x.field.id in local ? local[x.field.id] : base?.get(x.field.id) })), [c, task.content_type_label, local, base])
+    .filter(x => fieldOn(task.brand, x.field))
+    .map(x => ({ ...x, value: x.field.id in local ? local[x.field.id] : base?.get(x.field.id) })), [c, task.content_type_label, task.brand, local, base])
   async function save(f: TaskFieldDef, value: unknown): Promise<string | null> {
     const p = parseValue(f, value)
     if (!p.ok) return 'invalid'
@@ -65,7 +68,7 @@ function RequiredBadge({ link }: { link: TaskTypeFieldLink }) {
 
 /** The panel's top rows for fields placed there; `Row` is the panel's own row (label + value). */
 export function PanelTopFields({ task, canEdit, Row }: {
-  task: { id: string; content_type_label: string | null }; canEdit: boolean
+  task: { id: string; content_type_label: string | null; brand?: { features?: BrandFeatures | null } | null }; canEdit: boolean
   Row: (p: { label: string; children: ReactNode }) => ReactNode
 }) {
   const { entries, save } = usePanelFields(task)
@@ -87,7 +90,7 @@ export function hasSections(task: { content_type_label: string | null }, fields:
 }
 
 export function PanelFieldSections({ task, canEdit, place }: {
-  task: { id: string; content_type_label: string | null }; canEdit: boolean; place: Exclude<FieldPlace, 'top'>
+  task: { id: string; content_type_label: string | null; brand?: { features?: BrandFeatures | null } | null }; canEdit: boolean; place: Exclude<FieldPlace, 'top'>
 }) {
   const { entries, save } = usePanelFields(task)
   const [flagged, setFlagged] = useState<string[]>([])

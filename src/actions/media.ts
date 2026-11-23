@@ -62,7 +62,7 @@ export async function linkToMedia(
     const taken = await prisma.task.findFirst({ where: { content_task_id: content.id, media_board: m.media_board, dropped_at: null }, select: { id: true } })
     if (taken) return { success: false, error: 'already_linked' }
     await prisma.task.update({ where: { id: m.id }, data: { content_task_id: content.id, updated_at: new Date() } })
-    // Linked by hand before Ready For Design: the media task waits; its SLA starts there (R10).
+    // Linked by hand: the content row now follows the linked task's stage (user, 2026-11-23); the media task's SLA starts at Ready For Design (R10).
     await syncContent(content.id, me.id)
     revalidate()
     return { success: true, linked: [m.id] }

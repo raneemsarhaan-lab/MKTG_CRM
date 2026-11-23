@@ -284,7 +284,7 @@ export function SheetGrid(p: SheetGridProps) {
     label: p.label,
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
-      const text = col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? '' : t(`col.${col as SheetColumn}`)))
+      const text = col === 'drop' && !named ? '' : (named ?? (isCustom(col) ? (String(col).startsWith('f:') ? cl.nameOf(col) : '') : t(`col.${col as SheetColumn}`)))
       // The redesign: plain names under the column letters, as in a spreadsheet.
       // A column that follows a board field carries a link badge.
       const lk = linkedOf(col)

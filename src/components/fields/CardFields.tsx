@@ -8,9 +8,10 @@
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { ContentType, Member, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
+import type { BrandFeatures, ContentType, Member, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
 import { applies, fieldName, formatValue, isEmpty, requiredEmpty } from '@/lib/task-fields'
 import { PIPE } from '@/lib/pipeline-tokens'
+import { fieldOn } from '@/lib/brand-features'
 
 export interface CardFieldsData {
   /** Field keys switched on; null = the default (standard + "show on cards"). */
@@ -54,15 +55,15 @@ export function useCardShows() {
 }
 
 /** The custom field values a card shows, under its title. */
-export function CardFieldValues({ taskId, typeLabel, status }: { taskId: string; typeLabel: string | null | undefined; status?: string }) {
+export function CardFieldValues({ taskId, typeLabel, status, brand }: { taskId: string; typeLabel: string | null | undefined; status?: string; brand?: { features?: BrandFeatures | null } | null }) {
   const c = useContext(Ctx)
   const locale = useLocale()
   const t = useTranslations('fields')
   if (!c || !typeLabel) return null
   // Required fields still empty: a small red label each ("Caption missing"), until it's published.
-  const missing = status === 'publish' ? [] : requiredEmpty({ id: taskId, content_type_label: typeLabel }, c.links, c.fields, id => c.values.get(taskId)?.get(id))
+  const missing = status === 'publish' ? [] : requiredEmpty({ id: taskId, content_type_label: typeLabel }, c.links, c.fields, id => c.values.get(taskId)?.get(id)).filter(x => fieldOn(brand, x.field))
   const vals = c.values.get(taskId)
-  const list = c.fields.filter(f => !f.retired && applies(typeLabel, f.id, c.links)
+  const list = c.fields.filter(f => !f.retired && fieldOn(brand, f) && applies(typeLabel, f.id, c.links)
     && (c.shown ? c.shown.includes(`f:${f.id}`) : f.on_card))
   const rows = list.map(f => {
     const v = vals?.get(f.id)

@@ -29,13 +29,22 @@ export function cleanFeatures(input: unknown): BrandFeatures {
     const v = (input as Record<string, unknown>)[k]
     if (typeof v === 'boolean') out[k] = v
   }
+  // Spec 023: switchable task fields (`f:<field id>`), off only when stored false.
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) if (FIELD_SWITCH.test(k) && typeof v === 'boolean') out[k as `f:${string}`] = v
   return out
 }
+
+export const FIELD_SWITCH = /^f:[0-9a-f-]{36}$/i
+
+/** Whether a switchable task field shows for this brand (the brand's own switch; on unless switched off). */
+export const fieldOn = (brand: { features?: BrandFeatures | null } | null | undefined, field: { id: string; switchable?: boolean }) =>
+  !field.switchable || brand?.features?.[`f:${field.id}`] !== false
 
 /** Every switch resolved to on or off: the brand's own value, else the workspace default, else on. */
 export function resolveFeatures(own: BrandFeatures | null | undefined, defaults?: BrandFeatures | null): Required<BrandFeatures> {
   const out = {} as Required<BrandFeatures>
   for (const k of BRAND_FEATURES) out[k] = featureOn({ features: own }, k, defaults)
+  for (const [k, v] of Object.entries(own ?? {})) if (FIELD_SWITCH.test(k) && typeof v === 'boolean') out[k as `f:${string}`] = v
   return out
 }
 

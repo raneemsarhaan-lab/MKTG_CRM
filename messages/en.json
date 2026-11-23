@@ -2978,7 +2978,8 @@
       "moved": "Moved to {name}.",
       "otherStage": "That step belongs to another stage.",
       "step": "Another step of this stage"
-    }
+    },
+    "groupStatusGroup": "Status group"
   },
   "views": {
     "list": "List",
@@ -3009,7 +3010,8 @@
       "brand": "Brand",
       "assignee": "Assignee",
       "type": "Type",
-      "campaign": "Campaign"
+      "campaign": "Campaign",
+      "statusGroup": "Status group"
     },
     "any": "Any",
     "noOne": "No one",
@@ -3055,7 +3057,8 @@
     "pinnedMark": "Pinned",
     "hide": "Hide",
     "hiddenViews": "Hidden ({n})",
-    "showView": "Show {name}"
+    "showView": "Show {name}",
+    "groupStatusGroup": "Status group"
   },
   "calendar": {
     "today": "Today",
@@ -3342,7 +3345,12 @@
     "place": "In the task panel",
     "placeTop": "Top rows (with Status)",
     "placeAbove": "Above the Description",
-    "placeBelow": "Below the Description"
+    "placeBelow": "Below the Description",
+    "makeField": "Make it a task field",
+    "madeField": "Now a task field. {n, plural, one {# value} other {# values}} moved onto the tasks.",
+    "makeFieldFailed": "Couldn't make it a task field.",
+    "brandFields": "Task fields",
+    "switchedOff": "Switched off for {brand}"
   },
   "types": {
     "eyebrow": "Workspace",
@@ -3501,5 +3509,25 @@
     "notSaved": "Couldn't save that. Try again.",
     "notMoved": "Couldn't move that task.",
     "moved": "{name} moved on."
+  },
+  "statusGroups": {
+    "not_started": "Not started",
+    "active": "Active",
+    "done": "Done",
+    "closed": "Closed"
+  },
+  "milestones": {
+    "flag": "Milestone",
+    "add": "Add milestone",
+    "edit": "Milestone",
+    "name": "Name",
+    "namePh": "e.g. Ramadan launch",
+    "day": "Day",
+    "brand": "Brand",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "failed": "Couldn't save the milestone.",
+    "deleted": "{name} deleted."
   }
 }

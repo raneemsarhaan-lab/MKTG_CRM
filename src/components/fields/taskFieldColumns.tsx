@@ -14,6 +14,7 @@ import type { Task, TaskFieldDef } from '@/types/index'
 import { applies, fieldName, formatValue, isEmpty, parseValue } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
 import { useCardFields } from './CardFields'
+import { FEATURE_OFF_CELL, fieldOn } from '@/lib/brand-features'
 import type { useSheetColumns } from '@/components/sheet/useSheetColumns'
 
 type Columns = ReturnType<typeof useSheetColumns>
@@ -36,7 +37,7 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
   const isField = (key: string) => byKey.has(key)
   const fieldOf = (key: string) => byKey.get(key) as TaskFieldDef
   const valueOf = (task: Task, key: string) => { const k = `${task.id}|${key.slice(2)}`; return k in local ? local[k] : c.values.get(task.id)?.get(key.slice(2)) }
-  const has = (task: Task, key: string) => applies(task.content_type_label, key.slice(2), c.links)
+  const has = (task: Task, key: string) => applies(task.content_type_label, key.slice(2), c.links) && fieldOn(task.brand, fieldOf(key))
   const required = (task: Task, key: string) => c.links.some(l => l.type_label === task.content_type_label && l.field_id === key.slice(2) && !!l.required_from)
   const text = (task: Task, key: string) => {
     const v = valueOf(task, key)
@@ -54,7 +55,7 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
     readOnlyNote: (task, key) => (isField(key) ? note(task, key) : cl.custom.readOnlyNote(task, key)),
     render: (task, key): ReactNode => {
       if (!isField(key)) return cl.custom.render(task, key)
-      if (!has(task, key)) return null
+      if (!has(task, key)) return <span data-field-na="" title={note(task, key) ?? ''} style={{ display: 'block', width: '100%', height: '100%', ...FEATURE_OFF_CELL }} />
       const f = fieldOf(key), v = valueOf(task, key)
       if (isEmpty(v)) return required(task, key) ? <span className="fx-sheet-ellipsis" data-field-missing={f.name_en} style={{ color: RED }}>{t('notAdded', { field: fieldName(f, locale) })}</span> : null
       if (f.kind === 'choice' || f.kind === 'multi') {
