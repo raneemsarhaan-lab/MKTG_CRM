@@ -36,6 +36,7 @@ import { NamePrompt } from '@/components/content/ThemeEditor'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { clipLink, CLIP_LINK_COLS } from './SheetGrid'
 import type { LinkRole } from '@/types/index'
+import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 
 /** The Content sheet's link columns on the Video sheet (design/video-sheet-v4.html). */
 type LinkCol = typeof CLIP_LINK_COLS[number]
@@ -127,7 +128,14 @@ export function VideoSheet(p: VideoSheetProps) {
   const tMediaErr = useTranslations('media')
   // Spec 022: a linked row's Status follows its linked tasks; these say why a move was refused.
   const MEDIA_ERRORS = ['waiting_on_media', 'follows_content', 'follows_media']
-  const why = (code: string | undefined) => (code && MEDIA_ERRORS.includes(code) ? tMediaErr(code as 'follows_media') : code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
+  const moveErr = useMoveError()
+  /** A refusal's words; a move's whole result also names the required fields (spec 023). */
+  const why = (r?: string | MoveRefusal) => {
+    const known = typeof r === 'object' ? moveErr(r) : null
+    if (known) return known
+    const code = typeof r === 'object' ? r?.error : r
+    return code && MEDIA_ERRORS.includes(code) ? tMediaErr(code as 'follows_media') : code && KNOWN_ERRORS.includes(code) ? t(`err.${code}` as 'err.generic') : code || t('err.generic')
+  }
 
   // ── highlight a row arriving from "Open sheet" on a clip ────────────────
   const highlighted = useRef<string | null>(null)
@@ -178,7 +186,7 @@ export function VideoSheet(p: VideoSheetProps) {
     const rowKey = anchor.closest('[data-row]')?.getAttribute('data-row') ?? ''
     const res = await p.api.move(task.id, to)
     if (!res.success) {
-      const reason = why(res.error)
+      const reason = why(res)
       say(t('notMoved', { reason }))
       onNote(`${rowKey}|status`, reason)
       return
@@ -435,7 +443,7 @@ export function VideoSheet(p: VideoSheetProps) {
     })()
     if (res.success) return null
     const local: Record<string, string> = { badNumber: t('badNumber'), badTime: t('badTime'), outBeforeIn: t('outBeforeIn'), empty: t('err.generic') }
-    const reason = (res.error && local[res.error]) || why(res.error)
+    const reason = (res.error && local[res.error]) || why(res as MoveRefusal)
     say(t('notSaved', { reason }))
     return reason
   }

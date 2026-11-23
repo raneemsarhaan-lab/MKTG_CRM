@@ -9,7 +9,7 @@ import { setWorkWeekend } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
-import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage } from '@/lib/mappers'
+import { mapMember, mapTask, mapSlaConfig, mapTheme, mapSheetColumn, mapBrand, mapSpace, mapSpaceStage, mapContentType, mapTaskField, mapTypeField, mapMilestone } from '@/lib/mappers'
 import { configured as storageConfigured } from '@/lib/storage'
 
 type SessionMember = NonNullable<Awaited<ReturnType<typeof import('@/lib/authz').getSessionMember>>>
@@ -21,7 +21,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -98,6 +98,11 @@ export async function loadBoardData(member: SessionMember) {
     // Spec 022: Space stages and each task's sub-stage — two flat arrays, never a query per task.
     prisma.spaceStage.findMany({ orderBy: [{ space_id: 'asc' }, { stage_id: 'asc' }, { position: 'asc' }] }),
     prisma.taskSpaceStage.findMany({ select: { task_id: true, space_id: true, space_stage_id: true, stage_id: true } }),
+    // Spec 023: the field library, what each type carries, every value, and milestones — flat arrays.
+    prisma.taskField.findMany({ orderBy: [{ position: 'asc' }, { created_at: 'asc' }] }),
+    prisma.taskTypeField.findMany({ orderBy: { position: 'asc' } }),
+    prisma.taskFieldValue.findMany({ select: { task_id: true, field_id: true, value: true } }),
+    prisma.milestone.findMany({ orderBy: { day: 'asc' } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -125,7 +130,11 @@ export async function loadBoardData(member: SessionMember) {
     boardSorts: (prefs?.board_sorts ?? {}) as Record<string, string>,
     // The due-date rule (Settings › Due Dates).
     dueRule: (() => { const r = ruleFromSettings(ws); setWorkWeekend(r.weekend); return r })(),
-    contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label, media_boards: ct.media_boards })),
+    contentTypes: [...contentTypes].sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.label.localeCompare(b.label)).map(mapContentType),
+    taskFields: taskFields.map(mapTaskField),
+    typeFields: typeFields.map(mapTypeField),
+    fieldValues: fieldValues as import('@/types/index').TaskFieldValueRow[],
+    milestones: milestones.map(mapMilestone),
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),

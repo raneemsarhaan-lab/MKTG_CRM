@@ -9,8 +9,11 @@
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import type { ContentTheme, Task } from '@/types/index'
 import type { BoardData } from './types'
+import { ShownFieldsProvider } from '@/components/fields/CardFields'
 
-export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope, boardKey }: {
+export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetScope, themeScope, boardKey, fields }: {
+  /** Spec 023: what the page's Fields button shows on cards. */
+  fields?: string[]
   /** Which board, for the member's saved sort. */
   boardKey?: string
   data: BoardData
@@ -21,6 +24,7 @@ export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetSco
   themeScope?: (theme: ContentTheme) => boolean
 }) {
   return (
+    <ShownFieldsProvider shown={fields}>
     <KanbanBoard
       {...data}
       surface="view"
@@ -31,5 +35,6 @@ export function BoardView({ data, scopeTasks, spaceId, start = 'board', sheetSco
       themeScope={themeScope}
       boardKey={boardKey}
     />
+    </ShownFieldsProvider>
   )
 }

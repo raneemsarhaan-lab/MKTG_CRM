@@ -15,23 +15,23 @@
 
 ## Phase 1: Setup — Stage A gates
 
-- [ ] T001 **Gate**: confirm with the user that spec 022 has shipped and been tested (spec 023 plan, R14). Nothing below starts before this.
-- [ ] T002 Amend `.specify/memory/constitution.md` to 4.1.0 (MINOR), part 1: §II — the move rule also refuses a stage while a field required from it is empty; milestones are calendar markers, not tasks. §VI — task types are data (`content_types` gains names, icon, colour, defaults). Update the Sync Impact Report.
-- [ ] T003 Write `design/023-stage-a.html` (tokens only, en + ar copy) for every Stage A screen in `contracts/ui.md`: Settings › Task types, Settings › Fields (attach, Required from), task panel Fields section, card values, sheet field columns and hatched cells, the refused-move message, Make it a task field, status group filter, milestones on calendars. Publish it for review.
-- [ ] T004 Record the user's approval of `design/023-stage-a.html` at the top of `specs/023-task-types-fields/research.md`. **Gate: Stage A screen tasks wait for this.**
+- [X] T001 **Gate**: confirm with the user that spec 022 has shipped and been tested (spec 023 plan, R14). Nothing below starts before this.
+- [X] T002 Amend `.specify/memory/constitution.md` to 4.1.0 (MINOR), part 1: §II — the move rule also refuses a stage while a field required from it is empty; milestones are calendar markers, not tasks. §VI — task types are data (`content_types` gains names, icon, colour, defaults). Update the Sync Impact Report.
+- [X] T003 Write `design/023-stage-a.html` (tokens only, en + ar copy) for every Stage A screen in `contracts/ui.md`: Settings › Task types, Settings › Fields (attach, Required from), task panel Fields section, card values, sheet field columns and hatched cells, the refused-move message, Make it a task field, status group filter, milestones on calendars. Publish it for review.
+- [X] T004 Record the user's approval of `design/023-stage-a.html` at the top of `specs/023-task-types-fields/research.md`. **Gate: Stage A screen tasks wait for this.**
 
 ---
 
 ## Phase 2: Foundational — Stage A model (blocks US1–US3)
 
-- [ ] T005 In `prisma/schema.prisma`: extend `ContentType` with `name_ar`, `icon`, `color`, `default_priority`, `default_tag_ids`, `default_template_id`, `position`; add `TaskField`, `TaskTypeField`, `TaskFieldValue`, `Milestone` (data-model.md §Stage A). Run `prisma db push`; restart the dev server.
-- [ ] T006 [P] Types in `src/types/index.ts`: `TaskType` (extends today's `ContentType`), `FieldKind`, `TaskField`, `TaskTypeField`, `FieldValue`, `Milestone`.
-- [ ] T007 [P] Mappers in `src/lib/mappers.ts` for the new tables.
-- [ ] T008 Load types, fields, attachments, values (one flat array) and milestones in `src/lib/board-data.ts`.
-- [ ] T009 `once('task-types-v1')` in `prisma/seed.ts`: icon, colour, `name_ar` and position for each existing type, by label.
-- [ ] T010 [P] Pure `src/lib/task-types.ts`: the icon set (about 24 names), `typeLabel(type, locale)`, `defaultsFor(type)`.
-- [ ] T011 [P] Pure `src/lib/task-fields.ts`: kinds, `parseValue(kind, input)`, `formatValue(kind, value, locale)`, `isEmpty`, `fieldsFor(type, attachments, fields)`, `missingRequired(task, attachments, values, target)`, `applies(task, field)`.
-- [ ] T012 [P] Pure `src/lib/status-groups.ts`: stage → Not started / Active / Done / Closed (research R5).
+- [X] T005 In `prisma/schema.prisma`: extend `ContentType` with `name_ar`, `icon`, `color`, `default_priority`, `default_tag_ids`, `default_template_id`, `position`; add `TaskField`, `TaskTypeField`, `TaskFieldValue`, `Milestone` (data-model.md §Stage A). Run `prisma db push`; restart the dev server.
+- [X] T006 [P] Types in `src/types/index.ts`: `TaskType` (extends today's `ContentType`), `FieldKind`, `TaskField`, `TaskTypeField`, `FieldValue`, `Milestone`.
+- [X] T007 [P] Mappers in `src/lib/mappers.ts` for the new tables.
+- [X] T008 Load types, fields, attachments, values (one flat array) and milestones in `src/lib/board-data.ts`.
+- [X] T009 `once('task-types-v1')` in `prisma/seed.ts`: icon, colour, `name_ar` and position for each existing type, by label.
+- [X] T010 [P] Pure `src/lib/task-types.ts`: the icon set (about 24 names), `typeLabel(type, locale)`, `defaultsFor(type)`.
+- [X] T011 [P] Pure `src/lib/task-fields.ts`: kinds, `parseValue(kind, input)`, `formatValue(kind, value, locale)`, `isEmpty`, `fieldsFor(type, attachments, fields)`, `missingRequired(task, attachments, values, target)`, `applies(task, field)`.
+- [X] T012 [P] Pure `src/lib/status-groups.ts`: stage → Not started / Active / Done / Closed (research R5).
 - [ ] T013 Export the new pure helpers from `scripts/spaces-lab/pure-entry.ts`.
 
 **Checkpoint**: Stage A data loads; nothing on screen has changed yet.
@@ -48,11 +48,11 @@
 - [ ] T015 [P] [US1] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-023-a.cjs`, registered in `run.cjs`: an admin renames Reel in Arabic and sets icon, colour and default priority; a new Reel task shows them; existing Reel tasks keep SLA and Video board; a user sees the page read-only.
 
 ### Implementation for US1
-- [ ] T016 [US1] `src/actions/task-types.ts`: `saveTaskType` (admins; rename cascades; errors `exists`, `invalid`).
-- [ ] T017 [US1] `src/components/settings/TaskTypesSettings.tsx` in Settings (per `design/023-stage-a.html`), replacing the content-type list; read-only for users.
-- [ ] T018 [US1] Show the type's icon and colour on cards (`src/components/kanban/TaskCard.tsx`), sheet Type cells (`ContentGrid.tsx`, `SheetGrid.tsx`, `TaskSheet.tsx`) and the task panel (`src/components/kanban/TaskModal.tsx`); Arabic names in Arabic.
+- [X] T016 [US1] `src/actions/task-types.ts`: `saveTaskType` (admins; rename cascades; errors `exists`, `invalid`).
+- [X] T017 [US1] `src/components/settings/TaskTypesSettings.tsx` in Settings (per `design/023-stage-a.html`), replacing the content-type list; read-only for users.
+- [X] T018 [US1] Show the type's icon and colour on cards (`src/components/kanban/TaskCard.tsx`), sheet Type cells (`ContentGrid.tsx`, `SheetGrid.tsx`, `TaskSheet.tsx`) and the task panel (`src/components/kanban/TaskModal.tsx`); Arabic names in Arabic.
 - [ ] T019 [US1] Apply type defaults (priority now; tags in Stage B; template in Stage D) in `createTask` and `createTasks` (`src/actions/tasks.ts`) when not chosen.
-- [ ] T020 [US1] Strings `types.*` in `messages/en.json` and `messages/ar.json`.
+- [X] T020 [US1] Strings `types.*` in `messages/en.json` and `messages/ar.json`.
 
 ---
 
@@ -71,9 +71,9 @@
   - a Video row under a Post-only field shows a hatched cell that refuses typing.
 
 ### Implementation for US2
-- [ ] T023 [US2] `src/actions/task-fields.ts`: `createField`, `updateField` (kind change converts or keeps as text), `retireField`, `restoreField`, `attachField`, `detachField`, `setFieldValue`, `setFieldValues`, `makeTaskField` (contracts/server-actions.md).
-- [ ] T024 [US2] Move gate: `requiredGate(task, target)` in `src/lib/media-server.ts`, called with `mediaGate` in `setTaskStage`, `moveTask`, `bulkUpdateTasks` (`src/actions/tasks.ts`) and in `moveThroughMedia`; `syncContent` holds the content task when the field is missing (research R4). Refusal `required_fields` with the field names and stage.
-- [ ] T025 [US2] Refusal messages on every path: board drag (`KanbanBoard.tsx`), panel stage menu (`TaskModal.tsx`), sheets (`ContentSheet.tsx`, `VideoSheet.tsx`, `TaskSheet.tsx`), bulk notes; in the Space's stage names where shown.
+- [X] T023 [US2] `src/actions/task-fields.ts`: `createField`, `updateField` (kind change converts or keeps as text), `retireField`, `restoreField`, `attachField`, `detachField`, `setFieldValue`, `setFieldValues`, `makeTaskField` (contracts/server-actions.md).
+- [X] T024 [US2] Move gate: `requiredGate(task, target)` in `src/lib/media-server.ts`, called with `mediaGate` in `setTaskStage`, `moveTask`, `bulkUpdateTasks` (`src/actions/tasks.ts`) and in `moveThroughMedia`; `syncContent` holds the content task when the field is missing (research R4). Refusal `required_fields` with the field names and stage.
+- [X] T025 [US2] Refusal messages on every path: board drag (`KanbanBoard.tsx`), panel stage menu (`TaskModal.tsx`), sheets (`ContentSheet.tsx`, `VideoSheet.tsx`, `TaskSheet.tsx`), bulk notes; in the Space's stage names where shown.
 - [ ] T026 [US2] `src/components/settings/FieldsSettings.tsx`: the library, New field, options with colours, attach to types with Required from (stage menu) and default value.
 - [ ] T027 [US2] `src/components/fields/FieldEditor.tsx` and `FieldCell.tsx`: one editor per kind (text, number, money, date, link, person, choice, multi, checkbox, rating, related task), used by the panel, sheets and cards.
 - [ ] T028 [US2] Task panel Fields section `src/components/fields/FieldsSection.tsx` in `TaskModal.tsx`, marking required fields with their stage.
@@ -96,7 +96,7 @@
 
 ### Implementation for US3
 - [ ] T036 [US3] Status group in filters and list group-by (`BoardFilters.tsx`, `ListView.tsx`).
-- [ ] T037 [US3] `src/actions/milestones.ts` (admins, superusers).
+- [X] T037 [US3] `src/actions/milestones.ts` (admins, superusers).
 - [ ] T038 [US3] Milestones in `src/components/views/CalendarView.tsx`: flag chips on their day, Add milestone on a day, rename/move/delete; brand, Space and My tasks calendars.
 - [ ] T039 [US3] Strings `milestones.*`, `statusGroups.*`.
 

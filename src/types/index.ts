@@ -229,7 +229,36 @@ export interface ContentType {
   label: string
   /** Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design. */
   media_boards?: string[]
+  /** Spec 023 (R1): a task type's Arabic name, icon, colour and defaults. */
+  name_ar?: string | null
+  icon?: string
+  color?: string
+  default_priority?: string | null
+  default_tag_ids?: string[]
+  default_template_id?: string | null
+  position?: number
 }
+/** Spec 023: task types are the content types, extended. */
+export type TaskType = ContentType
+
+/** Spec 023 (R2): a field's kind. */
+export type FieldKind = 'text' | 'number' | 'money' | 'date' | 'link' | 'person' | 'choice' | 'multi' | 'checkbox' | 'rating' | 'task'
+export interface FieldOption { id: string; en: string; ar?: string | null; color?: string | null }
+export interface TaskFieldDef {
+  id: string
+  name_en: string
+  name_ar: string | null
+  kind: FieldKind
+  options: { choices?: FieldOption[]; currency?: string; max?: number }
+  on_card: boolean
+  switchable: boolean
+  position: number
+  retired: boolean
+}
+export interface TaskTypeFieldLink { type_label: string; field_id: string; required_from: StageId | null; default_value: unknown; position: number }
+export interface TaskFieldValueRow { task_id: string; field_id: string; value: unknown }
+/** Spec 023 (R6): a brand's calendar marker — not a task. */
+export interface Milestone { id: string; brand_id: string; name: string; day: string }
 
 export interface Stage {
   id: StageId
@@ -466,6 +495,11 @@ export interface MoveTaskResult {
   /** Spec 021: set with error 'needs_handoff' — the stage asked for and what the box pre-ticks. */
   target?: StageId
   handoff?: HandoffDefaults
+  /** Spec 023: set with error 'required_fields' — the empty fields (English names) and the stage they're needed by. */
+  missing?: string[]
+  /** The same fields' Arabic names (the English name where none is set). */
+  missing_ar?: string[]
+  requiredStage?: StageId
 }
 
 export interface WorkspaceSettings {

@@ -39,6 +39,10 @@ import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { useNotify } from '@/components/notifications/NotifyProvider'
 import { ReplyComposer } from './ReplyComposer'
 import { mentionedIn } from '@/lib/notify/mentions'
+import { useMoveError } from '@/components/fields/moveErrors'
+import { TypePicker } from '@/components/types/TypePicker'
+import { TypeIcon } from '@/components/types/TypeIcon'
+import { typeName } from '@/lib/task-types'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -98,7 +102,7 @@ interface TaskModalProps {
   onClose: () => void
   brands?: Brand[]
   members?: Member[]
-  contentTypes?: { id: string; label: string }[]
+  contentTypes?: import('@/types/index').ContentType[]
   /** Everything the composer can link to with #, and a chip can jump to. */
   allTasks?: TaskRef[]
   /**
@@ -634,6 +638,7 @@ export function TaskModal({
   const tsheet = useTranslations('sheet')
   const tDates = useTranslations('dates')
   const tMedia = useTranslations('media')
+  const moveErr = useMoveError()
   const locale = useLocale()
   const tSpaces = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
@@ -680,6 +685,7 @@ export function TaskModal({
     currentUser.access === 'superuser'
 
   const isAdmin     = currentUser.access === 'admin'
+  const typeOf      = contentTypes.find(c => c.label === task.content_type_label)
   const isSuperuser = currentUser.access === 'superuser'
   const isPublished = task.status === 'publish'
 
@@ -949,8 +955,7 @@ export function TaskModal({
       if (!r.success) {
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
-          : ['waiting_on_media', 'follows_content', 'follows_media'].includes(r.error ?? '') ? tMedia(r.error as 'follows_media')
-          : r.error ?? 'Could not move that task')
+          : moveErr(r) ?? r.error ?? 'Could not move that task')
         return
       }
       router.refresh()
@@ -1120,21 +1125,9 @@ export function TaskModal({
       key: 'type', filled: Boolean(task.content_type_label),
       node: (
         <Field key="type" icon="type" label="Type">
-          <InlineValue
-            canEdit={canEdit} type="select" value={task.content_type_label}
-            display={task.content_type_label ? (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px',
-                borderRadius: 8, background: CU.blueLight, color: CU.blue, fontWeight: 700, fontSize: 13,
-              }}>
-                <Icon name="folder" size={13} color={CU.blue} width={2.2} />
-                {task.content_type_label}
-              </span>
-            ) : ''}
-            options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
-            emptyLabel="–"
-            onCommit={v => applyPatch({ content_type_label: v })}
-          />
+          {/* Spec 023: the type's icon and colour; admins add a type from the menu ("+ Type"). */}
+          <TypePicker value={task.content_type_label} types={contentTypes} canEdit={canEdit} canAdd={isAdmin}
+            onPick={v => applyPatch({ content_type_label: v })} />
         </Field>
       ),
     },
@@ -1483,8 +1476,8 @@ export function TaskModal({
                   color: CU.text, textTransform: 'uppercase',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220,
                 }}>
-                  <Icon name="type" size={15} color={CU.label} />
-                  {task.content_type_label}
+                  <TypeIcon icon={typeOf?.icon} color={typeOf?.color ?? CU.label} size={15} />
+                  {typeOf ? typeName(typeOf, locale) : task.content_type_label}
                 </span>
               </>
             )}

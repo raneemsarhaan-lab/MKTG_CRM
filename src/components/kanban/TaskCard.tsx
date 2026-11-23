@@ -9,11 +9,14 @@ import { useTaskLinkNames } from './TaskLinks'
 import { CardMedia } from '@/components/media/MediaLinks'
 import { TaskDates } from '@/components/shared/DueDates'
 import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { PIPE } from '@/lib/pipeline-tokens'
+import { CardFieldValues, useCardFields, useCardShows } from '@/components/fields/CardFields'
+import { TypeIcon } from '@/components/types/TypeIcon'
+import { typeName } from '@/lib/task-types'
 
 /**
  * Board task card — Pipeline handoff §7 "Task card".
@@ -114,6 +117,11 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   // Spec 021: the tasks this one links to (Task link fields), e.g. "↗ Ramadan launch plan".
   const linkNames  = useTaskLinkNames(task.id)
 
+  // Spec 023: the page's Fields button decides which standard fields the card shows.
+  const shows = useCardShows()
+  const locale = useLocale()
+  const types = useCardFields()?.types
+  const type = types?.find(x => x.label === task.content_type_label)
   // Stable per task, so a card does not reshuffle its bars on every render.
   const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
 
@@ -153,7 +161,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           Two short lines above the title so a column can be read for
           direction without opening anything. The brand mark moved here from
           the cover's corner rather than being drawn twice. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+      {shows('brand') && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
         <span aria-hidden="true" style={{
           width: 16, height: 16, borderRadius: 4, flexShrink: 0, overflow: 'hidden',
           background: task.brand ? brandColor : PIPE.surface,
@@ -175,7 +183,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         }}>
           {task.brand?.name ?? 'No brand'}
         </span>
-      </div>
+      </div>}
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -201,8 +209,11 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         {task.name}
       </div>
 
+      {/* Spec 023: custom field values the page shows. */}
+      <CardFieldValues taskId={task.id} typeLabel={task.content_type_label} />
+
       {/* Publishing and due dates, each labelled (✎ on a due date set by hand). */}
-      <div style={{ marginTop: 5 }}><TaskDates task={task} size={10.5} /></div>
+      {(shows('publish') || shows('due')) && <div style={{ marginTop: 5 }}><TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={10.5} /></div>}
 
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
@@ -214,10 +225,12 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>
           </span>
         ))}
-        {task.content_type_label && featureOn(task.brand, 'type') && (
-          <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
-            {task.content_type_label}
-          </Chip>
+        {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (
+          <span data-card-type={task.content_type_label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
+            background: type?.color ? `${type.color}1A` : PIPE.surface, color: type?.color ?? PIPE.textMuted }}>
+            <TypeIcon icon={type?.icon} color={type?.color ?? PIPE.textMuted} size={11} />
+            {type ? typeName(type, locale) : task.content_type_label}
+          </span>
         )}
       </div>
 
@@ -226,7 +239,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginTop: 10, gap: 8,
       }}>
-        <div style={{ display: 'flex', flexShrink: 0 }}>
+        <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
           <AssigneeDot name={task.task_owner.name} />
           {currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
             <AssigneeDot name={currentStageOwner.name} stacked />

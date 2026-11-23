@@ -4,6 +4,7 @@ import { ROLE_SPACES, membersBySpace, startingSpaces } from '../src/lib/spaces'
 import { stagesFromWords } from '../src/lib/space-stages'
 import { calcDueDate, dayDate, dayOf, ruleFromSettings } from '../src/lib/due-dates'
 import { contentStageFrom, passedDCheck } from '../src/lib/media'
+import { STARTING_LOOKS } from '../src/lib/task-types'
 
 const prisma = new PrismaClient()
 
@@ -449,6 +450,17 @@ async function main() {
       if (follow.length) await prisma.task.updateMany({ where: { id: { in: follow.map(m => m.id) } }, data: { status: stage } })
     }
     return `${n} of ${ids.length} linked rows moved`
+  })
+
+  /** Spec 023 (R1): content types become task types — an Arabic name, an icon, a colour and an order. */
+  await once('task-types-v1', 'gave task types their Arabic names, icons and colours', async () => {
+    const types = await prisma.contentType.findMany({ orderBy: { label: 'asc' } })
+    let i = 0
+    for (const t of types) {
+      const look = STARTING_LOOKS[t.label]
+      await prisma.contentType.update({ where: { id: t.id }, data: { position: i++, ...(look ? { icon: look.icon, color: look.color, name_ar: t.name_ar ?? look.ar } : {}) } })
+    }
+    return `${types.length} types`
   })
 
   // Workspace settings

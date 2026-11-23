@@ -197,7 +197,7 @@ export async function removeContentType(
 
   try {
     await prisma.contentType.delete({ where: { label } })
-    revalidatePath('/settings')
+    revalidatePath('/', 'layout'); revalidatePath('/settings')
     return { success: true }
   } catch (e: unknown) {
     return { success: false, error: String(e) }

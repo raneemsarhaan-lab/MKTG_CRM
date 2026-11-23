@@ -1,6 +1,23 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 4.0.0 → 4.1.0 (2026-11-23)
+Type of bump: MINOR — spec 023 Stage A (T002): required fields join the one
+  move rule; milestones are calendar markers, not tasks; task types are data.
+
+Modified principles:
+  - §II: the move rule also refuses a stage while a field required from it
+    (spec 023, "Required from stage") is empty, on every path, with the field
+    named. Milestones (name, date, brand) are not tasks and never enter the
+    pipeline.
+  - §VI: task types are the content types as data (Arabic name, icon, colour,
+    defaults, attached fields); fields, their values and milestones live in
+    Postgres.
+
+Templates: no changes needed.
+
+Previous report (4.0.0)
+-----------------------
 Version change: 3.0.0 → 4.0.0 (2026-11-23)
 Type of bump: MAJOR — §II redefined again: one workflow (simple tasks removed),
   media tasks on the Design and Video boards, and SLA working days from
@@ -135,6 +152,13 @@ constitution amendment. Its definition lives in `src/lib/stage-meta.ts`.
   - `allowedStages` MUST hold a content task before F-Check until every linked
     media task has passed D-Check, and MUST keep a linked media task following
     its content task after D-Check.
+- **Required fields (spec 023).** A task type's field may be required from a
+  stage. `allowedStages`' move gate MUST refuse moving a task to or past that
+  stage while the field is empty, on every path (Advance, stage menu, Board
+  drag, Inbox, sheets, bulk, and a linked row's move), naming the field. When
+  linked media tasks pass D-Check, the content task waits instead of moving.
+- **Milestones (spec 023)** are calendar markers (a name, a date, a brand). They
+  are not tasks and never enter the pipeline.
 - **Space stages (spec 022).** A team Space may rename or split each original
   stage in its own views. Each Space stage maps to exactly one original stage;
   every original stage has at least one. A move between Space stages of one
@@ -237,6 +261,10 @@ identity and makes completing work feel rewarding.
   correctly without them. They MUST NOT hold application data or anything
   another member needs to see; shared things (saved views, team Space words)
   belong in Postgres, as do team Space stages and each task's sub-stage.
+- **Task types are data (spec 023).** The content types are the task types:
+  each has an Arabic name, an icon, a colour, defaults for new tasks and the
+  fields attached to it. Field definitions, their attachments, every task's
+  values and milestones live in Postgres.
 - **Types**: `StageId`, `ContentType`, `Priority`, `Platform`, `AccessLevel`,
   `MediaBoard` are exhaustive unions in `src/types/index.ts`; adding a value
   updates that file first. (`TaskKind` and `SimpleStatus` are retired.)
@@ -298,4 +326,4 @@ src/
 - Spec Kit skills (`/speckit-plan`, `/speckit-specify`, …) read this file to
   enforce compliance gates.
 
-**Version**: 4.0.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23
+**Version**: 4.1.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23

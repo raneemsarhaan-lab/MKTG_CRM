@@ -28,6 +28,7 @@ import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
+import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -125,7 +126,14 @@ export function ContentSheet(p: ContentSheetProps) {
   const tMediaErr = useTranslations('media')
   // Spec 022: a linked row's Status follows its linked tasks; these say why a move was refused.
   const MEDIA_ERRORS = ['waiting_on_media', 'follows_content', 'follows_media']
-  const why = (code?: string) => (code && MEDIA_ERRORS.includes(code) ? tMediaErr(code as 'follows_media') : code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
+  const moveErr = useMoveError()
+  /** A refusal's words; a move's whole result also names the required fields (spec 023). */
+  const why = (r?: string | MoveRefusal) => {
+    const known = typeof r === 'object' ? moveErr(r) : null
+    if (known) return known
+    const code = typeof r === 'object' ? r?.error : r
+    return code && MEDIA_ERRORS.includes(code) ? tMediaErr(code as 'follows_media') : code && KNOWN_ERRORS.includes(code) ? t(`err.${code}` as 'err.generic') : code || t('err.generic')
+  }
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
   const cl = useSheetColumns({
@@ -157,7 +165,7 @@ export function ContentSheet(p: ContentSheetProps) {
     const rowKey = anchor.closest('[data-row]')?.getAttribute('data-row') ?? ''
     const res = await p.api.move(task.id, to)
     const n = isClip ? videoNames : names
-    if (!res.success) { const reason = why(res.error); say(t('notMoved', { reason })); onNote(`${rowKey}|status`, reason); return }
+    if (!res.success) { const reason = why(res); say(t('notMoved', { reason })); onNote(`${rowKey}|status`, reason); return }
     say(t('moved', { name: task.name, stage: n.video(to) }))
     // FR-043: a piece moved to Published here is asked for its links.
     if (to === 'publish' && !isClip && !task.published_url) {
@@ -369,7 +377,7 @@ export function ContentSheet(p: ContentSheetProps) {
     // Spec 019 stage 2: a typed or pasted stage or type (ContentGrid has read the sheet's words into a stage id or a type label).
     if (col === 'status') {
       const res = await p.api.move(task.id, value as StageId)
-      if (!res.success) return why(res.error)
+      if (!res.success) return why(res)
       say(t('moved', { name: task.name, stage: names.video(value as StageId) }))
       return null
     }

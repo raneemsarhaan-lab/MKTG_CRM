@@ -15,6 +15,11 @@ import { initials, avatarColor } from '@/lib/utils'
 import { featureOn } from '@/lib/brand-features'
 import { TaskDates } from '@/components/shared/DueDates'
 import type { ViewTask } from './types'
+import type { ContentType, TaskFieldDef, TaskTypeFieldLink } from '@/types/index'
+import { useLocale } from 'next-intl'
+import { applies, fieldName, formatValue, isEmpty } from '@/lib/task-fields'
+import { typeName } from '@/lib/task-types'
+import { TypeIcon } from '@/components/types/TypeIcon'
 
 type Group = 'brand' | 'stage'
 
@@ -34,9 +39,17 @@ interface ListViewProps {
   /** A saved view's grouping. */
   initialGroup?: Group | null
   onOpen: (id: string) => void
+  /** Spec 023: the Fields button's choice (standard keys and `f:<id>`); absent = every standard field. */
+  fields?: string[]
+  /** Spec 023: custom fields and their values, task id → field id → value. */
+  custom?: { fields: TaskFieldDef[]; links: TaskTypeFieldLink[]; values: Map<string, Map<string, unknown>>; types: ContentType[] }
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, spaceStages, initialGroup, onOpen }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, spaceStages, initialGroup, onOpen, fields, custom }: ListViewProps) {
+  const locale = useLocale()
+  const shows = (k: string) => !fields || fields.includes(k)
+  const shownCustom = (custom?.fields ?? []).filter(f => !f.retired && fields?.includes(`f:${f.id}`))
+  const typeOf = (label: string | null | undefined) => custom?.types.find(x => x.label === label)
   const t = useTranslations('spaces')
   const tSheet = useTranslations('taskSheet')
   const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
@@ -86,14 +99,25 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                   padding: '9px 12px', border: `1px solid ${PIPE.border}`, borderRadius: 12, background: '#FFFFFF', cursor: 'pointer', fontFamily: 'inherit' }}>
                 <span style={{ minWidth: 0, display: 'grid', gap: 2 }}>
                   <span style={{ fontWeight: 600, fontSize: 13.5, color: PIPE.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</span>
-                  <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>{task.brand?.name ?? t('noBrand')}{task.content_type_label && featureOn(task.brand, 'type') ? ` · ${task.content_type_label}` : ''}</span>
+                  <span style={{ fontSize: 11.5, color: PIPE.textMuted, display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                    {shows('brand') && (task.brand?.name ?? t('noBrand'))}
+                    {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (() => {
+                      const ty = typeOf(task.content_type_label)
+                      return <>{shows('brand') && ' · '}<TypeIcon icon={ty?.icon} color={ty?.color} size={11} />{ty ? typeName(ty, locale) : task.content_type_label}</>
+                    })()}
+                  </span>
+                  {shownCustom.length > 0 && <FieldChips task={task} list={shownCustom} custom={custom!} members={members} locale={locale} />}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {late && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '1px 6px', borderRadius: 6, background: ALERT_BADGE_STYLES[sla].bg, color: ALERT_BADGE_STYLES[sla].text }}>SLA</span>}
-                  {group === 'brand' && <Pill stage={task.status} label={spaceStages?.name(task) ?? name(task.status)} board={STAGE_META[task.status]?.label_en} />}
-                  {who && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
+                  {shows('priority') && task.priority && (task.priority as string) !== 'None' && <span data-list-priority style={{ fontSize: 11, fontWeight: 700, color: ['High', 'Urgent'].includes(task.priority) ? '#D22040' : PIPE.textMuted }}>{(task.priority as string) === 'Medium' ? 'Normal' : task.priority}</span>}
+                  {group === 'brand' && shows('status') && <Pill stage={task.status} label={spaceStages?.name(task) ?? name(task.status)} board={STAGE_META[task.status]?.label_en} />}
+                  {who && shows('assignee') && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
                   {/* Publishing and due dates, each labelled (spec: both on every task). */}
-                  <span style={{ minWidth: 44, textAlign: 'end' }}>{task.publish_date || task.due_date ? <TaskDates task={task} /> : <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>—</span>}</span>
+                  {(shows('publish') || shows('due')) && (() => {
+                    const d = { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task
+                    return <span style={{ minWidth: 44, textAlign: 'end' }}>{d.publish_date || d.due_date ? <TaskDates task={d} /> : <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>—</span>}</span>
+                  })()}
                 </span>
               </button>
             )
@@ -101,6 +125,26 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
         </section>
       ))}
     </div>
+  )
+}
+
+/** Custom field values on a row (spec 023): the fields the page shows that the task's type has. */
+function FieldChips({ task, list, custom, members, locale }: { task: ViewTask; list: TaskFieldDef[]; custom: NonNullable<ListViewProps['custom']>; members: Member[]; locale: string }) {
+  const vals = custom.values.get(task.id)
+  const items = list.filter(f => applies(task.content_type_label, f.id, custom.links)).map(f => {
+    const v = vals?.get(f.id)
+    return { f, text: isEmpty(v) ? '' : formatValue(f, v, { locale, memberName: id => members.find(m => m.id === id)?.name }) }
+  }).filter(x => x.text)
+  if (!items.length) return null
+  return (
+    <span data-list-fields style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 11.5 }}>
+      {items.map(({ f, text }) => (
+        <span key={f.id} data-list-field={f.id} style={{ display: 'inline-flex', gap: 4, minWidth: 0, maxWidth: 260 }}>
+          <span style={{ color: PIPE.textMuted }}>{fieldName(f, locale)}</span>
+          <span style={{ color: PIPE.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+        </span>
+      ))}
+    </span>
   )
 }
 

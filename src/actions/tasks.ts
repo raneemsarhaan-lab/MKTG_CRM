@@ -1,7 +1,7 @@
 'use server'
 
 import { datesFor, newTaskDates } from '@/lib/due-dates-server'
-import { afterMove, mediaGate, moveThroughMedia } from '@/lib/media-server'
+import { afterMove, mediaGate, moveThroughMedia, requiredGate, requiredRefusal } from '@/lib/media-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
@@ -57,6 +57,8 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   // Own-stage check, shared with the board, the sheet and bulk moves
   // (src/lib/stage-moves.ts): a working stage belongs to the assignee or the
   // owner, a review stage to its role; admin and superuser may override.
+  const reqNext = await requiredGate(task, nextStage)
+  if (reqNext) return { success: false, shouldCelebrate: false, ...requiredRefusal(reqNext) }
   const throughNext = await moveThroughMedia(task, nextStage, member)
   if (throughNext) {
     if (!throughNext.success) return { success: false, shouldCelebrate: false, error: throughNext.error }
@@ -125,9 +127,14 @@ export async function setTaskStage(
 
   // Spec 022 (user, 2026-11-23): a linked row's Status follows its linked tasks, so moving
   // it moves them — with their own stage permissions, approvals and SLA.
+  // Spec 023 (FR-008): a field required by the target stage must be filled first.
+  if (toIdx > fromIdx) {
+    const req = await requiredGate(task, stageId)
+    if (req) return { success: false, shouldCelebrate: false, ...requiredRefusal(req) }
+  }
   const through = await moveThroughMedia(task, stageId, member)
   if (through) {
-    if (!through.success) return { success: false, shouldCelebrate: false, error: through.error }
+    if (!through.success) return { success: false, shouldCelebrate: false, error: through.error, missing: 'missing' in through ? through.missing as string[] : undefined, missing_ar: 'missing_ar' in through ? through.missing_ar as string[] : undefined, requiredStage: 'requiredStage' in through ? through.requiredStage as StageId : undefined }
     revalidatePath('/board'); revalidatePath('/overview'); revalidatePath('/', 'layout')
     return { success: true, shouldCelebrate: false }
   }
@@ -823,6 +830,7 @@ export async function bulkUpdateTasks(
         // Spec 021 (FR-030a): a bulk move never opens a box — it skips the task and counts it.
         if (needsHandoff(task, patch.status, shownOf(task.id), spaceCtx.spaces)) { handoff++; continue }
         if (await mediaGate(task, patch.status)) { refused++; continue }
+        if (path.indexOf(patch.status) > path.indexOf(task.status as StageId) && await requiredGate(task, patch.status)) { refused++; continue }
         data.status = patch.status
         data.stage_date = new Date()
       }

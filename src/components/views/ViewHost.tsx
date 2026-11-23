@@ -18,8 +18,9 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { PIPE } from '@/lib/pipeline-tokens'
 import type { SavedView, ViewType } from '@/types/index'
-import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, VIEW_FIELDS, VIEW_FILTERS, VIEW_SORTS, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
+import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, shownFields, VIEW_FILTERS, VIEW_SORTS, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
 import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
+import { FieldsMenu, type FieldsSetup } from '@/components/fields/FieldsMenu'
 
 export interface ViewTab { key: string; label: string; disabled?: boolean; note?: string }
 export interface OpenView { id: string; type: ViewType; config: ViewConfig }
@@ -41,8 +42,10 @@ interface ViewHostProps {
   sub?: React.ReactNode
   actions?: React.ReactNode
   tabs: ViewTab[]
-  /** A saved view renders as its type, with its config. */
-  render: (tab: string, view?: OpenView) => React.ReactNode
+  /** A saved view renders as its type, with its config. `fields`: what the Fields button shows (Board, List, Sheet). */
+  render: (tab: string, view?: OpenView, fields?: string[]) => React.ReactNode
+  /** Spec 023: the Fields button's custom fields and "+ Field". */
+  fields?: FieldsSetup
   /** Saved views: the node they belong to ('space:<id>', 'brand:<id>', 'me'). */
   node?: string
   /** The types "+ View" offers (the page's own view tabs). */
@@ -55,7 +58,7 @@ interface ViewHostProps {
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup }: ViewHostProps) {
   const t = useTranslations('views')
   const params = useSearchParams()
   const [views, setViews] = useState<SavedView[]>([])
@@ -117,6 +120,19 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const config = open ? drafts[open.id] ?? cleanConfig(open.config) : null
   const mayChange = (v: SavedView) => (v.owner_id ? true : !!v.mine || lead)
   const typeLabel = (k: string) => tabs.find(x => x.key === k)?.label ?? t(k as 'list')
+  // The Fields button (spec 023): a saved view keeps its fields in its config (saved with Save);
+  // a built-in tab keeps this member's choice in their tab prefs.
+  const viewType = open ? open.type : tab
+  const hasFields = !!fieldSetup && ['board', 'list', 'sheet'].includes(viewType)
+  const shown = hasFields && fieldSetup
+    ? shownFields(open ? config?.fields : prefs.fields?.[tab], viewType, fieldSetup.custom, new Set(fieldSetup.typesOnPage), fieldSetup.links)
+    : undefined
+  function setShown(keys: string[]) {
+    if (open && config) { setDrafts(d => ({ ...d, [open.id]: { ...config, fields: keys } })); return }
+    const next = { ...prefs, fields: { ...(prefs.fields ?? {}), [tab]: keys } }
+    setPrefs(next)
+    if (node) void setTabPrefs(node, next).catch(() => null)
+  }
 
   return (
     <div data-view-host style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
@@ -184,6 +200,11 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
               {t('addView')}
             </button>
           ) : null}
+          {hasFields && fieldSetup && shown && (
+            <div style={{ marginInlineStart: 'auto', paddingBottom: 6, paddingInlineStart: 8 }}>
+              <FieldsMenu shown={shown} setup={fieldSetup} onChange={setShown} />
+            </div>
+          )}
         </div>
       </header>
       {tabMenu && (() => {
@@ -239,7 +260,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
       )}
       {say && <div role="status" data-view-say style={{ padding: '6px 38px', fontSize: 12, color: PIPE.textSecondary }}>{say}</div>}
       <div role="tabpanel" data-view={open ? open.type : tab} data-saved-view={open?.id} style={{ flex: 1, minWidth: 0 }}>
-        {open && config ? render(open.type, { id: open.id, type: open.type, config }) : render(tab)}
+        {open && config ? render(open.type, { id: open.id, type: open.type, config }, shown) : render(tab, undefined, shown)}
       </div>
     </div>
   )
@@ -341,23 +362,6 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
           </select>
         </label>
       )}
-      {view.type === 'sheet' && (
-        <details data-view-fields style={{ position: 'relative' }}>
-          <summary style={{ ...pill, listStyle: 'none' }}>{t('fields')}</summary>
-          <div style={{ position: 'absolute', zIndex: 30, top: 'calc(100% + 4px)', insetInlineStart: 0, minWidth: 180, background: '#FFFFFF', border: `1px solid ${PIPE.border}`, borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,.08)' }}>
-            {VIEW_FIELDS.map(f => {
-              const shown = config.fields ?? [...VIEW_FIELDS]
-              return (
-                <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', fontSize: 12.5, cursor: 'pointer' }}>
-                  <input type="checkbox" data-view-field={f} checked={shown.includes(f)}
-                    onChange={e => onChange({ ...config, fields: e.target.checked ? [...shown, f] : shown.filter(x => x !== f) })} />
-                  <FieldName f={f} />
-                </label>
-              )
-            })}
-          </div>
-        </details>
-      )}
       <span style={{ flex: 1 }} />
       {filterCount(config) > 0 && <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>{t('filters')} · {filterCount(config)}</span>}
       {editable ? (
@@ -371,11 +375,6 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
       ) : <span data-view-readonly style={{ fontSize: 11.5, color: PIPE.textMuted }}>{t('readOnlyView')}</span>}
     </div>
   )
-}
-
-function FieldName({ f }: { f: string }) {
-  const t = useTranslations('taskSheet')
-  return <>{t(`col.${f as 'brand'}`)}</>
 }
 
 function TabMenu({ at, items, label, onClose }: {

@@ -1,0 +1,179 @@
+<title>Spec 023 Stage A</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;600&display=swap">
+<style>
+/* Layout: one review page; each part pairs the screen (left) with what it does (right), stacking on phones. Momentum's own tokens (constitution §I). */
+:root {
+  --ink: #1B1A13; --muted: #6F7276; --faint: #A3A5A8; --line: #E1E1E0; --soft: #F7F7F5; --panel: #FFFFFF; --bg: #EFEFEC;
+  --lime: #C8F24E; --on-lime: #111111; --sel: #EEF8D3; --coral: #F5334F; --coral-soft: #FDE7EA; --violet: #8F6FE8; --cyan: #3E7BEA; --mint: #2F8F3F;
+  --c-content: #3E7BEA; --c-design: #8F6FE8; --c-video: #1E9E8A; --c-plan: #2AA7D8;
+  --shadow: 0 14px 40px rgba(20,20,16,.10);
+  --display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --arabic: 'Noto Sans Arabic', 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ink: #F1F1EC; --muted: #A2A5A9; --faint: #6E7176; --line: #34363B; --soft: #1C1D20; --panel: #222327; --bg: #151618;
+  --sel: #2F3A17; --coral-soft: #3A1F24; --shadow: 0 14px 40px rgba(0,0,0,.4); color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 900 }
+h2 { font-size: 22px; font-weight: 800 }
+h3 { font-size: 14.5px; font-weight: 800 }
+p { margin: 0 }
+button, input, select { font: inherit; color: inherit }
+button { cursor: pointer }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.lede { max-width: 72ch; font-size: 15px; color: var(--muted) }
+.muted { color: var(--muted) }
+.small { font-size: 12px }
+.ar { font-family: var(--arabic); direction: rtl }
+.jump { display: flex; flex-wrap: wrap; gap: 8px }
+.jump a { text-decoration: none; color: var(--ink); font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel) }
+.jump a:hover { background: var(--sel) }
+section.part { background: var(--panel); border-radius: 18px; padding: 24px; display: grid; gap: 18px; border: 1px solid var(--line) }
+.part-head { display: grid; gap: 6px }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--muted) }
+.pair { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start }
+@media (max-width: 860px) { .pair { grid-template-columns: minmax(0, 1fr) } }
+.frame { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; min-width: 0 }
+.frame-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--soft); flex-wrap: wrap }
+.frame-body { padding: 14px; display: grid; gap: 10px; min-width: 0 }
+.cap { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600 }
+.btn.primary { background: var(--lime); border-color: var(--lime); color: var(--on-lime); font-weight: 800 }
+.btn.dark { background: var(--ink); border-color: var(--ink); color: var(--panel); font-weight: 700 }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden }
+.seg button { border: none; background: var(--panel); padding: 6px 12px; font-size: 12.5px; font-weight: 600 }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel) }
+.note { font-size: 12.5px; color: var(--muted); border-inline-start: 3px solid var(--lime); padding: 2px 0 2px 10px }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block }
+ul.rules { margin: 0; padding-inline-start: 18px; display: grid; gap: 6px; font-size: 13.5px }
+.stages { display: flex; flex-wrap: wrap; gap: 6px }
+.stage { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line) }
+.stage.off { border-style: dashed; color: var(--muted) }
+.mini-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 8px; overflow-x: auto; padding-bottom: 4px }
+.col { background: var(--soft); border-radius: 10px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 110px }
+.col h4 { margin: 0; font-size: 11.5px; font-weight: 700; display: flex; justify-content: space-between; gap: 6px }
+.col h4 small { font-weight: 500; color: var(--muted) }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 9px; font-size: 12.5px; display: grid; gap: 5px }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: 11px }
+.card.ro { opacity: .7 }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); border: 1px solid var(--line) }
+.chip.design { color: var(--c-design) } .chip.video { color: var(--c-video) }
+.chip.unl { border-style: dashed; color: var(--muted) }
+.iconbtn { border: none; background: transparent; color: var(--muted); padding: 0 3px; font-size: 12px; font-weight: 700 }
+.box { border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); background: var(--panel); padding: 16px; display: grid; gap: 12px; max-width: 460px }
+.row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px }
+.row select, .row input, .search { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; background: var(--panel) }
+.opt { display: flex; justify-content: space-between; gap: 10px; padding: 7px 8px; border-radius: 8px; font-size: 13px }
+.opt.hi { background: var(--sel) }
+.opt small { display: block; color: var(--muted); font-size: 11px }
+.map { display: grid; gap: 4px }
+.map-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; padding: 6px 4px; border-top: 1px solid var(--line) }
+.map-row:first-child { border-top: none }
+.orig { font-size: 12px; font-weight: 700; display: inline-flex; gap: 6px; align-items: center }
+.subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.sub { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px 3px 8px; font-size: 12.5px; background: var(--panel) }
+.sub b { font-weight: 600 }
+.add { border: 1px dashed var(--line); background: transparent; border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--muted); font-weight: 600 }
+table.types { width: 100%; border-collapse: collapse; font-size: 13px }
+table.types th, table.types td { text-align: start; padding: 7px 6px; border-top: 1px solid var(--line) }
+table.types th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-top: none }
+.q { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft) }
+.q b { font-size: 13px }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
+.flow .step { padding: 3px 9px; border-radius: 999px; background: var(--sel); font-weight: 700 }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+</style>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">Spec 023 · Stage A design</span>
+    <h1>Task types, fields and milestones</h1>
+    <p class="lede">The screens Stage A adds: the Task types &amp; fields page, the task panel's Fields section, field columns in sheets, the refused move, and milestones on calendars. Admins edit task types; admins and superusers edit fields; everyone else reads.</p>
+  </header>
+
+  <section class="part"><div class="part-head"><span class="tag">Workspace › Task types &amp; fields · Types tab</span><h2>1 · Task types</h2></div>
+    <div class="pair">
+      <div class="frame"><div class="frame-head"><b>Task types</b><span class="seg"><button aria-pressed="true">Types</button><button>Fields</button></span></div>
+        <div class="frame-body">
+          <table class="types"><thead><tr><th>Type</th><th>Arabic</th><th>Default priority</th><th>Boards</th><th>Fields</th></tr></thead><tbody>
+            <tr><td><span class="chip" style="color:#3E7BEA">▣ Post</span></td><td class="ar">منشور</td><td>Normal</td><td>Design</td><td>Caption · Hashtags</td></tr>
+            <tr><td><span class="chip" style="color:#1E9E8A">▶ Reel</span></td><td class="ar">ريل</td><td>High</td><td>Video</td><td>Caption · Duration</td></tr>
+            <tr><td><span class="chip" style="color:#D22040">▤ Report</span></td><td class="ar">تقرير</td><td>Normal</td><td>Design</td><td>Budget</td></tr>
+          </tbody></table>
+          <div class="box" style="max-width:none"><b>Edit · Reel</b>
+            <div class="row"><span>English name</span><input value="Reel"></div>
+            <div class="row"><span>Arabic name</span><input class="ar" value="ريل"></div>
+            <div class="row"><span>Icon</span><span class="stages"><span class="stage">▶</span><span class="stage">▣</span><span class="stage">✉</span><span class="stage">★</span><span class="stage off">…</span></span></div>
+            <div class="row"><span>Colour</span><span class="stages"><span class="dot" style="background:#3E7BEA"></span><span class="dot" style="background:#1E9E8A;outline:2px solid var(--ink)"></span><span class="dot" style="background:#8F6FE8"></span><span class="dot" style="background:#E8772E"></span><span class="dot" style="background:#D22040"></span></span></div>
+            <div class="row"><span>Default priority</span><select><option>High</option></select></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn">Cancel</button><button class="btn primary">Save</button></div>
+          </div>
+        </div></div>
+      <ul class="rules"><li>Today's content types, with their SLA and boards kept; renaming a type renames it on every task.</li><li>The icon and colour show on cards, the Type column and the task panel; Arabic readers see the Arabic name.</li><li>Defaults apply only when the creator doesn't choose.</li><li>Users see this page read-only.</li></ul>
+    </div>
+  </section>
+
+  <section class="part"><div class="part-head"><span class="tag">Workspace › Task types &amp; fields · Fields tab</span><h2>2 · The field library</h2></div>
+    <div class="pair">
+      <div class="frame"><div class="frame-head"><b>Fields</b><button class="btn primary">＋ New field</button></div>
+        <div class="frame-body">
+          <div class="map">
+            <div class="map-row"><span class="orig">Caption <span class="tag">Text</span></span><span class="subs"><span class="sub"><b>Post</b> · required from C-Review</span><span class="sub"><b>Reel</b> · required from C-Review</span><button class="add">＋ Attach</button></span></div>
+            <div class="map-row"><span class="orig">Channels <span class="tag">Multi-choice</span></span><span class="subs"><span class="sub"><b>Post</b> · optional</span><button class="add">＋ Attach</button></span></div>
+            <div class="map-row"><span class="orig">Budget <span class="tag">Money · EGP</span></span><span class="subs"><span class="sub"><b>Report</b> · optional</span><button class="add">＋ Attach</button></span></div>
+          </div>
+          <div class="box" style="max-width:none"><b>Attach Caption to Reel</b>
+            <div class="row"><span>Required</span><select><option>From C-Review</option><option>Optional</option></select></div>
+            <div class="row"><span>Default</span><input placeholder="(none)"></div>
+          </div>
+        </div></div>
+      <ul class="rules"><li>Kinds: text, number, money, date, link, person, choice, multi-choice, checkbox, rating, related task.</li><li>"Required from" is a pipeline stage; Optional is the default.</li><li>Show on cards, and let a brand switch it off, per field.</li><li>Retiring a field hides it and keeps its values.</li></ul>
+    </div>
+  </section>
+
+  <section class="part"><div class="part-head"><span class="tag">Task panel · Content sheet</span><h2>3 · Values on the task, everywhere</h2></div>
+    <div class="pair">
+      <div class="frame"><div class="frame-head"><b>Ramadan teaser</b><span class="chip" style="color:#3E7BEA">▣ Post</span></div>
+        <div class="frame-body"><span class="cap">Fields</span>
+          <div class="row"><span>Caption <span class="tag">needed by C-Review</span></span><input value="Iftar with us this Friday…"></div>
+          <div class="row"><span>Channels</span><span class="stages"><span class="chip">Instagram</span><span class="chip">LinkedIn</span></span></div>
+        </div></div>
+      <div class="frame"><div class="frame-head"><b>Content sheet</b></div>
+        <div class="frame-body"><table class="types"><thead><tr><th>Title</th><th>Type</th><th>Caption</th><th>Budget</th></tr></thead><tbody>
+          <tr><td>Ramadan teaser</td><td>Post</td><td>Iftar with us this Friday…</td><td style="background:repeating-linear-gradient(45deg,var(--soft),var(--soft) 4px,var(--panel) 4px,var(--panel) 8px)" title="Budget isn't a Post field"></td></tr>
+          <tr><td>Q4 report</td><td>Report</td><td style="background:repeating-linear-gradient(45deg,var(--soft),var(--soft) 4px,var(--panel) 4px,var(--panel) 8px)"></td><td>EGP 12,500</td></tr>
+        </tbody></table>
+        <p class="note">A hatched cell: the field isn't one of that type's fields, so it can't be typed into.</p></div></div>
+    </div>
+  </section>
+
+  <section class="part"><div class="part-head"><span class="tag">Every way a task moves</span><h2>4 · A required field stops the move</h2></div>
+    <div class="pair">
+      <div class="frame"><div class="frame-body"><div class="q"><b>Caption is required before C-Review.</b><span>Fill it in the task or the sheet, then move the task again.</span></div>
+        <div class="q"><b>Waiting for Caption</b><span>Design passed D-Check; the content task moves to F-Check once Caption is filled.</span></div></div></div>
+      <ul class="rules"><li>The same message on a drag, the stage menu, typing in a sheet, bulk moves and a linked row.</li><li>Several fields: "Caption and Hashtags are required before C-Review".</li></ul>
+    </div>
+  </section>
+
+  <section class="part"><div class="part-head"><span class="tag">Calendars · admins and superusers add</span><h2>5 · Milestones and status groups</h2></div>
+    <div class="pair">
+      <div class="frame"><div class="frame-body"><div class="mini-board">
+        <div class="col"><h4>Sun 30 Nov</h4><div class="card">Iftar invite cards</div></div>
+        <div class="col"><h4>Mon 1 Dec</h4><span class="chip" style="color:var(--coral)">⚑ Ramadan campaign launch · Forefront</span><div class="card">Launch reel</div></div>
+        <div class="col"><h4>Tue 2 Dec</h4><button class="add">＋ Add milestone</button></div>
+      </div></div></div>
+      <ul class="rules"><li>A milestone is a name, a date and a brand: no stage, no assignee, no SLA.</li><li>Shows on its brand's calendar, Space calendars with that brand's work, and My tasks.</li><li>Lists and filters can group by status group: Not started, Active, Done, Closed.</li></ul>
+    </div>
+  </section>
+</div>

@@ -28,6 +28,8 @@ export const NAV: readonly NavItem[] = [
   // Projects and Capacity are hidden from the bar (their pages still open by
   // address). The weekly Hours report moved onto Working Hours (/overview).
   { href: '/team',     key: 'team',     adminOnly: false },
+  // Spec 023: everyone reads task types and fields; admins and superusers edit.
+  { href: '/task-types', key: 'taskTypes', adminOnly: false },
   { href: '/settings', key: 'settings', adminOnly: true  },
 ] as const
 
@@ -47,6 +49,10 @@ export function navFor(access: AccessLevel): NavItem[] {
  * to the caller and only the geometry is shared.
  */
 export const NAV_ICON: Record<string, React.ReactNode> = {
+  // Task types & fields: a tag with a list.
+  taskTypes: (<>
+    <path d="M3 5a2 2 0 0 1 2-2h6l10 10-8 8L3 11z" /><circle cx="8" cy="8" r="1.5" />
+  </>),
   // Working Hours: a clock with a tick, hours logged.
   overview: (<>
     <path d="M21 12a9 9 0 1 0-9.3 9" /><path d="M12 7v5l3 2" /><path d="m15.5 19 2 2 4-4" />

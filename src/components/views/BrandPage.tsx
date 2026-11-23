@@ -29,7 +29,7 @@ import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
 import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
-import { viewTasks, viewOptions, type BoardData } from './types'
+import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData } from './types'
 
 export type BrandFolderSlug = 'calendar' | 'assets' | 'sheet' | 'library'
 const FOLDER_KEY = { calendar: 'cal', assets: 'assets', sheet: 'sheet', library: 'lib' } as const
@@ -52,6 +52,8 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   const themeScope = useMemo(() => (th: ContentTheme) => (brandId ? th.brand_id === brandId : !th.brand_id), [brandId])
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)
+  // Spec 023: custom fields and their values, for List rows.
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes }), [data])
   const campaigns = [...new Map(all.filter(x => x.project).map(x => [x.project!.id, x.project!])).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
   const folderName = folder ? t(`folders.${FOLDER_KEY[folder]}`) : null
@@ -71,7 +73,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
         render={tab => tab === 'board'
           ? <BoardView data={data} scopeTasks={scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
           : withPanel(tab === 'list'
-            ? <ListView tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
+            ? <ListView custom={custom} tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
             : <CalendarView tasks={all.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" />)} />
     )
   }
@@ -90,7 +92,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
       <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('libraryLede')}
         tabs={[{ key: 'gallery', label: tv('gallery') }, { key: 'list', label: tv('list') }]}
         render={tab => withPanel(tab === 'list'
-          ? <ListView tasks={published} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
+          ? <ListView custom={custom} tasks={published} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
           : <BrandLibrary tasks={published} color={color} onOpen={open} />)} />
     )
   }
@@ -113,21 +115,22 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
       node={brandId ? `brand:${brandId}` : undefined}
       viewTypes={['list', 'board', 'sheet', 'calendar', 'workload']}
       options={viewOptions(data, all, { brand: true })}
+      fields={fieldsSetup(data, all)}
       lead={data.currentUser.access !== 'user'}
-      render={(tab, view) => {
+      render={(tab, view, shownKeys) => {
         const shownTasks = view ? applyView(all, view.config) : all
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
-        if (tab === 'board') return <BoardView key={view?.id} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
+        if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
         return withPanel(tab === 'sheet'
           ? (brandId
             ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
-                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
-            : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={view?.config.fields} label={name} />)
+                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+            : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} label={name} />)
           : tab === 'calendar'
             ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)
+              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)
       }} />
   )
 }

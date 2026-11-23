@@ -9,11 +9,40 @@ import type { MediaBoard, StageId } from '@/types/index'
 import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/media'
 import { addSpaces } from '@/lib/spaces-server'
 import { allowedStages } from '@/lib/stage-moves'
+import { missingRequired } from '@/lib/task-fields'
+import { mapTaskField, mapTypeField } from '@/lib/mappers'
 import { notify, notifyAfter } from '@/lib/notify/notify'
 
 type Db = PrismaClient | Prisma.TransactionClient
 const ORDER: StageId[] = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
 const STAGE_AT = (s: string) => ORDER.indexOf(s as StageId)
+
+/**
+ * Spec 023 (FR-008, R4): the fields that stop `task` moving to `target` — attached
+ * to its type, required from a stage at or before `target`, and empty. One query
+ * set per call; every move path calls it before moving.
+ */
+export async function requiredGate(
+  task: { id: string; content_type_label: string | null; media_board?: string | null },
+  target: StageId,
+  db: Db = prisma,
+): Promise<{ missing: string[]; missing_ar: string[]; stage: StageId } | null> {
+  if (!task.content_type_label) return null
+  const links = (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label, required_from: { not: null } } })).map(mapTypeField)
+  if (!links.length) return null
+  const fields = (await db.taskField.findMany({ where: { id: { in: links.map(l => l.field_id) } } })).map(mapTaskField)
+  const values = await db.taskFieldValue.findMany({ where: { task_id: task.id, field_id: { in: links.map(l => l.field_id) } }, select: { task_id: true, field_id: true, value: true } })
+  const missing = missingRequired(task, target, links, fields, values)
+  if (!missing.length) return null
+  const order = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
+  const stage = missing.map(f => links.find(l => l.field_id === f.id)!.required_from as StageId).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0]
+  return { missing: missing.map(f => f.name_en), missing_ar: missing.map(f => f.name_ar || f.name_en), stage }
+}
+
+/** The refusal every move path returns for `requiredGate` (spec 023 FR-008). */
+export function requiredRefusal(req: { missing: string[]; missing_ar: string[]; stage: StageId }) {
+  return { error: 'required_fields' as const, missing: req.missing, missing_ar: req.missing_ar, requiredStage: req.stage }
+}
 
 /** Why the media rules refuse moving `task` to `target`, or null. */
 export async function mediaGate(
@@ -46,6 +75,11 @@ export async function syncContent(contentTaskId: string, actorId: string): Promi
   let stage = content.status as StageId
   if (waiting && waiting !== stage) stage = waiting
   else if (!waiting && STAGE_AT(stage) < STAGE_AT('final-check')) stage = 'final-check'
+  // Spec 023 (R4): a forward move waits while a field required by then is empty ("Waiting for Caption").
+  if (stage !== content.status && STAGE_AT(stage) > STAGE_AT(content.status)) {
+    const full = await prisma.task.findUnique({ where: { id: content.id }, select: { id: true, content_type_label: true } })
+    if (full && await requiredGate(full, stage)) stage = content.status as StageId
+  }
   if (stage !== content.status) {
     await prisma.task.update({ where: { id: content.id }, data: { status: stage, stage_date: new Date(), updated_at: new Date() } })
     await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId, taskId: content.id }))
@@ -71,13 +105,15 @@ export async function moveThroughMedia(
   content: { id: string; media_board: string | null },
   target: StageId,
   member: Parameters<typeof allowedStages>[1] & { id: string },
-): Promise<{ success: true; moved: number } | { success: false; error: string; board?: string } | null> {
+): Promise<{ success: true; moved: number } | { success: false; error: string; board?: string; missing?: string[]; requiredStage?: StageId } | null> {
   if (content.media_board) return null
   const linked = await prisma.task.findMany({ where: { content_task_id: content.id, dropped_at: null, media_board: { not: null } } })
   const open = linked.filter(m => !passedDCheck(m))
   if (!open.length) return null
   if (STAGE_AT(target) < STAGE_AT('r-design')) return { success: false, error: 'follows_media' }
   if (STAGE_AT(target) > STAGE_AT('final-check')) return { success: false, error: 'waiting_on_media' }
+  const req = await requiredGate({ id: content.id, content_type_label: (await prisma.task.findUnique({ where: { id: content.id }, select: { content_type_label: true } }))?.content_type_label ?? null }, target)
+  if (req) return { success: false, ...requiredRefusal(req) } as never
   const toMove = open.filter(m => m.status !== target)
   for (const m of toMove) {
     if (!allowedStages(m as never, member).includes(target)) return { success: false, error: 'not_authorized', board: m.media_board ?? undefined }

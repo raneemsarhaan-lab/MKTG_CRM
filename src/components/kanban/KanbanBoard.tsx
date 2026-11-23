@@ -57,6 +57,8 @@ import { BulkBar, type BulkPatch } from './BulkBar'
 import { TaskLinkNames, TaskLinksSection, linkNamesByTask, taskLinkFields } from './TaskLinks'
 import { TaskForm } from '@/components/shared/TaskForm'
 import { handoffRequest } from '@/components/handoff/request'
+import { useMoveError } from '@/components/fields/moveErrors'
+import { CardFieldsProvider } from '@/components/fields/CardFields'
 
 type FullTask = Task & {
   brand: Brand
@@ -66,6 +68,10 @@ type FullTask = Task & {
 }
 
 interface KanbanBoardProps {
+  /** Spec 023: custom fields for cards (the field library, attachments, values). */
+  taskFields?: import('@/types/index').TaskFieldDef[]
+  typeFields?: import('@/types/index').TaskTypeFieldLink[]
+  fieldValues?: import('@/types/index').TaskFieldValueRow[]
   initialTasks: FullTask[]
   currentUser: Member
   members: Member[]
@@ -125,7 +131,16 @@ interface KanbanBoardProps {
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
 
-export function KanbanBoard({
+export function KanbanBoard(props: KanbanBoardProps) {
+  const names = useMemo(() => new Map(props.initialTasks.map(x => [x.id, x.name])), [props.initialTasks])
+  return (
+    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)}>
+      <KanbanBoardInner {...props} />
+    </CardFieldsProvider>
+  )
+}
+
+function KanbanBoardInner({
   initialTasks,
   currentUser,
   members,
@@ -193,6 +208,7 @@ export function KanbanBoard({
   const openHandoff    = useUIStore(s => s.openHandoff)
   const tSpaces        = useTranslations('spaces')
   const tMedia         = useTranslations('media')
+  const moveErr        = useMoveError()
   const tSheet         = useTranslations('taskSheet')
   const tViews         = useTranslations('views')
   const tHandoff       = useTranslations('handoff')
@@ -424,7 +440,7 @@ export function KanbanBoard({
         startTransition(async () => {
           const res = await moveTo(dragged, toStage)
           if (res.success) await ss.sub({ ...dragged, status: toStage }, entry)
-          else if (res.error !== 'needs_handoff') setDragError(['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '') ? tMedia(res.error as 'follows_media') : 'Could not move that task')
+          else if (res.error !== 'needs_handoff') setDragError(moveErr(res) ?? 'Could not move that task')
         })
         return
       }
@@ -458,8 +474,7 @@ export function KanbanBoard({
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
-            : ['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '') ? tMedia(res.error as 'follows_media')
-            : 'Could not move that task',
+            : moveErr(res) ?? 'Could not move that task',
         )
       }
     })

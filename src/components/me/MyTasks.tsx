@@ -20,7 +20,7 @@ import { CalendarView } from '@/components/views/CalendarView'
 import { TaskPanel } from '@/components/views/TaskPanel'
 import { TaskSheet } from '@/components/views/TaskSheet'
 import { NodeWorkbook } from '@/components/views/NodeWorkbook'
-import { viewTasks, viewOptions, type BoardData, type ViewTask } from '@/components/views/types'
+import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData, type ViewTask } from '@/components/views/types'
 import { applyView } from '@/lib/view-config'
 
 type Show = 'all' | 'assigned' | 'handed'
@@ -41,6 +41,8 @@ export function MyTasks({ data }: { data: BoardData }) {
   }, [me, show])
   const tasks = viewTasks(data).filter(x => !x.dropped_at && scope(x))
   const open = (id: string) => selectTask(id)
+  // Spec 023: custom fields and their values, for List rows.
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes }), [data])
 
   const baseGroups: [string, ViewTask[]][] = [
     [t('working'), tasks.filter(x => x.assignee_id === me && !finished(x))],
@@ -75,7 +77,8 @@ export function MyTasks({ data }: { data: BoardData }) {
       node="me"
       viewTypes={['list', 'calendar', 'board', 'sheet']}
       options={viewOptions(data, tasks)}
-      render={(tab, view) => {
+      fields={fieldsSetup(data, tasks)}
+      render={(tab, view, shownKeys) => {
         // A saved view: the same groups, narrowed and ordered by the view.
         const ids = view ? new Set(applyView(tasks, view.config).map(x => x.id)) : null
         const order = view ? applyView(tasks, view.config).map(x => x.id) : null
@@ -85,14 +88,14 @@ export function MyTasks({ data }: { data: BoardData }) {
         // FR-013b: the same groups as the List, with a private My notes column.
         // T081: My tasks' Sheet is my own workbook: the Tasks tab (with My notes), then my blank tabs.
         if (tab === 'sheet') return <><NodeWorkbook key={view?.id} data={data} node="me"
-          linked={<TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={view?.config.fields} sheetKey={`tasks:me:${data.currentUser.id}`} label={t('title')} />} /><TaskPanel data={data} /></>
+          linked={<TaskSheet data={data} tasks={tasks} groups={groups.filter(([, g]) => g.length)} notes fields={shownKeys} sheetKey={`tasks:me:${data.currentUser.id}`} label={t('title')} />} /><TaskPanel data={data} /></>
         if (tab === 'calendar') return <><CalendarView tasks={ids ? tasks.filter(x => ids.has(x.id)) : tasks} brands={data.brands} colorBy="brand" onOpen={open} /><TaskPanel data={data} /></>
         return (
           <div data-my-tasks>
             {groups.filter(([, g]) => g.length).map(([label, g]) => (
               <section key={label} data-my-group={label}>
                 <h2 style={{ margin: '16px 38px 0', fontSize: 12, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: PIPE.textMuted }}>{label} · {g.length}</h2>
-                <ListView tasks={g} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand onOpen={open} />
+                <ListView fields={shownKeys} custom={custom} tasks={g} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand onOpen={open} />
               </section>
             ))}
             <TaskPanel data={data} />

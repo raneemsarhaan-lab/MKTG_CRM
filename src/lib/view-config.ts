@@ -13,6 +13,29 @@ export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'camp
 export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
 export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'due', 'type', 'priority', 'platform'] as const
 
+/** Spec 023: a custom field shows as `f:<field id>` beside the standard fields. */
+export const CUSTOM_FIELD = /^f:[0-9a-f-]{36}$/i
+export const isFieldKey = (x: string) => (VIEW_FIELDS as readonly string[]).includes(x) || CUSTOM_FIELD.test(x)
+
+/**
+ * The fields a Board, List or Sheet shows (user, 2026-11-23: "a button called
+ * Fields — the standard ones + the custom ones + '+ Field'"). A choice saved
+ * for the tab wins; without one every standard field shows, and the custom
+ * fields of the task types on the page (on a Board, those marked "show on cards").
+ */
+export function shownFields(
+  saved: string[] | null | undefined,
+  view: 'board' | 'list' | 'sheet' | string,
+  custom: { id: string; on_card: boolean; retired: boolean }[],
+  typesOnPage: Set<string>,
+  links: { type_label: string; field_id: string }[],
+): string[] {
+  const live = new Set(custom.filter(f => !f.retired).map(f => `f:${f.id}`))
+  if (saved) return saved.filter(k => !CUSTOM_FIELD.test(k) || live.has(k))
+  const onPage = custom.filter(f => !f.retired && links.some(l => l.field_id === f.id && typesOnPage.has(l.type_label)) && (view !== 'board' || f.on_card))
+  return [...VIEW_FIELDS, ...onPage.map(f => `f:${f.id}`)]
+}
+
 export interface ViewConfig {
   filters: Partial<Record<ViewFilterKey, string[]>>
   group: ViewGroup | null
@@ -31,7 +54,7 @@ export function cleanConfig(raw: unknown): ViewConfig {
   const f = o.filters && typeof o.filters === 'object' ? o.filters as Record<string, unknown> : {}
   const filters: ViewConfig['filters'] = {}
   for (const k of VIEW_FILTERS) { const v = strings(f[k]); if (v.length) filters[k] = v }
-  const fields = o.fields === null || o.fields === undefined ? null : strings(o.fields).filter(x => (VIEW_FIELDS as readonly string[]).includes(x))
+  const fields = o.fields === null || o.fields === undefined ? null : strings(o.fields).filter(isFieldKey)
   return {
     filters,
     group: o.group === 'stage' || o.group === 'brand' ? o.group : null,
@@ -75,14 +98,21 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
 export const filterCount = (c: ViewConfig) => Object.values(c.filters).reduce((n, v) => n + (v?.length ? 1 : 0), 0)
 
 /** A member's tab choices on one page (spec 021): home view, pinned tabs first, hidden tabs tucked away. */
-export interface TabPrefs { home: string | null; pinned: string[]; hidden: string[] }
+export interface TabPrefs {
+  home: string | null; pinned: string[]; hidden: string[]
+  /** Spec 023: the fields each built-in tab shows for this member (tab key → field keys). */
+  fields?: Record<string, string[]>
+}
 export const EMPTY_TAB_PREFS: TabPrefs = { home: null, pinned: [], hidden: [] }
 
 export function cleanTabPrefs(raw: unknown): TabPrefs {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
   const keys = (v: unknown) => strings(v, 60).slice(0, 40)
   const pinned = keys(o.pinned)
-  return { home: typeof o.home === 'string' && o.home.length <= 60 ? o.home : null, pinned, hidden: keys(o.hidden).filter(k => !pinned.includes(k)) }
+  const fields: Record<string, string[]> = {}
+  const f = o.fields && typeof o.fields === 'object' && !Array.isArray(o.fields) ? o.fields as Record<string, unknown> : {}
+  for (const [k, v] of Object.entries(f).slice(0, 20)) if (k.length <= 60 && Array.isArray(v)) fields[k] = strings(v).filter(isFieldKey)
+  return { home: typeof o.home === 'string' && o.home.length <= 60 ? o.home : null, pinned, hidden: keys(o.hidden).filter(k => !pinned.includes(k)), ...(Object.keys(fields).length ? { fields } : {}) }
 }
 
 /** Tab order: pinned first (in pin order), then the rest in their own order; hidden ones left out. */

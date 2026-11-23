@@ -37,6 +37,8 @@ import { matchSpaceStage } from '@/lib/space-stages'
 import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
 import { stagesForSpace } from '@/lib/space-stages'
 import { FEATURE_OFF_CELL, offFeatureFor } from '@/lib/brand-features'
+import { applies, fieldName, formatValue, isEmpty, parseValue } from '@/lib/task-fields'
+import { setFieldValue } from '@/actions/task-fields'
 import { formatDay, isOverdue } from '@/lib/due-dates'
 import { ManualMark } from '@/components/shared/DueDates'
 import { useMediaLinks } from '@/components/media/MediaLinks'
@@ -55,6 +57,7 @@ import { useGridTips } from '@/components/sheet/useGridTips'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { FIELDS_OPEN, PresetFieldsDrawer, type PresetRow } from '@/components/sheets/links/FieldsPanel'
 import { viewTasks, type BoardData, type ViewTask } from './types'
+import { useMoveError } from '@/components/fields/moveErrors'
 
 type Row =
   | { key: string; kind: 'group'; label: string; count: number }
@@ -89,6 +92,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const tFeat = useTranslations('spaces.features')
   const tDates = useTranslations('dates')
   const tMedia = useTranslations('media')
+  const tFields = useTranslations('fields')
+  const moveErr = useMoveError()
   const locale = useLocale()
   const router = useRouter()
   const selectTask = useUIStore(s => s.selectTask)
@@ -145,7 +150,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const bundle = useColumnsBundle(data.sheetColumns, data.sheetValues, me)
   const cl = useSheetColumns({
     sheet, set: 'all', bundle, me, members: data.members,
-    defaultName: key => (key === NOTES ? t('col.notes') : t(`col.${key as 'title'}`)),
+    defaultName: key => (key === NOTES ? t('col.notes') : key.startsWith('f:') ? (() => { const f = data.taskFields.find(x => x.id === key.slice(2)); return f ? fieldName(f, locale) : '' })() : t(`col.${key as 'title'}`)),
     canEdit: task => may(task as ViewTask), say: sayNow,
     onNote: (k, n) => setCellNotes(c => ({ ...c, [k]: n ?? undefined })),
     // Spec 021: Task link fields pick from every task, and create in a Space.
@@ -156,11 +161,22 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     },
   })
   const isCustom = (col: GridCol) => cl.custom.is(col)
+  // ── spec 023: task fields as columns `f:<id>` (the page's Fields button picks them) ──
+  const fieldById = useMemo(() => new Map(data.taskFields.filter(f => !f.retired).map(f => [f.id, f])), [data.taskFields])
+  const isField = (col: GridCol) => typeof col === 'string' && col.startsWith('f:') && fieldById.has(col.slice(2))
+  const fieldOf = (col: GridCol) => fieldById.get(String(col).slice(2))!
+  const fieldCols = (fields ?? []).filter(k => k.startsWith('f:') && fieldById.has(k.slice(2))) as GridCol[]
+  const baseValues = useMemo(() => new Map(data.fieldValues.map(v => [`${v.task_id}|${v.field_id}`, v.value])), [data.fieldValues])
+  const [fieldOver, setFieldOver] = useState<Record<string, unknown>>({})
+  useEffect(() => { setFieldOver({}) }, [data.fieldValues])
+  const fieldValue = (x: ViewTask, col: GridCol) => { const k = `${x.id}|${String(col).slice(2)}`; return k in fieldOver ? fieldOver[k] : baseValues.get(k) }
+  const fieldApplies = (x: ViewTask, col: GridCol) => applies(x.content_type_label, String(col).slice(2), data.typeFields)
   // Spec 022 (R19): Link task is on content-side sheets, not on the Design and Video boards' own sheets.
   const mediaSpace = /^tasks:space:/.test(sheet) && !!data.spaces.find(sp => `tasks:space:${sp.id}` === sheet)?.media_board
   const ml = useMediaLinks({ tasks: viewTasks(data), onOpenTask: id => selectTask(id), say: sayNow })
   const cols: GridCol[] = [
     ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(c === 'media' && mediaSpace) && (c === 'title' || c === 'media' || isCustom(c) || !fields || fields.includes(c))),
+    ...fieldCols,
     ...(notes ? [NOTES] : []),
   ]
 
@@ -168,6 +184,11 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const viewRef = useRef<LinkedView>({})
   const shown = (x: ViewTask, col: GridCol): string => {
     if (isCustom(col)) return cl.custom.textValue(x as unknown as Task, col)
+    if (isField(col)) {
+      if (!fieldApplies(x, col)) return ''
+      const v = fieldValue(x, col)
+      return isEmpty(v) ? '' : formatValue(fieldOf(col), v, { locale, memberName: id => memberName.get(id), taskName: id => viewTasks(data).find(y => y.id === id)?.name })
+    }
     if (col === 'media') return x.media_board ? '' : ml.text(x)
     // Spec 021 (US4): a field the task's brand has switched off shows nothing (its value is kept).
     if (offFeatureFor(x.brand, col)) return ''
@@ -240,6 +261,18 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     }
     if (isCustom(col)) return cl.custom.commit(x as unknown as Task, col, value)
     if (!may(x)) return t('readOnly')
+    if (isField(col)) {
+      const f = fieldOf(col)
+      if (!fieldApplies(x, col)) return tFields('notApplicable')
+      const p = parseValue(f, value)
+      if (!p.ok) return tFields('badValue', { field: fieldName(f, locale) })
+      const k = `${x.id}|${f.id}`
+      setFieldOver(o => ({ ...o, [k]: p.value }))
+      const r = await setFieldValue(x.id, f.id, value).catch(() => ({ success: false as const, error: 'generic' }))
+      if (!r.success) { setFieldOver(o => { const n = { ...o }; delete n[k]; return n }); return t('notSaved', { reason: r.error ?? 'generic' }) }
+      router.refresh()
+      return null
+    }
     if (offFeatureFor(x.brand, col)) return tFeat('hidden', { brand: x.brand?.name ?? '' })
     switch (col) {
       case 'title':
@@ -301,7 +334,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
           const req = handoffRequest(res, x, data.spaces, data.taskSpaces, data.members, tSpaces)
           if (req) { openHandoff(req); return null }
         }
-        if (['waiting_on_media', 'follows_content', 'follows_media'].includes(res.error ?? '')) return tMedia(res.error as 'follows_media')
+        const known = moveErr(res)
+        if (known) return known
         return res.error === 'not_authorized' || res.error === 'stage_not_in_pipeline' ? t('notAllowed', { stage: stageWord(to) }) : t('notSaved', { reason: res.error ?? 'generic' })
       }
     }
@@ -319,15 +353,15 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
 
   // Row numbers count tasks only; group rows show none.
   const numbers = useMemo(() => { let n = 0; return new Map(baseRows.filter(r => r.kind === 'task').map(r => [r.key, ++n])) }, [baseRows])
-  const headerText = (col: GridCol) => (isCustom(col) ? cl.header(col)?.text ?? '' : cl.nameOf(col) || t(`col.${col as 'title'}`))
+  const headerText = (col: GridCol) => (isCustom(col) ? cl.header(col)?.text ?? '' : isField(col) ? fieldName(fieldOf(col), locale) : cl.nameOf(col) || t(`col.${col as 'title'}`))
 
   const model: GridModel<Row> = {
     rows: baseRows,
     cols,
-    widths: { ...cl.widths, [NOTES]: 260 },
+    widths: { ...cl.widths, [NOTES]: 260, ...Object.fromEntries(fieldCols.map(c => [c, 170])) },
     rowNoWidth: ROW_NO_WIDTH,
     label,
-    header: col => ({ text: headerText(col), className: col === NOTES ? 'is-mine' : undefined }),
+    header: col => ({ text: headerText(col), className: col === NOTES ? 'is-mine' : isField(col) ? 'is-task-field' : undefined }),
     ...(inWorkbook ? cl.grid : {}),
     tailHeader: inWorkbook
       ? <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
@@ -341,7 +375,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     }),
     rowLabel: row => numbers.get(row.key) ?? '',
     cellRole: (_row, col) => (col === 'title' ? 'rowheader' : 'gridcell'),
-    cellClass: (_row, col) => ['fx-sheet-td', `is-${col}`, col === 'rowNo' ? 'is-frozen-no' : '', col === 'title' ? 'is-frozen-title' : '', isCustom(col) ? `is-custom ${cl.custom.cellClass(col)}` : ''].filter(Boolean).join(' '),
+    cellClass: (_row, col) => ['fx-sheet-td', isField(col) ? 'is-task-field' : `is-${col}`, col === 'rowNo' ? 'is-frozen-no' : '', col === 'title' ? 'is-frozen-title' : '', isCustom(col) ? `is-custom ${cl.custom.cellClass(col)}` : ''].filter(Boolean).join(' '),
     isText,
     textValue: (row, col) => (row.kind === 'task' ? shown(row.task, col) : ''),
     isMenu,
@@ -390,6 +424,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
       if (!may(row.task)) return t('readOnly')
+      if (isField(col) && !fieldApplies(row.task, col)) return tFields('notApplicable')
       if (offFeatureFor(row.task.brand, col)) return tFeat('hidden', { brand: row.task.brand?.name ?? '' })
       return null
     },
@@ -456,6 +491,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     // Spec 021 (US4): a switched-off field is a hatched, empty cell in a mixed view.
     cellStyle: (row: Row, col: GridCol) => {
       const fx = lf.cellStyle(row, col)
+      // Spec 023: a task field the row's type doesn't have is hatched and refuses typing.
+      if (row.kind === 'task' && isField(col) && !fieldApplies(row.task, col)) return { cell: { ...(fx?.cell ?? {}), ...FEATURE_OFF_CELL }, text: fx?.text ?? null, border: fx?.border ?? null }
       if (row.kind !== 'task' || !offFeatureFor(row.task.brand, col)) return fx
       return { cell: { ...(fx?.cell ?? {}), ...FEATURE_OFF_CELL }, text: fx?.text ?? null, border: fx?.border ?? null }
     }, cellIcon: lf.cellIcon, onSelect: lf.onSelect, onAreasNotice: lf.onAreasNotice, marked: lf.marked, headerExtra: lf.headerExtra,

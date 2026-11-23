@@ -110,6 +110,7 @@ model Brand {
   sheet_folder SheetFolder?
 
   @@map("brands")
+  milestones  Milestone[]
 }
 
 /// A planned piece of work, from the Aspiring / Focus plan.
@@ -218,6 +219,15 @@ model ContentType {
   created_at DateTime @default(now()) @db.Timestamptz(6)
   /// Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design.
   media_boards String[] @default(["design"])
+  /// Spec 023 (R1): a task type — its Arabic name, icon, colour and defaults.
+  name_ar             String?
+  icon                String   @default("doc")
+  color               String   @default("#6B7280")
+  default_priority    String?
+  default_tag_ids     String[] @default([]) @db.Uuid
+  default_template_id String?  @db.Uuid
+  position            Int      @default(0)
+  type_fields         TaskTypeField[]
 
   tasks      Task[]      @relation("TaskContentType")
   sla_config SlaConfig[]
@@ -384,6 +394,7 @@ model Task {
   content_task       Task?             @relation("MediaTasks", fields: [content_task_id], references: [id], onDelete: SetNull)
   media_tasks        Task[]            @relation("MediaTasks")
   space_stages       TaskSpaceStage[]
+  field_values       TaskFieldValue[]
 
   /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
   @@unique([content_task_id, media_board])
@@ -1219,4 +1230,73 @@ model SavedView {
 
   @@index([node, owner_id])
   @@map("saved_views")
+}
+
+/// Spec 023 (R2): the workspace field library. Values belong to the task.
+model TaskField {
+  id          String    @id @default(uuid()) @db.Uuid
+  name_en     String
+  name_ar     String?
+  /// text · number · money · date · link · person · choice · multi · checkbox · rating · task
+  kind        String
+  /// Choice options [{id, en, ar, color}], money currency, rating max.
+  options     Json      @default("{}")
+  on_card     Boolean   @default(false)
+  switchable  Boolean   @default(false)
+  position    Int       @default(0)
+  retired_at  DateTime? @db.Timestamptz(6)
+  created_by  String?   @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  attachments TaskTypeField[]
+  values      TaskFieldValue[]
+
+  @@map("task_fields")
+}
+
+/// Spec 023: a field attached to a task type, optional or required from a stage.
+model TaskTypeField {
+  type_label    String
+  field_id      String  @db.Uuid
+  /// A pipeline stage id; null = optional.
+  required_from String?
+  default_value Json?
+  position      Int     @default(0)
+
+  type  ContentType @relation(fields: [type_label], references: [label], onDelete: Cascade, onUpdate: Cascade)
+  field TaskField   @relation(fields: [field_id], references: [id], onDelete: Cascade)
+
+  @@id([type_label, field_id])
+  @@map("task_type_fields")
+}
+
+/// Spec 023: a task's value for a field.
+model TaskFieldValue {
+  task_id    String   @db.Uuid
+  field_id   String   @db.Uuid
+  value      Json
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  task  Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  field TaskField @relation(fields: [field_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, field_id])
+  @@index([field_id])
+  @@map("task_field_values")
+}
+
+/// Spec 023 (R6): a calendar marker for a brand — not a task.
+model Milestone {
+  id         String   @id @default(uuid()) @db.Uuid
+  brand_id   String   @db.Uuid
+  name       String
+  day        DateTime @db.Date
+  created_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+
+  @@index([day])
+  @@map("milestones")
 }

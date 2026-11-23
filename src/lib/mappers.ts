@@ -74,7 +74,29 @@ export function mapSpaceStage(r: any): import('@/types/index').SpaceStage {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapContentType(ct: any): ContentType {
-  return { id: ct.id, label: ct.label }
+  return {
+    id: ct.id, label: ct.label, media_boards: ct.media_boards,
+    name_ar: ct.name_ar ?? null, icon: ct.icon ?? 'doc', color: ct.color ?? '#6B7280',
+    default_priority: ct.default_priority ?? null, default_tag_ids: ct.default_tag_ids ?? [],
+    default_template_id: ct.default_template_id ?? null, position: ct.position ?? 0,
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapTaskField(f: any): import('@/types/index').TaskFieldDef {
+  const o = (f.options && typeof f.options === 'object' ? f.options : {}) as import('@/types/index').TaskFieldDef['options']
+  return { id: f.id, name_en: f.name_en, name_ar: f.name_ar ?? null, kind: f.kind, options: o, on_card: !!f.on_card, switchable: !!f.switchable, position: f.position ?? 0, retired: !!f.retired_at }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapTypeField(x: any): import('@/types/index').TaskTypeFieldLink {
+  return { type_label: x.type_label, field_id: x.field_id, required_from: x.required_from ?? null, default_value: x.default_value ?? null, position: x.position ?? 0 }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mapMilestone(m: any): import('@/types/index').Milestone {
+  const d = m.day instanceof Date ? m.day.toISOString().slice(0, 10) : String(m.day).slice(0, 10)
+  return { id: m.id, brand_id: m.brand_id, name: m.name, day: d }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

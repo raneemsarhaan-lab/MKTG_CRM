@@ -1,5 +1,7 @@
 # Research: Task Types and Fields
 
+> **2026-11-23 — gates.** The user said "continue until you finish": that is the go for T001 (spec 022 treated as shipped on this branch) and for building each stage without stopping at the design gates. The designs are still published for review — Stage A: https://claude.ai/artifact/6jNNspCsA5Ek33WoQkv7c9 (`design/023-stage-a.html`) — and any change the user asks for is applied afterwards.
+
 Decisions behind the plan. User decisions (D1–D18, Milestone, D14) are recorded in `design/task-fields-methodology.html`; the items below settle how to build them.
 
 ## R1. Task types are the content types, extended
