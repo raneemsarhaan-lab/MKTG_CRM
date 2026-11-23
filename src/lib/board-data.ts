@@ -5,6 +5,7 @@
  *
  * Server-only: it reads the database directly.
  */
+import { setWorkWeekend } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { cleanFeatures, withResolvedFeatures } from '@/lib/brand-features'
 import { cairoToday, dayDate, ruleFromSettings } from '@/lib/due-dates'
@@ -123,7 +124,7 @@ export async function loadBoardData(member: SessionMember) {
     // This member's sort per board; a missing board means due date (the default).
     boardSorts: (prefs?.board_sorts ?? {}) as Record<string, string>,
     // The due-date rule (Settings › Due Dates).
-    dueRule: ruleFromSettings(ws),
+    dueRule: (() => { const r = ruleFromSettings(ws); setWorkWeekend(r.weekend); return r })(),
     contentTypes: contentTypes.map(ct => ({ id: ct.id, label: ct.label, media_boards: ct.media_boards })),
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],

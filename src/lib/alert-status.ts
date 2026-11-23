@@ -20,15 +20,21 @@ import { businessDaysBetween, calDaysBetween } from '@/lib/utils'
 export function getAlertStatus(
   task: Task,
   slaConfig: SLAConfig,
-  today: Date
+  today: Date,
+  /** Settings › Due Dates weekend (spec 022 R12); Friday and Saturday by default. */
+  weekend?: number[],
 ): AlertStatus {
   // Spec 021 (US5, FR-024): a simple task has no SLA, so it is never at risk or breached.
   if ((task as { kind?: string }).kind === 'simple') return 'On Track'
   // Spec 021 (US4): a brand with SLA tracking off has no badges and no breaches.
   if (!featureOn((task as { brand?: { features?: BrandFeatures } }).brand, 'sla')) return 'On Track'
+  // Spec 022 (US6): a task made on a media board has no SLA for the stages before it started.
+  const ORDER = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
+  const entry = (task as { entry_stage?: string | null }).entry_stage
+  if (entry && ORDER.indexOf(task.status) < ORDER.indexOf(entry)) return 'On Track'
   const stageDate = new Date(task.stage_date)
 
-  const stageDays = businessDaysBetween(stageDate, today)
+  const stageDays = businessDaysBetween(stageDate, today, weekend)
   const slaLimit  = slaConfig[task.status]?.[task.content_type_label] ?? 1
 
   // Imported tasks may have no deadline. Absent a due date nothing can be

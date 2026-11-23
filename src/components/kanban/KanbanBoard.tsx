@@ -10,6 +10,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId, TeamSpace, SpaceMember, TaskSpace as TaskSpaceRow, SpaceStage, TaskSpaceStage } from '@/types/index'
 import { useSpaceStages } from '@/components/spaces/useSpaceStages'
+import { setWorkWeekend } from '@/lib/utils'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
@@ -154,6 +155,8 @@ export function KanbanBoard({
   spaceStages = [],
   taskSpaceStages = [],
 }: KanbanBoardProps) {
+  // Spec 022 (US6): SLA days count the Settings weekend.
+  setWorkWeekend(dueRule?.weekend)
   const embedded = surface === 'sheets'
   /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
   const hosted = surface === 'view'

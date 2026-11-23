@@ -7,6 +7,7 @@
  * Handed off. The List groups them as Working on, Handed off · I own it,
  * Planning and Published.
  */
+import { setWorkWeekend } from '@/lib/utils'
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
@@ -26,6 +27,7 @@ type Show = 'all' | 'assigned' | 'handed'
 const finished = (t: Task) => t.status === 'publish'
 
 export function MyTasks({ data }: { data: BoardData }) {
+  setWorkWeekend(data.dueRule?.weekend)
   const t = useTranslations('me')
   const tv = useTranslations('views')
   const ts = useTranslations('spaces')

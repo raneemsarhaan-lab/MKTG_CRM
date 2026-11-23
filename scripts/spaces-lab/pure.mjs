@@ -124,6 +124,21 @@ check('pure-assignee-change-drops', () => {
   eq(m.spacesToDropOnAssigneeChange(rows, [], ['c']), [], 'nothing of the old assignee: nothing goes')
 })
 
+check('pure-sla-days', () => {
+  // Spec 022 US6: working days on Cairo days, weekend from Settings (Friday and Saturday by default).
+  const thu = new Date('2026-11-19T09:00:00+02:00'), sun = new Date('2026-11-22T09:00:00+02:00')
+  eq(m.businessDaysBetween(thu, sun, [5, 6]), 1, 'Thursday to Sunday is 1 working day')
+  eq(m.businessDaysBetween(thu, sun, [0, 6]), 1, 'with a Saturday–Sunday weekend, Friday counts instead')
+  eq(m.businessDaysBetween(thu, new Date('2026-11-20T09:00:00+02:00'), [5, 6]), 0, 'Thursday to Friday: none')
+  // 23:30 Cairo on Wednesday is Wednesday there (21:30 UTC), so to Thursday morning is 1.
+  eq(m.businessDaysBetween(new Date('2026-11-18T21:30:00Z'), new Date('2026-11-19T07:00:00Z'), [5, 6]), 1, 'Cairo midnight edge')
+  eq(m.businessDaysBetween(new Date('2026-11-18T22:30:00Z'), new Date('2026-11-19T07:00:00Z'), [5, 6]), 0, 'after Cairo midnight it is already Thursday')
+  for (const n of [0, 1, 3, 7]) eq(m.businessDaysBetween(m.subtractBusinessDays(sun, n, [5, 6]), sun, [5, 6]), n, `subtract is the inverse (${n})`)
+  const task = { status: 'c-prog', stage_date: '2026-11-01', content_type_label: 'Post', entry_stage: 'r-design', due_date: null }
+  eq(m.getAlertStatus(task, { 'c-prog': { Post: 1 } }, sun, [5, 6]), 'On Track', 'a media-made task has no SLA before its entry stage')
+  eq(m.getAlertStatus({ ...task, entry_stage: 'todo' }, { 'c-prog': { Post: 1 } }, sun, [5, 6]), 'Stuck', 'other tasks do')
+})
+
 check('pure-fixtures-sane', () => {
   ok(lab.tasks.every(t => lab.taskSpaces.some(r => r.task_id === t.id)), 'every task shows somewhere')
 })

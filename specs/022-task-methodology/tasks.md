@@ -276,13 +276,13 @@ description: "Tasks for 022 — task methodology"
 
 **Independent test** (quickstart 13): a task entering a stage on Thursday shows 1 day in stage on Sunday.
 
-- [ ] T053 [P] [US6] Pure check `pure-sla-days` in `pure.mjs`:
+- [X] T053 [P] [US6] Pure check `pure-sla-days` in `pure.mjs`:
   - Thursday → Sunday = 1 with weekend `{5,6}`;
   - Cairo midnight edge;
   - `entry_stage` skips earlier stages in reports.
-- [ ] T054 [US6] `businessDaysBetween(from, to, weekend)` on Cairo days in `src/lib/utils.ts`; callers pass `dueRule.weekend` (`src/lib/alert-status.ts`, `src/lib/inbox.ts`, `src/lib/workload.ts`, board data `today`).
-- [ ] T055 [US6] Reports and alerts skip stages before `entry_stage` (`src/lib/alert-status.ts`, `src/lib/home-metrics.ts`).
-- [ ] T056 [US6] Real-app check in `scenarios-022-us3.cjs` (extend): a media-made task shows no SLA for content stages.
+- [X] T054 [US6] `businessDaysBetween(from, to, weekend)` on Cairo days in `src/lib/utils.ts`; callers pass `dueRule.weekend` (`src/lib/alert-status.ts`, `src/lib/inbox.ts`, `src/lib/workload.ts`, board data `today`).
+- [X] T055 [US6] Reports and alerts skip stages before `entry_stage` (`src/lib/alert-status.ts`, `src/lib/home-metrics.ts`).
+- [X] T056 [US6] Real-app check in `scenarios-022-us3.cjs` (extend): a media-made task shows no SLA for content stages.
 
 **Checkpoint**: all stories pass independently.
 

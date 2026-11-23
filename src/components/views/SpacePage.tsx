@@ -8,6 +8,7 @@
  * The Content and Video Spaces' Sheet tab is today's Content sheet and Video
  * sheet, unchanged (FR-012). Other Spaces get the task Sheet (TaskSheet).
  */
+import { setWorkWeekend } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
@@ -31,6 +32,7 @@ import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
 
 export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
+  setWorkWeekend(data.dueRule?.weekend)
   const t = useTranslations('spaces')
   const tv = useTranslations('views')
   const selectTask = useUIStore(s => s.selectTask)

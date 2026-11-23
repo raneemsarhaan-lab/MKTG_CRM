@@ -9,6 +9,7 @@
  *   - Sheet: today's Content and Video sheets with only its rows, plus its own blank tabs;
  *   - Library: everything it has published.
  */
+import { setWorkWeekend } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
@@ -39,6 +40,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   folder: BrandFolderSlug | null
   assets?: { id: string; filename: string; url: string }[]
 }) {
+  setWorkWeekend(data.dueRule?.weekend)
   const t = useTranslations('spaces')
   const tv = useTranslations('views')
   const selectTask = useUIStore(s => s.selectTask)
