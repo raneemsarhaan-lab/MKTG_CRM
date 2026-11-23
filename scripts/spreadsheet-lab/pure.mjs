@@ -141,7 +141,7 @@ export async function runPure(lab, root) {
   await check('fmt-validate', () => {
     const v = h.validateStyle({ b: true, i: false, size: 99, font: 'arial', fill: '#ff0000', color: 'red', junk: 1, ha: 'general', va: 'middle',
       bt: { w: 'thick', c: '#000000' }, bb: { w: 'wavy', c: '#000000' }, indent: 40, rot: 200, num: { kind: 'currency', cur: 'XYZ', dp: 20, pattern: '<script>' } })
-    eq(v, { font: 'Arial', size: 72, b: true, i: false, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
+    eq(v, { font: 'Arial', size: 96, b: true, i: false, fill: '#FF0000', bt: { w: 'thick', c: '#000000' }, va: 'middle', indent: 15, rot: 90, num: { kind: 'currency', dp: 10 } }, 'unknown and out-of-range fields dropped or clamped')
     eq(h.validateStyle({ junk: true, num: { kind: 'general' } }), null, 'nothing left is null (the record is deleted)')
     eq(h.validateStyle({ b: false }), { b: false }, 'an explicit off is kept (it turns a row or column layer off)')
     eq(h.validateStyle('bold'), null, 'not an object')
@@ -177,6 +177,7 @@ export async function runPure(lab, root) {
     const sp = x => x.replace(/[\u00A0\u202F]/g, ' ')
     const en = (t, n) => sp(h.display(t, n, 'en')), ar = (t, n) => h.display(t, n, 'ar')
     eq(en('12500', { kind: 'currency', cur: 'EGP', dp: 2 }), 'EGP 12,500.00', 'currency')
+    eq(en('12500', { kind: 'currency', cur: 'EGP', dp: 0, sep: false }), 'EGP 12500', 'currency without the thousands separator (spec 015 T061)')
     eq(en('-1234.1', { kind: 'number', dp: 2, neg: 'paren-red' }), '(1,234.10)', 'negative in brackets')
     ok(h.showsRed('-1234.1', { kind: 'number', neg: 'paren-red' }) && !h.showsRed('5', { kind: 'number', neg: 'red' }), 'red negatives')
     eq(en('1234.5', { kind: 'number', dp: 0, sep: false }), '1235', 'no separator, rounded')

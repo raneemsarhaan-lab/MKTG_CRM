@@ -312,9 +312,9 @@ export const SCENARIOS = [
       await t.page.waitForSelector('[data-setting="mention:in_app"]')
       const on = sel => t.page.locator(`[data-setting="${sel}"]`).getAttribute('aria-checked')
       t.eq(await t.page.$$eval('[data-setting-row]', rs => rs.map(r => r.getAttribute('data-setting-row'))),
-        ['mention', 'assigned', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue'], 'the order')
-      for (const k of ['mention', 'assigned', 'due_soon', 'overdue']) t.eq(await on(`${k}:push`), 'true', `${k}: phone on`)
-      for (const k of ['comment', 'reply', 'attachment']) t.eq(await on(`${k}:push`), 'false', `${k}: phone off`)
+        ['mention', 'assigned', 'comment', 'reply', 'sheet_mention', 'sheet_reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue'], 'the order')
+      for (const k of ['mention', 'sheet_mention', 'assigned', 'due_soon', 'overdue']) t.eq(await on(`${k}:push`), 'true', `${k}: phone on`)
+      for (const k of ['comment', 'reply', 'sheet_reply', 'attachment']) t.eq(await on(`${k}:push`), 'false', `${k}: phone off`)
       for (const k of ['mention', 'comment']) t.eq(await on(`${k}:email`), 'false', `${k}: email off`)
       t.eq(await t.page.locator('[data-email-mode="daily"]').getAttribute('aria-pressed'), 'true', 'daily summary by default')
       t.eq(await t.page.locator('[data-dnd]').getAttribute('aria-checked'), 'false', 'DND off')

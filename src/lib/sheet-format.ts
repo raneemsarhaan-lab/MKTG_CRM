@@ -97,7 +97,7 @@ export function validateStyle(input: unknown): CellStyle | null {
   if (!isObj(input)) return null
   const s: CellStyle = {}
   const font = knownFont(typeof input.font === 'string' ? input.font : null); if (font) s.font = font
-  const size = int(input.size, 6, 72); if (size !== undefined) s.size = size
+  const size = int(input.size, 6, 96); if (size !== undefined) s.size = size
   // false is kept: it turns Bold (etc.) off over a row, column or sheet that sets it.
   for (const k of ['b', 'i', 's', 'wrap'] as const) if (typeof input[k] === 'boolean') s[k] = input[k] as boolean
   if (input.u === 'single' || input.u === 'double' || input.u === 'none') s.u = input.u
@@ -377,7 +377,7 @@ export function display(text: string, num: NumberFormat | null | undefined, lang
   const n = parseNumber(text)
   if (n === null) return text
   const dp = num.dp ?? (num.kind === 'percent' ? 0 : 2)
-  const o: Intl.NumberFormatOptions = { minimumFractionDigits: dp, maximumFractionDigits: dp, useGrouping: num.kind === 'number' ? num.sep !== false : true }
+  const o: Intl.NumberFormatOptions = { minimumFractionDigits: dp, maximumFractionDigits: dp, useGrouping: num.kind === 'number' || num.kind === 'currency' ? num.sep !== false : true }
   const abs = Math.abs(n)
   let s: string
   if (num.kind === 'currency' || num.kind === 'accounting') s = new Intl.NumberFormat(loc, { ...o, style: 'currency', currency: num.cur ?? 'EGP', currencyDisplay: 'code' }).format(abs)
