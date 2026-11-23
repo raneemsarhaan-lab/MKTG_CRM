@@ -13,7 +13,10 @@
   "greeting": {
     "morning": "Good morning",
     "afternoon": "Good afternoon",
-    "evening": "Good evening"
+    "evening": "Good evening",
+    "hello": "{greeting}, {name}",
+    "tagline": "Let's make <hl>today</hl> count.",
+    "cheer": "you got this! 💜"
   },
   "board": {
     "allBrands": "All brands",
@@ -2861,7 +2864,8 @@
       "of": "of {capacity}",
       "empty": "No members yet.",
       "teamTitle": "Team hours",
-      "managerOnly": "Marketing Manager only"
+      "managerOnly": "Marketing Manager only",
+      "noEntry": "No entry"
     },
     "err": {
       "bad_hours": "Hours go from 0 to 24.",
@@ -2873,6 +2877,8 @@
       "not_authorized": "Only the Marketing Manager can see the team's hours.",
       "network": "Not saved: check your connection and try again.",
       "generic": "That didn't work. Try again."
-    }
+    },
+    "loadError": "Today's hours didn't load. Check your connection, then try again.",
+    "retry": "Try again"
   }
 }

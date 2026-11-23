@@ -63,7 +63,7 @@ export function HoursReport({ report, today }: { report: HoursWeekReport; today:
                       if (e?.off) return <td key={d} className="is-off">{t('off')}</td>
                       if (e && typeof e.hours === 'number') return <td key={d}>{num(e.hours)}</td>
                       const missing = isWorkingDay(d) && d < today
-                      return <td key={d} className={missing ? 'is-miss' : 'is-empty'}>{missing ? <><span aria-hidden="true">⚠ </span>{t('missing')}</> : '–'}</td>
+                      return <td key={d} className={missing ? 'is-miss' : 'is-empty'}>{missing ? <><span aria-hidden="true">⚠ </span>{t('missing')}</> : <><span aria-hidden="true">–</span><span className="sr-only">{t('report.noEntry')}</span></>}</td>
                     })}
                     <td className="is-total">{num(r.total)} <small>{t('report.of', { capacity: num(r.capacity) })}</small></td>
                   </tr>
