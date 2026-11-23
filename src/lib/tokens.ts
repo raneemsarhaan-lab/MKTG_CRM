@@ -311,6 +311,7 @@ export const NOTIFY_UI = {
     overdue:               '#C81E3A',
     sheet_mention:         '#D6336C',
     sheet_reply:           '#0E7C7C',
+    urgent:                '#D22040',
   },
 } as const
 

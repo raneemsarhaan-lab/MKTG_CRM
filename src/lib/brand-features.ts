@@ -8,7 +8,7 @@
  */
 import type { BrandFeatureKey, BrandFeatures } from '@/types/index'
 
-export const BRAND_FEATURES: BrandFeatureKey[] = ['priorities', 'platform', 'type', 'pillars', 'hours', 'covers', 'clips', 'sla']
+export const BRAND_FEATURES: BrandFeatureKey[] = ['priorities', 'platform', 'type', 'pillars', 'hours', 'covers', 'clips', 'sla', 'tags']
 
 export function featureOn(
   brand: { features?: BrandFeatures | null } | null | undefined,
@@ -66,7 +66,7 @@ export function featureOnAny(brands: ({ features?: BrandFeatures | null } | null
 
 /** The sheet column each switch hides, where a sheet has one. */
 export const COLUMN_FEATURE: Record<string, BrandFeatureKey> = {
-  type: 'type', priority: 'priorities', platform: 'platform', pillar: 'pillars', hours: 'hours', clips: 'clips',
+  type: 'type', priority: 'priorities', platform: 'platform', pillar: 'pillars', hours: 'hours', clips: 'clips', tags: 'tags',
 }
 
 /** A switched-off field in a mixed view: a hatched, empty cell (design/spaces-stage-c.html). */

@@ -21,7 +21,7 @@ const privateSheets = (memberId: string) => ({
 
 export async function loadBoardData(member: SessionMember) {
   const now = new Date()
-  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones] = await Promise.all([
+  const [tasks, members, brands, contentTypes, slaRows, themes, reads, snoozes, prefs, sheetColumns, sheetValues, rowHeights, spaces, spaceMembers, taskSpaces, linkedViews, ws, spaceStages, taskSpaceStages, taskFields, typeFields, fieldValues, milestones, tags] = await Promise.all([
     prisma.task.findMany({
       include: {
         brand:      true,
@@ -51,6 +51,9 @@ export async function loadBoardData(member: SessionMember) {
           select: { id: true, name: true, project: { select: { id: true, name: true } } },
         },
         parent:     { select: { id: true, name: true } },
+        // Spec 023 (R9): the other assignees and each person's hours (the lead stays in assignee_id).
+        assignees:  { select: { member_id: true, position: true, hours: true }, orderBy: { position: 'asc' } },
+        tags:       { select: { tag_id: true } },
         subtasks:   { select: { id: true, name: true, status: true, dropped_at: true }, orderBy: { created_at: 'asc' } },
         // A clip's details, for the video sheet (spec 008). Small: numbers and two short strings.
         clip: {
@@ -103,6 +106,8 @@ export async function loadBoardData(member: SessionMember) {
     prisma.taskTypeField.findMany({ orderBy: { position: 'asc' } }),
     prisma.taskFieldValue.findMany({ select: { task_id: true, field_id: true, value: true } }),
     prisma.milestone.findMany({ orderBy: { day: 'asc' } }),
+    // Spec 023 (R8): the workspace's tags.
+    prisma.tag.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true } }),
   ])
   const linkedRowHeights: { content: Record<string, number>; video: Record<string, number> } = { content: {}, video: {} }
   for (const h of rowHeights) linkedRowHeights[h.sheet_kind === 'linked_video' ? 'video' : 'content'][h.task_id] = h.height
@@ -135,6 +140,7 @@ export async function loadBoardData(member: SessionMember) {
     typeFields: typeFields.map(mapTypeField),
     fieldValues: fieldValues as import('@/types/index').TaskFieldValueRow[],
     milestones: milestones.map(mapMilestone),
+    tags: tags as import('@/types/index').Tag[],
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),

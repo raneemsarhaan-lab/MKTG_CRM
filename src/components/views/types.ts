@@ -16,6 +16,8 @@ export function viewOptions(d: BoardData, tasks: ViewTask[], hide: { brand?: boo
     assignee: d.members.filter(m => tasks.some(x => x.assignee_id === m.id)).map(m => ({ id: m.id, name: m.name })).sort(byName),
     type: [...new Set(tasks.map(x => x.content_type_label).filter((x): x is string => !!x))].sort().map(x => ({ id: x, name: x })),
     campaign: [...new Map(tasks.filter(x => x.project).map(x => [x.project!.id, { id: x.project!.id, name: x.project!.name }])).values()].sort(byName),
+    statusGroup: [],
+    tag: d.tags.filter(g => tasks.some(x => x.tag_ids?.includes(g.id))).map(g => ({ id: g.id, name: g.name })),
   }
 }
 

@@ -11,7 +11,7 @@ import { NOTIFICATION_KINDS } from '@/types/index'
 export interface KindSetting { in_app: boolean; push: boolean; email: boolean }
 export type KindSettings = Record<NotificationKind, KindSetting>
 
-const URGENT: NotificationKind[] = ['mention', 'sheet_mention', 'assigned', 'due_soon', 'overdue']
+const URGENT: NotificationKind[] = ['mention', 'sheet_mention', 'assigned', 'urgent', 'due_soon', 'overdue']
 
 export const DEFAULT_SETTINGS: KindSettings = Object.fromEntries(
   NOTIFICATION_KINDS.map(k => [k, { in_app: true, push: URGENT.includes(k), email: false }]),

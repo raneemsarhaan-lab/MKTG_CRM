@@ -76,3 +76,7 @@ Decisions behind the plan. User decisions (D1–D18, Milestone, D14) are recorde
 - A required field has a "Required" badge (hover: "Required before C-Review"). Empty, the panel shows red words in its place ("Caption not added" / "لم تتم إضافة الكابشن"), cards a small red "Caption missing" (until published), sheets the red words in the cell.
 - Required means "crossing": a move is refused only when it passes the required stage; tasks already beyond it when the rule was added aren't held back.
 - Preview: `design/023-description-fields.html` (https://claude.ai/artifact/1EACx6hV8Yhuas6AzFzqqM).
+
+## R17. Assignees as built (2026-11-23)
+- **Decision**: the lead stays the single source of truth in `tasks.assignee_id`; `task_assignees` holds every assignee in order (position 0 = lead) and each person's hours. Readers build the list as the lead first, then the others by position, so no existing path that sets `assignee_id` (creation, sheets, bulk, hand-offs) has to change, and the invariant can't drift. `once('assignees-v1')` isn't needed.
+- Stage B screens were built without a separate design page (the user asked to continue without stopping); screenshots are shown at the Stage B stop.

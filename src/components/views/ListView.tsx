@@ -21,6 +21,7 @@ import { useLocale } from 'next-intl'
 import { applies, fieldName, formatValue, isEmpty } from '@/lib/task-fields'
 import { typeName } from '@/lib/task-types'
 import { TypeIcon } from '@/components/types/TypeIcon'
+import { TagChip } from '@/components/tags/TagPicker'
 
 type Group = 'brand' | 'stage' | 'statusGroup'
 
@@ -43,7 +44,7 @@ interface ListViewProps {
   /** Spec 023: the Fields button's choice (standard keys and `f:<id>`); absent = every standard field. */
   fields?: string[]
   /** Spec 023: custom fields and their values, task id → field id → value. */
-  custom?: { fields: TaskFieldDef[]; links: TaskTypeFieldLink[]; values: Map<string, Map<string, unknown>>; types: ContentType[] }
+  custom?: { fields: TaskFieldDef[]; links: TaskTypeFieldLink[]; values: Map<string, Map<string, unknown>>; types: ContentType[]; tags?: import('@/types/index').Tag[] }
 }
 
 export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, spaceStages, initialGroup, onOpen, fields, custom }: ListViewProps) {
@@ -110,6 +111,9 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                       return <>{shows('brand') && ' · '}<TypeIcon icon={ty?.icon} color={ty?.color} size={11} />{ty ? typeName(ty, locale) : task.content_type_label}</>
                     })()}
                   </span>
+                  {(task.tag_ids?.length ?? 0) > 0 && featureOn(task.brand, 'tags') && shows('tags') && custom?.tags && (
+                    <span data-list-tags style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>{task.tag_ids!.map(id => custom.tags!.find(g => g.id === id)).filter(Boolean).slice(0, 4).map(g => <TagChip key={g!.id} tag={g!} small />)}</span>
+                  )}
                   {shownCustom.length > 0 && <FieldChips task={task} list={shownCustom} custom={custom!} members={members} locale={locale} />}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>

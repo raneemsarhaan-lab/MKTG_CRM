@@ -50,7 +50,7 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const sheetStart = space.key === 'content' ? 'content' : space.key === 'video' ? 'sheet' : null
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
-  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes }), [data])
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   // Spec 021 (US3): this Space's own words for the stages. Boards keep the board names.
   const locale = useLocale()
   const tSheet = useTranslations('taskSheet')

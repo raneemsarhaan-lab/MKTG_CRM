@@ -145,7 +145,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const stageOf = (x: ViewTask) => stages?.name(x) ?? boardWord(x.status)
   // Without a Space, typed names are the original stages' (English or Arabic).
   const plain = useMemo(() => stagesForSpace('-', [], locale), [locale])
-  const may = (x: ViewTask) => canActOn({ task_owner_id: x.task_owner_id, assignee_id: x.assignee_id ?? null }, me)
+  const may = (x: ViewTask) => canActOn({ task_owner_id: x.task_owner_id, assignee_id: x.assignee_id ?? null, assignee_ids: x.assignee_ids }, me)
 
   // ── columns (spec 010): this sheet's own layout and regular columns ──
   const bundle = useColumnsBundle(data.sheetColumns, data.sheetValues, me)

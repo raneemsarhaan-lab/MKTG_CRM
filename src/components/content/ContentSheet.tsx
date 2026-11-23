@@ -105,7 +105,7 @@ export function ContentSheet(p: ContentSheetProps) {
   const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesOf(p.tasks, th.id))), [p.tasks, p.themes])
 
   // ── permissions ─────────────────────────────────────────────────────────
-  const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || admin, [me.id, admin])
+  const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || admin, [me.id, admin])
   const ctx = useMemo(() => ({ tasks: p.tasks, themes: p.themes, members: p.members, me }), [p.tasks, p.themes, p.members, me])
   const mayAdd = (theme: ContentTheme) => mayAddTo(theme, ctx)
   const mayEditTheme = (theme: ContentTheme) => admin || theme.owner_id === me.id

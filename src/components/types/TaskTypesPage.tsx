@@ -20,6 +20,8 @@ import { ALL_STAGES, STAGE_META } from '@/lib/stage-meta'
 import { saveTaskType } from '@/actions/task-types'
 import { createContentType } from '@/actions/settings'
 import { attachField, createField, detachField, retireField, updateField } from '@/actions/task-fields'
+import { deleteTag, mergeTags, recolorTag, renameTag } from '@/actions/tags'
+import { TAG_COLORS } from '@/lib/tags'
 import { TypeIcon } from './TypeIcon'
 
 interface Props {
@@ -30,6 +32,8 @@ interface Props {
   taskCounts: Record<string, number>
   canEditTypes: boolean
   canEditFields: boolean
+  /** Spec 023 (US4): tags with how many tasks use each; admins manage them. */
+  tags?: { id: string; name: string; color: string; count: number }[]
 }
 
 const PRIORITY_CHOICES = ['Urgent', 'High', 'Normal', 'Low', 'None'] as const
@@ -48,8 +52,8 @@ export function TaskTypesPage(p: Props) {
   const t = useTranslations('types')
   const tf = useTranslations('fields')
   const locale = useLocale()
-  const [tab, setTab] = useState<'types' | 'fields'>('types')
-  const readOnly = tab === 'types' ? !p.canEditTypes : !p.canEditFields
+  const [tab, setTab] = useState<'types' | 'fields' | 'tags'>('types')
+  const readOnly = tab === 'fields' ? !p.canEditFields : !p.canEditTypes
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
@@ -61,18 +65,16 @@ export function TaskTypesPage(p: Props) {
           <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: '6px 0 0' }}>{t('intro')}</p>
         </div>
         <div role="tablist" className="fx-tabs" style={{ display: 'inline-flex', borderRadius: 10, padding: 4, background: '#EBEBEB', marginBottom: 20, gap: 2 }}>
-          {(['types', 'fields'] as const).map(k => (
+          {(['types', 'fields', 'tags'] as const).map(k => (
             <button key={k} role="tab" aria-selected={tab === k} data-types-tab={k} onClick={() => setTab(k)}
               style={{ fontSize: '0.82rem', fontWeight: 700, padding: '8px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 background: tab === k ? '#fff' : 'transparent', color: tab === k ? 'var(--ink)' : 'var(--muted)', boxShadow: tab === k ? '0 1px 3px rgba(16,16,11,.12)' : 'none' }}>
-              {k === 'types' ? t('tabTypes') : t('tabFields')}
+              {k === 'types' ? t('tabTypes') : k === 'fields' ? t('tabFields') : t('tabTags')}
             </button>
           ))}
         </div>
-        {readOnly && <p data-read-only style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 14px' }}>{tab === 'types' ? t('readOnly') : tf('readOnly')}</p>}
-        {tab === 'types'
-          ? <TypesTab {...p} locale={locale} />
-          : <FieldsTab {...p} locale={locale} />}
+        {readOnly && <p data-read-only style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0 0 14px' }}>{tab === 'types' ? t('readOnly') : tab === 'tags' ? t('tagsReadOnly') : tf('readOnly')}</p>}
+        {tab === 'types' ? <TypesTab {...p} locale={locale} /> : tab === 'fields' ? <FieldsTab {...p} locale={locale} /> : <TagsTab tags={p.tags ?? []} canEdit={p.canEditTypes} />}
       </div>
     </div>
   )
@@ -163,7 +165,7 @@ function TypeRow({ ct, p, fields, editing, onEdit, onDone }: { ct: ContentType; 
   )
 }
 
-const priorityKey = (v: string) => (v === 'Medium' ? 'Normal' : v) as 'Normal'
+const priorityKey = (v: string) => (v === 'Medium' ? 'Normal' : v) as 'Normal' // older rows
 
 function TypeEditor({ ct, count, onDone }: { ct: ContentType; count: number; onDone: (msg?: string) => void }) {
   const t = useTranslations('types')
@@ -448,6 +450,49 @@ function FieldEditorForm({ field, onDone }: { field?: TaskFieldDef; onDone: (msg
         <button style={btn()} onClick={() => onDone()}>{tf('cancel')}</button>
         <button style={btn(true)} onClick={save} disabled={pending || !name.trim()} data-field-save>{field ? tf('save') : tf('create')}</button>
       </div>
+    </div>
+  )
+}
+
+// ─── Tags ───────────────────────────────────────────────────────────────────
+
+function TagsTab({ tags, canEdit }: { tags: { id: string; name: string; color: string; count: number }[]; canEdit: boolean }) {
+  const t = useTranslations('tags')
+  const router = useRouter()
+  const [msg, setMsg] = useState('')
+  const [pending, start] = useTransition()
+  const run = (fn: () => Promise<{ success: boolean; error?: string; moved?: number }>, ok: (r: { moved?: number }) => string) => start(async () => {
+    const r = await fn()
+    setMsg(r.success ? ok(r) : r.error === 'exists' ? t('exists') : t('failed'))
+    if (r.success) router.refresh()
+  })
+  if (!tags.length) return <p style={{ ...card, padding: 18, margin: 0, color: 'var(--muted)', fontSize: '0.85rem' }} data-tags-settings="">{t('none')}</p>
+  return (
+    <div data-tags-settings="" style={{ ...card, overflow: 'hidden' }}>
+      {tags.map(tag => (
+        <div key={tag.id} data-tag-row={tag.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid #F2F2EF', flexWrap: 'wrap' }}>
+          <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', background: tag.color }} />
+          {canEdit
+            ? <input defaultValue={tag.name} aria-label={t('rename')} maxLength={40} data-tag-rename={tag.name} style={{ ...input, flex: '1 1 160px' }}
+                onBlur={e => { const v = e.target.value.trim(); if (v && v !== tag.name) run(() => renameTag(tag.id, v), () => t('rename')) }} />
+            : <strong style={{ flex: '1 1 160px', fontSize: '0.9rem', color: 'var(--ink)' }}>{tag.name}</strong>}
+          <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{t('count', { n: tag.count })}</span>
+          {canEdit && <>
+            <span role="radiogroup" aria-label={t('colour')} style={{ display: 'inline-flex', gap: 3 }}>
+              {TAG_COLORS.map(c => <button key={c} type="button" role="radio" aria-checked={tag.color === c} aria-label={c} onClick={() => run(() => recolorTag(tag.id, c), () => t('colour'))}
+                style={{ width: 16, height: 16, borderRadius: '50%', background: c, cursor: 'pointer', padding: 0, border: tag.color === c ? '2px solid var(--ink)' : '1px solid #fff', boxShadow: '0 0 0 1px #D9D9D3' }} />)}
+            </span>
+            <select aria-label={t('merge')} value="" data-tag-merge={tag.name} disabled={pending} style={{ ...input, padding: '5px 8px' }}
+              onChange={e => { const into = e.target.value; if (into) run(() => mergeTags(tag.id, into), r => t('mergeDone', { n: r.moved ?? 0 })) }}>
+              <option value="">{t('merge')}</option>
+              {tags.filter(x => x.id !== tag.id).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <button type="button" style={{ ...btn(), color: '#B42318' }} data-tag-delete={tag.name}
+              onClick={() => { if (window.confirm(t('deleteConfirm', { name: tag.name, n: tag.count }))) run(() => deleteTag(tag.id), () => t('delete')) }}>{t('delete')}</button>
+          </>}
+        </div>
+      ))}
+      <p role="status" aria-live="polite" style={{ margin: 0, padding: msg ? '8px 14px 12px' : 0, fontSize: '0.8rem', color: 'var(--muted)' }}>{msg}</p>
     </div>
   )
 }

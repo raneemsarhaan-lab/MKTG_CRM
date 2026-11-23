@@ -15,13 +15,13 @@ import { useTranslations } from 'next-intl'
 import type { Task } from '@/types/index'
 import { HeaderMenu, ChevronIcon } from './HeaderMenu'
 import { compareByDue, compareByPublish } from '@/lib/due-dates'
+import { priorityRank, urgentFirst } from '@/lib/priorities'
 
 export type SortKey = 'due' | 'publish' | 'priority' | 'name' | 'created' | 'updated'
 /** Boards sort by due date, earliest first, unless a person picks otherwise for that board. */
 export const DEFAULT_SORT: SortKey = 'due'
 export const SORT_KEYS: readonly SortKey[] = ['due', 'publish', 'priority', 'name', 'created', 'updated']
 
-const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 
 /** Due date, earliest first; no due date last; then publishing date, then created. */
 function byDue<T extends Task>(a: T, b: T): number {
@@ -32,7 +32,7 @@ function byPublish<T extends Task>(a: T, b: T): number {
 }
 
 function byPriority<T extends Task>(a: T, b: T): number {
-  const d = (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1)
+  const d = priorityRank(a.priority) - priorityRank(b.priority)
   return d !== 0 ? d : byDue(a, b)
 }
 
@@ -51,13 +51,14 @@ function byUpdated<T extends Task>(a: T, b: T): number {
 /** Sorts a copy; the input array is left untouched. */
 export function sortTasks<T extends Task>(tasks: T[], sort: SortKey): T[] {
   const copy = [...tasks]
+  // Spec 023 (D8): Urgent first in every sort; the chosen order follows.
   switch (sort) {
-    case 'due':      return copy.sort(byDue)
-    case 'publish':  return copy.sort(byPublish)
+    case 'due':      return copy.sort(urgentFirst(byDue))
+    case 'publish':  return copy.sort(urgentFirst(byPublish))
     case 'priority': return copy.sort(byPriority)
-    case 'name':     return copy.sort(byName)
-    case 'created':  return copy.sort(byCreated)
-    case 'updated':  return copy.sort(byUpdated)
+    case 'name':     return copy.sort(urgentFirst(byName))
+    case 'created':  return copy.sort(urgentFirst(byCreated))
+    case 'updated':  return copy.sort(urgentFirst(byUpdated))
   }
 }
 

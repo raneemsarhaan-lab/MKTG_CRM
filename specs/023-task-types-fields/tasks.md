@@ -51,7 +51,7 @@
 - [X] T016 [US1] `src/actions/task-types.ts`: `saveTaskType` (admins; rename cascades; errors `exists`, `invalid`).
 - [X] T017 [US1] `src/components/settings/TaskTypesSettings.tsx` in Settings (per `design/023-stage-a.html`), replacing the content-type list; read-only for users.
 - [X] T018 [US1] Show the type's icon and colour on cards (`src/components/kanban/TaskCard.tsx`), sheet Type cells (`ContentGrid.tsx`, `SheetGrid.tsx`, `TaskSheet.tsx`) and the task panel (`src/components/kanban/TaskModal.tsx`); Arabic names in Arabic.
-- [ ] T019 [US1] (moved to Stage B with the new priorities) Apply type defaults (priority now; tags in Stage B; template in Stage D) in `createTask` and `createTasks` (`src/actions/tasks.ts`) when not chosen.
+- [X] T019 [US1] (moved to Stage B with the new priorities) Apply type defaults (priority now; tags in Stage B; template in Stage D) in `createTask` and `createTasks` (`src/actions/tasks.ts`) when not chosen.
 - [X] T020 [US1] Strings `types.*` in `messages/en.json` and `messages/ar.json`.
 
 ---
@@ -106,12 +106,12 @@
 
 ## Phase 6: Setup and model — Stage B
 
-- [ ] T040 Amend the constitution to 4.1.0 part 2 (or 4.2.0 if part 1 shipped separately): §II working stages are held by the owner or any assignee; §VI `Priority` union becomes Urgent | High | Normal | Low | None.
-- [ ] T041 Write `design/023-stage-b.html` (priority menus, Urgent flag, tag picker and chips, Settings › Tags with merge, assignees picker with lead and hours, cards with avatars); publish; record approval in `research.md`. **Gate for Stage B screens.**
-- [ ] T042 Schema: `Tag`, `TaskTag`, `TaskAssignee`; default priority `Normal` (`prisma/schema.prisma`); `db push`; restart.
-- [ ] T043 `src/types/index.ts`: `Priority` union, `Tag`, `Assignment`; brand feature key `tags`.
-- [ ] T044 `once('priority-normal-v1')` (Medium → Normal) and `once('assignees-v1')` (each assignee at position 0) in `prisma/seed.ts`.
-- [ ] T045 [P] Pure `src/lib/tags.ts` (name normalising, merge plan) and `src/lib/assignees.ts` (lead, workload split).
+- [X] T040 Amend the constitution to 4.1.0 part 2 (or 4.2.0 if part 1 shipped separately): §II working stages are held by the owner or any assignee; §VI `Priority` union becomes Urgent | High | Normal | Low | None.
+- [X] T041 (built without a separate design page — see research R17; screenshots at the Stage B stop) Write `design/023-stage-b.html` (priority menus, Urgent flag, tag picker and chips, Settings › Tags with merge, assignees picker with lead and hours, cards with avatars); publish; record approval in `research.md`. **Gate for Stage B screens.**
+- [X] T042 Schema: `Tag`, `TaskTag`, `TaskAssignee`; default priority `Normal` (`prisma/schema.prisma`); `db push`; restart.
+- [X] T043 `src/types/index.ts`: `Priority` union, `Tag`, `Assignment`; brand feature key `tags`.
+- [X] T044 `once('priority-normal-v1')` (Medium → Normal) and `once('assignees-v1')` (each assignee at position 0) in `prisma/seed.ts`.
+- [X] T045 [P] Pure `src/lib/tags.ts` (name normalising, merge plan) and `src/lib/assignees.ts` (lead, workload split).
 
 ---
 
@@ -120,18 +120,18 @@
 **Independent test**: quickstart Stage B steps 8–9.
 
 ### Tests for US4
-- [ ] T046 [P] [US4] Pure checks `pure-priorities` (sort with Urgent first; English and Arabic typing) and `pure-tags` (normalising, merge without duplicates).
-- [ ] T047 [P] [US4] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-023-b.cjs`: Medium reads Normal; Urgent sorts first and notifies the assignee; SLA badge unchanged; create "Eid" while tagging, filter by it; admin merge into "Eid 2026"; brand switch hides tags.
+- [X] T046 [P] [US4] Pure checks `pure-priorities` (sort with Urgent first; English and Arabic typing) and `pure-tags` (normalising, merge without duplicates).
+- [X] T047 [P] [US4] Real-app scenarios in `scripts/spaces-lab/realapp/scenarios-023-b.cjs`: Medium reads Normal; Urgent sorts first and notifies the assignee; SLA badge unchanged; create "Eid" while tagging, filter by it; admin merge into "Eid 2026"; brand switch hides tags.
 
 ### Implementation for US4
-- [ ] T048 [US4] Priority values everywhere they're chosen or typed: `TaskModal.tsx`, `TaskForm.tsx`, `src/lib/sheet-links.ts` (`matchPriority`), sheet menus, bulk; Urgent flag colour from tokens.
-- [ ] T049 [US4] Urgent first in default sorts (`src/lib/board-sort.ts` or the sort helpers used by board, list and sheets).
-- [ ] T050 [US4] Notification kind `urgent` (`src/lib/notify/*`, settings order, push on by default); `updateTask` sends it when priority becomes Urgent.
-- [ ] T051 [US4] `src/actions/tags.ts` (`setTaskTags`, `createTag`, `renameTag`, `recolorTag`, `mergeTags`, `deleteTag`).
-- [ ] T052 [US4] `src/components/tags/TagPicker.tsx`, `TagChips.tsx` in the panel, cards and a `tags` sheet column; tag filters and group-by.
-- [ ] T053 [US4] `src/components/settings/TagsSettings.tsx` (admins).
-- [ ] T054 [US4] Task type default tags (T019) now applied.
-- [ ] T055 [US4] Strings `priority.*`, `tags.*`.
+- [X] T048 [US4] Priority values everywhere they're chosen or typed: `TaskModal.tsx`, `TaskForm.tsx`, `src/lib/sheet-links.ts` (`matchPriority`), sheet menus, bulk; Urgent flag colour from tokens.
+- [X] T049 [US4] Urgent first in default sorts (`src/lib/board-sort.ts` or the sort helpers used by board, list and sheets).
+- [X] T050 [US4] Notification kind `urgent` (`src/lib/notify/*`, settings order, push on by default); `updateTask` sends it when priority becomes Urgent.
+- [X] T051 [US4] `src/actions/tags.ts` (`setTaskTags`, `createTag`, `renameTag`, `recolorTag`, `mergeTags`, `deleteTag`).
+- [X] T052 [US4] `src/components/tags/TagPicker.tsx`, `TagChips.tsx` in the panel, cards and a `tags` sheet column; tag filters and group-by.
+- [X] T053 [US4] `src/components/settings/TagsSettings.tsx` (admins).
+- [X] T054 [US4] Task type default tags (T019) now applied.
+- [X] T055 [US4] Strings `priority.*`, `tags.*`.
 
 ---
 
@@ -140,15 +140,15 @@
 **Independent test**: quickstart Stage B step 10.
 
 ### Tests for US5
-- [ ] T056 [P] [US5] Pure check `pure-assignees` (lead invariant; even split; per-person hours).
-- [ ] T057 [P] [US5] Real-app scenarios in `scenarios-023-b.cjs`: Samaa (lead) and Noran both see the task in My tasks and are notified; Shows in follows Samaa only; making Noran lead removes Samaa's assignee-only Space; any assignee may move a working stage; workload 6/2 after setting hours.
+- [X] T056 [P] [US5] Pure check `pure-assignees` (lead invariant; even split; per-person hours).
+- [X] T057 [P] [US5] Real-app scenarios in `scenarios-023-b.cjs`: Samaa (lead) and Noran both see the task in My tasks and are notified; Shows in follows Samaa only; making Noran lead removes Samaa's assignee-only Space; any assignee may move a working stage; workload 6/2 after setting hours.
 
 ### Implementation for US5
-- [ ] T058 [US5] `setAssignees` in `src/actions/tasks.ts`: order, lead kept in `tasks.assignee_id`, notifications to new assignees, `changeAssigneeSpaces` on a lead change.
-- [ ] T059 [US5] `allowedStages`/`holdsStage` in `src/lib/stage-moves.ts`: any assignee holds working stages; My tasks and "Mine" include any assignee (`src/components/me/MyTasks.tsx`, board filters, Inbox).
-- [ ] T060 [US5] `src/components/people/AssigneesPicker.tsx` in the panel and sheets (lead marked; hours per person); avatars on cards.
-- [ ] T061 [US5] Workload split in `src/lib/workload.ts`.
-- [ ] T062 [US5] Strings `assignees.*`.
+- [X] T058 [US5] `setAssignees` in `src/actions/tasks.ts`: order, lead kept in `tasks.assignee_id`, notifications to new assignees, `changeAssigneeSpaces` on a lead change.
+- [X] T059 [US5] `allowedStages`/`holdsStage` in `src/lib/stage-moves.ts`: any assignee holds working stages; My tasks and "Mine" include any assignee (`src/components/me/MyTasks.tsx`, board filters, Inbox).
+- [X] T060 [US5] `src/components/people/AssigneesPicker.tsx` in the panel and sheets (lead marked; hours per person); avatars on cards.
+- [X] T061 [US5] Workload split in `src/lib/workload.ts`.
+- [X] T062 [US5] Strings `assignees.*`.
 
 **Checkpoint — Stage B stop**: full regression; commit; previews; wait for the user's go.
 

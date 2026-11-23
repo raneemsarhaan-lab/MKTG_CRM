@@ -30,6 +30,8 @@ export interface ViewOptions {
   assignee: { id: string; name: string }[]
   type: { id: string; name: string }[]
   campaign: { id: string; name: string }[]
+  statusGroup?: { id: string; name: string }[]
+  tag?: { id: string; name: string }[]
 }
 
 interface ViewHostProps {
@@ -322,7 +324,7 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
 }) {
   const t = useTranslations('views')
   const tg = useTranslations('statusGroups')
-  const none = useMemo(() => ({ assignee: t('noOne'), campaign: t('noCampaign') }) as Partial<Record<ViewFilterKey, string>>, [t])
+  const none = useMemo(() => ({ assignee: t('noOne'), campaign: t('noCampaign'), tag: t('noTag') }) as Partial<Record<ViewFilterKey, string>>, [t])
   const setFilter = (k: ViewFilterKey, ids: string[]) => onChange({ ...config, filters: { ...config.filters, [k]: ids } })
   const sel: React.CSSProperties = { ...pill, paddingInlineEnd: 4 }
   return (
@@ -330,7 +332,7 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
       style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 38px', borderBottom: `1px solid ${PIPE.border}` }}>
       {VIEW_FILTERS.map(k => {
         // Spec 023: status groups (Not started, Active, Done, Closed) are the same on every page.
-        const list = k === 'statusGroup' ? STATUS_GROUPS.map(g => ({ id: g, name: tg(g) })) : [...options[k], ...(none[k] ? [{ id: '__none', name: none[k]! }] : [])]
+        const list = k === 'statusGroup' ? STATUS_GROUPS.map(g => ({ id: g, name: tg(g) })) : [...(options[k] ?? []), ...(none[k] ? [{ id: '__none', name: none[k]! }] : [])]
         if (!list.length) return null
         const on = config.filters[k] ?? []
         return (

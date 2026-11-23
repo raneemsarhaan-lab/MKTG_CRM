@@ -40,16 +40,19 @@ async function settingsLoader(db: Tx, memberIds: string[]): Promise<(id: string)
 export async function notify(db: Tx, event: NotifyEvent, extra: NotifyExtra = {}): Promise<string[]> {
   const task = await db.task.findUnique({
     where: { id: event.taskId },
-    select: { id: true, name: true, status: true, nine_stage: true, kind: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true },
+    select: { id: true, name: true, status: true, nine_stage: true, kind: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true,
+      assignees: { select: { member_id: true, position: true } } },
   })
   if (!task) return []
+  // Spec 023 (R9): every assignee hears what the lead hears.
+  const assignee_ids = [task.assignee_id, ...task.assignees.sort((a, b) => a.position - b.position).map(r => r.member_id)].filter((x): x is string => !!x)
   // Archived tasks are quiet (spec edge case), except the paste summary which is about new tasks.
   if (task.dropped_at && event.kind !== 'task_created_in_stage') return []
 
   const members = await db.member.findMany({ select: { id: true, role: true, access: true } })
   const followers: RFollower[] = await db.taskFollower.findMany({ where: { task_id: task.id }, select: { member_id: true, muted: true } })
   const settingsOf = await settingsLoader(db, members.map(m => m.id))
-  const recipients = resolveRecipients(event, { task, members, followers, settingsOf })
+  const recipients = resolveRecipients(event, { task: { ...task, assignee_ids }, members, followers, settingsOf })
   if (!recipients.length) return []
 
   const now = new Date()

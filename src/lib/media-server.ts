@@ -11,7 +11,7 @@ import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/medi
 import { addSpaces } from '@/lib/spaces-server'
 import { allowedStages } from '@/lib/stage-moves'
 import { missingRequired } from '@/lib/task-fields'
-import { mapTaskField, mapTypeField } from '@/lib/mappers'
+import { assigneeIds, mapTaskField, mapTypeField } from '@/lib/mappers'
 import { notify, notifyAfter } from '@/lib/notify/notify'
 
 type Db = PrismaClient | Prisma.TransactionClient
@@ -121,8 +121,10 @@ export async function moveThroughMedia(
   const req = await requiredGate({ id: content.id, content_type_label: row?.content_type_label ?? null, status: row?.status ?? null }, target)
   if (req) return { success: false, ...requiredRefusal(req) } as never
   const toMove = open.filter(m => m.status !== target)
+  const extra = await prisma.taskAssignee.findMany({ where: { task_id: { in: toMove.map(m => m.id) } }, select: { task_id: true, member_id: true, position: true } })
   for (const m of toMove) {
-    if (!allowedStages(m as never, member).includes(target)) return { success: false, error: 'not_authorized', board: m.media_board ?? undefined }
+    const withAll = { ...m, assignee_ids: assigneeIds(m.assignee_id, extra.filter(r => r.task_id === m.id)) }
+    if (!allowedStages(withAll as never, member).includes(target)) return { success: false, error: 'not_authorized', board: m.media_board ?? undefined }
   }
   for (const m of toMove) {
     await prisma.task.update({ where: { id: m.id }, data: { status: target, stage_date: new Date(), updated_at: new Date() } })

@@ -319,7 +319,7 @@ export function MyTasksPage({ data, todos: initialTodos, today: realToday }: { d
 /** Tasks of mine published in the last 30 days, for "Show completed". */
 function recentPublished(data: BoardData, me: string, today: string) {
   const since = new Date(Date.parse(today) - 30 * 86_400_000).toISOString().slice(0, 10)
-  return viewTasks(data).filter(x => x.status === 'publish' && x.assignee_id === me && !x.dropped_at && (x.stage_date ?? '').slice(0, 10) >= since).slice(0, 50)
+  return viewTasks(data).filter(x => x.status === 'publish' && (x.assignee_id === me || !!x.assignee_ids?.includes(me)) && !x.dropped_at && (x.stage_date ?? '').slice(0, 10) >= since).slice(0, 50)
 }
 
 function NewTodo({ onAdd, section }: { onAdd: (text: string) => Promise<boolean>; section: string }) {

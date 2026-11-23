@@ -85,6 +85,8 @@ model Member {
   task_spaces_added TaskSpace[]       @relation("TaskSpaceAdder")
   /// My tasks: personal to-dos, private to their owner.
   todos             Todo[]
+  /// Spec 023 Stage B: tasks I'm one of the assignees of (position 0 = lead).
+  assignments       TaskAssignee[]
   views_owned       SavedView[]       @relation("SavedViewOwner")
   views_created     SavedView[]       @relation("SavedViewCreator")
 
@@ -321,7 +323,7 @@ model Task {
   /// dozen kilobytes or so. It is set on upload and is not a user field —
   /// cover_image_url above is the one somebody chooses.
   cover_thumb          String?   @db.Text
-  priority             String    @default("Medium")
+  priority             String    @default("Normal")
   /// Spec 012 (R11): members @mentioned in the description, by id.
   description_mentions String[]  @default([]) @db.Uuid
   created_by           String?   @db.Uuid
@@ -397,6 +399,9 @@ model Task {
   media_tasks        Task[]            @relation("MediaTasks")
   space_stages       TaskSpaceStage[]
   field_values       TaskFieldValue[]
+  /// Spec 023 Stage B.
+  tags               TaskTag[]
+  assignees          TaskAssignee[]
 
   /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
   @@unique([content_task_id, media_board])
@@ -1320,4 +1325,47 @@ model Todo {
 
   @@index([owner_id, done_at])
   @@map("todos")
+}
+
+/// Spec 023 (R8): workspace tags. Anyone tagging may create one; admins rename, merge and delete.
+model Tag {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  /// The name lower-cased with spaces collapsed: unique, so "Eid" and "eid " are one tag.
+  key        String   @unique
+  color      String   @default("#6B7280")
+  created_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  tasks TaskTag[]
+
+  @@map("tags")
+}
+
+model TaskTag {
+  task_id String @db.Uuid
+  tag_id  String @db.Uuid
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, tag_id])
+  @@index([tag_id])
+  @@map("task_tags")
+}
+
+/// Spec 023 (R9): several assignees; position 0 is the lead and always equals tasks.assignee_id.
+model TaskAssignee {
+  task_id   String @db.Uuid
+  member_id String @db.Uuid
+  position  Int    @default(0)
+  /// This person's hours; null = an even share of the estimate.
+  hours     Float?
+
+  task   Task   @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, member_id])
+  @@index([member_id])
+  @@map("task_assignees")
 }

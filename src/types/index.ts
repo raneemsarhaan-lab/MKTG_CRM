@@ -83,7 +83,8 @@ export type SheetColumn =
   | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
   | 'reviewer' | 'due' | 'inStage' | 'doc' | 'design' | 'task' | 'post'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
-export type Priority = 'Low' | 'Medium' | 'High'
+/** Spec 023 (D7): Medium became Normal. */
+export type Priority = 'Urgent' | 'High' | 'Normal' | 'Low' | 'None'
 
 // ─── Core entities ─────────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ export type TaskKind = 'pipeline' | 'simple'
 export type SimpleStatus = 's-todo' | 's-doing' | 's-done'
 
 /** The per-brand feature switches (US4). */
-export type BrandFeatureKey = 'priorities' | 'platform' | 'type' | 'pillars' | 'hours' | 'covers' | 'clips' | 'sla'
+export type BrandFeatureKey = 'priorities' | 'platform' | 'type' | 'pillars' | 'hours' | 'covers' | 'clips' | 'sla' | 'tags'
 /** Spec 023: a switchable task field's switch is `f:<field id>`. */
 export type BrandFeatures = Partial<Record<BrandFeatureKey, boolean>> & { [field: `f:${string}`]: boolean | undefined }
 
@@ -259,6 +260,8 @@ export interface TaskFieldDef {
 }
 export interface TaskTypeFieldLink { type_label: string; field_id: string; required_from: StageId | null; default_value: unknown; position: number }
 export interface TaskFieldValueRow { task_id: string; field_id: string; value: unknown }
+/** Spec 023 (R8): a workspace tag. */
+export interface Tag { id: string; name: string; color: string }
 /** My tasks: a personal to-do, private to its owner. */
 export interface Todo { id: string; name: string; note: string | null; day: string | null; flagged: boolean; done_at: string | null; created_at: string }
 /** Spec 023 (R6): a brand's calendar marker — not a task. */
@@ -294,6 +297,12 @@ export interface Task {
   task_owner_id: string
   /** Who is doing the work. Null when nobody has picked it up. */
   assignee_id?: string | null
+  /** Spec 023 (R9): every assignee, the lead first (the lead is also assignee_id). */
+  assignee_ids?: string[]
+  /** Spec 023: hours set per person; others share the rest evenly. */
+  assignee_hours?: Record<string, number>
+  /** Spec 023 (R8): the task's tags. */
+  tag_ids?: string[]
   assignee?: Member
   task_owner?: Member
   initiator_role: string
@@ -521,8 +530,10 @@ export type NotificationKind =
   | 'assigned' | 'mention' | 'due_soon' | 'overdue'
   /** Spec 015: a sheet comment mentions you, or someone replies in a thread you're in. */
   | 'sheet_mention' | 'sheet_reply'
+  /** Spec 023 (D8): a task you're on became Urgent. */
+  | 'urgent'
 export const NOTIFICATION_KINDS: NotificationKind[] = [
-  'mention', 'assigned', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
+  'mention', 'assigned', 'urgent', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
   'sheet_mention', 'sheet_reply',
 ]
 /** Where a member hears about it. */

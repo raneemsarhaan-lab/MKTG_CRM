@@ -1058,7 +1058,8 @@
       "due_soon": "Due tomorrow",
       "overdue": "Overdue",
       "sheet_mention": "Sheet mentions",
-      "sheet_reply": "Sheet comment replies"
+      "sheet_reply": "Sheet comment replies",
+      "urgent": "Urgent tasks"
     },
     "kindHelp": {
       "mention": "When someone @mentions you",
@@ -1071,7 +1072,8 @@
       "due_soon": "Your tasks and your stage",
       "overdue": "Your tasks and your stage",
       "sheet_mention": "When someone @mentions you in a sheet comment",
-      "sheet_reply": "In sheet comment threads you’re part of"
+      "sheet_reply": "In sheet comment threads you’re part of",
+      "urgent": "When a task you're on becomes Urgent"
     },
     "msg": {
       "comment": {
@@ -1100,7 +1102,8 @@
       "due_soon": "<t>{task}</t> is due tomorrow",
       "overdue": "<t>{task}</t> is overdue",
       "sheet_mention": "<b>{actor}</b> mentioned you on <t>{task}</t>",
-      "sheet_reply": "<b>{actor}</b> replied in a comment thread on <t>{task}</t>"
+      "sheet_reply": "<b>{actor}</b> replied in a comment thread on <t>{task}</t>",
+      "urgent": "<t>{task}</t> is now Urgent"
     },
     "push": {
       "offerTitle": "Get alerts on this phone",
@@ -2930,7 +2933,8 @@
         "covers": "Cover images",
         "clips": "Video clips",
         "sla": "SLA tracking",
-        "cCheck": "Islam Check (C-Check)"
+        "cCheck": "Islam Check (C-Check)",
+        "tags": "Tags"
       },
       "hints": {
         "priorities": "Priority on tasks, filters and sorting",
@@ -2941,7 +2945,8 @@
         "covers": "Card cover images",
         "clips": "Clips under a video",
         "sla": "Time-in-stage badges and breach counts",
-        "cCheck": "Applies to new tasks only; existing tasks keep their stages"
+        "cCheck": "Applies to new tasks only; existing tasks keep their stages",
+        "tags": "Tags on tasks: picker, chips on cards, the Tags column and tag filters."
       },
       "on": "On",
       "off": "Off",
@@ -3011,7 +3016,8 @@
       "assignee": "Assignee",
       "type": "Type",
       "campaign": "Campaign",
-      "statusGroup": "Status group"
+      "statusGroup": "Status group",
+      "tag": "Tag"
     },
     "any": "Any",
     "noOne": "No one",
@@ -3058,7 +3064,8 @@
     "hide": "Hide",
     "hiddenViews": "Hidden ({n})",
     "showView": "Show {name}",
-    "groupStatusGroup": "Status group"
+    "groupStatusGroup": "Status group",
+    "noTag": "No tag"
   },
   "calendar": {
     "today": "Today",
@@ -3126,7 +3133,8 @@
       "platform": "Platform",
       "notes": "My notes",
       "publish": "Publishing date",
-      "media": "Link task"
+      "media": "Link task",
+      "tags": "Tags"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3134,9 +3142,12 @@
       "s-doing": "In progress"
     },
     "priority": {
+      "Urgent": "Urgent",
+      "High": "High",
+      "Normal": "Normal",
       "Low": "Low",
-      "Medium": "Medium",
-      "High": "High"
+      "None": "No priority",
+      "Medium": "Normal"
     },
     "notesHint": "My notes is yours alone: no one else sees this column.",
     "readOnly": "Only the task's owner, its assignee or an admin can change this.",
@@ -3405,7 +3416,9 @@
       "notAllowed": "Only admins can change task types."
     },
     "label": "Type",
-    "none": "No type"
+    "none": "No type",
+    "tabTags": "Tags",
+    "tagsReadOnly": "Only admins rename, merge or delete tags. Anyone can add a tag from a task."
   },
   "search": {
     "open": "Search",
@@ -3529,5 +3542,44 @@
     "save": "Save",
     "failed": "Couldn't save the milestone.",
     "deleted": "{name} deleted."
+  },
+  "priority": {
+    "Urgent": "Urgent",
+    "High": "High",
+    "Normal": "Normal",
+    "Low": "Low",
+    "None": "No priority",
+    "Medium": "Normal",
+    "label": "Priority"
+  },
+  "tags": {
+    "title": "Tags",
+    "add": "+ Tag",
+    "search": "Find or create a tag",
+    "create": "Create tag “{name}”",
+    "remove": "Remove {name}",
+    "failed": "Couldn't save the tags.",
+    "manage": "Tags",
+    "rename": "Rename",
+    "merge": "Merge into…",
+    "mergeDone": "Merged: {n, plural, one {# task} other {# tasks}} moved.",
+    "delete": "Delete",
+    "deleteConfirm": "Delete {name}? It comes off {n, plural, one {# task} other {# tasks}}.",
+    "colour": "Colour",
+    "none": "No tags yet. Create one from a task.",
+    "count": "{n, plural, one {# task} other {# tasks}}",
+    "readOnly": "Only admins rename, merge or delete tags.",
+    "exists": "A tag with that name already exists."
+  },
+  "assignees": {
+    "label": "Assignees",
+    "lead": "Lead",
+    "makeLead": "Make lead",
+    "add": "+ Add",
+    "remove": "Remove {name}",
+    "hoursFor": "Hours for {name}",
+    "h": "h",
+    "nobody": "Nobody yet",
+    "failed": "Couldn't save the assignees."
   }
 }

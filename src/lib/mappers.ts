@@ -147,6 +147,10 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     task_owner:         t.task_owner ? mapMember(t.task_owner) : undefined,
     assignee_id:        t.assignee_id ?? null,
     assignee:           t.assignee ? mapMember(t.assignee) : undefined,
+    // Spec 023 (R9): every assignee, the lead first; and hours set per person.
+    assignee_ids:       assigneeIds(t.assignee_id ?? null, t.assignees),
+    tag_ids:            (t.tags ?? []).map((x: { tag_id: string }) => x.tag_id) as string[],
+    assignee_hours:     Object.fromEntries((t.assignees ?? []).filter((r: { hours: number | null }) => r.hours != null).map((r: { member_id: string; hours: number }) => [r.member_id, r.hours])) as Record<string, number>,
     initiator_role:     t.initiator_role,
     nine_stage:         t.nine_stage,
     status:             t.status,
@@ -246,4 +250,10 @@ export function mapSheetColumn(c: any): import('@/types/index').SheetColumnRecor
     updatedByName: c.updater?.name ?? null,
     updatedAt:     (c.updated_at instanceof Date ? c.updated_at : new Date(c.updated_at)).toISOString(),
   }
+}
+
+/** Every assignee of a task: the lead (tasks.assignee_id) first, then the others by position. */
+export function assigneeIds(lead: string | null, rows: { member_id: string; position: number }[] | undefined): string[] {
+  const others = (rows ?? []).filter(r => r.member_id !== lead).sort((a, b) => a.position - b.position).map(r => r.member_id)
+  return lead ? [lead, ...others] : others
 }

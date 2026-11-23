@@ -22,7 +22,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
   // My tasks: assigned to me, or waiting in a review stage my role holds; and my open to-dos.
   const today = new Date(`${cairoToday()}T00:00:00Z`)
   const held = member.role ? stagesHeldBy(member.role) : []
-  const MINE = { dropped_at: null, status: { not: 'publish' }, OR: [{ assignee_id: member.id }, ...(held.length ? [{ status: { in: held } }] : [])] }
+  const MINE = { dropped_at: null, status: { not: 'publish' }, OR: [{ assignee_id: member.id }, { assignees: { some: { member_id: member.id } } }, ...(held.length ? [{ status: { in: held } }] : [])] }
   const [spaces, brands, byBrand, noBrand, bySpace, mine, mtOpen, mtLate, tdOpen, tdLate] = await Promise.all([
     prisma.teamSpace.findMany({
       where: { archived_at: null, ...(admin ? {} : { members: { some: { member_id: member.id } } }) },

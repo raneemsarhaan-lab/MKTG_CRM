@@ -22,7 +22,7 @@ import { applyLocale } from '@/lib/locale-switch'
 import { useUIStore } from '@/store/useUIStore'
 
 export const SETTINGS_ORDER: NotificationKind[] = [
-  'mention', 'assigned', 'comment', 'reply', 'sheet_mention', 'sheet_reply', 'attachment',
+  'mention', 'assigned', 'urgent', 'comment', 'reply', 'sheet_mention', 'sheet_reply', 'attachment',
   'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
 ]
 const CHANNELS = ['in_app', 'push', 'email'] as const

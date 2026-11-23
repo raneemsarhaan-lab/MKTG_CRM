@@ -2,6 +2,10 @@
 
 import { datesFor, newTaskDates } from '@/lib/due-dates-server'
 import { afterMove, mediaGate, moveThroughMedia, requiredGate, requiredRefusal } from '@/lib/media-server'
+import { withAssignees } from '@/lib/assignees-server'
+import { everyAssignee } from '@/lib/assignees'
+import { asPriority } from '@/lib/priorities'
+import { assigneeIds } from '@/lib/mappers'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
@@ -21,6 +25,7 @@ import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import { createComment } from '@/lib/comments'
 import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import type { StageId, MoveTaskResult } from '@/types/index'
+import type { Priority } from '@/types/index'
 
 /**
  * Who may act on a task.
@@ -30,11 +35,12 @@ import type { StageId, MoveTaskResult } from '@/types/index'
  * admin or superuser overrides both.
  */
 function canAct(
-  task: { task_owner_id: string; assignee_id: string | null },
+  task: { task_owner_id: string; assignee_id: string | null; assignee_ids?: string[] | null },
   member: { id: string; access: string },
 ): boolean {
   return task.task_owner_id === member.id
     || task.assignee_id === member.id
+    || !!task.assignee_ids?.includes(member.id)
     || member.access === 'admin'
     || member.access === 'superuser'
 }
@@ -45,7 +51,9 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  const found = await prisma.task.findUnique({ where: { id: taskId } })
+  // Spec 023 (R9): any assignee holds a working stage.
+  const task = found ? await withAssignees(found) : null
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
   // Spec 021 (US5): simple tasks never move through the pipeline (setSimpleStatus moves them).
@@ -114,7 +122,9 @@ export async function setTaskStage(
   const member = await getSessionMember()
   if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  const found = await prisma.task.findUnique({ where: { id: taskId } })
+  // Spec 023 (R9): any assignee holds a working stage.
+  const task = found ? await withAssignees(found) : null
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
   if (task.kind === 'simple') return { success: false, shouldCelebrate: false, error: 'simple_task' }
@@ -255,7 +265,7 @@ export interface TaskPatch {
   /** "Reset to auto": forget the hand-set due date and work it out from the publishing date. */
   due_reset?:          boolean
   hours_estimate?:     number
-  priority?:           'Low' | 'Medium' | 'High'
+  priority?:           Priority
   cover_image_url?:    string
   /** Spec 012 (R11): members @mentioned in the description, by id. */
   description_mentions?: string[]
@@ -268,8 +278,9 @@ export async function updateTask(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } })
-  if (!task) return { success: false, error: 'not_found' }
+  const found = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!found) return { success: false, error: 'not_found' }
+  const task = await withAssignees(found)
 
   if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
 
@@ -290,7 +301,11 @@ export async function updateTask(
   if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
   if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
-  if (patch.priority !== undefined)           data.priority           = patch.priority
+  if (patch.priority !== undefined) {
+    const p = asPriority(patch.priority)
+    if (!p) return { success: false, error: 'invalid_priority' }
+    data.priority = p
+  }
 
   // Publishing and due dates: a due date set here is set by hand; a new publishing date moves an automatic one.
   const dates = await datesFor(task, patch)
@@ -317,9 +332,12 @@ export async function updateTask(
   const newAssignee = patch.assignee_id !== undefined && patch.assignee_id && patch.assignee_id !== task.assignee_id ? patch.assignee_id : null
   // Spec 022 (US5): the task joins the new assignee's Spaces, and leaves the ones only the old assignee brought.
   if (patch.assignee_id !== undefined && (patch.assignee_id || null) !== task.assignee_id) await changeAssigneeSpaces(prisma, task, task.assignee_id, patch.assignee_id || null, member.id)
-  if (newAssignee || newlyMentioned.length) {
+  // Spec 023 (D8): a task that becomes Urgent tells every assignee.
+  const becameUrgent = data.priority === 'Urgent' && task.priority !== 'Urgent'
+  if (newAssignee || newlyMentioned.length || becameUrgent) {
     await notifyAfter(async tx => {
       const ids: string[] = []
+      if (becameUrgent) ids.push(...await notify(tx, { kind: 'urgent', actorId: member.id, taskId, assigneeIds: everyAssignee({ assignee_id: (data.assignee_id as string | null | undefined) ?? task.assignee_id, assignee_ids: task.assignee_ids }) }))
       if (newAssignee) {
         await follow(tx, taskId, newAssignee, { clearMute: true })
         ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId, assigneeId: newAssignee }))
@@ -621,7 +639,7 @@ export async function addClips(
             status:             'todo',
             stage_date:         now,
             hours_estimate:     0,
-            priority:           'Medium',
+            priority:           'Normal',
             created_by:         member.id,
           },
         })
@@ -808,7 +826,9 @@ export async function bulkUpdateTasks(
   if (!member) return { success: false, changed: 0, refused: 0, error: 'not_authenticated' }
   if (taskIds.length === 0) return { success: true, changed: 0, refused: 0 }
 
-  const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } } })
+  // Spec 023 (R9): with every assignee, so any of them holds a working stage.
+  const tasks = (await prisma.task.findMany({ where: { id: { in: taskIds } }, include: { assignees: { select: { member_id: true, position: true } } } }))
+    .map(t => ({ ...t, assignee_ids: assigneeIds(t.assignee_id, t.assignees) }))
   const isAdmin = member.access === 'admin' || member.access === 'superuser'
 
   let changed = 0, refused = 0, handoff = 0
@@ -846,7 +866,7 @@ export async function bulkUpdateTasks(
     if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
     if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
-    if (patch.priority !== undefined)           data.priority           = patch.priority
+    if (patch.priority !== undefined) { const p = asPriority(patch.priority); if (!p) { refused++; continue } data.priority = p }
     const dates = await datesFor(task, { due_date: patch.due_date, publish_date: patch.publish_date })
     if (typeof dates === 'string') { refused++; continue }
     Object.assign(data, dates)
@@ -923,7 +943,7 @@ interface CreateTaskInput {
   platform?:          string
   project_id?:        string | null
   hours_estimate?:    number
-  priority?:          'Low' | 'Medium' | 'High'
+  priority?:          Priority
   cover_image_url?:   string
   /** Spec 021 (FR-028): the Space it was created from. */
   space_id?:          string | null
@@ -978,6 +998,7 @@ export async function createTask(
   const board = input.space_id ? spaceCtx.spaces.find(s => s.id === input.space_id)?.media_board ?? null : null
   const media = board === 'design' || board === 'video' ? { media_board: board, status: 'r-design', entry_stage: 'r-design' } : {}
 
+  const typeRow = input.content_type_label ? await prisma.contentType.findUnique({ where: { label: input.content_type_label }, select: { default_priority: true, default_tag_ids: true } }) : null
   const task = await prisma.task.create({
     data: {
       kind,
@@ -995,7 +1016,8 @@ export async function createTask(
       stage_date:         new Date(),
       ...(await newTaskDates(input.publish_date, input.due_date)),
       hours_estimate:     input.hours_estimate ?? 0,
-      priority:           input.priority ?? 'Medium',
+      // Spec 023 (T019): the type's default priority when none was chosen.
+      priority:           input.priority ?? asPriority(typeRow?.default_priority) ?? 'Normal',
       cover_image_url:    input.cover_image_url ?? null,
       created_by:         member.id,
       ...media,
@@ -1013,6 +1035,9 @@ export async function createTask(
     }
     return ids
   })
+
+  // Spec 023 (T054): the type's default tags.
+  if (typeRow?.default_tag_ids?.length) await prisma.taskTag.createMany({ data: typeRow.default_tag_ids.map(tag_id => ({ task_id: task.id, tag_id })), skipDuplicates: true }).catch(() => null)
 
   revalidatePath('/board')
   revalidatePath('/', 'layout')
@@ -1034,7 +1059,7 @@ export async function addVideo(name: string): Promise<{ success: boolean; id?: s
   const task = await prisma.task.create({
     data: {
       name: n, content_type_label: 'Video', task_owner_id: member.id, assignee_id: member.id, initiator_role: member.role,
-      nine_stage: await nineStageFor(null), status: 'todo', stage_date: new Date(), priority: 'Medium', created_by: member.id,
+      nine_stage: await nineStageFor(null), status: 'todo', stage_date: new Date(), priority: 'Normal', created_by: member.id,
     },
   })
   const spaceCtx = await loadSpaceContext()
@@ -1068,6 +1093,7 @@ export async function createTasks(
   const member = auth.member
   if (!userMayCreate(member, shared.task_owner_id, shared.assignee_id)) return { success: false, error: 'not_authorized' }
 
+  const typeRow = shared.content_type_label ? await prisma.contentType.findUnique({ where: { label: shared.content_type_label }, select: { default_priority: true } }) : null
   const clean = names.map(n => n.trim()).filter(Boolean)
   if (!clean.length) return { success: false, error: 'Nothing to create' }
   if (clean.length > MAX_PASTED) {
@@ -1101,7 +1127,7 @@ export async function createTasks(
         stage_date:         now,
         ...shareDates,
         hours_estimate:     shared.hours_estimate ?? 0,
-        priority:           shared.priority ?? 'Medium',
+        priority:           shared.priority ?? asPriority(typeRow?.default_priority) ?? 'Normal',
         cover_image_url:    shared.cover_image_url ?? null,
         created_by:         member.id,
       })),

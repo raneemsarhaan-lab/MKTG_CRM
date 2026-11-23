@@ -5,6 +5,7 @@
  */
 import { featureOn } from '@/lib/brand-features'
 import type { BrandFeatures } from '@/types/index'
+import { hoursSplit } from '@/lib/assignees'
 
 export interface LoadTask {
   assignee_id?: string | null
@@ -26,14 +27,16 @@ export const isOpen = (t: LoadTask) =>
 export function taskLoad(tasks: LoadTask[]): PersonLoad[] {
   const by = new Map<string, PersonLoad>()
   for (const t of tasks) {
-    if (!t.assignee_id || !isOpen(t)) continue
-    const p = by.get(t.assignee_id) ?? { memberId: t.assignee_id, hours: 0, tasks: 0, byBrand: {} }
-    // Spec 021 (US4): hours a brand has switched off are hidden, so they add nothing.
-    const h = featureOn(t.brand, 'hours') ? Number(t.hours_estimate) || 0 : 0
-    p.hours += h; p.tasks += 1
-    const b = t.brand_id ?? 'none'
-    p.byBrand[b] = (p.byBrand[b] ?? 0) + h
-    by.set(t.assignee_id, p)
+    if (!isOpen(t)) continue
+    // Spec 023 (R9): hours split among the assignees — each person's own hours, else an even share.
+    const split = hoursSplit({ ...t, hours_estimate: featureOn(t.brand, 'hours') ? Number(t.hours_estimate) || 0 : 0 })
+    for (const [id, h] of Object.entries(split)) {
+      const p = by.get(id) ?? { memberId: id, hours: 0, tasks: 0, byBrand: {} }
+      p.hours += h; p.tasks += 1
+      const b = t.brand_id ?? 'none'
+      p.byBrand[b] = (p.byBrand[b] ?? 0) + h
+      by.set(id, p)
+    }
   }
   return [...by.values()].sort((a, b) => b.hours - a.hours)
 }

@@ -210,7 +210,7 @@ check('pure-brand-features', () => {
   eq(m.featureOn({ features: {} }, 'platform', { platform: false }), false, 'the workspace default')
   eq(m.featureOn({ features: { platform: true } }, 'platform', { platform: false }), true, "the brand's own switch wins")
   const r = m.resolveFeatures({ sla: false, bogus: true }, { clips: false })
-  eq([r.sla, r.clips, r.platform, Object.keys(r).length], [false, false, true, 8], 'every switch resolved')
+  eq([r.sla, r.clips, r.platform, Object.keys(r).length], [false, false, true, 9], 'every switch resolved')
   const b = m.withResolvedFeatures({ id: 'b', features: { hours: false } }, { covers: false })
   eq([b.own_features, b.features.hours, b.features.covers], [{ hours: false }, false, false], 'own overrides kept apart')
   eq(m.featureOn(b, 'covers'), false, 'resolved brands need no defaults')
@@ -400,6 +400,65 @@ check('pure-brand-field-switch', () => {
   ok(!m.fieldOn({ features: { [`f:${fid}`]: false } }, field), 'switched off for the brand')
   ok(m.fieldOn({ features: { [`f:${fid}`]: false } }, { id: fid, switchable: false }), 'a field that isn\'t switchable always shows')
   eq(m.cleanBrandFeatures({ sla: false, [`f:${fid}`]: false, 'f:bad': false, junk: 1 }), { sla: false, [`f:${fid}`]: false }, 'only real switches are kept')
+})
+
+// Spec 023 Stage B: priorities, tags, several assignees.
+check('pure-priorities', () => {
+  const P = m.priorities
+  eq(P.asPriority('Medium'), 'Normal', 'Medium reads Normal')
+  eq(['عاجل', 'urgent', 'medium', 'No priority', 'منخفضة'].map(P.readPriority), ['Urgent', 'Urgent', 'Normal', 'None', 'Low'], 'typed in English or Arabic')
+  const list = [{ n: 'b', priority: 'Low', d: 1 }, { n: 'a', priority: 'Urgent', d: 9 }, { n: 'c', priority: 'High', d: 0 }]
+  eq([...list].sort(P.urgentFirst((x, y) => x.d - y.d)).map(x => x.n), ['a', 'c', 'b'], 'Urgent first, then the chosen order')
+})
+check('pure-tags', () => {
+  const T = m.tags
+  eq(T.tagKey('  Eid   2026 '), 'eid 2026', 'case and spacing ignored')
+  const links = [{ task_id: 't1', tag_id: 'a' }, { task_id: 't2', tag_id: 'a' }, { task_id: 't2', tag_id: 'b' }]
+  eq(T.mergePlan(links, 'a', 'b'), { add: ['t1'], drop: ['t1', 't2'] }, 'merge adds the kept tag once')
+})
+check('pure-assignees', () => {
+  const A = m.assignees
+  eq(A.hoursSplit({ hours_estimate: 8, assignee_id: 's', assignee_ids: ['s', 'n'] }), { s: 4, n: 4 }, 'even split')
+  eq(A.hoursSplit({ hours_estimate: 8, assignee_ids: ['s', 'n'], assignee_hours: { s: 6 } }), { s: 6, n: 2 }, 'per-person hours, the rest shared')
+  eq(A.everyAssignee({ assignee_id: 's' }), ['s'], 'the lead alone')
+  ok(m.holdsStage({ status: 'c-prog', task_owner_id: 'o', assignee_id: 's', assignee_ids: ['s', 'n'] }, { id: 'n', role: 'x' }), 'any assignee holds a working stage')
+  ok(!m.holdsStage({ status: 'c-final', task_owner_id: 'o', assignee_id: 's', assignee_ids: ['s', 'n'] }, { id: 'n', role: 'x' }), 'not a review stage')
+})
+
+// Spec 023 Stage C: start dates.
+check('pure-start-dates', () => {
+  const S = m.startDates, wk = [5, 6]
+  ok(S.startAfterDue('2026-12-11', '2026-12-10') && !S.startAfterDue('2026-12-10', '2026-12-10') && !S.startAfterDue(null, '2026-12-10'), 'start after due is refused')
+  // Sun 6 Dec to Thu 10 Dec 2026: five working days, 10 h → 2 h a day.
+  eq(S.spreadHours(10, '2026-12-06', '2026-12-10', wk), { '2026-12-06': 2, '2026-12-07': 2, '2026-12-08': 2, '2026-12-09': 2, '2026-12-10': 2 }, 'spread over the span')
+  eq(Object.keys(S.spreadHours(8, '2026-12-03', '2026-12-08', wk)).length, 4, 'Friday and Saturday skipped')
+  eq(S.spreadHours(6, null, '2026-12-10', wk), { '2026-12-10': 6 }, 'no start: on the due day')
+  eq(S.spanDays('2026-12-06', '2026-12-10').length, 5, 'calendar span')
+})
+
+// Spec 023 Stage D: templates and recurring tasks.
+check('pure-templates', () => {
+  const T = m.templates
+  eq(T.fillPattern('{Brand} recap · {Month}', { brand: 'Forefront', date: '2026-12-30' }), 'Forefront recap · December', 'placeholders')
+  eq(T.offsetDay('2026-12-30', -7), '2026-12-23', 'relative date'); eq(T.offsetDay(null, -7), null, 'no publishing date')
+  const members = [{ id: 'n', role: 'Digital Marketing Specialist' }, { id: 's', role: 'Content Creator' }]
+  eq(T.roleHolder(members, 'Content Creator', 'me'), 's', 'by role'); eq(T.roleHolder(members, 'Video Editor', 'me'), 'me', 'missing role → the creator')
+  eq(T.planSubtasks([{ name: 'Draft {Month}', dueOffset: -10, assigneeRole: 'Content Creator' }, { name: '' }], '2026-12-30', members, 'me', x => T.fillPattern(x, { date: '2026-12-30' })),
+    [{ name: 'Draft December', start_date: null, due_date: '2026-12-20', assignee_id: 's' }], 'subtasks')
+})
+check('pure-recurrence', () => {
+  const R = m.recurrence, rule = { daysBefore: 7, weekend: [5, 6], shift: 'earlier' }
+  eq(R.nextOccurrence({ freq: 'weeks', interval: 1, weekdays: [0] }, '2026-11-23', '2026-11-22'), '2026-11-29', 'weekly on Sunday')
+  eq(R.nextOccurrence({ freq: 'weeks', interval: 2, weekdays: [0] }, '2026-11-22', '2026-11-22'), '2026-12-06', 'every 2 weeks')
+  eq(R.nextOccurrence({ freq: 'days', interval: 3 }, '2026-11-23', '2026-11-20'), '2026-11-26', 'every 3 days')
+  eq(R.nextOccurrence({ freq: 'monthly', interval: 1, month_day: 31 }, '2027-01-31', '2027-01-31'), '2027-02-28', 'short month: its last day')
+  eq(R.nextOccurrence({ freq: 'days', interval: 1, ends_on: '2026-11-24' }, '2026-11-24', '2026-11-20'), null, 'ends on a date')
+  eq(R.nextOccurrence({ freq: 'days', interval: 1, max_count: 2, made_count: 2 }, '2026-11-24', '2026-11-20'), null, 'ends after a count')
+  // Publishing Sun 13 Dec → due Sun 6 Dec; 13 working days before → creation day.
+  eq(R.creationDay('2026-12-13', 0, rule), '2026-12-06', 'no lead: the due day')
+  eq(R.workingDaysBefore('2026-12-06', 2, [5, 6]), '2026-12-02', 'working days skip the weekend')
+  ok(!R.leadOk(5, 13) && R.leadOk(13, 13), 'lead time at least the SLA')
+  eq(R.recurrenceKey('r1', '2026-12-13'), 'r1:2026-12-13', 'once per occurrence')
 })
 
 if (failed) process.exitCode = 1

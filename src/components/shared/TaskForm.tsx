@@ -13,6 +13,8 @@ import { BriefEditor } from '@/components/kanban/BriefEditor'
 import { FieldPill, PillOption, PillInput } from './FieldPill'
 import { shortDate } from '@/lib/myboard'
 import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
+import { PRIORITIES, PRIORITY_COLOR, asPriority } from '@/lib/priorities'
+import type { Priority } from '@/types/index'
 
 /** The blue + lime brand palette, local to this form — see TaskModal's `CU`. */
 const CU = {
@@ -63,13 +65,8 @@ interface TaskFormProps {
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email'] as const
-const PRIORITIES = ['High', 'Medium', 'Low'] as const
 
-const PRIORITY_COLOR: Record<string, string> = {
-  High:   '#D57D6F',
-  Medium: '#E0A23F',
-  Low:    '#7C8288',
-}
+
 
 /**
  * A brand's own mark.
@@ -106,6 +103,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
 
 export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceAssignees = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
   const tDates = useTranslations('dates')
+  const tPri = useTranslations('priority')
   const locale = useLocale()
   const tViews = useTranslations('views')
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
@@ -141,7 +139,9 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
     due_date: '',
     due_touched: false,
     hours_estimate: 2,
-    priority: 'Medium' as typeof PRIORITIES[number],
+    // Spec 023 (T019): the type's default priority until someone picks one.
+    priority: (asPriority(contentTypes[0]?.default_priority) ?? 'Normal') as Priority,
+    priority_touched: false,
     project_id: '',
     project_name: '',
     cover_image_url: '',
@@ -332,7 +332,12 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                   <PillOption
                     key={c.id}
                     selected={c.label === form.content_type_label}
-                    onClick={() => { patch('content_type_label', c.label); closePill() }}
+                    onClick={() => {
+                      patch('content_type_label', c.label)
+                      const dflt = asPriority(c.default_priority)
+                      if (dflt && !form.priority_touched) patch('priority', dflt)
+                      closePill()
+                    }}
                   >
                     {c.label}
                   </PillOption>
@@ -458,7 +463,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
             {on('priorities') && (
               <FieldPill
                 label="Priority"
-                value={form.priority}
+                value={tPri(form.priority)}
                 active
                 icon={<span aria-hidden="true" style={{
                   width: 8, height: 8, borderRadius: '50%',
@@ -470,12 +475,12 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                   <PillOption
                     key={p}
                     selected={p === form.priority}
-                    onClick={() => { patch('priority', p); closePill() }}
+                    onClick={() => { patch('priority', p); patch('priority_touched', true); closePill() }}
                   >
                     <span aria-hidden="true" style={{
                       width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[p],
                     }} />
-                    {p}
+                    {tPri(p)}
                   </PillOption>
                 ))}
               </FieldPill>
@@ -527,7 +532,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                     selected={p === form.platform}
                     onClick={() => { patch('platform', p); closePill() }}
                   >
-                    {p}
+                    {tPri(p)}
                   </PillOption>
                 ))}
               </FieldPill>

@@ -56,7 +56,7 @@ export const EMPTY_FILTERS: BoardFilterState = {
 export const ALERT_OPTIONS: AlertStatus[] =
   ['Overdue', 'Stuck', 'Will Miss', 'At Risk', 'Idle', 'On Track']
 
-const PRIORITY_OPTIONS = ['High', 'Medium', 'Low']
+const PRIORITY_OPTIONS = ['Urgent', 'High', 'Normal', 'Low', 'None']
 
 /** How many dimensions are narrowing the board right now. */
 export function activeFilterCount(f: BoardFilterState): number {

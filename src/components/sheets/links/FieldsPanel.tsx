@@ -24,7 +24,7 @@ export const openFields = () => document.dispatchEvent(new CustomEvent(FIELDS_OP
 
 export interface ColRef { id: string; letter: string; name: string; field: TaskField | null; task: boolean }
 const STAGES = Object.keys(STAGE_META) as StageId[]
-const PRIORITIES = ['High', 'Medium', 'Low']
+const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low', 'None']
 
 /** The board's values a word field takes, with their names. */
 export function boardValues(field: WordField, types: string[], locale: string): { value: string; name: string }[] {

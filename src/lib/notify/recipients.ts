@@ -16,6 +16,8 @@ export interface RTask {
   nine_stage: boolean
   task_owner_id: string
   assignee_id: string | null
+  /** Spec 023: every assignee, the lead first. */
+  assignee_ids?: string[]
   created_by: string | null
 }
 export interface RMember { id: string; role: string; access: string }
@@ -28,6 +30,8 @@ export type NotifyEvent =
   | { kind: 'task_created_in_stage'; actorId: string; taskId: string; pasteId?: string; pasteCount?: number }
   | { kind: 'task_moved_to_stage'; actorId: string; taskId: string }
   | { kind: 'assigned'; actorId: string; taskId: string; assigneeId: string }
+  /** Spec 023: the task became Urgent — its assignees hear, whatever their mute. */
+  | { kind: 'urgent'; actorId: string; taskId: string; assigneeIds: string[] }
   | { kind: 'mention'; actorId: string; taskId: string; commentId: string | null; mentionedIds: string[] }
   | { kind: 'due_soon' | 'overdue'; actorId: null; taskId: string; dueDate: string }
 
@@ -39,7 +43,7 @@ export function stageHolders(task: RTask, members: RMember[]): string[] {
 }
 
 /** Kinds that reach people regardless of a mute (FR-032). */
-export const IGNORES_MUTE: NotificationKind[] = ['mention', 'assigned']
+export const IGNORES_MUTE: NotificationKind[] = ['mention', 'assigned', 'urgent']
 
 /**
  * The members to notify, in a stable order: the actor removed, each person
@@ -62,13 +66,13 @@ export function resolveRecipients(
   let list: string[]
   switch (event.kind) {
     case 'comment':
-      list = [...people(task.assignee_id, task.task_owner_id, task.created_by), ...followIds]
+      list = [...people(task.assignee_id, ...(task.assignee_ids ?? []), task.task_owner_id, task.created_by), ...followIds]
       break
     case 'reply':
       list = [event.parentAuthorId, ...event.threadAuthorIds, ...followIds]
       break
     case 'attachment':
-      list = [...people(task.assignee_id, task.task_owner_id, task.created_by), ...stageHolders(task, members), ...followIds]
+      list = [...people(task.assignee_id, ...(task.assignee_ids ?? []), task.task_owner_id, task.created_by), ...stageHolders(task, members), ...followIds]
       break
     case 'task_created_in_stage':
     case 'task_moved_to_stage':
@@ -77,12 +81,15 @@ export function resolveRecipients(
     case 'assigned':
       list = [event.assigneeId]
       break
+    case 'urgent':
+      list = event.assigneeIds
+      break
     case 'mention':
       list = event.mentionedIds
       break
     case 'due_soon':
     case 'overdue':
-      list = [...people(task.assignee_id), ...stageHolders(task, members)]
+      list = [...people(task.assignee_id, ...(task.assignee_ids ?? [])), ...stageHolders(task, members)]
       break
   }
   const known = new Set(members.map(m => m.id))

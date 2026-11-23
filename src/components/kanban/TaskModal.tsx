@@ -45,6 +45,10 @@ import { DescriptionLabel, PanelFieldSections, PanelTopFields, REQUIRED_EVENT, h
 import { useCardFields } from '@/components/fields/CardFields'
 import { TypeIcon } from '@/components/types/TypeIcon'
 import { typeName } from '@/lib/task-types'
+import { PRIORITIES, asPriority, priorityColor } from '@/lib/priorities'
+import type { Priority } from '@/types/index'
+import { AssigneesPicker } from '@/components/people/AssigneesPicker'
+import { TagPicker } from '@/components/tags/TagPicker'
 
 /**
  * Task detail — rebuilt to the ClickUp reference.
@@ -71,7 +75,6 @@ type FullTask = Task & {
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
-const PRIORITIES = ['High', 'Medium', 'Low']
 
 /** The brand palette — blue primary, lime-green secondary accent. */
 const CU = {
@@ -682,11 +685,14 @@ export function TaskModal({
   // Mirrors canAct() in the server action — owner or assignee, or a manager.
   const canEdit =
     task.task_owner_id === currentUser.id ||
-    task.assignee_id === currentUser.id ||
+    task.assignee_id === currentUser.id || !!task.assignee_ids?.includes(currentUser.id) ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
 
   const isAdmin     = currentUser.access === 'admin'
+  const tPri        = useTranslations('priority')
+  const tAs         = useTranslations('assignees')
+  const tTags       = useTranslations('tags')
   const typeOf      = contentTypes.find(c => c.label === task.content_type_label)
   const cardFields  = useCardFields()
   const withSections = hasSections(task, cardFields?.fields, cardFields?.links)
@@ -694,7 +700,7 @@ export function TaskModal({
   const isPublished = task.status === 'publish'
 
   const isOwnStage = stageMeta.owner_role === null
-    ? task.assignee_id === currentUser.id || task.task_owner_id === currentUser.id
+    ? task.assignee_id === currentUser.id || task.task_owner_id === currentUser.id || !!task.assignee_ids?.includes(currentUser.id)
     : stageMeta.owner_role === currentUser.role
 
   const canAdvance = !isPublished && nextStage !== null && (isOwnStage || isAdmin || isSuperuser)
@@ -1781,25 +1787,19 @@ export function TaskModal({
                 {/* Assignee is who is doing it; Owner sits in Fields below and
                     is who is answerable for it. Everything personal — My Day,
                     the attention card, the bell — follows this one. */}
-                <Prop icon="user" label="Assignee">
-                  <InlineValue
-                    canEdit={canEdit} type="select"
-                    value={task.assignee_id ?? ''}
-                    display={assignee ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-                        <Avatar name={assignee.name} size={26} />
-                        {assignee.name}
-                      </span>
-                    ) : ''}
-                    emptyLabel="Nobody yet"
-                    options={[{ value: '', label: '— nobody —' },
-                              ...members.map(m => ({ value: m.id, label: m.name }))]}
-                    onCommit={v => applyPatch({ assignee_id: v || null })}
-                  />
+                <Prop icon="user" label={tAs('label')}>
+                  {/* Spec 023 (US5): several assignees, the first is the lead. */}
+                  <AssigneesPicker taskId={task.id} ids={task.assignee_ids?.length ? task.assignee_ids : task.assignee_id ? [task.assignee_id] : []}
+                    hours={task.assignee_hours ?? {}} estimate={Number(task.hours_estimate ?? 0)} members={members} canEdit={canEdit} />
                 </Prop>
 
                 {/* Spec 023: fields placed in the top rows (Channels), after Assignee. */}
                 <PanelTopFields task={task} canEdit={canEdit} Row={({ label, children }) => <Prop icon="platform" label={label}>{children}</Prop>} />
+
+                {/* Spec 023 (US4): tags, unless the brand has them switched off. */}
+                {on('tags') && <Prop icon="tag" label={tTags('title')}>
+                  <TagPicker taskId={task.id} value={task.tag_ids ?? []} tags={cardFields?.tags ?? []} canEdit={canEdit} />
+                </Prop>}
 
                 {/* Publishing date: set by people. It moves an automatic due date. */}
                 <Prop icon="calendar" label={tDates('publish')}>
@@ -1848,14 +1848,12 @@ export function TaskModal({
                     canEdit={canEdit} type="select" value={task.priority}
                     display={
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <Icon name="flag" size={15}
-                              color={task.priority === 'High' ? '#E5484D'
-                                   : task.priority === 'Medium' ? '#E8A33D' : '#8F95A1'} />
-                        {task.priority}
+                        <Icon name="flag" size={15} color={priorityColor(task.priority)} />
+                        <span data-priority={asPriority(task.priority) ?? 'None'}>{tPri(asPriority(task.priority) ?? 'None')}</span>
                       </span>
                     }
-                    options={PRIORITIES.map(p => ({ value: p, label: p }))}
-                    onCommit={v => applyPatch({ priority: v as 'Low' | 'Medium' | 'High' })}
+                    options={PRIORITIES.map(p => ({ value: p, label: tPri(p) }))}
+                    onCommit={v => applyPatch({ priority: v as Priority })}
                   />
                 </Prop>}
 

@@ -11,7 +11,7 @@ import { requireAdmin } from '@/lib/authz'
 import { isTypeColor, isTypeIcon } from '@/lib/task-types'
 
 type Fail = { success: false; error: string }
-const PRIORITIES = ['Urgent', 'High', 'Normal', 'Medium', 'Low', 'None']
+const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low', 'None']
 
 export async function saveTaskType(label: string, patch: {
   label?: string; name_ar?: string | null; icon?: string; color?: string; default_priority?: string | null

@@ -35,17 +35,17 @@ export function MyTasks({ data }: { data: BoardData }) {
   const me = data.currentUser.id
   const [show, setShow] = useState<Show>('all')
   const scope = useMemo(() => (x: Task) => {
-    const assigned = x.assignee_id === me
+    const assigned = x.assignee_id === me || !!x.assignee_ids?.includes(me)
     const handed = x.task_owner_id === me && x.assignee_id !== me
     return show === 'assigned' ? assigned : show === 'handed' ? handed : assigned || handed
   }, [me, show])
   const tasks = viewTasks(data).filter(x => !x.dropped_at && scope(x))
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
-  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes }), [data])
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
 
   const baseGroups: [string, ViewTask[]][] = [
-    [t('working'), tasks.filter(x => x.assignee_id === me && !finished(x))],
+    [t('working'), tasks.filter(x => (x.assignee_id === me || !!x.assignee_ids?.includes(me)) && !finished(x))],
     [t('handedGroup'), tasks.filter(x => x.assignee_id !== me && !finished(x))],
     [t('published'), tasks.filter(finished)],
   ]

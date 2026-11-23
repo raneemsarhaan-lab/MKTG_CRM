@@ -12,6 +12,7 @@
 import type { SheetTaskMap, TaskField } from '@/types/index'
 import { TASK_FIELDS, WORD_FIELDS } from '@/types/index'
 import { parseDate } from '@/lib/sheet-format'
+import { asPriority, readPriority } from '@/lib/priorities'
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 
@@ -135,8 +136,8 @@ export function matchStage(text: string, stages: { id: string; names: string[] }
   if (!t) return null
   return stages.find(s => s.id.toLowerCase() === t || s.names.some(n => normTitle(n) === t))?.id ?? wordValue(text, words)
 }
-const PRIORITY: Record<string, 'Low' | 'Medium' | 'High'> = { low: 'Low', medium: 'Medium', high: 'High', 'منخفضة': 'Low', 'متوسطة': 'Medium', 'عالية': 'High' }
-export const matchPriority = (text: string, words?: Record<string, string[]>) => PRIORITY[normTitle(text)] ?? (wordValue(text, words) as 'Low' | 'Medium' | 'High' | null)
+/** Spec 023: Urgent, High, Normal (or Medium), Low, No priority — English or Arabic. */
+export const matchPriority = (text: string, words?: Record<string, string[]>) => readPriority(text) ?? asPriority(wordValue(text, words))
 /** A typed date as yyyy-mm-dd, or null. */
 export function readDay(text: string): string | null {
   const d = parseDate(text)

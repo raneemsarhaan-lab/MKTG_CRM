@@ -245,7 +245,7 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
             name: title, project_id: theme.id, pillar_id: pillarId, brand_id: theme.brand_id,
             content_type_label: type ?? 'Post', task_owner_id: owner, assignee_id: null,
             initiator_role: member.role, status: status.stage as StageId, stage_date: stageDateFor(status.stage),
-            dropped_at: status.archived ? now : null, hours_estimate: 0, priority: 'Medium', created_by: member.id,
+            dropped_at: status.archived ? now : null, hours_estimate: 0, priority: 'Normal', created_by: member.id,
             post_url: links.post, published_url: links.published,
           },
         })
@@ -304,7 +304,7 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
     data: {
       name: title, project_id: themeId, pillar_id: pillarId, brand_id: theme.brand_id, content_type_label: 'Post',
       task_owner_id: owner, assignee_id: assignee, initiator_role: member.role, status: 'todo', stage_date: new Date(),
-      hours_estimate: 0, priority: 'Medium', created_by: member.id,
+      hours_estimate: 0, priority: 'Normal', created_by: member.id,
     },
   })
   // Spec 021: a piece is content work — it shows in the Content Space, and in its assignee's.

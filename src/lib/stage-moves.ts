@@ -20,20 +20,22 @@ interface MoveTask {
   nine_stage: boolean
   task_owner_id: string
   assignee_id?: string | null
+  /** Spec 023 (R9): every assignee (lead and others); any of them holds a working stage. */
+  assignee_ids?: string[] | null
   dropped_at?: string | Date | null
 }
 interface MoveMember { id: string; role: string; access: AccessLevel | string }
 
 /** Whether the member holds the task's current stage (the right to hand it on). */
 export function holdsStage(
-  task: Pick<MoveTask, 'status' | 'task_owner_id' | 'assignee_id'>,
+  task: Pick<MoveTask, 'status' | 'task_owner_id' | 'assignee_id' | 'assignee_ids'>,
   member: Pick<MoveMember, 'id' | 'role'>,
 ): boolean {
   const meta = STAGE_META[task.status as StageId]
   if (!meta) return false
   return meta.owner_role
     ? meta.owner_role === member.role
-    : task.assignee_id === member.id || task.task_owner_id === member.id
+    : task.assignee_id === member.id || task.task_owner_id === member.id || !!task.assignee_ids?.includes(member.id)
 }
 
 /** Every stage the member may move this task to, in path order; [] when none. */

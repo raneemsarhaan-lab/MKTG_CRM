@@ -158,7 +158,7 @@ export async function setFieldValues(writes: FieldWrite[]): Promise<{ success: t
   const list = (Array.isArray(writes) ? writes : []).slice(0, 5000)
   const taskIds = [...new Set(list.map(w => w.taskId))], fieldIds = [...new Set(list.map(w => w.fieldId))]
   const [tasks, fields, links] = await Promise.all([
-    prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, task_owner_id: true, assignee_id: true, content_type_label: true, dropped_at: true } }),
+    prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, task_owner_id: true, assignee_id: true, content_type_label: true, dropped_at: true, assignees: { select: { member_id: true } } } }),
     prisma.taskField.findMany({ where: { id: { in: fieldIds } } }),
     prisma.taskTypeField.findMany({ where: { field_id: { in: fieldIds } } }),
   ])
@@ -166,7 +166,7 @@ export async function setFieldValues(writes: FieldWrite[]): Promise<{ success: t
   for (const w of list) {
     const task = tasks.find(t => t.id === w.taskId), raw = fields.find(f => f.id === w.fieldId)
     if (!task || !raw || raw.retired_at) { results.push({ taskId: w.taskId, fieldId: w.fieldId, ok: false, error: 'not_found' }); continue }
-    if (!canActOn(task, me)) { results.push({ taskId: w.taskId, fieldId: w.fieldId, ok: false, error: 'not_authorized' }); continue }
+    if (!canActOn({ ...task, assignee_ids: task.assignees.map(a => a.member_id) }, me)) { results.push({ taskId: w.taskId, fieldId: w.fieldId, ok: false, error: 'not_authorized' }); continue }
     if (!applies(task.content_type_label, raw.id, links.map(l => ({ ...l, required_from: null, default_value: null })))) { results.push({ taskId: w.taskId, fieldId: w.fieldId, ok: false, error: 'not_applicable' }); continue }
     const p = parseValue(mapTaskField(raw), w.value)
     if (!p.ok) { results.push({ taskId: w.taskId, fieldId: w.fieldId, ok: false, error: 'invalid' }); continue }

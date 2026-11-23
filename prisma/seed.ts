@@ -491,6 +491,13 @@ async function main() {
     return `${n} attachments`
   })
 
+  // Spec 023 (D7): Medium is now called Normal.
+  await once('priority-normal-v1', 'renamed priority Medium to Normal', async () => {
+    const t = await prisma.task.updateMany({ where: { priority: 'Medium' }, data: { priority: 'Normal' } })
+    await prisma.contentType.updateMany({ where: { default_priority: 'Medium' }, data: { default_priority: 'Normal' } })
+    return `${t.count} tasks`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

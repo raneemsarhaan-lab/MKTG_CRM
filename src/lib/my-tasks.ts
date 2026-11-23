@@ -19,11 +19,11 @@ export type Tile = 'today' | 'upcoming' | 'overdue' | 'all'
 export const stagesHeldBy = (role: string): StageId[] => ALL_STAGES.filter(s => STAGE_META[s].owner_role === role)
 
 export function isMine(
-  t: { status: string; assignee_id?: string | null; dropped_at?: unknown },
+  t: { status: string; assignee_id?: string | null; assignee_ids?: string[] | null; dropped_at?: unknown },
   me: { id: string; role: string },
 ): boolean {
   if (t.dropped_at || t.status === 'publish') return false
-  if (t.assignee_id === me.id) return true
+  if (t.assignee_id === me.id || t.assignee_ids?.includes(me.id)) return true
   return STAGE_META[t.status as StageId]?.owner_role === me.role
 }
 

@@ -12,12 +12,14 @@ import { TaskTypesPage } from '@/components/types/TaskTypesPage'
 export default async function TaskTypesRoute() {
   const member = await getSessionMember()
   if (!member) redirect('/login')
-  const [types, fields, links, sla, counts] = await Promise.all([
+  const [types, fields, links, sla, counts, tags] = await Promise.all([
     prisma.contentType.findMany({ orderBy: [{ position: 'asc' }, { label: 'asc' }] }),
     prisma.taskField.findMany({ orderBy: [{ position: 'asc' }, { created_at: 'asc' }] }),
     prisma.taskTypeField.findMany({ orderBy: { position: 'asc' } }),
     prisma.slaConfig.findMany({ select: { content_type_label: true, max_business_days: true } }),
     prisma.task.groupBy({ by: ['content_type_label'], where: { dropped_at: null }, _count: { _all: true } }),
+    // Spec 023 (US4): the workspace's tags, with how many tasks use each.
+    prisma.tag.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, _count: { select: { tasks: true } } } }),
   ])
   const slaDays: Record<string, number> = {}
   for (const r of sla) slaDays[r.content_type_label] = (slaDays[r.content_type_label] ?? 0) + Number(r.max_business_days)
@@ -32,6 +34,7 @@ export default async function TaskTypesRoute() {
       taskCounts={taskCounts}
       canEditTypes={member.access === 'admin'}
       canEditFields={member.access !== 'user'}
+      tags={tags.map(x => ({ id: x.id, name: x.name, color: x.color, count: x._count.tasks }))}
     />
   )
 }

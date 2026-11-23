@@ -1,7 +1,14 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 4.0.0 → 4.1.0 (2026-11-23)
+Version change: 4.1.0 → 4.2.0 (2026-11-23)
+Type of bump: MINOR — spec 023 Stage B (T040): a task has several assignees,
+  the first is the lead (tasks.assignee_id); any assignee holds a working
+  stage and may edit the task; Priority is Urgent | High | Normal | Low | None
+  (Medium renamed Normal); Urgent sorts first and notifies, it does not change
+  the SLA.
+
+Previous: 4.0.0 → 4.1.0 (2026-11-23)
 Type of bump: MINOR — spec 023 Stage A (T002): required fields join the one
   move rule; milestones are calendar markers, not tasks; task types are data.
 
@@ -126,6 +133,9 @@ constitution amendment. Its definition lives in `src/lib/stage-meta.ts`.
 | 11| `publish`       | Published         | تم النشر                    | Ship    | — (terminal)        |
 
 **Rules:**
+- **Assignee** in the table means any of the task's assignees (spec 023): the
+  first is the lead and is `tasks.assignee_id`; the others are in
+  `task_assignees`. Any of them, and the task's owner, holds a working stage.
 - **C-Check is optional per task.** A task created "with C-Check" has 11 stages;
   without it, 10 (`EIGHT_STAGE` in code, named for history). The choice is made
   at creation from the task's brand default (`brands.nine_stage_default`), else
@@ -234,7 +244,7 @@ preserved in every refactor.
 **Rules:**
 - A celebration fires for **one person**, the one who acted, never broadcast.
 - Pipeline tasks: it fires when a member advances a stage they personally own
-  (working stages for the assignee/owner, review stages for the matching role).
+  (working stages for any assignee or the owner, review stages for the matching role).
   The server's move result (`shouldCelebrate`) is authoritative.
 - Tasks migrated from simple tasks (spec 022) never celebrate.
 - Celebrations are opt-in per member (`celebrationsOn`).
@@ -265,6 +275,9 @@ identity and makes completing work feel rewarding.
   each has an Arabic name, an icon, a colour, defaults for new tasks and the
   fields attached to it. Field definitions, their attachments, every task's
   values and milestones live in Postgres.
+- **Priority** is `Urgent | High | Normal | Low | None` (spec 023 D7–D8); stored
+  `Medium` reads as Normal. Urgent sorts first in every list and notifies the
+  assignees; it never shortens an SLA.
 - **Types**: `StageId`, `ContentType`, `Priority`, `Platform`, `AccessLevel`,
   `MediaBoard` are exhaustive unions in `src/types/index.ts`; adding a value
   updates that file first. (`TaskKind` and `SimpleStatus` are retired.)
@@ -326,4 +339,4 @@ src/
 - Spec Kit skills (`/speckit-plan`, `/speckit-specify`, …) read this file to
   enforce compliance gates.
 
-**Version**: 4.1.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23
+**Version**: 4.2.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23

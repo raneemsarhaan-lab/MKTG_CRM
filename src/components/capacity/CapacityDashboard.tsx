@@ -3,6 +3,7 @@
 import type { Member, Task } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
 import { MemberCapacityCard } from './MemberCapacityCard'
+import { PRIORITIES, PRIORITY_COLOR as PCOLOR, asPriority } from '@/lib/priorities'
 
 type TaskWithBrand = Task & { brand?: { id: string; name: string; color: string } }
 
@@ -32,15 +33,9 @@ export function CapacityDashboard({ members, tasks }: CapacityDashboardProps) {
   const brandRows = Object.values(brandTotals).sort((a, b) => b.hours - a.hours)
 
   // Priority distribution
-  const priorityCounts = {
-    High:   activeTasks.filter(t => t.priority === 'High').length,
-    Medium: activeTasks.filter(t => t.priority === 'Medium').length,
-    Low:    activeTasks.filter(t => t.priority === 'Low').length,
-  }
+  const priorityCounts = Object.fromEntries(PRIORITIES.map(p => [p, activeTasks.filter(t => (asPriority(t.priority) ?? 'None') === p).length])) as Record<string, number>
 
-  const PRIORITY_COLOR: Record<string, string> = {
-    High: COLORS.coral, Medium: '#F59E0B', Low: COLORS.muted,
-  }
+  const PRIORITY_COLOR: Record<string, string> = { ...PCOLOR }
 
   return (
     <div style={{ overflowY: 'auto', height: '100%', background: '#F6F6F4' }}>
@@ -94,7 +89,7 @@ export function CapacityDashboard({ members, tasks }: CapacityDashboardProps) {
               Priority Distribution
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(['High', 'Medium', 'Low'] as const).map(p => {
+              {PRIORITIES.map(p => {
                 const count = priorityCounts[p]
                 const pct   = activeTasks.length > 0 ? Math.round((count / activeTasks.length) * 100) : 0
                 return (

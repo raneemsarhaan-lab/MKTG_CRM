@@ -5,6 +5,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { ALL_STAGES, STAGE_META } from '@/lib/stage-meta'
 import type { Brand, BrandFeatureKey, BrandFeatures, ContentType, Member, StageId } from '@/types/index'
 import { featureOnAny } from '@/lib/brand-features'
+import { PRIORITIES, PRIORITY_COLOR } from '@/lib/priorities'
 
 /**
  * Bulk action bar — ClickUp's pattern.
@@ -21,7 +22,7 @@ export interface BulkPatch {
   assignee_id?:        string | null
   brand_id?:           string
   content_type_label?: string
-  priority?:           'Low' | 'Medium' | 'High'
+  priority?:           import('@/types/index').Priority
   due_date?:           string
   /** The Content sheet's Date: the publishing date (its due date follows unless set by hand). */
   publish_date?:       string
@@ -153,7 +154,7 @@ export function BulkBar({
           ...(pillars ?? []).map(pl => <Item key={pl.id} onClick={() => { close(); onPillar?.(pl.id) }}>{pl.name}</Item>),
           <Item key="" onClick={() => { close(); onPillar?.(null) }}>{L.noPillar}</Item>,
         ]
-        case 'priority': return (['High', 'Medium', 'Low'] as const).map(p => <Item key={p} onClick={() => apply({ priority: p })}>{p}</Item>)
+        case 'priority': return PRIORITIES.map(p => <Item key={p} onClick={() => apply({ priority: p })}><span style={{ color: PRIORITY_COLOR[p] }}>⚑</span> {p === 'None' ? '–' : p}</Item>)
         case 'due': return (
           <div style={{ padding: 6, display: 'grid', gap: 6 }}>
             <input

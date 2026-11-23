@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { BrandFeatures, ContentType, Member, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
+import type { BrandFeatures, ContentType, Member, Tag, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
 import { applies, fieldName, formatValue, isEmpty, requiredEmpty } from '@/lib/task-fields'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { fieldOn } from '@/lib/brand-features'
@@ -22,6 +22,8 @@ export interface CardFieldsData {
   types: ContentType[]
   members: Member[]
   taskName?(id: string): string | undefined
+  /** Spec 023 (R8): the workspace's tags. */
+  tags: Tag[]
 }
 
 const Ctx = createContext<CardFieldsData | null>(null)
@@ -32,8 +34,8 @@ export function ShownFieldsProvider({ shown, children }: { shown: string[] | nul
   return <ShownCtx.Provider value={shown ?? null}>{children}</ShownCtx.Provider>
 }
 
-export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, children }: {
-  fields?: TaskFieldDef[]; links?: TaskTypeFieldLink[]; values?: TaskFieldValueRow[]; types: ContentType[]; members: Member[]
+export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, tags = [], children }: {
+  fields?: TaskFieldDef[]; links?: TaskTypeFieldLink[]; values?: TaskFieldValueRow[]; types: ContentType[]; members: Member[]; tags?: Tag[]
   taskName?(id: string): string | undefined; children: ReactNode
 }) {
   const shown = useContext(ShownCtx) ?? null
@@ -42,7 +44,7 @@ export function CardFieldsProvider({ fields = [], links = [], values = [], types
     for (const v of values) { let x = m.get(v.task_id); if (!x) m.set(v.task_id, (x = new Map())); x.set(v.field_id, v.value) }
     return m
   }, [values])
-  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName }), [shown, fields, links, byTask, types, members, taskName])
+  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName, tags }), [shown, fields, links, byTask, types, members, taskName, tags])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 

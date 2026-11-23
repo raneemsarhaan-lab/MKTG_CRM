@@ -151,7 +151,7 @@ export function VideoSheet(p: VideoSheetProps) {
   }, [p.highlightId, rows])
 
   const canEdit = useCallback((task: Task) =>
-    task.task_owner_id === me.id || task.assignee_id === me.id || me.access === 'admin' || me.access === 'superuser',
+    task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || me.access === 'admin' || me.access === 'superuser',
   [me])
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────

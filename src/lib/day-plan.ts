@@ -18,7 +18,7 @@ export interface PlanTask {
   /** Days from today — negative is overdue, null is undated. */
   due:   number | null
   /** Ordering hint inside a deadline. */
-  priority?: 'High' | 'Medium' | 'Low'
+  priority?: string | null
   /** True when `mins` is a default rather than somebody's estimate. */
   assumed?: boolean
 }
@@ -85,7 +85,7 @@ export const MIN_CHUNK = 15
 /** What a task with no estimate is assumed to take. */
 export const ASSUMED_MINS = 60
 
-const RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
+const RANK: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Medium: 2, Low: 3, None: 4 }
 
 /** An undated task starts three weeks out and walks towards the present. */
 const AGE_FROM = 21
@@ -112,7 +112,7 @@ export function orderTasks(tasks: PlanTask[], ageUndated = true): PlanTask[] {
     .map((t, i) => ({
       t,
       key: t.due ?? (ageUndated ? AGE_FROM : NEVER),
-      rank: RANK[t.priority ?? 'Medium'] ?? 1,
+      rank: RANK[t.priority ?? 'Normal'] ?? 2,
       seq: i,
     }))
     .sort((a, b) => a.key - b.key || a.rank - b.rank || a.seq - b.seq)

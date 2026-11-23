@@ -19,6 +19,7 @@ import { isProduction } from '@/lib/spaces'
 import { addAssigneeSpaces, addSpaces, loadSpaceContext } from '@/lib/spaces-server'
 import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import type { MoveTaskResult, StageId } from '@/types/index'
+import { withAssignees } from '@/lib/assignees-server'
 
 type Result = { success: true } | { success: false; error: string }
 
@@ -67,7 +68,8 @@ export async function handOff(
 ): Promise<MoveTaskResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
-  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  const found = await prisma.task.findUnique({ where: { id: taskId } })
+  const task = found ? await withAssignees(found) : null
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
   if (task.dropped_at || task.media_board) return { success: false, shouldCelebrate: false, error: 'invalid' }
 

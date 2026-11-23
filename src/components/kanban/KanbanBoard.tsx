@@ -72,6 +72,7 @@ interface KanbanBoardProps {
   taskFields?: import('@/types/index').TaskFieldDef[]
   typeFields?: import('@/types/index').TaskTypeFieldLink[]
   fieldValues?: import('@/types/index').TaskFieldValueRow[]
+  tags?: import('@/types/index').Tag[]
   initialTasks: FullTask[]
   currentUser: Member
   members: Member[]
@@ -134,7 +135,7 @@ const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toIS
 export function KanbanBoard(props: KanbanBoardProps) {
   const names = useMemo(() => new Map(props.initialTasks.map(x => [x.id, x.name])), [props.initialTasks])
   return (
-    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)}>
+    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags}>
       <KanbanBoardInner {...props} />
     </CardFieldsProvider>
   )
@@ -367,7 +368,7 @@ function KanbanBoardInner({
 
   const scopedTasks = useMemo(
     () => (scope === 'me'
-      ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id)
+      ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id))
       : liveTasks),
     [liveTasks, scope, currentUser.id],
   )
@@ -632,7 +633,7 @@ function KanbanBoardInner({
           id: c.id, name: c.name, parent_task_id: videoId, parent: { id: videoId, name: video?.name ?? '' },
           content_type_label: 'Reel', status: 'todo' as StageId, stage_date: now.slice(0, 10),
           task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined,
-          due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now,
+          due_date: null, priority: 'Normal' as const, created_at: now, updated_at: now,
           comments: [], subtasks: [], published_url: null, dropped_at: null, clip: c.clip,
           cover_image_url: undefined, cover_thumb: undefined,
           attachments: c.link_attachment ? [{ ...c.link_attachment, task_id: c.id, uploaded_by: currentUser.id }] : [],
@@ -700,7 +701,7 @@ function KanbanBoardInner({
         const base = tasks[0]
         if (base) setTasks(prev => [{
           ...base, id: res.id!, name: name.trim(), parent_task_id: null, parent: undefined, project_id: null, pillar_id: null,
-          content_type_label: 'Video', status: 'todo' as StageId, stage_date: now.slice(0, 10), due_date: null, priority: 'Medium' as const,
+          content_type_label: 'Video', status: 'todo' as StageId, stage_date: now.slice(0, 10), due_date: null, priority: 'Normal' as const,
           task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: currentUser.id, assignee: currentUser,
           created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [], published_url: null, post_url: null, dropped_at: null, clip: null,
           cover_image_url: undefined, cover_thumb: undefined,
@@ -758,7 +759,7 @@ function KanbanBoardInner({
               }
             })(),
             parent_task_id: null, parent: null,
-            due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
+            due_date: null, priority: 'Normal' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
             published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
           }, ...prev])
         }

@@ -17,6 +17,7 @@ import { PIPE } from '@/lib/pipeline-tokens'
 import { CardFieldValues, useCardFields, useCardShows } from '@/components/fields/CardFields'
 import { TypeIcon } from '@/components/types/TypeIcon'
 import { typeName } from '@/lib/task-types'
+import { TagChip } from '@/components/tags/TagPicker'
 
 /**
  * Board task card — Pipeline handoff §7 "Task card".
@@ -122,6 +123,10 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const locale = useLocale()
   const types = useCardFields()?.types
   const type = types?.find(x => x.label === task.content_type_label)
+  const ctx = useCardFields()
+  const tPri = useTranslations('priority')
+  const tagList = (task.tag_ids ?? []).map(id => ctx?.tags.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
+  const people = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => ctx?.members.find(m => m.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   // Stable per task, so a card does not reshuffle its bars on every render.
   const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
 
@@ -225,6 +230,12 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>
           </span>
         ))}
+        {/* Spec 023 (US4): up to three tags, then +N. */}
+        {featureOn(task.brand, 'tags') && tagList.slice(0, 3).map(tg => <TagChip key={tg.id} tag={tg} small />)}
+        {featureOn(task.brand, 'tags') && tagList.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, alignSelf: 'center' }}>+{tagList.length - 3}</span>}
+        {task.priority === 'Urgent' && featureOn(task.brand, 'priorities') && (
+          <span data-card-urgent="" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 800, padding: '4px 8px', borderRadius: 6, background: '#FDE7EA', color: '#D22040', whiteSpace: 'nowrap' }}>⚑ {tPri('Urgent')}</span>
+        )}
         {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (
           <span data-card-type={task.content_type_label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
             background: type?.color ? `${type.color}1A` : PIPE.surface, color: type?.color ?? PIPE.textMuted }}>
@@ -240,8 +251,12 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         marginTop: 10, gap: 8,
       }}>
         <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
-          <AssigneeDot name={task.task_owner.name} />
-          {currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
+          {/* Spec 023 (US5): up to three assignees, the lead first; otherwise the owner. */}
+          {people.length
+            ? people.slice(0, 3).map((m, i) => <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />)
+            : <AssigneeDot name={task.task_owner.name} />}
+          {people.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, marginInlineStart: 3 }}>+{people.length - 3}</span>}
+          {!people.length && currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
             <AssigneeDot name={currentStageOwner.name} stacked />
           )}
         </div>

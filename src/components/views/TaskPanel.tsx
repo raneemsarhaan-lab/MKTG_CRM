@@ -27,7 +27,7 @@ export function TaskPanel({ data }: { data: BoardData }) {
   if (!task) return null
   return (
     // Spec 023: the panel's task fields (Channels, Caption, TOV…) read the page's field data.
-    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members}
+    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members} tags={data.tags}
       taskName={id => tasks.find(x => x.id === id)?.name}>
     <TaskModal
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

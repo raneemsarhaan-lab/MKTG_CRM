@@ -47,7 +47,7 @@ export function makeLab() {
       id: `t${i}`, name: `${type} ${i}`, brand_id: brand.id, brand, content_type_label: type,
       task_owner_id: 'samaa', assignee_id: assignee, initiator_role: 'Content Creator',
       nine_stage: i % 3 !== 0, status, stage_date: '2026-11-20', due_date: `2026-12-${String((i % 28) + 1).padStart(2, '0')}`,
-      hours_estimate: 2, priority: 'Medium', created_at: '2026-11-01', updated_at: '2026-11-01', kind: 'pipeline', simple_status: null,
+      hours_estimate: 2, priority: 'Normal', created_at: '2026-11-01', updated_at: '2026-11-01', kind: 'pipeline', simple_status: null,
     } as Task
   })
   tasks.push({ ...tasks[0], id: 'simple1', name: 'Plan Q1', kind: 'simple', simple_status: 's-doing', status: 'todo', assignee_id: 'noran', task_owner_id: 'noran' })

@@ -40,8 +40,8 @@ export function clipsOf(tasks: SheetTask[], videoId: string): SheetTask[] {
 }
 
 /** Whether a task belongs to the member for the Mine toggle (FR-054). */
-export function isMine(t: Pick<Task, 'assignee_id' | 'task_owner_id'>, me: string): boolean {
-  return t.assignee_id === me || t.task_owner_id === me
+export function isMine(t: Pick<Task, 'assignee_id' | 'task_owner_id' | 'assignee_ids'>, me: string): boolean {
+  return t.assignee_id === me || t.task_owner_id === me || !!t.assignee_ids?.includes(me)
 }
 
 /** The most recent change across a video and its clips. */

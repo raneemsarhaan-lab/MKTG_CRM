@@ -53,7 +53,7 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
-  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes }), [data])
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   const campaigns = [...new Map(all.filter(x => x.project).map(x => [x.project!.id, x.project!])).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
   const folderName = folder ? t(`folders.${FOLDER_KEY[folder]}`) : null
