@@ -4,8 +4,11 @@
  * The task panel for views that aren't the Board (List, Calendar, Sheet):
  * the same TaskModal, opened from the shared `selectedTaskId`.
  */
+import { createTask } from '@/actions/tasks'
 import { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { setValue } from '@/actions/sheet-columns'
+import { TaskLinksSection, taskLinkFields } from '@/components/kanban/TaskLinks'
 import { useUIStore } from '@/store/useUIStore'
 import { TaskModal } from '@/components/kanban/TaskModal'
 import { viewTasks, type BoardData } from './types'
@@ -15,6 +18,7 @@ export function TaskPanel({ data }: { data: BoardData }) {
   const selectTask = useUIStore(s => s.selectTask)
   // A task link (?task=<id>) opens its panel here too, as it does on the Board.
   const linked = useSearchParams().get('task')
+  const router = useRouter()
   useEffect(() => { if (linked) selectTask(linked) }, [linked, selectTask])
   const tasks = viewTasks(data)
   const task = tasks.find(t => t.id === selectedTaskId)
@@ -34,6 +38,13 @@ export function TaskPanel({ data }: { data: BoardData }) {
       hasStorage={data.hasStorage}
       spaces={data.spaces}
       taskSpaces={data.taskSpaces}
+      linksSection={
+        <TaskLinksSection key={task.id} taskId={task.id} brandId={task.brand_id}
+          fields={taskLinkFields(data.sheetColumns, data.sheetValues, task.id)}
+          ctx={{ tasks, spaces: data.spaces, brands: data.brands, me: data.currentUser, workspaceNineStage: data.workspaceNineStage,
+            openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask }}
+          set={async (columnId, value) => { const r = await setValue(columnId, task.id, value).catch(() => ({ success: false })); router.refresh(); return r.success }} />
+      }
       onClose={() => selectTask(null)}
     />
   )

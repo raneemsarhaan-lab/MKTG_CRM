@@ -130,4 +130,6 @@ export interface ColumnsBundle {
   records: SheetColumnRecord[]
   values: SheetValues
   api: ColumnsApi
+  /** Spec 021: what Task link fields pick from and create in, when the host has it. */
+  taskLinks?: import('./LinkTaskPicker').TaskLinkCtx
 }

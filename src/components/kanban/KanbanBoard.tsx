@@ -1,5 +1,6 @@
 'use client'
 
+import { createTask } from '@/actions/tasks'
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -49,6 +50,7 @@ import { snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { featureOnAny } from '@/lib/brand-features'
 import { BulkBar, type BulkPatch } from './BulkBar'
+import { TaskLinkNames, TaskLinksSection, linkNamesByTask, taskLinkFields } from './TaskLinks'
 import { TaskForm } from '@/components/shared/TaskForm'
 import { handoffRequest } from '@/components/handoff/request'
 
@@ -104,6 +106,8 @@ interface KanbanBoardProps {
   taskSpaces?: TaskSpaceRow[]
   /** Spec 013: the linked sheets' saved row heights, by task id. */
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
+  /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
+  workspaceNineStage?: boolean
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
@@ -131,6 +135,7 @@ export function KanbanBoard({
   spaces = [],
   spaceMembers = [],
   taskSpaces = [],
+  workspaceNineStage = false,
 }: KanbanBoardProps) {
   const embedded = surface === 'sheets'
   /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
@@ -525,7 +530,14 @@ export function KanbanBoard({
       return r
     },
   }
-  const columnsBundle: ColumnsBundle = { records: colRecords, values: colValues, api: columnsApi }
+  const columnsBundle: ColumnsBundle = {
+    records: colRecords, values: colValues, api: columnsApi,
+    // Spec 021: Task link fields on the Content and Video sheets.
+    taskLinks: {
+      tasks, spaces, brands, me: currentUser, workspaceNineStage,
+      openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask,
+    },
+  }
 
   const sheetApi: ContentApi = {
     move: (taskId, to) => {
@@ -1056,9 +1068,17 @@ export function KanbanBoard({
       onOpenSheet={openSheet}
       spaces={spaces}
       taskSpaces={taskSpaces}
+      linksSection={
+        <TaskLinksSection key={selectedTask.id} taskId={selectedTask.id} brandId={selectedTask.brand_id}
+          fields={taskLinkFields(colRecords, colValues, selectedTask.id)} ctx={columnsBundle.taskLinks!}
+          set={async (columnId, value) => (await columnsApi.setValue(columnId, selectedTask.id, value)).success} />
+      }
       onClose={() => { setPreviewFor(null); setCommentFor(null); setSectionFor(null); selectTask(null) }}
     />
   )
+
+  // Spec 021: each card's Task links, by name.
+  const linkNames = useMemo(() => linkNamesByTask(colRecords, colValues, new Map(tasks.map(x => [x.id, x.name]))), [colRecords, colValues, tasks])
 
   /* ── The header (spec 011): top bar and title row, on every view ── */
   const header = (
@@ -1177,6 +1197,7 @@ export function KanbanBoard({
     : null
 
   return (
+    <TaskLinkNames.Provider value={linkNames}>
     <div
       className={selected.size > 0 ? 'fx-board-selecting' : undefined}
       style={{
@@ -1350,5 +1371,6 @@ export function KanbanBoard({
       {/* Task creation form */}
       {taskForm}
     </div>
+    </TaskLinkNames.Provider>
   )
 }

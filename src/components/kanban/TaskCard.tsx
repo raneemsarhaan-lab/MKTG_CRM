@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn } from '@/lib/brand-features'
+import { useTaskLinkNames } from './TaskLinks'
 import { useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
@@ -105,6 +106,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const brandColor = task.brand?.color ?? PIPE.textFaint
   const brandMark  = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
   const cover      = coverImageFor(task)
+  // Spec 021: the tasks this one links to (Task link fields), e.g. "↗ Ramadan launch plan".
+  const linkNames  = useTaskLinkNames(task.id)
 
   // Stable per task, so a card does not reshuffle its bars on every render.
   const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
@@ -199,6 +202,11 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         {task.kind === 'simple'
           ? <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={700}>{tViews('kindSimple')}</Chip>
           : featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
+        {linkNames.map(n => (
+          <span key={n} data-card-task-link="" title={n} style={{ display: 'inline-flex', alignItems: 'center', maxWidth: 170, height: 22, padding: '0 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: 'color-mix(in srgb, #5B5FC7 10%, transparent)', color: '#3B3F9E' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>
+          </span>
+        ))}
         {task.content_type_label && featureOn(task.brand, 'type') && (
           <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
             {task.content_type_label}

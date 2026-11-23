@@ -9,7 +9,7 @@ import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/typ
 import { isWebLink } from '@/lib/content-plan'
 import { CHOICE_COLORS } from '@/lib/tokens'
 
-export const COLUMN_KINDS: ColumnKind[] = ['text', 'number', 'date', 'link', 'person', 'choice', 'checkbox']
+export const COLUMN_KINDS: ColumnKind[] = ['text', 'number', 'date', 'link', 'person', 'choice', 'checkbox', 'task']
 export const MAX_CUSTOM_COLUMNS = 30
 export const MAX_NAME = 40
 export const MAX_OPTIONS = 50
@@ -208,8 +208,10 @@ export function readPastedValues(
 export interface ValueCtx {
   members?: { id: string; name: string }[]
   options?: ChoiceOption[]
+  /** Spec 021 (Task link): the tasks a value may name, by id or exact name. */
+  tasks?: { id: string; name: string }[]
 }
-export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long'
+export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long' | 'task'
 export type Parsed = { ok: true; value: string } | { ok: false; code: ParseCode }
 
 /** "2026-11-20" or "20/11/2026" (also 20.11.2026, 20-11-26) → YYYY-MM-DD, or null. */
@@ -255,6 +257,14 @@ export function parseValue(kind: ColumnKind, raw: string, ctx: ValueCtx = {}): P
       const o = os.find(x => x.id === v) ?? os.find(x => same(x.name, v))
       return o ? { ok: true, value: o.id } : { ok: false, code: 'choice' }
     }
+    case 'task': {
+      // One task (approved design): its id, or a name only one task has.
+      const ts = ctx.tasks ?? []
+      const byId = ts.find(x => x.id === v)
+      if (byId) return { ok: true, value: byId.id }
+      const named = ts.filter(x => same(x.name, v))
+      return named.length === 1 ? { ok: true, value: named[0].id } : { ok: false, code: 'task' }
+    }
     case 'checkbox': {
       const l = v.toLowerCase()
       if (YES.includes(l)) return { ok: true, value: '1' }
@@ -271,6 +281,7 @@ export function formatValue(kind: ColumnKind, value: string, ctx: ValueCtx = {})
     case 'person': return ctx.members?.find(m => m.id === value)?.name ?? ''
     case 'choice': return ctx.options?.find(o => o.id === value)?.name ?? ''
     case 'checkbox': return value === '1' ? 'yes' : ''
+    case 'task': return ctx.tasks?.find(x => x.id === value)?.name ?? ''
     case 'date': {
       const d = new Date(`${value}T00:00:00`)
       return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })

@@ -337,7 +337,8 @@ async function valueContext(columnId: string) {
   const col = await prisma.sheetColumn.findUnique({ where: { id: columnId } })
   if (!col || col.deleted_at || !col.kind) return null
   const members = col.kind === 'person' ? await prisma.member.findMany({ select: { id: true, name: true } }) : []
-  return { col, kind: col.kind as ColumnKind, ctx: { members, options: (col.options as unknown as ChoiceOption[]) ?? [] } }
+  const ctx: import('@/lib/sheet-columns').ValueCtx = { members, options: (col.options as unknown as ChoiceOption[]) ?? [] }
+  return { col, kind: col.kind as ColumnKind, ctx }
 }
 
 const canAct = (t: { task_owner_id: string; assignee_id: string | null }, m: { id: string; access: string }) =>
@@ -367,6 +368,16 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
   const refused: { taskId: string; code: string }[] = []
   const values: Record<string, string> = {}
   let saved = 0
+  // Spec 021 (Task link): the tasks the values name, by id or by name.
+  if (vc.kind === 'task') {
+    const raws = list.map(e => (e.raw ?? '').trim()).filter(Boolean)
+    const ids = raws.filter(r => /^[0-9a-f-]{36}$/i.test(r))
+    const names = raws.filter(r => !/^[0-9a-f-]{36}$/i.test(r))
+    vc.ctx.tasks = await prisma.task.findMany({
+      where: { dropped_at: null, OR: [{ id: { in: ids } }, ...names.map(n => ({ name: { equals: n, mode: 'insensitive' as const } }))] },
+      select: { id: true, name: true },
+    })
+  }
   for (const e of list) {
     const t = tasks.find(x => x.id === e.taskId)
     if (!t) { refused.push({ taskId: e.taskId, code: 'not_found' }); continue }
@@ -374,6 +385,8 @@ export async function setValues(columnId: string, entries: { taskId: string; raw
     if (t.dropped_at) { refused.push({ taskId: e.taskId, code: 'archived' }); continue }
     const p = parseValue(vc.kind, e.raw, vc.ctx)
     if (!p.ok) { refused.push({ taskId: e.taskId, code: `invalid_${p.code}` }); continue }
+    // A task never links to itself.
+    if (vc.kind === 'task' && p.value === e.taskId) { refused.push({ taskId: e.taskId, code: 'invalid_task_self' }); continue }
     const where = { column_id_task_id: { column_id: columnId, task_id: e.taskId } }
     if (!p.value) await prisma.sheetValue.deleteMany({ where: { column_id: columnId, task_id: e.taskId } })
     else await prisma.sheetValue.upsert({ where, create: { column_id: columnId, task_id: e.taskId, value: p.value, updated_by: me.id }, update: { value: p.value, updated_by: me.id, updated_at: new Date() } })

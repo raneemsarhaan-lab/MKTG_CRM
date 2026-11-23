@@ -476,7 +476,8 @@
         "link": "Link",
         "person": "Person",
         "choice": "Choice",
-        "checkbox": "Checkbox"
+        "checkbox": "Checkbox",
+        "task": "Task link"
       },
       "kindHelp": {
         "text": "Any words",
@@ -485,7 +486,8 @@
         "link": "A web address",
         "person": "One team member",
         "choice": "One option from a list",
-        "checkbox": "Yes or no"
+        "checkbox": "Yes or no",
+        "task": "One task, linked"
       },
       "reviewFit": "{n, plural, =0 {No values to convert.} one {The value fits {kind}.} other {All # values fit {kind}.}}",
       "reviewClear": "{bad} of {n} values won't fit {kind} and will be cleared: {examples}",
@@ -527,7 +529,9 @@
         "person": "Not a team member",
         "choice": "Not one of the options",
         "checkbox": "Use yes or no",
-        "long": "Too long: 2,000 characters at most"
+        "long": "Too long: 2,000 characters at most",
+        "task": "Not a task: pick one from the list",
+        "task_self": "A task can't link to itself"
       },
       "clear": "Clear",
       "checked": "Yes",
@@ -558,7 +562,37 @@
         "fillExistingClips": "{n, plural, one {Fills the empty cells of # clip already in the sheet} other {Fills the empty cells of # clips already in the sheet}}",
         "problemHead": "Problem"
       },
-      "removed": "{name} removed from the sheet. The tasks keep their values; add it back from ＋."
+      "removed": "{name} removed from the sheet. The tasks keep their values; add it back from ＋.",
+      "taskLink": {
+        "linkTask": "Link task",
+        "change": "Change link",
+        "unlink": "Unlink",
+        "open": "Open {name}",
+        "unlinked": "Unlinked {name}.",
+        "linked": "Linked {name}.",
+        "undo": "Undo",
+        "search": "Search tasks",
+        "noMatch": "No task matches \"{q}\".",
+        "create": "Create new task \"{name}\"",
+        "createEmpty": "Create new task",
+        "space": "Space",
+        "brand": "Brand",
+        "assignee": "Assignee",
+        "me": "{name} (me)",
+        "due": "Due",
+        "getsSimple": "Gets {space}'s stages (a simple task: no SLA, no approvals):",
+        "getsPipeline": "Gets {space}'s stages (the pipeline, with its owners, SLA and approvals):",
+        "cancel": "Cancel",
+        "make": "Create and link",
+        "making": "Creating…",
+        "failed": "Couldn't create the task: {reason}",
+        "pipeline": "Pipeline",
+        "simple": "Simple",
+        "missing": "A task that no longer exists",
+        "dialog": "Link a task to {name}",
+        "noBrand": "No brand",
+        "hint": "Type to search, ↑↓ to choose, Enter to link, Esc to close"
+      }
     },
     "more": "More sheet controls",
     "newClipButton": "+ New clip",

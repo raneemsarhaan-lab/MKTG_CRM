@@ -23,6 +23,7 @@ import {
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
+import { LinkTaskPicker, type TaskLinkCtx } from './LinkTaskPicker'
 import { SheetMenu, SheetPopover, type MenuItem } from './SheetMenu'
 import { SheetCombo, type ComboItem } from './SheetCombo'
 import { ColumnEditor } from './ColumnEditor'
@@ -34,10 +35,11 @@ import type { ColumnsBundle } from './types'
 type Popup =
   | { kind: 'menu'; anchor: HTMLElement; label: string; items: MenuItem[] }
   | { kind: 'rename'; anchor: HTMLElement; col: LaidColumn }
-  | { kind: 'editor'; anchor: HTMLElement; col?: LaidColumn; rel?: 'before' | 'after'; at?: string }
+  | { kind: 'editor'; anchor: HTMLElement; col?: LaidColumn; rel?: 'before' | 'after'; at?: string; preset?: ColumnKind }
   | { kind: 'panel'; anchor: HTMLElement }
   | { kind: 'delete'; anchor: HTMLElement; col: LaidColumn }
   | { kind: 'link'; anchor: HTMLElement; col: LaidColumn; task: Task; rowKey: string }
+  | { kind: 'task'; anchor: HTMLElement; col: LaidColumn; task: Task; rowKey: string; typed: string }
   | { kind: 'combo'; anchor: HTMLElement; label: string; items: ComboItem[]; current: string | null; clear?: boolean
       add?: { label(text: string): string; hint: string; allowed: boolean; deniedHint: string }
       onPick(key: string): void; onAdd?(text: string): void }
@@ -56,9 +58,12 @@ export interface UseSheetColumns {
   onNote(cellKey: string, note: string | null): void
   /** More items for a column's menu (the Video sheet's "Link to a board field…"). */
   extraMenu?(key: string, anchor: HTMLElement): MenuItem[]
+  /** Spec 021: what Task link fields pick from and create in. */
+  taskLinks?: TaskLinkCtx
 }
 
-export function useSheetColumns(o: UseSheetColumns) {
+export function useSheetColumns(given: UseSheetColumns) {
+  const o: UseSheetColumns = given.taskLinks || !given.bundle.taskLinks ? given : { ...given, taskLinks: given.bundle.taskLinks }
   const t = useTranslations('sheet.columns')
   const locale = useLocale()
   const { sheet, set, bundle, me } = o
@@ -70,7 +75,8 @@ export function useSheetColumns(o: UseSheetColumns) {
   const nameOf = useCallback((key: string) => byKey.get(key)?.name ?? (isCustomKey(key) ? '' : o.defaultName(key)), [byKey, o])
   const valuesOf = (key: string) => bundle.values[key.slice(2)] ?? {}
   const valueOf = (task: Task, key: string) => bundle.values[key.slice(2)]?.[task.id] ?? ''
-  const ctxFor = (c: LaidColumn) => ({ members: o.members, options: c.options })
+  const ctxFor = (c: LaidColumn) => ({ members: o.members, options: c.options, tasks: o.taskLinks?.tasks })
+  const taskName = (id: string) => o.taskLinks?.tasks.find(x => x.id === id)?.name ?? null
 
   // ── popups ──────────────────────────────────────────────────────────────
   const [popup, setPopup] = useState<Popup | null>(null)
@@ -192,8 +198,8 @@ export function useSheetColumns(o: UseSheetColumns) {
       // Spec 013 R8 (FR-060): team columns are open to every member on a live task.
       return !!c && ['text', 'number', 'date'].includes(c.kind ?? '') && !gone(task)
     },
-    isMenu: (key: string) => ['link', 'person', 'choice'].includes(byKey.get(key)?.kind ?? ''),
-    textValue: (task: Task, key: string) => valueOf(task, key),
+    isMenu: (key: string) => ['link', 'person', 'choice', 'task'].includes(byKey.get(key)?.kind ?? ''),
+    textValue: (task: Task, key: string) => (byKey.get(key)?.kind === 'task' ? taskName(valueOf(task, key)) ?? '' : valueOf(task, key)),
     cellClass: (key: string) => (byKey.get(key)?.kind === 'number' ? 'fx-sheet-num' : ''),
     readOnlyNote: (task: Task, key: string) => (gone(task) ? t('err.archived') : null),
     render: (task: Task, key: string): ReactNode => {
@@ -210,6 +216,7 @@ export function useSheetColumns(o: UseSheetColumns) {
         case 'date': return <span className="fx-sheet-ellipsis">{formatValue('date', v)}</span>
         case 'link': return <a className="fx-sheet-link fx-sheet-ellipsis" href={v} target="_blank" rel="noopener noreferrer" tabIndex={-1} onClick={e => e.stopPropagation()}>{siteName(v) || v}</a>
         case 'person': return <PersonChip member={o.members.find(m => m.id === v)} />
+        case 'task': return taskChip(task, c, v)
         case 'choice': {
           const op = c.options.find(x => x.id === v)
           return op ? <span className="fx-sheet-pill" style={{ background: op.color }}>{op.name}</span> : null
@@ -233,6 +240,7 @@ export function useSheetColumns(o: UseSheetColumns) {
       const note = custom.readOnlyNote(task, key)
       if (note) { o.onNote(`${rowKey}|${key}`, note); return }
       if (c.kind === 'link') { setPopup({ kind: 'link', anchor, col: c, task, rowKey }); return }
+      if (c.kind === 'task') { setPopup({ kind: 'task', anchor, col: c, task, rowKey, typed: '' }); return }
       if (c.kind === 'person') {
         const cur = valueOf(task, key)
         const items: MenuItem[] = [
@@ -257,11 +265,20 @@ export function useSheetColumns(o: UseSheetColumns) {
     clear: (task: Task, key: string, rowKey: string) => {
       const note = custom.readOnlyNote(task, key)
       if (note) { o.onNote(`${rowKey}|${key}`, note); return }
+      if (byKey.get(key)?.kind === 'task') { unlink(task, key, rowKey); return }
       void custom.set(task, key, '', rowKey)
     },
     /** A letter typed on a Choice cell opens its type-ahead with that letter. */
     typeAhead: (task: Task, key: string, ch: string, anchor: HTMLElement, rowKey: string) => {
       const c = byKey.get(key)
+      // Spec 021: typing in a Task link cell opens Link task, already searching for it.
+      if (c?.kind === 'task') {
+        const note = custom.readOnlyNote(task, key)
+        if (note) { o.onNote(`${rowKey}|${key}`, note); return true }
+        if (popupRef.current?.kind === 'task') return true
+        setPopup({ kind: 'task', anchor, col: c, task, rowKey, typed: ch })
+        return true
+      }
       if (c?.kind !== 'choice') return false
       if (popupRef.current?.kind === 'combo') { typed.current += ch; return true }
       const note = custom.readOnlyNote(task, key)
@@ -270,6 +287,40 @@ export function useSheetColumns(o: UseSheetColumns) {
       choiceCombo(task, c, anchor, rowKey)
       return true
     },
+  }
+
+  /** × Unlink: removed at once, with Undo. The linked task itself is untouched. */
+  function unlink(task: Task, key: string, rowKey: string) {
+    const prev = valueOf(task, key)
+    if (!prev) return
+    const name = taskName(prev) ?? t('taskLink.missing')
+    void custom.set(task, key, '', rowKey)
+    o.say(t('taskLink.unlinked', { name }), () => void custom.set(task, key, prev, rowKey))
+  }
+
+  /** A linked task: its name (opens it), ⇄ Change and × Unlink (approved 2026-11-22). */
+  function taskChip(task: Task, c: LaidColumn, id: string): ReactNode {
+    const name = taskName(id)
+    const cellOf = (el: HTMLElement) => (el.closest('[data-cell]') as HTMLElement | null) ?? el
+    const rowKeyOf = (el: HTMLElement) => cellOf(el).getAttribute('data-row-key') ?? ''
+    const can = !gone(task)
+    return (
+      <span className="fx-tasklink" data-task-link={id}>
+        <button type="button" tabIndex={-1} className={`fx-tasklink-name${name ? '' : ' is-missing'}`} data-tasklink-open=""
+                title={name ? t('taskLink.open', { name }) : undefined}
+                onClick={e => { e.stopPropagation(); if (name) o.taskLinks?.openTask(id) }}>
+          <span>{name ? `↗ ${name}` : t('taskLink.missing')}</span>
+        </button>
+        {can && (
+          <>
+            <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-tasklink-change="" aria-label={t('taskLink.change')} title={t('taskLink.change')}
+                    onClick={e => { e.stopPropagation(); const cell = cellOf(e.currentTarget); setPopup({ kind: 'task', anchor: cell, col: c, task, rowKey: rowKeyOf(e.currentTarget), typed: '' }) }}>⇄</button>
+            <button type="button" tabIndex={-1} className="fx-tasklink-ib" data-tasklink-unlink="" aria-label={t('taskLink.unlink')} title={t('taskLink.unlink')}
+                    onClick={e => { e.stopPropagation(); unlink(task, c.key, rowKeyOf(e.currentTarget)) }}>×</button>
+          </>
+        )}
+      </span>
+    )
   }
 
   function choiceCombo(task: Task, c: LaidColumn, anchor: HTMLElement, rowKey: string) {
@@ -342,9 +393,10 @@ export function useSheetColumns(o: UseSheetColumns) {
   }
   const customCount = laid.filter(c => c.kind).length
 
-  const openAdd = (anchor: HTMLElement) => {
+  /** ＋ Field: a new column, optionally of a kind chosen already (Task link). */
+  const openAdd = (anchor: HTMLElement, preset?: ColumnKind) => {
     if (customCount >= MAX_CUSTOM_COLUMNS) { o.say(t('err.limit')); return }
-    setPopup({ kind: 'editor', anchor })
+    setPopup({ kind: 'editor', anchor, preset })
   }
   const toolbar = (
     <>
@@ -384,6 +436,7 @@ export function useSheetColumns(o: UseSheetColumns) {
       <SheetPopover anchor={popup.anchor} label={heading} onClose={close}>
         <ColumnEditor
           initial={c?.kind ? { name: c.name ?? '', kind: c.kind, options: c.options } : undefined}
+          preset={popup.preset}
           values={c ? valuesOf(c.key) : {}}
           members={o.members}
           heading={heading}
@@ -466,6 +519,23 @@ export function useSheetColumns(o: UseSheetColumns) {
                       o.onNote(`${rowKey}|${c.key}`, null)
                       return null
                     }} />
+      </SheetPopover>
+    )
+  } else if (popup?.kind === 'task' && o.taskLinks) {
+    const { col: c, task, rowKey, typed: first } = popup
+    const ctx = o.taskLinks
+    layer = (
+      <SheetPopover anchor={popup.anchor} label={t('taskLink.dialog', { name: nameOf(c.key) })} onClose={close}>
+        <LinkTaskPicker ctx={ctx} typed={first} current={valueOf(task, c.key) || null} exclude={task.id}
+                        brandId={task.brand_id || null} onClose={() => close(true)}
+                        onPick={async (id, name) => {
+                          close(true)
+                          const prev = valueOf(task, c.key)
+                          const r = await api.setValue(c.key.slice(2), task.id, id)
+                          if (!r.success) { o.onNote(`${rowKey}|${c.key}`, err(r.error)); return }
+                          o.onNote(`${rowKey}|${c.key}`, null)
+                          o.say(t('taskLink.linked', { name }), () => void custom.set(task, c.key, prev, rowKey))
+                        }} />
       </SheetPopover>
     )
   } else if (popup?.kind === 'combo') {

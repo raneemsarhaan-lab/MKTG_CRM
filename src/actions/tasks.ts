@@ -877,7 +877,8 @@ interface CreateTaskInput {
   task_owner_id:      string
   /** Who will do it. Defaults to the owner when not given. */
   assignee_id?:       string | null
-  due_date:           string
+  /** Spec 021 (Link task): a task made from a Task link may have no due date yet. */
+  due_date?:          string | null
   platform?:          string
   project_id?:        string | null
   hours_estimate?:    number
@@ -934,7 +935,7 @@ export async function createTask(
       nine_stage:         nineStage,
       status:             'todo',
       stage_date:         new Date(),
-      due_date:           new Date(input.due_date),
+      due_date:           input.due_date ? new Date(input.due_date) : null,
       hours_estimate:     input.hours_estimate ?? 0,
       priority:           input.priority ?? 'Medium',
       cover_image_url:    input.cover_image_url ?? null,
@@ -1017,7 +1018,7 @@ export async function createTasks(
 
   const nineStage = await nineStageFor(shared.brand_id)
   const now = new Date()
-  const due = new Date(shared.due_date)
+  const due = shared.due_date ? new Date(shared.due_date) : null
   const spaceCtx = await loadSpaceContext()
   const kind = kindForSpace(shared.space_id, spaceCtx)
 

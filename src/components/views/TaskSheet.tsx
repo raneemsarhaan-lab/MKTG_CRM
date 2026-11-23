@@ -21,6 +21,7 @@
  * Its formats, rules and view live on the workbook's Tasks sheet ('tasks:<node>');
  * its columns are that sheet's (spec 010 records keyed by the same id).
  */
+import { createTask } from '@/actions/tasks'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -46,7 +47,7 @@ import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
 import { useGridTips } from '@/components/sheet/useGridTips'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { FIELDS_OPEN, PresetFieldsDrawer, type PresetRow } from '@/components/sheets/links/FieldsPanel'
-import type { BoardData, ViewTask } from './types'
+import { viewTasks, type BoardData, type ViewTask } from './types'
 
 type Row =
   | { key: string; kind: 'group'; label: string; count: number }
@@ -114,7 +115,9 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     return () => { live = false }
   }, [notes])
 
-  const sayNow = (text: string) => setSay(text)
+  // An Undo travels with the message it belongs to (Task link: unlink, link).
+  const [undoFor, setUndoFor] = useState<{ text: string; fn: () => void } | null>(null)
+  const sayNow = (text: string, undo?: () => void) => { setSay(text); setUndoFor(undo ? { text, fn: undo } : null) }
   const brands = data.brands
   const brandName = useMemo(() => new Map(brands.map(b => [b.id, b.name])), [brands])
   const memberName = useMemo(() => new Map(data.members.map(m => [m.id, m.name])), [data.members])
@@ -136,6 +139,12 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     defaultName: key => (key === NOTES ? t('col.notes') : t(`col.${key as 'title'}`)),
     canEdit: task => may(task as ViewTask), say: sayNow,
     onNote: (k, n) => setCellNotes(c => ({ ...c, [k]: n ?? undefined })),
+    // Spec 021: Task link fields pick from every task, and create in a Space.
+    taskLinks: {
+      tasks: viewTasks(data), spaces: data.spaces, brands: data.brands, me, workspaceNineStage: data.workspaceNineStage,
+      defaultSpaceId: /^tasks:space:/.test(sheet) ? sheet.slice('tasks:space:'.length) : null,
+      openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask,
+    },
   })
   const isCustom = (col: GridCol) => cl.custom.is(col)
   const cols: GridCol[] = [
@@ -314,6 +323,14 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     isText,
     textValue: (row, col) => (row.kind === 'task' ? shown(row.task, col) : ''),
     isMenu,
+    // Custom cells: a letter opens a Choice or Task link list; Space toggles a Checkbox; Delete clears (unlinks, with Undo).
+    onTypeAhead: (row, col, ch, anchor) => (row.kind === 'task' && isCustom(col) ? cl.custom.typeAhead(row.task as unknown as Task, col, ch, anchor, row.key) : false),
+    onActivate: (row, col) => (row.kind === 'task' && isCustom(col) ? cl.custom.activate(row.task as unknown as Task, col, row.key) : false),
+    onDelete: (row, col) => {
+      if (row.kind !== 'task' || !isCustom(col)) return false
+      cl.custom.clear(row.task as unknown as Task, col, row.key)
+      return true
+    },
     render: (row, col) => {
       if (row.kind === 'group') {
         return col === 'title'
@@ -430,6 +447,8 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
     })),
     { key: 'regular', text: tf('spreadsheetCol'), label: tf('spreadsheetCol'), group: tf('regularTitle'), onSelect: () => { const a = addAt; setAddAt(null); if (a) cl.openAdd(a) } },
+    // Spec 021: Task link sits in the ＋ Field menu, next to the other kinds.
+    { key: 'tasklink', text: tcol('kinds.task'), label: <span data-add-task-link="">⇢ {tcol('kinds.task')} <span className="fx-sheet-muted">· {tcol('kindHelp.task')}</span></span>, group: tf('regularTitle'), onSelect: () => { const a = addAt; setAddAt(null); if (a) cl.openAdd(a, 'task') } },
   ] : []
 
   if (!rows.length && !tasks.length) return <div className="fx-sheet-empty" data-task-sheet=""><p>{t('empty')}</p></div>
@@ -440,6 +459,9 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
         <div className="fx-sheet-sum" role="status" aria-live="polite">
           {notes && <span data-notes-hint="">{t('notesHint')}</span>}
           {say && <span className="fx-sheet-sum-bad" data-sheet-say="">{say}</span>}
+          {say && undoFor?.text === say && (
+            <button type="button" className="fx-sheet-btn" data-sheet-undo="" onClick={() => { const u = undoFor; setUndoFor(null); setSay(''); u.fn() }}>{tcol('taskLink.undo')}</button>
+          )}
         </div>
       )}
       <div className="fx-sheet-scroll">

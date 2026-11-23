@@ -86,6 +86,8 @@ const CU = {
 
 interface TaskModalProps {
   task: FullTask
+  /** Spec 021: the task's Task link fields ("Part of ↗ …" with ⇄ and ×), shown under Fields. */
+  linksSection?: React.ReactNode
   currentUser: Member
   stages: Stage[]
   slaConfig: SLAConfig
@@ -477,7 +479,7 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
-  spaces = [], taskSpaces = [],
+  spaces = [], taskSpaces = [], linksSection,
 }: TaskModalProps) {
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
@@ -1972,6 +1974,7 @@ export function TaskModal({
                 {fieldsOpen && (
                   <div>
                     {fields.filter(f => f.filled).map(f => f.node)}
+                    {linksSection}
                     {showEmpty && fields.filter(f => !f.filled).map(f => f.node)}
                     {emptyCount > 0 && (
                       <button type="button" onClick={() => setShowEmpty(v => !v)}

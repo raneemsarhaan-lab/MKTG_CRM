@@ -3198,3 +3198,40 @@ a.fx-pill:hover { filter: brightness(.95); }
 @media (max-width: 767px) {
   [data-view-host]:has([data-node-workbook]) { height: calc(100dvh - 62px - env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ── Spec 021: Task link field and Link task picker (design/spaces-stage-c.html §4) ── */
+.fx-tasklink { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.fx-tasklink-name { display: inline-flex; align-items: center; gap: 4px; min-width: 0; border: none; background: color-mix(in srgb, #5B5FC7 10%, transparent); color: #3B3F9E; border-radius: 6px; padding: 1px 7px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.fx-tasklink-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-tasklink-name:hover { text-decoration: underline; }
+.fx-tasklink-name.is-missing { background: transparent; color: var(--muted, #6B7280); font-weight: 500; font-style: italic; cursor: default; text-decoration: none; }
+.fx-tasklink-ib { flex: none; width: 20px; height: 20px; display: inline-grid; place-items: center; border: none; background: transparent; border-radius: 5px; color: var(--muted, #6B7280); font: inherit; font-size: 13px; line-height: 1; cursor: pointer; opacity: .55; }
+.fx-tasklink-ib:hover, .fx-tasklink-ib:focus-visible { opacity: 1; background: rgba(15, 23, 42, .07); color: var(--ink, #111827); }
+.fx-tasklink-add { color: var(--muted, #6B7280); font-size: 12px; opacity: 0; }
+.fx-sheet-td.is-active .fx-tasklink-add, .fx-sheet-td:hover .fx-tasklink-add { opacity: .8; }
+.fx-linkpick { display: grid; gap: 8px; min-width: 0; }
+/* The popover holding Link task is wider than the usual 300px. */
+.fx-sheet-pop:has(> .fx-linkpick), .fx-sheet-pop:has(.fx-linkpick) { width: 380px; }
+.fx-linkpick > input, .fx-linkpick select { width: 100%; box-sizing: border-box; border: 1px solid var(--line, #E5E7EB); border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; background: #fff; color: inherit; }
+.fx-linkpick-list { display: grid; gap: 1px; max-height: 280px; overflow-y: auto; }
+.fx-linkpick-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: none; background: transparent; border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; text-align: start; cursor: pointer; color: inherit; }
+.fx-linkpick-opt.is-hi { background: rgba(15, 23, 42, .06); }
+.fx-linkpick-opt.is-current { box-shadow: inset 3px 0 0 #5B5FC7; }
+.fx-linkpick-opt.is-create { font-weight: 700; border-top: 1px dashed var(--line, #E5E7EB); border-radius: 0 0 8px 8px; margin-top: 2px; }
+.fx-linkpick-name { display: grid; min-width: 0; }
+.fx-linkpick-name small { font-size: 11px; color: var(--muted, #6B7280); }
+.fx-linkpick-kind { flex: none; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 1px 7px; border: 1px dashed var(--muted, #9CA3AF); color: var(--muted, #6B7280); }
+.fx-linkpick-kind.is-pipe { border-style: solid; border-color: #5B5FC7; color: #3B3F9E; }
+.fx-linkpick-none { margin: 4px 8px; font-size: 12.5px; color: var(--muted, #6B7280); }
+.fx-linkpick-new { display: grid; gap: 8px; border: 1px solid var(--line, #E5E7EB); border-radius: 10px; padding: 10px; background: #FAFAF9; }
+.fx-linkpick-label { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted, #6B7280); margin-bottom: 3px; }
+.fx-linkpick-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx-linkpick-seg button { border: 1px solid var(--line, #E5E7EB); background: #fff; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; color: inherit; }
+.fx-linkpick-seg button[aria-checked="true"] { background: var(--ink, #111827); border-color: var(--ink, #111827); color: #fff; }
+.fx-linkpick-gets { margin: 0; display: grid; gap: 2px; font-size: 12px; }
+.fx-linkpick-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; font-size: 12.5px; }
+.fx-linkpick-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.fx-linkpick-err { margin: 0; font-size: 12px; color: #C2353A; font-weight: 600; }
+.fx-linkpick-hint { margin: 0; font-size: 11px; color: var(--muted, #6B7280); }
+.fx-linkpick-actions .is-go { background: #14131A; color: #fff; border-color: #14131A; }
+.fx-linkpick-actions .is-go:disabled { opacity: .45; cursor: default; }

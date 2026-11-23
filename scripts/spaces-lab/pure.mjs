@@ -170,4 +170,15 @@ check('pure-brand-features', () => {
   eq(m.getAlertStatus({ ...t, brand: { features: { sla: false } } }, {}, new Date('2026-01-01')), 'On Track', 'SLA off: no badge, no breach')
 })
 
+check('pure-task-link-values', () => {
+  const tasks = [{ id: '11111111-1111-1111-1111-111111111111', name: 'Ramadan launch plan' }, { id: '22222222-2222-2222-2222-222222222222', name: 'Poster' }, { id: '33333333-3333-3333-3333-333333333333', name: 'poster' }]
+  eq(m.COLUMN_KINDS.includes('task'), true, 'Task link is a field kind')
+  eq(m.parseValue('task', tasks[0].id, { tasks }), { ok: true, value: tasks[0].id }, 'by id')
+  eq(m.parseValue('task', '  ramadan LAUNCH plan ', { tasks }), { ok: true, value: tasks[0].id }, 'by its name, case and spacing ignored')
+  eq(m.parseValue('task', 'Poster', { tasks }).ok, false, 'a name two tasks share is refused')
+  eq(m.parseValue('task', 'Nothing', { tasks }), { ok: false, code: 'task' }, 'unknown')
+  eq(m.parseValue('task', '', { tasks }), { ok: true, value: '' }, 'empty unlinks')
+  eq(m.formatValue('task', tasks[0].id, { tasks }), 'Ramadan launch plan', 'shown as its name')
+})
+
 if (failed) process.exitCode = 1
