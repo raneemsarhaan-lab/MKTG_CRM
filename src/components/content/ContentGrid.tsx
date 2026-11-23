@@ -64,7 +64,7 @@ export function pieceLink(task: Task, col: typeof LINK_COLS[number]): string | n
 export function shortDate(ymd: string | null | undefined, lang = 'en'): string {
   if (!ymd) return ''
   const d = new Date(`${ymd.slice(0, 10)}T00:00:00`)
-  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(`${intlLocale(lang)}-u-nu-latn`, { day: 'numeric', month: 'short' }).format(d)
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(intlLocale(lang), { day: 'numeric', month: 'short' }).format(d)
 }
 
 export interface ContentGridProps {
