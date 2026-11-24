@@ -1036,7 +1036,7 @@ The task sheet (`TaskSheet.tsx`: one line per task, with a Space column) is the 
 
 Tests: `scripts/spaces-lab/realapp/scenarios-026.cjs`. The old Video sheet is out of the app; `scripts/sheet-lab/harness/` keeps its two files as the lab's harness for the shared grid (`npm run lab:sheet`).
 
-Also changed on 24 Nov at the user's request: a Space page has no brand filter chips (its brand folders are the filter; "Group by brand" stays); the sidebar shows numbers only on My tasks and Inbox (`NavTree.tsx`); the notifications page filters by All or one of four groups of kinds, with one list for the dates (`KIND_GROUPS` in `NotificationsPage.tsx`).
+Also changed on 24 Nov at the user's request: a Space page has no brand filter chips and no "Group by brand" (its brand folders are the filter; the board's grouping code in `KanbanColumn.tsx` is kept but nothing switches it on); the sidebar shows numbers only on My tasks and Inbox (`NavTree.tsx`); the notifications page filters by All or one of four groups of kinds, with one list for the dates (`KIND_GROUPS` in `NotificationsPage.tsx`).
 
 If a style change doesn't show in the dev server, its build cache is stale: stop it, delete `.next`, start it again.
 

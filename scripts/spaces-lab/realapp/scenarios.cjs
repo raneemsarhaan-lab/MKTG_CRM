@@ -43,12 +43,10 @@ module.exports = (EMAIL, psql, ok) => {
         await page.waitForSelector('.fx-board-cols')
         const rows = await page.$$eval('.fx-board-cols [data-task-card]', els => els.length)
         ok(String(rows) === want, `Video lists its Shows in tasks: ${rows} vs ${want}`)
-        // Spec 025: Board, Sheet and Calendar only; a brand filter and "Group by brand".
+        // Spec 025: Board, Sheet and Calendar only. No brand filter or "Group by brand" (user, 24 Nov 2026).
         const tabs = await page.$$eval('[role="toolbar"] [data-view-tab]', els => els.map(e => e.getAttribute('data-view-tab')))
         ok(tabs.join(',') === 'board,sheet,calendar', `the Space's views: ${tabs}`)
-        await page.check('[data-group-brand]')
-        ok(await page.locator('[data-brand-group]').count() > 0, 'Group by brand puts cards under their brand')
-        await page.uncheck('[data-group-brand]')
+        ok(!(await page.$('[data-group-brand]')) && !(await page.$('[data-brand-chip]')), 'no brand filter or Group by brand on the Space page')
       },
     },
     {

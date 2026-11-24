@@ -99,5 +99,5 @@ The Library row leaves the sidebar. The request says "Move its contents into Ass
 - **Sidebar numbers**: only My tasks and Inbox carry one. Spaces, folders and brands show their names
   alone. (The counts are still worked out with the page, in case they are wanted back.)
 - **The Space page's brand filter** is removed: a Space's brand folders in the sidebar are the
-  filter. "Group by brand" stays.
+  filter. "Group by brand" is removed too.
 

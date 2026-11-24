@@ -9,12 +9,10 @@
  * sheet, unchanged (FR-012). Other Spaces get the task Sheet (TaskSheet).
  */
 import { setWorkWeekend } from '@/lib/utils'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { ContentTheme, StageId, Task } from '@/types/index'
-import { PIPE } from '@/lib/pipeline-tokens'
-import { BrandGroupProvider } from '@/components/spaces/brandGroup'
 import { STAGE_META } from '@/lib/stage-meta'
 import { SpaceSettingsButton } from '@/components/spaces/SpaceSettings'
 import { inRange, mayCreateIn, newTaskLabel, typesForSpace } from '@/lib/space-settings'
@@ -52,14 +50,8 @@ export function SpacePage({ data, spaceId, brandId = null }: {
   const board = space.media_board ?? null
   // Spec 024 (§2): its views show only the stages from "Starts at" to "Ends at".
   const flow = space.settings.flow
-  // Spec 025 (§2): "Group by brand" on the Space page; a folder is one brand.
+  // Spec 025 (§2): a folder is one brand.
   const folderBrand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
-  const [groupBrand, setGroupBrand] = useState(false)
-  const prefKey = `momentum.space.${spaceId}`
-  useEffect(() => {
-    try { setGroupBrand(JSON.parse(window.localStorage.getItem(prefKey) ?? '{}').group === true) } catch { /* a preference, never required */ }
-  }, [prefKey])
-  const remember = (group: boolean) => { try { window.localStorage.setItem(prefKey, JSON.stringify({ group })) } catch { /* ignore */ } }
   const brandIds = useMemo(() => (brandId ? [brandId] : []), [brandId])
   const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status))
     && (!brandIds.length || (!!task.brand_id && brandIds.includes(task.brand_id))), [shown, board, flow, brandIds])
@@ -109,13 +101,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
           <span data-space-rule>{folderBrand ? t('folderRule', { space: label, brand: folderBrand.name }) : rule}</span>
           <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
         </span>
-        {/* User, 24 Nov 2026: no brand filter here — a Space's brand folders in the sidebar are the filter. */}
-        {!folderBrand && data.brands.length > 1 && (
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: PIPE.ink, justifySelf: 'start' }}>
-            <input type="checkbox" checked={groupBrand} data-group-brand onChange={e => { setGroupBrand(e.target.checked); remember(e.target.checked) }} />
-            {t('groupBrand')}
-          </label>
-        )}
+        {/* User, 24 Nov 2026: no brand filter and no "Group by brand" here — a Space's brand folders in the sidebar do that. */}
       </span>}
       tabs={[
         { key: 'board', label: tv('board') },
@@ -132,7 +118,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         const shownTasks = view ? applyView(tasks, view.config) : tasks
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
-        if (tab === 'board') return <BrandGroupProvider value={groupBrand && !folderBrand}><BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} /></BrandGroupProvider>
+        if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} />
         // Spec 026: every Space's Sheet view is its sheet of rows — themes, pillars, plain and linked rows —
         // inside a full workbook (tabs, toolbar, formatting, comments, blank tabs). The Content and Video
         // Spaces keep the workbooks their sheets always had, so formatting and comments carry over.

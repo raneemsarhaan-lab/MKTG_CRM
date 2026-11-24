@@ -48,7 +48,7 @@ open it on the brand's page (the task sheet's home), or in a saved Sheet view of
 | Asked | Done |
 |---|---|
 | The sheet's toolbar keeps only "+ Column" and "+ Theme", in every folder | Built, on every Space and Space › Brand folder sheet and the brand page's sheets. Nothing was lost: the columns open from the workbook's **Fields** button; **Paste plan…**, **Only my rows** and **Show archived** are in the workbook's **Data** menu (with a tick when on). Pasting a table onto a theme, pillar or "+ Row" still opens Paste plan |
-| No brand filters on a Space page | Built: the brand chips are gone (a Space's brand folders in the sidebar are the filter). "Group by brand" stays, as it is a grouping of the board, not a filter |
+| No brand filters on a Space page | Built: the brand chips and "Group by brand" are gone (a Space's brand folders in the sidebar do that) |
 | Sidebar numbers only for Inbox and My tasks | Built: Spaces, folders and brands show their names alone |
 | Simplify the notifications filters | Built: one row — All, Mentions, Comments, Assigned to me, Deadlines — and one list for the dates, in place of twelve kind chips and four date chips |
 
@@ -62,6 +62,5 @@ decide which of the sheet's own columns show until someone shows or hides one th
   into rows. They can be added one at a time with Make task › an existing task.
 - Blank sheets made in the old Sheets section (team folders) have no page of their own now. They
   still open by address. Should they move under a Space, or go?
-- "Group by brand" was left on the Space page when the brand filters were removed.
 - The local lab database had leftover test tasks, which were deleted before the final run. No
   real data was involved.
