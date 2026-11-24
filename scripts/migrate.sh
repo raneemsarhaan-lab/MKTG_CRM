@@ -24,6 +24,10 @@ set -e
 # The schema and the reference rows the app cannot render without. Fatal:
 # serving pages against a schema that was never pushed fails on every request,
 # which is worse than not starting.
+# First, a guard: `db push --accept-data-loss` would drop a column without asking. If the change
+# can lose or alter existing data, stop here, before anything is touched (scripts/schema-guard.sh).
+step 120 fatal   "Checking the schema change keeps all data" \
+  bash "$(dirname "$0")/schema-guard.sh"
 step 180 fatal   "Pushing Prisma schema to database" \
   prisma db push --accept-data-loss --skip-generate
 step 120 fatal   "Generating the Prisma client" \

@@ -23,7 +23,6 @@
  */
 import { runRecurring } from '@/lib/recurrence-server'
 import { prisma } from '@/lib/prisma'
-import { clearSheetOrphans } from '@/lib/sheet-cleanup'
 import type { NotificationKind, NotificationMeta } from '@/types/index'
 import { notify, deliver } from './notify'
 import { dueState, teamDay, teamClock, DEFAULT_TZ } from './days'
@@ -146,8 +145,10 @@ export async function runCleanup(now = new Date()): Promise<number> {
   const r = await prisma.notification.deleteMany({ where: { read_at: { not: null, lt: cutoff } } })
   await prisma.dueReminder.deleteMany({ where: { due_date: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
   await prisma.emailDigest.deleteMany({ where: { day: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
-  // Spec 015 (T057): formats and comment threads whose row, column or task is gone.
-  await clearSheetOrphans(now).catch(e => console.error('[cleanup] sheet orphans', e))
+  // Spec 015 (T057) clears formats and comment threads whose row, column or task is gone. It is NOT
+  // run in this release (user, 25 Nov 2026: nothing deletes live rows until its removal is approved):
+  // it is new, it deletes rows on a schedule, and it doesn't know the rows of the new sheets.
+  // `clearSheetOrphans` in src/lib/sheet-cleanup.ts is kept for when it is approved.
   return r.count
 }
 

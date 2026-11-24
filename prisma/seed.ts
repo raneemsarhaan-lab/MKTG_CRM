@@ -240,6 +240,18 @@ async function main() {
   })
 
   /**
+   * Release safety (user, 25 Nov 2026): the one-time steps below rewrite some existing values in
+   * place (stages of clips and linked rows, due dates, priority Medium → Normal, where the Video
+   * sheet's own columns belong, which projects are themes). Before any of them runs, the old values
+   * are copied into kept exports (Settings › Diagnostics › Kept exports), so nothing is lost.
+   */
+  await once('before-release-snapshot-v1', 'kept a copy of the values the one-time steps rewrite', async () => {
+    const { snapshotBeforeRelease } = await import('../src/lib/release-snapshot')
+    const r = await snapshotBeforeRelease(prisma)
+    return `${r.tasks} tasks, ${r.columns} sheet columns, ${r.projects} projects, ${r.types} task types`
+  })
+
+  /**
    * Spec 021 (research R3): the four team Spaces, with members started from
    * their job roles. Admins edit membership afterwards, so this runs once —
    * a later role change must not move anyone, and a Space an admin renamed
@@ -530,13 +542,10 @@ async function main() {
     return `${r.backfilled} rows and themes placed, ${r.exported} clip details exported, ${r.videos} videos and ${r.clips} clips as rows, ${r.themes} themes`
   })
 
-  // User, 24 Nov 2026: the folders of blank sheets made in the old Sheets section are removed; what
-  // their sheets held is kept as CSV exports first.
-  await once('team-sheets-removed-v1', 'removed the blank sheets of the old Sheets section', async () => {
-    const { removeTeamSheets } = await import('../src/lib/sheet-convert')
-    const r = await removeTeamSheets(prisma)
-    return `${r.folders} folders, ${r.sheets} sheets removed, ${r.exported} kept as exports`
-  })
+  // The folders of blank sheets made in the old Sheets section are NOT removed by this release (user,
+  // 25 Nov 2026: no live data is deleted at release; old data stays until its removal is approved).
+  // They are out of the app's pages and stay in the database as they are. `removeTeamSheets` in
+  // src/lib/sheet-convert.ts is the removal (it keeps a CSV of each sheet first), for when it is approved.
 
   // Workspace settings
   await prisma.workspaceSettings.upsert({
