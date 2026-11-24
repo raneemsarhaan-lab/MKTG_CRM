@@ -25,6 +25,7 @@ import { BrandAssetsTable } from '@/components/brands/BrandAssetsTable'
 import { BrandSettingsTab } from '@/components/brands/BrandSettingsTab'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
+import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { ListView } from './ListView'
 import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
@@ -77,6 +78,13 @@ export function BrandPage({ data, brandId, folder }: {
   const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   const campaigns = [...new Map(all.filter(x => x.project).map(x => [x.project!.id, x.project!])).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
+  // The Spaces each task shows in, for the List grouped by project (a brand's work, collected from every Space).
+  const spacesOf = useMemo(() => {
+    const byTask = new Map<string, { id: string; name: string; color: string }[]>()
+    const info = new Map(data.spaces.map(sp => [sp.id, { id: sp.id, name: spaceLabel(sp, t), color: sp.color }]))
+    for (const r of data.taskSpaces) { const sp = info.get(r.space_id); if (sp) byTask.set(r.task_id, [...(byTask.get(r.task_id) ?? []), sp]) }
+    return (taskId: string) => byTask.get(taskId) ?? []
+  }, [data.spaces, data.taskSpaces, t])
   const folderName = folder === 'library' ? t('folders.lib') : null
   const withPanel = (node: React.ReactNode) => <>{node}<TaskPanel data={data} /></>
 
@@ -138,7 +146,8 @@ export function BrandPage({ data, brandId, folder }: {
             ? <CalendarView tasks={shownTasks.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)
+              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open}
+                  projectGroups={brandId ? { spacesOf, noProject: t('noProjectGroup') } : undefined} />)
       }} />
   )
 }

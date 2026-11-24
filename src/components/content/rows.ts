@@ -30,6 +30,16 @@ export function piecesOf(tasks: Task[], themeId: string): Task[] {
   return tasks.filter(t => t.project_id === themeId && !t.media_board && !(t.parent_task_id && videos.has(t.parent_task_id)))
 }
 
+/**
+ * A theme's tasks on one sheet. With the sheet's rows, they are the tasks its rows are linked to: the
+ * theme's project may be a theme on other Spaces' sheets too, and their tasks don't belong here.
+ */
+export function piecesIn(tasks: Task[], themeId: string, recs?: readonly ContentRowRec[]): Task[] {
+  if (!recs) return piecesOf(tasks, themeId)
+  const ids = new Set(recs.filter(r => r.project_id === themeId && r.task_id).map(r => r.task_id as string))
+  return tasks.filter(t => ids.has(t.id))
+}
+
 export function comparePieces(a: Task, b: Task): number {
   // By publishing date (the Content sheet's Date), then due date.
   const da = a.publish_date ?? a.due_date ?? '9999', db = b.publish_date ?? b.due_date ?? '9999'
@@ -65,10 +75,11 @@ export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: Conte
   const recs = o.recs ?? []
   const shownTask = (t: Task) => (o.showArchived || !t.dropped_at) && (!o.mine || t.task_owner_id === o.me || t.assignee_id === o.me || !!t.assignee_ids?.includes(o.me))
   for (const theme of themes) {
-    const pieces = piecesOf(tasks, theme.id)
+    const pieces = piecesIn(tasks, theme.id, o.recs)
     const mineRecs = recs.filter(r => r.project_id === theme.id)
     const linkedIds = new Set(mineRecs.map(r => r.task_id).filter(Boolean) as string[])
-    // A piece the sheet has no row for yet (just made elsewhere) still shows, at the end of its group.
+    // Without rows (the sheet before 2b): every piece of the theme is a row. With rows, the sheet
+    // shows only what was put on it — never the project's tasks from other Spaces.
     let tail = 1e12
     const pseudo: ContentRowRec[] = pieces.filter(t => !linkedIds.has(t.id)).sort(comparePieces).map(t => ({
       id: `t:${t.id}`, project_id: theme.id, pillar_id: t.pillar_id ?? null, parent_id: null, position: tail++, title: t.name, date: null, values: {}, task_id: t.id, created_by: null,

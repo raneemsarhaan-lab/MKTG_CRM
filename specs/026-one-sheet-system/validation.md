@@ -51,7 +51,9 @@ open it on the brand's page (the task sheet's home), or in a saved Sheet view of
 | No brand filters on a Space page | Built: the brand chips and "Group by brand" are gone (a Space's brand folders in the sidebar do that) |
 | Sidebar numbers only for Inbox and My tasks | Built: Spaces, folders and brands show their names alone |
 | Simplify the notifications filters | Built: one row — All, Mentions, Comments, Assigned to me, Deadlines — and one list for the dates, in place of twelve kind chips and four date chips |
-| Adding a theme asks for a name only; themes aren't shared between Spaces | Built: "+ Theme" is one name field. It never picks an existing project, and the same name on another Space's sheet is a separate theme (`2b-theme-from-project-or-new`). Existing themes, "Videos · brand" included, are left as they are |
+| Adding a theme asks for a name only | Built: "+ Theme" is one name field that offers the brand's existing projects while typing (`2b-theme-from-project-or-new`) |
+| A same-named theme in the same brand is the same project across Spaces; its tasks from other Spaces aren't brought onto a sheet | Built. Typing an existing project's name uses that project (the box says so). The sheet shows only its own rows; the Content sheet gives a row only to the Content Space's own tasks of a theme (`2b-theme-from-project-or-new`: a Planning task of the same project stays off the Content sheet, and neither task shows on the Design sheet) |
+| On a brand's page, tasks grouped by project with each project's tasks from different Spaces | Built: the brand's List opens grouped by project; each task shows the Spaces it is in; "No project" comes last (`025-brand-list-groups-by-project-across-spaces`) |
 | Remove the "Linked" tag | Built: gone from the sheet's title and its tab |
 | Home and pinned views carry icons | Built: a home icon and a pin icon before the view's name |
 | Remove the blank sheets of the old Sheets section | Built (see §1 above) |
@@ -62,9 +64,8 @@ decide which of the sheet's own columns show until someone shows or hides one th
 ## To confirm with the user
 
 Answered on 24 Nov: blank sheets of the old Sheets section are removed; Planning's flow is edited in
-its settings when needed; the brand page stays one Space at a time; a theme stays connected to its
-record among the projects behind the scenes, and a future dashboard is where themes from several
-Spaces get collected and connected (nothing is built for that now). Still open:
+its settings when needed; the brand page stays one Space at a time; themes stay projects behind the scenes,
+and a brand's work is collected by project on the brand page's List. Still open:
 
 - A Space other than Content and Video starts with an empty sheet: its existing tasks aren't turned
   into rows. They can be added one at a time with Make task › an existing task.

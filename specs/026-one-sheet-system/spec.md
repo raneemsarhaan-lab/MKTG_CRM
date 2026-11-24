@@ -125,16 +125,22 @@ used as the Sheet view of every Space and Space › Brand folder.
 
 ## Changed on 24 Nov 2026 (user), after the build
 
-- **A theme is not a project.** "+ Theme" asks for a name and nothing else. It is never picked from
-  the projects, and it belongs to one Space's sheet: another Space's sheet may use the same name, and
-  nothing links the two. A theme added in a Space › Brand folder or on a brand's page belongs to that
-  brand. (This replaces "A theme is mapped to a project" in §2 and "the same project can be a theme on
-  several sheets" above, for themes added from now on. Themes that existed before are left as they are,
-  including the "Videos · <brand>" ones.)
-  *Still true underneath:* each theme keeps a record of its own in the projects table, which holds its
-  name, brand and pillars and is what a linked row's task points at as its theme. Separating that
-  fully was offered and declined: the user keeps it connected behind the scenes. Themes from several
-  Spaces are to be collected and connected in a dashboard, later; nothing is built for that now.
+- **Themes and projects** (settled on 24 Nov after two changes of direction):
+  - A theme stays a project behind the scenes. "+ Theme" asks for a name and nothing else; the box
+    offers the brand's existing projects while typing.
+  - A name that is already a project of that brand uses that project, so the same theme on several
+    Spaces' sheets is one project. A new name makes a new one. A theme added in a Space › Brand
+    folder or on a brand's page belongs to that brand; on a Space's own sheet it has no brand.
+  - Using an existing project brings none of its tasks onto the sheet. A sheet holds the rows put on
+    it. The Content Space's sheet still gives a row to a task in one of its themes, but only to the
+    Content Space's own tasks (and a task in no Space at all), never to that project's tasks that
+    belong to other Spaces.
+  - A task made from a row, or linked to one, takes the theme as its project (as before).
+  - **On a brand's page, the List groups tasks by project**: each project as a heading, then its tasks
+    from every Space, each showing the Spaces it is in; tasks with no project come last. This is where
+    a brand's work is collected across Spaces. Status and Status group are still offered.
+  - Separating themes from projects completely was built and then set aside at the user's word (kept
+    in a git stash on the build machine, not in the branch).
 - **No "Linked" tag** on a sheet's title or tab: every sheet is the same kind of sheet.
 - **The sheet's toolbar** keeps "+ Column" and "+ Theme" only; **no brand filter or "Group by brand"**
   on a Space page; **the old Sheets section's blank sheets are removed** (kept first as CSV exports).

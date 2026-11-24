@@ -861,6 +861,7 @@ function KanbanBoardInner({
         removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current)),
         // A theme added in a Space › Brand folder, or on a brand's page, belongs to that brand.
         addSheetTheme: run((input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current, brandId: sheetBrandId })),
+        themeNames: () => contentRows.themeNames(sheetSpaceRef.current, sheetBrandId).catch(() => []),
       }
     })(),
     async removePillar(id) {

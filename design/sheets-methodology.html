@@ -90,7 +90,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
         <tbody>
           <tr><td>A Space</td><td>All of that Space's rows, every brand.</td></tr>
           <tr><td>Space › Brand folder</td><td>That Space's rows for one brand (the themes that belong to the brand).</td></tr>
-          <tr><td>A brand's page</td><td>The brand's rows from every Space, one Space at a time, and "All tasks".</td></tr>
+          <tr><td>A brand's page</td><td>The brand's rows from every Space, one Space at a time, and "All tasks". Its <b>List</b> groups tasks by project, with each project's tasks from every Space under it.</td></tr>
           <tr><td>My tasks</td><td>A task sheet: one line per task of mine (no themes or plain rows).</td></tr>
         </tbody>
       </table></div>
@@ -115,7 +115,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
    + Row</div>
       <div class="cols">
         <div class="box"><h3>Adding</h3><ul>
-          <li><b>Theme</b>: "+ Theme" on the toolbar, or Insert theme above / below in a theme's menu. It asks for a name and nothing else. Admins and superusers.</li>
+          <li><b>Theme</b>: "+ Theme" on the toolbar, or Insert theme above / below in a theme's menu. It asks for a name and nothing else, and offers the brand's existing projects while typing. Admins and superusers.</li>
           <li><b>Pillar</b>: "+ Pillar" in a theme's menu. Admins, superusers and the theme's owner.</li>
           <li><b>Row</b>: "+ Row" at the end of each theme or pillar (it carries the Space's own words, such as "+ New clip"); type, and Enter adds it and starts the next. Anyone with access to the Space.</li>
           <li><b>Child row</b>: Add child row in a row's menu, or Tab on a row's number. One level only.</li>
@@ -124,7 +124,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
           <li>Drag a row by its number onto a theme or pillar. A linked row's task changes its theme or pillar to match.</li>
           <li>Themes and pillars are reordered by dragging.</li>
           <li>Removing a theme or pillar asks where its rows go.</li>
-          <li>A theme belongs to one Space's sheet. Another Space can use the same name; nothing links the two.</li>
+          <li>A theme is a project behind the scenes. The same name in the same brand is the same project on every Space's sheet, but each sheet shows only the rows put on it, never that project's tasks from other Spaces.</li>
         </ul></div>
       </div>
     </section>
@@ -258,7 +258,6 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
       <h2>12 · Open points</h2>
       <p>Decisions still needed:</p>
       <div class="gap"><b>A brand's rows in one grid.</b> The brand page shows one Space's sheet at a time, because each Space's sheet has its own columns, formatting and comments. One merged grid would need shared columns across Spaces.</div>
-      <div class="gap"><b>Themes across Spaces.</b> A theme belongs to one sheet and keeps a record among the projects behind the scenes. Collecting themes from several Spaces and connecting them is for a dashboard, later; nothing is built for it yet.</div>
       <div class="gap"><b>Existing tasks of other Spaces.</b> Design and Planning tasks made before the change aren't rows on their Space's sheet. They can be added one at a time with Make task › an existing task.</div>
       <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
       <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>

@@ -97,6 +97,34 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
+      // User, 24 Nov 2026: on a brand's page, tasks grouped by project, with each project's tasks from every Space under it.
+      id: '025-brand-list-groups-by-project-across-spaces', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const [b1] = brands()
+        const project = psql(`insert into projects (id, name, brand_id, standing, is_theme) values (gen_random_uuid(), 'Lab stream ${n}', '${b1[0]}', true, true) returning id`).split(/\n/)[0]
+        const inContent = task(`Lab stream post ${n}`, b1[0])
+        const inDesign = task(`Lab stream design ${n}`, b1[0])
+        const loose = task(`Lab stream loose ${n}`, b1[0])
+        psql(`update tasks set project_id='${project}' where id in ('${inContent}', '${inDesign}')`)
+        psql(`update tasks set project_id=null where id='${loose}'`)
+        psql(`delete from task_spaces where task_id='${inDesign}'`)
+        psql(`insert into task_spaces (task_id, space_id, added_via) values ('${inDesign}', '${space('design')}', 'created')`)
+        try {
+          await go(`/brands/${b1[0]}?view=list`)
+          await page.waitForSelector('[data-list-view]', { timeout: 60000 })
+          ok(await page.getAttribute('[data-group="project"]', 'aria-pressed') === 'true', "a brand's List opens grouped by project")
+          const group = `[data-group-key="p:lab stream ${n}"]`
+          await page.waitForSelector(group, { timeout: 30000 })
+          ok(await page.isVisible(`${group} [data-row="${inContent}"]`) && await page.isVisible(`${group} [data-row="${inDesign}"]`), "the project's tasks from different Spaces are listed under it")
+          ok(await page.isVisible(`${group} [data-row="${inContent}"] [data-task-space="Content"]`) && await page.isVisible(`${group} [data-row="${inDesign}"] [data-task-space="Design"]`), 'each shows the Space it is in')
+          ok(await page.isVisible(`[data-group-key="p:"] [data-row="${loose}"]`), 'tasks with no project sit under No project')
+          await page.click('[data-group="stage"]')
+          ok(!(await page.$(group)), 'the other groupings are still there')
+        } finally { drop([inContent, inDesign, loose]); psql(`delete from projects where id='${project}'`) }
+      },
+    },
+    {
       id: '025-brand-page-sections', as: 'admin',
       async run({ page, go }) {
         const n = rnd()

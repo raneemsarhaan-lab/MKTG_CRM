@@ -23,7 +23,7 @@ import { typeName } from '@/lib/task-types'
 import { TypeIcon } from '@/components/types/TypeIcon'
 import { TagChip } from '@/components/tags/TagPicker'
 
-type Group = 'brand' | 'stage' | 'statusGroup'
+type Group = 'brand' | 'project' | 'stage' | 'statusGroup'
 
 interface ListViewProps {
   tasks: ViewTask[]
@@ -38,8 +38,13 @@ interface ListViewProps {
   /** Spec 022 (US4): a Space's stages — groups and pills per Space stage. */
   spaceStages?: import('@/components/spaces/useSpaceStages').SpaceStagesApi | null
   /** The shown name of a simple status — a Space's own words, or the default (US3). */
+  /**
+   * A brand's page (user, 24 Nov 2026): offer "Group by Project", and open on it — each project, then
+   * its tasks from every Space, each showing the Spaces it is in.
+   */
+  projectGroups?: { spacesOf(taskId: string): { id: string; name: string; color: string }[]; noProject: string }
   /** A saved view's grouping. */
-  initialGroup?: Group | null
+  initialGroup?: Exclude<Group, 'project'> | null
   onOpen: (id: string) => void
   /** Spec 023: the Fields button's choice (standard keys and `f:<id>`); absent = every standard field. */
   fields?: string[]
@@ -47,7 +52,7 @@ interface ListViewProps {
   custom?: { fields: TaskFieldDef[]; links: TaskTypeFieldLink[]; values: Map<string, Map<string, unknown>>; types: ContentType[]; tags?: import('@/types/index').Tag[] }
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, stageName, spaceStages, initialGroup, onOpen, fields, custom }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, projectGroups, stageName, spaceStages, initialGroup, onOpen, fields, custom }: ListViewProps) {
   const locale = useLocale()
   const shows = (k: string) => !fields || fields.includes(k)
   const shownCustom = (custom?.fields ?? []).filter(f => !f.retired && fields?.includes(`f:${f.id}`))
@@ -56,12 +61,26 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
   const tSheet = useTranslations('taskSheet')
   const tRepeat = useTranslations('repeat')
   const tg = useTranslations('statusGroups')
-  const [group, setGroup] = useState<Group>(initialGroup ?? (canGroupByBrand ? 'brand' : 'stage'))
+  const [group, setGroup] = useState<Group>(initialGroup ?? (projectGroups ? 'project' : canGroupByBrand ? 'brand' : 'stage'))
   const byId = useMemo(() => new Map(members.map(m => [m.id, m])), [members])
   const live = tasks.filter(x => !x.dropped_at)
   const name = (s: StageId) => stageName?.(s) ?? STAGE_META[s]?.label_en ?? s
 
-  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'statusGroup'
+  // By project: a project's name is the heading (one heading per name, so a theme used on several
+  // Spaces' sheets is one group), then "No project". Inside, by Space, then by date.
+  const byProject = () => {
+    const key = (x: ViewTask) => (x.project?.name ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
+    const names = new Map<string, string>()
+    for (const x of live) if (x.project?.name && !names.has(key(x))) names.set(key(x), x.project.name)
+    const order = (x: ViewTask) => projectGroups?.spacesOf(x.id)[0]?.name ?? '\uffff'
+    const when = (x: ViewTask) => x.publish_date ?? x.due_date ?? '9999'
+    const sorted = (list: ViewTask[]) => [...list].sort((a, b) => order(a).localeCompare(order(b)) || when(a).localeCompare(when(b)) || a.name.localeCompare(b.name))
+    return [
+      ...[...names].sort((a, b) => a[1].localeCompare(b[1])).map(([k, n]) => ({ key: `p:${k}`, head: <span data-project-group={n}>{n}</span>, rows: sorted(live.filter(x => !!x.project?.name && key(x) === k)) })),
+      { key: 'p:', head: <span data-project-group="">{projectGroups?.noProject ?? ''}</span>, rows: sorted(live.filter(x => !x.project?.name)) },
+    ]
+  }
+  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'project' ? byProject() : group === 'statusGroup'
     ? STATUS_GROUPS.map(g => ({ key: g, head: <span data-status-group={g}>{tg(g)}</span>, rows: live.filter(x => statusGroupOf(x.status) === g) }))
     : group === 'brand'
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),
@@ -79,11 +98,11 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: PIPE.textMuted }}>
           {t('groupBy')}
           <div role="group" aria-label={t('groupBy')} style={{ display: 'inline-flex', border: `1px solid ${PIPE.border}`, borderRadius: 10, overflow: 'hidden' }}>
-            {(['brand', 'stage', 'statusGroup'] as const).filter(g => g !== 'brand' || canGroupByBrand).map(g => (
+            {(['project', 'brand', 'stage', 'statusGroup'] as const).filter(g => (g !== 'brand' || canGroupByBrand) && (g !== 'project' || !!projectGroups)).map(g => (
               <button key={g} type="button" data-group={g} aria-pressed={group === g} onClick={() => setGroup(g)}
                 style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, padding: '5px 10px',
                   background: group === g ? PIPE.ink : '#FFFFFF', color: group === g ? '#FFFFFF' : PIPE.ink }}>
-                {g === 'brand' ? t('groupBrand') : g === 'stage' ? t('groupStatus') : t('groupStatusGroup')}
+                {g === 'project' ? t('groupProject') : g === 'brand' ? t('groupBrand') : g === 'stage' ? t('groupStatus') : t('groupStatusGroup')}
               </button>
             ))}
           </div>
@@ -121,7 +140,12 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {late && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '1px 6px', borderRadius: 6, background: ALERT_BADGE_STYLES[sla].bg, color: ALERT_BADGE_STYLES[sla].text }}>SLA</span>}
                   {shows('priority') && task.priority && (task.priority as string) !== 'None' && <span data-list-priority style={{ fontSize: 11, fontWeight: 700, color: ['High', 'Urgent'].includes(task.priority) ? '#D22040' : PIPE.textMuted }}>{(task.priority as string) === 'Medium' ? 'Normal' : task.priority}</span>}
-                  {group === 'brand' && shows('status') && <Pill stage={task.status} label={spaceStages?.name(task) ?? name(task.status)} board={STAGE_META[task.status]?.label_en} />}
+                  {group === 'project' && projectGroups?.spacesOf(task.id).map(sp => (
+                    <span key={sp.id} data-task-space={sp.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: PIPE.ink, border: `1px solid ${PIPE.border}`, borderRadius: 999, padding: '1px 8px' }}>
+                      <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', background: sp.color }} />{sp.name}
+                    </span>
+                  ))}
+                  {(group === 'brand' || group === 'project') && shows('status') && <Pill stage={task.status} label={spaceStages?.name(task) ?? name(task.status)} board={STAGE_META[task.status]?.label_en} />}
                   {who && shows('assignee') && <span title={who.name} style={{ width: 22, height: 22, borderRadius: '50%', background: avatarColor(who.name), color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9.5, fontWeight: 800 }}>{initials(who.name)}</span>}
                   {/* Publishing and due dates, each labelled (spec: both on every task). */}
                   {(shows('publish') || shows('due')) && (() => {

@@ -71,15 +71,32 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(2500)
           const fresh = made(`Lab new ${n}`)
           ok(!!fresh && Number(psql(`select position from content_themes where project_id='${fresh}'`)) < 0.5, 'inserted above A')
-          // Another Space's sheet can use the same name; nothing links the two.
+          // The same name on another Space's sheet is the same project behind the scenes (user, 24 Nov 2026),
+          // and none of its tasks from other Spaces come onto that sheet.
+          const cs = psql(`select id from team_spaces where key='content'`), ps = psql(`select id from team_spaces where key='planning'`)
+          const mk = (name, sid) => {
+            const id = first(`insert into tasks (id,name,brand_id,content_type_label,task_owner_id,assignee_id,initiator_role,nine_stage,status,stage_date,priority,updated_at,project_id)
+              values (gen_random_uuid(), '${name}', (select id from brands order by name limit 1), 'Post', '${who('admin')}', '${who('admin')}', 'Marketing Manager', true, 'todo', now(), 'Normal', now(), '${one}') returning id`)
+            psql(`insert into task_spaces (task_id, space_id, added_via) values ('${id}', '${sid}', 'created')`)
+            return id
+          }
+          const inContent = mk(`Lab content task ${n}`, cs), inPlanning = mk(`Lab planning task ${n}`, ps)
+          await open(page, go)
+          await page.waitForSelector(`[data-row="k:${inContent}"]`, { timeout: 60000 })
+          ok(true, "the Content Space's own task in the theme's project shows on the Content sheet")
+          ok(!(await page.$(`[data-row="k:${inPlanning}"]`)) && psql(`select count(*) from content_rows where task_id='${inPlanning}'`) === '0', "another Space's task in the same project isn't brought onto it")
           await go('/spaces/design?view=sheet')
           await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
-          ok(!(await page.$(`[data-row="t:${one}"]`)), "it isn't on another Space's sheet")
+          ok(!(await page.$(`[data-row="t:${one}"]`)), "the theme isn't on another Space's sheet until it is added there")
           await page.click('[data-add-theme]')
+          await page.waitForSelector('[data-theme-add] [data-theme-name]')
+          ok(await page.locator(`#fx-theme-names option[value="Lab named ${n}"]`).count() === 1, 'the existing project is offered while typing')
           await page.fill('[data-theme-name]', `Lab named ${n}`)
+          ok(await page.isVisible('[data-theme-reuses]'), 'and the box says it uses the existing project')
           await page.click('[data-theme-add-save]')
-          await page.waitForTimeout(2500)
-          ok(psql(`select count(*) from projects where name='Lab named ${n}'`) === '2' && psql(`select count(distinct t.space_id) from content_themes t join projects p on p.id=t.project_id where p.name='Lab named ${n}'`) === '2', "the same name on another Space's sheet is a theme of its own")
+          await page.waitForSelector(`[data-row="t:${one}"]`, { timeout: 30000 })
+          ok(psql(`select count(*) from projects where name='Lab named ${n}'`) === '1' && psql(`select count(distinct space_id) from content_themes where project_id='${one}'`) === '2', "the same name on another Space's sheet is the same project")
+          ok(!(await page.$(`[data-row="k:${inContent}"]`)) && !(await page.$(`[data-row="k:${inPlanning}"]`)), "and the project's tasks from other Spaces aren't on that sheet")
         } finally { cleanup([a, ...psql(`select id from projects where name in ('Lab named ${n}', 'Lab new ${n}')`).split(/\n/)].filter(Boolean)) }
       },
     },

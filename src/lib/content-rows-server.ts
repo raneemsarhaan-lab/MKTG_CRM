@@ -38,8 +38,11 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
 
   const [tasks, rows] = await Promise.all([
     db.task.findMany({
-      // A task unlinked from the sheet by hand isn't given a row again (spec 026).
-      where: { project_id: { in: ids }, media_board: null },
+      // A task unlinked from the sheet by hand isn't given a row again (spec 026). A project can be a
+      // theme on several Spaces' sheets (user, 24 Nov 2026): the Content Space's own tasks get a row
+      // here (and a task that is in no Space at all, as before Spaces), never the project's tasks
+      // that belong to other Spaces.
+      where: { project_id: { in: ids }, media_board: null, OR: [{ spaces: { some: { space_id: sid } } }, { spaces: { none: {} } }] },
       select: {
         id: true, name: true, project_id: true, pillar_id: true, parent_task_id: true, publish_date: true, due_date: true, created_at: true, sheet_row_off: true,
         parent: { select: { content_type_label: true, parent_task_id: true } },

@@ -467,12 +467,15 @@ export async function addSheetTheme(input: {
   const sid = await sheetSpace(input.spaceId)
   const name = clean(input.name, 120)
   if (!name) return { success: false, error: 'theme_name_empty' }
-  // A name is this sheet's own: another Space's sheet may use it too, and nothing links the two.
-  const here = await prisma.contentSheetTheme.findMany({ where: { space_id: sid }, select: { project: { select: { name: true } } } })
-  if (here.some(t => norm(t.project.name) === norm(name))) return { success: false, error: 'theme_exists' }
   const brandId = input.brandId && UUID.test(input.brandId) && await prisma.brand.findUnique({ where: { id: input.brandId }, select: { id: true } }) ? input.brandId : null
-  // The theme's own record (it carries the name, the brand and the pillars); never an existing project.
-  const projectId = (await prisma.project.create({ data: { name, standing: true, is_theme: true, owner_id: m.id, brand_id: brandId } })).id
+  // A theme is a project behind the scenes. One with this name in this brand is the same project on
+  // every Space's sheet (user, 24 Nov 2026), so a brand's work can be collected by project. Using an
+  // existing project brings none of its tasks onto this sheet: a sheet holds the rows put on it.
+  const found = (await prisma.project.findMany({ where: { brand_id: brandId }, select: { id: true, name: true } })).find(p => norm(p.name) === norm(name))
+  if (found && await prisma.contentSheetTheme.findFirst({ where: { project_id: found.id, space_id: sid }, select: { id: true } })) return { success: false, error: 'theme_exists' }
+  const projectId = found
+    ? (await prisma.project.update({ where: { id: found.id }, data: { is_theme: true } })).id
+    : (await prisma.project.create({ data: { name, standing: true, is_theme: true, owner_id: m.id, brand_id: brandId } })).id
   const themes = await prisma.contentSheetTheme.findMany({ where: { space_id: sid }, orderBy: { position: 'asc' } })
   let position = between(themes[themes.length - 1]?.position ?? null, null)
   if (input.anchor) {
@@ -605,3 +608,14 @@ export async function removePillarTo(pillarId: string, dest: { projectId: string
   return { success: true }
 }
 
+/** + Theme: the names of this brand's projects that aren't themes of this Space's sheet yet, to pick from while typing. */
+export async function themeNames(spaceId?: string | null, brandId?: string | null): Promise<string[]> {
+  const m = await me()
+  if (!m || !isAdmin(m)) return []
+  const sid = await sheetSpace(spaceId)
+  const rows = await prisma.project.findMany({
+    where: { brand_id: brandId && UUID.test(brandId) ? brandId : null, sheet_themes: { none: { space_id: sid } } },
+    select: { name: true }, orderBy: { name: 'asc' },
+  })
+  return rows.map(r => r.name)
+}

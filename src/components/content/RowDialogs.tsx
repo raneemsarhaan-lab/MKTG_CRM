@@ -9,8 +9,13 @@ import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, Member, Task } from '@/types/index'
 
-/** + Theme: a name, and that is all (user, 24 Nov 2026). */
-export function ThemeAdd({ onCreate, onCancel }: {
+/**
+ * + Theme: a name, and that is all (user, 24 Nov 2026). The brand's existing projects are offered
+ * while typing; a name that is already a project uses that project (the same theme across Spaces).
+ */
+export function ThemeAdd({ names = [], onCreate, onCancel }: {
+  /** The brand's projects that aren't themes of this sheet yet. */
+  names?: string[]
   onCreate(name: string): Promise<string | null>
   onCancel(): void
 }) {
@@ -18,13 +23,17 @@ export function ThemeAdd({ onCreate, onCancel }: {
   const [name, setName] = useState('')
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const norm = (x: string) => x.replace(/\s+/g, ' ').trim().toLowerCase()
+  const existing = names.find(n => norm(n) === norm(name))
   return (
     <form className="fx-sheet-pop-form" data-theme-add=""
           onSubmit={async e => { e.preventDefault(); if (!name.trim() || busy) return; setBusy(true); setNote(await onCreate(name.trim())); setBusy(false) }}>
       <label className="fx-sheet-pop-title">{t('themes.name')}
-        <input type="text" id="fx-theme-name" value={name} maxLength={120} data-autofocus="" data-theme-name="" aria-invalid={note ? true : undefined}
-               onChange={e => { setName(e.target.value); setNote(null) }} />
+        <input type="text" id="fx-theme-name" list="fx-theme-names" value={name} maxLength={120} data-autofocus="" data-theme-name="" autoComplete="off" aria-invalid={note ? true : undefined}
+               aria-describedby={existing ? 'fx-theme-reuses' : undefined} onChange={e => { setName(e.target.value); setNote(null) }} />
       </label>
+      <datalist id="fx-theme-names">{names.map(n => <option key={n} value={n} />)}</datalist>
+      {existing && <span id="fx-theme-reuses" className="fx-sheet-muted" data-theme-reuses="">{t('themes.reuses', { name: existing })}</span>}
       {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
       <span className="fx-sheet-pop-row">
         <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>

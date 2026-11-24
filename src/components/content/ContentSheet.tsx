@@ -18,7 +18,7 @@ import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/shee
 import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
-import { buildContentRows, piecesOf, type ContentRow } from './rows'
+import { buildContentRows, piecesIn, type ContentRow } from './rows'
 import { summariseContent } from './summary'
 import { ContentGrid, LINK_COLS, pieceLink } from './ContentGrid'
 import { ThemeEditor, NamePrompt } from './ThemeEditor'
@@ -44,7 +44,7 @@ type Popup =
   | { kind: 'theme'; anchor: HTMLElement; theme: ContentTheme }
   | { kind: 'name'; anchor: HTMLElement; title: string; initial?: string; save(name: string): Promise<string | null> }
   // Sheet 2b
-  | { kind: 'themeAdd'; anchor: HTMLElement; at?: { projectId: string; where: 'above' | 'below' } | null }
+  | { kind: 'themeAdd'; anchor: HTMLElement; at?: { projectId: string; where: 'above' | 'below' } | null; names: string[] }
   | { kind: 'dest'; anchor: HTMLElement; theme: ContentTheme; pillar?: ContentTheme['pillars'][number] | null; rows: number }
   | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
   | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
@@ -117,7 +117,7 @@ export function ContentSheet(p: ContentSheetProps) {
   const recs = p.rows ?? []
   const childCount = (id: string) => recs.filter(r => r.parent_id === id).length
   const recOf = (row: ContentRow): ContentRowRec | null => (row.kind === 'line' ? row.rec : row.kind === 'piece' ? row.rec : null)
-  const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesOf(p.tasks, th.id))), [p.tasks, p.themes])
+  const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesIn(p.tasks, th.id, p.rows))), [p.tasks, p.themes, p.rows])
 
   // ── permissions ─────────────────────────────────────────────────────────
   const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || admin, [me.id, admin])
@@ -205,8 +205,9 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!p.api.indentRow) return
     ok(await p.api.indentRow(rec.id, dir), dir === 'in' ? t('rows.indented') : t('rows.outdented'))
   }
-  function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
-    setPopup({ kind: 'themeAdd', anchor, at })
+  async function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
+    const names = (await p.api.themeNames?.().catch(() => [])) ?? []
+    setPopup({ kind: 'themeAdd', anchor, at, names })
   }
   function askDelete(rec: ContentRowRec, name: string, anchor: HTMLElement) {
     const children = childCount(rec.id)
@@ -325,7 +326,7 @@ export function ContentSheet(p: ContentSheetProps) {
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkTasks = bulkIds.map(id => p.tasks.find(x => x.id === id)).filter((x): x is Task => !!x && !x.dropped_at)
   /** Pillar spans one theme: that theme's pillars, or null when the pieces come from several. */
-  const bulkThemes = new Set(bulkTasks.map(x => p.themes.find(th => piecesOf(p.tasks, th.id).some(y => y.id === x.id))?.id ?? ''))
+  const bulkThemes = new Set(bulkTasks.map(x => p.themes.find(th => piecesIn(p.tasks, th.id, p.rows).some(y => y.id === x.id))?.id ?? ''))
   const bulkTheme = bulkThemes.size === 1 ? p.themes.find(th => bulkThemes.has(th.id)) : undefined
   const bulkMessage = (changed: number, refused: number) =>
     (refused ? t('bulk.doneSome', { n: changed, m: refused }) : t('bulk.done', { n: changed }))
@@ -785,7 +786,7 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {popup?.kind === 'themeAdd' && (
         <SheetPopover anchor={popup.anchor} label={t('themes.addTitle')} onClose={closePopup}>
-          <ThemeAdd onCancel={() => closePopup(true)}
+          <ThemeAdd names={popup.names} onCancel={() => closePopup(true)}
             onCreate={async name => { const r = await p.api.addSheetTheme!({ name, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }} />
         </SheetPopover>
       )}
