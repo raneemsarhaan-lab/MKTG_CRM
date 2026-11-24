@@ -108,7 +108,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const t = seedTask('Handoff lab video', 'Video', 'c-final', false, 'Content Creator')
         await go(`/spaces/content?task=${t}`)
-        await page.getByRole('button', { name: /→ Ready For Design/ }).click()
+        await page.getByRole('button', { name: /^Move to Ready For Design/ }).click()
         await page.waitForSelector('[data-handoff]')
         ok(await page.isChecked('[data-handoff-space="video"] input'), 'Video pre-ticked for a Video task')
         ok(!(await page.isChecked('[data-handoff-space="design"] input')), 'Design not ticked')
@@ -132,7 +132,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const t = seedTask('Handoff lab cancel', 'Post', 'c-final', false, 'Content Creator')
         await go(`/spaces/content?task=${t}`)
-        await page.getByRole('button', { name: /→ Ready For Design/ }).click()
+        await page.getByRole('button', { name: /^Move to Ready For Design/ }).click()
         await page.waitForSelector('[data-handoff]')
         ok(await page.isChecked('[data-handoff-space="design"] input'), 'Design pre-ticked for a Post')
         await page.click('[data-handoff-cancel]')
@@ -160,7 +160,7 @@ module.exports = (EMAIL, psql, ok) => {
         const t = seedTask('Handoff lab linked once', 'Video', 'c-final', false, 'Content Creator')
         psql(`update tasks set auto_linked_at=now() where id='${t}'`)
         await go(`/spaces/content?task=${t}`)
-        await page.getByRole('button', { name: /→ Ready For Design/ }).click()
+        await page.getByRole('button', { name: /^Move to Ready For Design/ }).click()
         await page.waitForTimeout(1500)
         ok(!(await page.$('[data-handoff]')), 'no box when it was linked before')
         ok(psql(`select status from tasks where id='${t}'`) === 'r-design', 'moved straight on')

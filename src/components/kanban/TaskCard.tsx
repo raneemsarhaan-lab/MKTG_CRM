@@ -377,7 +377,6 @@ export function TaskCard({
     // still reveals the checkbox.
     <div
       ref={setNodeRef}
-      data-task-card={task.id}
       className="fx-task-card"
       inert={ghost}
       aria-hidden={ghost || undefined}
