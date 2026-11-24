@@ -32,6 +32,8 @@ interface KanbanColumnProps {
   highlight?: boolean
   onSelectTask: (id: string) => void
   onAddTask?: () => void
+  /** Spec 024 (§3): the Space's own text for the add button. */
+  addLabel?: string
   selectedIds?: Set<string>
   selecting?: boolean
   onToggleSelect?: (id: string, shiftKey: boolean) => void
@@ -43,7 +45,7 @@ interface KanbanColumnProps {
 }
 
 export function KanbanColumn({
-  stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask,
+  stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask, addLabel,
   selectedIds, selecting, onToggleSelect, onSelectAll, dashed = false, spaceStage,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: spaceStage ? `ss:${spaceStage.id}` : stage.id })
@@ -158,7 +160,7 @@ export function KanbanColumn({
                  strokeWidth="2.6" aria-hidden="true">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
-            Add task
+            {addLabel ?? 'Add task'}
           </button>
         )}
       </div>

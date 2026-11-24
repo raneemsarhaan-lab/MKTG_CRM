@@ -1150,6 +1150,8 @@ model TeamSpace {
   default_assignee_role String?
   /// Spec 022: 'design' | 'video' when this Space is that media board.
   media_board   String?
+  /// Spec 024: how the Space works (src/lib/space-settings.ts); missing keys take the Space's defaults.
+  settings      Json      @default("{}")
 
   members TeamSpaceMember[]
   tasks   TaskSpace[]

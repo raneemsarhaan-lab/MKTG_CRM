@@ -1,5 +1,6 @@
 'use client'
 
+import { PANEL_SECTIONS } from '@/lib/space-settings'
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
@@ -98,6 +99,10 @@ const CU = {
 
 interface TaskModalProps {
   task: FullTask
+  /** Spec 024 (§4): inside a Space, the order of the sections under the top rows. */
+  sectionOrder?: string[]
+  /** Spec 024 (§8): inside a Space, its own name for a stage (Editing, Edit Review…); elsewhere the original names. */
+  stageNameOf?: (stage: StageId) => string | undefined
   /** Spec 021: the task's Task link fields ("Part of ↗ …" with ⇄ and ×), shown under Fields. */
   linksSection?: React.ReactNode
   /** The workspace's days-before for the due-date rule (the hover on an automatic due date). */
@@ -493,8 +498,10 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
-  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7,
+  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7, stageNameOf, sectionOrder,
 }: TaskModalProps) {
+  const orderOf = (k: string) => { const i = sectionOrder?.indexOf(k) ?? -1; return i < 0 ? PANEL_SECTIONS.indexOf(k as never) : i }
+  const nameOf = (s: StageId) => stageNameOf?.(s) ?? STAGE_META[s]?.label_en ?? s
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
   // Where the read brief was clicked, so editing starts on that word (spec 005 FR-015).
@@ -1733,7 +1740,7 @@ export function TaskModal({
                       disabled={isPending}
                       aria-haspopup="listbox"
                       aria-expanded={stageOpen}
-                      aria-label={`Stage: ${stageMeta.label_en}. Change it`}
+                      aria-label={`Stage: ${nameOf(task.status as StageId)}. Change it`}
                       title="Change the stage"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6, border: 'none',
@@ -1743,7 +1750,7 @@ export function TaskModal({
                         cursor: 'pointer', fontFamily: 'inherit', opacity: isPending ? 0.6 : 1,
                       }}
                     >
-                      {stageMeta.label_en}
+                      {nameOf(task.status as StageId)}
                       <Icon name="chevron" size={13} color="#fff" width={2.6} />
                     </button>
 
@@ -1776,7 +1783,7 @@ export function TaskModal({
                               onMouseLeave={e => { if (!here) e.currentTarget.style.background = 'transparent' }}
                             >
                               <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                              <span style={{ flex: 1, minWidth: 0 }}>{meta.label_en}</span>
+                              <span style={{ flex: 1, minWidth: 0 }}>{nameOf(id)}</span>
                               {here && <span style={{ fontSize: 12, color: CU.faint }}>now</span>}
                               {!here && back && <span style={{ fontSize: 12, color: CU.faint }}>back</span>}
                             </button>
@@ -1789,7 +1796,7 @@ export function TaskModal({
                       <button
                         onClick={handleAdvance}
                         disabled={isPending}
-                        title={`Move to ${nextMeta.label_en}`}
+                        title={`Move to ${nameOf(nextMeta.id)}`}
                         style={{
                           border: 'none', background: isOverride ? CU.ink : CU.blueLight,
                           color: isOverride ? CU.green : CU.blue,
@@ -1799,7 +1806,7 @@ export function TaskModal({
                           boxShadow: isOverride ? 'none' : '0 1px 2px rgba(24,35,63,0.03)',
                         }}
                       >
-                        {isOverride ? '⚡ ' : ''}→ {nextMeta.label_en}
+                        {isOverride ? '⚡ ' : ''}→ {nameOf(nextMeta.id)}
                       </button>
                     )}
                   </span>
@@ -1914,11 +1921,16 @@ export function TaskModal({
 
               <div style={{ height: 1, background: CU.line, margin: '22px 0 18px' }} />
 
+              {/* Spec 024 (§4): inside a Space, these sections follow its order. */}
+              <div data-panel-sections="" style={{ display: 'flex', flexDirection: 'column' }}>
               {/* ── Spec 023: field sections around the Description (Caption above, TOV below) ── */}
+              <div data-panel-section="above" style={{ order: orderOf('above') }}>
               <PanelFieldSections task={task} canEdit={canEdit} place="above" />
-              {withSections && <DescriptionLabel />}
+              </div>
 
               {/* ── Description ──────────────────────────────────────────── */}
+              <div data-panel-section="description" style={{ order: orderOf('description') }}>
+              {withSections && <DescriptionLabel />}
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}
@@ -2015,11 +2027,14 @@ export function TaskModal({
                   )}
                 </>
               )}
+              </div>
 
+              <div data-panel-section="below" style={{ order: orderOf('below') }}>
               <PanelFieldSections task={task} canEdit={canEdit} place="below" />
+              </div>
 
               {/* ── Fields ───────────────────────────────────────────────── */}
-              <div style={{ marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
+              <div data-panel-section="fields" style={{ order: orderOf('fields'), marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
                 <button type="button" onClick={() => setFieldsOpen(v => !v)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none',
@@ -2057,7 +2072,7 @@ export function TaskModal({
               {/* ── Subtasks + actions ───────────────────────────────────── */}
               {/* Spec 021 (US4): a video's clips are hidden when its brand has Video clips off. */}
               {(task.subtasks?.length ?? 0) > 0 && !(task.content_type_label === 'Video' && !on('clips')) && (
-                <div style={{ marginTop: 20 }}>
+                <div data-panel-section="subtasks" style={{ order: orderOf('subtasks'), marginTop: 20 }}>
                   <div style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, marginBottom: 8 }}>
                     Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
                   </div>
@@ -2125,6 +2140,7 @@ export function TaskModal({
               )}
 
               {/* ── Attachments (spec 007) ─────────────────────────────── */}
+              <div data-panel-section="attachments" style={{ order: orderOf('attachments') }}>
               <AttachmentsSection
                 handle={sectionRef}
                 taskId={task.id}
@@ -2140,6 +2156,8 @@ export function TaskModal({
                 onStoredForComment={a => setDraftFiles(d => (d.includes(a.id) ? d : [...d, a.id]))}
                 onFilesChange={setFiles}
               />
+              </div>
+              </div>
 
               {isPublished && (
                 <div style={{

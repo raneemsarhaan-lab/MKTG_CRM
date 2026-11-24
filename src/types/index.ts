@@ -162,6 +162,8 @@ export interface TeamSpace {
   default_assignee_role?: string | null
   /** Spec 022: this Space is the Design or Video media board. */
   media_board?: MediaBoard | null
+  /** Spec 024: how the Space works (defaults filled in). */
+  settings: import('@/lib/space-settings').SpaceSettings
 }
 
 /** Spec 022: a media board. */
@@ -338,6 +340,12 @@ export interface Task {
   entry_stage?: StageId
   /** Spec 022 (R5): when the automatic link at Ready For Design ran (content tasks). */
   auto_linked_at?: string | null
+  /** Spec 024: the Space whose rules apply to this task (board data only). */
+  home_space_id?: string | null
+  /** Spec 024: that Space's role per stage (owner or approver). */
+  stage_roles?: Partial<Record<string, string>> | null
+  /** Spec 024: that Space's SLA for the task's current stage, when it sets one. */
+  space_sla_days?: number | null
   /** Spec 022: migrated from a simple task (never celebrates). */
   migrated_simple?: boolean
   hours_estimate: number

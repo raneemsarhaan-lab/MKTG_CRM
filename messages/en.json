@@ -426,7 +426,8 @@
       "bad_link": "That isn't a web address.",
       "bad_times": "The out time must be after the in time.",
       "duplicate_file_name": "Another clip of this video already has that file name.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "child_rows_off": "Child rows are switched off for this Space. An admin can turn them on in the Space's settings."
     },
     "columns": {
       "button": "Columns",
@@ -856,7 +857,8 @@
       "project_exists": "A project with that name exists: pick it from the list.",
       "already_in_sheet": "That task already has a row on the sheet.",
       "linked": "This row has a task: change it through the task.",
-      "media_task": "Design and Video tasks aren't content rows."
+      "media_task": "Design and Video tasks aren't content rows.",
+      "child_rows_off": "Child rows are switched off for this Space. An admin can turn them on in the Space's settings."
     },
     "menu": {
       "next": "Next",
@@ -2904,7 +2906,8 @@
       "content": "Content",
       "design": "Design",
       "video": "Video",
-      "planning": "Planning"
+      "planning": "Planning",
+      "lang": "en"
     },
     "rules": {
       "content": "Tasks created by the content team or assigned to it. They stay here after the hand-off.",
@@ -3048,7 +3051,144 @@
       "otherStage": "That step belongs to another stage.",
       "step": "Another step of this stage"
     },
-    "groupStatusGroup": "Status group"
+    "groupStatusGroup": "Status group",
+    "config": {
+      "open": "Settings",
+      "title": "{space} · Settings",
+      "sections": "Settings sections",
+      "saved": "Saved.",
+      "saving": "Saving…",
+      "failed": "That wasn't saved. Try again.",
+      "notAllowed": "Only admins and superusers can change Space settings.",
+      "done": "Done",
+      "none": "None",
+      "tab": {
+        "basics": "Basics",
+        "flow": "Flow",
+        "newTasks": "New tasks",
+        "panel": "Task panel",
+        "views": "Views",
+        "linking": "Linking and hand-off",
+        "rules": "Rules and alerts"
+      },
+      "name": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "icon": "Icon",
+      "color": "Colour",
+      "visibility": "Who can see this Space",
+      "visibleMembers": "Its members and admins",
+      "visibleEveryone": "Everyone in the workspace",
+      "members": "Members · {n}",
+      "flowHelp": "Where this Space's work starts, leaves, comes back and ends. Its views show only the stages from Starts at to Ends at.",
+      "startsAt": "Starts at",
+      "endsAt": "Ends at",
+      "handsOffAt": "Hands off at",
+      "returnsAt": "Returns at",
+      "never": "Never hands off",
+      "doesNotReturn": "Doesn't come back",
+      "goesTo": "Goes to",
+      "shows": "This Space shows",
+      "slaStarts": "New tasks made here start at {stage}. Their SLA starts counting there.",
+      "stageNames": "Rename or split stages",
+      "flowProblem": {
+        "end_before_start": "Ends at can't come before Starts at.",
+        "handoff_outside": "Hands off at must be between Starts at and Ends at.",
+        "return_before_handoff": "Returns at must come after Hands off at.",
+        "return_outside": "Returns at must be between Starts at and Ends at.",
+        "handoff_no_target": "Choose the Space the work goes to."
+      },
+      "newLabel": "New task label (English)",
+      "newLabelAr": "New task label (Arabic)",
+      "newLabelDefault": "New task",
+      "newLabelHint": "Shown on the add button and on the first row of this Space's sheets.",
+      "allowedTypes": "Task types allowed here",
+      "defaultType": "Default task type",
+      "defaultAssignee": "Default assignee, by role",
+      "defaultPriority": "Default priority",
+      "typeDefault": "The task type's default",
+      "noPriority": "No priority",
+      "creators": "Who can create tasks here",
+      "creatorsEveryone": "Everyone",
+      "creatorsMembers": "Members of this Space",
+      "creatorsLeads": "Admins and superusers only",
+      "newOnly": "These apply to new tasks only. Existing tasks don't change.",
+      "childRows": "Allow child rows (for example, clips under a video)",
+      "panelHelp": "The task type decides which fields exist. Here you choose which of them this Space shows and which it requires. A hidden field keeps its value and stays visible in other Spaces. A field a brand has switched off stays hidden for that brand everywhere.",
+      "field": "Field",
+      "shown": "Shown",
+      "required": "Required",
+      "requiredBefore": "Required before",
+      "shownFor": "Show {field}",
+      "requiredFor": "{field}: required or optional",
+      "beforeFor": "{field}: required before",
+      "typeRequired": "As the task type says (required)",
+      "typeOptional": "As the task type says (optional)",
+      "requiredYes": "Required",
+      "requiredNo": "Optional",
+      "neverAsked": "Never asked here: this stage comes before {stage}, where this Space starts.",
+      "noFields": "The task types allowed here have no custom fields yet.",
+      "sectionOrder": "Order of the sections in the task panel (under the top rows)",
+      "section": {
+        "above": "Fields above the Description",
+        "description": "Description",
+        "below": "Fields below the Description",
+        "fields": "Fields box",
+        "subtasks": "Subtasks",
+        "attachments": "Attachments"
+      },
+      "moveUp": "Move {name} up",
+      "moveDown": "Move {name} down",
+      "defaultView": "Default view",
+      "defaultSort": "Default sort",
+      "defaultGroup": "Default group by",
+      "defaultColumns": "Default sheet columns",
+      "columnsHint": "Until a member picks their own sort or grouping. Sheet columns apply to this Space's task sheet.",
+      "view": {
+        "board": "Board",
+        "sheet": "Sheet",
+        "calendar": "Calendar",
+        "list": "List",
+        "workload": "Workload"
+      },
+      "sort": {
+        "due": "Due date",
+        "publish": "Publishing date",
+        "priority": "Priority",
+        "name": "Name",
+        "created": "Date created",
+        "updated": "Last updated"
+      },
+      "group": {
+        "none": "The view's own grouping",
+        "stage": "Stage",
+        "brand": "Brand",
+        "statusGroup": "Status group"
+      },
+      "linkRoles": "Who can link and unlink",
+      "linkRolesHint": "Admins and superusers always can.",
+      "atHandoff": "At hand-off",
+      "handoff": {
+        "ask": "Ask for a person",
+        "default": "Use the receiving Space's default assignee"
+      },
+      "rulesHelp": "For the stages this Space owns. Leave a row as it is to keep the workspace's rule.",
+      "stage": "Stage",
+      "holder": "Owner or approver",
+      "sla": "SLA (working days)",
+      "builtInApprover": "The workspace's approver",
+      "assigneeHolds": "The task's assignee",
+      "ownerFor": "Owner of {stage}",
+      "approverFor": "Approver of {stage}",
+      "slaFor": "SLA for {stage}, in working days",
+      "typeSla": "Type's",
+      "slaHint": "Working days are Sunday to Thursday, Cairo time. An empty SLA uses the task type's.",
+      "notify": {
+        "enter": "Tell these roles when a task enters this Space",
+        "overdue": "Tell these roles when a task goes overdue",
+        "back": "Tell these roles when a task is handed back"
+      },
+      "notifyHint": "Only members of this Space with that role are told, on top of the people already notified."
+    }
   },
   "views": {
     "list": "List",
@@ -3323,7 +3463,8 @@
       "already_linked": "That task, or a task on that board, is already linked.",
       "not_found": "That task no longer exists.",
       "no_board": "There's no Design or Video board yet.",
-      "generic": "Couldn't link it. Try again."
+      "generic": "Couldn't link it. Try again.",
+      "not_authorized": "You can't link or unlink here. The Space's settings name who can."
     },
     "col": "Link task",
     "createOnBoard": "Create task",

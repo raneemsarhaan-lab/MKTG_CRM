@@ -35,7 +35,9 @@ export function getAlertStatus(
   const stageDate = new Date(task.stage_date)
 
   const stageDays = businessDaysBetween(stageDate, today, weekend)
-  const slaLimit  = slaConfig[task.status]?.[task.content_type_label] ?? 1
+  // Spec 024 (§7): the Space that owns this stage may set its own SLA, in working days.
+  const spaceSla = (task as { space_sla_days?: number | null }).space_sla_days
+  const slaLimit  = spaceSla ?? slaConfig[task.status]?.[task.content_type_label] ?? 1
 
   // Imported tasks may have no deadline. Absent a due date nothing can be
   // overdue, but time-in-stage still measures against the SLA.

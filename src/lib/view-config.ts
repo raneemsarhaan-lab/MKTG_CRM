@@ -106,6 +106,8 @@ export interface TabPrefs {
   home: string | null; pinned: string[]; hidden: string[]
   /** Spec 023: the fields each built-in tab shows for this member (tab key → field keys). */
   fields?: Record<string, string[]>
+  /** Spec 025: the view this member used last on this page; it opens there next time (after a home view). */
+  last?: string | null
 }
 export const EMPTY_TAB_PREFS: TabPrefs = { home: null, pinned: [], hidden: [] }
 
@@ -116,7 +118,7 @@ export function cleanTabPrefs(raw: unknown): TabPrefs {
   const fields: Record<string, string[]> = {}
   const f = o.fields && typeof o.fields === 'object' && !Array.isArray(o.fields) ? o.fields as Record<string, unknown> : {}
   for (const [k, v] of Object.entries(f).slice(0, 20)) if (k.length <= 60 && Array.isArray(v)) fields[k] = strings(v).filter(isFieldKey)
-  return { home: typeof o.home === 'string' && o.home.length <= 60 ? o.home : null, pinned, hidden: keys(o.hidden).filter(k => !pinned.includes(k)), ...(Object.keys(fields).length ? { fields } : {}) }
+  return { home: typeof o.home === 'string' && o.home.length <= 60 ? o.home : null, pinned, hidden: keys(o.hidden).filter(k => !pinned.includes(k)), ...(Object.keys(fields).length ? { fields } : {}), ...(typeof o.last === 'string' && o.last.length <= 60 ? { last: o.last } : {}) }
 }
 
 /** Tab order: pinned first (in pin order), then the rest in their own order; hidden ones left out. */

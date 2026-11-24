@@ -18,6 +18,8 @@ export interface RTask {
   assignee_id: string | null
   /** Spec 023: every assignee, the lead first. */
   assignee_ids?: string[]
+  /** Spec 024: its Space's role per stage. */
+  stage_roles?: Partial<Record<string, string>> | null
   created_by: string | null
 }
 export interface RMember { id: string; role: string; access: string }
@@ -57,6 +59,8 @@ export function resolveRecipients(
     members: RMember[]
     followers: RFollower[]
     settingsOf(memberId: string): KindSettings
+    /** Spec 024: the people the task's Space adds for this event (stage and overdue events only). */
+    also?: string[]
   },
 ): string[] {
   const { task, members, followers } = ctx
@@ -92,6 +96,7 @@ export function resolveRecipients(
       list = [...people(task.assignee_id, ...(task.assignee_ids ?? [])), ...stageHolders(task, members)]
       break
   }
+  if (ctx.also?.length && ['task_created_in_stage', 'task_moved_to_stage', 'overdue'].includes(event.kind)) list = [...list, ...ctx.also]
   const known = new Set(members.map(m => m.id))
   const seen = new Set<string>()
   const out: string[] = []

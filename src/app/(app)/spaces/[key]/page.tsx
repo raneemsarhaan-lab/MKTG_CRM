@@ -16,6 +16,7 @@ export default async function SpaceRoute({ params }: { params: Promise<{ key: st
   const space = data.spaces.find(s => s.key === key)
   if (!space) notFound()
   const isMember = data.spaceMembers.some(r => r.space_id === space.id && r.member_id === member.id)
-  if (!isMember && member.access !== 'admin') notFound()
+  // Spec 024 (§1): a Space set to "everyone" opens for every member.
+  if (!isMember && member.access !== 'admin' && space.settings.visibility !== 'everyone') notFound()
   return <SpacePage data={data} spaceId={space.id} />
 }

@@ -4,6 +4,7 @@
  */
 import type { Brand, Member, StageId, Task, TeamSpace, TaskSpace } from '@/types/index'
 import { NINE_STAGE } from '@/lib/stage-meta'
+import { defaultSettings } from '@/lib/space-settings'
 import { startingSpaces, membersBySpace, ROLE_SPACES } from '@/lib/spaces'
 
 export const BRANDS: Brand[] = [
@@ -27,10 +28,10 @@ export const MEMBERS: Member[] = [
 ]
 
 export const SPACES: TeamSpace[] = [
-  { id: 's-content', key: 'content', name: 'Content', color: '#3B82F6', is_production: false, default_kind: 'pipeline', words: {}, sort_order: 0, archived_at: null },
-  { id: 's-design', key: 'design', name: 'Design', color: '#7C3AED', is_production: true, default_kind: 'pipeline', words: {}, sort_order: 1, archived_at: null },
-  { id: 's-video', key: 'video', name: 'Video', color: '#0E9F9A', is_production: true, default_kind: 'pipeline', words: {}, sort_order: 2, archived_at: null },
-  { id: 's-planning', key: 'planning', name: 'Planning', color: '#0EA5E9', is_production: false, default_kind: 'simple', words: {}, sort_order: 3, archived_at: null },
+  { id: 's-content', key: 'content', name: 'Content', color: '#3B82F6', is_production: false, default_kind: 'pipeline', words: {}, sort_order: 0, archived_at: null, settings: defaultSettings('content') },
+  { id: 's-design', key: 'design', name: 'Design', color: '#7C3AED', is_production: true, default_kind: 'pipeline', words: {}, sort_order: 1, archived_at: null, settings: defaultSettings('design') },
+  { id: 's-video', key: 'video', name: 'Video', color: '#0E9F9A', is_production: true, default_kind: 'pipeline', words: {}, sort_order: 2, archived_at: null, settings: defaultSettings('video') },
+  { id: 's-planning', key: 'planning', name: 'Planning', color: '#0EA5E9', is_production: false, default_kind: 'simple', words: {}, sort_order: 3, archived_at: null, settings: defaultSettings('planning') },
 ]
 
 export function makeLab() {

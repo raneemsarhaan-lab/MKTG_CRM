@@ -1,5 +1,7 @@
 'use client'
 
+import { AddLabelProvider } from '@/components/spaces/addLabel'
+import { newTaskLabel, rangeOf, typesForSpace } from '@/lib/space-settings'
 import { createTask } from '@/actions/tasks'
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -18,7 +20,7 @@ import {
 } from '@/actions/tasks'
 import { writeClipField } from '@/actions/sheet-links'
 import { PIPE } from '@/lib/pipeline-tokens'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
 import type { ContentApi } from '@/components/content/types'
@@ -137,10 +139,16 @@ const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toIS
 
 export function KanbanBoard(props: KanbanBoardProps) {
   const names = useMemo(() => new Map(props.initialTasks.map(x => [x.id, x.name])), [props.initialTasks])
+  // Spec 024 (§3): inside a Space, its sheets' add rows use the Space's "New task label".
+  const wrapLocale = useLocale()
+  const wrapSpace = props.spaceId ? props.spaces?.find(x => x.id === props.spaceId) : undefined
+  const sheetAddLabel = wrapSpace ? newTaskLabel(wrapSpace.settings, wrapLocale, '') || null : null
   return (
-    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags}>
+    <AddLabelProvider value={sheetAddLabel}>
+    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null}>
       <KanbanBoardInner {...props} />
     </CardFieldsProvider>
+    </AddLabelProvider>
   )
 }
 
@@ -349,7 +357,9 @@ function KanbanBoardInner({
   // Saved per person per board, on the server, so it follows them across sessions and devices.
   const board = boardKey ?? (spaceId ? `space:${spaceId}` : 'board')
   const savedSort = boardSorts?.[board]
-  const [sortBy, setSortBy] = useState<SortKey>(savedSort && (SORT_KEYS as string[]).includes(savedSort) ? savedSort as SortKey : DEFAULT_SORT)
+  // Spec 024 (§5): a Space's default sort, until the member picks their own.
+  const spaceSort = spaceId ? spaces.find(x => x.id === spaceId)?.settings.views.sort : undefined
+  const [sortBy, setSortBy] = useState<SortKey>(savedSort && (SORT_KEYS as string[]).includes(savedSort) ? savedSort as SortKey : spaceSort ?? DEFAULT_SORT)
   function chooseSort(next: SortKey) {
     setSortBy(next)
     void setBoardSort(board, next === DEFAULT_SORT ? null : next)
@@ -1024,6 +1034,7 @@ function KanbanBoardInner({
    * localStorage while rendering makes the server and client disagree.
    */
   const [showUpstream, setShowUpstream] = useState(true)
+  const boardLocale = useLocale()
   const isPhone = useIsPhone()
   useEffect(() => {
     const stored = window.localStorage.getItem('momentum.board.upstream')
@@ -1034,10 +1045,14 @@ function KanbanBoardInner({
     try { window.localStorage.setItem('momentum.board.upstream', v ? '1' : '0') } catch { /* private mode */ }
   }
   // Spec 022: a media board's tasks start at Ready For Design, so it has no writing columns.
-  const mediaBoardView = hosted && !!spaceId && !!spaces.find(x => x.id === spaceId)?.media_board
-  const stagesInScope = showUpstream && !mediaBoardView
-    ? ALL_STAGES
-    : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
+  // Spec 024 (§2): a Space's board shows the stages from its "Starts at" to its "Ends at".
+  const viewSpace = hosted && spaceId ? spaces.find(x => x.id === spaceId) : undefined
+  const stagesInScope = viewSpace
+    ? rangeOf(viewSpace.settings.flow)
+    : showUpstream
+      ? ALL_STAGES
+      : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
+  const addLabel = viewSpace ? newTaskLabel(viewSpace.settings, boardLocale, '') || undefined : undefined
 
   /* Stacked, an empty stage is a heading with nothing beneath it.
    *
@@ -1134,6 +1149,8 @@ function KanbanBoardInner({
   const taskPanel = selectedTask && (
     <TaskModal
       task={selectedTask}
+      stageNameOf={hosted && spaceId && ss ? s => ss.stageName(s) : undefined}
+      sectionOrder={viewSpace?.settings.section_order}
       currentUser={currentUser}
       stages={[]}
       slaConfig={slaConfig}
@@ -1212,11 +1229,13 @@ function KanbanBoardInner({
   )
   // Spec 021: the creator's own pipeline Spaces, for "Show in" when not created from a Space.
   const mySpaces = spaces.filter(x => spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
+  // Spec 024 (§3): in a Space, the form offers its allowed task types, the default first.
+  const formSpace = spaceId ? spaces.find(x => x.id === spaceId) : undefined
   const taskForm = showTaskForm && (
     <TaskForm
       currentUser={currentUser}
       brands={brands}
-      contentTypes={contentTypes}
+      contentTypes={typesForSpace(formSpace?.settings, contentTypes)}
       members={members}
       spaceId={spaceId ?? null}
       spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
@@ -1383,6 +1402,7 @@ function KanbanBoardInner({
               highlight={overStage === e.stage_id && activeDragId !== null}
               onSelectTask={id => selectTask(id)}
               onAddTask={() => setShowTaskForm(true)}
+              addLabel={addLabel}
               selectedIds={selected}
               selecting={selected.size > 0}
               onToggleSelect={toggleSelect}
@@ -1406,6 +1426,7 @@ function KanbanBoardInner({
                 onSelectTask={id => selectTask(id)}
                 // Spec 021 (FR-027a): everyone may create tasks they own.
                 onAddTask={() => setShowTaskForm(true)}
+                addLabel={addLabel}
                 selectedIds={selected}
                 selecting={selected.size > 0}
                 onToggleSelect={toggleSelect}

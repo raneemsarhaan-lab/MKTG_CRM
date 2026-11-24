@@ -15,7 +15,7 @@ import type { FieldOption, StageId, TaskFieldDef, TaskTypeFieldLink } from '@/ty
 import { STAGE_META } from '@/lib/stage-meta'
 import { fieldName, fieldsForType, formatValue, isEmpty, parseValue, placeOf, type FieldPlace } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
-import { useCardFields } from './CardFields'
+import { ruleFor, useCardFields } from './CardFields'
 import { fieldOn } from '@/lib/brand-features'
 import type { BrandFeatures } from '@/types/index'
 
@@ -31,9 +31,13 @@ function usePanelFields(task: { id: string; content_type_label: string | null; b
   const [local, setLocal] = useState<Record<string, unknown>>({})
   const base = c?.values.get(task.id)
   useEffect(() => { setLocal({}) }, [base])
+  // Spec 024 (§4): the Space decides which of the type's fields show here and which are required.
+  const homeId = (task as { home_space_id?: string | null }).home_space_id
   const entries: Entry[] = useMemo(() => (c ? fieldsForType(task.content_type_label, c.links, c.fields) : [])
     .filter(x => fieldOn(task.brand, x.field))
-    .map(x => ({ ...x, value: x.field.id in local ? local[x.field.id] : base?.get(x.field.id) })), [c, task.content_type_label, task.brand, local, base])
+    .map(x => ({ ...x, rule: ruleFor(c, { home_space_id: homeId }, x.link) }))
+    .filter(x => x.rule.shown)
+    .map(x => ({ field: x.field, link: { ...x.link, required_from: x.rule.before }, value: x.field.id in local ? local[x.field.id] : base?.get(x.field.id) })), [c, task.content_type_label, task.brand, local, base, homeId])
   async function save(f: TaskFieldDef, value: unknown): Promise<string | null> {
     const p = parseValue(f, value)
     if (!p.ok) return 'invalid'

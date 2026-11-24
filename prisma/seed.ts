@@ -498,6 +498,22 @@ async function main() {
     return `${t.count} tasks`
   })
 
+  // Spec 024 (§8): the Video Space's own stage names, when it has none yet.
+  await once('video-stage-names-v1', 'named the Video Space stages Editing, Edit Review and Final Cut', async () => {
+    const video = await prisma.teamSpace.findUnique({ where: { key: 'video' } })
+    if (!video) return 'no Video Space'
+    if (await prisma.spaceStage.count({ where: { space_id: video.id } })) return 'already named'
+    const names: [string, string][] = [['d-prog', 'Editing'], ['d-check', 'Edit Review'], ['final-check', 'Final Cut']]
+    await prisma.spaceStage.createMany({ data: names.map(([stage_id, name]) => ({ space_id: video.id, stage_id, name, position: 0 })) })
+    return `${names.length} names`
+  })
+
+  // Spec 024 (§8): clips still at To Do start where the Video Space starts — Ready For Design on the Video board.
+  await once('clips-to-video-v1', 'moved clips at To Do to Ready For Design on the Video board', async () => {
+    const { moveTodoClips } = await import('../src/lib/space-settings-server')
+    return `${await moveTodoClips(prisma)} clips`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

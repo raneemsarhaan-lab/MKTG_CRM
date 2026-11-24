@@ -6,7 +6,7 @@ module.exports = (EMAIL, psql, ok) => {
   const memberWithRole = role => psql(`select name from members where role='${role}' order by name limit 1`)
   const create = async (page, go, where, name) => {
     await go(`/spaces/${where}?view=board`)
-    await page.getByRole('button', { name: 'Add task' }).first().click()
+    await page.getByRole('button', { name: /^(Add task|New post|New design|New clip)$/ }).first().click()
     await page.fill('input[placeholder="Task name — or paste a list"]', name)
     await page.locator('button', { hasText: /^Create Task$/i }).first().click()
     await page.waitForTimeout(2200)

@@ -150,7 +150,7 @@ export function useMediaLinks({ tasks, onOpenTask, say }: {
   const busy = useRef(false)
   const linkedOf = (id: string) => tasks.filter(x => x.content_task_id === id && !!x.media_board && !x.dropped_at)
   const unlinked = tasks.filter(x => !!x.media_board && !x.content_task_id && !x.dropped_at)
-  const why = (e: string) => (['past_d_check', 'already_linked', 'not_found', 'no_board'].includes(e) ? t(`err.${e}` as 'err.past_d_check') : t('err.generic'))
+  const why = (e: string) => (['past_d_check', 'already_linked', 'not_found', 'no_board', 'not_authorized'].includes(e) ? t(`err.${e}` as 'err.past_d_check') : t('err.generic'))
 
   async function run<T extends { success: boolean; error?: string }>(p: Promise<T>): Promise<T | null> {
     if (busy.current) return null
@@ -203,7 +203,7 @@ export function useMediaLinks({ tasks, onOpenTask, say }: {
 }
 
 /** A media board's Create task (spec 022 FR-004): an unlinked media task at Ready For Design. */
-export function MediaCreateButton({ board, boardName, brands }: { board: MediaBoard; boardName: string; brands: { id: string; name: string }[] }) {
+export function MediaCreateButton({ board, boardName, brands, label }: { board: MediaBoard; boardName: string; brands: { id: string; name: string }[]; /** Spec 024: the Space's own text for the button. */ label?: string }) {
   const t = useTranslations('media')
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -223,7 +223,7 @@ export function MediaCreateButton({ board, boardName, brands }: { board: MediaBo
     <>
       <button type="button" data-media-create-open="" onClick={() => setOpen(true)}
               style={{ border: 'none', background: '#14131A', color: '#FFFFFF', borderRadius: 9, padding: '6px 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-        ＋ {t('createOnBoard')}
+        ＋ {label ?? t('createOnBoard')}
       </button>
       {open && (
         <Modal title={t('createTitle', { board: boardName })} body={t('createBody')} onCancel={() => setOpen(false)} attr="data-media-create-dialog">
@@ -277,6 +277,7 @@ export function MediaPanelSection({ task, tasks, onOpenTask }: {
                   onClick={async () => {
                     const r = await unlinkMedia(task.id).catch(() => null)
                     if (r?.success) setNote({ text: t('unlinked', { name: content.name }), undo: () => void relinkMedia(task.id, r.contentTaskId) })
+                    else setNote({ text: r && !r.success && r.error === 'not_authorized' ? t('err.not_authorized') : t('err.generic') })
                   }}>× {t('unlink')}</button>
         </div>
       ) : (

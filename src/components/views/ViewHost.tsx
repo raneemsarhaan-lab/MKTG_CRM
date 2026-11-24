@@ -57,11 +57,15 @@ interface ViewHostProps {
   options?: ViewOptions
   /** The reader is an admin or superuser (may change any shared view). */
   lead?: boolean
+  /** Spec 024 (§5): the tab the page opens on without a ?view= or a home view; the first tab when unset. */
+  defaultTab?: string
+  /** This member's tab choices for this page, sent with the page so it opens on the right view at once. */
+  initialPrefs?: TabPrefs
 }
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs }: ViewHostProps) {
   const t = useTranslations('views')
   const params = useSearchParams()
   const [views, setViews] = useState<SavedView[]>([])
@@ -69,16 +73,26 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const [adding, setAdding] = useState(false)
   const [say, setSay] = useState('')
   // Home, pinned and hidden tabs (user, 2026-11-22), this member's own per page.
-  const [prefs, setPrefs] = useState<TabPrefs>(EMPTY_TAB_PREFS)
+  const [prefs, setPrefs] = useState<TabPrefs>(initialPrefs ?? EMPTY_TAB_PREFS)
+  // The latest choices, for a save that follows another in the same click (hide a tab, then leave it).
+  const prefsRef = useRef(prefs)
+  prefsRef.current = prefs
   const [tabMenu, setTabMenu] = useState<{ key: string; x: number; y: number } | null>(null)
   const [hiddenMenu, setHiddenMenu] = useState<{ x: number; y: number } | null>(null)
   const firstLoad = useRef(true)
   const live = tabs.filter(x => !x.disabled)
   const savedKey = (v: SavedView) => `v:${v.id}`
+  const first = live.some(x => x.key === defaultTab) ? defaultTab as string : live[0]?.key ?? ''
   const pick = (v: string | null, list = views) =>
-    live.some(x => x.key === v) || list.some(x => savedKey(x) === v) ? (v as string) : live[0]?.key ?? ''
-  const [tab, setTab] = useState(() => pick(params.get('view')))
-  useEffect(() => { setTab(pick(params.get('view'))) }, [params]) // eslint-disable-line react-hooks/exhaustive-deps
+    live.some(x => x.key === v) || list.some(x => savedKey(x) === v) ? (v as string) : first
+  // Without a ?view=: this member's home view, else the view they used last here, else the page's default.
+  const remembered = (p: TabPrefs, list = views) => [p.home, p.last].find(k => !!k && (live.some(x => x.key === k) || list.some(v => savedKey(v) === k))) ?? null
+  const [tab, setTab] = useState(() => (params.get('view') ? pick(params.get('view')) : remembered(initialPrefs ?? EMPTY_TAB_PREFS, []) ?? first))
+  // Follow the address's ?view= only when it changes: another part of the page touching the
+  // address (the board does) must not send the page back from the member's home view.
+  const viewParam = params.get('view')
+  const seenParam = useRef(viewParam)
+  useEffect(() => { if (seenParam.current !== viewParam) { seenParam.current = viewParam; setTab(pick(viewParam)) } }, [viewParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function reload(select?: string) {
     if (!node) return
@@ -89,8 +103,8 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
     // Without a ?view= in the address, the page opens on this member's home view.
     if (firstLoad.current) {
       firstLoad.current = false
-      const home = r.prefs.home
-      if (!select && !params.get('view') && home && (live.some(x => x.key === home) || r.views.some(v => savedKey(v) === home))) { setTab(home); return }
+      const home = remembered(r.prefs, r.views)
+      if (!select && !params.get('view') && home) { setTab(home); return }
     }
     if (select) choose(select)
     else setTab(cur => (cur.startsWith('v:') && !r.views.some(v => savedKey(v) === cur) ? pick(params.get('view'), r.views) : pick(cur, r.views)))
@@ -102,8 +116,11 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   function choose(next: string) {
     setTab(next)
     setSay('')
+    // Spec 025: the page remembers the view used last, per member and per page.
+    const cur = prefsRef.current
+    if (node && cur.last !== next) { const p = { ...cur, last: next }; prefsRef.current = p; setPrefs(p); void setTabPrefs(node, p).catch(() => null) }
     const url = new URL(window.location.href)
-    if (next === live[0]?.key) url.searchParams.delete('view'); else url.searchParams.set('view', next)
+    if (next === first) url.searchParams.delete('view'); else url.searchParams.set('view', next)
     window.history.replaceState(null, '', url)
   }
 
@@ -111,6 +128,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
   const arranged = node ? arrangeTabs(allTabs, prefs) : { shown: allTabs, hidden: [] as typeof allTabs }
   function updatePrefs(next: TabPrefs) {
+    prefsRef.current = next
     setPrefs(next)
     setTabMenu(null)
     if (node) void setTabPrefs(node, next).catch(() => null)

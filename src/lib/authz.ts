@@ -48,6 +48,14 @@ export async function requireAdmin(): Promise<Guard> {
   return { member }
 }
 
+/** Spec 024: admins and superusers — Space settings. */
+export async function requireLead(): Promise<Guard> {
+  const member = await getSessionMember()
+  if (!member) return { error: 'not_authenticated' }
+  if (member.access !== 'admin' && member.access !== 'superuser') return { error: 'not_authorized' }
+  return { member }
+}
+
 /** Admin or superuser — task creation. Mirrors the guard in TaskForm. */
 export async function requireTaskCreator(): Promise<Guard> {
   const member = await getSessionMember()

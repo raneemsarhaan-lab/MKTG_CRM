@@ -6,7 +6,7 @@
  * task; removing it changes nothing else (FR-032).
  */
 import { MEDIA_BOARDS, spaceForBoard } from '@/lib/media'
-import { createLinkedMedia, dropStaleSubStages } from '@/lib/media-server'
+import { createLinkedMedia, dropStaleSubStages, requiredGate, requiredRefusal } from '@/lib/media-server'
 import { defaultAssigneeFor, type SpaceLike } from '@/lib/spaces'
 import type { MediaBoard } from '@/types/index'
 import { revalidatePath } from 'next/cache'
@@ -78,6 +78,9 @@ export async function handOff(
   const toIdx = path.indexOf(input.target)
   if (toIdx === -1) return { success: false, shouldCelebrate: false, error: 'stage_not_in_pipeline' }
   if (!allowedStages(task, member).includes(input.target)) return { success: false, shouldCelebrate: false, error: 'not_authorized' }
+  // Spec 023/024: the hand-off is a move like any other — fields required by then must be filled.
+  const need = await requiredGate(task, 'r-design')
+  if (need) return { success: false, shouldCelebrate: false, ...requiredRefusal(need) }
 
   const ctx = await loadSpaceContext()
   const links = (input.links ?? []).filter((l, i, all) => all.findIndex(x => x.spaceId === l.spaceId) === i)

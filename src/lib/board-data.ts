@@ -5,6 +5,7 @@
  *
  * Server-only: it reads the database directly.
  */
+import { homeSpace, slaFor, stageRoles } from '@/lib/space-settings'
 import { setWorkWeekend } from '@/lib/utils'
 import { syncContentSheet } from '@/lib/content-rows-server'
 import { prisma } from '@/lib/prisma'
@@ -130,7 +131,21 @@ export async function loadBoardData(member: SessionMember) {
   const brandFeatureDefaults = cleanFeatures(ws?.brand_feature_defaults)
   const resolvedBrands = brands.map(b => withResolvedFeatures(mapBrand(b), brandFeatureDefaults))
   const brandById = new Map(resolvedBrands.map(b => [b.id, b]))
-  const viewTaskRows = tasks.map(mapTask).map(x => (x.brand_id && brandById.has(x.brand_id) ? { ...x, brand: brandById.get(x.brand_id) } : x))
+  // Spec 024: each task carries the Space whose rules apply to it, that Space's role per stage
+  // and its SLA for the task's current stage (when the Space sets one).
+  const liveSpaces = spaces.map(mapSpace)
+  const madeIn = new Map(taskSpaces.filter(r => r.added_via === 'created').map(r => [r.task_id, r.space_id]))
+  const rolesBySpace = new Map(liveSpaces.map(sp => [sp.id, stageRoles(sp.settings)]))
+  const viewTaskRows = tasks.map(mapTask).map(x => {
+    const home = homeSpace(x, liveSpaces, madeIn.get(x.id))
+    return {
+      ...x,
+      ...(x.brand_id && brandById.has(x.brand_id) ? { brand: brandById.get(x.brand_id) } : {}),
+      home_space_id: home?.id ?? null,
+      stage_roles: home ? rolesBySpace.get(home.id) ?? null : null,
+      space_sla_days: slaFor(home?.settings, x.status),
+    }
+  })
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,7 +175,9 @@ export async function loadBoardData(member: SessionMember) {
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
     linkedRowHeights,
-    spaces: spaces.map(mapSpace),
+    spaces: liveSpaces,
+    // This member's tab choices per page (home, pinned, hidden, last view), so a page opens on the right view at once.
+    viewPrefs: ((member as { view_prefs?: unknown }).view_prefs ?? {}) as Record<string, unknown>,
     spaceMembers,
     taskSpaces: taskSpaces as import('@/types/index').TaskSpace[],
     inbox: {

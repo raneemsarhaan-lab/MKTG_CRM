@@ -216,7 +216,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       </div>
 
       {/* Spec 023: custom field values the page shows. */}
-      <CardFieldValues taskId={task.id} typeLabel={task.content_type_label} status={task.status} brand={task.brand} />
+      <CardFieldValues taskId={task.id} typeLabel={task.content_type_label} status={task.status} brand={task.brand} homeSpaceId={task.home_space_id} />
 
       {/* Publishing and due dates, each labelled (✎ on a due date set by hand). */}
       {(shows('publish') || shows('due')) && <div style={{ marginTop: 5 }}><TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={10.5} /></div>}

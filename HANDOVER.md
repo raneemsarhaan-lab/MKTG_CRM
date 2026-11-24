@@ -968,6 +968,29 @@ Rows are their own records; a row may stand for one task. Rules: `design/sheets-
 
 Tests: `scripts/spaces-lab/realapp/scenarios-2b.cjs`, `pure-content-rows`. Without rows (the sheet lab), the sheet shows every piece as a row in date order, as before.
 
+### 7.za Space settings (spec 024)
+
+Each team Space says how it works. Settings are one JSON column (`team_spaces.settings`); missing keys take the Space's defaults, so a Space with nothing stored behaves as its default. Spec: `specs/024-space-settings/spec.md`.
+
+| Rule | Where it lives |
+|---|---|
+| The settings, their defaults per Space key, and every rule that reads them (range, stage ownership, field rules, creators, link roles, SLA, labels) | `src/lib/space-settings.ts` (pure) |
+| Reading them on the server: a new task's start, who may create, the Space whose rules apply to a task (`homeSpaceOf`), the one-time clip move | `src/lib/space-settings-server.ts` |
+| Saving (admins and superusers): a patch is merged into the stored settings, checked, and stored whole; a flow that doesn't hold together is refused | `updateSpaceSettings` in `src/actions/spaces.ts`, `requireLead` in `src/lib/authz.ts` |
+| A new task starts at its Space's "Starts at" (on the board when the Space is one), with the Space's default type, assignee and priority | `createTask`, `createTasks`, `addClips` in `src/actions/tasks.ts` |
+| Clips are media tasks on the Video board at the Video Space's start, and still sit under their video in the Video sheet | `addClips`; `sheetVideos` in `src/components/sheet/rows.ts` |
+| Required fields are checked by the Space whose rules apply; a field hidden there, or required before a stage earlier than its start, is never asked | `requiredGate` in `src/lib/media-server.ts` |
+| The panel and cards show or hide a type's fields by the Space being looked at | `ruleFor` in `src/components/fields/CardFields.tsx`, `usePanelFields` |
+| A Space's board shows its range only; its views list only tasks inside it | `KanbanBoard.tsx` (`stagesInScope`), `SpacePage.tsx` (`scope`) |
+| Stage owner or approver per Space stage; a Space SLA for the stages it owns | `stageRoles` → `holdsStage` (`src/lib/stage-moves.ts`); `space_sla_days` → `getAlertStatus` |
+| Who else is told when a task enters, goes overdue or is handed back | `notifyRoles`, used in `src/lib/notify/notify.ts` |
+| Who may link and unlink; hand-off without the box | `canLink` in `src/actions/media.ts`; `autoHandoff` in `src/actions/tasks.ts` |
+| The settings screen (seven sections, saves as you change) | `src/components/spaces/SpaceSettings.tsx` |
+
+Board data gives every task `home_space_id`, `stage_roles` and `space_sla_days`. Server moves get the same roles through `withAssignees`.
+
+Tests: `scripts/spaces-lab/realapp/scenarios-024.cjs`, `pure-space-settings`. The dev server's `.next` cache can grow very large (35 GB seen); delete `.next` if pages stop compiling.
+
 ---
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)

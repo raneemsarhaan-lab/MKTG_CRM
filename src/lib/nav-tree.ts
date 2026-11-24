@@ -25,7 +25,8 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
   const MINE = { dropped_at: null, status: { not: 'publish' }, OR: [{ assignee_id: member.id }, { assignees: { some: { member_id: member.id } } }, ...(held.length ? [{ status: { in: held } }] : [])] }
   const [spaces, brands, byBrand, noBrand, bySpace, mine, mtOpen, mtLate, tdOpen, tdLate] = await Promise.all([
     prisma.teamSpace.findMany({
-      where: { archived_at: null, ...(admin ? {} : { members: { some: { member_id: member.id } } }) },
+      // Spec 024 (§1): a Space set to "everyone" is seen by every member.
+      where: { archived_at: null, ...(admin ? {} : { OR: [{ members: { some: { member_id: member.id } } }, { settings: { path: ['visibility'], equals: 'everyone' } }] }) },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
       select: { id: true, key: true, name: true, color: true },
     }),

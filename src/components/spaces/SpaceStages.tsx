@@ -34,7 +34,7 @@ export function SpaceStagesButton({ space, rows }: { space: TeamSpace; rows: Spa
   )
 }
 
-function SpaceStagesPanel({ space, rows, onClose }: { space: TeamSpace; rows: SpaceStage[]; onClose(): void }) {
+export function SpaceStagesPanel({ space, rows, onClose }: { space: TeamSpace; rows: SpaceStage[]; onClose(): void }) {
   const t = useTranslations('spaces.stages')
   const locale = useLocale()
   const router = useRouter()

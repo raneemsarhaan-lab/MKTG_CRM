@@ -37,9 +37,9 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: 'us1-space-lists-shows-in', as: 'admin',
       async run({ page, go }) {
-        await go('/spaces/video')
-        // Spec 022: the Video board lists its media tasks.
-        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and t.media_board='video'`)
+        await go('/spaces/video?view=list')
+        // Spec 022: the Video board lists its media tasks. Spec 024: within its range (Ready For Design to D-Check).
+        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and t.media_board='video' and t.status in ('r-design','d-prog','d-check')`)
         const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)
         ok(String(rows) === want, `Video lists its Shows in tasks: ${rows} vs ${want}`)
         ok(await page.$('[data-group="brand"][aria-pressed="true"]'), 'grouped by brand by default')
@@ -167,7 +167,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const name = `Lab user task ${Date.now()}`
         await go('/spaces/content?view=board')
-        await page.getByRole('button', { name: 'Add task' }).first().click()
+        await page.getByRole('button', { name: /^(Add task|New post|New design|New clip)$/ }).first().click()
         await page.fill('input[placeholder="Task name — or paste a list"]', name)
         await page.locator('button', { hasText: /^Create Task$/i }).first().click()
         await page.waitForTimeout(2000)

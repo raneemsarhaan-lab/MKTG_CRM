@@ -49,7 +49,7 @@ type Popup =
   | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
   | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
 
-const KNOWN_ERRORS = ['one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */

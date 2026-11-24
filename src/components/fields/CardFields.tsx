@@ -8,7 +8,8 @@
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { BrandFeatures, ContentType, Member, Tag, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink } from '@/types/index'
+import type { BrandFeatures, ContentType, Member, Tag, TaskFieldDef, TaskFieldValueRow, TaskTypeFieldLink, TeamSpace, StageId } from '@/types/index'
+import { fieldRule, stageAt } from '@/lib/space-settings'
 import { applies, fieldName, formatValue, isEmpty, requiredEmpty } from '@/lib/task-fields'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { fieldOn } from '@/lib/brand-features'
@@ -24,8 +25,26 @@ export interface CardFieldsData {
   taskName?(id: string): string | undefined
   /** Spec 023 (R8): the workspace's tags. */
   tags: Tag[]
+  /** Spec 024 (§4): every Space's settings, and the Space this page is (null outside a Space). */
+  spaces: TeamSpace[]
+  viewSpaceId: string | null
 }
 
+/**
+ * Spec 024 (§4): a field's rule for a task here — shown or hidden by the Space being
+ * looked at; required before a stage by that Space, else by the Space whose rules apply
+ * to the task. A stage earlier than that Space's start is never asked for.
+ */
+export function ruleFor(c: Pick<CardFieldsData, 'spaces' | 'viewSpaceId'> | null | undefined, task: { home_space_id?: string | null }, link: TaskTypeFieldLink): { shown: boolean; before: StageId | null } {
+  const view = c?.viewSpaceId ? c.spaces.find(s => s.id === c.viewSpaceId) : undefined
+  const home = task.home_space_id ? c?.spaces.find(s => s.id === task.home_space_id) : undefined
+  const s = (view ?? home)?.settings
+  if (!s) return { shown: true, before: link.required_from }
+  const r = fieldRule(s, link)
+  return { shown: view ? r.shown : true, before: r.before && stageAt(r.before) < stageAt(s.flow.start) ? null : r.before }
+}
+
+const NO_SPACES: TeamSpace[] = []
 const Ctx = createContext<CardFieldsData | null>(null)
 /** Set by a page's Fields button; a board inside it keeps the outer choice. */
 const ShownCtx = createContext<string[] | null | undefined>(undefined)
@@ -34,8 +53,9 @@ export function ShownFieldsProvider({ shown, children }: { shown: string[] | nul
   return <ShownCtx.Provider value={shown ?? null}>{children}</ShownCtx.Provider>
 }
 
-export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, tags = [], children }: {
+export function CardFieldsProvider({ fields = [], links = [], values = [], types, members, taskName, tags = [], spaces = NO_SPACES, viewSpaceId = null, children }: {
   fields?: TaskFieldDef[]; links?: TaskTypeFieldLink[]; values?: TaskFieldValueRow[]; types: ContentType[]; members: Member[]; tags?: Tag[]
+  spaces?: TeamSpace[]; viewSpaceId?: string | null
   taskName?(id: string): string | undefined; children: ReactNode
 }) {
   const shown = useContext(ShownCtx) ?? null
@@ -44,7 +64,7 @@ export function CardFieldsProvider({ fields = [], links = [], values = [], types
     for (const v of values) { let x = m.get(v.task_id); if (!x) m.set(v.task_id, (x = new Map())); x.set(v.field_id, v.value) }
     return m
   }, [values])
-  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName, tags }), [shown, fields, links, byTask, types, members, taskName, tags])
+  const value = useMemo(() => ({ shown, fields, links, values: byTask, types, members, taskName, tags, spaces, viewSpaceId }), [shown, fields, links, byTask, types, members, taskName, tags, spaces, viewSpaceId])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
@@ -57,15 +77,16 @@ export function useCardShows() {
 }
 
 /** The custom field values a card shows, under its title. */
-export function CardFieldValues({ taskId, typeLabel, status, brand }: { taskId: string; typeLabel: string | null | undefined; status?: string; brand?: { features?: BrandFeatures | null } | null }) {
+export function CardFieldValues({ taskId, typeLabel, status, brand, homeSpaceId }: { taskId: string; typeLabel: string | null | undefined; status?: string; brand?: { features?: BrandFeatures | null } | null; homeSpaceId?: string | null }) {
   const c = useContext(Ctx)
   const locale = useLocale()
   const t = useTranslations('fields')
   if (!c || !typeLabel) return null
   // Required fields still empty: a small red label each ("Caption missing"), until it's published.
-  const missing = status === 'publish' ? [] : requiredEmpty({ id: taskId, content_type_label: typeLabel }, c.links, c.fields, id => c.values.get(taskId)?.get(id)).filter(x => fieldOn(brand, x.field))
+  const missing = status === 'publish' ? [] : requiredEmpty({ id: taskId, content_type_label: typeLabel }, c.links.map(l => ({ ...l, required_from: ruleFor(c, { home_space_id: homeSpaceId }, l).shown ? ruleFor(c, { home_space_id: homeSpaceId }, l).before : null })), c.fields, id => c.values.get(taskId)?.get(id)).filter(x => fieldOn(brand, x.field))
   const vals = c.values.get(taskId)
-  const list = c.fields.filter(f => !f.retired && fieldOn(brand, f) && applies(typeLabel, f.id, c.links)
+  const hiddenHere = new Set(c.links.filter(l => l.type_label === typeLabel && !ruleFor(c, { home_space_id: homeSpaceId }, l).shown).map(l => l.field_id))
+  const list = c.fields.filter(f => !f.retired && fieldOn(brand, f) && !hiddenHere.has(f.id) && applies(typeLabel, f.id, c.links)
     && (c.shown ? c.shown.includes(`f:${f.id}`) : f.on_card))
   const rows = list.map(f => {
     const v = vals?.get(f.id)

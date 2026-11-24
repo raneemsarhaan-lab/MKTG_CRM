@@ -11,6 +11,8 @@
  *   - linkFromCalendar: Link task on a calendar day — makes the content task
  *     (that day is its publishing date) and links it.
  */
+import { mayLink } from '@/lib/space-settings'
+import { homeSpaceOf } from '@/lib/space-settings-server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
@@ -40,6 +42,12 @@ async function boardSpaces() {
   return { ctx, spaceOf, personFor }
 }
 
+/** Spec 024 (§6): who may link and unlink — the roles its Space names (admins and superusers always). */
+async function canLink(me: { access: string; role: string | null }, contentTaskId: string): Promise<boolean> {
+  const home = await homeSpaceOf(contentTaskId)
+  return !home || mayLink(home.settings, me)
+}
+
 /**
  * Link task: link `contentTaskId` to an unlinked media task, or create one
  * linked media task per board. Refuses a content task at F-Check or later (R11).
@@ -54,6 +62,7 @@ export async function linkToMedia(
   if (!content || content.dropped_at) return { success: false, error: 'not_found' }
   if (content.media_board) return { success: false, error: 'not_content_task' }
   if (AFTER_D_CHECK.includes(content.status)) return { success: false, error: 'past_d_check' }
+  if (!await canLink(me, content.id)) return { success: false, error: 'not_authorized' }
 
   if ('mediaTaskId' in target) {
     const m = await prisma.task.findUnique({ where: { id: target.mediaTaskId } })
@@ -131,6 +140,7 @@ export async function unlinkMedia(mediaTaskId: string): Promise<{ success: true;
   if (!me) return { success: false, error: 'not_authenticated' }
   const m = await prisma.task.findUnique({ where: { id: mediaTaskId }, select: { id: true, media_board: true, content_task_id: true, dropped_at: true } })
   if (!m || !m.media_board || !m.content_task_id) return { success: false, error: 'not_linked' }
+  if (!await canLink(me, m.content_task_id)) return { success: false, error: 'not_authorized' }
   await prisma.task.update({ where: { id: m.id }, data: { content_task_id: null, updated_at: new Date() } })
   revalidate()
   return { success: true, contentTaskId: m.content_task_id }

@@ -14,7 +14,10 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { StageId, Task } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { SpaceStagesButton } from '@/components/spaces/SpaceStages'
+import { SpaceSettingsButton } from '@/components/spaces/SpaceSettings'
+import { inRange, mayCreateIn, newTaskLabel, typesForSpace } from '@/lib/space-settings'
+import { defaultAssigneeFor } from '@/lib/spaces'
+import { TaskForm } from '@/components/shared/TaskForm'
 import { useSpaceStages } from '@/components/spaces/useSpaceStages'
 import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { ViewHost } from './ViewHost'
@@ -27,7 +30,7 @@ import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData } from './types'
-import { applyView } from '@/lib/view-config'
+import { applyView, cleanTabPrefs } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
 
@@ -41,7 +44,9 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   // Spec 022: a media board (Design, Video) shows its media tasks; other Spaces show content tasks,
   // with linked media tasks seen through their content task's chips.
   const board = space.media_board ?? null
-  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)), [shown, board])
+  // Spec 024 (§2): its views show only the stages from "Starts at" to "Ends at".
+  const flow = space.settings.flow
+  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status)), [shown, board, flow])
   const tasks = viewTasks(data).filter(scope)
   const memberNames = data.spaceMembers.filter(r => r.space_id === spaceId)
     .map(r => data.members.find(m => m.id === r.member_id)?.name).filter(Boolean).join(', ')
@@ -49,6 +54,11 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const rule = ['content', 'design', 'video', 'planning'].includes(space.key) ? t(`rules.${space.key}`) : t('rules.other')
   const sheetStart = space.key === 'content' ? 'content' : space.key === 'video' ? 'sheet' : null
   const open = (id: string) => selectTask(id)
+  // Spec 024 (§3): the Space's own text for the add button, and who may create here.
+  const showTaskForm = useUIStore(s => s.showTaskForm)
+  const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
+  const memberIds = data.spaceMembers.filter(r => r.space_id === spaceId).map(r => r.member_id)
+  const mayCreate = mayCreateIn(space.settings, data.currentUser, memberIds)
   // Spec 023: custom fields and their values, for List rows.
   const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   // Spec 021 (US3): this Space's own words for the stages. Boards keep the board names.
@@ -58,6 +68,12 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const ss = useSpaceStages(spaceId, data.spaceStages, data.taskSpaceStages)
   const stageName = (s: StageId) => ss?.stageName(s) ?? (locale === 'ar' ? STAGE_META[s]?.label_ar : STAGE_META[s]?.label_en) ?? s
   const statusName = (x: Task) => ss?.name(x) ?? stageName(x.status as StageId)
+  const addLabel = newTaskLabel(space.settings, locale, t('config.newLabelDefault'))
+  // The add form, on the tabs that don't carry a board of their own.
+  const taskForm = showTaskForm && (
+    <TaskForm currentUser={data.currentUser} brands={data.brands} contentTypes={typesForSpace(space.settings, data.contentTypes)} members={data.members}
+      spaceId={spaceId} spaceAssignees={{ [spaceId]: defaultAssigneeFor(space, data.members, memberIds) }} dueRule={data.dueRule} />
+  )
 
   return (
     <ViewHost
@@ -65,7 +81,15 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
       title={label}
       tag={t('spaceTag')}
       color={space.color}
-      actions={<>{space.media_board && <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} />}{data.currentUser.access !== 'user' && <SpaceStagesButton space={space} rows={data.spaceStages} />}</>}
+      actions={<>
+        {mayCreate && (space.media_board
+          ? <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} label={addLabel} />
+          : <button type="button" data-space-add onClick={() => setShowTaskForm(true)}
+              style={{ border: 'none', background: '#14131A', color: '#FFFFFF', borderRadius: 9, padding: '6px 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>＋ {addLabel}</button>)}
+        {data.currentUser.access !== 'user' && <SpaceSettingsButton space={space} data={data} />}
+      </>}
+      defaultTab={space.settings.views.default}
+      initialPrefs={cleanTabPrefs(data.viewPrefs[`space:${spaceId}`])}
       sub={<span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <span data-space-rule>{rule}</span>
         <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
@@ -103,8 +127,8 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
                 link={board ? undefined : { spaceId, media: viewTasks(data) }} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} spaceStages={ss} initialGroup={view?.config.group} onOpen={open} />
-        return <>{body}<TaskPanel data={data} /></>
+              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} spaceStages={ss} initialGroup={view?.config.group ?? (space.settings.views.group === 'none' ? undefined : space.settings.views.group)} onOpen={open} />
+        return <>{body}<TaskPanel data={data} spaceId={spaceId} />{taskForm}</>
       }}
     />
   )

@@ -33,7 +33,7 @@ module.exports = (EMAIL, psql, ok) => {
         clearStages('design')
         try {
           await go('/spaces/design?view=list')
-          await page.click('[data-space-stages-open]')
+          await page.click('[data-space-settings-open]'); await page.click('[data-space-settings-tab="flow"]'); await page.click('[data-space-stages-open]')
           await page.waitForSelector('[data-space-stages]')
           await page.fill('[data-space-stage-name="d-prog:0"]', 'Sketch')
           await page.click('[data-space-stage-add="d-prog"]')
@@ -73,7 +73,7 @@ module.exports = (EMAIL, psql, ok) => {
           // Leaving the stage and coming back starts at the first step.
           await panelStage(page, go, t, 'D-Check')
           ok(psql(`select status from tasks where id='${t}'`) === 'd-check', 'moved on to D-Check')
-          await panelStage(page, go, t, 'D-In Progress')
+          await panelStage(page, go, t, 'Sketch') // the panel carries the Space's names (spec 024)
           ok(psql(`select status from tasks where id='${t}'`) === 'd-prog', 'and back')
           await go('/spaces/design?view=sheet')
           const cell = `[data-cell*="${t}|status"]`

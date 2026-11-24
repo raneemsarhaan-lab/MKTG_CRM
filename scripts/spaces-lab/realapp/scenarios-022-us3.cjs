@@ -119,7 +119,7 @@ module.exports = (EMAIL, psql, ok) => {
     },
     {
       id: '022-us3-unlink-as-designer', as: 'design',
-      async run({ page, go }) {
+      async run({ page, go, signInAs, BASE }) {
         const n = rnd()
         const c = content(`Lab 022 pair ${n}`, 'd-prog')
         const m = media(`Lab 022 pair art ${n}`)
@@ -127,9 +127,18 @@ module.exports = (EMAIL, psql, ok) => {
         try {
           await go(`/spaces/design?view=list&task=${m}`)
           await page.waitForSelector('[data-media-section] [data-media-unlink]', { timeout: 30000 })
+          // Spec 024 (§6): a designer isn't among the roles that link and unlink; a content creator is.
           await page.click('[data-media-section] [data-media-unlink]')
           await page.waitForTimeout(2500)
-          ok(psql(`select coalesce(content_task_id::text,'-') from tasks where id='${m}'`) === '-', 'the media task is unlinked')
+          ok(psql(`select coalesce(content_task_id::text,'-') from tasks where id='${m}'`) === c, 'a designer is refused')
+          ok((await page.textContent('[data-media-section]')).includes("can't link or unlink here"), 'with the reason')
+          const writer = await signInAs('content')
+          await writer.page.goto(`${BASE}/spaces/content?view=list&task=${c}`, { waitUntil: 'networkidle', timeout: 120000 })
+          await writer.page.waitForSelector('[data-media-section] [data-media-unlink]', { timeout: 30000 })
+          await writer.page.click('[data-media-section] [data-media-unlink]')
+          await writer.page.waitForTimeout(2500)
+          await writer.ctx.close()
+          ok(psql(`select coalesce(content_task_id::text,'-') from tasks where id='${m}'`) === '-', 'a content creator unlinks it')
           ok(psql(`select count(*) from tasks where id in ('${c}','${m}') and dropped_at is null`) === '2', 'both stay')
           psql(`update tasks set status='d-check' where id='${m}'`)
           ok(psql(`select status from tasks where id='${c}'`) === 'd-prog', 'and they move separately')

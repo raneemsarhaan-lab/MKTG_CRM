@@ -8,7 +8,9 @@
  */
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin, requireTaskCreator } from '@/lib/authz'
+import { requireAdmin, requireLead } from '@/lib/authz'
+import { ALL_STAGES } from '@/lib/stage-meta'
+import { resolveSettings, validateFlow, type FlowProblem, type SpaceSettings } from '@/lib/space-settings'
 import type { TaskKind } from '@/types/index'
 
 type Result<T = object> = ({ success: true } & T) | { success: false; error: string }
@@ -55,7 +57,7 @@ export async function createSpace(input: SpaceInput): Promise<Result<{ id: strin
 }
 
 export async function updateSpace(id: string, patch: Partial<SpaceInput & { sort_order: number }>): Promise<Result> {
-  const auth = await requireAdmin()
+  const auth = await requireLead()
   if (auth.error) return { success: false, error: auth.error }
   const data: Record<string, unknown> = { updated_at: new Date() }
   if (patch.name !== undefined) {
@@ -79,7 +81,7 @@ export async function updateSpace(id: string, patch: Partial<SpaceInput & { sort
 
 /** Replace a Space's members. */
 export async function setSpaceMembers(id: string, memberIds: string[]): Promise<Result> {
-  const auth = await requireAdmin()
+  const auth = await requireLead()
   if (auth.error) return { success: false, error: auth.error }
   const space = await prisma.teamSpace.findUnique({ where: { id } })
   if (!space) return { success: false, error: 'not_found' }
@@ -127,9 +129,9 @@ export async function deleteSpace(id: string, confirmName: string): Promise<Resu
 
 /** Every Space, archived included, with members — for Settings. */
 export async function listSpacesForSettings(): Promise<Result<{
-  spaces: { id: string; key: string; name: string; color: string; is_production: boolean; default_assignee_role: string | null; archived: boolean; memberIds: string[] }[]
+  spaces: { id: string; key: string; name: string; color: string; is_production: boolean; default_assignee_role: string | null; archived: boolean; memberIds: string[]; media_board: string | null; settings: SpaceSettings }[]
 }>> {
-  const auth = await requireAdmin()
+  const auth = await requireLead()
   if (auth.error) return { success: false, error: auth.error }
   const rows = await prisma.teamSpace.findMany({ orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }], include: { members: { select: { member_id: true } } } })
   return {
@@ -137,6 +139,47 @@ export async function listSpacesForSettings(): Promise<Result<{
     spaces: rows.map(r => ({
       id: r.id, key: r.key, name: r.name, color: r.color, is_production: r.is_production,
       default_assignee_role: r.default_assignee_role ?? null, archived: !!r.archived_at, memberIds: r.members.map(m => m.member_id),
+      media_board: r.media_board ?? null, settings: resolveSettings(r.key, r.settings),
     })),
   }
+}
+
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object | null ? DeepPartial<NonNullable<T[K]>> | null : T[K] }
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+/** Merge a patch into stored settings: objects merge key by key (a null or array replaces). `fields` rules replace per field. */
+function merge(base: Record<string, unknown>, patch: Record<string, unknown>, depth = 0): Record<string, unknown> {
+  const out = { ...base }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue
+    out[k] = isObj(v) && isObj(base[k]) && depth < 2 && k !== 'new_label' ? merge(base[k] as Record<string, unknown>, v, depth + 1) : v
+  }
+  return out
+}
+
+/**
+ * Spec 024: save part of a Space's settings (admins and superusers). The patch
+ * is merged into what is stored, checked, and stored whole. A flow that doesn't
+ * hold together is refused with what is wrong.
+ */
+export async function updateSpaceSettings(id: string, patch: DeepPartial<SpaceSettings>): Promise<Result | { success: false; error: 'invalid_flow'; problems: FlowProblem[] }> {
+  const auth = await requireLead()
+  if (auth.error) return { success: false, error: auth.error }
+  const space = await prisma.teamSpace.findUnique({ where: { id } })
+  if (!space) return { success: false, error: 'not_found' }
+  if (!isObj(patch)) return { success: false, error: 'invalid' }
+  const stored = isObj(space.settings) ? space.settings as Record<string, unknown> : {}
+  // Start from the full current settings so a partial patch never drops a default.
+  const current = resolveSettings(space.key, stored) as unknown as Record<string, unknown>
+  const next = resolveSettings(space.key, merge(current, patch as Record<string, unknown>))
+  const problems = validateFlow(next.flow)
+  if (problems.length) return { success: false, error: 'invalid_flow', problems }
+  // Hand-off targets must be live Spaces; a media board never starts before Ready For Design.
+  const keys = new Set((await prisma.teamSpace.findMany({ where: { archived_at: null }, select: { key: true } })).map(s => s.key))
+  next.flow.handoff_to = next.flow.handoff_to.filter(k => keys.has(k) && k !== space.key)
+  if (next.flow.handoff && !next.flow.handoff_to.length) return { success: false, error: 'invalid_flow', problems: ['handoff_no_target'] }
+  if (space.media_board && ALL_STAGES.indexOf(next.flow.start) < ALL_STAGES.indexOf('r-design')) return { success: false, error: 'invalid_flow', problems: ['handoff_outside'] }
+  if (next.allowed_types.length && next.default_type && !next.allowed_types.includes(next.default_type)) next.default_type = next.allowed_types[0]
+  await prisma.teamSpace.update({ where: { id }, data: { settings: next as unknown as object, updated_at: new Date() } })
+  revalidateSpaces(space.key)
+  return { success: true }
 }

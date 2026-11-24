@@ -13,23 +13,28 @@ import { MediaPanelSection } from '@/components/media/MediaLinks'
 import { useUIStore } from '@/store/useUIStore'
 import { TaskModal } from '@/components/kanban/TaskModal'
 import { CardFieldsProvider } from '@/components/fields/CardFields'
+import { useSpaceStages } from '@/components/spaces/useSpaceStages'
 import { viewTasks, type BoardData } from './types'
 
-export function TaskPanel({ data }: { data: BoardData }) {
+export function TaskPanel({ data, spaceId = null }: { data: BoardData; /** Spec 024: the Space this page is, for its field rules. */ spaceId?: string | null }) {
   const selectedTaskId = useUIStore(s => s.selectedTaskId)
   const selectTask = useUIStore(s => s.selectTask)
   // A task link (?task=<id>) opens its panel here too, as it does on the Board.
   const linked = useSearchParams().get('task')
   const router = useRouter()
   useEffect(() => { if (linked) selectTask(linked) }, [linked, selectTask])
+  // Spec 024 (§8): inside a Space, the panel's stages carry that Space's names.
+  const ss = useSpaceStages(spaceId ?? undefined, data.spaceStages, data.taskSpaceStages)
   const tasks = viewTasks(data)
   const task = tasks.find(t => t.id === selectedTaskId)
   if (!task) return null
   return (
     // Spec 023: the panel's task fields (Channels, Caption, TOV…) read the page's field data.
-    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members} tags={data.tags}
+    <CardFieldsProvider fields={data.taskFields} links={data.typeFields} values={data.fieldValues} types={data.contentTypes} members={data.members} tags={data.tags} spaces={data.spaces} viewSpaceId={spaceId}
       taskName={id => tasks.find(x => x.id === id)?.name}>
     <TaskModal
+      stageNameOf={spaceId && ss ? s => ss.stageName(s) : undefined}
+      sectionOrder={spaceId ? data.spaces.find(x => x.id === spaceId)?.settings.section_order : undefined}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       task={task as any}
       currentUser={data.currentUser}

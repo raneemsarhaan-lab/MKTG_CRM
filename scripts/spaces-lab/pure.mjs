@@ -483,4 +483,61 @@ check('pure-content-rows', () => {
   eq(C.orderPillars([{ id: 'p1', sort_order: 0 }, { id: 'p2', sort_order: 1 }, { id: 'p3', sort_order: 2 }], ['p3']).map(p => p.id), ['p3', 'p1', 'p2'], 'the sheet\'s pillar order first')
 })
 
+// Spec 024: Space settings — flow, stage ownership, field rules, creation.
+check('pure-space-settings', () => {
+  const S = m.spaceSettings
+  const content = S.defaultSettings('content'), video = S.defaultSettings('video'), design = S.defaultSettings('design'), planning = S.defaultSettings('planning')
+  eq([content.flow.start, content.flow.handoff, content.flow.return, content.flow.end], ['todo', 'r-design', 'final-check', 'publish'], 'Content flow')
+  eq([video.flow.start, video.flow.handoff, video.flow.return, video.flow.end], ['r-design', 'd-check', null, 'd-check'], 'Video flow')
+  eq(design.flow.handoff_to, ['content'], 'Design hands back to Content')
+  eq(S.rangeOf(video.flow), ['r-design', 'd-prog', 'd-check'], 'Video shows Ready For Design to D-Check')
+  eq(S.rangeOf(content.flow).length, 11, 'Content shows every stage')
+  ok(S.ownsStage(content.flow, 'c-final') && !S.ownsStage(content.flow, 'd-prog') && S.ownsStage(content.flow, 'final-check'), 'Content owns its stages except while handed off')
+  ok(S.ownsStage(video.flow, 'd-check') && !S.ownsStage(video.flow, 'final-check') && !S.ownsStage(video.flow, 'c-final'), 'Video owns only its range')
+  ok(video.child_rows && content.child_rows, 'child rows: allowed until a Space turns them off')
+  eq(S.startStage(video), 'r-design', 'new Video tasks start at Ready For Design')
+  eq(S.startStage(planning), 'todo', 'Planning starts at To Do')
+  // Stored values over defaults; junk is dropped.
+  const r = S.resolveSettings('video', { flow: { start: 'nope', end: 'final-check' }, creators: 'x', new_label: { en: ' New  reel ' }, fields: { f1: { shown: false, junk: 1 }, f2: 'bad' } })
+  eq([r.flow.start, r.flow.end, r.creators, r.new_label.en, r.new_label.ar], ['r-design', 'final-check', 'members', 'New reel', 'New reel'], 'checked on the way in')
+  eq(r.fields, { f1: { shown: false } }, 'field rules cleaned')
+  eq(S.resolveSettings('content', { new_label: null }).new_label, null, 'a cleared label stays cleared')
+  // Flow problems.
+  eq(S.validateFlow({ ...content.flow, return: 'c-prog' }), ['return_before_handoff'], 'return before hand-off')
+  eq(S.validateFlow({ ...content.flow, end: 'c-prog' }).includes('handoff_outside'), true, 'hand-off outside the range')
+  eq(S.validateFlow({ start: 'd-check', handoff: null, handoff_to: [], return: null, end: 'r-design' }), ['end_before_start'], 'end before start')
+  eq(S.validateFlow({ ...video.flow, handoff_to: [] }), ['handoff_no_target'], 'hand-off needs a Space')
+  eq(S.validateFlow(content.flow), [], 'the default flow is sound')
+  // Required fields: only when the move crosses the stage, in a Space that covers it.
+  const links = [{ type_label: 'Reel', field_id: 'cap', required_from: 'c-final' }, { type_label: 'Reel', field_id: 'ch', required_from: null }]
+  eq(S.requiredForMove(content, links, 'c-prog', 'c-final'), [{ field_id: 'cap', before: 'c-final' }], 'Content asks for Caption before C-Review')
+  eq(S.requiredForMove(content, links, 'c-final', 'c-check'), [], 'not asked again once past it')
+  eq(S.requiredForMove(video, links, 'r-design', 'd-prog'), [], 'Video never asks: C-Review is before its start')
+  eq(S.requiredForMove(video, links, null, 'publish'), [], 'even on a long move')
+  const strict = { ...video, fields: { ch: { required: true, before: 'd-check' }, cap: { required: false } } }
+  eq(S.requiredForMove(strict, links, 'r-design', 'd-check'), [{ field_id: 'ch', before: 'd-check' }], 'a Space can require an optional field, and relax a required one')
+  eq(S.fieldRule({ ...video, fields: { cap: { shown: false } } }, links[0]).shown, false, 'hidden in this Space')
+  eq(S.fieldRule(content, links[0]), { shown: true, before: 'c-final' }, 'the type rule by default')
+  eq(S.fieldRule({ ...content, fields: { ch: { required: true } } }, links[1]).before, 'todo', 'required with no stage: from the Space start')
+  // Home Space, creators, types, linking, SLA, labels.
+  const spaces = [{ id: 'c', key: 'content', settings: content }, { id: 'v', key: 'video', media_board: 'video', settings: video }, { id: 'p', key: 'planning', settings: planning }]
+  eq(S.homeSpace({ id: 't', media_board: 'video' }, spaces)?.id, 'v', 'a media task: its board Space')
+  eq(S.homeSpace({ id: 't' }, spaces, 'p')?.id, 'p', 'the Space it was made in')
+  eq(S.homeSpace({ id: 't' }, spaces, 'v')?.id, 'c', 'a content task never takes a board Space')
+  eq(S.homeSpace({ id: 't' }, spaces)?.id, 'c', 'else Content')
+  ok(S.mayCreateIn(content, { id: 'm', access: 'user' }, ['m']) && !S.mayCreateIn(content, { id: 'x', access: 'user' }, ['m']), 'members create')
+  ok(S.mayCreateIn({ ...content, creators: 'leads' }, { id: 'x', access: 'superuser' }, []) && !S.mayCreateIn({ ...content, creators: 'leads' }, { id: 'm', access: 'user' }, ['m']), 'leads only')
+  ok(S.typeAllowed(video, 'Reel') && !S.typeAllowed(video, 'Post') && S.typeAllowed(content, 'Anything'), 'allowed types')
+  eq(S.typesForSpace(video, [{ label: 'Post' }, { label: 'Video' }, { label: 'Reel' }]).map(x => x.label), ['Reel', 'Video'], 'the form: allowed types, the default first')
+  ok(S.mayLink(content, { access: 'user', role: 'Content Creator' }) && !S.mayLink(content, { access: 'user', role: 'Video Editor' }) && S.mayLink(content, { access: 'admin', role: null }), 'who links')
+  eq(S.slaFor({ ...video, rules: { ...video.rules, sla: { 'd-prog': 3, 'final-check': 9 } } }, 'd-prog'), 3, 'a Space SLA for a stage it owns')
+  eq(S.slaFor({ ...video, rules: { ...video.rules, sla: { 'final-check': 9 } } }, 'final-check'), null, 'not for a stage it does not own')
+  eq(S.newTaskLabel(video, 'en', 'New task'), 'New clip', 'the label')
+  eq(S.newTaskLabel(video, 'ar', 'x'), 'مقطع جديد', 'in Arabic')
+  eq(S.newTaskLabel(planning, 'en', 'New task'), 'New task', 'the fallback')
+  eq(S.stageRoles({ ...content, rules: { ...content.rules, approvers: { 'c-final': 'Brand Director', 'd-check': 'X' }, owners: { 'c-prog': 'Content Creator' } } }), { 'c-prog': 'Content Creator', 'c-final': 'Brand Director' }, 'roles only for stages the Space owns')
+  eq(S.notifyRoles({ ...content, rules: { ...content.rules, notify: { enter: ['A'], overdue: ['B'], back: ['C'] } } }, 'task_moved_to_stage', 'final-check'), ['C'], 'handed back: the return stage')
+  eq(S.notifyRoles({ ...video, rules: { ...video.rules, notify: { enter: ['A'], overdue: ['B'], back: ['C'] } } }, 'task_created_in_stage', 'r-design'), ['A'], 'entered: the start stage')
+})
+
 if (failed) process.exitCode = 1

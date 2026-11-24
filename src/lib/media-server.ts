@@ -10,7 +10,9 @@ import { fieldOn } from '@/lib/brand-features'
 import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/media'
 import { addSpaces } from '@/lib/spaces-server'
 import { allowedStages } from '@/lib/stage-moves'
-import { missingRequired } from '@/lib/task-fields'
+import { isEmpty } from '@/lib/task-fields'
+import { requiredForMove } from '@/lib/space-settings'
+import { homeSpaceOf } from '@/lib/space-settings-server'
 import { assigneeIds, mapTaskField, mapTypeField } from '@/lib/mappers'
 import { notify, notifyAfter } from '@/lib/notify/notify'
 
@@ -29,18 +31,26 @@ export async function requiredGate(
   db: Db = prisma,
 ): Promise<{ missing: string[]; missing_ar: string[]; stage: StageId } | null> {
   if (!task.content_type_label) return null
-  const links = (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label, required_from: { not: null } } })).map(mapTypeField)
+  const links = (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label } })).map(mapTypeField)
   if (!links.length) return null
+  // Spec 024 (§4): the rules of the Space that owns the task's work — its board's Space, the Space it
+  // was made in, else Content. A field hidden there, or required before a stage earlier than the
+  // Space's start, is never asked for.
+  const from = task.status ?? (await db.task.findUnique({ where: { id: task.id }, select: { status: true } }))?.status ?? null
+  const space = await homeSpaceOf(task.id, db)
+  const wanted = requiredForMove(space?.settings, links, from, target)
+    .filter(r => space?.settings.fields[r.field_id]?.shown !== false)
+  if (!wanted.length) return null
   // Spec 023: a field the task's brand has switched off never stops a move.
   const owner = await db.task.findUnique({ where: { id: task.id }, select: { brand: { select: { features: true } } } })
   const features = (owner?.brand?.features ?? null) as BrandFeatures | null
-  const fields = (await db.taskField.findMany({ where: { id: { in: links.map(l => l.field_id) } } })).map(mapTaskField)
+  const fields = (await db.taskField.findMany({ where: { id: { in: wanted.map(w => w.field_id) }, retired_at: null } })).map(mapTaskField)
     .filter(f => fieldOn({ features }, f))
-  const values = await db.taskFieldValue.findMany({ where: { task_id: task.id, field_id: { in: links.map(l => l.field_id) } }, select: { task_id: true, field_id: true, value: true } })
-  const missing = missingRequired(task, target, links, fields, values)
+  const values = await db.taskFieldValue.findMany({ where: { task_id: task.id, field_id: { in: fields.map(f => f.id) } }, select: { field_id: true, value: true } })
+  const missing = fields.filter(f => isEmpty(values.find(v => v.field_id === f.id)?.value))
+    .sort((a, b) => STAGE_AT(wanted.find(w => w.field_id === a.id)!.before) - STAGE_AT(wanted.find(w => w.field_id === b.id)!.before))
   if (!missing.length) return null
-  const order = ['todo', 'c-prog', 'c-final', 'c-check', 'r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
-  const stage = missing.map(f => links.find(l => l.field_id === f.id)!.required_from as StageId).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0]
+  const stage = wanted.find(w => w.field_id === missing[0].id)!.before
   return { missing: missing.map(f => f.name_en), missing_ar: missing.map(f => f.name_ar || f.name_en), stage }
 }
 

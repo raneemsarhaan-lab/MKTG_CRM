@@ -14,6 +14,7 @@
  *   Pillars: admins, superusers and the theme's owner add, reorder (the sheet
  *   only) and remove them; their rows go where the person says.
  */
+import { resolveSettings } from '@/lib/space-settings'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
@@ -66,6 +67,12 @@ async function taskFollows(taskIds: string[], projectId: string, pillarId: strin
 
 // ─── Rows ───────────────────────────────────────────────────────────────────
 
+/** Spec 024 (§3): the Content Space's "Child rows allowed" switch. */
+async function childRowsOn(): Promise<boolean> {
+  const space = await prisma.teamSpace.findUnique({ where: { key: 'content' }, select: { key: true, settings: true } })
+  return !space || resolveSettings(space.key, space.settings).child_rows
+}
+
 export async function addRow(input: {
   projectId: string; pillarId?: string | null; parentId?: string | null; title: string
   anchor?: { id: string; where: 'above' | 'below' } | null
@@ -79,6 +86,7 @@ export async function addRow(input: {
   let pillar = await pillarIn(input.projectId, input.pillarId)
   if (pillar === false) return { success: false, error: 'not_a_theme' }
   let parentId: string | null = null
+  if (input.parentId && !(await childRowsOn())) return { success: false, error: 'child_rows_off' }
   if (input.parentId) {
     const parent = rows.find(r => r.id === input.parentId)
     if (!parent || parent.parent_id) return { success: false, error: 'one_level' }
@@ -166,6 +174,7 @@ export async function indentRow(id: string, dir: 'in' | 'out'): Promise<{ succes
   const rows = await allRows(row.project_id)
   const rec = rows.find(r => r.id === id)!
   if (dir === 'in') {
+    if (!(await childRowsOn())) return { success: false, error: 'child_rows_off' }
     const target = indentTarget(rows, rec)
     if (!target) return { success: false, error: 'one_level' }
     return moveRow(id, { projectId: row.project_id, parentId: target.id })

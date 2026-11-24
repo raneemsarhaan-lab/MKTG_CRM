@@ -62,7 +62,7 @@ export async function addSpaces(db: Db, taskId: string, spaceIds: string[], via:
 }
 
 /** FR-029: the Spaces a new assignee brings, added as 'assignee'. */
-export async function addAssigneeSpaces(db: Db, task: { id: string; kind?: string | null }, assigneeId: string | null | undefined, by: string, ctx?: SpaceContext) {
+export async function addAssigneeSpaces(db: Db, task: { id: string; kind?: string | null; media_board?: string | null }, assigneeId: string | null | undefined, by: string, ctx?: SpaceContext) {
   if (!assigneeId) return
   const c = ctx ?? await loadSpaceContext(db)
   await addSpaces(db, task.id, spacesForAssignee(task, assigneeId, c.spaces, c.members), 'assignee', by)

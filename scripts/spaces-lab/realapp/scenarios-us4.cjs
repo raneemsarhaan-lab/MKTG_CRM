@@ -91,7 +91,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select nine_stage_default from brands where name='${B}'`) === 't', "the brand's C-Check is on for new tasks")
           const name = `Lab C-Check ${Date.now()}`
           await go('/spaces/content?view=board')
-          await page.getByRole('button', { name: 'Add task' }).first().click()
+          await page.getByRole('button', { name: /^(Add task|New post|New design|New clip)$/ }).first().click()
           await page.fill('input[placeholder="Task name — or paste a list"]', name)
           await page.locator('button', { hasText: /^Create Task$/i }).first().click()
           await page.waitForTimeout(2500)

@@ -13,6 +13,8 @@
  * browser.
  */
 import type { Prisma } from '@prisma/client'
+import { notifyRoles, stageRoles } from '@/lib/space-settings'
+import { homeSpaceOf } from '@/lib/space-settings-server'
 import { resolveRecipients, type NotifyEvent, type RFollower } from './recipients'
 import { groupKey, joins, merged } from './group'
 import { effective, mergeSettings, type KindSettings } from './settings'
@@ -52,7 +54,12 @@ export async function notify(db: Tx, event: NotifyEvent, extra: NotifyExtra = {}
   const members = await db.member.findMany({ select: { id: true, role: true, access: true } })
   const followers: RFollower[] = await db.taskFollower.findMany({ where: { task_id: task.id }, select: { member_id: true, muted: true } })
   const settingsOf = await settingsLoader(db, members.map(m => m.id))
-  const recipients = resolveRecipients(event, { task: { ...task, assignee_ids }, members, followers, settingsOf })
+  // Spec 024 (§7): the task's Space names who holds its stages and who else hears about it.
+  const home = await homeSpaceOf(task.id, db)
+  const roles = notifyRoles(home?.settings, event.kind, task.status)
+  const inSpace = home && roles.length ? new Set((await db.teamSpaceMember.findMany({ where: { space_id: home.id }, select: { member_id: true } })).map(r => r.member_id)) : null
+  const also = inSpace ? members.filter(m => roles.includes(m.role) && inSpace.has(m.id)).map(m => m.id) : []
+  const recipients = resolveRecipients(event, { task: { ...task, assignee_ids, stage_roles: stageRoles(home?.settings) }, members, followers, settingsOf, also })
   if (!recipients.length) return []
 
   const now = new Date()

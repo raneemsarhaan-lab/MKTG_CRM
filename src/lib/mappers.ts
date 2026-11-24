@@ -1,3 +1,4 @@
+import { resolveSettings } from '@/lib/space-settings'
 import { orderPillars } from '@/lib/content-rows'
 import type { Member, Brand, ContentType, Task, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
 
@@ -64,6 +65,8 @@ export function mapSpace(s: any): import('@/types/index').TeamSpace {
     archived_at:   s.archived_at ? toIsoStr(s.archived_at) : null,
     default_assignee_role: s.default_assignee_role ?? null,
     media_board:   s.media_board === 'design' || s.media_board === 'video' ? s.media_board : null,
+    // Spec 024: the stored settings over the Space's defaults.
+    settings:      resolveSettings(s.key, s.settings),
   }
 }
 

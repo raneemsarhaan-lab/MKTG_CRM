@@ -10,6 +10,7 @@
  * (Samaa for the content plan) owns its pieces, and the sheet works by
  * assignee.
  */
+import { useAddLabel } from '@/components/spaces/addLabel'
 import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { useLocale, useTranslations } from 'next-intl'
@@ -127,6 +128,7 @@ export interface ContentGridProps {
 
 export function ContentGrid(p: ContentGridProps) {
   const t = useTranslations('content')
+  const addRowText = useAddLabel(t('rows.add'))
   const ts = useTranslations('sheet')
   const stageNames = useStageNames('content')
   const tf = useTranslations('sheets.fields')
@@ -377,7 +379,7 @@ export function ContentGrid(p: ContentGridProps) {
         return (
           <span className="fx-sheet-plus" data-add-row={row.parentId ? `child:${row.parentId}` : row.pillarId ?? 'theme'}>
             {row.parentId && <span className="fx-content-child-indent" aria-hidden="true" />}
-            {row.parentId ? t('rows.addChild') : t('rows.add')}
+            {row.parentId ? t('rows.addChild') : addRowText}
           </span>
         )
       }

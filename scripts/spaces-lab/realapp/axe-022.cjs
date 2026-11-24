@@ -55,7 +55,7 @@ async function axe(page, name) {
       await go(p, path); await axe(p, `${path} (${label})`)
     }
     if (label !== 'phone') {
-      await go(p, '/spaces/design?view=list'); await p.click('[data-space-stages-open]'); await p.waitForSelector('[data-space-stages]')
+      await go(p, '/spaces/design?view=list'); await p.click('[data-space-settings-open]'); await p.click('[data-space-settings-tab="flow"]'); await p.click('[data-space-stages-open]'); await p.waitForSelector('[data-space-stages]')
       await axe(p, `Space stages panel (${label})`)
       await go(p, '/spaces/content?view=calendar'); await p.click(`[data-cal-link="${day}"]`); await p.waitForSelector('[data-media-pick]')
       await axe(p, `Link task list (${label})`)

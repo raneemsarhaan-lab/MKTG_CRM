@@ -5,6 +5,7 @@
  * Video rows group their clips; "+ Clip" rows add one; drafts are clips not
  * saved yet. Keyboard, focus, editing and ARIA live in GridCore.
  */
+import { useAddLabel } from '@/components/spaces/addLabel'
 import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { useLocale, useTranslations } from 'next-intl'
@@ -135,6 +136,7 @@ export interface SheetGridProps {
 
 export function SheetGrid(p: SheetGridProps) {
   const t = useTranslations('sheet')
+  const addClipText = useAddLabel(t('addClip'))
   const stageNames = useStageNames('sheet')
   const tf = useTranslations('sheets.fields')
   const tc = useTranslations('sheet.columns')
@@ -388,7 +390,7 @@ export function SheetGrid(p: SheetGridProps) {
     },
     onPaste: p.onPaste,
     render: (row, col, cellEl) => {
-      if (row.kind === 'add') return col === 'title' ? <span className="fx-sheet-plus">{t('addClip')}</span> : null
+      if (row.kind === 'add') return col === 'title' ? <span className="fx-sheet-plus" data-add-clip-row="">{addClipText}</span> : null
       if (row.kind === 'draft') {
         return col === 'rowNo' ? row.n : col === 'title' ? <span className="fx-sheet-muted">{t('newClip.placeholder')}</span> : null
       }

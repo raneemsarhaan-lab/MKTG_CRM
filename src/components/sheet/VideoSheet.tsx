@@ -9,6 +9,7 @@
  * video is a band with its clips' progress; lettered columns. Every change goes through the host's `api`, which is the board's own
  * code path, so the sheet can never do what the board would refuse.
  */
+import { useAddLabel } from '@/components/spaces/addLabel'
 import { useMediaLinks } from '@/components/media/MediaLinks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -50,11 +51,12 @@ type Popup =
   | { kind: 'drop'; anchor: HTMLElement; task: Task }
   | { kind: 'video'; anchor: HTMLElement }
 
-const KNOWN_ERRORS = ['not_authenticated', 'not_found', 'not_authorized', 'stage_not_in_pipeline', 'terminal',
+const KNOWN_ERRORS = ['child_rows_off', 'not_authenticated', 'not_found', 'not_authorized', 'stage_not_in_pipeline', 'terminal',
   'not_a_video', 'not_a_clip', 'dropped', 'bad_link', 'bad_times', 'duplicate_file_name', 'generic']
 
 export function VideoSheet(p: VideoSheetProps) {
   const t = useTranslations('sheet')
+  const newClipText = useAddLabel(t('newClipButton'))
   const tHandoff = useTranslations('handoff')
   const tSp = useTranslations('spaces')
   /** Spec 022: a linked row whose tasks haven't all passed D-Check moves only from Ready For Design to F-Check. */
@@ -565,7 +567,7 @@ export function VideoSheet(p: VideoSheetProps) {
         </div>
         <button type="button" className="fx-vs-new" data-new-clip="" disabled={!pasteTarget(activeRow ?? null)}
                 onClick={() => { const v = pasteTarget(activeRow ?? null); if (v) addClip(v) }}>
-          {t('newClipButton')}
+          {newClipText}
         </button>
       </div>
 
