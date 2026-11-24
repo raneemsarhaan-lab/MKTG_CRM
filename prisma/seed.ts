@@ -332,42 +332,24 @@ async function main() {
   })
 
   /**
-   * Spec 022 (R1, R5): hand-offs already made become linked media tasks. A
-   * content task at Ready For Design or later that shows in the Design or
-   * Video Space gets one media task per board, at its stage, with its current
-   * assignee; it is marked as linked, and those Design/Video rows go.
+   * Spec 022 (R1, R5) made a linked Design or Video task for every hand-off already made. By the
+   * user's decision of 25 Nov 2026 the release creates none: nothing is created for published work,
+   * and a content task in the design stages (Ready For Design, D-In Progress, D-Check) that has no
+   * linked task is an error to fix by hand after go-live. They are listed live in Settings ›
+   * Diagnostics ("Needs a linked task") and kept as a CSV here. No task and no "shows in" row is
+   * created, changed or removed by this step.
    */
-  await once('media-tasks-v1', 'turned earlier hand-offs into linked media tasks', async () => {
-    const half = ['r-design', 'd-prog', 'd-check', 'final-check', 'ready-publish', 'scheduled', 'publish']
-    const boards = await prisma.teamSpace.findMany({ where: { media_board: { not: null } }, select: { id: true, media_board: true } })
-    if (!boards.length) return 'no media boards'
-    const rows = await prisma.taskSpace.findMany({
-      where: { space_id: { in: boards.map(b => b.id) }, task: { media_board: null, dropped_at: null, status: { in: half } } },
-      include: { task: true },
+  await once('media-tasks-v1', 'listed the hand-offs that need a linked task (none created)', async () => {
+    const { needsLinkedTask } = await import('../src/lib/needs-linked-task')
+    const rows = await needsLinkedTask(prisma)
+    const cell = (v: unknown) => { const x = v == null ? '' : String(v); return /[",\n\r]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x }
+    const content = ['task id,name,stage,brand,type,board it needs', ...rows.map(r => [r.id, r.name, r.status, r.brand ?? '', r.type ?? '', r.board].map(cell).join(','))].join('\r\n') + '\r\n'
+    await prisma.dataExport.upsert({
+      where: { name: 'needs-linked-task.csv' },
+      create: { name: 'needs-linked-task.csv', title: 'Content tasks in the design stages with no linked Design or Video task, at the release of 25 Nov 2026', content, rows: rows.length },
+      update: {},
     })
-    let made = 0
-    for (const r of rows) {
-      const board = boards.find(b => b.id === r.space_id)!.media_board!
-      const t = r.task
-      const exists = await prisma.task.findFirst({ where: { content_task_id: t.id, media_board: board }, select: { id: true } })
-      if (!exists) {
-        const m = await prisma.task.create({
-          data: {
-            name: t.name, brand_id: t.brand_id, content_type_label: t.content_type_label, platform: t.platform,
-            task_owner_id: t.task_owner_id, assignee_id: t.assignee_id, initiator_role: t.initiator_role, created_by: t.created_by,
-            nine_stage: t.nine_stage, priority: t.priority, status: t.status, stage_date: t.stage_date,
-            publish_date: t.publish_date, due_date: t.due_date, due_manual: t.due_manual,
-            media_board: board, content_task_id: t.id, entry_stage: 'r-design',
-          },
-          select: { id: true },
-        })
-        await prisma.taskSpace.createMany({ data: [{ task_id: m.id, space_id: r.space_id, added_via: 'handoff' }], skipDuplicates: true })
-        made++
-      }
-      await prisma.task.update({ where: { id: t.id }, data: { auto_linked_at: t.auto_linked_at ?? new Date() } })
-      await prisma.taskSpace.delete({ where: { task_id_space_id: { task_id: t.id, space_id: r.space_id } } })
-    }
-    return `${made} media tasks from ${rows.length} hand-offs`
+    return `${rows.length} content tasks need a linked task`
   })
 
   /**

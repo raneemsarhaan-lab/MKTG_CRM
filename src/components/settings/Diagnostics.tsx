@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { COLORS } from '@/lib/tokens'
-import { listDataExports, pingServerAction } from '@/actions/diagnostics'
+import { listDataExports, listNeedsLinkedTask, pingServerAction } from '@/actions/diagnostics'
 
 /**
  * Diagnostics — what the deployed server reports about itself.
@@ -260,7 +260,35 @@ export function Diagnostics() {
           )}
         </div>
       )}
+      <NeedsLinkedTask />
       <KeptExports />
+    </div>
+  )
+}
+
+/**
+ * User, 25 Nov 2026: the release made no linked Design or Video tasks for work already in the design
+ * stages. Each such content task is an error until someone links or creates its task by hand.
+ */
+function NeedsLinkedTask() {
+  const [list, setList] = useState<Awaited<ReturnType<typeof listNeedsLinkedTask>> | null>(null)
+  useEffect(() => { void listNeedsLinkedTask().then(setList).catch(() => setList([])) }, [])
+  if (!list?.length) return null
+  const stage: Record<string, string> = { 'r-design': 'Ready For Design', 'd-prog': 'D-In Progress', 'd-check': 'D-Check' }
+  return (
+    <div data-needs-linked-task={list.length} role="alert" style={{ marginTop: 18, border: '1px solid #F1B8C2', background: '#FDE7EA', borderRadius: 12, padding: '12px 14px' }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 800, color: '#8F1230' }}>Needs a linked task: {list.length}</h3>
+      <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#3A1F24' }}>
+        These content tasks are in the design stages and have no linked Design or Video task, so they don’t show on the Design or Video board.
+        Open each one and link or create its task (the “Link task” cell on the sheet, or the task’s panel). The list empties as they are fixed.
+      </p>
+      <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, display: 'grid', gap: 2 }}>
+        {list.map(x => (
+          <li key={x.id} data-needs-link={x.id}>
+            <a href={`/board?task=${x.id}`}>{x.name}</a> — {stage[x.status] ?? x.status}{x.brand ? ` · ${x.brand}` : ''} · needs a {x.board === 'video' ? 'Video' : 'Design'} task
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

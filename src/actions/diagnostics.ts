@@ -19,6 +19,14 @@ export async function pingServerAction(): Promise<{ ok: boolean; error?: string;
   return { ok: true, at: new Date().toISOString() }
 }
 
+/** User, 25 Nov 2026: content tasks in the design stages with no linked Design or Video task — errors to fix by hand. */
+export async function listNeedsLinkedTask(): Promise<import('@/lib/needs-linked-task').NeedsLink[]> {
+  const member = await getSessionMember()
+  if (!member || (member.access !== 'admin' && member.access !== 'superuser')) return []
+  const { needsLinkedTask } = await import('@/lib/needs-linked-task')
+  return needsLinkedTask(prisma)
+}
+
 /** Spec 026: the exports kept for the record (the clip details CSV), for Settings › Diagnostics. */
 export async function listDataExports(): Promise<{ name: string; title: string; rows: number; created_at: string }[]> {
   const member = await getSessionMember()
