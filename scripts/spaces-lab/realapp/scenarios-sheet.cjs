@@ -23,7 +23,7 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'sheet-design-space-typed-edits', as: 'admin',
       async run({ page, go }) {
         const t = seed('Sheet lab', 'd-prog', 'Content Creator', 'Graphic Designer', 'design')
-        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
         ok(await page.$('[data-task-sheet]'), 'the Design Space has a Sheet')
         await typeInto(page, t, 'priority', 'High')
         ok(psql(`select priority from tasks where id='${t}'`) === 'High', 'typing a priority saves it')
@@ -42,7 +42,7 @@ module.exports = (EMAIL, psql, ok) => {
         psql(`delete from task_spaces where task_id='${t}' and space_id<>'${spaceId('content')}'`)
         // First in the sheet's due-date order, so it's on screen however many tasks earlier runs left behind.
         psql(`update tasks set due_date='2001-01-01', due_manual=true where id='${t}'`)
-        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
         await typeInto(page, t, 'status', 'Ready For Design')
         ok(await page.$('[data-handoff]'), 'the hand-off box opens')
         ok(psql(`select status from tasks where id='${t}'`) === 'c-check', 'the task waits for the box')
@@ -86,7 +86,7 @@ module.exports.workbook = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const sp = spaceId('design')
         psql(`delete from sheet_formats where sheet_id=(select id from sheets where linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}')`)
-        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
         await page.waitForSelector('[data-node-workbook] .fx-sh-workbook [data-task-sheet]', { timeout: 60000 })
         ok(psql(`select kind from sheets where linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}'`) === 'linked_tasks', 'the Space has its Tasks sheet')
         // Formatting from the toolbar saves on this sheet.
@@ -121,7 +121,7 @@ module.exports.workbook = (EMAIL, psql, ok) => {
       id: 'workbook-blank-tab-beside-tasks', as: 'admin',
       async run({ page, go }) {
         const b = psql('select id from brands order by name limit 1')
-        await go(`/brands/${b}?view=sheet`)
+        await go(`/brands/${b}?view=sheet&sheet=tasks`)
         await page.waitForSelector('[data-node-workbook] .fx-sh-workbook', { timeout: 60000 })
         const folder = psql(`select id from sheet_folders where brand_id='${b}'`)
         ok(psql(`select count(*) from sheets where folder_id='${folder}' and kind='linked_tasks'`) === '1', "the brand's workbook has one Tasks tab")

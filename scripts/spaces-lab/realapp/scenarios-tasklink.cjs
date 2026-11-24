@@ -26,7 +26,7 @@ module.exports = (EMAIL, psql, ok) => {
         cleanup()
         try {
           const row = taskIn('content', 'Meetup poster')
-          await go(`/brands/${psql(`select brand_id from tasks where id='${row}'`)}?view=sheet`)
+          await go(`/brands/${psql(`select brand_id from tasks where id='${row}'`)}?view=sheet&sheet=tasks`)
           const name = `Lab link ${Date.now() % 100000}`
           const col = await addField(page, name)
           ok(psql(`select kind from sheet_columns where id='${col}'`) === 'task', 'the ＋ Field menu adds a Task link field')

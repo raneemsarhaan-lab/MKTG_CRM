@@ -25,7 +25,7 @@ import { regroupContent, type ContentRow } from './rows'
 import { STAGE_META } from '@/lib/stage-meta'
 import { matchStage, normTitle, shownWord, wordValue } from '@/lib/sheet-links'
 import { FieldIcon } from '@/components/sheets/links/FieldCells'
-import { FIELDS_OPEN, PresetFieldsDrawer, ValuesDialog, type PresetRow } from '@/components/sheets/links/FieldsPanel'
+import { ADD_COLUMN_OPEN, FIELDS_OPEN, PresetFieldsDrawer, ValuesDialog, type PresetRow } from '@/components/sheets/links/FieldsPanel'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
@@ -269,8 +269,11 @@ export function ContentGrid(p: ContentGridProps) {
   const [addAt, setAddAt] = useState<HTMLElement | null>(null)
   useEffect(() => {
     const on = () => setDrawer(true)
+    // The toolbar's "+ Column" opens the same menu as the ＋ after the last heading.
+    const add = (e: Event) => { const a = (e as CustomEvent<HTMLElement | null>).detail; if (a) setAddAt(a) }
     document.addEventListener(FIELDS_OPEN, on)
-    return () => document.removeEventListener(FIELDS_OPEN, on)
+    document.addEventListener(ADD_COLUMN_OPEN, add)
+    return () => { document.removeEventListener(FIELDS_OPEN, on); document.removeEventListener(ADD_COLUMN_OPEN, add) }
   }, [])
   const colLabel = (key: string) => cl.nameOf(key) || (isCustom(key) ? '' : t(`col.${key as ContentCol}`))
 
@@ -625,7 +628,7 @@ export function ContentGrid(p: ContentGridProps) {
   const asRow = (c: (typeof laid)[number]): PresetRow => {
     const i = laid.indexOf(c), name = colLabel(c.key) || t('col.archive')
     return {
-      key: c.key, name, icon: c.kind ? 'regular' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
+      key: c.key, name, icon: c.kind ? 'regular' : c.field ? 'taskcol' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
       // Spec 022 (US4): stage names come from the Space's Stages; the sheet keeps its Type words.
       values: c.key === 'status' && !p.stages ? 'stage' : c.key === 'type' ? 'type' : undefined,
       up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
@@ -633,13 +636,15 @@ export function ContentGrid(p: ContentGridProps) {
     }
   }
   const closeBack = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-content-sheet] .fx-sheet-td.is-active, [data-content-sheet] [data-cell][tabindex="0"]')?.focus())
+  // Spec 026 (§6): a column is a Task field (the sheet's own, or one from the field library: linked rows
+  // show and save the task's value) or Sheet only (stays on the row, never touches the task).
   const addItems: MenuItem[] = addAt ? [
     ...laid.filter(c => c.builtIn && !c.shown).map(c => ({
-      key: c.key, text: colLabel(c.key) || t('col.archive'), group: tf('fieldsTitle'),
-      label: <span className="fx-fd-mi">{FIELD_OF[c.key] && <FieldIcon field={FIELD_OF[c.key]} />}{colLabel(c.key) || t('col.archive')}</span>,
+      key: c.key, text: colLabel(c.key) || t('col.archive'), group: tf('taskFieldGroup'),
+      label: <span className="fx-fd-mi" data-add-task-field={c.key}><FieldIcon field={c.field ? 'taskcol' : FIELD_OF[c.key] ?? 'taskcol'} />{colLabel(c.key) || t('col.archive')}</span>,
       onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
     })),
-    { key: 'regular', text: tf('spreadsheetCol'), group: tf('regularTitle'), label: <span className="fx-fd-mi"><FieldIcon field="regular" />{tf('spreadsheetCol')}</span>,
+    { key: 'regular', text: tf('sheetOnlyCol'), group: tf('sheetOnlyGroup'), label: <span className="fx-fd-mi" data-add-sheet-only="" title={tf('sheetOnlyHint')}><FieldIcon field="regular" />{tf('sheetOnlyCol')}</span>,
       onSelect: () => { const a = addAt; setAddAt(null); cl.openAdd(a) } },
   ] : []
 
@@ -667,6 +672,7 @@ export function ContentGrid(p: ContentGridProps) {
         onMove={(key, dir) => { const i = laid.findIndex(c => c.key === key); void cl.move(key, dir < 0 ? laid[i - 1]?.key ?? null : laid[i + 2]?.key ?? null) }}
         onValues={f => setValuesFor(f)}
         onAddRegular={a => cl.openAdd(a)}
+        onRename={(key, a) => cl.openRename(key, a)} renameLabel={name => tc('renameNamed', { name })}
         onClose={() => { setDrawer(false); closeBack() }} />
     )}
     {valuesFor && (

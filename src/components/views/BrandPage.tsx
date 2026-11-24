@@ -17,6 +17,7 @@ import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
+import { BrandSheets } from './BrandSheets'
 import { applyView, cleanTabPrefs } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
 import Link from 'next/link'
@@ -124,8 +125,13 @@ export function BrandPage({ data, brandId, folder }: {
         if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
         return withPanel(tab === 'sheet'
           ? (brandId
-            ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
-                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+            // Spec 026 (§1): the brand's rows from every Space, one Space's sheet at a time; "All tasks" and a
+            // saved Sheet view (its filters and fields) are the brand's tasks as a task sheet.
+            ? (() => {
+                const tasksSheet = <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
+                  linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+                return view ? tasksSheet : <BrandSheets data={data} brandId={brandId} taskCount={shownTasks.filter(x => !x.dropped_at).length} tasksSheet={tasksSheet} />
+              })()
             : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} label={name} />)
           : tab === 'calendar'
             // The brand's publishing calendar (spec 025): by publishing date, campaigns as a filter.

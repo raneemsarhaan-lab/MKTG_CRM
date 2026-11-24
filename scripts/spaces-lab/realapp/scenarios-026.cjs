@@ -167,6 +167,117 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
+      // §1: the Brand page's Sheet view shows the brand's rows from every Space.
+      id: '026-brand-page-sheet-shows-rows-of-every-space', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const td = theme(`Lab brand design ${n}`, 'design')
+        const tc = theme(`Lab brand content ${n}`, 'content')
+        const rd = row(td, 'design', `Lab design line ${n}`)
+        const rc = row(tc, 'content', `Lab content line ${n}`)
+        const b = brand()
+        const other = first(`select id from brands order by name offset 1 limit 1`)
+        try {
+          // Every Space is on the strip with the brand's row count; a plain row of the Design Space shows.
+          await go(`/brands/${b}?view=sheet&sheet=design`)
+          await page.waitForSelector(`[data-row="l:${rd}"]`, { timeout: 90000 })
+          ok(true, "the brand's Sheet view shows its rows on the Design Space's sheet, plain rows included")
+          for (const k of ['content', 'design', 'video', 'planning']) ok(await page.isVisible(`[data-brand-sheet="${k}"]`), `the ${k} Space is on the strip`)
+          const count = async k => Number(await page.getAttribute(`[data-brand-sheet="${k}"]`, 'data-rows'))
+          const want = k => Number(psql(`select count(*) from content_rows r join projects p on p.id=r.project_id where p.brand_id='${b}' and r.space_id='${space(k)}'`))
+          ok(await count('design') === want('design') && await count('content') === want('content'), "each Space shows how many of the brand's rows it has")
+          ok(!(await page.$(`[data-row="l:${rc}"]`)), "the Content Space's rows aren't mixed into the Design sheet")
+          // Moving to another Space's sheet, on the same page.
+          await page.click('[data-brand-sheet="content"]')
+          await page.waitForSelector(`[data-row="l:${rc}"]`, { timeout: 60000 })
+          ok(!(await page.$(`[data-row="l:${rd}"]`)), "the Content Space's sheet shows its own rows for the brand")
+          // It is the same sheet: Make task works from here.
+          await makeTask(page, rc, null)
+          const made = psql(`select task_id from content_rows where id='${rc}'`)
+          ok(!!made && psql(`select brand_id from tasks where id='${made}'`) === b, 'Make task from the brand page makes the task for this brand')
+          // The choice is remembered for the brand.
+          await go(`/brands/${b}?view=sheet`)
+          await page.waitForSelector(`[data-row="k:${made}"]`, { timeout: 60000 })
+          ok(await page.getAttribute('[data-brand-sheets]', 'data-brand-sheets') === 'content', 'the Space last opened is remembered')
+          // "All tasks" is the brand's tasks from every Space, with a Space column.
+          await page.click('[data-brand-sheet="tasks"]')
+          await page.waitForSelector(`[data-task-sheet] [data-row="t:${made}"]`, { timeout: 60000 })
+          ok(true, 'All tasks lists the new task')
+          // Another brand's page doesn't show these rows.
+          await go(`/brands/${other}?view=sheet&sheet=design`)
+          await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
+          ok(!(await page.$(`[data-row="t:${td}"]`)), "another brand's page doesn't show them")
+        } finally { cleanup([td, tc]) }
+      },
+    },
+    {
+      // §6: a column is a Task field from the library, or Sheet only; all are shown, hidden, moved and renamed in the Fields drawer.
+      id: '026-columns-task-field-or-sheet-only', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const th = theme(`Lab column theme ${n}`, 'design')
+        const r = row(th, 'design', `Lab column row ${n}`)
+        // A field of the library that no task type carries: it isn't on the sheet until someone adds it.
+        const fid = first(`insert into task_fields (id, name_en, kind, position) values (gen_random_uuid(), 'Lab field ${n}', 'text', 990) returning id`)
+        const key = `f:${fid}`, sheet = `rows:${space('design')}`
+        const rec = col => psql(`select coalesce(name,'') || '|' || position || '|' || shown_default || '|' || array_to_string(shown_in, ',') from sheet_columns where sheet='${sheet}' and key='${col}'`)
+        try {
+          await openSheet(page, go, 'design', th)
+          ok(!(await page.$(`[data-col-head="${key}"]`)), "a library field no type carries isn't a column yet")
+          // + Column offers Task field (the library) or Sheet only.
+          await page.click('[data-content-sheet] [data-add-column]')
+          await page.waitForSelector(`[data-add-task-field="${key}"]`)
+          ok(await page.isVisible('[data-add-sheet-only]'), '+ Column offers a Task field or a Sheet only column')
+          await page.click(`[data-add-task-field="${key}"]`)
+          await page.waitForSelector(`[data-col-head="${key}"]`, { timeout: 30000 })
+          ok((await page.locator(`[data-col-head="${key}"]`).innerText()).includes(`Lab field ${n}`), 'the chosen library field is a column, named by the field')
+          // A plain row holds its own value in it.
+          await page.click(`[data-cell="l:${r}|${key}"]`)
+          await page.keyboard.type(`Plain value ${n}`)
+          await page.keyboard.press('Enter')
+          await page.waitForTimeout(1500)
+          ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'a plain row holds its own value in a task-field column')
+          // The Fields drawer: rename, move, hide.
+          await page.click('[data-content-sheet] [data-columns-button]')
+          await page.waitForSelector(`[data-fields-drawer] [data-field-row="${key}"]`)
+          await page.click(`[data-field-rename="${key}"]`)
+          await page.waitForSelector('[data-column-rename] input')
+          await page.fill('[data-column-rename] input', `Lab renamed ${n}`)
+          await page.keyboard.press('Enter')
+          await page.waitForFunction(k => document.querySelector(`[data-col-head="${k}"]`)?.textContent?.includes('Lab renamed'), key, { timeout: 30000 })
+          await page.waitForTimeout(1500)
+          ok(rec(key).startsWith(`Lab renamed ${n}|`), 'renamed from the Fields drawer (on this sheet)')
+          ok(psql(`select name_en from task_fields where id='${fid}'`) === `Lab field ${n}`, "the library field keeps its own name")
+          const posBefore = Number(rec(key).split('|')[1])
+          await page.locator(`[data-fields-drawer] [data-field-row="${key}"] button`, { hasText: '↑' }).click()
+          await page.waitForTimeout(1500)
+          ok(Number(rec(key).split('|')[1]) === posBefore - 1, 'moved up from the Fields drawer')
+          await page.click(`[data-fields-drawer] [data-field-switch="${key}"]`)
+          await page.waitForFunction(k => !document.querySelector(`[data-col-head="${k}"]`), key, { timeout: 30000 })
+          await page.waitForTimeout(1500)
+          ok(rec(key).endsWith('|false|'), 'hidden from the Fields drawer')
+          ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'hiding keeps the values')
+          await page.click('[data-fields-close]')
+          // Sheet only: a column of the sheet's own.
+          await page.click('[data-content-sheet] [data-add-column]')
+          await page.click('[data-add-sheet-only]')
+          await page.waitForSelector('[data-column-editor]')
+          await page.fill('[data-column-editor] input[type="text"]', `Lab only ${n}`)
+          await page.keyboard.press('Enter')
+          await page.waitForFunction(name => [...document.querySelectorAll('[data-col-head]')].some(h => h.textContent?.includes(name)), `Lab only ${n}`, { timeout: 30000 })
+          await page.waitForTimeout(1000)
+          ok(psql(`select kind from sheet_columns where sheet='${sheet}' and name='Lab only ${n}' and deleted_at is null`) === 'text', 'Sheet only adds a column that belongs to the sheet')
+          // The Content Space's sheet is not changed by any of it.
+          ok(psql(`select count(*) from sheet_columns where sheet='content' and (key='${key}' or name='Lab only ${n}')`) === '0', "another Space's sheet keeps its own columns")
+        } finally {
+          psql(`delete from sheet_columns where sheet='${sheet}' and (key='${key}' or name='Lab only ${n}')`)
+          psql(`delete from sheet_columns where key='${key}'`)
+          psql(`delete from task_fields where id='${fid}'`)
+          cleanup([th])
+        }
+      },
+    },
+    {
       id: '026-paste-plan-makes-plain-rows-only', as: 'admin',
       async run({ page, go }) {
         const n = rnd()

@@ -21,6 +21,9 @@ import { FieldIcon } from './FieldCells'
 /** The workbook's ⚙ Fields button and Data › Task fields open the drawer of the sheet on screen. */
 export const FIELDS_OPEN = 'momentum:fields-open'
 export const openFields = () => document.dispatchEvent(new CustomEvent(FIELDS_OPEN))
+/** Spec 026 (§6): a sheet of rows' "+ Column" opens its add menu (Task field or Sheet only) at the button. */
+export const ADD_COLUMN_OPEN = 'momentum:add-column-open'
+export const openAddColumn = (anchor: HTMLElement) => document.dispatchEvent(new CustomEvent(ADD_COLUMN_OPEN, { detail: anchor }))
 
 export interface ColRef { id: string; letter: string; name: string; field: TaskField | null; task: boolean }
 const STAGES = Object.keys(STAGE_META) as StageId[]
@@ -296,7 +299,7 @@ export interface PresetRow { key: string; name: string; icon: TaskField | 'taskc
  * Content sheet). Its rows are a preset; its columns are the sheet's fields
  * and the team's own columns, with the same switches as a team sheet's.
  */
-export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup, fields, regular, onToggle, onMove, onValues, onAddRegular, onClose }: {
+export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup, fields, regular, onToggle, onMove, onValues, onAddRegular, onRename, renameLabel, onClose }: {
   rowsName: string
   rowsHelp: string
   groups: { value: string; label: string }[]
@@ -308,6 +311,9 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
   onMove(key: string, dir: -1 | 1): void
   onValues(field: WordField): void
   onAddRegular(anchor: HTMLElement): void
+  /** Spec 026 (§6): rename a column from the drawer (the sheet's rename box opens at the button). */
+  onRename?(key: string, anchor: HTMLElement): void
+  renameLabel?(name: string): string
   onClose(): void
 }) {
   const t = useTranslations('sheets.fields')
@@ -318,6 +324,7 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
       {r.icon && <FieldIcon field={r.icon} />}
       <span className="fx-fd-nm">{r.name}<small className="fx-col-who">{r.who}</small></span>
       {r.values && <button type="button" className="fx-fd-values" data-field-values={r.values} onClick={() => onValues(r.values!)}>{t('values')}</button>}
+      {onRename && <button type="button" className="fx-fd-mv" data-field-rename={r.key} aria-label={renameLabel?.(r.name) ?? r.name} title={renameLabel?.(r.name)} onClick={e => onRename(r.key, e.currentTarget)}>✎</button>}
       <button type="button" className="fx-fd-mv" aria-label={r.upLabel} disabled={!r.up} onClick={() => onMove(r.key, -1)}>↑</button>
       <button type="button" className="fx-fd-mv" aria-label={r.downLabel} disabled={!r.down} onClick={() => onMove(r.key, 1)}>↓</button>
       <button type="button" role="switch" className="fx-nt-sw" aria-checked={r.shown} aria-label={t('showField', { name: r.name })} data-field-switch={r.key}

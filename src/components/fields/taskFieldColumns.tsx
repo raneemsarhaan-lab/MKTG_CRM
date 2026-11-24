@@ -16,9 +16,28 @@ import { setFieldValue } from '@/actions/task-fields'
 import { useCardFields } from './CardFields'
 import { FEATURE_OFF_CELL, fieldOn } from '@/lib/brand-features'
 import type { useSheetColumns } from '@/components/sheet/useSheetColumns'
+import type { FieldColumn } from '@/lib/sheet-columns'
 
 type Columns = ReturnType<typeof useSheetColumns>
 const RED = '#D22040'
+
+/**
+ * Spec 026 (§6): the field library as columns of a sheet of rows. A field shows by itself while a
+ * type in use on the sheet carries it; any other is there to switch on (＋ Column › Task field, or
+ * the Fields drawer).
+ */
+export function useFieldColumnDefs(tasks: Task[]): (FieldColumn & { name: string })[] {
+  const c = useCardFields()
+  const locale = useLocale()
+  return useMemo(() => {
+    if (!c) return []
+    const typesHere = new Set(tasks.map(x => x.content_type_label).filter(Boolean) as string[])
+    return c.fields.filter(f => !f.retired).sort((a, b) => a.position - b.position).map(f => ({
+      key: `f:${f.id}`, name: fieldName(f, locale), width: f.kind === 'text' ? 220 : 160,
+      shown: c.links.some(l => l.field_id === f.id && typesHere.has(l.type_label)),
+    }))
+  }, [c, tasks, locale])
+}
 
 export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(task: Task): boolean }): Columns {
   const c = useCardFields()
@@ -28,9 +47,11 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
   const [local, setLocal] = useState<Record<string, unknown>>({})
   useEffect(() => { setLocal({}) }, [c?.values])
 
+  // The sheet lays the field columns itself (a sheet of rows), or they follow its own columns (the lab's Video sheet).
+  const laysFields = cl.laid.some(x => x.field)
   const typesHere = useMemo(() => new Set(o.tasks.map(x => x.content_type_label).filter(Boolean) as string[]), [o.tasks])
-  const fields = useMemo(() => (c?.fields ?? []).filter(f => !f.retired && c!.links.some(l => l.field_id === f.id && typesHere.has(l.type_label)))
-    .sort((a, b) => a.position - b.position), [c, typesHere])
+  const fields = useMemo(() => (c?.fields ?? []).filter(f => !f.retired && (laysFields || c!.links.some(l => l.field_id === f.id && typesHere.has(l.type_label))))
+    .sort((a, b) => a.position - b.position), [c, typesHere, laysFields])
   const byKey = useMemo(() => new Map(fields.map(f => [`f:${f.id}`, f])), [fields])
   if (!c || !fields.length) return cl
 
@@ -89,6 +110,7 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
     clear: (task, key, rowKey) => { if (isField(key)) void custom.commit(task, key, ''); else cl.custom.clear(task, key, rowKey) },
     open: (task, key, anchor, rowKey) => { if (!isField(key)) cl.custom.open(task, key, anchor, rowKey) },
   }
+  if (laysFields) return { ...cl, header: key => (isField(key) ? { text: cl.nameOf(key) } : cl.header(key)), custom }
   return {
     ...cl,
     cols: [...cl.cols, ...fields.map(f => `f:${f.id}`)],

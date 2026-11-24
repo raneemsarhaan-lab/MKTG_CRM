@@ -26,9 +26,9 @@ import { PlanPreview } from './PlanPreview'
 import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
-import { useTaskFieldColumns } from '@/components/fields/taskFieldColumns'
+import { useFieldColumnDefs, useTaskFieldColumns } from '@/components/fields/taskFieldColumns'
 import { useMakeField } from '@/components/fields/useMakeField'
-import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { openAddColumn, openFields } from '@/components/sheets/links/FieldsPanel'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 import type { ContentRowRec } from '@/lib/content-rows'
@@ -156,8 +156,10 @@ export function ContentSheet(p: ContentSheetProps) {
   // Spec 026: each Space's sheet has its own columns.
   const sheetId = p.sheet ?? 'content'
   const makeField = useMakeField(sheetId, me.access, text => say(text))
+  // Spec 026 (§6): the field library as columns of this sheet.
+  const fieldCols = useFieldColumnDefs(p.tasks)
   const sheetCols = useSheetColumns({
-    sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField,
+    sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField, fields: fieldCols,
     defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
   })
   // Spec 023: Caption, Channels, TOV and the other task fields of the pieces' types, as columns.
@@ -626,7 +628,7 @@ export function ContentSheet(p: ContentSheetProps) {
         <span className="fx-sheet-bar-gap" />
         {/* Spec 019 stage 2: Columns opens the Fields drawer (the same as ⚙ Fields). */}
         <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{ts('columns.button')}</button>
-        <button type="button" className="fx-sheet-btn" data-add-column="" onClick={e => cl.openAdd(e.currentTarget)}>{ts('columns.add')}</button>
+        <button type="button" className="fx-sheet-btn" data-add-column="" aria-haspopup="menu" onClick={e => openAddColumn(e.currentTarget)}>{ts('columns.add')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
         <button type="button" className="fx-sheet-tog" aria-pressed={showArchived} data-show-archived="" onClick={toggleArchived}>{t('showArchived')}</button>
         {admin && (

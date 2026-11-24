@@ -182,6 +182,32 @@ export async function runPure(bundle, root) {
     eq(v.find(c => c.key === 'c:music').shown, false, 'custom hidden in Copy')
     eq(C.applyLayout('video', fx.records, 'editing').find(c => c.key === 'c:music').shown, true, 'shown in Editing')
   })
+  // Spec 026 (§6): task fields of the library as columns of a sheet of rows.
+  check('cols-task-fields', () => {
+    const A = 'f:11111111-1111-1111-1111-111111111111', B = 'f:22222222-2222-2222-2222-222222222222'
+    const fields = [{ key: A, shown: true, width: 220 }, { key: B, shown: false }]
+    const def = C.applyLayout('content', [], 'all', fields)
+    eq(def.slice(-2).map(c => c.key), [A, B], 'fields follow the built-ins, in the library order')
+    eq([def.at(-2).shown, def.at(-1).shown], [true, false], 'a field a type in use carries shows; another waits to be switched on')
+    eq(def.at(-2).field && def.at(-2).builtIn && def.at(-2).kind === null && def.at(-2).width === 220, true, 'a field column is renamed and moved like a built-in')
+    eq(C.isFieldKey(A) && !C.isFieldKey('f:nope') && !C.isCustomKey(A), true, 'field keys')
+    const who = { id: 'samaa', name: 'Samaa' }
+    // With records (as the server writes them): place, name and switch are the sheet's.
+    const base = C.applyOp('content', [], { op: 'width', key: 'type', width: 200 }, who)
+    const rec = (key, position, extra = {}) => ({ id: `r-${position}`, sheet: 'content', key, name: null, position, width: null, shownDefault: true, shownIn: [], kind: null, options: [], updatedBy: 'samaa', updatedByName: 'Samaa', updatedAt: '2026-11-25T00:00:00Z', ...extra })
+    let r = [...base, rec(A, 50), rec(B, 51)]
+    r = C.applyOp('content', r, { op: 'shown', key: B, set: 'all', shown: true }, who)
+    eq(C.applyLayout('content', r, 'all', fields).find(c => c.key === B).shown, true, 'switched on')
+    r = C.applyOp('content', r, { op: 'shown', key: A, set: 'all', shown: false }, who)
+    eq(C.applyLayout('content', r, 'all', fields).find(c => c.key === A).shown, false, 'switched off, though a type carries it')
+    r = C.applyOp('content', r, { op: 'rename', key: B, name: 'Hook line' }, who)
+    r = C.applyOp('content', r, { op: 'move', key: B, before: 'type' }, who)
+    const laid = C.applyLayout('content', r, 'all', fields)
+    eq([laid[1].key, laid[1].name], [B, 'Hook line'], 'moved and renamed on this sheet')
+    // Another column's change keeps the field's record (the optimistic layer has no field list).
+    const r2 = C.applyOp('content', r, { op: 'width', key: 'status', width: 180 }, who)
+    eq(C.applyLayout('content', r2, 'all', fields)[1].key, B, "a change elsewhere doesn't move it")
+  })
   check('cols-ops', () => {
     const who = { id: 'samaa', name: 'Samaa' }
     let r = C.applyOp('content', [], { op: 'rename', key: 'status', name: 'Stage' }, who)

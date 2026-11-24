@@ -17,7 +17,7 @@ import { getSessionMember } from '@/lib/authz'
 import { mapSheetColumn } from '@/lib/mappers'
 import {
   COLUMN_KINDS, MAX_CUSTOM_COLUMNS, ROWS_SHEET, builtInOf, builtInsFor, isTaskSheet, setsFor, checkName, cleanOptions, clampWidth,
-  convertValues, defaultShownIn, isCustomKey, normName, parseValue,
+  convertValues, defaultShownIn, isCustomKey, isFieldKey, isRowsSheet, normName, parseValue,
 } from '@/lib/sheet-columns'
 import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/types/index'
 
@@ -39,10 +39,33 @@ async function lock(tx: Tx, sheet: SheetId) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'sheet-columns:' + sheet}))`
 }
 
-/** The sheet's records, writing the built-ins first if the sheet has none (R1). */
+/**
+ * The sheet's records, writing the built-ins first if the sheet has none (R1). On a sheet of rows
+ * (spec 026 §6) every task field of the library has a record too, after the others in the library's
+ * order, so it can be moved, renamed, resized and switched like any column.
+ */
 async function records(tx: Tx, sheet: SheetId, memberId: string) {
+  const rows = await builtInRecords(tx, sheet, memberId)
+  if (!isRowsSheet(sheet)) return rows
+  const fields = await tx.taskField.findMany({ where: { retired_at: null }, orderBy: [{ position: 'asc' }, { created_at: 'asc' }], select: { id: true } })
+  const missing = fields.filter(f => !rows.some(r => r.key === `f:${f.id}`))
+  if (!missing.length) return rows
+  let pos = rows.reduce((m, r) => Math.max(m, r.position), -1) + 1
+  for (const f of missing) {
+    // A record deleted earlier comes back rather than clashing with the sheet's one-key rule.
+    await tx.sheetColumn.upsert({
+      where: { sheet_key: { sheet, key: `f:${f.id}` } },
+      create: { sheet, key: `f:${f.id}`, position: pos, created_by: memberId, updated_by: memberId },
+      update: { deleted_at: null, position: pos },
+    })
+    pos++
+  }
+  return tx.sheetColumn.findMany({ where: { sheet, deleted_at: null }, orderBy: { position: 'asc' } })
+}
+
+async function builtInRecords(tx: Tx, sheet: SheetId, memberId: string) {
   const live = await tx.sheetColumn.findMany({ where: { sheet, deleted_at: null }, orderBy: { position: 'asc' } })
-  if (live.some(r => !isCustomKey(r.key))) {
+  if (live.some(r => !isCustomKey(r.key) && !isFieldKey(r.key))) {
     // A built-in added to the code since the first change gets its record now, after its predecessor.
     const missing = builtInsFor(sheet).filter(b => !live.some(r => r.key === b.key))
     if (!missing.length) return live
@@ -67,7 +90,7 @@ async function records(tx: Tx, sheet: SheetId, memberId: string) {
       update: { position: pos - 1 },
     })
   }
-  for (const r of live.filter(x => isCustomKey(x.key))) await tx.sheetColumn.update({ where: { id: r.id }, data: { position: pos++ } })
+  for (const r of live.filter(x => isCustomKey(x.key) || isFieldKey(x.key))) await tx.sheetColumn.update({ where: { id: r.id }, data: { position: pos++ } })
   return tx.sheetColumn.findMany({ where: { sheet, deleted_at: null }, orderBy: { position: 'asc' } })
 }
 

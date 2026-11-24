@@ -133,7 +133,7 @@ module.exports = (EMAIL, psql, ok) => {
         const n = rnd(), post = task(`Lab sheet post ${n}`, 'Post'), video = task(`Lab sheet video ${n}`, 'Video')
         const fid = field(`Lab hashtags ${n}`); attach('Post', fid)
         try {
-          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
+          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
           const cell = id => `[data-cell="t:${id}|f:${fid}"]`
           await page.waitForSelector(cell(post), { timeout: 60000 })
           await page.click(cell(post))
@@ -233,7 +233,7 @@ module.exports = (EMAIL, psql, ok) => {
         const key = psql(`select key from sheet_columns where id='${col}'`)
         psql(`insert into sheet_values (column_id, task_id, value) values ('${col}', '${id}', 'Big hook')`)
         try {
-          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
+          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
           await page.waitForSelector(`[data-col-menu="${key}"]`, { state: 'attached', timeout: 60000 })
           await page.hover(`[data-col-head="${key}"]`)
           await page.click(`[data-col-menu="${key}"]`, { force: true })

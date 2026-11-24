@@ -48,7 +48,7 @@ module.exports = (EMAIL, psql, ok) => {
         await go('/spaces/design?view=sheet')
         await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
         ok(await page.$('[data-content-sheet]'), "other Spaces have the same sheet of rows")
-        await go(`/brands/${firstBrand()}?view=sheet`)
+        await go(`/brands/${firstBrand()}?view=sheet&sheet=tasks`)
         await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
         ok(true, "the brand's Sheet view is the task sheet")
       },

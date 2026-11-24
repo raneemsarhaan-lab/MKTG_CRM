@@ -111,6 +111,10 @@ export const spaceSheetId = (space: { id: string; key: string }): SheetId =>
   (space.key === 'content' || !space.id ? 'content' : `rows:${space.id}`) as SheetId
 
 export const isCustomKey = (key: string) => key.startsWith('c:')
+/** Spec 026 (§6): a task-field column, `f:<field id>` — a field of the library shown on a sheet of rows. */
+export const isFieldKey = (key: string) => /^f:[0-9a-f-]{36}$/.test(key)
+/** A library field as a column: its key, and whether it shows before anyone decides (a type in use carries it). */
+export interface FieldColumn { key: string; shown: boolean; width?: number }
 export const builtInOf = (sheet: SheetId, key: string) => builtInsFor(sheet).find(b => b.key === key)
 
 export interface LaidColumn {
@@ -123,6 +127,8 @@ export interface LaidColumn {
   kind: ColumnKind | null
   options: ChoiceOption[]
   record: SheetColumnRecord | null
+  /** Spec 026: a task field of the library. It is renamed, moved and hidden like a built-in column. */
+  field?: boolean
 }
 
 /**
@@ -130,10 +136,11 @@ export interface LaidColumn {
  * defaults. With records: their order, a built-in added to the code later
  * slotted after its default predecessor, Title always first and shown.
  */
-export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string): LaidColumn[] {
+export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string, fields: FieldColumn[] = []): LaidColumn[] {
   const builtIns = builtInsFor(sheet)
   const recs = records.filter(r => r.sheet === sheet && (!isCustomKey(r.key) || r.kind))
   const byKey = new Map(recs.map(r => [r.key, r]))
+  const fieldOf = new Map(fields.map(f => [f.key, f]))
   let keys: string[]
   if (!recs.length) keys = builtIns.map(b => b.key)
   else {
@@ -143,22 +150,28 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
       const before = builtIns.slice(0, i).reverse().find(x => keys.includes(x.key))
       keys.splice(before ? keys.indexOf(before.key) + 1 : 0, 0, b.key)
     })
-    keys = keys.filter(k => isCustomKey(k) || builtIns.some(b => b.key === k))
+    // A task-field column keeps its place once it has a record (even while the caller's field list is
+    // not at hand: the optimistic layer), so a change to another column never moves it.
+    keys = keys.filter(k => isCustomKey(k) || isFieldKey(k) || builtIns.some(b => b.key === k))
   }
+  // Task fields nobody has placed yet follow, in the library's order.
+  for (const f of fields) if (!keys.includes(f.key)) keys.push(f.key)
   keys = ['title', ...keys.filter(k => k !== 'title')]
   return keys.map(key => {
     const r = byKey.get(key) ?? null
     const b = builtInOf(sheet, key)
-    const defaultShown = b ? (b.sets ? b.sets.includes(set) : true) : true
+    const f = isFieldKey(key) ? fieldOf.get(key) ?? { key, shown: false } : null
+    const defaultShown = f ? f.shown : b ? (b.sets ? b.sets.includes(set) : true) : true
     return {
       key,
-      builtIn: !!b,
+      builtIn: !!b || !!f,
       name: r?.name ?? null,
-      width: clampWidth(r?.width ?? b?.width ?? CUSTOM_WIDTH),
+      width: clampWidth(r?.width ?? b?.width ?? f?.width ?? CUSTOM_WIDTH),
       shown: key === 'title' ? true : r && !r.shownDefault ? r.shownIn.includes(set) : defaultShown,
-      kind: b ? null : (r?.kind ?? null),
-      options: b ? [] : (r?.options ?? []),
+      kind: b || f ? null : (r?.kind ?? null),
+      options: b || f ? [] : (r?.options ?? []),
       record: r,
+      ...(f ? { field: true } : {}),
     }
   })
 }

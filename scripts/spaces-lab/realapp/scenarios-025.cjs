@@ -118,7 +118,7 @@ module.exports = (EMAIL, psql, ok) => {
           const secs = await page.$$eval('[data-brand-section]', els => els.map(e => e.getAttribute('data-brand-section')))
           ok(secs.join(',') === 'brand,assets,settings', `three sections: ${secs}`)
           // Brand: the Sheet has a Space column.
-          await go(`/brands/${b1[0]}?view=sheet`)
+          await go(`/brands/${b1[0]}?view=sheet&sheet=tasks`)
           await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
           const heads = await page.$$eval('[data-task-sheet] [role="columnheader"]', els => els.map(e => e.textContent.trim()))
           ok(heads.some(h => h.includes('Space')), `the brand's Sheet has a Space column: ${heads.slice(0, 6).join(', ')}`)

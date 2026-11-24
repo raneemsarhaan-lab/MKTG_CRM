@@ -80,7 +80,9 @@ export const columns = [
   {
     id: 'col-2-add', hash: C,
     async run(t) {
+      // Spec 026 (§6): + Column asks first — a Task field, or a column of the sheet's own.
       await t.tool('[data-add-column]', 'click')
+      await t.page.click('[data-add-sheet-only]')
       await t.page.locator('[data-column-editor] input[type="text"]').first().fill('Notes')
       await t.page.locator('[data-column-editor] button[type="submit"]').click()
       await t.idle(200)
@@ -383,6 +385,8 @@ export const columns = [
       t.eq(await t.axe('[data-columns-panel]'), [], 'Columns panel')
       await t.page.keyboard.press('Escape')
       await t.tool('[data-add-column]', 'click')
+      t.eq(await t.axe('[data-sheet-menu]'), [], 'the + Column menu')
+      await t.page.click('[data-add-sheet-only]')
       t.eq(await t.axe('[data-column-editor]'), [], 'column editor')
       await t.page.keyboard.press('Escape')
       await t.focusCell(`k:${POST1}`, 'type')

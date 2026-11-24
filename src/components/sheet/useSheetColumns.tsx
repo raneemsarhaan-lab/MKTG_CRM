@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, setsFor, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, normName, type LaidColumn, type PasteValueColumn,
+  MAX_CUSTOM_COLUMNS, setsFor, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, isFieldKey, normName, type FieldColumn, type LaidColumn, type PasteValueColumn,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -62,19 +62,29 @@ export interface UseSheetColumns {
   taskLinks?: TaskLinkCtx
   /** Spec 023: "Make it a task field" on a team column (admins and superusers; rows are tasks). */
   makeField?: { label: string; run(key: string): void }
+  /** Spec 026 (§6): the field library as columns of a sheet of rows — shown, hidden, moved and renamed like the others. */
+  fields?: (FieldColumn & { name: string })[]
 }
 
 export function useSheetColumns(given: UseSheetColumns) {
-  const o: UseSheetColumns = given.taskLinks || !given.bundle.taskLinks ? given : { ...given, taskLinks: given.bundle.taskLinks }
+  const fieldNames = useMemo(() => new Map((given.fields ?? []).map(f => [f.key, f.name])), [given.fields])
+  const o: UseSheetColumns = {
+    ...given,
+    taskLinks: given.taskLinks ?? given.bundle.taskLinks,
+    // A task field's default name is its name in the library.
+    defaultName: key => fieldNames.get(key) ?? given.defaultName(key),
+  }
   const t = useTranslations('sheet.columns')
   const locale = useLocale()
   const { sheet, set, bundle, me } = o
   const api = bundle.api
 
-  const laid = useMemo(() => applyLayout(sheet, bundle.records, set), [sheet, bundle.records, set])
+  // A field's record outlives the field (retired, or a sheet that has no field library): only fields at hand are laid.
+  const laid = useMemo(() => applyLayout(sheet, bundle.records, set, given.fields).filter(c => !isFieldKey(c.key) || fieldNames.has(c.key)),
+    [sheet, bundle.records, set, given.fields, fieldNames])
   const shown = useMemo(() => laid.filter(c => c.shown), [laid])
   const byKey = useMemo(() => new Map(laid.map(c => [c.key, c])), [laid])
-  const nameOf = useCallback((key: string) => byKey.get(key)?.name ?? (isCustomKey(key) ? '' : o.defaultName(key)), [byKey, o])
+  const nameOf = useCallback((key: string) => byKey.get(key)?.name ?? (isCustomKey(key) ? '' : fieldNames.get(key) ?? given.defaultName(key)), [byKey, fieldNames, given])
   const valuesOf = (key: string) => bundle.values[key.slice(2)] ?? {}
   const valueOf = (task: Task, key: string) => bundle.values[key.slice(2)]?.[task.id] ?? ''
   const ctxFor = (c: LaidColumn) => ({ members: o.members, options: c.options, tasks: o.taskLinks?.tasks })
@@ -557,6 +567,8 @@ export function useSheetColumns(given: UseSheetColumns) {
     laid, shown,
     /** Spec 019 stage 2: the Fields drawer and ＋ drive the same layout actions as the Columns panel. */
     openAdd,
+    /** The rename box for a column, opened from outside the grid (the Fields drawer). */
+    openRename: (key: string, anchor: HTMLElement) => { const c = byKey.get(key); if (c) setPopup({ kind: 'rename', anchor, col: c }) },
     setShown: (key: string, on: boolean) => run(api.setShown(sheet, key, set, on), t(on ? 'shownCol' : 'hidden', { name: nameOf(key) || o.defaultName(key) })),
     move: (key: string, before: string | null) => run(api.move(sheet, key, before), t('movedCol', { name: nameOf(key) || o.defaultName(key) })),
     changedBy,
