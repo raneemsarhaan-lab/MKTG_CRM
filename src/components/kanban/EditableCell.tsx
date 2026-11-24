@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { COLORS } from '@/lib/tokens'
 
 /**
@@ -35,6 +35,26 @@ const VALUE: React.CSSProperties = {
   fontWeight: 600,
 }
 
+/**
+ * What a blank value shows. A bare dash says "nothing here" to the eye but
+ * reads as "dash" (or as nothing) to a screen reader, so a punctuation-only
+ * placeholder is hidden from it and the reader hears "Not set" instead.
+ */
+function Empty({ label }: { label: string }) {
+  const muted = { color: COLORS.muted, fontWeight: 400 }
+  if (!/^\p{P}+$/u.test(label)) return <span style={muted}>{label}</span>
+  return (
+    <span style={muted}>
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">Not set</span>
+    </span>
+  )
+}
+
+/** A form-safe `name` from a field's label: "Due date" → "due-date". */
+const fieldName = (label?: string) =>
+  label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || undefined : undefined
+
 const CONTROL: React.CSSProperties = {
   ...VALUE,
   width: '100%',
@@ -43,7 +63,6 @@ const CONTROL: React.CSSProperties = {
   borderRadius: 6,
   padding: '2px 4px',
   fontFamily: 'inherit',
-  outline: 'none',
   boxSizing: 'border-box',
 }
 
@@ -55,7 +74,7 @@ const CONTROL: React.CSSProperties = {
  * populated task reads as text rather than as a form.
  */
 export function InlineValue({
-  canEdit, type, value, display, options, min, step, placeholder, emptyLabel, onCommit,
+  canEdit, type, value, display, options, min, step, placeholder, emptyLabel, ariaLabel, onCommit,
 }: {
   canEdit:  boolean
   type:     'text' | 'number' | 'date' | 'select'
@@ -68,6 +87,11 @@ export function InlineValue({
   /** What a blank looks like. The task panel's Fields block uses "–"; the
    *  property grid above it, and every other caller, keeps "Empty". */
   emptyLabel?: string
+  /** The field's name, e.g. "Due date". The label beside the value is drawn
+   *  by the caller and isn't tied to the control, so this names the control
+   *  itself — and prefixes the value button, so Tab lands on "Due date: 3 Dec"
+   *  rather than on a bare date or a dash. */
+  ariaLabel?: string
   onCommit: (next: string) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -77,7 +101,7 @@ export function InlineValue({
   useEffect(() => { if (!editing) setDraft(String(value ?? '')) }, [value, editing])
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
 
-  const EMPTY = <span style={{ color: COLORS.muted, fontWeight: 400 }}>{emptyLabel ?? 'Empty'}</span>
+  const EMPTY = <Empty label={emptyLabel ?? 'Empty'} />
 
   if (!canEdit) {
     return <div style={{ ...VALUE, padding: '3px 6px' }}>{display || EMPTY}</div>
@@ -96,6 +120,9 @@ export function InlineValue({
         onChange={e => { setDraft(e.target.value); onCommit(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
         onKeyDown={e => { if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) } }}
+        aria-label={ariaLabel}
+        name={fieldName(ariaLabel)}
+        className="fx-focus"
         style={{ ...CONTROL, cursor: 'pointer' }}
       >
         {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -114,6 +141,10 @@ export function InlineValue({
           if (e.key === 'Enter')  { e.preventDefault(); commit() }
           if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) }
         }}
+        aria-label={ariaLabel}
+        name={fieldName(ariaLabel)}
+        autoComplete="off"
+        className="fx-focus"
         style={CONTROL}
       />
     )
@@ -130,6 +161,7 @@ export function InlineValue({
       onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F2')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
     >
+      {ariaLabel && <span className="sr-only">{ariaLabel}: </span>}
       {display || EMPTY}
     </button>
   )
@@ -169,6 +201,9 @@ export function EditableCell({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(String(value ?? ''))
   const ref = useRef<HTMLInputElement | HTMLSelectElement>(null)
+  // One id for whichever control is showing, so the label always points at it.
+  const id = useId()
+  const labelId = `${id}-label`
 
   useEffect(() => { if (!editing) setDraft(String(value ?? '')) }, [value, editing])
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
@@ -182,7 +217,7 @@ export function EditableCell({
 
   return (
     <div style={SHELL}>
-      <div style={LABEL}>{label}</div>
+      <label id={labelId} htmlFor={id} style={{ ...LABEL, display: 'block' }}>{label}</label>
 
       {editing ? (
         type === 'select' ? (
@@ -192,6 +227,9 @@ export function EditableCell({
             onChange={e => { setDraft(e.target.value); onCommit(e.target.value); setEditing(false) }}
             onBlur={() => setEditing(false)}
             onKeyDown={e => { if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) } }}
+            id={id}
+            name={fieldName(label)}
+            className="fx-focus"
             style={{ ...CONTROL, cursor: 'pointer' }}
           >
             {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -210,20 +248,30 @@ export function EditableCell({
               if (e.key === 'Enter')  { e.preventDefault(); commit() }
               if (e.key === 'Escape') { setDraft(String(value ?? '')); setEditing(false) }
             }}
+            id={id}
+            name={fieldName(label)}
+            autoComplete="off"
+            className="fx-focus"
             style={CONTROL}
           />
         )
       ) : (
+        // Named by the label and its own value ("Brand Acme"): a <label> alone
+        // would replace the value in the button's name.
         <button
+          type="button"
+          id={id}
+          aria-labelledby={`${labelId} ${id}`}
           onClick={() => setEditing(true)}
           title={`Edit ${label.toLowerCase()}`}
+          className="fx-focus fx-hov-tint"
           style={{
             ...VALUE,
             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
             fontFamily: 'inherit', textAlign: 'start', width: '100%',
           }}
         >
-          {display || <span style={{ color: COLORS.muted, fontWeight: 400 }}>—</span>}
+          {display || <Empty label="—" />}
         </button>
       )}
     </div>

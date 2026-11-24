@@ -38,6 +38,7 @@ import { offFeatureFor } from '@/lib/brand-features'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLinkedMenu } from '@/components/sheet/useLinkedMenu'
+import { sheetLocale } from '@/lib/sheet-columns'
 
 export type { GridCol, ActiveCell }
 
@@ -187,7 +188,10 @@ export function SheetGrid(p: SheetGridProps) {
     return p.onCommit(row, col, value)
   }
   const membersById = new Map(p.members.map(m => [m.id, m]))
-  const dayFmt = new Intl.DateTimeFormat(locale.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  const dayFmt = new Intl.DateTimeFormat(sheetLocale(locale), { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  /** "5h", "3d" in the reader's language ("5 س", "3 ي"), Western digits as the rest of the sheet. */
+  const hoursFmt = new Intl.NumberFormat(sheetLocale(locale), { style: 'unit', unit: 'hour', unitDisplay: 'narrow' })
+  const daysFmt = new Intl.NumberFormat(sheetLocale(locale), { style: 'unit', unit: 'day', unitDisplay: 'narrow' })
   const dueText = (d: string | null | undefined) => (d ? dayFmt.format(new Date(`${d.slice(0, 10)}T00:00:00Z`)) : '')
   /** Who signs the clip off: its task owner, once it reaches review. */
   const reviewerOf = (task: Task) => (STAGE_ORDER.indexOf(task.status) >= REVIEW_FROM ? membersById.get(task.task_owner_id) : undefined)
@@ -198,7 +202,7 @@ export function SheetGrid(p: SheetGridProps) {
     const hours = Math.max(0, Math.floor((now.getTime() - from.getTime()) / 3_600_000))
     const days = businessDaysBetween(from, now)
     const limit = p.slaConfig?.[task.status]?.[task.content_type_label ?? '']
-    return { text: hours < 24 ? `${Math.max(1, hours)}h` : `${days}d`, late: limit != null && days > limit }
+    return { text: hours < 24 ? hoursFmt.format(Math.max(1, hours)) : daysFmt.format(days), late: limit != null && days > limit }
   }
   const rowTask = (row: SheetRow): Task | null => (row.kind === 'clip' || row.kind === 'video' ? row.task : null)
   const [drawer, setDrawer] = useState(false)
@@ -271,8 +275,15 @@ export function SheetGrid(p: SheetGridProps) {
           </span>
         )}
         <span className="fx-vs-band-mix">{mix}</span>
-        {p.allVideos && <span className="fx-sheet-open" role="link" tabIndex={-1} title={t('openOnItsOwn', { name: task.name })}
-                              onClick={e => { e.stopPropagation(); p.onOpenVideo(task.id) }} aria-hidden="true">↗</span>}
+        {/* A real link, so Cmd/Ctrl+click and a middle click open the video's sheet in a new tab.
+            Out of the tab order and hidden from screen readers: the row number's menu has "Open on its own". */}
+        {p.allVideos && <a className="fx-sheet-open" href={`?view=sheet&video=${encodeURIComponent(task.id)}`} tabIndex={-1} aria-hidden="true"
+                           title={t('openOnItsOwn', { name: task.name })}
+                           onClick={e => {
+                             e.stopPropagation()
+                             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                             e.preventDefault(); p.onOpenVideo(task.id)
+                           }}>↗</a>}
         {due && <span className="fx-vs-band-due">{t.rich('band.due', { date: dueText(due), b: c => <b>{c}</b> })}</span>}
       </span>
     )
@@ -322,7 +333,8 @@ export function SheetGrid(p: SheetGridProps) {
           row.kind === 'clip' && row.task.dropped_at ? 'is-dropped' : '',
           task && task.id === p.highlightId ? 'is-hl' : '',
         ].filter(Boolean).join(' '),
-        level: row.kind === 'video' ? 1 : 2,
+        // Grouped by stage or editor, the group rows lead: group 1, video 2, clip 3.
+        level: row.kind === 'group' ? 1 : (row.kind === 'video' ? 1 : 2) + (by === 'stage' || by === 'assignee' ? 1 : 0),
         expanded: row.kind === 'video' ? !row.collapsed : undefined,
         taskId: task?.id,
       }
@@ -366,6 +378,7 @@ export function SheetGrid(p: SheetGridProps) {
     inputLabel: (row, col) => (row.kind === 'draft' ? t('newClip.label') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as SheetColumn}`)),
     inputPlaceholder: row => (row.kind === 'draft' ? t('newClip.placeholder') : undefined),
     inputDir: col => (['in', 'out', 'clipNo', 'fileName'].includes(col) ? 'ltr' : undefined),
+    inputCode: col => ['in', 'out', 'clipNo', 'fileName', 'source'].includes(col),
     readOnlyNote: (row, col) => {
       const task = rowTask(row)
       if (task && linkedOf(col)) return task.dropped_at ? t('drop.droppedSr') : !p.canEdit(task) ? t('readOnly') : null
@@ -382,9 +395,18 @@ export function SheetGrid(p: SheetGridProps) {
     },
     onToggle: row => { if (row.kind !== 'video') return false; p.onToggle(row.task.id); return true },
     onDelete: (row, col, anchor) => {
+      // Delete on a Choice, Person or Link cell, or a column that follows a board field,
+      // clears it as one step on the sheet's undo stack, so Ctrl+Z puts it back.
+      const cleared = (before: string) => leRef.current?.record('clear', [{ kind: 'taskCells', cells: [{ taskId: row.key, field: col, before, after: '' }] }])
       const lfd = linkedOf(col)
-      if (lfd) { if (row.kind === 'clip' && p.boardField) void p.boardField(row.task, lfd, '').then(err => { if (err) p.onNote(`${row.key}|${col}`, err) }); return true }
-      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) { cl.custom.clear(row.task, col, row.key); return true }
+      if (lfd) {
+        if (row.kind === 'clip' && p.boardField) {
+          const before = fieldText(row.task, lfd, true)
+          if (before) void p.boardField(row.task, lfd, '').then(err => { if (err) p.onNote(`${row.key}|${col}`, err); else cleared(before) })
+        }
+        return true
+      }
+      if ((row.kind === 'clip' || row.kind === 'video') && isCustom(col)) { void cl.custom.clear(row.task, col, row.key, cleared); return true }
       if (row.kind !== 'clip') return false
       p.onDelete(row, anchor); return true
     },
@@ -426,11 +448,11 @@ export function SheetGrid(p: SheetGridProps) {
         case 'type':   return task.content_type_label ? <span className="fx-content-type" style={{ background: contentTypeColor(task.content_type_label) }}>{task.content_type_label}</span> : null
         case 'reviewer': { const r = isVideo ? undefined : reviewerOf(task); return r ? <EditorContent member={r} t={t} /> : null }
         case 'due':    return isVideo ? '' : dueText(task.due_date)
-        case 'inStage': { const s = isVideo ? null : inStage(task); return s ? s.text : <span className="fx-sheet-muted">–</span> }
+        case 'inStage': { const s = isVideo ? null : inStage(task); return s ? s.text : <span className="fx-sheet-muted" aria-hidden="true">–</span> }
         case 'status': return <StatusContent task={task} me={p.me} tipId={`fx-tip-${row.key}`} name={stageOf(task)} />
         case 'editor': return <EditorContent member={task.assignee_id ? membersById.get(task.assignee_id) : undefined} t={t} />
-        case 'source': return isVideo ? '' : <span className="fx-sheet-ellipsis">{task.clip?.source ?? ''}</span>
-        case 'fileName': return isVideo ? '' : <span className="fx-sheet-ellipsis" title={task.clip?.file_name ?? undefined}>{task.clip?.file_name ?? ''}</span>
+        case 'source': return isVideo ? '' : <span className="fx-sheet-ellipsis" translate="no">{task.clip?.source ?? ''}</span>
+        case 'fileName': return isVideo ? '' : <span className="fx-sheet-ellipsis" translate="no" title={task.clip?.file_name ?? undefined}>{task.clip?.file_name ?? ''}</span>
         case 'in':     return isVideo ? '' : formatClipTime(task.clip?.in_ms)
         case 'out':    return isVideo ? '' : formatClipTime(task.clip?.out_ms)
         case 'length': return isVideo ? '' : formatClipTime(clipLength(task.clip?.in_ms, task.clip?.out_ms))

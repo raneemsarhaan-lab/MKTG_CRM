@@ -338,8 +338,13 @@ export function parseTime(text: string): { h: number; min: number } | null {
   return h < 24 && +x[2] < 60 ? { h, min: +x[2] } : null
 }
 
-/** The Intl locale for the member's language: day-first English, Egyptian Arabic. */
-export const intlLocale = (lang: string) => (lang.startsWith('ar') ? 'ar-EG' : 'en-GB')
+/**
+ * The Intl locale for the member's language: day-first English, Egyptian
+ * Arabic. Arabic keeps its month names and words but writes Western digits
+ * (1, 2, 3), as everywhere else in the app: ar-EG on its own would switch to
+ * Arabic-Indic digits (١، ٢، ٣).
+ */
+export const intlLocale = (lang: string) => (lang.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-GB')
 
 /** A custom date pattern (FR-022): d, dd, ddd, dddd, m, mm, mmm, mmmm, yy, yyyy. */
 export function formatPattern(date: Date, pattern: string, lang: string): string {

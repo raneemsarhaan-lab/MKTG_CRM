@@ -5,6 +5,7 @@ import { TodayHoursApp } from '@/components/hours/pages'
 import { HoursReport } from '@/components/hours/HoursReport'
 import { hoursStatus, teamHours } from '@/actions/hours'
 import { isDate, weekOf } from '@/lib/hours'
+import { DEFAULT_TZ, teamClock, teamDay } from '@/lib/notify/days'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,13 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const member = await getSessionMember()
   if (!member) redirect('/login')
 
-  const today = new Date().toISOString().slice(0, 10)
+  // The team's day and hour (Cairo unless NOTIFY_TZ says otherwise), not UTC:
+  // just after midnight in Cairo UTC still says yesterday, which would leave
+  // yesterday unmarked as Missing and the greeting a day behind.
+  const now   = new Date()
+  const tz    = process.env.NOTIFY_TZ || DEFAULT_TZ
+  const today = teamDay(now, tz)
+  const hour  = teamClock(now, tz).h
   const manager = await isHoursManager(member)
   const { week } = await searchParams
   const [hoursRes, reportRes] = await Promise.all([
@@ -31,7 +38,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="fx-myboard fx-wh-page" style={{ padding: '36px 44px 44px' }}>
-      <GreetingHeader firstName={member.name.split(' ')[0]} />
+      <GreetingHeader firstName={member.name.split(' ')[0]} today={today} hour={hour} />
       <TodayHoursApp initial={hoursRes.success ? hoursRes : null} />
       {reportRes?.success && <HoursReport report={reportRes} today={today} />}
     </div>

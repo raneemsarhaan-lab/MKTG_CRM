@@ -297,6 +297,42 @@ html {
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* ─── Keyboard focus for inline-styled controls ───────────────────────────────
+   Controls styled with inline `style` can't take a :focus-visible rule there,
+   and inline `outline: none` would beat any class rule — so those controls
+   drop the inline outline and carry one of these instead. `fx-focus-within`
+   rings a composite box (a borderless textarea and its buttons) as one unit. */
+.fx-focus:focus-visible,
+.fx-task-card:focus-visible {
+  outline: 2px solid var(--violet-accent);
+  outline-offset: 2px;
+}
+.fx-focus-within:focus-within {
+  outline: 2px solid var(--violet-accent);
+  outline-offset: 2px;
+}
+.fx-focus-within textarea:focus-visible { outline: none; }
+
+/* ─── Hover feedback for inline-styled buttons ────────────────────────────────
+   Inline styles can't hold :hover, and an inline `background` beats a class
+   rule, hence !important on the background tint.
+   fx-hov       — filled buttons: a slight darken.
+   fx-hov-tint  — transparent buttons and links: a faint ink wash.
+   fx-hov-light — on dark surfaces (the bulk bar): a faint white wash. */
+.fx-hov { transition: filter 120ms ease-out; }
+.fx-hov:hover:not(:disabled) { filter: brightness(0.94); }
+.fx-hov-tint:hover:not(:disabled) { background-color: rgba(23, 36, 65, 0.06) !important; }
+.fx-hov-light:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.12) !important; }
+
+/* ─── Touch ───────────────────────────────────────────────────────────────────
+   No double-tap-zoom delay on controls; the grey tap flash is replaced by the
+   controls' own pressed and focus styles. */
+a, button, input, select, textarea, label, summary, [role="button"], [role="tab"],
+[role="checkbox"], [role="menuitem"], [role="option"] {
+  touch-action: manipulation;
+}
+html { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .fx-stat-card:hover { transform: none; }
 }
@@ -367,7 +403,7 @@ html {
      is the whole fix; the switch drops under the greeting and sits left with
      it rather than hanging off the edge. */
   .fx-greeting { flex-wrap: wrap; }
-  .fx-greeting > div:last-child { text-align: left !important; }
+  .fx-greeting > div:last-child { text-align: start !important; }
 
   /* The greeting is set at 44px for a 1280px canvas. */
   .fx-greeting h1 { font-size: 34px !important; }
@@ -1147,17 +1183,19 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
   background: var(--brief-ink); color: var(--panel); font-weight: 700; font-size: 13px; font-family: inherit;
 }
 .fx-att-timer {
-  position: absolute; inset-inline-start: 0; bottom: 0; height: 3px; background: var(--brief-blue);
-  animation: fx-att-drain 5s linear forwards;
+  position: absolute; inset-inline: 0; bottom: 0; height: 3px; background: var(--brief-blue);
+  transform-origin: left; animation: fx-att-drain 5s linear forwards;
 }
+[dir="rtl"] .fx-att-timer { transform-origin: right; }
 .fx-att-secs { display: none; font-size: 12px; color: var(--brief-label); }
-@keyframes fx-att-drain { from { width: 100%; } to { width: 0; } }
+/* Drains by transform, not width, so it runs on the compositor. */
+@keyframes fx-att-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 .fx-att-prog {
   position: absolute; inset-inline: 10px; bottom: 10px; height: 6px; border-radius: 99px;
   background: var(--panel); overflow: hidden;
 }
-.fx-att-prog > i { display: block; height: 100%; border-radius: 99px; background: var(--att-uploading); transition: width .15s; }
+.fx-att-prog > i { display: block; height: 100%; border-radius: 99px; background: var(--att-uploading); transition: transform .15s; }
 .fx-att-prog.is-indeterminate > i { width: 40%; animation: fx-att-indet 1.1s ease-in-out infinite; }
 @keyframes fx-att-indet { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 
@@ -1218,6 +1256,10 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
   background: var(--att-on-dark-soft); color: var(--panel); font-weight: 700; font-size: 13px; font-family: inherit;
 }
 .fx-att-pv-btn.is-icon { padding: 0; width: 34px; }
+/* On the dark preview, hover lifts the 0.14 resting wash. */
+.fx-att-pv-btn:hover,
+.fx-att-pv-nav:hover:not(:disabled),
+.fx-att-pv-film button:hover { background: rgba(255, 255, 255, .24); }
 .fx-att-pv-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 /* Fitted (100%): the full height of the preview area, the width following its
    proportions (narrower only when the image is too wide for the screen); sized
@@ -1353,6 +1395,9 @@ button.fx-att-name:hover { background: var(--brief-surface); box-shadow: inset 0
 .fx-sheet-td { cursor: default; outline: none; }
 .fx-sheet-td.is-action { cursor: pointer; }
 .fx-sheet-td.is-active { box-shadow: inset 0 0 0 2px var(--sheet-focus); z-index: 3; }
+/* The active cell's own ring is its focus indicator; the general sheet
+   :focus-visible outline on top of it drew a second line around the cell. */
+.fx-sheet-td.is-active:focus-visible { outline: none; }
 .fx-sheet-td.is-frozen-no.is-active, .fx-sheet-td.is-frozen-title.is-active { z-index: 3; }
 .fx-sheet-tr:hover > .fx-sheet-td:not(.is-frozen-no) { background: var(--sheet-hover); }
 .fx-sheet-tr.is-video > .fx-sheet-td:not(.is-frozen-no) { background: var(--sheet-video-row); font-weight: 600; }
@@ -2421,11 +2466,13 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-hr-quick { display: flex; gap: 6px; flex-wrap: wrap; }
 .fx-hr-chip { border: 1px solid #E3E3EA; background: var(--inbox-panel); border-radius: 999px; padding: 0 14px; min-height: 38px; cursor: pointer; font: 600 13.5px var(--font-body); color: var(--inbox-text); font-variant-numeric: tabular-nums; }
 [dir="rtl"] .fx-hr-chip, [dir="rtl"] .fx-hr-save, [dir="rtl"] .fx-hr-field input { font-family: inherit; }
-.fx-hr-chip:hover { background: var(--inbox-surface); }
+.fx-hr-chip:hover:not(:disabled) { background: var(--inbox-surface); }
+.fx-hr-chip:disabled { opacity: .55; cursor: default; }
 .fx-hr-chip.is-off { color: var(--hr-off-ink); }
 .fx-hr-chip.is-on { background: var(--hr-off-fill); border-color: var(--hr-off-ink); color: #14131A; }
 .fx-hr-save { border: 0; background: #14131A; color: #fff; border-radius: 999px; padding: 0 20px; min-height: 42px; font: 700 14px var(--font-body); cursor: pointer; }
 .fx-hr-save:disabled { opacity: .55; cursor: default; }
+.fx-hr-save:hover:not(:disabled) { background: #2C2A36; }
 .fx-hr-status { margin: 0; font-size: 13px; color: var(--hr-ok); font-weight: 600; min-height: 18px; }
 .fx-hr-status.is-bad { color: var(--hr-bad); }
 .fx-hr-striphead { font-size: 12px; font-weight: 600; color: #5A5F6C; }
@@ -2480,6 +2527,9 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-hr-weeknav > span:not(.is-dim) { font-weight: 700; font-size: 13.5px; padding-inline: 6px; font-variant-numeric: tabular-nums; }
 [dir="rtl"] .fx-hr-weeknav a, [dir="rtl"] .fx-hr-weeknav .is-dim { transform: scaleX(-1); }
 .fx-hr-dl { margin-inline-start: auto; background: var(--inbox-lime); color: #14131A; border-radius: 999px; padding: 9px 16px; font: 700 13.5px var(--font-heading); text-decoration: none; }
+.fx-hr-dl:hover { filter: brightness(0.94); }
+.fx-hr-link:hover, .fx-hr-later:hover { text-decoration: underline; }
+.fx-hr-tog:hover:not([aria-pressed="true"]) { background: var(--inbox-surface); }
 .fx-hr-sum { margin: 0; font-size: 13.5px; color: #5A5F6C; }
 .fx-hr-tbl { overflow-x: auto; border: 1px solid var(--inbox-border); border-radius: 14px; }
 .fx-hr-tbl:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 2px; }
@@ -3245,3 +3295,78 @@ a.fx-pill:hover { filter: brightness(.95); }
 .fx-sheet-td[data-row-handle] { cursor: grab; }
 .fx-content-child-indent { display: inline-block; width: 18px; flex-shrink: 0; }
 .fx-content-plain .fx-sheet-ellipsis { color: #3D4357; }
+/* ─── Sheets: hover, scroll containment, touch (UI review) ────────────────────
+   Hover: a slight darken on bordered and filled buttons, an underline on the
+   text-only ones (toast Undo). Scroll containment: popups and drawers that
+   scroll stop there instead of carrying on into the grid or the page. Touch:
+   grid cells edit on double-tap, which must not zoom. */
+.fx-sheet-btn, .fx-sheet-tog, .fx-sheet-back, .fx-col-ib, .fx-vs-more-btn, .fx-flt-btn,
+.fx-sh-dialog-row button, .fx-sh-cta { transition: filter 120ms ease-out; }
+.fx-sheet-btn:hover:not(:disabled), .fx-sheet-tog:hover:not(:disabled), .fx-sheet-back:hover,
+.fx-col-ib:hover:not(:disabled), .fx-vs-more-btn:hover, .fx-flt-btn:hover,
+.fx-sh-dialog-row button:hover:not(:disabled), .fx-sh-cta:hover { filter: brightness(0.94); }
+.fx-sheet-toast-in button:hover, .fx-sh-toast button:hover { text-decoration: underline; }
+
+.fx-sheet-menu, .fx-sheet-combo-list, .fx-col-panel, .fx-sheet-dlg-body, .fx-sh-menu, .fx-fmt-pop,
+.fx-fmt-sheet, .fx-cmt-list, .fx-cmt-items, .fx-fd-scroll, .fx-sh-listbox, .fx-fc-lb, .fx-flt-list,
+.fx-mb-search ul, .fx-slicers, .fx-slicer-items { overscroll-behavior: contain; }
+
+[role="gridcell"], [role="rowheader"], [role="columnheader"] { touch-action: manipulation; }
+
+/* ─── Sheets fixes: video sheet grid (src/components/sheet) ─── */
+/* Upload progress grows by scaleX from the inline start (compositor-only), not by width. */
+.fx-sheet-prog i.is-pct { width: 100%; transform-origin: left center; transition: transform .2s ease-out; }
+[dir="rtl"] .fx-sheet-prog i.is-pct { transform-origin: right center; }
+@media (prefers-reduced-motion: reduce) { .fx-sheet-prog i.is-pct { transition: none; } }
+/* Retry and Paste a link instead are real buttons now, drawn as the link-like words they were. */
+button.fx-sheet-fbtn { border: 0; background: none; padding: 0; font-family: inherit; }
+button.fx-sheet-fbtn:hover { color: var(--sheet-ink); }
+/* ↗ on a video's band is a real link: no underline, darker on hover. */
+a.fx-sheet-open { text-decoration: none; }
+a.fx-sheet-open:hover { color: var(--sheet-ink); }
+.fx-sheet-combo-opt:hover:not(:disabled) { background: var(--sheet-hover); }
+/* Alt+↓'s pick list can hold 500 values: those scrolled out of the menu skip layout and paint. */
+.fx-sh-menu[data-pick-list] > [role="none"] { content-visibility: auto; contain-intrinsic-size: auto 160px auto 34px; }
+
+/* ─── Sheets fixes: workbook (src/components/sheets) ─── */
+/* Live regions that stay mounted (toasts, the skipped-cells note): only their text comes and goes. */
+.fx-sh-live { position: absolute; }
+.fx-sh-skip-live:not(:empty) { margin-inline-start: auto; }
+.fx-sh-skip-live:empty { position: absolute; }
+/* A toolbar button's picture is hidden from screen readers; the wrapper leaves its layout alone. */
+.fx-fmt-in { display: contents; }
+/* The pickers' section headings are h3 now (they were h5, skipping levels). */
+.fx-fmt-pop h3 { margin: 8px 2px 4px; font: 700 11px var(--font-body); color: var(--inbox-muted); letter-spacing: .05em; text-transform: uppercase; }
+[dir="rtl"] .fx-fmt-pop h3 { letter-spacing: 0; }
+/* Find and Replace: the fields sit in the tab panel. */
+.fx-find-body { display: grid; gap: 10px; }
+/* A sheet that didn't load offers Try again. */
+.fx-sh-retry { margin-inline-start: 8px; border: 1px solid var(--inbox-border); background: var(--inbox-panel); color: var(--inbox-text); border-radius: 999px; padding: 4px 12px; font: 600 13px var(--font-body); cursor: pointer; }
+.fx-sh-retry:hover { background: var(--inbox-surface); }
+.fx-sh-retry:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: 2px; }
+/* Hover on the workbook's own buttons. */
+.fx-find-row button, .fx-flt-foot button, .fx-cmt-send, .fx-tip-btn, .fx-tip-btns > button, .fx-fmt-done, .fx-fd-go,
+.fx-fc-presets button, .fx-fc-lines button, .fx-fc-nofill { transition: filter 120ms ease-out; }
+.fx-find-row button:hover:not(:disabled), .fx-flt-foot button:hover, .fx-cmt-send:hover:not(:disabled), .fx-tip-btn:hover:not(:disabled),
+.fx-tip-btns > button:hover:not(:disabled), .fx-fmt-done:hover, .fx-fd-go:hover:not(:disabled),
+.fx-fc-presets button:hover, .fx-fc-lines button:hover, .fx-fc-nofill:hover { filter: brightness(0.94); }
+.fx-fc-tabs button:hover, .fx-cmt-tabs button:hover { color: var(--inbox-text); }
+.fx-fmt-stabs button:hover { filter: brightness(0.96); }
+.fx-fc-lb button:hover:not([aria-selected="true"]) { background: var(--inbox-surface); }
+.fx-fd-values:hover { background: var(--inbox-surface); }
+.fx-lk-lnk:hover, .fx-fd-link:hover:not(:disabled) { text-decoration: underline; }
+.fx-fd-drawer .fx-fd-add:hover:not(:disabled) { background: var(--inbox-surface); }
+.fx-sh-pin-more:hover { background: var(--inbox-surface); }
+/* Option lists and tabs with a roving Tab stop show where it is. */
+.fx-fc-lb button:focus-visible, .fx-fc-tabs button:focus-visible, .fx-cmt-tabs button:focus-visible, .fx-fmt-stabs button:focus-visible,
+.fx-lk-trow:focus-visible { outline: 2px solid var(--inbox-purple); outline-offset: -2px; }
+/* The filter menu lists up to 500 values: those scrolled out of view skip layout and paint. */
+.fx-flt-list .fx-fc-chk { content-visibility: auto; contain-intrinsic-size: auto 26px; }
+
+/* ─── Sheets fixes: blank sheet and content (BlankSheet, src/components/content) ─── */
+/* Digits that line up down a column: number- and date-formatted cells, a table's Total row, Content dates, counts. */
+.fx-cs-tnum { font-variant-numeric: tabular-nums; }
+/* Slicer values (up to 5,000) and the Alt+↓ pick list (up to 500): rows off screen skip layout and paint until scrolled to. */
+.fx-slicer-items button { content-visibility: auto; contain-intrinsic-size: auto 29px; transition: border-color 120ms ease-out, color 120ms ease-out, filter 120ms ease-out; }
+.fx-slicer-items button:hover { border-color: color-mix(in srgb, var(--inbox-purple, #7C3AED) 45%, transparent); color: var(--sheet-ink); filter: brightness(0.96); }
+.fx-sh-menu[data-pick-list] > [role="none"] { content-visibility: auto; contain-intrinsic-size: auto 34px; }

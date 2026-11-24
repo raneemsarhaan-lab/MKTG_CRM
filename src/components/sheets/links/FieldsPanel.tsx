@@ -17,6 +17,7 @@ import { normTitle } from '@/lib/sheet-links'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { StagePill } from '@/components/sheet/StatusCell'
 import { FieldIcon } from './FieldCells'
+import { Modal } from '../Dialogs'
 
 /** The workbook's ⚙ Fields button and Data › Task fields open the drawer of the sheet on screen. */
 export const FIELDS_OPEN = 'momentum:fields-open'
@@ -58,6 +59,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
   onClose(): void
 }) {
   const t = useTranslations('sheets.fields')
+  const tu = useTranslations('sheets.ux')
   const [q, setQ] = useState('')
   const ref = useRef<HTMLElement>(null)
   useEffect(() => { ref.current?.querySelector<HTMLElement>('button, input, select')?.focus() }, [])
@@ -75,7 +77,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
         <button type="button" aria-label={t('close')} data-fields-close="" onClick={onClose}>×</button>
       </header>
       <div className="fx-fd-scroll">
-        {readOnly && <p className="fx-fd-why">🔒 {readOnly}</p>}
+        {readOnly && <p className="fx-fd-why"><span aria-hidden="true">🔒 </span>{readOnly}</p>}
         {look && onLook && (
           <section>
             <h3>{t('lookTitle')}</h3>
@@ -119,7 +121,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
         </section>
         <section>
           <h3>{t('fieldsTitle')}</h3>
-          <input type="search" value={q} placeholder={t('search')} aria-label={t('search')} onChange={e => setQ(e.target.value)} />
+          <input type="search" value={q} placeholder={tu('ph.fields')} aria-label={t('search')} name="field-search" autoComplete="off" onChange={e => setQ(e.target.value)} />
           <ul className="fx-fd-list">
             {shownList.map(f => {
               const c = colOf.get(f)
@@ -128,7 +130,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
                 <li key={f} className="fx-fd-row" data-field-row={f}>
                   <FieldIcon field={f} />
                   <span className="fx-fd-nm">{name(f)}{c && <small>{t('inColumn', { col: c.letter })}</small>}</span>
-                  {word && map && <button type="button" className="fx-fd-values" data-field-values={f} onClick={() => onValues(f as WordField)}>{t('values')}</button>}
+                  {word && map && <button type="button" className="fx-fd-values" data-field-values={f} aria-label={tu('valuesFor', { name: name(f) })} onClick={() => onValues(f as WordField)}>{t('values')}</button>}
                   <button type="button" role="switch" className="fx-nt-sw" aria-checked={!!c} aria-label={t('showField', { name: name(f) })} data-field-switch={f}
                           disabled={!!readOnly} onClick={() => onToggle(f, !c)} />
                 </li>
@@ -144,7 +146,7 @@ export function FieldsDrawer({ map, cols, teamCols, groupBy, groupCols, readOnly
               <li key={c.id} className="fx-fd-row"><FieldIcon field="regular" /><span className="fx-fd-nm">{c.name || t('untitled')}<small>{t('inColumn', { col: c.letter })}</small></span></li>
             ))}
           </ul>
-          <button type="button" className="fx-fd-add" data-add-regular="" disabled={!!readOnly} onClick={onAddRegular}>＋ {t('addRegular')}</button>
+          <button type="button" className="fx-fd-add" data-add-regular="" disabled={!!readOnly} onClick={onAddRegular}><span aria-hidden="true">＋ </span>{t('addRegular')}</button>
         </section>
       </div>
     </aside>
@@ -168,7 +170,7 @@ export function AddFieldMenu({ anchor, shown, teamCols, linked, onField, onRegul
     ...fields.map(f => ({ key: f, text: name(f), group: t('fieldsTitle'), label: <span className="fx-fd-mi"><FieldIcon field={f} />{name(f)}</span>, onSelect: () => onField(f) })),
     { key: 'regular', text: t('spreadsheetCol'), group: t('regularTitle'), label: <span className="fx-fd-mi"><FieldIcon field="regular" />{t('spreadsheetCol')}</span>, onSelect: onRegular },
   ]
-  if (!linked) items.unshift({ key: 'link', text: t('pickTaskCol'), group: t('linkedTitle'), label: <span className="fx-fd-mi">↗ {t('pickTaskCol')}</span>, onSelect: () => onField('title') })
+  if (!linked) items.unshift({ key: 'link', text: t('pickTaskCol'), group: t('linkedTitle'), label: <span className="fx-fd-mi"><span aria-hidden="true">↗ </span>{t('pickTaskCol')}</span>, onSelect: () => onField('title') })
   return <SheetMenu anchor={anchor} label={t('addTitle')} items={items} onClose={onClose} />
 }
 
@@ -183,6 +185,7 @@ export function ValuesDialog({ field, map, types, defaults, onSave, onClose }: {
   onClose(): void
 }) {
   const t = useTranslations('sheets.fields')
+  const tu = useTranslations('sheets.ux')
   const locale = useLocale()
   const values = boardValues(field, types, locale)
   const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(values.map(v => [v.value, (map.words?.[field]?.[v.value] ?? (defaults?.[v.value] ? [defaults[v.value]] : [])).join(', ')])))
@@ -197,18 +200,15 @@ export function ValuesDialog({ field, map, types, defaults, onSave, onClose }: {
     }
     onSave(out, show)
   }
+  // A Modal: focus moves in, Tab stays inside, Esc cancels, and focus goes back to the Values button.
   return (
-    <div className="fx-sh-scrim" onPointerDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="fx-sh-dialog fx-fd-dialog" role="dialog" aria-modal="true" aria-labelledby="fx-fd-vt" data-values-dialog={field}
-           onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }}>
-        <h2 id="fx-fd-vt">{t('valuesTitle', { field: t(`names.${field}`) })}</h2>
-        <p>{t('valuesHelp')}</p>
+    <Modal title={t('valuesTitle', { field: t(`names.${field}`) })} body={t('valuesHelp')} onCancel={onClose} className="fx-fd-dialog" attrs={{ 'data-values-dialog': field }}>
         <div className="fx-fd-vtable">
           <b>{t('onBoard')}</b><b>{t('sheetCalls')}</b>
           {values.map(v => [
             <span key={`${v.value}-n`}>{field === 'stage' ? <StagePill stage={v.value as StageId} name={v.name} /> : v.name}</span>,
-            <input key={`${v.value}-i`} value={draft[v.value] ?? ''} data-word-for={v.value} aria-label={t('wordsFor', { name: v.name })}
-                   placeholder={field === 'stage' && v.value === 'd-prog' ? t('wordsExample') : ''}
+            <input key={`${v.value}-i`} value={draft[v.value] ?? ''} data-word-for={v.value} aria-label={t('wordsFor', { name: v.name })} name={`words-${v.value}`} autoComplete="off"
+                   placeholder={field === 'stage' && v.value === 'd-prog' ? tu('ph.words') : ''}
                    onChange={e => { setErr(''); setDraft(d => ({ ...d, [v.value]: e.target.value })) }} />,
           ])}
         </div>
@@ -222,8 +222,7 @@ export function ValuesDialog({ field, map, types, defaults, onSave, onClose }: {
           <button type="button" onClick={onClose}>{t('cancel')}</button>
           <button type="button" className="is-go" data-values-save="" onClick={save}>{t('save')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -263,11 +262,7 @@ export function MatchDialog({ field, colName, values, map, types, linkedRows, on
     onSave(words, win)
   }
   return (
-    <div className="fx-sh-scrim" onPointerDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="fx-sh-dialog fx-fd-dialog" role="dialog" aria-modal="true" aria-labelledby="fx-fd-mt" data-match-dialog={field}
-           onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }}>
-        <h2 id="fx-fd-mt">{t('matchTitle', { col: colName })}</h2>
-        <p>{t('matchHelp', { n: values.length, field: t(`names.${field}`) })}</p>
+    <Modal title={t('matchTitle', { col: colName })} body={t('matchHelp', { n: values.length, field: t(`names.${field}`) })} onCancel={onClose} className="fx-fd-dialog" attrs={{ 'data-match-dialog': field }}>
         <div className="fx-fd-vtable">
           <b>{t('inColumnHead')}</b><b>{t(`names.${field}`)}</b>
           {values.map(v => [
@@ -290,8 +285,7 @@ export function MatchDialog({ field, colName, values, map, types, linkedRows, on
           <button type="button" onClick={onClose}>{t('cancel')}</button>
           <button type="button" className="is-go" data-match-save="" onClick={save}>{t('useFor', { field: t(`names.${field}`) })}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -321,13 +315,14 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
   onClose(): void
 }) {
   const t = useTranslations('sheets.fields')
+  const tu = useTranslations('sheets.ux')
   const ref = useRef<HTMLElement>(null)
   useEffect(() => { ref.current?.querySelector<HTMLElement>('select, button')?.focus() }, [])
   const row = (r: PresetRow) => (
     <li key={r.key} className="fx-fd-row" data-field-row={r.key} data-panel-col={r.key}>
       {r.icon && <FieldIcon field={r.icon} />}
       <span className="fx-fd-nm">{r.name}<small className="fx-col-who">{r.who}</small></span>
-      {r.values && <button type="button" className="fx-fd-values" data-field-values={r.values} onClick={() => onValues(r.values!)}>{t('values')}</button>}
+      {r.values && <button type="button" className="fx-fd-values" data-field-values={r.values} aria-label={tu('valuesFor', { name: r.name })} onClick={() => onValues(r.values!)}>{t('values')}</button>}
       {onRename && <button type="button" className="fx-fd-mv" data-field-rename={r.key} aria-label={renameLabel?.(r.name) ?? r.name} title={renameLabel?.(r.name)} onClick={e => onRename(r.key, e.currentTarget)}>✎</button>}
       <button type="button" className="fx-fd-mv" aria-label={r.upLabel} disabled={!r.up} onClick={() => onMove(r.key, -1)}>↑</button>
       <button type="button" className="fx-fd-mv" aria-label={r.downLabel} disabled={!r.down} onClick={() => onMove(r.key, 1)}>↓</button>
@@ -363,7 +358,7 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
         <section>
           <h3>{t('regularTitle')}</h3>
           <ul className="fx-fd-list">{regular.map(row)}</ul>
-          <button type="button" className="fx-fd-add" data-add-regular="" onClick={e => onAddRegular(e.currentTarget)}>＋ {t('addRegular')}</button>
+          <button type="button" className="fx-fd-add" data-add-regular="" onClick={e => onAddRegular(e.currentTarget)}><span aria-hidden="true">＋ </span>{t('addRegular')}</button>
         </section>
       </div>
     </aside>

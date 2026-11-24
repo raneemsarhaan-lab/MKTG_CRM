@@ -132,7 +132,11 @@ export function BlankSheet(p: BlankSheetProps) {
     return linkedMap && taskIdFrom(doc.cells[f.id]?.[linkedMap.taskCol] ?? '') ? null : f.id
   }, [doc.rows, doc.cells, linkedMap])
   const [mine, setMine] = useState(false)
-  const [showDone, setShowDone] = useState(() => { try { return typeof window === 'undefined' || window.localStorage.getItem('momentum.team.done') !== '0' } catch { return true } })
+  // Shown until the browser says otherwise: read after mount, so the server's first render and the browser's match.
+  const [showDone, setShowDone] = useState(true)
+  useEffect(() => {
+    try { if (window.localStorage.getItem('momentum.team.done') === '0') setShowDone(false) } catch { /* private mode */ }
+  }, [])
   const [meId, setMeId] = useState<string | null>(null)
   const index = useMemo(() => indexFormats(extras.formats), [extras.formats])
   const styleOf = useCallback((rowId: string, colId: string) => resolveStyle(index, rowId, colId), [index])
@@ -383,8 +387,8 @@ export function BlankSheet(p: BlankSheetProps) {
     const at = vCols.findIndex(c => c.id === colId)
     if (at < 0) lk.removeField(colId)
     else if (vCols.length <= 1) { p.onNotice(t('menu.keepOneCol')); return }
-    else deleteColsAt([at])
-    p.onNotice(tf('hidden', { name: fieldName(f) }))
+    else deleteColsAt([at], true)
+    p.onNotice(tf('hidden', { name: fieldName(f) }), at >= 0)
   }
   /** "Use this column for a task field": Stage, Type and Priority match the column's own words first. */
   function useColumnFor(colId: string, f: TaskField) {
@@ -534,15 +538,19 @@ export function BlankSheet(p: BlankSheetProps) {
     return remove.length ? [{ kind: 'merges', add, remove }] : []
   }
   const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i)
+  // Deleting and clearing are one undo step each; the toast offers that Undo too, as rewrite and dedupe do.
   function deleteRowsAt(at: number[]) {
     const gone = at.map(i => vRows[i]).filter((x): x is NonNullable<typeof x> => !!x)
     const ids = new Set(gone.map(r => r.id))
     applyR('deleteRows', [...tablesAfter('rows', ids), ...mergesAfter('rows', ids), ...validationsAfter('rows', ids), { kind: 'deleteRows', rows: gone, cells: cellsOfRows(doc, gone.map(r => r.id)) }])
+    if (!ro && gone.length) p.onNotice(t('menu.deletedRows', { n: gone.length }), true)
   }
-  function deleteColsAt(at: number[]) {
+  /** `quiet`: the caller says what happened itself (a field switched off). */
+  function deleteColsAt(at: number[], quiet = false) {
     const gone = at.map(i => vCols[i]).filter((x): x is NonNullable<typeof x> => !!x)
     const ids = new Set(gone.map(c => c.id))
     applyR('deleteCols', [...tablesAfter('cols', ids), ...mergesAfter('cols', ids), ...validationsAfter('cols', ids), { kind: 'deleteCols', cols: gone, cells: cellsOfCols(doc, gone.map(c => c.id)) }])
+    if (!ro && !quiet && gone.length) p.onNotice(t('menu.deletedCols', { n: gone.length }), true)
   }
   function setHeights(ids: string[], h: number | null) {
     const list = doc.rows.filter(r => ids.includes(r.id) && r.height !== h).map(r => ({ id: r.id, before: r.height, after: h }))
@@ -559,7 +567,9 @@ export function BlankSheet(p: BlankSheetProps) {
       if (row && col && value(row.id, col.id)) list.push({ rowId: row.id, colId: col.id, value: '' })
     }
     const ch = cellChange(list)
-    if (ch) applyR('clear', [ch])
+    if (!ch) return
+    applyR('clear', [ch])
+    if (!ro) p.onNotice(t('menu.cleared', { n: unionSize(sel) }), true)
   }
   // ── spec 017: several areas ─────────────────────────────────────────────
   const tA = (k: string) => t(`areas.${k}`)
@@ -803,7 +813,7 @@ export function BlankSheet(p: BlankSheetProps) {
       // A Task link column on a row with no task yet: Create task (the same preview as Board › Create tasks).
       if (lk.map?.fields[col] === 'task' && lk.noteOfRow(row.id) === 'notLinked' && lk.canCreate && !ro) {
         return <button type="button" className="fx-lk-create" data-create-task={row.id} tabIndex={-1}
-                       onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}>＋ {tf('createTask')}</button>
+                       onPointerDown={ev => ev.stopPropagation()} onClick={ev => { ev.stopPropagation(); lk.createForRow(row.id) }}><span aria-hidden="true">＋</span> {tf('createTask')}</button>
       }
       // Spec 020 tip 73: a table's Total row shows its totals (no formula in the cell) and a ▾ on the active cell.
       const tot = totalCell(row.id, col)
@@ -818,7 +828,7 @@ export function BlankSheet(p: BlankSheetProps) {
                       setMenu({ at: { x: rtl ? r.right : r.left, y: r.bottom + 4 }, anchor: el, items: TOTAL_FNS.map(fn => ({ key: fn, label: tt(`total.fns.${fn}`), checked: (tot.fn ?? 'none') === fn, onSelect: () => setTotal(tot.tb.id, col, fn) })) })
                     }}>▾</button>
           : null
-        return <><span className="fx-sheet-cell-text" data-total={tot.fn ?? 'label'}>{tot.shown}</span>{drop}</>
+        return <><span className="fx-sheet-cell-text fx-cs-tnum" data-total={tot.fn ?? 'label'}>{tot.shown}</span>{drop}</>
       }
       const v = value(row.id, col)
       // Stage 3: the filter buttons sit in the filter's header row.
@@ -834,9 +844,11 @@ export function BlankSheet(p: BlankSheetProps) {
       // Spec 020 tip 26: Center Across Selection lays the text over the next empty cells that also carry it.
       const across = st?.ha === 'across' ? acrossWidth(row.id, col) : 0
       const red = showsRed(v, st?.num) ? { color: '#C00000' } : undefined
+      // A number or date format lines its digits up down the column.
+      const tnum = st?.num && st.num.kind !== 'general' && st.num.kind !== 'text' ? ' fx-cs-tnum' : ''
       const text = across
-        ? <span className="fx-sheet-cell-text fx-across" data-across={across} style={{ ...red, width: across }}>{shown}</span>
-        : <span className="fx-sheet-cell-text" style={red}>{shown}</span>
+        ? <span className={`fx-sheet-cell-text fx-across${tnum}`} data-across={across} style={{ ...red, width: across }}>{shown}</span>
+        : <span className={`fx-sheet-cell-text${tnum}`} style={red}>{shown}</span>
       // Spec 020: Excel's green corner on a number kept as text, with its ! menu on the active cell.
       const isGreen = storedAsText(v, st?.num?.kind) && !ro && !ignored.has(`${row.id}|${col}`)
       const green = isGreen ? <>
@@ -962,7 +974,7 @@ export function BlankSheet(p: BlankSheetProps) {
         </span>
       }
       return <span className={`fx-band${b.main ? '' : ' is-sub'}`} data-band-name={b.main ?? b.sub ?? ''}>
-        {b.main && <b>{b.main}</b>}{b.sub && <span className="fx-band-sub">{b.main ? ' › ' : '› '}{b.sub}</span>}<span className="fx-band-n">{b.n}</span>
+        {b.main && <b>{b.main}</b>}{b.sub && <span className="fx-band-sub"><span aria-hidden="true">{b.main ? ' › ' : '› '}</span>{b.sub}</span>}<span className="fx-band-n">{b.n}</span>
       </span>
     },
     onPaste: () => {},
@@ -1133,13 +1145,17 @@ export function BlankSheet(p: BlankSheetProps) {
       if (!items) { p.onNotice(t('format.err.too_many_formats')); return }
       if (items.length) forward.push({ kind: 'formats', items })
     }
-    if (what === 'all' || what === 'comments') {
-      const keys: string[] = []
-      each((rid, cid) => { if (marks.has(`${rid}|${cid}`)) keys.push(`${rid}|${cid}`) })
-      if (keys.length) clearComments('blank', keys)
+    const threads: string[] = []
+    if (what === 'all' || what === 'comments') each((rid, cid) => { if (marks.has(`${rid}|${cid}`)) threads.push(`${rid}|${cid}`) })
+    if (forward.length) {
+      applyR(`clear-${what}`, forward)
+      if (!ro) p.onNotice(t('menu.cleared', { n: unionSize(areasRef.current) }), true)
     }
-    if (forward.length) applyR(`clear-${what}`, forward)
+    // Comment threads aren't on the undo stack, so deleting them is asked first. Declining keeps them;
+    // with Clear › All the contents and formats are cleared all the same (Undo brings those back).
+    if (threads.length) setCommentsAsk(threads)
   }
+  const [commentsAsk, setCommentsAsk] = useState<string[] | null>(null)
   /** Fill Down / Right (FR-043): the first row or column's values and look, into the rest. */
   function fill(dir: 'down' | 'right') {
     if (ro) { p.onNotice(ro); return }
@@ -2498,6 +2514,12 @@ export function BlankSheet(p: BlankSheetProps) {
     setAlert({ rule, rowId, colId, value: v })
     return false
   }
+  /**
+   * Ctrl+; and Ctrl+Shift+;. What's typed is the cell's stored value, which
+   * everyone sharing the sheet reads back (parseDate, parseTime), so it stays
+   * one day-first, Western-digit pattern (the order en-GB and ar-EG both use);
+   * a Date or Time format then shows it in each reader's language.
+   */
   function nowText(kind: 'date' | 'time') {
     const d = new Date(), p2 = (n: number) => String(n).padStart(2, '0')
     return kind === 'date' ? `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}` : `${p2(d.getHours())}:${p2(d.getMinutes())}`
@@ -2696,6 +2718,12 @@ export function BlankSheet(p: BlankSheetProps) {
         <ConfirmDialog attr="data-move-replace" title={tt('move.replaceTitle')} body={tt('move.replaceBody')} ok={tt('move.replaceOk')} cancel={tt('cancel')}
                        onCancel={() => { setMoveAsk(null); focusActive() }} onOk={() => { const run = moveAsk.run; setMoveAsk(null); run(); focusActive() }} />
       )}
+      {commentsAsk && (
+        <ConfirmDialog attr="data-clear-comments" danger title={t('format.edit.clearCommentsTitle', { n: commentsAsk.length })} body={t('format.edit.clearCommentsBody')}
+                       ok={t('format.edit.clearCommentsOk')} cancel={t('format.edit.clearCommentsKeep')}
+                       onCancel={() => { setCommentsAsk(null); focusActive() }}
+                       onOk={() => { const keys = commentsAsk; setCommentsAsk(null); clearComments('blank', keys); focusActive() }} />
+      )}
       {printing && <PrintDialog data={printData} selection={multi()} onClose={() => { setPrinting(false); focusActive() }} />}
       {moveAlert && <MoveAlert text={moveAlert} onClose={() => { setMoveAlert(null); focusActive() }} />}
       {splitAsk && (
@@ -2746,13 +2774,14 @@ export function BlankSheet(p: BlankSheetProps) {
                            onApply={f => { filterCol(filterUi.col, f); close() }} onClose={close} />
       })()}
       {newTheme && (
-        <SheetPopover anchor={newTheme} label={tf('newTheme')} onClose={() => setNewTheme(null)}>
+        <SheetPopover anchor={newTheme} label={tf('newTheme')} onClose={restore => { setNewTheme(null); if (restore) focusActive() }}>
           <div data-new-theme="">
-            <NamePrompt title={tf('newTheme')} saveLabel={tf('save')} cancelLabel={tf('cancel')} onCancel={() => setNewTheme(null)}
+            <NamePrompt title={tf('newTheme')} saveLabel={tf('save')} cancelLabel={tf('cancel')} onCancel={() => { setNewTheme(null); focusActive() }}
                         onSave={async name => {
                           const err = await lk.addTheme(name.trim())
                           if (err) return err
                           setNewTheme(null)
+                          focusActive()
                           p.onNotice(tf('themeAdded', { name: name.trim() }))
                           return null
                         }} />

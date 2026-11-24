@@ -8,8 +8,9 @@
  * - Paste Special: all, values only, formats only; transpose.
  * Plus the clipboard reader they and the Paste menu share.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { tabKeys, useFocusReturn } from '../a11y'
 import type { PasteOp } from '@/lib/sheet-clean'
 import type { CellStyle } from '@/types/index'
 import { parseClipboard, toGrid, toKeys, toStyles } from '@/lib/sheet-clipboard'
@@ -41,6 +42,9 @@ export function FindPanel({ target, replace: startReplace, onClose }: { target: 
   const [whole, setWhole] = useState(false)
   const [result, setResult] = useState<FindResult | null>(null)
   const input = useRef<HTMLInputElement>(null)
+  const uid = useId()
+  // Closing gives focus back to the grid (or what opened the panel).
+  useFocusReturn()
   useEffect(() => { setTab(startReplace ? 'replace' : 'find') }, [startReplace])
   useEffect(() => { requestAnimationFrame(() => { input.current?.focus(); input.current?.select() }) }, [tab])
   useEffect(() => {
@@ -67,12 +71,13 @@ export function FindPanel({ target, replace: startReplace, onClose }: { target: 
         <h2>{t('findTitle')}</h2>
         <button type="button" className="fx-cmt-ico" aria-label={t('close')} title={t('close')} onClick={onClose}>✕</button>
       </header>
-      <div className="fx-fc-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'find'} onClick={() => setTab('find')}>{t('findTab')}</button>
-        <button type="button" role="tab" aria-selected={tab === 'replace'} data-find-tab="replace" onClick={() => setTab('replace')}>{t('replaceTab')}</button>
+      <div className="fx-fc-tabs" role="tablist" aria-label={t('findTitle')} onKeyDown={tabKeys}>
+        <button type="button" role="tab" id={`${uid}-find`} aria-selected={tab === 'find'} aria-controls={`${uid}-panel`} tabIndex={tab === 'find' ? 0 : -1} onClick={() => setTab('find')}>{t('findTab')}</button>
+        <button type="button" role="tab" id={`${uid}-replace`} aria-selected={tab === 'replace'} aria-controls={`${uid}-panel`} tabIndex={tab === 'replace' ? 0 : -1} data-find-tab="replace" onClick={() => setTab('replace')}>{t('replaceTab')}</button>
       </div>
-      <label className="fx-fc-fld"><span>{t('findWhat')}</span><input ref={input} type="text" value={query} data-find-what="" dir="auto" onChange={e => setQuery(e.target.value)} /></label>
-      {tab === 'replace' && <label className="fx-fc-fld"><span>{t('replaceWith')}</span><input type="text" value={by} data-find-with="" dir="auto" onChange={e => setBy(e.target.value)} /></label>}
+      <div className="fx-find-body" role="tabpanel" id={`${uid}-panel`} aria-labelledby={`${uid}-${tab}`}>
+      <label className="fx-fc-fld"><span>{t('findWhat')}</span><input ref={input} type="text" value={query} data-find-what="" dir="auto" name="find" autoComplete="off" onChange={e => setQuery(e.target.value)} /></label>
+      {tab === 'replace' && <label className="fx-fc-fld"><span>{t('replaceWith')}</span><input type="text" value={by} data-find-with="" dir="auto" name="replace" autoComplete="off" onChange={e => setBy(e.target.value)} /></label>}
       <label className="fx-fc-chk"><input type="checkbox" checked={matchCase} onChange={e => setMatchCase(e.target.checked)} />{t('matchCase')}</label>
       <label className="fx-fc-chk"><input type="checkbox" checked={whole} data-find-whole="" onChange={e => setWhole(e.target.checked)} />{t('wholeCell')}</label>
       <p className="fx-find-status" role="status" aria-live="polite" data-find-status="">{status}</p>
@@ -86,6 +91,7 @@ export function FindPanel({ target, replace: startReplace, onClose }: { target: 
           </>
         )}
       </div>
+      </div>
     </div>
   )
 }
@@ -93,13 +99,18 @@ export function FindPanel({ target, replace: startReplace, onClose }: { target: 
 export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSource; onClose(): void; say(text: string): void }) {
   const t = useTranslations('sheets.format.edit')
   const tt = useTranslations('sheets.tips')
+  const tu = useTranslations('sheets.ux')
   const [mode, setMode] = useState<PasteMode>('values')
   const [op, setOp] = useState<PasteOp | null>(null)
   const [flip, setFlip] = useState(false)
   const [skip, setSkip] = useState(false)
+  /** Reading the clipboard can take a moment (the browser may ask): one paste per OK. */
+  const [busy, setBusy] = useState(false)
   // Spec 020 (approved design power-tips-b): Excel's whole list; the new choices are team-sheet tools.
   const linked = target === 'linked'
   async function ok() {
+    if (busy) return
+    setBusy(true)
     const clip = await readClipboard()
     onClose()
     if (!clip || !clip.grid.length) { say(t('noClip')); return }
@@ -168,7 +179,7 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
         <button type="button" disabled title={tt('ps.formulasWhy')}>{tt('ps.link')}</button>
         <span className="fx-sh-dialog-sp" />
         <button type="button" onClick={onClose}>{t('cancel')}</button>
-        <button type="button" className="is-go" data-ok="" onClick={() => void ok()}>{t('ok')}</button>
+        <button type="button" className="is-go" data-ok="" disabled={busy} aria-busy={busy || undefined} onClick={() => void ok()}>{busy ? tu('pasting') : tu('ok.paste')}</button>
       </div>
     </Modal>
   )

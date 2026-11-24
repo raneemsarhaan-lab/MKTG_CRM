@@ -100,7 +100,7 @@ export function formatDay(iso: string | null | undefined, locale = 'en', today: 
   if (!isDay(day)) return ''
   const withYear = day.slice(0, 4) !== today.slice(0, 4)
   // Built from its parts so every locale reads weekday, day, month[, year] with plain spaces.
-  const parts = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', {
+  const parts = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', {
     timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short', ...(withYear ? { year: 'numeric' } : {}),
   }).formatToParts(dayDate(day))
   const part = (type: string) => parts.find(p => p.type === type)?.value ?? ''

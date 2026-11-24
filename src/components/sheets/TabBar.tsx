@@ -57,7 +57,8 @@ export function TabBar(p: TabBarProps) {
     const el = listRef.current
     if (!el) return
     const rtl = getComputedStyle(el).direction === 'rtl'
-    el.scrollBy({ left: 160 * dir * (rtl ? -1 : 1), behavior: 'smooth' })
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollBy({ left: 160 * dir * (rtl ? -1 : 1), behavior: still ? 'auto' : 'smooth' })
   }
 
   function onTabKey(e: React.KeyboardEvent, s: SheetSummary, i: number) {
@@ -155,7 +156,7 @@ export function TabBar(p: TabBarProps) {
                 onDragEnd={() => setDrag(null)}
               >
                 <span className="fx-sh-tabname">{p.nameOf(s)}</span>
-                {s.protectedBy && <span className="fx-sh-tabicon" title={t('sheet.protected')} aria-label={t('sheet.protected')}>🔒</span>}
+                {s.protectedBy && <><span className="fx-sh-tabicon" title={t('sheet.protected')} aria-hidden="true">🔒</span><span className="sr-only">{t('sheet.protected')}</span></>}
                 <span className="fx-sh-caret" aria-hidden="true"
                       onClick={e => { e.stopPropagation(); const b = e.currentTarget.getBoundingClientRect(); p.onMenu(s.id, { x: b.left, y: b.top - 4 }, e.currentTarget.parentElement as HTMLElement) }}>▾</span>
                 {s.color && <span className="fx-sh-stripe" style={{ background: `var(--sh-${s.color})` }} aria-hidden="true" />}
@@ -187,6 +188,8 @@ function RenameInput({ initial, label, onDone }: { initial: string; label: strin
       <input
         ref={ref}
         value={v}
+        name="sheet-name"
+        autoComplete="off"
         aria-label={label}
         aria-invalid={!!err || undefined}
         aria-describedby={err ? 'fx-sh-rename-err' : undefined}

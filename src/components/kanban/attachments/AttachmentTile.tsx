@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { TaskAttachment } from '@/types/index'
 import { attachmentSrc, extensionOf, isImageAttachment, isLinkAttachment } from '@/lib/attachments'
 import { initials, avatarColor } from '@/lib/utils'
+import { intlLocale } from '@/lib/sheet-format'
 import { AttIcon } from './icons'
 import { ageLabel } from './order'
 import { firstName, renamedTo, splitExt, splitName } from './names'
@@ -144,6 +145,9 @@ export function AttachmentTile({
           <span className="fx-att-rename">
             <input
               ref={inputRef}
+              name="filename"
+              autoComplete="off"
+              spellCheck={false}
               value={draft}
               aria-label={t('renameField', { name: a.filename })}
               onChange={e => setDraft(e.target.value)}
@@ -240,7 +244,7 @@ export function GhostTile({ a, onUndo }: { a: TaskAttachment; onUndo: () => void
     <div className="fx-att-tile fx-att-ghost" data-att-ghost={a.id} role="status">
       <span className="fx-att-thumb">
         <b>{t('deletedTile', { name: short })}</b>
-        <button type="button" className="fx-att-undo" data-undo={a.id} onClick={onUndo}>{t('undo')}</button>
+        <button type="button" className="fx-att-undo fx-hov" data-undo={a.id} onClick={onUndo}>{t('undo')}</button>
         <span className="fx-att-secs">{t('seconds', { n: 5 })}</span>
         <span className="fx-att-timer" />
       </span>
@@ -256,6 +260,7 @@ export function JobTile({ job, onRetry, onRemove }: {
   onRemove: () => void
 }) {
   const t = useTranslations('attachments')
+  const locale = intlLocale(useLocale())
   const isImage = job.file.type.startsWith('image/')
   // The local picture while it uploads: the same bytes, shown before the server has them.
   // Created and revoked in the same effect, keyed on the file alone, so the
@@ -284,7 +289,12 @@ export function JobTile({ job, onRetry, onRemove }: {
             <span className={`fx-att-prog${job.progress == null ? ' is-indeterminate' : ''}`}
                   role="progressbar" aria-label={t('aUploading', { name: job.name })}
                   aria-valuemin={0} aria-valuemax={100} aria-valuenow={job.progress ?? undefined}>
-              <i style={job.progress == null ? undefined : { width: `${job.progress}%` }} />
+              {/* Moved, not resized: a full-width bar slid in from the start
+                  edge animates on the compositor, and keeps its rounded end. */}
+              <i style={job.progress == null ? undefined : {
+                width: '100%',
+                transform: `translateX(${(locale.startsWith('ar') ? 1 : -1) * (100 - job.progress)}%)`,
+              }} />
             </span>
           )}
         </Thumb>
@@ -292,7 +302,7 @@ export function JobTile({ job, onRetry, onRemove }: {
       <div className="fx-att-info">
         <span className="fx-att-name" title={job.name}><NameLines name={job.name} /></span>
         <span className={`fx-att-meta${failed ? ' is-error' : ''}`}>
-          <span>{failed ? job.error : `${job.progress == null ? '' : `${job.progress}% · `}${formatBytes(job.file.size)}`}</span>
+          <span>{failed ? job.error : `${job.progress == null ? '' : `${new Intl.NumberFormat(locale, { style: 'percent' }).format(job.progress / 100)} · `}${formatBytes(job.file.size, locale)}`}</span>
         </span>
       </div>
       {failed && (

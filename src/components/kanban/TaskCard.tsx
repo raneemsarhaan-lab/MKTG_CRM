@@ -1,7 +1,9 @@
 'use client'
 
+import { useId } from 'react'
+import { useDndContext } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { CSS, isKeyboardEvent } from '@dnd-kit/utilities'
 import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
 import { featureOn } from '@/lib/brand-features'
@@ -90,16 +92,10 @@ function AssigneeDot({ name, stacked }: { name: string; stacked?: boolean }) {
   )
 }
 
-/** Card body with no drag wiring, so DragOverlay can reuse it. */
-function CardBody({ task, currentStageOwner, slaConfig, today }: {
-  task: TaskCardProps['task']
-  currentStageOwner: Member | null
-  slaConfig: SLAConfig
-  today: Date
-}) {
-  const tViews   = useTranslations('views')
+/** Status and due date, worked out once for the card and for its description. */
+function cardFacts(task: TaskCardProps['task'], slaConfig: SLAConfig, today: Date) {
   const alert    = getAlertStatus(task, slaConfig, today)
-  const chip     = CHIP[alert]
+  // Whole days in Cairo, as everywhere else dates are compared (spec 022).
   const daysLeft = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
   // Published or done work is never overdue (and shows no count).
   const overdue  = isOverdue(task as Parameters<typeof isOverdue>[0])
@@ -108,6 +104,26 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
     ? ''
     : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
+  return { alert, overdue, dueLabel }
+}
+
+/** The people the footer draws: the owner, then whoever holds the stage. */
+function assigneesOf(task: TaskCardProps['task'], currentStageOwner: Member | null) {
+  return currentStageOwner && currentStageOwner.id !== task.task_owner.id
+    ? [task.task_owner, currentStageOwner]
+    : [task.task_owner]
+}
+
+/** Card body with no drag wiring, so DragOverlay can reuse it. */
+function CardBody({ task, currentStageOwner, slaConfig, today }: {
+  task: TaskCardProps['task']
+  currentStageOwner: Member | null
+  slaConfig: SLAConfig
+  today: Date
+}) {
+  const tViews   = useTranslations('views')
+  const { alert, overdue, dueLabel } = cardFacts(task, slaConfig, today)
+  const chip = CHIP[alert]
 
   const attachmentCount = task.attachments?.length ?? 0
   const commentCount    = task.comments?.length ?? 0
@@ -210,7 +226,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       {/* Title */}
       <div style={{
         fontSize: 12.5, fontWeight: 600, lineHeight: 1.35,
-        color: PIPE.textPrimary, textWrap: 'pretty',
+        color: PIPE.textPrimary, textWrap: 'pretty', overflowWrap: 'anywhere',
       }}>
         {task.name}
       </div>
@@ -329,72 +345,133 @@ export function TaskCard({
   task, currentStageOwner, currentUser: _currentUser, slaConfig, today, onSelect,
   selected, selecting, onToggleSelect,
 }: TaskCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
+  const { activatorEvent } = useDndContext()
+  const summaryId = useId()
+
+  // The overlay carries the card while it moves, so the copy left behind is
+  // a ghost: out of the tab order and the accessibility tree. Not for a
+  // keyboard drag, though — focus stays on this card for the whole move, and
+  // taking it away would drop a screen reader user's place.
+  const ghost = isDragging && !(activatorEvent && isKeyboardEvent(activatorEvent))
+
+  // What the card shows, as a sentence: the card's name is the task, and
+  // this is read after it, so status, due date and people are not lost
+  // behind the label.
+  const { alert, dueLabel } = cardFacts(task, slaConfig, today)
+  const summary = [
+    alert,
+    dueLabel || 'No due date',
+    `Assigned to ${assigneesOf(task, currentStageOwner).map(m => m.name).join(' and ')}`,
+    task.brand?.name ?? 'No brand',
+    task.project?.name ?? 'No project',
+    task.parent ? `Subtask of ${task.parent.name}` : '',
+  ].filter(Boolean).join('. ')
 
   return (
+    // The sortable node is this wrapper; the card proper is the button
+    // inside it, with the selection checkbox beside it rather than in it — a
+    // control inside a button is neither one thing nor the other to a screen
+    // reader. The wrapper keeps .fx-task-card so hovering or focusing either
+    // still reveals the checkbox.
     <div
       ref={setNodeRef}
       data-task-card={task.id}
+      className="fx-task-card"
+      inert={ghost}
+      aria-hidden={ghost || undefined}
       style={{
-        ...SHELL,
         position: 'relative',
-        borderColor: selected ? PIPE.purple : PIPE.border,
-        boxShadow: selected ? `0 0 0 2px ${PIPE.purple}33` : undefined,
         transform: CSS.Transform.toString(transform),
         transition,
         // The overlay carries the card while it moves, so the original dims.
         opacity: isDragging ? 0.35 : 1,
-        cursor: isDragging ? 'grabbing' : 'grab',
-        // Pointer drags on touch devices are swallowed by scrolling without this.
-        touchAction: 'none',
-        userSelect: 'none',
-        outline: 'none',
       }}
-      {...attributes}
-      {...listeners}
-      onClick={e => {
-        // While a selection is running, a plain click extends it rather than
-        // opening the task — the same bargain ClickUp makes.
-        if (selecting && onToggleSelect) { onToggleSelect(task.id, e.shiftKey); return }
-        onSelect(task.id)
-      }}
-      onKeyDown={e => { if (e.key === 'Enter') onSelect(task.id) }}
-      role="button"
-      tabIndex={0}
-      aria-label={`Task: ${task.name}`}
-      className="fx-task-card"
     >
+      <div
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        style={{
+          ...SHELL,
+          borderColor: selected ? PIPE.purple : PIPE.border,
+          boxShadow: selected ? `0 0 0 2px ${PIPE.purple}33` : undefined,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          // A touch drag starts on a press-and-hold (the board's TouchSensor),
+          // so a swipe that starts on a card still scrolls the page.
+          touchAction: 'manipulation',
+          userSelect: 'none',
+          WebkitTouchCallout: 'none',
+        }}
+        onClick={e => {
+          // While a selection is running, a plain click extends it rather than
+          // opening the task — the same bargain ClickUp makes.
+          if (selecting && onToggleSelect) { onToggleSelect(task.id, e.shiftKey); return }
+          onSelect(task.id)
+        }}
+        // Enter opens the task; every other key goes on to dnd-kit's keyboard
+        // sensor (Space picks the card up). Setting onKeyDown after {...listeners}
+        // replaces theirs, so it has to be passed on by hand.
+        onKeyDown={e => {
+          if (e.key === 'Enter') { onSelect(task.id); return }
+          listeners?.onKeyDown?.(e)
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={`Task: ${task.name}`}
+        aria-describedby={[summaryId, attributes['aria-describedby']].filter(Boolean).join(' ')}
+        className="fx-focus"
+        data-task-card={task.id}
+      >
+        <span id={summaryId} className="sr-only">{summary}</span>
+        {/* Off-screen cards skip layout and paint until they scroll near —
+            a Team board runs to hundreds of cards. Inside the shell, so the
+            shell's selected ring and focus outline are never clipped. */}
+        <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 272px' }}>
+          <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
+        </div>
+      </div>
+
       {onToggleSelect && (
+        // A real checkbox, drawn as the round-cornered tick over the cover.
+        // Its click carries shiftKey for range selection; Space on the
+        // focused box arrives as a click too, so one handler covers both.
         <span
-          role="checkbox"
-          aria-checked={Boolean(selected)}
-          aria-label={`Select ${task.name}`}
-          tabIndex={0}
           className="fx-card-check"
           data-on={selected ? 'true' : undefined}
-          // Stops the click reaching the card and the drag sensor claiming it.
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onToggleSelect(task.id, e.shiftKey) }}
-          onKeyDown={e => {
-            if (e.key === ' ' || e.key === 'Enter') {
-              e.preventDefault(); e.stopPropagation(); onToggleSelect(task.id, e.shiftKey)
-            }
-          }}
-          style={{
-            position: 'absolute', top: 15, left: 15, zIndex: 2,
-            width: 20, height: 20, borderRadius: 6, cursor: 'pointer',
-            border: `1.5px solid ${selected ? PIPE.purple : 'rgba(255,255,255,.9)'}`,
-            background: selected ? PIPE.purple : 'rgba(255,255,255,.82)',
-            color: '#FFFFFF', fontSize: 12, fontWeight: 900, lineHeight: '17px',
-            textAlign: 'center', boxShadow: '0 1px 4px rgba(20,19,26,.25)',
-          }}
+          // 16, not 15: measured from the shell's outer edge now, not from
+          // inside its 1px border.
+          style={{ position: 'absolute', top: 16, left: 16, zIndex: 2, display: 'block' }}
         >
-          {selected ? '✓' : ''}
+          <input
+            type="checkbox"
+            checked={Boolean(selected)}
+            readOnly
+            aria-label={`Select ${task.name}`}
+            className="fx-focus"
+            onClick={e => onToggleSelect(task.id, e.shiftKey)}
+            // Enter toggled the old box too; a native checkbox only takes Space.
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); onToggleSelect(task.id, e.shiftKey) }
+            }}
+            style={{
+              appearance: 'none', WebkitAppearance: 'none', margin: 0, display: 'block',
+              width: 20, height: 20, boxSizing: 'content-box', borderRadius: 6, cursor: 'pointer',
+              border: `1.5px solid ${selected ? PIPE.purple : 'rgba(255,255,255,.9)'}`,
+              background: selected ? PIPE.purple : 'rgba(255,255,255,.82)',
+              boxShadow: '0 1px 4px rgba(20,19,26,.25)',
+            }}
+          />
+          <span aria-hidden="true" style={{
+            position: 'absolute', top: 1.5, left: 1.5, width: 20, height: 20, pointerEvents: 'none',
+            color: '#FFFFFF', fontSize: 12, fontWeight: 900, lineHeight: '17px',
+            textAlign: 'center',
+          }}>
+            {selected ? '✓' : ''}
+          </span>
         </span>
       )}
-
-      <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
     </div>
   )
 }

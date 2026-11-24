@@ -919,6 +919,14 @@ export async function bulkUpdateTasks(
  * you may rewrite entirely you may also remove. Comments and attachments go
  * with it by cascade; subtasks are kept and simply lose their parent, which is
  * why the relation is onDelete: SetNull rather than Cascade.
+ *
+ * A deleted task that carries an external_id (a ClickUp import) is also
+ * tombstoned, same as removeMember/removeProject. scripts/import-clickup.ts
+ * runs on every container start and otherwise recreates any external_id it
+ * cannot find — "not in the database" and "deleted on purpose" look
+ * identical to it — so without this a deleted imported task is back on the
+ * next deploy. A task made in the app has no external_id and needs no
+ * tombstone; the importer never touches it either way.
  */
 export async function bulkDeleteTasks(taskIds: string[]): Promise<BulkResult> {
   const member = await getSessionMember()
@@ -928,10 +936,22 @@ export async function bulkDeleteTasks(taskIds: string[]): Promise<BulkResult> {
   const isAdmin = member.access === 'admin' || member.access === 'superuser'
   const tasks   = await prisma.task.findMany({ where: { id: { in: taskIds } } })
 
-  const allowed = tasks.filter(t => isAdmin || t.task_owner_id === member.id || t.assignee_id === member.id).map(t => t.id)
+  const allowedTasks = tasks.filter(t => isAdmin || t.task_owner_id === member.id || t.assignee_id === member.id)
+  const allowed = allowedTasks.map(t => t.id)
   const refused = tasks.length - allowed.length
 
-  if (allowed.length) await prisma.task.deleteMany({ where: { id: { in: allowed } } })
+  if (allowed.length) {
+    await prisma.$transaction(async tx => {
+      await tx.task.deleteMany({ where: { id: { in: allowed } } })
+      const imported = allowedTasks.filter(t => t.external_id)
+      if (imported.length) {
+        await tx.tombstone.createMany({
+          data: imported.map(t => ({ kind: 'task', key: t.external_id as string, label: t.name })),
+          skipDuplicates: true,
+        })
+      }
+    })
+  }
 
   revalidatePath('/board')
   revalidatePath('/overview')

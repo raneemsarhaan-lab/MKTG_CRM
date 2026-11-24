@@ -11,7 +11,7 @@
  * one table into `#fx-print-root`; rows to repeat go in its `<thead>`, which
  * browsers repeat on every page.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useMemo, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslations } from 'next-intl'
 import { Modal } from '../Dialogs'
@@ -40,6 +40,8 @@ export function repeatRows(text: string): [number, number] | null {
 
 export function PrintDialog({ data, selection, onClose }: { data: (selectionOnly: boolean) => PrintData; selection: boolean; onClose(): void }) {
   const t = useTranslations('sheets.tips.print')
+  const tu = useTranslations('sheets.ux')
+  const uid = useId()
   const [what, setWhat] = useState<'sheet' | 'selection'>('sheet')
   const [land, setLand] = useState(false)
   const [scale, setScale] = useState<Scale>('fitCols')
@@ -95,14 +97,19 @@ export function PrintDialog({ data, selection, onClose }: { data: (selectionOnly
               </select></label>
             {!d.headings && (
               <label className="fx-sh-field"><span>{t('repeat')}</span>
-                <input type="text" value={rep} dir="ltr" data-print-repeat-rows="" aria-invalid={!!rep.trim() && !repeat} onChange={e => setRep(e.target.value)} placeholder="$1:$1" /></label>
+                <input type="text" value={rep} dir="ltr" data-print-repeat-rows="" aria-invalid={!!rep.trim() && !repeat} onChange={e => setRep(e.target.value)}
+                       placeholder={tu('ph.eg', { ex: '$1:$1' })} name="repeat-rows" autoComplete="off" spellCheck={false} translate="no"
+                       aria-describedby={rep.trim() && !repeat ? `${uid}-rep` : undefined} />
+                {/* Said next to the box, not only by its red outline. */}
+                {!!rep.trim() && !repeat && <small id={`${uid}-rep`} className="fx-fc-bad" role="alert" data-print-repeat-bad="">{tu('repeatBad')}</small>}
+              </label>
             )}
             <fieldset className="fx-tip-set"><legend className="fx-tip-cap">{t('print')}</legend>
               <label className="fx-sh-check"><input type="checkbox" checked={grid} data-print-grid="" onChange={e => setGrid(e.target.checked)} />{t('gridlines')}</label>
               <label className="fx-sh-check"><input type="checkbox" checked={heads} data-print-heads="" onChange={e => setHeads(e.target.checked)} />{t('headings')}</label>
             </fieldset>
           </div>
-          <div className="fx-print-pv" aria-label={t('preview')}>
+          <div className="fx-print-pv" role="group" aria-label={t('preview')}>
             {Array.from({ length: Math.min(2, pages) }, (_, p) => (
               <figure key={p} className={`fx-print-page${land ? ' is-land' : ''}`}>
                 <div className="fx-print-paper" data-print-page={p + 1}>

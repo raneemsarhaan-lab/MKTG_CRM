@@ -17,7 +17,10 @@
   "greeting": {
     "morning": "Good morning",
     "afternoon": "Good afternoon",
-    "evening": "Good evening"
+    "evening": "Good evening",
+    "hello": "{greeting}, {name}",
+    "tagline": "Let's make <hl>today</hl> count.",
+    "cheer": "you got this! 💜"
   },
   "board": {
     "allBrands": "All brands",
@@ -96,13 +99,15 @@
     "clearFormatHint": "selected text",
     "copyMarkdown": "Copy Markdown",
     "markdownCopied": "Markdown copied",
-    "clipboardBlocked": "Clipboard blocked by the browser",
+    "clipboardBlocked": "The browser blocked the clipboard. Allow clipboard access for this site, then try again.",
     "linkLabel": "Link",
-    "linkPlaceholder": "Paste or type an address",
+    "linkPlaceholder": "e.g. forefront.consulting/team…",
     "addLink": "Add link",
     "updateLink": "Update link",
     "imageLabel": "Image URL",
-    "imagePlaceholder": "https://…/picture.png",
+    "imagePlaceholder": "e.g. https://example.com/picture.png…",
+    "imageAltLabel": "Describe the image (optional)",
+    "imageAltPlaceholder": "e.g. The team at the launch event…",
     "insertImage": "Insert image",
     "orAttachment": "or use an attachment:",
     "imageChecking": "Checking the image…",
@@ -112,9 +117,9 @@
     "addVideo": "Add video",
     "notYoutube": "That isn't a YouTube video link.",
     "subtaskLabel": "Subtask name",
-    "subtaskPlaceholder": "What needs doing?",
+    "subtaskPlaceholder": "e.g. Draft the caption…",
     "createSubtask": "Create subtask",
-    "subtaskFailed": "Could not create that subtask",
+    "subtaskFailed": "Couldn't create that subtask. Check your connection, then try again: the name is still in the box.",
     "working": "Working…",
     "cancel": "Cancel",
     "urlEmpty": "Enter an address.",
@@ -133,9 +138,10 @@
     "remove": "Remove",
     "linkRemoved": "Link removed, text kept",
     "uploading": "Uploading {name}…",
-    "uploadFailed": "{name} couldn't upload: {error}",
+    "uploadFailed": "{name} couldn't upload: {error}. Paste or drop it again to retry.",
+    "uploadFailedUnknown": "{name} couldn't upload. Check your connection, then paste or drop it again.",
     "notAnImage": "Only images go into the brief. Add other files as attachments.",
-    "tooBig": "{name} is over {mb} MB.",
+    "tooBig": "{name} is over {mb} MB. Make it smaller and paste it again, or share a link to it instead.",
     "skipped": "Only the first {max} images were taken.",
     "notCreated": "Images can be added once the task is created.",
     "noPermission": "You can't add attachments to this task.",
@@ -147,11 +153,16 @@
     "deleteRow": "Delete row",
     "deleteColumn": "Delete column",
     "deleteTable": "Delete table",
+    "tableDeleted": "Table deleted. Press {keys} to undo.",
+    "resizeColumn": "Resize column",
+    "resizeKeys": "Use ← and → to resize, Shift for bigger steps. Enter keeps the size, Esc cancels.",
+    "columnWidth": "Column width",
+    "tableWidth": "Table width",
     "equalWidths": "Equal widths",
     "fullWidth": "Full width",
     "dragColumns": "Drag to resize columns",
     "dragTable": "Drag to resize the table",
-    "wide": "{n}% wide",
+    "wide": "{pct} wide",
     "toggleTitle": "Toggle title",
     "toggleBody": "Hidden content",
     "toggleDefaultTitle": "Details",
@@ -173,7 +184,7 @@
     "dropOverlay": "Drop to attach to this task",
     "noFiles": "No files.",
     "latest": "Latest",
-    "uploading": "Uploading",
+    "uploading": "Uploading…",
     "tooLarge": "Too large",
     "notUploaded": "Not uploaded",
     "tooLargeDetail": "{size}, over the {limit} limit. Shrink it, or share a link in a comment.",
@@ -346,6 +357,7 @@
       "tooLarge": "Too large · {size}",
       "tooLargeDetail": "{size}, over the {limit} limit",
       "retry": "Retry",
+      "retryUpload": "Retry uploading {name}",
       "linkLabel": "Drive or web link",
       "attach": "Attach",
       "attached": "Link attached",
@@ -404,7 +416,7 @@
       "adding": "Adding…"
     },
     "newClip": {
-      "placeholder": "Clip title, then Enter",
+      "placeholder": "Clip title, then Enter…",
       "added": "Clip added · To Do",
       "label": "New clip title"
     },
@@ -466,7 +478,7 @@
       "editorAfter": "after {name}",
       "editorSets": "shown in Full and {set}",
       "name": "Name",
-      "namePlaceholder": "e.g. Hook",
+      "namePlaceholder": "e.g. Hook…",
       "kind": "Kind",
       "options": "Options",
       "addOption": "+ Option",
@@ -541,6 +553,8 @@
         "task_self": "A task can't link to itself"
       },
       "clear": "Clear",
+      "valueCleared": "{name} cleared",
+      "saving": "Saving…",
       "checked": "Yes",
       "unchecked": "No",
       "combo": {
@@ -645,6 +659,7 @@
       "cancel": "Cancel",
       "clear": "Clear selection",
       "setDue": "Set due date",
+      "saving": "Saving…",
       "done": "{n, plural, one {# clip changed} other {# clips changed}}.",
       "doneSome": "{n, plural, one {# clip changed} other {# clips changed}} · {m} not changed (the board's rules).",
       "undone": "Put back as they were.",
@@ -718,7 +733,11 @@
       "saved": "Pillar saved",
       "insertAbove": "Insert pillar above",
       "insertBelow": "Insert pillar below",
-      "moved": "Pillar moved (this sheet only)."
+      "moved": "Pillar moved (this sheet only).",
+      "removeConfirm": "Remove the pillar {name}? {n, plural, =0 {It has no pieces.} one {Its piece stays in the theme with no pillar.} other {Its # pieces stay in the theme with no pillar.}}",
+      "removeOk": "Remove",
+      "restored": "Pillar back, with its pieces",
+      "restoredSome": "Pillar back. {n, plural, one {# piece} other {# pieces}} couldn’t be put back in it."
     },
     "editor": {
       "title": "Edit {name}",
@@ -731,7 +750,8 @@
       "month": "month",
       "audience": "Target audience",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "saving": "Saving…"
     },
     "audience": {
       "c-level": "C-Level of large companies",
@@ -822,7 +842,12 @@
       "owner": "Owner",
       "links": "Links",
       "problem": "Problem",
-      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link"
+      "warnSection": "Cells that aren’t web addresses · left empty unless you paste a link",
+      "archived": "Archived",
+      "more": "Showing {shown} of {n}. All {n} are added.",
+      "discardAsk": "Close and lose the pasted rows and your fixes?",
+      "keepEditing": "Keep editing",
+      "discard": "Close without adding"
     },
     "problem": {
       "noTitle": "No title",
@@ -870,7 +895,9 @@
       "needs_space": "Choose a Space for the task.",
       "not_allowed_in_space": "You can't create tasks in that Space.",
       "type_not_allowed": "That Space doesn't allow this task type.",
-      "not_linked": "This row has no task."
+      "not_linked": "This row has no task.",
+      "emptyTitle": "A title can’t be empty, so the old one was kept.",
+      "emptyName": "Type a name first."
     },
     "menu": {
       "next": "Next",
@@ -890,6 +917,7 @@
       "cancel": "Cancel",
       "clear": "Clear selection",
       "setDue": "Set date",
+      "saving": "Saving…",
       "noPillar": "No pillar",
       "pillarOff": "Pick pieces from one theme",
       "done": "{n, plural, one {# piece changed} other {# pieces changed}}.",
@@ -1265,10 +1293,81 @@
       "manage": "Change notification settings"
     },
     "replyingTo": "Replying to {name}",
+    "replySending": "Sending…",
+    "replyError": "Couldn’t send your reply. It’s still here — check your connection and try again.",
     "cancel": "Cancel",
     "back": "Back to the board"
   },
   "sheets": {
+    "ux": {
+      "loading": "Loading the sheet…",
+      "retry": "Try again",
+      "save": "Save",
+      "pasting": "Pasting…",
+      "searchMenus": "Search the menus…",
+      "found": "{n, plural, one {# command found} other {# commands found}}",
+      "valuesFor": "{name} values",
+      "leaveRow": "Leave out row {n}",
+      "backRow": "Bring back row {n}",
+      "commentPosted": "Comment posted.",
+      "newComment": "New comment from {name}.",
+      "repeatBad": "Type the rows as $1:$1 or 1:3.",
+      "ok": {
+        "resize": "Resize",
+        "move": "Move",
+        "copy": "Copy",
+        "unhide": "Unhide",
+        "paste": "Paste",
+        "apply": "Apply",
+        "sort": "Sort",
+        "addRule": "Add rule",
+        "saveRule": "Save rule",
+        "go": "Go",
+        "select": "Select",
+        "fill": "Fill",
+        "dedupe": "Remove duplicates",
+        "createTable": "Create table",
+        "insert": "Insert",
+        "filter": "Filter"
+      },
+      "ph": {
+        "search": "Search…",
+        "fields": "Search fields…",
+        "tasks": "Search all tasks…",
+        "optional": "Optional, e.g. 100…",
+        "source": "To do, Doing, Done…",
+        "entries": "One entry per line…",
+        "link": "Paste a link…",
+        "words": "e.g. editing in progress…",
+        "eg": "e.g. {ex}…",
+        "comment": "Add a comment, type @ to mention someone…"
+      },
+      "keys": {
+        "click": "click",
+        "drag": "drag",
+        "wheel": "wheel",
+        "space": "Space"
+      },
+      "hue": {
+        "red": "Red",
+        "orange": "Orange",
+        "yellow": "Yellow",
+        "lime": "Lime",
+        "green": "Green",
+        "teal": "Teal",
+        "blue": "Blue",
+        "purple": "Purple",
+        "pink": "Pink",
+        "brown": "Brown",
+        "grey": "Grey",
+        "black": "Black",
+        "white": "White"
+      },
+      "shade": {
+        "light": "Light {name}",
+        "dark": "Dark {name}"
+      }
+    },
     "nav": "Sheets",
     "pinned": "Pinned folders",
     "new": "New",
@@ -1375,7 +1474,10 @@
       "archiveRowsNote": "Archived pieces leave the board and can be brought back with Show archived or Undo.",
       "archive": "Archive",
       "newClip": "New clip in this video",
-      "newPiece": "New piece in this theme"
+      "newPiece": "New piece in this theme",
+      "deletedRows": "{n, plural, one {Row deleted} other {# rows deleted}}",
+      "deletedCols": "{n, plural, one {Column deleted} other {# columns deleted}}",
+      "cleared": "{n, plural, one {Cell cleared} other {# cells cleared}}"
     },
     "tabs": {
       "label": "Sheets in {folder}",
@@ -1756,6 +1858,10 @@
         "clearFormats": "Clear formats",
         "clearContents": "Clear contents",
         "clearComments": "Clear comments",
+        "clearCommentsTitle": "{n, plural, one {Delete the comment thread on this cell?} other {Delete the comment threads on # cells?}}",
+        "clearCommentsBody": "This can’t be undone.",
+        "clearCommentsOk": "Delete comments",
+        "clearCommentsKeep": "Keep comments",
         "fillDown": "Down",
         "fillRight": "Right",
         "find": "Find…",
@@ -2905,7 +3011,8 @@
       "of": "of {capacity}",
       "empty": "No members yet.",
       "teamTitle": "Team hours",
-      "managerOnly": "Marketing Manager only"
+      "managerOnly": "Marketing Manager only",
+      "noEntry": "No entry"
     },
     "err": {
       "bad_hours": "Hours go from 0 to 24.",
@@ -2917,7 +3024,9 @@
       "not_authorized": "Only the Marketing Manager can see the team's hours.",
       "network": "Not saved: check your connection and try again.",
       "generic": "That didn't work. Try again."
-    }
+    },
+    "loadError": "Today's hours didn't load. Check your connection, then try again.",
+    "retry": "Try again"
   },
   "spaces": {
     "teams": "Spaces",

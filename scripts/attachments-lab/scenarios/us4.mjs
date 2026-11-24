@@ -52,7 +52,7 @@ export const us4 = [
     async run(t) {
       await t.add(lab => [lab.dataUrlToFile(lab.poster(1), 'a.png')])
       await t.page.waitForSelector('[data-att-job]')
-      t.assert((await t.page.textContent('[data-att-job] .fx-att-pill')) === 'جارٍ الرفع', 'Arabic "Uploading"')
+      t.assert((await t.page.textContent('[data-att-job] .fx-att-pill')) === 'جارٍ الرفع…', 'Arabic "Uploading"')
     },
   },
   {
@@ -71,14 +71,14 @@ export const us4 = [
       const job = t.page.locator('[data-att-job-status="too-large"]')
       await job.waitFor()
       const text = await job.textContent()
-      t.assert(text.includes('Too large') && text.includes('210.0 MB') && text.includes('200 MB limit'), text)
+      t.assert(text.includes('Too large') && text.includes('210.0\u00a0MB') && text.includes('200 MB limit'), text)
       t.eq((await t.lab()).uploads.length, 0, 'nothing uploaded')
       await job.getByRole('button', { name: 'Remove' }).click()
       t.eq(await t.page.locator('[data-att-job]').count(), 0, 'Remove clears it')
       await t.open('storage=0')
       await t.add(lab => [lab.sizedFile('Hero.png', 7 * 1024 * 1024, 'image/png')])
       const inline = await t.page.locator('[data-att-job-status="too-large"]').textContent()
-      t.assert(inline.includes('7.0 MB') && inline.includes('about 5 MB'), `pictures are refused, not shrunk: ${inline}`)
+      t.assert(inline.includes('7.0\u00a0MB') && inline.includes('about 5 MB'), `pictures are refused, not shrunk: ${inline}`)
     },
   },
   {

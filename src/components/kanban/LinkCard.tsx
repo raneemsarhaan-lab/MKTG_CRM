@@ -64,10 +64,13 @@ export function LinkCard({ url }: { url: string }) {
       rel="noopener noreferrer nofollow"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      className="fx-focus"
       style={{
         display: 'block', marginTop: 8, border: 'none', borderRadius: 18,
         overflow: 'hidden', textDecoration: 'none', color: 'inherit', background: C.surface,
-        boxShadow: '0 4px 20px rgba(23,36,65,0.04)',
+        // The whole card is the link, so the whole card answers the pointer.
+        boxShadow: hover ? '0 6px 24px rgba(23,36,65,0.10)' : '0 4px 20px rgba(23,36,65,0.04)',
+        transition: 'box-shadow .12s',
       }}
     >
       <span style={{
@@ -85,20 +88,26 @@ export function LinkCard({ url }: { url: string }) {
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{site}</span>
         </span>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.muted}
-             strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+             strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
           <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
           <path d="M12 3v12M8 7l4-4 4 4" />
         </svg>
       </span>
 
       {rich?.image_url && (
+        // Sized at the usual 1200×630 share image so its space is held before
+        // it loads; height:auto lets the real picture's shape take over after.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={rich.image_url}
           alt=""
+          width={1200}
+          height={630}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={e => { e.currentTarget.style.display = 'none' }}
-          style={{ display: 'block', width: '100%', maxHeight: 220, objectFit: 'cover', marginTop: 9 }}
+          style={{ display: 'block', width: '100%', height: 'auto', maxHeight: 220, objectFit: 'cover', marginTop: 9 }}
         />
       )}
 
@@ -132,7 +141,7 @@ export function LinkCard({ url }: { url: string }) {
           background: hover ? C.blueHover : C.blueLight, color: C.blue,
           fontSize: 12.5, fontWeight: 700, transition: 'background .12s',
         }}>
-          Open link →
+          Open link <span aria-hidden="true">→</span>
         </span>
       </span>
     </a>

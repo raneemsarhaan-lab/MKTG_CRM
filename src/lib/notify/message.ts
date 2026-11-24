@@ -55,7 +55,7 @@ export function relativeTime(iso: string, now: Date, locale: 'en' | 'ar'): { key
   const h = Math.floor(min / 60)
   if (h < 24) return { key: 'time.h', values: { n: h } }
   if (h < 48) return { key: 'time.yesterday', values: {} }
-  return { text: new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(iso)) }
+  return { text: new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(iso)) }
 }
 
 /** A comment's text, cut to 100 characters for the notification. */

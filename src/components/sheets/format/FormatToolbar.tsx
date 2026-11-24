@@ -9,7 +9,7 @@
  * stages. On a phone the same controls sit in a bottom sheet (FormatSheet).
  */
 import { rowsCommand } from '@/components/sheets/links/FieldsPanel'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { BorderSide, CellStyle, NumberFormat, RuleKind } from '@/types/index'
 import { CURRENCIES, ICON_SETS } from '@/types/index'
@@ -20,6 +20,7 @@ import { ColorPicker } from './ColorPicker'
 import { BorderPicker } from './BorderPicker'
 import { CellStylesMenu, TableMenu } from './StyleTools'
 import { DEFAULT_BAR, DEFAULT_SCALE, ICONS } from '@/lib/sheet-rules'
+import { useRovingToolbar } from '../a11y'
 
 const P: Record<string, ReactNode> = {
   left: <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />, center: <path d="M4 6h16M7 10h10M4 14h16M7 18h10" />, right: <path d="M4 6h16M10 10h10M4 14h16M10 18h10" />,
@@ -53,7 +54,10 @@ const Icon = ({ k }: { k: string }) => (
 
 export const DEFAULT_LINE: BorderSide = { w: 'thin', c: '#000000' }
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-export const keyName = (k: string) => (isMac() ? k.replace('Ctrl+', '⌘').replace('Alt+', '⌥') : k)
+const never = () => () => {}
+/** A Mac's key names (⌘, ⌥), once on the page: the server and the first render say Ctrl and Alt, so they match. */
+export const useMac = () => useSyncExternalStore(never, isMac, () => false)
+export const keyName = (k: string, mac = false) => (mac ? k.replace('Ctrl+', '⌘').replace('Alt+', '⌥') : k)
 
 /** The number formats in the menu, in Excel's order. */
 export const NUM_MENU: { key: string; num: NumberFormat | null; sample: string }[] = [
@@ -113,7 +117,9 @@ const SIZE_MIN = 6, SIZE_MAX = 96
 type Leaf = Extract<PopItem, { label: string; onSelect(): void }>
 
 /** One tool on the strip; the same entry feeds the ⋮ menu when its group is hidden. */
-interface Tool { key: string; label: string; kbd?: string; inner: ReactNode; run(el: HTMLElement): void; pressed?: boolean; menu?: MenuKey; disabled?: string | null; cls?: string; dbl?(): void; data?: Record<string, string> }
+interface Tool { key: string; label: string; kbd?: string; inner: ReactNode; run(el: HTMLElement): void; pressed?: boolean; menu?: MenuKey; disabled?: string | null; cls?: string; dbl?(): void; data?: Record<string, string>
+  /** What the control shows now (the font's name), read after its label. */
+  value?: string }
 
 export function FormatToolbar({ state, target, onFormatCells, painter, onPainter, onPaste, onPasteSpecial, onFind, onRule, onManageRules, onSortDialog, onUndo, onRedo, canUndo, canRedo, onFileMenu, onBoardMenu, onFields, onTip }: {
   state: FormatState | null
@@ -145,7 +151,10 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const t = useTranslations('sheets.format')
   const tc = useTranslations('sheets.comments')
   const tb = useTranslations('sheets.toolbar2')
+  const tu = useTranslations('sheets.ux')
   const locale = useLocale()
+  const mac = useMac()
+  const kn = (k: string) => keyName(k, mac)
   const a = useFormatActions(target, state)
   const st = a.st
   const [open, setOpenState] = useState<Open>(null)
@@ -205,38 +214,48 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const s3 = (k: string, v?: Record<string, string | number>) => t(`st3.${k}`, v)
   const viewOff = state?.viewOff ?? null
   const cmd = (c: Parameters<typeof sendFormat>[1]) => () => sendFormat(target, c)
-  const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
+  const vItem = (key: string, op: ViewOp, checked?: boolean, first = false): PopItem => ({ key, label: e(key), checked, radio: true, disabled: !!viewOff, why: first ? viewOff ?? undefined : undefined, onSelect: cmd({ kind: 'view', op }) })
   const head = (key: string, text: string): PopItem => ({ kind: 'node', key, node: <div role="presentation" className="fx-st-h">{text}</div> })
   const lock = off ? { disabled: true, why } : {}
   /** Spec 020: Data Validation is a team-sheet tool (the Content and Video sheets keep the board's own choices). */
   const blankOnly = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
   /** Spec 020 stage B: Clean up, tables, Advanced Filter and Group are team-sheet tools too. */
   const cleanOff = target === 'linked' ? { disabled: true, why: tt('blankOnly') } : {}
-  const setSize = (n: number) => { if (!off && n >= SIZE_MIN && n <= SIZE_MAX) a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') }
-  const stepSize = (d: 1 | -1) => setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, size + d)))
+  const setSize = (n: number) => { if (!off && n >= SIZE_MIN && n <= SIZE_MAX && n !== size) a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') }
+  const stepSize = (d: 1 | -1) => { setSizeDraft(null); setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, size + d))) }
+  /** The size box while typing: kept as typed, set on Enter or on leaving the box (one undo step), Esc puts it back. */
+  const [sizeDraft, setSizeDraft] = useState<string | null>(null)
+  const sizeKept = useRef(false)
+  const commitSize = () => {
+    const v = sizeDraft
+    setSizeDraft(null)
+    if (v === null) return
+    const n = Math.round(Number(v.trim()))
+    if (v.trim() && Number.isFinite(n)) setSize(Math.max(SIZE_MIN, Math.min(SIZE_MAX, n)))
+  }
 
   /** Every menu, by key: the strip's ▾ menus, the menu bar's, and their submenus. */
   function menuFor(k: MenuKey): { items: PopItem[]; label: string; attr: string } | null {
     const rows = typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('[data-linked-pane]:not([hidden]) [data-content-sheet]')
     switch (k) {
-      case 'font': return { label: t('ctl.font'), attr: 'data-font-menu', items: FONTS.map(f => ({ key: f.name, label: f.name, checked: font === f.name, onSelect: () => a.patch({ font: f.name === DEFAULT_FONT ? null : f.name }, 'font') })) }
-      case 'size': return { label: t('ctl.size'), attr: 'data-size-menu', items: FONT_SIZES.map(n => ({ key: String(n), label: String(n), checked: size === n, onSelect: () => a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') })) }
-      case 'rotate': return { label: t('ctl.rotate'), attr: 'data-rotate-menu', items: ([['none', null], ['ccw', 45], ['cw', -45], ['vertical', 'vertical'], ['up', 90], ['down', -90]] as const).map(([k, v]) => ({ key: k, label: t(`rotate.${k}`), checked: (st.rot ?? null) === v, onSelect: () => a.patch({ rot: v }, 'rotate') })) }
+      case 'font': return { label: t('ctl.font'), attr: 'data-font-menu', items: FONTS.map(f => ({ key: f.name, label: f.name, checked: font === f.name, radio: true, onSelect: () => a.patch({ font: f.name === DEFAULT_FONT ? null : f.name }, 'font') })) }
+      case 'size': return { label: t('ctl.size'), attr: 'data-size-menu', items: FONT_SIZES.map(n => ({ key: String(n), label: String(n), checked: size === n, radio: true, onSelect: () => a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') })) }
+      case 'rotate': return { label: t('ctl.rotate'), attr: 'data-rotate-menu', items: ([['none', null], ['ccw', 45], ['cw', -45], ['vertical', 'vertical'], ['up', 90], ['down', -90]] as const).map(([k, v]) => ({ key: k, label: t(`rotate.${k}`), checked: (st.rot ?? null) === v, radio: true, onSelect: () => a.patch({ rot: v }, 'rotate') })) }
       case 'merge': return { label: t('ctl.merge'), attr: 'data-merge-menu', items: (['center', 'across', 'cells', 'unmerge'] as MergeMode[]).map(m => ({ key: m, label: t(`merge.${m}`), disabled: !!oneOff || !!mergeOff || (m === 'unmerge' && !state?.merged && !state?.multi), why: m === 'center' ? oneOff ?? mergeOff ?? undefined : undefined, onSelect: () => a.merge(m) })) }
       case 'num': return { label: t('ctl.numberFormat'), attr: 'data-num-menu', items: [
-        ...NUM_MENU.map(n => { const sm = n.sample ? sample(n.num, n.sample) : ''; return { key: n.key, label: sm ? `${t(`num.${n.key}`)} · ${sm}` : t(`num.${n.key}`), checked: nk === n.key, onSelect: () => a.num(n.num) } }),
+        ...NUM_MENU.map(n => { const sm = n.sample ? sample(n.num, n.sample) : ''; return { key: n.key, label: sm ? `${t(`num.${n.key}`)} · ${sm}` : t(`num.${n.key}`), checked: nk === n.key, radio: true, onSelect: () => a.num(n.num) } }),
         { kind: 'sep', key: 's0' },
         { key: 'comma', label: t('ctl.comma'), checked: st.num?.kind === 'number' && st.num.sep !== false, onSelect: () => a.num({ kind: 'number', dp: 2, sep: true }) },
         { kind: 'sep', key: 's' },
-        { key: 'more', label: t('num.more'), kbd: keyName('Ctrl+1'), onSelect: onFormatCells },
+        { key: 'more', label: t('num.more'), kbd: kn('Ctrl+1'), onSelect: onFormatCells },
       ] }
-      case 'cur': return { label: t('ctl.currency'), attr: 'data-cur-menu', items: CURRENCIES.map(c => ({ key: c, label: t(`cur.${c}`), checked: st.num?.cur === c && st.num.kind === 'currency', onSelect: () => a.num({ kind: 'currency', cur: c, dp: st.num?.dp ?? 2 }) })) }
+      case 'cur': return { label: t('ctl.currency'), attr: 'data-cur-menu', items: CURRENCIES.map(c => ({ key: c, label: t(`cur.${c}`), checked: st.num?.cur === c && st.num.kind === 'currency', radio: true, onSelect: () => a.num({ kind: 'currency', cur: c, dp: st.num?.dp ?? 2 }) })) }
       case 'paste': return { label: tb('pasteSpecial'), attr: 'data-paste-menu', items: [
-        { key: 'all', label: e('paste'), kbd: keyName('Ctrl+V'), onSelect: () => onPaste('all') },
+        { key: 'all', label: e('paste'), kbd: kn('Ctrl+V'), onSelect: () => onPaste('all') },
         { key: 'values', label: e('pasteValues'), ...one(true), onSelect: () => onPaste('values') },
         { key: 'formats', label: e('pasteFormats'), ...one(), onSelect: () => onPaste('formats') },
         { kind: 'sep', key: 's' },
-        { key: 'special', label: e('pasteSpecial'), kbd: keyName('Ctrl+Shift+V'), ...one(), onSelect: onPasteSpecial },
+        { key: 'special', label: e('pasteSpecial'), kbd: kn('Ctrl+Shift+V'), ...one(), onSelect: onPasteSpecial },
       ] }
       case 'fmt': return { label: t('ctl.format'), attr: 'data-cells-menu', items: [
         { key: 'rowHeight', label: e('rowHeight'), disabled: !!viewOff, why: viewOff ?? undefined, onSelect: cmd({ kind: 'resize', what: 'row' }) },
@@ -262,14 +281,14 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         const ti = state?.tableInfo ?? null
         const noTable = !ti ? { disabled: true, why: tt('table.none') } : {}
         return { label: tt('table.title'), attr: 'data-table-menu', items: [
-          { key: 'create', label: `${tt('table.create')}…`, kbd: keyName('Ctrl+T'), ...lock, ...one(), ...cleanOff, disabled: !!ti || !!state?.readOnly || !!oneOff || !!state?.cleanOff, onSelect: () => onTip?.('createTable') },
+          { key: 'create', label: `${tt('table.create')}…`, kbd: kn('Ctrl+T'), ...lock, ...one(), ...cleanOff, disabled: !!ti || !!state?.readOnly || !!oneOff || !!state?.cleanOff, onSelect: () => onTip?.('createTable') },
           { key: 'totalRow', label: tt('table.totalRow'), checked: !!ti?.totals, ...lock, ...cleanOff, ...noTable, onSelect: cmd({ kind: 'totalRow', on: !ti?.totals }) },
           { key: 'slicers', label: `${tt('table.slicers')}…`, ...lock, ...cleanOff, ...noTable, onSelect: () => onTip?.('slicers') },
         ] }
       }
       case 'outlineM': return { label: tt('outline.title'), attr: 'data-outline-menu', items: [
-        { key: 'group', label: tt('outline.group'), kbd: keyName('Shift+Alt+→'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'group' }) },
-        { key: 'ungroup', label: tt('outline.ungroup'), kbd: keyName('Shift+Alt+←'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'ungroup' }) },
+        { key: 'group', label: tt('outline.group'), kbd: kn('Shift+Alt+→'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'group' }) },
+        { key: 'ungroup', label: tt('outline.ungroup'), kbd: kn('Shift+Alt+←'), ...lock, ...one(), ...cleanOff, onSelect: cmd({ kind: 'outline', op: 'ungroup' }) },
       ] }
       case 'icons': return { label: tt('icons.title'), attr: 'data-icons-menu', items: ICON_SETS.map(set => ({
         key: set, label: `${ICONS[set].map(x => x.glyph).join(' ')}  ${tt(`icons.${set}.name`)}`, ...one(),
@@ -279,12 +298,12 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         key: w, label: e(`clear${w[0].toUpperCase()}${w.slice(1)}`), ...(w === 'contents' ? { kbd: 'Delete' } : {}), onSelect: cmd({ kind: 'clear', what: w }),
       })) }
       case 'fillDn': return { label: t('ctl.fillDown'), attr: 'data-fill-menu', items: [
-        { key: 'down', label: e('fillDown'), kbd: keyName('Ctrl+D'), ...one(true), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
-        { key: 'right', label: e('fillRight'), kbd: keyName('Ctrl+R'), ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
+        { key: 'down', label: e('fillDown'), kbd: kn('Ctrl+D'), ...one(true), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
+        { key: 'right', label: e('fillRight'), kbd: kn('Ctrl+R'), ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
       ] }
       case 'find': return { label: t('ctl.find'), attr: 'data-find-menu', items: [
-        { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
-        { key: 'replace', label: e('replace'), kbd: keyName('Ctrl+H'), onSelect: () => onFind(true) },
+        { key: 'find', label: e('find'), kbd: kn('Ctrl+F'), onSelect: () => onFind(false) },
+        { key: 'replace', label: e('replace'), kbd: kn('Ctrl+H'), onSelect: () => onFind(true) },
       ] }
       case 'freeze': {
         const fz = state?.frozen ?? { rows: 0, cols: 0 }
@@ -316,50 +335,50 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
           { key: 'za', label: s3('sortZA'), ...one(), onSelect: cmd({ kind: 'sort', keys: [{ col, dir: 'desc' }], header: null }) },
           { key: 'custom', label: `${s3('customSort')}…`, ...one(), onSelect: onSortDialog },
           { kind: 'sep', key: 's' },
-          { key: 'filter', label: s3('filter'), kbd: keyName('Ctrl+Shift+L'), checked: fl.on, ...(fl.on ? {} : one()), onSelect: cmd({ kind: 'filter', op: 'toggle' }) },
+          { key: 'filter', label: s3('filter'), kbd: kn('Ctrl+Shift+L'), checked: fl.on, ...(fl.on ? {} : one()), onSelect: cmd({ kind: 'filter', op: 'toggle' }) },
           { key: 'clearFilter', label: s3('clearFilter'), disabled: !fl.cols, onSelect: cmd({ kind: 'filter', op: 'clear' }) },
         ] }
       }
       // ── spec 018 ──
       case 'align': return { label: tb('tips.align'), attr: 'data-align-menu', items: [
-        ...(['left', 'center', 'right'] as const).map(h => ({ key: h, label: t(`ctl.align${h[0].toUpperCase()}${h.slice(1)}`), checked: (st.ha ?? null) === h, ...lock, onSelect: () => a.align(h) })),
+        ...(['left', 'center', 'right'] as const).map(h => ({ key: h, label: t(`ctl.align${h[0].toUpperCase()}${h.slice(1)}`), checked: (st.ha ?? null) === h, radio: true, ...lock, onSelect: () => a.align(h) })),
         // Spec 020 tip 26: Center Across Selection (team sheets: the text spans the empty cells after it, no merge).
-        { key: 'across', label: t('fc.h.across'), checked: st.ha === 'across', ...lock, onSelect: () => a.patch({ ha: st.ha === 'across' ? null : 'across' }, 'align') },
+        { key: 'across', label: t('fc.h.across'), checked: st.ha === 'across', radio: true, ...lock, onSelect: () => a.patch({ ha: st.ha === 'across' ? null : 'across' }, 'align') },
         { kind: 'sep', key: 's' },
         { key: 'indent', label: tb('indent'), ...lock, onSelect: () => a.indent(1) },
         { key: 'outdent', label: tb('outdent'), ...lock, onSelect: () => a.indent(-1) },
       ] }
-      case 'valign': return { label: tb('tips.valign'), attr: 'data-valign-menu', items: (['top', 'middle', 'bottom'] as const).map(v => ({ key: v, label: t(`ctl.align${v[0].toUpperCase()}${v.slice(1)}`), checked: (st.va ?? 'bottom') === v, ...lock, onSelect: () => a.valign(v) })) }
+      case 'valign': return { label: tb('tips.valign'), attr: 'data-valign-menu', items: (['top', 'middle', 'bottom'] as const).map(v => ({ key: v, label: t(`ctl.align${v[0].toUpperCase()}${v.slice(1)}`), checked: (st.va ?? 'bottom') === v, radio: true, ...lock, onSelect: () => a.valign(v) })) }
       case 'wrapM': return { label: tb('tips.wrapping'), attr: 'data-wrap-menu', items: [
-        { key: 'wrap', label: tb('wrap'), checked: !!st.wrap, ...lock, onSelect: () => { if (!st.wrap) a.toggle('wrap') } },
-        { key: 'clip', label: tb('clip'), checked: !st.wrap, ...lock, onSelect: () => { if (st.wrap) a.toggle('wrap') } },
+        { key: 'wrap', label: tb('wrap'), checked: !!st.wrap, radio: true, ...lock, onSelect: () => { if (!st.wrap) a.toggle('wrap') } },
+        { key: 'clip', label: tb('clip'), checked: !st.wrap, radio: true, ...lock, onSelect: () => { if (st.wrap) a.toggle('wrap') } },
       ] }
       case 'text': return { label: tb('text'), attr: 'data-text-menu', items: [
-        { key: 'b', label: t('ctl.bold'), kbd: keyName('Ctrl+B'), checked: !!st.b, ...lock, onSelect: () => a.toggle('b') },
-        { key: 'i', label: t('ctl.italic'), kbd: keyName('Ctrl+I'), checked: !!st.i, ...lock, onSelect: () => a.toggle('i') },
-        { key: 'u', label: t('ctl.underline'), kbd: keyName('Ctrl+U'), checked: !!st.u && st.u !== 'none', ...lock, onSelect: () => a.underline() },
-        { key: 's', label: t('ctl.strike'), kbd: keyName('Ctrl+5'), checked: !!st.s, ...lock, onSelect: () => a.toggle('s') },
+        { key: 'b', label: t('ctl.bold'), kbd: kn('Ctrl+B'), checked: !!st.b, ...lock, onSelect: () => a.toggle('b') },
+        { key: 'i', label: t('ctl.italic'), kbd: kn('Ctrl+I'), checked: !!st.i, ...lock, onSelect: () => a.toggle('i') },
+        { key: 'u', label: t('ctl.underline'), kbd: kn('Ctrl+U'), checked: !!st.u && st.u !== 'none', ...lock, onSelect: () => a.underline() },
+        { key: 's', label: t('ctl.strike'), kbd: kn('Ctrl+5'), checked: !!st.s, ...lock, onSelect: () => a.toggle('s') },
       ] }
-      case 'more': return { label: tb('tips.more'), attr: 'data-more-menu', items: hiddenTools().map(x => ({ key: x.key, label: x.label, kbd: x.kbd ? keyName(x.kbd) : undefined, checked: x.pressed, disabled: x.disabled != null, why: x.disabled || undefined, onSelect: () => x.run(open?.el ?? document.body) })) }
+      case 'more': return { label: tb('tips.more'), attr: 'data-more-menu', items: hiddenTools().map(x => ({ key: x.key, label: x.label, kbd: x.kbd ? kn(x.kbd) : undefined, checked: x.pressed, disabled: x.disabled != null, why: x.disabled || undefined, onSelect: () => x.run(open?.el ?? document.body) })) }
       case 'mb-edit': return { label: tb('menu.edit'), attr: 'data-mb-edit', items: [
-        { key: 'undo', label: tb('undo'), kbd: keyName('Ctrl+Z'), disabled: !canUndo, onSelect: onUndo },
-        { key: 'redo', label: tb('redo'), kbd: keyName('Ctrl+Y'), disabled: !canRedo, onSelect: onRedo },
+        { key: 'undo', label: tb('undo'), kbd: kn('Ctrl+Z'), disabled: !canUndo, onSelect: onUndo },
+        { key: 'redo', label: tb('redo'), kbd: kn('Ctrl+Y'), disabled: !canRedo, onSelect: onRedo },
         { kind: 'sep', key: 's1' },
-        { key: 'cut', label: tb('cut'), kbd: keyName('Ctrl+X'), ...lock, onSelect: () => clip('cut') },
-        { key: 'copy', label: tb('copy'), kbd: keyName('Ctrl+C'), onSelect: () => clip('copy') },
-        { key: 'paste', label: tb('paste'), kbd: keyName('Ctrl+V'), ...lock, onSelect: () => onPaste('all') },
+        { key: 'cut', label: tb('cut'), kbd: kn('Ctrl+X'), ...lock, onSelect: () => clip('cut') },
+        { key: 'copy', label: tb('copy'), kbd: kn('Ctrl+C'), onSelect: () => clip('copy') },
+        { key: 'paste', label: tb('paste'), kbd: kn('Ctrl+V'), ...lock, onSelect: () => onPaste('all') },
         sub('pasteSpecial', tb('pasteSpecial'), 'paste', lock),
         { kind: 'sep', key: 's2' },
-        { key: 'fillDown', label: e('fillDown'), kbd: keyName('Ctrl+D'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
-        { key: 'fillRight', label: e('fillRight'), kbd: keyName('Ctrl+R'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
+        { key: 'fillDown', label: e('fillDown'), kbd: kn('Ctrl+D'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'down' }) },
+        { key: 'fillRight', label: e('fillRight'), kbd: kn('Ctrl+R'), ...lock, ...one(), onSelect: cmd({ kind: 'fill', dir: 'right' }) },
         // Spec 020: Series…, Flash Fill, Repeat.
         { key: 'series', label: `${tt('series.title')}…`, ...lock, ...one(), onSelect: () => onTip?.('series') },
-        { key: 'flashFill', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'flashFill', label: tt('fill.flash'), kbd: kn('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
         { key: 'repeat', label: tt('repeat'), kbd: 'F4', ...lock, onSelect: cmd({ kind: 'repeat' }) },
         { kind: 'sep', key: 's3' },
-        { key: 'find', label: e('find'), kbd: keyName('Ctrl+F'), onSelect: () => onFind(false) },
-        { key: 'replace', label: e('replace'), kbd: keyName('Ctrl+H'), onSelect: () => onFind(true) },
-        { key: 'goto', label: `${tt('goto.title')}…`, kbd: keyName('Ctrl+G'), onSelect: () => onTip?.('goto') },
+        { key: 'find', label: e('find'), kbd: kn('Ctrl+F'), onSelect: () => onFind(false) },
+        { key: 'replace', label: e('replace'), kbd: kn('Ctrl+H'), onSelect: () => onFind(true) },
+        { key: 'goto', label: `${tt('goto.title')}…`, kbd: kn('Ctrl+G'), onSelect: () => onTip?.('goto') },
         { key: 'gotoSpecial', label: `${tt('gs.title')}…`, onSelect: () => onTip?.('gotoSpecial') },
         sub('clear', tb('clear'), 'clear', lock),
       ] }
@@ -368,12 +387,12 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { kind: 'sep', key: 's1' },
         ...(menuFor('fmt')?.items ?? []),
         { kind: 'sep', key: 's2' },
-        { key: 'collapse', label: tt('collapse'), kbd: keyName('Ctrl+F1'), checked: collapsed, onSelect: () => toggleCollapsed() },
+        { key: 'collapse', label: tt('collapse'), kbd: kn('Ctrl+F1'), checked: collapsed, onSelect: () => toggleCollapsed() },
       ] }
       case 'mb-insert': return { label: tb('menu.insert'), attr: 'data-mb-insert', items: [
         ...(['rowAbove', 'rowBelow', 'colLeft', 'colRight'] as const).map(w => ({ key: w, label: tb(w), ...lock, ...one(), onSelect: cmd({ kind: 'insert', what: w }) })),
         { kind: 'sep', key: 's1' },
-        { key: 'comment', label: tb('comment'), kbd: keyName('Ctrl+Alt+M'), disabled: !state, onSelect: () => a.comment() },
+        { key: 'comment', label: tb('comment'), kbd: kn('Ctrl+Alt+M'), disabled: !state, onSelect: () => a.comment() },
       ] }
       case 'mb-format': return { label: tb('menu.format'), attr: 'data-mb-format', items: [
         sub('number', tb('number'), 'num', lock), sub('text', tb('text'), 'text', lock), sub('alignment', tb('alignment'), 'align', lock),
@@ -385,7 +404,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         { key: 'table', label: tb('formatAsTable'), ...(oneOff && !state?.table ? { disabled: true, why: oneOff } : {}), onSelect: () => openSub('table') },
         sub('cond', tb('conditional'), 'cond'),
         { kind: 'sep', key: 's2' },
-        { key: 'fmtCells', label: tb('formatCells'), kbd: keyName('Ctrl+1'), ...lock, onSelect: onFormatCells },
+        { key: 'fmtCells', label: tb('formatCells'), kbd: kn('Ctrl+1'), ...lock, onSelect: onFormatCells },
         { key: 'clearFormatting', label: tb('clearFormatting'), ...lock, onSelect: cmd({ kind: 'clear', what: 'formats' }) },
       ] }
       case 'mb-data': return { label: tb('menu.data'), attr: 'data-mb-data', items: [
@@ -393,8 +412,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         // Spec 020: Data Validation, Pick From Drop-down List, Flash Fill, Custom Lists.
         { kind: 'sep', key: 'sv' },
         { key: 'validation', label: `${tt('dv.title')}…`, ...lock, ...one(), ...(blankOnly), onSelect: () => onTip?.('validation') },
-        { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: isMac() ? '⌥↓' : 'Alt+↓', ...lock, onSelect: cmd({ kind: 'pickList' }) },
-        { key: 'flashFillD', label: tt('fill.flash'), kbd: keyName('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
+        { key: 'pickList', label: `${tt('pickFrom')}…`, kbd: mac ? '⌥↓' : 'Alt+↓', ...lock, onSelect: cmd({ kind: 'pickList' }) },
+        { key: 'flashFillD', label: tt('fill.flash'), kbd: kn('Ctrl+E'), ...lock, onSelect: cmd({ kind: 'flashFill' }) },
         { key: 'lists', label: `${tt('lists.title')}…`, onSelect: () => onTip?.('lists') },
         // Spec 020 stage B: Clean up, Advanced Filter, Table, Group.
         { kind: 'sep', key: 'sc' },
@@ -412,8 +431,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
       ] }
       case 'mb-help': return { label: tb('menu.help'), attr: 'data-mb-help', items: [
-        { key: 'shortcuts', label: tb('shortcuts'), kbd: keyName('Ctrl+/'), onSelect: () => setHelp(true) },
-        { key: 'search', label: tb('searchMenus'), kbd: isMac() ? '⌥/' : 'Alt+/', onSelect: () => setSearch('') },
+        { key: 'shortcuts', label: tb('shortcuts'), kbd: kn('Ctrl+/'), onSelect: () => setHelp(true) },
+        { key: 'search', label: tb('searchMenus'), kbd: mac ? '⌥/' : 'Alt+/', onSelect: () => setSearch('') },
       ] }
     }
     return null
@@ -437,7 +456,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       { key: 'num', label: tb('tips.num'), inner: <span className="fx-fmt-123">123</span>, run: el => toggleOpen('num', el), menu: 'num' },
     ],
     font: [
-      { key: 'font', label: t('ctl.font'), inner: <span className="fx-fmt-sel is-font" style={{ fontFamily: FONTS.find(f => f.name === font)?.stack }}>{font}</span>, run: el => toggleOpen('font', el), menu: 'font', cls: 'is-sel' },
+      { key: 'font', label: t('ctl.font'), value: font, inner: <span className="fx-fmt-sel is-font" style={{ fontFamily: FONTS.find(f => f.name === font)?.stack }}>{font}</span>, run: el => toggleOpen('font', el), menu: 'font', cls: 'is-sel' },
     ],
     size: [
       { key: 'sizeDn', label: tb('tips.sizeDown'), inner: <span aria-hidden="true">−</span>, run: () => stepSize(-1) },
@@ -473,6 +492,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
   const groupRefs = useRef(new Map<string, HTMLElement>())
   const widths = useRef(new Map<string, number>())
   const [hidden, setHidden] = useState<string[]>([])
+  // One Tab stop for the strip; ←/→ between its tools (FR-002, UI review).
+  useRovingToolbar(stripRef)
   const hiddenTools = () => GROUPS.filter(g => hidden.includes(g.id)).flatMap(g => groups[g.id])
   useLayoutEffect(() => {
     const strip = stripRef.current
@@ -535,7 +556,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
 
   const btn = (x: Tool) => {
     const disabled = x.disabled !== undefined ? x.disabled : (off && !always.has(x.key) ? why ?? '' : null)
-    const tip = `${x.label}${x.kbd ? ` (${keyName(x.kbd)})` : ''}${disabled ? ` · ${disabled}` : ''}`
+    const tip = `${x.label}${x.kbd ? ` (${kn(x.kbd)})` : ''}${disabled ? ` · ${disabled}` : ''}`
     return (
       <button type="button" key={x.key} className={`fx-fmt-b${x.cls ? ` ${x.cls}` : ''}`} data-fmt={x.key} title={tip}
               {...(x.data ?? {})}
@@ -545,7 +566,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
               aria-expanded={x.menu ? open?.k === x.menu : undefined}
               onClick={ev => { if (disabled !== null) return; x.run(ev.currentTarget) }}
               onDoubleClick={x.dbl ? () => { if (disabled === null) x.dbl?.() } : undefined}>
-        {x.inner}<span className="sr-only">{x.label}</span>{x.menu && <span className="fx-fmt-car" aria-hidden="true">▾</span>}
+        {/* The picture is for the eye ("B", "123"); the name is read once, from the hidden label. */}
+        <span className="fx-fmt-in" aria-hidden="true">{x.inner}</span><span className="sr-only">{x.value ? `${x.label}: ${x.value}` : x.label}</span>{x.menu && <span className="fx-fmt-car" aria-hidden="true">▾</span>}
       </button>
     )
   }
@@ -625,9 +647,16 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
               ? <>
                   {btn(groups.size[0])}
                   <input className="fx-fmt-size" data-fmt="size" aria-label={tb('tips.size')} title={tb('tips.size')} inputMode="numeric"
-                         disabled={off} value={String(size)}
-                         onChange={ev => { const n = Number(ev.target.value); if (Number.isFinite(n)) setSize(Math.round(n)) }}
-                         onKeyDown={ev => { if (ev.key === 'Enter') { ev.preventDefault(); focusGrid() } if (ev.key === 'ArrowUp') { ev.preventDefault(); stepSize(1) } if (ev.key === 'ArrowDown') { ev.preventDefault(); stepSize(-1) } }} />
+                         name="font-size" autoComplete="off" spellCheck={false}
+                         disabled={off} value={sizeDraft ?? String(size)}
+                         onChange={ev => { sizeKept.current = false; setSizeDraft(ev.target.value) }}
+                         onBlur={() => { if (sizeKept.current) { sizeKept.current = false; return } commitSize() }}
+                         onKeyDown={ev => {
+                           if (ev.key === 'Enter') { ev.preventDefault(); commitSize(); sizeKept.current = true; focusGrid() }
+                           else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); setSizeDraft(null); sizeKept.current = true; focusGrid() }
+                           else if (ev.key === 'ArrowUp') { ev.preventDefault(); stepSize(1) }
+                           else if (ev.key === 'ArrowDown') { ev.preventDefault(); stepSize(-1) }
+                         }} />
                   {btn(groups.size[1])}
                 </>
               : groups[g.id].map(btn)}
@@ -642,7 +671,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         )}
       </div>
       <div className="fx-fbar" data-cell-row="">
-        <input className="fx-namebox" data-namebox="" aria-label={tb('nameBox')} title={tb('nameBox')} dir="ltr"
+        <input className="fx-namebox" data-namebox="" aria-label={tb('nameBox')} title={tb('nameBox')} dir="ltr" name="name-box" autoComplete="off" spellCheck={false} translate="no"
                readOnly={!state?.canGoto} value={nameDraft ?? nameShown}
                onFocus={ev => { setNameDraft(nameShown); ev.currentTarget.select(); nameFresh.current = true }}
                onMouseUp={ev => { if (nameFresh.current) { ev.preventDefault(); nameFresh.current = false } }}
@@ -653,7 +682,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
                  if (ev.key === 'Escape') { ev.preventDefault(); setNameDraft(null); focusGrid() }
                }} />
         <span className="fx-fx" aria-hidden="true">fx</span>
-        <input className="fx-cellbar" data-cellbar="" aria-label={tb('cellBar')} dir="auto"
+        <input className="fx-cellbar" data-cellbar="" aria-label={tb('cellBar')} dir="auto" name="cell-value" autoComplete="off"
                readOnly={off} title={off ? why ?? tb('cellBarRo') : undefined}
                value={cellDraft ?? state?.value ?? ''}
                onFocus={() => setCellDraft(state?.value ?? '')}
@@ -678,7 +707,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
       )}
       {search !== null && (
         <div className="fx-mb-search" role="dialog" aria-label={tb('searchMenus')} data-menu-search="">
-          <input autoFocus value={search} placeholder={tb('searchPlaceholder')} aria-label={tb('searchMenus')}
+          <input autoFocus value={search} placeholder={tu('searchMenus')} aria-label={tb('searchMenus')} title={tb('searchPlaceholder')}
+                 name="menu-search" autoComplete="off" spellCheck={false}
                  onChange={ev => setSearch(ev.target.value)}
                  onKeyDown={ev => {
                    if (ev.key === 'Escape') { ev.preventDefault(); setSearch(null); focusGrid() }
@@ -708,6 +738,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
                 })}
               </ul>
             : <p className="fx-mb-none">{tb('noMatch', { q: search ?? '' })}</p>)}
+          {/* Read out as the results change: how many, or that nothing matches. */}
+          <p className="sr-only" role="status">{!q ? '' : found.length ? tu('found', { n: found.length }) : tb('noMatch', { q: search ?? '' })}</p>
         </div>
       )}
       {help && <ShortcutsDialog onClose={() => { setHelp(false); focusGrid() }} />}
@@ -718,17 +750,20 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
 /** Help › Keyboard shortcuts (US2). */
 function ShortcutsDialog({ onClose }: { onClose(): void }) {
   const tb = useTranslations('sheets.toolbar2')
-  const k = (s: string) => keyName(s)
+  const tu = useTranslations('sheets.ux')
+  const mac = useMac()
+  const k = (s: string) => keyName(s, mac)
+  const w = (x: 'click' | 'drag' | 'wheel' | 'space') => tu(`keys.${x}`)
   const rows: [string, string][] = [
     ['copy', `${k('Ctrl+C')} · ${k('Ctrl+X')} · ${k('Ctrl+V')}`], ['undo', `${k('Ctrl+Z')} · ${k('Ctrl+Y')}`], ['selectAll', k('Ctrl+A')],
-    ['addArea', `${k('Ctrl+')}click · ${k('Ctrl+')}drag`], ['addMode', 'Shift+F8'], ['fillAll', k('Ctrl+Enter')], ['edit', 'F2 · Enter'], ['lineBreak', k('Alt+Enter')],
+    ['addArea', `${k('Ctrl+')}${w('click')} · ${k('Ctrl+')}${w('drag')}`], ['addMode', 'Shift+F8'], ['fillAll', k('Ctrl+Enter')], ['edit', 'F2 · Enter'], ['lineBreak', k('Alt+Enter')],
     ['bold', `${k('Ctrl+B')} · ${k('Ctrl+I')} · ${k('Ctrl+U')}`], ['strike', k('Ctrl+5')], ['formatCells', k('Ctrl+1')], ['currency', `${k('Ctrl+Shift+$')} · ${k('Ctrl+Shift+%')}`],
     ['pasteSpecial', k('Ctrl+Shift+V')], ['fill', `${k('Ctrl+D')} · ${k('Ctrl+R')}`], ['find', `${k('Ctrl+F')} · ${k('Ctrl+H')}`], ['filter', k('Ctrl+Shift+L')],
-    ['comment', k('Ctrl+Alt+M')], ['sheets', `${k('Ctrl+')}PgUp · ${k('Ctrl+')}PgDn`], ['newSheet', 'Shift+F11'], ['menus', isMac() ? '⌥/' : 'Alt+/'],
+    ['comment', k('Ctrl+Alt+M')], ['sheets', `${k('Ctrl+')}PgUp · ${k('Ctrl+')}PgDn`], ['newSheet', 'Shift+F11'], ['menus', mac ? '⌥/' : 'Alt+/'],
     // Spec 020.
-    ['selectRowCol', `Shift+Space · ${k('Ctrl+')}Space`], ['goto', `F5 · ${k('Ctrl+G')}`], ['repeat', `F4 · ${k('Ctrl+Y')}`], ['now', `${k('Ctrl+;')} · ${k('Ctrl+Shift+;')}`],
-    ['flash', k('Ctrl+E')], ['pick', isMac() ? '⌥↓' : 'Alt+↓'], ['zoom', `${k('Ctrl+')}wheel · ${k('Ctrl+=')} · ${k('Ctrl+−')} · ${k('Ctrl+0')}`],
-    ['collapse', k('Ctrl+F1')], ['keytips', isMac() ? '⌥' : 'Alt'],
+    ['selectRowCol', `Shift+${w('space')} · ${k('Ctrl+')}${w('space')}`], ['goto', `F5 · ${k('Ctrl+G')}`], ['repeat', `F4 · ${k('Ctrl+Y')}`], ['now', `${k('Ctrl+;')} · ${k('Ctrl+Shift+;')}`],
+    ['flash', k('Ctrl+E')], ['pick', mac ? '⌥↓' : 'Alt+↓'], ['zoom', `${k('Ctrl+')}${w('wheel')} · ${k('Ctrl+=')} · ${k('Ctrl+−')} · ${k('Ctrl+0')}`],
+    ['collapse', k('Ctrl+F1')], ['keytips', mac ? '⌥' : 'Alt'],
   ]
   const ref = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)

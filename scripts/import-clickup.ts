@@ -4,7 +4,8 @@
  * Reads data/clickup-export.csv and upserts every row as a Fluxo task, keyed
  * on the ClickUp task ID in `external_id`. Safe to run repeatedly: a second run
  * updates the same rows rather than creating duplicates, so it can live in the
- * startup path alongside the seed.
+ * startup path alongside the seed. A task deleted in the app is tombstoned
+ * (see bulkDeleteTasks) and skipped here rather than recreated.
  *
  * Mapping decisions were agreed with the owner:
  *
@@ -98,7 +99,8 @@ export const BRAND_PATTERNS: [RegExp, string][] = [
 ]
 
 /** ClickUp priority: 1 urgent, 2 high, 3 normal, 4 low. */
-const PRIORITY: Record<string, string> = { '1': 'High', '2': 'High', '3': 'Medium', '4': 'Low' }
+// 'Normal' is what the app calls ClickUp's normal priority (it was 'Medium' before the priorities release).
+const PRIORITY: Record<string, string> = { '1': 'High', '2': 'High', '3': 'Normal', '4': 'Low' }
 
 /** ClickUp's Attachments column is a JSON array of { title, url }. */
 export function parseAttachments(raw: string): { title: string; url: string }[] {
@@ -386,15 +388,20 @@ async function main() {
   const csvNames = new Set<string>()
   for (const r of rows) parseAssignees(r['Assignees']).forEach(n => csvNames.add(n))
 
-  // People an admin removed in the app. Both keys are needed: this loop finds
-  // people by display name and creates them by email, and either one may be
-  // the thing that matches.
-  const memberTombs = await prisma.tombstone.findMany({
-    where: { kind: { in: ['member', 'member-name'] } },
+  // People and tasks an admin removed in the app. Both member keys are
+  // needed: this loop finds people by display name and creates them by
+  // email, and either one may be the thing that matches. Tasks are keyed on
+  // the export's own id (external_id) — see bulkDeleteTasks, which records
+  // the tombstone at delete time for exactly this reason: this importer runs
+  // on every container start, and without it a deleted task would be back on
+  // the next deploy.
+  const tombs = await prisma.tombstone.findMany({
+    where: { kind: { in: ['member', 'member-name', 'task'] } },
     select: { kind: true, key: true },
   })
-  const deadEmails = new Set(memberTombs.filter(t => t.kind === 'member').map(t => t.key))
-  const deadNames  = new Set(memberTombs.filter(t => t.kind === 'member-name').map(t => t.key))
+  const deadEmails = new Set(tombs.filter(t => t.kind === 'member').map(t => t.key))
+  const deadNames  = new Set(tombs.filter(t => t.kind === 'member-name').map(t => t.key))
+  const deadTasks  = new Set(tombs.filter(t => t.kind === 'task').map(t => t.key))
 
   for (const name of csvNames) {
     if (memberByName.has(name.toLowerCase())) continue
@@ -430,13 +437,15 @@ async function main() {
     console.log(`  + member: ${name}`)
   }
 
-  let created = 0, updated = 0, skipped = 0, attached = 0, repaired = 0
+  let created = 0, updated = 0, skipped = 0, attached = 0, repaired = 0, removedInApp = 0
   const unmapped = new Set<string>()
 
   for (const r of rows) {
     const externalId = r['Task ID']?.trim()
     const name       = r['Task Name']?.trim()
     if (!externalId || !name) { skipped++; continue }
+
+    if (deadTasks.has(externalId)) { removedInApp++; continue }
 
     const stage = STATUS_TO_STAGE[r['Status']?.trim().toLowerCase()]
     if (!stage) { unmapped.add(r['Status']); skipped++; continue }
@@ -478,7 +487,7 @@ async function main() {
       stage_date:     stageDate,
       due_date:       dueDate,
       hours_estimate: 0,
-      priority:       PRIORITY[r['Priority']?.trim()] ?? 'Medium',
+      priority:       PRIORITY[r['Priority']?.trim()] ?? 'Normal',
       created_by:     admin.id,
     }
 
@@ -554,7 +563,7 @@ async function main() {
     }
   }
 
-  console.log(`✅ Import complete — ${created} created, ${updated} updated (${repaired} briefs repaired), ${skipped} skipped, ${attached} attachments written.`)
+  console.log(`✅ Import complete — ${created} created, ${updated} updated (${repaired} briefs repaired), ${skipped} skipped, ${removedInApp} removed in the app, ${attached} attachments written.`)
   if (unmapped.size) console.log(`   Unmapped statuses: ${[...unmapped].join(', ')}`)
 }
 

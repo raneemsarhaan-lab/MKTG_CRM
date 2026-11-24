@@ -217,9 +217,13 @@ export async function deleteRow(id: string, opts: { task?: 'unlink' | 'delete'; 
   const linked = [row, ...(opts.children === 'delete' ? kids : [])].filter(r => r.task_id)
   if (linked.length && !opts.task) return { success: false, error: 'needs_task_choice' }
   const taskIds = linked.map(r => r.task_id!)
+  // Deleted tasks that came from the ClickUp import are tombstoned, as in bulkDeleteTasks: the importer
+  // runs at every start and would otherwise bring them back.
+  let imported: { key: string; label: string }[] = []
   if (opts.task === 'delete' && taskIds.length) {
     const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } } })
     for (const t of tasks) if (!canActOn(await withAssignees(t), m)) return { success: false, error: 'not_authorized' }
+    imported = tasks.filter(t => t.external_id).map(t => ({ key: t.external_id as string, label: t.name }))
   }
   await prisma.$transaction(async tx => {
     if (opts.children === 'up' && kids.length) {
@@ -237,7 +241,10 @@ export async function deleteRow(id: string, opts: { task?: 'unlink' | 'delete'; 
     }
     await tx.contentRow.delete({ where: { id } })
     if (taskIds.length) {
-      if (opts.task === 'delete') await tx.task.deleteMany({ where: { id: { in: taskIds } } })
+      if (opts.task === 'delete') {
+        await tx.task.deleteMany({ where: { id: { in: taskIds } } })
+        if (imported.length) await tx.tombstone.createMany({ data: imported.map(t => ({ kind: 'task', ...t })), skipDuplicates: true })
+      }
       // Unlinked: the sheet doesn't give it a row again; it keeps its theme and stays in its Spaces.
       else await tx.task.updateMany({ where: { id: { in: taskIds } }, data: { sheet_row_off: true, updated_at: new Date() } })
     }

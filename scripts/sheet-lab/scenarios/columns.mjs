@@ -362,6 +362,22 @@ export const columns = [
       t.eq([rec.sheet, rec.shownIn.sort()], ['video', ['full', 'sheet']], 'a new Video column shows in Full and the sheet set (FR-034)')
     },
   },
+  {
+    // UI review: Delete on a team cell no one types into goes on the undo stack (it used to be final).
+    id: 'vcol-delete-undo', hash: 'cols=1',
+    async run(t) {
+      t.eq(await valueOf(t, 'music', 'c09'), '1', 'checked to start with')
+      // A click would toggle it: arrive from the cell before.
+      await t.focusCell('c:c09', 'length')
+      await t.page.keyboard.press('ArrowRight')
+      await t.page.keyboard.press('Delete')
+      await t.idle(200)
+      t.eq(await valueOf(t, 'music', 'c09'), undefined, 'Delete clears it')
+      await t.page.keyboard.press('Control+z')
+      await t.idle(300)
+      t.eq(await valueOf(t, 'music', 'c09'), '1', 'Ctrl+Z puts it back')
+    },
+  },
   // ── Polish ───────────────────────────────────────────────────────────────
   {
     id: 'cols-kbd', hash: C,

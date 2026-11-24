@@ -39,11 +39,11 @@ export function ConfirmLeave({ reason, onStay, onLeave }: {
         {t(reason === 'unsaved' ? 'unsaved' : 'uploadingLeave')}
       </b>
       <span style={{ flex: 1 }} />
-      <button ref={stayRef} type="button" onClick={onStay}
+      <button ref={stayRef} type="button" className="fx-hov" onClick={onStay}
               style={{ height: 30, padding: '0 14px', border: 'none', borderRadius: 8, background: BRIEF_UI.blue, color: COLORS.panel, fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
         {t('stay')}
       </button>
-      <button type="button" onClick={onLeave}
+      <button type="button" className="fx-hov-tint" onClick={onLeave}
               style={{ height: 30, padding: '0 12px', border: 'none', borderRadius: 8, background: 'transparent', color: BRIEF_UI.ink, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>
         {t('leaveAnyway')}
       </button>

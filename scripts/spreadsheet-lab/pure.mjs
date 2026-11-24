@@ -193,7 +193,9 @@ export async function runPure(lab, root) {
     eq(en('31/02/2026', { kind: 'date' }), '31/02/2026', 'an impossible date shows as typed')
     eq(en('12500', { kind: 'text' }), '12500', 'Text format')
     eq(en('١٢٥٠٠', { kind: 'number', dp: 0 }), '12,500', 'Arabic digits are read')
-    eq(ar('12500', { kind: 'number', dp: 0 }), '١٢٬٥٠٠', 'Arabic display follows the language')
+    // Arabic writes Western digits app-wide (spec 015 §V, amended); Arabic digits are still read when typed.
+    eq(ar('12500', { kind: 'number', dp: 0 }), '12,500', 'Arabic display uses Western digits')
+    eq(ar('١٢٥٠٠', { kind: 'number', dp: 0 }), '12,500', 'Arabic digits typed in an Arabic sheet show as Western digits')
     ok(ar('2026-11-16', { kind: 'date', long: true }).includes('نوفمبر'), 'Arabic month names')
     eq(h.parseNumber('(1,234)'), -1234, 'accounting negatives read back')
     eq(h.parseNumber('1,23'), null, 'a bad grouping is text')

@@ -58,15 +58,17 @@ export function LinkCard({ editor, hiddenRef, onEdit, onNote }: {
           background: COLORS.panel, borderRadius: 12, boxShadow: `0 12px 32px ${alpha(BRIEF_UI.ink, 0.16)}`,
         }}
       >
-        <div style={{ minWidth: 0, fontSize: 12.5, lineHeight: 1.3 }}>
-          <b data-url="" dir="ltr" style={{ display: 'block', color: BRIEF_UI.ink }}>{host}</b>
-          {shortPath && <span data-url="" dir="ltr" title={href} style={{ display: 'block', color: BRIEF_UI.label, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 190 }}>{shortPath}</span>}
+        {/* Addresses aren't prose: no page translation, and a long host is cut
+            with an ellipsis rather than pushing the buttons out of the card. */}
+        <div translate="no" style={{ flex: '0 1 auto', minWidth: 0, maxWidth: 190, fontSize: 12.5, lineHeight: 1.3 }}>
+          <b data-url="" dir="ltr" title={host} style={{ display: 'block', color: BRIEF_UI.ink, ...ELLIPSIS }}>{host}</b>
+          {shortPath && <span data-url="" dir="ltr" title={href} style={{ display: 'block', color: BRIEF_UI.label, ...ELLIPSIS }}>{shortPath}</span>}
         </div>
-        <a href={href.startsWith('/') ? href : hrefFor(href)} target="_blank" rel="noopener noreferrer" style={cardBtn(BRIEF_UI.blueLight, BRIEF_UI.blue)}>
+        <a href={href.startsWith('/') ? href : hrefFor(href)} target="_blank" rel="noopener noreferrer" className="fx-hov" style={cardBtn(BRIEF_UI.blueLight, BRIEF_UI.blue)}>
           {t('open')} <ToolIcon name="external" size={12} />
         </a>
-        <button type="button" onClick={onEdit} style={cardBtn(BRIEF_UI.blueLight, BRIEF_UI.blue)}>{t('edit')}</button>
-        <button type="button"
+        <button type="button" className="fx-hov" onClick={onEdit} style={cardBtn(BRIEF_UI.blueLight, BRIEF_UI.blue)}>{t('edit')}</button>
+        <button type="button" className="fx-hov-tint"
                 onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); onNote(t('linkRemoved')) }}
                 style={cardBtn('transparent', BRIEF_UI.error)}>
           {t('remove')}
@@ -77,6 +79,8 @@ export function LinkCard({ editor, hiddenRef, onEdit, onNote }: {
 }
 
 const CARD_OPTIONS = { placement: 'bottom-start' as const, offset: 6 }
+
+const ELLIPSIS: React.CSSProperties = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
 
 function cardBtn(bg: string, fg: string): React.CSSProperties {
   return {

@@ -7,6 +7,12 @@
  * in calls of at most 2,000 cells. A network failure is retried at 2, 4, 8 and
  * 16 s, then every 30 s; a refusal is handed back to the sheet, which reloads
  * from the server and says why. Leaving with changes waiting asks first.
+ *
+ * A sheet left for another page (the breadcrumb, a pinned folder) sends what
+ * it still holds at once, and its outbox stays registered until that is
+ * saved: closing the tab meanwhile still asks first, and it still retries
+ * when the connection is back (UI review). One set of window listeners serves
+ * every outbox.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SheetChanges } from '@/types/index'
@@ -26,6 +32,29 @@ export interface Outbox {
 
 const DELAYS = [2000, 4000, 8000, 16000]
 
+/** Every outbox with changes waiting, mounted or not: the page-level listeners ask them all. */
+interface Entry { live: boolean; waiting(): boolean; flush(): void; online(): void }
+const outboxes = new Set<Entry>()
+let wired = false
+function each(fn: (e: Entry) => void) {
+  for (const e of [...outboxes]) {
+    if (!e.live && !e.waiting()) { outboxes.delete(e); continue }
+    fn(e)
+  }
+}
+function wire() {
+  if (wired || typeof window === 'undefined') return
+  wired = true
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') each(e => e.flush()) })
+  window.addEventListener('pagehide', () => each(e => e.flush()))
+  window.addEventListener('online', () => each(e => e.online()))
+  window.addEventListener('beforeunload', ev => {
+    let waiting = false
+    each(e => { if (e.waiting()) waiting = true })
+    if (waiting) { ev.preventDefault(); ev.returnValue = '' }
+  })
+}
+
 export function useOutbox(api: SheetsApi, handlers: {
   onRefused(sheetId: string, error: string): void
   onSaved?(sheetId: string, res: { positions?: { rows?: { id: string; position: number }[]; cols?: { id: string; position: number }[] }; skipped: unknown[] }): void
@@ -34,6 +63,7 @@ export function useOutbox(api: SheetsApi, handlers: {
   const busy = useRef(false)
   const timer = useRef<number | undefined>(undefined)
   const attempt = useRef(0)
+  const entry = useRef<Entry | null>(null)
   const [status, setStatus] = useState<SaveStatus>('saved')
   const [pending, setPending] = useState(0)
   const [tracked, setTracked] = useState(0)
@@ -70,6 +100,7 @@ export function useOutbox(api: SheetsApi, handlers: {
       setStatus(queue.current.size ? 'saving' : 'saved')
       busy.current = false
       if (queue.current.size) timer.current = window.setTimeout(() => void flush(), 50)
+      else if (entry.current && !entry.current.live) outboxes.delete(entry.current)
     } catch {
       busy.current = false
       setPending(count())
@@ -85,8 +116,8 @@ export function useOutbox(api: SheetsApi, handlers: {
     queue.current.set(sheetId, prev ? mergeServer(prev, changes) : changes)
     setPending(count())
     if (status !== 'retrying') setStatus('saving')
-    window.clearTimeout(timer.current)
-    if (attempt.current === 0) timer.current = window.setTimeout(() => void flush(), 400)
+    // While retrying, the retry's own timer stays: clearing it here would leave the queue waiting for good.
+    if (attempt.current === 0) { window.clearTimeout(timer.current); timer.current = window.setTimeout(() => void flush(), 400) }
   }, [flush, status])
 
   const track = useCallback(async <T,>(p: Promise<T>) => {
@@ -94,20 +125,21 @@ export function useOutbox(api: SheetsApi, handlers: {
     try { return await p } finally { setTracked(n => n - 1) }
   }, [])
 
+  const flushRef = useRef(flush)
+  flushRef.current = flush
   useEffect(() => {
-    const hide = () => { if (document.visibilityState === 'hidden') void flush() }
-    const leave = (e: BeforeUnloadEvent) => { if (queue.current.size || busy.current) { e.preventDefault(); e.returnValue = '' } }
-    const online = () => { attempt.current = 0; void flush() }
-    document.addEventListener('visibilitychange', hide)
-    window.addEventListener('pagehide', () => void flush())
-    window.addEventListener('beforeunload', leave)
-    window.addEventListener('online', online)
-    return () => {
-      document.removeEventListener('visibilitychange', hide)
-      window.removeEventListener('beforeunload', leave)
-      window.removeEventListener('online', online)
+    const e: Entry = {
+      live: true,
+      waiting: () => queue.current.size > 0 || busy.current,
+      flush: () => void flushRef.current(),
+      online: () => { attempt.current = 0; void flushRef.current() },
     }
-  }, [flush])
+    entry.current = e
+    outboxes.add(e)
+    wire()
+    // Leaving the sheet: send what is waiting now; the entry stays until it is saved.
+    return () => { e.live = false; if (e.waiting()) void flushRef.current(); else outboxes.delete(e) }
+  }, [])
 
   const shown: SaveStatus = status === 'retrying' ? 'retrying' : status === 'saving' || tracked > 0 ? 'saving' : 'saved'
   return { status: shown, pending, enqueue, flush, track }

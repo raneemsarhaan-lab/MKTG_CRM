@@ -13,7 +13,7 @@ import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 export function PersonAvatar({ member }: { member: Pick<Member, 'name' | 'avatar_url'> }) {
   return (
     <span className="fx-person-av" data-initials={initials(member.name)} style={{ background: avatarColor(member.name) }} aria-hidden="true">
-      <ImageWithFallback src={member.avatar_url} alt="" className="fx-person-img" fallback={null} />
+      <ImageWithFallback src={member.avatar_url} alt="" className="fx-person-img" fallback={null} loading="lazy" />
     </span>
   )
 }

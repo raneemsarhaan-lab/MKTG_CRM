@@ -12,7 +12,7 @@ export const us2 = [
       t.eq(await counter(t), '1 of 4', 'counter')
       const top = await pv.locator('.fx-att-pv-top').textContent()
       t.assert(top.includes('Forefront Consulting - AI Gap Post v3 FINAL.png'), 'full name')
-      t.assert(top.includes('yosra · 2h ago · 1.3 MB'), `uploader, age and size: ${top}`)
+      t.assert(top.includes('yosra · 2h ago · 1.3\u00a0MB'), `uploader, age and size: ${top}`)
       t.assert(await pv.locator('a', { hasText: 'Download' }).count() === 1, 'Download')
       t.eq(await pv.locator('.fx-att-pv-film button').count(), 4, 'a strip of every file')
       t.assert(await pv.locator('button[aria-label="Previous file"]').isDisabled(), 'no previous on the first')

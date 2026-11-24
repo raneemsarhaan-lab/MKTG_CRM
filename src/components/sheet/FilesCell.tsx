@@ -4,6 +4,9 @@
  * The Files cell (spec 008 FR-040–FR-046): what the clip has (a Drive link,
  * other links, uploaded files), an upload in progress, a refusal with "Paste a
  * link instead", or a failure with Retry.
+ *
+ * The cell's buttons are for the mouse (a grid cell holds one tab stop); from
+ * the keyboard, Enter opens the Files menu, which has Retry and Paste a link.
  */
 import type { useTranslations } from 'next-intl'
 import type { TaskAttachment } from '@/types/index'
@@ -42,7 +45,8 @@ export function FilesContent({ attachments, state, canEdit, t, onRetry, onLinkIn
         </span>
         <span className="fx-sheet-prog" role="progressbar" aria-label={state.name}
               aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress ?? undefined}>
-          <i style={state.progress == null ? undefined : { width: `${state.progress}%` }} className={state.progress == null ? 'is-indeterminate' : undefined} />
+          {/* Grows by scaleX, not width, so it animates on the compositor. */}
+          <i style={state.progress == null ? undefined : { transform: `scaleX(${state.progress / 100})` }} className={state.progress == null ? 'is-indeterminate' : 'is-pct'} />
         </span>
       </>
     )
@@ -53,8 +57,8 @@ export function FilesContent({ attachments, state, canEdit, t, onRetry, onLinkIn
         <span className="fx-sheet-err fx-sheet-ellipsis" title={t('files.tooLargeDetail', { size: state.size, limit: state.limit })}>
           {t('files.tooLarge', { size: state.size })}
         </span>
-        {canEdit && <span className="fx-sheet-fbtn" role="button" tabIndex={-1} data-link-instead=""
-              onClick={e => { e.stopPropagation(); onLinkInstead() }}>{t('files.linkInstead')}</span>}
+        {canEdit && <button type="button" className="fx-sheet-fbtn" tabIndex={-1} data-link-instead=""
+              onClick={e => { e.stopPropagation(); onLinkInstead() }}>{t('files.linkInstead')}</button>}
       </span>
     )
   }
@@ -62,8 +66,8 @@ export function FilesContent({ attachments, state, canEdit, t, onRetry, onLinkIn
     return (
       <span className="fx-sheet-files">
         <span className="fx-sheet-err fx-sheet-ellipsis" title={`${state.name}: ${state.error}`}>{state.error}</span>
-        {state.retryable && <span className="fx-sheet-fbtn" role="button" tabIndex={-1} data-retry=""
-              onClick={e => { e.stopPropagation(); onRetry() }}>{t('files.retry')}</span>}
+        {state.retryable && <button type="button" className="fx-sheet-fbtn" tabIndex={-1} data-retry=""
+              onClick={e => { e.stopPropagation(); onRetry() }}>{t('files.retry')}</button>}
       </span>
     )
   }

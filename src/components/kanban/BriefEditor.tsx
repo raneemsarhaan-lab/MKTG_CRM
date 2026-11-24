@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
@@ -11,6 +11,7 @@ import { TableKit } from '@tiptap/extension-table/kit'
 import { Markdown } from 'tiptap-markdown'
 import { imageAttachments } from '@/lib/attachments'
 import { BRIEF_UI, COLORS, alpha } from '@/lib/tokens'
+import { intlLocale } from '@/lib/sheet-format'
 import type { TaskAttachment } from '@/types/index'
 import { Toggle, LinkShortcut, BriefImage, SlashCommand, MentionCommand, Youtube, Toc, dismissSlash, dismissMention, getMarkdown, type SlashBridge, type SlashState, type MentionBridge, type MentionState, type MentionPerson } from './brief-editor/extensions'
 import { BriefTable, TableResize } from './brief-editor/tableEdges'
@@ -20,7 +21,7 @@ import { MentionMenu } from './brief-editor/MentionMenu'
 import { blockItems, filterBlocks, insertYoutube, type BlockContext, type BlockItem } from './brief-editor/blocks'
 import { ImageUpload, insertImageBlock, blockSlot, type ImageUploadContext, type UploadResult, type UploadUnavailableReason } from './brief-editor/imageUpload'
 import { LinkCard } from './brief-editor/LinkCard'
-import { ToolIcon, ToolButton, Sep, SaveStatusBadge } from './brief-editor/Toolbar'
+import { ToolIcon, ToolButton, Sep, SaveStatusBadge, VISUALLY_HIDDEN } from './brief-editor/Toolbar'
 import { ConfirmLeave } from './brief-editor/ConfirmLeave'
 import { useSaveQueue, type SaveStatus } from './brief-editor/useSaveQueue'
 import { Menu, MenuItem } from './brief-editor/Menu'
@@ -111,6 +112,7 @@ export function BriefEditor({
   // The editor only renders in the browser, so there is no first-paint flash.
   const phone = useMediaQuery('(max-width: 480px)')
   const t = useTranslations('briefEditor')
+  const locale = intlLocale(useLocale())
   const stack = useMemo(createOverlayStack, [])
   const save = useSaveQueue(value, onSave)
   const [pendingUploads, setPendingUploads] = useState(0)
@@ -128,6 +130,9 @@ export function BriefEditor({
   const promptRange = useRef<{ from: number; to: number } | null>(null)
   const [note, setNote]       = useState('')
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // Screen-reader-only announcements (an upload starting), for what is
+  // already on screen and shouldn't be repeated in the visible note.
+  const [said, setSaid] = useState('')
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [slash, setSlash] = useState<SlashState | null>(null)
   const [slashActive, setSlashActive] = useState(0)
@@ -155,10 +160,14 @@ export function BriefEditor({
     upload: onUploadImages,
     unavailableReason: uploadUnavailableReason,
     note: msg => flashNote(msg, 6000),
+    // Cleared first, so the same words twice are still announced twice.
+    announce: msg => { setSaid(''); requestAnimationFrame(() => setSaid(msg)) },
     pendingChanged: n => setPendingUploads(n),
     text: {
       uploading: name => t('uploading', { name }),
-      failed: (name, error) => t('uploadFailed', { name, error }),
+      // The host's reason already ends a sentence of its own; the message adds the next step.
+      failed: (name, error) => t('uploadFailed', { name, error: error.trim().replace(/[.。]+$/, '') }),
+      failedUnknown: name => t('uploadFailedUnknown', { name }),
       notAnImage: t('notAnImage'),
       tooBig: (name, mb) => t('tooBig', { name, mb }),
       skipped: max => t('skipped', { max }),
@@ -220,8 +229,14 @@ export function BriefEditor({
   // The size badge while a table is being resized (FR-067).
   const [badge, setBadge] = useState<{ text: string; x: number; y: number } | null>(null)
   const sizeBadge = useRef((text: string, x: number, y: number) => setBadge(text ? { text, x, y } : null))
-  const sizeTexts = useRef({ wide: (n: number) => t('wide', { n }), columns: t('dragColumns'), table: t('dragTable') })
-  sizeTexts.current = { wide: (n: number) => t('wide', { n }), columns: t('dragColumns'), table: t('dragTable') }
+  const pctFormat = useMemo(() => new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }), [locale])
+  const makeSizeTexts = () => ({
+    pct: (share: number) => pctFormat.format(share / 100),
+    wide: (pct: string) => t('wide', { pct }),
+    columns: t('dragColumns'), table: t('dragTable'), columnWidth: t('columnWidth'), tableWidth: t('tableWidth'),
+  })
+  const sizeTexts = useRef(makeSizeTexts())
+  sizeTexts.current = makeSizeTexts()
 
   // Read by the key handler and extensions, which Tiptap captures once at creation.
   const leaveRef = useRef<() => void>(() => {})
@@ -243,6 +258,17 @@ export function BriefEditor({
     onDone()
   }
   leaveRef.current = requestLeave
+
+  // Keep the caret clear of the sticky toolbar when typing scrolls the brief.
+  // ProseMirror reads these on every scroll into view, so the getter follows
+  // the toolbar's real height (one row, or two when it wraps).
+  const toolbarClearance = useMemo(() => {
+    const top = () => (toolbarRef.current?.offsetHeight ?? 58) + 12
+    return {
+      margin: { get top() { return top() }, right: 5, bottom: 24, left: 5 },
+      threshold: { get top() { return top() }, right: 5, bottom: 24, left: 5 },
+    }
+  }, [])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -282,6 +308,8 @@ export function BriefEditor({
     ],
     content: value,
     editorProps: {
+      scrollMargin: toolbarClearance.margin,
+      scrollThreshold: toolbarClearance.threshold,
       attributes: {
         class: 'fx-brief fx-brief-edit',
         role: 'textbox',
@@ -355,9 +383,9 @@ export function BriefEditor({
     editor?.commands.focus()
   }
 
-  async function confirmPrompt(v: string) {
+  async function confirmPrompt(v: string, extra?: { alt: string }) {
     if (!editor) return
-    if (prompt === 'image') insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), v)
+    if (prompt === 'image') insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), v, extra?.alt ?? '')
     if (prompt === 'youtube') insertYoutube(editor, v, promptRange.current?.from ?? editor.state.selection.from)
     if (prompt === 'link') {
       const r = promptRange.current
@@ -369,8 +397,9 @@ export function BriefEditor({
       else chain.insertContent({ type: 'text', text: v, marks: [{ type: 'link', attrs: { href: v } }] }).run()
     }
     if (prompt === 'subtask' && onCreateSubtask) {
-      const made = await onCreateSubtask(v)
-      if (!made) { flashNote(t('subtaskFailed')); return }
+      const made = await onCreateSubtask(v).catch(e => { console.error('[brief] subtask', e); return null })
+      // The box stays open with the name in it, so trying again is one click.
+      if (!made) { flashNote(t('subtaskFailed'), 6000); return }
       editor.chain().focus().insertContent({
         type: 'taskList',
         content: [{
@@ -401,7 +430,7 @@ export function BriefEditor({
       await navigator.clipboard.writeText(getMarkdown(editor))
       flashNote(t('markdownCopied'))
     } catch {
-      flashNote(t('clipboardBlocked'))
+      flashNote(t('clipboardBlocked'), 6000)
     }
   }
 
@@ -507,7 +536,8 @@ export function BriefEditor({
         // No overflow: hidden here: it would stop the toolbar sticking (R13).
         borderRadius: 18, background: COLORS.panel,
         boxShadow: focused
-          ? `0 0 0 2px ${alpha(BRIEF_UI.blue, 0.08)}, 0 4px 20px ${alpha(BRIEF_UI.ink, 0.04)}`
+          // Strong enough to see where typing will land; at .08 it was invisible.
+          ? `0 0 0 2px ${alpha(BRIEF_UI.blue, 0.45)}, 0 4px 20px ${alpha(BRIEF_UI.ink, 0.04)}`
           : `0 2px 12px ${alpha(BRIEF_UI.ink, 0.05)}`,
         transition: 'box-shadow .12s',
       }}>
@@ -634,8 +664,8 @@ export function BriefEditor({
             initial={promptInitial}
             images={images}
             onConfirm={confirmPrompt}
-            onPickAttachment={a => {
-              insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), a.url ?? a.data ?? '', a.filename)
+            onPickAttachment={(a, alt) => {
+              insertImageBlock(editor, blockSlot(editor.state, promptRange.current?.from ?? editor.state.selection.from), a.url ?? a.data ?? '', alt || a.filename)
               setPrompt(null)
             }}
             onCancel={closePrompt}
@@ -649,7 +679,7 @@ export function BriefEditor({
           <MentionMenu state={mention} active={mentionActive} onClose={() => dismissMention(editor)} />
         )}
 
-        <TableMenu editor={editor} />
+        <TableMenu editor={editor} onNote={flashNote} />
 
         {badge && (
           <div aria-hidden="true" style={{
@@ -667,11 +697,11 @@ export function BriefEditor({
         }} />
       </div>
 
-      {note && (
-        <div role="status" style={{ marginTop: 10, fontSize: 12, color: BRIEF_UI.ink, fontWeight: 700 }}>
-          {note}
-        </div>
-      )}
+      {/* Always mounted, so a note is announced when its text arrives. */}
+      <div role="status" style={{ marginTop: note ? 10 : 0, fontSize: 12, color: BRIEF_UI.ink, fontWeight: 700 }}>
+        {note}
+      </div>
+      <span aria-live="polite" style={VISUALLY_HIDDEN}>{said}</span>
     </div>
     </OverlayStackProvider>
   )

@@ -29,6 +29,7 @@ import { ADD_COLUMN_OPEN, FIELDS_OPEN, PresetFieldsDrawer, ValuesDialog, type Pr
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
 import { cadence } from './summary'
 import { contentTypeColor } from '@/lib/tokens'
+import { intlLocale } from '@/lib/sheet-format'
 import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
@@ -63,11 +64,14 @@ export function pieceLink(task: Task, col: typeof LINK_COLS[number]): string | n
   return a.length ? a[a.length - 1].url ?? null : null
 }
 
-/** "3 Nov": Western digits in every language. */
-export function shortDate(ymd: string | null | undefined): string {
+/**
+ * "3 Nov", "3 نوفمبر": the month in the reader's language, the day in Western
+ * digits in every language (spec 009: counts and dates stay in Western digits).
+ */
+export function shortDate(ymd: string | null | undefined, lang = 'en'): string {
   if (!ymd) return ''
   const d = new Date(`${ymd.slice(0, 10)}T00:00:00`)
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(intlLocale(lang), { day: 'numeric', month: 'short' }).format(d)
 }
 
 export interface ContentGridProps {
@@ -218,7 +222,8 @@ export function ContentGrid(p: ContentGridProps) {
     ].filter(Boolean).join(' · ')
     return (
       <span className="fx-content-theme" title={tip} data-cadence={c ? `${c.done}/${c.target}` : undefined}>
-        <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
+        {/* A mouse shortcut only: the row's own aria-expanded and Space (onToggle) are the keyboard's way. */}
+        <span className="fx-sheet-caret" aria-hidden="true"
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>
         <span className="fx-content-theme-name">{th.name}</span>
         <span className="fx-sheet-muted"> · {row.pieces.filter(x => !x.dropped_at).length + row.lines}</span>
@@ -354,7 +359,7 @@ export function ContentGrid(p: ContentGridProps) {
     describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
     isDraft: row => row.kind === 'draft',
     inputLabel: (row, col) => (row.kind === 'draft' ? t('rows.newLabel') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
-    inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('rows.placeholder') : col === 'date' ? '2026-11-20' : undefined),
+    inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('rows.placeholder') : col === 'date' ? '2026-11-20…' : undefined),
     inputDir: col => (col === 'date' ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
       const task = taskOf(row)
@@ -459,7 +464,7 @@ export function ContentGrid(p: ContentGridProps) {
             <span className="fx-sheet-title">
               {Array.from({ length: deep - (row.kind === 'piece' && row.clips.length ? 1 : 0) }, (_, i) => <span key={i} className="fx-sheet-indent" aria-hidden="true" />)}
               {row.kind === 'piece' && row.clips.length > 0 && (
-                <span className="fx-sheet-caret" role="button" tabIndex={-1} aria-hidden="true"
+                <span className="fx-sheet-caret" aria-hidden="true"
                       onClick={e => { e.stopPropagation(); p.onToggleVideo(task.id) }}>{row.expanded ? '▾' : '▸'}</span>
               )}
               <span className="fx-sheet-ellipsis" title={task.name}>{task.name}</span>
@@ -481,15 +486,18 @@ export function ContentGrid(p: ContentGridProps) {
           // Spec 026 (§4): a linked row's Task cell — the task's name as a link, its Space and its stage.
           return isClip ? null : (
             <span className="fx-sheet-ellipsis" data-task-cell={task.id} style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline', minWidth: 0 }}>
-              <a className="fx-sheet-link fx-sheet-ellipsis" href={`/board?task=${task.id}`} tabIndex={-1} onClick={e => e.preventDefault()}>↗ {task.name}</a>
+              <a className="fx-sheet-link fx-sheet-ellipsis" href={`/board?task=${task.id}`} tabIndex={-1}
+                 // Cmd/Ctrl-click (and the middle button) open the task the browser's way, in a new tab; a plain click opens it here, through the cell.
+                 onPointerDown={e => { if (e.metaKey || e.ctrlKey) e.stopPropagation() }}
+                 onClick={e => { if (e.metaKey || e.ctrlKey) e.stopPropagation(); else e.preventDefault() }}>↗ {task.name}</a>
               <span className="fx-sheet-muted" style={{ flexShrink: 0 }}>{[p.spaceNameOf?.(task), stageOf(task)].filter(Boolean).join(' · ')}</span>
             </span>
           )
         case 'date':
           if (isClip) return null
           // The Date column is the publishing date; a published piece says so.
-          if (task.status === 'publish') return <span className="fx-sheet-ellipsis" data-publish-cell={task.publish_date ?? task.stage_date}>{t('date.published', { date: formatDay(task.publish_date ?? task.stage_date, locale) })}</span>
-          return task.publish_date ? <span className="fx-sheet-ellipsis" data-publish-cell={task.publish_date}>{formatDay(task.publish_date, locale)}</span> : null
+          if (task.status === 'publish') return <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date ?? task.stage_date}>{t('date.published', { date: formatDay(task.publish_date ?? task.stage_date, locale) })}</span>
+          return task.publish_date ? <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date}>{formatDay(task.publish_date, locale)}</span> : null
         case 'archive':
           return isClip || !can ? null : <span className="fx-sheet-dropb">{task.dropped_at ? t('archive.restore') : t('archive.archive')}</span>
       }

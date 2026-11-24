@@ -34,11 +34,16 @@ export function TodayHours({ api, initial }: { api: HoursApi; initial: HoursStat
   const [status, setStatus] = useState<{ text: string; bad?: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState<{ title: string; lines: DayLine[]; clear: boolean } | null>(null)
+  // Nothing loaded at all (the page's call and the card's own both failed):
+  // say so and offer Try again, rather than leave a gap where the card was.
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const typed = useRef(false)
 
   const refresh = useCallback(async () => {
-    const res = await api.hoursStatus(toISODate(new Date()))
-    if (res.success) setSt(res)
+    const res = await api.hoursStatus(toISODate(new Date())).catch(() => null)
+    if (res?.success) { setSt(res); setLoadFailed(false) }
+    else setLoadFailed(true)
   }, [api])
   useEffect(() => { void refresh() }, [refresh])
   useEffect(() => {
@@ -49,7 +54,20 @@ export function TodayHours({ api, initial }: { api: HoursApi; initial: HoursStat
   // Show the saved value unless the member is typing.
   useEffect(() => { if (!typed.current) setValue(savedValue) }, [savedValue])
 
-  if (!st) return null
+  if (!st) {
+    if (!loadFailed) return null
+    return (
+      <section className="fx-hr-card" aria-labelledby="fx-hr-title" data-today-hours="" data-hours-load-error="">
+        <div className="fx-hr-top"><h2 id="fx-hr-title">{t('today')}</h2></div>
+        <p className="fx-hr-status is-bad" role="alert">{t('loadError')}</p>
+        <button type="button" className="fx-hr-save" style={{ justifySelf: 'start', width: 'fit-content' }}
+                disabled={retrying} aria-busy={retrying || undefined} data-hours-retry=""
+                onClick={async () => { setRetrying(true); await refresh(); setRetrying(false) }}>
+          {t('retry')}
+        </button>
+      </section>
+    )
+  }
   const today = st.localDate
   const errText = (e: string) => (t.has(`err.${e}`) ? t(`err.${e}`) : t('err.generic'))
   const num = (n: number) => f.number(n, { maximumFractionDigits: 2 })
@@ -98,18 +116,19 @@ export function TodayHours({ api, initial }: { api: HoursApi; initial: HoursStat
       </div>
       <form className="fx-hr-entry" onSubmit={e => { e.preventDefault(); void save(value) }}>
         <label className={`fx-hr-field is-big${status?.bad ? ' is-bad' : ''}`}>
-          <input inputMode="decimal" autoComplete="off" value={value} placeholder={offToday ? t('off') : '0'} data-hours-input=""
+          <input name="hours" inputMode="decimal" autoComplete="off" value={value} placeholder={offToday ? t('off') : '0'} data-hours-input=""
                  aria-label={t('field')} aria-invalid={status?.bad || undefined} aria-describedby="fx-hr-status"
                  onChange={e => { typed.current = true; setValue(e.target.value); if (status?.bad) setStatus(null) }} />
           <span aria-hidden="true">{t('unit')}</span>
         </label>
         <div className="fx-hr-quick" role="group" aria-label={t('today')}>
           {QUICK.map(n => (
-            <button key={n} type="button" className="fx-hr-chip" data-hours-quick={n} onClick={() => { typed.current = false; setValue(String(n)); void save(String(n)) }}>
+            // Held while a save runs: a click then would show a number that never saves.
+            <button key={n} type="button" className="fx-hr-chip" data-hours-quick={n} disabled={busy} onClick={() => { typed.current = false; setValue(String(n)); void save(String(n)) }}>
               {t('quick', { n: num(n) })}
             </button>
           ))}
-          <button type="button" className={`fx-hr-chip is-off${offToday ? ' is-on' : ''}`} aria-pressed={offToday} data-hours-quick="off"
+          <button type="button" className={`fx-hr-chip is-off${offToday ? ' is-on' : ''}`} aria-pressed={offToday} data-hours-quick="off" disabled={busy}
                   onClick={() => void save('off')}>{t('off')}</button>
         </div>
         <button type="submit" className="fx-hr-save" data-hours-save="" disabled={busy}>{t('save')}</button>

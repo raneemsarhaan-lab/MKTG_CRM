@@ -107,7 +107,7 @@ export function useTaskFieldColumns(cl: Columns, o: { tasks: Task[]; canEdit(tas
       void custom.commit(task, key, valueOf(task, key) ? 'false' : 'true')
       return true
     },
-    clear: (task, key, rowKey) => { if (isField(key)) void custom.commit(task, key, ''); else cl.custom.clear(task, key, rowKey) },
+    clear: async (task, key, rowKey, onCleared) => { if (isField(key)) void custom.commit(task, key, ''); else await cl.custom.clear(task, key, rowKey, onCleared) },
     open: (task, key, anchor, rowKey) => { if (!isField(key)) cl.custom.open(task, key, anchor, rowKey) },
   }
   if (laysFields) return { ...cl, header: key => (isField(key) ? { text: cl.nameOf(key) } : cl.header(key)), custom }

@@ -182,6 +182,15 @@ export function AttachmentsSection({
     t: (k, v) => t(k, v),
   })
 
+  // Closing or reloading the tab mid-upload would drop the queue: ask first.
+  const uploading = queue.jobs.some(j => j.status === 'queued' || j.status === 'uploading')
+  useEffect(() => {
+    if (!uploading) return
+    function onBeforeUnload(e: BeforeUnloadEvent) { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [uploading])
+
   const addFiles = useCallback((list: File[], opts: { forComment?: boolean; source?: 'paste' | 'drop' | 'pick' } = {}) => {
     if (!list.length) return
     if (!canEdit) { setNote(t('readOnly')); return }
@@ -340,10 +349,13 @@ export function AttachmentsSection({
       style={{ marginTop: 18 }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingBottom: 12 }}>
-        <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} id={`att-title-${taskId}`}
+        {/* The padding and matching negative margin give the hover tint room
+            without moving the title. */}
+        <button type="button" className="fx-hov-tint" onClick={() => setOpen(v => !v)} aria-expanded={open} id={`att-title-${taskId}`}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'transparent',
-                  cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: BRIEF_UI.ink,
+                  cursor: 'pointer', padding: '3px 6px', margin: '-3px -6px', borderRadius: 7,
+                  fontFamily: 'inherit', fontSize: 16.5, fontWeight: 600, color: BRIEF_UI.ink,
                 }}>
           <span style={{ display: 'inline-flex', color: BRIEF_UI.label, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}>
             <AttIcon name="chevron" size={14} />
