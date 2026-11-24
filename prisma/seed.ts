@@ -522,6 +522,14 @@ async function main() {
     return `${n} brands`
   })
 
+  // Spec 026 (§8): one sheet per Space — the Content sheet's rows get their Space, the clip details are
+  // exported and kept, and each video becomes a linked row with its clips as child rows on the Video sheet.
+  await once('sheet-spaces-v1', 'converted the Content and Video sheets to one sheet per Space', async () => {
+    const { convertSheets } = await import('../src/lib/sheet-convert')
+    const r = await convertSheets(prisma)
+    return `${r.backfilled} rows and themes placed, ${r.exported} clip details exported, ${r.videos} videos and ${r.clips} clips as rows, ${r.themes} themes`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

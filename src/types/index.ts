@@ -396,6 +396,8 @@ export interface ContentTheme {
   /** Sheet 2b: the theme's entry on the Content sheet (not the project) and its place there. */
   sheet_theme_id?: string | null
   position?: number
+  /** Spec 026: the Space whose sheet this theme entry is on. */
+  space_id?: string | null
 }
 
 /** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */

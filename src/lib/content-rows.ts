@@ -16,6 +16,8 @@ export interface ContentRowRec {
   values: Record<string, string>
   task_id: string | null
   created_by: string | null
+  /** Spec 026: the Space whose sheet the row is on. */
+  space_id?: string | null
 }
 
 /** A position between two neighbours (either may be missing). */

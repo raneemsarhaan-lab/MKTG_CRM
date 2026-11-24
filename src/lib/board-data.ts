@@ -77,7 +77,7 @@ export async function loadBoardData(member: SessionMember) {
     prisma.contentSheetTheme.findMany({
       orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
       select: {
-        id: true, position: true, pillar_order: true,
+        id: true, position: true, pillar_order: true, space_id: true,
         project: { select: {
           id: true, name: true, brand_id: true, owner_id: true, frequency_count: true, frequency_period: true, audience: true,
           pillars: { select: { id: true, name: true, sort_order: true } },
@@ -169,7 +169,8 @@ export async function loadBoardData(member: SessionMember) {
     spaceStages: spaceStages.map(mapSpaceStage),
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),
-    themes: themes.map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order })),
+    // Spec 026: every Space's sheet has its own themes; each carries its Space.
+    themes: themes.map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order, space_id: th.space_id })),
     contentRows: contentRows.map(mapContentRow),
     hasStorage: storageConfigured(),
     sheetColumns: sheetColumns.map(mapSheetColumn),

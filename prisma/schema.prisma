@@ -162,7 +162,7 @@ model Project {
   tasks   Task[]
   pillars ContentPillar[]
   /// Sheet 2b: the Content sheet's entry for this project, when it is a theme there.
-  sheet_theme  ContentSheetTheme?
+  sheet_themes ContentSheetTheme[]
   content_rows ContentRow[]
 
   @@map("projects")
@@ -438,7 +438,9 @@ model Task {
 
   /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
   /// Sheet 2b: the Content sheet row that stands for this task.
-  content_row          ContentRow?
+  content_rows         ContentRow[]
+  /// Spec 026: unlinked from a sheet by hand, so the Content sheet doesn't give it a row again.
+  sheet_row_off        Boolean   @default(false)
   @@unique([content_task_id, media_board])
   @@map("tasks")
   brand_assets BrandAsset[] @relation("BrandAssetTask")
@@ -666,6 +668,18 @@ model SeniorityLevel {
 /// kind: 'member' (key = email) | 'member-name' (key = lowercased name, which
 /// is what the ClickUp export matches on) | 'project' | 'step' (key = the
 /// plan key).
+/// Spec 026: a file kept for the record when something is removed — the clip details as a CSV.
+/// Admins download it from Settings › Diagnostics.
+model DataExport {
+  name       String   @id
+  title      String
+  content    String   @db.Text
+  rows       Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("data_exports")
+}
+
 model Tombstone {
   kind       String
   key        String
@@ -1182,6 +1196,9 @@ model TeamSpace {
   stages  SpaceStage[]
   task_stages TaskSpaceStage[]
 
+  sheet_themes ContentSheetTheme[]
+  sheet_rows   ContentRow[]
+
   @@map("team_spaces")
 }
 
@@ -1464,15 +1481,19 @@ model RepeatRule {
 /// from the sheet only. Its order and its pillars' order are the sheet's own.
 model ContentSheetTheme {
   id           String   @id @default(uuid()) @db.Uuid
-  project_id   String   @unique @db.Uuid
+  project_id   String   @db.Uuid
+  /// Spec 026: the Space whose sheet this theme is on. (Null only before the one-time backfill: the Content Space.)
+  space_id     String?  @db.Uuid
   position     Float    @default(0)
   /// Pillar ids in the sheet's order; pillars not listed follow by their own order.
   pillar_order String[] @default([]) @db.Uuid
   created_by   String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
 
-  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  space   TeamSpace? @relation(fields: [space_id], references: [id], onDelete: Cascade)
 
+  @@unique([space_id, project_id])
   @@index([position])
   @@map("content_themes")
 }
@@ -1484,6 +1505,8 @@ model ContentRow {
   id         String    @id @default(uuid()) @db.Uuid
   /// The theme's project.
   project_id String    @db.Uuid
+  /// Spec 026: the Space whose sheet this row is on. (Null only before the one-time backfill: the Content Space.)
+  space_id   String?   @db.Uuid
   pillar_id  String?   @db.Uuid
   parent_id  String?   @db.Uuid
   position   Float     @default(0)
@@ -1491,17 +1514,21 @@ model ContentRow {
   date       DateTime? @db.Date
   /// A plain row's custom column values by column id.
   values     Json      @default("{}")
-  task_id    String?   @unique @db.Uuid
+  /// The task this row stands for, when linked. A task has at most one row per Space's sheet.
+  task_id    String?   @db.Uuid
   created_by String?   @db.Uuid
   created_at DateTime  @default(now()) @db.Timestamptz(6)
   updated_at DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
+  space    TeamSpace?     @relation(fields: [space_id], references: [id], onDelete: Cascade)
   project  Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
   pillar   ContentPillar? @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
   parent   ContentRow?    @relation("ContentRowChildren", fields: [parent_id], references: [id], onDelete: SetNull)
   children ContentRow[]   @relation("ContentRowChildren")
   task     Task?          @relation(fields: [task_id], references: [id], onDelete: SetNull)
 
+  @@unique([space_id, task_id])
   @@index([project_id, position])
+  @@index([task_id])
   @@map("content_rows")
 }

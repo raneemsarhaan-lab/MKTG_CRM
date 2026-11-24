@@ -99,6 +99,14 @@ export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
 export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (sheet === 'content' || sheet === 'video' ? BUILT_INS[sheet] : TASK_BUILT_INS)
 export const setsFor = (sheet: SheetId): string[] => (sheet === 'content' || sheet === 'video' ? SHEET_SETS[sheet] : ['all'])
 
+/**
+ * Spec 026: where a Space's sheet keeps its columns. Content and Video keep the
+ * ids their sheets always had, so their custom columns, values, formatting and
+ * comments carry over; every other Space uses its task sheet's id.
+ */
+export const spaceSheetId = (space: { id: string; key: string }): SheetId =>
+  (space.key === 'content' ? 'content' : space.key === 'video' ? 'video' : `tasks:space:${space.id}`) as SheetId
+
 export const isCustomKey = (key: string) => key.startsWith('c:')
 export const builtInOf = (sheet: SheetId, key: string) => builtInsFor(sheet).find(b => b.key === key)
 

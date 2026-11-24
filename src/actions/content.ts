@@ -1,5 +1,6 @@
 'use server'
 
+import { spaceSheetId } from '@/lib/sheet-columns'
 import { datesFor } from '@/lib/due-dates-server'
 import { needsHandoff } from '@/lib/spaces'
 import { addAssigneeSpaces, addSpaces, loadSpaceContext } from '@/lib/spaces-server'
@@ -94,8 +95,10 @@ export interface AddPlanResult {
  */
 export async function addPlan(rows: PlanRowInput[], opts: {
   useSheetTitleStatus: boolean
-  /** Sheet 2b: pasted on a theme, pillar or "+ Row" line — new lines become plain rows there (no tasks). */
+  /** Sheet 2b: pasted on a theme, pillar or "+ Row" line — rows that name no theme go there. */
   target?: { projectId: string; pillarId?: string | null } | null
+  /** Spec 026: the Space whose sheet is pasted into; the Content Space when left out. */
+  spaceId?: string | null
 }): Promise<AddPlanResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
@@ -115,13 +118,17 @@ export async function addPlan(rows: PlanRowInput[], opts: {
   // Spec 021: pasted pieces show in the Content Space; a paste never opens the hand-off box.
   const spaceCtx = await loadSpaceContext()
   const contentSpace = spaceCtx.spaces.find(x => x.key === 'content')?.id
+  // Spec 026 (§7): Paste plan only creates plain rows — no tasks, and no linking in bulk.
+  const sheetSpace = spaceCtx.spaces.find(x => x.id === opts.spaceId) ?? spaceCtx.spaces.find(x => x.key === 'content')
+  const sheetSpaceId = sheetSpace?.id ?? null
+  void contentSpace
 
   try {
     const out = await prisma.$transaction(async tx => {
       // $executeRaw: the lock returns void, which $queryRaw cannot read back.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
       const res = { rowsCreated: [] as string[], created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0, handoff: 0 }
-      const columns = await pasteColumns(tx, 'content', members)
+      const columns = await pasteColumns(tx, sheetSpace ? spaceSheetId(sheetSpace) : 'content', members)
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
       // A piece that arrives already Published was published on a day the sheet
@@ -173,9 +180,13 @@ export async function addPlan(rows: PlanRowInput[], opts: {
             res.themesCreated.push(themeName)
           }
           themeCache.set(tkey, theme)
+          // The theme is on this Space's sheet (the Content Space's sync would add it; other Spaces need it here).
+          if (!(await tx.contentSheetTheme.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId }, select: { id: true } }))) {
+            const last = await tx.contentSheetTheme.findFirst({ where: { space_id: sheetSpaceId }, orderBy: { position: 'desc' }, select: { position: true } })
+            await tx.contentSheetTheme.create({ data: { project_id: theme.id, space_id: sheetSpaceId, position: (last?.position ?? 0) + 1, created_by: member.id } })
+          }
         }
-        // Sheet 2b: anyone may add plain rows; tasks follow the theme's rule.
-        if (!opts.target && !(await mayAddPiece(tx, theme.id, member))) { res.problems.push({ row, code: 'mayNotAdd' }); continue }
+        // Anyone with access to the Space may add plain rows.
 
         // The pillar: matched by name within the theme, or created.
         let pillarId: string | null = null
@@ -197,7 +208,9 @@ export async function addPlan(rows: PlanRowInput[], opts: {
 
         const type = readType(r.type, types.length ? types : KNOWN_TYPES)
         const links = { doc: link(r.working_doc), design: link(r.design), post: link(r.post), published: link(r.published) }
-        const taskId = taskIdFromLink(r.task_link)
+        // Spec 026: a pasted task link no longer links or updates a task; rows are linked one at a time with Make task.
+        const taskId = null as string | null
+        void taskIdFromLink
 
         if (taskId) {
           const task = await tx.task.findUnique({ where: { id: taskId } })
@@ -235,8 +248,8 @@ export async function addPlan(rows: PlanRowInput[], opts: {
           continue
         }
 
-        // Sheet 2b: a plain row of the same title in this theme is already in the sheet too.
-        if (opts.target && await tx.contentRow.findFirst({ where: { project_id: theme.id, task_id: null, title: { equals: title, mode: 'insensitive' } }, select: { id: true } })) {
+        // A plain row of the same title in this theme is already in the sheet.
+        if (await tx.contentRow.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId, task_id: null, title: { equals: title, mode: 'insensitive' } }, select: { id: true } })) {
           res.skipped.push(title); continue
         }
         // Already in this theme by title: nothing to add (FR-035).
@@ -244,42 +257,21 @@ export async function addPlan(rows: PlanRowInput[], opts: {
           where: { project_id: theme.id, name: { equals: title, mode: 'insensitive' } },
           select: { id: true, task_owner_id: true, assignee_id: true, dropped_at: true },
         })
-        if (same) {
-          // Its empty custom cells are filled from the paste, under the row rule.
-          const n = !same.dropped_at && canAct(same, member)
-            ? await writePastedValues(tx, columns, same.id, r.custom, member.id, { onlyEmpty: true })
-            : 0
-          if (n) res.values += n
-          else res.skipped.push(title)
+        if (same && await tx.contentRow.findFirst({ where: { space_id: sheetSpaceId, task_id: same.id }, select: { id: true } })) {
+          // Already a linked row of this sheet: nothing is added, and the task isn't touched.
+          res.skipped.push(title)
           continue
         }
 
-        // Sheet 2b: on a theme, pillar or "+ Row" line, a new line is a plain row (its custom values kept on the row).
-        if (opts.target) {
-          const last = await tx.contentRow.findFirst({ where: { project_id: theme.id }, orderBy: { position: 'desc' }, select: { position: true } })
+        // A new line is a plain row (its custom values kept on the row).
+        {
+          const last = await tx.contentRow.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId }, orderBy: { position: 'desc' }, select: { position: true } })
           const values: Record<string, string> = {}
           for (const [colId, v] of Object.entries(r.custom ?? {})) { const c = columns.get(colId); if (c && typeof v === 'string' && v.trim()) values[(await tx.sheetColumn.findUnique({ where: { id: c.id }, select: { key: true } }))?.key ?? colId] = v.trim().slice(0, 5000) }
-          const made = await tx.contentRow.create({ data: { project_id: theme.id, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id } })
+          const made = await tx.contentRow.create({ data: { project_id: theme.id, space_id: sheetSpaceId, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id } })
           res.rowsCreated.push(made.id)
           continue
         }
-        // A new piece pasted at Ready For Design or later would need a hand-off: skipped (FR-030a).
-        if (!status.archived && needsHandoff({ status: 'todo', nine_stage: false, kind: 'pipeline' }, status.stage, [], spaceCtx.spaces)) { res.handoff++; continue }
-        const owner = memberByName(r.owner) ?? member.id
-        const task = await tx.task.create({
-          data: {
-            name: title, project_id: theme.id, pillar_id: pillarId, brand_id: theme.brand_id,
-            content_type_label: type ?? 'Post', task_owner_id: owner, assignee_id: null,
-            initiator_role: member.role, status: status.stage as StageId, stage_date: stageDateFor(status.stage),
-            dropped_at: status.archived ? now : null, hours_estimate: 0, priority: 'Normal', created_by: member.id,
-            post_url: links.post, published_url: links.published,
-          },
-        })
-        if (links.doc) await setRoleLink(tx, task.id, 'working_doc', links.doc, member.id)
-        if (links.design) await setRoleLink(tx, task.id, 'design', links.design, member.id)
-        res.values += await writePastedValues(tx, columns, task.id, r.custom, member.id, { onlyEmpty: false })
-        if (contentSpace) await addSpaces(tx, task.id, [contentSpace], 'created', member.id)
-        res.created.push(task.id)
       }
       return res
     }, { timeout: 60_000 })

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { COLORS } from '@/lib/tokens'
-import { pingServerAction } from '@/actions/diagnostics'
+import { listDataExports, pingServerAction } from '@/actions/diagnostics'
 
 /**
  * Diagnostics — what the deployed server reports about itself.
@@ -260,6 +260,27 @@ export function Diagnostics() {
           )}
         </div>
       )}
+      <KeptExports />
+    </div>
+  )
+}
+
+/** Spec 026: files kept for the record when something was removed (the clip details). */
+function KeptExports() {
+  const [list, setList] = useState<{ name: string; title: string; rows: number; created_at: string }[] | null>(null)
+  useEffect(() => { void listDataExports().then(setList).catch(() => setList([])) }, [])
+  if (!list?.length) return null
+  return (
+    <div data-kept-exports style={{ marginTop: 18, borderTop: '1px solid #E1E1E0', paddingTop: 14 }}>
+      <h3 style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 800 }}>Kept exports</h3>
+      <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--muted)' }}>Saved before a column or field was removed. Nothing here is used by the app.</p>
+      <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13 }}>
+        {list.map(x => (
+          <li key={x.name}>
+            <a href={`/api/exports/${x.name}`} data-kept-export={x.name}>{x.name}</a> — {x.title} · {x.rows} rows · {x.created_at.slice(0, 10)}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

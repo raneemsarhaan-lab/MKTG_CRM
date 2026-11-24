@@ -16,15 +16,18 @@ type Db = typeof prisma
 const datePart = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null)
 
 export async function syncContentSheet(db: Db = prisma): Promise<void> {
+  // Spec 026: this keeps the Content Space's sheet whole. Other Spaces' sheets hold what was put on them.
+  const sid = (await db.teamSpace.findUnique({ where: { key: 'content' }, select: { id: true } }))?.id ?? null
+  if (!sid) return
   const [themes, flagged] = await Promise.all([
-    db.contentSheetTheme.findMany({ select: { project_id: true, position: true } }),
+    db.contentSheetTheme.findMany({ where: { space_id: sid }, select: { project_id: true, position: true } }),
     db.project.findMany({ where: { is_theme: true }, select: { id: true, sort_order: true, created_at: true }, orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] }),
   ])
   const has = new Set(themes.map(t => t.project_id))
   let top = themes.reduce((m, t) => Math.max(m, t.position), 0)
   const add = flagged.filter(p => !has.has(p.id))
   if (add.length) {
-    await db.contentSheetTheme.createMany({ data: add.map(p => ({ project_id: p.id, position: ++top })), skipDuplicates: true })
+    await db.contentSheetTheme.createMany({ data: add.map(p => ({ project_id: p.id, space_id: sid, position: ++top })), skipDuplicates: true })
     for (const p of add) has.add(p.id)
   }
   const ids = [...has]
@@ -32,13 +35,14 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
 
   const [tasks, rows] = await Promise.all([
     db.task.findMany({
+      // A task unlinked from the sheet by hand isn't given a row again (spec 026).
       where: { project_id: { in: ids }, media_board: null },
       select: {
-        id: true, name: true, project_id: true, pillar_id: true, parent_task_id: true, publish_date: true, due_date: true, created_at: true,
+        id: true, name: true, project_id: true, pillar_id: true, parent_task_id: true, publish_date: true, due_date: true, created_at: true, sheet_row_off: true,
         parent: { select: { content_type_label: true, parent_task_id: true } },
       },
     }),
-    db.contentRow.findMany({ select: { id: true, task_id: true, project_id: true, pillar_id: true, parent_id: true, position: true } }),
+    db.contentRow.findMany({ where: { space_id: sid }, select: { id: true, task_id: true, project_id: true, pillar_id: true, parent_id: true, position: true } }),
   ])
   // A video's clips are not rows: they open under their video.
   const pieces = tasks.filter(t => !(t.parent && t.parent.content_type_label === 'Video' && !t.parent.parent_task_id))
@@ -54,7 +58,7 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
   const okPillar = (project: string, pillar: string | null) => (pillar && pillarsOf.get(project)?.has(pillar) ? pillar : null)
 
   // New linked rows, in the order the sheet used to show pieces: publishing date, then due date, then created.
-  const missing = pieces.filter(t => !byTask.has(t.id)).sort((a, b) => {
+  const missing = pieces.filter(t => !byTask.has(t.id) && !t.sheet_row_off).sort((a, b) => {
     const da = datePart(a.publish_date) ?? datePart(a.due_date) ?? '9999', dbb = datePart(b.publish_date) ?? datePart(b.due_date) ?? '9999'
     return da !== dbb ? (da < dbb ? -1 : 1) : a.created_at.getTime() - b.created_at.getTime()
   })
@@ -63,7 +67,7 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
       data: missing.map(t => {
         const pos = (maxPos.get(t.project_id!) ?? 0) + 1
         maxPos.set(t.project_id!, pos)
-        return { project_id: t.project_id!, pillar_id: okPillar(t.project_id!, t.pillar_id), position: pos, title: t.name, task_id: t.id }
+        return { project_id: t.project_id!, space_id: sid, pillar_id: okPillar(t.project_id!, t.pillar_id), position: pos, title: t.name, task_id: t.id }
       }),
       skipDuplicates: true,
     })
