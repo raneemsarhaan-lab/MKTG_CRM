@@ -30,7 +30,7 @@ Generated with `prisma migrate diff` from `main`'s schema to the branch's: 481 l
 | Kind of change | Count | Risk |
 |---|---|---|
 | New tables | 19 | None: `data_exports`, `team_spaces`, `space_stages`, `task_space_stages`, `team_space_members`, `task_spaces`, `saved_views`, `task_fields`, `task_type_fields`, `task_field_values`, `milestones`, `todos`, `tags`, `task_tags`, `task_assignees`, `task_templates`, `repeat_rules`, `content_themes`, `content_rows` |
-| New columns on existing tables | 44 on `members`, `brands`, `brand_assets`, `content_types`, `tasks`, `workspace_settings`, `sheet_folders` | None: each is nullable or has a default |
+| New columns on existing tables | 41 on `members`, `brands`, `brand_assets`, `content_types`, `tasks`, `workspace_settings`, `sheet_folders` | None: each is nullable or has a default |
 | Changed default | 1: `tasks.priority` default `Medium` → `Normal` | New rows only; existing rows are renamed by a one-time step (B13) |
 | New unique indexes on existing tables | 3: `tasks.recurrence_key`, `tasks(content_task_id, media_board)`, `sheet_folders.brand_id` | None: all on new columns, empty for every existing row |
 | New foreign keys on existing tables | 4 | `sheet_folders.brand_id → brands ON DELETE CASCADE`: deleting a brand would delete that brand's sheet folder. The other three are `SET NULL` |
