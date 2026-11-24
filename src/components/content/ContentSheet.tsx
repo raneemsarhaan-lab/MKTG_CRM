@@ -33,7 +33,7 @@ import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 import type { ContentRowRec } from '@/lib/content-rows'
 import { mayNest } from '@/lib/content-rows'
-import { ThemeAdd, DestinationPick, DeleteRowPrompt, LinkTaskPick, destinations } from './RowDialogs'
+import { ThemeAdd, DestinationPick, DeleteRowPrompt, LinkTaskPick, MakeTaskDialog, destinations } from './RowDialogs'
 import type { ContentDraft } from './rows'
 
 type LinkCol = typeof LINK_COLS[number]
@@ -48,8 +48,9 @@ type Popup =
   | { kind: 'dest'; anchor: HTMLElement; theme: ContentTheme; pillar?: ContentTheme['pillars'][number] | null; rows: number }
   | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
   | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
+  | { kind: 'makeTask'; anchor: HTMLElement; rec: ContentRowRec }
 
-const KNOWN_ERRORS = ['child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
@@ -152,9 +153,11 @@ export function ContentSheet(p: ContentSheetProps) {
   }
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
-  const makeField = useMakeField('content', me.access, text => say(text))
+  // Spec 026: each Space's sheet has its own columns.
+  const sheetId = p.sheet ?? 'content'
+  const makeField = useMakeField(sheetId, me.access, text => say(text))
   const sheetCols = useSheetColumns({
-    sheet: 'content', set: 'all', bundle: p.columns, me, members: p.members, makeField,
+    sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField,
     defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
   })
   // Spec 023: Caption, Channels, TOV and the other task fields of the pieces' types, as columns.
@@ -209,6 +212,12 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!rec.task_id && !children) { void p.api.deleteRow?.(rec.id, {}).then(r => ok(r, t('rows.deleted'))); return }
     setPopup({ kind: 'delRow', anchor, rec, name, linked: !!rec.task_id, children })
   }
+  /** Make task: a child row needs its parent row linked first. */
+  function openMakeTask(rec: ContentRowRec, anchor: HTMLElement) {
+    const parent = rec.parent_id ? recs.find(r => r.id === rec.parent_id) : null
+    if (parent && !parent.task_id) { closePopup(true); say(t('err.parent_plain')); return }
+    setPopup({ kind: 'makeTask', anchor, rec })
+  }
   function rowItems(row: ContentRow, anchor: HTMLElement): MenuItem[] {
     const rec = recOf(row)
     if (!rowsOn || !rec) return []
@@ -222,9 +231,15 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!rec.parent_id && editable) items.push({ key: 'child', text: t('rows.addChildItem'), label: t('rows.addChildItem'), onSelect: pick(() => addPiece((row as { theme: ContentTheme }).theme, rec.pillar_id, rec.id)) })
     if (editable && !rec.parent_id && !childCount(rec.id)) items.push({ key: 'indent', text: t('rows.makeChild'), label: t('rows.makeChild'), onSelect: pick(() => void indent(rec, 'in')) })
     if (editable && parent) items.push({ key: 'outdent', text: t('rows.moveOut'), label: t('rows.moveOut'), onSelect: pick(() => void indent(rec, 'out')) })
+    // Spec 026: Make task (a new task in a chosen Space, or an existing one); Unlink keeps the row as plain text.
     if (!rec.task_id) {
-      items.push({ key: 'task', text: t('rows.makeTask'), label: t('rows.makeTask'), onSelect: pick(() => void p.api.rowToTask?.(rec.id).then(r => ok(r, t('rows.taskMade')))) })
-      items.push({ key: 'link', text: t('rows.linkTask'), label: t('rows.linkTask'), onSelect: () => setPopup({ kind: 'linkTask', anchor, rec }) })
+      if (p.api.makeTask) items.push({ key: 'task', text: t('rows.makeTaskItem'), label: t('rows.makeTaskItem'), onSelect: () => openMakeTask(rec, anchor) })
+      else {
+        items.push({ key: 'task', text: t('rows.makeTask'), label: t('rows.makeTask'), onSelect: pick(() => void p.api.rowToTask?.(rec.id).then(r => ok(r, t('rows.taskMade')))) })
+        items.push({ key: 'link', text: t('rows.linkTask'), label: t('rows.linkTask'), onSelect: () => setPopup({ kind: 'linkTask', anchor, rec }) })
+      }
+    } else if (editable && p.api.unlinkRow) {
+      items.push({ key: 'unlink', text: t('rows.unlink'), label: t('rows.unlink'), onSelect: pick(() => void p.api.unlinkRow!(rec.id).then(r => ok(r, t('rows.unlinked')))) })
     }
     if (editable) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
     return items
@@ -412,6 +427,7 @@ export function ContentSheet(p: ContentSheetProps) {
     if (row.kind === 'line') {
       const rec = row.rec
       if (col === 'rowNo') return menu(t('rows.menu', { name: rec.title }), rowItems(row, anchor))
+      if (col === 'task') return openMakeTask(rec, anchor)
       if (col === 'status') return menu(t('rows.noTask'), rowItems(row, anchor).filter(i => i.key === 'task' || i.key === 'link'))
       if (col === 'pillar') {
         if (!canEditRec(rec)) { onNote(`${row.key}|pillar`, t('readOnly')); return }
@@ -528,7 +544,8 @@ export function ContentSheet(p: ContentSheetProps) {
         const r = await p.api.updateRow(rec.id, { date: d || null })
         return r.success ? null : why(r.error)
       }
-      if (cl.custom.is(col)) { const r = await p.api.updateRow(rec.id, { values: { [String(col)]: value || null } }); return r.success ? null : why(r.error) }
+      // A plain row holds its own value in a task-field or sheet-only column, and a stage as a label (spec 026 §3, §6).
+      if (cl.custom.is(col) || col === 'status') { const r = await p.api.updateRow(rec.id, { values: { [String(col)]: value || null } }); return r.success ? null : why(r.error) }
       return null
     }
     if (row.kind !== 'piece' && row.kind !== 'clip') return null
@@ -642,6 +659,8 @@ export function ContentSheet(p: ContentSheetProps) {
             <ContentGrid
               media={ml}
               stages={p.stages}
+              rowRecs={recs}
+              spaceNameOf={task => { const id = (task as { home_space_id?: string | null }).home_space_id; return id ? p.spaces?.find(sp => sp.id === id)?.name ?? null : null }}
               rows={rows}
               me={me}
               members={p.members}
@@ -685,7 +704,7 @@ export function ContentSheet(p: ContentSheetProps) {
                   return true
                 },
                 heights: p.rowHeights,
-                saveHeights: p.api.setRowHeights ? e => p.api.setRowHeights!('linked_content', e) : undefined,
+                saveHeights: p.api.setRowHeights && sheetId === 'content' ? e => p.api.setRowHeights!('linked_content', e) : undefined,
                 say: text => say(text),
               }}
               columns={cl}
@@ -786,6 +805,18 @@ export function ContentSheet(p: ContentSheetProps) {
             onConfirm={async o => { const r = await p.api.deleteRow!(popup.rec.id, o); if (!r.success) return why(r.error); closePopup(true); say(t('rows.deleted')); return null }} />
         </SheetPopover>
       )}
+      {popup?.kind === 'makeTask' && (() => {
+        const parent = popup.rec.parent_id ? recs.find(r => r.id === popup.rec.parent_id) : null
+        const parentTask = parent?.task_id ? p.tasks.find(x => x.id === parent.task_id) ?? null : null
+        return (
+          <SheetPopover anchor={popup.anchor} label={t('rows.makeTask')} onClose={closePopup}>
+            <MakeTaskDialog title={popup.rec.title} spaces={(p.spaces ?? []).map(sp => ({ id: sp.id, name: sp.name }))} defaultSpaceId={p.space?.id ?? null}
+              tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} parentTask={parentTask} taskSpaces={p.taskSpaces ?? []}
+              onCancel={() => closePopup(true)}
+              onMake={async o => { const r = await p.api.makeTask!(popup.rec.id, o); if (!r.success) return why(r.error); closePopup(true); say(o.taskId ? t('rows.linked') : t('rows.taskMade')); return null }} />
+          </SheetPopover>
+        )
+      })()}
       {popup?.kind === 'linkTask' && (
         <SheetPopover anchor={popup.anchor} label={t('rows.linkTask')} onClose={closePopup}>
           <LinkTaskPick tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} onCancel={() => closePopup(true)}

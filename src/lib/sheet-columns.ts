@@ -96,16 +96,19 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
 ]
 export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
 export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
-export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (sheet === 'content' || sheet === 'video' ? BUILT_INS[sheet] : TASK_BUILT_INS)
-export const setsFor = (sheet: SheetId): string[] => (sheet === 'content' || sheet === 'video' ? SHEET_SETS[sheet] : ['all'])
+/** Spec 026: a Space's sheet of rows (`rows:<spaceId>`); the Content Space's keeps the id `content`. */
+export const ROWS_SHEET = /^rows:[0-9a-f-]{36}$/
+export const isRowsSheet = (sheet: string) => sheet === 'content' || ROWS_SHEET.test(sheet)
+export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (isRowsSheet(sheet) ? BUILT_INS.content : sheet === 'video' ? BUILT_INS.video : TASK_BUILT_INS)
+export const setsFor = (sheet: SheetId): string[] => (sheet === 'video' ? SHEET_SETS.video : ['all'])
 
 /**
- * Spec 026: where a Space's sheet keeps its columns. Content and Video keep the
- * ids their sheets always had, so their custom columns, values, formatting and
- * comments carry over; every other Space uses its task sheet's id.
+ * Spec 026: where a Space's sheet keeps its columns. The Content Space keeps the
+ * id its sheet always had; every other Space has `rows:<its id>`, and the
+ * one-time conversion moves the custom columns of its old sheet there.
  */
 export const spaceSheetId = (space: { id: string; key: string }): SheetId =>
-  (space.key === 'content' ? 'content' : space.key === 'video' ? 'video' : `tasks:space:${space.id}`) as SheetId
+  (space.key === 'content' || !space.id ? 'content' : `rows:${space.id}`) as SheetId
 
 export const isCustomKey = (key: string) => key.startsWith('c:')
 export const builtInOf = (sheet: SheetId, key: string) => builtInsFor(sheet).find(b => b.key === key)

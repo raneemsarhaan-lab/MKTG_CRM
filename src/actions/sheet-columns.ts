@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import { mapSheetColumn } from '@/lib/mappers'
 import {
-  COLUMN_KINDS, MAX_CUSTOM_COLUMNS, builtInOf, builtInsFor, isTaskSheet, setsFor, checkName, cleanOptions, clampWidth,
+  COLUMN_KINDS, MAX_CUSTOM_COLUMNS, ROWS_SHEET, builtInOf, builtInsFor, isTaskSheet, setsFor, checkName, cleanOptions, clampWidth,
   convertValues, defaultShownIn, isCustomKey, normName, parseValue,
 } from '@/lib/sheet-columns'
 import type { ChoiceOption, ColumnKind, SheetColumnRecord, SheetId } from '@/types/index'
@@ -30,7 +30,7 @@ type Tx = Prisma.TransactionClient
  * owner's alone, so its columns and values are private.
  */
 const isSheet = (s: string, memberId?: string): s is SheetId =>
-  s === 'content' || s === 'video' || (isTaskSheet(s) && (!s.startsWith('tasks:me:') || s === `tasks:me:${memberId}`))
+  s === 'content' || s === 'video' || ROWS_SHEET.test(s) || (isTaskSheet(s) && (!s.startsWith('tasks:me:') || s === `tasks:me:${memberId}`))
 const mine = (sheet: string, memberId: string) => !sheet.startsWith('tasks:me:') || sheet === `tasks:me:${memberId}`
 const isAdmin = (m: { access: string }) => m.access === 'admin' || m.access === 'superuser'
 const done = () => { revalidatePath('/board') }

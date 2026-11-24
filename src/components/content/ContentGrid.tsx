@@ -93,6 +93,9 @@ export interface ContentGridProps {
   onAddPiece(theme: ContentTheme, pillarId: string | null): void
   /** Sheet 2b: "+ Row" or "+ Child row" was clicked. */
   onAddRow?(row: Extract<ContentRow, { kind: 'add' }>): void
+  /** Spec 026: every row of the sheet (a child row's Task cell reads its parent), and a task's Space name. */
+  rowRecs?: import('@/lib/content-rows').ContentRowRec[]
+  spaceNameOf?(task: Task): string | null
   /** Sheet 2b: whether the member may edit a plain row (its title, date and values). */
   canEditLine?(rec: import('@/lib/content-rows').ContentRowRec): boolean
   /** Sheet 2b: Tab / Shift+Tab and other row keys. */
@@ -182,7 +185,7 @@ export function ContentGrid(p: ContentGridProps) {
   const isText = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'draft') return col === 'title'
     // Sheet 2b: a plain row's title, date and custom columns are typed.
-    if (row.kind === 'line') return lineEdit(row) && (col === 'title' || col === 'date' || isCustom(col))
+    if (row.kind === 'line') return lineEdit(row) && (col === 'title' || col === 'date' || col === 'status' || isCustom(col))
     if (isCustom(col)) return (row.kind === 'piece' || row.kind === 'clip') && cl.custom.isText(row.task, col)
     // Spec 019 stage 2: Status and Type take typed and pasted words too (the menus stay on click and Enter).
     if (col === 'status' && (row.kind === 'piece' || row.kind === 'clip')) return !row.task.dropped_at
@@ -192,7 +195,7 @@ export function ContentGrid(p: ContentGridProps) {
   const isMenu = (row: ContentRow, col: GridCol) => {
     if (row.kind === 'add' || row.kind === 'draft' || row.kind === 'group') return false
     if (row.kind === 'theme' || row.kind === 'pillar') return col === 'title' || col === 'rowNo'
-    if (row.kind === 'line') return col === 'rowNo' || col === 'status' || col === 'pillar'
+    if (row.kind === 'line') return col === 'rowNo' || col === 'pillar' || col === 'task'
     if (isCustom(col)) return cl.custom.isMenu(col)
     if (row.kind === 'clip') return ['rowNo', 'status', 'assignee'].includes(col)
     return ['rowNo', 'type', 'status', 'media', 'assignee', 'pillar', 'doc', 'design', 'task', 'post', 'published', 'archive'].includes(col)
@@ -247,6 +250,13 @@ export function ContentGrid(p: ContentGridProps) {
       if (v === null) return Promise.resolve(tf(col === 'status' ? 'notAStage' : 'notAType', { text: value.trim() }))
       if (col === 'status' && v === row.task.status) return Promise.resolve(null)
       if (col === 'type' && v === (row.task.content_type_label ?? '')) return Promise.resolve(null)
+      return p.onCommit(row, col, v)
+    }
+    // Spec 026 (§3): a plain row's stage is a label — one of the Space's stage names, with no stage rules.
+    if (col === 'status' && row.kind === 'line') {
+      if (!value.trim()) return p.onCommit(row, col, '')
+      const v = p.stages?.match(value)?.stage_id ?? readWord('status', value)
+      if (v === null) return Promise.resolve(tf('notAStage', { text: value.trim() }))
       return p.onCommit(row, col, v)
     }
     return p.onCommit(row, col, value)
@@ -324,6 +334,7 @@ export function ContentGrid(p: ContentGridProps) {
       if (row.kind === 'line') {
         if (col === 'title') return row.rec.title
         if (col === 'date') return row.rec.date ?? ''
+        if (col === 'status') return row.rec.values.status && STAGE_META[row.rec.values.status as StageId] ? stageWord(row.rec.values.status) : ''
         if (isCustom(col)) return row.rec.values[String(col)] ?? ''
         return ''
       }
@@ -346,7 +357,7 @@ export function ContentGrid(p: ContentGridProps) {
       const task = taskOf(row)
       if (task && isCustom(col)) return cl.custom.readOnlyNote(task, col)
       // Sheet 2b: a plain row has no task yet: its task's cells wait for one.
-      if (row.kind === 'line') return col === 'title' || col === 'date' || isCustom(col) ? (lineEdit(row) ? null : t('readOnly')) : t('rows.needsTask')
+      if (row.kind === 'line') return col === 'title' || col === 'date' || col === 'status' || isCustom(col) ? (lineEdit(row) ? null : t('readOnly')) : col === 'task' ? null : t('rows.needsTask')
       return row.kind === 'piece' && task && !task.dropped_at && (col === 'title' || col === 'date') && !p.canEdit(task) ? t('readOnly') : null
     },
     onCommit: (row, col, v) => commitWord(row, col, v),
@@ -405,7 +416,18 @@ export function ContentGrid(p: ContentGridProps) {
             const pl = row.theme.pillars.find(x => x.id === r.pillar_id)
             return pl ? <span className="fx-sheet-ellipsis">{pl.name}</span> : <span className="fx-sheet-muted">{t('pillar.none')}</span>
           }
-          case 'status': return <span className="fx-sheet-muted" data-line-status="">{t('rows.noTask')}</span>
+          // Spec 026 (§3): a plain row's stage is a label only — it triggers no stage rules.
+          case 'status': return r.values.status && STAGE_META[r.values.status as StageId]
+            ? <span className="fx-sheet-ellipsis" data-line-status={r.values.status}>{stageWord(r.values.status as StageId)}</span>
+            : <span className="fx-sheet-muted" data-line-status="">{t('rows.noTask')}</span>
+          case 'type': return r.values.type ? <span className="fx-sheet-ellipsis">{r.values.type}</span> : null
+          // Spec 026 (§4): the Task cell of a plain row makes it a task.
+          case 'task': {
+            const parent = r.parent_id ? p.rowRecs?.find(x => x.id === r.parent_id) : null
+            return parent && !parent.task_id
+              ? <span className="fx-sheet-muted" data-make-task-blocked="">{t('rows.parentFirst')}</span>
+              : <span className="fx-sheet-link" data-make-task={r.id}>{t('rows.makeTask')}</span>
+          }
         }
         return null
       }
@@ -453,10 +475,12 @@ export function ContentGrid(p: ContentGridProps) {
         case 'doc': case 'design': case 'post': case 'published':
           return isClip ? null : linkCell(task, col, can)
         case 'task':
-          // Every piece is a task: its link is always there (FR: the team sheet's Task Link).
+          // Spec 026 (§4): a linked row's Task cell — the task's name as a link, its Space and its stage.
           return isClip ? null : (
-            <a className="fx-sheet-link fx-sheet-ellipsis" href={`/board?task=${task.id}`} tabIndex={-1}
-               onClick={e => e.preventDefault()}>{t('links.openTask')}</a>
+            <span className="fx-sheet-ellipsis" data-task-cell={task.id} style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline', minWidth: 0 }}>
+              <a className="fx-sheet-link fx-sheet-ellipsis" href={`?task=${task.id}`} tabIndex={-1} onClick={e => e.preventDefault()}>↗ {task.name}</a>
+              <span className="fx-sheet-muted" style={{ flexShrink: 0 }}>{[p.spaceNameOf?.(task), stageOf(task)].filter(Boolean).join(' · ')}</span>
+            </span>
           )
         case 'date':
           if (isClip) return null

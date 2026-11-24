@@ -1,5 +1,6 @@
 'use client'
 
+import { spaceSheetId } from '@/lib/sheet-columns'
 import { AddLabelProvider } from '@/components/spaces/addLabel'
 import { newTaskLabel, rangeOf, typesForSpace } from '@/lib/space-settings'
 import { createTask } from '@/actions/tasks'
@@ -192,7 +193,10 @@ function KanbanBoardInner({
   // Spec 022 (US4): a Space's Board shows its own stages; the Content and Video sheets read their Spaces'.
   const ss = useSpaceStages(hosted && spaceId ? spaceId : null, spaceStages, taskSpaceStages)
   const spaceStageCols = !!ss?.own
-  const contentStages = useSpaceStages(spaces.find(x => x.key === 'content')?.id ?? null, spaceStages, taskSpaceStages)
+  // Spec 026: the Space whose sheet is shown — the page's Space, else the Content Space.
+  const sheetSpace = (spaceId ? spaces.find(x => x.id === spaceId) : undefined) ?? spaces.find(x => x.key === 'content')
+  const sheetSpaceId = sheetSpace?.id ?? null
+  const contentStages = useSpaceStages(sheetSpaceId, spaceStages, taskSpaceStages)
   const videoStages = useSpaceStages(spaces.find(x => x.key === 'video')?.id ?? null, spaceStages, taskSpaceStages)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
@@ -748,7 +752,7 @@ function KanbanBoardInner({
     },
     // ── the Content sheet (spec 009) ──
     async addPlan(rows, opts) {
-      const res = await addPlan(rows, opts).catch(() => ({ success: false as const, error: 'generic' }))
+      const res = await addPlan(rows, { ...opts, spaceId: sheetSpaceId }).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) router.refresh()
       return res
     },
@@ -841,12 +845,19 @@ function KanbanBoardInner({
         return res
       }
       return {
-        addRow: run(contentRows.addRow), updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
+        // Spec 026: every call carries the Space whose sheet this is.
+        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, spaceId: sheetSpaceId })),
+        updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
         indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
-        linkRowTask: run(contentRows.linkRowTask), reorderThemes: run(contentRows.reorderThemes), removeSheetTheme: run(contentRows.removeSheetTheme),
-        addPillarAt: run(contentRows.addPillarAt), reorderPillars: run(contentRows.reorderPillars), removePillarTo: run(contentRows.removePillarTo),
-        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme(input)),
-        themeCandidates: () => contentRows.themeCandidates().catch(() => []),
+        linkRowTask: run(contentRows.linkRowTask),
+        makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
+        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceId)),
+        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceId)),
+        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceId)),
+        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceId)),
+        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceId)),
+        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceId })),
+        themeCandidates: () => contentRows.themeCandidates(sheetSpaceId).catch(() => []),
       }
     })(),
     async removePillar(id) {
@@ -1251,13 +1262,17 @@ function KanbanBoardInner({
         <ContentSheet
           stages={contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
-          themes={themeScope ? themes.filter(themeScope) : themes}
+          themes={(themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
           me={currentUser}
           members={members}
           contentTypes={types}
           columns={columnsBundle}
-          rowHeights={linkedRowHeights?.content}
-          rows={contentRows_}
+          rowHeights={sheetSpace?.key === 'content' || !sheetSpace ? linkedRowHeights?.content : undefined}
+          rows={contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
+          sheet={sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
+          space={sheetSpace ?? null}
+          spaces={spaces}
+          taskSpaces={taskSpaces}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}

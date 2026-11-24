@@ -25,7 +25,10 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
   ])
   const has = new Set(themes.map(t => t.project_id))
   let top = themes.reduce((m, t) => Math.max(m, t.position), 0)
-  const add = flagged.filter(p => !has.has(p.id))
+  // A project flagged as a theme that is on no Space's sheet yet (Paste plan made it) comes here;
+  // one that is a theme on another Space's sheet stays there (spec 026).
+  const elsewhere = new Set((await db.contentSheetTheme.findMany({ where: { NOT: { space_id: sid } }, select: { project_id: true } })).map(t => t.project_id))
+  const add = flagged.filter(p => !has.has(p.id) && !elsewhere.has(p.id))
   if (add.length) {
     await db.contentSheetTheme.createMany({ data: add.map(p => ({ project_id: p.id, space_id: sid, position: ++top })), skipDuplicates: true })
     for (const p of add) has.add(p.id)

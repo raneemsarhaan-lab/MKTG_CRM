@@ -26,7 +26,7 @@ export type BoardTab = 'pipeline' | 'content'
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
 
 /** Spec 021 (T081): 'tasks:<node>' is a Space's, brand's or My tasks' Tasks sheet. */
-export type SheetId = 'content' | 'video' | `tasks:${string}`
+export type SheetId = 'content' | 'video' | `tasks:${string}` | `rows:${string}`
 export type ColumnKind = 'text' | 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'task'
 export interface ChoiceOption { id: string; name: string; color: string }
 /** One column of a sheet the team has shaped (data-model §1). */

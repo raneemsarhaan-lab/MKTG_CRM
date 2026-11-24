@@ -56,6 +56,19 @@ export async function convertSheets(db: Db): Promise<{ backfilled: number; expor
     update: {},
   })
 
+  // Custom columns (and so their values) move to each Space's own sheet: the Video sheet's to the Video
+  // Space, a Space's task sheet's to that Space. Shown everywhere there: the old sheet's column sets are gone.
+  for (const sp of await db.teamSpace.findMany({ where: { key: { not: 'content' } }, select: { id: true, key: true, media_board: true } })) {
+    const from = sp.id === video?.id ? ['video', `tasks:space:${sp.id}`] : [`tasks:space:${sp.id}`]
+    const to = `rows:${sp.id}`
+    const taken = new Set((await db.sheetColumn.findMany({ where: { sheet: to }, select: { key: true } })).map(c => c.key))
+    for (const col of await db.sheetColumn.findMany({ where: { sheet: { in: from }, key: { startsWith: 'c:' } }, orderBy: { position: 'asc' }, select: { id: true, key: true } })) {
+      if (taken.has(col.key)) continue
+      taken.add(col.key)
+      await db.sheetColumn.update({ where: { id: col.id }, data: { sheet: to, shown_default: true, shown_in: [] } })
+    }
+  }
+
   let videos = 0, clips = 0, themes = 0
   if (!video) return { backfilled, exported: rows, videos, clips, themes }
   const all = await db.task.findMany({

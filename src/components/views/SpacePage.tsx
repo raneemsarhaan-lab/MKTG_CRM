@@ -150,17 +150,15 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
         if (tab === 'board') return <BrandGroupProvider value={groupBrand && !folderBrand}><BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} /></BrandGroupProvider>
-        // T081: every Sheet tab is a full workbook (tabs, toolbar, formatting, comments, blank tabs).
-        if (tab === 'sheet' && sheetStart) return (
-          <NodeWorkbook key={view?.id} data={data} folder={space.key as 'content' | 'video'}
-            linked={<KanbanBoard {...data} surface="sheets" sheetsView={sheetStart} scopeTasks={inView} spaceId={spaceId}
-              sheetScope={brandIds.length ? (x: Task) => !!x.brand_id && brandIds.includes(x.brand_id) : undefined} themeScope={themeScope} />} />
+        // Spec 026: every Space's Sheet view is its sheet of rows — themes, pillars, plain and linked rows —
+        // inside a full workbook (tabs, toolbar, formatting, comments, blank tabs). The Content and Video
+        // Spaces keep the workbooks their sheets always had, so formatting and comments carry over.
+        if (tab === 'sheet') return (
+          <NodeWorkbook key={view?.id} data={data} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
+            linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
+              themeScope={themeScope} />} />
         )
-        // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
-        const body = tab === 'sheet'
-          ? <NodeWorkbook key={view?.id} data={data} node={`space:${spaceId}`}
-              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand} />} />
-          : <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
+        const body = <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
               milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}
               link={board ? undefined : { spaceId, media: viewTasks(data) }} />
         return <>{body}<TaskPanel data={data} spaceId={spaceId} />{taskForm}</>

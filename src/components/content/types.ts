@@ -27,6 +27,10 @@ export interface ContentApi extends SheetApi {
   deleteRow?(id: string, opts: { task?: 'unlink' | 'delete'; children?: 'up' | 'delete' }): Promise<Result>
   rowToTask?(id: string): Promise<Result & { taskId?: string }>
   linkRowTask?(id: string, taskId: string): Promise<Result>
+  /** Spec 026 (§4–§5): Make task — a new task in a Space, or an existing one; a child row makes a subtask. */
+  makeTask?(id: string, opts: { spaceId?: string | null; taskId?: string | null; type?: string | null }): Promise<Result & { taskId?: string }>
+  /** Spec 026 (§4): unlink — the row keeps its last values as plain text. */
+  unlinkRow?(id: string): Promise<Result>
   addSheetTheme?(input: { projectId?: string; newProject?: ThemePatch & { name: string }; anchor?: { projectId: string; where: 'above' | 'below' } | null }): Promise<Result & { projectId?: string }>
   reorderThemes?(projectId: string, target: string, where: 'before' | 'after'): Promise<Result>
   removeSheetTheme?(projectId: string, dest: { projectId: string; pillarId?: string | null } | null): Promise<Result>
@@ -57,4 +61,11 @@ export interface ContentSheetProps {
   rowHeights?: Record<string, number>
   /** Sheet 2b: the sheet's rows. Without them, every piece is a row in date order. */
   rows?: ContentRowRec[]
+  /** Spec 026: where this sheet keeps its columns (`content`, or `rows:<spaceId>`). */
+  sheet?: import('@/types/index').SheetId
+  /** Spec 026: the Space whose sheet this is, and every Space a task can be made in. */
+  space?: { id: string; key: string; name: string } | null
+  spaces?: { id: string; key: string; name: string; color: string; media_board?: string | null }[]
+  /** Which tasks show in which Space (Make task › an existing task there). */
+  taskSpaces?: { task_id: string; space_id: string }[]
 }

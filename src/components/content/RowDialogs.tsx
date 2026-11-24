@@ -158,3 +158,74 @@ export function LinkTaskPick({ tasks, taken, onPick, onCancel }: {
     </div>
   )
 }
+
+/**
+ * Make task (spec 026 §4–§5): a plain row becomes a linked row — a new task in
+ * the chosen Space, or an existing task there. A child row makes a subtask of
+ * its parent row's task, so it has no Space to choose.
+ */
+export function MakeTaskDialog({ title, spaces, defaultSpaceId, tasks, taken, parentTask, taskSpaces, onMake, onCancel }: {
+  title: string
+  spaces: { id: string; name: string }[]
+  defaultSpaceId: string | null
+  tasks: Task[]
+  /** Tasks already on this sheet. */
+  taken: Set<string>
+  /** A child row: the parent row's task. */
+  parentTask: Task | null
+  /** Which tasks show in which Space, for "an existing task there". */
+  taskSpaces: { task_id: string; space_id: string }[]
+  onMake(o: { spaceId?: string | null; taskId?: string | null }): Promise<string | null>
+  onCancel(): void
+}) {
+  const t = useTranslations('content')
+  const [spaceId, setSpaceId] = useState(defaultSpaceId ?? spaces[0]?.id ?? '')
+  const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [q, setQ] = useState('')
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const inSpace = useMemo(() => new Set(taskSpaces.filter(r => r.space_id === spaceId).map(r => r.task_id)), [taskSpaces, spaceId])
+  const list = useMemo(() => {
+    const k = q.trim().toLowerCase()
+    return tasks.filter(x => !x.dropped_at && !taken.has(x.id)
+      && (parentTask ? x.parent_task_id === parentTask.id : !x.parent_task_id && (inSpace.has(x.id) || (x as { home_space_id?: string | null }).home_space_id === spaceId))
+      && (!k || x.name.toLowerCase().includes(k))).slice(0, 30)
+  }, [tasks, taken, q, parentTask, inSpace, spaceId])
+  const go = (o: { spaceId?: string | null; taskId?: string | null }) => { setBusy(true); setNote(null); void onMake(o).then(err => { setBusy(false); setNote(err) }) }
+  return (
+    <form className="fx-sheet-pop-form" data-make-task-dialog="" onSubmit={e => { e.preventDefault(); if (mode === 'new') go({ spaceId: parentTask ? null : spaceId }) }}>
+      <span className="fx-sheet-pop-title">{t('rows.makeTaskTitle', { name: title })}</span>
+      {parentTask
+        ? <span className="fx-sheet-muted" data-make-subtask="">{t('rows.subtaskOf', { name: parentTask.name })}</span>
+        : (
+          <label className="fx-sheet-pop-title" style={{ fontWeight: 600 }}>{t('rows.inSpace')}
+            <select value={spaceId} onChange={e => setSpaceId(e.target.value)} data-make-space="">
+              {spaces.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
+            </select>
+          </label>
+        )}
+      <span role="radiogroup" aria-label={t('rows.makeTask')} className="fx-sheet-pop-row">
+        <label className="fx-content-check"><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} data-make-mode="new" />{t('rows.newTask')}</label>
+        <label className="fx-content-check"><input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} data-make-mode="existing" />{t('rows.existingTask')}</label>
+      </span>
+      {mode === 'existing' && (
+        <>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('rows.findTask')} aria-label={t('rows.findTask')} data-make-search="" />
+          <div role="listbox" aria-label={t('rows.existingTask')} style={{ maxHeight: 220, overflowY: 'auto', display: 'grid' }}>
+            {list.map(x => (
+              <button key={x.id} type="button" role="option" aria-selected={false} className="fx-sheet-btn" style={{ justifyContent: 'flex-start', textAlign: 'start' }} disabled={busy}
+                      data-make-existing={x.name} onClick={() => go({ spaceId: parentTask ? null : spaceId, taskId: x.id })}>{x.name}</button>
+            ))}
+            {!list.length && <span className="fx-sheet-muted">{t('rows.noTasks')}</span>}
+          </div>
+          <span className="fx-sheet-muted">{t('rows.taskWins')}</span>
+        </>
+      )}
+      {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+      <span className="fx-sheet-pop-row">
+        <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
+        {mode === 'new' && <button type="submit" className="fx-sheet-btn is-primary" disabled={busy || (!parentTask && !spaceId)} data-make-task-go="">{t('rows.makeTask')}</button>}
+      </span>
+    </form>
+  )
+}
