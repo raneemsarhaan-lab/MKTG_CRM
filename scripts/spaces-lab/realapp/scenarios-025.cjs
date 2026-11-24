@@ -40,16 +40,9 @@ module.exports = (EMAIL, psql, ok) => {
           ok(page.url().endsWith('/my-tasks'), 'the arrow does not open the Space')
           const folders = await page.$$eval('[data-space="content"] [data-node^="space:content:"]', els => els.map(e => e.textContent.replace(/[\d·\s]+$/, '').trim()))
           ok(folders.join('|') === brands().map(b => b[1]).join('|'), `one folder per brand, short names: ${folders.join(', ')}`)
-          // Counts: open, with overdue in red; the same task counted in the Space, the folder and the brand.
-          const want = sql => psql(sql).replace('|', ':')
-          const spaceWant = want(`select count(*), count(*) filter (where t.due_date < (now() at time zone 'Africa/Cairo')::date) from task_spaces ts join tasks t on t.id=ts.task_id
-            where ts.space_id='${space('content')}' and t.dropped_at is null and t.status<>'publish' and not (t.media_board is not null and t.content_task_id is not null) and not (t.kind='simple' and t.simple_status='s-done')`)
-          ok(await counts(page, 'space:content') === spaceWant, `Content: ${await counts(page, 'space:content')} vs ${spaceWant}`)
-          const folderWant = want(`select count(*), count(*) filter (where t.due_date < (now() at time zone 'Africa/Cairo')::date) from task_spaces ts join tasks t on t.id=ts.task_id
-            where ts.space_id='${space('content')}' and t.brand_id='${b1[0]}' and t.dropped_at is null and t.status<>'publish' and not (t.media_board is not null and t.content_task_id is not null) and not (t.kind='simple' and t.simple_status='s-done')`)
-          ok(await counts(page, `space:content:${b1[0]}`) === folderWant, `Content › ${b1[1]}: ${await counts(page, `space:content:${b1[0]}`)} vs ${folderWant}`)
-          ok(Number((await counts(page, `brand:${b1[0]}`)).split(':')[1]) >= 1, 'the brand shows an overdue count')
-          ok((await page.$eval(`[data-node="brand:${b1[0]}"] [data-overdue]`, el => getComputedStyle(el).color)) === 'rgb(210, 32, 64)', 'overdue is red')
+          // Numbers: only My tasks and Inbox carry one (user, 24 Nov 2026); Spaces, folders and brands show names alone.
+          ok(await page.isVisible('[data-node="my-tasks"] [data-count]'), 'My tasks keeps its number')
+          for (const node of ['space:content', `space:content:${b1[0]}`, `brand:${b1[0]}`]) ok(!(await page.$(`[data-node="${node}"] [data-count]`)), `no number on ${node}`)
           // It fits without scrolling.
           const fits = await page.$eval('[data-nav-tree]', el => { const box = el.parentElement; return box.scrollHeight <= box.clientHeight + 1 })
           ok(fits, 'the sidebar fits on screen without scrolling')
@@ -68,17 +61,14 @@ module.exports = (EMAIL, psql, ok) => {
           await go('/spaces/content?view=board')
           await page.waitForSelector(`[data-task-card="${mine}"]`, { timeout: 60000 })
           ok(await page.isVisible(`[data-task-card="${other}"]`), 'Content shows tasks from every brand')
-          // The brand filter narrows it; clearing it brings the rest back.
-          await page.click(`[data-brand-chip="${b1[0]}"]`)
-          await page.waitForTimeout(600)
-          ok(await page.isVisible(`[data-task-card="${mine}"]`) && !(await page.$(`[data-task-card="${other}"]`)), 'the brand filter')
-          await page.click('[data-brand-chip="all"]')
+          // No brand filter on the Space page (user, 24 Nov 2026): its brand folders are the filter.
+          ok(!(await page.$('[data-brand-chip]')), 'the Space page has no brand filter chips')
           // The folder: that brand only, with the Space's views.
           await page.click('[data-space-toggle="content"]').catch(() => {})
           await go(`/spaces/content/${b1[0]}?view=board`)
           await page.waitForSelector(`[data-task-card="${mine}"]`, { timeout: 60000 })
           ok(!(await page.$(`[data-task-card="${other}"]`)), `Content › ${b1[1]} shows only that brand`)
-          ok(!(await page.$('[data-space-brands]')), 'a folder has no brand filter')
+          ok(!(await page.$('[data-brand-chip]')) && !(await page.$('[data-group-brand]')), 'a folder has no brand controls')
           const tabs = await page.$$eval('[role="toolbar"] [data-view-tab]', els => els.map(e => e.getAttribute('data-view-tab')))
           ok(tabs.join(',') === 'board,sheet,calendar', `Board, Sheet, Calendar: ${tabs}`)
           // An edit in the folder shows in the Space and on the brand page.

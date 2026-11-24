@@ -1,4 +1,4 @@
-<title>Content and Video Sheets</title>
+<title>Space Sheets</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap">
 <style>
@@ -52,191 +52,218 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
 .gap b { color: var(--ink) }
 .red { color: var(--coral); font-weight: 600 }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px }
+.tree { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; line-height: 1.75; background: var(--soft); border-radius: 12px; padding: 12px 16px; overflow-x: auto; white-space: pre; color: var(--ink) }
+.tree i { font-style: normal; color: var(--muted); font-family: var(--body) }
+.strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px }
+.strip span { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-weight: 600 }
+.strip span.on { background: var(--ink); color: var(--panel); border-color: var(--ink) }
+.strip small { color: var(--muted); font-weight: 500 }
 </style>
 
 <div class="wrap">
   <header class="top">
-    <span class="eyebrow">Momentum · methodology · as built on 23 Nov 2026</span>
-    <h1>Content and Video sheets</h1>
-    <p class="lede">How the two linked sheets work today: what each row is, what each column holds, who may change what, how Status moves a task, and how they connect to the Design and Video boards. Every row is a real board task, so the sheet and the board are two views of the same work.</p>
+    <span class="eyebrow">Momentum · methodology · as built on 24 Nov 2026</span>
+    <h1>Space sheets</h1>
+    <p class="lede">One kind of sheet, used as the Sheet view of every Space, every Space › Brand folder and every brand page. It replaced the separate Content and Video sheets and the Sheets section. A row is a line of the plan; linking it to a task makes the row and the task one thing.</p>
   </header>
 
   <nav class="toc" aria-label="Contents">
-    <a href="#where">1 · Where they open</a>
-    <a href="#rows">2 · Rows</a>
-    <a href="#adding">2b · Adding and moving</a>
-    <a href="#columns">3 · Columns</a>
-    <a href="#status">4 · Status and stages</a>
-    <a href="#editing">5 · Editing rules</a>
-    <a href="#format">6 · Formatting and comments</a>
-    <a href="#media">7 · Links to Design and Video</a>
-    <a href="#shared">8 · Shared or private</a>
-    <a href="#open">9 · Open points</a>
+    <a href="#where">1 · Where a sheet opens</a>
+    <a href="#structure">2 · Themes, pillars, rows</a>
+    <a href="#plain">3 · Plain rows</a>
+    <a href="#linked">4 · Linked rows and Make task</a>
+    <a href="#children">5 · Child rows</a>
+    <a href="#columns">6 · Columns</a>
+    <a href="#status">7 · Status and stages</a>
+    <a href="#editing">8 · Editing rules</a>
+    <a href="#format">9 · Formatting and comments</a>
+    <a href="#shared">10 · Shared or private</a>
+    <a href="#changed">11 · What changed</a>
+    <a href="#open">12 · Open points</a>
   </nav>
 
   <main>
     <section class="part" id="where">
-      <h2>1 · What they're for, and where they open</h2>
+      <h2>1 · Where a sheet opens</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Page</th><th>Its Sheet view shows</th></tr></thead>
+        <tbody>
+          <tr><td>A Space</td><td>All of that Space's rows, every brand.</td></tr>
+          <tr><td>Space › Brand folder</td><td>That Space's rows for one brand (the themes whose project belongs to the brand).</td></tr>
+          <tr><td>A brand's page</td><td>The brand's rows from every Space, one Space at a time, and "All tasks".</td></tr>
+          <tr><td>My tasks</td><td>A task sheet: one line per task of mine (no themes or plain rows).</td></tr>
+        </tbody>
+      </table></div>
+      <h3>On a brand's page</h3>
+      <div class="strip" aria-label="The strip above a brand's sheet"><small>Sheets by Space</small><span class="on">Content <small>12</small></span><span>Design <small>0</small></span><span>Video <small>5</small></span><span>Planning <small>0</small></span><span>All tasks <small>61</small></span></div>
+      <ul>
+        <li>Each Space is on the strip with the number of the brand's rows on its sheet. Choosing one opens that Space's sheet for the brand, on the same page, fully editable.</li>
+        <li><b>All tasks</b> lists the brand's tasks from every Space together, with a Space column.</li>
+        <li>The page opens on the Space last used for that brand, or the first Space that has rows.</li>
+      </ul>
+      <p class="note">There is no Sheets section in the sidebar. An old Sheets address, and the link in a sheet-comment notification, lead to the page that owns the sheet, on the same tab and cell. Each sheet sits in a workbook, so blank tabs can still be added beside it.</p>
+    </section>
+
+    <section class="part" id="structure">
+      <h2>2 · Themes, pillars, rows</h2>
+      <div class="tree">▾ Theme               <i>a group row across the sheet; it is a project</i>
+   ▾ Pillar           <i>a sub-group of its theme</i>
+        Row           <i>plain, or linked to a task</i>
+          Child row   <i>one level under a row</i>
+        + Row
+   Row                <i>a row with no pillar sits under the theme</i>
+   + Row</div>
       <div class="cols">
-        <div class="box"><h3 class="c">Content sheet</h3><p>The content plan as a spreadsheet: campaigns (themes), their pillars and their pieces. Used by Content Creators, the Marketing Manager and theme owners.</p></div>
-        <div class="box"><h3 class="v">Video sheet</h3><p>Every video and its clips, with files, timings and review. Used by editors and the content team.</p></div>
+        <div class="box"><h3>Adding</h3><ul>
+          <li><b>Theme</b>: "+ Theme" on the toolbar, or Insert theme above / below in a theme's menu. Pick an existing project or make one (name, owner, frequency, audience). Admins and superusers.</li>
+          <li><b>Pillar</b>: "+ Pillar" in a theme's menu. Admins, superusers and the theme's owner.</li>
+          <li><b>Row</b>: "+ Row" at the end of each theme or pillar (it carries the Space's own words, such as "+ New clip"); type, and Enter adds it and starts the next. Anyone with access to the Space.</li>
+          <li><b>Child row</b>: Add child row in a row's menu, or Tab on a row's number. One level only.</li>
+        </ul></div>
+        <div class="box"><h3>Moving and removing</h3><ul>
+          <li>Drag a row by its number onto a theme or pillar. A linked row's task changes its theme or pillar to match.</li>
+          <li>Themes and pillars are reordered by dragging; this changes the sheet, not the projects.</li>
+          <li>Removing a theme or pillar asks where its rows go. A removed theme leaves this sheet only; the project stays.</li>
+          <li>The same project can be a theme on several Spaces' sheets; each sheet has its own rows under it.</li>
+        </ul></div>
+      </div>
+    </section>
+
+    <section class="part" id="plain">
+      <h2>3 · Plain rows</h2>
+      <ul>
+        <li>A planning line, not a task: no SLA, no approvals, no card on a board.</li>
+        <li>It holds a title, a date and its own value in every column.</li>
+        <li>Its Status is a label in the Space's stage names. It triggers no stage rules.</li>
+        <li>Anyone with access to the Space can edit plain rows.</li>
+        <li><b>Paste plan</b> only ever creates plain rows, on the sheet it is pasted into. A pasted task link no longer links or changes a task.</li>
+      </ul>
+    </section>
+
+    <section class="part" id="linked">
+      <h2>4 · Linked rows and Make task</h2>
+      <p>The <b>Task</b> column shows <b>Make task</b> on a plain row. It asks for the destination Space, then either creates a task there or connects the row to a task that is already there.</p>
+      <div class="cols">
+        <div class="box"><h3>A new task</h3><ul>
+          <li>Starts where that Space starts (Design and Video: Ready For Design), on its board if it has one.</li>
+          <li>Takes the Space's default type, assignee and priority, the brand of the folder, and the theme and pillar of the row's groups.</li>
+          <li>The row's date becomes the publishing date; values in task-field columns go to the task when its type has that field.</li>
+          <li>Only people who may create in that Space can make it.</li>
+        </ul></div>
+        <div class="box"><h3>An existing task</h3><ul>
+          <li>It must be in the chosen Space and not already on this sheet.</li>
+          <li>Where both have a value, the task's value wins; the row fills only what the task lacks.</li>
+          <li>The task joins the row's theme and pillar.</li>
+        </ul></div>
       </div>
       <ul>
-        <li><b>Content Space › Sheet</b> and <b>Video Space › Sheet</b>: a workbook whose first, fixed tab is the linked sheet; blank tabs can sit beside it.</li>
-        <li><b>Brand › Sheet</b>: All tasks, Content sheet and Video sheet, limited to that brand.</li>
-        <li><b>Sheets</b> section: the Content and Video folders, with the linked sheet first.</li>
-        <li>From a task panel ("Open sheet") and from a content row's menu ("Open in video sheet").</li>
+        <li><b>Once linked</b>, every task-field column is the task's field: an edit in the sheet, the task panel or a board shows everywhere. Task permissions, required fields and stage rules apply to those cells.</li>
+        <li>The Task cell shows the task's name as a link, its Space and its stage.</li>
+        <li><b>Unlink</b> keeps the row with its last values as plain text. The task carries on in its Space.</li>
+        <li>The Content Space's sheet still gives a new task in one of its themes a row by itself, so work started on a board appears in the plan. Other Spaces' sheets hold only what is put on them.</li>
       </ul>
-      <p class="note">Linked means an edit in the sheet goes through the board's own save, with the board's rules. A change on the board shows in the sheet straight away.</p>
     </section>
 
-    <section class="part" id="rows">
-      <h2>2 · Rows</h2>
-      <div class="cols">
-        <div class="box">
-          <h3 class="c">Content sheet</h3>
-          <ul>
-            <li><b>Theme</b> row: a project shown on the sheet, with its owner, frequency and audience. The theme is the sheet's entry; the project stays when the theme is removed.</li>
-            <li><b>Pillar</b> rows under it, each with its rows and its own <b>+ Row</b>; rows without a pillar follow, then the theme's <b>+ Row</b>.</li>
-            <li>A <b>row</b> is a line of the plan. A <b>plain row</b> has a title, a date and custom values; a <b>linked row</b> stands for one task and shows its fields. A linked Video row opens to show its clips.</li>
-            <li><b>Child rows</b>: one level under a row, then <b>+ Child row</b>.</li>
-            <li><b>Create task</b> turns a plain row into a task at To Do (the theme's owner owns it; whoever made it, if not the owner or an admin, is its assignee). <b>Link a task</b> links an existing one.</li>
-            <li><b>Paste plan</b>: on a theme, pillar or + Row line it adds plain rows there; from the toolbar it reads the Content Library and sorts rows into New, Matched by Task Link, Already in the sheet and Problems. Pasting the same rows again adds nothing.</li>
-            <li><b>Archive</b> hides a linked row's task from the board and greys it here; Restore brings it back to its stage.</li>
-          </ul>
-        </div>
-        <div class="box">
-          <h3 class="v">Video sheet</h3>
-          <ul>
-            <li>Each <b>video</b> (a Video task) is a band: name, clip count, progress, stage mix and due date.</li>
-            <li>Its <b>clips</b> (subtasks) follow, ordered by clip number (01, 02…), then <b>+ Clip</b>.</li>
-            <li>Clip numbers come from the file name (<code>NN_SOURCE_in-out.mp4</code>), the # column or Paste clips.</li>
-            <li>A new clip is a Reel at To Do, owned by whoever adds it. <b>+ Video</b> is for admins and superusers.</li>
-            <li><b>File</b>: upload (up to 200 MB with storage), paste a link, preview, or remove with Undo.</li>
-            <li><b>Drop</b> works like Archive.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="part" id="adding">
-      <h2>2b · Adding, moving and removing</h2>
-      <div class="cols">
-        <div class="box">
-          <h3 class="c">Adding</h3>
-          <ul>
-            <li><b>Theme</b>: "+ Theme" at the top, or Insert theme above / below in a theme's menu. Pick an existing project or make a new one (name, owner, frequency, audience); the theme takes the project's name and opens with an empty + Row. Admins and superusers.</li>
-            <li><b>Pillar</b>: "+ Pillar" in a theme's menu, or Insert pillar above / below in a pillar's menu. A name only; it's added to the theme's project. Admins, superusers and the theme's owner.</li>
-            <li><b>Row</b>: + Row at the end of each theme or pillar; type, and Enter adds it and starts the next. Insert row above / below in a row's menu. Paste plan on a theme, pillar or + Row adds plain rows. Anyone with access to the Space.</li>
-            <li><b>Child row</b>: Add child row in a row's menu, then + Child row. Tab on a row's number makes it a child of the row above; Shift+Tab moves it back out. One level only. Anyone who can edit the parent.</li>
-          </ul>
-        </div>
-        <div class="box">
-          <h3 class="c">Moving and removing</h3>
-          <ul>
-            <li>Drag a row by its number onto a theme or pillar to move it there; a linked row's task changes its theme or pillar to match. Dropped on another row (not between rows), it becomes that row's child.</li>
-            <li>Themes and pillars are reordered by dragging their rows. This changes the sheet only, not the projects.</li>
-            <li>Removing a theme or pillar asks where its rows go: another theme or pillar, or No pillar under the same theme. Rows are never deleted with their group. A removed theme leaves this sheet only; the project stays.</li>
-            <li>Deleting a linked row asks: unlink (the task stays in its Space, out of the theme) or delete both. Deleting a parent asks whether its children move up a level or are deleted with it.</li>
-          </ul>
-        </div>
-      </div>
+    <section class="part" id="children">
+      <h2>5 · Child rows</h2>
+      <ul>
+        <li>Any row can have child rows, one level deep.</li>
+        <li>Linking a child row whose parent is linked makes a <b>subtask</b> of the parent's task, in the same Space.</li>
+        <li>Under a video's row it makes a <b>clip</b>: a Reel on the Video board at Ready For Design, with the Video Space's default assignee.</li>
+        <li>A child row can't be linked while its parent is plain. The Task cell says why.</li>
+      </ul>
     </section>
 
     <section class="part" id="columns">
-      <h2>3 · Columns</h2>
-      <div class="scroll"><table>
-        <thead><tr><th>Column</th><th>Sheet</th><th>Holds</th><th>Edited by</th></tr></thead>
-        <tbody>
-          <tr><td>Title</td><td>Both</td><td>The task's name</td><td>Typing</td></tr>
-          <tr><td>Type</td><td>Both</td><td>Task type, with its icon and colour</td><td>Type-ahead list; only admins add a new type</td></tr>
-          <tr><td>Status / Stage</td><td>Both</td><td>The task's stage, in the Space's words</td><td>Menu or typing (see part 4)</td></tr>
-          <tr><td>Link task</td><td>Both</td><td>The linked Design or Video task, by name and board</td><td>Any member</td></tr>
-          <tr><td>Assignee / Owner</td><td>Both</td><td>Who does it (the Video sheet calls the assignee "Owner")</td><td>Menu</td></tr>
-          <tr><td>Reviewer</td><td>Video</td><td>The task's owner, shown from Edit Review</td><td>Menu</td></tr>
-          <tr><td>Due, In stage</td><td>Video</td><td>Due date; time in the stage, red past its limit</td><td>Read only</td></tr>
-          <tr><td>Working Doc, Design Link</td><td>Both</td><td>Link attachments on the task</td><td>Paste a link</td></tr>
-          <tr><td>Task Link, LinkedIn, Published</td><td>Both</td><td>Opens the task; post links ("Missing link" on a published piece with none)</td><td>Paste a link</td></tr>
-          <tr><td>Pillar</td><td>Content</td><td>The theme's pillar</td><td>Menu</td></tr>
-          <tr><td>Publishing date</td><td>Content</td><td>Publishing date (the due date follows the rule)</td><td>Typing</td></tr>
-          <tr><td>#, Source, File name, In, Out, Length</td><td>Video</td><td>Clip details (hidden by default)</td><td>Typing; Out before In is refused</td></tr>
-          <tr><td>Caption, Channels, TOV</td><td>Both</td><td>Task fields of the row's type (spec 023)</td><td>The task's editors; empty and required shows <span class="red">"Caption not added"</span></td></tr>
-          <tr><td>Custom columns</td><td>Both</td><td>Text, Number, Date, Link, Person, Choice, Checkbox, Related task (up to 30)</td><td>Any member on a live row</td></tr>
-        </tbody>
-      </table></div>
+      <h2>6 · Columns</h2>
+      <div class="cols">
+        <div class="box"><h3>Task field</h3><p>Type, Status, Assignee, the link columns, Pillar, Date, and every field of the field library (Caption, Channels, TOV…). A linked row shows and saves the task's value. A plain row holds its own until it is linked.</p></div>
+        <div class="box"><h3>Sheet only</h3><p>A column the team adds with a kind of its own (text, number, date, link, person, choice, checkbox, related task). It stays on the row, stays when the row is linked, and never touches the task.</p></div>
+      </div>
       <ul>
-        <li><b>Columns</b> (or ⚙ Fields) opens a drawer: show or hide, reorder, Group by (Content: Theme, Stage, Assignee, Type, None; Video: Video, Stage, Editor) and the sheet's own words.</li>
-        <li><b>＋</b> after the last heading adds a hidden column back or a new column. Each heading's menu: rename, reset, insert, move, hide, delete; on a custom column, admins and superusers also get <b>Make it a task field</b>, which moves its values onto the tasks.</li>
-        <li>A task field cell is hatched where the row's type doesn't use the field, or where its brand has switched it off.</li>
-        <li>The layout is shared by the team; the drawer shows who changed it last.</li>
+        <li><b>+ Column</b> asks which: a task field (the sheet's hidden ones and the field library), or a new sheet-only column.</li>
+        <li>A library field shows by itself while a task type in use carries it. Any other can be switched on.</li>
+        <li>The <b>Fields</b> button opens the drawer: show or hide, move, rename, and Group rows by. All of it is per sheet, so renaming a column on one Space's sheet changes nothing in the library or on another sheet.</li>
+        <li>A Space's settings choose its <b>default sheet columns</b>: what the sheet shows until someone shows or hides a column there.</li>
+        <li>A task-field cell is hatched where the row's task type doesn't use the field, or its brand has switched it off.</li>
+        <li>Each Space's sheet has its own columns. The layout is shared by the team; the drawer shows who changed it last.</li>
       </ul>
     </section>
 
     <section class="part" id="status">
-      <h2>4 · Status and stages</h2>
+      <h2>7 · Status and stages</h2>
       <div class="flow" aria-label="The pipeline">
         <span>To Do</span><b>→</b><span>C-In Progress</span><b>→</b><span class="rev">C-Review</span><b>→</b><span class="rev">C-Check</span><b>→</b><span>Ready For Design</span><b>→</b><span>D-In Progress</span><b>→</b><span class="rev">D-Check</span><b>→</b><span class="rev">F-Check</span><b>→</b><span>Ready to Publish</span><b>→</b><span>Scheduled</span><b>→</b><span>Published</span>
       </div>
       <ul>
-        <li>Change it from the menu (Next, Back to, Skip to) or by typing a stage: the Space's names, the sheet's own words (Writing, Content Review… / Script, Editing, Edit Review…) or the board names.</li>
-        <li><b>Who may move it:</b> whoever holds the current stage. Review stages (shaded) belong to a role: C-Review and F-Check to the Marketing Manager, C-Check to the Managing Director, D-Check to the Brand Director. Other stages belong to the task's assignee or owner. Admins and superusers can move any task.</li>
-        <li>Brands with C-Check switched off have 10 stages.</li>
-        <li><b>Required fields:</b> a move that crosses C-Review with Caption or TOV empty is refused: "Caption is required before C-Review". The same rule holds for the menu, typing, bulk moves and the board.</li>
-        <li>Moving a piece to Published asks for its Published link (and LinkedIn link for a Post).</li>
+        <li>On a linked row, change Status from the menu or by typing a stage in the Space's names. Whoever holds the current stage may move it; admins and superusers can move any task.</li>
+        <li>Review stages (shaded) belong to a role, or to the owner or approver the Space's settings name for that stage.</li>
+        <li><b>Required fields</b> are checked by the task's home Space. Content asks for Caption and TOV before C-Review; Video doesn't ask a clip for them. A stage before the Space's start is never asked for.</li>
+        <li>While a content row's linked Design or Video tasks haven't passed D-Check, its Status follows them.</li>
+        <li>Moving a piece to Published asks for its Published link.</li>
       </ul>
     </section>
 
     <section class="part" id="editing">
-      <h2>5 · Editing rules</h2>
+      <h2>8 · Editing rules</h2>
       <div class="cols">
         <div class="box"><h3>Who edits what</h3><ul>
-          <li>Task fields (title, type, assignee, pillar, dates, links, files, clip details, Caption, TOV): the task's owner, its assignee, admins and superusers. Anyone else sees "read only".</li>
-          <li>Custom columns, formatting and comments: any member, on a live row.</li>
+          <li>Plain rows: anyone with access to the Space.</li>
+          <li>Task-field cells of a linked row: the task's owner, its assignee, admins and superusers. Anyone else sees "read only".</li>
+          <li>Sheet-only columns, formatting and comments: any member, on a live row.</li>
+          <li>Unlinking and Make task: people who may link or create in that Space.</li>
         </ul></div>
         <div class="box"><h3>How</h3><ul>
-          <li>Click and type replaces; Enter, F2 or double-click edits.</li>
-          <li>Paste fills cells and counts what it skipped; a table on a theme row opens Paste plan; clip file names open Paste clips.</li>
-          <li>Fill handle, Ctrl+;, Alt+↓ pick list. Undo and redo follow the same rules.</li>
-          <li>Bulk bar (2+ rows): Content: Stage, Assignee, Type, Pillar, Date, Archive. Video: Stage, Owner, Reviewer, Type, Priority, Due, Drop. One Undo reverses it.</li>
+          <li>Click and type replaces; Enter, F2 or double-click edits. Undo and redo follow the same rules.</li>
+          <li>Paste fills cells and counts what it skipped. A table pasted on a theme, pillar or "+ Row" opens Paste plan.</li>
+          <li>The toolbar has two buttons: <b>+ Column</b> and <b>+ Theme</b>. Paste plan, Only my rows and Show archived are in the <b>Data</b> menu.</li>
+          <li>Bulk bar (2+ linked rows): Stage, Assignee, Type, Pillar, Date, Archive. One Undo reverses it.</li>
         </ul></div>
       </div>
     </section>
 
     <section class="part" id="format">
-      <h2>6 · Formatting and comments</h2>
+      <h2>9 · Formatting and comments</h2>
       <ul>
-        <li>Fills, fonts, number formats and colour rules are kept per task and column, so they follow the task through sorting, filtering and archiving.</li>
-        <li>Sort and filter work inside each theme or video and never change the board's order.</li>
-        <li>Cell comments are threads with @mentions, resolve and reopen. Paste Special: values, formats, comments, transpose.</li>
-      </ul>
-    </section>
-
-    <section class="part" id="media">
-      <h2>7 · Links to the Design and Video boards</h2>
-      <ul>
-        <li>At <b>Ready For Design</b> a box creates one linked task per board, once: Video and Reel go to the Video board, the rest to Design (set per type). It picks a person for each.</li>
-        <li><b>Link task</b> cell: type to find an unlinked Design or Video task, or create one. Each link shows the task's name and board, with ⇄ to change and × to unlink. No new links from F-Check on.</li>
-        <li>While linked tasks haven't passed D-Check, the content row's <b>Status follows them</b> (the earliest of their stages). Its menu offers Ready For Design to F-Check, and moving it moves them, with their own permissions. Once every linked task passes D-Check, the row moves to F-Check on its own; after that the linked tasks follow the row.</li>
+        <li>Fills, fonts, number formats and colour rules are kept per row and column, so they follow the row through sorting, filtering and archiving.</li>
+        <li>Sort and filter work inside each theme and never change a board's order.</li>
+        <li>Cell comments are threads with @mentions, resolve and reopen. Their notifications open the sheet on its Space or brand page, at the cell.</li>
       </ul>
     </section>
 
     <section class="part" id="shared">
-      <h2>8 · Shared or private</h2>
+      <h2>10 · Shared or private</h2>
       <div class="cols">
-        <div class="box"><h3>Shared by everyone</h3><p>Column layout, custom columns and values, task fields, row heights, the sheet's sort, filter, group and words, formatting, colour rules and comments.</p></div>
-        <div class="box"><h3>Per person or device</h3><p>Mine (resets each visit), Show archived / Show dropped (remembered on the device), collapsed themes and videos.</p></div>
+        <div class="box"><h3>Shared by everyone</h3><p>Rows, themes and their order; each sheet's columns, names and widths; sheet-only values; task fields; row heights; sort, filter and grouping; formatting, colour rules and comments.</p></div>
+        <div class="box"><h3>Per person or device</h3><p>Only my rows (resets each visit), Show archived (remembered on the device), collapsed themes, and which Space a brand's sheet last opened on.</p></div>
       </div>
     </section>
 
+    <section class="part" id="changed">
+      <h2>11 · What changed from the old sheets</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Before</th><th>Now</th></tr></thead>
+        <tbody>
+          <tr><td>Content sheet</td><td>The Content Space's sheet. Its themes, pillars, rows, columns, formatting and comments carried over.</td></tr>
+          <tr><td>Video sheet</td><td>The Video Space's sheet. Each video became a linked row, its clips linked child rows. A video with no project sits under "Videos · brand".</td></tr>
+          <tr><td>Clip detail columns</td><td>Removed (#, Source, File name, In, Out, Length, File). Their values were exported first to <code>clip-details.csv</code>, kept in Settings › Diagnostics.</td></tr>
+          <tr><td>Bulk linking</td><td>Removed. Rows are linked one at a time with Make task.</td></tr>
+          <tr><td>Sheets section</td><td>Removed from the sidebar. Old addresses lead to the page that owns the sheet.</td></tr>
+          <tr><td>Design, Planning and new Spaces</td><td>Each has its own sheet, empty until rows are added.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
     <section class="part" id="open">
-      <h2>9 · Open points</h2>
-      <p>Where the specs and the code differ, or a decision is still needed:</p>
-      <div class="gap"><b>Clips and required fields.</b> Clips are created as Reels, and Reels require Caption and TOV before C-Review, so every clip needs both. Should clips use their own type (e.g. "Clip") without TOV?</div>
-      <div class="gap"><b>Task field columns in the drawer.</b> Caption, Channels and TOV always sit at the end of the Content and Video sheets and can't be hidden or reordered from Columns yet.</div>
+      <h2>12 · Open points</h2>
+      <p>Decisions still needed:</p>
+      <div class="gap"><b>A brand's rows in one grid.</b> The brand page shows one Space's sheet at a time, because each Space's sheet has its own columns, formatting and comments. One merged grid would need shared columns across Spaces.</div>
+      <div class="gap"><b>Blank sheets from the old Sheets section.</b> Folders of blank sheets made there have no page of their own now. They still open by their address. Move them under a Space, or remove them?</div>
+      <div class="gap"><b>"Videos · brand" themes.</b> Created for videos that had no project. Keep them, or move those videos into real projects?</div>
+      <div class="gap"><b>Existing tasks of other Spaces.</b> Design and Planning tasks made before the change aren't rows on their Space's sheet. They can be added one at a time with Make task › an existing task.</div>
       <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
       <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>
-      <div class="gap"><b>+ Video for users.</b> The button is hidden from regular users, although the server lets them add a video they own.</div>
-      <div class="gap"><b>Older spec text.</b> Spec 008's per-member column sets (Editing, Copy, Full) became one shared set; spec 009 said whoever adds a piece owns it (the theme owner does); spec 010 said built-in columns can't be deleted (they can be hidden everywhere).</div>
+      <div class="gap"><b>Planning's flow.</b> Its start and end stages in Space settings were marked "confirm" and haven't been confirmed.</div>
     </section>
   </main>
 </div>

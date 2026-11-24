@@ -5,6 +5,7 @@ import { listFolders, listSheets } from '@/actions/sheets'
 import { loadBoardData } from '@/lib/board-data'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { WorkbookPage } from '@/components/sheets/pages'
+import { folderHome } from '@/lib/sheet-home'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,14 @@ export default async function FolderPage({ params, searchParams }: {
   const { folderId } = await params
   const { sheet, cell } = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(folderId)) notFound()
+  // Spec 026 (§1): the sheet opens where it lives; a link to a tab or a commented cell goes with it.
+  const home = await folderHome(folderId)
+  if (home) {
+    const q = new URLSearchParams()
+    if (sheet) q.set('tab', sheet)
+    if (cell && cell.length < 200) q.set('cell', cell)
+    redirect(q.size ? `${home}&${q.toString()}` : home)
+  }
 
   const [folders, sheets] = await Promise.all([listFolders(), listSheets(folderId)])
   if (!folders.success || !sheets.success) notFound()

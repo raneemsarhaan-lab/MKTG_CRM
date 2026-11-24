@@ -15,7 +15,7 @@ export const pipeline = [
     id: 'pipe-content-bar', hash: 'view=content',
     async run(t) {
       t.eq(await t.page.locator('[data-content-sheet] .fx-sheet-bar [data-view-pair], [data-content-sheet] .fx-sheet-bar .fx-sheet-seg').count(), 0, 'no view switch on the Content bar')
-      t.assert(await t.page.locator('[data-content-sheet] [data-paste-plan]').count() === 1, 'its own controls stay')
+      t.assert(await t.page.locator('[data-content-sheet] [data-add-column]').count() === 1 && await t.page.locator('[data-content-sheet] [data-toolbar] button').count() <= 2, 'its own controls: + Column and + Theme only')
     },
   },
   {

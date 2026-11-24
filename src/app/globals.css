@@ -2123,7 +2123,8 @@ body:has(.fx-sheet-menu, .fx-sheet-pop) .fx-sheet-tip { display: none !important
 .fx-nt-warn { color: var(--hd-warn); background: var(--hd-warn-bg); border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }
 .fx-nt-saved { color: #15803D; font-size: 12.5px; font-weight: 600; min-height: 18px; }
 .fx-nt-saved.is-bad { color: #C81E3A; }
-.fx-nt-filters { display: grid; gap: 10px; }
+.fx-nt-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.fx-nt-range { border: 1px solid var(--hd-input); background: var(--hd-panel); border-radius: 999px; padding: 0 12px; height: 34px; font: 600 13px var(--font-body); color: var(--hd-text); cursor: pointer; }
 .fx-nt-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .fx-nt-chip { border: 1px solid var(--hd-input); background: var(--hd-panel); border-radius: 999px; padding: 0 12px; height: 34px; font: 600 13px var(--font-body); color: var(--hd-text); cursor: pointer; }
 .fx-nt-chip[aria-pressed="true"] { background: var(--hd-ink); color: #fff; border-color: var(--hd-ink); }

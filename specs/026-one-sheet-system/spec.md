@@ -84,6 +84,21 @@ used as the Sheet view of every Space and Space › Brand folder.
   (`content`); every other Space has `rows:<its id>`. The conversion moves the Video sheet's custom
   columns, and each other Space's task-sheet custom columns, to that Space's sheet; their values go
   with them.
+- **The Brand page's Sheet view** shows one Space's sheet at a time, narrowed to the brand, with a
+  strip of every Space and the number of the brand's rows on each. Each Space's sheet has its own
+  columns, formatting and comments, so the Spaces aren't merged into one grid. "All tasks" on the same
+  strip is the brand's tasks from every Space together (every linked row), with a Space column. The
+  address (`?sheet=<space key>` or `?sheet=tasks`) decides which opens, then the one last opened for
+  that brand, then the first Space that has rows for it. A saved Sheet view of a brand stays a task
+  sheet (its filters and fields are about tasks).
+- **Columns.** A sheet's own columns of a task (Type, Status, Assignee, the links, Date…) and every
+  field of the field library are **task fields**; a column the team adds with a kind of its own is
+  **sheet only**. A library field shows by itself while a task type in use carries it; any other is
+  switched on from "+ Column › Task field" or the Fields drawer. Each sheet keeps its own place, width,
+  name and on/off for a field column (`sheet_columns` with the key `f:<field id>`); renaming a column
+  on a sheet doesn't rename the field in the library. Removing a task-field column from a sheet hides
+  it there; the tasks keep their values. A linked row whose task type doesn't carry the field shows the
+  cell as not applicable.
 - **Make task** takes the Space's rules (spec 024): the task starts at that Space's "Starts at" stage,
   on its board when it is a board, with its default type, assignee and priority; only people who may
   create there can. The row's date becomes the publishing date. Values in task-field columns go to the

@@ -136,8 +136,10 @@ export interface LaidColumn {
  * defaults. With records: their order, a built-in added to the code later
  * slotted after its default predecessor, Title always first and shown.
  */
-export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string, fields: FieldColumn[] = []): LaidColumn[] {
+export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string, fields: FieldColumn[] = [], defaults: string[] = []): LaidColumn[] {
   const builtIns = builtInsFor(sheet)
+  // Spec 024 (§5): the Space's default columns — the built-ins that show until someone shows or hides one.
+  const picked = defaults.filter(k => builtIns.some(b => b.key === k))
   const recs = records.filter(r => r.sheet === sheet && (!isCustomKey(r.key) || r.kind))
   const byKey = new Map(recs.map(r => [r.key, r]))
   const fieldOf = new Map(fields.map(f => [f.key, f]))
@@ -161,7 +163,7 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
     const r = byKey.get(key) ?? null
     const b = builtInOf(sheet, key)
     const f = isFieldKey(key) ? fieldOf.get(key) ?? { key, shown: false } : null
-    const defaultShown = f ? f.shown : b ? (b.sets ? b.sets.includes(set) : true) : true
+    const defaultShown = f ? f.shown : b ? (picked.length ? picked.includes(key) : b.sets ? b.sets.includes(set) : true) : true
     return {
       key,
       builtIn: !!b || !!f,

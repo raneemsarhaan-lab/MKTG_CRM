@@ -34,7 +34,6 @@ import { applyView, cleanTabPrefs } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
 
-const chip = (on: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${on ? PIPE.ink : PIPE.border}`, background: on ? PIPE.ink : '#FFFFFF', color: on ? '#FFFFFF' : PIPE.ink, borderRadius: 999, padding: '3px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' })
 const brandShort = (b: { name: string; short_name?: string | null }) => b.short_name?.trim() || b.name
 
 export function SpacePage({ data, spaceId, brandId = null }: {
@@ -53,20 +52,15 @@ export function SpacePage({ data, spaceId, brandId = null }: {
   const board = space.media_board ?? null
   // Spec 024 (§2): its views show only the stages from "Starts at" to "Ends at".
   const flow = space.settings.flow
-  // Spec 025 (§2): on the Space page a brand filter and "Group by brand"; a folder is one brand.
+  // Spec 025 (§2): "Group by brand" on the Space page; a folder is one brand.
   const folderBrand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
-  const [picked, setPicked] = useState<string[]>([])
   const [groupBrand, setGroupBrand] = useState(false)
   const prefKey = `momentum.space.${spaceId}`
   useEffect(() => {
-    try {
-      const v = JSON.parse(window.localStorage.getItem(prefKey) ?? '{}')
-      if (Array.isArray(v.brands)) setPicked(v.brands.filter((x: unknown): x is string => typeof x === 'string'))
-      setGroupBrand(v.group === true)
-    } catch { /* a preference, never required */ }
+    try { setGroupBrand(JSON.parse(window.localStorage.getItem(prefKey) ?? '{}').group === true) } catch { /* a preference, never required */ }
   }, [prefKey])
-  const remember = (brands: string[], group: boolean) => { try { window.localStorage.setItem(prefKey, JSON.stringify({ brands, group })) } catch { /* ignore */ } }
-  const brandIds = useMemo(() => (brandId ? [brandId] : picked.filter(id => data.brands.some(b => b.id === id))), [brandId, picked, data.brands])
+  const remember = (group: boolean) => { try { window.localStorage.setItem(prefKey, JSON.stringify({ group })) } catch { /* ignore */ } }
+  const brandIds = useMemo(() => (brandId ? [brandId] : []), [brandId])
   const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status))
     && (!brandIds.length || (!!task.brand_id && brandIds.includes(task.brand_id))), [shown, board, flow, brandIds])
   const themeScope = useMemo(() => (brandIds.length ? (th: ContentTheme) => !!th.brand_id && brandIds.includes(th.brand_id) : undefined), [brandIds])
@@ -115,23 +109,12 @@ export function SpacePage({ data, spaceId, brandId = null }: {
           <span data-space-rule>{folderBrand ? t('folderRule', { space: label, brand: folderBrand.name }) : rule}</span>
           <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
         </span>
+        {/* User, 24 Nov 2026: no brand filter here — a Space's brand folders in the sidebar are the filter. */}
         {!folderBrand && data.brands.length > 1 && (
-          <span data-space-brands role="group" aria-label={t('brandFilter')} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-            <button type="button" aria-pressed={!brandIds.length} data-brand-chip="all" onClick={() => { setPicked([]); remember([], groupBrand) }} style={chip(!brandIds.length)}>{t('allBrands')}</button>
-            {data.brands.map(b => {
-              const on = brandIds.includes(b.id)
-              return (
-                <button key={b.id} type="button" aria-pressed={on} data-brand-chip={b.id} title={b.name}
-                  onClick={() => { const next = on ? picked.filter(x => x !== b.id) : [...picked, b.id]; setPicked(next); remember(next, groupBrand) }} style={chip(on)}>
-                  <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: b.color }} />{brandShort(b)}
-                </button>
-              )
-            })}
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginInlineStart: 8, fontSize: 12.5, fontWeight: 600, color: PIPE.ink }}>
-              <input type="checkbox" checked={groupBrand} data-group-brand onChange={e => { setGroupBrand(e.target.checked); remember(picked, e.target.checked) }} />
-              {t('groupBrand')}
-            </label>
-          </span>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: PIPE.ink, justifySelf: 'start' }}>
+            <input type="checkbox" checked={groupBrand} data-group-brand onChange={e => { setGroupBrand(e.target.checked); remember(e.target.checked) }} />
+            {t('groupBrand')}
+          </label>
         )}
       </span>}
       tabs={[

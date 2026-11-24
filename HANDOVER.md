@@ -1025,11 +1025,20 @@ Every Space's Sheet view is one kind of sheet: themes (projects) › pillars ›
 | Paste plan only creates plain rows, on the sheet it is pasted into | `addPlan` in `src/actions/content.ts` |
 | The Space page's Sheet view is this sheet for every Space; a saved Sheet view of a Space is its tasks as a task sheet (filters and fields kept) | `SpacePage.tsx` |
 | Outside a Space, the board's "Content" is the Content Space's sheet and "Sheet" the Video Space's. The old Video sheet component is no longer shown | `KanbanBoard.tsx` (`sheetSpace`) |
+| The Brand page's Sheet view: a strip of every Space with the brand's row count; one Space's sheet at a time, narrowed to the brand, or "All tasks" (the task sheet). `?sheet=<space key|tasks>`, then the last choice, then the first Space with rows | `src/components/views/BrandSheets.tsx` |
+| Columns: every field of the library is a column of a sheet of rows (`f:<field id>`), shown by itself while a type in use carries it; place, width, name and on/off are per sheet (`sheet_columns`). "+ Column" asks for a Task field or a Sheet only column; the Fields drawer renames | `applyLayout` (its `fields` and `defaults`), `isFieldKey` in `src/lib/sheet-columns.ts`; `records` in `src/actions/sheet-columns.ts`; `useFieldColumnDefs` in `src/components/fields/taskFieldColumns.tsx`; the add menu in `ContentGrid.tsx` |
+| A Space's "Default sheet columns" (spec 024 §5) decide which of its sheet's own columns show until someone changes one | `defaultShown` in `useSheetColumns`; the list in `SpaceSettings.tsx` (`ROW_COLUMNS`) |
+| The sheet's toolbar is "+ Column" and "+ Theme" only (user, 24 Nov). Paste plan, Only my rows and Show archived are commands of the workbook's Data menu | `ROWS_COMMAND` in `src/components/sheets/links/FieldsPanel.tsx`; `FormatToolbar.tsx` (Data menu); `ContentSheet.tsx` |
+| An old Sheets address leads to the page that owns the sheet, with its tab and cell (`?tab=&cell=`) | `src/lib/sheet-home.ts`, `src/app/(app)/sheets/[folderId]/page.tsx`, `NodeWorkbook.tsx` |
 | One-time conversion: rows get their Space; videos become linked rows with their clips as child rows; custom columns move to each Space's sheet; clip details exported to a kept CSV | `src/lib/sheet-convert.ts`, run by the seed (`sheet-spaces-v1`); `data_exports`, `/api/exports/[name]`, Settings › Diagnostics |
 
 The task sheet (`TaskSheet.tsx`: one line per task, with a Space column) is the Sheet view of a brand's page and of My tasks.
 
-Tests: `scripts/spaces-lab/realapp/scenarios-026.cjs`. The sheet lab (`npm run lab:sheet`) still exercises the old Video sheet component in isolation; that component and its lab checks are to be removed together.
+Tests: `scripts/spaces-lab/realapp/scenarios-026.cjs`. The old Video sheet is out of the app; `scripts/sheet-lab/harness/` keeps its two files as the lab's harness for the shared grid (`npm run lab:sheet`).
+
+Also changed on 24 Nov at the user's request: a Space page has no brand filter chips (its brand folders are the filter; "Group by brand" stays); the sidebar shows numbers only on My tasks and Inbox (`NavTree.tsx`); the notifications page filters by All or one of four groups of kinds, with one list for the dates (`KIND_GROUPS` in `NotificationsPage.tsx`).
+
+If a style change doesn't show in the dev server, its build cache is stale: stop it, delete `.next`, start it again.
 
 ---
 

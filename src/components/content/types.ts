@@ -64,7 +64,7 @@ export interface ContentSheetProps {
   /** Spec 026: where this sheet keeps its columns (`content`, or `rows:<spaceId>`). */
   sheet?: import('@/types/index').SheetId
   /** Spec 026: the Space whose sheet this is, and every Space a task can be made in. */
-  space?: { id: string; key: string; name: string } | null
+  space?: { id: string; key: string; name: string; settings?: { views?: { columns?: string[] } } | null } | null
   spaces?: { id: string; key: string; name: string; color: string; media_board?: string | null }[]
   /** Which tasks show in which Space (Make task › an existing task there). */
   taskSpaces?: { task_id: string; space_id: string }[]

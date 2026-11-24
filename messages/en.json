@@ -1247,7 +1247,14 @@
       "none": "Nothing matches these filters.",
       "kinds": "Kinds",
       "dates": "Dates",
-      "clear": "Clear filters"
+      "clear": "Clear filters",
+      "groups": {
+        "all": "All",
+        "mentions": "Mentions",
+        "comments": "Comments",
+        "assigned": "Assigned to me",
+        "deadlines": "Deadlines"
+      }
     },
     "email": {
       "subjectOne": "{text}",
@@ -2251,6 +2258,9 @@
         "keytips": "Show the menus' key letters"
       },
       "taskFields": "Task fields…",
+      "rowsPastePlan": "Paste plan…",
+      "rowsMine": "Only my rows",
+      "rowsArchived": "Show archived",
       "noComments": "The copied cells have no comments."
     },
     "fields": {
@@ -3166,7 +3176,7 @@
       "defaultSort": "Default sort",
       "defaultGroup": "Default group by",
       "defaultColumns": "Default sheet columns",
-      "columnsHint": "Until a member picks their own sort or grouping. Sheet columns apply to this Space's task sheet.",
+      "columnsHint": "Sort and grouping apply until a member picks their own. Sheet columns: the ones this Space's sheet shows until someone shows or hides a column there.",
       "view": {
         "board": "Board",
         "sheet": "Sheet",

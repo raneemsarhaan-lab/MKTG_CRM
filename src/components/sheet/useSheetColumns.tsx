@@ -64,6 +64,8 @@ export interface UseSheetColumns {
   makeField?: { label: string; run(key: string): void }
   /** Spec 026 (§6): the field library as columns of a sheet of rows — shown, hidden, moved and renamed like the others. */
   fields?: (FieldColumn & { name: string })[]
+  /** Spec 024 (§5): the Space's default sheet columns (built-in keys); empty = all of them. */
+  defaultShown?: string[]
 }
 
 export function useSheetColumns(given: UseSheetColumns) {
@@ -80,8 +82,8 @@ export function useSheetColumns(given: UseSheetColumns) {
   const api = bundle.api
 
   // A field's record outlives the field (retired, or a sheet that has no field library): only fields at hand are laid.
-  const laid = useMemo(() => applyLayout(sheet, bundle.records, set, given.fields).filter(c => !isFieldKey(c.key) || fieldNames.has(c.key)),
-    [sheet, bundle.records, set, given.fields, fieldNames])
+  const laid = useMemo(() => applyLayout(sheet, bundle.records, set, given.fields, given.defaultShown).filter(c => !isFieldKey(c.key) || fieldNames.has(c.key)),
+    [sheet, bundle.records, set, given.fields, given.defaultShown, fieldNames])
   const shown = useMemo(() => laid.filter(c => c.shown), [laid])
   const byKey = useMemo(() => new Map(laid.map(c => [c.key, c])), [laid])
   const nameOf = useCallback((key: string) => byKey.get(key)?.name ?? (isCustomKey(key) ? '' : fieldNames.get(key) ?? given.defaultName(key)), [byKey, fieldNames, given])

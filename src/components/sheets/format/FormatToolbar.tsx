@@ -8,6 +8,7 @@
  * selection through the format bus. Stage 2 and 3 controls arrive with their
  * stages. On a phone the same controls sit in a bottom sheet (FormatSheet).
  */
+import { rowsCommand } from '@/components/sheets/links/FieldsPanel'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { BorderSide, CellStyle, NumberFormat, RuleKind } from '@/types/index'
@@ -216,6 +217,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
 
   /** Every menu, by key: the strip's ▾ menus, the menu bar's, and their submenus. */
   function menuFor(k: MenuKey): { items: PopItem[]; label: string; attr: string } | null {
+    const rows = typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('[data-linked-pane]:not([hidden]) [data-content-sheet]')
     switch (k) {
       case 'font': return { label: t('ctl.font'), attr: 'data-font-menu', items: FONTS.map(f => ({ key: f.name, label: f.name, checked: font === f.name, onSelect: () => a.patch({ font: f.name === DEFAULT_FONT ? null : f.name }, 'font') })) }
       case 'size': return { label: t('ctl.size'), attr: 'data-size-menu', items: FONT_SIZES.map(n => ({ key: String(n), label: String(n), checked: size === n, onSelect: () => a.patch({ size: n === DEFAULT_SIZE ? null : n }, 'size') })) }
@@ -401,6 +403,12 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         sub('tableM', tt('table.title'), 'tableM', cleanOff),
         sub('outlineM', tt('outline.title'), 'outlineM', cleanOff),
         ...(onFields ? [{ kind: 'sep', key: 'sf' } as PopItem, { key: 'taskFields', label: tb('taskFields'), onSelect: onFields } as PopItem] : []),
+        // A sheet of rows (a Space's or folder's sheet): what its toolbar used to carry.
+        ...(rows ? [
+          { key: 'rowsPastePlan', label: tb('rowsPastePlan'), onSelect: () => rowsCommand('pastePlan') } as PopItem,
+          { key: 'rowsMine', label: tb('rowsMine'), checked: rows.dataset.mine === 'true', onSelect: () => rowsCommand('mine') } as PopItem,
+          { key: 'rowsArchived', label: tb('rowsArchived'), checked: rows.dataset.archived === 'true', onSelect: () => rowsCommand('archived') } as PopItem,
+        ] : []),
         ...(onBoardMenu ? [{ kind: 'sep', key: 'sb' } as PopItem, { key: 'board', label: tb('board'), sub: true, onSelect: () => { const el = root.current; if (el) { const item = document.activeElement as HTMLElement | null, r = item?.getBoundingClientRect(); onBoardMenu(el, r ? { x: rtlOf(el) ? r.left : r.right, y: r.top - 8 } : at({ k: 'mb-data', el })) } } } as PopItem] : []),
       ] }
       case 'mb-help': return { label: tb('menu.help'), attr: 'data-mb-help', items: [

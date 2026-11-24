@@ -23,14 +23,14 @@ Also checked: Paste plan makes plain rows and no tasks (`026-paste-plan-makes-pl
 | Part of the request | State |
 |---|---|
 | §1 One sheet as the Sheet view of every Space and Space › Brand folder | Built |
-| §1 The Brand page's Sheet view shows the brand's rows from every Space | **Not built.** It shows the brand's tasks from every Space (so every linked row), with a Space column; plain rows aren't listed there |
-| §1 No Sheets section in the sidebar | Built. The `/sheets` page still opens by address, because people's blank sheets live there |
+| §1 The Brand page's Sheet view shows the brand's rows from every Space | Built, one Space at a time: a strip of every Space with the brand's row count opens that Space's sheet for the brand (plain rows included), on the same page; "All tasks" lists the brand's tasks from every Space together. The Spaces aren't merged into one grid, because each Space's sheet has its own columns, formatting and comments (`026-brand-page-sheet-shows-rows-of-every-space`) |
+| §1 No Sheets section in the sidebar | Built. An old Sheets address (`/sheets/<folder>`, and the link in a sheet-comment notification) now leads to the page that owns the sheet: the Space's Sheet view, the brand's page or My tasks, on the same tab and cell. Only a folder of blank sheets made in the old Sheets section still opens at `/sheets/<id>`; `/sheets` itself lists those, or leads to the Content Space when there are none |
 | §2 Themes, pillars, rows, child rows, "+ Row" | Built (sheet 2b), now per Space |
 | §3 Plain rows; a stage as a label | Built |
 | §4 Make task to a chosen Space, or an existing task; the Task cell; unlink | Built |
 | §5 Child rows as subtasks | Built |
-| §6 Columns: task field or sheet only | **Partly.** Task-field columns appear by themselves for every field the task types in use carry, and "+ Column" adds a sheet-only column. Choosing a task field from the library when adding a column, and hiding, reordering or renaming task-field columns in the Fields drawer, are not built |
-| §7 Remove the special Content and Video sheets | The old Video sheet is no longer shown anywhere. Its component and its isolated lab checks are still in the code, to be removed together |
+| §6 Columns: task field or sheet only | Built. "+ Column" asks for a Task field (the sheet's hidden ones and the field library) or a Sheet only column. Every column — task-field ones included — is shown, hidden, moved and renamed in the Fields drawer, per sheet (`026-columns-task-field-or-sheet-only`, pure check `cols-task-fields`) |
+| §7 Remove the special Content and Video sheets | Built. The old Video sheet is out of the app; its two files are kept only as the sheet lab's harness for the shared grid (`scripts/sheet-lab/harness/`), which about 110 isolated checks of columns, editing, paste and keyboard use |
 | §7 Remove the clip detail columns and fields | Gone from every screen (the task panel never showed them). The `task_clips` records are kept |
 | §7 Remove bulk linking; Paste plan only makes plain rows | Built. A pasted plan's Task Link column no longer links or updates tasks (that was the only way to link in bulk), and Paste plan makes plain rows only |
 | §8 Convert the Content sheet | Built (its rows were already rows; they now carry their Space) |
@@ -43,10 +43,25 @@ Also checked: Paste plan makes plain rows and no tasks (`026-paste-plan-makes-pl
 See the commit message for the final count. Tests that opened the task sheet inside a Space now
 open it on the brand's page (the task sheet's home), or in a saved Sheet view of the Space.
 
+## Changes asked for on 24 Nov, after the build
+
+| Asked | Done |
+|---|---|
+| The sheet's toolbar keeps only "+ Column" and "+ Theme", in every folder | Built, on every Space and Space › Brand folder sheet and the brand page's sheets. Nothing was lost: the columns open from the workbook's **Fields** button; **Paste plan…**, **Only my rows** and **Show archived** are in the workbook's **Data** menu (with a tick when on). Pasting a table onto a theme, pillar or "+ Row" still opens Paste plan |
+| No brand filters on a Space page | Built: the brand chips are gone (a Space's brand folders in the sidebar are the filter). "Group by brand" stays, as it is a grouping of the board, not a filter |
+| Sidebar numbers only for Inbox and My tasks | Built: Spaces, folders and brands show their names alone |
+| Simplify the notifications filters | Built: one row — All, Mentions, Comments, Assigned to me, Deadlines — and one list for the dates, in place of twelve kind chips and four date chips |
+
+Also finished here: a Space's **Default sheet columns** (spec 024 §5) now apply to its sheet — they
+decide which of the sheet's own columns show until someone shows or hides one there.
+
 ## To confirm with the user
 
 - The catch-all themes "Videos · <brand>" created for videos with no project.
 - A Space other than Content and Video starts with an empty sheet: its existing tasks aren't turned
   into rows. They can be added one at a time with Make task › an existing task.
+- Blank sheets made in the old Sheets section (team folders) have no page of their own now. They
+  still open by address. Should they move under a Space, or go?
+- "Group by brand" was left on the Space page when the brand filters were removed.
 - The local lab database had leftover test tasks, which were deleted before the final run. No
   real data was involved.

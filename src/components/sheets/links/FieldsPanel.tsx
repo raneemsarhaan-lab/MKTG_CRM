@@ -21,6 +21,10 @@ import { FieldIcon } from './FieldCells'
 /** The workbook's ⚙ Fields button and Data › Task fields open the drawer of the sheet on screen. */
 export const FIELDS_OPEN = 'momentum:fields-open'
 export const openFields = () => document.dispatchEvent(new CustomEvent(FIELDS_OPEN))
+/** A sheet of rows' own commands, from the workbook's Data menu: Paste plan, only my rows, show archived. */
+export const ROWS_COMMAND = 'momentum:rows-command'
+export type RowsCommand = 'pastePlan' | 'mine' | 'archived'
+export const rowsCommand = (c: RowsCommand) => document.dispatchEvent(new CustomEvent(ROWS_COMMAND, { detail: c }))
 /** Spec 026 (§6): a sheet of rows' "+ Column" opens its add menu (Task field or Sheet only) at the button. */
 export const ADD_COLUMN_OPEN = 'momentum:add-column-open'
 export const openAddColumn = (anchor: HTMLElement) => document.dispatchEvent(new CustomEvent(ADD_COLUMN_OPEN, { detail: anchor }))

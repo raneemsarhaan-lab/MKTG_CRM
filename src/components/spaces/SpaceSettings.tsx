@@ -13,7 +13,7 @@ import type { StageId, TeamSpace } from '@/types/index'
 import { ALL_STAGES } from '@/lib/stage-meta'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { PRIORITIES } from '@/lib/priorities'
-import { TASK_BUILT_INS } from '@/lib/sheet-columns'
+import { BUILT_INS } from '@/lib/sheet-columns'
 import { originalName, stagesForSpace } from '@/lib/space-stages'
 import { PANEL_SECTIONS, fieldRule, ownsStage, rangeOf, validateFlow, type PanelSection, type SpaceSettings } from '@/lib/space-settings'
 import { setSpaceMembers, updateSpace, updateSpaceSettings } from '@/actions/spaces'
@@ -24,6 +24,9 @@ import type { BoardData } from '@/components/views/types'
 const SECTIONS = ['basics', 'flow', 'newTasks', 'panel', 'views', 'linking', 'rules'] as const
 type Section = typeof SECTIONS[number]
 const REVIEW: StageId[] = ['c-final', 'c-check', 'd-check', 'final-check']
+
+/** Spec 026: a Space's sheet is the sheet of rows; these are its own columns (Title always shows; Archive is its row control). */
+const ROW_COLUMNS = BUILT_INS.content.filter(c => c.key !== 'archive')
 
 export function SpaceSettingsButton({ space, data }: { space: TeamSpace; data: BoardData }) {
   const t = useTranslations('spaces.config')
@@ -334,11 +337,13 @@ function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: 
             <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
               <legend style={{ ...label, padding: 0 }}>{t('defaultColumns')}</legend>
               <span style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-                {TASK_BUILT_INS.map(c => {
-                  const on = !s.views.columns.length || s.views.columns.includes(c.key)
+                {ROW_COLUMNS.map(c => {
+                  // Keys saved for the task sheet these columns used to describe aren't this sheet's: ignored.
+                  const picked = s.views.columns.filter(k => ROW_COLUMNS.some(x => x.key === k))
+                  const on = !picked.length || picked.includes(c.key)
                   return (
                     <label key={c.key} style={check}><input type="checkbox" checked={on} disabled={c.key === 'title'} data-default-column={c.key}
-                      onChange={e => { const all = TASK_BUILT_INS.map(x => x.key); const cur = s.views.columns.length ? s.views.columns : all; const next = toggle(cur, c.key, e.target.checked); const views = { ...s.views, columns: next.length === all.length ? [] : all.filter(k => next.includes(k)) }; save({ views }, { ...s, views }) }} />{c.en}</label>
+                      onChange={e => { const all = ROW_COLUMNS.map(x => x.key); const cur = picked.length ? picked : all; const next = toggle(cur, c.key, e.target.checked); const views = { ...s.views, columns: next.length === all.length ? [] : all.filter(k => next.includes(k)) }; save({ views }, { ...s, views }) }} />{c.en}</label>
                   )
                 })}
               </span>

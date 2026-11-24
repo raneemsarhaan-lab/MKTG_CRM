@@ -7,7 +7,7 @@
  * Paste plan brings the Content Library Google Sheet in.
  */
 import { useMediaLinks } from '@/components/media/MediaLinks'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
 import { SheetMenu, SheetPopover, type MenuItem } from '@/components/sheet/SheetMenu'
@@ -28,7 +28,7 @@ import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
 import { useFieldColumnDefs, useTaskFieldColumns } from '@/components/fields/taskFieldColumns'
 import { useMakeField } from '@/components/fields/useMakeField'
-import { openAddColumn, openFields } from '@/components/sheets/links/FieldsPanel'
+import { ROWS_COMMAND, openAddColumn, type RowsCommand } from '@/components/sheets/links/FieldsPanel'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
 import { useMoveError, type MoveRefusal } from '@/components/fields/moveErrors'
 import type { ContentRowRec } from '@/lib/content-rows'
@@ -159,7 +159,7 @@ export function ContentSheet(p: ContentSheetProps) {
   // Spec 026 (§6): the field library as columns of this sheet.
   const fieldCols = useFieldColumnDefs(p.tasks)
   const sheetCols = useSheetColumns({
-    sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField, fields: fieldCols,
+    sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField, fields: fieldCols, defaultShown: p.space?.settings?.views?.columns,
     defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
   })
   // Spec 023: Caption, Channels, TOV and the other task fields of the pieces' types, as columns.
@@ -616,21 +616,28 @@ export function ContentSheet(p: ContentSheetProps) {
     if (looksLikeRows(cells) || pasteTarget(row)) { e.preventDefault(); setPaste({ cells, target: pasteTarget(row) }) }
   }
 
+  // The Data menu's commands for this sheet (the toolbar no longer carries them).
+  const commands = useRef<(c: RowsCommand) => void>(() => {})
+  commands.current = c => { if (c === 'pastePlan') setPaste({ cells: null }); else if (c === 'mine') setMine(v => !v); else toggleArchived() }
+  useEffect(() => {
+    const on = (e: Event) => commands.current((e as CustomEvent<RowsCommand>).detail)
+    document.addEventListener(ROWS_COMMAND, on)
+    return () => document.removeEventListener(ROWS_COMMAND, on)
+  }, [])
+
   // ── render ──────────────────────────────────────────────────────────────
   const linkTask = popup?.kind === 'link' ? p.tasks.find(x => x.id === popup.taskId) : undefined
   const linkLabel = (col: LinkCol) => t(`links.${col}`)
 
   return (
-    <div className="fx-sheet" data-content-sheet="">
+    <div className="fx-sheet" data-content-sheet="" data-mine={mine} data-archived={showArchived}>
       {/* The header's third row on the Content tab (spec 011 R2): the sheet's
           own controls. Pipeline | Content are the header's tabs now. */}
       <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
         <span className="fx-sheet-bar-gap" />
-        {/* Spec 019 stage 2: Columns opens the Fields drawer (the same as ⚙ Fields). */}
-        <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{ts('columns.button')}</button>
+        {/* User, 24 Nov 2026: the toolbar keeps + Column and + Theme only. The Fields button above opens
+            the columns; Paste plan, Only my rows and Show archived are in the workbook's Data menu. */}
         <button type="button" className="fx-sheet-btn" data-add-column="" aria-haspopup="menu" onClick={e => openAddColumn(e.currentTarget)}>{ts('columns.add')}</button>
-        <button type="button" className="fx-sheet-tog" aria-pressed={mine} data-mine="" onClick={() => setMine(v => !v)}>{t('mine')}</button>
-        <button type="button" className="fx-sheet-tog" aria-pressed={showArchived} data-show-archived="" onClick={toggleArchived}>{t('showArchived')}</button>
         {admin && (
           <button type="button" className="fx-sheet-btn" data-add-theme="" onClick={e => {
             if (rowsOn) { void openThemeAdd(e.currentTarget); return }
@@ -640,7 +647,6 @@ export function ContentSheet(p: ContentSheetProps) {
             })
           }}>{t('addTheme')}</button>
         )}
-        <button type="button" className="fx-sheet-btn is-primary" data-paste-plan="" onClick={() => setPaste({ cells: null })}>{t('pastePlan')}</button>
       </div>
 
       <div className="fx-sheet-sum" data-summary="">

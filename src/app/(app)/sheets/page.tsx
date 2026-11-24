@@ -11,5 +11,7 @@ export default async function SheetsPage() {
   if (!member) redirect('/login')
   const res = await listFolders()
   if (!res.success) redirect('/board')
+  // Spec 026 (§1): there is no Sheets section. Only folders of blank sheets made here before still open here.
+  if (!res.folders.some(f => f.kind === 'team')) redirect('/spaces/content?view=sheet')
   return <SheetsHomePage folders={res.folders} pins={res.pins} now={new Date().toISOString()} />
 }

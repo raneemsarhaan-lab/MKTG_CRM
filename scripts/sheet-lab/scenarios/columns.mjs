@@ -18,7 +18,7 @@ async function headMenu(t, key) {
 const pick = (t, item) => t.page.locator(`[data-sheet-menu] [data-menu-item="${item}"]`).click()
 const valueOf = async (t, id, task) => (await cols(t)).values[id]?.[task]
 async function openPlan(t, opts) {
-  await t.page.locator('[data-paste-plan]').click()
+  await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'pastePlan' })))
   await t.page.waitForSelector('[data-plan-preview] textarea')
   const text = await t.page.evaluate(o => window.__sheet.customPlanText(o), opts)
   await t.page.locator('[data-plan-preview] textarea').fill(text)
@@ -217,7 +217,7 @@ export const columns = [
   {
     id: 'col-3-panel', hash: C,
     async run(t) {
-      await t.tool('[data-columns-button]', 'click')
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:fields-open')))
       await t.page.waitForSelector('[data-columns-panel]')
       const who = await t.page.locator('[data-panel-col="c:hook"] .fx-col-who').innerText()
       t.assert(/Changed by Samaa/.test(who), `who changed it (FR-004): ${who}`)
@@ -236,7 +236,7 @@ export const columns = [
       await pick(t, 'hide')
       await t.idle(200)
       t.assert(!(await heads(t)).includes('Hook'), 'hidden')
-      await t.tool('[data-columns-button]', 'click')
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:fields-open')))
       await t.page.locator('[data-panel-col="c:hook"] [data-field-switch]').click()
       await t.idle(250)
       t.assert((await heads(t)).includes('Hook'), 'shown again from Columns')
@@ -371,8 +371,8 @@ export const columns = [
       await t.page.waitForSelector('[data-sheet-menu]')
       t.assert((await t.menuItems()).includes('edit'), 'Alt+↓ opens the column menu')
       await t.page.keyboard.press('Escape')
-      await t.tool('[data-columns-button]', 'focus')
-      await t.page.keyboard.press('Enter')
+      // The columns open from the workbook's Fields button (the sheet's own toolbar keeps + Column and + Theme).
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:fields-open')))
       await t.page.waitForSelector('[data-columns-panel]')
       t.assert(await t.page.evaluate(() => !!document.activeElement?.closest('[data-columns-panel]')), 'focus moves into the Columns panel')
     },
@@ -381,7 +381,7 @@ export const columns = [
     id: 'cols-axe', hash: C,
     async run(t) {
       t.eq(await t.axe('[data-content-sheet]'), [], 'sheet with custom columns')
-      await t.tool('[data-columns-button]', 'click')
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:fields-open')))
       t.eq(await t.axe('[data-columns-panel]'), [], 'Columns panel')
       await t.page.keyboard.press('Escape')
       await t.tool('[data-add-column]', 'click')

@@ -238,7 +238,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(1500)
           ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'a plain row holds its own value in a task-field column')
           // The Fields drawer: rename, move, hide.
-          await page.click('[data-content-sheet] [data-columns-button]')
+          await page.click('[data-fields-btn]')
           await page.waitForSelector(`[data-fields-drawer] [data-field-row="${key}"]`)
           await page.click(`[data-field-rename="${key}"]`)
           await page.waitForSelector('[data-column-rename] input')
@@ -251,7 +251,8 @@ module.exports = (EMAIL, psql, ok) => {
           const posBefore = Number(rec(key).split('|')[1])
           await page.locator(`[data-fields-drawer] [data-field-row="${key}"] button`, { hasText: '↑' }).click()
           await page.waitForTimeout(1500)
-          ok(Number(rec(key).split('|')[1]) === posBefore - 1, 'moved up from the Fields drawer')
+          // (Columns of fields retired since may sit between, so the place moves up by one or more.)
+          ok(Number(rec(key).split('|')[1]) < posBefore, 'moved up from the Fields drawer')
           await page.click(`[data-fields-drawer] [data-field-switch="${key}"]`)
           await page.waitForFunction(k => !document.querySelector(`[data-col-head="${k}"]`), key, { timeout: 30000 })
           await page.waitForTimeout(1500)

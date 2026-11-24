@@ -13,7 +13,8 @@ const themeTip = t => t.page.getAttribute('[data-cell="t:th-strategy|title"] .fx
 const stageText = async (t, key) => (await t.page.locator(`[data-cell="${key}|status"] .fx-sheet-ellipsis`).first().innerText()).trim()
 
 async function pastePlan(t, kind = 'html') {
-  await t.page.locator('[data-paste-plan]').click()
+  // The toolbar keeps + Column and + Theme only; Paste plan is a command of the workbook's Data menu.
+  await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'pastePlan' })))
   await t.page.waitForSelector('[data-plan-preview] textarea')
   await t.page.locator('[data-plan-preview] textarea').focus()
   if (kind === 'html') {
@@ -427,9 +428,9 @@ export const content = [
       await t.idle(200)
       t.assert(await t.page.locator(`[data-row="k:${POST1}"].is-dropped`).count() === 1, 'greyed')
       t.assert((await summary(t)).includes('1 archived'), 'counted as archived')
-      await t.page.locator('[data-show-archived]').click()
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'archived' })))
       t.assert(!(await t.rows()).includes(`k:${POST1}`), 'Show archived off hides it')
-      await t.page.locator('[data-show-archived]').click()
+      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'archived' })))
       await t.cell(`k:${POST1}`, 'archive').click()
       await t.idle(200)
       t.eq((await t.task(POST1)).dropped_at, null, 'restored')

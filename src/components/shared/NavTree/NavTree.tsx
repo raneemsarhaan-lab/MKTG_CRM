@@ -10,7 +10,8 @@
  *   folder list; a folder opens that Space's tasks for that brand.
  * - Brands: each brand's page. Its views live in the page, not under it.
  *
- * A number is open tasks, with the overdue count in red beside it (25 · 3).
+ * A number is open tasks, with the overdue count in red beside it (25 · 3). Only My tasks and Inbox
+ * carry one (user, 24 Nov 2026); Spaces, folders and brands show their names alone.
  * Used by the desktop sidebar and by the phone's More sheet. Collapsed
  * sections and open Spaces are per-device preferences, read after mount.
  */
@@ -143,14 +144,14 @@ export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; 
                 </svg>
               </button>
               <Link href={href} data-node={`space:${s.key}`} style={{ ...row(isOn(href, true)), flex: 1, paddingInlineStart: 4 }} aria-current={isOn(href, true) ? 'page' : undefined}>
-                {dot(s.color)}{name(label)}{count(s.open, s.overdue)}
+                {dot(s.color)}{name(label)}
               </Link>
             </div>
             {open && folders.map(f => {
               const fh = `${href}/${f.id}`
               return (
                 <Link key={f.id} href={fh} data-node={`space:${s.key}:${f.id}`} style={{ ...row(isOn(fh)), paddingInlineStart: 30, minHeight: phone ? 44 : 26 }} aria-current={isOn(fh) ? 'page' : undefined}>
-                  {dot(f.color)}{name(f.name)}{count(f.open, f.overdue)}
+                  {dot(f.color)}{name(f.name)}
                 </Link>
               )
             })}
@@ -165,7 +166,7 @@ export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; 
             const href = `/brands/${b.slug}`
             return (
               <Link key={b.id} href={href} data-node={`brand:${b.slug}`} style={row(isOn(href))} aria-current={isOn(href) ? 'page' : undefined}>
-                {dot(b.color)}{name(b.name, b.full_name)}{count(b.open, b.overdue)}
+                {dot(b.color)}{name(b.name, b.full_name)}
               </Link>
             )
           })}

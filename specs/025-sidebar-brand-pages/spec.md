@@ -93,3 +93,11 @@ The Library row leaves the sidebar. The request says "Move its contents into Ass
   Removing that page waits for the user's confirmation.
 - **Brand Settings** also holds the short name. The brand's default priority comes after a Space's
   default priority and before the task type's.
+
+## Changed on 24 Nov 2026 (user)
+
+- **Sidebar numbers**: only My tasks and Inbox carry one. Spaces, folders and brands show their names
+  alone. (The counts are still worked out with the page, in case they are wanted back.)
+- **The Space page's brand filter** is removed: a Space's brand folders in the sidebar are the
+  filter. "Group by brand" stays.
+

@@ -13,6 +13,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
+import { useSearchParams } from 'next/navigation'
 import { Workbook } from '@/components/sheets/Workbook'
 import { sheetsApi } from '@/components/sheets/api'
 import { ensureNodeWorkbook, listFolders, listSheets } from '@/actions/sheets'
@@ -31,6 +32,9 @@ export function NodeWorkbook({ data, node, folder, linked }: {
   linked: ReactNode
 }) {
   const t = useTranslations('spaces')
+  // A link to one tab, or to a commented cell (`rowKey:colKey`), from a notification or an old Sheets address.
+  const params = useSearchParams()
+  const tab = params.get('tab'), cell = params.get('cell')
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
 
@@ -67,6 +71,8 @@ export function NodeWorkbook({ data, node, folder, linked }: {
         me={{ id: data.currentUser.id, admin: data.currentUser.access === 'admin' }}
         names={Object.fromEntries(data.members.map(m => [m.id, m.name]))}
         linked={linked}
+        initialSheetId={tab && /^[0-9a-f-]{36}$/i.test(tab) ? tab : null}
+        initialCell={cell && cell.length < 200 ? cell : null}
         inPage
       />
     </div>

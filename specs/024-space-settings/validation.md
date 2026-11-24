@@ -41,8 +41,8 @@ sees no Settings button (`024-user-cannot-change-settings`).
 
 ## Not done here
 
-- **Default sheet columns** are saved but not applied yet. They take effect with the unified
-  sheet (spec 026), which replaces the sheets they would apply to.
+- **Default sheet columns**: applied with spec 026. The setting lists the columns of the Space's
+  sheet of rows, and decides which show until someone shows or hides a column on that sheet.
 - **Arabic** for the new strings was written here and hasn't been reviewed by a native speaker.
 - **The link and unlink buttons** still show for people who may not use them; pressing one
   explains why it was refused.
