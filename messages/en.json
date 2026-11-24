@@ -706,7 +706,10 @@
       "audience": "Target audience",
       "save": "Save",
       "cancel": "Cancel",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "discardAsk": "Close and lose your changes to this theme?",
+      "keepEditing": "Keep editing",
+      "discard": "Discard changes"
     },
     "audience": {
       "c-level": "C-Level of large companies",
@@ -738,7 +741,8 @@
       "published": "Published",
       "publishPrompt": "Published! Paste the published link",
       "postPrompt": "And the LinkedIn link",
-      "openTask": "Open task"
+      "openTask": "Open task",
+      "open": "Open link"
     },
     "archive": {
       "archive": "Archive",
@@ -755,7 +759,7 @@
       "cancel": "Cancel"
     },
     "newPiece": {
-      "placeholder": "Piece title, then Enter",
+      "placeholder": "Piece title, then Enter…",
       "added": "Piece added · Planned",
       "label": "New piece title"
     },
@@ -802,7 +806,14 @@
       "more": "Showing {shown} of {n}. All {n} are added.",
       "discardAsk": "Close and lose the pasted rows and your fixes?",
       "keepEditing": "Keep editing",
-      "discard": "Close without adding"
+      "discard": "Close without adding",
+      "tooMany": "{n} rows. Up to {max} can be added at once; split the paste.",
+      "fixed": "Fixed",
+      "fixCol": "Fix",
+      "leaveCol": "Leave out or keep",
+      "moveCol": "Move",
+      "moreProblems": "Showing {shown} of {n}. The rest are left out.",
+      "moreWarnings": "Showing {shown} of {n}. The rest are added with those cells empty."
     },
     "problem": {
       "noTitle": "No title",
@@ -833,7 +844,12 @@
       "bad_date": "Use a date like 2026-11-20",
       "generic": "Something went wrong. Try again.",
       "emptyTitle": "A title can’t be empty, so the old one was kept.",
-      "emptyName": "Type a name first."
+      "emptyName": "Type a name first.",
+      "stage_not_in_pipeline": "That stage isn’t on this piece’s path.",
+      "terminal": "It’s already at the last stage.",
+      "too_many_rows": "Up to {max} rows can be added at once. Split the paste.",
+      "nothing_to_add": "There’s nothing to add.",
+      "empty_title": "Type a title for the piece."
     },
     "menu": {
       "next": "Next",
@@ -842,14 +858,14 @@
       "statusFor": "Move {name}"
     },
     "bulk": {
-      "count": "{n} pieces selected",
+      "count": "{n, plural, one {# piece selected} other {# pieces selected}}",
       "stage": "Stage",
       "assignee": "Assignee",
       "type": "Type",
       "pillar": "Pillar",
       "date": "Date",
       "archive": "Archive",
-      "archiveConfirm": "Archive {n} pieces? Yes",
+      "archiveConfirm": "{n, plural, one {Archive # piece? Yes} other {Archive # pieces? Yes}}",
       "cancel": "Cancel",
       "clear": "Clear selection",
       "setDue": "Set date",
@@ -859,8 +875,14 @@
       "done": "{n, plural, one {# piece changed} other {# pieces changed}}.",
       "doneSome": "{n, plural, one {# piece changed} other {# pieces changed}} · {m} not changed (the board's rules).",
       "undone": "Put back as they were.",
-      "archived": "{n, plural, one {# piece archived} other {# pieces archived}}."
-    }
+      "archived": "{n, plural, one {# piece archived} other {# pieces archived}}.",
+      "archivedSome": "{n, plural, one {# piece archived} other {# pieces archived}} · {m} not archived.",
+      "undoneSome": "Put back, except {n, plural, one {# piece} other {# pieces}} that couldn’t be."
+    },
+    "noMatch": "No pieces match.",
+    "noMatchSearch": "No pieces match “{q}”.",
+    "clearSearch": "Clear search",
+    "showAll": "Show everyone’s pieces"
   },
   "inbox": {
     "button": {

@@ -16,6 +16,7 @@ import { LINK_CONTENT_TYPE } from '@/lib/attachments'
 import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import { periodStart } from '@/components/content/summary'
+import { MAX_PLAN_ROWS } from '@/components/content/parse-plan'
 import {
   AUDIENCE_KEYS, KNOWN_TYPES, isWebLink, norm, readAudience, readFrequency, readStatus, readType, siteName, taskIdFromLink,
 } from '@/lib/content-plan'
@@ -87,8 +88,9 @@ export interface AddPlanResult {
 export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean }): Promise<AddPlanResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
-  if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'Nothing to add' }
-  if (rows.length > 300) return { success: false, error: 'At most 300 rows at a time' }
+  // Codes, not sentences: the sheet says them in the reader's language (content.err.*).
+  if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'nothing_to_add' }
+  if (rows.length > MAX_PLAN_ROWS) return { success: false, error: 'too_many_rows' }
 
   const members = await prisma.member.findMany({ select: { id: true, name: true } })
   const memberByName = (name: string | undefined) => {
@@ -255,7 +257,8 @@ export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus:
     done()
     return { success: true, ...out }
   } catch (e: unknown) {
-    return { success: false, error: String(e).slice(0, 200) }
+    console.error('addPlan', e)
+    return { success: false, error: 'generic' }
   }
 }
 
@@ -273,7 +276,7 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   const title = (input.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
-  if (!title) return { success: false, error: 'Task name cannot be empty' }
+  if (!title) return { success: false, error: 'empty_title' }
   const theme = await prisma.project.findUnique({ where: { id: themeId } })
   if (!theme?.is_theme) return { success: false, error: 'not_a_theme' }
   if (!(await mayAddPiece(prisma, themeId, member))) return { success: false, error: 'may_not_add' }

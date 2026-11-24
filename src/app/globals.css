@@ -3315,3 +3315,12 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-slicer-items button { content-visibility: auto; contain-intrinsic-size: auto 29px; transition: border-color 120ms ease-out, color 120ms ease-out, filter 120ms ease-out; }
 .fx-slicer-items button:hover { border-color: color-mix(in srgb, var(--inbox-purple, #7C3AED) 45%, transparent); color: var(--sheet-ink); filter: brightness(0.96); }
 .fx-sh-menu[data-pick-list] > [role="none"] { content-visibility: auto; contain-intrinsic-size: auto 34px; }
+/* Content sheet: the expand caret points the reading way (▸ is ◂ in Arabic). */
+[dir="rtl"] [data-content-sheet] .fx-sheet-caret { transform: scaleX(-1); }
+/* A link prompt's "Open link": a button-looking link, at the start of its row. */
+.fx-sheet-btn.fx-cs-open { margin-inline-end: auto; text-decoration: none; display: inline-flex; align-items: center; }
+/* Paste plan: a fixed row says so where its problem was; the always-there status line takes no room while empty. */
+.fx-content-fixed { color: var(--sheet-ok); font-weight: 600; }
+.fx-cs-plan-status:empty { margin-block-start: -10px; }
+/* An empty search or Mine: what to do next, under the message. */
+.fx-cs-empty-row { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }

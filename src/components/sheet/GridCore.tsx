@@ -86,6 +86,12 @@ export interface GridModel<R extends { key: string }> {
   isText(row: R, col: GridCol): boolean
   textValue(row: R, col: GridCol): string
   isMenu(row: R, col: GridCol): boolean
+  /**
+   * What Enter on the cell opens, for `aria-haspopup`: a menu, a list, a
+   * dialog (a link prompt), or null for nothing (it opens a link or the task).
+   * Absent, or undefined for a cell: every menu cell says "menu", as before.
+   */
+  popupKind?(row: R, col: GridCol): 'menu' | 'listbox' | 'dialog' | null | undefined
   render(row: R, col: GridCol, cellEl: () => HTMLElement | undefined): ReactNode
   describedBy?(row: R, col: GridCol): string | undefined
   isDraft(row: R): boolean
@@ -360,6 +366,13 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
     let best = own[0]
     for (const c of own) if (allCols.indexOf(c) <= want) best = c
     return best
+  }
+
+  /** A cell's `aria-haspopup`: the model's own answer, or "menu" for a menu cell (Drop and Archive just act). */
+  const popupOf = (row: R, col: GridCol, menu: boolean) => {
+    const kind = m.popupKind?.(row, col)
+    if (kind !== undefined) return kind ?? undefined
+    return menu && col !== 'drop' && col !== 'archive' ? 'menu' as const : undefined
   }
 
   const activeRow = activeIn ? m.rows.find(r => r.key === activeIn.key) : undefined
@@ -1515,7 +1528,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
                   data-row-key={row.key}
                   data-col={col}
                   aria-selected={m.selection ? (selected || isActive) : undefined}
-                  aria-haspopup={menu && col !== 'drop' && col !== 'archive' ? 'menu' : undefined}
+                  aria-haspopup={popupOf(row, col, menu)}
                   aria-readonly={!text && !menu ? true : undefined}
                   aria-describedby={[bandId, m.describedBy?.(row, col) ?? '', note ? `${key}-note` : ''].filter(Boolean).join(' ') || undefined}
                   // Only the cell itself: a button inside it (Auto Fill Options) taking focus mustn't move the selection.

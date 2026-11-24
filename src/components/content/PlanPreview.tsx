@@ -19,16 +19,22 @@ import type { StageId } from '@/types/index'
 import { CONTENT_STAGE_WORDS, isWebLink, norm, readStatus } from '@/lib/content-plan'
 import { cellsFromText, type PastedCell } from '@/components/sheet/parse-clips'
 import {
-  classifyPlan, gridFromHtml, readPlan, LINK_COLUMNS,
+  classifyPlan, gridFromHtml, readPlan, LINK_COLUMNS, MAX_PLAN_ROWS,
   type Classified, type LinkColumn, type PlanContext, type PlanRow, type ProblemCode,
 } from './parse-plan'
 import type { PasteColumns } from '@/components/sheet/types'
 import type { AddPlanResult, PlanRowInput } from './types'
+import { errorText } from './errors'
 
-/** Rows shown per New / Matched table; the rest are counted (they're all still added). */
+/** Rows shown per table; the rest are counted (New and Matched rows are all still added). */
 const SHOWN_ROWS = 200
 
-interface Fix { title?: string; status?: string; links: Partial<Record<LinkColumn, string>>; leftOut?: boolean; move?: boolean; asNew?: boolean }
+/**
+ * A person's fixes to one pasted row. `of` is the row's title as pasted: when
+ * the box is edited and read again, a fix stays with the row at the same place
+ * with the same title, and is set aside otherwise.
+ */
+interface Fix { of: string; title?: string; status?: string; links: Partial<Record<LinkColumn, string>>; leftOut?: boolean; move?: boolean; asNew?: boolean }
 
 /** A pasted row with the person's fixes applied, and its own problems checked again. */
 function applyFix(row: PlanRow, fix: Fix | undefined): PlanRow {
@@ -99,27 +105,47 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ctx = useMemo(() => ({ ...baseCtx, columns: columns?.values ?? [] }), [baseCtx, valuesKey])
   const [adding, setAdding] = useState<string | null>(null)
-  useEffect(() => { setFixes({}) }, [cells])
+  /** The fixes that still belong to a pasted row (same place, same title): typing in the box never wipes the rest. */
+  const kept = useMemo(() => {
+    const out: Record<number, Fix> = {}
+    for (const r of read.rows) { const f = fixes[r.index]; if (f && f.of === r.title) out[r.index] = f }
+    return out
+  }, [fixes, read])
   const rows = useMemo(
-    () => classifyPlan(read.rows.map(r => applyFix(r, fixes[r.index])), ctx),
-    [read, fixes, ctx],
+    () => classifyPlan(read.rows.map(r => applyFix(r, kept[r.index])), ctx),
+    [read, kept, ctx],
   )
-  const fix = (i: number, patch: Partial<Fix>) => setFixes(f => ({ ...f, [i]: { ...f[i], ...patch, links: { ...(f[i]?.links ?? {}), ...(patch.links ?? {}) } } }))
-  /** A web address typed over a cell that wasn't one. */
+  /**
+   * The rows as pasted, before any fix: which table each row is listed in. A
+   * row stays in its table while it's fixed (marked Fixed), so the field being
+   * typed in never moves or goes away.
+   */
+  const asPasted = useMemo(() => classifyPlan(read.rows, ctx), [read, ctx])
+  const now = new Map(rows.map(r => [r.index, r]))
+  const fix = (i: number, patch: Partial<Fix>) => {
+    const of = read.rows.find(r => r.index === i)?.title ?? ''
+    setFixes(f => {
+      const prev = f[i]?.of === of ? f[i] : undefined
+      return { ...f, [i]: { ...prev, ...patch, of, links: { ...(prev?.links ?? {}), ...(patch.links ?? {}) } } }
+    })
+  }
+  /** A web address typed over a cell that wasn't one; kept as typed (not just once it parses). */
   const linkInput = (i: number, column: LinkColumn) => ({
     type: 'url', inputMode: 'url' as const, name: `link-${column}-${i}`, autoComplete: 'off', spellCheck: false, dir: 'ltr',
-    'aria-label': t(`links.${column}`), placeholder: 'https://…', defaultValue: '',
+    'aria-label': t(`links.${column}`), placeholder: 'https://…', value: kept[i]?.links[column] ?? '',
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => fix(i, { links: { [column]: e.target.value } }),
   })
 
-  const fresh = rows.filter(r => r.kind === 'fresh' && !fixes[r.index]?.leftOut)
-  const linked = rows.filter(r => r.kind === 'linked' && !fixes[r.index]?.leftOut)
+  const fresh = rows.filter(r => r.kind === 'fresh' && !kept[r.index]?.leftOut)
+  const linked = rows.filter(r => r.kind === 'linked' && !kept[r.index]?.leftOut)
   const existing = rows.filter(r => r.kind === 'existing')
   const problems = rows.filter(r => r.kind === 'problem')
-  // Rows that will be added, but with a cell left empty: shown so they can be fixed.
-  const warnings = rows.filter(r => r.kind !== 'problem' && r.kind !== 'existing' && r.problems.some(p => p.code === 'badLink'))
-  const badValues = rows.filter(r => r.kind !== 'problem' && !fixes[r.index]?.leftOut && r.problems.some(p => p.code === 'badValue'))
-  const pieces = [...fresh, ...linked.filter(r => !r.otherTheme || fixes[r.index]?.move)]
+  // Listed as pasted (see asPasted): rows with problems to fix or leave out…
+  const problemRows = asPasted.filter(r => r.kind === 'problem')
+  // …and rows that will be added, but with a cell left empty: shown so they can be fixed.
+  const warnings = asPasted.filter(r => r.kind !== 'problem' && r.kind !== 'existing' && r.problems.some(p => p.code === 'badLink'))
+  const badValues = rows.filter(r => r.kind !== 'problem' && !kept[r.index]?.leftOut && r.problems.some(p => p.code === 'badValue'))
+  const pieces = [...fresh, ...linked.filter(r => !r.otherTheme || kept[r.index]?.move)]
   // Pieces already in the sheet go too when they bring values: their empty cells are filled.
   // Only pieces this member may still edit: an archived one, or someone else's, takes none.
   const admin = ctx.me.access === 'admin' || ctx.me.access === 'superuser'
@@ -131,6 +157,10 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   const filling = existing.filter(r => Object.keys(r.values).length && editable(r))
   const sending = [...pieces, ...filling]
   const valueCount = sending.reduce((n, r) => n + Object.keys(r.values).length, 0)
+  /** More rows than one Add takes (the paste reads up to MAX_PLAN_ROWS): said before Add, which waits. */
+  const total = read.rows.length + read.overflow
+  const tooMany = read.overflow > 0 || sending.length > MAX_PLAN_ROWS
+  const limitId = 'fx-plan-limit'
   const matchedNames = read.matched.map(k => columns?.values.find(c => c.key === k)?.name).filter(Boolean) as string[]
   const themes = [...new Map(rows.filter(r => r.theme).map(r => [norm(r.theme), { name: r.theme, isNew: r.themeIsNew }])).values()]
   const pillars = [...new Map(rows.filter(r => r.pillar).map(r => {
@@ -173,7 +203,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   /** Closing by Esc or the backdrop: straight away when there's nothing to lose, otherwise asked first. */
   function tryClose() {
     if (asking) return
-    if (!rows.length && !Object.keys(fixes).length) { onClose(); return }
+    if (!rows.length && !Object.keys(kept).length) { onClose(); return }
     askedFrom.current = document.activeElement as HTMLElement | null
     setAsking(true)
   }
@@ -184,11 +214,11 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
   }
 
   async function add() {
-    if (!sending.length || busy) return
+    if (!sending.length || busy || tooMany) return
     setBusy(true); setError(null)
-    const res = await onAdd(sending.map(r => toInput(r, !!fixes[r.index]?.move)), { useSheetTitleStatus: useSheet })
+    const res = await onAdd(sending.map(r => toInput(r, !!kept[r.index]?.move)), { useSheetTitleStatus: useSheet })
     setBusy(false)
-    if (!res.success) { setError(res.error ?? t('err.generic')); return }
+    if (!res.success) { setError(errorText(t, res.error)); return }
     const skipped = (res.skipped?.length ?? 0) + (res.problems?.length ?? 0)
     onClose([t('paste.done', { created: res.created?.length ?? 0, updated: res.updated?.length ?? 0 }),
       res.values ? tc('paste.filled', { n: res.values }) : '',
@@ -221,27 +251,33 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
         <div className="fx-sheet-dlg-body">
           <textarea ref={boxRef} name="plan" autoComplete="off" spellCheck={false} value={text} aria-label={t('paste.box')} placeholder={t('paste.placeholder')}
                     onPaste={onPaste} onChange={e => { setText(e.target.value); setCells(cellsFromText(e.target.value)) }} />
-          {cells.length > 0 && !rows.length && <p className="fx-sheet-counts">{t('paste.none')}</p>}
           {rows.length > 0 && (
             <>
-              <div className="fx-content-pills" aria-label={t('paste.themes')} data-plan-themes="">
+              <div className="fx-content-pills" role="group" aria-label={t('paste.themes')} data-plan-themes="">
                 <span className="fx-sheet-sect">{t('paste.themes')}</span>
                 {themes.map(th => <span key={th.name} className={`fx-content-pill${th.isNew ? ' is-new' : ''}`}>{th.name} · {th.isNew ? t('paste.isNew') : t('paste.isExisting')}</span>)}
               </div>
               {pillars.length > 0 && (
-                <div className="fx-content-pills" aria-label={t('paste.pillars')} data-plan-pillars="">
+                <div className="fx-content-pills" role="group" aria-label={t('paste.pillars')} data-plan-pillars="">
                   <span className="fx-sheet-sect">{t('paste.pillars')}</span>
                   {pillars.map(p => <span key={p.name} className={`fx-content-pill${p.isNew ? ' is-new' : ''}`}>{p.name} · {p.isNew ? t('paste.isNew') : t('paste.isExisting')}</span>)}
                 </div>
               )}
-              <p className="fx-sheet-counts" role="status" data-plan-counts="">
-                {t('paste.counts', { fresh: fresh.length, linked: linked.length, existing: existing.length, problems: problems.filter(r => !fixes[r.index]?.leftOut).length })}
-                {valueCount > 0 && <> · {tc('paste.values', { n: valueCount })}</>}
-              </p>
-              {matchedNames.length > 0 && <p className="fx-sheet-muted" data-plan-matched="">{tc('paste.fills', { names: matchedNames.join(', ') })}</p>}
-              {filling.length > 0 && <p className="fx-sheet-muted" data-plan-filling="">{tc('paste.fillExisting', { n: filling.length })}</p>}
             </>
           )}
+          {/* Mounted from the start, so what the paste found (or didn't) is announced. */}
+          <div className="fx-cs-plan-status" role="status">
+            {cells.length > 0 && !rows.length && <p className="fx-sheet-counts">{t('paste.none')}</p>}
+            {rows.length > 0 && (
+              <p className="fx-sheet-counts" data-plan-counts="">
+                {t('paste.counts', { fresh: fresh.length, linked: linked.length, existing: existing.length, problems: problems.filter(r => !kept[r.index]?.leftOut).length })}
+                {valueCount > 0 && <> · {tc('paste.values', { n: valueCount })}</>}
+                {tooMany && <span className="fx-sheet-sr"> · {t('paste.tooMany', { n: total, max: MAX_PLAN_ROWS })}</span>}
+              </p>
+            )}
+          </div>
+          {rows.length > 0 && matchedNames.length > 0 && <p className="fx-sheet-muted" data-plan-matched="">{tc('paste.fills', { names: matchedNames.join(', ') })}</p>}
+          {rows.length > 0 && filling.length > 0 && <p className="fx-sheet-muted" data-plan-filling="">{tc('paste.fillExisting', { n: filling.length })}</p>}
 
           {read.unknown.length > 0 && (
             <section aria-label={tc('paste.notImported')} data-not-imported="">
@@ -283,32 +319,41 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
             </section>
           )}
 
-          {problems.length > 0 && (
+          {problemRows.length > 0 && (
             <section aria-label={t('paste.problemSection')}>
               <div className="fx-sheet-sect">{t('paste.problemSection')}</div>
               <div className="fx-sheet-ptab-wrap">
                 <table className="fx-sheet-ptab" data-plan-problems="">
-                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.problem')}</th><th /><th /></tr></thead>
+                  <thead><tr>
+                    <th>{t('paste.piece')}</th><th>{t('paste.problem')}</th>
+                    <th><span className="fx-sheet-sr">{t('paste.fixCol')}</span></th><th><span className="fx-sheet-sr">{t('paste.leaveCol')}</span></th>
+                  </tr></thead>
                   <tbody>
-                    {problems.map(r => {
-                      const f = fixes[r.index]
+                    {problemRows.slice(0, SHOWN_ROWS).map(r => {
+                      const f = kept[r.index]
+                      const cur = now.get(r.index) ?? r
+                      const fixed = cur.kind !== 'problem'
+                      // The fields are the row's problems as pasted, each kept (and controlled) until the dialog closes.
                       return (
-                        <tr key={r.index} className={f?.leftOut ? 'is-out' : undefined} data-plan-row={r.index}>
+                        <tr key={r.index} className={f?.leftOut ? 'is-out' : fixed ? 'is-fixed' : undefined} data-plan-row={r.index} data-fixed={fixed ? '' : undefined}>
                           <td>{r.title || <span className="fx-sheet-muted">#{r.index}</span>}</td>
-                          <td className="fx-content-problem">{r.problems.map(problemText).join(' · ')}</td>
+                          <td className={fixed ? 'fx-content-fixed' : 'fx-content-problem'}>{fixed ? t('paste.fixed') : cur.problems.map(problemText).join(' · ')}</td>
                           <td className="fx-content-fixes">
                             {r.problems.map(p => {
-                              if (p.code === 'noTitle') return <input key="t" name={`title-${r.index}`} autoComplete="off" aria-label={t('paste.piece')} disabled={f?.leftOut} onChange={e => fix(r.index, { title: e.target.value })} />
+                              if (p.code === 'noTitle') return <input key="t" name={`title-${r.index}`} autoComplete="off" aria-label={t('paste.piece')} disabled={f?.leftOut} value={f?.title ?? ''} onChange={e => fix(r.index, { title: e.target.value })} />
                               if (p.code === 'badLink') return <input key={p.column} {...linkInput(r.index, p.column)} disabled={f?.leftOut} />
                               // The sheet's own words are what's sent (readStatus reads them); each is shown in the reader's language.
                               if (p.code === 'badStatus') return (
-                                <select key="s" name={`status-${r.index}`} aria-label={t('paste.status')} disabled={f?.leftOut} defaultValue="" onChange={e => fix(r.index, { status: e.target.value })}>
+                                <select key="s" name={`status-${r.index}`} aria-label={t('paste.status')} disabled={f?.leftOut} value={f?.status ?? ''} onChange={e => fix(r.index, { status: e.target.value })}>
                                   <option value="" disabled>{p.status || '—'}</option>
                                   {(Object.entries(CONTENT_STAGE_WORDS) as [StageId, string][]).map(([id, w]) => <option key={w} value={w}>{t(`stage.${id}`)}</option>)}
                                   <option value="Archived">{t('paste.archived')}</option>
                                 </select>
                               )
-                              if (p.code === 'missingTask') return <button key="n" type="button" className="fx-sheet-btn" onClick={() => fix(r.index, { asNew: true })}>{t('paste.newSection')}</button>
+                              if (p.code === 'missingTask') return (
+                                <button key="n" type="button" className="fx-sheet-btn" aria-pressed={!!f?.asNew} disabled={f?.leftOut}
+                                        onClick={() => fix(r.index, { asNew: !f?.asNew })}>{t('paste.newSection')}</button>
+                              )
                               return null
                             })}
                           </td>
@@ -319,6 +364,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                   </tbody>
                 </table>
               </div>
+              {problemRows.length > SHOWN_ROWS && <p className="fx-sheet-muted" data-plan-more="">{t('paste.moreProblems', { shown: SHOWN_ROWS, n: problemRows.length })}</p>}
             </section>
           )}
 
@@ -327,20 +373,27 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
               <div className="fx-sheet-sect">{t('paste.warnSection')}</div>
               <div className="fx-sheet-ptab-wrap">
                 <table className="fx-sheet-ptab" data-plan-warnings="">
-                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.problem')}</th><th /></tr></thead>
+                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.problem')}</th><th><span className="fx-sheet-sr">{t('paste.fixCol')}</span></th></tr></thead>
                   <tbody>
-                    {warnings.map(r => (
-                      <tr key={r.index} data-plan-row={r.index}>
-                        <td>{r.title}</td>
-                        <td className="fx-content-problem">{r.problems.filter(p => p.code === 'badLink').map(p => `${problemText(p)}: “${r.badLinks[(p as { column: LinkColumn }).column]}”`).join(' · ')}</td>
-                        <td className="fx-content-fixes">
-                          {r.problems.map(p => p.code === 'badLink' && <input key={p.column} {...linkInput(r.index, p.column)} />)}
-                        </td>
-                      </tr>
-                    ))}
+                    {warnings.slice(0, SHOWN_ROWS).map(r => {
+                      const cur = now.get(r.index) ?? r
+                      const left = cur.problems.filter(p => p.code === 'badLink')
+                      return (
+                        <tr key={r.index} className={left.length ? undefined : 'is-fixed'} data-plan-row={r.index}>
+                          <td>{r.title}</td>
+                          <td className={left.length ? 'fx-content-problem' : 'fx-content-fixed'}>
+                            {left.length ? left.map(p => `${problemText(p)}: “${cur.badLinks[(p as { column: LinkColumn }).column]}”`).join(' · ') : t('paste.fixed')}
+                          </td>
+                          <td className="fx-content-fixes">
+                            {r.problems.map(p => p.code === 'badLink' && <input key={p.column} {...linkInput(r.index, p.column)} />)}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
+              {warnings.length > SHOWN_ROWS && <p className="fx-sheet-muted">{t('paste.moreWarnings', { shown: SHOWN_ROWS, n: warnings.length })}</p>}
             </section>
           )}
 
@@ -349,7 +402,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
               <div className="fx-sheet-sect">{t(`paste.${label as string}`)}</div>
               <div className="fx-sheet-ptab-wrap">
                 <table className="fx-sheet-ptab" data-plan-section={label as string}>
-                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.theme')}</th><th>{t('paste.type')}</th><th>{t('paste.status')}</th><th>{t('paste.owner')}</th><th>{t('paste.links')}</th><th /></tr></thead>
+                  <thead><tr><th>{t('paste.piece')}</th><th>{t('paste.theme')}</th><th>{t('paste.type')}</th><th>{t('paste.status')}</th><th>{t('paste.owner')}</th><th>{t('paste.links')}</th><th><span className="fx-sheet-sr">{t('paste.moveCol')}</span></th></tr></thead>
                   <tbody>
                     {(list as Classified[]).slice(0, SHOWN_ROWS).map(r => (
                       <tr key={r.index} data-plan-row={r.index}>
@@ -361,7 +414,7 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
                         <td className="fx-cs-tnum">{LINK_COLUMNS.filter(k => r.links[k]).length}</td>
                         <td>{r.otherTheme && (
                           <label className="fx-content-check">
-                            <input type="checkbox" name={`move-${r.index}`} checked={!!fixes[r.index]?.move} onChange={e => fix(r.index, { move: e.target.checked })} />
+                            <input type="checkbox" name={`move-${r.index}`} checked={!!kept[r.index]?.move} onChange={e => fix(r.index, { move: e.target.checked })} />
                             {t('paste.inTheme', { theme: r.otherTheme })} · {t('paste.moveHere')}
                           </label>
                         )}</td>
@@ -388,8 +441,11 @@ export function PlanPreview({ ctx: baseCtx, columns, onAdd, onClose, initialCell
             <input type="checkbox" name="useSheet" checked={useSheet} onChange={e => setUseSheet(e.target.checked)} data-use-sheet="" />
             {t('paste.useSheet')}
           </label>
-          <button type="button" className="fx-sheet-btn" onClick={() => onClose()}>{t('paste.close')}</button>
-          <button type="button" className="fx-sheet-btn is-primary" data-plan-add="" disabled={!sending.length || busy} onClick={() => void add()}>
+          {tooMany && <span className="fx-sheet-note" id={limitId} data-plan-limit="">{t('paste.tooMany', { n: total, max: MAX_PLAN_ROWS })}</span>}
+          {/* Close asks first too, as Esc and the backdrop do, when there's something to lose. */}
+          <button type="button" className="fx-sheet-btn" onClick={tryClose}>{t('paste.close')}</button>
+          <button type="button" className="fx-sheet-btn is-primary" data-plan-add="" disabled={!sending.length || busy || tooMany}
+                  aria-describedby={tooMany ? limitId : undefined} onClick={() => void add()}>
             {busy ? t('paste.adding') : pieces.length || !valueCount ? t('paste.add', { count: pieces.length }) : tc('paste.fill', { n: valueCount })}
           </button>
           </>}

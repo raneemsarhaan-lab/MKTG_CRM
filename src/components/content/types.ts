@@ -32,6 +32,8 @@ export interface ContentSheetProps {
   onView(view: BoardView): void
   /** The header's search (spec 011 R6): narrows rows by title. */
   query?: string
+  /** Clears the header's search (the "Clear search" of an empty result); absent: that button takes focus to the search box. */
+  onClearQuery?(): void
   api: ContentApi
   /** The sheet's shaped columns and custom values (spec 010). */
   columns: ColumnsBundle

@@ -26,7 +26,10 @@ import { gridFromHtml, mayAddTo } from './parse-plan'
 import type { ContentSheetProps } from './types'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
 import { openFields } from '@/components/sheets/links/FieldsPanel'
+import { useRovingToolbar } from '@/components/sheets/a11y'
 import { BulkBar, type BulkPatch } from '@/components/kanban/BulkBar'
+import { westernDigits } from '@/lib/sheet-format'
+import { errorText } from './errors'
 
 type LinkCol = typeof LINK_COLS[number]
 type Popup =
@@ -37,12 +40,13 @@ type Popup =
   | { kind: 'theme'; anchor: HTMLElement; theme: ContentTheme }
   | { kind: 'name'; anchor: HTMLElement; title: string; initial?: string; save(name: string): Promise<string | null> }
 
-const KNOWN_ERRORS = ['may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
-  'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
+/** An Undo toast stays at least this long; a hover or focus on it holds it. */
+const UNDO_MS = 10000
+const NOTE_MS = 3000
 
-/** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
+/** "2026-11-20", "20/11/2026" or "20/11" (Arabic digits too) → YYYY-MM-DD; '' clears; null when unreadable. */
 export function readDate(text: string, now = new Date()): string | null | '' {
-  const v = text.trim()
+  const v = westernDigits(text).trim()
   if (!v) return ''
   let y: number, m: number, d: number
   let r: RegExpExecArray | null
@@ -103,17 +107,42 @@ export function ContentSheet(p: ContentSheetProps) {
   // ── messages ────────────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ text: string; undo?: () => void; n: number } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const say = useCallback((text: string, undo?: () => void) => {
+  /** The toast's time left, and what holds it: the pointer over it, or focus in it (its Undo). */
+  const toastClock = useRef({ left: 0, since: 0, hover: false, focus: false })
+  const runToast = useCallback(() => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
-    toastTimer.current = setTimeout(() => setToast(null), undo ? 10000 : 3000)
+    toastClock.current.since = Date.now()
+    toastTimer.current = setTimeout(() => setToast(null), toastClock.current.left)
   }, [])
+  const say = useCallback((text: string, undo?: () => void) => {
+    setToast(prev => ({ text, undo, n: (prev?.n ?? 0) + 1 }))
+    // A new toast is a new element: nothing holds it until the pointer or focus comes to it.
+    toastClock.current = { left: undo ? UNDO_MS : NOTE_MS, since: 0, hover: false, focus: false }
+    runToast()
+  }, [runToast])
+  function holdToast(why: 'hover' | 'focus', on: boolean) {
+    const c = toastClock.current
+    const was = c.hover || c.focus
+    c[why] = on
+    const now = c.hover || c.focus
+    if (!was && now) {
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      c.left = Math.max(0, c.left - (Date.now() - c.since))
+    } else if (was && !now) {
+      // Let go: a moment more to read it, never less.
+      c.left = Math.max(c.left, 2000)
+      runToast()
+    }
+  }
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  /** Back to the grid's active cell (after Undo, whose button is gone). */
+  const focusGrid = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-content-sheet] [data-cell][tabindex="0"]')?.focus())
   const [notes, setNotes] = useState<Record<string, string | undefined>>({})
   const onNote = useCallback((key: string, note: string | null) => {
     setNotes(prev => ({ ...prev, [key]: note ?? undefined }))
     if (note) setTimeout(() => setNotes(prev => (prev[key] === note ? { ...prev, [key]: undefined } : prev)), 4000)
   }, [])
-  const why = (code?: string) => (code && KNOWN_ERRORS.includes(code) ? t(`err.${code}`) : code || t('err.generic'))
+  const why = (code?: string) => errorText(t, code)
 
   // ── shaped columns (spec 010) ───────────────────────────────────────────
   const cl = useSheetColumns({
@@ -125,6 +154,9 @@ export function ContentSheet(p: ContentSheetProps) {
 
   // ── popups ──────────────────────────────────────────────────────────────
   const [popup, setPopup] = useState<Popup | null>(null)
+  /** The theme editor has changes; a click outside then asks (themeAsk counts the asks). */
+  const themeDirty = useRef(false)
+  const [themeAsk, setThemeAsk] = useState(0)
   const closePopup = useCallback((restore: boolean) => {
     setPopup(prev => {
       if (restore && prev) requestAnimationFrame(() => (prev.anchor.closest('[data-cell]') as HTMLElement | null ?? prev.anchor).focus())
@@ -209,38 +241,61 @@ export function ContentSheet(p: ContentSheetProps) {
     const res = await p.api.bulkUpdate(bulkTasks.map(x => x.id), patch)
     setBulkBusy(false)
     if (!res.success && !res.changed) { say(t('notSaved', { reason: why(res.error) })); return }
-    say(bulkMessage(res.changed, res.refused), res.changed ? () => void bulkUndo(key, before) : undefined)
+    say(bulkMessage(res.changed, res.refused), res.changed ? () => void bulkUndo(key, before, res.refused) : undefined)
   }
-  async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[]) {
+  /** What an Undo put back: all of it, or how many it couldn't. */
+  const undoneText = (missed: number) => (missed > 0 ? t('bulk.undoneSome', { n: missed }) : t('bulk.undone'))
+  /**
+   * Every piece back as it was. The pieces the board refused never changed, so
+   * putting them back may be refused again: they aren't counted as missed.
+   */
+  async function bulkUndo(key: keyof BulkPatch, before: { id: string; old: string | null | undefined }[], refused: number) {
+    let failed = 0
     if (key === 'status') {
-      for (const b of before) if (b.old) await p.api.move(b.id, b.old as StageId)
+      for (const b of before) if (b.old) { const r = await p.api.move(b.id, b.old as StageId); if (!r.success) failed++ }
     } else {
       const groups = new Map<string, string[]>()
       for (const b of before) { const k = b.old ?? ''; groups.set(k, [...(groups.get(k) ?? []), b.id]) }
       for (const [old, ids] of groups) {
         const value = key === 'due_date' ? (old ? old.slice(0, 10) : '') : old
-        await p.api.bulkUpdate?.(ids, { [key]: value } as BulkPatch)
+        const r = await p.api.bulkUpdate?.(ids, { [key]: value } as BulkPatch)
+        failed += r ? Math.max(0, ids.length - r.changed) : ids.length
       }
     }
-    say(t('bulk.undone'))
+    say(undoneText(Math.max(0, failed - refused)))
   }
   /** Pillar isn't one of the board's fields: each piece is saved as the Pillar cell saves it. */
   async function bulkPillar(id: string | null) {
     const list = bulkTasks.filter(canEdit)
-    const before = list.map(x => ({ id: x.id, old: x.pillar_id ?? null }))
+    const done: { id: string; old: string | null }[] = []
     setBulkBusy(true)
-    let n = 0
-    for (const x of list) { const r = await p.api.updatePiece(x.id, { pillar_id: id }); if (r.success) n++ }
+    for (const x of list) { const r = await p.api.updatePiece(x.id, { pillar_id: id }); if (r.success) done.push({ id: x.id, old: x.pillar_id ?? null }) }
     setBulkBusy(false)
-    say(bulkMessage(n, bulkTasks.length - n), n ? () => {
-      void (async () => { for (const b of before) await p.api.updatePiece(b.id, { pillar_id: b.old }); say(t('bulk.undone')) })()
+    say(bulkMessage(done.length, bulkTasks.length - done.length), done.length ? () => {
+      void (async () => {
+        let missed = 0
+        for (const b of done) { const r = await p.api.updatePiece(b.id, { pillar_id: b.old }); if (!r.success) missed++ }
+        say(undoneText(missed))
+      })()
     } : undefined)
   }
+  /** Archive the pieces this member may change; the rest are skipped, and said. */
   async function bulkArchive() {
+    if (bulkBusy) return
+    const all = bulkTasks.length
     const list = bulkTasks.filter(canEdit)
-    let n = 0
-    for (const x of list) { const r = await p.api.drop(x.id); if (r.success) n++ }
-    say(t('bulk.archived', { n }), n ? () => { void (async () => { for (const x of list) await p.api.restore(x.id); say(t('bulk.undone')) })() } : undefined)
+    const done: string[] = []
+    setBulkBusy(true)
+    for (const x of list) { const r = await p.api.drop(x.id); if (r.success) done.push(x.id) }
+    setBulkBusy(false)
+    const skipped = all - done.length
+    say(skipped ? t('bulk.archivedSome', { n: done.length, m: skipped }) : t('bulk.archived', { n: done.length }), done.length ? () => {
+      void (async () => {
+        let missed = 0
+        for (const id of done) { const r = await p.api.restore(id); if (!r.success) missed++ }
+        say(undoneText(missed))
+      })()
+    } : undefined)
     setBulkIds([])
   }
 
@@ -419,6 +474,18 @@ export function ContentSheet(p: ContentSheetProps) {
   }
 
   // ── render ──────────────────────────────────────────────────────────────
+  /** The toolbar is one Tab stop; ←/→ (mirrored in Arabic), Home and End move along it. */
+  const barRef = useRef<HTMLDivElement>(null)
+  useRovingToolbar(barRef)
+  /** A search or Mine that leaves no pieces: said, with the way back. */
+  const query = p.query?.trim() ?? ''
+  const noMatch = (!!query || mine) && p.themes.length > 0 && !rows.some(r => r.kind === 'piece')
+  function clearSearch() {
+    if (p.onClearQuery) { p.onClearQuery(); return }
+    // The search box is the header's: take the reader there, with its text selected to clear.
+    const box = document.querySelector<HTMLInputElement>('[data-header-search]')
+    if (box) { box.focus(); box.select() }
+  }
   const linkTask = popup?.kind === 'link' ? p.tasks.find(x => x.id === popup.taskId) : undefined
   const linkLabel = (col: LinkCol) => t(`links.${col}`)
 
@@ -426,7 +493,7 @@ export function ContentSheet(p: ContentSheetProps) {
     <div className="fx-sheet" data-content-sheet="">
       {/* The header's third row on the Content tab (spec 011 R2): the sheet's
           own controls. Pipeline | Content are the header's tabs now. */}
-      <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
+      <div ref={barRef} className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
         <span className="fx-sheet-bar-gap" />
         {/* Spec 019 stage 2: Columns opens the Fields drawer (the same as ⚙ Fields). */}
         <button type="button" className="fx-sheet-btn" data-columns-button="" aria-haspopup="dialog" onClick={() => openFields()}>{ts('columns.button')}</button>
@@ -455,7 +522,15 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {p.themes.length === 0
         ? <div className="fx-sheet-empty"><p>{admin ? t('noThemesAdmin') : t('noThemes')}</p></div>
-        : (
+        : noMatch ? (
+          <div className="fx-sheet-empty" data-no-match="">
+            <p>{query ? t('noMatchSearch', { q: query }) : t('noMatch')}</p>
+            <p className="fx-cs-empty-row">
+              {query && <button type="button" className="fx-sheet-btn" data-clear-search="" onClick={clearSearch}>{t('clearSearch')}</button>}
+              {mine && <button type="button" className="fx-sheet-btn" data-show-all="" onClick={() => setMine(false)}>{t('showAll')}</button>}
+            </p>
+          </div>
+        ) : (
           <div className="fx-sheet-scroll">
             <ContentGrid
               rows={rows}
@@ -519,6 +594,9 @@ export function ContentSheet(p: ContentSheetProps) {
             skipLabel={popup.prompt ? ts('published.skip') : t('links.cancel')}
             badLink={t('err.bad_link')}
             placeholder="https://…"
+            savingLabel={t('editor.saving')}
+            openHref={popup.prompt ? null : pieceLink(linkTask, popup.col)}
+            openLabel={t('links.open')}
             onSkip={() => {
               // After the published link, a Post is asked for its post link too.
               if (popup.prompt === 'published' && linkTask.content_type_label === 'Post' && !linkTask.post_url) {
@@ -543,8 +621,9 @@ export function ContentSheet(p: ContentSheetProps) {
           <div className="fx-sheet-pop-form" data-archive-confirm="">
             <span>{t('archive.confirm', { name: popup.task.name })}</span>
             <span className="fx-sheet-pop-row">
-              <button type="button" className="fx-sheet-btn" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
-              <button type="button" className="fx-sheet-btn is-danger" data-autofocus="" onClick={() => void archive(popup.task)}>{t('archive.archive')}</button>
+              {/* A danger confirm opens on Cancel: Enter straight away keeps the piece. */}
+              <button type="button" className="fx-sheet-btn" data-autofocus="" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
+              <button type="button" className="fx-sheet-btn is-danger" onClick={() => void archive(popup.task)}>{t('archive.archive')}</button>
             </span>
           </div>
         </SheetPopover>
@@ -554,16 +633,18 @@ export function ContentSheet(p: ContentSheetProps) {
           <div className="fx-sheet-pop-form" data-remove-pillar-confirm="">
             <span>{t('pillar.removeConfirm', { name: popup.pillar.name, n: p.tasks.filter(x => x.pillar_id === popup.pillar.id).length })}</span>
             <span className="fx-sheet-pop-row">
-              <button type="button" className="fx-sheet-btn" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
-              <button type="button" className="fx-sheet-btn is-danger" data-autofocus="" onClick={() => void removePillar(popup.theme, popup.pillar)}>{t('pillar.removeOk')}</button>
+              <button type="button" className="fx-sheet-btn" data-autofocus="" onClick={() => closePopup(true)}>{t('archive.cancel')}</button>
+              <button type="button" className="fx-sheet-btn is-danger" onClick={() => void removePillar(popup.theme, popup.pillar)}>{t('pillar.removeOk')}</button>
             </span>
           </div>
         </SheetPopover>
       )}
       {popup?.kind === 'theme' && (
-        <SheetPopover anchor={popup.anchor} label={t('editor.title', { name: popup.theme.name })} onClose={closePopup}>
-          <ThemeEditor theme={popup.theme} members={p.members} onCancel={() => closePopup(true)}
-                       onSave={async patch => { const r = await p.api.saveTheme(popup.theme.id, patch); if (!r.success) return why(r.error); closePopup(true); say(t('theme.saved')); return null }} />
+        // A click outside with changes in the editor asks first, as Paste plan does; Esc and Cancel close.
+        <SheetPopover anchor={popup.anchor} label={t('editor.title', { name: popup.theme.name })}
+                      onClose={restore => { if (!restore && themeDirty.current) setThemeAsk(n => n + 1); else closePopup(restore) }}>
+          <ThemeEditor theme={popup.theme} members={p.members} onCancel={() => closePopup(true)} ask={themeAsk} onDirty={d => { themeDirty.current = d }}
+                       onSave={async patch => { const r = await p.api.saveTheme(popup.theme.id, patch); if (!r.success) return r.error ?? 'generic'; closePopup(true); say(t('theme.saved')); return null }} />
         </SheetPopover>
       )}
       {popup?.kind === 'name' && (
@@ -612,9 +693,16 @@ export function ContentSheet(p: ContentSheetProps) {
 
       <div className="fx-sheet-toast" role="status" aria-live="polite" data-sheet-toast="">
         {toast && (
-          <span key={toast.n} className="fx-sheet-toast-in">
+          <span key={toast.n} className="fx-sheet-toast-in"
+                onMouseEnter={() => holdToast('hover', true)} onMouseLeave={() => holdToast('hover', false)}
+                onFocus={() => holdToast('focus', true)} onBlur={() => holdToast('focus', false)}>
             {toast.text}
-            {toast.undo && <button type="button" onClick={() => { const u = toast.undo; setToast(null); u?.() }}>{ta('undo')}</button>}
+            {toast.undo && <button type="button" onClick={() => {
+              const u = toast.undo
+              if (toastTimer.current) clearTimeout(toastTimer.current)
+              setToast(null); u?.()
+              focusGrid()
+            }}>{ta('undo')}</button>}
           </span>
         )}
       </div>

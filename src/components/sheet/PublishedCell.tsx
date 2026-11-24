@@ -19,8 +19,12 @@ export function PublishedContent({ task, canEdit, t }: { task: Task; canEdit: bo
   return canEdit ? <span className="fx-sheet-muted">{t('published.add')}</span> : null
 }
 
-/** A link field with Save and Skip/Cancel, used inside a SheetPopover. */
-export function LinkPrompt({ title, initial, saveLabel, savingLabel, skipLabel, badLink, placeholder, onSave, onSkip }: {
+/**
+ * A link field with Save and Skip/Cancel, used inside a SheetPopover. With
+ * `openHref`, the link already in the cell can be opened from here too (in a
+ * new tab), so Enter on the cell edits and the keyboard can still follow it.
+ */
+export function LinkPrompt({ title, initial, saveLabel, savingLabel, skipLabel, badLink, placeholder, openHref, openLabel, onSave, onSkip }: {
   title: string
   initial?: string
   saveLabel: string
@@ -29,6 +33,9 @@ export function LinkPrompt({ title, initial, saveLabel, savingLabel, skipLabel, 
   skipLabel: string
   badLink: string
   placeholder: string
+  /** The cell's current link, shown as an "Open link" action; absent: no action (as before). */
+  openHref?: string | null
+  openLabel?: string
   onSave(url: string): Promise<string | null>
   onSkip(): void
 }) {
@@ -63,6 +70,9 @@ export function LinkPrompt({ title, initial, saveLabel, savingLabel, skipLabel, 
       </label>
       {note && <span className="fx-sheet-note" id="fx-sheet-pop-note" role="alert">{note}</span>}
       <span className="fx-sheet-pop-row">
+        {openHref && openLabel && (
+          <a className="fx-sheet-btn fx-cs-open" href={openHref} target="_blank" rel="noopener noreferrer" data-link-open="">{openLabel}</a>
+        )}
         <button type="button" className="fx-sheet-btn" onClick={onSkip}>{skipLabel}</button>
         <button type="submit" className="fx-sheet-btn is-primary" disabled={busy}>{busy && savingLabel ? savingLabel : saveLabel}</button>
       </span>

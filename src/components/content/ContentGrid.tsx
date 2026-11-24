@@ -143,6 +143,7 @@ export function ContentGrid(p: ContentGridProps) {
     return (p.contentTypes ?? []).find(x => normTitle(x.label) === normTitle(text))?.label ?? null
   }
   const byId = new Map(p.members.map(m => [m.id, m]))
+  const themeTipId = (themeId: string) => `fx-thd-${themeId}`
   const taskOf = (row: ContentRow): Task | null => (row.kind === 'piece' || row.kind === 'clip' ? row.task : null)
 
   const cl = p.columns
@@ -166,7 +167,8 @@ export function ContentGrid(p: ContentGridProps) {
   /**
    * A theme reads like a pillar, "Strategy · 5": its name and its live pieces.
    * Owner, frequency, cadence and audience stay in the theme editor and in the
-   * name's tooltip.
+   * name's tooltip, and are the cell's description, so the keyboard and screen
+   * readers get them without hovering.
    */
   function themeLine(row: Extract<ContentRow, { kind: 'theme' }>) {
     const th = row.theme
@@ -185,6 +187,7 @@ export function ContentGrid(p: ContentGridProps) {
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>
         <span className="fx-content-theme-name">{th.name}</span>
         <span className="fx-sheet-muted"> · {row.pieces.filter(x => !x.dropped_at).length}</span>
+        <span hidden id={themeTipId(th.id)}>{tip}</span>
       </span>
     )
   }
@@ -279,6 +282,19 @@ export function ContentGrid(p: ContentGridProps) {
     },
     isText,
     isMenu,
+    // What Enter opens: a menu, the Type list, a link's prompt, or nothing (a link opens, the task opens, a note says why not).
+    popupKind: (row, col) => {
+      if ((row.kind !== 'piece' && row.kind !== 'clip') || isCustom(col)) return undefined
+      const can = p.canEdit(row.task), isClip = row.kind === 'clip'
+      switch (col) {
+        case 'assignee': return can ? 'menu' : null
+        case 'type': return can ? 'listbox' : null
+        case 'pillar': return can && !isClip ? 'menu' : null
+        case 'doc': case 'design': case 'post': case 'published': return can && !isClip && !row.task.dropped_at ? 'dialog' : null
+        case 'task': case 'archive': return null
+      }
+      return undefined
+    },
     textValue: (row, col) => {
       const task = taskOf(row)
       if (!task) return ''
@@ -290,7 +306,8 @@ export function ContentGrid(p: ContentGridProps) {
       if (col === 'type') return task.content_type_label ? typeWord(task.content_type_label) : ''
       return ''
     },
-    describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
+    describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}`
+      : col === 'title' && row.kind === 'theme' ? themeTipId(row.theme.id) : undefined),
     isDraft: row => row.kind === 'draft',
     inputLabel: (row, col) => (row.kind === 'draft' ? t('newPiece.label') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
     inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('newPiece.placeholder') : col === 'date' ? '2026-11-20…' : undefined),
@@ -424,6 +441,28 @@ export function ContentGrid(p: ContentGridProps) {
     })
   }, [lv.rows, by, lv.store.view.words, lv.store.view.show]) // eslint-disable-line react-hooks/exhaustive-deps
   model.rows = rows
+  /**
+   * The active cell the grid shows. The grid always has a Tab stop and nothing
+   * takes focus: before anything is picked it's the first cell (as on a blank
+   * sheet), and when the active row goes (archived with Show archived off, its
+   * pillar removed, regrouped) it's the nearest row still shown, not the top.
+   */
+  const withActive = useRef<ContentRow[]>([])
+  if (p.active && rows.some(r => r.key === p.active!.key)) withActive.current = rows
+  const active = useMemo((): ActiveCell | null => {
+    if (!rows.length) return null
+    const want = p.active
+    if (want && rows.some(r => r.key === want.key)) return want
+    const before = withActive.current
+    const at = want ? before.findIndex(r => r.key === want.key) : -1
+    if (want && at >= 0) {
+      const here = new Set(rows.map(r => r.key))
+      for (let d = 1; d < before.length; d++) {
+        for (const j of [at + d, at - d]) if (before[j] && here.has(before[j].key)) return { key: before[j].key, col: want.col }
+      }
+    }
+    return { key: rows[0].key, col: model.cols[0] ?? 'title' }
+  }, [rows, p.active]) // eslint-disable-line react-hooks/exhaustive-deps
   const colName = (col: GridCol) => { const h = model.header(col); return h.label ?? (typeof h.text === 'string' ? h.text : col) }
   const cellName = (row: ContentRow, col: GridCol) => {
     if (col === 'rowNo') return ''
@@ -433,7 +472,7 @@ export function ContentGrid(p: ContentGridProps) {
     return task ? `${task.name} · ${colName}` : colName
   }
   const lf = useLinkedFormats<ContentRow>({
-    enabled: !!p.linked, sheetKey: 'linked_content', rows, cols: model.cols, active: p.active,
+    enabled: !!p.linked, sheetKey: 'linked_content', rows, cols: model.cols, active,
     store: lv.store, ruleLooks: lv.ruleLooks, colName, shownText, rawRows: p.rows, isItem: row => row.kind === 'piece',
     record: (label, changes) => leRef.current?.record(label, changes),
     taskOf: row => taskOf(row)?.id ?? null, cellName, textValue: model.textValue,
@@ -516,7 +555,7 @@ export function ContentGrid(p: ContentGridProps) {
 
   return (
     <>
-    <GridCore model={model} active={p.active} setActive={p.setActive}
+    <GridCore model={model} active={active} setActive={p.setActive}
               editDraft={p.editDraft ? `d:${p.editDraft}` : null} notes={p.notes} onNote={p.onNote}
               selectAreas={tips.grid.selectAreas} optionsAt={tips.grid.optionsAt} />
     {lm.node}

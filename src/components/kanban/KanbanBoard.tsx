@@ -1078,6 +1078,7 @@ export function KanbanBoard({
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
           onView={v => setView(v)}
           query={filters.search}
+          onClearQuery={() => setFilters(f => ({ ...f, search: '' }))}
           api={sheetApi}
         />
         {taskPanel}
