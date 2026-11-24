@@ -133,8 +133,8 @@ used as the Sheet view of every Space and Space › Brand folder.
   including the "Videos · <brand>" ones.)
   *Still true underneath:* each theme keeps a record of its own in the projects table, which holds its
   name, brand and pillars and is what a linked row's task points at as its theme. Separating that
-  fully (so a theme never shows among the projects, and a task's project is untouched by its row's
-  theme) is a larger change, not made here.
+  fully was offered and declined: the user keeps it connected behind the scenes. Themes from several
+  Spaces are to be collected and connected in a dashboard, later; nothing is built for that now.
 - **No "Linked" tag** on a sheet's title or tab: every sheet is the same kind of sheet.
 - **The sheet's toolbar** keeps "+ Column" and "+ Theme" only; **no brand filter or "Group by brand"**
   on a Space page; **the old Sheets section's blank sheets are removed** (kept first as CSV exports).

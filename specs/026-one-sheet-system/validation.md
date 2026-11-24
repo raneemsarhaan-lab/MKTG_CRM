@@ -62,11 +62,10 @@ decide which of the sheet's own columns show until someone shows or hides one th
 ## To confirm with the user
 
 Answered on 24 Nov: blank sheets of the old Sheets section are removed; Planning's flow is edited in
-its settings when needed. Still open:
+its settings when needed; the brand page stays one Space at a time; a theme stays connected to its
+record among the projects behind the scenes, and a future dashboard is where themes from several
+Spaces get collected and connected (nothing is built for that now). Still open:
 
-- Whether a theme's record should also leave the Projects page and the project pickers, and stop
-  being the task's project (see the spec's 24 Nov note). Themes are separate by name and by sheet now,
-  but each still has a record among the projects.
 - A Space other than Content and Video starts with an empty sheet: its existing tasks aren't turned
   into rows. They can be added one at a time with Make task › an existing task.
 - The local lab database had leftover test tasks, which were deleted before the final run. No
