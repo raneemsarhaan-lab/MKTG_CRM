@@ -84,13 +84,9 @@ used as the Sheet view of every Space and Space › Brand folder.
   (`content`); every other Space has `rows:<its id>`. The conversion moves the Video sheet's custom
   columns, and each other Space's task-sheet custom columns, to that Space's sheet; their values go
   with them.
-- **The Brand page's Sheet view** shows one Space's sheet at a time, narrowed to the brand, with a
-  strip of every Space and the number of the brand's rows on each. Each Space's sheet has its own
-  columns, formatting and comments, so the Spaces aren't merged into one grid. "All tasks" on the same
-  strip is the brand's tasks from every Space together (every linked row), with a Space column. The
-  address (`?sheet=<space key>` or `?sheet=tasks`) decides which opens, then the one last opened for
-  that brand, then the first Space that has rows for it. A saved Sheet view of a brand stays a task
-  sheet (its filters and fields are about tasks).
+- **The Brand page's Sheet view** is the brand's tasks from every Space, with a Space column. A strip
+  of Spaces (one Space's sheet at a time, with row counts) was built and then removed at the user's
+  word on 25 Nov; a Space's rows for a brand, plain rows included, are in that Space's brand folder.
 - **Columns.** A sheet's own columns of a task (Type, Status, Assignee, the links, Date…) and every
   field of the field library are **task fields**; a column the team adds with a kind of its own is
   **sheet only**. A library field shows by itself while a task type in use carries it; any other is

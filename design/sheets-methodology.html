@@ -90,17 +90,10 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
         <tbody>
           <tr><td>A Space</td><td>All of that Space's rows, every brand.</td></tr>
           <tr><td>Space › Brand folder</td><td>That Space's rows for one brand (the themes that belong to the brand).</td></tr>
-          <tr><td>A brand's page</td><td>The brand's rows from every Space, one Space at a time, and "All tasks". Its <b>List</b> groups tasks by project, with each project's tasks from every Space under it.</td></tr>
+          <tr><td>A brand's page</td><td>The brand's tasks from every Space, one line per task, with a Space column. Its <b>List</b> groups tasks by project, with each project's tasks from every Space under it.</td></tr>
           <tr><td>My tasks</td><td>A task sheet: one line per task of mine (no themes or plain rows).</td></tr>
         </tbody>
       </table></div>
-      <h3>On a brand's page</h3>
-      <div class="strip" aria-label="The strip above a brand's sheet"><small>Sheets by Space</small><span class="on">Content <small>12</small></span><span>Design <small>0</small></span><span>Video <small>5</small></span><span>Planning <small>0</small></span><span>All tasks <small>61</small></span></div>
-      <ul>
-        <li>Each Space is on the strip with the number of the brand's rows on its sheet. Choosing one opens that Space's sheet for the brand, on the same page, fully editable.</li>
-        <li><b>All tasks</b> lists the brand's tasks from every Space together, with a Space column.</li>
-        <li>The page opens on the Space last used for that brand, or the first Space that has rows.</li>
-      </ul>
       <p class="note">There is no Sheets section in the sidebar. An old Sheets address, and the link in a sheet-comment notification, lead to the page that owns the sheet, on the same tab and cell. Each sheet sits in a workbook, so blank tabs can still be added beside it.</p>
     </section>
 
@@ -235,7 +228,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
       <h2>10 · Shared or private</h2>
       <div class="cols">
         <div class="box"><h3>Shared by everyone</h3><p>Rows, themes and their order; each sheet's columns, names and widths; sheet-only values; task fields; row heights; sort, filter and grouping; formatting, colour rules and comments.</p></div>
-        <div class="box"><h3>Per person or device</h3><p>Only my rows (resets each visit), Show archived (remembered on the device), collapsed themes, and which Space a brand's sheet last opened on.</p></div>
+        <div class="box"><h3>Per person or device</h3><p>Only my rows (resets each visit), Show archived (remembered on the device) and collapsed themes.</p></div>
       </div>
     </section>
 
@@ -257,7 +250,6 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
     <section class="part" id="open">
       <h2>12 · Open points</h2>
       <p>Decisions still needed:</p>
-      <div class="gap"><b>A brand's rows in one grid.</b> The brand page shows one Space's sheet at a time, because each Space's sheet has its own columns, formatting and comments. One merged grid would need shared columns across Spaces.</div>
       <div class="gap"><b>Existing tasks of other Spaces.</b> Design and Planning tasks made before the change aren't rows on their Space's sheet. They can be added one at a time with Make task › an existing task.</div>
       <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
       <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>

@@ -174,47 +174,29 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      // §1: the Brand page's Sheet view shows the brand's rows from every Space.
+      // §1, as changed by the user on 24 Nov 2026: the Brand page's Sheet view is the brand's tasks from every
+      // Space (no strip of Spaces); a Space's rows for the brand are in its brand folder.
       id: '026-brand-page-sheet-shows-rows-of-every-space', as: 'admin',
       async run({ page, go }) {
         const n = rnd()
         const td = theme(`Lab brand design ${n}`, 'design')
-        const tc = theme(`Lab brand content ${n}`, 'content')
         const rd = row(td, 'design', `Lab design line ${n}`)
-        const rc = row(tc, 'content', `Lab content line ${n}`)
         const b = brand()
-        const other = first(`select id from brands order by name offset 1 limit 1`)
         try {
-          // Every Space is on the strip with the brand's row count; a plain row of the Design Space shows.
-          await go(`/brands/${b}?view=sheet&sheet=design`)
-          await page.waitForSelector(`[data-row="l:${rd}"]`, { timeout: 90000 })
-          ok(true, "the brand's Sheet view shows its rows on the Design Space's sheet, plain rows included")
-          for (const k of ['content', 'design', 'video', 'planning']) ok(await page.isVisible(`[data-brand-sheet="${k}"]`), `the ${k} Space is on the strip`)
-          const count = async k => Number(await page.getAttribute(`[data-brand-sheet="${k}"]`, 'data-rows'))
-          const want = k => Number(psql(`select count(*) from content_rows r join projects p on p.id=r.project_id where p.brand_id='${b}' and r.space_id='${space(k)}'`))
-          ok(await count('design') === want('design') && await count('content') === want('content'), "each Space shows how many of the brand's rows it has")
-          ok(!(await page.$(`[data-row="l:${rc}"]`)), "the Content Space's rows aren't mixed into the Design sheet")
-          // Moving to another Space's sheet, on the same page.
-          await page.click('[data-brand-sheet="content"]')
-          await page.waitForSelector(`[data-row="l:${rc}"]`, { timeout: 60000 })
-          ok(!(await page.$(`[data-row="l:${rd}"]`)), "the Content Space's sheet shows its own rows for the brand")
-          // It is the same sheet: Make task works from here.
-          await makeTask(page, rc, null)
-          const made = psql(`select task_id from content_rows where id='${rc}'`)
-          ok(!!made && psql(`select brand_id from tasks where id='${made}'`) === b, 'Make task from the brand page makes the task for this brand')
-          // The choice is remembered for the brand.
           await go(`/brands/${b}?view=sheet`)
-          await page.waitForSelector(`[data-row="k:${made}"]`, { timeout: 60000 })
-          ok(await page.getAttribute('[data-brand-sheets]', 'data-brand-sheets') === 'content', 'the Space last opened is remembered')
-          // "All tasks" is the brand's tasks from every Space, with a Space column.
-          await page.click('[data-brand-sheet="tasks"]')
+          await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 90000 })
+          ok(!(await page.$('[data-brand-sheet-strip]')) && !(await page.$('[data-brand-sheet]')), "no Sheets by Space strip on the brand's page")
+          ok(await page.locator('[data-task-sheet] [data-col-head="space"]').count() === 1, "the brand's tasks from every Space, with a Space column")
+          // The Space's rows for the brand are in that Space's brand folder, plain rows included.
+          await go(`/spaces/design/${b}?view=sheet`)
+          await page.waitForSelector(`[data-row="l:${rd}"]`, { timeout: 60000 })
+          await makeTask(page, rd, null)
+          const made = psql(`select task_id from content_rows where id='${rd}'`)
+          ok(!!made && psql(`select brand_id from tasks where id='${made}'`) === b, 'Make task in the brand folder makes the task for this brand')
+          await go(`/brands/${b}?view=sheet`)
           await page.waitForSelector(`[data-task-sheet] [data-row="t:${made}"]`, { timeout: 60000 })
-          ok(true, 'All tasks lists the new task')
-          // Another brand's page doesn't show these rows.
-          await go(`/brands/${other}?view=sheet&sheet=design`)
-          await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
-          ok(!(await page.$(`[data-row="t:${td}"]`)), "another brand's page doesn't show them")
-        } finally { cleanup([td, tc]) }
+          ok(true, "and it shows on the brand's sheet")
+        } finally { cleanup([td]) }
       },
     },
     {

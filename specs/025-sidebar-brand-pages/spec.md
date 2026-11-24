@@ -100,4 +100,5 @@ The Library row leaves the sidebar. The request says "Move its contents into Ass
   alone. (The counts are still worked out with the page, in case they are wanted back.)
 - **The Space page's brand filter** is removed: a Space's brand folders in the sidebar are the
   filter. "Group by brand" is removed too.
-
+- **Brands in the sidebar** show the brand's icon, not a colour dot (25 Nov); a brand with no icon shows
+  its initial on its colour.

@@ -9,7 +9,7 @@ export async function folderHome(folderId: string): Promise<string | null> {
   const f = await prisma.sheetFolder.findUnique({ where: { id: folderId }, select: { kind: true, brand_id: true, linked_key: true } })
   if (!f) return null
   if (f.kind === 'content' || f.kind === 'video') return `/spaces/${f.kind}?view=sheet`
-  if (f.kind === 'brand' && f.brand_id) return `/brands/${f.brand_id}?view=sheet&sheet=tasks`
+  if (f.kind === 'brand' && f.brand_id) return `/brands/${f.brand_id}?view=sheet`
   const node = /^node:(space|me):([0-9a-f-]{36})$/.exec(f.linked_key ?? '')
   if (node?.[1] === 'me') return '/me?view=sheet'
   if (node?.[1] === 'space') {

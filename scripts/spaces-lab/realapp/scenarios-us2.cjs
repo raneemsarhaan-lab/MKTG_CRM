@@ -66,10 +66,7 @@ module.exports = (EMAIL, psql, ok) => {
         await go(`/brands/${b}/library`)
         const want = psql(`select count(*) from tasks where brand_id='${b}' and status='publish' and dropped_at is null and content_task_id is null and not migrated_simple`)
         ok(String((await page.$$('[data-library-item]')).length) === want, `Library lists published only (${want})`)
-        // Spec 026: the Sheet address opens the brand's sheets — one Space's rows at a time, or All tasks.
         await go(`/brands/${b}/sheet`)
-        await page.waitForSelector('[data-brand-sheets]', { timeout: 60000 })
-        await page.click('[data-brand-sheet="tasks"]')
         await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 60000 })
         ok(psql(`select count(*) from sheet_folders where brand_id='${b}' and kind='brand'`) === '1', "the Sheet address opens the brand's own workbook, once")
       },

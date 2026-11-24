@@ -23,7 +23,7 @@ Also checked: Paste plan makes plain rows and no tasks (`026-paste-plan-makes-pl
 | Part of the request | State |
 |---|---|
 | §1 One sheet as the Sheet view of every Space and Space › Brand folder | Built |
-| §1 The Brand page's Sheet view shows the brand's rows from every Space | Built, one Space at a time: a strip of every Space with the brand's row count opens that Space's sheet for the brand (plain rows included), on the same page; "All tasks" lists the brand's tasks from every Space together. The Spaces aren't merged into one grid, because each Space's sheet has its own columns, formatting and comments (`026-brand-page-sheet-shows-rows-of-every-space`) |
+| §1 The Brand page's Sheet view shows the brand's rows from every Space | Changed by the user on 25 Nov: the strip of Spaces built for this is removed. The brand's Sheet view is its tasks from every Space, with a Space column (so every linked row); a Space's rows for the brand, plain rows included, are in that Space's brand folder (`026-brand-page-sheet-shows-rows-of-every-space`) |
 | §1 No Sheets section in the sidebar | Built. An old Sheets address (`/sheets`, `/sheets/<folder>`, and the link in a sheet-comment notification) leads to the page that owns the sheet: the Space's Sheet view, the brand's page or My tasks, on the same tab and cell. The folders of blank sheets people made in the old Sheets section are removed (user, 24 Nov); whatever a sheet held is kept first as a CSV in Settings › Diagnostics › Kept exports |
 | §2 Themes, pillars, rows, child rows, "+ Row" | Built (sheet 2b), now per Space |
 | §3 Plain rows; a stage as a label | Built |

@@ -32,7 +32,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
       select: { id: true, key: true, name: true, color: true, media_board: true, settings: true },
     }),
-    prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, short_name: true, color: true } }),
+    prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, short_name: true, color: true, logo_url: true } }),
     // Spec 025: one pass over the open tasks gives every count the sidebar shows.
     prisma.task.findMany({ where: OPEN, select: { id: true, brand_id: true, status: true, due_date: true, media_board: true, content_task_id: true, kind: true } }),
     prisma.taskSpace.findMany({ where: { task: OPEN }, select: { task_id: true, space_id: true } }),
@@ -79,7 +79,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
         folders: brands.map(b => ({ id: b.id, name: short(b), color: b.color, open: x.brands.get(b.id)?.open ?? 0, overdue: x.brands.get(b.id)?.overdue ?? 0 })),
       }
     }),
-    brands: brands.map(b => ({ id: b.id, name: short(b), full_name: b.name, color: b.color, open: brandN.get(b.id)?.open ?? 0, overdue: brandN.get(b.id)?.overdue ?? 0 })),
+    brands: brands.map(b => ({ id: b.id, name: short(b), full_name: b.name, color: b.color, logo_url: b.logo_url, open: brandN.get(b.id)?.open ?? 0, overdue: brandN.get(b.id)?.overdue ?? 0 })),
     noBrandOpen: noBrand.open,
     noBrandOverdue: noBrand.overdue,
   }

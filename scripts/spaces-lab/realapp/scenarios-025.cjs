@@ -43,6 +43,10 @@ module.exports = (EMAIL, psql, ok) => {
           // Numbers: only My tasks and Inbox carry one (user, 24 Nov 2026); Spaces, folders and brands show names alone.
           ok(await page.isVisible('[data-node="my-tasks"] [data-count]'), 'My tasks keeps its number')
           for (const node of ['space:content', `space:content:${b1[0]}`, `brand:${b1[0]}`]) ok(!(await page.$(`[data-node="${node}"] [data-count]`)), `no number on ${node}`)
+          // Brands show their icon, not a colour dot (user, 25 Nov 2026); a brand without one shows its initial.
+          const marks = await page.$$eval('[data-node^="brand:"] [data-brand-mark]', els => els.map(e => e.getAttribute('data-brand-mark')))
+          ok(marks.length >= brands().length && !(await page.$('[data-node^="brand:"] [data-dot]')), `each brand has a mark, no colour dots: ${marks}`)
+          ok(marks.filter(m => m === 'icon').length === Number(psql(`select count(*) from brands where logo_url is not null`)), 'a brand with an icon shows it')
           // It fits without scrolling.
           const fits = await page.$eval('[data-nav-tree]', el => { const box = el.parentElement; return box.scrollHeight <= box.clientHeight + 1 })
           ok(fits, 'the sidebar fits on screen without scrolling')

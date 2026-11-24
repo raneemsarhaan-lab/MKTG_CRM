@@ -74,6 +74,18 @@ export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; 
     </span>
   ) : null)
   const dot = (color: string) => <span aria-hidden="true" data-dot style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+  /** A brand's own icon (user, 25 Nov 2026: icons here, not colour dots); its initial on its colour when it has none. */
+  const brandMark = (b: { name: string; color: string; logo_url?: string | null }, none = false) => (
+    <span aria-hidden="true" data-brand-mark={b.logo_url ? 'icon' : none ? 'none' : 'letter'}
+      style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, overflow: 'hidden', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: b.logo_url ? '#FFFFFF' : none ? 'transparent' : b.color, color: '#FFFFFF', fontSize: 10, fontWeight: 800, lineHeight: 1,
+        border: none ? `1.5px dashed ${PIPE.textFaint}` : b.logo_url ? `1px solid ${PIPE.border}` : 'none' }}>
+      {b.logo_url
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={b.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : none ? null : b.name.trim()[0]?.toUpperCase()}
+    </span>
+  )
   const name = (s: string, title?: string) => <span title={title} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s}</span>
   const icon = (d: React.ReactNode) => (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>{d}</svg>
@@ -166,7 +178,7 @@ export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; 
             const href = `/brands/${b.slug}`
             return (
               <Link key={b.id} href={href} data-node={`brand:${b.slug}`} style={row(isOn(href))} aria-current={isOn(href) ? 'page' : undefined}>
-                {dot(b.color)}{name(b.name, b.full_name)}
+                {brandMark({ name: b.full_name ?? b.name, color: b.color, logo_url: 'logo_url' in b ? (b as { logo_url?: string | null }).logo_url : null }, b.id === 'none')}{name(b.name, b.full_name)}
               </Link>
             )
           })}
