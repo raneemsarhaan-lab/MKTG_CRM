@@ -39,33 +39,48 @@ module.exports = (EMAIL, psql, ok) => {
 
   return [
     {
+      // User, 24 Nov 2026: adding a theme asks for a name and nothing else; it is never an existing project.
       id: '2b-theme-from-project-or-new', as: 'admin',
       async run({ page, go }) {
         const n = rnd()
-        const existing = first(`insert into projects (id, name, standing) values (gen_random_uuid(), 'Lab project ${n}', true) returning id`)
         const a = theme(`Lab theme A ${n}`, 0.5)
+        const made = name => psql(`select p.id from projects p join content_themes t on t.project_id=p.id where p.name='${name}' and t.space_id='${psql(`select id from team_spaces where key='content'`)}'`)
         try {
           await open(page, go)
-          // + Theme from an existing project: the theme takes its name.
           await page.click('[data-add-theme]')
-          await page.waitForSelector('[data-theme-add]')
-          await page.selectOption('[data-theme-project]', existing)
+          await page.waitForSelector('[data-theme-add] [data-theme-name]')
+          ok(await page.locator('[data-theme-add] input, [data-theme-add] select').count() === 1, '+ Theme asks for a name and nothing else')
+          await page.fill('[data-theme-name]', `Lab named ${n}`)
           await page.click('[data-theme-add-save]')
           await page.waitForTimeout(2500)
-          ok(psql(`select count(*) from content_themes where project_id='${existing}'`) === '1', 'the project is a theme on the sheet')
-          ok(await page.isVisible(`[data-row="t:${existing}"]`), 'it shows, with its "+ Row" line')
-          ok(await page.isVisible(`[data-row="a:${existing}"]`), '"+ Row" under the new theme')
-          // Insert theme above A, as a new project.
+          const one = made(`Lab named ${n}`)
+          ok(!!one, 'the theme is on the sheet')
+          ok(await page.isVisible(`[data-row="t:${one}"]`) && await page.isVisible(`[data-row="a:${one}"]`), 'it shows, with its "+ Row" line')
+          // The same name again on this sheet is refused.
+          await page.click('[data-add-theme]')
+          await page.fill('[data-theme-name]', `Lab named ${n}`)
+          await page.click('[data-theme-add-save]')
+          await page.waitForSelector('[data-theme-add] [role="alert"]')
+          ok(true, 'a second theme with that name is refused on the same sheet')
+          await page.keyboard.press('Escape')
+          // Insert theme above A.
           await menu(page, `t:${a}|title`, 'Insert theme above')
-          await page.waitForSelector('[data-theme-add]')
-          await page.click('[data-theme-mode="new"]')
-          await page.fill('[data-theme-editor] input >> nth=0', `Lab new ${n}`)
-          await page.click('[data-theme-editor] button[type="submit"]')
+          await page.waitForSelector('[data-theme-add] [data-theme-name]')
+          await page.fill('[data-theme-name]', `Lab new ${n}`)
+          await page.keyboard.press('Enter')
           await page.waitForTimeout(2500)
-          const fresh = psql(`select id from projects where name='Lab new ${n}'`)
-          ok(!!fresh, 'a new project is made')
-          ok(Number(psql(`select position from content_themes where project_id='${fresh}'`)) < 0.5, 'inserted above A')
-        } finally { cleanup([existing, a, psql(`select id from projects where name='Lab new ${n}'`)].filter(Boolean)) }
+          const fresh = made(`Lab new ${n}`)
+          ok(!!fresh && Number(psql(`select position from content_themes where project_id='${fresh}'`)) < 0.5, 'inserted above A')
+          // Another Space's sheet can use the same name; nothing links the two.
+          await go('/spaces/design?view=sheet')
+          await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
+          ok(!(await page.$(`[data-row="t:${one}"]`)), "it isn't on another Space's sheet")
+          await page.click('[data-add-theme]')
+          await page.fill('[data-theme-name]', `Lab named ${n}`)
+          await page.click('[data-theme-add-save]')
+          await page.waitForTimeout(2500)
+          ok(psql(`select count(*) from projects where name='Lab named ${n}'`) === '2' && psql(`select count(distinct t.space_id) from content_themes t join projects p on p.id=t.project_id where p.name='Lab named ${n}'`) === '2', "the same name on another Space's sheet is a theme of its own")
+        } finally { cleanup([a, ...psql(`select id from projects where name in ('Lab named ${n}', 'Lab new ${n}')`).split(/\n/)].filter(Boolean)) }
       },
     },
     {

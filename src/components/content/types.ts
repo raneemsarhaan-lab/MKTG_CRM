@@ -31,13 +31,12 @@ export interface ContentApi extends SheetApi {
   makeTask?(id: string, opts: { spaceId?: string | null; taskId?: string | null; type?: string | null }): Promise<Result & { taskId?: string }>
   /** Spec 026 (§4): unlink — the row keeps its last values as plain text. */
   unlinkRow?(id: string): Promise<Result>
-  addSheetTheme?(input: { projectId?: string; newProject?: ThemePatch & { name: string }; anchor?: { projectId: string; where: 'above' | 'below' } | null }): Promise<Result & { projectId?: string }>
+  addSheetTheme?(input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }): Promise<Result & { projectId?: string }>
   reorderThemes?(projectId: string, target: string, where: 'before' | 'after'): Promise<Result>
   removeSheetTheme?(projectId: string, dest: { projectId: string; pillarId?: string | null } | null): Promise<Result>
   addPillarAt?(projectId: string, name: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null): Promise<Result & { id?: string }>
   reorderPillars?(projectId: string, pillarId: string, target: string, where: 'before' | 'after'): Promise<Result>
   removePillarTo?(pillarId: string, dest: { projectId: string; pillarId?: string | null } | null): Promise<Result>
-  themeCandidates?(): Promise<{ id: string; name: string }[]>
 }
 
 export interface ContentSheetProps {

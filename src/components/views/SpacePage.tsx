@@ -131,7 +131,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         if (tab === 'sheet') return (
           <NodeWorkbook key={view?.id} data={data} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
             linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
-              themeScope={themeScope} />} />
+              themeScope={themeScope} sheetBrandId={brandId} />} />
         )
         const body = <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
               milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}

@@ -1,53 +1,36 @@
 'use client'
 
 /**
- * Sheet 2b dialogs on the Content sheet: + Theme (an existing project or a new
- * one), where a removed theme's or pillar's rows go, deleting a row (unlink or
+ * Sheet 2b dialogs on a sheet of rows: + Theme (a name), where a removed theme's or pillar's rows go, deleting a row (unlink or
  * delete its task; children up a level or deleted), and linking a plain row
  * to an existing task.
  */
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, Member, Task } from '@/types/index'
-import { ThemeEditor } from './ThemeEditor'
-import type { ThemePatch } from './types'
 
-export function ThemeAdd({ candidates, members, onPick, onCreate, onCancel }: {
-  candidates: { id: string; name: string }[]
-  members: Member[]
-  onPick(projectId: string): Promise<string | null>
-  onCreate(patch: ThemePatch): Promise<string | null>
+/** + Theme: a name, and that is all (user, 24 Nov 2026). */
+export function ThemeAdd({ onCreate, onCancel }: {
+  onCreate(name: string): Promise<string | null>
   onCancel(): void
 }) {
   const t = useTranslations('content')
-  const [mode, setMode] = useState<'existing' | 'new'>(candidates.length ? 'existing' : 'new')
-  const [pick, setPick] = useState(candidates[0]?.id ?? '')
+  const [name, setName] = useState('')
   const [note, setNote] = useState<string | null>(null)
-  const blank: ContentTheme = { id: '', name: '', brand_id: null, owner_id: null, frequency_count: null, frequency_period: 'week', audience: [], pillars: [] }
+  const [busy, setBusy] = useState(false)
   return (
-    <div className="fx-sheet-pop-form" data-theme-add="">
-      <span role="radiogroup" aria-label={t('themes.addTitle')} className="fx-sheet-pop-row">
-        <label className="fx-content-check"><input type="radio" checked={mode === 'existing'} disabled={!candidates.length} onChange={() => setMode('existing')} data-theme-mode="existing" />{t('themes.existing')}</label>
-        <label className="fx-content-check"><input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} data-theme-mode="new" />{t('themes.newProject')}</label>
+    <form className="fx-sheet-pop-form" data-theme-add=""
+          onSubmit={async e => { e.preventDefault(); if (!name.trim() || busy) return; setBusy(true); setNote(await onCreate(name.trim())); setBusy(false) }}>
+      <label className="fx-sheet-pop-title">{t('themes.name')}
+        <input type="text" id="fx-theme-name" value={name} maxLength={120} data-autofocus="" data-theme-name="" aria-invalid={note ? true : undefined}
+               onChange={e => { setName(e.target.value); setNote(null) }} />
+      </label>
+      {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
+      <span className="fx-sheet-pop-row">
+        <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
+        <button type="submit" className="fx-sheet-btn is-primary" disabled={!name.trim() || busy} data-theme-add-save="">{t('themes.add')}</button>
       </span>
-      {mode === 'existing' ? (
-        <form onSubmit={e => { e.preventDefault(); if (pick) void onPick(pick).then(setNote) }} className="fx-sheet-pop-form">
-          <label className="fx-sheet-pop-title">{t('themes.project')}
-            <select value={pick} onChange={e => setPick(e.target.value)} data-theme-project="">
-              {candidates.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <span className="fx-sheet-muted">{t('themes.takesName')}</span>
-          {note && <span role="alert" className="fx-sheet-missing">{note}</span>}
-          <span className="fx-sheet-pop-row">
-            <button type="button" className="fx-sheet-btn" onClick={onCancel}>{t('editor.cancel')}</button>
-            <button type="submit" className="fx-sheet-btn is-primary" disabled={!pick} data-theme-add-save="">{t('themes.add')}</button>
-          </span>
-        </form>
-      ) : (
-        <ThemeEditor theme={blank} members={members} onCancel={onCancel} onSave={onCreate} />
-      )}
-    </div>
+    </form>
   )
 }
 

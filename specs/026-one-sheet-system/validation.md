@@ -51,6 +51,10 @@ open it on the brand's page (the task sheet's home), or in a saved Sheet view of
 | No brand filters on a Space page | Built: the brand chips and "Group by brand" are gone (a Space's brand folders in the sidebar do that) |
 | Sidebar numbers only for Inbox and My tasks | Built: Spaces, folders and brands show their names alone |
 | Simplify the notifications filters | Built: one row — All, Mentions, Comments, Assigned to me, Deadlines — and one list for the dates, in place of twelve kind chips and four date chips |
+| Adding a theme asks for a name only; themes aren't shared between Spaces | Built: "+ Theme" is one name field. It never picks an existing project, and the same name on another Space's sheet is a separate theme (`2b-theme-from-project-or-new`). Existing themes, "Videos · brand" included, are left as they are |
+| Remove the "Linked" tag | Built: gone from the sheet's title and its tab |
+| Home and pinned views carry icons | Built: a home icon and a pin icon before the view's name |
+| Remove the blank sheets of the old Sheets section | Built (see §1 above) |
 
 Also finished here: a Space's **Default sheet columns** (spec 024 §5) now apply to its sheet — they
 decide which of the sheet's own columns show until someone shows or hides one there.
@@ -60,7 +64,9 @@ decide which of the sheet's own columns show until someone shows or hides one th
 Answered on 24 Nov: blank sheets of the old Sheets section are removed; Planning's flow is edited in
 its settings when needed. Still open:
 
-- The catch-all themes "Videos · <brand>" created for videos with no project.
+- Whether a theme's record should also leave the Projects page and the project pickers, and stop
+  being the task's project (see the spec's 24 Nov note). Themes are separate by name and by sheet now,
+  but each still has a record among the projects.
 - A Space other than Content and Video starts with an empty sheet: its existing tasks aren't turned
   into rows. They can be added one at a time with Make task › an existing task.
 - The local lab database had leftover test tasks, which were deleted before the final run. No

@@ -789,7 +789,7 @@ export function Workbook(p: WorkbookProps) {
           {/* Spec 026: inside a Space, brand or My tasks page there is no Sheets section to go back to. */}
           {!inPage && <><Link href="/sheets">{t('crumb')}</Link><span aria-hidden="true">›</span></>}
           <h1>{folderName}</h1>
-          {linkedFolder && <span className="fx-sh-linked">🔗 {t('home.linkedBadge')}</span>}
+          {/* User, 24 Nov 2026: no "Linked" tag — every sheet is the same kind of sheet. */}
         </nav>
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
               title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>

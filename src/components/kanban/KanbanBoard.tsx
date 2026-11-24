@@ -114,6 +114,8 @@ interface KanbanBoardProps {
    */
   sheetScope?: (t: Task) => boolean
   themeScope?: (theme: ContentTheme) => boolean
+  /** The one brand this sheet is narrowed to (a Space › Brand folder, a brand's page): new themes take it. */
+  sheetBrandId?: string | null
   /** Spec 021: live team Spaces, their members, and Shows in rows. */
   spaces?: TeamSpace[]
   spaceMembers?: SpaceMember[]
@@ -173,6 +175,7 @@ function KanbanBoardInner({
   spaceId,
   sheetScope,
   themeScope,
+  sheetBrandId = null,
   spaces = [],
   spaceMembers = [],
   taskSpaces = [],
@@ -856,8 +859,8 @@ function KanbanBoardInner({
         addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current)),
         reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current)),
         removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current)),
-        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current })),
-        themeCandidates: () => contentRows.themeCandidates(sheetSpaceRef.current).catch(() => []),
+        // A theme added in a Space › Brand folder, or on a brand's page, belongs to that brand.
+        addSheetTheme: run((input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current, brandId: sheetBrandId })),
       }
     })(),
     async removePillar(id) {

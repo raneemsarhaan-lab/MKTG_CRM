@@ -122,3 +122,21 @@ used as the Sheet view of every Space and Space › Brand folder.
   "Videos · <brand>", created for this. The clip details are exported first to `clip-details.csv`,
   kept in the database and downloaded from Settings › Diagnostics; the `task_clips` records are not
   deleted either.
+
+## Changed on 24 Nov 2026 (user), after the build
+
+- **A theme is not a project.** "+ Theme" asks for a name and nothing else. It is never picked from
+  the projects, and it belongs to one Space's sheet: another Space's sheet may use the same name, and
+  nothing links the two. A theme added in a Space › Brand folder or on a brand's page belongs to that
+  brand. (This replaces "A theme is mapped to a project" in §2 and "the same project can be a theme on
+  several sheets" above, for themes added from now on. Themes that existed before are left as they are,
+  including the "Videos · <brand>" ones.)
+  *Still true underneath:* each theme keeps a record of its own in the projects table, which holds its
+  name, brand and pillars and is what a linked row's task points at as its theme. Separating that
+  fully (so a theme never shows among the projects, and a task's project is untouched by its row's
+  theme) is a larger change, not made here.
+- **No "Linked" tag** on a sheet's title or tab: every sheet is the same kind of sheet.
+- **The sheet's toolbar** keeps "+ Column" and "+ Theme" only; **no brand filter or "Group by brand"**
+  on a Space page; **the old Sheets section's blank sheets are removed** (kept first as CSV exports).
+- **View tabs**: the home view shows a home icon and a pinned view a pin icon before its name.
+

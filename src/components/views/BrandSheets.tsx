@@ -92,7 +92,7 @@ export function BrandSheets({ data, brandId, taskCount, tasksSheet }: {
       </div>
       {space
         ? <NodeWorkbook key={space.id} data={data} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${space.id}` })}
-            linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={scope} spaceId={space.id} themeScope={themeScope} />} />
+            linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={scope} spaceId={space.id} themeScope={themeScope} sheetBrandId={brandId} />} />
         : tasksSheet}
     </div>
   )

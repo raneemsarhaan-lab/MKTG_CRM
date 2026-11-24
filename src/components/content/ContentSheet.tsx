@@ -44,13 +44,13 @@ type Popup =
   | { kind: 'theme'; anchor: HTMLElement; theme: ContentTheme }
   | { kind: 'name'; anchor: HTMLElement; title: string; initial?: string; save(name: string): Promise<string | null> }
   // Sheet 2b
-  | { kind: 'themeAdd'; anchor: HTMLElement; at?: { projectId: string; where: 'above' | 'below' } | null; candidates: { id: string; name: string }[] }
+  | { kind: 'themeAdd'; anchor: HTMLElement; at?: { projectId: string; where: 'above' | 'below' } | null }
   | { kind: 'dest'; anchor: HTMLElement; theme: ContentTheme; pillar?: ContentTheme['pillars'][number] | null; rows: number }
   | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
   | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
   | { kind: 'makeTask'; anchor: HTMLElement; rec: ContentRowRec }
 
-const KNOWN_ERRORS = ['parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'theme_exists', 'theme_name_empty', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
@@ -205,9 +205,8 @@ export function ContentSheet(p: ContentSheetProps) {
     if (!p.api.indentRow) return
     ok(await p.api.indentRow(rec.id, dir), dir === 'in' ? t('rows.indented') : t('rows.outdented'))
   }
-  async function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
-    const candidates = (await p.api.themeCandidates?.()) ?? []
-    setPopup({ kind: 'themeAdd', anchor, at, candidates })
+  function openThemeAdd(anchor: HTMLElement, at: { projectId: string; where: 'above' | 'below' } | null = null) {
+    setPopup({ kind: 'themeAdd', anchor, at })
   }
   function askDelete(rec: ContentRowRec, name: string, anchor: HTMLElement) {
     const children = childCount(rec.id)
@@ -786,9 +785,8 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {popup?.kind === 'themeAdd' && (
         <SheetPopover anchor={popup.anchor} label={t('themes.addTitle')} onClose={closePopup}>
-          <ThemeAdd candidates={popup.candidates} members={p.members} onCancel={() => closePopup(true)}
-            onPick={async projectId => { const r = await p.api.addSheetTheme!({ projectId, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }}
-            onCreate={async patch => { const r = await p.api.addSheetTheme!({ newProject: { ...patch, name: patch.name ?? '' }, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }} />
+          <ThemeAdd onCancel={() => closePopup(true)}
+            onCreate={async name => { const r = await p.api.addSheetTheme!({ name, anchor: popup.at }); if (!r.success) return why(r.error); closePopup(true); say(t('theme.added')); return null }} />
         </SheetPopover>
       )}
       {popup?.kind === 'dest' && (

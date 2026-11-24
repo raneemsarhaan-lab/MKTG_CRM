@@ -856,6 +856,8 @@
       "not_a_child": "That row isn't a child row.",
       "needs_destination": "Choose where its rows go.",
       "already_theme": "That project is already a theme.",
+      "theme_exists": "This sheet already has a theme with that name.",
+      "theme_name_empty": "Give the theme a name.",
       "project_exists": "A project with that name exists: pick it from the list.",
       "already_in_sheet": "That task already has a row on the sheet.",
       "linked": "This row has a task: change it through the task.",
@@ -946,16 +948,13 @@
     },
     "themes": {
       "addTitle": "Add a theme",
-      "existing": "An existing project",
-      "newProject": "New project",
-      "project": "Project",
-      "takesName": "The theme takes the project's name.",
+      "name": "Theme name",
       "add": "Add theme",
       "insertAbove": "Insert theme above",
       "insertBelow": "Insert theme below",
       "remove": "Remove theme",
       "moved": "Theme moved (this sheet only).",
-      "removed": "Theme removed from the sheet. The project stays."
+      "removed": "Theme removed from the sheet."
     },
     "spaceTitle": "{space} plan"
   },
@@ -3312,7 +3311,7 @@
     "tabOptions": "Options for {name}",
     "makeHome": "Make home view",
     "homeOff": "Stop opening here first",
-    "homeMark": "home",
+    "homeMark": "Home view",
     "pin": "Pin",
     "unpin": "Unpin",
     "pinnedMark": "Pinned",

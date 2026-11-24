@@ -89,7 +89,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
         <thead><tr><th>Page</th><th>Its Sheet view shows</th></tr></thead>
         <tbody>
           <tr><td>A Space</td><td>All of that Space's rows, every brand.</td></tr>
-          <tr><td>Space › Brand folder</td><td>That Space's rows for one brand (the themes whose project belongs to the brand).</td></tr>
+          <tr><td>Space › Brand folder</td><td>That Space's rows for one brand (the themes that belong to the brand).</td></tr>
           <tr><td>A brand's page</td><td>The brand's rows from every Space, one Space at a time, and "All tasks".</td></tr>
           <tr><td>My tasks</td><td>A task sheet: one line per task of mine (no themes or plain rows).</td></tr>
         </tbody>
@@ -106,7 +106,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
 
     <section class="part" id="structure">
       <h2>2 · Themes, pillars, rows</h2>
-      <div class="tree">▾ Theme               <i>a group row across the sheet; it is a project</i>
+      <div class="tree">▾ Theme               <i>a group row across the sheet; it has a name, nothing more</i>
    ▾ Pillar           <i>a sub-group of its theme</i>
         Row           <i>plain, or linked to a task</i>
           Child row   <i>one level under a row</i>
@@ -115,16 +115,16 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
    + Row</div>
       <div class="cols">
         <div class="box"><h3>Adding</h3><ul>
-          <li><b>Theme</b>: "+ Theme" on the toolbar, or Insert theme above / below in a theme's menu. Pick an existing project or make one (name, owner, frequency, audience). Admins and superusers.</li>
+          <li><b>Theme</b>: "+ Theme" on the toolbar, or Insert theme above / below in a theme's menu. It asks for a name and nothing else. Admins and superusers.</li>
           <li><b>Pillar</b>: "+ Pillar" in a theme's menu. Admins, superusers and the theme's owner.</li>
           <li><b>Row</b>: "+ Row" at the end of each theme or pillar (it carries the Space's own words, such as "+ New clip"); type, and Enter adds it and starts the next. Anyone with access to the Space.</li>
           <li><b>Child row</b>: Add child row in a row's menu, or Tab on a row's number. One level only.</li>
         </ul></div>
         <div class="box"><h3>Moving and removing</h3><ul>
           <li>Drag a row by its number onto a theme or pillar. A linked row's task changes its theme or pillar to match.</li>
-          <li>Themes and pillars are reordered by dragging; this changes the sheet, not the projects.</li>
-          <li>Removing a theme or pillar asks where its rows go. A removed theme leaves this sheet only; the project stays.</li>
-          <li>The same project can be a theme on several Spaces' sheets; each sheet has its own rows under it.</li>
+          <li>Themes and pillars are reordered by dragging.</li>
+          <li>Removing a theme or pillar asks where its rows go.</li>
+          <li>A theme belongs to one Space's sheet. Another Space can use the same name; nothing links the two.</li>
         </ul></div>
       </div>
     </section>
@@ -258,7 +258,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
       <h2>12 · Open points</h2>
       <p>Decisions still needed:</p>
       <div class="gap"><b>A brand's rows in one grid.</b> The brand page shows one Space's sheet at a time, because each Space's sheet has its own columns, formatting and comments. One merged grid would need shared columns across Spaces.</div>
-      <div class="gap"><b>"Videos · brand" themes.</b> Created for videos that had no project. Keep them, or move those videos into real projects?</div>
+      <div class="gap"><b>Themes and the Projects page.</b> A theme is added by name and belongs to one sheet, but each theme still has a record among the projects, and a task made from a row shows that theme as its project. Should themes leave the Projects page and stop being the task's project?</div>
       <div class="gap"><b>Existing tasks of other Spaces.</b> Design and Planning tasks made before the change aren't rows on their Space's sheet. They can be added one at a time with Make task › an existing task.</div>
       <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
       <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>

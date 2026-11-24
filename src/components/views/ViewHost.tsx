@@ -200,9 +200,10 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
                   borderBottom: `2px solid ${tab === x.key ? PIPE.ink : 'transparent'}`,
                 }}
               >
-                {prefs.pinned.includes(x.key) && <svg role="img" aria-label={t('pinnedMark')} viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginInlineEnd: 4, verticalAlign: '-1px' }}><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" /></svg>}
+                {/* User, 24 Nov 2026: the home view and pinned views carry an icon before their name. */}
+                {prefs.home === x.key && <svg role="img" aria-label={t('homeMark')} data-view-home="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('homeMark')}</title><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>}
+                {prefs.pinned.includes(x.key) && <svg role="img" aria-label={t('pinnedMark')} data-view-pinned="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginInlineEnd: 5, verticalAlign: '-2px' }}><title>{t('pinnedMark')}</title><path d="M12 17v5" /><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" /></svg>}
                 {x.label}
-                {prefs.home === x.key && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 600, color: PIPE.textMuted }}>· {t('homeMark')}</span>}
                 {x.note && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>{x.note}</span>}
                 {x.personal && <span style={{ marginInlineStart: 6, fontSize: 10.5, fontWeight: 500 }}>· {t('onlyMeMark')}</span>}
               </button>
