@@ -99,7 +99,7 @@ export const content = [
     id: 'cus1-2', hash: C,
     async run(t) {
       const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
-      t.eq(heads, ['Title', 'Type', 'Status', 'Link task', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Publishing date', 'Archive or restore'], 'piece columns')
+      t.eq(heads, ['Title', 'Type', 'Status', 'Link task', 'Assignee', 'Working Doc', 'Design Link', 'Task', 'LinkedIn Link', 'Published Link', 'Pillar', 'Publishing date', 'Archive or restore'], 'piece columns')
       t.eq(await t.page.getAttribute('[data-cell="t:th-strategy|title"]', 'class').then(c => c.includes('is-span')), true, 'the theme row spans the columns')
     },
   },
@@ -397,7 +397,8 @@ export const content = [
     id: 'cus-columns', hash: C,
     async run(t) {
       // Task Link: every piece links to its task; activating it opens the task.
-      t.eq((await t.text(`k:${POST1}`, 'task')).trim(), 'Open task', 'Task Link shown')
+      // Spec 026: a linked row's Task cell is the task's name as a link, with its Space and stage.
+      t.eq((await t.text(`k:${POST1}`, 'task')).includes('↗ '), true, 'the Task cell names the task')
       t.eq(await t.page.getAttribute(`[data-cell="k:${POST1}|task"] a`, 'href'), `/board?task=${POST1}`, 'a link to the task')
       await t.cell(`k:${POST1}`, 'task').click()
       await t.idle(100)

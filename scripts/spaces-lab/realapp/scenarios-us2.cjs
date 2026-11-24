@@ -44,8 +44,13 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         await go('/spaces/content?view=sheet')
         ok(await page.$('.fx-board-page.is-sheet'), "the Content Space's Sheet tab is today's sheet")
+        // Spec 026: every Space's Sheet view is its sheet of rows; the task sheet is on the brand's page.
         await go('/spaces/design?view=sheet')
-        ok(await page.$('[data-task-sheet]'), "other Spaces' Sheet tab is the task Sheet")
+        await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
+        ok(await page.$('[data-content-sheet]'), "other Spaces have the same sheet of rows")
+        await go(`/brands/${firstBrand()}?view=sheet`)
+        await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
+        ok(true, "the brand's Sheet view is the task sheet")
       },
     },
     {

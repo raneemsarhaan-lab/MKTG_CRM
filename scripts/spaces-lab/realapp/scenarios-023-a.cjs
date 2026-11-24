@@ -133,7 +133,7 @@ module.exports = (EMAIL, psql, ok) => {
         const n = rnd(), post = task(`Lab sheet post ${n}`, 'Post'), video = task(`Lab sheet video ${n}`, 'Video')
         const fid = field(`Lab hashtags ${n}`); attach('Post', fid)
         try {
-          await go('/spaces/planning?view=sheet')
+          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
           const cell = id => `[data-cell="t:${id}|f:${fid}"]`
           await page.waitForSelector(cell(post), { timeout: 60000 })
           await page.click(cell(post))
@@ -228,12 +228,12 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: '023-make-it-a-task-field', as: 'admin',
       async run({ page, go }) {
-        const n = rnd(), id = task(`Lab column ${n}`, 'Post'), sheet = `tasks:space:${space('planning')}`
+        const n = rnd(), id = task(`Lab column ${n}`, 'Post'), sheet = `tasks:brand:${psql('select id from brands order by name limit 1')}`
         const col = psql(`insert into sheet_columns (id, sheet, key, name, position, kind) values (gen_random_uuid(), '${sheet}', 'c:' || gen_random_uuid(), 'Lab hook ${n}', 90, 'text') returning id`).split(/\n/)[0]
         const key = psql(`select key from sheet_columns where id='${col}'`)
         psql(`insert into sheet_values (column_id, task_id, value) values ('${col}', '${id}', 'Big hook')`)
         try {
-          await go('/spaces/planning?view=sheet')
+          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
           await page.waitForSelector(`[data-col-menu="${key}"]`, { state: 'attached', timeout: 60000 })
           await page.hover(`[data-col-head="${key}"]`)
           await page.click(`[data-col-menu="${key}"]`, { force: true })

@@ -63,7 +63,9 @@ module.exports = (EMAIL, psql, ok) => {
         const t = media(`Lab 022 split ${rnd()}`)
         const before = psql(`select status||'|'||stage_date::text from tasks where id='${t}'`)
         try {
-          await typeStatus(page, go, '/spaces/design?view=sheet', t, 'Final art')
+          // Spec 026: a saved Sheet view of the Space is its tasks as a task sheet, with the Space's stage names.
+          const view = psql(`insert into saved_views (id, node, type, name, config, position) values (gen_random_uuid(), 'space:${ds}', 'sheet', 'Lab steps ${rnd()}', '{}', 99) returning id`).split(/\n/)[0]
+          await typeStatus(page, go, `/spaces/design?view=v:${view}`, t, 'Final art')
           ok(psql(`select status||'|'||stage_date::text from tasks where id='${t}'`) === before, 'the original stage and its date are unchanged')
           ok(psql(`select space_stage_id from task_space_stages where task_id='${t}' and space_id='${ds}'`) === final, 'this Space remembers Final art')
           ok(psql(`select count(*) from task_space_stages where task_id='${t}' and space_id<>'${ds}'`) === '0', 'no other Space changes')
@@ -75,11 +77,11 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select status from tasks where id='${t}'`) === 'd-check', 'moved on to D-Check')
           await panelStage(page, go, t, 'Sketch') // the panel carries the Space's names (spec 024)
           ok(psql(`select status from tasks where id='${t}'`) === 'd-prog', 'and back')
-          await go('/spaces/design?view=sheet')
+          await go(`/spaces/design?view=v:${view}`)
           const cell = `[data-cell*="${t}|status"]`
           await page.waitForSelector(cell, { timeout: 60000 })
           ok(/Sketch/.test(await page.textContent(cell) ?? ''), `re-entering starts at Sketch: ${await page.textContent(cell)}`)
-        } finally { psql(`update tasks set dropped_at=now() where id='${t}'`); clearStages('design') }
+        } finally { psql(`update tasks set dropped_at=now() where id='${t}'`); psql(`delete from saved_views where name like 'Lab steps %'`); clearStages('design') }
       },
     },
     {

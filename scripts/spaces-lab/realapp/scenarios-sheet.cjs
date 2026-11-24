@@ -23,7 +23,7 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'sheet-design-space-typed-edits', as: 'admin',
       async run({ page, go }) {
         const t = seed('Sheet lab', 'd-prog', 'Content Creator', 'Graphic Designer', 'design')
-        await go('/spaces/design?view=sheet')
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
         ok(await page.$('[data-task-sheet]'), 'the Design Space has a Sheet')
         await typeInto(page, t, 'priority', 'High')
         ok(psql(`select priority from tasks where id='${t}'`) === 'High', 'typing a priority saves it')
@@ -85,10 +85,10 @@ module.exports.workbook = (EMAIL, psql, ok) => {
       id: 'workbook-space-tasks-tab', as: 'admin',
       async run({ page, go }) {
         const sp = spaceId('design')
-        psql(`delete from sheet_formats where sheet_id=(select id from sheets where linked_key='tasks:space:${sp}')`)
-        await go('/spaces/design?view=sheet')
+        psql(`delete from sheet_formats where sheet_id=(select id from sheets where linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}')`)
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
         await page.waitForSelector('[data-node-workbook] .fx-sh-workbook [data-task-sheet]', { timeout: 60000 })
-        ok(psql(`select kind from sheets where linked_key='tasks:space:${sp}'`) === 'linked_tasks', 'the Space has its Tasks sheet')
+        ok(psql(`select kind from sheets where linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}'`) === 'linked_tasks', 'the Space has its Tasks sheet')
         // Formatting from the toolbar saves on this sheet.
         // The toolbar turns on once the sheet has said where its selection is.
         const bold = page.locator('[data-fmt="b"]:visible').first()
@@ -96,7 +96,7 @@ module.exports.workbook = (EMAIL, psql, ok) => {
         await page.waitForTimeout(500)
         await bold.click()
         await page.waitForTimeout(1500)
-        ok(psql(`select count(*) from sheet_formats f join sheets s on s.id=f.sheet_id where s.linked_key='tasks:space:${sp}'`) === '1', 'Bold saves on the Tasks sheet')
+        ok(psql(`select count(*) from sheet_formats f join sheets s on s.id=f.sheet_id where s.linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}'`) === '1', 'Bold saves on the Tasks sheet')
         // A regular column through ＋.
         const name = `Lab col ${Date.now() % 100000}`
         await page.click('[data-task-sheet] [data-add-field]')
@@ -104,14 +104,17 @@ module.exports.workbook = (EMAIL, psql, ok) => {
         await page.fill('[data-column-editor] input[type="text"]', name)
         await page.click('[data-column-editor] button[type="submit"]')
         await page.waitForTimeout(1500)
-        ok(psql(`select count(*) from sheet_columns where sheet='tasks:space:${sp}' and name='${name}' and deleted_at is null`) === '1', 'a regular column is added to this sheet')
+        ok(psql(`select count(*) from sheet_columns where sheet='tasks:brand:${psql('select id from brands order by name limit 1')}' and name='${name}' and deleted_at is null`) === '1', 'a regular column is added to this sheet')
         ok(psql(`select count(*) from sheet_columns where sheet='content' and name='${name}'`) === '0', "the Content sheet's columns are untouched")
         // Fields › Group by Brand groups the rows and is saved on this sheet.
         await page.click('[data-fields-btn]')
         await page.selectOption('[data-group-by]', 'brand')
         await page.waitForTimeout(1500)
-        ok(/"brand"/.test(psql(`select view::text from sheets where linked_key='tasks:space:${sp}'`)), 'Group by Brand is saved on this sheet')
+        ok(/"brand"/.test(psql(`select view::text from sheets where linked_key='tasks:brand:${psql('select id from brands order by name limit 1')}'`)), 'Group by Brand is saved on this sheet')
         ok(await page.$('[data-task-sheet] [data-group-row]'), 'the rows are grouped')
+        // Other tests share this brand's sheet: leave it as it was.
+        psql(`update sheets set view='{}' where linked_key like 'tasks:brand:%'`)
+        psql(`delete from sheet_columns where name like 'Lab col %'`)
       },
     },
     {

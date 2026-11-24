@@ -22,7 +22,6 @@ import {
 import { writeClipField } from '@/actions/sheet-links'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { useLocale, useTranslations } from 'next-intl'
-import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
 import type { ContentApi } from '@/components/content/types'
 import { setLinkedRowHeights } from '@/actions/sheets'
@@ -194,9 +193,10 @@ function KanbanBoardInner({
   const ss = useSpaceStages(hosted && spaceId ? spaceId : null, spaceStages, taskSpaceStages)
   const spaceStageCols = !!ss?.own
   // Spec 026: the Space whose sheet is shown — the page's Space, else the Content Space.
-  const sheetSpace = (spaceId ? spaces.find(x => x.id === spaceId) : undefined) ?? spaces.find(x => x.key === 'content')
-  const sheetSpaceId = sheetSpace?.id ?? null
-  const contentStages = useSpaceStages(sheetSpaceId, spaceStages, taskSpaceStages)
+  // (Outside a Space, the board's "Sheet" is the Video Space's sheet and "Content" the Content Space's.)
+  const pageSheetSpace = (spaceId ? spaces.find(x => x.id === spaceId) : undefined) ?? spaces.find(x => x.key === 'content')
+  const contentStages = useSpaceStages(pageSheetSpace?.id ?? null, spaceStages, taskSpaceStages)
+  const sheetSpaceRef = useRef<string | null>(pageSheetSpace?.id ?? null)
   const videoStages = useSpaceStages(spaces.find(x => x.key === 'video')?.id ?? null, spaceStages, taskSpaceStages)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
@@ -752,7 +752,7 @@ function KanbanBoardInner({
     },
     // ── the Content sheet (spec 009) ──
     async addPlan(rows, opts) {
-      const res = await addPlan(rows, { ...opts, spaceId: sheetSpaceId }).catch(() => ({ success: false as const, error: 'generic' }))
+      const res = await addPlan(rows, { ...opts, spaceId: sheetSpaceRef.current }).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) router.refresh()
       return res
     },
@@ -846,18 +846,18 @@ function KanbanBoardInner({
       }
       return {
         // Spec 026: every call carries the Space whose sheet this is.
-        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, spaceId: sheetSpaceId })),
+        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, spaceId: sheetSpaceRef.current })),
         updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
         indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
         linkRowTask: run(contentRows.linkRowTask),
         makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
-        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceId)),
-        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceId)),
-        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceId)),
-        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceId)),
-        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceId)),
-        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceId })),
-        themeCandidates: () => contentRows.themeCandidates(sheetSpaceId).catch(() => []),
+        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current)),
+        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceRef.current)),
+        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current)),
+        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current)),
+        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current)),
+        addSheetTheme: run((input: Parameters<typeof contentRows.addSheetTheme>[0]) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current })),
+        themeCandidates: () => contentRows.themeCandidates(sheetSpaceRef.current).catch(() => []),
       }
     })(),
     async removePillar(id) {
@@ -1255,12 +1255,17 @@ function KanbanBoardInner({
     />
   )
 
-  if (view === 'content') {
+  // Spec 026: one sheet system. In a Space it is that Space's sheet; outside one, "Sheet" is the Video
+  // Space's and "Content" the Content Space's. The old Video sheet (videos with clip details) is gone.
+  const sheetSpace = spaceId ? pageSheetSpace : view === 'sheet' ? spaces.find(x => x.key === 'video') ?? pageSheetSpace : pageSheetSpace
+  const sheetSpaceId = sheetSpace?.id ?? null
+  sheetSpaceRef.current = sheetSpaceId
+  if (view === 'content' || view === 'sheet') {
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
         <ContentSheet
-          stages={contentStages}
+          stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           themes={(themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
           me={currentUser}
@@ -1275,36 +1280,6 @@ function KanbanBoardInner({
           taskSpaces={taskSpaces}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
-          onView={v => setView(v)}
-          query={filters.search}
-          api={sheetApi}
-        />
-        {taskPanel}
-        {!embedded && inboxOpen && inboxPanel(false)}
-        {taskForm}
-      </div>
-    )
-  }
-
-  if (view === 'sheet') {
-    return (
-      <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
-        {!embedded && !hosted && header}
-        <VideoSheet
-          stages={videoStages}
-          tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
-          me={currentUser}
-          members={members}
-          contentTypes={types}
-          columns={columnsBundle}
-          rowHeights={linkedRowHeights?.video}
-          slaConfig={slaConfig}
-          themes={themes}
-          hasStorage={hasStorage}
-          videoId={sheetVideo}
-          highlightId={sheetRow}
-          onOpenVideo={id => { setSheetVideo(id); setSheetRow(null) }}
-          onOpenTask={(id, opts) => { setPreviewFor(opts?.previewId ? { taskId: id, previewId: opts.previewId } : null); selectTask(id) }}
           onView={v => setView(v)}
           query={filters.search}
           api={sheetApi}

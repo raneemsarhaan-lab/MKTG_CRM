@@ -642,7 +642,7 @@ export function ContentSheet(p: ContentSheetProps) {
       </div>
 
       <div className="fx-sheet-sum" data-summary="">
-        <span className="fx-sheet-sum-name">{t('title')}</span>
+        <span className="fx-sheet-sum-name">{p.space && p.space.key !== 'content' ? t('spaceTitle', { space: p.space.name }) : t('title')}</span>
         <span><b>{t('summary.pieces', { count: summary.pieces })}</b></span>
         <span>
           {t('summary.published', { n: summary.published })}

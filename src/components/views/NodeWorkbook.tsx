@@ -67,6 +67,7 @@ export function NodeWorkbook({ data, node, folder, linked }: {
         me={{ id: data.currentUser.id, admin: data.currentUser.access === 'admin' }}
         names={Object.fromEntries(data.members.map(m => [m.id, m.name]))}
         linked={linked}
+        inPage
       />
     </div>
   )

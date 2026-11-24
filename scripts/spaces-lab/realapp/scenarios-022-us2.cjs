@@ -10,7 +10,9 @@ module.exports = (EMAIL, psql, ok) => {
     return id
   }
   const typeStatus = async (page, go, where, id, text) => {
-    await go(`/spaces/${where}?view=sheet`)
+    // Spec 026: the task sheet is a view of the brand's page.
+    void where
+    await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet`)
     const cell = `[data-task-sheet] [data-cell$="${id}|status"]`
     await page.waitForSelector(cell, { timeout: 60000 })
     await page.locator(cell).click()

@@ -38,10 +38,13 @@ module.exports = (EMAIL, psql, ok) => {
           ok(featuresOf(A) === '{"platform": false}', `the brand keeps an override: ${featuresOf(A)}`)
           ok(await page.$('[data-brand-features] [data-feature-reset="platform"]'), 'it says the brand has its own setting')
 
-          await go('/spaces/design?view=sheet')
+          // Spec 026: the task sheet is a view of each brand's page.
+          await go(`/brands/${brandId(B)}?view=sheet`)
+          await page.waitForSelector(cell(b, 'platform'), { timeout: 60000 })
+          ok((await page.locator(cell(b, 'platform')).innerText()).trim() === 'LinkedIn', "B's Platform still shows")
+          await go(`/brands/${brandId(A)}?view=sheet`)
           await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
           ok(await page.$(`${cell(a, 'platform')} [data-feature-off]`), "A's Platform is a hatched, empty cell")
-          ok((await page.locator(cell(b, 'platform')).innerText()).trim() === 'LinkedIn', "B's Platform still shows")
           await page.locator(cell(a, 'platform')).click()
           await page.keyboard.type('Instagram')
           await page.keyboard.press('Enter')
@@ -56,7 +59,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-brand-features] [data-feature-reset="platform"]')
           await page.waitForTimeout(1500)
           ok(featuresOf(A) === '{}', 'Use default clears the override')
-          await go('/spaces/design?view=sheet')
+          await go(`/brands/${brandId(A)}?view=sheet`)
           await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
           ok((await page.locator(cell(a, 'platform')).innerText()).trim() === 'LinkedIn', 'switched back on, the value returns')
         } finally { reset() }

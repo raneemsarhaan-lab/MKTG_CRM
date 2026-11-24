@@ -75,4 +75,35 @@ used as the Sheet view of every Space and Space › Brand folder.
 
 ## Decisions made while building
 
-Recorded here as they are made.
+- **A row belongs to one Space's sheet** (`content_rows.space_id`), and a theme entry to one Space's
+  sheet (`content_themes.space_id`); the same project can be a theme on several sheets. A task has at
+  most one row per sheet, so a video can be a row on the Video sheet and a piece on the Content sheet.
+- **The brand of a row** is its theme's project's brand; a Space › Brand folder shows that brand's
+  themes. A theme whose project has no brand shows only on the Space's own sheet.
+- **Each Space's sheet has its own columns.** The Content Space keeps the column store it always had
+  (`content`); every other Space has `rows:<its id>`. The conversion moves the Video sheet's custom
+  columns, and each other Space's task-sheet custom columns, to that Space's sheet; their values go
+  with them.
+- **Make task** takes the Space's rules (spec 024): the task starts at that Space's "Starts at" stage,
+  on its board when it is a board, with its default type, assignee and priority; only people who may
+  create there can. The row's date becomes the publishing date. Values in task-field columns go to the
+  task when its type has that field; values in sheet-only columns stay with the row's cell.
+- **Connecting an existing task**: it must be in the chosen Space; the task's values win and the row's
+  fill only what the task lacks. The task joins the row's theme and pillar.
+- **Unlink** keeps the row's title, date, task-field values, sheet-only values and its stage as plain
+  text. The task keeps its theme and stays in its Space; it is marked so the Content sheet doesn't give
+  it a row again (`tasks.sheet_row_off`), and Make task › an existing task clears that mark.
+- **A child row** makes a subtask in its parent task's Space, starting where that Space starts; under
+  a video it makes a clip, by the clip rule of spec 024.
+- **A plain row's stage** is typed as one of the Space's stage names and kept as a label.
+- **Paste plan** creates plain rows only, on the sheet it is pasted into. A pasted task link no longer
+  links or updates a task. A title that is already a plain row of the theme, or a linked row of this
+  sheet, is skipped.
+- **The Content sheet still adds a linked row for a new task in one of its themes** (as sheet 2b did),
+  so work started on the board appears in the plan. Other Spaces' sheets hold only what is put on them.
+- **Conversion** (run once by the seed): rows and themes without a Space go to the Content Space;
+  each video the Video sheet listed becomes a linked row on the Video Space's sheet with its clips as
+  linked child rows. A video with no project sits under a catch-all theme for its brand,
+  "Videos · <brand>", created for this. The clip details are exported first to `clip-details.csv`,
+  kept in the database and downloaded from Settings › Diagnostics; the `task_clips` records are not
+  deleted either.

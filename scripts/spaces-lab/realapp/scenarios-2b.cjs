@@ -5,12 +5,13 @@ module.exports = (EMAIL, psql, ok) => {
   const first = sql => psql(sql).split(/\n/)[0]
   const theme = (name, pos) => {
     const id = first(`insert into projects (id, name, standing, is_theme, owner_id) values (gen_random_uuid(), '${name}', true, true, '${who('admin')}') returning id`)
-    psql(`insert into content_themes (id, project_id, position) values (gen_random_uuid(), '${id}', ${pos ?? 1000 + Math.random()})`)
+    // Spec 026: a theme entry belongs to a Space's sheet (the Content Space here).
+    psql(`insert into content_themes (id, project_id, space_id, position) values (gen_random_uuid(), '${id}', (select id from team_spaces where key='content'), ${pos ?? 1000 + Math.random()})`)
     return id
   }
   const pillar = (projectId, name, i = 0) => first(`insert into content_pillars (id, project_id, name, sort_order) values (gen_random_uuid(), '${projectId}', '${name}', ${i}) returning id`)
-  const row = (projectId, title, o = {}) => first(`insert into content_rows (id, project_id, pillar_id, parent_id, position, title, task_id, created_by, updated_at)
-    values (gen_random_uuid(), '${projectId}', ${o.pillar ? `'${o.pillar}'` : 'null'}, ${o.parent ? `'${o.parent}'` : 'null'}, ${o.pos ?? 1}, '${title}', ${o.task ? `'${o.task}'` : 'null'}, '${who('admin')}', now()) returning id`)
+  const row = (projectId, title, o = {}) => first(`insert into content_rows (id, project_id, space_id, pillar_id, parent_id, position, title, task_id, created_by, updated_at)
+    values (gen_random_uuid(), '${projectId}', (select id from team_spaces where key='content'), ${o.pillar ? `'${o.pillar}'` : 'null'}, ${o.parent ? `'${o.parent}'` : 'null'}, ${o.pos ?? 1}, '${title}', ${o.task ? `'${o.task}'` : 'null'}, '${who('admin')}', now()) returning id`)
   const task = (projectId, name, o = {}) => first(`insert into tasks (id,name,brand_id,content_type_label,task_owner_id,assignee_id,initiator_role,nine_stage,status,stage_date,priority,updated_at,project_id,pillar_id)
     values (gen_random_uuid(), '${name}', (select id from brands order by name limit 1), 'Post', '${who('admin')}', '${who('content')}', 'Content Creator', true, 'todo', now(), 'Normal', now(), '${projectId}', ${o.pillar ? `'${o.pillar}'` : 'null'}) returning id`)
   const cleanup = ids => {
@@ -131,9 +132,12 @@ module.exports = (EMAIL, psql, ok) => {
         try {
           await open(page, go)
           ok(!!psql(`select id from content_rows where task_id='${t}'`), 'a task in a theme gets a linked row')
-          // Create task from a plain row.
-          await menu(page, `l:${plain}|status`, 'Create task')
-          await page.waitForTimeout(2500)
+          // Make task from a plain row (spec 026): its Task cell opens the dialog; the Content Space is offered first.
+          await page.click(`[data-make-task="${plain}"]`)
+          await page.waitForSelector('[data-make-task-dialog]')
+          await page.click('[data-make-task-go]')
+          await page.waitForFunction(() => !document.querySelector('[data-make-task-dialog]'), null, { timeout: 30000 })
+          await page.waitForTimeout(1500)
           const made = psql(`select task_id from content_rows where id='${plain}'`)
           ok(!!made, 'the row is linked to a new task')
           ok(psql(`select project_id || '|' || pillar_id || '|' || status from tasks where id='${made}'`) === `${a}|${plA}|todo`, 'in the theme and pillar, at To Do')
@@ -172,7 +176,8 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-delete-row-confirm]')
           await page.waitForTimeout(2000)
           ok(psql(`select count(*) from content_rows where task_id='${t}'`) === '0', 'the row is gone')
-          ok(psql(`select coalesce(project_id::text, 'none') from tasks where id='${t}'`) === 'none', 'the task stays, out of the theme')
+          // Spec 026: the task carries on by itself — it keeps its theme, and the sheet doesn't give it a row again.
+          ok(psql(`select (project_id is not null)::text || '|' || sheet_row_off::text || '|' || (dropped_at is null)::text from tasks where id='${t}'`) === 'true|true|true', 'the task stays, and is not given a row again')
           // A parent row: its children move up a level.
           await menu(page, `l:${parent}|rowNo`, 'Delete row')
           await page.waitForSelector('[data-delete-children="up"]')

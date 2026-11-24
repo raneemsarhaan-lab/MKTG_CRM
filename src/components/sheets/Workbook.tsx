@@ -61,6 +61,8 @@ export interface WorkbookProps {
   names: Record<string, string>
   /** The board's sheet, for a linked folder's linked tab. */
   linked?: ReactNode
+  /** Spec 026: shown inside a Space, brand or My tasks page (no Sheets section to go back to). */
+  inPage?: boolean
   initialSheetId?: string | null
   /** Spec 015: a notification's cell to open, `rowKey:colKey`. */
   initialCell?: string | null
@@ -86,6 +88,7 @@ const SB_KEY = 'momentum.sheet.stats'
 export function Workbook(p: WorkbookProps) {
   const t = useTranslations('sheets')
   const { api, folder } = p
+  const inPage = !!p.inPage
   const [sheets, setSheets] = useState<SheetSummary[]>(() => [...p.initialSheets].sort(byPos))
   const visible = useMemo(() => sheets.filter(s => !s.hidden), [sheets])
   const hidden = useMemo(() => sheets.filter(s => s.hidden), [sheets])
@@ -783,8 +786,8 @@ export function Workbook(p: WorkbookProps) {
     <div className="fx-sh-workbook" data-workbook={folder.id} onKeyDownCapture={onKeyDownCapture}>
       <div className="fx-sh-top" ref={topRef}>
         <nav className="fx-sh-crumbs" aria-label={t('crumb')} data-crumb="">
-          <Link href="/sheets">{t('crumb')}</Link>
-          <span aria-hidden="true">›</span>
+          {/* Spec 026: inside a Space, brand or My tasks page there is no Sheets section to go back to. */}
+          {!inPage && <><Link href="/sheets">{t('crumb')}</Link><span aria-hidden="true">›</span></>}
           <h1>{folderName}</h1>
           {linkedFolder && <span className="fx-sh-linked">🔗 {t('home.linkedBadge')}</span>}
         </nav>

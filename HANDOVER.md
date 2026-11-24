@@ -1009,6 +1009,28 @@ Spec and decisions: `specs/025-sidebar-brand-pages/spec.md`.
 
 Tests: `scripts/spaces-lab/realapp/scenarios-025.cjs`.
 
+### 7.zc One sheet system (spec 026)
+
+Every Space's Sheet view is one kind of sheet: themes (projects) › pillars › rows › child rows. A row is plain (a planning line) or linked (it stands for a task). Spec and decisions: `specs/026-one-sheet-system/spec.md`.
+
+| Rule | Where it lives |
+|---|---|
+| Rows and theme entries belong to a Space's sheet (`content_rows.space_id`, `content_themes.space_id`); a task has at most one row per sheet | `prisma/schema.prisma`; every row action takes the Space (`sheetSpace` in `src/actions/content-rows.ts`) |
+| Each Space's sheet keeps its own columns: `content` for the Content Space, `rows:<spaceId>` for the others | `spaceSheetId`, `isRowsSheet`, `builtInsFor` in `src/lib/sheet-columns.ts` |
+| Make task: a new task in a chosen Space (that Space's start stage, board, default type, assignee and priority), or an existing task there (the task's values win); a child row makes a subtask, a video's child row a clip | `makeTask`, `rowValuesToTask` in `src/actions/content-rows.ts`; `MakeTaskDialog` in `src/components/content/RowDialogs.tsx` |
+| Unlink keeps the row's last values as plain text; the task keeps its theme and isn't given a row again (`tasks.sheet_row_off`) | `unlinkRow`; `syncContentSheet` skips it |
+| A plain row holds its own value in task-field and sheet-only columns, and a stage as a label (`values.status`) | `ContentGrid.tsx` (line rows), `updateRow` |
+| The Task cell: Make task on a plain row; the task's name, Space and stage on a linked row | `ContentGrid.tsx` (`case 'task'`) |
+| The Content Space's sheet still gives a new task in one of its themes a linked row; a theme on another Space's sheet stays there | `src/lib/content-rows-server.ts` |
+| Paste plan only creates plain rows, on the sheet it is pasted into | `addPlan` in `src/actions/content.ts` |
+| The Space page's Sheet view is this sheet for every Space; a saved Sheet view of a Space is its tasks as a task sheet (filters and fields kept) | `SpacePage.tsx` |
+| Outside a Space, the board's "Content" is the Content Space's sheet and "Sheet" the Video Space's. The old Video sheet component is no longer shown | `KanbanBoard.tsx` (`sheetSpace`) |
+| One-time conversion: rows get their Space; videos become linked rows with their clips as child rows; custom columns move to each Space's sheet; clip details exported to a kept CSV | `src/lib/sheet-convert.ts`, run by the seed (`sheet-spaces-v1`); `data_exports`, `/api/exports/[name]`, Settings › Diagnostics |
+
+The task sheet (`TaskSheet.tsx`: one line per task, with a Space column) is the Sheet view of a brand's page and of My tasks.
+
+Tests: `scripts/spaces-lab/realapp/scenarios-026.cjs`. The sheet lab (`npm run lab:sheet`) still exercises the old Video sheet component in isolation; that component and its lab checks are to be removed together.
+
 ---
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)

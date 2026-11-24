@@ -31,30 +31,27 @@ module.exports = (EMAIL, psql, ok) => {
       id: '024-clip-starts-at-ready-for-design', as: 'admin',
       async run({ page, go }) {
         const n = rnd()
-        // A video is a content task; its clips are made on the Video board.
+        // A video is a content task; it is a linked row on the Video Space's sheet (spec 026), and a
+        // child row under it makes a clip on the Video board.
         const video = task(`Lab video ${n}`, 'Video', 'c-prog')
+        const th = first(`insert into projects (id, name, standing, is_theme, brand_id) values (gen_random_uuid(), 'Lab video theme ${n}', true, true, '${brand()}') returning id`)
+        psql(`insert into content_themes (id, project_id, space_id, position) values (gen_random_uuid(), '${th}', '${space('video')}', -5)`)
+        const vrow = first(`insert into content_rows (id, project_id, space_id, position, title, task_id, updated_at) values (gen_random_uuid(), '${th}', '${space('video')}', 1, 'Lab video ${n}', '${video}', now()) returning id`)
+        const crow = first(`insert into content_rows (id, project_id, space_id, parent_id, position, title, updated_at) values (gen_random_uuid(), '${th}', '${space('video')}', '${vrow}', 1, 'Lab clip ${n}', now()) returning id`)
         try {
           await go('/spaces/video?view=sheet')
-          await page.waitForSelector('[data-new-clip]', { timeout: 60000 })
-          // Lab leftovers can push the new video below the rows drawn: scroll until it shows.
-          const cell = page.locator('[data-row]', { hasText: `Lab video ${n}` }).first()
-          const box = await page.locator('.fx-sheet-scroll, [data-sheet-scroll]').first().boundingBox().catch(() => null)
-          await page.mouse.move(box ? box.x + 300 : 700, box ? box.y + 200 : 600)
-          for (let i = 0; i < 80 && !(await cell.count()); i++) { await page.mouse.wheel(0, 500); await page.waitForTimeout(120) }
-          await cell.waitFor({ timeout: 10000 })
-          // The add row and the button use the Space's "New task label".
-          ok((await page.textContent('[data-new-clip]')).trim() === '+ New clip', 'the add button says + New clip')
-          await cell.click()
-          await page.click('[data-new-clip]')
-          await page.waitForSelector('.fx-sheet-tr.is-draft input, .fx-sheet-tr.is-draft textarea', { timeout: 10000 })
-          await page.keyboard.type(`Lab clip ${n}`)
-          await page.keyboard.press('Enter')
-          await page.waitForTimeout(3000)
-          const clip = psql(`select id from tasks where parent_task_id='${video}'`)
-          ok(!!clip, 'the clip was added')
+          await page.waitForSelector(`[data-row="t:${th}"]`, { timeout: 90000 })
+          // The sheet's add row uses the Space's "New task label".
+          ok((await page.locator('[data-add-row="theme"]').first().textContent()).includes('New clip'), 'the add row says + New clip')
+          await page.click(`[data-make-task="${crow}"]`)
+          await page.waitForSelector('[data-make-task-dialog] [data-make-subtask]')
+          await page.click('[data-make-task-go]')
+          await page.waitForFunction(() => !document.querySelector('[data-make-task-dialog]'), null, { timeout: 30000 })
+          await page.waitForTimeout(1500)
+          const clip = psql(`select task_id from content_rows where id='${crow}'`)
+          ok(!!clip && psql(`select parent_task_id from tasks where id='${clip}'`) === video, 'the clip was added under its video')
           ok(psql(`select status || '|' || entry_stage || '|' || coalesce(media_board,'') from tasks where id='${clip}'`) === 'r-design|r-design|video', 'it starts at Ready For Design on the Video board')
           ok(psql(`select count(*) from task_spaces where task_id='${clip}' and space_id='${space('video')}'`) === '1', 'it shows in the Video Space')
-          ok(await page.locator('[data-row]', { hasText: `Lab clip ${n}` }).count() > 0, 'and still sits under its video in the sheet')
           await go('/spaces/video?view=board')
           await page.waitForSelector('.fx-board-cols')
           ok(await page.isVisible(`[data-task-card="${clip}"]`), 'and is a card on the Video board')
@@ -69,7 +66,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: 'Edit Review' }).first().click()
           await page.waitForTimeout(2500)
           ok(psql(`select status from tasks where id='${clip}'`) === 'd-check', 'it moves on without Caption or TOV')
-        } finally { drop([video]) }
+        } finally { drop([video]); psql(`delete from content_rows where project_id='${th}'`); psql(`delete from content_themes where project_id='${th}'`); psql(`delete from projects where id='${th}'`) }
       },
     },
     {
@@ -125,7 +122,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const before = settings('content')
         const theme = first(`insert into projects (id, name, standing, is_theme, owner_id) values (gen_random_uuid(), 'Lab theme ${rnd()}', true, true, '${who('admin')}') returning id`)
-        psql(`insert into content_themes (id, project_id, position) values (gen_random_uuid(), '${theme}', -5)`)
+        psql(`insert into content_themes (id, project_id, space_id, position) values (gen_random_uuid(), '${theme}', '${space('content')}', -5)`)
         try {
           await go('/spaces/content?view=board')
           await page.waitForSelector('[data-space-add]')

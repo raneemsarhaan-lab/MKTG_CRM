@@ -1,7 +1,8 @@
 // Spaces lab real-app scenarios for the Task link field (spec 021 T074–T076, T078).
 module.exports = (EMAIL, psql, ok) => {
   const spaceId = key => psql(`select id from team_spaces where key='${key}'`)
-  const taskIn = (space, name) => psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId(space)}' and t.name='${name}' limit 1`)
+  // A task the brand's sheet lists: not a linked media task (those show through their content task).
+  const taskIn = (space, name) => psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId(space)}' and t.name='${name}' and t.content_task_id is null and t.dropped_at is null limit 1`)
   const cleanup = () => {
     psql(`delete from sheet_values where column_id in (select id from sheet_columns where name like 'Lab link%')`)
     psql(`delete from sheet_columns where name like 'Lab link%'`)
@@ -24,11 +25,11 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         cleanup()
         try {
-          await go('/spaces/design?view=sheet')
+          const row = taskIn('content', 'Meetup poster')
+          await go(`/brands/${psql(`select brand_id from tasks where id='${row}'`)}?view=sheet`)
           const name = `Lab link ${Date.now() % 100000}`
           const col = await addField(page, name)
           ok(psql(`select kind from sheet_columns where id='${col}'`) === 'task', 'the ＋ Field menu adds a Task link field')
-          const row = taskIn('design', 'Meetup poster')
           const target = psql(`select id from tasks where name='Ramadan hero key visual' and media_board is null`)
           const cell = `[data-task-sheet] [data-cell$="${row}|c:${col}"]`
           await page.locator(cell).click()
@@ -64,7 +65,8 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         cleanup()
         try {
-          const row = taskIn('design', 'Meetup poster')
+          // The Design board's own card (a media task).
+          const row = psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId('design')}' and t.name='Meetup poster' and t.media_board='design' limit 1`)
           const target = psql(`select id from tasks where name='Ramadan hero key visual' and media_board is null`)
           const col = psql('select gen_random_uuid()')
           psql(`insert into sheet_columns (id, sheet, key, name, position, kind, options, shown_default, shown_in, updated_at)

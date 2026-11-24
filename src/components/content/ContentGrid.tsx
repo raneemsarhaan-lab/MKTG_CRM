@@ -478,7 +478,7 @@ export function ContentGrid(p: ContentGridProps) {
           // Spec 026 (§4): a linked row's Task cell — the task's name as a link, its Space and its stage.
           return isClip ? null : (
             <span className="fx-sheet-ellipsis" data-task-cell={task.id} style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline', minWidth: 0 }}>
-              <a className="fx-sheet-link fx-sheet-ellipsis" href={`?task=${task.id}`} tabIndex={-1} onClick={e => e.preventDefault()}>↗ {task.name}</a>
+              <a className="fx-sheet-link fx-sheet-ellipsis" href={`/board?task=${task.id}`} tabIndex={-1} onClick={e => e.preventDefault()}>↗ {task.name}</a>
               <span className="fx-sheet-muted" style={{ flexShrink: 0 }}>{[p.spaceNameOf?.(task), stageOf(task)].filter(Boolean).join(' · ')}</span>
             </span>
           )

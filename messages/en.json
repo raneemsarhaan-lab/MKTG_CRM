@@ -955,7 +955,8 @@
       "remove": "Remove theme",
       "moved": "Theme moved (this sheet only).",
       "removed": "Theme removed from the sheet. The project stays."
-    }
+    },
+    "spaceTitle": "{space} plan"
   },
   "inbox": {
     "button": {
