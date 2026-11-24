@@ -26,8 +26,8 @@ module.exports = (EMAIL, psql, ok) => {
         const late = task(`Lab late ${n}`, plus(-2)), now = task(`Lab today ${n}`, today()), next = task(`Lab tomorrow ${n}`, plus(1)), far = task(`Lab later ${n}`, plus(20)), none = task(`Lab undated ${n}`, null)
         try {
           await go('/my-tasks')
-          ok(await page.isVisible('nav a[href="/my-tasks"] [data-nav-count]'), 'My tasks in the sidebar with its count')
-          ok(/\d+\s*·\s*\d+/.test(await page.textContent('nav a[href="/my-tasks"] [data-nav-count]')), 'open · overdue')
+          ok(await page.isVisible('a[href="/my-tasks"] [data-count]'), 'My tasks in the sidebar with its count')
+          ok(/\d+\s*·\s*\d+/.test(await page.textContent('a[href="/my-tasks"] [data-count]')), 'open · overdue')
           ok((await section(page, 'overdue')).includes(late), 'overdue section')
           ok((await section(page, 'today')).includes(now), 'today section')
           ok((await section(page, 'tomorrow')).includes(next), 'tomorrow section')

@@ -317,7 +317,7 @@ function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: 
             <div style={grid2}>
               <label style={label}>{t('defaultView')}
                 <select style={input} value={s.views.default} data-default-view onChange={e => { const views = { ...s.views, default: e.target.value as SpaceSettings['views']['default'] }; save({ views }, { ...s, views }) }}>
-                  {(['board', 'sheet', 'calendar', 'list', 'workload'] as const).map(v => <option key={v} value={v}>{t(`view.${v}`)}</option>)}
+                  {(['board', 'sheet', 'calendar'] as const).map(v => <option key={v} value={v}>{t(`view.${v}`)}</option>)}
                 </select>
               </label>
               <label style={label}>{t('defaultSort')}

@@ -1322,6 +1322,7 @@ function KanbanBoardInner({
           scope={scope}
           onScope={chooseScope}
           brands={brands}
+          hideBrands={hosted && (!!spaceId || !!boardKey?.startsWith('brand:'))}
           brandIds={filters.brandIds}
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}

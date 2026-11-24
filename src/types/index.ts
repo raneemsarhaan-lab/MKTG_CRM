@@ -125,6 +125,10 @@ export interface Brand {
   own_features?: BrandFeatures
   /** Spec 021 (R11): the brand's "with C-Check" default for new tasks; null = the workspace default. */
   nine_stage_default?: boolean | null
+  /** Spec 025: the short name the sidebar shows; null = the full name. */
+  short_name?: string | null
+  /** Spec 025: the priority new tasks for this brand start with; null = the Space's, then the type's. */
+  default_priority?: string | null
 }
 
 // ─── Spec 021: brands, team Spaces and views ─────────────────────────────────
@@ -1028,8 +1032,13 @@ export interface NavTree {
   myOpen: number
   /** My tasks page (user, 2026-11-23): open tasks and to-dos that are mine, and how many are overdue. */
   myTasks?: { open: number; overdue: number }
-  spaces: { id: string; key: string; name: string; color: string; open: number }[]
-  brands: { id: string; name: string; color: string; open: number }[]
+  /** Spec 025: unread notifications, for the Inbox row. */
+  inboxUnread?: number
+  /** Spec 025: each Space with one folder per brand; counts are open tasks and how many are overdue. */
+  spaces: { id: string; key: string; name: string; name_ar?: string | null; color: string; open: number; overdue?: number; folders?: { id: string; name: string; color: string; open: number; overdue: number }[] }[]
+  /** `name` is the short name the sidebar shows; `full_name` the brand's own. */
+  brands: { id: string; name: string; full_name?: string; color: string; open: number; overdue?: number }[]
   /** Open tasks with no brand; the "No brand" entry shows only when > 0. */
   noBrandOpen: number
+  noBrandOverdue?: number
 }

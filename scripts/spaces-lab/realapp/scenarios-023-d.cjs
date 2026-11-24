@@ -32,7 +32,7 @@ module.exports = (EMAIL, psql, ok) => {
         psql(`insert into task_tags (task_id, tag_id) values ('${src}', '${tag}')`)
         try {
           // Save as template from the panel menu.
-          await go(`/spaces/planning?view=list&task=${src}`)
+          await go(`/spaces/planning?view=board&task=${src}`)
           await page.waitForSelector('[data-priority]')
           page.once('dialog', d => d.accept(tplName))
           await page.click('button[aria-label="Task actions"]')
@@ -90,7 +90,7 @@ module.exports = (EMAIL, psql, ok) => {
         const min = Number(psql(`select coalesce(sum(max_business_days),0) from sla_config where content_type_label='Post'`))
         const inProject = () => Number(psql(`select count(*) from tasks where project_id='${project}' and name='${name}'`))
         try {
-          await go(`/spaces/planning?view=list&task=${src}`)
+          await go(`/spaces/planning?view=board&task=${src}`)
           await page.waitForSelector('[data-repeat]')
           ok((await page.getAttribute('[data-repeat]', 'data-repeat-on')) === 'false', 'doesn’t repeat yet')
           await page.click('[data-repeat-open]')
@@ -122,12 +122,12 @@ module.exports = (EMAIL, psql, ok) => {
           ok(inProject() > before, 'the standing project counts it')
 
           // Board: ↻ on the cards.
-          await go('/spaces/planning?view=list')
+          await go('/spaces/planning?view=board')
           ok(await page.isVisible(`[data-repeat-mark]`), '↻ shows on rows')
 
           // Skip next moves the series on a week.
           const next = psql(`select next_publish::text from repeat_rules where id='${rule}'`)
-          await go(`/spaces/planning?view=list&task=${src}`)
+          await go(`/spaces/planning?view=board&task=${src}`)
           await page.waitForSelector('[data-repeat-skip]')
           await page.click('[data-repeat-skip]')
           await page.waitForTimeout(1500)

@@ -94,6 +94,7 @@ model Member {
   work_days_updated WorkDay[] @relation("WorkDayUpdater")
 
   @@map("members")
+  brand_assets_added BrandAsset[] @relation("BrandAssetAdder")
 }
 
 model Brand {
@@ -107,6 +108,10 @@ model Brand {
   features           Json     @default("{}")
   /// Spec 021 (R11): this brand's "with C-Check" default for new tasks. Null = the workspace default.
   nine_stage_default Boolean?
+  /// Spec 025: the name the sidebar shows ("Forefront" for "Forefront Consulting"). Null = the full name.
+  short_name       String?
+  /// Spec 025: the priority new tasks for this brand start with. Null = the Space's, then the task type's.
+  default_priority String?
 
   tasks        Task[]
   assets       BrandAsset[]
@@ -212,10 +217,28 @@ model BrandAsset {
   id          String   @id @default(uuid()) @db.Uuid
   brand_id    String   @db.Uuid
   filename    String
+  /// Where to read it: a link, or the bucket's public address. Empty when the bytes are in `data`.
   url         String
   uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+  /// Spec 025 (Assets tab): 'logo' | 'template' | 'photo' | 'design' | 'other'.
+  kind         String   @default("other")
+  /// An uploaded file kept in the database (no bucket configured), as a data URL.
+  data         String?  @db.Text
+  /// The object's key in the bucket, for deleting it.
+  storage_key  String?  @db.Text
+  content_type String?
+  size_bytes   Int?
+  /// A small preview for images (longest edge 360px), as a data URL.
+  thumb        String?  @db.Text
+  added_by     String?  @db.Uuid
+  /// The task this file belongs with, when linked.
+  task_id      String?  @db.Uuid
 
   brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+  adder Member? @relation("BrandAssetAdder", fields: [added_by], references: [id], onDelete: SetNull)
+  task  Task?   @relation("BrandAssetTask", fields: [task_id], references: [id], onDelete: SetNull)
+
+  @@index([brand_id])
 
   @@map("brand_assets")
 }
@@ -418,6 +441,7 @@ model Task {
   content_row          ContentRow?
   @@unique([content_task_id, media_board])
   @@map("tasks")
+  brand_assets BrandAsset[] @relation("BrandAssetTask")
 }
 
 /// One clip of a long-form video (spec 008 Video Sheet).

@@ -14,7 +14,7 @@ module.exports = (EMAIL, psql, ok) => {
     return id
   }
   const drop = ids => psql(`delete from tasks where id in ('${ids.join("','")}')`)
-  const panel = (go, id) => go(`/spaces/planning?view=list&task=${id}`)
+  const panel = (go, id) => go(`/spaces/planning?view=board&task=${id}`)
 
   return [
     {
@@ -109,7 +109,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-make-lead="Noran"]')
           await page.waitForTimeout(1500)
           ok(psql(`select assignee_id from tasks where id='${id}'`) === who('dms'), 'Noran is now the lead')
-          await go('/spaces/planning?view=workload')
+          await go(`/brands/${brand()}?view=workload`)
           await page.waitForSelector('[data-workload-view]')
           ok(true, 'workload view renders with split hours')
         } finally { drop([id]) }

@@ -1,6 +1,8 @@
 'use client'
 
+import { Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { useBrandGroup } from '@/components/spaces/brandGroup'
 import { SortableContext, type SortingStrategy } from '@dnd-kit/sortable'
 
 /**
@@ -53,6 +55,10 @@ export function KanbanColumn({
   const accent = PIPE_ACCENT[stage.id] ?? PIPE.purpleStroke
 
   const allSelected = tasks.length > 0 && tasks.every(t => selectedIds?.has(t.id))
+  // Spec 025: "Group by brand" — the column's cards under their brand's name, the sort kept inside each.
+  const byBrand = useBrandGroup()
+  const brandKey = (t: { brand?: { name?: string } | null }) => t.brand?.name ?? '\uffff'
+  const shownTasks = byBrand ? [...tasks].sort((a, b) => brandKey(a).localeCompare(brandKey(b))) : tasks
 
   const stageOwner = stage.owner_role
     ? members.find(m => m.role === stage.owner_role) ?? null
@@ -129,10 +135,16 @@ export function KanbanColumn({
         padding: '0 6px 10px', display: 'flex', flexDirection: 'column', gap: 10,
         flex: 1, minHeight: 96, overflowY: 'auto',
       }}>
-        <SortableContext items={tasks.map(t => t.id)} strategy={keepOrder}>
-          {tasks.map(task => (
+        <SortableContext items={shownTasks.map(t => t.id)} strategy={keepOrder}>
+          {shownTasks.map((task, i) => (
+            <Fragment key={task.id}>
+            {byBrand && (i === 0 || brandKey(shownTasks[i - 1]) !== brandKey(task)) && (
+              <div data-brand-group={task.brand?.name ?? ''} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 0', fontSize: 11.5, fontWeight: 700, color: PIPE.textMuted }}>
+                <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: task.brand?.color ?? PIPE.textFaint }} />
+                {task.brand?.name ?? '—'}
+              </div>
+            )}
             <TaskCard
-              key={task.id}
               task={task}
               currentStageOwner={stageOwner}
               currentUser={currentUser}
@@ -143,6 +155,7 @@ export function KanbanColumn({
               selecting={selecting}
               onToggleSelect={onToggleSelect}
             />
+            </Fragment>
           ))}
         </SortableContext>
 

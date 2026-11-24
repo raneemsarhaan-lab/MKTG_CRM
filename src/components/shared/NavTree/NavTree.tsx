@@ -1,47 +1,48 @@
 'use client'
 
 /**
- * The sidebar's Me / Teams / Brands sections (spec 021, contracts/routes.md,
- * design/teams-brands.html).
+ * The sidebar's My work / Spaces / Brands sections (spec 021, restructured in
+ * spec 025).
  *
- * - Me: My tasks, then the member's pinned Sheets folders (moved here from
- *   under Sheets; Unpin / Rename / Delete behave as before).
- * - Teams: the team Spaces the member belongs to (every Space for admins).
- * - Brands: each brand, and under the open one its four Folders.
+ * - My work: My tasks and the Inbox.
+ * - Spaces: the team Spaces the member can see, each with one folder per brand.
+ *   A Space's name opens all its tasks; its arrow only opens or closes its
+ *   folder list; a folder opens that Space's tasks for that brand.
+ * - Brands: each brand's page. Its views live in the page, not under it.
  *
- * Used by the desktop sidebar and by the phone's More sheet, which is the
- * drawer form. Collapsed sections are a per-device preference
- * (`momentum.sidebar.collapsed`), read after mount.
+ * A number is open tasks, with the overdue count in red beside it (25 · 3).
+ * Used by the desktop sidebar and by the phone's More sheet. Collapsed
+ * sections and open Spaces are per-device preferences, read after mount.
  */
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import type { NavTree as NavTreeData, PinnedFolder } from '@/types/index'
-import { PinnedFolders } from '@/components/sheets/PinnedFolders'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { spaceLabel } from './labels'
 
 const KEY = 'momentum.sidebar.collapsed'
-const FOLDERS = ['calendar', 'assets', 'sheet', 'library'] as const
-const FOLDER_KEY = { calendar: 'cal', assets: 'assets', sheet: 'sheet', library: 'lib' } as const
+const OPEN_KEY = 'momentum.sidebar.spaces'
 
-type Section = 'me' | 'teams' | 'brands'
+type Section = 'mywork' | 'spaces' | 'brands'
+const SECTIONS: Section[] = ['mywork', 'spaces', 'brands']
 
-export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTreeData; pins: PinnedFolder[]; pathname: string; phone?: boolean }) {
+export function NavTree({ tree, pathname, phone = false }: { tree: NavTreeData; pins?: PinnedFolder[]; pathname: string; phone?: boolean }) {
   const t = useTranslations('spaces')
   const [collapsed, setCollapsed] = useState<Section[]>([])
-  const [openBrand, setOpenBrand] = useState<string | null>(null)
+  const [openSpaces, setOpenSpaces] = useState<string[]>([])
 
+  // The Space in the address is open.
+  const routeSpace = pathname.startsWith('/spaces/') ? pathname.split('/')[2] ?? null : null
   useEffect(() => {
     try {
       const v = JSON.parse(window.localStorage.getItem(KEY) ?? '[]')
-      if (Array.isArray(v)) setCollapsed(v.filter((x): x is Section => x === 'me' || x === 'teams' || x === 'brands'))
+      if (Array.isArray(v)) setCollapsed(v.filter((x): x is Section => SECTIONS.includes(x)))
+      const o = JSON.parse(window.localStorage.getItem(OPEN_KEY) ?? 'null')
+      if (Array.isArray(o)) setOpenSpaces(o.filter((x): x is string => typeof x === 'string'))
     } catch { /* a preference, never required */ }
   }, [])
-
-  // The brand in the address is the open one.
-  const routeBrand = pathname.startsWith('/brands/') ? pathname.split('/')[2] ?? null : null
-  useEffect(() => { if (routeBrand) setOpenBrand(routeBrand) }, [routeBrand])
+  useEffect(() => { if (routeSpace) setOpenSpaces(prev => (prev.includes(routeSpace) ? prev : [...prev, routeSpace])) }, [routeSpace])
 
   function toggle(s: Section) {
     setCollapsed(prev => {
@@ -50,20 +51,34 @@ export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTree
       return next
     })
   }
+  function toggleSpace(key: string) {
+    setOpenSpaces(prev => {
+      const next = prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]
+      try { window.localStorage.setItem(OPEN_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
 
   const row = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 8, minHeight: phone ? 44 : 30,
-    padding: '0 8px', borderRadius: 10, textDecoration: 'none',
+    display: 'flex', alignItems: 'center', gap: 8, minHeight: phone ? 44 : 28,
+    padding: '0 8px', borderRadius: 9, textDecoration: 'none',
     background: active ? '#F4FBD6' : 'transparent', color: active ? PIPE.ink : PIPE.textSecondary,
     fontSize: 13, fontWeight: active ? 700 : 500, minWidth: 0,
   })
-  const count = (n: number) => (n > 0 ? <span data-count style={{ marginInlineStart: 'auto', fontSize: 11, color: PIPE.textMuted, fontVariantNumeric: 'tabular-nums' }}>{n}</span> : null)
-  const square = (color: string, letter: string) => (
-    <span aria-hidden="true" style={{ width: 16, height: 16, borderRadius: 5, background: color, color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>{letter}</span>
+  /** Open tasks, with the overdue count in red beside it. */
+  const count = (open: number, overdue = 0) => (open > 0 || overdue > 0 ? (
+    <span data-count={`${open}:${overdue}`} style={{ marginInlineStart: 'auto', paddingInlineStart: 4, fontSize: 11, color: PIPE.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0 }}>
+      <span aria-label={t('openN', { n: open })}>{open}</span>
+      {overdue > 0 && <> · <span data-overdue aria-label={t('overdueN', { n: overdue })} title={t('overdueN', { n: overdue })} style={{ color: '#D22040', fontWeight: 800 }}>{overdue}</span></>}
+    </span>
+  ) : null)
+  const dot = (color: string) => <span aria-hidden="true" data-dot style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }} />
+  const name = (s: string, title?: string) => <span title={title} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s}</span>
+  const icon = (d: React.ReactNode) => (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>{d}</svg>
   )
-  const name = (s: string) => <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s}</span>
 
-  function header(s: Section, label: string, hint?: string) {
+  function header(s: Section, label: string) {
     const open = !collapsed.includes(s)
     return (
       <button
@@ -74,12 +89,11 @@ export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTree
         title={open ? t('collapse', { name: label }) : t('expand', { name: label })}
         style={{
           display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6, width: '100%',
-          background: 'none', border: 'none', cursor: 'pointer', padding: '10px 8px 4px', fontFamily: 'inherit',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '9px 8px 3px', fontFamily: 'inherit',
           fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: PIPE.textMuted,
         }}
       >
         <span>{label}</span>
-        {hint && phone && <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500, fontSize: 10 }}>{hint}</span>}
       </button>
     )
   }
@@ -87,66 +101,72 @@ export function NavTree({ tree, pins, pathname, phone = false }: { tree: NavTree
   const isOn = (href: string, exact = false) => (exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`))
 
   return (
-    <div data-nav-tree style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {header('me', t('me'))}
-      {!collapsed.includes('me') && (
+    <div data-nav-tree style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {header('mywork', t('myWork'))}
+      {!collapsed.includes('mywork') && (
         <>
-          {/* My tasks moved to the top of the sidebar (user, 2026-11-23); its board and sheet views stay at /me. */}
-          <Link href="/sheets" data-node="my-sheets" style={row(isOn('/sheets'))} aria-current={isOn('/sheets') ? 'page' : undefined}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" x2="21" y1="9" y2="9" /><line x1="3" x2="21" y1="15" y2="15" /><line x1="9" x2="9" y1="3" y2="21" />
-            </svg>
-            {name(t('mySheets'))}
+          <Link href="/my-tasks" data-node="my-tasks" style={row(isOn('/my-tasks'))} aria-current={isOn('/my-tasks') ? 'page' : undefined}>
+            {icon(<><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>)}
+            {name(t('myTasks'))}
+            {tree.myTasks && count(tree.myTasks.open, tree.myTasks.overdue)}
           </Link>
-          {pins.length > 0 && <PinnedFolders pins={pins} pathname={pathname} />}
+          <Link href="/notifications" data-node="inbox" style={row(isOn('/notifications'))} aria-current={isOn('/notifications') ? 'page' : undefined}>
+            {icon(<><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z" /></>)}
+            {name(t('inbox'))}
+            {(tree.inboxUnread ?? 0) > 0 && (
+              <span data-unread aria-label={t('unreadN', { n: tree.inboxUnread ?? 0 })} style={{ marginInlineStart: 'auto', fontSize: 11, fontWeight: 700, color: PIPE.ink, background: PIPE.limePrimary, borderRadius: 999, padding: '1px 7px', fontVariantNumeric: 'tabular-nums' }}>{tree.inboxUnread}</span>
+            )}
+          </Link>
         </>
       )}
 
-      {tree.spaces.length > 0 && header('teams', t('teams'), t('teamsHint'))}
-      {tree.spaces.length > 0 && !collapsed.includes('teams') && tree.spaces.map(s => {
+      {tree.spaces.length > 0 && header('spaces', t('teams'))}
+      {tree.spaces.length > 0 && !collapsed.includes('spaces') && tree.spaces.map(s => {
         const href = `/spaces/${s.key}`
         const label = spaceLabel(s, t)
+        const open = openSpaces.includes(s.key)
+        const folders = s.folders ?? []
         return (
-          <Link key={s.id} href={href} data-node={`space:${s.key}`} style={row(isOn(href))} aria-current={isOn(href) ? 'page' : undefined}>
-            {square(s.color, label[0] ?? '·')}{name(label)}{count(s.open)}
-          </Link>
+          <div key={s.id} data-space={s.key}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {/* The arrow only opens or closes the folder list. */}
+              <button
+                type="button"
+                data-space-toggle={s.key}
+                aria-expanded={open}
+                aria-label={open ? t('collapse', { name: label }) : t('expand', { name: label })}
+                onClick={() => toggleSpace(s.key)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: PIPE.textMuted, padding: phone ? 12 : '6px 2px', lineHeight: 0, flexShrink: 0 }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}>
+                  <path d="M8 5l9 7-9 7z" />
+                </svg>
+              </button>
+              <Link href={href} data-node={`space:${s.key}`} style={{ ...row(isOn(href, true)), flex: 1, paddingInlineStart: 4 }} aria-current={isOn(href, true) ? 'page' : undefined}>
+                {dot(s.color)}{name(label)}{count(s.open, s.overdue)}
+              </Link>
+            </div>
+            {open && folders.map(f => {
+              const fh = `${href}/${f.id}`
+              return (
+                <Link key={f.id} href={fh} data-node={`space:${s.key}:${f.id}`} style={{ ...row(isOn(fh)), paddingInlineStart: 30, minHeight: phone ? 44 : 26 }} aria-current={isOn(fh) ? 'page' : undefined}>
+                  {dot(f.color)}{name(f.name)}{count(f.open, f.overdue)}
+                </Link>
+              )
+            })}
+          </div>
         )
       })}
 
-      {header('brands', t('brands'), t('brandsHint'))}
+      {header('brands', t('brands'))}
       {!collapsed.includes('brands') && (
         <>
-          {[...tree.brands.map(b => ({ ...b, slug: b.id })), ...(tree.noBrandOpen > 0 ? [{ id: 'none', slug: 'none', name: t('noBrand'), color: PIPE.textFaint, open: tree.noBrandOpen }] : [])].map(b => {
+          {[...tree.brands.map(b => ({ ...b, slug: b.id })), ...(tree.noBrandOpen > 0 ? [{ id: 'none', slug: 'none', name: t('noBrand'), full_name: t('noBrand'), color: PIPE.textFaint, open: tree.noBrandOpen, overdue: tree.noBrandOverdue ?? 0 }] : [])].map(b => {
             const href = `/brands/${b.slug}`
-            const expanded = openBrand === b.slug
             return (
-              <div key={b.id}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <Link href={href} data-node={`brand:${b.slug}`} style={{ ...row(isOn(href, true)), flex: 1 }} aria-current={isOn(href, true) ? 'page' : undefined}>
-                    {square(b.color, b.name[0] ?? '·')}{name(b.name)}{count(b.open)}
-                  </Link>
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    aria-label={expanded ? t('collapse', { name: b.name }) : t('expand', { name: b.name })}
-                    onClick={() => setOpenBrand(expanded ? null : b.slug)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: PIPE.textMuted, padding: phone ? 12 : 4, lineHeight: 0 }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"
-                         style={{ transform: expanded ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}>
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                  </button>
-                </div>
-                {expanded && FOLDERS.map(f => {
-                  const fh = `${href}/${f}`
-                  return (
-                    <Link key={f} href={fh} data-node={`brand:${b.slug}:${f}`} style={{ ...row(isOn(fh)), paddingInlineStart: 30 }} aria-current={isOn(fh) ? 'page' : undefined}>
-                      {name(t(`folders.${FOLDER_KEY[f]}`))}
-                    </Link>
-                  )
-                })}
-              </div>
+              <Link key={b.id} href={href} data-node={`brand:${b.slug}`} style={row(isOn(href))} aria-current={isOn(href) ? 'page' : undefined}>
+                {dot(b.color)}{name(b.name, b.full_name)}{count(b.open, b.overdue)}
+              </Link>
             )
           })}
         </>

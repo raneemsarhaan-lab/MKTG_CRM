@@ -20,7 +20,7 @@ module.exports = (EMAIL, psql, ok) => {
   }
   /** Moves a task from its panel's stage menu (works for any task, wherever it shows). */
   const panelStage = async (page, go, id, label) => {
-    await go(`/spaces/planning?view=list&task=${id}`)
+    await go(`/spaces/planning?view=board&task=${id}`)
     await page.locator('button[aria-label^="Stage:"]').first().click()
     await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: label }).first().click()
     await page.waitForTimeout(2000)

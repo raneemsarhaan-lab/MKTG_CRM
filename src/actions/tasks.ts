@@ -996,6 +996,12 @@ async function spaceDefaultAssignee(spaceId: string | null | undefined, ctx: Awa
   return defaultAssigneeFor(space, members, ctx.members[spaceId] ?? [])
 }
 
+/** Spec 025: the brand's default priority for new tasks, when it sets one. */
+async function brandPriority(brandId: string | null | undefined): Promise<Priority | null> {
+  if (!brandId) return null
+  return asPriority((await prisma.brand.findUnique({ where: { id: brandId }, select: { default_priority: true } }))?.default_priority)
+}
+
 /** "With C-Check" for a new task: the brand's default first (R11), else the workspace's. */
 async function nineStageFor(brandId: string | null | undefined): Promise<boolean> {
   const [brand, ws] = await Promise.all([
@@ -1057,7 +1063,7 @@ export async function createTask(
       ...(await newTaskDates(input.publish_date, input.due_date, input.start_date)),
       hours_estimate:     input.hours_estimate ?? (Number(useTpl?.values.hours) || 0),
       // Spec 023 (T019): the template's or the type's default priority when none was chosen.
-      priority:           input.priority ?? asPriority(useTpl?.values.priority) ?? asPriority(plan.default_priority) ?? asPriority(typeRow?.default_priority) ?? 'Normal',
+      priority:           input.priority ?? asPriority(useTpl?.values.priority) ?? asPriority(plan.default_priority) ?? await brandPriority(input.brand_id) ?? asPriority(typeRow?.default_priority) ?? 'Normal',
       cover_image_url:    input.cover_image_url ?? null,
       created_by:         member.id,
       ...media,
@@ -1159,6 +1165,7 @@ export async function createTasks(
   const nineStage = await nineStageFor(shared.brand_id)
   const now = new Date()
   const shareDates = await newTaskDates(shared.publish_date, shared.due_date)
+  const brandDefault = await brandPriority(shared.brand_id)
   const spaceCtx = await loadSpaceContext()
   const kind = 'pipeline' as const
   // Spec 024: no assignee chosen → the Space's default assignee role, as for one task.
@@ -1186,7 +1193,7 @@ export async function createTasks(
         stage_date:         now,
         ...shareDates,
         hours_estimate:     shared.hours_estimate ?? 0,
-        priority:           shared.priority ?? asPriority(plan.default_priority) ?? asPriority(typeRow?.default_priority) ?? 'Normal',
+        priority:           shared.priority ?? asPriority(plan.default_priority) ?? brandDefault ?? asPriority(typeRow?.default_priority) ?? 'Normal',
         cover_image_url:    shared.cover_image_url ?? null,
         created_by:         member.id,
       })),

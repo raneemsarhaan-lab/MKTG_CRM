@@ -6,8 +6,8 @@ import { prisma } from '@/lib/prisma'
 import type { SavedView, ViewType } from '@/types/index'
 
 export const VIEW_TYPES: ViewType[] = ['list', 'board', 'sheet', 'calendar', 'workload', 'files', 'gallery']
-/** 'everything' | 'me' | 'space:<uuid>' | 'brand:<uuid>' | 'brand:<uuid>:<folder>' */
-const NODE = /^(everything|me|space:[0-9a-f-]{36}|brand:[0-9a-f-]{36}(:(calendar|assets|sheet|library))?)$/
+/** 'everything' | 'me' | 'space:<uuid>' | 'space:<uuid>:brand:<uuid>' (a Space › Brand folder, spec 025) | 'brand:<uuid>' | 'brand:<uuid>:<folder>' */
+const NODE = /^(everything|me|space:[0-9a-f-]{36}(:brand:[0-9a-f-]{36})?|brand:[0-9a-f-]{36}(:(calendar|assets|sheet|library))?)$/
 export const validNode = (node: string) => NODE.test(node)
 
 export async function loadViews(node: string, memberId: string): Promise<SavedView[]> {

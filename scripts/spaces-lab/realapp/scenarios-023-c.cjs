@@ -32,7 +32,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const id = task(`Lab start ${rnd()}`, { due: '2026-12-10', hours: 10 })
         try {
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.waitForSelector('[data-start-date]')
           ok((await page.getAttribute('[data-start-date]', 'data-start-date')) === '', 'empty unless set')
           await setDate(page, '[data-start-date]', '2026-12-06')
@@ -47,7 +47,7 @@ module.exports = (EMAIL, psql, ok) => {
       id: '023c-workload-spreads-and-calendar-spans', as: 'admin',
       async run({ page, go }) {
         // Sun 6 Dec → Thu 10 Dec 2026, 10 h: five working days, 2 h a day.
-        await go('/spaces/planning?view=workload')
+        await go(`/brands/${psql('select id from brands order by name limit 1')}?view=workload`)
         await page.waitForSelector('[data-workload-week]')
         await toWeekOf(page, '2026-12-06')
         const before = {}
@@ -55,7 +55,7 @@ module.exports = (EMAIL, psql, ok) => {
         const id = task(`Lab span ${rnd()}`, { due: '2026-12-10', hours: 10 })
         psql(`update tasks set start_date='2026-12-06' where id='${id}'`)
         try {
-          await go('/spaces/planning?view=workload')
+          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=workload`)
           await page.waitForSelector('[data-workload-week]')
           await toWeekOf(page, '2026-12-06')
           for (const d of ['2026-12-06', '2026-12-08', '2026-12-10'])

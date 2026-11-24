@@ -41,7 +41,7 @@ module.exports = (EMAIL, psql, ok) => {
           await openSheet(page, go, s.c)
           ok(/Ready For Design|Ready for design/i.test(await page.textContent(cell(s.c, 'status')) ?? ''), `starts at Ready For Design: ${await page.textContent(cell(s.c, 'status'))}`)
           // Move the Design task on its board (its panel's stage menu).
-          await go(`/spaces/design?view=list&task=${s.media[0]}`)
+          await go(`/spaces/design?view=board&task=${s.media[0]}`)
           await page.locator('button[aria-label^="Stage:"]').first().click()
           await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: 'D-In Progress' }).first().click()
           await page.waitForTimeout(2500)

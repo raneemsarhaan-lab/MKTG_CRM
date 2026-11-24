@@ -27,7 +27,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         resetRule()
         const t = seed('Dates lab')
-        await go(`/spaces/design?view=list&task=${t}`)
+        await go(`/spaces/design?view=board&task=${t}`)
         await page.waitForSelector('[data-publish-date]', { timeout: 60000 })
         await setDate(page, '[data-publish-date]', '2026-12-15')
         ok(dates(t) === '2026-12-15|2026-12-08|false', `publishing Tue 15 Dec → due Tue 8 Dec, automatic: ${dates(t)}`)
@@ -53,7 +53,7 @@ module.exports = (EMAIL, psql, ok) => {
         const today = psql(`select (now() at time zone 'Africa/Cairo')::date::text`)
         const publish = psql(`select ((now() at time zone 'Africa/Cairo')::date + 3)::text`)
         const t = seed('Dates soon lab')
-        await go(`/spaces/design?view=list&task=${t}`)
+        await go(`/spaces/design?view=board&task=${t}`)
         await page.waitForSelector('[data-publish-date]', { timeout: 60000 })
         await setDate(page, '[data-publish-date]', publish)
         const [, due] = dates(t).split('|')

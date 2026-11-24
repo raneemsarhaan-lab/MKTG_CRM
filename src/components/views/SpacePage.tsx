@@ -9,10 +9,12 @@
  * sheet, unchanged (FR-012). Other Spaces get the task Sheet (TaskSheet).
  */
 import { setWorkWeekend } from '@/lib/utils'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
-import type { StageId, Task } from '@/types/index'
+import type { ContentTheme, StageId, Task } from '@/types/index'
+import { PIPE } from '@/lib/pipeline-tokens'
+import { BrandGroupProvider } from '@/components/spaces/brandGroup'
 import { STAGE_META } from '@/lib/stage-meta'
 import { SpaceSettingsButton } from '@/components/spaces/SpaceSettings'
 import { inRange, mayCreateIn, newTaskLabel, typesForSpace } from '@/lib/space-settings'
@@ -21,20 +23,25 @@ import { TaskForm } from '@/components/shared/TaskForm'
 import { useSpaceStages } from '@/components/spaces/useSpaceStages'
 import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { ViewHost } from './ViewHost'
-import { ListView } from './ListView'
 import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
-import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData } from './types'
+import { viewTasks, viewOptions, fieldsSetup, type BoardData } from './types'
 import { applyView, cleanTabPrefs } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
 
-export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string }) {
+const chip = (on: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${on ? PIPE.ink : PIPE.border}`, background: on ? PIPE.ink : '#FFFFFF', color: on ? '#FFFFFF' : PIPE.ink, borderRadius: 999, padding: '3px 10px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' })
+const brandShort = (b: { name: string; short_name?: string | null }) => b.short_name?.trim() || b.name
+
+export function SpacePage({ data, spaceId, brandId = null }: {
+  data: BoardData; spaceId: string
+  /** Spec 025: a Space › Brand folder — only this brand's tasks in the Space. */
+  brandId?: string | null
+}) {
   setWorkWeekend(data.dueRule?.weekend)
   const t = useTranslations('spaces')
   const tv = useTranslations('views')
@@ -46,7 +53,23 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const board = space.media_board ?? null
   // Spec 024 (§2): its views show only the stages from "Starts at" to "Ends at".
   const flow = space.settings.flow
-  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status)), [shown, board, flow])
+  // Spec 025 (§2): on the Space page a brand filter and "Group by brand"; a folder is one brand.
+  const folderBrand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
+  const [picked, setPicked] = useState<string[]>([])
+  const [groupBrand, setGroupBrand] = useState(false)
+  const prefKey = `momentum.space.${spaceId}`
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem(prefKey) ?? '{}')
+      if (Array.isArray(v.brands)) setPicked(v.brands.filter((x: unknown): x is string => typeof x === 'string'))
+      setGroupBrand(v.group === true)
+    } catch { /* a preference, never required */ }
+  }, [prefKey])
+  const remember = (brands: string[], group: boolean) => { try { window.localStorage.setItem(prefKey, JSON.stringify({ brands, group })) } catch { /* ignore */ } }
+  const brandIds = useMemo(() => (brandId ? [brandId] : picked.filter(id => data.brands.some(b => b.id === id))), [brandId, picked, data.brands])
+  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status))
+    && (!brandIds.length || (!!task.brand_id && brandIds.includes(task.brand_id))), [shown, board, flow, brandIds])
+  const themeScope = useMemo(() => (brandIds.length ? (th: ContentTheme) => !!th.brand_id && brandIds.includes(th.brand_id) : undefined), [brandIds])
   const tasks = viewTasks(data).filter(scope)
   const memberNames = data.spaceMembers.filter(r => r.space_id === spaceId)
     .map(r => data.members.find(m => m.id === r.member_id)?.name).filter(Boolean).join(', ')
@@ -59,11 +82,8 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const memberIds = data.spaceMembers.filter(r => r.space_id === spaceId).map(r => r.member_id)
   const mayCreate = mayCreateIn(space.settings, data.currentUser, memberIds)
-  // Spec 023: custom fields and their values, for List rows.
-  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   // Spec 021 (US3): this Space's own words for the stages. Boards keep the board names.
   const locale = useLocale()
-  const tSheet = useTranslations('taskSheet')
   // Spec 022 (US4): this Space's stages (renamed or split); boards elsewhere keep the original names.
   const ss = useSpaceStages(spaceId, data.spaceStages, data.taskSpaceStages)
   const stageName = (s: StageId) => ss?.stageName(s) ?? (locale === 'ar' ? STAGE_META[s]?.label_ar : STAGE_META[s]?.label_en) ?? s
@@ -77,10 +97,10 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
 
   return (
     <ViewHost
-      crumbs={[t('teams'), label]}
-      title={label}
-      tag={t('spaceTag')}
-      color={space.color}
+      crumbs={folderBrand ? [t('teams'), label, brandShort(folderBrand)] : [t('teams'), label]}
+      title={folderBrand ? `${label} · ${brandShort(folderBrand)}` : label}
+      tag={folderBrand ? t('folderTag') : t('spaceTag')}
+      color={folderBrand?.color ?? space.color}
       actions={<>
         {mayCreate && (space.media_board
           ? <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} label={addLabel} />
@@ -89,20 +109,38 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
         {data.currentUser.access !== 'user' && <SpaceSettingsButton space={space} data={data} />}
       </>}
       defaultTab={space.settings.views.default}
-      initialPrefs={cleanTabPrefs(data.viewPrefs[`space:${spaceId}`])}
-      sub={<span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <span data-space-rule>{rule}</span>
-        <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
+      initialPrefs={cleanTabPrefs(data.viewPrefs[folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`])}
+      sub={<span style={{ display: 'grid', gap: 8 }}>
+        <span style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <span data-space-rule>{folderBrand ? t('folderRule', { space: label, brand: folderBrand.name }) : rule}</span>
+          <span>{memberNames ? t('members', { names: memberNames }) : t('noMembers')}</span>
+        </span>
+        {!folderBrand && data.brands.length > 1 && (
+          <span data-space-brands role="group" aria-label={t('brandFilter')} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <button type="button" aria-pressed={!brandIds.length} data-brand-chip="all" onClick={() => { setPicked([]); remember([], groupBrand) }} style={chip(!brandIds.length)}>{t('allBrands')}</button>
+            {data.brands.map(b => {
+              const on = brandIds.includes(b.id)
+              return (
+                <button key={b.id} type="button" aria-pressed={on} data-brand-chip={b.id} title={b.name}
+                  onClick={() => { const next = on ? picked.filter(x => x !== b.id) : [...picked, b.id]; setPicked(next); remember(next, groupBrand) }} style={chip(on)}>
+                  <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: b.color }} />{brandShort(b)}
+                </button>
+              )
+            })}
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginInlineStart: 8, fontSize: 12.5, fontWeight: 600, color: PIPE.ink }}>
+              <input type="checkbox" checked={groupBrand} data-group-brand onChange={e => { setGroupBrand(e.target.checked); remember(picked, e.target.checked) }} />
+              {t('groupBrand')}
+            </label>
+          </span>
+        )}
       </span>}
       tabs={[
-        { key: 'list', label: tv('list') },
         { key: 'board', label: tv('board') },
         { key: 'sheet', label: tv('sheet') },
         { key: 'calendar', label: tv('calendar') },
-        { key: 'workload', label: tv('workload') },
       ]}
-      node={`space:${spaceId}`}
-      viewTypes={['list', 'board', 'sheet', 'calendar', 'workload']}
+      node={folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`}
+      viewTypes={['board', 'sheet', 'calendar']}
       options={viewOptions(data, tasks)}
       fields={fieldsSetup(data, tasks)}
       lead={data.currentUser.access !== 'user'}
@@ -111,23 +149,20 @@ export function SpacePage({ data, spaceId }: { data: BoardData; spaceId: string 
         const shownTasks = view ? applyView(tasks, view.config) : tasks
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
-        if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} />
+        if (tab === 'board') return <BrandGroupProvider value={groupBrand && !folderBrand}><BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} /></BrandGroupProvider>
         // T081: every Sheet tab is a full workbook (tabs, toolbar, formatting, comments, blank tabs).
         if (tab === 'sheet' && sheetStart) return (
           <NodeWorkbook key={view?.id} data={data} folder={space.key as 'content' | 'video'}
-            linked={<KanbanBoard {...data} surface="sheets" sheetsView={sheetStart} scopeTasks={inView} spaceId={spaceId} />} />
+            linked={<KanbanBoard {...data} surface="sheets" sheetsView={sheetStart} scopeTasks={inView} spaceId={spaceId}
+              sheetScope={brandIds.length ? (x: Task) => !!x.brand_id && brandIds.includes(x.brand_id) : undefined} themeScope={themeScope} />} />
         )
         // Spec 021 (FR-013a): Spaces without a sheet of their own get the task Sheet.
         const body = tab === 'sheet'
           ? <NodeWorkbook key={view?.id} data={data} node={`space:${spaceId}`}
-              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} />} />
-          : tab === 'calendar'
-            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="brand" statusName={statusName} onOpen={open}
-                milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}
-                link={board ? undefined : { spaceId, media: viewTasks(data) }} />
-            : tab === 'workload'
-              ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} canGroupByBrand stageName={stageName} spaceStages={ss} initialGroup={view?.config.group ?? (space.settings.views.group === 'none' ? undefined : space.settings.views.group)} onOpen={open} />
+              linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand} />} />
+          : <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
+              milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}
+              link={board ? undefined : { spaceId, media: viewTasks(data) }} />
         return <>{body}<TaskPanel data={data} spaceId={spaceId} />{taskForm}</>
       }}
     />

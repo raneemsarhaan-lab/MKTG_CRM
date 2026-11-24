@@ -54,7 +54,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const n = rnd(), id = task(`Lab type ${n}`, 'Post'), label = `Lab type ${n}`
         try {
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.waitForSelector('[data-type-picker-open]')
           await page.click('[data-type-picker-open]')
           ok(await page.isVisible('[data-type-option="Reel"] [data-type-icon]'), 'each type has its icon')
@@ -72,7 +72,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const n = rnd(), id = task(`Lab type user ${n}`, 'Post', 'c-prog', EMAIL.content)
         try {
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.waitForSelector('[data-type-picker-open]')
           await page.click('[data-type-picker-open]')
           await page.waitForSelector('[data-type-option="Post"]')
@@ -85,7 +85,8 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const n = rnd(), id = task(`Lab fields ${n}`, 'Post'), name = `Lab caption ${n}`
         try {
-          await go('/spaces/planning?view=list')
+          // Spec 025: List is a view of the brand's page (a Space has Board, Sheet and Calendar).
+          await go(`/brands/${brand()}?view=list`)
           await page.click('[data-fields-button]')
           await page.waitForSelector('[data-fields-menu] [data-view-field="brand"]')
           await page.click('[data-field-add]')
@@ -100,14 +101,14 @@ module.exports = (EMAIL, psql, ok) => {
           ok(await page.isChecked(`[data-view-field="f:${fid}"]`), 'shown at once')
           // A value shows on the row.
           psql(`insert into task_field_values (task_id, field_id, value) values ('${id}', '${fid}', '"Hello world"')`)
-          await go('/spaces/planning?view=list')
+          await go(`/brands/${brand()}?view=list`)
           await page.waitForSelector(`[data-row="${id}"] [data-list-field="${fid}"]`)
           ok((await page.textContent(`[data-row="${id}"] [data-list-field="${fid}"]`)).includes('Hello world'), 'the row shows the value')
           // Switching Brand off hides it on rows (kept for this member).
           await page.click('[data-fields-button]')
           await page.uncheck('[data-fields-menu] [data-view-field="brand"]')
           await page.waitForTimeout(1200)
-          await go('/spaces/planning?view=list')
+          await go(`/brands/${brand()}?view=list`)
           ok(!(await page.textContent(`[data-row="${id}"]`)).includes(psql(`select name from brands where id='${brand()}'`)), 'brand hidden after reload')
         } finally {
           psql(`update members set view_prefs = view_prefs - ('space:' || '${space('planning')}') where email='${EMAIL.admin}'`)
@@ -120,7 +121,7 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: '023-fields-button-user-no-add', as: 'content',
       async run({ page, go }) {
-        await go('/spaces/planning?view=list')
+        await go('/spaces/planning?view=board')
         await page.click('[data-fields-button]')
         await page.waitForSelector('[data-fields-menu]')
         ok(!(await page.$('[data-field-add]')), 'no + Field for a user')
@@ -154,7 +155,7 @@ module.exports = (EMAIL, psql, ok) => {
         const n = rnd(), id = task(`Lab required ${n}`, 'Post', 'c-prog'), name = `Lab must ${n}`
         const fid = field(name); attach('Post', fid, 'c-final')
         try {
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.locator('button[aria-label^="Stage:"]').first().click()
           await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: 'C-Review' }).first().click()
           await page.waitForTimeout(2500)
@@ -162,7 +163,7 @@ module.exports = (EMAIL, psql, ok) => {
           const body = await page.textContent('body')
           ok(new RegExp(`${name}.* (is|are) required before C-Review`).test(body), 'the panel names the field and the stage')
           psql(`insert into task_field_values (task_id, field_id, value) select '${id}', id, '"done"' from task_fields where id='${fid}' or (name_en in ('Caption','TOV') and retired_at is null)`)
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.locator('button[aria-label^="Stage:"]').first().click()
           await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: 'C-Review' }).first().click()
           await page.waitForTimeout(2500)
@@ -181,7 +182,7 @@ module.exports = (EMAIL, psql, ok) => {
         const f = name => psql(`select id from task_fields where name_en='${name}' and retired_at is null`)
         ok(!!f('Caption') && !!f('TOV') && !!f('Channels'), 'Caption, TOV and Channels exist')
         try {
-          await go(`/spaces/content?view=list&task=${id}`)
+          await go(`/spaces/content?view=board&task=${id}`)
           await page.waitForSelector('[data-field-section="Caption"]')
           // Channels is a top row, before the Publishing date; Caption above the Description, TOV below.
           const order = await page.evaluate(() => {
@@ -255,13 +256,12 @@ module.exports = (EMAIL, psql, ok) => {
         psql(`update task_fields set switchable=true where id='${fid}'`)
         const before = psql(`select coalesce(features::text, '{}') from brands where id='${b}'`)
         try {
-          await go(`/brands/${b}`)
-          await page.click('[data-brand-features-open]')
+          await go(`/brands/${b}/settings`)
           await page.click(`[data-feature-switch="f:${fid}"]`)
           await page.waitForTimeout(1500)
           ok(psql(`select features ->> 'f:${fid}' from brands where id='${b}'`) === 'false', 'switched off for the brand')
           // Hidden in the panel, and it no longer stops a move.
-          await go(`/spaces/planning?view=list&task=${id}`)
+          await go(`/spaces/planning?view=board&task=${id}`)
           await page.waitForSelector('[data-type-picker-open]')
           ok(!(await page.$(`[data-field-section="Lab switchable ${n}"]`)), 'hidden in the task panel')
           psql(`insert into task_field_values (task_id, field_id, value) select '${id}', f.id, '"lab"' from task_fields f where f.name_en in ('Caption','TOV') and f.retired_at is null on conflict do nothing`)
@@ -278,7 +278,7 @@ module.exports = (EMAIL, psql, ok) => {
         const n = rnd(), a = task(`Lab group ${n}`, 'Post', 'todo'), c = task(`Lab group done ${n}`, 'Post', 'scheduled')
         const day = psql(`select to_char((now() at time zone 'Africa/Cairo')::date + 2, 'YYYY-MM-DD')`)
         try {
-          await go('/spaces/planning?view=list')
+          await go(`/brands/${brand()}?view=list`)
           await page.click('[data-group="statusGroup"]')
           ok(await page.isVisible(`[data-group-key="not_started"] [data-row="${a}"]`), 'To Do is Not started')
           ok(await page.isVisible(`[data-group-key="done"] [data-row="${c}"]`), 'Scheduled is Done')

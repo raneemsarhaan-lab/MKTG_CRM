@@ -52,19 +52,18 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'us2-brand-folders', as: 'admin',
       async run({ page, go }) {
         const b = firstBrand()
+        // Spec 025: the Calendar and Sheet folders are views of the brand's Brand section now.
         await go(`/brands/${b}/calendar`)
-        ok(await page.$('[data-calendar-view]'), 'Calendar folder')
+        ok(page.url().endsWith(`/brands/${b}?view=calendar`), `the Calendar address leads to the brand's Calendar view: ${page.url()}`)
+        ok(await page.$('[data-calendar-view]'), 'which is its calendar')
         await go(`/brands/${b}/assets`)
-        ok(await page.$('[data-brand-files]'), 'Assets folder')
+        ok(await page.$('[data-brand-assets]'), 'Assets section')
         await go(`/brands/${b}/library`)
         const want = psql(`select count(*) from tasks where brand_id='${b}' and status='publish' and dropped_at is null and content_task_id is null and not migrated_simple`)
         ok(String((await page.$$('[data-library-item]')).length) === want, `Library lists published only (${want})`)
         await go(`/brands/${b}/sheet`)
         await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 60000 })
-        ok(psql(`select count(*) from sheet_folders where brand_id='${b}' and kind='brand'`) === '1', "the Sheet folder opens the brand's own workbook, once")
-        await go(`/brands/${b}/sheet?view=content`)
-        await page.waitForSelector('[data-node-workbook="content"] .fx-sh-workbook', { timeout: 60000 })
-        ok(await page.$('[data-node-workbook="content"] [data-content-sheet]'), 'its Content sheet tab opens the Content workbook')
+        ok(psql(`select count(*) from sheet_folders where brand_id='${b}' and kind='brand'`) === '1', "the Sheet address opens the brand's own workbook, once")
       },
     },
     {

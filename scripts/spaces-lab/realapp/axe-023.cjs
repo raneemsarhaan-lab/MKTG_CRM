@@ -62,11 +62,11 @@ async function axe(page, name, only) {
     }
     await go(p, '/my-tasks'); await axe(p, `My tasks (${label})`)
     await go(p, '/spaces/planning?view=workload'); await axe(p, `Workload week (${label})`)
-    await go(p, `/spaces/${taskSpace}?view=list&task=${task}`); await p.waitForSelector('[data-repeat-open]')
+    await go(p, `/spaces/${taskSpace}?view=board&task=${task}`); await p.waitForSelector('[data-repeat-open]')
     await p.click('[data-repeat-open]'); await p.waitForSelector('[data-repeat-dialog]')
     await axe(p, `Repeat row and box in the task panel (${label})`, '[data-repeat]')
     if (label !== 'phone') {
-      await go(p, '/spaces/planning?view=list'); await p.keyboard.press('Control+k'); await p.waitForTimeout(400)
+      await go(p, '/spaces/planning?view=board'); await p.keyboard.press('Control+k'); await p.waitForTimeout(400)
       await p.keyboard.type('post'); await p.waitForTimeout(800)
       await axe(p, `Search (${label})`)
       if (hasTemplates) {

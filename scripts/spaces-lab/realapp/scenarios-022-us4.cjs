@@ -11,7 +11,7 @@ module.exports = (EMAIL, psql, ok) => {
     return id
   }
   const panelStage = async (page, go, id, label) => {
-    await go(`/spaces/design?view=list&task=${id}`)
+    await go(`/spaces/design?view=board&task=${id}`)
     await page.locator('button[aria-label^="Stage:"]').first().click()
     await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: label }).first().click()
     await page.waitForTimeout(2000)
@@ -32,7 +32,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         clearStages('design')
         try {
-          await go('/spaces/design?view=list')
+          await go('/spaces/design?view=board')
           await page.click('[data-space-settings-open]'); await page.click('[data-space-settings-tab="flow"]'); await page.click('[data-space-stages-open]')
           await page.waitForSelector('[data-space-stages]')
           await page.fill('[data-space-stage-name="d-prog:0"]', 'Sketch')

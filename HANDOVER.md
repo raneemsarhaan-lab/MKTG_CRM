@@ -991,6 +991,24 @@ Board data gives every task `home_space_id`, `stage_roles` and `space_sla_days`.
 
 Tests: `scripts/spaces-lab/realapp/scenarios-024.cjs`, `pure-space-settings`. The dev server's `.next` cache can grow very large (35 GB seen); delete `.next` if pages stop compiling.
 
+### 7.zb Sidebar and brand pages (spec 025)
+
+Spec and decisions: `specs/025-sidebar-brand-pages/spec.md`.
+
+| Rule | Where it lives |
+|---|---|
+| The sidebar: My work (My tasks, Inbox), Spaces (a folder per brand under each; the arrow only opens the list), Brands (no rows under a brand). A count is open tasks with the overdue count in red | `src/lib/nav-tree.ts` (one pass over the open tasks), `src/components/shared/NavTree/NavTree.tsx` |
+| The other pages are a row of icons at the bottom of the sidebar | `src/components/shared/Sidebar.tsx` |
+| Short brand names (`brands.short_name`) and a brand's default priority (`brands.default_priority`) | `setBrandBasics` in `src/actions/brands.ts`; `brandPriority` in `src/actions/tasks.ts` |
+| A Space › Brand folder is the Space page narrowed to one brand (`/spaces/<key>/<brandId>`), with its own remembered view (`space:<id>:brand:<id>`) | `src/app/(app)/spaces/[key]/[brandId]/page.tsx`, `SpacePage.tsx`, `validNode` in `src/lib/views-data.ts` |
+| Space pages: Board, Sheet, Calendar; brand chips filter all three; Group by brand groups cards inside each column | `SpacePage.tsx`, `src/components/spaces/brandGroup.tsx`, `KanbanColumn.tsx` |
+| A page opens on `?view=`, else the member's home view, else the view used last, else its default | `ViewHost.tsx` (`remembered`, `prefs.last`), `viewPrefs` in `src/lib/board-data.ts` |
+| The brand page's three sections; Calendar and Sheet addresses lead to those views; Settings is admins only (404 otherwise) | `src/app/(app)/brands/[brandId]/[[...folder]]/page.tsx`, `BrandPage.tsx` |
+| The Space column on a brand's sheet (the Spaces the task shows in; read-only) | `TaskSheet.tsx` (`showSpace`), `TASK_BUILT_INS` |
+| Assets: the brand's own files plus files on its finished tasks; sort, type filter and search are pure | `src/lib/brand-assets.ts`, `src/actions/brand-assets.ts`, `src/components/brands/BrandAssetsTable.tsx`, `src/app/api/brand-assets/[id]/route.ts` |
+
+Tests: `scripts/spaces-lab/realapp/scenarios-025.cjs`.
+
 ---
 
 ## 8. The Islam Check toggle (9-stage vs 8-stage)

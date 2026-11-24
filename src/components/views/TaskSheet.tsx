@@ -49,6 +49,7 @@ import { myNotes, setMyNote } from '@/actions/my-notes'
 import { handoffRequest } from '@/components/handoff/request'
 import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { useSheetColumns } from '@/components/sheet/useSheetColumns'
+import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { useColumnsBundle } from '@/components/sheet/useColumnsBundle'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
@@ -74,6 +75,8 @@ interface TaskSheetProps {
   groups?: [string, ViewTask[]][]
   /** Hide the Brand column (a brand page). */
   hideBrand?: boolean
+  /** Spec 025: the Space column (the Spaces the task shows in); a brand's sheet has it. */
+  showSpace?: boolean
   /** The private My notes column (My tasks). */
   notes?: boolean
   /** A saved view's shown fields (Task always shows); null = all. */
@@ -85,7 +88,7 @@ interface TaskSheetProps {
   label: string
 }
 
-export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = false, fields = null, sheetKey, stages, label }: TaskSheetProps) {
+export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = false, notes = false, fields = null, sheetKey, stages, label }: TaskSheetProps) {
   const t = useTranslations('taskSheet')
   const tf = useTranslations('sheets.fields')
   const tcol = useTranslations('sheet.columns')
@@ -177,12 +180,21 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
   const mediaSpace = /^tasks:space:/.test(sheet) && !!data.spaces.find(sp => `tasks:space:${sp.id}` === sheet)?.media_board
   const ml = useMediaLinks({ tasks: viewTasks(data), onOpenTask: id => selectTask(id), say: sayNow })
   const cols: GridCol[] = [
-    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(c === 'media' && mediaSpace) && (c === 'title' || c === 'media' || isCustom(c) || !fields || fields.includes(c))),
+    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(!showSpace && c === 'space') && !(c === 'media' && mediaSpace) && (c === 'title' || c === 'media' || c === 'space' || isCustom(c) || !fields || fields.includes(c))),
     ...fieldCols,
     ...(notes ? [NOTES] : []),
   ]
 
   const view = (x: ViewTask): ViewTask => ({ ...x, ...(over[x.id] ?? {}) }) as ViewTask
+  // Spec 025: the Spaces a task shows in — its board's Space for a media task.
+  const spaceNames = useMemo(() => {
+    const name = new Map(data.spaces.map(sp => [sp.id, spaceLabel(sp, tSpaces)]))
+    const m = new Map<string, string[]>()
+    for (const r of data.taskSpaces) { const n = name.get(r.space_id); if (n) m.set(r.task_id, [...(m.get(r.task_id) ?? []), n]) }
+    return m
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.spaces, data.taskSpaces])
+  const spacesOf = (x: ViewTask) => (spaceNames.get(x.id) ?? []).join(', ')
   const viewRef = useRef<LinkedView>({})
   const shown = (x: ViewTask, col: GridCol): string => {
     if (isCustom(col)) return cl.custom.textValue(x as unknown as Task, col)
@@ -197,6 +209,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     switch (col) {
       case 'title': return x.name
       case 'brand': return brandName.get(x.brand_id) ?? ''
+      case 'space': return spacesOf(x)
       case 'status': return stageOf(x)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
@@ -263,6 +276,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
       return r.success ? null : t('notSaved', { reason: r.error })
     }
     if (isCustom(col)) return cl.custom.commit(x as unknown as Task, col, value)
+    if (col === 'space') return t('spaceReadOnly')
     if (!may(x)) return t('readOnly')
     if (isField(col)) {
       const f = fieldOf(col)
@@ -438,6 +452,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, notes = fals
     readOnlyNote: (row, col) => {
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
+      if (col === 'space') return t('spaceReadOnly')
       if (!may(row.task)) return t('readOnly')
       if (isField(col) && !fieldApplies(row.task, col)) return tFields('notApplicable')
       if (offFeatureFor(row.task.brand, col)) return tFeat('hidden', { brand: row.task.brand?.name ?? '' })

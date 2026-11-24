@@ -11,7 +11,8 @@
     "hours": "Hours",
     "taskTypes": "Task types",
     "myTasks": "My tasks",
-    "overdueN": "{n} overdue"
+    "overdueN": "{n} overdue",
+    "more": "More pages"
   },
   "greeting": {
     "morning": "Good morning",
@@ -2886,7 +2887,7 @@
     }
   },
   "spaces": {
-    "teams": "Teams",
+    "teams": "Spaces",
     "teamsHint": "lenses across brands",
     "brands": "Brands",
     "brandsHint": "where work lives",
@@ -2924,7 +2925,7 @@
     "openCount": "{n} open",
     "empty": "No tasks show here yet.",
     "groupBy": "Group by",
-    "groupBrand": "Brand",
+    "groupBrand": "Group by brand",
     "groupStatus": "Status",
     "newTask": "+ Task",
     "comingSoon": "This Folder arrives with the next stage of the build.",
@@ -3188,7 +3189,22 @@
         "back": "Tell these roles when a task is handed back"
       },
       "notifyHint": "Only members of this Space with that role are told, on top of the people already notified."
-    }
+    },
+    "myWork": "My work",
+    "inbox": "Inbox",
+    "openN": "{n} open",
+    "overdueN": "{n} overdue",
+    "unreadN": "{n} unread",
+    "folderRule": "{space} tasks for {brand} only.",
+    "brandFilter": "Filter by brand",
+    "allBrands": "All brands",
+    "tabBrand": "Brand",
+    "tabAssets": "Assets",
+    "tabSettings": "Settings",
+    "brandTabs": "Brand sections",
+    "colSpace": "Space",
+    "assetsSub": "The brand's files: logos, templates, photos and finished designs.",
+    "settingsSub": "How this brand's work is set up. Admins only."
   },
   "views": {
     "list": "List",
@@ -3345,7 +3361,8 @@
       "publish": "Publishing date",
       "media": "Link task",
       "tags": "Tags",
-      "start": "Start date"
+      "start": "Start date",
+      "space": "Space"
     },
     "simple": {
       "s-todo": "To Do",
@@ -3379,7 +3396,8 @@
     "rowsName": "Tasks on this page",
     "rowsHelp": "Every task this page shows is a row. Change which tasks with the page's filters or a saved view.",
     "groupDefault": "This page's groups",
-    "unknownStageList": "“{text}” isn't a status here. Try: {list}."
+    "unknownStageList": "“{text}” isn't a status here. Try: {list}.",
+    "spaceReadOnly": "Shows in is changed in the task panel."
   },
   "dates": {
     "publish": "Publishing date",
@@ -3880,5 +3898,66 @@
     "unit": "Unit",
     "endsOn": "End date",
     "count": "Number of times"
+  },
+  "assets": {
+    "search": "Search files",
+    "filterType": "Filter by type",
+    "allTypes": "All types",
+    "kind": {
+      "logo": "Logo",
+      "template": "Template",
+      "photo": "Photo",
+      "design": "Finished design",
+      "other": "Other"
+    },
+    "upload": "Upload",
+    "addLink": "Add link",
+    "add": "Add",
+    "linkUrl": "Link address",
+    "linkName": "Name (optional)",
+    "col": {
+      "name": "Name",
+      "preview": "Preview",
+      "kind": "Type",
+      "task": "Linked task",
+      "added_by": "Added by",
+      "added_at": "Date added",
+      "actions": "Actions"
+    },
+    "rename": "Rename",
+    "renameNamed": "Rename {name}",
+    "delete": "Delete",
+    "deleteNamed": "Delete {name}",
+    "typeOf": "Type of {name}",
+    "linkTaskOf": "Link {name} to a task",
+    "linkTask": "Link to a task…",
+    "unlinkTask": "Unlink",
+    "confirmDelete": "Delete \"{name}\"? This can't be undone.",
+    "deleted": "Deleted \"{name}\".",
+    "added": "{n, plural, one {# file added.} other {# files added.}}",
+    "uploading": "{n, plural, one {Uploading # file…} other {Uploading # files…}}",
+    "tooLarge": "That file is too large to add here.",
+    "tooLargeNamed": "\"{name}\" is too large to add here.",
+    "notAllowed": "You can only change files you added. Admins and superusers can change any.",
+    "failed": "That didn't work. Try again.",
+    "empty": "No files yet. Upload some, or drag them here.",
+    "noMatch": "No files match. Clear the search or the type filter.",
+    "loading": "Loading files…",
+    "dropHint": "Drag files onto the table to upload them.",
+    "count": "Showing {n} of {total}."
+  },
+  "brandSettings": {
+    "newTasks": "New tasks",
+    "defaultPriority": "Default priority",
+    "priorityDefault": "The Space's or the task type's",
+    "noPriority": "No priority",
+    "newOnly": "Applies to tasks created from now on. Existing tasks keep their priority.",
+    "switches": "C-Check and fields",
+    "switchesHelp": "C-Check on or off for this brand's new tasks, and the fields switched off for it. Switching a field off hides it; its values are kept.",
+    "sidebar": "Sidebar",
+    "shortName": "Short name",
+    "shortNameHint": "Shown in the sidebar and on brand chips, so the name isn't cut off. Leave empty to use the full name.",
+    "saved": "Saved.",
+    "failed": "That wasn't saved. Try again."
   }
 }

@@ -1,29 +1,29 @@
 'use client'
 
 /**
- * A brand and its four Folders (spec 021 US1/US2, FR-006, FR-007,
- * design/teams-brands.html):
- *   - the brand: every task for it, as List, Board, Calendar or Workload;
- *   - Calendar: where its tasks live, one continuous calendar, campaigns as a filter;
- *   - Assets: its files and open design requests;
- *   - Sheet: today's Content and Video sheets with only its rows, plus its own blank tabs;
- *   - Library: everything it has published.
+ * A brand's page (spec 021 US1/US2; three sections since spec 025):
+ *   - Brand: every task for it from every Space, with the original stage names,
+ *     as Board, Sheet (with a Space column), Calendar (its publishing calendar),
+ *     List or Workload;
+ *   - Assets: a table of its files;
+ *   - Settings (admins): C-Check, fields switched off, default priority.
+ * The Library (everything it has published) is still reachable by address.
  */
 import { setWorkWeekend } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
-import type { ContentTheme, Task } from '@/types/index'
+import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
-import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import { applyView } from '@/lib/view-config'
+import { applyView, cleanTabPrefs } from '@/lib/view-config'
 import { isLinkedMedia } from '@/lib/media'
-import { BrandAssets } from '@/components/brands/BrandAssets'
+import Link from 'next/link'
+import { BrandAssetsTable } from '@/components/brands/BrandAssetsTable'
+import { BrandSettingsTab } from '@/components/brands/BrandSettingsTab'
 import { BrandLibrary } from '@/components/brands/BrandLibrary'
 import { ViewHost } from './ViewHost'
-import { BrandFeaturesButton } from '@/components/brands/BrandFeatures'
 import { ListView } from './ListView'
 import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
@@ -31,13 +31,34 @@ import { WorkloadView } from './WorkloadView'
 import { TaskPanel } from './TaskPanel'
 import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData } from './types'
 
-export type BrandFolderSlug = 'calendar' | 'assets' | 'sheet' | 'library'
-const FOLDER_KEY = { calendar: 'cal', assets: 'assets', sheet: 'sheet', library: 'lib' } as const
+export type BrandFolderSlug = 'calendar' | 'assets' | 'sheet' | 'library' | 'settings'
 
-export function BrandPage({ data, brandId, folder, assets = [] }: {
+/** Spec 025 (§3): a brand's three sections, as links under its name. Settings is for admins only. */
+function BrandSections({ brandId, current, admin }: { brandId: string; current: 'brand' | 'assets' | 'settings'; admin: boolean }) {
+  const t = useTranslations('spaces')
+  const tabs = [
+    { key: 'brand' as const, href: `/brands/${brandId}`, label: t('tabBrand') },
+    { key: 'assets' as const, href: `/brands/${brandId}/assets`, label: t('tabAssets') },
+    ...(admin ? [{ key: 'settings' as const, href: `/brands/${brandId}/settings`, label: t('tabSettings') }] : []),
+  ]
+  return (
+    <nav data-brand-sections aria-label={t('brandTabs')} style={{ display: 'flex', gap: 4 }}>
+      {tabs.map(x => (
+        <Link key={x.key} href={x.href} data-brand-section={x.key} aria-current={current === x.key ? 'page' : undefined}
+          style={{ padding: '6px 14px', borderRadius: 999, textDecoration: 'none', fontSize: 13, fontWeight: 700,
+            background: current === x.key ? PIPE.ink : PIPE.surface, color: current === x.key ? '#FFFFFF' : PIPE.ink }}>
+          {x.label}
+        </Link>
+      ))}
+    </nav>
+  )
+}
+
+export function BrandPage({ data, brandId, folder }: {
   data: BoardData
   brandId: string | null
   folder: BrandFolderSlug | null
+  /** Unused since spec 025 (the Assets tab loads its own files); kept so older callers compile. */
   assets?: { id: string; filename: string; url: string }[]
 }) {
   setWorkWeekend(data.dueRule?.weekend)
@@ -49,40 +70,32 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
   const color = brand?.color ?? PIPE.textFaint
   // Spec 022: linked media tasks show through their content task, not as cards of their own.
   const scope = useMemo(() => (task: Task) => (brandId ? task.brand_id === brandId : !task.brand_id) && !isLinkedMedia(task), [brandId])
-  const themeScope = useMemo(() => (th: ContentTheme) => (brandId ? th.brand_id === brandId : !th.brand_id), [brandId])
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
   const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   const campaigns = [...new Map(all.filter(x => x.project).map(x => [x.project!.id, x.project!])).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
-  const folderName = folder ? t(`folders.${FOLDER_KEY[folder]}`) : null
+  const folderName = folder === 'library' ? t('folders.lib') : null
   const withPanel = (node: React.ReactNode) => <>{node}<TaskPanel data={data} /></>
 
-  // Spec 021 (US4): admins switch the brand's features from its header.
-  const features = brand && data.currentUser.access === 'admin'
-    ? <BrandFeaturesButton brand={{ id: brand.id, name: brand.name, own: brand.own_features ?? {}, nine_stage_default: brand.nine_stage_default ?? null }}
-        defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage}  fields={data.taskFields}/>
-    : undefined
-  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: features }
+  const admin = data.currentUser.access === 'admin'
+  const section = folder === 'assets' ? 'assets' as const : folder === 'settings' ? 'settings' as const : 'brand' as const
+  const sections = brandId ? <BrandSections brandId={brandId} current={section} admin={admin} /> : undefined
+  const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: undefined as React.ReactNode, sections }
 
-  if (folder === 'calendar') {
+  if (folder === 'assets' && brandId) {
     return (
-      <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('calendarLede')}
-        tabs={[{ key: 'calendar', label: tv('calendar') }, { key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }]}
-        render={tab => tab === 'board'
-          ? <BoardView data={data} scopeTasks={scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
-          : withPanel(tab === 'list'
-            ? <ListView custom={custom} tasks={all} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />
-            : <CalendarView tasks={all.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />)} />
+      <ViewHost {...common} crumbs={[t('brands'), name, t('tabAssets')]} title={name} tag={t('brandTag')} sub={t('assetsSub')} noViews
+        tabs={[{ key: 'files', label: tv('files') }]}
+        render={() => withPanel(<BrandAssetsTable brandId={brandId} tasks={all.filter(x => !x.dropped_at).map(x => ({ id: x.id, name: x.name }))} hasStorage={data.hasStorage} onOpenTask={open} />)} />
     )
   }
-  if (folder === 'assets') {
-    const requests = all.filter(x => x.content_type_label === 'Design' && x.status !== 'publish')
+  if (folder === 'settings' && brandId && brand && admin) {
     return (
-      <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('assetsLede')}
-        tabs={[{ key: 'files', label: tv('files') }, { key: 'requests', label: tv('requests') }]}
-        render={tab => withPanel(<BrandAssets assets={assets} requests={requests} color={color} onOpen={open} tab={tab === 'requests' ? 'requests' : 'files'} />)} />
+      <ViewHost {...common} crumbs={[t('brands'), name, t('tabSettings')]} title={name} tag={t('brandTag')} sub={t('settingsSub')} noViews
+        tabs={[{ key: 'settings', label: t('tabSettings') }]}
+        render={() => <BrandSettingsTab brand={brand} defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage} fields={data.taskFields} />} />
     )
   }
   if (folder === 'library') {
@@ -96,23 +109,11 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
           : <BrandLibrary tasks={published} color={color} onOpen={open} />)} />
     )
   }
-  if (folder === 'sheet') {
-    return (
-      <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('sheetLede')}
-        tabs={[{ key: 'tasks', label: t('allTasksSheet'), disabled: !brandId }, { key: 'content', label: t('contentSheet') }, { key: 'video', label: t('videoSheet') }]}
-        render={tab => tab === 'tasks' && brandId
-          // T081: the brand's own workbook: its Tasks tab, then the brand's blank tabs.
-          ? withPanel(<NodeWorkbook data={data} node={`brand:${brandId}`}
-              linked={<TaskSheet data={data} tasks={all.filter(x => !x.dropped_at)} hideBrand sheetKey={`tasks:brand:${brandId}`} label={`${name} · ${t('allTasksSheet')}`} />} />)
-          : <NodeWorkbook key={tab} data={data} folder={tab === 'video' ? 'video' : 'content'}
-              linked={<KanbanBoard {...data} surface="sheets" sheetsView={tab === 'video' ? 'sheet' : 'content'} scopeTasks={scope} sheetScope={scope} themeScope={themeScope} />} />} />
-    )
-  }
-
   return (
     <ViewHost {...common} title={name} tag={t('brandTag')} sub={t('brandAll')}
-      tabs={[{ key: 'list', label: tv('list') }, { key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'workload', label: tv('workload') }]}
+      tabs={[{ key: 'board', label: tv('board') }, { key: 'sheet', label: tv('sheet') }, { key: 'calendar', label: tv('calendar') }, { key: 'list', label: tv('list') }, { key: 'workload', label: tv('workload') }]}
       node={brandId ? `brand:${brandId}` : undefined}
+      initialPrefs={brandId ? cleanTabPrefs(data.viewPrefs[`brand:${brandId}`]) : undefined}
       viewTypes={['list', 'board', 'sheet', 'calendar', 'workload']}
       options={viewOptions(data, all, { brand: true })}
       fields={fieldsSetup(data, all)}
@@ -124,10 +125,11 @@ export function BrandPage({ data, brandId, folder, assets = [] }: {
         return withPanel(tab === 'sheet'
           ? (brandId
             ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
-                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
-            : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand fields={shownKeys} label={name} />)
+                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+            : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} label={name} />)
           : tab === 'calendar'
-            ? <CalendarView tasks={shownTasks} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />
+            // The brand's publishing calendar (spec 025): by publishing date, campaigns as a filter.
+            ? <CalendarView tasks={shownTasks.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
               : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open} />)

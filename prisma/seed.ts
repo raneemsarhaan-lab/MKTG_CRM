@@ -514,6 +514,14 @@ async function main() {
     return `${await moveTodoClips(prisma)} clips`
   })
 
+  // Spec 025: short brand names for the sidebar, where a brand has none yet.
+  await once('brand-short-names-v1', 'gave brands their short sidebar names', async () => {
+    const names: Record<string, string> = { 'Forefront Consulting': 'Forefront', 'Islam Personal Branding': 'Islam Saadany', 'The Strategy Community': 'TSC' }
+    let n = 0
+    for (const [name, short_name] of Object.entries(names)) n += (await prisma.brand.updateMany({ where: { name, short_name: null }, data: { short_name } })).count
+    return `${n} brands`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

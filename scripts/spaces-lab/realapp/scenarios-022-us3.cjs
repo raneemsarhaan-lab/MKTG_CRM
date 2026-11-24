@@ -36,7 +36,7 @@ module.exports = (EMAIL, psql, ok) => {
         const name = `Lab 022 board ${rnd()}`
         let id
         try {
-          await go('/spaces/design?view=list')
+          await go('/spaces/design?view=board')
           await page.click('[data-media-create-open]')
           await page.fill('[data-media-create-name]', name)
           await page.click('[data-media-create-go]')
@@ -125,7 +125,7 @@ module.exports = (EMAIL, psql, ok) => {
         const m = media(`Lab 022 pair art ${n}`)
         psql(`update tasks set content_task_id='${c}', status='d-prog' where id='${m}'`)
         try {
-          await go(`/spaces/design?view=list&task=${m}`)
+          await go(`/spaces/design?view=board&task=${m}`)
           await page.waitForSelector('[data-media-section] [data-media-unlink]', { timeout: 30000 })
           // Spec 024 (§6): a designer isn't among the roles that link and unlink; a content creator is.
           await page.click('[data-media-section] [data-media-unlink]')
@@ -133,7 +133,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select coalesce(content_task_id::text,'-') from tasks where id='${m}'`) === c, 'a designer is refused')
           ok((await page.textContent('[data-media-section]')).includes("can't link or unlink here"), 'with the reason')
           const writer = await signInAs('content')
-          await writer.page.goto(`${BASE}/spaces/content?view=list&task=${c}`, { waitUntil: 'networkidle', timeout: 120000 })
+          await writer.page.goto(`${BASE}/spaces/content?view=board&task=${c}`, { waitUntil: 'networkidle', timeout: 120000 })
           await writer.page.waitForSelector('[data-media-section] [data-media-unlink]', { timeout: 30000 })
           await writer.page.click('[data-media-section] [data-media-unlink]')
           await writer.page.waitForTimeout(2500)

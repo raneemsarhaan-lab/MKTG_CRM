@@ -47,6 +47,8 @@ export function mapBrand(b: any): Brand {
     description: b.description ?? undefined,
     features:    (b.features && typeof b.features === 'object' ? b.features : {}) as import('@/types/index').BrandFeatures,
     nine_stage_default: b.nine_stage_default ?? null,
+    short_name: b.short_name ?? null,
+    default_priority: b.default_priority ?? null,
   }
 }
 

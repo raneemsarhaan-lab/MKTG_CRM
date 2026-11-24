@@ -73,7 +73,7 @@ module.exports = (EMAIL, psql, ok) => {
           await go('/spaces/design?view=board')
           await page.waitForSelector(`[data-task-card="${row}"]`, { timeout: 60000 })
           ok((await page.locator(`[data-task-card="${row}"] [data-card-task-link]`).allInnerTexts()).some(x => /Ramadan hero key visual/.test(x)), 'the card shows the link')
-          await go(`/spaces/design?view=list&task=${row}`)
+          await go(`/spaces/design?view=board&task=${row}`)
           await page.waitForSelector(`[data-task-link-field="${col}"]`, { timeout: 60000 })
           ok(/Lab link Part of/.test(await page.locator(`[data-task-link-field="${col}"]`).innerText()), 'the panel shows the field by its name')
           await page.click(`[data-task-link-field="${col}"] [data-tasklink-unlink]`)

@@ -37,12 +37,18 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: 'us1-space-lists-shows-in', as: 'admin',
       async run({ page, go }) {
-        await go('/spaces/video?view=list')
+        await go('/spaces/video?view=board')
         // Spec 022: the Video board lists its media tasks. Spec 024: within its range (Ready For Design to D-Check).
         const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and t.media_board='video' and t.status in ('r-design','d-prog','d-check')`)
-        const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)
+        await page.waitForSelector('.fx-board-cols')
+        const rows = await page.$$eval('.fx-board-cols [data-task-card]', els => els.length)
         ok(String(rows) === want, `Video lists its Shows in tasks: ${rows} vs ${want}`)
-        ok(await page.$('[data-group="brand"][aria-pressed="true"]'), 'grouped by brand by default')
+        // Spec 025: Board, Sheet and Calendar only; a brand filter and "Group by brand".
+        const tabs = await page.$$eval('[role="toolbar"] [data-view-tab]', els => els.map(e => e.getAttribute('data-view-tab')))
+        ok(tabs.join(',') === 'board,sheet,calendar', `the Space's views: ${tabs}`)
+        await page.check('[data-group-brand]')
+        ok(await page.locator('[data-brand-group]').count() > 0, 'Group by brand puts cards under their brand')
+        await page.uncheck('[data-group-brand]')
       },
     },
     {
@@ -71,7 +77,7 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'us1-brand-page', as: 'content',
       async run({ page, go }) {
         const b = firstBrand()
-        await go(`/brands/${b}`)
+        await go(`/brands/${b}?view=list`)
         // Spec 022: linked media tasks show through their content task.
         const want = psql(`select count(*) from tasks where brand_id='${b}' and dropped_at is null and content_task_id is null`)
         const rows = await page.$$eval('[data-list-view] [data-row]', els => els.length)

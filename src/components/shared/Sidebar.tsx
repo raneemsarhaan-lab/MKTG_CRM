@@ -55,13 +55,14 @@ export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: Pi
 
   if (ready && !expanded) return <NavRail member={member} onExpand={toggle} />
 
-  const items = navFor(member.access)
+  // Spec 025: My tasks is in the tree's My work section; the other pages are a row of icons at the bottom.
+  const items = navFor(member.access).filter(i => i.key !== 'myTasks')
 
   return (
     <aside style={{
-      width: 200, flexShrink: 0, boxSizing: 'border-box',
+      width: 216, flexShrink: 0, boxSizing: 'border-box',
       borderRight: '1px solid #EFEFF3', background: '#FFFFFF',
-      padding: '26px 20px 20px', display: 'flex', flexDirection: 'column', gap: 18,
+      padding: '22px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14,
       position: 'sticky', top: 0, height: '100vh', alignSelf: 'flex-start',
     }}>
       <div>
@@ -88,71 +89,25 @@ export function Sidebar({ member, pins = [], tree }: { member: Member; pins?: Pi
           <span style={{ flex: 1, textAlign: 'start' }}>{ts('open')}</span>
           <kbd style={{ fontSize: 10.5, fontFamily: 'inherit', color: PIPE.textFaint }}>⌘K</kbd>
         </button>
-        {items.map(({ href, key }) => {
-          const active = pathname.startsWith(href)
-          const link = (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active ? 'page' : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 12, textDecoration: 'none',
-                background: active ? '#F4FBD6' : 'transparent',
-                color: active ? PIPE.ink : PIPE.textSecondary,
-                fontSize: 13.5, fontWeight: active ? 700 : 500,
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-                   strokeWidth={active ? 2.3 : 2} strokeLinecap="round" strokeLinejoin="round"
-                   aria-hidden="true">
-                {NAV_ICON[key]}
-              </svg>
-              {t(key)}
-              {key === 'myTasks' && tree?.myTasks && (
-                <span data-nav-count="" style={{ marginInlineStart: 'auto', fontSize: 12, fontWeight: 600, color: PIPE.textMuted, fontVariantNumeric: 'tabular-nums' }}>
-                  {tree.myTasks.open}{tree.myTasks.overdue > 0 && <> · <span style={{ color: '#D22040', fontWeight: 800 }} title={t('overdueN', { n: tree.myTasks.overdue })}>{tree.myTasks.overdue}</span></>}
-                </span>
-              )}
-            </Link>
-          )
-          // Spec 021: pinned folders moved from under Sheets to Me, in the tree below.
-          return link
-        })}
       </nav>
       {tree && <NavTree tree={tree} pins={pins} pathname={pathname} />}
       </div>
 
-      {/* Focus card — §3, margin-top:auto pins it above the user row */}
-      <div style={{
-        flexShrink: 0, border: `1px solid ${PIPE.border}`, borderRadius: 16,
-        padding: '18px 16px 14px', position: 'relative', background: '#FFFFFF',
-      }}>
-        <div style={{
-          fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 21,
-          lineHeight: 1.32, letterSpacing: '-0.02em', color: PIPE.ink,
-        }}>
-          Focus.<br />Flow.<br />Finish.
-        </div>
-        <svg width="64" height="8" viewBox="0 0 64 8" fill="none" aria-hidden="true"
-             style={{ display: 'block' }}>
-          <path d="M2 5C14 2 44 1.6 62 4" stroke={PIPE.limePrimary} strokeWidth="4" strokeLinecap="round" />
-        </svg>
-        <div style={{ marginTop: 14, fontWeight: 500, fontSize: 13.5, lineHeight: 1.5, color: '#3A3F4B' }}>
-          Small wins,<br />every day.
-        </div>
-
-        <svg width="42" height="42" viewBox="0 0 42 42" fill="none" aria-hidden="true"
-             style={{ position: 'absolute', right: 14, bottom: 16 }}>
-          <circle cx="21" cy="21" r="20" fill={PIPE.limePrimary} />
-          <circle cx="15" cy="17" r="2" fill={PIPE.ink} /><circle cx="27" cy="17" r="2" fill={PIPE.ink} />
-          <path d="M14 25c2 3 12 3 14 0" stroke={PIPE.ink} strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-        <svg width="52" height="26" viewBox="0 0 52 26" fill="none" aria-hidden="true"
-             style={{ position: 'absolute', right: 44, top: 24 }}>
-          <path d="M2 20c8-16 16 8 24-6s14 2 24-6" stroke={PIPE.purpleStroke} strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </div>
+      {/* Spec 025: the other pages, as icons, so the tree fits without scrolling. */}
+      <nav aria-label={t('more')} data-sidebar-pages="" style={{ flexShrink: 0, display: 'flex', gap: 4, justifyContent: 'space-between', borderTop: `1px solid ${PIPE.border}`, paddingTop: 10 }}>
+        {items.map(({ href, key }) => {
+          const active = pathname.startsWith(href)
+          return (
+            <Link key={href} href={href} aria-current={active ? 'page' : undefined} aria-label={t(key)} title={t(key)} data-page={key}
+              style={{ display: 'grid', placeItems: 'center', width: 34, height: 34, borderRadius: 10, textDecoration: 'none',
+                background: active ? '#F4FBD6' : 'transparent', color: active ? PIPE.ink : PIPE.textSecondary }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {NAV_ICON[key]}
+              </svg>
+            </Link>
+          )
+        })}
+      </nav>
 
       {/* User row — the account menu, plus the collapse control */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4 }}>

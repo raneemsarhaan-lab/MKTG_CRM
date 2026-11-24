@@ -51,11 +51,11 @@ async function axe(page, name) {
   ]
   for (const [label, opts, locale] of runs) {
     const p = await open(opts, locale)
-    for (const path of ['/spaces/content?view=list', '/spaces/design?view=board', '/spaces/content?view=calendar', `/brands/${brand}`, '/me']) {
+    for (const path of ['/spaces/content?view=board', '/spaces/design?view=board', '/spaces/content?view=calendar', `/brands/${brand}`, '/me']) {
       await go(p, path); await axe(p, `${path} (${label})`)
     }
     if (label !== 'phone') {
-      await go(p, '/spaces/design?view=list'); await p.click('[data-space-settings-open]'); await p.click('[data-space-settings-tab="flow"]'); await p.click('[data-space-stages-open]'); await p.waitForSelector('[data-space-stages]')
+      await go(p, '/spaces/design?view=board'); await p.click('[data-space-settings-open]'); await p.click('[data-space-settings-tab="flow"]'); await p.click('[data-space-stages-open]'); await p.waitForSelector('[data-space-stages]')
       await axe(p, `Space stages panel (${label})`)
       await go(p, '/spaces/content?view=calendar'); await p.click(`[data-cal-link="${day}"]`); await p.waitForSelector('[data-media-pick]')
       await axe(p, `Link task list (${label})`)

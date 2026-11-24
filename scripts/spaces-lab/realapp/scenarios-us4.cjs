@@ -18,8 +18,8 @@ module.exports = (EMAIL, psql, ok) => {
     psql(`update workspace_settings set brand_feature_defaults='{}'`)
   }
   const openPanel = async (page, go, brand) => {
-    await go(`/brands/${brandId(brand)}`)
-    await page.click('[data-brand-features-open]')
+    // Spec 025: a brand's switches are in its Settings section.
+    await go(`/brands/${brandId(brand)}/settings`)
     await page.waitForSelector('[data-brand-features] [data-feature-switch]')
   }
   const featuresOf = brand => psql(`select features::text from brands where name='${brand}'`)
@@ -48,7 +48,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(1200)
           ok(psql(`select platform from tasks where id='${a}'`) === 'LinkedIn', "a hidden field can't be typed into, and its value is kept")
 
-          await go(`/spaces/design?view=list&task=${a}`)
+          await go(`/spaces/design?view=board&task=${a}`)
           await page.waitForSelector('text=Time estimate', { timeout: 30000 })
           ok(!(await page.locator('text=/^Platform$/').count()), 'the task panel has no Platform field')
 
@@ -121,7 +121,7 @@ module.exports = (EMAIL, psql, ok) => {
       id: 'us4-users-see-no-switches', as: 'design',
       async run({ page, go }) {
         await go(`/brands/${brandId(A)}`)
-        ok(!(await page.$('[data-brand-features-open]')), "a user can't change a brand's features")
+        ok(!(await page.$('[data-brand-section="settings"]')), "a user can't change a brand's features")
       },
     },
   ]

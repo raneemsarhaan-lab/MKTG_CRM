@@ -20,7 +20,7 @@ const lead = (m: Who) => m.access === 'admin' || m.access === 'superuser'
 async function mayUseNode(node: string, m: Who): Promise<boolean> {
   if (!validNode(node)) return false
   if (!node.startsWith('space:') || lead(m)) return true
-  return !!(await prisma.teamSpaceMember.findFirst({ where: { space_id: node.slice(6), member_id: m.id } }))
+  return !!(await prisma.teamSpaceMember.findFirst({ where: { space_id: node.slice(6, 42), member_id: m.id } }))
 }
 const mayChange = (v: { owner_id: string | null; created_by: string | null }, m: Who) =>
   v.owner_id ? v.owner_id === m.id : v.created_by === m.id || lead(m)

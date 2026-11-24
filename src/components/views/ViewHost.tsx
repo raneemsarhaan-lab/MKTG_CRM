@@ -61,11 +61,15 @@ interface ViewHostProps {
   defaultTab?: string
   /** This member's tab choices for this page, sent with the page so it opens on the right view at once. */
   initialPrefs?: TabPrefs
+  /** Spec 025: the page's sections (a brand's Brand · Assets · Settings), above the view tabs. */
+  sections?: React.ReactNode
+  /** Spec 025: a section with no views of its own (Assets, Settings): no view tabs. */
+  noViews?: boolean
 }
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false }: ViewHostProps) {
   const t = useTranslations('views')
   const params = useSearchParams()
   const [views, setViews] = useState<SavedView[]>([])
@@ -174,8 +178,9 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
           </h1>
           {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>{actions}</div>}
         </div>
-        {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary }}>{sub}</div>}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+        {sections}
+        {sub && <div data-sub style={{ fontSize: 12.5, color: PIPE.textSecondary, paddingBottom: noViews ? 12 : 0 }}>{sub}</div>}
+        <div hidden={noViews} style={{ display: noViews ? 'none' : 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
           {/* A toolbar of view buttons (each with its ⋯ menu), so the menus sit beside them legitimately. */}
           <div role="toolbar" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
             {arranged.shown.map(x => (

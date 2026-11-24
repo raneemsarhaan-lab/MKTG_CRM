@@ -16,7 +16,8 @@
 import type { StageId } from '@/types/index'
 import { ALL_STAGES } from '@/lib/stage-meta'
 
-export type SpaceView = 'list' | 'board' | 'sheet' | 'calendar' | 'workload'
+/** Spec 025: a Space page's views. */
+export type SpaceView = 'board' | 'sheet' | 'calendar'
 export type SpaceCreators = 'everyone' | 'members' | 'leads'
 export type SpaceVisibility = 'members' | 'everyone'
 export type HandoffAsk = 'ask' | 'default'
@@ -94,7 +95,7 @@ export function defaultSettings(key: string): SpaceSettings {
         { name_ar: 'الفيديو', icon: '🎬', new_label: { en: 'New clip', ar: 'مقطع جديد' }, allowed_types: ['Video', 'Reel'], default_type: 'Reel', child_rows: true, views: { default: 'sheet', sort: 'due', group: 'none', columns: [] } })
     case 'planning':
       return base({ start: 'todo', handoff: null, handoff_to: [], return: null, end: 'publish' },
-        { name_ar: 'التخطيط', icon: '🗂️', views: { default: 'list', sort: 'due', group: 'none', columns: [] } })
+        { name_ar: 'التخطيط', icon: '🗂️' })
     default:
       return base({ start: 'todo', handoff: null, handoff_to: [], return: null, end: 'publish' })
   }
@@ -156,7 +157,7 @@ export function resolveSettings(key: string, stored: unknown): SpaceSettings {
     fields,
     section_order: [...order, ...PANEL_SECTIONS.filter(x => !order.includes(x))],
     views: {
-      default: pick(v.default, ['list', 'board', 'sheet', 'calendar', 'workload'] as const, d.views.default),
+      default: pick(v.default, ['board', 'sheet', 'calendar'] as const, d.views.default),
       sort: pick(v.sort, ['due', 'publish', 'priority', 'name', 'created', 'updated'] as const, d.views.sort),
       group: pick(v.group, ['none', 'stage', 'brand', 'statusGroup'] as const, d.views.group),
       columns: Array.isArray(v.columns) ? strs(v.columns, 80) : d.views.columns,

@@ -74,11 +74,12 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
 
   return (
     <div data-list-view style={{ padding: '14px 26px 30px 38px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {canGroupByBrand && (
+      {/* Spec 025: List lives on the brand page, so the grouping shows there too (without "Brand"). */}
+      {(
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: PIPE.textMuted }}>
           {t('groupBy')}
           <div role="group" aria-label={t('groupBy')} style={{ display: 'inline-flex', border: `1px solid ${PIPE.border}`, borderRadius: 10, overflow: 'hidden' }}>
-            {(['brand', 'stage', 'statusGroup'] as const).map(g => (
+            {(['brand', 'stage', 'statusGroup'] as const).filter(g => g !== 'brand' || canGroupByBrand).map(g => (
               <button key={g} type="button" data-group={g} aria-pressed={group === g} onClick={() => setGroup(g)}
                 style={{ border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, padding: '5px 10px',
                   background: group === g ? PIPE.ink : '#FFFFFF', color: group === g ? '#FFFFFF' : PIPE.ink }}>

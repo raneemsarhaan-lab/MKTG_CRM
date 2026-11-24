@@ -62,4 +62,34 @@ The Library row leaves the sidebar. The request says "Move its contents into Ass
 
 ## Decisions made while building
 
-Recorded here as they are made.
+- **Short brand names** are a field on the brand (`short_name`), set once for the three long names
+  (Forefront, Islam Saadany, TSC) and editable in the brand's Settings section. The full name shows
+  as a tooltip and on the brand's page.
+- **Inbox** in the sidebar opens the notifications page and shows the unread count.
+- **The other pages** (Working Hours, Plan, Task types, Settings) are a row of icons at the bottom of
+  the sidebar, so the tree fits without scrolling. The "Focus. Flow. Finish." card is removed.
+- **My sheets** is no longer in the sidebar; `/sheets` still opens by address. Spec 026 removes the
+  Sheets section for good.
+- **Counts** are worked out the way each page lists tasks: a Space counts its Shows in tasks, on its
+  board or not linked media, inside its range; a brand counts every open task of the brand with linked
+  media seen through its content task.
+- **The arrow** remembers which Spaces are open, per device; the Space in the address is opened.
+- **Space pages** have Board, Sheet and Calendar. List and Workload stay on the brand's Brand
+  section ("any other task views the app has").
+- **Group by brand** groups the cards inside each stage column under their brand's name. The brand
+  filter is a row of brand chips above the views and applies to all three views. Both are remembered
+  per Space, per device.
+- **The view used last** is remembered per member and per page (Space, Space › Brand folder, brand),
+  after a home view the member has set.
+- **The old brand folder addresses**: `/calendar` and `/sheet` lead to the brand's Calendar and Sheet
+  views. The brand's Content and Video sheets are now the Sheet view of Content › Brand and Video › Brand.
+- **Assets**: anyone signed in can add a file or a link and change what they added; admins and
+  superusers can change or delete any. A file's type is guessed from its name and can be changed.
+  Files on the brand's tasks that reached F-Check or later are listed as finished designs, read-only,
+  with their task. With no file storage configured, a file is kept in the database within the same
+  size limit as a task attachment; with storage, up to 25 MB.
+- **Library**: its sidebar row is gone and nothing was deleted. Its content (published work) is
+  covered in Assets by the finished designs; the page itself still opens at `/brands/<id>/library`.
+  Removing that page waits for the user's confirmation.
+- **Brand Settings** also holds the short name. The brand's default priority comes after a Space's
+  default priority and before the task type's.

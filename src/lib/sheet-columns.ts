@@ -81,6 +81,8 @@ export const SHEET_SETS: Record<'content' | 'video', string[]> = { content: ['al
 export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'title', width: 300, en: 'Task' },
   { key: 'brand', width: 170, en: 'Brand' },
+  // Spec 025: the Spaces a task shows in — on a brand's sheet only.
+  { key: 'space', width: 150, en: 'Space' },
   { key: 'status', width: 150, en: 'Status' },
   // Spec 022 (R19): Link task — this task's Design and Video tasks.
   { key: 'media', width: 340, en: 'Link task' },
