@@ -122,3 +122,37 @@ export async function convertSheets(db: Db): Promise<{ backfilled: number; expor
   }
   return { backfilled, exported: rows, videos, clips, themes }
 }
+
+/**
+ * User, 24 Nov 2026: the Sheets section is gone, and the folders of blank sheets people made there
+ * (kind 'team') go with it. Each sheet that holds anything is first kept as a CSV among the kept
+ * exports (Settings › Diagnostics). Blank tabs beside a Space's, a brand's or My tasks' sheet stay.
+ */
+export async function removeTeamSheets(db: Db): Promise<{ folders: number; sheets: number; exported: number }> {
+  const folders = await db.sheetFolder.findMany({ where: { kind: 'team' }, select: { id: true, name: true, sheets: { orderBy: { position: 'asc' }, select: { id: true, name: true } } } })
+  let sheets = 0, exported = 0
+  for (const f of folders) {
+    for (const sh of f.sheets) {
+      sheets++
+      const [rows, cols, cells] = await Promise.all([
+        db.sheetRow.findMany({ where: { sheet_id: sh.id }, orderBy: { position: 'asc' }, select: { id: true } }),
+        db.sheetCol.findMany({ where: { sheet_id: sh.id }, orderBy: { position: 'asc' }, select: { id: true } }),
+        db.sheetCell.findMany({ where: { sheet_id: sh.id }, select: { row_id: true, col_id: true, value: true } }),
+      ])
+      const filled = cells.filter(c => c.value !== '')
+      if (!filled.length) continue
+      const at = new Map(filled.map(c => [`${c.row_id}|${c.col_id}`, c.value]))
+      // Up to the last row and column that hold something.
+      const lastRow = rows.reduce((m, r, i) => (cols.some(c => at.has(`${r.id}|${c.id}`)) ? i : m), -1)
+      const lastCol = cols.reduce((m, c, i) => (rows.some(r => at.has(`${r.id}|${c.id}`)) ? i : m), -1)
+      const lines = rows.slice(0, lastRow + 1).map(r => cols.slice(0, lastCol + 1).map(c => csvCell(at.get(`${r.id}|${c.id}`) ?? '')).join(','))
+      const name = `sheet-${sh.id}.csv`
+      const title = `${f.name ?? 'Folder'} › ${sh.name ?? 'Sheet'} (a blank sheet from the old Sheets section)`
+      const content = lines.join('\r\n') + '\r\n'
+      await db.dataExport.upsert({ where: { name }, create: { name, title, content, rows: lines.length }, update: { title, content, rows: lines.length } })
+      exported++
+    }
+  }
+  if (folders.length) await db.sheetFolder.deleteMany({ where: { id: { in: folders.map(f => f.id) } } })
+  return { folders: folders.length, sheets, exported }
+}

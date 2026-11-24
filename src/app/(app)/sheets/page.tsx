@@ -1,17 +1,8 @@
 import { redirect } from 'next/navigation'
-import { getSessionMember } from '@/lib/authz'
-import { listFolders } from '@/actions/sheets'
-import { SheetsHomePage } from '@/components/sheets/pages'
 
 export const dynamic = 'force-dynamic'
 
-/** The Sheets home (spec 013 US8): linked folders, then the team's. */
-export default async function SheetsPage() {
-  const member = await getSessionMember()
-  if (!member) redirect('/login')
-  const res = await listFolders()
-  if (!res.success) redirect('/board')
-  // Spec 026 (§1): there is no Sheets section. Only folders of blank sheets made here before still open here.
-  if (!res.folders.some(f => f.kind === 'team')) redirect('/spaces/content?view=sheet')
-  return <SheetsHomePage folders={res.folders} pins={res.pins} now={new Date().toISOString()} />
+/** Spec 026 (§1): there is no Sheets section. Its old address leads to the Content Space's sheet. */
+export default function SheetsPage() {
+  redirect('/spaces/content?view=sheet')
 }

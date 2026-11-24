@@ -2,8 +2,8 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * Spec 026 (§1): where a workbook lives now that there is no Sheets section — the Sheet view of its
- * Space, its brand's page or My tasks. Null for a folder of blank sheets made in the old Sheets
- * section (kind 'team'), which has no page of its own and still opens at `/sheets/<id>`.
+ * Space, its brand's page or My tasks. Null for a folder that has none (the folders of blank sheets
+ * made in the old Sheets section were removed).
  */
 export async function folderHome(folderId: string): Promise<string | null> {
   const f = await prisma.sheetFolder.findUnique({ where: { id: folderId }, select: { kind: true, brand_id: true, linked_key: true } })

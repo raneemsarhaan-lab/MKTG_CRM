@@ -159,6 +159,13 @@ module.exports = (EMAIL, psql, ok) => {
           ok(true, 'and the brand\'s own folder has them')
           // The Sheets section is gone from the sidebar.
           ok(!(await page.$('[data-nav-tree] a[href="/sheets"]')) && !(await page.$('aside a[href="/sheets"]')), 'no Sheets entry in the sidebar')
+          // Its old addresses lead to the page that owns the sheet.
+          await go('/sheets')
+          await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
+          ok(page.url().includes('/spaces/content'), `the old Sheets address leads to the Content Space: ${page.url()}`)
+          await go(`/sheets/${psql(`select id from sheet_folders where kind='video'`)}`)
+          await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })
+          ok(page.url().includes('/spaces/video'), `an old folder address leads to its Space: ${page.url()}`)
           // The Video Space's sheet: videos are rows.
           await go('/spaces/video?view=sheet')
           await page.waitForSelector('.fx-board-page.is-sheet', { timeout: 60000 })

@@ -24,7 +24,7 @@ Also checked: Paste plan makes plain rows and no tasks (`026-paste-plan-makes-pl
 |---|---|
 | §1 One sheet as the Sheet view of every Space and Space › Brand folder | Built |
 | §1 The Brand page's Sheet view shows the brand's rows from every Space | Built, one Space at a time: a strip of every Space with the brand's row count opens that Space's sheet for the brand (plain rows included), on the same page; "All tasks" lists the brand's tasks from every Space together. The Spaces aren't merged into one grid, because each Space's sheet has its own columns, formatting and comments (`026-brand-page-sheet-shows-rows-of-every-space`) |
-| §1 No Sheets section in the sidebar | Built. An old Sheets address (`/sheets/<folder>`, and the link in a sheet-comment notification) now leads to the page that owns the sheet: the Space's Sheet view, the brand's page or My tasks, on the same tab and cell. Only a folder of blank sheets made in the old Sheets section still opens at `/sheets/<id>`; `/sheets` itself lists those, or leads to the Content Space when there are none |
+| §1 No Sheets section in the sidebar | Built. An old Sheets address (`/sheets`, `/sheets/<folder>`, and the link in a sheet-comment notification) leads to the page that owns the sheet: the Space's Sheet view, the brand's page or My tasks, on the same tab and cell. The folders of blank sheets people made in the old Sheets section are removed (user, 24 Nov); whatever a sheet held is kept first as a CSV in Settings › Diagnostics › Kept exports |
 | §2 Themes, pillars, rows, child rows, "+ Row" | Built (sheet 2b), now per Space |
 | §3 Plain rows; a stage as a label | Built |
 | §4 Make task to a chosen Space, or an existing task; the Task cell; unlink | Built |
@@ -57,10 +57,11 @@ decide which of the sheet's own columns show until someone shows or hides one th
 
 ## To confirm with the user
 
+Answered on 24 Nov: blank sheets of the old Sheets section are removed; Planning's flow is edited in
+its settings when needed. Still open:
+
 - The catch-all themes "Videos · <brand>" created for videos with no project.
 - A Space other than Content and Video starts with an empty sheet: its existing tasks aren't turned
   into rows. They can be added one at a time with Make task › an existing task.
-- Blank sheets made in the old Sheets section (team folders) have no page of their own now. They
-  still open by address. Should they move under a Space, or go?
 - The local lab database had leftover test tasks, which were deleted before the final run. No
   real data was involved.

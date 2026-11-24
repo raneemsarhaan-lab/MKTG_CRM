@@ -530,6 +530,14 @@ async function main() {
     return `${r.backfilled} rows and themes placed, ${r.exported} clip details exported, ${r.videos} videos and ${r.clips} clips as rows, ${r.themes} themes`
   })
 
+  // User, 24 Nov 2026: the folders of blank sheets made in the old Sheets section are removed; what
+  // their sheets held is kept as CSV exports first.
+  await once('team-sheets-removed-v1', 'removed the blank sheets of the old Sheets section', async () => {
+    const { removeTeamSheets } = await import('../src/lib/sheet-convert')
+    const r = await removeTeamSheets(prisma)
+    return `${r.folders} folders, ${r.sheets} sheets removed, ${r.exported} kept as exports`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

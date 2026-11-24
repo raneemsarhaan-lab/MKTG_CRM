@@ -97,13 +97,14 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: '015-comment-undo-on-blank-sheet', as: 'admin',
       async run({ page, go }) {
-        const folder = psql(`insert into sheet_folders (id, kind, name) values (gen_random_uuid(), 'team', 'Lab 015 ' || floor(random()*1e6)) returning id`).split(/\n/)[0]
-        const sheet = psql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'Undo', 0, 5, 5) returning id`).split(/\n/)[0]
+        // A blank tab beside the Content Space's sheet (the old Sheets section and its folders are gone).
+        const folder = psql(`select id from sheet_folders where kind='content'`)
+        const sheet = psql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'Lab undo ' || floor(random()*1e6), 90, 5, 5) returning id`).split(/\n/)[0]
         psql(`insert into sheet_rows (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 5) g`)
         psql(`insert into sheet_cols (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 5) g`)
         const live = () => psql(`select count(*) from sheet_comments where sheet_id='${sheet}' and deleted_at is null`)
         try {
-          await go(`/sheets/${folder}?sheet=${sheet}`)
+          await go(`/spaces/content?view=sheet&tab=${sheet}`)
           const first = page.locator(`[data-blank-sheet="${sheet}"] .fx-sheet-tr[data-row]`).nth(0).locator('.fx-sheet-td').nth(1)
           await first.waitFor({ timeout: 60000 })
           await first.click()
@@ -122,15 +123,16 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(2500)
           ok(live() === '1', 'Ctrl+Y brings it back')
         } finally {
-          psql(`delete from sheet_folders where id='${folder}'`)
+          psql(`delete from sheets where id='${sheet}'`)
         }
       },
     },
     {
       id: '015-merge-shrinks-when-edge-row-deleted', as: 'admin',
       async run({ page, go }) {
-        const folder = psql(`insert into sheet_folders (id, kind, name) values (gen_random_uuid(), 'team', 'Lab 015 merge ' || floor(random()*1e6)) returning id`).split(/\n/)[0]
-        const sheet = psql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'Merge', 0, 6, 4) returning id`).split(/\n/)[0]
+        // A blank tab beside the Content Space's sheet (the old Sheets section and its folders are gone).
+        const folder = psql(`select id from sheet_folders where kind='content'`)
+        const sheet = psql(`insert into sheets (id, folder_id, kind, name, position, row_count, col_count) values (gen_random_uuid(), '${folder}', 'blank', 'Lab merge ' || floor(random()*1e6), 91, 6, 4) returning id`).split(/\n/)[0]
         psql(`insert into sheet_rows (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 6) g`)
         psql(`insert into sheet_cols (id, sheet_id, position) select gen_random_uuid(), '${sheet}', g from generate_series(1, 4) g`)
         const row = n => psql(`select id from sheet_rows where sheet_id='${sheet}' and position=${n}`)
@@ -138,7 +140,7 @@ module.exports = (EMAIL, psql, ok) => {
         // A1:B3 merged.
         psql(`insert into sheet_merges (id, sheet_id, top_row, bottom_row, left_col, right_col) values (gen_random_uuid(), '${sheet}', '${row(1)}', '${row(3)}', '${col(1)}', '${col(2)}')`)
         try {
-          await go(`/sheets/${folder}?sheet=${sheet}`)
+          await go(`/spaces/content?view=sheet&tab=${sheet}`)
           const first = page.locator(`[data-blank-sheet="${sheet}"] .fx-sheet-tr[data-row]`).nth(0).locator('.fx-sheet-td').nth(1)
           await first.waitFor({ timeout: 60000 })
           await first.click({ button: 'right' })
@@ -149,7 +151,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select count(*) from sheet_merges where sheet_id='${sheet}'`) === '1', 'one merge')
           ok(psql(`select count(*) from sheet_rows r join sheet_merges g on g.top_row=r.id where g.sheet_id='${sheet}'`) === '1', 'its top is a live row')
         } finally {
-          psql(`delete from sheet_folders where id='${folder}'`)
+          psql(`delete from sheets where id='${sheet}'`)
         }
       },
     },

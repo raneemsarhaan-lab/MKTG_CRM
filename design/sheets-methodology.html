@@ -248,7 +248,7 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
           <tr><td>Video sheet</td><td>The Video Space's sheet. Each video became a linked row, its clips linked child rows. A video with no project sits under "Videos · brand".</td></tr>
           <tr><td>Clip detail columns</td><td>Removed (#, Source, File name, In, Out, Length, File). Their values were exported first to <code>clip-details.csv</code>, kept in Settings › Diagnostics.</td></tr>
           <tr><td>Bulk linking</td><td>Removed. Rows are linked one at a time with Make task.</td></tr>
-          <tr><td>Sheets section</td><td>Removed from the sidebar. Old addresses lead to the page that owns the sheet.</td></tr>
+          <tr><td>Sheets section</td><td>Removed. Old addresses lead to the page that owns the sheet. Folders of blank sheets made there are removed; what they held is kept as CSV files in Settings › Diagnostics.</td></tr>
           <tr><td>Design, Planning and new Spaces</td><td>Each has its own sheet, empty until rows are added.</td></tr>
         </tbody>
       </table></div>
@@ -258,12 +258,10 @@ td:first-child { font-weight: 700; color: var(--ink); white-space: nowrap }
       <h2>12 · Open points</h2>
       <p>Decisions still needed:</p>
       <div class="gap"><b>A brand's rows in one grid.</b> The brand page shows one Space's sheet at a time, because each Space's sheet has its own columns, formatting and comments. One merged grid would need shared columns across Spaces.</div>
-      <div class="gap"><b>Blank sheets from the old Sheets section.</b> Folders of blank sheets made there have no page of their own now. They still open by their address. Move them under a Space, or remove them?</div>
       <div class="gap"><b>"Videos · brand" themes.</b> Created for videos that had no project. Keep them, or move those videos into real projects?</div>
       <div class="gap"><b>Existing tasks of other Spaces.</b> Design and Planning tasks made before the change aren't rows on their Space's sheet. They can be added one at a time with Make task › an existing task.</div>
       <div class="gap"><b>"Waiting for Caption".</b> When a linked row is held at D-Check because a required field is empty, the cards and the sheet show the red "missing" words, but the row doesn't yet say it is waiting.</div>
       <div class="gap"><b>Linked-row permissions.</b> The Status menu offers stages by the row's own holder, while the server checks the linked tasks' holders, so typing a stage can succeed where the menu offered nothing.</div>
-      <div class="gap"><b>Planning's flow.</b> Its start and end stages in Space settings were marked "confirm" and haven't been confirmed.</div>
     </section>
   </main>
 </div>
