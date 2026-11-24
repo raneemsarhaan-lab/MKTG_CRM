@@ -11,7 +11,7 @@
  * - `node`: the page's own workbook (ensureNodeWorkbook): a live Tasks tab
  *   first, then any blank tabs the team adds.
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSearchParams } from 'next/navigation'
 import { Workbook } from '@/components/sheets/Workbook'
@@ -23,8 +23,10 @@ import type { BoardData } from './types'
 
 type Loaded = { folder: FolderSummary; folders: FolderSummary[]; sheets: SheetSummary[] }
 
-export function NodeWorkbook({ data, node, folder, linked }: {
+export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
   data: BoardData
+  /** A Space › Brand folder: tabs tagged with another brand are left out. */
+  brandId?: string | null
   /** 'space:<id>' | 'brand:<id>' | 'me' */
   node?: string
   folder?: 'content' | 'video'
@@ -37,6 +39,9 @@ export function NodeWorkbook({ data, node, folder, linked }: {
   const tab = params.get('tab'), cell = params.get('cell')
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
+  const mine = useMemo(() => (list: SheetSummary[]) => (brandId ? list.filter(s => !s.brandId || s.brandId === brandId) : list), [brandId])
+  // The workbook re-reads its tabs after some changes: the same tabs are left out then.
+  const api = useMemo(() => (brandId ? { ...sheetsApi, listSheets: async (id: string) => { const r = await sheetsApi.listSheets(id); return r.success ? { ...r, sheets: mine(r.sheets) } : r } } : sheetsApi), [brandId, mine])
 
   useEffect(() => {
     let live = true
@@ -47,7 +52,7 @@ export function NodeWorkbook({ data, node, folder, linked }: {
         const r = await ensureNodeWorkbook(node).catch(() => null)
         if (!live) return
         if (!r?.success) { setFailed(r?.error ?? 'generic'); return }
-        setLoaded({ folder: r.folder, folders: [r.folder, ...folders], sheets: r.sheets })
+        setLoaded({ folder: r.folder, folders: [r.folder, ...folders], sheets: mine(r.sheets) })
       } else if (folder) {
         const f = folders.find(x => x.kind === folder)
         const s = f ? await listSheets(f.id).catch(() => null) : null
@@ -57,14 +62,14 @@ export function NodeWorkbook({ data, node, folder, linked }: {
       }
     })()
     return () => { live = false }
-  }, [node, folder])
+  }, [node, folder, mine])
 
   if (failed) return <p data-node-workbook-error style={{ padding: '18px 38px', color: PIPE.textMuted, fontSize: 13 }}>{t('workbookFailed')}</p>
   if (!loaded) return <p data-node-workbook-loading style={{ padding: '18px 38px', color: PIPE.textMuted, fontSize: 13 }}>{t('workbookLoading')}</p>
   return (
     <div data-node-workbook={node ?? folder} style={{ minWidth: 0 }}>
       <Workbook
-        api={sheetsApi}
+        api={api}
         folder={loaded.folder}
         folders={loaded.folders}
         initialSheets={loaded.sheets}

@@ -379,7 +379,9 @@ async function main() {
         if (t.status === 'publish') {
           await prisma.task.update({ where: { id: t.id }, data: { publish_date: t.stage_date ?? dayDate(due), due_manual: true } })
         } else {
-          await prisma.task.update({ where: { id: t.id }, data: { publish_date: dayDate(due), due_date: dayDate(calcDueDate(due, rule)), due_manual: false } })
+          // Owner's decision, 24 Nov 2026: the old due date stays as it is, marked set by hand; the planned
+          // date is also the publishing date. (The rule would have moved it 7 days earlier.)
+          await prisma.task.update({ where: { id: t.id }, data: { publish_date: dayDate(due), due_manual: true } })
         }
         pieces++
       } else if (due) {
@@ -524,10 +526,14 @@ async function main() {
     return `${r.backfilled} rows and themes placed, ${r.exported} clip details exported, ${r.videos} videos and ${r.clips} clips as rows, ${r.themes} themes`
   })
 
-  // The folders of blank sheets made in the old Sheets section are NOT removed by this release (user,
-  // 25 Nov 2026: no live data is deleted at release; old data stays until its removal is approved).
-  // They are out of the app's pages and stay in the database as they are. `removeTeamSheets` in
-  // src/lib/sheet-convert.ts is the removal (it keeps a CSV of each sheet first), for when it is approved.
+  // The old Sheets section's two folders (owner's decision, 24 Nov 2026): "TSC Calendar" becomes the
+  // workbook of a new Space, Digital Media, tagged with the brand The Strategy Community; "Marketing
+  // Projects" is deleted, a CSV of each sheet kept first. Any other folder of that section stays as it is.
+  await once('old-sheet-folders-v1', 'moved TSC Calendar to the Digital Media Space and deleted Marketing Projects', async () => {
+    const { placeOldSheetFolders } = await import('../src/lib/sheet-convert')
+    const r = await placeOldSheetFolders(prisma)
+    return `${r.moved} sheets moved (${r.tagged} tagged), ${r.deleted} sheets deleted (${r.exported} kept as CSV)`
+  })
 
   // Workspace settings
   await prisma.workspaceSettings.upsert({

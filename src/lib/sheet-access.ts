@@ -5,7 +5,8 @@
  * belong to someone:
  *   - My tasks (`tasks:me:<id>` and the `me:<id>` workbook's blank tabs): only that member;
  *   - a team Space's (`tasks:space:<id>` and the `space:<id>` workbook's tabs):
- *     its members, superusers and admins (as ensureNodeWorkbook decides).
+ *     its members, superusers and admins, and everyone when the Space is set to be seen by everyone
+ *     (as ensureNodeWorkbook decides).
  * Brand workbooks and the linked Content and Video sheets are open to all.
  */
 import { prisma } from '@/lib/prisma'
@@ -19,7 +20,10 @@ async function nodeAllowed(node: string | null | undefined, m: Who): Promise<boo
   if (kind === 'me') return id === m.id
   if (kind === 'space') {
     if (m.access === 'admin' || m.access === 'superuser') return true
-    return !!(await prisma.teamSpaceMember.findFirst({ where: { space_id: id, member_id: m.id }, select: { member_id: true } }))
+    if (await prisma.teamSpaceMember.findFirst({ where: { space_id: id, member_id: m.id }, select: { member_id: true } })) return true
+    // A Space set to "everyone can see it" shares its workbook with everyone too.
+    const space = await prisma.teamSpace.findUnique({ where: { id }, select: { settings: true } })
+    return (space?.settings as { visibility?: string } | null)?.visibility === 'everyone'
   }
   return true
 }

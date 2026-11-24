@@ -124,12 +124,12 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         // Spaces keep the workbooks their sheets always had, so formatting and comments carry over.
         // A saved Sheet view keeps its filters and fields: it is the Space's tasks as a task sheet.
         if (tab === 'sheet' && view) return <>
-          <NodeWorkbook key={view.id} data={data} node={`space:${spaceId}`}
+          <NodeWorkbook key={view.id} data={data} node={`space:${spaceId}`} brandId={brandId}
             linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand} />} />
           <TaskPanel data={data} spaceId={spaceId} />{taskForm}
         </>
         if (tab === 'sheet') return (
-          <NodeWorkbook key={view?.id} data={data} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
+          <NodeWorkbook key={view?.id} data={data} brandId={brandId} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
             linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
               themeScope={themeScope} sheetBrandId={brandId} />} />
         )

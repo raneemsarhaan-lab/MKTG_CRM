@@ -55,10 +55,11 @@ function pattern(p?: string | null): string {
 
 function summary(s: {
   id: string; folder_id: string; kind: string; name: string | null; position: number; tab_color: string | null
-  hidden: boolean; protected_by: string | null; row_count: number; col_count: number; linked_key?: string | null
+  hidden: boolean; protected_by: string | null; row_count: number; col_count: number; linked_key?: string | null; brand_id?: string | null
 }): SheetSummary {
   return {
     ...(s.kind === 'linked_tasks' ? { linkedKey: s.linked_key ?? null } : {}),
+    ...(s.brand_id ? { brandId: s.brand_id } : {}),
     id: s.id, folderId: s.folder_id, kind: s.kind as SheetKind, name: s.name, position: s.position,
     color: (TAB_COLORS as readonly string[]).includes(s.tab_color ?? '') ? (s.tab_color as TabColor) : null,
     hidden: s.hidden, protectedBy: s.protected_by, rowCount: s.row_count, colCount: s.col_count,
@@ -182,10 +183,11 @@ export async function ensureNodeWorkbook(nodeIn: string): Promise<{ success: tru
   if (kind === 'me' && id !== m.id) return fail('not_authorized')
   let name: string | null = null
   if (kind === 'space') {
-    const space = await prisma.teamSpace.findUnique({ where: { id }, select: { name: true } })
+    const space = await prisma.teamSpace.findUnique({ where: { id }, select: { name: true, settings: true } })
     if (!space) return fail('gone')
     const lead = m.access === 'admin' || m.access === 'superuser'
-    if (!lead && !(await prisma.teamSpaceMember.findFirst({ where: { space_id: id, member_id: m.id } }))) return fail('not_authorized')
+    const open = (space.settings as { visibility?: string } | null)?.visibility === 'everyone'
+    if (!lead && !open && !(await prisma.teamSpaceMember.findFirst({ where: { space_id: id, member_id: m.id } }))) return fail('not_authorized')
     name = space.name
   }
   // The folder: a brand's own (it may already hold blank tabs), or the node's.

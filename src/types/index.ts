@@ -652,6 +652,8 @@ export interface SheetSummary {
   colCount: number
   /** Spec 021: a linked_tasks sheet's key ('tasks:<node>'), for comments and formats. */
   linkedKey?: string | null
+  /** A tab tagged with a brand: shown on its Space and in that brand's folder only. */
+  brandId?: string | null
 }
 
 /** A blank sheet as the client holds it (data-model §4). */

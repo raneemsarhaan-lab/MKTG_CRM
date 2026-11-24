@@ -27,15 +27,15 @@ app, so a deleted imported task no longer comes back. That fix is already live a
 
 ## A. The schema change (step 2 above)
 
-Generated with `prisma migrate diff` from `main`'s schema to the branch's: 481 lines of SQL.
+Generated with `prisma migrate diff` from `main`'s schema to the branch's: 487 lines of SQL.
 
 | Kind of change | Count | Risk |
 |---|---|---|
 | New tables | 19 | None: `data_exports`, `team_spaces`, `space_stages`, `task_space_stages`, `team_space_members`, `task_spaces`, `saved_views`, `task_fields`, `task_type_fields`, `task_field_values`, `milestones`, `todos`, `tags`, `task_tags`, `task_assignees`, `task_templates`, `repeat_rules`, `content_themes`, `content_rows` |
-| New columns on existing tables | 41 on `members`, `brands`, `brand_assets`, `content_types`, `tasks`, `workspace_settings`, `sheet_folders` | None: each is nullable or has a default |
+| New columns on existing tables | 42 on `members`, `brands`, `brand_assets`, `content_types`, `tasks`, `workspace_settings`, `sheet_folders`, `sheets` | None: each is nullable or has a default |
 | Changed default | 1: `tasks.priority` default `Medium` → `Normal` | New rows only; existing rows are renamed by a one-time step (B13) |
 | New unique indexes on existing tables | 3: `tasks.recurrence_key`, `tasks(content_task_id, media_board)`, `sheet_folders.brand_id` | None: all on new columns, empty for every existing row |
-| New foreign keys on existing tables | 4 | `sheet_folders.brand_id → brands ON DELETE CASCADE`: deleting a brand would delete that brand's sheet folder. The other three are `SET NULL` |
+| New foreign keys on existing tables | 5 | `sheet_folders.brand_id → brands ON DELETE CASCADE`: deleting a brand would delete that brand's sheet folder. The other four are `SET NULL` (one is `sheets.brand_id`, the brand tag of a sheet tab, added on 24 Nov) |
 | DROP TABLE, DROP COLUMN, TRUNCATE, RENAME, type change, NOT NULL on an existing column | **0** | — |
 
 **Standing risk, now guarded:** `db push --accept-data-loss` drops whatever the schema file doesn't
@@ -58,7 +58,7 @@ checking once more against the copy of production in step 4.
 | 4 | `space-default-roles-v1` | Sets fields on the new Spaces | Adds only |
 | 5 | `content-type-boards-v1` | Fills the new `media_boards` column of task types | Adds only |
 | 6 | `media-tasks-v1` | **Changed on 24 Nov 2026 (your decision): creates nothing and changes nothing.** It reads the content tasks that are in the design half (Ready For Design, D-In Progress, D-Internal Check), not archived, with no linked Design or Video task, and writes the list to a kept export, `needs-linked-task.csv`. The same list is shown live as a red error in Settings › Diagnostics, "Needs a linked task", until each one is linked by hand. Published tasks are never listed | Reads only |
-| 7 | `due-dates-v1` | **Rewrites dates.** For a piece of a theme with a planned date: the planned date becomes the publishing date, and the due date is recalculated (7 days earlier, off Friday/Saturday). Published pieces keep their due date. Every other task's due date is kept and marked "set by hand" | Old due dates are kept in the publishing date and in the snapshot |
+| 7 | `due-dates-v1` | **Changed on 24 Nov 2026 (your decision): no due date changes.** For a piece of a theme with a planned date, the planned date is also written as the publishing date (a new column); the due date stays as it is and is marked "set by hand". Every other task's due date is kept and marked "set by hand" | Adds only |
 | 8 | `space-stages-v1` | Creates Space stage names from the sheets' stage words | Adds only |
 | 9 | `content-follows-media-v1` | Can change a content task's stage to follow its linked tasks. No linked tasks exist after step 6, so **0 changes** | Old stage in the snapshot; confirm 0 in rehearsal |
 | 10 | `task-types-v1` | Fills new columns of task types (icon, colour, Arabic name, order) | Adds only |
@@ -68,7 +68,7 @@ checking once more against the copy of production in step 4.
 | 14 | `clips-to-video-v1` | **Moves every live clip at To Do to Ready For Design on the Video board** (stage, stage date, entry stage, board) | Old stage in the snapshot |
 | 15 | `brand-short-names-v1` | Fills the new `short_name` where empty | Adds only |
 | 16 | `sheet-spaces-v1` | Exports clip details to `clip-details.csv`. **Moves the Video sheet's own columns to the Video Space's sheet** (changes `sheet_columns.sheet`, resets where each is shown; values untouched). Creates sheet rows for videos and clips. Creates a "Videos · brand" project for videos with no project, and **marks videos' projects as themes** | Old column placement and theme flags in the snapshot. The `task_clips` records stay |
-| — | `team-sheets-removed-v1` | **Was a DELETE** of the old Sheets section's folders | **Removed from this release.** Those folders stay in the database, untouched and out of the app's pages |
+| 17 | `old-sheet-folders-v1` (**added on 24 Nov 2026, your decision**) | Found by folder name. **"TSC Calendar"** becomes the workbook of a new Space, Digital Media (open to everyone): the folder's kind and key change, its 8 sheets get the brand tag The Strategy Community; the sheets, cells, formats and comments are untouched. **"Marketing Projects" is DELETED**: its 5 sheets with their rows, columns, cells and formats. Each sheet that holds anything is first kept as a CSV (values only, not formatting) among the kept exports | **A delete, approved by you.** Any other folder of the old Sheets section is left as it is |
 
 Not in the list you gave because they don't exist as rewrites in this release: "status mapping"
 (stages keep their ids) and "assignee → lead" (`task_assignees` is new and starts empty; the lead is
@@ -78,7 +78,7 @@ still `tasks.assignee_id`).
 
 | Where | What | In this release |
 |---|---|---|
-| Seed | `team-sheets-removed-v1` | **Removed** (see above) |
+| Seed | `old-sheet-folders-v1` | **Deletes the folder "Marketing Projects"** (5 sheets, 364 filled cells on the 24 Nov backup), approved by you on 24 Nov. Values kept as CSV first. Runs once |
 | Seed | `media-tasks-v1` | Deletes nothing now (it only writes the list of hand-offs to fix) |
 | Scheduler, daily | `clearSheetOrphans`: deleted formatting and comment threads whose row, column or task is gone (new on this branch) | **Switched off.** It is new, and it doesn't know the rows of the new sheets |
 | Scheduler, daily | Read notifications over 90 days, old reminder and digest keys | Already on `main`; unchanged |
@@ -88,7 +88,8 @@ still `tasks.assignee_id`).
 
 ## D. Changes made to the branch for this review (committed locally, not pushed)
 
-1. The seed no longer deletes the old Sheets section's folders.
+1. The seed no longer deletes every folder of the old Sheets section. By your decision of 24 Nov it
+   deletes one, "Marketing Projects", and moves "TSC Calendar" to a new Space, Digital Media.
 2. The scheduled orphan clean-up no longer runs.
 3. A snapshot of everything the one-time steps rewrite is taken first, inside the database.
 4. The schema guard runs before the schema push.
@@ -99,6 +100,9 @@ still `tasks.assignee_id`).
 7. Deleting a sheet row together with its task now records the same "deleted on purpose" mark that
    `main`'s #122 added to the board's delete, so the ClickUp importer doesn't bring that task back
    at the next deploy.
+8. Due dates are not recalculated at release (your decision of 24 Nov 2026).
+9. A sheet tab can carry a brand tag (`sheets.brand_id`): it shows on its Space and in that brand's
+   folder of the Space. A Space set to be seen by everyone shares its workbook with everyone.
 
 ## E. Dry run (synthetic data, not production)
 

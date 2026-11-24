@@ -128,8 +128,8 @@ export async function convertSheets(db: Db): Promise<{ backfilled: number; expor
  * (kind 'team') go with it. Each sheet that holds anything is first kept as a CSV among the kept
  * exports (Settings › Diagnostics). Blank tabs beside a Space's, a brand's or My tasks' sheet stay.
  */
-export async function removeTeamSheets(db: Db): Promise<{ folders: number; sheets: number; exported: number }> {
-  const folders = await db.sheetFolder.findMany({ where: { kind: 'team' }, select: { id: true, name: true, sheets: { orderBy: { position: 'asc' }, select: { id: true, name: true } } } })
+export async function removeTeamSheets(db: Db, only?: string[]): Promise<{ folders: number; sheets: number; exported: number }> {
+  const folders = await db.sheetFolder.findMany({ where: { kind: 'team', ...(only ? { id: { in: only } } : {}) }, select: { id: true, name: true, sheets: { orderBy: { position: 'asc' }, select: { id: true, name: true } } } })
   let sheets = 0, exported = 0
   for (const f of folders) {
     for (const sh of f.sheets) {
@@ -155,4 +155,49 @@ export async function removeTeamSheets(db: Db): Promise<{ folders: number; sheet
   }
   if (folders.length) await db.sheetFolder.deleteMany({ where: { id: { in: folders.map(f => f.id) } } })
   return { folders: folders.length, sheets, exported }
+}
+
+/**
+ * Release 2026-11-25 (owner's decision, 24 Nov 2026): the two folders of the old Sheets section, which has
+ * no page any more.
+ *   - "TSC Calendar" becomes the workbook of a new team Space, "Digital Media", open to everyone as the
+ *     folder was. Its sheets are tagged with the brand The Strategy Community, so they show on the Space
+ *     and in that brand's folder of it. Nothing inside the sheets changes: the same sheet ids, cells,
+ *     formats and comments.
+ *   - "Marketing Projects" is deleted. Each of its sheets that holds anything is first kept as a CSV among
+ *     the kept exports (Settings › Diagnostics).
+ * A folder with neither name is left as it is. Found by name, so it does nothing where they don't exist.
+ */
+export async function placeOldSheetFolders(db: Db): Promise<{ moved: number; tagged: number; deleted: number; exported: number }> {
+  const norm = (x: string | null) => (x ?? '').trim().toLowerCase()
+  const folders = await db.sheetFolder.findMany({ where: { kind: 'team' }, select: { id: true, name: true } })
+  const calendar = folders.find(f => norm(f.name) === 'tsc calendar')
+  const projects = folders.find(f => norm(f.name) === 'marketing projects')
+  let moved = 0, tagged = 0
+  if (calendar) {
+    const space = await db.teamSpace.findUnique({ where: { key: 'digital-media' } }) ?? await db.teamSpace.create({
+      data: {
+        key: 'digital-media', name: 'Digital Media', color: '#DB2777', is_production: false, default_kind: 'pipeline',
+        sort_order: ((await db.teamSpace.aggregate({ _max: { sort_order: true } }))._max.sort_order ?? -1) + 1,
+        settings: { visibility: 'everyone' },
+      },
+    })
+    const key = `node:space:${space.id}`
+    const own = await db.sheetFolder.findUnique({ where: { linked_key: key }, select: { id: true } })
+    if (own) {
+      // The Space already has a workbook: the sheets join it, after its tabs.
+      const last = (await db.sheet.aggregate({ where: { folder_id: own.id }, _max: { position: true } }))._max.position ?? -1
+      const sheets = await db.sheet.findMany({ where: { folder_id: calendar.id }, orderBy: { position: 'asc' }, select: { id: true } })
+      for (const [i, sh] of sheets.entries()) await db.sheet.update({ where: { id: sh.id }, data: { folder_id: own.id, position: last + 1 + i } })
+      await db.sheetFolder.delete({ where: { id: calendar.id } })
+      moved = sheets.length
+    } else {
+      await db.sheetFolder.update({ where: { id: calendar.id }, data: { kind: 'node', linked_key: key } })
+      moved = await db.sheet.count({ where: { folder_id: calendar.id } })
+    }
+    const brand = await db.brand.findFirst({ where: { name: { equals: 'The Strategy Community', mode: 'insensitive' } }, select: { id: true } })
+    if (brand) tagged = (await db.sheet.updateMany({ where: { folder_id: own?.id ?? calendar.id, kind: 'blank', brand_id: null }, data: { brand_id: brand.id } })).count
+  }
+  const gone = projects ? await removeTeamSheets(db, [projects.id]) : { folders: 0, sheets: 0, exported: 0 }
+  return { moved, tagged, deleted: gone.sheets, exported: gone.exported }
 }

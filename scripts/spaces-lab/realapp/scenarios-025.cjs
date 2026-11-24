@@ -209,5 +209,33 @@ module.exports = (EMAIL, psql, ok) => {
         ok((await go(`/brands/${b1[0]}/settings`)).status() === 404, 'and its address is a 404')
       },
     },
+    {
+      // Release 2026-11-25: a tab tagged with a brand shows on its Space and in that brand's folder, not in the others.
+      id: '025-tab-tagged-with-a-brand', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const [b1, b2] = brands()
+        const sp = space('planning')
+        // The Space's own workbook (made on first open).
+        await go('/spaces/planning?view=sheet')
+        await page.waitForSelector('[data-node-workbook] [data-sheet-tabs]', { timeout: 60000 })
+        const folder = psql(`select id from sheet_folders where linked_key='node:space:${sp}'`)
+        ok(!!folder, 'the Space has a workbook')
+        const tagged = first(`insert into sheets (id, folder_id, kind, name, position, brand_id) values (gen_random_uuid(), '${folder}', 'blank', 'Lab tagged ${n}', 90, '${b1[0]}') returning id`)
+        const open = first(`insert into sheets (id, folder_id, kind, name, position) values (gen_random_uuid(), '${folder}', 'blank', 'Lab open ${n}', 91) returning id`)
+        try {
+          const tabs = async path => {
+            await go(path)
+            await page.waitForSelector(`[data-sheet-tab="${open}"]`, { timeout: 60000 })
+            return !!(await page.$(`[data-sheet-tab="${tagged}"]`))
+          }
+          ok(await tabs('/spaces/planning?view=sheet'), 'the Space shows the tagged tab')
+          ok(await tabs(`/spaces/planning/${b1[0]}?view=sheet`), "its brand's folder shows it")
+          ok(!(await tabs(`/spaces/planning/${b2[0]}?view=sheet`)), "another brand's folder leaves it out, and still shows the untagged tab")
+        } finally {
+          psql(`delete from sheets where id in ('${tagged}','${open}')`)
+        }
+      },
+    },
   ]
 }
