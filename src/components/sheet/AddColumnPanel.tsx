@@ -8,7 +8,9 @@
  *   2. Standard · already on every task — Show.
  *   3. Custom · on in <Space> — Show.
  *   4. Custom · off in <Space> — "Turn on in <Space>" (with where it is on).
- *   5. + New field: name, kind, where it lives (on the task, turned on in Spaces; or this sheet only).
+ *   5. + New field (25 Nov 2026, minimal text): ← and the name typed into the header; the kind as a
+ *      4-column grid of tiles (symbol and one word); "On the task | This sheet only" with one hint line,
+ *      the Spaces as chips with their colour dot (this Space always on); one full-width Add column.
  */
 import { useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -20,6 +22,10 @@ export interface AddItem { key: string; name: string; kind: CatalogKind | null; 
 export interface NewFieldInput { name: string; kind: FieldKind; place: 'task' | 'sheet'; spaceIds: string[]; choices: string[] }
 
 const KINDS: FieldKind[] = ['text', 'number', 'money', 'date', 'link', 'person', 'choice', 'multi', 'checkbox', 'rating', 'task']
+/** One word per kind tile. */
+const TILE: Record<FieldKind, 'text' | 'number' | 'money' | 'date' | 'link' | 'person' | 'choice' | 'multi' | 'check' | 'rating' | 'task'> = {
+  text: 'text', number: 'number', money: 'money', date: 'date', link: 'link', person: 'person', choice: 'choice', multi: 'multi', checkbox: 'check', rating: 'rating', task: 'task',
+}
 /** The kinds a sheet-only column can be. */
 const SHEET_KINDS: Partial<Record<FieldKind, ColumnKind>> = { text: 'text', number: 'number', date: 'date', link: 'link', person: 'person', choice: 'choice', checkbox: 'checkbox', task: 'task' }
 export const sheetKindOf = (k: FieldKind): ColumnKind | null => SHEET_KINDS[k] ?? null
@@ -37,7 +43,7 @@ export function AddColumnPanel(p: {
   customOn: AddItem[]
   customOff: AddItem[]
   /** Spaces a new custom field can be turned on in. */
-  spaces: { id: string; name: string }[]
+  spaces: { id: string; name: string; color?: string }[]
   onShow(key: string): void
   onTurnOn(key: string): void
   onCreate(input: NewFieldInput): Promise<string | null>
@@ -69,9 +75,10 @@ export function AddColumnPanel(p: {
   async function create() {
     if (!name.trim()) { setError(t('nameEmpty')); return }
     if (!kindOk) { setError(t('kindSheetOnly')); return }
-    if (place === 'task' && !on.length) { setError(t('pickSpace')); return }
+    if (place === 'task' && !on.length && !p.space) { setError(t('pickSpace')); return }
     setBusy(true); setError(null)
-    const err = await p.onCreate({ name: name.trim(), kind, place, spaceIds: on, choices: choices.split(',').map(x => x.trim()).filter(Boolean) })
+    const spaceIds = p.space ? [...new Set([p.space.id, ...on])] : on
+    const err = await p.onCreate({ name: name.trim(), kind, place, spaceIds, choices: choices.split(',').map(x => x.trim()).filter(Boolean) })
     setBusy(false)
     if (err) setError(err); else p.onClose()
   }
@@ -112,58 +119,50 @@ export function AddColumnPanel(p: {
         ) : (
           <div className="fx-ac-form" data-new-field="">
             <div className="fx-ac-formhead">
-              <button type="button" className="fx-ac-back" aria-label={t('back')} onClick={() => setView('list')}>←</button>
-              <h2 className="fx-ac-h">{t('newTitle')}</h2>
+              <button type="button" className="fx-ac-back" aria-label={t('back')} onClick={() => setView('list')}><span aria-hidden="true">←</span></button>
+              <input type="text" className="fx-ac-title" value={name} maxLength={60} placeholder={t('fieldName')} aria-label={t('fieldName')}
+                     onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void create() } }}
+                     data-new-name="" data-autofocus="" />
             </div>
-            <label className="fx-ac-label">{t('name')}
-              <input type="text" className="fx-ac-input" value={name} maxLength={60} onChange={e => setName(e.target.value)} data-new-name="" data-autofocus="" />
-            </label>
-            <div className="fx-ac-group" role="group" aria-label={t('kind')}>
-              <span className="fx-ac-label">{t('kind')}</span>
-              <div className="fx-ac-chips">
-                {KINDS.map(k => (
-                  <button key={k} type="button" className="fx-ac-chip" aria-pressed={kind === k} data-new-kind={k}
-                          disabled={sheetOnly && !sheetKindOf(k)} onClick={() => setKind(k)}>{tk(k)}</button>
-                ))}
-              </div>
+            <div className="fx-ac-tiles" role="radiogroup" aria-label={t('kind')}>
+              {KINDS.map(k => (
+                <button key={k} type="button" role="radio" className="fx-ac-tile" aria-checked={kind === k} data-new-kind={k}
+                        disabled={sheetOnly && !sheetKindOf(k)} onClick={() => setKind(k)}>
+                  <span className="fx-ac-tile-sym" aria-hidden="true">{KIND_GLYPH[k]}</span>
+                  <span className="fx-ac-tile-word">{t(`tile.${TILE[k]}`)}</span>
+                </button>
+              ))}
             </div>
             {(kind === 'choice' || kind === 'multi') && (
-              <label className="fx-ac-label">{t('choices')}
-                <input type="text" className="fx-ac-input" value={choices} onChange={e => setChoices(e.target.value)} placeholder={t('choicesHint')} data-new-choices="" />
-              </label>
+              <input type="text" className="fx-ac-input" value={choices} onChange={e => setChoices(e.target.value)} placeholder={t('choicesHint')} aria-label={t('choices')} data-new-choices="" />
             )}
-            <div className="fx-ac-group" role="group" aria-label={t('where')}>
-              <span className="fx-ac-label">{t('where')}</span>
-              <div className="fx-ac-places">
-                <button type="button" className="fx-ac-place" aria-pressed={place === 'task'} data-new-place="task" disabled={!p.spaces.length}
-                        onClick={() => { setPlace('task') }}>
-                  <span className="fx-ac-pt">{t('onTask')}</span><span className="fx-ac-pd">{t('onTaskHint')}</span>
-                </button>
-                <button type="button" className="fx-ac-place" aria-pressed={place === 'sheet'} data-new-place="sheet"
-                        onClick={() => { setPlace('sheet'); if (!sheetKindOf(kind)) setKind('text') }}>
-                  <span className="fx-ac-pt">{t('sheetOnly')}</span><span className="fx-ac-pd">{t('sheetOnlyHint')}</span>
-                </button>
+            <div className="fx-ac-where">
+              <div className="fx-ac-seg" role="radiogroup" aria-label={t('where')}>
+                <button type="button" role="radio" className="fx-ac-seg-b" aria-checked={place === 'task'} data-new-place="task" disabled={!p.spaces.length}
+                        onClick={() => setPlace('task')}>{t('onTask')}</button>
+                <button type="button" role="radio" className="fx-ac-seg-b" aria-checked={place === 'sheet'} data-new-place="sheet"
+                        onClick={() => { setPlace('sheet'); if (!sheetKindOf(kind)) setKind('text') }}>{t('sheetOnly')}</button>
               </div>
-            </div>
-            {place === 'task' && (
-              <div className="fx-ac-group" role="group" aria-label={t('turnOnIn')}>
-                <span className="fx-ac-label">{t('turnOnIn')}</span>
-                <div className="fx-ac-chips">
-                  {p.spaces.map(s => (
-                    <button key={s.id} type="button" className="fx-ac-chip" aria-pressed={on.includes(s.id)} data-new-space={s.id}
-                            onClick={() => setOn(o => (o.includes(s.id) ? o.filter(x => x !== s.id) : [...o, s.id]))}>
-                      {s.id === p.space?.id ? t('thisSpace', { space: s.name }) : s.name}
-                    </button>
-                  ))}
+              {place === 'task' ? (
+                <div className="fx-ac-onin">
+                  <span className="fx-ac-hint">{t('onTaskLine')}</span>
+                  <div className="fx-ac-chips" role="group" aria-label={t('turnOnIn')}>
+                    {p.spaces.map(sp => {
+                      const here = sp.id === p.space?.id
+                      return (
+                        <button key={sp.id} type="button" className="fx-ac-chip" aria-pressed={here || on.includes(sp.id)} data-new-space={sp.id}
+                                disabled={here} title={here ? t('alwaysHere') : undefined}
+                                onClick={() => setOn(o => (o.includes(sp.id) ? o.filter(x => x !== sp.id) : [...o, sp.id]))}>
+                          <i className="fx-ac-dot" style={{ background: sp.color || '#8A8D91' }} aria-hidden="true" />{sp.name}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-                <span className="fx-ac-sec-note">{t('turnOnNote')}</span>
-              </div>
-            )}
-            {error && <p className="fx-ac-error" role="alert">{error}</p>}
-            <div className="fx-ac-actions">
-              <button type="button" className="fx-ac-cancel" onClick={() => setView('list')}>{t('cancel')}</button>
-              <button type="button" className="fx-ac-add" data-new-add="" disabled={busy} onClick={() => void create()}>{busy ? t('adding') : t('add')}</button>
+              ) : <span className="fx-ac-hint">{t('sheetOnlyLine')}</span>}
             </div>
+            {error && <p className="fx-ac-error" role="alert">{error}</p>}
+            <button type="button" className="fx-ac-add" data-new-add="" disabled={busy} onClick={() => void create()}>{busy ? t('adding') : t('add')}</button>
           </div>
         )}
       </div>

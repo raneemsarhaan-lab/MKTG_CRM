@@ -172,7 +172,8 @@ export function FieldIcon({ field }: { field: TaskField | 'taskcol' | 'regular' 
   if (field === 'stage') {
     return <span className="fx-fd-ic" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5 1a4 4 0 0 1 0 8z" fill="currentColor" /></svg></span>
   }
-  const ch = field === 'taskcol' ? '✓' : field === 'task' ? '↗' : field === 'regular' ? 'A' : field === 'assignee' || field === 'owner' ? '◉' : field === 'due' ? '▦' : field === 'priority' ? '⚑' : field === 'type' ? '▣' : field === 'theme' ? '◆' : field === 'pillar' ? '◇' : field === 'platform' ? '◎' : field === 'title' ? 'T' : field.startsWith('link:') ? '↗' : '✎'
+  // The kind symbols of the New field tiles (user, 25 Nov 2026): Aa text, @ person, 31 date, ◉ choice, ↗ link, ⇢ task.
+  const ch = field === 'taskcol' ? '⇢' : field === 'task' ? '⇢' : field === 'regular' ? 'Aa' : field === 'assignee' || field === 'owner' ? '@' : field === 'due' ? '31' : field === 'priority' ? '◉' : field === 'type' ? '▣' : field === 'theme' ? '◉' : field === 'pillar' ? '◉' : field === 'platform' ? '◉' : field === 'title' ? 'Aa' : field.startsWith('link:') ? '↗' : 'Aa'
   // The glyph is drawn by CSS, so it isn't part of the heading's text (copy, find, a column's name).
   return <span className={`fx-fd-ic${field === 'regular' ? ' is-reg' : ''}`} data-ic={ch} aria-hidden="true" />
 }

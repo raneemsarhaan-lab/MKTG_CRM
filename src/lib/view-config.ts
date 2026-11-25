@@ -8,8 +8,18 @@ import { NINE_STAGE } from '@/lib/stage-meta'
 import { statusGroupOf } from '@/lib/status-groups'
 
 export type ViewFilterKey = 'brand' | 'assignee' | 'type' | 'campaign' | 'statusGroup' | 'tag'
-export type ViewGroup = 'stage' | 'brand' | 'statusGroup'
-export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage'
+/**
+ * Fields (25 Nov 2026, §5): a view also filters, sorts and groups by a field — a custom field from the
+ * library (`f:<id>`) or one of the built-in custom fields below. The view keeps working on the stored
+ * values even after a Space turns the field off (it then says so).
+ */
+export type FieldViewKey = `f:${string}` | 'priority' | 'pillar' | 'start' | 'platform'
+export const BUILT_IN_VIEW_FIELDS: FieldViewKey[] = ['priority', 'pillar', 'start', 'platform']
+export const isFieldViewKey = (k: unknown): k is FieldViewKey => typeof k === 'string' && (CUSTOM_FIELD.test(k) || (BUILT_IN_VIEW_FIELDS as string[]).includes(k))
+export type ViewGroup = 'stage' | 'brand' | 'statusGroup' | FieldViewKey
+export type ViewSort = 'due' | 'publish' | 'name' | 'priority' | 'stage' | FieldViewKey
+/** A field filter's special values: the field has a value / is empty. A checkbox's values are 'yes' / 'no'. */
+export const HAS_VALUE = '__set'
 export const VIEW_FILTERS: ViewFilterKey[] = ['brand', 'assignee', 'type', 'campaign', 'statusGroup', 'tag']
 export const VIEW_SORTS: ViewSort[] = ['due', 'publish', 'name', 'priority', 'stage']
 export const VIEW_FIELDS = ['brand', 'status', 'assignee', 'publish', 'start', 'due', 'type', 'priority', 'platform', 'tags'] as const
@@ -39,6 +49,8 @@ export function shownFields(
 
 export interface ViewConfig {
   filters: Partial<Record<ViewFilterKey, string[]>>
+  /** Fields (§5): filters on fields — field key → the values that match (any of them). */
+  fieldFilters?: Record<string, string[]>
   group: ViewGroup | null
   sort: ViewSort | null
   /** Sheet fields shown (Task always is); null = all. */
@@ -56,10 +68,14 @@ export function cleanConfig(raw: unknown): ViewConfig {
   const filters: ViewConfig['filters'] = {}
   for (const k of VIEW_FILTERS) { const v = strings(f[k]); if (v.length) filters[k] = v }
   const fields = o.fields === null || o.fields === undefined ? null : strings(o.fields).filter(isFieldKey)
+  const ff = o.fieldFilters && typeof o.fieldFilters === 'object' && !Array.isArray(o.fieldFilters) ? o.fieldFilters as Record<string, unknown> : {}
+  const fieldFilters: Record<string, string[]> = {}
+  for (const [k, v] of Object.entries(ff).slice(0, 20)) { if (!isFieldViewKey(k)) continue; const vs = strings(v); if (vs.length) fieldFilters[k] = vs }
   return {
     filters,
-    group: o.group === 'stage' || o.group === 'brand' || o.group === 'statusGroup' ? o.group : null,
-    sort: VIEW_SORTS.includes(o.sort as ViewSort) ? o.sort as ViewSort : null,
+    ...(Object.keys(fieldFilters).length ? { fieldFilters } : {}),
+    group: o.group === 'stage' || o.group === 'brand' || o.group === 'statusGroup' || isFieldViewKey(o.group) ? o.group as ViewGroup : null,
+    sort: VIEW_SORTS.includes(o.sort as ViewSort) || isFieldViewKey(o.sort) ? o.sort as ViewSort : null,
     fields,
   }
 }
@@ -73,14 +89,44 @@ export interface ViewableTask {
 const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Medium: 2, Low: 3, None: 4 }
 const NONE = '__none'
 
+/** A task's value for a field key (custom values come from the page's field values). */
+export type FieldValueOf = (task: ViewableTask & { id?: string }, key: FieldViewKey) => unknown
+
+const empty = (v: unknown) => v === null || v === undefined || v === '' || v === false || (Array.isArray(v) && !v.length)
+/** The values a field value counts as, for matching and grouping: each choice of a multi, 'yes'/'no' for a checkbox. */
+export function valueKeys(v: unknown): string[] {
+  if (empty(v)) return []
+  if (v === true) return ['yes']
+  if (Array.isArray(v)) return v.map(x => String(x))
+  if (typeof v === 'object') return [JSON.stringify(v)]
+  return [String(v)]
+}
+/** Whether a task's value passes a field filter: any listed value, "has a value", "empty" ('__none'), or a checkbox's 'no'. */
+export function fieldMatches(v: unknown, wanted: string[]): boolean {
+  if (!wanted.length) return true
+  const keys = valueKeys(v)
+  return wanted.some(w => (w === HAS_VALUE ? keys.length > 0 : w === NONE || w === 'no' ? keys.length === 0 || (w === 'no' && v === false) : keys.includes(w)))
+}
+/** The fields a view uses (filters, sort, group): the page notes any that are off in its Space. */
+export const fieldsUsed = (c: ViewConfig): FieldViewKey[] => [...new Set([
+  ...Object.keys(c.fieldFilters ?? {}).filter(isFieldViewKey),
+  ...(isFieldViewKey(c.sort) ? [c.sort] : []),
+  ...(isFieldViewKey(c.group) ? [c.group] : []),
+])]
+/** Built-in custom fields read straight off the task. */
+export const builtInValue = (x: ViewableTask & { pillar_id?: string | null; start_date?: string | null; platform?: string | null }, key: FieldViewKey): unknown =>
+  key === 'priority' ? (x.priority && x.priority !== 'None' ? x.priority : null) : key === 'pillar' ? x.pillar_id ?? null : key === 'start' ? x.start_date ?? null : key === 'platform' ? x.platform || null : undefined
+
 /** The tasks a view shows, in its order. "No one" / "No campaign" filter with '__none'. */
-export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[] {
+export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig, valueOf?: FieldValueOf): T[] {
+  const val = (x: T, k: FieldViewKey) => (CUSTOM_FIELD.test(k) ? valueOf?.(x, k) : builtInValue(x, k))
+  const fieldOk = (x: T) => Object.entries(c.fieldFilters ?? {}).every(([k, want]) => !isFieldViewKey(k) || fieldMatches(val(x, k), want))
   const hit = (list: string[] | undefined, v: string | null | undefined) => !list?.length || list.includes(v || NONE)
   // Spec 023: several assignees and tags — any of them matches ("No one" / "No tag" when there are none).
   const anyHit = (list: string[] | undefined, vs: string[]) => !list?.length || (vs.length ? vs.some(v => list.includes(v)) : list.includes(NONE))
   const out = tasks.filter(x =>
     hit(c.filters.brand, x.brand_id) && anyHit(c.filters.assignee, x.assignee_ids?.length ? x.assignee_ids : x.assignee_id ? [x.assignee_id] : []) && anyHit(c.filters.tag, x.tag_ids ?? []) &&
-    hit(c.filters.type, x.content_type_label) && hit(c.filters.campaign, x.project_id) && hit(c.filters.statusGroup, statusGroupOf(x.status)))
+    hit(c.filters.type, x.content_type_label) && hit(c.filters.campaign, x.project_id) && hit(c.filters.statusGroup, statusGroupOf(x.status)) && fieldOk(x))
   if (!c.sort) return out
   const key = (x: T): [number, string] => {
     switch (c.sort) {
@@ -89,7 +135,14 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
       case 'publish': return x.publish_date ? [0, `${x.publish_date.slice(0, 10)}|${x.due_date?.slice(0, 10) ?? '9999'}`] : [1, '']
       case 'priority': return [PRIORITY_RANK[x.priority ?? ''] ?? 4, '']
       case 'stage': return [NINE_STAGE.indexOf(x.status as never), '']
-      default: return [0, x.name.toLowerCase()]
+      case 'name': return [0, x.name.toLowerCase()]
+      default: {
+        // A field: tasks with a value first, in the value's order (numbers as numbers); empty last.
+        const v = isFieldViewKey(c.sort) ? val(x, c.sort) : null
+        if (empty(v)) return [1, '']
+        const n = typeof v === 'number' ? v : typeof v === 'object' && v && 'amount' in v ? Number((v as { amount: unknown }).amount) : NaN
+        return [0, Number.isFinite(n) ? String(n + 1e12).padStart(20, '0') : valueKeys(v).join(',').toLowerCase()]
+      }
     }
   }
   return [...out].sort((a, b) => {
@@ -99,7 +152,7 @@ export function applyView<T extends ViewableTask>(tasks: T[], c: ViewConfig): T[
 }
 
 /** How many filters a view uses (for the config bar's badge). */
-export const filterCount = (c: ViewConfig) => Object.values(c.filters).reduce((n, v) => n + (v?.length ? 1 : 0), 0)
+export const filterCount = (c: ViewConfig) => Object.values(c.filters).reduce((n, v) => n + (v?.length ? 1 : 0), 0) + Object.values(c.fieldFilters ?? {}).filter(v => v.length).length
 
 /** A member's tab choices on one page (spec 021): home view, pinned tabs first, hidden tabs tucked away. */
 export interface TabPrefs {

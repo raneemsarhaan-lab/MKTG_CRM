@@ -101,7 +101,7 @@ module.exports = (EMAIL, psql, ok) => {
         const name = `Hook ${n}`
         const th = theme(`Lab fields hook ${n}`, 'content')
         const t = task(`Lab fields hook piece ${n}`, th)
-        const before = { content: settingsOf('content'), design: settingsOf('design') }
+        const before = { content: settingsOf('content'), design: settingsOf('design'), video: settingsOf('video') }
         let fid = ''
         try {
           await go('/spaces/content?view=sheet')
@@ -110,29 +110,35 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-add-new]')
           await page.fill('[data-new-name]', name)
           await page.click('[data-new-kind="text"]')
+          ok(await page.getAttribute('[data-new-kind="text"]', 'aria-checked') === 'true', 'the Text tile is picked')
+          // "This sheet only" hides the Space chips; back to "On the task".
+          await page.click('[data-new-place="sheet"]')
+          ok(!(await page.$('[data-new-space]')), 'This sheet only: no Space chips')
           await page.click('[data-new-place="task"]')
-          ok(await page.getAttribute(`[data-new-space="${space('content')}"]`, 'aria-pressed') === 'true', 'this Space is selected')
+          ok(await page.getAttribute(`[data-new-space="${space('content')}"]`, 'aria-pressed') === 'true', 'this Space is always on')
+          await page.click(`[data-new-space="${space('design')}"]`)
           await page.click('[data-new-add]')
           await page.waitForFunction(() => !document.querySelector('[data-add-column-panel]'), null, { timeout: 20000 })
           fid = psql(`select id from task_fields where name_en='${name}'`)
           ok(!!fid, 'the field is made')
           ok(psql(`select count(*) from task_type_fields where field_id='${fid}'`) === '0', 'attached to no type: it applies to every task')
           ok(psql(`select settings->'fields'->'${fid}'->>'shown' from team_spaces where key='content'`) === 'true', 'on in Content')
+          ok(psql(`select settings->'fields'->'${fid}'->>'shown' from team_spaces where key='design'`) === 'true', 'on in Design (its chip was tapped)')
           // Content's task panel.
           await go(`/spaces/content?task=${t}`)
           await page.waitForSelector(`[data-panel-field="${name}"], [data-field-section="${name}"], [role="dialog"] >> text=${name}`, { timeout: 30000 })
           ok(true, 'it appears in Content\'s task panel')
-          // Design: off, under "Custom · off in Design".
-          await go('/spaces/design?view=sheet')
+          // Video: off, under "Custom · off in Video".
+          await go('/spaces/video?view=sheet')
           await page.waitForSelector('[data-add-field]', { timeout: 90000 }).catch(() => null)
           if (await page.$('[data-add-field]')) {
             await openAdd(page)
-            ok((await sectionItems(page, 'off')).includes(`f:${fid}`), 'in Design it is under "Custom · off in Design"')
+            ok((await sectionItems(page, 'off')).includes(`f:${fid}`), 'in Video it is under "Custom · off in Video"')
           } else {
-            ok(psql(`select coalesce(settings->'fields'->'${fid}'->>'shown', 'none') from team_spaces where key='design'`) === 'none', 'Design has not turned it on')
+            ok(psql(`select coalesce(settings->'fields'->'${fid}'->>'shown', 'none') from team_spaces where key='video'`) === 'none', 'Video has not turned it on')
           }
         } finally {
-          restoreSettings('content', before.content); restoreSettings('design', before.design)
+          restoreSettings('content', before.content); restoreSettings('design', before.design); restoreSettings('video', before.video)
           if (fid) { psql(`delete from task_field_values where field_id='${fid}'`); psql(`delete from task_fields where id='${fid}'`) }
           cleanup([th])
         }
@@ -214,6 +220,36 @@ module.exports = (EMAIL, psql, ok) => {
         } finally {
           restoreSettings('content', before)
           psql(`delete from task_field_values where task_id='${t}'`)
+          cleanup([th])
+        }
+      },
+    },
+    {
+      // §8: a saved view filtered by Theme keeps working after Theme is turned off in the Space, with a note.
+      id: 'fields-filter-keeps-working-when-field-off', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd()
+        const th = theme(`Lab fields filter ${n}`, 'content')
+        const inTheme = task(`Lab fields filter in ${n}`, th)
+        const other = task(`Lab fields filter out ${n}`, null)
+        const before = settingsOf('content')
+        const node = `space:${space('content')}`
+        const vid = first(`insert into saved_views (id, node, type, name, config, owner_id, position) values (gen_random_uuid(), '${node}', 'sheet', 'Lab by theme ${n}',
+          '{"filters":{"campaign":["${th}"]}}'::jsonb, '${who('admin')}', 99) returning id`)
+        try {
+          psql(`update team_spaces set settings = jsonb_set(coalesce(settings,'{}'::jsonb), '{fields,theme}', '{"shown":false}'::jsonb, true) where key='content'`)
+          await go(`/spaces/content?view=v:${vid}`)
+          await page.waitForSelector('[data-view-config]', { timeout: 90000 })
+          await page.waitForSelector('[data-view-field-off="theme"]', { timeout: 20000 })
+          ok(/Filtered by Theme, which is off in this Space\./.test(await page.textContent('[data-view-field-off="theme"]')), 'the note names Theme')
+          await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
+          const text = await page.textContent('[data-task-sheet]')
+          ok(text.includes(`Lab fields filter in ${n}`), 'the filter still works on the stored theme')
+          ok(!text.includes(`Lab fields filter out ${n}`), 'tasks outside the theme stay out')
+        } finally {
+          restoreSettings('content', before)
+          psql(`delete from saved_views where id='${vid}'`)
+          psql(`delete from tasks where id in ('${inTheme}', '${other}')`)
           cleanup([th])
         }
       },

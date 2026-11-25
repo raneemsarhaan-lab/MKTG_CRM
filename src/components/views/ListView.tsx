@@ -45,6 +45,8 @@ interface ListViewProps {
   projectGroups?: { spacesOf(taskId: string): { id: string; name: string; color: string }[]; noProject: string }
   /** A saved view's grouping. */
   initialGroup?: Exclude<Group, 'project'> | null
+  /** Fields (§5): a saved view grouped by a field — these groups replace the built-in ones. */
+  fieldGroups?: { key: string; label: string; tasks: ViewTask[] }[] | null
   onOpen: (id: string) => void
   /** Spec 023: the Fields button's choice (standard keys and `f:<id>`); absent = every standard field. */
   fields?: string[]
@@ -52,7 +54,7 @@ interface ListViewProps {
   custom?: { fields: TaskFieldDef[]; links: TaskTypeFieldLink[]; values: Map<string, Map<string, unknown>>; types: ContentType[]; tags?: import('@/types/index').Tag[] }
 }
 
-export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, projectGroups, stageName, spaceStages, initialGroup, onOpen, fields, custom }: ListViewProps) {
+export function ListView({ tasks, brands, members, slaConfig, today, canGroupByBrand = false, projectGroups, stageName, spaceStages, initialGroup, onOpen, fields, custom, fieldGroups }: ListViewProps) {
   const locale = useLocale()
   const shows = (k: string) => !fields || fields.includes(k)
   const shownCustom = (custom?.fields ?? []).filter(f => !f.retired && fields?.includes(`f:${f.id}`))
@@ -80,7 +82,9 @@ export function ListView({ tasks, brands, members, slaConfig, today, canGroupByB
       { key: 'p:', head: <span data-project-group="">{projectGroups?.noProject ?? ''}</span>, rows: sorted(live.filter(x => !x.project?.name)) },
     ]
   }
-  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = group === 'project' ? byProject() : group === 'statusGroup'
+  const groups: { key: string; head: React.ReactNode; rows: ViewTask[] }[] = fieldGroups
+    ? fieldGroups.map(g => ({ key: `f:${g.key}`, head: <span data-field-group={g.key}>{g.label}</span>, rows: g.tasks.filter(x => !x.dropped_at) }))
+    : group === 'project' ? byProject() : group === 'statusGroup'
     ? STATUS_GROUPS.map(g => ({ key: g, head: <span data-status-group={g}>{tg(g)}</span>, rows: live.filter(x => statusGroupOf(x.status) === g) }))
     : group === 'brand'
     ? [...brands.map(b => ({ key: b.id, head: <Brand b={b} />, rows: live.filter(x => x.brand_id === b.id) })),

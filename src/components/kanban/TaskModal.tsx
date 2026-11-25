@@ -421,8 +421,8 @@ function IconButton({ name, label, onClick, size = 17, color = CU.label }: {
  */
 /** Fields (25 Nov 2026): one icon per field kind, the same in every place. */
 const KIND_ICON: Partial<Record<string, IconName>> = {
-  text: 'pencil', number: 'target', money: 'target', date: 'calendar', link: 'link', person: 'person',
-  choice: 'type', multi: 'tag', checkbox: 'star', rating: 'star', task: 'subtask',
+  text: 'pencil', number: 'target', money: 'target', date: 'calendar', link: 'link', person: 'at',
+  choice: 'type', multi: 'tag', checkbox: 'status', rating: 'star', task: 'subtask',
 }
 
 function Prop({ icon, label, children }: {
@@ -764,6 +764,7 @@ export function TaskModal({
   const moveErr = useMoveError()
   const locale = useLocale()
   const tSpaces = useTranslations('spaces')
+  const tInfo = useTranslations('taskInfo')
   const tSheet = useTranslations('taskSheet')
   function openSheet() {
     if (!sheetTarget) return
@@ -2463,6 +2464,21 @@ export function TaskModal({
                   <span aria-hidden="true">✓ </span>Published — this task is complete
                 </div>
               )}
+
+              {/* Fields (25 Nov 2026, §1): system info — read only, not fields. */}
+              <p data-task-system-info="" style={{ margin: '26px 0 0', display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 12, color: '#6B7080' }}>
+                {(() => {
+                  const names = taskSpaces.filter(r => r.task_id === task.id).map(r => spaces.find(s => s.id === r.space_id)?.name).filter(Boolean)
+                  const days = task.stage_date ? Math.max(0, Math.round((Date.parse(cairoToday()) - Date.parse(task.stage_date.slice(0, 10))) / 86_400_000)) : null
+                  const by = members.find(m => m.id === task.created_by)?.name
+                  return <>
+                    {names.length > 0 && <span data-info="space">{tInfo('space', { names: names.join(', ') })}</span>}
+                    {days !== null && <span data-info="in-stage">{tInfo('inStage', { n: days })}</span>}
+                    <span data-info="created">{by ? tInfo('createdBy', { name: by, date: formatDay(task.created_at, locale) }) : tInfo('created', { date: formatDay(task.created_at, locale) })}</span>
+                    <span data-info="updated">{tInfo('updated', { date: formatDay(task.updated_at, locale) })}</span>
+                  </>
+                })()}
+              </p>
             </div>
           </div>
 

@@ -106,7 +106,7 @@ export function useAddColumn(o: {
     <AddColumnPanel anchor={anchor} onClose={() => setAnchor(null)}
       space={o.space ? { id: o.space.id, name: o.space.name } : null}
       standard={lists.standard} customOn={lists.customOn} customOff={lists.customOff}
-      spaces={o.spaces.filter(s => !s.archived_at).map(s => ({ id: s.id, name: s.name }))}
+      spaces={o.spaces.filter(s => !s.archived_at).map(s => ({ id: s.id, name: s.name, color: s.color }))}
       onShow={key => { void o.cl.setShown(key, true) }}
       onTurnOn={key => { void turnOn(key) }}
       onCreate={create} />

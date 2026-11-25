@@ -18,7 +18,7 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { PIPE } from '@/lib/pipeline-tokens'
 import type { SavedView, ViewType } from '@/types/index'
-import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, filterCount, shownFields, VIEW_FILTERS, VIEW_SORTS, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
+import { arrangeTabs, cleanConfig, EMPTY_TAB_PREFS, fieldsUsed, filterCount, HAS_VALUE, isFieldViewKey, shownFields, VIEW_FILTERS, VIEW_SORTS, type FieldViewKey, type TabPrefs, type ViewConfig, type ViewFilterKey } from '@/lib/view-config'
 import { deleteView, listViews, reorderViews, saveView, setTabPrefs } from '@/actions/views'
 import { FieldsMenu, type FieldsSetup } from '@/components/fields/FieldsMenu'
 import { STATUS_GROUPS } from '@/lib/status-groups'
@@ -33,6 +33,17 @@ export interface ViewOptions {
   campaign: { id: string; name: string }[]
   statusGroup?: { id: string; name: string }[]
   tag?: { id: string; name: string }[]
+}
+
+/** Fields (§5): what a saved view's bar offers beyond its standard filters. */
+export interface FieldPicker {
+  /** Fields this page offers (standard extras and custom fields on in the Space), each with whether it's on here. */
+  fields: { key: FieldViewKey; label: string; glyph: string; on: boolean }[]
+  /** A field's values to pick from (choices, people, Yes); empty for text, numbers, dates and links. */
+  choices: (key: FieldViewKey) => { id: string; name: string }[]
+  groupable: (key: FieldViewKey) => boolean
+  /** Theme (the Campaign filter): false when this Space has turned the Theme field off. */
+  themeOn?: boolean
 }
 
 interface ViewHostProps {
@@ -52,6 +63,8 @@ interface ViewHostProps {
   fields?: FieldsSetup
   /** The built-in tabs whose view uses the Fields button's choices (default: Board, List and Sheet). A Space's Sheet tab has its own Fields. */
   builtInFields?: string[]
+  /** Fields (§5): the fields a saved view can filter, sort and group by. */
+  fieldPicker?: FieldPicker
   /** Saved views: the node they belong to ('space:<id>', 'brand:<id>', 'me'). */
   node?: string
   /** The types "+ View" offers (the page's own view tabs). */
@@ -72,7 +85,7 @@ interface ViewHostProps {
 
 const pill: React.CSSProperties = { border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '5px 9px', fontFamily: 'inherit', fontSize: 12, fontWeight: 600, color: PIPE.ink, cursor: 'pointer' }
 
-export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields }: ViewHostProps) {
+export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, render, node, viewTypes, options, lead = false, fields: fieldSetup, defaultTab, initialPrefs, sections, noViews = false, builtInFields, fieldPicker }: ViewHostProps) {
   // Sheet look (25 Nov 2026): where a sheet puts its "Saved" and its tools, in this header.
   const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null)
   const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null)
@@ -268,7 +281,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
       )}
       {open && config && options && (
         <ConfigBar
-          view={open} config={config} options={options} editable={mayChange(open)} dirty={!!drafts[open.id]}
+          view={open} config={config} options={options} editable={mayChange(open)} dirty={!!drafts[open.id]} picker={fieldPicker}
           first={views[0]?.id === open.id} last={views[views.length - 1]?.id === open.id}
           onChange={c => setDrafts(d => ({ ...d, [open.id]: c }))}
           onSave={async () => {
@@ -351,8 +364,8 @@ function NewView({ types, typeLabel, onCreate, onCancel }: {
   )
 }
 
-function ConfigBar({ view, config, options, editable, dirty, first, last, onChange, onSave, onDelete, onMove }: {
-  view: SavedView; config: ViewConfig; options: ViewOptions; editable: boolean; dirty: boolean; first: boolean; last: boolean
+function ConfigBar({ view, config, options, editable, dirty, first, last, onChange, onSave, onDelete, onMove, picker }: {
+  view: SavedView; config: ViewConfig; options: ViewOptions; editable: boolean; dirty: boolean; first: boolean; last: boolean; picker?: FieldPicker
   onChange: (c: ViewConfig) => void; onSave: () => void; onDelete: () => void; onMove: (dir: -1 | 1) => void
 }) {
   const t = useTranslations('views')
@@ -360,8 +373,17 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
   const none = useMemo(() => ({ assignee: t('noOne'), campaign: t('noCampaign'), tag: t('noTag') }) as Partial<Record<ViewFilterKey, string>>, [t])
   const setFilter = (k: ViewFilterKey, ids: string[]) => onChange({ ...config, filters: { ...config.filters, [k]: ids } })
   const sel: React.CSSProperties = { ...pill, paddingInlineEnd: 4 }
+  // An open filter menu closes on a click anywhere outside it.
+  const barRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      for (const d of barRef.current?.querySelectorAll('details[open]') ?? []) if (!d.contains(e.target as Node)) d.removeAttribute('open')
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
   return (
-    <div data-view-config role="toolbar" aria-label={t('filters')}
+    <div data-view-config role="toolbar" aria-label={t('filters')} ref={barRef}
       style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 38px', borderBottom: `1px solid ${PIPE.border}` }}>
       {VIEW_FILTERS.map(k => {
         // Spec 023: status groups (Not started, Active, Done, Closed) are the same on every page.
@@ -385,10 +407,13 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
           </details>
         )
       })}
-      {(view.type === 'list') && (
+      {picker && <FieldFilters config={config} picker={picker} onChange={onChange} />}
+      {(view.type === 'list' || view.type === 'sheet') && (
         <label style={{ fontSize: 12, color: PIPE.textMuted, display: 'inline-flex', gap: 6, alignItems: 'center' }}>{t('group')}
           <select data-view-group value={config.group ?? ''} style={sel} onChange={e => onChange({ ...config, group: (e.target.value || null) as ViewConfig['group'] })}>
-            <option value="">{t('groupDefault')}</option><option value="stage">{t('groupStage')}</option><option value="brand">{t('groupBrand')}</option><option value="statusGroup">{t('groupStatusGroup')}</option>
+            <option value="">{t('groupDefault')}</option>
+            {view.type === 'list' && <><option value="stage">{t('groupStage')}</option><option value="brand">{t('groupBrand')}</option><option value="statusGroup">{t('groupStatusGroup')}</option></>}
+            {picker?.fields.filter(f => picker.groupable(f.key) && (f.on || config.group === f.key)).map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </label>
       )}
@@ -397,19 +422,21 @@ function ConfigBar({ view, config, options, editable, dirty, first, last, onChan
           <select data-view-sort value={config.sort ?? ''} style={sel} onChange={e => onChange({ ...config, sort: (e.target.value || null) as ViewConfig['sort'] })}>
             <option value="">{t('sortDefault')}</option>
             {VIEW_SORTS.map(s => <option key={s} value={s}>{t(`sortBy.${s}`)}</option>)}
+            {picker?.fields.filter(f => f.key !== 'priority' && (f.on || config.sort === f.key)).map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
           </select>
         </label>
       )}
       <span style={{ flex: 1 }} />
       {filterCount(config) > 0 && <span style={{ fontSize: 11.5, color: PIPE.textMuted }}>{t('filters')} · {filterCount(config)}</span>}
       {editable ? (
-        <>
+        // Above any open filter menu, so a menu from the row above never covers Save.
+        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', position: 'relative', zIndex: 31 }}>
           <button type="button" style={pill} aria-label={t('moveLeft')} disabled={first} onClick={() => onMove(-1)}>‹</button>
           <button type="button" style={pill} aria-label={t('moveRight')} disabled={last} onClick={() => onMove(1)}>›</button>
           <button type="button" data-view-delete style={pill} onClick={onDelete}>{t('deleteView')}</button>
           <button type="button" data-view-save disabled={!dirty} onClick={onSave}
             style={{ ...pill, background: dirty ? '#C8F24E' : '#FFFFFF', borderColor: dirty ? '#C8F24E' : PIPE.border, fontWeight: 800 }}>{t('save')}</button>
-        </>
+        </span>
       ) : <span data-view-readonly style={{ fontSize: 11.5, color: PIPE.textMuted }}>{t('readOnlyView')}</span>}
     </div>
   )
@@ -452,4 +479,64 @@ function ViewIcon({ type }: { type?: string }) {
     : null
   if (!path) return null
   return <svg className="fx-view-tab-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
+}
+
+/**
+ * Fields (§5): filters on fields. "+ Field" offers the fields on in this Space; each filter picks values
+ * (choices, people, Yes) or "Has a value" / "Empty". A field turned off in the Space keeps filtering on the
+ * stored values, with a note saying so.
+ */
+function FieldFilters({ config, picker, onChange }: { config: ViewConfig; picker: FieldPicker; onChange: (c: ViewConfig) => void }) {
+  const t = useTranslations('views')
+  const ff = config.fieldFilters ?? {}
+  const used = Object.keys(ff).filter(isFieldViewKey)
+  const set = (key: string, vals: string[] | null) => {
+    const next = { ...ff }
+    if (vals === null) delete next[key]; else next[key] = vals
+    onChange({ ...config, fieldFilters: next })
+  }
+  const off: { key: string; label: string }[] = fieldsUsed(config).map(k => picker.fields.find(f => f.key === k)).filter((f): f is FieldPicker['fields'][number] => !!f && !f.on)
+  // The Theme filter (Campaign) keeps working when the Space turns Theme off, with the same note.
+  if (config.filters.campaign?.length && picker.themeOn === false) off.push({ key: 'theme', label: t('builtInField.theme') })
+  const offerable = picker.fields.filter(f => f.on && !used.includes(f.key))
+  return (
+    <>
+      {used.map(key => {
+        const f = picker.fields.find(x => x.key === key)
+        const on = ff[key] ?? []
+        const list = [...picker.choices(key as FieldViewKey), { id: HAS_VALUE, name: t('hasValue') }, { id: '__none', name: t('noValue') }]
+        return (
+          <details key={key} data-view-field-filter={key} style={{ position: 'relative' }}>
+            <summary style={{ ...pill, listStyle: 'none', background: on.length ? PIPE.surface : '#FFFFFF' }}>
+              <span aria-hidden="true" style={{ marginInlineEnd: 4, fontWeight: 800 }}>{f?.glyph}</span>
+              {f?.label ?? key}: {on.length ? on.map(id => list.find(x => x.id === id)?.name ?? id).join(', ') : t('any')}
+            </summary>
+            <div style={{ position: 'absolute', zIndex: 30, top: 'calc(100% + 4px)', insetInlineStart: 0, minWidth: 200, maxHeight: 260, overflowY: 'auto', background: '#FFFFFF', border: `1px solid ${PIPE.border}`, borderRadius: 10, padding: 6, boxShadow: '0 8px 24px rgba(0,0,0,.08)' }}>
+              {list.map(o => (
+                <label key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', fontSize: 12.5, cursor: 'pointer' }}>
+                  <input type="checkbox" data-view-field-option={o.id} checked={on.includes(o.id)}
+                    onChange={e => set(key, e.target.checked ? [...on, o.id] : on.filter(x => x !== o.id))} />
+                  {o.name}
+                </label>
+              ))}
+              <button type="button" data-view-field-remove={key} onClick={() => set(key, null)}
+                style={{ ...pill, marginTop: 4, width: '100%', justifyContent: 'center' }}>{t('removeFilter')}</button>
+            </div>
+          </details>
+        )
+      })}
+      {offerable.length > 0 && (
+        <select data-view-add-field-filter value="" aria-label={t('addFieldFilter')} style={{ ...pill, paddingInlineEnd: 4 }}
+          onChange={e => { const k = e.target.value; if (k) set(k, []) }}>
+          <option value="">{t('addFieldFilter')}</option>
+          {offerable.map(f => <option key={f.key} value={f.key}>{f.glyph} {f.label}</option>)}
+        </select>
+      )}
+      {off.map(f => (
+        <span key={f.key} role="note" data-view-field-off={f.key} style={{ fontSize: 12, color: '#8A5A00', background: '#FFF4DB', borderRadius: 8, padding: '4px 8px' }}>
+          {t('fieldOffNote', { field: f.label })}
+        </span>
+      ))}
+    </>
+  )
 }

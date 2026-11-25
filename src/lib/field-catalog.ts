@@ -98,6 +98,7 @@ export function kindOf(key: string, library?: Pick<TaskFieldDef, 'kind'> | null)
 
 /** One glyph per kind, the same in every place a field is named (sheet headings, drawer, panel, Add column). */
 export const KIND_GLYPH: Record<CatalogKind, string> = {
-  text: 'Aa', number: '#', money: '¤', date: '▦', link: '↗', person: '◉', choice: '◆', multi: '◈',
-  checkbox: '☑', rating: '★', task: '⇄', stage: '◐', brand: 'B', type: '▣',
+  // The same symbols as the New field tiles, everywhere a field shows its kind (user, 25 Nov 2026).
+  text: 'Aa', number: '#', money: '$', date: '31', link: '↗', person: '@', choice: '◉', multi: '☰',
+  checkbox: '✓', rating: '★', task: '⇢', stage: '◐', brand: 'B', type: '▣',
 }

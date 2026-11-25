@@ -306,7 +306,7 @@ export function ContentGrid(p: ContentGridProps) {
       const kind = p.addColumn?.kindOf(String(col)) ?? null
       const f = FIELD_OF[col]
       return {
-        text: kind && text ? <><FieldGlyph kind={kind} tone="custom" />{text}</> : f && text ? <><FieldIcon field={f} />{text}</> : text,
+        text: kind && text ? <><FieldGlyph kind={kind} tone={p.addColumn?.classFor(String(col)) ?? 'custom'} />{text}</> : f && text ? <><FieldIcon field={f} />{text}</> : text,
         label: col === 'archive' && !named ? t('col.archive') : (kind || f) && text ? text : undefined,
       }
     },
@@ -674,7 +674,8 @@ export function ContentGrid(p: ContentGridProps) {
   const addItems: MenuItem[] = addAt ? [
     ...laid.filter(c => c.builtIn && !c.shown).map(c => ({
       key: c.key, text: colLabel(c.key) || t('col.archive'), group: tf('taskFieldGroup'),
-      label: <span className="fx-fd-mi" data-add-task-field={c.key}><FieldIcon field={c.field ? 'taskcol' : FIELD_OF[c.key] ?? 'taskcol'} />{colLabel(c.key) || t('col.archive')}</span>,
+      // A field shows its kind's symbol (Caption, Channels, TOV included), never the Task column's ✓.
+      label: <span className="fx-fd-mi" data-add-task-field={c.key}>{(() => { const k = p.addColumn?.kindOf(c.key); return k ? <FieldGlyph kind={k} tone={p.addColumn?.classFor(c.key) ?? 'custom'} /> : <FieldIcon field={FIELD_OF[c.key] ?? 'regular'} /> })()}{colLabel(c.key) || t('col.archive')}</span>,
       onSelect: () => { setAddAt(null); void cl.setShown(c.key, true) },
     })),
     { key: 'regular', text: tf('sheetOnlyCol'), group: tf('sheetOnlyGroup'), label: <span className="fx-fd-mi" data-add-sheet-only="" title={tf('sheetOnlyHint')}><FieldIcon field="regular" />{tf('sheetOnlyCol')}</span>,

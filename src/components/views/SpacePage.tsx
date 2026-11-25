@@ -23,12 +23,15 @@ import { spaceLabel } from '@/components/shared/NavTree/labels'
 import { ViewHost } from './ViewHost'
 import { BoardView } from './BoardView'
 import { CalendarView } from './CalendarView'
+import { ListView } from './ListView'
+import { useFieldView } from './useFieldView'
 import { TaskPanel } from './TaskPanel'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
-import { viewTasks, viewOptions, fieldsSetup, type BoardData } from './types'
-import { applyView, cleanTabPrefs } from '@/lib/view-config'
+import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData } from './types'
+import { applyView, cleanTabPrefs, isFieldViewKey } from '@/lib/view-config'
+import { fieldOnIn } from '@/lib/field-catalog'
 import { isLinkedMedia } from '@/lib/media'
 import { MediaCreateButton } from '@/components/media/MediaLinks'
 
@@ -61,6 +64,9 @@ export function SpacePage({ data, spaceId, brandId = null }: {
   const label = spaceLabel(space, t)
   const sheetStart = space.key === 'content' ? 'content' : space.key === 'video' ? 'sheet' : null
   const open = (id: string) => selectTask(id)
+  // Fields (§5): saved views filter, sort and group by any field on in this Space.
+  const fv = useFieldView(data)
+  const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   // Spec 024 (§3): the Space's own text for the add button, and who may create here.
   const showTaskForm = useUIStore(s => s.showTaskForm)
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
@@ -100,15 +106,17 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         { key: 'calendar', label: tv('calendar') },
       ]}
       node={folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`}
-      viewTypes={['board', 'sheet', 'calendar']}
+      viewTypes={['board', 'sheet', 'calendar', 'list']}
       // The built-in Sheet tab is the Space's workbook, with its own Fields; the page's Fields is for the Board and saved views.
       builtInFields={['board', 'list']}
       options={viewOptions(data, tasks)}
       fields={fieldsSetup(data, tasks)}
+      // Fields (§5): a custom field this Space has turned off can still filter (with a note); it isn't offered.
+      fieldPicker={fv.picker(tasks, key => fieldOnIn(key, space.settings.fields, data.standardFields ?? [], key.startsWith('f:') ? data.taskFields.find(f => f.id === key.slice(2)) ?? null : null))}
       lead={data.currentUser.access !== 'user'}
       render={(tab, view, shownKeys) => {
         // A saved view narrows the Space's tasks by its filters and orders them by its sort.
-        const shownTasks = view ? applyView(tasks, view.config) : tasks
+        const shownTasks = view ? applyView(tasks, view.config, fv.valueOf) : tasks
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         const inView = ids ? (x: Task) => scope(x) && ids.has(x.id) : scope
         if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={inView} spaceId={spaceId} />
@@ -118,7 +126,15 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         // A saved Sheet view keeps its filters and fields: it is the Space's tasks as a task sheet.
         if (tab === 'sheet' && view) return <>
           <NodeWorkbook key={view.id} data={data} node={`space:${spaceId}`} brandId={brandId}
-            linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand} />} />
+            linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand}
+              groups={fv.groupsFor(view.config, shownTasks.filter(x => !x.dropped_at))?.map(g => [g.label, g.tasks] as [string, typeof shownTasks])} />} />
+          <TaskPanel data={data} spaceId={spaceId} />{taskForm}
+        </>
+        // Fields (§5): a saved List view, grouped by its grouping (a field included).
+        if (tab === 'list') return <>
+          <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today}
+            canGroupByBrand={!folderBrand} stageName={stageName} spaceStages={ss} onOpen={open}
+            initialGroup={view && !isFieldViewKey(view.config.group) ? view.config.group : null} fieldGroups={view ? fv.groupsFor(view.config, shownTasks) : null} />
           <TaskPanel data={data} spaceId={spaceId} />{taskForm}
         </>
         if (tab === 'sheet') return (

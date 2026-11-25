@@ -17,7 +17,8 @@ import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
-import { applyView, cleanTabPrefs } from '@/lib/view-config'
+import { applyView, cleanTabPrefs, isFieldViewKey } from '@/lib/view-config'
+import { useFieldView } from './useFieldView'
 import { isLinkedMedia } from '@/lib/media'
 import Link from 'next/link'
 import { BrandAssetsTable } from '@/components/brands/BrandAssetsTable'
@@ -74,6 +75,7 @@ export function BrandPage({ data, brandId, folder }: {
   const all = viewTasks(data).filter(scope)
   const open = (id: string) => selectTask(id)
   // Spec 023: custom fields and their values, for List rows.
+  const fv = useFieldView(data)
   const custom = useMemo(() => ({ fields: data.taskFields, links: data.typeFields, values: fieldValuesOf(data), types: data.contentTypes, tags: data.tags }), [data])
   const campaigns = [...new Map(all.filter(x => x.project).map(x => [x.project!.id, x.project!])).values()]
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -126,8 +128,9 @@ export function BrandPage({ data, brandId, folder }: {
       options={viewOptions(data, all, { brand: true })}
       fields={fieldsSetup(data, all)}
       lead={data.currentUser.access !== 'user'}
+      fieldPicker={fv.picker(all)}
       render={(tab, view, shownKeys) => {
-        const shownTasks = view ? applyView(all, view.config) : all
+        const shownTasks = view ? applyView(all, view.config, fv.valueOf) : all
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
         if (tab === 'board') return <BoardView key={view?.id} fields={shownKeys} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} boardKey={brandId ? `brand:${brandId}` : undefined} />
         return withPanel(tab === 'sheet'
@@ -142,7 +145,7 @@ export function BrandPage({ data, brandId, folder }: {
             ? <CalendarView tasks={shownTasks.filter(x => !(x.migrated_simple && x.status === 'publish'))} brands={data.brands} colorBy="stage" campaigns={campaigns} onOpen={open} defaultBy="publish" milestones={brandId ? { list: data.milestones, brandIds: [brandId], canEdit: data.currentUser.access !== 'user' } : undefined} />
             : tab === 'workload'
               ? <WorkloadView tasks={shownTasks} members={data.members} brands={data.brands} />
-              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view?.config.group} onOpen={open}
+              : <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} initialGroup={view && !isFieldViewKey(view.config.group) ? view.config.group : null} fieldGroups={view ? fv.groupsFor(view.config, shownTasks) : null} onOpen={open}
                   projectGroups={brandId ? { spacesOf, noProject: t('noProjectGroup') } : undefined} />)
       }} />
   )

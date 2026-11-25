@@ -22,6 +22,7 @@ import { TaskSheet } from '@/components/views/TaskSheet'
 import { NodeWorkbook } from '@/components/views/NodeWorkbook'
 import { viewTasks, viewOptions, fieldsSetup, fieldValuesOf, type BoardData, type ViewTask } from '@/components/views/types'
 import { applyView } from '@/lib/view-config'
+import { useFieldView } from '@/components/views/useFieldView'
 
 type Show = 'all' | 'assigned' | 'handed'
 const finished = (t: Task) => t.status === 'publish'
@@ -30,6 +31,7 @@ export function MyTasks({ data }: { data: BoardData }) {
   setWorkWeekend(data.dueRule?.weekend)
   const t = useTranslations('me')
   const tv = useTranslations('views')
+  const fv = useFieldView(data)
   const ts = useTranslations('spaces')
   const selectTask = useUIStore(s => s.selectTask)
   const me = data.currentUser.id
@@ -78,10 +80,11 @@ export function MyTasks({ data }: { data: BoardData }) {
       viewTypes={['list', 'calendar', 'board', 'sheet']}
       options={viewOptions(data, tasks)}
       fields={fieldsSetup(data, tasks)}
+      fieldPicker={fv.picker(tasks)}
       render={(tab, view, shownKeys) => {
         // A saved view: the same groups, narrowed and ordered by the view.
-        const ids = view ? new Set(applyView(tasks, view.config).map(x => x.id)) : null
-        const order = view ? applyView(tasks, view.config).map(x => x.id) : null
+        const ids = view ? new Set(applyView(tasks, view.config, fv.valueOf).map(x => x.id)) : null
+        const order = view ? applyView(tasks, view.config, fv.valueOf).map(x => x.id) : null
         const narrow = (g: ViewTask[]) => (ids && order ? g.filter(x => ids.has(x.id)).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)) : g)
         const groups = baseGroups.map(([l, g]) => [l, narrow(g)] as [string, ViewTask[]])
         if (tab === 'board') return <BoardView key={`${show}${view?.id ?? ''}`} data={data} scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} />

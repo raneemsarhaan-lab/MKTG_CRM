@@ -3135,7 +3135,7 @@
     "allTasksSheet": "All tasks",
     "mySheets": "My sheets",
     "workbookLoading": "Opening the sheet…",
-    "workbookFailed": "This sheet couldn't open. Reload the page to try again.",
+    "workbookFailed": "This sheet couldn't open.",
     "features": {
       "open": "Features",
       "title": "{brand} · features",
@@ -3357,7 +3357,9 @@
     "brandTabs": "Brand sections",
     "colSpace": "Space",
     "assetsSub": "The brand's files: logos, templates, photos and finished designs.",
-    "settingsSub": "How this brand's work is set up. Admins only."
+    "settingsSub": "How this brand's work is set up. Admins only.",
+    "workbookSlow": "This sheet is taking too long to open.",
+    "workbookRetry": "Try again"
   },
   "views": {
     "list": "List",
@@ -3442,7 +3444,20 @@
     "weekOf": "Week of {day}",
     "weekPrev": "Previous week",
     "weekNext": "Next week",
-    "weekNote": "Hours spread from each task’s start date to its due date, on working days."
+    "weekNote": "Hours spread from each task’s start date to its due date, on working days.",
+    "addFieldFilter": "+ Field",
+    "hasValue": "Has a value",
+    "noValue": "Empty",
+    "yes": "Yes",
+    "removeFilter": "Remove this filter",
+    "fieldOffNote": "Filtered by {field}, which is off in this Space.",
+    "builtInField": {
+      "priority": "Priority",
+      "pillar": "Pillar",
+      "start": "Start date",
+      "platform": "Platform",
+      "theme": "Theme"
+    }
   },
   "calendar": {
     "today": "Today",
@@ -4189,7 +4204,24 @@
     "makeStandard": "Make standard",
     "makeCustom": "Make custom",
     "offHere": "Turn off in this Space",
-    "isStandard": "Standard fields are on in every Space."
+    "isStandard": "Standard fields are on in every Space.",
+    "fieldName": "Field name",
+    "onTaskLine": "Saved on the task · on in:",
+    "sheetOnlyLine": "A note in this sheet · never on the task",
+    "alwaysHere": "This Space is always on",
+    "tile": {
+      "text": "Text",
+      "number": "Number",
+      "money": "Money",
+      "date": "Date",
+      "link": "Link",
+      "person": "Person",
+      "choice": "Choice",
+      "multi": "Multi",
+      "check": "Check",
+      "rating": "Rating",
+      "task": "Task"
+    }
   },
   "passwordReset": {
     "forgotLink": "Forgot password?",
@@ -4219,5 +4251,12 @@
       "expired": "This reset link has expired. Links work for 60 minutes; ask for a new one.",
       "used": "This reset link has already been used. Ask for a new one if you still need it."
     }
+  },
+  "taskInfo": {
+    "space": "Space: {names}",
+    "inStage": "In stage {n, plural, =0 {since today} one {# day} other {# days}}",
+    "createdBy": "Created by {name} · {date}",
+    "created": "Created {date}",
+    "updated": "Last updated {date}"
   }
 }
