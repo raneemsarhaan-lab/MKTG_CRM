@@ -44,12 +44,14 @@ module.exports = (EMAIL, psql, ok) => {
           // The sheet's add row uses the Space's "New task label".
           ok((await page.locator('[data-add-row="theme"]').first().textContent()).includes('New clip'), 'the add row says + New clip')
           await page.click(`[data-make-task="${crow}"]`)
-          await page.waitForSelector('[data-make-task-dialog] [data-make-subtask]')
+          // Owner, 25 Nov 2026: a clip is a task like any other — the child row makes one in the Video Space.
+          await page.waitForSelector('[data-make-task-dialog] [data-make-task-go]')
           await page.click('[data-make-task-go]')
           await page.waitForFunction(() => !document.querySelector('[data-make-task-dialog]'), null, { timeout: 30000 })
           await page.waitForTimeout(1500)
           const clip = psql(`select task_id from content_rows where id='${crow}'`)
-          ok(!!clip && psql(`select parent_task_id from tasks where id='${clip}'`) === video, 'the clip was added under its video')
+          ok(!!clip && psql(`select coalesce(parent_task_id::text, 'none') from tasks where id='${clip}'`) === 'none', 'the clip is a task of its own (no parent)')
+          ok(psql(`select project_id from tasks where id='${clip}'`) === th, 'under the theme its row sits in')
           ok(psql(`select status || '|' || entry_stage || '|' || coalesce(media_board,'') from tasks where id='${clip}'`) === 'r-design|r-design|video', 'it starts at Ready For Design on the Video board')
           ok(psql(`select count(*) from task_spaces where task_id='${clip}' and space_id='${space('video')}'`) === '1', 'it shows in the Video Space')
           await go('/spaces/video?view=board')

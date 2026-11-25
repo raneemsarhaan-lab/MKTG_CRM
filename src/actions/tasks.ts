@@ -640,11 +640,12 @@ export async function addClips(
         const task = await tx.task.create({
           data: {
             name:               r.title,
-            parent_task_id:     video.id,
+            // Owner, 25 Nov 2026: a clip is a task like any other (no parent), in its video's theme and pillar.
             brand_id:           video.brand_id,
             content_type_label: 'Reel',
             platform:           video.platform,
             project_id:         video.project_id,
+            pillar_id:          video.pillar_id,
             task_owner_id:      member.id,
             assignee_id:        clipAssignee,
             initiator_role:     member.role,
@@ -750,6 +751,8 @@ export async function addLinkAttachment(
 /** A task that may be dropped: a clip of a video (spec 008) or a piece of a theme (spec 009). */
 async function droppable(task: { id: string; parent_task_id: string | null; project_id: string | null }): Promise<boolean> {
   if (await videoOf(task)) return true
+  // A clip (owner, 25 Nov 2026: a task like any other, no longer under its video) is archived the same way.
+  if (await prisma.taskClip.findUnique({ where: { task_id: task.id }, select: { task_id: true } })) return true
   // Spec 027 (US3): a task that is a row of a sheet tab is archived from it ("Archive the task").
   if (await prisma.contentRow.findFirst({ where: { task_id: task.id, sheet_id: { not: null } }, select: { id: true } })) return true
   if (!task.project_id) return false

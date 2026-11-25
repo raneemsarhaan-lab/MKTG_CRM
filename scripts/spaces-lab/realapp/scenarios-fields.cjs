@@ -243,10 +243,10 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForSelector('[data-view-config]', { timeout: 90000 })
           await page.waitForSelector('[data-view-field-off="theme"]', { timeout: 20000 })
           ok(/Filtered by Theme, which is off in this Space\./.test(await page.textContent('[data-view-field-off="theme"]')), 'the note names Theme')
-          await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
-          const text = await page.textContent('[data-task-sheet]')
-          ok(text.includes(`Lab fields filter in ${n}`), 'the filter still works on the stored theme')
-          ok(!text.includes(`Lab fields filter out ${n}`), 'tasks outside the theme stay out')
+          // Spec 027: a saved Sheet view is the new sheet, narrowed by the view.
+          await page.waitForSelector(`[data-content-sheet] [data-row="k:${inTheme}"]`, { timeout: 60000 })
+          ok(true, 'the filter still works on the stored theme')
+          ok(!(await page.$(`[data-content-sheet] [data-row="k:${other}"]`)), 'tasks outside the theme stay out')
         } finally {
           restoreSettings('content', before)
           psql(`delete from saved_views where id='${vid}'`)

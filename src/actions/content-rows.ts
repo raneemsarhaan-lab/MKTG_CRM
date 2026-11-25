@@ -384,7 +384,8 @@ export async function makeTask(id: string, opts: {
   // it makes (or links) a task of its own, like a top-level row.
   const parentRow = row.parent_id ? await prisma.contentRow.findUnique({ where: { id: row.parent_id } }) : null
   const parentOf = parentRow?.task_id ? await prisma.task.findUnique({ where: { id: parentRow.task_id } }) : null
-  const parentTask = parentOf && parentOf.content_type_label === 'Video' && !parentOf.parent_task_id ? parentOf : null
+  // Owner, 25 Nov 2026: clips too are tasks like any other — no child row is tied to its parent's task.
+  void parentOf
   const day = row.date ? row.date.toISOString().slice(0, 10) : null
 
   let taskId: string
@@ -395,9 +396,6 @@ export async function makeTask(id: string, opts: {
     if (!task || task.dropped_at) return { success: false, error: 'not_found' }
     if (!canActOn(await withAssignees(task), m)) return { success: false, error: 'not_authorized' }
     if (await prisma.contentRow.findFirst({ where: { ...inScope(sc), task_id: task.id }, select: { id: true } })) return { success: false, error: 'already_in_sheet' }
-    // Under a video only its own clips; elsewhere never a clip (a clip lives under its video).
-    if (parentTask && task.parent_task_id !== parentTask.id) return { success: false, error: 'not_a_subtask' }
-    if (!parentTask && task.parent_task_id) return { success: false, error: 'is_a_subtask' }
     if (opts.spaceId && UUID.test(opts.spaceId)) {
       const home = await homeSpaceOf(task.id)
       const inSpace = home?.id === opts.spaceId || !!(await prisma.taskSpace.findFirst({ where: { task_id: task.id, space_id: opts.spaceId }, select: { task_id: true } }))
@@ -407,16 +405,6 @@ export async function makeTask(id: string, opts: {
     // The task's values win; the row fills only what the task lacks.
     if (!task.publish_date && day) await prisma.task.update({ where: { id: task.id }, data: { ...(await newTaskDates(day, task.due_date ? task.due_date.toISOString().slice(0, 10) : null)), updated_at: new Date() } })
     await rowValuesToTask(task.id, task.content_type_label, row, m.id, true)
-  } else if (parentTask) {
-    // A child row under a video: one of its clips.
-    const tasks = await import('@/actions/tasks')
-    const r = await tasks.addClips(parentTask.id, [{ title: row.title }])
-    if (!r.success || !r.created?.[0]) return { success: false, error: r.error ?? (r.skipped?.length ? 'already_in_sheet' : 'generic') }
-    taskId = r.created[0].id
-    created = true
-    if (day) await prisma.task.update({ where: { id: taskId }, data: { ...(await newTaskDates(day, null)) } })
-    const made = await prisma.task.findUnique({ where: { id: taskId }, select: { content_type_label: true } })
-    await rowValuesToTask(taskId, made?.content_type_label ?? null, row, m.id, false)
   } else {
     // A new pipeline task in the chosen Space.
     const spaces = await loadSpacesWithSettings()
@@ -461,7 +449,7 @@ export async function makeTask(id: string, opts: {
   }
   // Linked: the row shows the task's values from here on, and the task sits in the row's theme and pillar.
   await prisma.contentRow.update({ where: { id }, data: { task_id: taskId, values: {}, last_task_id: null } })
-  await prisma.task.update({ where: { id: taskId }, data: { ...(row.sheet_id ? {} : { sheet_row_off: false }), ...(created || parentTask || !row.project_id ? {} : { project_id: row.project_id, pillar_id: row.pillar_id }), updated_at: new Date() } })
+  await prisma.task.update({ where: { id: taskId }, data: { ...(row.sheet_id ? {} : { sheet_row_off: false }), ...(created || !row.project_id ? {} : { project_id: row.project_id, pillar_id: row.pillar_id }), updated_at: new Date() } })
   done()
   return { success: true, taskId }
 }

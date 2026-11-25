@@ -29,7 +29,9 @@ async function signIn(browser, who) {
     let top = false
     while (true) {
       const left = end - Date.now()
-      try { return await wait(sel, { ...opts, timeout: Math.max(1, Math.min(left, 1500)) }) } catch (e) { if (left <= 1500) throw e }
+      // A good wait where the sheet opens, then a short look after each scroll.
+      const step = top ? 450 : 1500
+      try { return await wait(sel, { ...opts, timeout: Math.max(1, Math.min(left, step)) }) } catch (e) { if (left <= step) throw e }
       // Sweep sideways first (columns are drawn near the viewport too), then down a screen.
       await page.evaluate(first => {
         for (const s of document.querySelectorAll('.fx-sheet-scroll')) {

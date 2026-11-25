@@ -53,7 +53,8 @@ module.exports = (EMAIL, psql, ok) => {
           ok(!(await findInSheet(page, `[data-row="k:${theirs}"]`, 5000)), "someone else's task is not")
           await scopeTo(page, 'team')
           ok(await findInSheet(page, `[data-row="k:${theirs}"]`), 'Everyone: their task appears in the Board tab')
-          ok(await page.$(`[data-row="t:__none"]`) !== null || await findInSheet(page, '[data-row="t:__none"]'), 'tasks with no theme sit in "No theme"')
+          // The Board tab's "No theme" group (it takes rows of its own too).
+          ok(await page.$(`[data-row="t:__rows"]`) !== null || await findInSheet(page, '[data-row="t:__rows"]'), 'tasks with no theme sit in "No theme"')
         } finally {
           psql(`delete from tasks where id in ('${mine}', '${theirs}')`)
         }

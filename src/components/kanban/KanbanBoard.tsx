@@ -733,7 +733,7 @@ function KanbanBoardInner({
         const now = new Date().toISOString()
         const added = res.created.map(c => ({
           ...(video as FullTask),
-          id: c.id, name: c.name, parent_task_id: videoId, parent: { id: videoId, name: video?.name ?? '' },
+          id: c.id, name: c.name, parent_task_id: null, parent: undefined,
           content_type_label: 'Reel', status: 'todo' as StageId, stage_date: now.slice(0, 10),
           task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined,
           due_date: null, priority: 'Normal' as const, created_at: now, updated_at: now,

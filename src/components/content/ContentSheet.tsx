@@ -894,7 +894,9 @@ export function ContentSheet(p: ContentSheetProps) {
         const parent = popup.rec.parent_id ? recs.find(r => r.id === popup.rec.parent_id) : null
         const parentOf = parent?.task_id ? p.tasks.find(x => x.id === parent.task_id) ?? null : null
         // Owner, 25 Nov 2026: no subtasks — only a video's child rows are tied to it (its clips).
-        const parentTask = parentOf && parentOf.content_type_label === 'Video' && !parentOf.parent_task_id ? parentOf : null
+        // Owner, 25 Nov 2026: no subtasks or clips under a task — a child row makes a task of its own.
+        void parentOf
+        const parentTask = null
         return (
           <SheetPopover anchor={popup.anchor} label={t('rows.makeTask')} onClose={closePopup}>
             <MakeTaskDialog title={popup.rec.title} spaces={(p.spaces ?? []).map(sp => ({ id: sp.id, name: sp.name }))} defaultSpaceId={p.space?.id ?? null}
