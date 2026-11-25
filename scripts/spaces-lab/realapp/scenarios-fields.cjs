@@ -237,7 +237,8 @@ module.exports = (EMAIL, psql, ok) => {
         const vid = first(`insert into saved_views (id, node, type, name, config, owner_id, position) values (gen_random_uuid(), '${node}', 'sheet', 'Lab by theme ${n}',
           '{"filters":{"campaign":["${th}"]}}'::jsonb, '${who('admin')}', 99) returning id`)
         try {
-          psql(`update team_spaces set settings = jsonb_set(coalesce(settings,'{}'::jsonb), '{fields,theme}', '{"shown":false}'::jsonb, true) where key='content'`)
+          // jsonb_set can't add a missing "fields" object: build it.
+          psql(`update team_spaces set settings = coalesce(settings,'{}'::jsonb) || jsonb_build_object('fields', coalesce(settings->'fields','{}'::jsonb) || '{"theme":{"shown":false}}'::jsonb) where key='content'`)
           await go(`/spaces/content?view=v:${vid}`)
           await page.waitForSelector('[data-view-config]', { timeout: 90000 })
           await page.waitForSelector('[data-view-field-off="theme"]', { timeout: 20000 })
