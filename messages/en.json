@@ -3503,7 +3503,7 @@
   "taskSheet": {
     "ownerInPanel": "Change the owner in the task panel.",
     "col": {
-        "owner": "Owner",
+      "owner": "Owner",
       "title": "Task",
       "brand": "Brand",
       "status": "Status",
@@ -4190,5 +4190,34 @@
     "makeCustom": "Make custom",
     "offHere": "Turn off in this Space",
     "isStandard": "Standard fields are on in every Space."
+  },
+  "passwordReset": {
+    "forgotLink": "Forgot password?",
+    "forgotTitle": "Forgot your password?",
+    "forgotIntro": "Enter the email you sign in with. We'll email you a link to choose a new password.",
+    "email": "Email",
+    "emailEmpty": "Enter your email.",
+    "sendLink": "Send reset link",
+    "sending": "Sending…",
+    "sent": "If {email} has a Momentum account, a reset link is on its way. Check your inbox and spam folder. The link works once, for 60 minutes.",
+    "noEmail": "This workspace can't send email yet, so no link was sent. Ask an admin to set a new password for you in Settings › Team.",
+    "failed": "Something went wrong. Please try again.",
+    "backToLogin": "Back to sign in",
+    "resetTitle": "Choose a new password",
+    "resetIntro": "Hello {name}. Choose a new password of at least {min} characters.",
+    "newPassword": "New password",
+    "confirmPassword": "Type it again",
+    "save": "Save new password",
+    "saving": "Saving…",
+    "short": "Use at least {min} characters.",
+    "mismatch": "The two passwords don't match.",
+    "done": "Your password is changed. Sign in with the new one.",
+    "signIn": "Sign in",
+    "newLink": "Send a new link",
+    "bad": {
+      "invalid": "This reset link isn't valid. Ask for a new one.",
+      "expired": "This reset link has expired. Links work for 60 minutes; ask for a new one.",
+      "used": "This reset link has already been used. Ask for a new one if you still need it."
+    }
   }
 }

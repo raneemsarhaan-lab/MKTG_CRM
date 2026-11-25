@@ -93,37 +93,37 @@ model Member {
   views_owned       SavedView[]       @relation("SavedViewOwner")
   views_created     SavedView[]       @relation("SavedViewCreator")
 
-  work_days         WorkDay[] @relation("WorkDayMember")
-  work_days_updated WorkDay[] @relation("WorkDayUpdater")
+  work_days          WorkDay[]    @relation("WorkDayMember")
+  work_days_updated  WorkDay[]    @relation("WorkDayUpdater")
+  brand_assets_added BrandAsset[] @relation("BrandAssetAdder")
 
   @@map("members")
-  brand_assets_added BrandAsset[] @relation("BrandAssetAdder")
 }
 
 model Brand {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  color       String   @default("#64748B")
-  logo_url    String?
-  description String?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String   @unique
+  color              String   @default("#64748B")
+  logo_url           String?
+  description        String?
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
   /// Spec 021 (R11): feature switch overrides, e.g. { "platform": false }. A missing key means the workspace default (on).
   features           Json     @default("{}")
   /// Spec 021 (R11): this brand's "with C-Check" default for new tasks. Null = the workspace default.
   nine_stage_default Boolean?
   /// Spec 025: the name the sidebar shows ("Forefront" for "Forefront Consulting"). Null = the full name.
-  short_name       String?
+  short_name         String?
   /// Spec 025: the priority new tasks for this brand start with. Null = the Space's, then the task type's.
-  default_priority String?
+  default_priority   String?
 
-  tasks        Task[]
-  assets       BrandAsset[]
-  projects     Project[]
-  sheet_folder SheetFolder?
+  tasks         Task[]
+  assets        BrandAsset[]
+  projects      Project[]
+  sheet_folder  SheetFolder?
   tagged_sheets Sheet[]
+  milestones    Milestone[]
 
   @@map("brands")
-  milestones  Milestone[]
 }
 
 /// A planned piece of work, from the Aspiring / Focus plan.
@@ -160,11 +160,11 @@ model Project {
   /// Who it is for: keys from the fixed audience list (src/components/content/audience.ts).
   audience         String[] @default([])
 
-  brand   Brand?          @relation(fields: [brand_id], references: [id], onDelete: SetNull)
-  owner   Member?         @relation("ThemeOwner", fields: [owner_id], references: [id], onDelete: SetNull)
-  steps   ProjectStep[]
-  tasks   Task[]
-  pillars ContentPillar[]
+  brand        Brand?              @relation(fields: [brand_id], references: [id], onDelete: SetNull)
+  owner        Member?             @relation("ThemeOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  steps        ProjectStep[]
+  tasks        Task[]
+  pillars      ContentPillar[]
   /// Sheet 2b: the Content sheet's entry for this project, when it is a theme there.
   sheet_themes ContentSheetTheme[]
   content_rows ContentRow[]
@@ -218,12 +218,12 @@ model ProjectStep {
 /// Reference material for a brand — logos, guidelines, templates.
 /// Stored as URLs, like task attachments: there is no upload backend.
 model BrandAsset {
-  id          String   @id @default(uuid()) @db.Uuid
-  brand_id    String   @db.Uuid
-  filename    String
+  id           String   @id @default(uuid()) @db.Uuid
+  brand_id     String   @db.Uuid
+  filename     String
   /// Where to read it: a link, or the bucket's public address. Empty when the bytes are in `data`.
-  url         String
-  uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+  url          String
+  uploaded_at  DateTime @default(now()) @db.Timestamptz(6)
   /// Spec 025 (Assets tab): 'logo' | 'template' | 'photo' | 'design' | 'other'.
   kind         String   @default("other")
   /// An uploaded file kept in the database (no bucket configured), as a data URL.
@@ -238,29 +238,28 @@ model BrandAsset {
   /// The task this file belongs with, when linked.
   task_id      String?  @db.Uuid
 
-  brand Brand @relation(fields: [brand_id], references: [id], onDelete: Cascade)
+  brand Brand   @relation(fields: [brand_id], references: [id], onDelete: Cascade)
   adder Member? @relation("BrandAssetAdder", fields: [added_by], references: [id], onDelete: SetNull)
   task  Task?   @relation("BrandAssetTask", fields: [task_id], references: [id], onDelete: SetNull)
 
   @@index([brand_id])
-
   @@map("brand_assets")
 }
 
 model ContentType {
-  id         String   @id @default(uuid()) @db.Uuid
-  label      String   @unique
-  created_at DateTime @default(now()) @db.Timestamptz(6)
+  id                  String          @id @default(uuid()) @db.Uuid
+  label               String          @unique
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
   /// Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design.
-  media_boards String[] @default(["design"])
+  media_boards        String[]        @default(["design"])
   /// Spec 023 (R1): a task type — its Arabic name, icon, colour and defaults.
   name_ar             String?
-  icon                String   @default("doc")
-  color               String   @default("#6B7280")
+  icon                String          @default("doc")
+  color               String          @default("#6B7280")
   default_priority    String?
-  default_tag_ids     String[] @default([]) @db.Uuid
-  default_template_id String?  @db.Uuid
-  position            Int      @default(0)
+  default_tag_ids     String[]        @default([]) @db.Uuid
+  default_template_id String?         @db.Uuid
+  position            Int             @default(0)
   type_fields         TaskTypeField[]
   templates           TaskTemplate[]
 
@@ -442,12 +441,13 @@ model Task {
 
   /// One linked media task per board (nulls are distinct, so unlinked tasks are free).
   /// Sheet 2b: the Content sheet row that stands for this task.
-  content_rows         ContentRow[]
+  content_rows  ContentRow[]
   /// Spec 026: unlinked from a sheet by hand, so the Content sheet doesn't give it a row again.
-  sheet_row_off        Boolean   @default(false)
+  sheet_row_off Boolean      @default(false)
+  brand_assets  BrandAsset[] @relation("BrandAssetTask")
+
   @@unique([content_task_id, media_board])
   @@map("tasks")
-  brand_assets BrandAsset[] @relation("BrandAssetTask")
 }
 
 /// One clip of a long-form video (spec 008 Video Sheet).
@@ -469,7 +469,7 @@ model ContentPillar {
   sort_order Int      @default(0)
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
-  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [project_id], references: [id], onDelete: Cascade)
   tasks   Task[]
   rows    ContentRow[]
 
@@ -604,11 +604,11 @@ model TaskAttachment {
 }
 
 model WorkspaceSettings {
-  id                  Int     @id
+  id                  Int      @id
   /// Fields (25 Nov 2026): custom fields an admin promoted to Standard ("priority", or "f:<field id>"): on in every Space.
   standard_fields     String[] @default([])
-  capacity_hrs_per_wk Int     @default(40)
-  nine_stage_default  Boolean @default(false)
+  capacity_hrs_per_wk Int      @default(40)
+  nine_stage_default  Boolean  @default(false)
 
   /// How many hours one planned step-day costs. The plan is written in days;
   /// this is what turns it into hours.
@@ -684,6 +684,20 @@ model DataExport {
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("data_exports")
+}
+
+/// Forgot password (25 Nov 2026): one emailed reset link. Only a SHA-256 of the token is kept, so a
+/// copy of this table can't be used to reset anyone. A link works once, for an hour.
+model PasswordReset {
+  id         String    @id @default(uuid()) @db.Uuid
+  member_id  String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([member_id, created_at])
+  @@map("password_resets")
 }
 
 model Tombstone {
@@ -947,19 +961,19 @@ model Sheet {
   created_at   DateTime @default(now()) @db.Timestamptz(6)
   updated_at   DateTime @default(now()) @db.Timestamptz(6)
 
-  folder    SheetFolder    @relation(fields: [folder_id], references: [id], onDelete: Cascade)
-  creator   Member?        @relation("SheetCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  updater   Member?        @relation("SheetUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
-  protector Member?        @relation("SheetProtector", fields: [protected_by], references: [id], onDelete: SetNull)
-  brand     Brand?         @relation(fields: [brand_id], references: [id], onDelete: SetNull)
-  rows      SheetRow[]
-  cols      SheetCol[]
-  cells     SheetCell[]
-  formats   SheetFormat[]
-  merges    SheetMerge[]
-  comments  SheetComment[]
-  rules     SheetRule[]
-  tables    SheetTable[]
+  folder      SheetFolder       @relation(fields: [folder_id], references: [id], onDelete: Cascade)
+  creator     Member?           @relation("SheetCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater     Member?           @relation("SheetUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  protector   Member?           @relation("SheetProtector", fields: [protected_by], references: [id], onDelete: SetNull)
+  brand       Brand?            @relation(fields: [brand_id], references: [id], onDelete: SetNull)
+  rows        SheetRow[]
+  cols        SheetCol[]
+  cells       SheetCell[]
+  formats     SheetFormat[]
+  merges      SheetMerge[]
+  comments    SheetComment[]
+  rules       SheetRule[]
+  tables      SheetTable[]
   validations SheetValidation[]
 
   @@index([folder_id, position])
@@ -1179,31 +1193,31 @@ model WorkDay {
 /// Spec 021: a team Space — a lens on one team's work across every brand.
 /// Tasks never live in a Space; `task_spaces` lists which tasks show in it.
 model TeamSpace {
-  id            String    @id @default(uuid()) @db.Uuid
+  id                    String    @id @default(uuid()) @db.Uuid
   /// Stable key: 'content', 'design', 'video', 'planning', or one made from the name.
-  key           String    @unique
-  name          String
-  color         String    @default("#64748B")
+  key                   String    @unique
+  name                  String
+  color                 String    @default("#64748B")
   /// Design and Video: tasks are handed to these at Ready For Design (FR-030, FR-033).
-  is_production Boolean   @default(false)
+  is_production         Boolean   @default(false)
   /// 'pipeline' | 'simple': the kind of task created from this Space (FR-023).
-  default_kind  String    @default("pipeline")
+  default_kind          String    @default("pipeline")
   /// { [stageId | simpleStatus]: string[] }. Unused for 'content' and 'video', whose words live on their linked sheet (R5).
-  words         Json      @default("{}")
-  sort_order    Int       @default(0)
-  archived_at   DateTime? @db.Timestamptz(6)
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  words                 Json      @default("{}")
+  sort_order            Int       @default(0)
+  archived_at           DateTime? @db.Timestamptz(6)
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime  @default(now()) @db.Timestamptz(6)
   /// Spec 022 (R9): the role new tasks made in this Space are assigned to.
   default_assignee_role String?
   /// Spec 022: 'design' | 'video' when this Space is that media board.
-  media_board   String?
+  media_board           String?
   /// Spec 024: how the Space works (src/lib/space-settings.ts); missing keys take the Space's defaults.
-  settings      Json      @default("{}")
+  settings              Json      @default("{}")
 
-  members TeamSpaceMember[]
-  tasks   TaskSpace[]
-  stages  SpaceStage[]
+  members     TeamSpaceMember[]
+  tasks       TaskSpace[]
+  stages      SpaceStage[]
   task_stages TaskSpaceStage[]
 
   sheet_themes ContentSheetTheme[]
@@ -1214,19 +1228,19 @@ model TeamSpace {
 
 /// Spec 022 (R7): a Space's name for one original stage; a stage may have several (a split).
 model SpaceStage {
-  id        String   @id @default(uuid()) @db.Uuid
-  space_id  String   @db.Uuid
-  stage_id  String
+  id         String   @id @default(uuid()) @db.Uuid
+  space_id   String   @db.Uuid
+  stage_id   String
   /// Null shows the original stage's name.
-  name      String?
+  name       String?
   /// Order within its original stage; 0 is the first.
-  position  Int      @default(0)
+  position   Int      @default(0)
   /// Other names that can be typed in sheets (carried over from status words).
-  aliases   String[] @default([])
+  aliases    String[] @default([])
   updated_at DateTime @default(now()) @db.Timestamptz(6)
 
-  space      TeamSpace        @relation(fields: [space_id], references: [id], onDelete: Cascade)
-  task_rows  TaskSpaceStage[]
+  space     TeamSpace        @relation(fields: [space_id], references: [id], onDelete: Cascade)
+  task_rows TaskSpaceStage[]
 
   @@index([space_id, stage_id, position])
   @@map("space_stages")
@@ -1307,19 +1321,19 @@ model SavedView {
 
 /// Spec 023 (R2): the workspace field library. Values belong to the task.
 model TaskField {
-  id          String    @id @default(uuid()) @db.Uuid
-  name_en     String
-  name_ar     String?
+  id         String    @id @default(uuid()) @db.Uuid
+  name_en    String
+  name_ar    String?
   /// text · number · money · date · link · person · choice · multi · checkbox · rating · task
-  kind        String
+  kind       String
   /// Choice options [{id, en, ar, color}], money currency, rating max.
-  options     Json      @default("{}")
-  on_card     Boolean   @default(false)
-  switchable  Boolean   @default(false)
-  position    Int       @default(0)
-  retired_at  DateTime? @db.Timestamptz(6)
-  created_by  String?   @db.Uuid
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  options    Json      @default("{}")
+  on_card    Boolean   @default(false)
+  switchable Boolean   @default(false)
+  position   Int       @default(0)
+  retired_at DateTime? @db.Timestamptz(6)
+  created_by String?   @db.Uuid
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
 
   attachments TaskTypeField[]
   values      TaskFieldValue[]

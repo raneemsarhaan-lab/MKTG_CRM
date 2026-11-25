@@ -3,6 +3,7 @@
 import { MomentumWordmark } from '@/components/shared/Logo'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 /**
  * Sign-in tracing.
@@ -33,6 +34,7 @@ log('login bundle evaluated')
  * handleSubmit, so nothing below this line ever ran.
  */
 export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
+  const tr = useTranslations('passwordReset')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
@@ -277,6 +279,13 @@ export function LoginForm({ jsFailed = false }: { jsFailed?: boolean }) {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {/* Forgot password: emails a one-time link (25 Nov 2026). A plain link, so it works even if this form's script didn't start. */}
+        <p style={{ textAlign: 'center', margin: '16px 0 0' }}>
+          <a href="/forgot-password" data-forgot-link="" style={{ color: 'var(--ink)', fontSize: '13px', fontWeight: 600, textDecoration: 'underline' }}>
+            {tr('forgotLink')}
+          </a>
+        </p>
 
         {/* Which build is answering. Readable without signing in, so it can
             still be checked by the person who cannot get in — and it is the

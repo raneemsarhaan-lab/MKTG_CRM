@@ -88,6 +88,8 @@ export function MomentumWordmark({
     <span
       role="img"
       aria-label={title}
+      // The wordmark always reads left to right, Arabic pages included (inline-flex follows the page's direction).
+      dir="ltr"
       style={{ display: 'inline-flex', alignItems: 'center', gap: fontSize * 0.045 }}
     >
       <span style={letter} aria-hidden="true">mom</span>
