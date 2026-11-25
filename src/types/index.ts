@@ -258,7 +258,8 @@ export interface TaskFieldDef {
   name_ar: string | null
   kind: FieldKind
   /** place: where the task panel shows it — the top rows, or above / below the Description (default above). */
-  options: { choices?: FieldOption[]; currency?: string; max?: number; place?: 'top' | 'above' | 'below'; hint?: { en: string; ar?: string | null } }
+  /** default_on: false for a field made from a Space's "+ New field": it is on only where a Space turns it on. */
+  options: { choices?: FieldOption[]; currency?: string; max?: number; place?: 'top' | 'above' | 'below'; hint?: { en: string; ar?: string | null }; default_on?: boolean }
   on_card: boolean
   switchable: boolean
   position: number

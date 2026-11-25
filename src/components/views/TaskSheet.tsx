@@ -21,6 +21,10 @@
  * Its formats, rules and view live on the workbook's Tasks sheet ('tasks:<node>');
  * its columns are that sheet's (spec 010 records keyed by the same id).
  */
+import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
+import { useAddColumn } from '@/components/fields/useAddColumn'
+import { setMyColumns } from '@/actions/fields'
+import { fieldOnIn } from '@/lib/field-catalog'
 import { withCommentPaste, withNumberFormats } from '@/components/sheet/linkedNumbers'
 import { pasteComments as pasteCommentsTo } from '@/components/sheets/format/bus'
 import { createTask } from '@/actions/tasks'
@@ -153,9 +157,19 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
   // ── columns (spec 010): this sheet's own layout and regular columns ──
   const bundle = useColumnsBundle(data.sheetColumns, data.sheetValues, me)
   const makeField = useMakeField(sheet, me.access, text => setSay(text))
+  // Fields (25 Nov 2026): a Space's task sheet shows the custom fields on in that Space; each person has their own columns.
+  const sheetSpace = /^tasks:space:/.test(sheet) ? data.spaces.find(sp => `tasks:space:${sp.id}` === sheet) ?? null : null
+  const libraryCols = useMemo(() => data.taskFields.filter(f => !f.retired && (!sheetSpace || fieldOnIn(`f:${f.id}`, sheetSpace.settings.fields, data.standardFields, f)))
+    .map(f => ({ key: `f:${f.id}`, name: fieldName(f, locale), width: f.kind === 'text' ? 220 : 160, shown: !!fields?.includes(`f:${f.id}`) })),
+  [data.taskFields, sheetSpace, data.standardFields, fields, locale])
+  const [layoutMode, setLayoutMode] = useState<'me' | 'default'>('me')
+  const fieldMenu = useRef<(key: string) => MenuItem[]>(() => [])
   const cl = useSheetColumns({
+    fields: libraryCols,
+    extraMenu: key => fieldMenu.current(key),
+    personal: inWorkbook ? { viewKey: sheet, layout: data.myLayouts[sheet] ?? null, mode: layoutMode, save: l => setMyColumns(sheet, l).catch(() => ({ success: false, error: 'network' })) } : undefined,
     sheet, set: 'all', bundle, me, members: data.members, makeField,
-    defaultName: key => (key === NOTES ? t('col.notes') : key.startsWith('f:') ? (() => { const f = data.taskFields.find(x => x.id === key.slice(2)); return f ? fieldName(f, locale) : '' })() : t(`col.${key as 'title'}`)),
+    defaultName: key => (key.startsWith('c:') ? '' : key === NOTES ? t('col.notes') : key.startsWith('f:') ? (() => { const f = data.taskFields.find(x => x.id === key.slice(2)); return f ? fieldName(f, locale) : '' })() : t(`col.${key as 'title'}`)),
     canEdit: task => may(task as ViewTask), say: sayNow,
     onNote: (k, n) => setCellNotes(c => ({ ...c, [k]: n ?? undefined })),
     // Spec 021: Task link fields pick from every task, and create in a Space.
@@ -166,11 +180,16 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
     },
   })
   const isCustom = (col: GridCol) => cl.custom.is(col)
+  // (ac is set just below; the menu reads it through the ref.)
+  const ac = useAddColumn({
+    cl, sheet, rowsSheet: false, space: sheetSpace, spaces: data.spaces, promoted: data.standardFields, library: data.taskFields,
+    me, api: bundle.api, say: sayNow, builtInName: key => t(`col.${key as 'title'}`),
+  })
+  fieldMenu.current = ac.menuFor
   // ── spec 023: task fields as columns `f:<id>` (the page's Fields button picks them) ──
   const fieldById = useMemo(() => new Map(data.taskFields.filter(f => !f.retired).map(f => [f.id, f])), [data.taskFields])
   const isField = (col: GridCol) => typeof col === 'string' && col.startsWith('f:') && fieldById.has(col.slice(2))
   const fieldOf = (col: GridCol) => fieldById.get(String(col).slice(2))!
-  const fieldCols = (fields ?? []).filter(k => k.startsWith('f:') && fieldById.has(k.slice(2))) as GridCol[]
   const baseValues = useMemo(() => new Map(data.fieldValues.map(v => [`${v.task_id}|${v.field_id}`, v.value])), [data.fieldValues])
   const [fieldOver, setFieldOver] = useState<Record<string, unknown>>({})
   useEffect(() => { setFieldOver({}) }, [data.fieldValues])
@@ -180,8 +199,9 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
   const mediaSpace = /^tasks:space:/.test(sheet) && !!data.spaces.find(sp => `tasks:space:${sp.id}` === sheet)?.media_board
   const ml = useMediaLinks({ tasks: viewTasks(data), onOpenTask: id => selectTask(id), say: sayNow })
   const cols: GridCol[] = [
-    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(!showSpace && c === 'space') && !(c === 'media' && mediaSpace) && (c === 'title' || c === 'media' || c === 'space' || isCustom(c) || !fields || fields.includes(c))),
-    ...fieldCols,
+    // A saved view's own fields decide, until the person shapes their own columns here.
+    ...cl.cols.filter(c => !(hideBrand && c === 'brand') && !(!showSpace && c === 'space') && !(c === 'media' && mediaSpace) && !ac.offHere(c)
+      && (c === 'title' || c === 'media' || c === 'space' || isCustom(c) || !fields || cl.hasOwnView || fields.includes(c))),
     ...(notes ? [NOTES] : []),
   ]
 
@@ -212,6 +232,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       case 'space': return spacesOf(x)
       case 'status': return stageOf(x)
       case 'assignee': return x.assignee_id ? memberName.get(x.assignee_id) ?? '' : ''
+      case 'owner': return x.task_owner_id ? memberName.get(x.task_owner_id) ?? '' : ''
       case 'due': return x.due_date ?? ''
       case 'publish': return x.publish_date ?? ''
       case 'start': return x.start_date ?? ''
@@ -383,10 +404,10 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
   const model: GridModel<Row> = {
     rows: baseRows,
     cols,
-    widths: { ...cl.widths, [NOTES]: 260, ...Object.fromEntries(fieldCols.map(c => [c, 170])) },
+    widths: { ...cl.widths, [NOTES]: 260 },
     rowNoWidth: ROW_NO_WIDTH,
     label,
-    header: col => ({ text: headerText(col), className: col === NOTES ? 'is-mine' : isField(col) ? 'is-task-field' : undefined }),
+    header: col => { const k = ac.kindOf(String(col)); const text = headerText(col); return { text: k && text ? <><FieldGlyph kind={k} tone={isCustom(col) ? 'regular' : ac.classFor(String(col)) === 'custom' ? 'custom' : 'standard'} />{text}</> : text, label: k && text ? text : undefined, className: col === NOTES ? 'is-mine' : isField(col) ? 'is-task-field' : undefined } },
     ...(inWorkbook ? cl.grid : {}),
     tailHeader: inWorkbook
       ? <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
@@ -453,6 +474,7 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       if (row.kind !== 'task' || col === NOTES) return null
       if (isCustom(col)) return cl.custom.readOnlyNote(row.task as unknown as Task, col)
       if (col === 'space') return t('spaceReadOnly')
+      if (col === 'owner') return t('ownerInPanel')
       if (!may(row.task)) return t('readOnly')
       if (isField(col) && !fieldApplies(row.task, col)) return tFields('notApplicable')
       if (offFeatureFor(row.task.brand, col)) return tFeat('hidden', { brand: row.task.brand?.name ?? '' })
@@ -578,12 +600,13 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       {cl.layer}
       {ml.layer}
       {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
+      {ac.node}
       {drawer && inWorkbook && (() => {
         const laid = cl.laid.filter(c => !(hideBrand && c.key === 'brand'))
         const asRow = (c: (typeof laid)[number]): PresetRow => {
           const i = laid.indexOf(c), name = cl.nameOf(c.key) || t(`col.${c.key as 'title'}`)
           return {
-            key: c.key, name, icon: c.kind ? 'regular' : null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
+            key: c.key, name: isField(c.key) ? fieldName(fieldOf(c.key), locale) : name, icon: c.kind ? 'regular' : null, glyph: ac.kindOf(c.key), shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
             up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
             upLabel: tcol('moveUp', { name }), downLabel: tcol('moveDown', { name }),
           }
@@ -599,12 +622,14 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
             ]}
             group={view.groupBy?.by && view.groupBy.by !== 'col' && view.groupBy.by !== 'theme' ? view.groupBy.by : 'default'}
             onGroup={v => void lv.store.saveView({ ...view, groupBy: v === 'default' ? null : { by: v as 'stage' | 'assignee' | 'type' | 'brand' | 'none' } })}
-            fields={laid.filter(c => !c.kind).map(asRow)}
+            fields={laid.filter(c => !c.kind && !ac.offHere(c.key) && ac.classFor(c.key) === 'standard').map(asRow)}
+            custom={laid.filter(c => !c.kind && !ac.offHere(c.key) && ac.classFor(c.key) === 'custom').map(asRow)}
+            view={{ mode: layoutMode, canDefault: (me.access === 'admin' || me.access === 'superuser') && !!sheetSpace, hasOwn: cl.hasOwnView, onMode: setLayoutMode, onReset: () => void cl.resetToDefault() }}
             regular={laid.filter(c => c.kind).map(asRow)}
             onToggle={(key, on) => void cl.setShown(key, on)}
             onMove={(key, dir) => { const i = laid.findIndex(c => c.key === key); void cl.move(key, dir < 0 ? laid[i - 1]?.key ?? null : laid[i + 2]?.key ?? null) }}
             onValues={() => {}}
-            onAddRegular={a => cl.openAdd(a)}
+            onAddRegular={a => ac.open(a)}
             onClose={() => setDrawer(false)} />
         )
       })()}

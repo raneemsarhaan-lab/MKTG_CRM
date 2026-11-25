@@ -13,9 +13,9 @@ import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import type { FieldOption, StageId, TaskFieldDef, TaskTypeFieldLink } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { fieldName, fieldsForType, formatValue, isEmpty, parseValue, placeOf, type FieldPlace } from '@/lib/task-fields'
+import { applies, fieldName, formatValue, isEmpty, parseValue, placeOf, type FieldPlace } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
-import { ruleFor, useCardFields } from './CardFields'
+import { fieldsHere, ruleFor, useCardFields } from './CardFields'
 import { fieldOn } from '@/lib/brand-features'
 import type { BrandFeatures } from '@/types/index'
 
@@ -33,9 +33,8 @@ function usePanelFields(task: { id: string; content_type_label: string | null; b
   useEffect(() => { setLocal({}) }, [base])
   // Spec 024 (§4): the Space decides which of the type's fields show here and which are required.
   const homeId = (task as { home_space_id?: string | null }).home_space_id
-  const entries: Entry[] = useMemo(() => (c ? fieldsForType(task.content_type_label, c.links, c.fields) : [])
-    .filter(x => fieldOn(task.brand, x.field))
-    .map(x => ({ ...x, rule: ruleFor(c, { home_space_id: homeId }, x.link) }))
+  // Fields (25 Nov 2026): the custom fields on in the Space, in its order (the type's fields and the Space's own).
+  const entries: Entry[] = useMemo(() => fieldsHere(c, { id: task.id, content_type_label: task.content_type_label, home_space_id: homeId, brand: task.brand })
     .filter(x => x.rule.shown)
     .map(x => ({ field: x.field, link: { ...x.link, required_from: x.rule.before }, value: x.field.id in local ? local[x.field.id] : base?.get(x.field.id) })), [c, task.content_type_label, task.brand, local, base, homeId])
   async function save(f: TaskFieldDef, value: unknown): Promise<string | null> {
@@ -73,13 +72,14 @@ function RequiredBadge({ link }: { link: TaskTypeFieldLink }) {
 /** The panel's top rows for fields placed there; `Row` is the panel's own row (label + value). */
 export function PanelTopFields({ task, canEdit, Row }: {
   task: { id: string; content_type_label: string | null; brand?: { features?: BrandFeatures | null } | null }; canEdit: boolean
-  Row: (p: { label: string; children: ReactNode }) => ReactNode
+  /** Fields (25 Nov 2026): `kind` gives the row its kind's icon (Channels is a multi-choice, not a checkbox). */
+  Row: (p: { label: string; kind: TaskFieldDef['kind']; children: ReactNode }) => ReactNode
 }) {
   const { entries, save } = usePanelFields(task)
   const locale = useLocale()
   // Row is called, not mounted: the panel passes a fresh function each render, and the editors keep their state.
   return <>{entries.filter(e => placeOf(e.field) === 'top').map(e => (
-    <Fragment key={e.field.id}>{Row({ label: fieldName(e.field, locale), children: (
+    <Fragment key={e.field.id}>{Row({ label: fieldName(e.field, locale), kind: e.field.kind, children: (
       <span data-panel-field={e.field.name_en} style={{ display: 'contents' }}>
         <FieldValueEditor entry={e} canEdit={canEdit} save={save} compact />
       </span>
@@ -90,7 +90,8 @@ export function PanelTopFields({ task, canEdit, Row }: {
 // ─── the sections around the Description (Caption above, TOV below) ────────
 
 export function hasSections(task: { content_type_label: string | null }, fields: TaskFieldDef[] | undefined, links: TaskTypeFieldLink[] | undefined) {
-  return !!fields && !!links && fieldsForType(task.content_type_label, links, fields).some(x => placeOf(x.field) !== 'top')
+  // Fields (25 Nov 2026): a Space's own field (attached to no type) counts as well.
+  return !!fields && !!links && fields.some(f => !f.retired && applies(task.content_type_label, f.id, links) && placeOf(f) !== 'top')
 }
 
 export function PanelFieldSections({ task, canEdit, place }: {

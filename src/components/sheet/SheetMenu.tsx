@@ -118,11 +118,13 @@ export function SheetMenu({ anchor, label, items, onClose }: {
 }
 
 /** A small dialog fixed to a cell: the link prompts and the Drop confirm. */
-export function SheetPopover({ anchor, label, children, onClose }: {
+export function SheetPopover({ anchor, label, children, onClose, width }: {
   anchor: HTMLElement | null
   label: string
   children: ReactNode
   onClose(restoreFocus: boolean): void
+  /** A wider popover (the Add column panel): its own width, no padding; it is kept inside the window. */
+  width?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const pos = usePlacement(anchor, ref)
@@ -144,7 +146,7 @@ export function SheetPopover({ anchor, label, children, onClose }: {
       className="fx-sheet-pop"
       data-sheet-pop=""
       onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(true) } }}
-      style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999 }}
+      style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, ...(width ? { width: `min(${width}px, calc(100vw - 16px))`, padding: 0 } : {}) }}
     >
       {children}
     </div>

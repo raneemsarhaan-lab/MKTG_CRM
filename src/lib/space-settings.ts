@@ -60,6 +60,8 @@ export interface SpaceSettings {
   child_rows: boolean
   fields: Record<string, FieldRule>
   section_order: PanelSection[]
+  /** Fields (25 Nov 2026): the order of this Space's custom fields in the task panel (field keys); the rest follow. */
+  field_order: string[]
   views: { default: SpaceView; sort: 'due' | 'publish' | 'priority' | 'name' | 'created' | 'updated'; group: 'none' | 'stage' | 'brand' | 'statusGroup'; columns: string[] }
   linking: { roles: string[]; handoff: HandoffAsk }
   rules: {
@@ -76,7 +78,7 @@ const LINK_ROLES = ['Content Creator', 'Digital Marketing Specialist']
 const base = (flow: SpaceFlow, extra: Partial<SpaceSettings> = {}): SpaceSettings => ({
   name_ar: null, icon: null, owner_id: null, visibility: 'members', flow,
   new_label: null, allowed_types: [], default_type: null, default_priority: null,
-  creators: 'members', child_rows: true, fields: {}, section_order: [...PANEL_SECTIONS],
+  creators: 'members', child_rows: true, fields: {}, section_order: [...PANEL_SECTIONS], field_order: [],
   views: { default: 'board', sort: 'due', group: 'none', columns: [] },
   linking: { roles: [...LINK_ROLES], handoff: 'ask' },
   rules: { owners: {}, approvers: {}, sla: {}, notify: { enter: [], overdue: [], back: [] } },
@@ -159,6 +161,7 @@ export function resolveSettings(key: string, stored: unknown): SpaceSettings {
     child_rows: typeof s.child_rows === 'boolean' ? s.child_rows : d.child_rows,
     fields,
     section_order: [...order, ...PANEL_SECTIONS.filter(x => !order.includes(x))],
+    field_order: strs(s.field_order, 60).slice(0, 100),
     views: {
       default: pick(v.default, ['board', 'sheet', 'calendar'] as const, d.views.default),
       sort: pick(v.sort, ['due', 'publish', 'priority', 'name', 'created', 'updated'] as const, d.views.sort),

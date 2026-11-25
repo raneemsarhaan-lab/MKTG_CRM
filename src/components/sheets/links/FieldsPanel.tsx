@@ -8,6 +8,7 @@
  * - Values: this sheet's own words for a stage, a type or a priority;
  * - Match the values: turning a regular column into one of those fields.
  */
+import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import type { GroupBy, SheetTaskMap, StageId, TaskField, WordField } from '@/types/index'
@@ -290,14 +291,18 @@ export function MatchDialog({ field, colName, values, map, types, linkedRows, on
 }
 
 /** One row of the Content sheet's drawer: a column, who changed it last, ↑ ↓, and its switch. */
-export interface PresetRow { key: string; name: string; icon: TaskField | 'taskcol' | 'regular' | null; shown: boolean; who: string; locked?: boolean; values?: WordField; up: boolean; down: boolean; upLabel: string; downLabel: string }
+export interface PresetRow { key: string; glyph?: import('@/lib/field-catalog').CatalogKind | null; name: string; icon: TaskField | 'taskcol' | 'regular' | null; shown: boolean; who: string; locked?: boolean; values?: WordField; up: boolean; down: boolean; upLabel: string; downLabel: string }
 
 /**
  * Spec 019 stage 2: the drawer of a sheet whose rows come from the board (the
  * Content sheet). Its rows are a preset; its columns are the sheet's fields
  * and the team's own columns, with the same switches as a team sheet's.
  */
-export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup, fields, regular, onToggle, onMove, onValues, onAddRegular, onRename, renameLabel, onClose }: {
+export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup, fields, custom, regular, onToggle, onMove, onValues, onAddRegular, onRename, renameLabel, onClose, view }: {
+  /** Fields (25 Nov 2026): custom fields as their own group (Standard first, then Custom, then Sheet only). */
+  custom?: PresetRow[]
+  /** Fields (25 Nov 2026): your own columns, or the Space's default (admins); Reset to Space default. */
+  view?: { mode: 'me' | 'default'; canDefault: boolean; hasOwn: boolean; onMode(mode: 'me' | 'default'): void; onReset(): void }
   rowsName: string
   rowsHelp: string
   groups: { value: string; label: string }[]
@@ -316,11 +321,14 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
 }) {
   const t = useTranslations('sheets.fields')
   const tu = useTranslations('sheets.ux')
+  const tfs = useTranslations('fieldSystem')
   const ref = useRef<HTMLElement>(null)
+  const [q, setQ] = useState('')
   useEffect(() => { ref.current?.querySelector<HTMLElement>('select, button')?.focus() }, [])
+  const hit = (r: PresetRow) => !q.trim() || r.name.toLowerCase().includes(q.trim().toLowerCase())
   const row = (r: PresetRow) => (
     <li key={r.key} className="fx-fd-row" data-field-row={r.key} data-panel-col={r.key}>
-      {r.icon && <FieldIcon field={r.icon} />}
+      {r.glyph ? <FieldGlyph kind={r.glyph} tone={custom?.includes(r) ? 'custom' : regular.includes(r) ? 'regular' : 'standard'} /> : r.icon && <FieldIcon field={r.icon} />}
       <span className="fx-fd-nm">{r.name}<small className="fx-col-who">{r.who}</small></span>
       {r.values && <button type="button" className="fx-fd-values" data-field-values={r.values} aria-label={tu('valuesFor', { name: r.name })} onClick={() => onValues(r.values!)}>{t('values')}</button>}
       {onRename && <button type="button" className="fx-fd-mv" data-field-rename={r.key} aria-label={renameLabel?.(r.name) ?? r.name} title={renameLabel?.(r.name)} onClick={e => onRename(r.key, e.currentTarget)}>✎</button>}
@@ -338,6 +346,20 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
         <button type="button" aria-label={t('close')} data-fields-close="" onClick={onClose}>×</button>
       </header>
       <div className="fx-fd-scroll">
+        {view && (
+          <section className="fx-fd-view" data-fields-view={view.mode}>
+            <div className="fx-fd-viewbar">
+              <div className="fx-fd-seg" role="group" aria-label={tfs('justMe')}>
+                <button type="button" aria-pressed={view.mode === 'me'} data-fields-mode="me" onClick={() => view.onMode('me')}>{tfs('justMe')}</button>
+                {view.canDefault && <button type="button" aria-pressed={view.mode === 'default'} data-fields-mode="default" onClick={() => view.onMode('default')}>{tfs('spaceDefault')}</button>}
+              </div>
+              {view.mode === 'me' && view.hasOwn && <button type="button" className="fx-fd-reset" data-fields-reset="" onClick={view.onReset}>{tfs('resetDefault')}</button>}
+            </div>
+            <label className="fx-fd-search">{tfs('search')}
+              <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder={tfs('searchHint')} data-fields-search="" />
+            </label>
+          </section>
+        )}
         <section>
           <h3>{t('rowsTitle')}</h3>
           <div className="fx-fd-src" data-rows-source="">
@@ -351,13 +373,20 @@ export function PresetFieldsDrawer({ rowsName, rowsHelp, groups, group, onGroup,
           </div>
         </section>
         <section>
-          <h3>{t('fieldsTitle')}</h3>
-          <ul className="fx-fd-list">{fields.map(row)}</ul>
-          <p className="fx-fd-hint">{t('dragHint')}</p>
+          <h3>{custom ? tfs('standard') : t('fieldsTitle')}</h3>
+          <ul className="fx-fd-list">{fields.filter(hit).map(row)}</ul>
+          {!custom && <p className="fx-fd-hint">{t('dragHint')}</p>}
         </section>
+        {custom && (
+          <section data-fields-custom="">
+            <h3>{tfs('custom')}</h3>
+            <ul className="fx-fd-list">{custom.filter(hit).map(row)}</ul>
+            <p className="fx-fd-hint">{t('dragHint')}</p>
+          </section>
+        )}
         <section>
           <h3>{t('regularTitle')}</h3>
-          <ul className="fx-fd-list">{regular.map(row)}</ul>
+          <ul className="fx-fd-list">{regular.filter(hit).map(row)}</ul>
           <button type="button" className="fx-fd-add" data-add-regular="" onClick={e => onAddRegular(e.currentTarget)}><span aria-hidden="true">＋ </span>{t('addRegular')}</button>
         </section>
       </div>

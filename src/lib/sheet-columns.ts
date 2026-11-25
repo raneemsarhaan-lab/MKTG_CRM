@@ -26,6 +26,8 @@ export interface BuiltInColumn {
   en: string
   /** Video only: the sets that show it by default. */
   sets?: string[]
+  /** Fields (25 Nov 2026): a column added later that starts hidden; anyone can show it from ＋. */
+  hidden?: boolean
 }
 
 /** The built-in columns of each sheet, in default order. Title is always first. */
@@ -45,6 +47,12 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
     { key: 'pillar', width: 120, en: 'Pillar' },
     { key: 'date', width: 104, en: 'Date' },
     { key: 'archive', width: 80, en: 'Archive or restore' },
+    // Fields (25 Nov 2026): the standard fields every task has, and two ready-made custom ones.
+    { key: 'brand', width: 150, en: 'Brand', hidden: true },
+    { key: 'owner', width: 140, en: 'Owner', hidden: true },
+    { key: 'due', width: 120, en: 'Due date', hidden: true },
+    { key: 'priority', width: 100, en: 'Priority', hidden: true },
+    { key: 'start', width: 120, en: 'Start date', hidden: true },
   ],
   // The redesigned Video sheet (design/video-sheet-v4.html) shows its own set,
   // 'sheet': Clip, Type, Stage, Owner, Reviewer, Due, In stage, File, the
@@ -94,6 +102,8 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
   { key: 'type', width: 110, en: 'Type' },
   { key: 'priority', width: 90, en: 'Priority' },
   { key: 'platform', width: 110, en: 'Platform' },
+  // Fields (25 Nov 2026): Owner is a standard field.
+  { key: 'owner', width: 140, en: 'Owner', hidden: true },
 ]
 export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
 export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
@@ -164,7 +174,7 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
     const r = byKey.get(key) ?? null
     const b = builtInOf(sheet, key)
     const f = isFieldKey(key) ? fieldOf.get(key) ?? { key, shown: false } : null
-    const defaultShown = f ? f.shown : b ? (picked.length ? picked.includes(key) : b.sets ? b.sets.includes(set) : true) : true
+    const defaultShown = f ? f.shown : b ? (picked.length ? picked.includes(key) : b.hidden ? false : b.sets ? b.sets.includes(set) : true) : true
     return {
       key,
       builtIn: !!b || !!f,
@@ -176,6 +186,28 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
       record: r,
       ...(f ? { field: true } : {}),
     }
+  })
+}
+
+/** Fields (25 Nov 2026): one person's own columns in a sheet view — the keys shown, in order, and widths. */
+export interface PersonalLayout { cols: string[]; widths?: Record<string, number> }
+
+/**
+ * A person's own view over the Space's default layout: their shown columns, in their order, then the
+ * rest (hidden) in the default order; their widths. Title stays first and shown. Columns they never
+ * saw (added since) follow the default.
+ */
+export function applyPersonal(laid: LaidColumn[], p: PersonalLayout | null | undefined): LaidColumn[] {
+  if (!p) return laid
+  const known = new Set(laid.map(c => c.key))
+  const mine = ['title', ...p.cols.filter(k => k !== 'title' && known.has(k))]
+  const on = new Set(mine)
+  const byKey = new Map(laid.map(c => [c.key, c]))
+  const order = [...mine, ...laid.map(c => c.key).filter(k => !on.has(k))]
+  return order.map(k => {
+    const c = byKey.get(k)!
+    const w = p.widths?.[k]
+    return { ...c, shown: on.has(k), width: typeof w === 'number' ? clampWidth(w) : c.width }
   })
 }
 

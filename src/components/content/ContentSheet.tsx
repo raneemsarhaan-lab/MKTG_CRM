@@ -6,6 +6,9 @@
  * pillars group pieces; every row is a task, moved by the board's own rules.
  * Paste plan brings the Content Library Google Sheet in.
  */
+import { useAddColumn } from '@/components/fields/useAddColumn'
+import { setMyColumns } from '@/actions/fields'
+import { fieldOnIn } from '@/lib/field-catalog'
 import { useMediaLinks } from '@/components/media/MediaLinks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
@@ -160,11 +163,29 @@ export function ContentSheet(p: ContentSheetProps) {
   const sheetId = p.sheet ?? 'content'
   const makeField = useMakeField(sheetId, me.access, text => say(text))
   // Spec 026 (§6): the field library as columns of this sheet.
-  const fieldCols = useFieldColumnDefs(p.tasks)
+  const fieldColsAll = useFieldColumnDefs(p.tasks)
+  // Fields (25 Nov 2026): only the custom fields on in this Space are columns here; each person has their own view.
+  const fs = p.fieldSystem
+  const [layoutMode, setLayoutMode] = useState<'me' | 'default'>('me')
+  const fieldMenu = useRef<(key: string) => import('@/components/sheet/SheetMenu').MenuItem[]>(() => [])
+  const fieldCols = useMemo(() => (fs?.space ? fieldColsAll.filter(f => fieldOnIn(f.key, fs.space!.settings.fields, fs.promoted, fs.library.find(x => `f:${x.id}` === f.key))) : fieldColsAll),
+    [fieldColsAll, fs])
   const sheetCols = useSheetColumns({
     sheet: sheetId, set: 'all', bundle: p.columns, me, members: p.members, makeField, fields: fieldCols, defaultShown: p.space?.settings?.views?.columns,
-    defaultName: key => (key.startsWith('f:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
+    defaultName: key => (key.startsWith('f:') || key.startsWith('c:') ? '' : t(`col.${key}` as 'col.title')), canEdit, say, onNote,
+    extraMenu: key => fieldMenu.current(key),
+    personal: fs ? { viewKey: fs.viewKey, layout: fs.layouts[fs.viewKey] ?? null, mode: layoutMode, save: l => setMyColumns(fs.viewKey, l).catch(() => ({ success: false, error: 'network' })) } : undefined,
   })
+  const ac = useAddColumn({
+    cl: sheetCols, sheet: sheetId, rowsSheet: true, space: fs?.space ?? null, spaces: fs?.spaces ?? [], promoted: fs?.promoted ?? [], library: fs?.library ?? [],
+    me, api: p.columns.api, say, builtInName: key => (key.startsWith('f:') || key.startsWith('c:') ? '' : t(`col.${key}` as 'col.title')),
+  })
+  fieldMenu.current = ac.menuFor
+  const lead = me.access === 'admin' || me.access === 'superuser'
+  const addColumn = fs ? {
+    ...ac,
+    view: { mode: layoutMode, canDefault: lead && !!fs.space, hasOwn: sheetCols.hasOwnView, onMode: setLayoutMode, onReset: () => void sheetCols.resetToDefault() },
+  } : undefined
   // Spec 023: Caption, Channels, TOV and the other task fields of the pieces' types, as columns.
   const cl = useTaskFieldColumns(sheetCols, { tasks: p.tasks, canEdit })
   const setType = (task: Task, label: string) =>
@@ -687,6 +708,7 @@ export function ContentSheet(p: ContentSheetProps) {
         : (
           <div className="fx-sheet-scroll">
             <ContentGrid
+              addColumn={addColumn}
               media={ml}
               stages={p.stages}
               rowRecs={recs}

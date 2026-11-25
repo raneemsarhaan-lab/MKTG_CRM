@@ -19,7 +19,7 @@ import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'r
 import { useLocale, useTranslations } from 'next-intl'
 import type { ColumnKind, Member, SheetId, Task } from '@/types/index'
 import {
-  MAX_CUSTOM_COLUMNS, setsFor, applyLayout, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, isFieldKey, normName, sheetLocale, type FieldColumn, type LaidColumn, type PasteValueColumn,
+  MAX_CUSTOM_COLUMNS, setsFor, applyLayout, applyPersonal, builtInOf, checkName, defaultShownIn, formatValue, isCustomKey, isFieldKey, normName, sheetLocale, type FieldColumn, type LaidColumn, type PasteValueColumn, type PersonalLayout,
 } from '@/lib/sheet-columns'
 import { contentTypeColor } from '@/lib/tokens'
 import { siteName } from '@/lib/content-plan'
@@ -66,6 +66,11 @@ export interface UseSheetColumns {
   fields?: (FieldColumn & { name: string })[]
   /** Spec 024 (§5): the Space's default sheet columns (built-in keys); empty = all of them. */
   defaultShown?: string[]
+  /**
+   * Fields (25 Nov 2026): each person's own columns in this view. Hide, show, move and resize change
+   * only their view; in 'default' mode (admins) they change the Space's default for everyone.
+   */
+  personal?: { viewKey: string; layout: PersonalLayout | null; mode: 'me' | 'default'; save(layout: PersonalLayout | null): Promise<{ success: boolean; error?: string }> }
 }
 
 export function useSheetColumns(given: UseSheetColumns) {
@@ -82,8 +87,14 @@ export function useSheetColumns(given: UseSheetColumns) {
   const api = bundle.api
 
   // A field's record outlives the field (retired, or a sheet that has no field library): only fields at hand are laid.
-  const laid = useMemo(() => applyLayout(sheet, bundle.records, set, given.fields, given.defaultShown).filter(c => !isFieldKey(c.key) || fieldNames.has(c.key)),
+  const base = useMemo(() => applyLayout(sheet, bundle.records, set, given.fields, given.defaultShown).filter(c => !isFieldKey(c.key) || fieldNames.has(c.key)),
     [sheet, bundle.records, set, given.fields, given.defaultShown, fieldNames])
+  // Fields (25 Nov 2026): this person's own view, saved per view; optimistic here.
+  const pv = given.personal
+  const [mine, setMine] = useState<{ key: string; layout: PersonalLayout | null } | null>(null)
+  const myLayout = pv ? (mine && mine.key === pv.viewKey ? mine.layout : pv.layout) : null
+  const personalMode = !!pv && pv.mode === 'me'
+  const laid = useMemo(() => (pv && pv.mode === 'me' ? applyPersonal(base, myLayout) : base), [base, pv, myLayout])
   const shown = useMemo(() => laid.filter(c => c.shown), [laid])
   const byKey = useMemo(() => new Map(laid.map(c => [c.key, c])), [laid])
   const nameOf = useCallback((key: string) => byKey.get(key)?.name ?? (isCustomKey(key) ? '' : fieldNames.get(key) ?? given.defaultName(key)), [byKey, fieldNames, given])
@@ -135,6 +146,32 @@ export function useSheetColumns(given: UseSheetColumns) {
     if (!r.success) o.say(err(r.error)); else if (ok) o.say(ok)
     return r.success
   }
+  /** Fields (25 Nov 2026): in a person's own view, hide, show, move and resize change only their layout. */
+  function saveMine(next: PersonalLayout | null) {
+    if (!pv) return Promise.resolve({ success: true })
+    setMine({ key: pv.viewKey, layout: next })
+    return pv.save(next)
+  }
+  const current = (): PersonalLayout => ({ cols: laid.filter(c => c.shown).map(c => c.key), widths: myLayout?.widths ?? {} })
+  function doShown(key: string, on: boolean) {
+    if (!personalMode) return api.setShown(sheet, key, set, on)
+    const cur = current()
+    const cols = on ? (cur.cols.includes(key) ? cur.cols : [...cur.cols, key]) : cur.cols.filter(k => k !== key)
+    return saveMine({ ...cur, cols })
+  }
+  function doMove(key: string, before: string | null) {
+    if (!personalMode) return api.move(sheet, key, before)
+    const cur = current()
+    const cols = cur.cols.filter(k => k !== key)
+    const i = before ? cols.indexOf(before) : -1
+    if (i >= 0) cols.splice(i, 0, key); else if (laid.find(c => c.key === key)?.shown) cols.push(key)
+    return saveMine({ ...cur, cols })
+  }
+  function doResize(key: string, width: number) {
+    if (!personalMode) return api.resize(sheet, key, width)
+    const cur = current()
+    return saveMine({ ...cur, widths: { ...(cur.widths ?? {}), [key]: width } })
+  }
   function moveBy(key: string, d: -1 | 1) {
     const vis = shown.map(c => c.key)
     const i = vis.indexOf(key)
@@ -142,7 +179,7 @@ export function useSheetColumns(given: UseSheetColumns) {
     if (!target || target === 'title') return
     // Before the one to the left; or before the one after the next to the right.
     const before = d < 0 ? target : vis[i + 2] ?? null
-    void run(api.move(sheet, key, before), t('movedCol', { name: nameOf(key) }))
+    void run(doMove(key, before), t('movedCol', { name: nameOf(key) }))
   }
 
   function columnMenu(key: string, anchor: HTMLElement) {
@@ -163,7 +200,7 @@ export function useSheetColumns(given: UseSheetColumns) {
       if (i > 1) items.push({ key: 'left', group: '  ', text: t('moveLeft'), label: t('moveLeft'), onSelect: pick(() => moveBy(key, -1)) })
       if (i < vis.length - 1) items.push({ key: 'right', group: '  ', text: t('moveRight'), label: t('moveRight'), onSelect: pick(() => moveBy(key, 1)) })
       items.push({ key: 'hide', group: '  ', text: t('hide'), label: t('hide'), hint: sheet === 'video' ? t('hideIn', { set: setName(set) }) : undefined,
-        onSelect: pick(() => void run(api.setShown(sheet, key, set, false), t('hidden', { name: nameOf(key) }))) })
+        onSelect: pick(() => void run(doShown(key, false), t('hidden', { name: nameOf(key) }))) })
     }
     items.push(...(o.extraMenu?.(key, anchor) ?? []).map(it => ({ ...it, onSelect: () => { close(false); it.onSelect() } })))
     if (c.kind) {
@@ -171,7 +208,8 @@ export function useSheetColumns(given: UseSheetColumns) {
       // Spec 023 (D5): a team column becomes a task field, keeping its values (admins, superusers).
       if (o.makeField && c.kind !== 'task') items.push({ key: 'make-field', group: '   ', text: o.makeField.label, label: <span data-make-field="">{o.makeField.label}</span>, onSelect: pick(() => o.makeField!.run(key)) })
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => setPopup({ kind: 'delete', anchor, col: c }) })
-    } else if (!title) {
+    } else if (!title && !personalMode) {
+      // Taking a built-in column off the sheet for everyone is the Space default (admins); in your own view, Hide.
       items.push({ key: 'delete', group: '   ', text: t('delete'), label: t('delete'), tone: 'danger', onSelect: () => void removeBuiltIn(key) })
     }
     setPopup({ kind: 'menu', anchor, label: t('menuFor', { name: nameOf(key) || o.defaultName(key) }), items })
@@ -394,8 +432,8 @@ export function useSheetColumns(given: UseSheetColumns) {
   // ── grid hooks ──────────────────────────────────────────────────────────
   const grid = {
     headerMenu: (col: string, anchor: HTMLElement) => columnMenu(col, anchor),
-    onReorder: (col: string, before: string | null) => { void run(api.move(sheet, col, before), t('movedCol', { name: nameOf(col) })) },
-    onResize: (col: string, width: number) => { void run(api.resize(sheet, col, width)) },
+    onReorder: (col: string, before: string | null) => { void run(doMove(col, before), t('movedCol', { name: nameOf(col) })) },
+    onResize: (col: string, width: number) => { void run(doResize(col, width)) },
     headerName: (col: string) => t('menuButton', { name: nameOf(col) || o.defaultName(col) }),
     // Spec 013 (FR-042): the grid's own menus reach spec 010's add and delete flows.
     /** Insert column: the add-column form, beside this column. Title has nothing before it. */
@@ -409,6 +447,7 @@ export function useSheetColumns(given: UseSheetColumns) {
     deleteColumn: (key: string, anchor: HTMLElement) => {
       const c = byKey.get(key)
       if (c?.kind) setPopup({ kind: 'delete', anchor, col: c })
+      else if (c && personalMode) void run(doShown(key, false), t('hidden', { name: nameOf(key) || o.defaultName(key) }))
       else if (c) void removeBuiltIn(key)
     },
   }
@@ -499,15 +538,15 @@ export function useSheetColumns(given: UseSheetColumns) {
               <div key={c.key} className="fx-col-prow" data-panel-col={c.key}>
                 <input type="checkbox" id={`fx-colshow-${c.key}`} name={`show-${c.key}`} checked={c.shown} disabled={c.key === 'title'} aria-describedby={`fx-colwho-${c.key}`}
                        data-autofocus={i === 1 ? '' : undefined}
-                       onChange={e => void run(api.setShown(sheet, c.key, set, e.target.checked), t(e.target.checked ? 'shownCol' : 'hidden', { name: label }))} />
+                       onChange={e => void run(doShown(c.key, e.target.checked), t(e.target.checked ? 'shownCol' : 'hidden', { name: label }))} />
                 <label htmlFor={`fx-colshow-${c.key}`}>
                   <span className="fx-sheet-ellipsis">{label}{c.kind ? <span className="fx-sheet-muted"> · {t(`kinds.${c.kind}`)}</span> : null}</span>
                   <span className="fx-col-who" id={`fx-colwho-${c.key}`}>{changedBy(c)}</span>
                 </label>
                 <button type="button" className="fx-col-ib" aria-label={t('moveUp', { name: label })} disabled={i <= 1}
-                        onClick={() => void run(api.move(sheet, c.key, laid[i - 1].key), t('movedCol', { name: label }))}>↑</button>
+                        onClick={() => void run(doMove(c.key, laid[i - 1].key), t('movedCol', { name: label }))}>↑</button>
                 <button type="button" className="fx-col-ib" aria-label={t('moveDown', { name: label })} disabled={c.key === 'title' || i === laid.length - 1}
-                        onClick={() => void run(api.move(sheet, c.key, laid[i + 2]?.key ?? null), t('movedCol', { name: label }))}>↓</button>
+                        onClick={() => void run(doMove(c.key, laid[i + 2]?.key ?? null), t('movedCol', { name: label }))}>↓</button>
                 <button type="button" className="fx-col-ib" aria-label={t('more', { name: label })} aria-haspopup="menu"
                         onClick={e => columnMenu(c.key, e.currentTarget)}>⋯</button>
               </div>
@@ -581,8 +620,12 @@ export function useSheetColumns(given: UseSheetColumns) {
     openAdd,
     /** The rename box for a column, opened from outside the grid (the Fields drawer). */
     openRename: (key: string, anchor: HTMLElement) => { const c = byKey.get(key); if (c) setPopup({ kind: 'rename', anchor, col: c }) },
-    setShown: (key: string, on: boolean) => run(api.setShown(sheet, key, set, on), t(on ? 'shownCol' : 'hidden', { name: nameOf(key) || o.defaultName(key) })),
-    move: (key: string, before: string | null) => run(api.move(sheet, key, before), t('movedCol', { name: nameOf(key) || o.defaultName(key) })),
+    setShown: (key: string, on: boolean) => run(doShown(key, on), t(on ? 'shownCol' : 'hidden', { name: nameOf(key) || o.defaultName(key) })),
+    move: (key: string, before: string | null) => run(doMove(key, before), t('movedCol', { name: nameOf(key) || o.defaultName(key) })),
+    /** Fields (25 Nov 2026): whether this person sees their own view, and putting the Space's default back. */
+    personalMode,
+    hasOwnView: personalMode && !!myLayout,
+    resetToDefault: () => run(saveMine(null), t('resetView')),
     changedBy,
     cols: shown.map(c => c.key),
     widths: Object.fromEntries(laid.map(c => [c.key, c.width])) as Record<string, number>,

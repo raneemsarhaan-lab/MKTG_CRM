@@ -213,11 +213,13 @@ module.exports = (EMAIL, psql, ok) => {
         try {
           await openSheet(page, go, 'design', th)
           ok(!(await page.$(`[data-col-head="${key}"]`)), "a library field no type carries isn't a column yet")
-          // + Column offers Task field (the library) or Sheet only.
+          // Fields (25 Nov 2026): + Column opens the Add column panel — the field is on in Design, not shown yet.
+          psql(`update members set sheet_layouts='{}' where email='${EMAIL.admin}'`)
           await page.click('[data-content-sheet] [data-add-column]')
-          await page.waitForSelector(`[data-add-task-field="${key}"]`)
-          ok(await page.isVisible('[data-add-sheet-only]'), '+ Column offers a Task field or a Sheet only column')
-          await page.click(`[data-add-task-field="${key}"]`)
+          await page.waitForSelector(`[data-add-section="on"] [data-add-item="${key}"]`)
+          ok(await page.isVisible('[data-add-new]'), '+ Column ends with + New field (a task field or a sheet-only column)')
+          // An admin shapes the Space default here (Just me would change only their own view).
+          await page.click(`[data-add-section="on"] [data-add-item="${key}"] [data-add-do]`)
           await page.waitForSelector(`[data-col-head="${key}"]`, { timeout: 30000 })
           ok((await page.locator(`[data-col-head="${key}"]`).innerText()).includes(`Lab field ${n}`), 'the chosen library field is a column, named by the field')
           // A plain row holds its own value in it.
@@ -226,9 +228,15 @@ module.exports = (EMAIL, psql, ok) => {
           await page.keyboard.press('Enter')
           await page.waitForTimeout(1500)
           ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'a plain row holds its own value in a task-field column')
-          // The Fields drawer: rename, move, hide.
+          // The Fields drawer: rename, move, hide — in the Space default (admins).
           await page.click('[data-fields-btn]')
           await page.waitForSelector(`[data-fields-drawer] [data-field-row="${key}"]`)
+          await page.click('[data-fields-mode="default"]')
+          // Shown above in my own view; the Space default shows it too.
+          await page.click(`[data-fields-drawer] [data-field-switch="${key}"]`).catch(() => {})
+          await page.waitForTimeout(1200)
+          if ((await page.getAttribute(`[data-fields-drawer] [data-field-switch="${key}"]`, 'aria-checked')) !== 'true') await page.click(`[data-fields-drawer] [data-field-switch="${key}"]`)
+          await page.waitForTimeout(1200)
           await page.click(`[data-field-rename="${key}"]`)
           await page.waitForSelector('[data-column-rename] input')
           await page.fill('[data-column-rename] input', `Lab renamed ${n}`)
@@ -243,17 +251,17 @@ module.exports = (EMAIL, psql, ok) => {
           // (Columns of fields retired since may sit between, so the place moves up by one or more.)
           ok(Number(rec(key).split('|')[1]) < posBefore, 'moved up from the Fields drawer')
           await page.click(`[data-fields-drawer] [data-field-switch="${key}"]`)
-          await page.waitForFunction(k => !document.querySelector(`[data-col-head="${k}"]`), key, { timeout: 30000 })
           await page.waitForTimeout(1500)
-          ok(rec(key).endsWith('|false|'), 'hidden from the Fields drawer')
+          ok(rec(key).endsWith('|false|'), 'hidden from the Fields drawer (the Space default)')
           ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'hiding keeps the values')
           await page.click('[data-fields-close]')
-          // Sheet only: a column of the sheet's own.
+          // Sheet only: a column of the sheet's own, from + New field.
           await page.click('[data-content-sheet] [data-add-column]')
-          await page.click('[data-add-sheet-only]')
-          await page.waitForSelector('[data-column-editor]')
-          await page.fill('[data-column-editor] input[type="text"]', `Lab only ${n}`)
-          await page.keyboard.press('Enter')
+          await page.click('[data-add-new]')
+          await page.fill('[data-new-name]', `Lab only ${n}`)
+          await page.click('[data-new-place="sheet"]')
+          await page.click('[data-new-kind="text"]')
+          await page.click('[data-new-add]')
           await page.waitForFunction(name => [...document.querySelectorAll('[data-col-head]')].some(h => h.textContent?.includes(name)), `Lab only ${n}`, { timeout: 30000 })
           await page.waitForTimeout(1000)
           ok(psql(`select kind from sheet_columns where sheet='${sheet}' and name='Lab only ${n}' and deleted_at is null`) === 'text', 'Sheet only adds a column that belongs to the sheet')
@@ -263,6 +271,7 @@ module.exports = (EMAIL, psql, ok) => {
           psql(`delete from sheet_columns where sheet='${sheet}' and (key='${key}' or name='Lab only ${n}')`)
           psql(`delete from sheet_columns where key='${key}'`)
           psql(`delete from task_fields where id='${fid}'`)
+          psql(`update members set sheet_layouts='{}' where email='${EMAIL.admin}'`)
           cleanup([th])
         }
       },

@@ -6,6 +6,10 @@
  * from the Space header by admins and superusers. Every control saves as it
  * changes; a flow that doesn't hold together is refused with what is wrong.
  */
+import { BUILT_IN_CUSTOM, fieldOnIn, type CatalogKind } from '@/lib/field-catalog'
+import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
+import { setFieldOrder, setFieldStandard } from '@/actions/fields'
+import type { TaskFieldDef, TaskTypeFieldLink } from '@/types/index'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -63,13 +67,24 @@ function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: 
   const others = data.spaces.filter(x => x.id !== space.id)
   const types = data.contentTypes.map(c => c.label)
   const inTypes = s.allowed_types.length ? s.allowed_types : types
-  // The fields the Space's task types carry (the type decides which fields exist).
-  const fieldLinks = useMemo(() => {
-    const seen = new Map<string, { field_id: string; type_label: string; required_from: string | null }>()
-    for (const l of data.typeFields) if (inTypes.includes(l.type_label) && !seen.has(l.field_id)) seen.set(l.field_id, l)
-    return [...seen.values()].map(l => ({ link: l, field: data.taskFields.find(f => f.id === l.field_id) })).filter(x => x.field && !x.field.retired)
+  // Fields (25 Nov 2026): every custom field, ready-made and from the library, in this Space's order.
+  const tfs = useTranslations('fieldSystem')
+  const promoted = data.standardFields
+  const lead = data.currentUser.access === 'admin' || data.currentUser.access === 'superuser'
+  const fieldRows = useMemo(() => {
+    const rows = [
+      ...BUILT_IN_CUSTOM.map(b => ({ key: b.key, en: b.en, name: locale === 'ar' ? b.ar : b.en, kind: b.kind as CatalogKind, field: null as TaskFieldDef | null, link: null as TaskTypeFieldLink | null })),
+      ...data.taskFields.filter(f => !f.retired).map(f => {
+        const l = data.typeFields.find(x => x.field_id === f.id && inTypes.includes(x.type_label))
+        return { key: `f:${f.id}`, en: f.name_en, name: locale === 'ar' && f.name_ar ? f.name_ar : f.name_en, kind: f.kind as CatalogKind, field: f as TaskFieldDef | null,
+          link: (l ?? { type_label: '', field_id: f.id, required_from: null, default_value: null, position: f.position }) as TaskTypeFieldLink | null }
+      }),
+    ]
+    const order = s.field_order
+    const rank = (k: string, i: number) => { const j = order.indexOf(k); return j < 0 ? 1000 + i : j }
+    return rows.map((r, i) => ({ r, n: rank(r.key, i) })).sort((a, b) => a.n - b.n).map(x => x.r)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.typeFields, data.taskFields, inTypes.join('|')])
+  }, [data.taskFields, data.typeFields, s.field_order, locale, inTypes.join('|')])
 
   const done = (r: { success: boolean; error?: string; problems?: string[] }) => {
     if (r.success) { setNote({ ok: true, text: t('saved') }); router.refresh(); return true }
@@ -266,47 +281,78 @@ function SpaceSettingsPanel({ space, data, onClose }: { space: TeamSpace; data: 
 
           {tab === 'panel' && <>
             <p style={hint}>{t('panelHelp')}</p>
-            {fieldLinks.length ? (
-              <table style={{ borderCollapse: 'collapse', width: '100%' }} data-space-fields>
-                <thead><tr><th style={th}>{t('field')}</th><th style={th}>{t('shown')}</th><th style={th}>{t('required')}</th><th style={th}>{t('requiredBefore')}</th></tr></thead>
-                <tbody>
-                  {fieldLinks.map(({ link, field }) => {
-                    const f = field!
-                    const rule = s.fields[f.id] ?? {}
-                    const eff = fieldRule(s, link)
-                    const mode = rule.required === true ? 'yes' : rule.required === false ? 'no' : 'type'
-                    const setRule = (patch: typeof rule) => {
-                      const next = { ...rule, ...patch }
-                      const fields = { ...s.fields, [f.id]: next }
-                      save({ fields } as Parameters<typeof updateSpaceSettings>[1], { ...s, fields })
-                    }
-                    const fname = locale === 'ar' && f.name_ar ? f.name_ar : f.name_en
-                    return (
-                      <tr key={f.id} data-space-field={f.name_en} style={{ borderTop: `1px solid ${PIPE.border}` }}>
-                        <td style={{ ...td, fontWeight: 600 }}>{fname}</td>
-                        <td style={td}><input type="checkbox" aria-label={t('shownFor', { field: fname })} checked={eff.shown} data-field-shown onChange={e => setRule({ shown: e.target.checked })} /></td>
-                        <td style={td}>
-                          <select style={input} aria-label={t('requiredFor', { field: fname })} value={mode} data-field-required disabled={!eff.shown}
-                            onChange={e => setRule({ required: (e.target.value === 'type' ? null : e.target.value === 'yes') as boolean | undefined, ...(e.target.value === 'yes' && rule.before === undefined && !link.required_from ? { before: s.flow.start } : {}) })}>
-                            <option value="type">{link.required_from ? t('typeRequired') : t('typeOptional')}</option>
+            {/* Fields (25 Nov 2026): every custom field — on or off in this Space, required here, its order in the panel; admins promote one to Standard. */}
+            <table style={{ borderCollapse: 'collapse', width: '100%' }} data-space-fields>
+              <thead><tr><th style={th}>{t('field')}</th><th style={th}>{tfs('onHereCol')}</th><th style={th}>{t('required')}</th><th style={th}>{t('requiredBefore')}</th><th style={th}><span className="fx-sheet-sr">{tfs('orderCol')}</span></th></tr></thead>
+              <tbody>
+                {fieldRows.map((row, i) => {
+                  const promotedHere = promoted.includes(row.key)
+                  const libField = row.field
+                  const link = row.link
+                  const rule = libField ? s.fields[libField.id] ?? {} : s.fields[row.key] ?? {}
+                  const on = fieldOnIn(row.key, s.fields, promoted, libField)
+                  const eff = link ? fieldRule(s, link) : { shown: on, before: null }
+                  const mode = rule.required === true ? 'yes' : rule.required === false ? 'no' : 'type'
+                  const setRule = (patch: typeof rule) => {
+                    const next = { ...rule, ...patch }
+                    const fields = { ...s.fields, [libField ? libField.id : row.key]: next }
+                    save({ fields } as Parameters<typeof updateSpaceSettings>[1], { ...s, fields })
+                  }
+                  const move = (by: number) => {
+                    const keys = fieldRows.map(r => r.key)
+                    const j = i + by
+                    if (j < 0 || j >= keys.length) return
+                    ;[keys[i], keys[j]] = [keys[j], keys[i]]
+                    setS({ ...s, field_order: keys })
+                    run(() => setFieldOrder(space.id, keys))
+                  }
+                  return (
+                    <tr key={row.key} data-space-field={row.en} style={{ borderTop: `1px solid ${PIPE.border}` }}>
+                      <td style={{ ...td, fontWeight: 600 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <FieldGlyph kind={row.kind} tone={promotedHere ? 'standard' : 'custom'} />{row.name}
+                        </span>
+                        {lead && (
+                          <button type="button" data-field-standard={promotedHere ? 'on' : 'off'} disabled={data.currentUser.access !== 'admin'}
+                            onClick={() => run(() => setFieldStandard(row.key, !promotedHere))}
+                            style={{ display: 'block', marginTop: 4, border: 'none', background: 'none', padding: 0, color: '#5B21D6', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {promotedHere ? tfs('makeCustom') : tfs('makeStandard')}
+                          </button>
+                        )}
+                      </td>
+                      <td style={td}>
+                        {promotedHere
+                          ? <span data-field-is-standard="" style={{ fontSize: 12, color: PIPE.textMuted }}>{tfs('standard')}</span>
+                          : <input type="checkbox" aria-label={t('shownFor', { field: row.name })} checked={on} data-field-shown
+                              onChange={e => { const v = e.target.checked; setRule({ shown: v }); }} />}
+                      </td>
+                      <td style={td}>
+                        {libField ? (
+                          <select style={input} aria-label={t('requiredFor', { field: row.name })} value={mode} data-field-required disabled={!on}
+                            onChange={e => setRule({ required: (e.target.value === 'type' ? null : e.target.value === 'yes') as boolean | undefined, ...(e.target.value === 'yes' && rule.before === undefined && !link?.required_from ? { before: s.flow.start } : {}) })}>
+                            <option value="type">{link?.required_from ? t('typeRequired') : t('typeOptional')}</option>
                             <option value="yes">{t('requiredYes')}</option>
                             <option value="no">{t('requiredNo')}</option>
                           </select>
-                        </td>
-                        <td style={td}>
-                          {eff.shown && eff.before
-                            ? <span style={{ display: 'grid', gap: 2 }}>
-                                {stageSelect(eff.before, v => v && setRule({ before: v }), { attr: 'data-field-before', ariaLabel: t('beforeFor', { field: fname }) })}
-                                {ALL_STAGES.indexOf(eff.before) < ALL_STAGES.indexOf(s.flow.start) && <span data-field-never style={{ fontSize: 12, color: PIPE.textMuted }}>{t('neverAsked', { stage: ownName(s.flow.start) })}</span>}
-                              </span>
-                            : <span style={{ color: PIPE.textMuted }}>—</span>}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            ) : <p style={hint}>{t('noFields')}</p>}
+                        ) : <span style={{ color: PIPE.textMuted }}>—</span>}
+                      </td>
+                      <td style={td}>
+                        {libField && on && eff.before
+                          ? <span style={{ display: 'grid', gap: 2 }}>
+                              {stageSelect(eff.before, v => v && setRule({ before: v }), { attr: 'data-field-before', ariaLabel: t('beforeFor', { field: row.name }) })}
+                              {ALL_STAGES.indexOf(eff.before) < ALL_STAGES.indexOf(s.flow.start) && <span data-field-never style={{ fontSize: 12, color: PIPE.textMuted }}>{t('neverAsked', { stage: ownName(s.flow.start) })}</span>}
+                            </span>
+                          : <span style={{ color: PIPE.textMuted }}>—</span>}
+                      </td>
+                      <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                        <button type="button" aria-label={t('moveUp', { name: row.name })} disabled={i === 0} data-field-up onClick={() => move(-1)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>↑</button>
+                        <button type="button" aria-label={t('moveDown', { name: row.name })} disabled={i === fieldRows.length - 1} data-field-down onClick={() => move(1)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>↓</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
             <fieldset style={{ border: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
               <legend style={{ ...label, padding: 0 }}>{t('sectionOrder')}</legend>
               <ol style={{ margin: 0, paddingInlineStart: 0, listStyle: 'none', display: 'grid', gap: 3, maxWidth: 360 }}>

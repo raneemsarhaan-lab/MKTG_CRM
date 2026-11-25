@@ -1,5 +1,6 @@
 'use client'
 
+import { fieldOnIn } from '@/lib/field-catalog'
 import { PANEL_SECTIONS } from '@/lib/space-settings'
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -418,6 +419,12 @@ function IconButton({ name, label, onClick, size = 17, color = CU.label }: {
  * ClickUp gives the label a fixed column so the values line up down both
  * halves of the grid regardless of how long the labels are.
  */
+/** Fields (25 Nov 2026): one icon per field kind, the same in every place. */
+const KIND_ICON: Partial<Record<string, IconName>> = {
+  text: 'pencil', number: 'target', money: 'target', date: 'calendar', link: 'link', person: 'person',
+  choice: 'type', multi: 'tag', checkbox: 'star', rating: 'star', task: 'subtask',
+}
+
 function Prop({ icon, label, children }: {
   icon: IconName; label: string; children: React.ReactNode
 }) {
@@ -1300,7 +1307,10 @@ export function TaskModal({
    */
   // Spec 021 (US4): a field switched off for the task's brand is hidden, never cleared.
   const taskBrand = brands.find(b => b.id === task.brand_id) ?? task.brand ?? null
-  const on = (k: BrandFeatureKey) => featureOn(taskBrand, k)
+  // Fields (25 Nov 2026): a custom field shows where its Space has it on (the Space looked at, else the task's own).
+  const fieldSpace = cardFields ? cardFields.spaces.find(s => s.id === (cardFields.viewSpaceId ?? (task as { home_space_id?: string | null }).home_space_id)) : undefined
+  const onHere = (key: string) => !fieldSpace || fieldOnIn(key, fieldSpace.settings.fields, cardFields?.promoted ?? [])
+  const on = (k: BrandFeatureKey) => featureOn(taskBrand, k) && (k === 'priorities' ? onHere('priority') : k === 'tags' ? onHere('tags') : true)
   const FIELD_FEATURE: Record<string, BrandFeatureKey> = { type: 'type', platform: 'platform', cover: 'covers' }
   const allFields: { key: string; filled: boolean; node: React.ReactNode }[] = [
     {
@@ -2085,7 +2095,7 @@ export function TaskModal({
                 </Prop>
 
                 {/* Spec 023: fields placed in the top rows (Channels), after Assignee. */}
-                <PanelTopFields task={task} canEdit={canEdit} Row={({ label, children }) => <Prop icon="platform" label={label}>{children}</Prop>} />
+                <PanelTopFields task={task} canEdit={canEdit} Row={({ label, kind, children }) => <Prop icon={KIND_ICON[kind] ?? 'type'} label={label}>{children}</Prop>} />
 
                 {/* Spec 023 (US4): tags, unless the brand has them switched off. */}
                 {on('tags') && <Prop icon="tag" label={tTags('title')}>
@@ -2103,8 +2113,8 @@ export function TaskModal({
                   </span>
                 </Prop>
 
-                {/* Spec 023 (US6): optional start date; never after the due date. */}
-                <Prop icon="calendar" label={tDates('start')}>
+                {/* Spec 023 (US6): optional start date; never after the due date. A custom field (25 Nov 2026). */}
+                {onHere('start') && <Prop icon="calendar" label={tDates('start')}>
                   <span data-start-date={task.start_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
                     <InlineValue
                       canEdit={canEdit} type="date" value={task.start_date ?? ''}
@@ -2112,7 +2122,7 @@ export function TaskModal({
                       onCommit={v => applyPatch({ start_date: v || null })}
                     />
                   </span>
-                </Prop>
+                </Prop>}
 
                 <Prop icon="calendar" label={tDates('due')}>
                   {/* The InlineValue button fills its parent, so it gets a

@@ -132,7 +132,9 @@ export function fieldsForType(typeLabel: string | null | undefined, links: TaskT
 
 /** Whether a field is attached to (applies to) a task's type. */
 export const applies = (typeLabel: string | null | undefined, fieldId: string, links: TaskTypeFieldLink[]) =>
-  !!typeLabel && links.some(l => l.type_label === typeLabel && l.field_id === fieldId)
+  // Fields (25 Nov 2026): a field attached to no type is a Space's field and applies to every task; one
+  // attached to types applies to those types.
+  !links.some(l => l.field_id === fieldId) || (!!typeLabel && links.some(l => l.type_label === typeLabel && l.field_id === fieldId))
 
 const at = (s: string) => ALL_STAGES.indexOf(s as StageId)
 

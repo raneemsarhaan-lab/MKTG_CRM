@@ -117,6 +117,9 @@ interface KanbanBoardProps {
   themeScope?: (theme: ContentTheme) => boolean
   /** The one brand this sheet is narrowed to (a Space › Brand folder, a brand's page): new themes take it. */
   sheetBrandId?: string | null
+  /** Fields (25 Nov 2026): custom fields promoted to Standard, and this person's own sheet columns per view. */
+  standardFields?: string[]
+  myLayouts?: Record<string, import('@/lib/sheet-columns').PersonalLayout>
   /** Spec 021: live team Spaces, their members, and Shows in rows. */
   spaces?: TeamSpace[]
   spaceMembers?: SpaceMember[]
@@ -148,7 +151,7 @@ export function KanbanBoard(props: KanbanBoardProps) {
   const sheetAddLabel = wrapSpace ? newTaskLabel(wrapSpace.settings, wrapLocale, '') || null : null
   return (
     <AddLabelProvider value={sheetAddLabel}>
-    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null}>
+    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null} promoted={props.standardFields}>
       <KanbanBoardInner {...props} />
     </CardFieldsProvider>
     </AddLabelProvider>
@@ -177,6 +180,9 @@ function KanbanBoardInner({
   sheetScope,
   themeScope,
   sheetBrandId = null,
+  standardFields = [],
+  myLayouts = {},
+  taskFields: libraryFields = [],
   spaces = [],
   spaceMembers = [],
   taskSpaces = [],
@@ -1312,6 +1318,11 @@ function KanbanBoardInner({
           rowHeights={sheetSpace?.key === 'content' || !sheetSpace ? linkedRowHeights?.content : undefined}
           rows={contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
           sheet={sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
+          fieldSystem={{
+            promoted: standardFields, layouts: myLayouts,
+            viewKey: `${sheetSpace ? spaceSheetId(sheetSpace) : 'content'}${sheetBrandId ? `:${sheetBrandId}` : ''}`,
+            space: sheetSpace ?? null, spaces, library: libraryFields,
+          }}
           space={sheetSpace ?? null}
           spaces={spaces}
           taskSpaces={taskSpaces}

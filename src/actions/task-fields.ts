@@ -36,6 +36,7 @@ function cleanOptions(kind: FieldKind, raw: unknown): TaskFieldDef['options'] {
   if (kind === 'money') out.currency = typeof o.currency === 'string' && /^[A-Z]{3}$/.test(o.currency) ? o.currency : 'EGP'
   if (kind === 'rating') out.max = typeof o.max === 'number' && o.max >= 3 && o.max <= 10 ? Math.trunc(o.max) : 5
   if (o.place === 'top' || o.place === 'below') out.place = o.place
+  if (o.default_on === false) out.default_on = false
   const h = o.hint && typeof o.hint === 'object' ? o.hint as Record<string, unknown> : null
   if (h && typeof h.en === 'string' && h.en.trim()) out.hint = { en: h.en.trim().slice(0, 80), ar: typeof h.ar === 'string' && h.ar.trim() ? h.ar.trim().slice(0, 80) : null }
   return out
@@ -205,9 +206,28 @@ export async function makeTaskField(sheet: string, columnKey: string): Promise<{
   let name = cleanName(col.name) || 'Field'
   for (let i = 2; await nameTaken(name); i++) name = `${cleanName(col.name) || 'Field'} ${i}`
   const choices = Array.isArray(col.options) ? (col.options as { id?: string; name?: string; color?: string }[]).map(o => ({ id: o.id, en: o.name ?? '', color: o.color ?? null })) : []
-  const made = await createField({ name_en: name, kind, options: kind === 'choice' ? { choices } : {} })
+  // Fields (25 Nov 2026): the column becomes a custom field of its Space — attached to no type (it
+  // applies to every task) and on in that Space. A column of a brand's or My tasks' sheet is on everywhere.
+  const spaceOfSheet = sheet === 'content'
+    ? await prisma.teamSpace.findUnique({ where: { key: 'content' }, select: { id: true, key: true, settings: true } })
+    : /^(rows|tasks:space):[0-9a-f-]{36}$/.test(sheet) ? await prisma.teamSpace.findUnique({ where: { id: sheet.slice(sheet.lastIndexOf(':') + 1) }, select: { id: true, key: true, settings: true } }) : null
+  const made = await createField({ name_en: name, kind, options: { ...(kind === 'choice' ? { choices } : {}), ...(spaceOfSheet ? { default_on: false } : {}) } })
   if (!made.success) return made
   const field = made.field
+  if (spaceOfSheet) {
+    const stored = (spaceOfSheet.settings && typeof spaceOfSheet.settings === 'object' ? { ...(spaceOfSheet.settings as Record<string, unknown>) } : {}) as Record<string, unknown>
+    const fields = { ...((stored.fields as Record<string, unknown>) ?? {}), [field.id]: { shown: true } }
+    await prisma.teamSpace.update({ where: { id: spaceOfSheet.id }, data: { settings: { ...stored, fields } as object } })
+  }
+  // A plain row's value (a row with no task) keeps its place under the field's key.
+  const plain = (await prisma.contentRow.findMany({ where: { task_id: null }, select: { id: true, values: true } }))
+    .filter(r => r.values && typeof r.values === 'object' && columnKey in (r.values as Record<string, unknown>))
+  for (const r of plain) {
+    const v = { ...(r.values as Record<string, unknown>) }
+    if (!(columnKey in v)) continue
+    v[`f:${field.id}`] = v[columnKey]
+    await prisma.contentRow.update({ where: { id: r.id }, data: { values: v as object } })
+  }
   let moved = 0
   const types = new Set<string>()
   for (const v of col.values) {
@@ -222,7 +242,8 @@ export async function makeTaskField(sheet: string, columnKey: string): Promise<{
     if (v.task.content_type_label) types.add(v.task.content_type_label)
     moved++
   }
-  for (const t of types) await attachField(t, field.id)
+  // Attached to no type: a Space's field applies to every task (types still carry the fields they had).
+  if (!spaceOfSheet) for (const t of types) await attachField(t, field.id)
   await prisma.sheetColumn.update({ where: { id: col.id }, data: { deleted_at: new Date(), updated_by: auth.member.id } })
   revalidate()
   return { success: true, fieldId: field.id, moved }

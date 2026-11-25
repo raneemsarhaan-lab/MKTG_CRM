@@ -42,6 +42,15 @@ export interface ContentApi extends SheetApi {
 }
 
 export interface ContentSheetProps {
+  /** Fields (25 Nov 2026): the field system here — promoted fields, each person's columns, the Space and the library. */
+  fieldSystem?: {
+    promoted: string[]
+    layouts: Record<string, import('@/lib/sheet-columns').PersonalLayout>
+    viewKey: string
+    space: import('@/types/index').TeamSpace | null
+    spaces: import('@/types/index').TeamSpace[]
+    library: import('@/types/index').TaskFieldDef[]
+  }
   /** Spec 022 (US4): the linked Space's stages. */
   stages?: import('@/components/spaces/useSpaceStages').SpaceStagesApi | null
   tasks: Task[]

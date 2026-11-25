@@ -87,7 +87,7 @@ export async function loadBoardData(member: SessionMember) {
     // The Inbox (spec 006): this member's read mentions, live put-offs and prefs.
     prisma.mentionRead.findMany({ where: { member_id: member.id }, select: { comment_id: true } }),
     prisma.taskSnooze.findMany({ where: { member_id: member.id, until: { gt: now } }, select: { task_id: true, until: true } }),
-    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true, board_sorts: true } }),
+    prisma.member.findUnique({ where: { id: member.id }, select: { inbox_since: true, inbox_pinned: true, show_week: true, board_sorts: true, sheet_layouts: true } }),
     // Sheet columns the team has shaped, and custom values (spec 010).
     // Spec 021: a member's private My notes columns (sheet 'me:<id>') are never loaded for anyone's sheets.
     // T081: a My tasks sheet's columns ('tasks:me:<id>') reach only their owner.
@@ -103,7 +103,7 @@ export async function loadBoardData(member: SessionMember) {
     // Spec 021 (US3, R5): the Content and Video Spaces' words are their sheet's words.
     prisma.sheet.findMany({ where: { linked_key: { in: ['linked_content', 'linked_video'] } }, select: { linked_key: true, view: true } }),
     // Spec 021 (US4, R11): the workspace's default feature switches for brands.
-    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true, due_days_before: true, due_weekend_days: true, due_weekend_shift: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { brand_feature_defaults: true, nine_stage_default: true, due_days_before: true, due_weekend_days: true, due_weekend_shift: true, standard_fields: true } }),
     // Spec 022: Space stages and each task's sub-stage — two flat arrays, never a query per task.
     prisma.spaceStage.findMany({ orderBy: [{ space_id: 'asc' }, { stage_id: 'asc' }, { position: 'asc' }] }),
     prisma.taskSpaceStage.findMany({ select: { task_id: true, space_id: true, space_stage_id: true, stage_id: true } }),
@@ -179,6 +179,9 @@ export async function loadBoardData(member: SessionMember) {
     spaces: liveSpaces,
     // This member's tab choices per page (home, pinned, hidden, last view), so a page opens on the right view at once.
     viewPrefs: ((member as { view_prefs?: unknown }).view_prefs ?? {}) as Record<string, unknown>,
+    // Fields (25 Nov 2026): custom fields promoted to Standard, and this person's own sheet columns per view.
+    standardFields: (ws?.standard_fields ?? []) as string[],
+    myLayouts: ((prefs?.sheet_layouts ?? {}) as Record<string, { cols: string[]; widths?: Record<string, number> }>),
     spaceMembers,
     taskSpaces: taskSpaces as import('@/types/index').TaskSpace[],
     inbox: {

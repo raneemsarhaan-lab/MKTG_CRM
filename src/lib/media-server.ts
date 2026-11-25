@@ -5,7 +5,8 @@
  */
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import type { BrandFeatures, MediaBoard, StageId } from '@/types/index'
+import type { BrandFeatures, MediaBoard, StageId, TaskFieldDef } from '@/types/index'
+import { fieldOnIn } from '@/lib/field-catalog'
 import { fieldOn } from '@/lib/brand-features'
 import { contentStageFrom, linkedTo, mediaBlock, passedDCheck } from '@/lib/media'
 import { addSpaces } from '@/lib/spaces-server'
@@ -30,16 +31,23 @@ export async function requiredGate(
   target: StageId,
   db: Db = prisma,
 ): Promise<{ missing: string[]; missing_ar: string[]; stage: StageId } | null> {
-  if (!task.content_type_label) return null
-  const links = (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label } })).map(mapTypeField)
-  if (!links.length) return null
+  const typeLinks = task.content_type_label ? (await db.taskTypeField.findMany({ where: { type_label: task.content_type_label } })).map(mapTypeField) : []
   // Spec 024 (§4): the rules of the Space that owns the task's work — its board's Space, the Space it
   // was made in, else Content. A field hidden there, or required before a stage earlier than the
   // Space's start, is never asked for.
   const from = task.status ?? (await db.task.findUnique({ where: { id: task.id }, select: { status: true } }))?.status ?? null
   const space = await homeSpaceOf(task.id, db)
+  // Fields (25 Nov 2026): a Space's own field (attached to no type) applies to every task; the Space
+  // makes it required. A field off in the Space is never asked for.
+  const linked = new Set((await db.taskTypeField.findMany({ select: { field_id: true }, distinct: ['field_id'] })).map(l => l.field_id))
+  const own = Object.keys(space?.settings.fields ?? {}).filter(id => /^[0-9a-f-]{36}$/.test(id) && !linked.has(id))
+    .map(field_id => ({ type_label: task.content_type_label ?? '', field_id, required_from: null, default_value: null, position: 0 }))
+  const links = [...typeLinks, ...own]
+  if (!links.length) return null
+  const promotedList = (await db.workspaceSettings.findUnique({ where: { id: 1 }, select: { standard_fields: true } }))?.standard_fields ?? []
+  const defs = new Map((await db.taskField.findMany({ where: { id: { in: links.map(l => l.field_id) } }, select: { id: true, options: true } })).map(f => [f.id, f]))
   const wanted = requiredForMove(space?.settings, links, from, target)
-    .filter(r => space?.settings.fields[r.field_id]?.shown !== false)
+    .filter(r => fieldOnIn(`f:${r.field_id}`, space?.settings.fields, promotedList, { options: (defs.get(r.field_id)?.options ?? {}) as TaskFieldDef['options'] }))
   if (!wanted.length) return null
   // Spec 023: a field the task's brand has switched off never stops a move.
   const owner = await db.task.findUnique({ where: { id: task.id }, select: { brand: { select: { features: true } } } })

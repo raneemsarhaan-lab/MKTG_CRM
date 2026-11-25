@@ -35,6 +35,8 @@ import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useGridTips } from '@/components/sheet/useGridTips'
 import { formatDay } from '@/lib/due-dates'
+import { asPriority, priorityColor } from '@/lib/priorities'
+import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
 import { gateFeatureCells, gateFeatureStyle, type OffNote } from '@/components/sheet/featureCells'
 import { offFeatureFor } from '@/lib/brand-features'
 import { useLinkedFormats } from '@/components/sheet/useLinkedFormats'
@@ -75,6 +77,12 @@ export function shortDate(ymd: string | null | undefined, lang = 'en'): string {
 }
 
 export interface ContentGridProps {
+  /** Fields (25 Nov 2026): the ＋ panel, and columns the Space has turned off (not on this sheet). */
+  addColumn?: {
+    open(anchor: HTMLElement): void; node: React.ReactNode; offHere(key: string): boolean
+    kindOf(key: string): import('@/lib/field-catalog').CatalogKind | null; classFor(key: string): 'standard' | 'custom' | 'regular'
+    view?: { mode: 'me' | 'default'; canDefault: boolean; hasOwn: boolean; onMode(mode: 'me' | 'default'): void; onReset(): void }
+  }
   /** Spec 022 (R19): the Link task cell (chips, the list, Undo), from the sheet. */
   media?: { render(task: Task): React.ReactNode; open(task: Task, anchor: HTMLElement, typed?: string): void; text(task: Task): string }
   /** Spec 022 (US4): the linked Space's stages — names shown and typed here. */
@@ -135,6 +143,8 @@ export interface ContentGridProps {
 
 export function ContentGrid(p: ContentGridProps) {
   const t = useTranslations('content')
+  const tPri = (k: string) => tPriority(k as 'Normal')
+  const tPriority = useTranslations('priority')
   const addRowText = useAddLabel(t('rows.add'))
   const ts = useTranslations('sheet')
   const stageNames = useStageNames('content')
@@ -275,33 +285,34 @@ export function ContentGrid(p: ContentGridProps) {
   useEffect(() => {
     const on = () => setDrawer(true)
     // The toolbar's "+ Column" opens the same menu as the ＋ after the last heading.
-    const add = (e: Event) => { const a = (e as CustomEvent<HTMLElement | null>).detail; if (a) setAddAt(a) }
+    const add = (e: Event) => { const a = (e as CustomEvent<HTMLElement | null>).detail; if (a) { if (p.addColumn) p.addColumn.open(a); else setAddAt(a) } }
     document.addEventListener(FIELDS_OPEN, on)
     document.addEventListener(ADD_COLUMN_OPEN, add)
     return () => { document.removeEventListener(FIELDS_OPEN, on); document.removeEventListener(ADD_COLUMN_OPEN, add) }
   }, [])
-  const colLabel = (key: string) => cl.nameOf(key) || (isCustom(key) ? '' : t(`col.${key as ContentCol}`))
+  const colLabel = (key: string) => cl.nameOf(key) || (isCustom(key) || key.startsWith('c:') || key.startsWith('f:') ? '' : t(`col.${key as ContentCol}`))
 
   const model: GridModel<ContentRow> = {
     rows: p.rows,
-    cols: cl.cols,
+    cols: p.addColumn ? cl.cols.filter(k => !p.addColumn!.offHere(String(k))) : cl.cols,
     widths: { ...WIDTHS, ...cl.widths },
     rowNoWidth: 40,
     label: t('gridLabel'),
     header: col => {
       const named = cl.laid.find(c => c.key === col)?.name
       // Spec 023: a task field column (f:<id>) is named by the field.
-      const text = col === 'archive' && !named ? '' : (named ?? (isCustom(col) ? (String(col).startsWith('f:') ? cl.nameOf(col) : '') : t(`col.${col as ContentCol}`)))
-      // Spec 019 stage 2: a task field's heading has its icon before the name.
+      const text = col === 'archive' && !named ? '' : (named ?? (isCustom(col) || String(col).startsWith('c:') || String(col).startsWith('f:') ? (String(col).startsWith('c:') ? '' : cl.nameOf(col)) : t(`col.${col as ContentCol}`)))
+      // Fields (25 Nov 2026): a field's heading has its kind's icon before the name, the same everywhere.
+      const kind = p.addColumn?.kindOf(String(col)) ?? null
       const f = FIELD_OF[col]
       return {
-        text: f && text ? <><FieldIcon field={f} />{text}</> : text,
-        label: col === 'archive' && !named ? t('col.archive') : f && text ? text : undefined,
+        text: kind && text ? <><FieldGlyph kind={kind} tone="custom" />{text}</> : f && text ? <><FieldIcon field={f} />{text}</> : text,
+        label: col === 'archive' && !named ? t('col.archive') : (kind || f) && text ? text : undefined,
       }
     },
     ...cl.grid,
     tailHeader: <button type="button" className="fx-fd-plus" data-add-field="" aria-haspopup="menu" aria-label={tf('addTitle')} title={tf('addTitle')}
-                        onPointerDown={e => e.stopPropagation()} onClick={e => setAddAt(e.currentTarget)}>＋</button>,
+                        onPointerDown={e => e.stopPropagation()} onClick={e => (p.addColumn ? p.addColumn.open(e.currentTarget) : setAddAt(e.currentTarget))}>＋</button>,
     onTypeAhead: (row, col, ch, anchor) => {
       if (row.kind !== 'piece' && row.kind !== 'clip') return false
       if (col === 'type') return p.onTypeAhead(row, ch, anchor)
@@ -358,7 +369,7 @@ export function ContentGrid(p: ContentGridProps) {
     },
     describedBy: (row, col) => (col === 'status' && (row.kind === 'piece' || row.kind === 'clip') ? `fx-tip-${row.key}` : undefined),
     isDraft: row => row.kind === 'draft',
-    inputLabel: (row, col) => (row.kind === 'draft' ? t('rows.newLabel') : isCustom(col) ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
+    inputLabel: (row, col) => (row.kind === 'draft' ? t('rows.newLabel') : isCustom(col) || String(col).startsWith('c:') || String(col).startsWith('f:') ? cl.nameOf(col) : t(`col.${col as 'title'}`)),
     inputPlaceholder: (row, col) => (row.kind === 'draft' ? t('rows.placeholder') : col === 'date' ? '2026-11-20…' : undefined),
     inputDir: col => (col === 'date' ? 'ltr' : undefined),
     readOnlyNote: (row, col) => {
@@ -500,6 +511,15 @@ export function ContentGrid(p: ContentGridProps) {
           return task.publish_date ? <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date}>{formatDay(task.publish_date, locale)}</span> : null
         case 'archive':
           return isClip || !can ? null : <span className="fx-sheet-dropb">{task.dropped_at ? t('archive.restore') : t('archive.archive')}</span>
+        // Fields (25 Nov 2026): Brand, Owner and Due date (standard); Priority and Start date (custom).
+        case 'brand': return task.brand ? <span className="fx-sheet-ellipsis" data-brand-cell={task.brand_id ?? ''}>{task.brand.name}</span> : null
+        case 'owner': return <EditorContent member={task.task_owner_id ? byId.get(task.task_owner_id) : undefined} t={ts} />
+        case 'due': return task.due_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{formatDay(task.due_date, locale)}</span> : null
+        case 'start': return task.start_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{formatDay(task.start_date, locale)}</span> : null
+        case 'priority': {
+          const pr = asPriority(task.priority)
+          return pr && pr !== 'None' ? <span className="fx-sheet-ellipsis" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ color: priorityColor(pr) }}>⚑</span>{tPri(pr)}</span> : null
+        }
       }
       return null
     },
@@ -531,6 +551,11 @@ export function ContentGrid(p: ContentGridProps) {
         case 'pillar': return row.kind === 'piece' ? row.theme.pillars.find((x: ContentTheme['pillars'][number]) => x.id === task.pillar_id)?.name ?? '' : ''
         case 'doc': case 'design': case 'post': case 'published': return pieceLink(task, col) ?? ''
         case 'date': return task.publish_date ?? (task.status === 'publish' ? task.stage_date ?? '' : '')
+        case 'brand': return task.brand?.name ?? ''
+        case 'owner': return task.task_owner_id ? byId.get(task.task_owner_id)?.name ?? '' : ''
+        case 'due': return task.due_date ?? ''
+        case 'start': return task.start_date ?? ''
+        case 'priority': { const pr = asPriority(task.priority); return pr && pr !== 'None' ? tPri(pr) : '' }
       }
     }
     return model.textValue(row, col) || (col === 'rowNo' ? '' : nodeText(model.render(row, col, () => undefined)).trim())
@@ -636,7 +661,7 @@ export function ContentGrid(p: ContentGridProps) {
   const asRow = (c: (typeof laid)[number]): PresetRow => {
     const i = laid.indexOf(c), name = colLabel(c.key) || t('col.archive')
     return {
-      key: c.key, name, icon: c.kind ? 'regular' : c.field ? 'taskcol' : FIELD_OF[c.key] ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
+      key: c.key, name, icon: c.kind ? 'regular' : c.field ? 'taskcol' : FIELD_OF[c.key] ?? null, glyph: p.addColumn?.kindOf(c.key) ?? null, shown: c.shown, who: cl.changedBy(c), locked: c.key === 'title',
       // Spec 022 (US4): stage names come from the Space's Stages; the sheet keeps its Type words.
       values: c.key === 'status' && !p.stages ? 'stage' : c.key === 'type' ? 'type' : undefined,
       up: i > 1 && c.key !== 'title', down: c.key !== 'title' && i < laid.length - 1,
@@ -665,6 +690,7 @@ export function ContentGrid(p: ContentGridProps) {
     {lf.node}
     {tips.node}
     {addAt && <SheetMenu anchor={addAt} label={tf('addTitle')} items={addItems} onClose={() => setAddAt(null)} />}
+    {p.addColumn?.node}
     {drawer && (
       <PresetFieldsDrawer
         rowsName={tf('rowsContent')} rowsHelp={tf('rowsContentHelp')}
@@ -674,12 +700,14 @@ export function ContentGrid(p: ContentGridProps) {
         ]}
         group={by}
         onGroup={v => saveView({ groupBy: v === 'theme' ? null : { by: v as 'stage' | 'assignee' | 'type' | 'none' } })}
-        fields={laid.filter(c => !c.kind).map(asRow)}
+        fields={laid.filter(c => !c.kind && (!p.addColumn || (!p.addColumn.offHere(c.key) && p.addColumn.classFor(c.key) === 'standard'))).map(asRow)}
+        custom={p.addColumn ? laid.filter(c => !c.kind && !p.addColumn!.offHere(c.key) && p.addColumn!.classFor(c.key) === 'custom').map(asRow) : undefined}
+        view={p.addColumn?.view}
         regular={laid.filter(c => c.kind).map(asRow)}
         onToggle={(key, on) => void cl.setShown(key, on)}
         onMove={(key, dir) => { const i = laid.findIndex(c => c.key === key); void cl.move(key, dir < 0 ? laid[i - 1]?.key ?? null : laid[i + 2]?.key ?? null) }}
         onValues={f => setValuesFor(f)}
-        onAddRegular={a => cl.openAdd(a)}
+        onAddRegular={a => (p.addColumn ? p.addColumn.open(a) : cl.openAdd(a))}
         onRename={(key, a) => cl.openRename(key, a)} renameLabel={name => tc('renameNamed', { name })}
         onClose={() => { setDrawer(false); closeBack() }} />
     )}

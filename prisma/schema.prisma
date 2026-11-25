@@ -30,6 +30,9 @@ model Member {
   /// Spec 021: per page ('space:<id>', 'brand:<id>', 'me'), this member's view tabs:
   /// { home?: tabKey, pinned?: tabKey[], hidden?: tabKey[] }.
   view_prefs      Json      @default("{}")
+  /// Fields (25 Nov 2026): this person's own column layout per sheet view — { "<view key>": { cols: [keys shown, in order], widths: { key: px } } }.
+  /// A view with no entry shows the Space's default columns.
+  sheet_layouts   Json      @default("{}")
   /// Each board's sort for this member, by board key ({ "board": "priority" }). Missing means due date.
   board_sorts     Json      @default("{}")
   /// Spec 006: Week Momentum and Daily Spark are shown on the Board.
@@ -602,6 +605,8 @@ model TaskAttachment {
 
 model WorkspaceSettings {
   id                  Int     @id
+  /// Fields (25 Nov 2026): custom fields an admin promoted to Standard ("priority", or "f:<field id>"): on in every Space.
+  standard_fields     String[] @default([])
   capacity_hrs_per_wk Int     @default(40)
   nine_stage_default  Boolean @default(false)
 

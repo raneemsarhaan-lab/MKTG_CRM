@@ -325,8 +325,7 @@ export async function deleteColumn(id: string): Promise<{ success: true; values:
       await lock(tx, col.sheet as SheetId)
       const n = await tx.sheetValue.count({ where: { column_id: id } })
       await tx.sheetColumn.update({ where: { id }, data: { deleted_at: new Date(), updated_by: me.id, updated_at: new Date() } })
-      // Lazy cleanup: columns deleted more than a day ago are gone for good.
-      await tx.sheetColumn.deleteMany({ where: { deleted_at: { lt: new Date(Date.now() - 86_400_000) } } })
+      // Fields (25 Nov 2026): a deleted column is kept (out of view) with its values; nothing is purged.
       return n
     })
     done()
