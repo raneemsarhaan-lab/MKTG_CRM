@@ -56,9 +56,11 @@ function pattern(p?: string | null): string {
 function summary(s: {
   id: string; folder_id: string; kind: string; name: string | null; position: number; tab_color: string | null
   hidden: boolean; protected_by: string | null; row_count: number; col_count: number; linked_key?: string | null; brand_id?: string | null
+  linked?: boolean; space_id?: string | null; created_by?: string | null
 }): SheetSummary {
   return {
     ...(s.kind === 'linked_tasks' ? { linkedKey: s.linked_key ?? null } : {}),
+    ...(s.kind === 'rows' ? { linked: !!s.linked, spaceId: s.space_id ?? null, createdBy: s.created_by ?? null } : {}),
     ...(s.brand_id ? { brandId: s.brand_id } : {}),
     id: s.id, folderId: s.folder_id, kind: s.kind as SheetKind, name: s.name, position: s.position,
     color: (TAB_COLORS as readonly string[]).includes(s.tab_color ?? '') ? (s.tab_color as TabColor) : null,
@@ -802,7 +804,11 @@ class Refuse extends Error {
 
 // ─── tab actions: Excel's sheet-tab menu (R9, FR-054–FR-059d) ───────────────
 
-const isLinkedKind = (k: string) => k !== 'blank'
+/** The Board tab (and the old linked sheets): not renamed, deleted, hidden or moved. Added `rows` tabs are. */
+const isLinkedKind = (k: string) => k !== 'blank' && k !== 'rows'
+/** Spec 027 (R7): an added tab is renamed and deleted by its creator, admins and superusers. */
+const mayManageTab = (s: { kind: string; created_by: string | null }, m: { id: string; access: string }) =>
+  s.kind !== 'rows' || s.created_by === m.id || m.access === 'admin' || m.access === 'superuser'
 
 /** Rename (FR-056): blank sheets only; Excel's rules; unique in the folder. */
 export async function renameSheet(id: string, name: string): Promise<{ success: true; name: string } | Fail> {
@@ -813,6 +819,7 @@ export async function renameSheet(id: string, name: string): Promise<{ success: 
   const sheet = await prisma.sheet.findUnique({ where: { id } })
   if (!sheet) return fail('gone')
   if (isLinkedKind(sheet.kind)) return fail('linked')
+  if (!mayManageTab(sheet, m)) return fail('not_authorized')
   const others = await prisma.sheet.findMany({ where: { folder_id: sheet.folder_id, NOT: { id } }, select: { name: true } })
   const { validateSheetName } = await import('@/lib/sheet-names')
   const v = validateSheetName(name, others.map(o => o.name ?? ''))
@@ -840,11 +847,19 @@ export async function deleteSheets(ids: string[]): Promise<{ success: true; dele
   const list = await prisma.sheet.findMany({ where: { id: { in: ids } } })
   if (!list.length) return { success: true, deleted: [] }
   if (list.some(s => isLinkedKind(s.kind))) return fail('linked')
+  if (list.some(s => !mayManageTab(s, m))) return fail('not_authorized')
   if (list.some(s => s.protected_by && s.protected_by !== m.id && !isAdmin(m))) return fail('protected')
   const folderId = list[0].folder_id
   if (list.some(s => s.folder_id !== folderId)) return fail('generic')
   try {
     await prisma.$transaction(async tx => {
+      // An added tab's rows and theme places go with it; their tasks stay (spec 027).
+      const rowsTabs = list.filter(s => s.kind === 'rows').map(s => s.id)
+      if (rowsTabs.length) {
+        await tx.contentRow.updateMany({ where: { sheet_id: { in: rowsTabs } }, data: { parent_id: null } })
+        await tx.contentRow.deleteMany({ where: { sheet_id: { in: rowsTabs } } })
+        await tx.contentSheetTheme.deleteMany({ where: { sheet_id: { in: rowsTabs } } })
+      }
       await tx.sheet.deleteMany({ where: { id: { in: list.map(s => s.id) } } })
       const visible = await tx.sheet.count({ where: { folder_id: folderId, hidden: false } })
       if (!visible) throw new Refuse('last_visible')
@@ -876,6 +891,7 @@ export async function moveSheets(ids: string[], folderId: string, beforeId: stri
   ])
   if (!list.length || !dest) return fail('gone')
   if (!copy && list.some(s => isLinkedKind(s.kind) && s.folder_id !== folderId)) return fail('linked')
+  if (list.some(s => s.kind === 'rows') && (copy || list.some(s => s.folder_id !== folderId))) return fail('linked')
   const { uniqueName } = await import('@/lib/sheet-names')
   try {
     const made = await prisma.$transaction(async tx => {

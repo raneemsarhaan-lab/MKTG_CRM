@@ -140,7 +140,11 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         if (tab === 'sheet') return (
           <NodeWorkbook key={view?.id} data={data} brandId={brandId} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
             linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
-              themeScope={themeScope} sheetBrandId={brandId} />} />
+              themeScope={themeScope} sheetBrandId={brandId} />}
+            // Spec 027 (US3): "+" adds a tab of rows; linked, its rows are tasks on this Space's board.
+            spaceId={spaceId}
+            rowsTab={s => <KanbanBoard {...data} surface="sheets" sheetsView="content" spaceId={spaceId} sheetBrandId={brandId}
+              tabSheet={{ id: s.id, linked: !!s.linked }} />} />
         )
         const body = <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
               milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}

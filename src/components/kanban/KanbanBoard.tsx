@@ -27,6 +27,11 @@ import type { ContentApi } from '@/components/content/types'
 import { setLinkedRowHeights } from '@/actions/sheets'
 import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
 import * as contentRows from '@/actions/content-rows'
+import * as sheetTabs from '@/actions/sheet-tabs'
+import { TAB_ROWS_ID } from '@/components/content/rows'
+import { tabSheetId } from '@/lib/tab-rows'
+/** Spec 027: the "no theme" group of an added tab stands for no project. */
+const noTheme = (id: string | null | undefined) => (!id || id === TAB_ROWS_ID ? null : id)
 import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -129,6 +134,10 @@ interface KanbanBoardProps {
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
   /** Sheet 2b: the Content sheet's rows. */
   contentRows?: import('@/lib/content-rows').ContentRowRec[]
+  /** Spec 027 (US3): added tabs' themes and rows (every tab's), and the tab this sheet shows, if one. */
+  tabThemes?: ContentTheme[]
+  tabRows?: import('@/lib/content-rows').ContentRowRec[]
+  tabSheet?: { id: string; linked: boolean } | null
   /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
   workspaceNineStage?: boolean
   /** The due-date rule (Settings › Due Dates). */
@@ -176,6 +185,9 @@ function KanbanBoardInner({
   sheetsView = 'content',
   linkedRowHeights,
   contentRows: contentRows_,
+  tabThemes = [],
+  tabRows = [],
+  tabSheet = null,
   scopeTasks,
   spaceId,
   sheetScope,
@@ -912,20 +924,25 @@ function KanbanBoardInner({
         return res
       }
       return {
-        // Spec 026: every call carries the Space whose sheet this is.
-        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, spaceId: sheetSpaceRef.current })),
-        updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
+        // Spec 026: every call carries the Space whose sheet this is; spec 027: and the added tab, if it is one.
+        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, projectId: noTheme(input.projectId), spaceId: sheetSpaceRef.current, sheetId: tabSheet?.id ?? null })),
+        updateRow: run(contentRows.updateRow),
+        moveRow: run((id: string, to: Parameters<typeof contentRows.moveRow>[1]) => contentRows.moveRow(id, { ...to, projectId: noTheme(to.projectId) })),
         indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
         linkRowTask: run(contentRows.linkRowTask),
         makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
-        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current)),
-        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceRef.current)),
-        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current)),
-        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current)),
-        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current)),
+        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current, tabSheet?.id ?? null)),
+        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceRef.current, tabSheet?.id ?? null)),
+        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current, tabSheet?.id ?? null)),
+        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current, tabSheet?.id ?? null)),
+        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current, tabSheet?.id ?? null)),
         // A theme added in a Space › Brand folder, or on a brand's page, belongs to that brand.
-        addSheetTheme: run((input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current, brandId: sheetBrandId })),
-        themeNames: () => contentRows.themeNames(sheetSpaceRef.current, sheetBrandId).catch(() => []),
+        addSheetTheme: run((input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current, brandId: sheetBrandId, sheetId: tabSheet?.id ?? null })),
+        themeNames: () => contentRows.themeNames(sheetSpaceRef.current, sheetBrandId, tabSheet?.id ?? null).catch(() => []),
+        ...(tabSheet ? {
+          removeTabRow: run((id: string, mode: 'tab' | 'archive') => sheetTabs.removeTabRow(id, mode)),
+          addExistingTasks: run((ids: string[]) => sheetTabs.addExistingTasks(tabSheet.id, ids)),
+        } : {}),
       }
     })(),
     async removePillar(id) {
@@ -1331,7 +1348,7 @@ function KanbanBoardInner({
   if (view === 'content' || view === 'sheet') {
     // Spec 027 (US2): in a Space, the sheet's Board tab lists the board's tasks under the Board's own filter
     // (Mine / Everyone and Filters, shared with the Board view), and shows that filter bar above it.
-    const boardTab = !!spaceId
+    const boardTab = !!spaceId && !tabSheet
     const isMine = (t: FullTask) => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id)
     const boardTasks = boardTab
       ? applyBoardFilters(tasks.filter(t => (scopeTasks ? scopeTasks(t) : true) && (scope !== 'me' || isMine(t))), filters, { currentUserId: currentUser.id, slaConfig, today })
@@ -1355,17 +1372,20 @@ function KanbanBoardInner({
           boardFiltered={boardTab && (scope === 'me' || activeFilterCount(filters) > 0)}
           stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
-          themes={(themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
+          themes={tabSheet
+            ? tabThemes.filter(th => th.sheet_id === tabSheet.id)
+            : (themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
+          tab={tabSheet ?? undefined}
           me={currentUser}
           members={members}
           contentTypes={types}
           columns={columnsBundle}
           rowHeights={sheetSpace?.key === 'content' || !sheetSpace ? linkedRowHeights?.content : undefined}
-          rows={contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
-          sheet={sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
+          rows={tabSheet ? tabRows.filter(r => r.sheet_id === tabSheet.id) : contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
+          sheet={tabSheet ? tabSheetId(tabSheet.id) : sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
           fieldSystem={{
             promoted: standardFields, layouts: myLayouts,
-            viewKey: `${sheetSpace ? spaceSheetId(sheetSpace) : 'content'}${sheetBrandId ? `:${sheetBrandId}` : ''}`,
+            viewKey: tabSheet ? tabSheetId(tabSheet.id) : `${sheetSpace ? spaceSheetId(sheetSpace) : 'content'}${sheetBrandId ? `:${sheetBrandId}` : ''}`,
             space: sheetSpace ?? null, spaces, library: libraryFields,
           }}
           space={sheetSpace ?? null}

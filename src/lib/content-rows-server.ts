@@ -20,14 +20,15 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
   const sid = (await db.teamSpace.findUnique({ where: { key: 'content' }, select: { id: true } }))?.id ?? null
   if (!sid) return
   const [themes, flagged] = await Promise.all([
-    db.contentSheetTheme.findMany({ where: { space_id: sid }, select: { project_id: true, position: true } }),
+    db.contentSheetTheme.findMany({ where: { space_id: sid, sheet_id: null }, select: { project_id: true, position: true } }),
     db.project.findMany({ where: { is_theme: true }, select: { id: true, sort_order: true, created_at: true }, orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] }),
   ])
   const has = new Set(themes.map(t => t.project_id))
   let top = themes.reduce((m, t) => Math.max(m, t.position), 0)
   // A project flagged as a theme that is on no Space's sheet yet (Paste plan made it) comes here;
   // one that is a theme on another Space's sheet stays there (spec 026).
-  const elsewhere = new Set((await db.contentSheetTheme.findMany({ where: { NOT: { space_id: sid } }, select: { project_id: true } })).map(t => t.project_id))
+  // (A theme placed on an added tab counts as elsewhere too: it isn't brought onto the Board tab.)
+  const elsewhere = new Set((await db.contentSheetTheme.findMany({ where: { OR: [{ space_id: { not: sid } }, { space_id: null }] }, select: { project_id: true } })).map(t => t.project_id))
   const add = flagged.filter(p => !has.has(p.id) && !elsewhere.has(p.id))
   if (add.length) {
     await db.contentSheetTheme.createMany({ data: add.map(p => ({ project_id: p.id, space_id: sid, position: ++top })), skipDuplicates: true })
@@ -48,13 +49,13 @@ export async function syncContentSheet(db: Db = prisma): Promise<void> {
         parent: { select: { content_type_label: true, parent_task_id: true } },
       },
     }),
-    db.contentRow.findMany({ where: { space_id: sid }, select: { id: true, task_id: true, project_id: true, pillar_id: true, parent_id: true, position: true } }),
+    db.contentRow.findMany({ where: { space_id: sid, sheet_id: null }, select: { id: true, task_id: true, project_id: true, pillar_id: true, parent_id: true, position: true } }),
   ])
   // A video's clips are not rows: they open under their video.
   const pieces = tasks.filter(t => !(t.parent && t.parent.content_type_label === 'Video' && !t.parent.parent_task_id))
   const byTask = new Map(rows.filter(r => r.task_id).map(r => [r.task_id!, r]))
   const maxPos = new Map<string, number>()
-  for (const r of rows) maxPos.set(r.project_id, Math.max(maxPos.get(r.project_id) ?? 0, r.position))
+  for (const r of rows) if (r.project_id) maxPos.set(r.project_id, Math.max(maxPos.get(r.project_id) ?? 0, r.position))
 
   const pillarsOf = new Map<string, Set<string>>()
   for (const p of await db.contentPillar.findMany({ where: { project_id: { in: ids } }, select: { id: true, project_id: true } })) {

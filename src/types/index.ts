@@ -394,6 +394,8 @@ export interface ContentTheme {
   frequency_period: FrequencyPeriod | null
   audience: AudienceKey[]
   pillars: { id: string; name: string; sort_order: number }[]
+  /** Spec 027 (US3): the added tab this theme is placed on (absent on a Board tab's theme). */
+  sheet_id?: string | null
   /** Sheet 2b: the theme's entry on the Content sheet (not the project) and its place there. */
   sheet_theme_id?: string | null
   position?: number
@@ -616,7 +618,7 @@ export interface AppNotification {
 export type SheetFolderKind = 'content' | 'video' | 'team' | 'brand' | 'node'
 /** A tab in a folder: one of the two linked sheets, or a blank sheet. */
 /** Spec 021: 'linked_tasks' is a Space's, brand's or My tasks' live Tasks tab (linked_key 'tasks:<node>'). */
-export type SheetKind = 'linked_content' | 'linked_video' | 'linked_tasks' | 'blank'
+export type SheetKind = 'linked_content' | 'linked_video' | 'linked_tasks' | 'blank' | 'rows'
 /** Excel-style tab colours (FR-059a), stored as keys, drawn from SHEETS_UI.tabs. */
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray', 'black'] as const
 export type TabColor = typeof TAB_COLORS[number]
@@ -655,6 +657,12 @@ export interface SheetSummary {
   linkedKey?: string | null
   /** A tab tagged with a brand: shown on its Space and in that brand's folder only. */
   brandId?: string | null
+  /** Spec 027 (US3): a `rows` tab linked to its Space's board. */
+  linked?: boolean
+  /** Spec 027 (US3): the Space whose board a `rows` tab makes tasks on. */
+  spaceId?: string | null
+  /** Spec 027 (US3): who added the tab (they may link, unlink and delete it). */
+  createdBy?: string | null
 }
 
 /** A blank sheet as the client holds it (data-model §4). */

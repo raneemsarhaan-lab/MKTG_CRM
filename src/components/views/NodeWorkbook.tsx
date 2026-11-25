@@ -20,13 +20,16 @@ import { useSearchParams } from 'next/navigation'
 import { Workbook } from '@/components/sheets/Workbook'
 import { sheetsApi } from '@/components/sheets/api'
 import { ensureNodeWorkbook, listFolders, listSheets } from '@/actions/sheets'
+import { addRowsTab, deleteTab, duplicateTab, unlinkTab } from '@/actions/sheet-tabs'
+import { useRouter } from 'next/navigation'
+import type { RowsTabsHost } from '@/components/sheets/Workbook'
 import type { FolderSummary, SheetSummary } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import type { BoardData } from './types'
 
 type Loaded = { folder: FolderSummary; folders: FolderSummary[]; sheets: SheetSummary[] }
 
-export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
+export function NodeWorkbook({ data, node, folder, linked, brandId = null, spaceId = null, rowsTab }: {
   data: BoardData
   /** A Space › Brand folder: tabs tagged with another brand are left out. */
   brandId?: string | null
@@ -35,7 +38,11 @@ export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
   folder?: 'content' | 'video'
   /** What the linked tab shows: the Tasks sheet, or the Board's Content or Video sheet. */
   linked: ReactNode
+  /** Spec 027 (US3): the Space whose board added tabs make tasks on; with `rowsTab`, "+" adds a tab of rows. */
+  spaceId?: string | null
+  rowsTab?: (sheet: SheetSummary) => ReactNode
 }) {
+  const router = useRouter()
   const t = useTranslations('spaces')
   // A link to one tab, or to a commented cell (`rowKey:colKey`), from a notification or an old Sheets address.
   const params = useSearchParams()
@@ -90,6 +97,18 @@ export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
     return () => { live = false; window.clearTimeout(timer) }
   }, [node, folder, mine, attempt])
 
+  const lead = data.currentUser.access === 'admin' || data.currentUser.access === 'superuser'
+  const folderId = loaded?.folder.id ?? null
+  const rowsTabs = useMemo<RowsTabsHost | undefined>(() => (rowsTab && folderId ? {
+    render: rowsTab,
+    add: (after, pattern) => addRowsTab(folderId, { spaceId, brandId, after, pattern }),
+    duplicate: (id, pattern) => duplicateTab(id, { pattern }),
+    remove: async id => { const r = await deleteTab(id); if (r.success) router.refresh(); return r },
+    unlink: async id => { const r = await unlinkTab(id); if (r.success) router.refresh(); return r },
+    mayManage: s => s.createdBy === data.currentUser.id || lead,
+    refresh: () => router.refresh(),
+  } : undefined), [rowsTab, folderId, spaceId, brandId, router, data.currentUser.id, lead])
+
   if (failed) return (
     <div data-node-workbook-error={failed} role="alert" style={{ padding: '18px 38px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', color: PIPE.textSecondary, fontSize: 13 }}>
       <span>{failed === 'timeout' ? t('workbookSlow') : t('workbookFailed')}</span>
@@ -115,6 +134,7 @@ export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
         inPage
         // Spec 027 (US2): a Space's (or brand's) first tab is its Board tab; My tasks keeps its Tasks tab.
         boardTabName={node === 'me' ? undefined : t('boardTab')}
+        rowsTabs={rowsTabs}
       />
     </div>
   )

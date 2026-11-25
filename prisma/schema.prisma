@@ -932,7 +932,7 @@ model SheetFolder {
 model Sheet {
   id           String   @id @default(uuid()) @db.Uuid
   folder_id    String   @db.Uuid
-  /// 'linked_content' · 'linked_video' · 'blank'
+  /// 'linked_content' · 'linked_video' · 'blank' · 'rows' (spec 027: an added tab of grouped rows)
   kind         String
   /// 'linked_content' or 'linked_video' for the two linked sheets, null for blank ones.
   linked_key   String?  @unique
@@ -956,6 +956,10 @@ model Sheet {
   /// Release 2026-11-25: a tab tagged with a brand shows on its Space and in that brand's folder of the
   /// Space, not in the Space's other brand folders. Null: shown in every folder.
   brand_id     String?  @db.Uuid
+  /// Spec 027 (US3): a `rows` tab linked to its Space's board (every titled row is a task). Blank and Board tabs: false.
+  linked       Boolean  @default(false)
+  /// Spec 027 (US3): the Space whose board a `rows` tab makes tasks on (the workbook's Space; a Brand page's tab asks).
+  space_id     String?  @db.Uuid
   created_by   String?  @db.Uuid
   updated_by   String?  @db.Uuid
   created_at   DateTime @default(now()) @db.Timestamptz(6)
@@ -1508,6 +1512,8 @@ model ContentSheetTheme {
   project_id   String   @db.Uuid
   /// Spec 026: the Space whose sheet this theme is on. (Null only before the one-time backfill: the Content Space.)
   space_id     String?  @db.Uuid
+  /// Spec 027 (US3): the added tab this theme is placed on (then `space_id` is null). Null: the Space's Board tab.
+  sheet_id     String?  @db.Uuid
   position     Float    @default(0)
   /// Pillar ids in the sheet's order; pillars not listed follow by their own order.
   pillar_order String[] @default([]) @db.Uuid
@@ -1518,6 +1524,7 @@ model ContentSheetTheme {
   space   TeamSpace? @relation(fields: [space_id], references: [id], onDelete: Cascade)
 
   @@unique([space_id, project_id])
+  @@unique([sheet_id, project_id])
   @@index([position])
   @@map("content_themes")
 }
@@ -1527,10 +1534,14 @@ model ContentSheetTheme {
 /// sheet shows. One level of child rows.
 model ContentRow {
   id         String    @id @default(uuid()) @db.Uuid
-  /// The theme's project.
-  project_id String    @db.Uuid
+  /// The theme's project. Spec 027: null for a row of an added tab that sits under no theme.
+  project_id String?   @db.Uuid
   /// Spec 026: the Space whose sheet this row is on. (Null only before the one-time backfill: the Content Space.)
   space_id   String?   @db.Uuid
+  /// Spec 027 (US3): the added tab this row is in (then `space_id` is null). Null: the Space's Board tab.
+  sheet_id   String?   @db.Uuid
+  /// Spec 027 (US3): the task this row was linked to before it was unlinked, so linking again reconnects it.
+  last_task_id String? @db.Uuid
   pillar_id  String?   @db.Uuid
   parent_id  String?   @db.Uuid
   position   Float     @default(0)
@@ -1545,14 +1556,16 @@ model ContentRow {
   updated_at DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
 
   space    TeamSpace?     @relation(fields: [space_id], references: [id], onDelete: Cascade)
-  project  Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project  Project?       @relation(fields: [project_id], references: [id], onDelete: Cascade)
   pillar   ContentPillar? @relation(fields: [pillar_id], references: [id], onDelete: SetNull)
   parent   ContentRow?    @relation("ContentRowChildren", fields: [parent_id], references: [id], onDelete: SetNull)
   children ContentRow[]   @relation("ContentRowChildren")
   task     Task?          @relation(fields: [task_id], references: [id], onDelete: SetNull)
 
   @@unique([space_id, task_id])
+  @@unique([sheet_id, task_id])
   @@index([project_id, position])
+  @@index([sheet_id, position])
   @@index([task_id])
   @@map("content_rows")
 }

@@ -250,6 +250,7 @@ export function mapTheme(p: any): import('@/types/index').ContentTheme {
     sheet_theme_id: p.sheet_theme_id ?? null,
     position: typeof p.position === 'number' ? p.position : 0,
     space_id: p.space_id ?? null,
+    ...(p.sheet_id ? { sheet_id: p.sheet_id as string } : {}),
   }
 }
 
@@ -261,6 +262,7 @@ export function mapContentRow(r: any): import('@/lib/content-rows').ContentRowRe
     id: r.id, project_id: r.project_id, pillar_id: r.pillar_id ?? null, parent_id: r.parent_id ?? null, position: Number(r.position) || 0,
     title: r.title ?? '', date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date ? String(r.date).slice(0, 10) : null,
     values, task_id: r.task_id ?? null, created_by: r.created_by ?? null, space_id: r.space_id ?? null,
+    sheet_id: r.sheet_id ?? null, last_task_id: r.last_task_id ?? null,
   }
 }
 

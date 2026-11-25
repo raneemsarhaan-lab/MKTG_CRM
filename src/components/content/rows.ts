@@ -72,6 +72,11 @@ export interface ContentRowOptions {
    */
   boardFiltered?: boolean
   noThemeLabel?: string
+  /**
+   * Spec 027 (US3): an added tab. Its rows under no theme close the tab in a group of their own, with
+   * "+ Row" (the group stands for no project: `TAB_ROWS_ID`).
+   */
+  tabRows?: boolean
 }
 
 /**
@@ -80,13 +85,22 @@ export interface ContentRowOptions {
  */
 export const NO_THEME_ID = '__none'
 export const isReadOnlyTheme = (id: string) => id === NO_THEME_ID || id.startsWith(`${NO_THEME_ID}:`)
+/** Spec 027 (US3): an added tab's rows under no theme. Rows go in and out of it; it has no menu. */
+export const TAB_ROWS_ID = '__rows'
+/** A group that isn't a theme of this sheet: no theme menu, no dragging the group. */
+export const isPseudoTheme = (id: string) => isReadOnlyTheme(id) || id === TAB_ROWS_ID
 
 /**
  * Theme, then each pillar with its rows and "+ Row", then rows with no pillar
  * and the theme's "+ Row". A row's children follow it, then "+ Child row". A
  * linked video row that's open is followed by its clips.
  */
-export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: ContentRowOptions): ContentRow[] {
+export function buildContentRows(tasks: Task[], themesIn: ContentTheme[], o: ContentRowOptions): ContentRow[] {
+  // Spec 027 (US3): in an added tab, rows under no theme sit in a last group of their own.
+  const themes = o.tabRows
+    ? [...themesIn, { id: TAB_ROWS_ID, name: o.noThemeLabel ?? 'No theme', brand_id: null, owner_id: null, frequency_count: null, frequency_period: null, audience: [], pillars: [] } as ContentTheme]
+    : themesIn
+  if (o.tabRows && o.recs) o = { ...o, recs: o.recs.map(r => (r.project_id ? r : { ...r, project_id: TAB_ROWS_ID })) }
   const rows: ContentRow[] = []
   const q = normQuery(o.query)
   let n = 1

@@ -22,7 +22,7 @@ import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/shee
 import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
-import { buildContentRows, isReadOnlyTheme, piecesIn, type ContentRow } from './rows'
+import { buildContentRows, isPseudoTheme, isReadOnlyTheme, piecesIn, type ContentRow } from './rows'
 import { ContentGrid, LINK_COLS, pieceLink } from './ContentGrid'
 import { ThemeEditor, NamePrompt } from './ThemeEditor'
 import { PlanPreview } from './PlanPreview'
@@ -53,8 +53,9 @@ type Popup =
   | { kind: 'delRow'; anchor: HTMLElement; rec: ContentRowRec; name: string; linked: boolean; children: number }
   | { kind: 'linkTask'; anchor: HTMLElement; rec: ContentRowRec }
   | { kind: 'makeTask'; anchor: HTMLElement; rec: ContentRowRec }
+  | { kind: 'addExisting'; anchor: HTMLElement }
 
-const KNOWN_ERRORS = ['parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'theme_exists', 'theme_name_empty', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
+const KNOWN_ERRORS = ['board_tab', 'already_linked', 'not_linked_tab', 'parent_plain', 'not_a_subtask', 'is_a_subtask', 'not_in_space', 'needs_space', 'not_allowed_in_space', 'type_not_allowed', 'not_linked', 'child_rows_off', 'one_level', 'not_a_child', 'needs_destination', 'already_theme', 'theme_exists', 'theme_name_empty', 'project_exists', 'already_in_sheet', 'linked', 'media_task', 'may_not_add', 'may_not_edit_theme', 'not_a_theme', 'bad_frequency', 'bad_audience', 'duplicate_pillar',
   'not_authorized', 'bad_link', 'not_found', 'dropped', 'not_authenticated', 'bad_date', 'generic']
 
 /** "2026-11-20", "20/11/2026" or "20/11" → YYYY-MM-DD; '' clears; null when unreadable. */
@@ -117,8 +118,8 @@ export function ContentSheet(p: ContentSheetProps) {
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
     mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query, recs: p.rows,
-    boardTasks: p.boardTasks, boardFiltered: p.boardFiltered, noThemeLabel: t('noTheme'),
-  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows, p.boardTasks, p.boardFiltered, t])
+    boardTasks: p.boardTasks, boardFiltered: p.boardFiltered, noThemeLabel: t('noTheme'), tabRows: !!p.tab,
+  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows, p.boardTasks, p.boardFiltered, p.tab, t])
   /** Sheet 2b: rows live on the server when the host has them; otherwise every piece is a row. */
   const rowsOn = !!p.rows && !!p.api.addRow
   const recs = p.rows ?? []
@@ -267,6 +268,12 @@ export function ContentSheet(p: ContentSheetProps) {
     } else if (editable && p.api.unlinkRow && !p.boardTasks) {
       items.push({ key: 'unlink', text: t('rows.unlink'), label: t('rows.unlink'), onSelect: pick(() => void p.api.unlinkRow!(rec.id).then(r => ok(r, t('rows.unlinked')))) })
     }
+    // Spec 027 (US3): in an added tab, a task's row comes off this tab only, or its task is archived.
+    if (p.tab && rec.task_id && p.api.removeTabRow) {
+      items.push({ key: 'removeTab', text: t('rows.removeFromTab'), label: t('rows.removeFromTab'), onSelect: pick(() => void p.api.removeTabRow!(rec.id, 'tab').then(r => ok(r, t('rows.removedFromTab')))) })
+      items.push({ key: 'archiveTask', text: t('rows.archiveTask'), label: t('rows.archiveTask'), tone: 'danger', onSelect: pick(() => void p.api.removeTabRow!(rec.id, 'archive').then(r => ok(r, t('rows.taskArchived')))) })
+      return items
+    }
     // Spec 027 (US2): the Board tab lists every task on the board, so a task's row there is only archived
     // (Archive the task); a plain row (an idea) can still be deleted.
     if (editable && !(p.boardTasks && rec.task_id)) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
@@ -284,7 +291,7 @@ export function ContentSheet(p: ContentSheetProps) {
   type Where = 'before' | 'after' | 'on'
   const rowDrag = rowsOn ? {
     can: (row: ContentRow) => {
-      if (row.kind === 'theme') return admin && !isReadOnlyTheme(row.theme.id)
+      if (row.kind === 'theme') return admin && !isPseudoTheme(row.theme.id)
       if (row.kind === 'pillar') return mayEditTheme(row.theme)
       const rec = recOf(row)
       return !!rec && canEditRec(rec)
@@ -430,7 +437,7 @@ export function ContentSheet(p: ContentSheetProps) {
     const menu = (label: string, items: MenuItem[]) => { if (items.length) setPopup({ kind: 'menu', label, anchor, items }) }
     const pick = (fn: () => void) => () => { closePopup(true); fn() }
     // Spec 027: the Board tab's "No theme" group is not a project: no menu.
-    if (row.kind === 'theme' && isReadOnlyTheme(row.theme.id)) return
+    if (row.kind === 'theme' && isPseudoTheme(row.theme.id)) return
     if (row.kind === 'theme') {
       const th = row.theme
       const items: MenuItem[] = []
@@ -694,6 +701,10 @@ export function ContentSheet(p: ContentSheetProps) {
         {/* User, 24 Nov 2026: the toolbar keeps + Column and + Theme only. The Fields button above opens
             the columns; Paste plan, Only my rows and Show archived are in the workbook's Data menu. */}
         <button type="button" className="fx-sheet-btn" data-add-column="" aria-haspopup="menu" onClick={e => openAddColumn(e.currentTarget)}>{ts('columns.add')}</button>
+        {/* Spec 027 (US3): an added tab takes tasks already on the board too. */}
+        {p.tab && p.api.addExistingTasks && (
+          <button type="button" className="fx-sheet-btn" data-add-existing-task="" onClick={e => setPopup({ kind: 'addExisting', anchor: e.currentTarget })}>{t('rows.addExisting')}</button>
+        )}
         {admin && (
           <button type="button" className="fx-sheet-btn" data-add-theme="" onClick={e => {
             if (rowsOn) { void openThemeAdd(e.currentTarget); return }
@@ -712,7 +723,7 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {/* User, 25 Nov 2026: no summary line ("Content plan · 23 pieces · …") above the grid. */}
 
-      {p.themes.length === 0 && !p.boardTasks?.length
+      {p.themes.length === 0 && !p.boardTasks?.length && !p.tab
         ? <div className="fx-sheet-empty"><p>{admin ? t('noThemesAdmin') : t('noThemes')}</p></div>
         : (
           <div className="fx-sheet-scroll">
@@ -888,6 +899,12 @@ export function ContentSheet(p: ContentSheetProps) {
           </SheetPopover>
         )
       })()}
+      {popup?.kind === 'addExisting' && p.api.addExistingTasks && (
+        <SheetPopover anchor={popup.anchor} label={t('rows.addExisting')} onClose={closePopup}>
+          <LinkTaskPick tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} onCancel={() => closePopup(true)}
+            onPick={async id => { const r = await p.api.addExistingTasks!([id]); if (!r.success) return why(r.error); closePopup(true); say(t('rows.addedExisting')); return null }} />
+        </SheetPopover>
+      )}
       {popup?.kind === 'linkTask' && (
         <SheetPopover anchor={popup.anchor} label={t('rows.linkTask')} onClose={closePopup}>
           <LinkTaskPick tasks={p.tasks} taken={new Set(recs.map(r => r.task_id).filter((x): x is string => !!x))} onCancel={() => closePopup(true)}
@@ -900,7 +917,7 @@ export function ContentSheet(p: ContentSheetProps) {
           ctx={ctx}
           columns={{ targets: cl.pasteNames, values: cl.pasteColumns, addColumn: cl.addTextColumn }}
           onAdd={(r, o) => p.api.addPlan(r, paste.target ? { ...o, target: { projectId: paste.target.theme.id, pillarId: paste.target.pillarId } } : o)}
-          target={paste.target ? { themeName: paste.target.theme.name, pillarName: paste.target.theme.pillars.find(x => x.id === paste.target!.pillarId)?.name ?? null, lines: recs.filter(r => !r.task_id) } : null}
+          target={paste.target ? { themeName: paste.target.theme.name, pillarName: paste.target.theme.pillars.find(x => x.id === paste.target!.pillarId)?.name ?? null, lines: recs.filter(r => !r.task_id).map(r => ({ project_id: r.project_id ?? '', title: r.title })) } : null}
           onClose={msg => {
             setPaste(null)
             if (msg) say(msg)

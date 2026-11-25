@@ -52,6 +52,7 @@ import type { FillList } from '@/lib/sheet-fill'
 import { STATUS_EVENT, ZOOM_EVENT, tipsBus, zoomBus } from '@/components/sheet/GridCore'
 import { LINKED_SPECIAL } from '@/components/sheet/useGridTips'
 import { intlLocale } from '@/lib/sheet-format'
+import { LinkTabDialog } from './LinkTabDialog'
 import { useRovingToolbar } from './a11y'
 
 export interface WorkbookProps {
@@ -72,10 +73,29 @@ export interface WorkbookProps {
   initialSheetId?: string | null
   /** Spec 015: a notification's cell to open, `rowKey:colKey`. */
   initialCell?: string | null
+  /** Spec 027 (US3): added tabs of grouped rows — "+" adds one; the page renders each. */
+  rowsTabs?: RowsTabsHost
+}
+
+type Res<T = object> = Promise<({ success: true } & T) | { success: false; error: string }>
+/** What a page gives the workbook for its added tabs (spec 027, US3). */
+export interface RowsTabsHost {
+  render(sheet: SheetSummary): ReactNode
+  add(after: string | null, pattern: string): Res<{ sheet: SheetSummary }>
+  duplicate(id: string, pattern: string): Res<{ sheet: SheetSummary }>
+  remove(id: string): Res
+  unlink(id: string): Res
+  /** The creator, admins and superusers link, unlink and delete a tab. */
+  mayManage(sheet: SheetSummary): boolean
+  /** After the tab's rows changed on the server (linked). */
+  refresh(): void
 }
 
 type Dialog =
   | { kind: 'delete'; ids: string[] }
+  | { kind: 'link'; id: string }
+  | { kind: 'unlink'; id: string }
+  | { kind: 'deleteTab'; id: string }
   | { kind: 'protect'; id: string }
   | { kind: 'moveCopy'; ids: string[] }
   | { kind: 'unhide' }
@@ -186,6 +206,8 @@ export function Workbook(p: WorkbookProps) {
 
   const open = sheets.find(s => s.id === openId)
   const openBlank = open?.kind === 'blank'
+  /** Spec 027 (US3): an added tab of rows is open (the page renders it). */
+  const openRows = open?.kind === 'rows' && !!p.rowsTabs
 
   const loadDoc = useCallback((id: string) => {
     if (docsRef.current[id] || loading.current.has(id)) return
@@ -469,7 +491,53 @@ export function Workbook(p: WorkbookProps) {
   }
   const targets = (id: string) => (grouped.has(id) && grouped.size > 1 ? visible.filter(s => grouped.has(s.id)).map(s => s.id) : [id])
 
+  /** Spec 027 (US3): "+" adds an unlinked tab of rows after `after`. */
+  async function createRowsTab(after: string | null) {
+    const res = await outbox.track(p.rowsTabs!.add(after, pattern))
+    if (!res.success) { say(errText(res.error)); return }
+    const made = res.sheet
+    setSheets(list => {
+      const vis = [...list].sort(byPos)
+      const i = after ? vis.findIndex(s => s.id === after) : -1
+      const at = i >= 0 ? i + 1 : vis.length
+      return renumber([...vis.slice(0, at), made, ...vis.slice(at)])
+    })
+    setGrouped(new Set([made.id]))
+    openSheet(made.id)
+  }
+  async function duplicateRowsTab(id: string) {
+    const res = await outbox.track(p.rowsTabs!.duplicate(id, pattern))
+    if (!res.success) { say(errText(res.error)); return }
+    const made = res.sheet
+    setSheets(list => {
+      const vis = [...list].sort(byPos)
+      const i = vis.findIndex(s => s.id === id)
+      return renumber([...vis.slice(0, i + 1), made, ...vis.slice(i + 1)])
+    })
+    setGrouped(new Set([made.id]))
+    openSheet(made.id)
+    p.rowsTabs!.refresh()
+  }
+  async function deleteRowsTab(id: string) {
+    const prev = sheets
+    const left = visible.filter(s => s.id !== id)
+    if (id === openRef.current) { const i = visible.findIndex(s => s.id === id); const next = left[Math.min(i, left.length - 1)]; if (next) setOpenId(next.id) }
+    setSheets(list => renumber(list.filter(s => s.id !== id)))
+    setGrouped(new Set([left[0]?.id ?? '']))
+    const res = await outbox.track(p.rowsTabs!.remove(id))
+    if (!res.success) { setSheets(prev); say(errText(res.error)); return }
+    say(t('rowsTab.deleted'))
+  }
+  async function unlinkRowsTab(id: string) {
+    const res = await outbox.track(p.rowsTabs!.unlink(id))
+    if (!res.success) { say(errText(res.error)); return }
+    setSheets(list => list.map(s => (s.id === id ? { ...s, linked: false } : s)))
+    say(t('rowsTab.unlinked'))
+  }
+
   async function createSheet(where: { before?: string; after?: string }) {
+    // Spec 027: on a Space's Sheet view a new tab is a tab of rows (unlinked).
+    if (p.rowsTabs) { await createRowsTab(where.before ? (visible[visible.findIndex(s => s.id === where.before) - 1]?.id ?? null) : where.after ?? null); return }
     const res = await outbox.track(api.createSheet(folder.id, { ...where, pattern }))
     if (!res.success) { say(errText(res.error)); return }
     const made = res.sheet
@@ -637,7 +705,7 @@ export function Workbook(p: WorkbookProps) {
     if (!grouped.has(id)) { setGrouped(new Set([id])); if (id !== openRef.current) openSheet(id) }
     const ids = grouped.has(id) ? targets(id) : [id]
     const list = sheets.filter(x => ids.includes(x.id))
-    const anyLinked = list.some(x => x.kind !== 'blank')
+    const anyLinked = list.some(x => x.kind !== 'blank' && x.kind !== 'rows')
     const wouldEmpty = visible.filter(x => !ids.includes(x.id)).length === 0
     const lockedByOther = list.some(x => !mayUnprotect(x))
     const no = (why: string) => ({ disabled: true, why })
@@ -666,6 +734,27 @@ export function Workbook(p: WorkbookProps) {
     const protectItem: PopItem = s.protectedBy
       ? { key: 'unprotect', label: t('tabMenu.unprotect'), ...(single && mayUnprotect(s) ? {} : no(t('tabMenu.why.notProtector'))), onSelect: () => void protect(id, false) }
       : { key: 'protect', label: t('tabMenu.protect'), ...(s.kind !== 'blank' ? no(t('tabMenu.why.linked')) : !single ? { disabled: true } : {}), onSelect: () => setDialog({ kind: 'protect', id }) }
+    // Spec 027 (US3): an added tab's menu — link or unlink, rename, duplicate, delete (asks first).
+    if (s.kind === 'rows' && p.rowsTabs) {
+      const manage = p.rowsTabs.mayManage(s)
+      const notYours = no(t('tabMenu.why.notCreator'))
+      const rowsItems: PopItem[] = [
+        s.linked
+          ? { key: 'unlink', label: t('tabMenu.unlink'), ...(manage ? {} : notYours), onSelect: () => setDialog({ kind: 'unlink', id }) }
+          : { key: 'link', label: t('tabMenu.link'), ...(manage ? {} : notYours), onSelect: () => setDialog({ kind: 'link', id }) },
+        { kind: 'sep', key: 'sl' },
+        { key: 'rename', label: t('tabMenu.rename'), kbd: 'F2', ...(manage ? {} : notYours), onSelect: () => setRenaming(id) },
+        { key: 'duplicate', label: t('tabMenu.duplicate'), onSelect: () => void duplicateRowsTab(id) },
+        { key: 'delete', label: t('tabMenu.delete'), danger: true, ...(!manage ? notYours : wouldEmpty ? no(t('tabMenu.why.lastVisible')) : {}), onSelect: () => setDialog({ kind: 'deleteTab', id }) },
+        { key: 'insert', label: t('tabMenu.insert'), onSelect: () => void createRowsTab(id) },
+        { kind: 'node', key: 'color', node: swatches },
+        { kind: 'sep', key: 's1' },
+        { key: 'hide', label: t('tabMenu.hide'), ...hide, onSelect: () => void hideSheets(ids) },
+        { key: 'unhide', label: t('tabMenu.unhide'), ...(hidden.length ? {} : no(t('tabMenu.why.noHidden'))), onSelect: () => setDialog({ kind: 'unhide' }) },
+      ]
+      setTabMenu({ at, items: rowsItems, anchor, attr: 'data-tab-menu', label: t('tabMenu.label') })
+      return
+    }
     // Spec 027 (US2): the Board tab is always linked, first and fixed.
     const isBoardTab = !!boardTabName && s.kind !== 'blank'
     const items: PopItem[] = [
@@ -886,7 +975,9 @@ export function Workbook(p: WorkbookProps) {
       <div role="status">{painter && <p className="fx-painter-note" data-painter-on="">{t(painter.sticky ? 'format.edit.painterOn' : 'format.edit.painterOnce')}</p>}</div>
 
       <div className={`fx-sh-panel${painter ? ' is-painting' : ''}`} id="fx-sh-panel" role="tabpanel" aria-labelledby={openId ? `sheet-tab-${openId}` : undefined}>
-        {p.linked && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
+        {/* Spec 027: while an added tab is open the Board tab's sheet is set aside, so one sheet answers the toolbar. */}
+        {p.linked && !openRows && <div className="fx-sh-linkedpane" hidden={openBlank} data-linked-pane=""><LinkedFormatsContext.Provider value={api}>{p.linked}</LinkedFormatsContext.Provider></div>}
+        {openRows && open && <div className="fx-sh-linkedpane" key={open.id} data-rows-tab={open.id} data-rows-linked={open.linked ? 'true' : 'false'}>{p.rowsTabs!.render(open)}</div>}
         {openBlank && (doc
           ? <BlankSheet key={doc.id} doc={doc} name={nameOf(open)} readOnly={readOnly}
                         apply={(label, ch) => apply(doc.id, label, ch)} onUndo={doUndo} onRedo={doRedo}
@@ -913,7 +1004,7 @@ export function Workbook(p: WorkbookProps) {
         onNew={() => void createSheet({ after: openId })}
         onAll={allSheetsMenu}
         onMenu={tabMenuFor}
-        onRenameStart={id => { const s = sheets.find(x => x.id === id); if (s?.kind === 'blank') setRenaming(id) }}
+        onRenameStart={id => { const s = sheets.find(x => x.id === id); if (s?.kind === 'blank' || (s?.kind === 'rows' && p.rowsTabs?.mayManage(s))) setRenaming(id) }}
         onRename={onRename}
         onDrop={(id, before, copy) => void onDrop(id, before, copy)}
       />
@@ -1022,6 +1113,28 @@ export function Workbook(p: WorkbookProps) {
                        title={t('deleteSheet.title', { n: dialog.ids.length, name: nameOf(dialogSheet(dialog.ids[0]) ?? sheets[0]) })}
                        body={t('deleteSheet.body')} ok={t('deleteSheet.ok')} cancel={t('deleteSheet.cancel')}
                        onCancel={() => setDialog(null)} onOk={() => { const ids = dialog.ids; setDialog(null); void deleteSheets(ids) }} />
+      )}
+      {dialog?.kind === 'link' && (
+        <LinkTabDialog sheetId={dialog.id} name={nameOf(dialogSheet(dialog.id) ?? sheets[0])} onCancel={() => setDialog(null)}
+          onDone={r => {
+            const id = dialog.id
+            setDialog(null)
+            setSheets(list => list.map(s => (s.id === id ? { ...s, linked: true } : s)))
+            say(t('rowsTab.linked', { created: r.created, reconnected: r.reconnected }))
+            p.rowsTabs?.refresh()
+          }} />
+      )}
+      {dialog?.kind === 'unlink' && (
+        <ConfirmDialog attr="data-unlink-tab"
+                       title={t('rowsTab.unlinkTitle', { name: nameOf(dialogSheet(dialog.id) ?? sheets[0]) })}
+                       body={t('rowsTab.unlinkBody')} ok={t('rowsTab.unlinkOk')} cancel={t('deleteSheet.cancel')}
+                       onCancel={() => setDialog(null)} onOk={() => { const id = dialog.id; setDialog(null); void unlinkRowsTab(id) }} />
+      )}
+      {dialog?.kind === 'deleteTab' && (
+        <ConfirmDialog attr="data-delete-tab" danger
+                       title={t('rowsTab.deleteTitle', { name: nameOf(dialogSheet(dialog.id) ?? sheets[0]) })}
+                       body={t('rowsTab.deleteBody')} ok={t('deleteSheet.ok')} cancel={t('deleteSheet.cancel')}
+                       onCancel={() => setDialog(null)} onOk={() => { const id = dialog.id; setDialog(null); void deleteRowsTab(id) }} />
       )}
       {dialog?.kind === 'protect' && (
         <ConfirmDialog attr="data-protect-sheet"

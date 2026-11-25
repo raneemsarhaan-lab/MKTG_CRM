@@ -124,7 +124,9 @@ export function TabBar(p: TabBarProps) {
            onDrop={drop}>
         {p.sheets.map((s, i) => {
           const open = s.id === p.openId
-          const linked = s.kind !== 'blank'
+          // The Board tab is fixed; added `rows` tabs move and rename like any tab (spec 027).
+          const fixed = s.kind !== 'blank' && s.kind !== 'rows'
+          const linked = fixed || (s.kind === 'rows' && !!s.linked)
           if (p.renaming === s.id) return (
             <span key={s.id} className="fx-sh-tabslot">
               <span role="tab" aria-selected={open} id={`sheet-tab-${s.id}`} data-sheet-tab={s.id} className="fx-sh-tab is-renaming">
@@ -145,14 +147,14 @@ export function TabBar(p: TabBarProps) {
                 data-sheet-tab={s.id}
                 className={`fx-sh-tab${p.grouped.has(s.id) && p.grouped.size > 1 ? ' is-grouped' : ''}${drag?.id === s.id ? ' is-dragging' : ''}`}
                 // Spec 027 (US2): the linked first tab (Board) stays first: it isn't dragged, and nothing drops before it.
-                draggable={!linked}
+                draggable={!fixed}
                 onClick={e => p.onOpen(s.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
-                onDoubleClick={() => { if (!linked) p.onRenameStart(s.id) }}
+                onDoubleClick={() => { if (!fixed) p.onRenameStart(s.id) }}
                 onKeyDown={e => onTabKey(e, s, i)}
                 onFocus={() => setFocusId(s.id)}
                 onContextMenu={e => { e.preventDefault(); p.onMenu(s.id, { x: e.clientX, y: e.clientY }, e.currentTarget) }}
                 onDragStart={e => { setDrag({ id: s.id, before: null, copy: false }); e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData('text/plain', s.id) }}
-                onDragOver={linked ? undefined : e => dragOver(e, s)}
+                onDragOver={fixed ? undefined : e => dragOver(e, s)}
                 onDrop={drop}
                 onDragEnd={() => setDrag(null)}
               >

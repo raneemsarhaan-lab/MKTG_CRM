@@ -903,7 +903,10 @@
       "type_not_allowed": "That Space doesn't allow this task type.",
       "not_linked": "This row has no task.",
       "emptyTitle": "A title can’t be empty, so the old one was kept.",
-      "emptyName": "Type a name first."
+      "emptyName": "Type a name first.",
+      "board_tab": "The Board tab is always linked.",
+      "already_linked": "This tab is already linked.",
+      "not_linked_tab": "This tab isn’t linked."
     },
     "menu": {
       "next": "Next",
@@ -978,7 +981,13 @@
       "taskWins": "Where the row and the task both have a value, the task's value is kept.",
       "subtaskOf": "A subtask of “{name}”, in the same Space.",
       "parentFirst": "Link the parent row first",
-      "unlinked": "Unlinked. The row keeps its last values; the task carries on in its Space."
+      "unlinked": "Unlinked. The row keeps its last values; the task carries on in its Space.",
+      "removeFromTab": "Remove from this tab only",
+      "removedFromTab": "Removed from this tab. The task stays on the board.",
+      "archiveTask": "Archive the task",
+      "taskArchived": "Task archived",
+      "addExisting": "+ Add existing task",
+      "addedExisting": "Task added to this tab"
     },
     "themes": {
       "addTitle": "Add a theme",
@@ -1526,9 +1535,13 @@
         "linked": "The linked sheet can't be deleted, renamed, hidden or protected.",
         "lastVisible": "A folder keeps one visible sheet.",
         "noHidden": "No hidden sheets.",
-        "notProtector": "Only the person who protected it, or an admin, can unprotect it."
+        "notProtector": "Only the person who protected it, or an admin, can unprotect it.",
+        "notCreator": "Only whoever added this tab, an admin or a superuser can do this"
       },
-      "alwaysLinked": "The Board tab is always linked."
+      "alwaysLinked": "The Board tab is always linked.",
+      "link": "Link to board",
+      "unlink": "Unlink from board",
+      "duplicate": "Duplicate"
     },
     "moveCopy": {
       "title": "Move or Copy",
@@ -2974,7 +2987,47 @@
         "go": "Print"
       }
     },
-    "undo": "Undo"
+    "undo": "Undo",
+    "rowsTab": {
+      "deleted": "Tab deleted. Its tasks stay on the board.",
+      "unlinked": "Unlinked. The tasks stay on the board; the rows keep their last values.",
+      "linked": "Linked: {created, plural, =0 {no new tasks} one {# task created} other {# tasks created}}, {reconnected, plural, =0 {none reconnected} one {# row reconnected} other {# rows reconnected}}.",
+      "unlinkTitle": "Unlink “{name}” from the board?",
+      "unlinkBody": "The tasks stay on the board. Each row keeps its last values as plain text and remembers its task, so linking again reconnects it.",
+      "unlinkOk": "Unlink",
+      "deleteTitle": "Delete the tab “{name}”?",
+      "deleteBody": "Only the tab and its rows go. Every task stays on the board."
+    },
+    "linkTab": {
+      "title": "Link “{name}” to the board",
+      "loading": "Reading the tab…",
+      "columns": "Columns → task fields",
+      "sheetOnly": "Sheet only",
+      "field": {
+        "title": "Title",
+        "brand": "Brand",
+        "type": "Type",
+        "status": "Status",
+        "owner": "Owner",
+        "assignee": "Assignee",
+        "publish": "Publishing date",
+        "due": "Due date"
+      },
+      "create": "This will create {n, plural, =0 {no tasks} one {# task} other {# tasks}} on the {space} board.",
+      "reconnect": "Reconnects {n, plural, one {# row} other {# rows}} to their tasks. No duplicates.",
+      "already": "{n, plural, one {# row is} other {# rows are}} already linked.",
+      "untitled": "{n, plural, one {# row has} other {# rows have}} no title and stay plain (row {rows}).",
+      "conflicts": "{n, plural, one {# row stays plain:} other {# rows stay plain:}} its task is already in another row of this tab.",
+      "cancel": "Cancel",
+      "go": "Link to board",
+      "error": {
+        "generic": "The tab couldn’t be linked. Try again.",
+        "already_linked": "This tab is already linked.",
+        "needs_space": "This tab has no Space to make tasks in.",
+        "not_authorized": "Only whoever added this tab, an admin or a superuser can link it.",
+        "board_tab": "The Board tab is always linked."
+      }
+    }
   },
   "hours": {
     "today": "Today's hours",

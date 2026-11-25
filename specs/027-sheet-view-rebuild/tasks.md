@@ -11,17 +11,17 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Register a `scenarios-027-views.cjs`, `scenarios-027-board-tab.cjs`, `scenarios-027-tabs.cjs`, `scenarios-027-structure.cjs` and `scenarios-027-convert.cjs` placeholder (each exporting `[]`) in scripts/spaces-lab/realapp/run.cjs
-- [ ] T002 [P] Add `spec027` message namespaces (en and ar) for every new string listed in contracts/server-actions.md errors and the UI below in messages/en.json and messages/ar.json
+- [X] T001 (done: views, board-tab and tabs scenarios registered; structure and convert come with their stages) Register a `scenarios-027-views.cjs`, `scenarios-027-board-tab.cjs`, `scenarios-027-tabs.cjs`, `scenarios-027-structure.cjs` and `scenarios-027-convert.cjs` placeholder (each exporting `[]`) in scripts/spaces-lab/realapp/run.cjs
+- [X] T002 (done: messages under sheets.linkTab, sheets.rowsTab, sheets.tabMenu, content.rows, en and ar) [P] Add `spec027` message namespaces (en and ar) for every new string listed in contracts/server-actions.md errors and the UI below in messages/en.json and messages/ar.json
 
 ---
 
 ## Phase 2: Foundational (blocking)
 
-- [ ] T003 Extend prisma/schema.prisma per data-model.md: `Sheet.linked Boolean @default(false)`, `Sheet.space_id String? @db.Uuid`, `ContentRow.sheet_id String? @db.Uuid`, `ContentRow.last_task_id String? @db.Uuid`, `@@unique([sheet_id, task_id])` on content_rows, `ContentSheetTheme.sheet_id String? @db.Uuid` with `@@unique([sheet_id, project_id])`; run scripts/schema-guard.sh and `prisma db push` locally
-- [ ] T004 Keep the Board tab's loaders to rows and themes with `sheet_id` null (src/lib/board-data.ts), so existing Board-tab behaviour is unchanged
+- [X] T003 (done; `content_rows.project_id` is also optional now, for a tab's rows under no theme — DROP NOT NULL, allowed by the guard) Extend prisma/schema.prisma per data-model.md: `Sheet.linked Boolean @default(false)`, `Sheet.space_id String? @db.Uuid`, `ContentRow.sheet_id String? @db.Uuid`, `ContentRow.last_task_id String? @db.Uuid`, `@@unique([sheet_id, task_id])` on content_rows, `ContentSheetTheme.sheet_id String? @db.Uuid` with `@@unique([sheet_id, project_id])`; run scripts/schema-guard.sh and `prisma db push` locally
+- [X] T004 (done: board data splits Board-tab themes and rows from added tabs' `tabThemes` / `tabRows`; the Board tab's sync filters `sheet_id` null) Keep the Board tab's loaders to rows and themes with `sheet_id` null (src/lib/board-data.ts), so existing Board-tab behaviour is unchanged
 - [X] T005 [P] Pure link rules in src/lib/tab-link.ts: `matchColumns(columns, fields)` (by normalised name; unknown → 'sheet'), `linkPreview(rows, matches)` → `{ create, reconnect, untitled, conflicts }`, `rowValuesToTask(row, matches)`; and a lab scripts/spaces-lab/tab-link.lab.ts covering: titled/untitled rows, rows with last_task_id (reconnect), rows already linked (skip), brand by name, unknown column → sheet only, idempotency (second preview after link = create 0)
-- [ ] T006 [P] Tab permission helper `mayManageTab(sheet, member)` and `mayUseNode(node, member)` in src/lib/sheet-access.ts (creator, admin, superuser; Board tab never)
+- [X] T006 (done inside src/actions/sheet-tabs.ts `tabFor` and src/actions/sheets.ts `mayManageTab`, with the existing src/lib/sheet-access.ts) [P] Tab permission helper `mayManageTab(sheet, member)` and `mayUseNode(node, member)` in src/lib/sheet-access.ts (creator, admin, superuser; Board tab never)
 
 **Checkpoint**: schema in place, link rules tested, existing suite green.
 
@@ -79,16 +79,16 @@
 
 ### Tests
 
-- [ ] T019 [P] [US3] Scenarios in scripts/spaces-lab/realapp/scenarios-027-tabs.cjs: + adds an unlinked tab, Board tab unchanged; link a tab with 3 titled + 1 untitled row → preview "create 3", 3 tasks in To Do, 1 plain row listed; + Row in the linked tab creates a task; unlink → tasks stay, rows keep values; link again → "Reconnects 3", 0 created; Make task on one row of an unlinked tab → 1 task; linking that tab later creates only the others; Add existing task puts the same task in two tabs; remove-from-tab keeps the task, Archive archives it; Content › Forefront linked tab and Make task → Brand Forefront; a user (not creator) can't link/unlink/delete someone else's tab (server refuses)
+- [X] T019 [P] [US3] Scenarios in scripts/spaces-lab/realapp/scenarios-027-tabs.cjs: + adds an unlinked tab, Board tab unchanged; link a tab with 3 titled + 1 untitled row → preview "create 3", 3 tasks in To Do, 1 plain row listed; + Row in the linked tab creates a task; unlink → tasks stay, rows keep values; link again → "Reconnects 3", 0 created; Make task on one row of an unlinked tab → 1 task; linking that tab later creates only the others; Add existing task puts the same task in two tabs; remove-from-tab keeps the task, Archive archives it; Content › Forefront linked tab and Make task → Brand Forefront; a user (not creator) can't link/unlink/delete someone else's tab (server refuses)
 
 ### Implementation
 
-- [ ] T020 [US3] src/actions/sheet-tabs.ts: `addTab`, `renameTab`, `duplicateTab`, `deleteTab` (tab + plain rows only), `linkPreview`, `linkTab` (idempotent; reconnects `last_task_id`; creates tasks in the first stage with folder brand), `unlinkTab` (rows keep last task values, `last_task_id` set) — per contracts, using src/lib/tab-link.ts and src/lib/sheet-access.ts
-- [ ] T021 [US3] Row actions in src/actions/content-rows.ts for rows with `sheet_id`: `makeTask` (reconnect if `last_task_id`), `unlinkRow`, `addExistingTasks`, `removeRow(mode)`; titled new rows in a linked tab create tasks
-- [ ] T022 [US3] Load added tabs' rows (`sheet_id`) and groups in src/lib/board-data.ts / sheet loaders, and render a `kind 'rows'` tab with the rows grid (src/components/content/ContentSheet.tsx in tab mode: no Board filter; Make task, Unlink row, Add existing task in its menus)
-- [ ] T023 [US3] Tab menu in src/components/sheets/TabBar.tsx: Link to board / Unlink from board, Rename, Duplicate, Delete (confirm); link icon on linked tab names; "+" calls `addTab`
-- [ ] T024 [US3] Link dialog src/components/sheets/LinkTabDialog.tsx: each column → field select (or Sheet only), counts "This will create N tasks on the [Space] board" / "Reconnects N rows", untitled rows listed; Brand page asks the Space
-- [ ] T025 [US3] Linked row Task cell: task name as a link with Space and stage (reuse the Link task cell) in src/components/content/ContentGrid.tsx
+- [X] T020 [US3] src/actions/sheet-tabs.ts: `addTab`, `renameTab`, `duplicateTab`, `deleteTab` (tab + plain rows only), `linkPreview`, `linkTab` (idempotent; reconnects `last_task_id`; creates tasks in the first stage with folder brand), `unlinkTab` (rows keep last task values, `last_task_id` set) — per contracts, using src/lib/tab-link.ts and src/lib/sheet-access.ts
+- [X] T021 [US3] Row actions in src/actions/content-rows.ts for rows with `sheet_id`: `makeTask` (reconnect if `last_task_id`), `unlinkRow`, `addExistingTasks`, `removeRow(mode)`; titled new rows in a linked tab create tasks
+- [X] T022 [US3] Load added tabs' rows (`sheet_id`) and groups in src/lib/board-data.ts / sheet loaders, and render a `kind 'rows'` tab with the rows grid (src/components/content/ContentSheet.tsx in tab mode: no Board filter; Make task, Unlink row, Add existing task in its menus)
+- [X] T023 [US3] Tab menu in src/components/sheets/TabBar.tsx: Link to board / Unlink from board, Rename, Duplicate, Delete (confirm); link icon on linked tab names; "+" calls `addTab`
+- [X] T024 [US3] Link dialog src/components/sheets/LinkTabDialog.tsx: each column → field select (or Sheet only), counts "This will create N tasks on the [Space] board" / "Reconnects N rows", untitled rows listed; Brand page asks the Space
+- [X] T025 (done: a linked row's Title is its task's name with the board's Status and Link task cells) [US3] Linked row Task cell: task name as a link with Space and stage (reuse the Link task cell) in src/components/content/ContentGrid.tsx
 
 **Checkpoint**: US3 scenarios and the full suite green → commit, push.
 

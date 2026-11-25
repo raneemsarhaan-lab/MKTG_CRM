@@ -7,7 +7,8 @@
 
 export interface ContentRowRec {
   id: string
-  project_id: string
+  /** The theme's project; null for an added tab's row under no theme (spec 027). */
+  project_id: string | null
   pillar_id: string | null
   parent_id: string | null
   position: number
@@ -18,6 +19,10 @@ export interface ContentRowRec {
   created_by: string | null
   /** Spec 026: the Space whose sheet the row is on. */
   space_id?: string | null
+  /** Spec 027 (US3): the added tab the row is in; null on the Board tab. */
+  sheet_id?: string | null
+  /** Spec 027 (US3): the task the row had before it was unlinked. */
+  last_task_id?: string | null
 }
 
 /** A position between two neighbours (either may be missing). */
@@ -29,7 +34,7 @@ export function between(before: number | null | undefined, after: number | null 
 }
 
 /** Rows of one group (theme + pillar, top level), in order. */
-export function groupRows(rows: ContentRowRec[], projectId: string, pillarId: string | null): ContentRowRec[] {
+export function groupRows(rows: ContentRowRec[], projectId: string | null, pillarId: string | null): ContentRowRec[] {
   return rows.filter(r => r.project_id === projectId && !r.parent_id && (r.pillar_id ?? null) === pillarId)
     .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id))
 }

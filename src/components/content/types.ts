@@ -20,9 +20,9 @@ export interface ContentApi extends SheetApi {
   savePillar(themeId: string, input: { id?: string; name: string }): Promise<Result & { id?: string }>
   removePillar(id: string): Promise<Result>
   // ── Sheet 2b: rows, themes and pillars (optional: a host without them shows every piece as a row) ──
-  addRow?(input: { projectId: string; pillarId?: string | null; parentId?: string | null; title: string; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result & { row?: ContentRowRec }>
+  addRow?(input: { projectId: string | null; pillarId?: string | null; parentId?: string | null; title: string; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result & { row?: ContentRowRec }>
   updateRow?(id: string, patch: { title?: string; date?: string | null; values?: Record<string, string | null> }): Promise<Result>
-  moveRow?(id: string, to: { projectId: string; pillarId?: string | null; parentId?: string | null; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result>
+  moveRow?(id: string, to: { projectId: string | null; pillarId?: string | null; parentId?: string | null; anchor?: { id: string; where: 'above' | 'below' } | null }): Promise<Result>
   indentRow?(id: string, dir: 'in' | 'out'): Promise<Result>
   deleteRow?(id: string, opts: { task?: 'unlink' | 'delete'; children?: 'up' | 'delete' }): Promise<Result>
   rowToTask?(id: string): Promise<Result & { taskId?: string }>
@@ -31,6 +31,10 @@ export interface ContentApi extends SheetApi {
   makeTask?(id: string, opts: { spaceId?: string | null; taskId?: string | null; type?: string | null }): Promise<Result & { taskId?: string }>
   /** Spec 026 (§4): unlink — the row keeps its last values as plain text. */
   unlinkRow?(id: string): Promise<Result>
+  /** Spec 027 (US3): an added tab's row off this tab only, or its task archived. */
+  removeTabRow?(id: string, mode: 'tab' | 'archive'): Promise<Result>
+  /** Spec 027 (US3): + Add existing task — the tasks become rows of the tab. */
+  addExistingTasks?(taskIds: string[]): Promise<Result & { added?: number }>
   /** + Theme: the brand's projects that aren't themes of this sheet yet. */
   themeNames?(): Promise<string[]>
   addSheetTheme?(input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }): Promise<Result & { projectId?: string }>
@@ -46,6 +50,8 @@ export interface ContentSheetProps {
   boardTasks?: import('@/types/index').Task[]
   /** The Board's Mine or a filter is on: rows whose task it hides hide too. */
   boardFiltered?: boolean
+  /** Spec 027 (US3): an added tab of this Sheet view (not the Board tab). */
+  tab?: { id: string; linked: boolean }
   /** Fields (25 Nov 2026): the field system here — promoted fields, each person's columns, the Space and the library. */
   fieldSystem?: {
     promoted: string[]

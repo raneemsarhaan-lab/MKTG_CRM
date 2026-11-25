@@ -745,8 +745,10 @@ export async function addLinkAttachment(
 }
 
 /** A task that may be dropped: a clip of a video (spec 008) or a piece of a theme (spec 009). */
-async function droppable(task: { parent_task_id: string | null; project_id: string | null }): Promise<boolean> {
+async function droppable(task: { id: string; parent_task_id: string | null; project_id: string | null }): Promise<boolean> {
   if (await videoOf(task)) return true
+  // Spec 027 (US3): a task that is a row of a sheet tab is archived from it ("Archive the task").
+  if (await prisma.contentRow.findFirst({ where: { task_id: task.id, sheet_id: { not: null } }, select: { id: true } })) return true
   if (!task.project_id) return false
   const p = await prisma.project.findUnique({ where: { id: task.project_id }, select: { is_theme: true } })
   return !!p?.is_theme

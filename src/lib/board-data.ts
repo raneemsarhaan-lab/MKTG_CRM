@@ -77,7 +77,7 @@ export async function loadBoardData(member: SessionMember) {
     prisma.contentSheetTheme.findMany({
       orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
       select: {
-        id: true, position: true, pillar_order: true, space_id: true,
+        id: true, position: true, pillar_order: true, space_id: true, sheet_id: true,
         project: { select: {
           id: true, name: true, brand_id: true, owner_id: true, frequency_count: true, frequency_period: true, audience: true,
           pillars: { select: { id: true, name: true, sort_order: true } },
@@ -170,8 +170,11 @@ export async function loadBoardData(member: SessionMember) {
     taskSpaceStages: taskSpaceStages as import('@/types/index').TaskSpaceStage[],
     slaConfig: mapSlaConfig(slaRows),
     // Spec 026: every Space's sheet has its own themes; each carries its Space.
-    themes: themes.map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order, space_id: th.space_id })),
-    contentRows: contentRows.map(mapContentRow),
+    // Spec 027: the Board tabs' themes and rows; added tabs' themes and rows apart, so nothing else sees them twice.
+    themes: themes.filter(th => !th.sheet_id).map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order, space_id: th.space_id })),
+    tabThemes: themes.filter(th => th.sheet_id).map(th => mapTheme({ ...th.project, sheet_theme_id: th.id, position: th.position, pillar_order: th.pillar_order, space_id: null, sheet_id: th.sheet_id })),
+    contentRows: contentRows.filter(r => !r.sheet_id).map(mapContentRow),
+    tabRows: contentRows.filter(r => r.sheet_id).map(mapContentRow),
     hasStorage: storageConfigured(),
     sheetColumns: sheetColumns.map(mapSheetColumn),
     sheetValues: values,
