@@ -831,6 +831,13 @@ function KanbanBoardInner({
     },
     // ── the Content sheet (spec 009) ──
     async addPlan(rows, opts) {
+      // Spec 027: pasted into an added tab, the lines are the tab's rows (tasks when it is linked).
+      if (tabSheet) {
+        const t = opts.target ? { projectId: noTheme(opts.target.projectId), pillarId: opts.target.pillarId ?? null } : null
+        const r = await sheetTabs.pasteTabRows(tabSheet.id, t, rows.map(x => ({ title: x.title, theme: x.theme, pillar: x.pillar, custom: x.custom }))).catch(() => ({ success: false as const, error: 'generic' }))
+        if (r.success) router.refresh()
+        return r.success ? { success: true, rowsCreated: r.rowsCreated, created: r.created } : r
+      }
       const res = await addPlan(rows, { ...opts, spaceId: sheetSpaceRef.current }).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) router.refresh()
       return res
@@ -932,7 +939,7 @@ function KanbanBoardInner({
         linkRowTask: run(contentRows.linkRowTask),
         makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
         reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current, tabSheet?.id ?? null)),
-        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceRef.current, tabSheet?.id ?? null)),
+        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d ? { ...d, projectId: noTheme(d.projectId) } : d, sheetSpaceRef.current, tabSheet?.id ?? null)),
         addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current, tabSheet?.id ?? null)),
         reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current, tabSheet?.id ?? null)),
         removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current, tabSheet?.id ?? null)),

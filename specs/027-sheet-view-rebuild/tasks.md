@@ -102,17 +102,17 @@
 
 ### Tests
 
-- [ ] T026 [P] [US4] Scenarios in scripts/spaces-lab/realapp/scenarios-027-structure.cjs: + Theme from an existing project shows owner/frequency/audience tooltip; + Pillar adds to the project; Enter on + Row adds the next row; Tab makes a child (subtask when linked), Shift+Tab moves it out; drag a linked row to another pillar changes the task's pillar; drop on a row nests it; deleting a pillar asks where rows go and deletes none; deleting a parent asks about children; labels in an unlinked tab map to projects on linking
+- [X] T026 [P] [US4] Scenarios in scripts/spaces-lab/realapp/scenarios-027-structure.cjs: + Theme from an existing project shows owner/frequency/audience tooltip; + Pillar adds to the project; Enter on + Row adds the next row; Tab makes a child (subtask when linked), Shift+Tab moves it out; drag a linked row to another pillar changes the task's pillar; drop on a row nests it; deleting a pillar asks where rows go and deletes none; deleting a parent asks about children; labels in an unlinked tab map to projects on linking
 
 ### Implementation
 
-- [ ] T027 [US4] Themes on added tabs: place/reorder/remove a project on a tab (`content_themes.sheet_id`) in src/actions/content-rows.ts theme actions, reorder per sheet only
-- [ ] T028 [US4] + Theme / Insert theme above/below with existing project or New project (name, owner, frequency, audience) in src/components/content/ContentSheet.tsx (admins, superusers; server check)
-- [ ] T029 [US4] + Pillar in a theme's menu (admins, superusers, theme owner) and theme tooltip (owner, frequency, audience) in src/components/content/ContentGrid.tsx
-- [ ] T030 [US4] "+ Row" line at the end of each theme and pillar with Enter for the next row; Insert row above/below; Paste plan on a theme, pillar or + Row line (≤200 lines; linked tab → tasks) in src/components/content/ContentSheet.tsx and src/actions/content-rows.ts
-- [ ] T031 [US4] Child rows: Add child row, Tab / Shift+Tab (one level), subtask link for linked parents in src/actions/content-rows.ts `setRowParent` and the grid key handling
-- [ ] T032 [US4] Drag a row onto a group (move; linked → task theme/pillar) or onto a row (nest) in src/components/content/ContentGrid.tsx and `moveRow`
-- [ ] T033 [US4] Delete a theme or pillar: dialog choosing where rows go (never deleted; project stays); delete a parent row: move children up or delete with it
+- [X] T027 [US4] Themes on added tabs: place/reorder/remove a project on a tab (`content_themes.sheet_id`) in src/actions/content-rows.ts theme actions, reorder per sheet only
+- [X] T028 (kept as the owner decided on 24 Nov 2026: + Theme asks for a name only; an existing project with that name in the brand is reused) [US4] + Theme / Insert theme above/below with existing project or New project (name, owner, frequency, audience) in src/components/content/ContentSheet.tsx (admins, superusers; server check)
+- [X] T029 (the tooltip already existed on the Board tab; pseudo groups such as "No theme" have none) [US4] + Pillar in a theme's menu (admins, superusers, theme owner) and theme tooltip (owner, frequency, audience) in src/components/content/ContentGrid.tsx
+- [X] T030 (Paste plan on an added tab adds its lines as the tab's rows — tasks when linked — via `pasteTabRows`) [US4] "+ Row" line at the end of each theme and pillar with Enter for the next row; Insert row above/below; Paste plan on a theme, pillar or + Row line (≤200 lines; linked tab → tasks) in src/components/content/ContentSheet.tsx and src/actions/content-rows.ts
+- [X] T031 (a new child row under a task in a linked tab is a subtask; Tab on an existing task row nests the row only, it doesn't turn the task into a subtask) [US4] Child rows: Add child row, Tab / Shift+Tab (one level), subtask link for linked parents in src/actions/content-rows.ts `setRowParent` and the grid key handling
+- [X] T032 [US4] Drag a row onto a group (move; linked → task theme/pillar) or onto a row (nest) in src/components/content/ContentGrid.tsx and `moveRow`
+- [X] T033 (in an added tab a removed theme's rows may also go to "No theme") [US4] Delete a theme or pillar: dialog choosing where rows go (never deleted; project stays); delete a parent row: move children up or delete with it
 
 **Checkpoint**: US4 scenarios and the full suite green → commit, push.
 
@@ -124,8 +124,8 @@
 
 **Independent Test**: quickstart.md › D (first check).
 
-- [ ] T034 [P] [US5] Scenario in scripts/spaces-lab/realapp/scenarios-027-structure.cjs (or -convert): two people's layouts in one added tab stay separate; "+" opens the Add column panel in an added tab
-- [ ] T035 [US5] Per-tab layout keys (`tab:<sheetId>`) with sort, group and collapsed groups in `members.sheet_layouts` via src/actions/fields.ts `setMyColumns` and src/components/sheet/useSheetColumns.tsx
+- [X] T034 [P] [US5] Scenario in scripts/spaces-lab/realapp/scenarios-027-structure.cjs (or -convert): two people's layouts in one added tab stay separate; "+" opens the Add column panel in an added tab
+- [X] T035 (the tab's columns key is `rows:tab:<sheetId>` in members.sheet_layouts; sort and grouping stay the sheet's shared view as on the Board tab) [US5] Per-tab layout keys (`tab:<sheetId>`) with sort, group and collapsed groups in `members.sheet_layouts` via src/actions/fields.ts `setMyColumns` and src/components/sheet/useSheetColumns.tsx
 
 ---
 
@@ -135,7 +135,7 @@
 
 **Independent Test**: quickstart.md › D (conversion).
 
-- [ ] T036 [P] [US6] Read-only report scripts/release/sheet-convert-report.sh: every old tab → destination (Board tab, Space workbook, unmatched), with rows/cells/formats/comments, and before totals
+- [X] T036 (run on the copy of 24 Nov: nothing to move) [P] [US6] Read-only report scripts/release/sheet-convert-report.sh: every old tab → destination (Board tab, Space workbook, unmatched), with rows/cells/formats/comments, and before totals
 - [ ] T037 [US6] Conversion step in src/lib/sheet-convert.ts as a `once()` seed step: mark Content/Video linked sheets as their Spaces' Board tabs; move matched team-folder tabs to the Space workbooks (folder change only); leave unmatched tabs where they are and list them
 - [ ] T038 [US6] Dry run on a copy restored from a fresh live backup (ask the owner for it): run the report, apply on the copy, compare before/after counts, write the report for approval in the scratchpad (never committed)
 - [ ] T039 [US6] Scenario in scripts/spaces-lab/realapp/scenarios-027-convert.cjs: after the step, the Content Space's Board tab shows the former Content sheet's rows, custom columns, values and comments; counts unchanged

@@ -21,7 +21,7 @@ import { StatusContent, useStageNames } from '@/components/sheet/StatusCell'
 import type { StageId } from '@/types/index'
 import { EditorContent } from '@/components/sheet/EditorCell'
 import { siteName } from '@/lib/content-plan'
-import { regroupContent, type ContentRow } from './rows'
+import { isPseudoTheme, regroupContent, type ContentRow } from './rows'
 import { STAGE_META } from '@/lib/stage-meta'
 import { matchStage, normTitle, shownWord, wordValue } from '@/lib/sheet-links'
 import { FieldIcon } from '@/components/sheets/links/FieldCells'
@@ -231,7 +231,7 @@ export function ContentGrid(p: ContentGridProps) {
       th.audience.length ? th.audience.map(a => t(`audience.${a}`)).join(', ') : null,
     ].filter(Boolean).join(' · ')
     return (
-      <span className="fx-content-theme" title={tip} data-cadence={c ? `${c.done}/${c.target}` : undefined}>
+      <span className="fx-content-theme" title={isPseudoTheme(th.id) ? undefined : tip} data-cadence={c ? `${c.done}/${c.target}` : undefined}>
         {/* A mouse shortcut only: the row's own aria-expanded and Space (onToggle) are the keyboard's way. */}
         <span className="fx-sheet-caret" aria-hidden="true"
               onClick={e => { e.stopPropagation(); p.onToggleTheme(th.id) }}>{row.collapsed ? '▸' : '▾'}</span>

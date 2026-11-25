@@ -882,7 +882,7 @@ export function Workbook(p: WorkbookProps) {
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
   // Spec 019: ⚙ Fields on team sheets and (stage 2) the Content sheet.
-  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video' || open?.kind === 'linked_tasks'
+  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video' || open?.kind === 'linked_tasks' || openRows
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>

@@ -22,7 +22,7 @@ import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/shee
 import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
-import { buildContentRows, isPseudoTheme, isReadOnlyTheme, piecesIn, type ContentRow } from './rows'
+import { TAB_ROWS_ID, buildContentRows, isPseudoTheme, isReadOnlyTheme, piecesIn, type ContentRow } from './rows'
 import { ContentGrid, LINK_COLS, pieceLink } from './ContentGrid'
 import { ThemeEditor, NamePrompt } from './ThemeEditor'
 import { PlanPreview } from './PlanPreview'
@@ -870,7 +870,11 @@ export function ContentSheet(p: ContentSheetProps) {
           <DestinationPick
             title={popup.pillar ? t('rows.removePillar', { name: popup.pillar.name }) : t('rows.removeTheme', { name: popup.theme.name })}
             rows={popup.rows}
-            options={destinations(p.themes, { themeId: popup.theme.id, pillarId: popup.pillar?.id ?? null }, (k, v) => t(k as 'rows.noPillarIn', v))}
+            options={[
+              ...destinations(p.themes, { themeId: popup.theme.id, pillarId: popup.pillar?.id ?? null }, (k, v) => t(k as 'rows.noPillarIn', v)),
+              // Spec 027: in an added tab a theme's rows may go under no theme.
+              ...(p.tab && !popup.pillar ? [{ key: `${TAB_ROWS_ID}:`, projectId: TAB_ROWS_ID, pillarId: null, label: t('noTheme') }] : []),
+            ]}
             onCancel={() => closePopup(true)}
             onConfirm={async d => {
               const dest = d ? { projectId: d.projectId, pillarId: d.pillarId } : null

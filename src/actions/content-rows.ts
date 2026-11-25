@@ -150,8 +150,10 @@ export async function addRow(input: {
       ...('sheetId' in sc ? { sheet_id: sc.sheetId, space_id: null } : { space_id: sc.spaceId }),
       project_id: projectId, pillar_id: pillar, parent_id: parentId, title, position: positionFor(siblings, input.anchor), created_by: m.id },
   })
-  // Spec 027: in a linked tab every titled row is a task on the tab's board.
-  if (tab?.linked && !parentId) {
+  // Spec 027: in a linked tab every titled row is a task on the tab's board; a child row under a task
+  // is a subtask of it (a child of a plain row stays plain until its parent is a task).
+  const parentLinked = !!parentId && !!rows.find(r => r.id === parentId)?.task_id
+  if (tab?.linked && (!parentId || parentLinked)) {
     const made = await makeTask(row.id, { spaceId: tab.space_id })
     done()
     return { success: true, row: mapContentRow(row), ...(made.success ? { taskId: made.taskId } : {}) }
@@ -586,7 +588,7 @@ export async function reorderThemes(projectId: string, target: string, where: 'b
  * Remove a theme from the sheet (the project stays). Its rows go to another
  * theme (and pillar there); none are deleted. Linked tasks follow.
  */
-export async function removeSheetTheme(projectId: string, dest: { projectId: string; pillarId?: string | null } | null, spaceId?: string | null, sheetId?: string | null): Promise<{ success: true } | Fail> {
+export async function removeSheetTheme(projectId: string, dest: { projectId: string | null; pillarId?: string | null } | null, spaceId?: string | null, sheetId?: string | null): Promise<{ success: true } | Fail> {
   const m = await me()
   if (!m) return { success: false, error: 'not_authenticated' }
   if (!isAdmin(m)) return { success: false, error: 'may_not_edit_theme' }
@@ -595,8 +597,10 @@ export async function removeSheetTheme(projectId: string, dest: { projectId: str
   if (!theme) return { success: false, error: 'not_a_theme' }
   const rows = await prisma.contentRow.findMany({ where: { project_id: projectId, ...inScope(sid) } })
   if (rows.length) {
-    if (!dest || dest.projectId === projectId || !(await themeOf(dest.projectId, sid))) return { success: false, error: 'needs_destination' }
-    const pillar = await pillarIn(dest.projectId, dest.pillarId)
+    // Spec 027: in an added tab the rows may go under no theme.
+    const toNone = !!dest && !dest.projectId && 'sheetId' in sid
+    if (!dest || dest.projectId === projectId || (!toNone && !(await themeOf(dest.projectId!, sid)))) return { success: false, error: 'needs_destination' }
+    const pillar = toNone ? null : await pillarIn(dest.projectId, dest.pillarId)
     if (pillar === false) return { success: false, error: 'not_a_theme' }
     const target = await allRows(dest.projectId, sid)
     let pos = groupRows(target, dest.projectId, pillar).reduce((mx, r) => Math.max(mx, r.position), 0)

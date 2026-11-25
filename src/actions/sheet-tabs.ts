@@ -328,3 +328,45 @@ export async function removeTabRow(rowId: string, mode: 'tab' | 'archive'): Prom
   done()
   return { success: true }
 }
+
+/**
+ * Paste plan into an added tab (spec 027 §5): each pasted line is a row of the tab, under the theme
+ * and pillar it was pasted on (or the theme its Theme column names, when the tab has it), with its
+ * values by column. In a linked tab each titled row becomes a task. At most 200 lines.
+ */
+export async function pasteTabRows(sheetId: string, target: { projectId: string | null; pillarId?: string | null } | null,
+  lines: { title: string; theme?: string; pillar?: string; custom?: Record<string, string> }[]): Promise<{ success: true; rowsCreated: string[]; created: string[] } | Fail> {
+  const m = await getSessionMember()
+  if (!m) return fail('not_authenticated')
+  const got = await tabFor(sheetId, m, false)
+  if (!got.ok) return fail(got.error)
+  const tab = got.tab
+  const list = (Array.isArray(lines) ? lines : []).slice(0, 200)
+  const [themes, cols, last] = await Promise.all([
+    prisma.contentSheetTheme.findMany({ where: { sheet_id: tab.id }, include: { project: { include: { pillars: true } } } }),
+    prisma.sheetColumn.findMany({ where: { sheet: tabSheetId(tab.id), deleted_at: null }, select: { id: true, key: true } }),
+    prisma.contentRow.aggregate({ where: { sheet_id: tab.id }, _max: { position: true } }),
+  ])
+  const norm = (x: string) => x.trim().toLowerCase()
+  const keyOf = new Map(cols.map(c => [c.id, c.key]))
+  const onTab = (id: string | null | undefined) => (id && themes.some(t => t.project_id === id) ? id : null)
+  let pos = last._max.position ?? 0
+  const rowsCreated: string[] = [], created: string[] = []
+  for (const line of list) {
+    const title = typeof line?.title === 'string' ? line.title.replace(/\s+/g, ' ').trim().slice(0, 300) : ''
+    if (!title) continue
+    const named = line.theme ? themes.find(t => norm(t.project.name) === norm(line.theme!)) : undefined
+    const projectId = onTab(target?.projectId) ?? named?.project_id ?? null
+    const pillars = themes.find(t => t.project_id === projectId)?.project.pillars ?? []
+    const pillarId = projectId
+      ? (target?.pillarId && pillars.some(p => p.id === target.pillarId) ? target.pillarId : line.pillar ? pillars.find(p => norm(p.name) === norm(line.pillar!))?.id ?? null : null)
+      : null
+    const values: Record<string, string> = {}
+    for (const [colId, v] of Object.entries(line.custom ?? {}).slice(0, 60)) { const k = keyOf.get(colId); if (k && typeof v === 'string' && v.trim()) values[k] = v.slice(0, 5000) }
+    const row = await prisma.contentRow.create({ data: { sheet_id: tab.id, project_id: projectId, pillar_id: pillarId, title, values, position: ++pos, created_by: m.id } })
+    rowsCreated.push(row.id)
+    if (tab.linked) { const r = await makeTask(row.id, { spaceId: tab.space_id }); if (r.success) created.push(r.taskId) }
+  }
+  done()
+  return { success: true, rowsCreated, created }
+}

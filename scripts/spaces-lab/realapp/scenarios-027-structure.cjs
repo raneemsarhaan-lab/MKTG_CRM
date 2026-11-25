@@ -136,6 +136,24 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
+      id: '027-us4-removing-a-theme-in-a-tab-keeps-its-rows', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), tab = newTab(`Lab rm theme ${n}`), th = theme(tab, `Lab rm t ${n}`)
+        const r1 = row(tab, `Lab stays ${n}`, { theme: th, pos: 1 })
+        try {
+          await openTab(page, go, tab)
+          await menu(page, `t:${th}|title`, 'Remove theme')
+          await page.waitForSelector('[data-destination]', { timeout: 10000 })
+          await page.selectOption('[data-destination-pick]', '__rows:')
+          await page.click('[data-destination-confirm]')
+          await page.waitForTimeout(2000)
+          ok(psql(`select count(*) from content_themes where sheet_id='${tab}'`) === '0', 'the theme is off the tab')
+          ok(psql(`select count(*) from projects where id='${th}'`) === '1', 'its project stays')
+          ok(psql(`select coalesce(project_id::text, 'none') from content_rows where id='${r1}'`) === 'none', 'its rows go under No theme, none deleted')
+        } finally { cleanup(tab, [th], n) }
+      },
+    },
+    {
       id: '027-us5-columns-per-tab-and-person', as: 'content',
       async run({ page, go }) {
         const n = rnd(), tab = newTab(`Lab cols ${n}`), other = newTab(`Lab cols other ${n}`)
