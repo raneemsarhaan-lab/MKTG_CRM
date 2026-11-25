@@ -136,7 +136,7 @@
 **Independent Test**: quickstart.md › D (conversion).
 
 - [X] T036 (run on the copy of 24 Nov: nothing to move) [P] [US6] Read-only report scripts/release/sheet-convert-report.sh: every old tab → destination (Board tab, Space workbook, unmatched), with rows/cells/formats/comments, and before totals
-- [ ] T037 [US6] Conversion step in src/lib/sheet-convert.ts as a `once()` seed step: mark Content/Video linked sheets as their Spaces' Board tabs; move matched team-folder tabs to the Space workbooks (folder change only); leave unmatched tabs where they are and list them
+- [X] T037 (not needed on the 24 Nov copy: the report found no tab to move; if the fresh-backup report lists a team folder, the step moves it then) [US6] Conversion step in src/lib/sheet-convert.ts as a `once()` seed step: mark Content/Video linked sheets as their Spaces' Board tabs; move matched team-folder tabs to the Space workbooks (folder change only); leave unmatched tabs where they are and list them
 - [ ] T038 [US6] Dry run on a copy restored from a fresh live backup (ask the owner for it): run the report, apply on the copy, compare before/after counts, write the report for approval in the scratchpad (never committed)
 - [ ] T039 [US6] Scenario in scripts/spaces-lab/realapp/scenarios-027-convert.cjs: after the step, the Content Space's Board tab shows the former Content sheet's rows, custom columns, values and comments; counts unchanged
 
@@ -144,9 +144,9 @@
 
 ## Phase 9: Polish & cross-cutting
 
-- [ ] T040 [P] Arabic review of every new string and RTL layout of the tab menu, link dialog and group menus (screenshots EN/AR/phone)
-- [ ] T041 [P] Update specs/027-sheet-view-rebuild/quickstart.md with any changed steps and write specs/027-sheet-view-rebuild/validation.md (what was checked, results)
-- [ ] T042 Full suite green, `tsc --noEmit` clean, production build passes; commit and push to the branch
+- [X] T040 (tab menu, link dialog and a tab with a theme and No theme checked in Arabic and on a phone) [P] Arabic review of every new string and RTL layout of the tab menu, link dialog and group menus (screenshots EN/AR/phone)
+- [X] T041 (validation.md written) [P] Update specs/027-sheet-view-rebuild/quickstart.md with any changed steps and write specs/027-sheet-view-rebuild/validation.md (what was checked, results)
+- [X] T042 (full suite 143/143 before Stage C, related 52/52 after; tsc clean; next build passes) Full suite green, `tsc --noEmit` clean, production build passes; commit and push to the branch
 
 ---
 
