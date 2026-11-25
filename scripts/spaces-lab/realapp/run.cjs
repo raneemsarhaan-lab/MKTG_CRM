@@ -24,15 +24,20 @@ async function signIn(browser, who) {
   // until it appears, so a check doesn't depend on how many other rows the lab database holds.
   const wait = page.waitForSelector.bind(page)
   page.waitForSelector = async (sel, opts = {}) => {
-    if (typeof sel !== 'string' || !/data-cell|data-row/.test(sel) || opts.state === 'detached' || opts.state === 'hidden') return wait(sel, opts)
+    if (typeof sel !== 'string' || !/data-cell|data-row|data-col-menu|data-col-head/.test(sel) || opts.state === 'detached' || opts.state === 'hidden') return wait(sel, opts)
     const end = Date.now() + (opts.timeout ?? 30000)
     let top = false
     while (true) {
       const left = end - Date.now()
       try { return await wait(sel, { ...opts, timeout: Math.max(1, Math.min(left, 1500)) }) } catch (e) { if (left <= 1500) throw e }
+      // Sweep sideways first (columns are drawn near the viewport too), then down a screen.
       await page.evaluate(first => {
         for (const s of document.querySelectorAll('.fx-sheet-scroll')) {
-          if (first) { s.scrollTop = 0; continue }
+          if (first) { s.scrollTop = 0; s.scrollLeft = 0; continue }
+          const wide = s.scrollWidth - s.clientWidth > 2, rtl = getComputedStyle(s).direction === 'rtl'
+          const left = Math.abs(s.scrollLeft)
+          if (wide && left < s.scrollWidth - s.clientWidth - 2) { const next = left + s.clientWidth * 0.8; s.scrollLeft = rtl ? -next : next; continue }
+          s.scrollLeft = 0
           s.scrollTop = s.scrollTop + s.clientHeight * 0.8 >= s.scrollHeight - s.clientHeight ? (s.scrollTop >= s.scrollHeight - s.clientHeight - 2 ? 0 : s.scrollHeight) : s.scrollTop + s.clientHeight * 0.8
         }
       }, !top).catch(() => {})

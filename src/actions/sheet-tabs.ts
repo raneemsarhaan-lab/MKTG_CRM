@@ -155,6 +155,8 @@ async function tabRows(sheetId: string): Promise<(TabRow & { position: number; p
 
 export interface TabLinkPreview {
   space: { id: string; name: string } | null
+  /** A Brand page's tab has no Space yet: the Spaces to choose from (spec 027: "it asks which Space"). */
+  spaces: { id: string; name: string }[]
   /** The tab's own columns, each with the task field its name matches ('sheet': stays on the row). */
   columns: { column: string; name: string; field: LinkField | 'sheet' }[]
   fields: { key: LinkField; name: string }[]
@@ -180,6 +182,7 @@ export async function tabLinkPreview(sheetId: string): Promise<({ success: true 
     fieldChoices(),
     tab.space_id ? prisma.teamSpace.findUnique({ where: { id: tab.space_id }, select: { id: true, name: true } }) : null,
   ])
+  const spaces = space ? [] : await prisma.teamSpace.findMany({ where: { archived_at: null, media_board: null }, orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }], select: { id: true, name: true } })
   const remembered = rows.map(r => r.lastTaskId).filter((x): x is string => !!x)
   const alive = new Set(remembered.length ? (await prisma.task.findMany({ where: { id: { in: remembered } }, select: { id: true } })).map(t => t.id) : [])
   const tops = rows.filter(r => !r.parentId)
@@ -190,6 +193,7 @@ export async function tabLinkPreview(sheetId: string): Promise<({ success: true 
   return {
     success: true,
     space,
+    spaces,
     columns: matches.map(x => ({ column: x.column, name: cols.find(c => c.key === x.column)?.name ?? x.column, field: x.field })),
     fields: choices.map(c => ({ key: c.key, name: fieldName(c.key) })),
     create: p.create.length, reconnect: p.reconnect.length, linked: p.linked.length, conflicts: p.conflicts.length,
@@ -215,12 +219,17 @@ function applyMatches(values: Record<string, string>, matches: Match[]): { value
  * Link to board: every titled row becomes a task on the tab's Space board (reconnecting the rows that
  * had one), by the confirmed column matches. Untitled rows stay plain. A second call creates nothing.
  */
-export async function linkTab(sheetId: string, matchesIn: Match[] = []): Promise<{ success: true; created: number; reconnected: number; problems: string[] } | Fail> {
+export async function linkTab(sheetId: string, matchesIn: Match[] = [], spaceIdIn?: string | null): Promise<{ success: true; created: number; reconnected: number; problems: string[] } | Fail> {
   const m = await getSessionMember()
   if (!m) return fail('not_authenticated')
   const got = await tabFor(sheetId, m, true)
   if (!got.ok) return fail(got.error)
   const tab = got.tab
+  // A Brand page's tab: linking it chooses the Space whose board its rows become tasks on.
+  if (!tab.space_id && spaceIdIn && UUID.test(spaceIdIn) && await prisma.teamSpace.findFirst({ where: { id: spaceIdIn, archived_at: null }, select: { id: true } })) {
+    await prisma.sheet.update({ where: { id: tab.id }, data: { space_id: spaceIdIn } })
+    tab.space_id = spaceIdIn
+  }
   if (!tab.space_id) return fail('needs_space')
   const choices = await fieldChoices()
   const known = new Set(choices.map(c => c.key as string))

@@ -131,7 +131,8 @@ export async function addRow(input: {
   if (input.sheetId && !tab) return { success: false, error: 'not_found' }
   const sc = await scopeFrom(input.spaceId, tab?.id)
   const projectId = input.projectId && UUID.test(input.projectId) ? input.projectId : null
-  if (projectId ? !(await themeOf(projectId, sc)) : !tab) return { success: false, error: 'not_a_theme' }
+  // A row may sit under no theme (the tab's or Board tab's "No theme" group).
+  if (projectId && !(await themeOf(projectId, sc))) return { success: false, error: 'not_a_theme' }
   const rows = await allRows(projectId, sc)
   let pillar = await pillarIn(projectId, input.pillarId)
   if (pillar === false) return { success: false, error: 'not_a_theme' }
@@ -150,10 +151,9 @@ export async function addRow(input: {
       ...('sheetId' in sc ? { sheet_id: sc.sheetId, space_id: null } : { space_id: sc.spaceId }),
       project_id: projectId, pillar_id: pillar, parent_id: parentId, title, position: positionFor(siblings, input.anchor), created_by: m.id },
   })
-  // Spec 027: in a linked tab every titled row is a task on the tab's board; a child row under a task
-  // is a subtask of it (a child of a plain row stays plain until its parent is a task).
-  const parentLinked = !!parentId && !!rows.find(r => r.id === parentId)?.task_id
-  if (tab?.linked && (!parentId || parentLinked)) {
+  // Spec 027: in a linked tab every titled row is a task on the tab's board (a child row under a video is
+  // one of its clips; under anything else, a task of its own: no subtasks, owner 25 Nov 2026).
+  if (tab?.linked) {
     const made = await makeTask(row.id, { spaceId: tab.space_id })
     done()
     return { success: true, row: mapContentRow(row), ...(made.success ? { taskId: made.taskId } : {}) }
@@ -208,8 +208,7 @@ export async function moveRow(id: string, toIn: {
   if (!(await mayEditRow(row, m))) return { success: false, error: 'not_authorized' }
   const sc = scopeOfRow(row)
   const to = { ...toIn, projectId: toIn.projectId && UUID.test(toIn.projectId) ? toIn.projectId : null }
-  // Only an added tab has rows under no theme.
-  if (to.projectId ? !(await themeOf(to.projectId, sc)) : !row.sheet_id) return { success: false, error: 'not_a_theme' }
+  if (to.projectId && !(await themeOf(to.projectId, sc))) return { success: false, error: 'not_a_theme' }
   const rows = await allRows(to.projectId, sc)
   const me0 = mapContentRow(row)
   let pillar = await pillarIn(to.projectId, to.pillarId)
@@ -381,10 +380,11 @@ export async function makeTask(id: string, opts: {
       return { success: true, taskId: was.id }
     }
   }
+  // Owner, 25 Nov 2026: no subtasks. A child row under a video is one of its clips; under any other row
+  // it makes (or links) a task of its own, like a top-level row.
   const parentRow = row.parent_id ? await prisma.contentRow.findUnique({ where: { id: row.parent_id } }) : null
-  if (row.parent_id && !parentRow?.task_id) return { success: false, error: 'parent_plain' }
-  const parentTask = parentRow?.task_id ? await prisma.task.findUnique({ where: { id: parentRow.task_id } }) : null
-  if (parentRow && !parentTask) return { success: false, error: 'parent_plain' }
+  const parentOf = parentRow?.task_id ? await prisma.task.findUnique({ where: { id: parentRow.task_id } }) : null
+  const parentTask = parentOf && parentOf.content_type_label === 'Video' && !parentOf.parent_task_id ? parentOf : null
   const day = row.date ? row.date.toISOString().slice(0, 10) : null
 
   let taskId: string
@@ -395,6 +395,7 @@ export async function makeTask(id: string, opts: {
     if (!task || task.dropped_at) return { success: false, error: 'not_found' }
     if (!canActOn(await withAssignees(task), m)) return { success: false, error: 'not_authorized' }
     if (await prisma.contentRow.findFirst({ where: { ...inScope(sc), task_id: task.id }, select: { id: true } })) return { success: false, error: 'already_in_sheet' }
+    // Under a video only its own clips; elsewhere never a clip (a clip lives under its video).
     if (parentTask && task.parent_task_id !== parentTask.id) return { success: false, error: 'not_a_subtask' }
     if (!parentTask && task.parent_task_id) return { success: false, error: 'is_a_subtask' }
     if (opts.spaceId && UUID.test(opts.spaceId)) {
@@ -407,23 +408,11 @@ export async function makeTask(id: string, opts: {
     if (!task.publish_date && day) await prisma.task.update({ where: { id: task.id }, data: { ...(await newTaskDates(day, task.due_date ? task.due_date.toISOString().slice(0, 10) : null)), updated_at: new Date() } })
     await rowValuesToTask(task.id, task.content_type_label, row, m.id, true)
   } else if (parentTask) {
-    // A child row: a subtask of the parent row's task, in the same Space.
+    // A child row under a video: one of its clips.
     const tasks = await import('@/actions/tasks')
-    if (parentTask.content_type_label === 'Video' && !parentTask.parent_task_id) {
-      const r = await tasks.addClips(parentTask.id, [{ title: row.title }])
-      if (!r.success || !r.created?.[0]) return { success: false, error: r.error ?? (r.skipped?.length ? 'already_in_sheet' : 'generic') }
-      taskId = r.created[0].id
-    } else {
-      const r = await tasks.createSubtask(parentTask.id, row.title)
-      if (!r.success || !r.id) return { success: false, error: r.error ?? 'generic' }
-      taskId = r.id
-      // Same Space as its parent: on its board when the parent is, starting where that Space starts.
-      const home = await homeSpaceOf(parentTask.id)
-      const plan = creationPlan(home)
-      const shows = await prisma.taskSpace.findMany({ where: { task_id: parentTask.id }, select: { space_id: true } })
-      await prisma.task.update({ where: { id: taskId }, data: { status: plan.status, entry_stage: plan.entry_stage, media_board: parentTask.media_board, pillar_id: row.pillar_id } })
-      if (shows.length) await prisma.taskSpace.createMany({ data: shows.map(x => ({ task_id: taskId, space_id: x.space_id, added_via: 'created', added_by: m.id })), skipDuplicates: true })
-    }
+    const r = await tasks.addClips(parentTask.id, [{ title: row.title }])
+    if (!r.success || !r.created?.[0]) return { success: false, error: r.error ?? (r.skipped?.length ? 'already_in_sheet' : 'generic') }
+    taskId = r.created[0].id
     created = true
     if (day) await prisma.task.update({ where: { id: taskId }, data: { ...(await newTaskDates(day, null)) } })
     const made = await prisma.task.findUnique({ where: { id: taskId }, select: { content_type_label: true } })
@@ -598,7 +587,7 @@ export async function removeSheetTheme(projectId: string, dest: { projectId: str
   const rows = await prisma.contentRow.findMany({ where: { project_id: projectId, ...inScope(sid) } })
   if (rows.length) {
     // Spec 027: in an added tab the rows may go under no theme.
-    const toNone = !!dest && !dest.projectId && 'sheetId' in sid
+    const toNone = !!dest && !dest.projectId
     if (!dest || dest.projectId === projectId || (!toNone && !(await themeOf(dest.projectId!, sid)))) return { success: false, error: 'needs_destination' }
     const pillar = toNone ? null : await pillarIn(dest.projectId, dest.pillarId)
     if (pillar === false) return { success: false, error: 'not_a_theme' }

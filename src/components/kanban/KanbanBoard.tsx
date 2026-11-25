@@ -137,7 +137,11 @@ interface KanbanBoardProps {
   /** Spec 027 (US3): added tabs' themes and rows (every tab's), and the tab this sheet shows, if one. */
   tabThemes?: ContentTheme[]
   tabRows?: import('@/lib/content-rows').ContentRowRec[]
-  tabSheet?: { id: string; linked: boolean } | null
+  tabSheet?: { id: string; linked: boolean; spaceId?: string | null } | null
+  /** Spec 027: a Brand page's Board tab — the brand's tasks from every Space, grouped by theme. */
+  brandBoard?: boolean
+  /** A saved view narrows this sheet's tasks: rows whose task it leaves out hide too. */
+  narrowed?: boolean
   /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
   workspaceNineStage?: boolean
   /** The due-date rule (Settings › Due Dates). */
@@ -188,6 +192,8 @@ function KanbanBoardInner({
   tabThemes = [],
   tabRows = [],
   tabSheet = null,
+  brandBoard = false,
+  narrowed = false,
   scopeTasks,
   spaceId,
   sheetScope,
@@ -1349,13 +1355,14 @@ function KanbanBoardInner({
 
   // Spec 026: one sheet system. In a Space it is that Space's sheet; outside one, "Sheet" is the Video
   // Space's and "Content" the Content Space's. The old Video sheet (videos with clip details) is gone.
-  const sheetSpace = spaceId ? pageSheetSpace : view === 'sheet' ? spaces.find(x => x.key === 'video') ?? pageSheetSpace : pageSheetSpace
+  const sheetSpace = tabSheet ? spaces.find(x => x.id === tabSheet.spaceId) ?? pageSheetSpace
+    : brandBoard || spaceId ? pageSheetSpace : view === 'sheet' ? spaces.find(x => x.key === 'video') ?? pageSheetSpace : pageSheetSpace
   const sheetSpaceId = sheetSpace?.id ?? null
   sheetSpaceRef.current = sheetSpaceId
   if (view === 'content' || view === 'sheet') {
     // Spec 027 (US2): in a Space, the sheet's Board tab lists the board's tasks under the Board's own filter
     // (Mine / Everyone and Filters, shared with the Board view), and shows that filter bar above it.
-    const boardTab = !!spaceId && !tabSheet
+    const boardTab = (!!spaceId || brandBoard) && !tabSheet
     const isMine = (t: FullTask) => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id)
     const boardTasks = boardTab
       ? applyBoardFilters(tasks.filter(t => (scopeTasks ? scopeTasks(t) : true) && (scope !== 'me' || isMine(t))), filters, { currentUserId: currentUser.id, slaConfig, today })
@@ -1376,23 +1383,26 @@ function KanbanBoardInner({
         )}
         <ContentSheet
           boardTasks={boardTasks}
-          boardFiltered={boardTab && (scope === 'me' || activeFilterCount(filters) > 0)}
+          boardFiltered={boardTab && (narrowed || scope === 'me' || activeFilterCount(filters) > 0)}
           stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           themes={tabSheet
             ? tabThemes.filter(th => th.sheet_id === tabSheet.id)
-            : (themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
+            // A brand's Board tab: its themes from every Space's sheet, once each.
+            : brandBoard
+              ? [...new Map(themes.filter(th => th.brand_id === sheetBrandId || boardTasks?.some(t => t.project_id === th.id)).map(th => [th.id, th])).values()]
+              : (themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
           tab={tabSheet ?? undefined}
           me={currentUser}
           members={members}
           contentTypes={types}
           columns={columnsBundle}
           rowHeights={sheetSpace?.key === 'content' || !sheetSpace ? linkedRowHeights?.content : undefined}
-          rows={tabSheet ? tabRows.filter(r => r.sheet_id === tabSheet.id) : contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
-          sheet={tabSheet ? tabSheetId(tabSheet.id) : sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
+          rows={tabSheet ? tabRows.filter(r => r.sheet_id === tabSheet.id) : brandBoard ? undefined : contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
+          sheet={tabSheet ? tabSheetId(tabSheet.id) : brandBoard && sheetBrandId ? `rows:brand:${sheetBrandId}` : sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
           fieldSystem={{
             promoted: standardFields, layouts: myLayouts,
-            viewKey: tabSheet ? tabSheetId(tabSheet.id) : `${sheetSpace ? spaceSheetId(sheetSpace) : 'content'}${sheetBrandId ? `:${sheetBrandId}` : ''}`,
+            viewKey: tabSheet ? tabSheetId(tabSheet.id) : brandBoard && sheetBrandId ? `rows:brand:${sheetBrandId}` : `${sheetSpace ? spaceSheetId(sheetSpace) : 'content'}${sheetBrandId ? `:${sheetBrandId}` : ''}`,
             space: sheetSpace ?? null, spaces, library: libraryFields,
           }}
           space={sheetSpace ?? null}

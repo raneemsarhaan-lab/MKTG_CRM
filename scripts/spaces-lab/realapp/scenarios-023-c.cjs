@@ -90,7 +90,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-cal-spans]')
 
           // Sheet: a Start column.
-          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           await findInSheet(page, `[data-start-cell="2026-12-06"]`, 30000)
           ok(true, 'the sheet shows the start date')
         } finally { drop(id) }

@@ -562,6 +562,14 @@ async function main() {
     return `${r.copied} tasks given their Platform as Channels${r.noMatch ? `, ${r.noMatch} with no matching choice left as they were` : ''}`
   })
 
+  // Owner, 25 Nov 2026: no subtasks. Every subtask becomes a task of its own (only its parent link goes;
+  // everything else about it stays). A video's clips are left as they are.
+  await once('subtasks-to-tasks-v1', 'turned subtasks into tasks of their own', async () => {
+    const { subtasksToTasks } = await import('../src/lib/subtasks-to-tasks')
+    const r = await subtasksToTasks(prisma)
+    return `${r.converted} subtasks are tasks now${r.boardsAdded ? ` (${r.boardsAdded} put on their parent's boards)` : ''}; ${r.clipsKept} video clips kept`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },

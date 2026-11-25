@@ -217,5 +217,53 @@ module.exports = (EMAIL, psql, ok) => {
         } finally { cleanup([tab], []) }
       },
     },
+    {
+      id: '027-us3-brand-page-has-the-new-sheet-and-its-tabs-ask-the-space', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), ff = brandId('Forefront')
+        const before = psql(`select coalesce(string_agg(id::text, ','), '') from sheets where kind='rows'`).split(',').filter(Boolean)
+        let made = []
+        try {
+          await go(`/brands/${ff}?view=sheet`)
+          await page.waitForSelector('[data-content-sheet]', { timeout: 60000 })
+          ok(await page.$('[data-board-tab-filters]'), "the brand's Board tab has the Board's own Mine / Everyone and Filters")
+          await page.click('[data-new-sheet]')
+          await page.waitForSelector('[data-rows-tab]', { timeout: 30000 })
+          made = psql(`select coalesce(string_agg(id::text, ','), '') from sheets where kind='rows'`).split(',').filter(x => x && !before.includes(x))
+          ok(made.length === 1 && psql(`select coalesce(space_id::text, 'none') || '|' || brand_id from sheets where id='${made[0]}'`) === `none|${ff}`, "a brand's tab has no Space until it is linked")
+          row(made[0], `Lab brand tab ${n}`, 1)
+          await go(`/brands/${ff}?view=sheet&tab=${made[0]}`)
+          await page.waitForSelector(`[data-rows-tab="${made[0]}"]`, { timeout: 60000 })
+          await linkVia(page, made[0])
+          ok(await page.$('[data-link-space-pick]'), 'linking asks which Space')
+          await page.selectOption('[data-link-space-pick]', space('content'))
+          await page.click('[data-link-tab-go]')
+          await page.waitForTimeout(3000)
+          const t = linkedOf(made[0], `Lab brand tab ${n}`)
+          ok(t !== '-', 'the row is a task')
+          ok(psql(`select count(*) from task_spaces where task_id='${t}' and space_id='${space('content')}'`) === '1', "on the chosen Space's board")
+          ok(psql(`select brand_id from tasks where id='${t}'`) === ff, "with the brand's name")
+        } finally { if (made.length) cleanup(made, [`Lab brand tab ${n}`]) }
+      },
+    },
+    {
+      id: '027-us3-a-new-empty-space-has-the-new-sheet', as: 'admin',
+      async run({ page, go }) {
+        const n = rnd(), key = `lab-new-${n}`
+        const sid = psql(`insert into team_spaces (id, key, name, color, is_production, default_kind, words, sort_order, settings, updated_at)
+          select gen_random_uuid(), '${key}', 'Lab new ${n}', color, is_production, default_kind, words, 99, settings, now() from team_spaces where key='planning' returning id`).split(/\n/)[0]
+        try {
+          await go(`/spaces/${key}?view=sheet`)
+          await page.waitForSelector('[data-content-sheet] .fx-sheet-scroll', { timeout: 60000 })
+          ok(!(await page.$('.fx-sheet-empty')), 'no "No themes yet" — the sheet itself')
+          ok(await page.$('[data-board-tab-filters]'), "with the Board's own filters")
+          ok(await page.$('[data-row="a:__rows"]'), 'and a "+ Row" to start typing')
+        } finally {
+          psql(`delete from sheets where folder_id in (select id from sheet_folders where linked_key='node:space:${sid}')`)
+          psql(`delete from sheet_folders where linked_key='node:space:${sid}'`)
+          psql(`delete from team_spaces where id='${sid}'`)
+        }
+      },
+    },
   ]
 }

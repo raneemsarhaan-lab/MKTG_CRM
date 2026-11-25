@@ -3026,7 +3026,8 @@
         "needs_space": "This tab has no Space to make tasks in.",
         "not_authorized": "Only whoever added this tab, an admin or a superuser can link it.",
         "board_tab": "The Board tab is always linked."
-      }
+      },
+      "space": "Board of"
     }
   },
   "hours": {

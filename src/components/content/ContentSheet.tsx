@@ -118,7 +118,7 @@ export function ContentSheet(p: ContentSheetProps) {
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
     mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query, recs: p.rows,
-    boardTasks: p.boardTasks, boardFiltered: p.boardFiltered, noThemeLabel: t('noTheme'), tabRows: !!p.tab,
+    boardTasks: p.boardTasks, boardFiltered: p.boardFiltered, noThemeLabel: t('noTheme'), tabRows: !!p.tab || (!!p.boardTasks && !!p.rows),
   }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows, p.boardTasks, p.boardFiltered, p.tab, t])
   /** Sheet 2b: rows live on the server when the host has them; otherwise every piece is a row. */
   const rowsOn = !!p.rows && !!p.api.addRow
@@ -241,8 +241,6 @@ export function ContentSheet(p: ContentSheetProps) {
   }
   /** Make task: a child row needs its parent row linked first. */
   function openMakeTask(rec: ContentRowRec, anchor: HTMLElement) {
-    const parent = rec.parent_id ? recs.find(r => r.id === rec.parent_id) : null
-    if (parent && !parent.task_id) { closePopup(true); say(t('err.parent_plain')); return }
     setPopup({ kind: 'makeTask', anchor, rec })
   }
   function rowItems(row: ContentRow, anchor: HTMLElement): MenuItem[] {
@@ -723,7 +721,8 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {/* User, 25 Nov 2026: no summary line ("Content plan · 23 pieces · …") above the grid. */}
 
-      {p.themes.length === 0 && !p.boardTasks?.length && !p.tab
+      {/* Spec 027: the Board tab and added tabs always show the sheet, even in a new, empty Space. */}
+      {p.themes.length === 0 && !p.boardTasks && !p.tab
         ? <div className="fx-sheet-empty"><p>{admin ? t('noThemesAdmin') : t('noThemes')}</p></div>
         : (
           <div className="fx-sheet-scroll">
@@ -872,8 +871,8 @@ export function ContentSheet(p: ContentSheetProps) {
             rows={popup.rows}
             options={[
               ...destinations(p.themes, { themeId: popup.theme.id, pillarId: popup.pillar?.id ?? null }, (k, v) => t(k as 'rows.noPillarIn', v)),
-              // Spec 027: in an added tab a theme's rows may go under no theme.
-              ...(p.tab && !popup.pillar ? [{ key: `${TAB_ROWS_ID}:`, projectId: TAB_ROWS_ID, pillarId: null, label: t('noTheme') }] : []),
+              // Spec 027: a theme's rows may go under "No theme".
+              ...((p.tab || p.boardTasks) && !popup.pillar ? [{ key: `${TAB_ROWS_ID}:`, projectId: TAB_ROWS_ID, pillarId: null, label: t('noTheme') }] : []),
             ]}
             onCancel={() => closePopup(true)}
             onConfirm={async d => {
@@ -893,7 +892,9 @@ export function ContentSheet(p: ContentSheetProps) {
       )}
       {popup?.kind === 'makeTask' && (() => {
         const parent = popup.rec.parent_id ? recs.find(r => r.id === popup.rec.parent_id) : null
-        const parentTask = parent?.task_id ? p.tasks.find(x => x.id === parent.task_id) ?? null : null
+        const parentOf = parent?.task_id ? p.tasks.find(x => x.id === parent.task_id) ?? null : null
+        // Owner, 25 Nov 2026: no subtasks — only a video's child rows are tied to it (its clips).
+        const parentTask = parentOf && parentOf.content_type_label === 'Video' && !parentOf.parent_task_id ? parentOf : null
         return (
           <SheetPopover anchor={popup.anchor} label={t('rows.makeTask')} onClose={closePopup}>
             <MakeTaskDialog title={popup.rec.title} spaces={(p.spaces ?? []).map(sp => ({ id: sp.id, name: sp.name }))} defaultSpaceId={p.space?.id ?? null}

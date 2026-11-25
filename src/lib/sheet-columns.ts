@@ -108,7 +108,7 @@ export const TASK_BUILT_INS: BuiltInColumn[] = [
 export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
 export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
 /** Spec 026: a Space's sheet of rows (`rows:<spaceId>`); the Content Space's keeps the id `content`. */
-export const ROWS_SHEET = /^rows:(tab:)?[0-9a-f-]{36}$/
+export const ROWS_SHEET = /^rows:(tab:|brand:)?[0-9a-f-]{36}$/
 export const isRowsSheet = (sheet: string) => sheet === 'content' || ROWS_SHEET.test(sheet)
 export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (isRowsSheet(sheet) ? BUILT_INS.content : sheet === 'video' ? BUILT_INS.video : TASK_BUILT_INS)
 export const setsFor = (sheet: SheetId): string[] => (sheet === 'video' ? SHEET_SETS.video : ['all'])

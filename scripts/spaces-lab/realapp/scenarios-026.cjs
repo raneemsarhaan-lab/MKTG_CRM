@@ -106,7 +106,7 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: '026-child-row-makes-a-subtask', as: 'admin',
+      id: '026-child-row-makes-its-own-task', as: 'admin',
       async run({ page, go }) {
         const n = rnd()
         const th = theme(`Lab sheet theme ${n}`, 'content')
@@ -114,20 +114,20 @@ module.exports = (EMAIL, psql, ok) => {
         const child = row(th, 'content', `Lab child ${n}`, { parent, pos: 1 })
         try {
           await openSheet(page, go, 'content', th)
-          // A child row can't be linked while its parent is plain.
-          ok(await page.isVisible(`[data-row="l:${child}"] [data-make-task-blocked]`), 'the child says to link the parent first')
+          // Owner, 25 Nov 2026: no subtasks — a child row makes a task of its own, parent linked or not.
+          ok(!(await page.$(`[data-row="l:${child}"] [data-make-task-blocked]`)), 'a child row is never blocked by its parent')
           await makeTask(page, parent, 'content')
           const pt = psql(`select task_id from content_rows where id='${parent}'`)
           ok(!!pt, 'the parent row is linked')
           await page.waitForSelector(`[data-make-task="${child}"]`, { timeout: 30000 })
           await page.click(`[data-make-task="${child}"]`)
-          await page.waitForSelector('[data-make-task-dialog] [data-make-subtask]')
-          ok(!(await page.$('[data-make-space]')), 'a child row has no Space to choose')
+          await page.waitForSelector('[data-make-task-dialog] [data-make-task-go]')
+          ok(!(await page.$('[data-make-subtask]')), 'no "subtask of" in the dialog')
           await page.click('[data-make-task-go]')
           await page.waitForFunction(() => !document.querySelector('[data-make-task-dialog]'), null, { timeout: 30000 })
           await page.waitForTimeout(1500)
           const ct = psql(`select task_id from content_rows where id='${child}'`)
-          ok(!!ct && psql(`select parent_task_id from tasks where id='${ct}'`) === pt, 'the child row is a subtask of the parent\'s task')
+          ok(!!ct && ct !== pt && psql(`select coalesce(parent_task_id::text, 'none') from tasks where id='${ct}'`) === 'none', 'the child row is a task of its own, not a subtask')
           ok(psql(`select count(*) from task_spaces where task_id='${ct}' and space_id='${space('content')}'`) === '1', 'in the same Space')
         } finally { cleanup([th]) }
       },
@@ -180,9 +180,10 @@ module.exports = (EMAIL, psql, ok) => {
         const b = brand()
         try {
           await go(`/brands/${b}?view=sheet`)
-          await page.waitForSelector('[data-node-workbook] [data-task-sheet]', { timeout: 90000 })
+          // Spec 027: the brand's page has the new sheet — its Board tab is the brand's tasks from every Space.
+          await page.waitForSelector('[data-node-workbook] [data-content-sheet]', { timeout: 90000 })
           ok(!(await page.$('[data-brand-sheet-strip]')) && !(await page.$('[data-brand-sheet]')), "no Sheets by Space strip on the brand's page")
-          ok(await page.locator('[data-task-sheet] [data-col-head="space"]').count() === 1, "the brand's tasks from every Space, with a Space column")
+          ok(await page.$('[data-board-tab-filters]'), "with the Board's own Mine / Everyone and Filters")
           // The Space's rows for the brand are in that Space's brand folder, plain rows included.
           await go(`/spaces/design/${b}?view=sheet`)
           await page.waitForSelector(`[data-row="l:${rd}"]`, { timeout: 60000 })
@@ -190,7 +191,9 @@ module.exports = (EMAIL, psql, ok) => {
           const made = psql(`select task_id from content_rows where id='${rd}'`)
           ok(!!made && psql(`select brand_id from tasks where id='${made}'`) === b, 'Make task in the brand folder makes the task for this brand')
           await go(`/brands/${b}?view=sheet`)
-          await page.waitForSelector(`[data-task-sheet] [data-row="t:${made}"]`, { timeout: 60000 })
+          await page.waitForSelector('[data-board-tab-filters] [data-scope="team"]', { timeout: 60000 })
+          await page.click('[data-board-tab-filters] [data-scope="team"]')
+          await page.waitForSelector(`[data-content-sheet] [data-row="k:${made}"]`, { timeout: 60000 })
           ok(true, "and it shows on the brand's sheet")
         } finally { cleanup([td]) }
       },

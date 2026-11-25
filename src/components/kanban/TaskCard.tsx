@@ -320,7 +320,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           top-level task once it is sitting in a column. */}
       {task.parent && (
         <div
-          title={`Subtask of ${task.parent.name}`}
+          title={`Clip of ${task.parent.name}`}
           style={{
             marginTop: 8, paddingTop: 7, borderTop: `1px solid ${PIPE.border}`,
             fontSize: 10.5, fontWeight: 600, color: PIPE.textFaint,
@@ -366,7 +366,7 @@ export function TaskCard({
     `Assigned to ${assigneesOf(task, currentStageOwner).map(m => m.name).join(' and ')}`,
     task.brand?.name ?? 'No brand',
     task.project?.name ?? 'No project',
-    task.parent ? `Subtask of ${task.parent.name}` : '',
+    task.parent ? `Clip of ${task.parent.name}` : '',
   ].filter(Boolean).join('. ')
 
   return (

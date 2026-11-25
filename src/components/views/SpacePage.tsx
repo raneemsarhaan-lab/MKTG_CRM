@@ -123,13 +123,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         // Spec 026: every Space's Sheet view is its sheet of rows — themes, pillars, plain and linked rows —
         // inside a full workbook (tabs, toolbar, formatting, comments, blank tabs). The Content and Video
         // Spaces keep the workbooks their sheets always had, so formatting and comments carry over.
-        // A saved Sheet view keeps its filters and fields: it is the Space's tasks as a task sheet.
-        if (tab === 'sheet' && view) return <>
-          <NodeWorkbook key={view.id} data={data} node={`space:${spaceId}`} brandId={brandId}
-            linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} fields={shownKeys} sheetKey={`tasks:space:${spaceId}`} stages={ss} label={label} hideBrand={!!folderBrand}
-              groups={fv.groupsFor(view.config, shownTasks.filter(x => !x.dropped_at))?.map(g => [g.label, g.tasks] as [string, typeof shownTasks])} />} />
-          <TaskPanel data={data} spaceId={spaceId} />{taskForm}
-        </>
+        // Spec 027: a saved Sheet view is the new sheet too, narrowed by the view's filters.
         // Fields (§5): a saved List view, grouped by its grouping (a field included).
         if (tab === 'list') return <>
           <ListView key={view?.id} fields={shownKeys} custom={custom} tasks={shownTasks} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today}
@@ -140,11 +134,11 @@ export function SpacePage({ data, spaceId, brandId = null }: {
         if (tab === 'sheet') return (
           <NodeWorkbook key={view?.id} data={data} brandId={brandId} {...(space.key === 'content' || space.key === 'video' ? { folder: space.key as 'content' | 'video' } : { node: `space:${spaceId}` })}
             linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" scopeTasks={inView} spaceId={spaceId}
-              themeScope={themeScope} sheetBrandId={brandId} />}
+              themeScope={themeScope} sheetBrandId={brandId} narrowed={!!view} />}
             // Spec 027 (US3): "+" adds a tab of rows; linked, its rows are tasks on this Space's board.
             spaceId={spaceId}
             rowsTab={s => <KanbanBoard {...data} surface="sheets" sheetsView="content" spaceId={spaceId} sheetBrandId={brandId}
-              tabSheet={{ id: s.id, linked: !!s.linked }} />} />
+              tabSheet={{ id: s.id, linked: !!s.linked, spaceId: s.spaceId ?? spaceId }} />} />
         )
         const body = <CalendarView tasks={shownTasks} brands={data.brands} colorBy={folderBrand ? 'stage' : 'brand'} statusName={statusName} onOpen={open}
               milestones={{ list: data.milestones, brandIds: [...new Set(shownTasks.map(x => x.brand_id).filter(Boolean))] as string[], canEdit: data.currentUser.access !== 'user' }}

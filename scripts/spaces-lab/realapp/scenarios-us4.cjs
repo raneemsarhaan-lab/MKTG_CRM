@@ -1,5 +1,7 @@
 // Spaces lab real-app scenarios for per-brand feature switches (spec 021 US4, T069).
 module.exports = (EMAIL, psql, ok) => {
+  /** Spec 027: the task sheet is My tasks' now — make the admin the task's owner so it shows there (put back after). */
+  const asMine = id => { const was = psql(`select task_owner_id from tasks where id='${id}'`); psql(`update tasks set task_owner_id=(select id from members where email='${EMAIL.admin}') where id='${id}'`); return () => psql(`update tasks set task_owner_id='${was}' where id='${id}'`) }
   const brandId = name => psql(`select id from brands where name='${name}'`)
   const spaceId = key => psql(`select id from team_spaces where key='${key}'`)
   const A = 'The Strategy Community', B = 'Forefront Consulting'
@@ -32,6 +34,7 @@ module.exports = (EMAIL, psql, ok) => {
         reset()
         try {
           const a = seed('Features lab A', A), b = seed('Features lab B', B)
+          asMine(a); asMine(b)
           await openPanel(page, go, A)
           await page.click('[data-brand-features] [data-feature-switch="platform"]')
           await page.waitForTimeout(1500)
@@ -39,10 +42,10 @@ module.exports = (EMAIL, psql, ok) => {
           ok(await page.$('[data-brand-features] [data-feature-reset="platform"]'), 'it says the brand has its own setting')
 
           // Spec 026: the task sheet is a view of each brand's page.
-          await go(`/brands/${brandId(B)}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           await page.waitForSelector(cell(b, 'platform'), { timeout: 60000 })
           ok((await page.locator(cell(b, 'platform')).innerText()).trim() === 'LinkedIn', "B's Platform still shows")
-          await go(`/brands/${brandId(A)}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
           ok(await page.$(`${cell(a, 'platform')} [data-feature-off]`), "A's Platform is a hatched, empty cell")
           await page.locator(cell(a, 'platform')).click()
@@ -59,7 +62,7 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-brand-features] [data-feature-reset="platform"]')
           await page.waitForTimeout(1500)
           ok(featuresOf(A) === '{}', 'Use default clears the override')
-          await go(`/brands/${brandId(A)}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           await page.waitForSelector(cell(a, 'platform'), { timeout: 60000 })
           ok((await page.locator(cell(a, 'platform')).innerText()).trim() === 'LinkedIn', 'switched back on, the value returns')
         } finally { reset() }

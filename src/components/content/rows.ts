@@ -116,7 +116,8 @@ export function buildContentRows(tasks: Task[], themesIn: ContentTheme[], o: Con
   const placed = new Set<string>()
   for (const theme of themes) {
     const pieces = o.boardTasks
-      ? [...new Map([...piecesIn(tasks, theme.id, o.recs).filter(t => !hidden(t.id)), ...o.boardTasks.filter(t => t.project_id === theme.id && ownRow(t))].map(t => [t.id, t])).values()]
+      // The "No theme" group (TAB_ROWS_ID) takes the board's tasks that have no theme at all.
+      ? [...new Map([...piecesIn(tasks, theme.id, o.recs).filter(t => !hidden(t.id)), ...o.boardTasks.filter(t => (theme.id === TAB_ROWS_ID ? !t.project_id : t.project_id === theme.id) && ownRow(t))].map(t => [t.id, t])).values()]
       : piecesIn(tasks, theme.id, o.recs)
     for (const t of pieces) placed.add(t.id)
     const mineRecs = recs.filter(r => r.project_id === theme.id && (!r.task_id || !hidden(r.task_id)))

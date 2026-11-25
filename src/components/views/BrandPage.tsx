@@ -17,6 +17,7 @@ import type { Task } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { TaskSheet } from './TaskSheet'
 import { NodeWorkbook } from './NodeWorkbook'
+import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { applyView, cleanTabPrefs, isFieldViewKey } from '@/lib/view-config'
 import { useFieldView } from './useFieldView'
 import { isLinkedMedia } from '@/lib/media'
@@ -139,8 +140,13 @@ export function BrandPage({ data, brandId, folder }: {
           ? (brandId
             // The brand's tasks from every Space, with a Space column. (User, 24 Nov 2026: no "Sheets by
             // Space" strip here — a Space's rows for the brand are in its brand folder in the sidebar.)
-            ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`}
-                linked={<TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} sheetKey={`tasks:brand:${brandId}`} label={name} />} />
+            // Spec 027: the new sheet. Its Board tab is the brand's tasks from every Space, by theme, under the
+            // Board's own Mine / Everyone and Filters; "+" adds tabs that link to a Space's board (it asks which).
+            ? <NodeWorkbook key={view?.id} data={data} node={`brand:${brandId}`} brandId={brandId}
+                linked={<KanbanBoard {...data} surface="sheets" sheetsView="content" boardKey={`brand:${brandId}`} brandBoard sheetBrandId={brandId}
+                  scopeTasks={ids ? (x: Task) => scope(x) && ids.has(x.id) : scope} narrowed={!!view} />}
+                rowsTab={s => <KanbanBoard {...data} surface="sheets" sheetsView="content" sheetBrandId={brandId}
+                  tabSheet={{ id: s.id, linked: !!s.linked, spaceId: s.spaceId ?? null }} />} />
             : <TaskSheet data={data} tasks={shownTasks.filter(x => !x.dropped_at)} hideBrand showSpace fields={shownKeys} label={name} />)
           : tab === 'calendar'
             // The brand's publishing calendar (spec 025): by publishing date, campaigns as a filter.

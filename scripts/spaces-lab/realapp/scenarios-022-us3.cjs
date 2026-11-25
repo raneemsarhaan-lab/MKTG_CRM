@@ -21,7 +21,7 @@ module.exports = (EMAIL, psql, ok) => {
     if (list) psql(`update tasks set dropped_at=now() where id in (${list}) or content_task_id in (${list})`)
   }
   const openLink = async (page, go, id, typed) => {
-    await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
+    await go('/me?view=sheet')
     const cell = `[data-task-sheet] [data-cell$="${id}|media"]`
     await page.waitForSelector(cell, { timeout: 60000 })
     await page.locator(cell).click()
@@ -84,7 +84,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const c = content(`Lab 022 late ${rnd()}`, 'final-check')
         try {
-          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           const cell = `[data-task-sheet] [data-cell$="${c}|media"]`
           await page.waitForSelector(cell, { timeout: 60000 })
           await page.locator(cell).click()
@@ -152,7 +152,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         const c = content(`Lab 022 writer ${rnd()}`)
         try {
-          await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
+          await go('/me?view=sheet')
           const designer = psql(`select name from members where email='${EMAIL.design}'`)
           const cell = `[data-task-sheet] [data-cell$="${c}|assignee"]`
           await page.waitForSelector(cell, { timeout: 60000 })

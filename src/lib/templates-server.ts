@@ -48,7 +48,7 @@ export async function applyTemplateExtras(taskId: string, tpl: TaskTemplate, cre
     const sub = await prisma.task.create({
       data: {
         name: s.name.slice(0, 300),
-        parent_task_id: task.id,
+        // Owner, 25 Nov 2026: no subtasks — a template's extra items are tasks of their own.
         brand_id: task.brand_id,
         content_type_label: task.content_type_label,
         platform: task.platform,
@@ -70,6 +70,9 @@ export async function applyTemplateExtras(taskId: string, tpl: TaskTemplate, cre
     })
     ids.push(sub.id)
   }
+  // On the same boards as the task the template made.
+  const shows = await prisma.taskSpace.findMany({ where: { task_id: task.id }, select: { space_id: true } })
+  if (shows.length && ids.length) await prisma.taskSpace.createMany({ data: ids.flatMap(id => shows.map(x => ({ task_id: id, space_id: x.space_id, added_via: 'created' }))), skipDuplicates: true })
   return ids
 }
 

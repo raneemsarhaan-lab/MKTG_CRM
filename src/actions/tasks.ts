@@ -398,7 +398,7 @@ export async function createSubtask(
   const task = await prisma.task.create({
     data: {
       name:               trimmed,
-      parent_task_id:     parent.id,
+      // Owner, 25 Nov 2026: no subtasks. It's a task of its own, made like its parent (no parent link).
       brand_id:           parent.brand_id,
       content_type_label: parent.content_type_label,
       platform:           parent.platform,
@@ -417,6 +417,9 @@ export async function createSubtask(
       created_by:         member.id,
     },
   })
+  // On the same boards as the task it was made from.
+  const shows = await prisma.taskSpace.findMany({ where: { task_id: parent.id }, select: { space_id: true } })
+  if (shows.length) await prisma.taskSpace.createMany({ data: shows.map(x => ({ task_id: task.id, space_id: x.space_id, added_via: 'created', added_by: member.id })), skipDuplicates: true })
   await notifyAfter(async tx => {
     for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
     return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })

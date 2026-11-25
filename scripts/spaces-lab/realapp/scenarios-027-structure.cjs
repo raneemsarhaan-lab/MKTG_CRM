@@ -1,6 +1,6 @@
 // Spec 027, US4 (Stage C): themes, pillars and child rows inside an added tab, as on the Board tab.
 // A theme placed on a tab is that tab's only; + Pillar and "+ Row" (Enter for the next) work there; a
-// child row under a task in a linked tab is a subtask; moving a linked row to another pillar moves its
+// child row in a linked tab is a task of its own (no subtasks); moving a linked row to another pillar moves its
 // task; removing a pillar asks where its rows go and deletes none; a row moves between "No theme" and a
 // theme.
 module.exports = (EMAIL, psql, ok) => {
@@ -73,7 +73,7 @@ module.exports = (EMAIL, psql, ok) => {
       },
     },
     {
-      id: '027-us4-child-row-in-linked-tab-is-a-subtask', as: 'admin',
+      id: '027-us4-child-row-in-linked-tab-is-its-own-task', as: 'admin',
       async run({ page, go }) {
         const n = rnd(), tab = newTab(`Lab child ${n}`, true)
         const parentTask = task(`Lab parent ${n}`, null, null)
@@ -86,8 +86,9 @@ module.exports = (EMAIL, psql, ok) => {
           const kid = psql(`select coalesce(task_id::text, '-') || '|' || coalesce(parent_id::text, '-') from content_rows where sheet_id='${tab}' and title='Lab kid ${n}'`)
           const [kidTask, kidParent] = kid.split('|')
           ok(kidParent === parent, 'the row is a child of its parent row')
-          ok(kidTask !== '-', 'in a linked tab it is a task')
-          ok(psql(`select parent_task_id from tasks where id='${kidTask}'`) === parentTask, "a subtask of the parent row's task")
+          ok(kidTask !== '-' && kidTask !== parentTask, 'in a linked tab it is a task')
+          ok(psql(`select coalesce(parent_task_id::text, 'none') from tasks where id='${kidTask}'`) === 'none', 'a task of its own, not a subtask')
+          ok(psql(`select count(*) from task_spaces where task_id='${kidTask}' and space_id='${space('content')}'`) === '1', 'on the Content board')
         } finally { cleanup(tab, [], n) }
       },
     },

@@ -1,5 +1,7 @@
 // Spaces lab real-app scenarios for the Task link field (spec 021 T074–T076, T078).
 module.exports = (EMAIL, psql, ok) => {
+  /** Spec 027: the task sheet is My tasks' now — make the admin the task's owner so it shows there (put back after). */
+  const asMine = id => { const was = psql(`select task_owner_id from tasks where id='${id}'`); psql(`update tasks set task_owner_id=(select id from members where email='${EMAIL.admin}') where id='${id}'`); return () => psql(`update tasks set task_owner_id='${was}' where id='${id}'`) }
   const spaceId = key => psql(`select id from team_spaces where key='${key}'`)
   // A task the brand's sheet lists: not a linked media task (those show through their content task).
   const taskIn = (space, name) => psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId(space)}' and t.name='${name}' and t.content_task_id is null and t.dropped_at is null limit 1`)
@@ -23,10 +25,12 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: 'tasklink-link-change-unlink-undo', as: 'admin',
       async run({ page, go }) {
+        let back = () => {}
         cleanup()
         try {
           const row = taskIn('content', 'Meetup poster')
-          await go(`/brands/${psql(`select brand_id from tasks where id='${row}'`)}?view=sheet&sheet=tasks`)
+          back = asMine(row)
+          await go('/me?view=sheet')
           const name = `Lab link ${Date.now() % 100000}`
           const col = await addField(page, name)
           ok(psql(`select kind from sheet_columns where id='${col}'`) === 'task', 'the ＋ Field menu adds a Task link field')
@@ -57,7 +61,8 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForTimeout(1500)
           ok(nameOfValue(col, row) === 'Iftar invite cards', '⇄ Change replaces the link (one task per field)')
           ok(psql(`select count(*) from sheet_values where column_id='${col}' and task_id='${row}'`) === '1', 'still one value')
-        } finally { cleanup() }
+        } finally {
+          back(); cleanup() }
       },
     },
     {

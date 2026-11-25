@@ -1766,8 +1766,6 @@ export function TaskModal({
                   <MenuSplit label="New tab" divider href={`/board?task=${task.id}`}
                              onClick={() => setMenuOpen(false)} />
                 </div>
-                <MenuItem icon="subtask" label="Add subtask"
-                          onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
                 <MenuItem icon="openIn" label="Open the board behind this"
                           onClick={() => { setMenuOpen(false); requestClose() }} />
                 {/* Spec 023 (US7): admins and superusers save a task as a template of its type. */}
@@ -2229,7 +2227,8 @@ export function TaskModal({
                   onDone={() => setEditingBrief(false)}
                   initialCursor={briefCursor}
                   attachments={attachments}
-                  onCreateSubtask={canEdit ? name => handleCreateSubtask(name) : undefined}
+                  // Owner, 25 Nov 2026: no subtasks — the brief no longer turns a line into one.
+                  onCreateSubtask={undefined}
                 />
               ) : (
                 <>
@@ -2359,7 +2358,8 @@ export function TaskModal({
               {(task.subtasks?.length ?? 0) > 0 && !(task.content_type_label === 'Video' && !on('clips')) && (
                 <div data-panel-section="subtasks" style={{ order: orderOf('subtasks'), marginTop: 20 }}>
                   <h2 style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, margin: '0 0 8px' }}>
-                    Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
+                    {/* Owner, 25 Nov 2026: no subtasks; what's left under a task are a video's clips. */}
+                    {task.content_type_label === 'Video' ? 'Clips' : 'Subtasks'} <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
                   </h2>
                   <div style={{ display: 'grid', gap: 4 }}>
                     {task.subtasks!.map(s => {
@@ -2392,49 +2392,7 @@ export function TaskModal({
                 </div>
               )}
 
-              {canEdit && (
-                <div style={{ marginTop: 10 }}>
-                  {addingSubtask ? (
-                    <>
-                    <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
-                      <input
-                        value={subtaskName}
-                        autoFocus
-                        aria-label="Subtask name"
-                        name="subtask-name"
-                        autoComplete="off"
-                        placeholder="Subtask name…"
-                        onChange={e => setSubtaskName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter')  { if (!addingSub) submitSubtask() }
-                          if (e.key === 'Escape') { setSubtaskName(''); setSubtaskError(''); setAddingSubtask(false) }
-                        }}
-                        style={{
-                          flex: 1, minWidth: 0, height: 38, padding: '0 11px', fontFamily: 'inherit',
-                          fontSize: 15.5, border: `1px solid ${CU.line}`, borderRadius: 8,
-                        }}
-                        className="fx-focus"
-                      />
-                      <button type="button" onClick={submitSubtask} disabled={addingSub}
-                              className="fx-hov"
-                              style={{
-                                height: 38, padding: '0 16px', border: 'none', borderRadius: 8,
-                                background: CU.blue, color: '#fff', cursor: addingSub ? 'default' : 'pointer',
-                                fontFamily: 'inherit', fontSize: 15, fontWeight: 700,
-                                opacity: addingSub ? 0.7 : 1,
-                              }}>
-                        {addingSub ? 'Adding…' : 'Add'}
-                      </button>
-                    </div>
-                    {subtaskError && (
-                      <p role="alert" style={{ color: '#D22040', fontSize: 14, margin: '4px 0 0' }}>{subtaskError}</p>
-                    )}
-                    </>
-                  ) : (
-                    <ActionRow label="Add subtask" onClick={() => setAddingSubtask(true)} />
-                  )}
-                </div>
-              )}
+              {/* Owner, 25 Nov 2026: no "Add subtask" — every piece of work is a task of its own. */}
 
               {/* ── Attachments (spec 007) ─────────────────────────────── */}
               <div data-panel-section="attachments" style={{ order: orderOf('attachments') }}>

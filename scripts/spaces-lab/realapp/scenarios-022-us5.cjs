@@ -9,7 +9,7 @@ module.exports = (EMAIL, psql, ok) => {
     return id
   }
   const reassign = async (page, go, id) => {
-    await go(`/brands/${psql('select id from brands order by name limit 1')}?view=sheet&sheet=tasks`)
+    await go('/me?view=sheet')
     const cell = `[data-task-sheet] [data-cell$="${id}|assignee"]`
     await page.waitForSelector(cell, { timeout: 60000 })
     await page.locator(cell).click()

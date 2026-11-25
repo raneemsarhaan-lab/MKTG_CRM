@@ -60,7 +60,9 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select count(*) from task_tags where task_id='${made}' and tag_id='${tag}'`) === '1', 'the tag')
           const firstCreator = psql(`select id from members where role='Content Creator' order by name limit 1`)
           ok(psql(`select assignee_id from tasks where id='${made}'`) === firstCreator, 'the assignee by role')
-          ok(psql(`select string_agg(due_date::text, ',' order by due_date) from tasks where parent_task_id='${made}'`) === '2026-12-20,2026-12-27', 'subtask dates relative to 30 Dec')
+          // Owner, 25 Nov 2026: no subtasks — the template's items are tasks of their own, on the same boards.
+          ok(psql(`select string_agg(due_date::text, ',' order by due_date) from tasks where name in ('Draft ${n}', 'Design ${n}') and publish_date='2026-12-30' and parent_task_id is null`) === '2026-12-20,2026-12-27', 'its items are tasks of their own, dates relative to 30 Dec')
+          ok(psql(`select count(*) from tasks t where t.name in ('Draft ${n}', 'Design ${n}') and t.publish_date='2026-12-30' and exists (select 1 from task_spaces s where s.task_id=t.id)`) === '2', 'on the same boards as the task')
 
           // Editing the template leaves the task alone.
           await go('/task-types')

@@ -139,11 +139,10 @@ module.exports = (EMAIL, psql, ok) => {
           await go(`/brands/${b1[0]}`)
           const secs = await page.$$eval('[data-brand-section]', els => els.map(e => e.getAttribute('data-brand-section')))
           ok(secs.join(',') === 'brand,assets,settings', `three sections: ${secs}`)
-          // Brand: the Sheet has a Space column.
-          await go(`/brands/${b1[0]}?view=sheet&sheet=tasks`)
-          await page.waitForSelector('[data-task-sheet]', { timeout: 60000 })
-          const heads = await page.$$eval('[data-task-sheet] [role="columnheader"]', els => els.map(e => e.textContent.trim()))
-          ok(heads.some(h => h.includes('Space')), `the brand's Sheet has a Space column: ${heads.slice(0, 6).join(', ')}`)
+          // Brand: the Sheet is the new sheet (spec 027): the brand's tasks from every Space, by theme.
+          await go(`/brands/${b1[0]}?view=sheet`)
+          await page.waitForSelector('[data-content-sheet]', { timeout: 60000 })
+          ok(await page.$('[data-board-tab-filters]'), "the brand's Sheet has the Board's own filters")
           // Assets: upload, search, filter, sort, rename, delete.
           await page.click('[data-brand-section="assets"]')
           await page.waitForSelector('[data-brand-assets]')

@@ -443,12 +443,9 @@ export function ContentGrid(p: ContentGridProps) {
             : <span className="fx-sheet-muted" data-line-status="">{t('rows.noTask')}</span>
           case 'type': return r.values.type ? <span className="fx-sheet-ellipsis">{r.values.type}</span> : null
           // Spec 026 (§4): the Task cell of a plain row makes it a task.
-          case 'task': {
-            const parent = r.parent_id ? p.rowRecs?.find(x => x.id === r.parent_id) : null
-            return parent && !parent.task_id
-              ? <span className="fx-sheet-muted" data-make-task-blocked="">{t('rows.parentFirst')}</span>
-              : <span className="fx-sheet-link" data-make-task={r.id}>{t('rows.makeTask')}</span>
-          }
+          // Owner, 25 Nov 2026: no subtasks, so a child row makes a task whether or not its parent has one.
+          case 'task':
+            return <span className="fx-sheet-link" data-make-task={r.id}>{t('rows.makeTask')}</span>
         }
         return null
       }
