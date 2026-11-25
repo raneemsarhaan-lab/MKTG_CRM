@@ -212,3 +212,28 @@ button is now announced as "Move to Ready For Design" instead of "→ Ready For 
 2. The due dates (5.3): decided 24 Nov. Built and rehearsed.
 3. The Design Space starts empty with 31 hand-offs to link by hand (5.1): your decision of 24 Nov.
 4. Step 5 approved on 24 Nov.
+
+## 10. After go-live, 25 Nov 2026: the in-flight design work moves to the Design board
+
+Your decision of 25 Nov (it replaces "link by hand" in 5.1): every content task in Ready For Design,
+D-In Progress or D-Check that has no linked task gets its linked Design task. One-time step
+`media-tasks-v2`. Rehearsed on the copy as it stands after the release (the state production is in):
+
+| | Before | After |
+|---|---|---|
+| Tasks | 449 | 480: 31 linked Design tasks added (15 Ready For Design, 3 D-In Progress, 13 D-Check) |
+| Existing tasks changed | | 31 content tasks marked as linked; no stage, date, owner, assignee or text changed |
+| "Shows in" rows | 906 | 906: each content task's Design row is replaced by its linked task's |
+| Followers | | owner and assignee follow each linked task |
+| Due reminders | | marked as already sent for each linked task, so nobody is reminded twice |
+| Every other table | | identical |
+
+Each linked task starts as a copy of its content task's stage, stage date, due and publishing dates,
+priority, owner and assignee. No notifications are sent. A second start changes nothing.
+
+On the copy: the Design board shows 15 / 3 / 13, a linked task opens, "Needs a linked task" in
+Settings › Diagnostics lists 0, no page errors. The hand-off and linked-task scenarios pass (15 of 15).
+
+Not included: the 2 tasks at F-Check and 8 at Ready to Publish (design is finished and the Design
+board has no column for those stages), published and archived tasks, and clips (already on the Video
+board).

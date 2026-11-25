@@ -535,6 +535,14 @@ async function main() {
     return `${r.moved} sheets moved (${r.tagged} tagged), ${r.deleted} sheets deleted (${r.exported} kept as CSV)`
   })
 
+  // Owner's decision, 25 Nov 2026 (after go-live): the in-flight design work moves to the Design and
+  // Video boards. Each content task in the design stages with no linked task gets one, at its stage.
+  await once('media-tasks-v2', 'gave the in-flight design work its linked Design and Video tasks', async () => {
+    const { linkInFlight } = await import('../src/lib/needs-linked-task')
+    const r = await linkInFlight(prisma)
+    return `${r.made} linked tasks made (${r.design} Design, ${r.video} Video)`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },
