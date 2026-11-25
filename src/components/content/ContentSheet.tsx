@@ -706,12 +706,12 @@ export function ContentSheet(p: ContentSheetProps) {
                 ? pageChrome.add.node
                 : <button type="button" className="fx-sheetbar-addmain" data-sheet-add-main="" onClick={() => pageChrome.add?.onClick?.()}>＋ {pageChrome.add.label}</button>}
               <button type="button" className="fx-sheetbar-addmore" data-sheet-add-more="" aria-haspopup="menu" aria-expanded={!!addMenu}
-                aria-label={ts('view.moreAdd')} title={ts('view.moreAdd')} onClick={e => setAddMenu(m => (m ? null : e.currentTarget))}>▾</button>
+                aria-label={ts('view.moreAdd')} title={ts('view.moreAdd')} onClick={e => { const el = e.currentTarget; setAddMenu(m => (m ? null : el)) }}>▾</button>
             </span>
           // No page add here (a Brand page, or no right to add): one "+ Add ▾" for the same menu.
           : <span className="fx-sheetbar-split is-solo" data-sheet-add="">
               <button type="button" className="fx-sheetbar-addmain" data-sheet-add-more="" aria-haspopup="menu" aria-expanded={!!addMenu}
-                onClick={e => setAddMenu(m => (m ? null : e.currentTarget))}>＋ {ts('view.addSolo')} <span aria-hidden="true">▾</span></button>
+                onClick={e => { const el = e.currentTarget; setAddMenu(m => (m ? null : el)) }}>＋ {ts('view.addSolo')} <span aria-hidden="true">▾</span></button>
             </span>,
         sheetBar.add)}
       {addMenu && (

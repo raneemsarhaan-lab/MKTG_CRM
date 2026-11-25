@@ -51,10 +51,18 @@ async function signIn(browser, who) {
   const MOVED = { '[data-add-theme]': 'theme', '[data-add-column]': 'column', '[data-add-existing-task]': 'existing' }
   const click = page.click.bind(page)
   page.click = async (sel, opts) => {
-    if (typeof sel === 'string' && MOVED[sel] && !(await page.$(sel)) && (await page.$('[data-sheet-add-more]'))) {
-      await click('[data-sheet-add-more]')
-      return click(`[data-menu-item="${MOVED[sel]}"]`, opts)
+    // Open a menu and pick an item; a second try when the page refreshed under the first click.
+    const viaMenu = async (opener, item) => {
+      for (let i = 0; ; i++) {
+        await click(opener)
+        try { await page.waitForSelector(item, { timeout: 4000 }); break } catch (e) { if (i) throw e; await page.waitForTimeout(800) }
+      }
+      return click(item, opts)
     }
+    if (typeof sel === 'string' && MOVED[sel] && !(await page.$(sel)) && (await page.$('[data-sheet-add-more]'))) return viaMenu('[data-sheet-add-more]', `[data-menu-item="${MOVED[sel]}"]`)
+    // The Space's Settings and the Fields button are in the header's settings icon menu on the Sheet view.
+    const IN_SETTINGS = { '[data-space-settings-open]': 'settings', '[data-fields-btn]': 'fields' }
+    if (IN_SETTINGS[sel] && !(await page.$(sel)) && (await page.$('[data-page-settings]'))) return viaMenu('[data-page-settings]', `[data-tab-option="${IN_SETTINGS[sel]}"]`)
     return click(sel, opts)
   }
   const errors = []
