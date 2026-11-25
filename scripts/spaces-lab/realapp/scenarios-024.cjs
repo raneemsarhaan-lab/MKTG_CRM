@@ -159,7 +159,10 @@ module.exports = (EMAIL, psql, ok) => {
         ok(text.includes('Editing') && text.includes('Edit Review'), 'Video stage names on its board')
         ok(!text.includes('F-Check') && !text.includes('Final Cut') && !text.includes('Published') && !text.includes('C-Review'), 'only Ready For Design to D-Check')
         // Only admins and superusers see Space settings.
-        ok(await page.isVisible('[data-space-settings-open]'), 'an admin sees Settings')
+        // The header's settings icon (simple header) holds Settings.
+        await page.click('[data-page-settings]')
+        ok(await page.isVisible('[data-tab-option="settings"]'), 'an admin sees Settings')
+        await page.keyboard.press('Escape')
       },
     },
     {
@@ -188,7 +191,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         await go('/spaces/content?view=board')
         await page.waitForSelector('.fx-board-cols')
-        ok(!(await page.$('[data-space-settings-open]')), 'a member without admin rights sees no Settings button')
+        ok(!(await page.$('[data-space-settings-open]')) && !(await page.$('[data-page-settings]')), 'a member without admin rights sees no Settings button')
       },
     },
   ]

@@ -3612,3 +3612,5 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
   .fx-sheetbar { padding: 4px 12px; }
   .fx-sheetbar-search.is-open input { width: 130px; }
 }
+.fx-sh1-actions { display: flex; align-items: center; gap: 8px; }
+.fx-simple-head [data-brand-sections] { padding: 2px 0 6px; }

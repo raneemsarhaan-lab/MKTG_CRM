@@ -98,24 +98,30 @@ export function BrandPage({ data, brandId, folder }: {
   // Simple sheet header (user, 25 Nov 2026): Brands / [logo] Forefront ☆ and the settings icon.
   const router = useRouter()
   const fav = useFavourite({ href: brandId ? `/brands/${brandId}` : '/brands/none', label: name, color: brand?.color ?? null }, data.favourites)
-  const simple = brandId && brand ? {
-    crumbs: [{ label: t('brands'), icon: <BrandsIcon /> }, { label: brand.short_name?.trim() || name, icon: <BrandMark brand={brand} /> }],
+  // On every view and section of the brand: Brands / [logo] Forefront (/ Assets, Settings or a folder).
+  const simpleFor = (extra?: string) => brandId && brand ? {
+    crumbs: [
+      { label: t('brands'), icon: <BrandsIcon /> },
+      { label: brand.short_name?.trim() || name, icon: <BrandMark brand={brand} />, href: extra ? `/brands/${brandId}` : undefined },
+      ...(extra ? [{ label: extra, icon: null }] : []),
+    ],
     favourite: fav,
-    settings: admin ? { label: t('tabSettings'), open: () => router.push(`/brands/${brandId}/settings`) } : null,
+    settings: admin && folder !== 'settings' ? { label: t('tabSettings'), open: () => router.push(`/brands/${brandId}/settings`) } : null,
     add: null,
   } : undefined
+  const simple = simpleFor()
   const common = { crumbs: [t('brands'), name, ...(folderName ? [folderName] : [])], color, mark: name[0], actions: undefined as React.ReactNode, sections }
 
   if (folder === 'assets' && brandId) {
     return (
-      <ViewHost {...common} crumbs={[t('brands'), name, t('tabAssets')]} title={name} tag={t('brandTag')} sub={t('assetsSub')} noViews
+      <ViewHost {...common} simple={simpleFor(t('tabAssets'))} crumbs={[t('brands'), name, t('tabAssets')]} title={name} tag={t('brandTag')} sub={t('assetsSub')} noViews
         tabs={[{ key: 'files', label: tv('files') }]}
         render={() => withPanel(<BrandAssetsTable brandId={brandId} tasks={all.filter(x => !x.dropped_at).map(x => ({ id: x.id, name: x.name }))} hasStorage={data.hasStorage} onOpenTask={open} />)} />
     )
   }
   if (folder === 'settings' && brandId && brand && admin) {
     return (
-      <ViewHost {...common} crumbs={[t('brands'), name, t('tabSettings')]} title={name} tag={t('brandTag')} sub={t('settingsSub')} noViews
+      <ViewHost {...common} simple={simpleFor(t('tabSettings'))} crumbs={[t('brands'), name, t('tabSettings')]} title={name} tag={t('brandTag')} sub={t('settingsSub')} noViews
         tabs={[{ key: 'settings', label: t('tabSettings') }]}
         render={() => <BrandSettingsTab brand={brand} defaults={data.brandFeatureDefaults} workspaceNineStage={data.workspaceNineStage} fields={data.taskFields} />} />
     )
@@ -124,7 +130,7 @@ export function BrandPage({ data, brandId, folder }: {
     // Spec 022: tasks migrated from simple tasks aren't new posts.
     const published = all.filter(x => x.status === 'publish' && !x.dropped_at && !x.migrated_simple)
     return (
-      <ViewHost {...common} title={folderName!} tag={t('folderTag')} sub={t('libraryLede')}
+      <ViewHost {...common} simple={simpleFor(folderName ?? undefined)} title={folderName!} tag={t('folderTag')} sub={t('libraryLede')}
         tabs={[{ key: 'gallery', label: tv('gallery') }, { key: 'list', label: tv('list') }]}
         render={tab => withPanel(tab === 'list'
           ? <ListView custom={custom} tasks={published} brands={data.brands} members={data.members} slaConfig={data.slaConfig} today={data.today} onOpen={open} />

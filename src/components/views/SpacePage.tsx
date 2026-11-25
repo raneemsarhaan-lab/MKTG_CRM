@@ -14,7 +14,6 @@ import { useLocale, useTranslations } from 'next-intl'
 import { useUIStore } from '@/store/useUIStore'
 import type { ContentTheme, StageId, Task } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
-import { SpaceSettingsButton } from '@/components/spaces/SpaceSettings'
 import { inRange, mayCreateIn, newTaskLabel, typesForSpace } from '@/lib/space-settings'
 import { defaultAssigneeFor } from '@/lib/spaces'
 import { TaskForm } from '@/components/shared/TaskForm'
@@ -120,7 +119,7 @@ export function SpacePage({ data, spaceId, brandId = null }: {
           ? <MediaCreateButton board={space.media_board} boardName={space.name} brands={data.brands} label={addLabel} />
           : <button type="button" data-space-add onClick={() => setShowTaskForm(true)}
               style={{ border: 'none', background: '#14131A', color: '#FFFFFF', borderRadius: 9, padding: '6px 12px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>＋ {addLabel}</button>)}
-        {data.currentUser.access !== 'user' && <SpaceSettingsButton space={space} data={data} />}
+        {/* Settings: the header's settings icon opens the same panel (simple header). */}
       </>}
       defaultTab={space.settings.views.default}
       initialPrefs={cleanTabPrefs(data.viewPrefs[folderBrand ? `space:${spaceId}:brand:${folderBrand.id}` : `space:${spaceId}`])}

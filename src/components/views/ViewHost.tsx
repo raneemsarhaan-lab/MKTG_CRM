@@ -182,6 +182,13 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   const open = views.find(v => savedKey(v) === tab) ?? null
   // The simple header is the Sheet view's (built-in or saved) on the pages that offer it.
   const isSimple = !!simple && (open ? open.type : tab) === 'sheet' && !noViews
+  // User, 25 Nov 2026: the breadcrumb header (Spaces / Content ☆ • Saved) is on every view of these pages;
+  // the one toolbar row and "+ Post ▾" are the Sheet view's.
+  const headSimple = !!simple
+  const settingsItems = [
+    ...(isSimple ? [{ key: 'fields', label: th('fields'), run: () => { setSettingsMenu(null); document.dispatchEvent(new CustomEvent(FIELDS_OPEN)) } }] : []),
+    ...(simple?.settings ? [{ key: 'settings', label: simple.settings.label, run: () => { setSettingsMenu(null); simple.settings!.open() } }] : []),
+  ]
   const chrome = useMemo(() => ({ status: statusSlot, tools: toolsSlot, simple: isSimple, add: isSimple ? simple?.add ?? null : null }), [statusSlot, toolsSlot, isSimple, simple?.add])
   const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null)
   const allTabs: (ViewTab & { personal?: boolean })[] = [...tabs, ...views.map(v => ({ key: savedKey(v), label: v.name, personal: !!v.owner_id }))]
@@ -242,7 +249,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
 
   // The view tabs: Board · Sheet · Calendar | + View, the same row in either header.
   const tabsRow = (
-        <div hidden={noViews} className={isSimple ? 'fx-sh2' : undefined} style={{ display: noViews ? 'none' : 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+        <div hidden={noViews} className={headSimple ? 'fx-sh2' : undefined} style={{ display: noViews ? 'none' : 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
           {/* A toolbar of view buttons (each with its ⋯ menu), so the menus sit beside them legitimately. */}
           <div role="toolbar" aria-label={t('tabs')} style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', minWidth: 0 }}>
             {arranged.shown.map(x => (
@@ -289,7 +296,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
               {t('hiddenViews', { n: arranged.hidden.length })} ▾
             </button>
           )}
-          {isSimple && <span aria-hidden="true" className="fx-sh2-sep" />}
+          {headSimple && <span aria-hidden="true" className="fx-sh2-sep" />}
           {node && viewTypes?.length ? (
             <button type="button" data-add-view aria-expanded={adding} onClick={() => setAdding(v => !v)} className="fx-view-add">
               {t('addView')}
@@ -306,7 +313,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   return (
     <ViewChromeContext.Provider value={chrome}>
     <div data-view-host style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
-      {isSimple && simple ? (
+      {headSimple && simple ? (
         <header className="fx-simple-head" data-simple-head="">
           <div className="fx-sh1">
             <nav aria-label={th('crumbs')} className="fx-sh1-crumbs" data-crumbs="">
@@ -332,11 +339,13 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
             </nav>
             <span ref={setStatusSlot} data-view-status-slot="" className="fx-view-status fx-sh1-saved" />
             <span className="fx-sh1-gap" />
-            <button type="button" className="fx-sh1-icon" data-page-settings="" aria-haspopup="menu" aria-expanded={!!settingsMenu}
+            {/* Other views keep the page's own buttons (+ New post) here; the sheet has them in its toolbar. */}
+            {!isSimple && actions && <div className="fx-sh1-actions">{actions}</div>}
+            {settingsItems.length > 0 && <button type="button" className="fx-sh1-icon" data-page-settings="" aria-haspopup="menu" aria-expanded={!!settingsMenu}
               aria-label={th('settings')} title={th('settings')}
               onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setSettingsMenu(m => (m ? null : { x: r.right - 220, y: r.bottom + 4 })) }}>
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
-            </button>
+            </button>}
           </div>
           {sections}
           {tabsRow}
@@ -369,10 +378,7 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
       )}
       {settingsMenu && (
         <TabMenu at={settingsMenu} label={th('settings')} onClose={() => setSettingsMenu(null)}
-          items={[
-            { key: 'fields', label: th('fields'), run: () => { setSettingsMenu(null); document.dispatchEvent(new CustomEvent(FIELDS_OPEN)) } },
-            ...(simple?.settings ? [{ key: 'settings', label: simple.settings.label, run: () => { setSettingsMenu(null); simple.settings!.open() } }] : []),
-          ]} />
+          items={settingsItems} />
       )}
       {tabMenu && (() => {
         const k = tabMenu.key
