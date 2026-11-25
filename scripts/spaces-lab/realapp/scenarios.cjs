@@ -39,7 +39,7 @@ module.exports = (EMAIL, psql, ok) => {
       async run({ page, go }) {
         await go('/spaces/video?view=board')
         // Spec 022: the Video board lists its media tasks. Spec 024: within its range (Ready For Design to D-Check).
-        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and t.media_board='video' and t.status in ('r-design','d-prog','d-check')`)
+        const want = psql(`select count(*) from task_spaces ts join tasks t on t.id=ts.task_id where ts.space_id='${spaceId('video')}' and t.dropped_at is null and (t.media_board='video' or t.media_board is null) and t.status in ('r-design','d-prog','d-check')`)
         await page.waitForSelector('.fx-board-cols')
         const rows = await page.$$eval('.fx-board-cols [data-task-card]', els => els.length)
         ok(String(rows) === want, `Video lists its Shows in tasks: ${rows} vs ${want}`)
@@ -117,14 +117,17 @@ module.exports = (EMAIL, psql, ok) => {
         await page.waitForSelector('[data-handoff]', { state: 'detached' })
         await page.waitForTimeout(800)
         ok(psql(`select status from tasks where id='${t}'`) === 'r-design', 'moved to Ready For Design')
-        // Spec 022 (R5): the content task keeps its assignee; a linked Video media task goes to the editor.
-        const m = psql(`select id from tasks where content_task_id='${t}' and media_board='video'`)
-        ok(!!m, 'a linked Video media task was made')
-        ok(psql(`select r.role from tasks x join members r on r.id=x.assignee_id where x.id='${m}'`) === 'Video Editor', 'assigned to the video editor')
-        const spaces = psql(`select string_agg(s.key||':'||ts.added_via, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${m}'`)
-        ok(spaces === 'video:handoff', `the media task is on the Video board: ${spaces}`)
-        ok(Number(psql(`select count(*) from notifications n join members r on r.id=n.recipient_id where n.task_id='${m}' and n.kind='assigned' and r.role='Video Editor'`)) > 0, 'the editor is notified')
-        ok(Number(psql(`select count(*) from task_followers f join members r on r.id=f.member_id where f.task_id='${m}' and r.role='Video Editor'`)) > 0, 'the editor follows')
+        // Owner, 25 Nov 2026: nothing is copied. The task itself goes on the Video board, stays in Content,
+        // and the video editor joins its assignees (the lead stays).
+        ok(psql(`select count(*) from tasks where content_task_id='${t}'`) === '0', 'no linked copy is made')
+        const spaces = psql(`select string_agg(s.key||':'||ts.added_via, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${t}' and s.key in ('content','video')`)
+        ok(spaces.split(',').includes('video:handoff') && spaces.split(',').some(x => x.startsWith('content:')), `the task is on the Video board and still in Content: ${spaces}`)
+        ok(psql(`select string_agg(r.role, ',') from task_assignees a join members r on r.id=a.member_id where a.task_id='${t}'`).split(',').includes('Video Editor'), 'the video editor is one of its assignees')
+        ok(psql(`select r.role from tasks x join members r on r.id=x.assignee_id where x.id='${t}'`) === 'Content Creator', 'the lead stays')
+        ok(Number(psql(`select count(*) from notifications n join members r on r.id=n.recipient_id where n.task_id='${t}' and n.kind='assigned' and r.role='Video Editor'`)) > 0, 'the editor is notified')
+        ok(Number(psql(`select count(*) from task_followers f join members r on r.id=f.member_id where f.task_id='${t}' and r.role='Video Editor'`)) > 0, 'the editor follows')
+        await go('/spaces/video?view=board')
+        await page.waitForSelector(`[data-task-card="${t}"]`, { timeout: 30000 })
       },
     },
     {

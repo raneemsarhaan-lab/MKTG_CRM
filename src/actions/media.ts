@@ -18,7 +18,8 @@ import { prisma } from '@/lib/prisma'
 import { getSessionMember } from '@/lib/authz'
 import type { MediaBoard } from '@/types/index'
 import { MEDIA_BOARDS, isMediaBoard, spaceForBoard } from '@/lib/media'
-import { createLinkedMedia, syncContent } from '@/lib/media-server'
+import { syncContent } from '@/lib/media-server'
+import { addAssignee } from '@/lib/needs-linked-task'
 import { addSpaces, loadSpaceContext } from '@/lib/spaces-server'
 import { defaultAssigneeFor, type SpaceLike } from '@/lib/spaces'
 import { newTaskDates } from '@/lib/due-dates-server'
@@ -82,22 +83,26 @@ export async function linkToMedia(
   const { spaceOf, personFor } = await boardSpaces()
   const links = boards.map(board => ({ board, spaceId: spaceOf(board)?.id ?? '', assigneeId: personFor(board) })).filter(l => l.spaceId)
   if (!links.length) return { success: false, error: 'no_board' }
-  const named = { ...content, name: target.create.name?.trim() || content.name }
-  const made = await createLinkedMedia(prisma, named, links, { id: me.id, role: me.role })
+  // Owner's decision, 25 Nov 2026: nothing is copied. The task itself goes on the chosen boards and
+  // stays in Content; each board's person joins its assignees.
+  const added = await prisma.$transaction(async tx => {
+    await addSpaces(tx, content.id, links.map(l => l.spaceId), 'handoff', me.id)
+    await tx.task.update({ where: { id: content.id }, data: { auto_linked_at: content.auto_linked_at ?? new Date(), updated_at: new Date() } })
+    const people: string[] = []
+    for (const l of links) if (l.assigneeId && await addAssignee(tx, content.id, l.assigneeId)) people.push(l.assigneeId)
+    return [...new Set(people)]
+  })
   await notifyAfter(async tx => {
     const out: string[] = []
-    for (const c of made) {
-      const who = links.find(l => l.board === c.board)?.assigneeId
-      if (who && who !== me.id) {
-        await follow(tx, c.taskId, who, { clearMute: true })
-        out.push(...await notify(tx, { kind: 'assigned', actorId: me.id, taskId: c.taskId, assigneeId: who }))
-      }
+    for (const who of added) {
+      if (who === me.id) continue
+      await follow(tx, content.id, who, { clearMute: true })
+      out.push(...await notify(tx, { kind: 'assigned', actorId: me.id, taskId: content.id, assigneeId: who }))
     }
     return out
   })
-  await syncContent(content.id, me.id)
   revalidate()
-  return { success: true, linked: made.map(c => c.taskId) }
+  return { success: true, linked: [content.id] }
 }
 
 /** Create task on a media board: an unlinked media task at Ready For Design (SLA from there). */

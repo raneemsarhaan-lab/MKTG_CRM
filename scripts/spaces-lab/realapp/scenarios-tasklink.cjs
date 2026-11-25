@@ -66,7 +66,7 @@ module.exports = (EMAIL, psql, ok) => {
         cleanup()
         try {
           // The Design board's own card (a media task).
-          const row = psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId('design')}' and t.name='Meetup poster' and t.media_board='design' limit 1`)
+          const row = psql(`select t.id from tasks t join task_spaces ts on ts.task_id=t.id where ts.space_id='${spaceId('design')}' and t.name='Meetup poster' limit 1`)
           const target = psql(`select id from tasks where name='Ramadan hero key visual' and media_board is null`)
           const col = psql('select gen_random_uuid()')
           psql(`insert into sheet_columns (id, sheet, key, name, position, kind, options, shown_default, shown_in, updated_at)
@@ -74,6 +74,9 @@ module.exports = (EMAIL, psql, ok) => {
           psql(`insert into sheet_values (column_id, task_id, value, updated_at) values ('${col}', '${row}', '${target}', now())`)
           await go('/spaces/design?view=board')
           await page.waitForSelector(`[data-task-card="${row}"]`, { timeout: 60000 })
+          // Off-screen cards skip rendering (content-visibility): bring it into view first.
+          await page.locator(`[data-task-card="${row}"]`).scrollIntoViewIfNeeded()
+          await page.waitForTimeout(500)
           ok((await page.locator(`[data-task-card="${row}"] [data-card-task-link]`).allInnerTexts()).some(x => /Ramadan hero key visual/.test(x)), 'the card shows the link')
           await go(`/spaces/design?view=board&task=${row}`)
           await page.waitForSelector(`[data-task-link-field="${col}"]`, { timeout: 60000 })

@@ -536,11 +536,22 @@ async function main() {
   })
 
   // Owner's decision, 25 Nov 2026 (after go-live): the in-flight design work moves to the Design and
-  // Video boards. Each content task in the design stages with no linked task gets one, at its stage.
+  // Video boards. (On the live app this step ran once, the morning of 25 Nov, and made linked copies;
+  // the next step folds them back. Where it hasn't run yet, it puts the tasks themselves on the boards.)
   await once('media-tasks-v2', 'gave the in-flight design work its linked Design and Video tasks', async () => {
     const { linkInFlight } = await import('../src/lib/needs-linked-task')
     const r = await linkInFlight(prisma)
-    return `${r.made} linked tasks made (${r.design} Design, ${r.video} Video)`
+    return `${r.made} tasks put on the boards (${r.design} Design, ${r.video} Video)`
+  })
+
+  // Owner's decision, 25 Nov 2026: no copies. Every linked Design or Video task is folded back into its
+  // content task (comments, files, followers, people and the rest move to it), which joins that board
+  // and stays in Content; then the copy is deleted.
+  await once('media-merge-v1', 'folded the linked Design and Video copies back into their tasks', async () => {
+    const { mergeLinkedMedia } = await import('../src/lib/needs-linked-task')
+    const r = await mergeLinkedMedia(prisma)
+    const what = Object.entries(r.moved).map(([k, n]) => `${n} ${k}`).join(', ')
+    return `${r.merged} copies folded back${what ? ` (moved: ${what})` : ''}`
   })
 
   // Workspace settings

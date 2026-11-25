@@ -53,7 +53,8 @@ export function SpacePage({ data, spaceId, brandId = null }: {
   // Spec 025 (§2): a folder is one brand.
   const folderBrand = brandId ? data.brands.find(b => b.id === brandId) ?? null : null
   const brandIds = useMemo(() => (brandId ? [brandId] : []), [brandId])
-  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? task.media_board === board : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status))
+  // Owner, 25 Nov 2026: a content task handed to a board shows on it and stays in Content (it isn't copied).
+  const scope = useMemo(() => (task: Task) => shown.has(task.id) && (board ? (!task.media_board || task.media_board === board) : !isLinkedMedia(task)) && (task.kind === 'simple' || inRange(flow, task.status))
     && (!brandIds.length || (!!task.brand_id && brandIds.includes(task.brand_id))), [shown, board, flow, brandIds])
   const themeScope = useMemo(() => (brandIds.length ? (th: ContentTheme) => !!th.brand_id && brandIds.includes(th.brand_id) : undefined), [brandIds])
   const tasks = viewTasks(data).filter(scope)

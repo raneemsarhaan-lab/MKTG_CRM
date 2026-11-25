@@ -27,6 +27,10 @@ module.exports = (EMAIL, psql, ok) => {
     await page.locator('[role="listbox"][aria-label="Move to a stage"] [role="option"]', { hasText: label }).first().click()
     await page.waitForTimeout(2000)
   }
+  // Owner, 25 Nov 2026: a hand-off puts the task itself on the boards. The boards it's on, and its people's roles.
+  const boards = id => psql(`select coalesce(string_agg(s.key, ',' order by s.key), '') from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${id}' and s.media_board is not null`)
+  const roles = id => psql(`select coalesce(string_agg(r.role, ',' order by r.role), '') from task_assignees a join members r on r.id=a.member_id where a.task_id='${id}'`).split(',')
+  const copies = id => psql(`select count(*) from tasks where content_task_id='${id}'`)
   const media = id => psql(`select coalesce(string_agg(m.media_board||':'||m.status||':'||coalesce(a.role,'-'), ',' order by m.media_board), '') from tasks m left join members a on a.id=m.assignee_id where m.content_task_id='${id}'`)
   const stage = id => psql(`select status from tasks where id='${id}'`)
   const drop = ids => psql(`update tasks set dropped_at=now() where id in (${ids.map(i => `'${i}'`).join(',')}) or content_task_id in (${ids.map(i => `'${i}'`).join(',')})`)
@@ -43,14 +47,15 @@ module.exports = (EMAIL, psql, ok) => {
           ok(!(await page.isChecked('[data-handoff-space="design"] input')), 'Design is not')
           await page.click('[data-handoff-confirm]')
           await page.waitForTimeout(2500)
-          ok(media(t) === 'video:r-design:Video Editor', `one linked Video task with the default editor: ${media(t)}`)
-          ok(stage(t) === 'r-design' && psql(`select auto_linked_at is not null from tasks where id='${t}'`) === 't', 'the content task waits at Ready For Design, linked')
-          ok(psql(`select count(*) from task_spaces ts join tasks m on m.id=ts.task_id where m.content_task_id='${t}' and ts.space_id='${space('video')}'`) === '1', 'the media task is on the Video board')
+          ok(copies(t) === '0' && media(t) === '', 'no linked copy')
+          ok(boards(t) === 'video', `the task itself is on the Video board: ${boards(t)}`)
+          ok(roles(t).includes('Video Editor'), `the default editor joins its assignees: ${roles(t)}`)
+          ok(stage(t) === 'r-design' && psql(`select auto_linked_at is not null from tasks where id='${t}'`) === 't', 'the task is at Ready For Design, handed off')
         } finally { drop([t]) }
       },
     },
     {
-      id: '022-us2-both-boards-gate-f-check', as: 'admin',
+      id: '022-us2-both-boards-one-task', as: 'admin',
       async run({ page, go }) {
         const before = psql(`select media_boards::text from content_types where label='Story'`)
         psql(`update content_types set media_boards='{design,video}' where label='Story'`)
@@ -60,17 +65,20 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForSelector('[data-handoff]', { timeout: 15000 })
           await page.click('[data-handoff-skip]')
           await page.waitForTimeout(2500)
-          ok(media(t) === 'design:r-design:Graphic Designer,video:r-design:Video Editor', `two media tasks with each board's default: ${media(t)}`)
-          const d = psql(`select id from tasks where content_task_id='${t}' and media_board='design'`)
-          const v = psql(`select id from tasks where content_task_id='${t}' and media_board='video'`)
-          psql(`update tasks set status='d-check' where id in ('${d}','${v}')`)
-          await panelStage(page, go, d, 'F-Check')
-          ok(stage(d) === 'final-check', 'Design passes D-Check')
-          ok(stage(t) === 'd-check', `the content task still waits on Video: ${stage(t)}`)
-          // User, 2026-11-23: moving the linked row moves the task it waits on (with that task's permissions).
-          await typeStatus(page, go, 'planning', t, 'F-Check')
-          ok(stage(v) === 'final-check', `the Video task moved with it: ${stage(v)}`)
-          ok(stage(t) === 'final-check', `both passed: the content task is at F-Check: ${stage(t)}`)
+          ok(copies(t) === '0', 'no copies')
+          ok(boards(t) === 'design,video', `the one task is on both boards: ${boards(t)}`)
+          ok(roles(t).includes('Graphic Designer') && roles(t).includes('Video Editor'), `each board's default joins its assignees: ${roles(t)}`)
+          for (const key of ['design', 'video']) {
+            await go(`/spaces/${key}?view=board`)
+            await page.waitForSelector(`[data-task-card="${t}"]`, { timeout: 30000 })
+          }
+          // One task: it moves on like any other, through D-Check to F-Check, and leaves the boards' range.
+          psql(`update tasks set status='d-check' where id='${t}'`)
+          await panelStage(page, go, t, 'F-Check')
+          ok(stage(t) === 'final-check', `it moves to F-Check: ${stage(t)}`)
+          await go('/spaces/design?view=board')
+          await page.waitForTimeout(1500)
+          ok(!(await page.$(`[data-task-card="${t}"]`)), 'past D-Check it is off the Design board')
         } finally { drop([t]); psql(`update content_types set media_boards='${before}' where label='Story'`) }
       },
     },
@@ -83,13 +91,11 @@ module.exports = (EMAIL, psql, ok) => {
           await page.waitForSelector('[data-handoff]', { timeout: 15000 })
           await page.click('[data-handoff-confirm]')
           await page.waitForTimeout(2500)
-          const m = psql(`select id from tasks where content_task_id='${t}'`)
-          psql(`update tasks set content_task_id=null where id='${m}'`)   // unlinked by hand
-          psql(`update tasks set status='c-check' where id='${t}'`)       // and back to C-Check
+          ok(boards(t) === 'design', `on the Design board: ${boards(t)}`)
+          psql(`update tasks set status='c-check' where id='${t}'`)       // back to C-Check
           await typeStatus(page, go, 'planning', t, 'Ready For Design')
           ok(!(await page.$('[data-handoff]')), 'no box the second time')
-          ok(stage(t) === 'r-design' && psql(`select count(*) from tasks where content_task_id='${t}'`) === '0', 'it moves on its own, with no new media task')
-          psql(`update tasks set dropped_at=now() where id='${m}'`)
+          ok(stage(t) === 'r-design' && copies(t) === '0' && boards(t) === 'design', 'it moves on its own, still on the Design board, no copies')
         } finally { drop([t]) }
       },
     },

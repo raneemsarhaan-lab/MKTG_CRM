@@ -72,8 +72,10 @@ module.exports = (EMAIL, psql, ok) => {
           await page.click('[data-media-board-choice="both"]')
           await page.click('[data-media-create] button')
           await page.waitForTimeout(3000)
-          const made = psql(`select string_agg(media_board||':'||status, ',' order by media_board) from tasks where content_task_id='${c2}' and dropped_at is null`)
-          ok(made === 'design:r-design,video:r-design', `Create task with Both makes two linked media tasks: ${made}`)
+          // Owner, 25 Nov 2026: nothing is copied — the task itself goes on both boards.
+          ok(psql(`select count(*) from tasks where content_task_id='${c2}'`) === '0', 'no linked copies')
+          const on = psql(`select string_agg(s.key, ',' order by s.key) from task_spaces ts join team_spaces s on s.id=ts.space_id where ts.task_id='${c2}' and s.media_board is not null`)
+          ok(on === 'design,video', `"Both" puts the task itself on both boards: ${on}`)
         } finally { drop([c, c2, m]) }
       },
     },

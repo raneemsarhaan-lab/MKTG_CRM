@@ -61,7 +61,7 @@ export async function loadNavTree(member: NavMember): Promise<NavTree> {
   for (const r of inSpaces) {
     const sp = info.get(r.space_id), t = byId.get(r.task_id)
     if (!sp || !t) continue
-    if (sp.board ? t.media_board !== sp.board : !!(t.media_board && t.content_task_id)) continue
+    if (sp.board ? (!!t.media_board && t.media_board !== sp.board) : !!(t.media_board && t.content_task_id)) continue
     if (t.kind !== 'simple' && !inRange(sp.flow, t.status)) continue
     add(sp.all, t)
     if (t.brand_id) { let n = sp.brands.get(t.brand_id); if (!n) sp.brands.set(t.brand_id, (n = { open: 0, overdue: 0 })); add(n, t) }

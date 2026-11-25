@@ -237,3 +237,29 @@ Settings › Diagnostics lists 0, no page errors. The hand-off and linked-task s
 Not included: the 2 tasks at F-Check and 8 at Ready to Publish (design is finished and the Design
 board has no column for those stages), published and archived tasks, and clips (already on the Video
 board).
+
+## 11. 25 Nov 2026, later: no copies — the task itself goes on the board
+
+Your decision of 25 Nov: a task handed to Design or Video is not copied. The task itself goes on the
+Design or Video board and stays in Content, with all its history. This replaces section 10.
+
+- **From now on:** at Ready For Design (and "Put on the board" in the Link task cell) the task joins
+  the chosen board's Space. The board's person (or its default) is added to the task's assignees;
+  the lead doesn't change. They are notified and follow the task. No second task is made.
+- **The 31 copies of this morning:** one-time step `media-merge-v1` folds each copy back into its
+  task. Anything added to a copy (comments, files, followers, subtasks, tags, field values, people,
+  notifications) moves to the task; the task joins the board; then the copy is deleted.
+
+Rehearsed on a copy at the live state (the 31 copies present), with a comment and a file added to
+one copy first:
+
+| | Result |
+|---|---|
+| Tasks | 480 → 449: the 31 copies are gone; no original task removed |
+| The comment and file added to a copy | now on its task |
+| The 31 tasks | each on the Design board (15 / 3 / 13), still in Content, same stage and dates |
+| Compared with before any copy was made | identical except the 31 tasks' board row and hand-off time |
+| A second start | changes nothing |
+
+In the app on that copy: all 31 open from the Design board with all their files and comments;
+"Not on the Design or Video board" in Settings › Diagnostics lists 0; no page errors.

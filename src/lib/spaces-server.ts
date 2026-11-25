@@ -38,8 +38,9 @@ export async function handoffFor(
     prisma.contentType.findMany({ select: { label: true, media_boards: true } }),
     prisma.member.findMany({ select: { id: true, name: true, role: true } }),
   ])
-  // Boards already linked by hand (Link task) aren't offered again; all covered → no box.
-  const have = (await prisma.task.findMany({ where: { content_task_id: task.id, dropped_at: null }, select: { media_board: true } })).map(r => r.media_board)
+  // Boards the task is already on, or linked to by hand (Link task), aren't offered again; all covered → no box.
+  const onBoards = (await prisma.taskSpace.findMany({ where: { task_id: task.id, space: { media_board: { not: null }, archived_at: null } }, select: { space: { select: { media_board: true } } } })).map(r => r.space.media_board)
+  const have = [...onBoards, ...(await prisma.task.findMany({ where: { content_task_id: task.id, dropped_at: null }, select: { media_board: true } })).map(r => r.media_board)]
   const need = boardsFor(task.content_type_label, types).filter(b => !have.includes(b))
   if (!need.length) return null
   const offered = MEDIA_BOARDS.map(board => ({ board, space: spaceForBoard(board, c.spaces as (SpaceLike & { key: string; media_board?: string | null; default_assignee_role?: string | null })[]) }))
