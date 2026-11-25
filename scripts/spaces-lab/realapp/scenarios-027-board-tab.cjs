@@ -30,7 +30,12 @@ module.exports = (EMAIL, psql, ok) => {
     }
     return false
   }
-  const scopeTo = async (page, v) => { await page.click(`[data-scope="${v}"]`); await page.waitForTimeout(400) }
+  // The Board view keeps Mine / Everyone; the sheet's simple header has Mine as my avatar (on or off).
+  const scopeTo = async (page, v) => {
+    if (await page.$(`[data-scope="${v}"]`)) await page.click(`[data-scope="${v}"]`)
+    else if ((await page.getAttribute('[data-scope-mine]', 'aria-pressed') === 'true') !== (v === 'me')) await page.click('[data-scope-mine]')
+    await page.waitForTimeout(400)
+  }
 
   return [
     {
@@ -48,7 +53,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(await page.$(`[data-task-card="${theirs}"]`) === null, "Mine: someone else's task is not on the board")
           await page.click('[data-view-tab="sheet"]')
           await page.waitForSelector('[data-board-tab-filters]', { timeout: 30000 })
-          ok(await page.getAttribute('[data-board-tab-filters] [data-scope="me"]', 'aria-pressed') === 'true', 'the Board tab shows Mine too (shared)')
+          ok(await page.getAttribute('[data-board-tab-filters] [data-scope-mine]', 'aria-pressed') === 'true', 'the Board tab shows Mine too (shared)')
           ok(await findInSheet(page, `[data-row="k:${mine}"]`), 'my task is a row in the Board tab')
           ok(!(await findInSheet(page, `[data-row="k:${theirs}"]`, 5000)), "someone else's task is not")
           await scopeTo(page, 'team')

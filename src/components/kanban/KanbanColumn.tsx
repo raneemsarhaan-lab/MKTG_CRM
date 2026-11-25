@@ -87,7 +87,8 @@ export function KanbanColumn({
       style={{
         // One neutral grey for every column: the header alone carries the
         // stage colour, and the white cards still stand off the panel.
-        background: dashed ? 'transparent' : '#FAFAFC',
+        // Boards UI (user, 25 Nov 2026): each column carries a light tint of its stage colour.
+        background: dashed ? 'transparent' : `color-mix(in srgb, ${accent} 7%, #FFFFFF)`,
         // No outline at rest; the stage colour draws it while a card is dragged
         // over. Transparent, not none, so the column doesn't shift by a pixel.
         border: dashed ? `1.5px dashed ${active ? accent : PIPE.border}` : `1px solid ${active ? accent : 'transparent'}`,
@@ -100,64 +101,43 @@ export function KanbanColumn({
         minWidth: 0,
       }}
     >
-      {/* The header: the stage's colour as a light wash, a dot in the colour
-          itself, and the titles in ink. The count and the select box carry
-          the colour too, in its darker shade where it has to be read. */}
-      <div style={{ padding: '12px 10px 10px', flexShrink: 0, background: `${accent}24`, marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
-            {/* Level with the first line when a long title wraps. */}
-            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: accent, flexShrink: 0, marginTop: 5 }} />
-            <div style={{
-              // 15px keeps "READY FOR DESIGN" on one line beside the select box
-              // and a two-digit count in 244px, with the tracking eased to suit.
-              // A longer name (the Arabic for C-Check) wraps rather than being
-              // cut off.
-              fontSize: 15, lineHeight: 1.25, fontWeight: 800, letterSpacing: arabic ? 0 : '0.01em',
-              color: PIPE.ink, textTransform: 'uppercase', overflowWrap: 'break-word', minWidth: 0,
-            }}>
-              {/* A Space's own name for the stage (spec 022), else the stage's name in the reader's language. */}
+      {/* Boards UI (user, 25 Nov 2026): the header is a small pill in the stage's colour with a status icon
+          and the stage's name, and the count beside it in the same colour (no boxed count). */}
+      <div data-column-head="" style={{ padding: '12px 10px 10px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span data-stage-pill="" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%',
+            padding: '4px 10px 4px 8px', borderRadius: 999, background: `color-mix(in srgb, ${accent} 20%, #FFFFFF)`, color: ink,
+            fontSize: 11.5, lineHeight: 1.25, fontWeight: 800, letterSpacing: arabic ? 0 : '0.03em', textTransform: 'uppercase',
+          }}>
+            <StageIcon stageId={stage.id} color={ink} />
+            {/* A Space's own name for the stage (spec 022), else the stage's name in the reader's language. */}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={spaceStage?.named ? (arabic ? stage.label_ar : stage.label_en) : undefined}>
               {spaceStage?.name ?? (arabic ? stage.label_ar : stage.label_en)}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            {onSelectAll && tasks.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onSelectAll(stage.id as StageId, !allSelected)}
-                title={allSelected ? `Deselect all in ${stage.label_en}` : `Select all in ${stage.label_en}`}
-                // One name for both states; aria-pressed says which it is in.
-                aria-label={`Select all in ${stage.label_en}`}
-                aria-pressed={allSelected}
-                className="fx-focus"
-                style={{
-                  width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
-                  border: `1.5px solid ${ink}`,
-                  background: allSelected ? ink : '#FFFFFF',
-                  color: '#FFFFFF', fontSize: 11, fontWeight: 900, lineHeight: '15px',
-                  padding: 0, fontFamily: 'inherit',
-                }}
-              >
-                <span aria-hidden="true">{allSelected ? '✓' : ''}</span>
-              </button>
-            )}
-            <div style={{
-              minWidth: 22, height: 22, borderRadius: 6, background: '#FFFFFF',
-              border: `1.5px solid ${accent}`, boxSizing: 'border-box',
-              fontSize: 11.5, fontWeight: 700, color: ink,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0 5px',
-            }}>
-              {tasks.length}
-            </div>
-          </div>
+            </span>
+          </span>
+          <span data-column-count={tasks.length} style={{ fontSize: 12.5, fontWeight: 700, color: ink, flexShrink: 0 }}>{tasks.length}</span>
         </div>
-        {/* A stage a Space renamed still says which board stage it is. (The Arabic line under every
-            title went with main's header: the title is in the reader's language now.) */}
-        {spaceStage?.named && (
-          <div style={{ marginTop: 4, marginInlineStart: 17, fontSize: 11, fontWeight: 500, color: PIPE.placeholder }}>
-            {arabic ? stage.label_ar : stage.label_en}
-          </div>
+        {onSelectAll && tasks.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onSelectAll(stage.id as StageId, !allSelected)}
+            title={allSelected ? `Deselect all in ${stage.label_en}` : `Select all in ${stage.label_en}`}
+            // One name for both states; aria-pressed says which it is in.
+            aria-label={`Select all in ${stage.label_en}`}
+            aria-pressed={allSelected}
+            className="fx-focus"
+            style={{
+              width: 18, height: 18, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
+              border: `1.5px solid ${ink}`,
+              background: allSelected ? ink : '#FFFFFF',
+              color: '#FFFFFF', fontSize: 11, fontWeight: 900, lineHeight: '15px',
+              padding: 0, fontFamily: 'inherit',
+            }}
+          >
+            <span aria-hidden="true">{allSelected ? '✓' : ''}</span>
+          </button>
         )}
       </div>
 
@@ -197,13 +177,13 @@ export function KanbanColumn({
             style={{
               // The same 10px above the label as before, split between margin
               // and padding so the hover tint has a little room round the text.
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              marginTop: 6, padding: '4px 0', borderRadius: 8,
-              fontSize: 12.5, fontWeight: 700, color: PIPE.purple,
+              display: 'flex', alignItems: 'center', gap: 7,
+              marginTop: 'auto', padding: '6px 6px', borderRadius: 8,
+              fontSize: 12.5, fontWeight: 700, color: ink,
               background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PIPE.purple}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ink}
                  strokeWidth="2.6" aria-hidden="true">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
@@ -212,5 +192,20 @@ export function KanbanColumn({
         )}
       </div>
     </div>
+  )
+}
+
+/** The stage's status icon in its pill: an empty circle to start, a part-filled one in progress, a tick when done. */
+function StageIcon({ stageId, color }: { stageId: string; color: string }) {
+  const done = stageId === 'publish' || stageId === 'scheduled' || stageId === 'ready-publish'
+  const start = stageId === 'todo'
+  return (
+    <svg aria-hidden="true" width="13" height="13" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+      {done
+        ? <><circle cx="8" cy="8" r="7" fill={color} /><path d="m4.8 8.2 2.2 2.2 4.2-4.6" fill="none" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></>
+        : start
+          ? <circle cx="8" cy="8" r="6.2" fill="none" stroke={color} strokeWidth="1.8" strokeDasharray="2.4 1.9" />
+          : <><circle cx="8" cy="8" r="6.2" fill="none" stroke={color} strokeWidth="1.8" /><path d="M8 4.2a3.8 3.8 0 0 1 0 7.6z" fill={color} /></>}
+    </svg>
   )
 }

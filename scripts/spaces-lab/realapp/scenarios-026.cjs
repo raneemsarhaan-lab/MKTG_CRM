@@ -191,8 +191,9 @@ module.exports = (EMAIL, psql, ok) => {
           const made = psql(`select task_id from content_rows where id='${rd}'`)
           ok(!!made && psql(`select brand_id from tasks where id='${made}'`) === b, 'Make task in the brand folder makes the task for this brand')
           await go(`/brands/${b}?view=sheet`)
-          await page.waitForSelector('[data-board-tab-filters] [data-scope="team"]', { timeout: 60000 })
-          await page.click('[data-board-tab-filters] [data-scope="team"]')
+          // The simple sheet header: Mine is my avatar in the toolbar; Everyone is Mine turned off.
+          await page.waitForSelector('[data-board-tab-filters] [data-scope-mine]', { timeout: 60000 })
+          if (await page.getAttribute('[data-board-tab-filters] [data-scope-mine]', 'aria-pressed') === 'true') await page.click('[data-board-tab-filters] [data-scope-mine]')
           await page.waitForSelector(`[data-content-sheet] [data-row="k:${made}"]`, { timeout: 60000 })
           ok(true, "and it shows on the brand's sheet")
         } finally { cleanup([td]) }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useDndContext } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS, isKeyboardEvent } from '@dnd-kit/utilities'
@@ -13,7 +13,7 @@ import { TaskDates } from '@/components/shared/DueDates'
 import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import { useLocale, useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
-import { coverImageFor } from '@/lib/attachments'
+import { attachmentKind, coverImageFor, isLinkAttachment } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { CardFieldValues, useCardFields, useCardShows } from '@/components/fields/CardFields'
@@ -57,8 +57,45 @@ const CHIP: Record<AlertStatus, { bg: string; color: string; weight: number; upp
   'Overdue':   { bg: '#FDE7EA', color: '#D22040', weight: 800, upper: true },
 }
 
-/** The placeholder cover: three bars on a grey gradient (§7.1). */
-const BAR_SETS = [[14, 30, 20], [24, 14, 32], [16, 32, 22], [22, 30, 16], [20, 32, 16]]
+/** The card's padding, and the cover's height (user, 25 Nov 2026). */
+const PAD = 10
+const COVER_H = 140
+
+/** "1:12" — a video's length. */
+const clock = (sec: number) => { const s = Math.round(sec); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(r).padStart(2, '0')}` }
+
+/**
+ * A video card's cover: the video's own frame (or the task's cover image), a play button and the length
+ * in the corner. Only the file's header is read (preload="metadata"), and only once the card is near the
+ * screen, so a long board doesn't fetch every video.
+ */
+function VideoCover({ src, poster }: { src: string; poster: string | null }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [near, setNear] = useState(false)
+  const [length, setLength] = useState<number | null>(null)
+  useEffect(() => {
+    const el = box.current
+    if (!el || typeof IntersectionObserver === 'undefined') { setNear(true); return }
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { setNear(true); io.disconnect() } }, { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return (
+    <div ref={box} style={{ position: 'absolute', inset: 0 }}>
+      {near && (
+        <video src={`${src}#t=0.1`} poster={poster ?? undefined} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true"
+          onLoadedMetadata={e => { const d = e.currentTarget.duration; if (Number.isFinite(d) && d > 0) setLength(d) }}
+          style={{ width: '100%', height: COVER_H, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+      )}
+      <span aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 38, height: 38, borderRadius: '50%', background: 'rgba(20, 19, 26, .62)', display: 'grid', placeItems: 'center' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="#FFFFFF" /></svg>
+      </span>
+      {length !== null && (
+        <span data-video-length="" style={{ position: 'absolute', insetInlineEnd: 8, bottom: 8, padding: '2px 6px', borderRadius: 5, background: 'rgba(20, 19, 26, .72)', color: '#FFFFFF', fontSize: 11, fontWeight: 700, direction: 'ltr' }}>{clock(length)}</span>
+      )}
+    </div>
+  )
+}
 
 function Chip({ bg, color, weight, upper, children }: {
   bg: string; color: string; weight: number; upper?: boolean; children: React.ReactNode
@@ -122,7 +159,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   today: Date
 }) {
   const tViews   = useTranslations('views')
-  const { alert, overdue, dueLabel } = cardFacts(task, slaConfig, today)
+  const { alert } = cardFacts(task, slaConfig, today)
   const chip = CHIP[alert]
 
   const attachmentCount = task.attachments?.length ?? 0
@@ -144,46 +181,26 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const tRepeat = useTranslations('repeat')
   const tagList = (task.tag_ids ?? []).map(id => ctx?.tags.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   const people = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => ctx?.members.find(m => m.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
-  // Stable per task, so a card does not reshuffle its bars on every render.
-  const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
+  // A video file on the task (newest first): the card shows its frame, a play button and its length.
+  const video = [...(task.attachments ?? [])].reverse().find(a => !isLinkAttachment(a) && a.url && (a.content_type?.startsWith('video/') || attachmentKind(a.filename) === 'video'))?.url ?? null
 
   return (
     <>
-      {/* Cover — spec 021 (US4): none when the brand has Cover images off. */}
-      {featureOn(task.brand, 'covers') && <div data-card-cover style={{ position: 'relative', marginBottom: 9 }}>
-        <ImageWithFallback
-          src={cover}
-          alt=""
-          loading="lazy"
-          style={{
-            width: '100%', height: 126, objectFit: 'cover', display: 'block',
-            borderRadius: 8, border: `1px solid ${PIPE.borderFaint}`,
-          }}
-          fallback={
-            <div style={{
-              width: '100%', height: 126, borderRadius: 8,
-              background: 'linear-gradient(140deg, #F1F1F5 0%, #E7E7EE 100%)',
-              border: `1px solid ${PIPE.borderFaint}`, display: 'flex',
-              alignItems: 'flex-end', justifyContent: 'center', gap: 5,
-              padding: '12px 16px', boxSizing: 'border-box', overflow: 'hidden',
-            }}>
-              {bars.map((h, i) => (
-                <div key={i} style={{
-                  flex: 1, height: h, borderRadius: 2,
-                  background: h >= 30 ? '#B3B8C6' : '#C9CDD8',
-                }} />
-              ))}
-            </div>
-          }
-        />
+      {/* Boards UI (user, 25 Nov 2026): a card with an image shows it as a full-width cover, 140px tall,
+          flush with the card's edges and a thin line under it; a video shows its frame with a play
+          button and its length; a card with neither stays compact, text only.
+          Spec 021 (US4): no cover when the brand has Cover images off. */}
+      {featureOn(task.brand, 'covers') && (video || cover) && (
+        <div data-card-cover={video ? 'video' : 'image'} style={{ position: 'relative', margin: `-${PAD}px -${PAD}px ${PAD}px`, height: COVER_H, overflow: 'hidden', borderRadius: '11px 11px 0 0', borderBottom: `1px solid ${PIPE.border}`, background: video ? '#14131A' : PIPE.surface }}>
+          {video
+            ? <VideoCover src={video} poster={cover} />
+            : <ImageWithFallback src={cover} alt="" loading="lazy" style={{ width: '100%', height: COVER_H, objectFit: 'cover', display: 'block' }}
+                fallback={<div style={{ width: '100%', height: COVER_H, background: 'linear-gradient(140deg, #F1F1F5 0%, #E7E7EE 100%)' }} />} />}
+        </div>
+      )}
 
-      </div>}
-
-      {/* Brand, then the project it serves.
-          Two short lines above the title so a column can be read for
-          direction without opening anything. The brand mark moved here from
-          the cover's corner rather than being drawn twice. */}
-      {shows('brand') && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+      {/* The brand on one small line, with its icon. */}
+      {shows('brand') && <div data-card-brand="" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span aria-hidden="true" style={{
           width: 16, height: 16, borderRadius: 4, flexShrink: 0, overflow: 'hidden',
           background: task.brand ? brandColor : PIPE.surface,
@@ -200,32 +217,17 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
             : null}
         </span>
         <span style={{
-          minWidth: 0, fontSize: 10.5, fontWeight: 700, color: PIPE.textSecondary,
+          minWidth: 0, fontSize: 11.5, fontWeight: 500, color: PIPE.textSecondary,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {task.brand?.name ?? 'No brand'}
         </span>
       </div>}
 
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        margin: '2px 0 6px 22px', fontSize: 10, fontWeight: 600,
-        color: task.project ? '#6D28D9' : PIPE.textFaintest,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-             style={{ flexShrink: 0 }}>
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        </svg>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {task.project?.name ?? 'No project'}
-        </span>
-      </div>
-
-      {/* Title */}
-      <div style={{
-        fontSize: 12.5, fontWeight: 600, lineHeight: 1.35,
+      {/* Title, in medium weight. */}
+      <div data-card-title="" style={{
+        marginTop: shows('brand') ? 6 : 0,
+        fontSize: 13.5, fontWeight: 500, lineHeight: 1.4,
         color: PIPE.textPrimary, textWrap: 'pretty', overflowWrap: 'anywhere',
       }}>
         {task.name}
@@ -234,11 +236,8 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
       {/* Spec 023: custom field values the page shows. */}
       <CardFieldValues taskId={task.id} typeLabel={task.content_type_label} status={task.status} brand={task.brand} homeSpaceId={task.home_space_id} />
 
-      {/* Publishing and due dates, each labelled (✎ on a due date set by hand). */}
-      {(shows('publish') || shows('due')) && <div style={{ marginTop: 5 }}><TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={10.5} /></div>}
-
-      {/* Chips */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+      {/* Chips the page and the brand turn on (SLA, media links, task links, tags, urgent, type). */}
+      <div data-card-chips="" style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         {featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
         {/* Spec 022: media links (content: per-board stage; media: its content task, or Unlinked). */}
         <CardMedia task={task as never} />
@@ -266,29 +265,13 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         )}
       </div>
 
-      {/* Footer */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginTop: 10, gap: 8,
-      }}>
-        <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
-          {/* Spec 023 (US5): up to three assignees, the lead first; otherwise the owner. */}
-          {people.length
-            ? people.slice(0, 3).map((m, i) => <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />)
-            : <AssigneeDot name={task.task_owner.name} />}
-          {people.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, marginInlineStart: 3 }}>+{people.length - 3}</span>}
-          {!people.length && currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
-            <AssigneeDot name={currentStageOwner.name} stacked />
-          )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-          {/* Not in the handoff, but asked for earlier — kept at the footer's
-              own muted weight so it reads as metadata, not a third chip. */}
+      {/* One meta row: attachments, comments and dates (the due date red when overdue), the assignee on the right. */}
+      <div data-card-meta="" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 9, gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0, flexWrap: 'wrap', color: PIPE.textFaint }}>
           {attachmentCount > 0 && (
-            <span title={`${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 600, color: PIPE.textFaintest }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <span data-card-files={attachmentCount} title={`${attachmentCount} attachment${attachmentCount === 1 ? '' : 's'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
@@ -297,21 +280,25 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           )}
           {commentCount > 0 && (
             <span title={`${commentCount} comment${commentCount === 1 ? '' : 's'}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 600, color: PIPE.textFaintest }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               {commentCount}
             </span>
           )}
-          {dueLabel && (
-            <span style={{
-              fontSize: 10.5, fontWeight: overdue ? 800 : 600,
-              color: overdue ? '#D22040' : PIPE.textFaintest, whiteSpace: 'nowrap',
-            }}>
-              {dueLabel}
-            </span>
+          {/* Publishing and due dates, each labelled (✎ on a due date set by hand; red when overdue). */}
+          {(shows('publish') || shows('due')) && <TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={11} />}
+        </div>
+        <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
+          {/* Spec 023 (US5): up to three assignees, the lead first; otherwise the owner. */}
+          {people.length
+            ? people.slice(0, 3).map((m, i) => <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />)
+            : <AssigneeDot name={task.task_owner.name} />}
+          {people.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, marginInlineStart: 3 }}>+{people.length - 3}</span>}
+          {!people.length && currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
+            <AssigneeDot name={currentStageOwner.name} stacked />
           )}
         </div>
       </div>
@@ -338,7 +325,7 @@ const SHELL: React.CSSProperties = {
   background: '#FFFFFF',
   border: `1px solid ${PIPE.border}`,
   borderRadius: 12,
-  padding: 8,
+  padding: PAD,
 }
 
 export function TaskCard({
@@ -394,6 +381,8 @@ export function TaskCard({
         {...listeners}
         style={{
           ...SHELL,
+          // The padding sits on the inner box: content-visibility clips at its edge, and the cover reaches it.
+          padding: 0,
           borderColor: selected ? PIPE.purple : PIPE.border,
           boxShadow: selected ? `0 0 0 2px ${PIPE.purple}33` : undefined,
           cursor: isDragging ? 'grabbing' : 'grab',
@@ -427,7 +416,7 @@ export function TaskCard({
         {/* Off-screen cards skip layout and paint until they scroll near —
             a Team board runs to hundreds of cards. Inside the shell, so the
             shell's selected ring and focus outline are never clipped. */}
-        <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 272px' }}>
+        <div style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 272px', padding: PAD, borderRadius: 11 }}>
           <CardBody task={task} currentStageOwner={currentStageOwner} slaConfig={slaConfig} today={today} />
         </div>
       </div>
