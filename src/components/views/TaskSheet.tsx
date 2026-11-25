@@ -36,6 +36,9 @@ import { ROW_NO_WIDTH } from '@/components/sheet/columns'
 import { useUIStore } from '@/store/useUIStore'
 import type { SheetId, StageId, Task } from '@/types/index'
 import { STAGE_META, NINE_STAGE } from '@/lib/stage-meta'
+import { StagePill } from '@/components/sheet/StatusCell'
+import { PersonChip } from '@/components/sheet/PersonChip'
+import { STAGE_COLORS } from '@/lib/tokens'
 import { matchMember, matchPriority, readDay } from '@/lib/sheet-links'
 import { matchSpaceStage } from '@/lib/space-stages'
 import type { SpaceStagesApi } from '@/components/spaces/useSpaceStages'
@@ -44,7 +47,7 @@ import { FEATURE_OFF_CELL, fieldOn, offFeatureFor } from '@/lib/brand-features'
 import { applies, fieldName, formatValue, isEmpty, parseValue } from '@/lib/task-fields'
 import { setFieldValue } from '@/actions/task-fields'
 import { useMakeField } from '@/components/fields/useMakeField'
-import { formatDay, isOverdue } from '@/lib/due-dates'
+import { formatDay, isOverdue, sheetDate } from '@/lib/due-dates'
 import { ManualMark } from '@/components/shared/DueDates'
 import { useMediaLinks } from '@/components/media/MediaLinks'
 import { canActOn } from '@/lib/task-access'
@@ -455,14 +458,25 @@ export function TaskSheet({ data, tasks, groups, hideBrand = false, showSpace = 
       if (col === 'title') return <span className="fx-sheet-title" data-task-cell={x.id}><span className="fx-sheet-ellipsis" title={x.name}>{x.name}</span></span>
       if (col === 'due' && x.due_date) {
         const late = isOverdue(x)
-        return <span className="fx-sheet-ellipsis" data-due-cell={x.due_date} style={late ? { color: '#D22040' } : undefined}>{formatDay(x.due_date, locale)}{x.due_manual && <ManualMark label={tDates('manual')} />}</span>
+        return <span className="fx-sheet-ellipsis" data-due-cell={x.due_date} style={late ? { color: '#D22040' } : undefined}>{sheetDate(x.due_date, locale)}{x.due_manual && <ManualMark label={tDates('manual')} />}</span>
       }
-      if (col === 'start' && x.start_date) return <span className="fx-sheet-ellipsis" data-start-cell={x.start_date}>{formatDay(x.start_date, locale)}</span>
-      if (col === 'publish' && x.publish_date) return <span className="fx-sheet-ellipsis" data-publish-cell={x.publish_date}>{formatDay(x.publish_date, locale)}</span>
+      if (col === 'start' && x.start_date) return <span className="fx-sheet-ellipsis" data-start-cell={x.start_date}>{sheetDate(x.start_date, locale)}</span>
+      if (col === 'publish' && x.publish_date) return <span className="fx-sheet-ellipsis" data-publish-cell={x.publish_date}>{sheetDate(x.publish_date, locale)}</span>
       const s = shown(x, col)
       if (col === 'status' && s) {
         const board = boardWord(x.status)
-        return <span className="fx-sheet-ellipsis" data-status-word={s} title={board !== s ? board : undefined}>{s}</span>
+        // Sheet look (25 Nov 2026): the same soft stage pill as the Content sheet.
+        return <span data-status-word={s} title={board !== s ? board : undefined} style={{ display: 'inline-flex', minWidth: 0, maxWidth: '100%' }}>
+          {STAGE_COLORS[x.status] ? <StagePill stage={x.status as StageId} name={s} /> : <span className="fx-sheet-ellipsis">{s}</span>}
+        </span>
+      }
+      if (col === 'assignee' && s) {
+        // The lead's avatar and name, and how many more share the task.
+        const ids = x.assignee_ids?.length ? x.assignee_ids : x.assignee_id ? [x.assignee_id] : []
+        const lead = data.members.find(m => m.id === ids[0])
+        return lead ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }} title={s}>
+          <PersonChip member={lead} />{ids.length > 1 && <span className="fx-sheet-muted">+{ids.length - 1}</span>}
+        </span> : <span className="fx-sheet-ellipsis">{s}</span>
       }
       return s ? <span className="fx-sheet-ellipsis">{s}</span> : null
     },

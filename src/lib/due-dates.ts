@@ -128,3 +128,11 @@ export function compareByPublish(
     || cmp(a.due_date?.slice(0, 10), b.due_date?.slice(0, 10))
     || cmp(a.created_at ?? null, b.created_at ?? null)
 }
+
+/** Sheet look (user, 25 Nov 2026): a sheet's dates in full, "Mar 5, 2025" (Arabic with Latin digits). */
+export function sheetDate(iso: string | null | undefined, locale = 'en'): string {
+  if (!iso) return ''
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(d)
+}

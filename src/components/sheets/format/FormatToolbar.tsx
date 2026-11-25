@@ -671,6 +671,7 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
         )}
       </div>
       <div className="fx-fbar" data-cell-row="">
+        <span className="fx-namebox-wrap">
         <input className="fx-namebox" data-namebox="" aria-label={tb('nameBox')} title={tb('nameBox')} dir="ltr" name="name-box" autoComplete="off" spellCheck={false} translate="no"
                readOnly={!state?.canGoto} value={nameDraft ?? nameShown}
                onFocus={ev => { setNameDraft(nameShown); ev.currentTarget.select(); nameFresh.current = true }}
@@ -681,6 +682,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
                  if (ev.key === 'Enter') { ev.preventDefault(); const v = (nameDraft ?? '').trim(); setNameDraft(null); if (v && state?.canGoto) sendFormat(target, { kind: 'goto', ref: v }); focusGrid() }
                  if (ev.key === 'Escape') { ev.preventDefault(); setNameDraft(null); focusGrid() }
                }} />
+        <span className="fx-namebox-chev" aria-hidden="true">▾</span>
+        </span>
         <span className="fx-fx" aria-hidden="true">fx</span>
         <input className="fx-cellbar" data-cellbar="" aria-label={tb('cellBar')} dir="auto" name="cell-value" autoComplete="off"
                readOnly={off} title={off ? why ?? tb('cellBarRo') : undefined}
@@ -693,6 +696,8 @@ export function FormatToolbar({ state, target, onFormatCells, painter, onPainter
                  if (ev.key === 'Escape') { ev.preventDefault(); setCellDraft(null); focusGrid() }
                }} />
         <span className="fx-cellcount" data-selection="" aria-live="polite">{countText}{state?.adding && <span className="fx-sh-adding" data-add-mode="">{ta('adding')}</span>}</span>
+        {/* Sheet look (25 Nov 2026): the open sheet's own buttons (+ Column, + Theme) sit at the end of this row. */}
+        <div className="fx-fbar-tools" data-fbar-slot="" />
       </div>
 
       {menu && open && <PopMenu key={open.k} at={at(open)} label={menu.label} items={menu.items} attr={menu.attr} returnTo={root.current ?? open.el} onClose={() => setOpen(null)} />}

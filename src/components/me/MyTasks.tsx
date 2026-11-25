@@ -81,6 +81,8 @@ export function MyTasks({ data }: { data: BoardData }) {
       options={viewOptions(data, tasks)}
       fields={fieldsSetup(data, tasks)}
       fieldPicker={fv.picker(tasks)}
+      // The Sheet tab's own Fields (in the tabs row) sets its columns; the page's Fields is for the other views.
+      builtInFields={['board', 'list', 'calendar']}
       render={(tab, view, shownKeys) => {
         // A saved view: the same groups, narrowed and ordered by the view.
         const ids = view ? new Set(applyView(tasks, view.config, fv.valueOf).map(x => x.id)) : null

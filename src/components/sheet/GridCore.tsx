@@ -265,7 +265,14 @@ export const tipsBus: { lists: string[][] } = { lists: [] }
 /** A linked grid's status-bar news: the mode text (undefined = unchanged, null = Ready) and the selection's figures. */
 export const STATUS_EVENT = 'momentum:sheet-status'
 
-export const ROW_H = 24
+/**
+ * Sheet look (user, 25 Nov 2026): roomier rows and headings. These match the CSS (--sheet-row-h,
+ * --sheet-head-h): the windowed scrolling and the frozen rows' offsets are worked out from them.
+ */
+export const ROW_H = 34
+export const HEAD_H = 38
+/** The letters row above lettered headings. */
+export const LETTERS_H = 20
 /** Rows beyond which only the visible part is rendered (R7). */
 const WINDOW_AT = 150
 /** Spec 019: a group heading's height. */
@@ -503,8 +510,8 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const z = m.zoom && m.zoom > 0 ? m.zoom : 1
   /** The sticky heading row; its height (26px, 46px with column letters) is measured, not assumed. */
   const headRef = useRef<HTMLDivElement>(null)
-  const headH = () => headRef.current?.getBoundingClientRect().height ?? (m.letters ? 46 : 26) * z
-  const first = windowed ? Math.max(0, find(view.top / z - (m.letters ? 46 : 26)) - OVERSCAN) : 0
+  const headH = () => headRef.current?.getBoundingClientRect().height ?? (m.letters ? HEAD_H + LETTERS_H : HEAD_H) * z
+  const first = windowed ? Math.max(0, find(view.top / z - (m.letters ? HEAD_H + LETTERS_H : HEAD_H)) - OVERSCAN) : 0
   const last = windowed ? Math.min(m.rows.length, find((view.top + view.height) / z) + OVERSCAN + 1) : m.rows.length
 
   useLayoutEffect(() => {
@@ -1395,7 +1402,7 @@ export function GridCore<R extends { key: string }>({ model: m, active: activeIn
   const F = Math.min(m.frozenRows ?? 0, m.rows.length)
   const FC = Math.min(m.frozenCols ?? 0, m.cols.length)
   const frozenTop: number[] = []
-  for (let i = 0, y = m.letters ? 46 : 26; i < F; i++) { frozenTop.push(y); y += heightOf(m.rows[i]) ?? ROW_H }
+  for (let i = 0, y = m.letters ? HEAD_H + LETTERS_H : HEAD_H; i < F; i++) { frozenTop.push(y); y += heightOf(m.rows[i]) ?? ROW_H }
   const frozenStart: number[] = []
   for (let c = 0, x = m.rowNoWidth; c < FC; c++) { frozenStart.push(x); x += widthOf(m.cols[c]) }
   const firstW = Math.max(first, F)

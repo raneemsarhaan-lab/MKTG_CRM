@@ -215,7 +215,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(!(await page.$(`[data-col-head="${key}"]`)), "a library field no type carries isn't a column yet")
           // Fields (25 Nov 2026): + Column opens the Add column panel — the field is on in Design, not shown yet.
           psql(`update members set sheet_layouts='{}' where email='${EMAIL.admin}'`)
-          await page.click('[data-content-sheet] [data-add-column]')
+          await page.click('[data-add-column]')
           await page.waitForSelector(`[data-add-section="on"] [data-add-item="${key}"]`)
           ok(await page.isVisible('[data-add-new]'), '+ Column ends with + New field (a task field or a sheet-only column)')
           // An admin shapes the Space default here (Just me would change only their own view).
@@ -256,7 +256,7 @@ module.exports = (EMAIL, psql, ok) => {
           ok(psql(`select values->>'${key}' from content_rows where id='${r}'`) === `Plain value ${n}`, 'hiding keeps the values')
           await page.click('[data-fields-close]')
           // Sheet only: a column of the sheet's own, from + New field.
-          await page.click('[data-content-sheet] [data-add-column]')
+          await page.click('[data-add-column]')
           await page.click('[data-add-new]')
           await page.fill('[data-new-name]', `Lab only ${n}`)
           await page.click('[data-new-place="sheet"]')

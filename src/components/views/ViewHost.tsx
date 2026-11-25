@@ -168,10 +168,13 @@ export function ViewHost({ crumbs, title, tag, color, mark, sub, actions, tabs, 
   // The Fields button (spec 023): a saved view keeps its fields in its config (saved with Save);
   // a built-in tab keeps this member's choice in their tab prefs.
   const viewType = open ? open.type : tab
-  const hasFields = !!fieldSetup && ['board', 'list', 'sheet'].includes(viewType) && (!!open || !builtInFields || builtInFields.includes(viewType))
+  // The fields a Board, List or Sheet shows are worked out for every such view; the button only shows where
+  // the page's Fields sets them (a built-in Sheet tab has its own Fields in the tabs row).
+  const fieldsFor = !!fieldSetup && ['board', 'list', 'sheet'].includes(viewType)
+  const hasFields = fieldsFor && (!!open || !builtInFields || builtInFields.includes(viewType))
   /** A tab's view type, for its icon: the built-in tab's key, or the saved view's type. */
   const typeOf = (key: string) => (key.startsWith('v:') ? views.find(v => savedKey(v) === key)?.type : key)
-  const shown = hasFields && fieldSetup
+  const shown = fieldsFor && fieldSetup
     ? shownFields(open ? config?.fields : prefs.fields?.[tab], viewType, fieldSetup.custom, new Set(fieldSetup.typesOnPage), fieldSetup.links)
     : undefined
   function setShown(keys: string[]) {

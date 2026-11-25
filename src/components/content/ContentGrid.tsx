@@ -34,7 +34,7 @@ import type { SheetColumnsHook } from '@/components/sheet/useSheetColumns'
 import { useLinkedEditing } from '@/components/sheet/useLinkedEditing'
 import { nodeText, useLinkedView, type LinkedView } from '@/components/sheet/useLinkedView'
 import { useGridTips } from '@/components/sheet/useGridTips'
-import { formatDay } from '@/lib/due-dates'
+import { formatDay, sheetDate } from '@/lib/due-dates'
 import { asPriority, priorityColor } from '@/lib/priorities'
 import { FieldGlyph } from '@/components/sheet/AddColumnPanel'
 import { gateFeatureCells, gateFeatureStyle, type OffNote } from '@/components/sheet/featureCells'
@@ -244,7 +244,9 @@ export function ContentGrid(p: ContentGridProps) {
   /** The type as a filled pill, one colour per content type. */
   function typePill(label: string | null | undefined) {
     if (!label) return null
-    return <span className="fx-content-type" style={{ background: contentTypeColor(label) }}>{typeWord(label)}</span>
+    // Sheet look (25 Nov 2026): a soft pill like Status — the type's colour as a tint, a dot and darker text.
+    const c = contentTypeColor(label)
+    return <span className="fx-content-type is-soft" style={{ ['--type-c' as string]: c }}><i className="fx-sheet-dot" style={{ background: c }} /><span className="fx-sheet-ellipsis">{typeWord(label)}</span></span>
   }
 
   function linkCell(task: Task, col: typeof LINK_COLS[number], can: boolean) {
@@ -507,15 +509,15 @@ export function ContentGrid(p: ContentGridProps) {
         case 'date':
           if (isClip) return null
           // The Date column is the publishing date; a published piece says so.
-          if (task.status === 'publish') return <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date ?? task.stage_date}>{t('date.published', { date: formatDay(task.publish_date ?? task.stage_date, locale) })}</span>
-          return task.publish_date ? <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date}>{formatDay(task.publish_date, locale)}</span> : null
+          if (task.status === 'publish') return <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date ?? task.stage_date}>{t('date.published', { date: sheetDate(task.publish_date ?? task.stage_date, locale) })}</span>
+          return task.publish_date ? <span className="fx-sheet-ellipsis fx-cs-tnum" data-publish-cell={task.publish_date}>{sheetDate(task.publish_date, locale)}</span> : null
         case 'archive':
           return isClip || !can ? null : <span className="fx-sheet-dropb">{task.dropped_at ? t('archive.restore') : t('archive.archive')}</span>
         // Fields (25 Nov 2026): Brand, Owner and Due date (standard); Priority and Start date (custom).
         case 'brand': return task.brand ? <span className="fx-sheet-ellipsis" data-brand-cell={task.brand_id ?? ''}>{task.brand.name}</span> : null
         case 'owner': return <EditorContent member={task.task_owner_id ? byId.get(task.task_owner_id) : undefined} t={ts} />
-        case 'due': return task.due_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{formatDay(task.due_date, locale)}</span> : null
-        case 'start': return task.start_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{formatDay(task.start_date, locale)}</span> : null
+        case 'due': return task.due_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{sheetDate(task.due_date, locale)}</span> : null
+        case 'start': return task.start_date ? <span className="fx-sheet-ellipsis fx-cs-tnum">{sheetDate(task.start_date, locale)}</span> : null
         case 'priority': {
           const pr = asPriority(task.priority)
           return pr && pr !== 'None' ? <span className="fx-sheet-ellipsis" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ color: priorityColor(pr) }}>⚑</span>{tPri(pr)}</span> : null

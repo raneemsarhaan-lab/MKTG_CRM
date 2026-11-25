@@ -10,7 +10,8 @@ import { useAddColumn } from '@/components/fields/useAddColumn'
 import { setMyColumns } from '@/actions/fields'
 import { fieldOnIn } from '@/lib/field-catalog'
 import { useMediaLinks } from '@/components/media/MediaLinks'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslations } from 'next-intl'
 import type { ContentTheme, LinkRole, StageId, Task } from '@/types/index'
 import { SheetMenu, SheetPopover, type MenuItem } from '@/components/sheet/SheetMenu'
@@ -22,7 +23,6 @@ import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
 import { buildContentRows, piecesIn, type ContentRow } from './rows'
-import { summariseContent } from './summary'
 import { ContentGrid, LINK_COLS, pieceLink } from './ContentGrid'
 import { ThemeEditor, NamePrompt } from './ThemeEditor'
 import { PlanPreview } from './PlanPreview'
@@ -123,7 +123,6 @@ export function ContentSheet(p: ContentSheetProps) {
   const recs = p.rows ?? []
   const childCount = (id: string) => recs.filter(r => r.parent_id === id).length
   const recOf = (row: ContentRow): ContentRowRec | null => (row.kind === 'line' ? row.rec : row.kind === 'piece' ? row.rec : null)
-  const summary = useMemo(() => summariseContent(p.themes.flatMap(th => piecesIn(p.tasks, th.id, p.rows))), [p.tasks, p.themes, p.rows])
 
   // ── permissions ─────────────────────────────────────────────────────────
   const canEdit = useCallback((task: Task) => task.task_owner_id === me.id || task.assignee_id === me.id || !!task.assignee_ids?.includes(me.id) || admin, [me.id, admin])
@@ -670,14 +669,21 @@ export function ContentSheet(p: ContentSheetProps) {
 
   // ── render ──────────────────────────────────────────────────────────────
   const linkTask = popup?.kind === 'link' ? p.tasks.find(x => x.id === popup.taskId) : undefined
+  // Sheet look: the workbook's formula bar offers a place for + Column and + Theme.
+  const sheetRootRef = useRef<HTMLDivElement>(null)
+  const [fbarSlot, setFbarSlot] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => { setFbarSlot(sheetRootRef.current?.closest('[data-workbook]')?.querySelector<HTMLElement>('[data-fbar-slot]') ?? null) }, [])
   const linkLabel = (col: LinkCol) => t(`links.${col}`)
 
   return (
-    <div className="fx-sheet" data-content-sheet="" data-mine={mine} data-archived={showArchived}>
+    <div className="fx-sheet" data-content-sheet="" data-mine={mine} data-archived={showArchived} ref={sheetRootRef}>
       {/* The header's third row on the Content tab (spec 011 R2): the sheet's
           own controls. Pipeline | Content are the header's tabs now. */}
-      <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar="">
-        <span className="fx-sheet-bar-gap" />
+      {/* Sheet look (25 Nov 2026): + Column and + Theme sit at the end of the workbook's formula bar; on their
+          own row only where there is none (outside a workbook). */}
+      {(() => {
+        const buttons = (
+          <>
         {/* User, 24 Nov 2026: the toolbar keeps + Column and + Theme only. The Fields button above opens
             the columns; Paste plan, Only my rows and Show archived are in the workbook's Data menu. */}
         <button type="button" className="fx-sheet-btn" data-add-column="" aria-haspopup="menu" onClick={e => openAddColumn(e.currentTarget)}>{ts('columns.add')}</button>
@@ -690,18 +696,14 @@ export function ContentSheet(p: ContentSheetProps) {
             })
           }}>{t('addTheme')}</button>
         )}
-      </div>
+          </>
+        )
+        return fbarSlot
+          ? createPortal(<span className="fx-fbar-sheet-tools" role="toolbar" aria-label={ts('view.label')} data-toolbar="">{buttons}</span>, fbarSlot)
+          : <div className="fx-sheet-bar" role="toolbar" aria-label={ts('view.label')} data-toolbar=""><span className="fx-sheet-bar-gap" />{buttons}</div>
+      })()}
 
-      <div className="fx-sheet-sum" data-summary="">
-        <span className="fx-sheet-sum-name">{p.space && p.space.key !== 'content' ? t('spaceTitle', { space: p.space.name }) : t('title')}</span>
-        <span><b>{t('summary.pieces', { count: summary.pieces })}</b></span>
-        <span>
-          {t('summary.published', { n: summary.published })}
-          {summary.noLink > 0 && <> <span className="fx-sheet-sum-bad">{t('summary.noLink', { n: summary.noLink })}</span></>}
-        </span>
-        <span>{t('summary.design', { n: summary.design })}</span>
-        <span>{t('summary.archived', { n: summary.archived })}</span>
-      </div>
+      {/* User, 25 Nov 2026: no summary line ("Content plan · 23 pieces · …") above the grid. */}
 
       {p.themes.length === 0
         ? <div className="fx-sheet-empty"><p>{admin ? t('noThemesAdmin') : t('noThemes')}</p></div>

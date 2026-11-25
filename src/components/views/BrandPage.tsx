@@ -129,6 +129,8 @@ export function BrandPage({ data, brandId, folder }: {
       fields={fieldsSetup(data, all)}
       lead={data.currentUser.access !== 'user'}
       fieldPicker={fv.picker(all)}
+      // The Sheet tab's own Fields (in the tabs row) sets its columns; the page's Fields is for the other views.
+      builtInFields={['board', 'list', 'calendar']}
       render={(tab, view, shownKeys) => {
         const shownTasks = view ? applyView(all, view.config, fv.valueOf) : all
         const ids = view ? new Set(shownTasks.map(x => x.id)) : null
