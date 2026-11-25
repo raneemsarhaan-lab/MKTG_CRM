@@ -20,6 +20,25 @@ const EMAIL = {
 async function signIn(browser, who) {
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 950 } })
   const page = await ctx.newPage()
+  // Sheets render only the rows near the viewport. A wait for a sheet cell or row scrolls the sheet down
+  // until it appears, so a check doesn't depend on how many other rows the lab database holds.
+  const wait = page.waitForSelector.bind(page)
+  page.waitForSelector = async (sel, opts = {}) => {
+    if (typeof sel !== 'string' || !/data-cell|data-row/.test(sel) || opts.state === 'detached' || opts.state === 'hidden') return wait(sel, opts)
+    const end = Date.now() + (opts.timeout ?? 30000)
+    let top = false
+    while (true) {
+      const left = end - Date.now()
+      try { return await wait(sel, { ...opts, timeout: Math.max(1, Math.min(left, 1500)) }) } catch (e) { if (left <= 1500) throw e }
+      await page.evaluate(first => {
+        for (const s of document.querySelectorAll('.fx-sheet-scroll')) {
+          if (first) { s.scrollTop = 0; continue }
+          s.scrollTop = s.scrollTop + s.clientHeight * 0.8 >= s.scrollHeight - s.clientHeight ? (s.scrollTop >= s.scrollHeight - s.clientHeight - 2 ? 0 : s.scrollHeight) : s.scrollTop + s.clientHeight * 0.8
+        }
+      }, !top).catch(() => {})
+      top = true
+    }
+  }
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
   page.on('console', m => { if (m.type() === 'error' && /MISSING_MESSAGE|FORMATTING_ERROR|Maximum update depth|unique "key"/.test(m.text())) errors.push(m.text().slice(0, 200)) })
@@ -60,6 +79,7 @@ const SCENARIOS = [
   ...require(path.join(__dirname, 'scenarios-fields.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-password-reset.cjs'))(EMAIL, psql, ok),
   ...require(path.join(__dirname, 'scenarios-027-views.cjs'))(EMAIL, psql, ok),
+  ...require(path.join(__dirname, 'scenarios-027-board-tab.cjs'))(EMAIL, psql, ok),
 ]
 
 ;(async () => {
@@ -67,7 +87,9 @@ const SCENARIOS = [
   const exe = process.env.LAB_CHROMIUM ?? (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined)
   const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--headless', '--no-sandbox'] } : {})
   let failed = 0
-  for (const sc of SCENARIOS.filter(s => !filters.length || filters.some(f => s.id.includes(f)))) {
+  // LAB_FROM=<id>: start at that scenario (to finish a run that was stopped part way).
+  const from = process.env.LAB_FROM ? SCENARIOS.findIndex(s => s.id === process.env.LAB_FROM) : 0
+  for (const sc of SCENARIOS.slice(Math.max(0, from)).filter(s => !filters.length || filters.some(f => s.id.includes(f)))) {
     const s = await signIn(browser, sc.as)
     try {
       // signInAs: a second member's page, for checks across people (e.g. private to-dos).

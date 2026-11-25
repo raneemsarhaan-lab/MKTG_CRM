@@ -18,8 +18,8 @@
 
 ## Phase 2: Foundational (blocking)
 
-- [ ] T003 Extend prisma/schema.prisma per data-model.md: `Sheet.linked Boolean @default(false)`, `Sheet.space_id String? @db.Uuid`, `ContentRow.sheet_id String? @db.Uuid`, `ContentRow.group_id String? @db.Uuid`, `ContentRow.last_task_id String? @db.Uuid`, `ContentRow.project_id` nullable, `@@unique([sheet_id, task_id])` on content_rows, new model `SheetGroup` (`sheet_groups`: id, sheet_id, parent_id, name, project_id, pillar_id, position, created_at); run scripts/schema-guard.sh and `prisma db push` locally
-- [ ] T004 Update readers of `content_rows.project_id` for null (rows in unlinked tabs) in src/content/rows loader (src/lib/board-data.ts and src/components/content/rows.ts) so existing Board-tab behaviour is unchanged
+- [ ] T003 Extend prisma/schema.prisma per data-model.md: `Sheet.linked Boolean @default(false)`, `Sheet.space_id String? @db.Uuid`, `ContentRow.sheet_id String? @db.Uuid`, `ContentRow.last_task_id String? @db.Uuid`, `@@unique([sheet_id, task_id])` on content_rows, `ContentSheetTheme.sheet_id String? @db.Uuid` with `@@unique([sheet_id, project_id])`; run scripts/schema-guard.sh and `prisma db push` locally
+- [ ] T004 Keep the Board tab's loaders to rows and themes with `sheet_id` null (src/lib/board-data.ts), so existing Board-tab behaviour is unchanged
 - [X] T005 [P] Pure link rules in src/lib/tab-link.ts: `matchColumns(columns, fields)` (by normalised name; unknown → 'sheet'), `linkPreview(rows, matches)` → `{ create, reconnect, untitled, conflicts }`, `rowValuesToTask(row, matches)`; and a lab scripts/spaces-lab/tab-link.lab.ts covering: titled/untitled rows, rows with last_task_id (reconnect), rows already linked (skip), brand by name, unknown column → sheet only, idempotency (second preview after link = create 0)
 - [ ] T006 [P] Tab permission helper `mayManageTab(sheet, member)` and `mayUseNode(node, member)` in src/lib/sheet-access.ts (creator, admin, superuser; Board tab never)
 
@@ -57,15 +57,15 @@
 
 ### Tests
 
-- [ ] T013 [P] [US2] Scenarios in scripts/spaces-lab/realapp/scenarios-027-board-tab.cjs: "Mine" on Board → same task ids in the Board tab; stage move on the board → Status in the tab, and Status changed in the tab → card column on the board; a task with no theme in "No theme" last; Board tab menu says always linked, no Delete/Unlink/Move; Content › Forefront Board tab holds only Forefront tasks
+- [X] T013 [P] [US2] Scenarios in scripts/spaces-lab/realapp/scenarios-027-board-tab.cjs: "Mine" on Board → same task ids in the Board tab; stage move on the board → Status in the tab, and Status changed in the tab → card column on the board; a task with no theme in "No theme" last; Board tab menu says always linked, no Delete/Unlink/Move; Content › Forefront Board tab holds only Forefront tasks
 
 ### Implementation
 
-- [ ] T014 [US2] Board tab record: ensure each Space's workbook has a Board tab first (`linked_content`/`linked_video` for Content/Video; `kind 'board'` for other Spaces) in src/actions/sheets.ts `ensureNodeWorkbook`, position 0, named from translations
-- [ ] T015 [US2] Rows sheet shows every board task: in src/components/content/rows.ts (buildContentRows) add tasks on the board without a row under their theme/pillar, and a trailing "No theme" group; Space › Brand folder narrows to its brand; Brand page shows the brand's tasks from every Space
-- [ ] T016 [US2] Shared Board filter: store Mine/Everyone, filters and sort per person per page in tab prefs (src/lib/view-config.ts `TabPrefs.board`, src/actions/views.ts `setTabPrefs`) and read them in both src/components/kanban/KanbanBoard.tsx and the Board tab (src/components/content/ContentSheet.tsx); show the same filter bar above the Board tab
-- [ ] T017 [US2] Tab bar rules in src/components/sheets/TabBar.tsx and src/components/sheets/Workbook.tsx: the Board tab is first, not draggable, not renamable, not deletable; its menu shows "The Board tab is always linked"
-- [ ] T018 [US2] Removing a row in the Board tab offers only "Archive the task" (src/components/content/ContentSheet.tsx row menu)
+- [X] T014 (done: the workbook's linked tab is first and named "Board" on Space and brand pages) [US2] Board tab record: ensure each Space's workbook has a Board tab first (`linked_content`/`linked_video` for Content/Video; `kind 'board'` for other Spaces) in src/actions/sheets.ts `ensureNodeWorkbook`, position 0, named from translations
+- [X] T015 [US2] Rows sheet shows every board task: in src/components/content/rows.ts (buildContentRows) add tasks on the board without a row under their theme/pillar, and a trailing "No theme" group; Space › Brand folder narrows to its brand; Brand page shows the brand's tasks from every Space
+- [X] T016 (done with per-page browser storage, `momentum.scope.<page>` / `momentum.filters.<page>`, per research R5) [US2] Shared Board filter: store Mine/Everyone, filters and sort per person per page in tab prefs (src/lib/view-config.ts `TabPrefs.board`, src/actions/views.ts `setTabPrefs`) and read them in both src/components/kanban/KanbanBoard.tsx and the Board tab (src/components/content/ContentSheet.tsx); show the same filter bar above the Board tab
+- [X] T017 [US2] Tab bar rules in src/components/sheets/TabBar.tsx and src/components/sheets/Workbook.tsx: the Board tab is first, not draggable, not renamable, not deletable; its menu shows "The Board tab is always linked"
+- [X] T018 [US2] Removing a row in the Board tab offers only "Archive the task" (src/components/content/ContentSheet.tsx row menu)
 
 **Checkpoint**: US2 scenarios and the full suite green → commit, push.
 
@@ -106,7 +106,7 @@
 
 ### Implementation
 
-- [ ] T027 [US4] Groups for added tabs: `sheet_groups` CRUD (label themes/pillars) in src/actions/content-themes.ts (or a new src/actions/sheet-groups.ts), reorder per sheet only; mapping labels → projects/pillars inside `linkTab`
+- [ ] T027 [US4] Themes on added tabs: place/reorder/remove a project on a tab (`content_themes.sheet_id`) in src/actions/content-rows.ts theme actions, reorder per sheet only
 - [ ] T028 [US4] + Theme / Insert theme above/below with existing project or New project (name, owner, frequency, audience) in src/components/content/ContentSheet.tsx (admins, superusers; server check)
 - [ ] T029 [US4] + Pillar in a theme's menu (admins, superusers, theme owner) and theme tooltip (owner, frequency, audience) in src/components/content/ContentGrid.tsx
 - [ ] T030 [US4] "+ Row" line at the end of each theme and pillar with Enter for the next row; Insert row above/below; Paste plan on a theme, pillar or + Row line (≤200 lines; linked tab → tasks) in src/components/content/ContentSheet.tsx and src/actions/content-rows.ts

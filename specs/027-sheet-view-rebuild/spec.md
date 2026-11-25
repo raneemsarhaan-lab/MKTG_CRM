@@ -23,7 +23,7 @@ Defaults proposed to the owner on 25 Nov 2026 and used unless the owner says oth
 - Q: What does a view tab's "…" menu hold? → A: Rename, Duplicate, Set as default, Delete, and also Pin and Hide (kept from today).
 - Q: Who adds, links, unlinks and deletes sheet tabs? → A: Anyone with access to the Space adds tabs. Linking, unlinking and deleting a tab is for the person who made it, admins and superusers.
 - Q: Video clips are their own tasks today. Are they subtasks? → A: Clips show as child rows of their video and stay their own tasks. No data changes for them.
-- Q: Does a theme in an unlinked tab create a project? → A: No. In an unlinked tab themes and pillars are plain labels. Linking the tab maps them to projects (existing ones by name, or new ones after confirmation).
+- Q: Does a theme in an unlinked tab create a project? → A: Revised 25 Nov 2026 during planning, to follow the owner's prompt literally (§5: "Theme … mapped to a project"): a theme in any tab is a project, picked from the existing ones or created by an admin or superuser, as in the Board tab. (The earlier default, plain labels in unlinked tabs, would have needed a second grouping system.)
 - Q: What about old Sheets tabs with no matching Space? → A: They are listed in the conversion report, and the owner says where each goes before anything moves.
 - Q: Which data does the conversion's dry run use? → A: A fresh backup of live, taken just before; yesterday's backup is out of date.
 
@@ -217,7 +217,7 @@ The Content sheet becomes the Content Space's Board tab and the Video sheet the 
 - **FR-034**: Dragging themes and pillars MUST reorder this sheet only, not the projects.
 - **FR-035**: Deleting a theme or pillar MUST ask where its rows go; rows MUST NOT be deleted with their group, and the project MUST stay.
 - **FR-036**: Deleting a parent row MUST ask whether its child rows move up a level or are deleted with it.
-- **FR-037**: In an unlinked tab, themes and pillars MUST be plain labels; linking the tab MUST map them to projects (existing by name, or new after confirmation).
+- **FR-037**: In every tab (linked or not), a theme MUST be a project and a pillar one of its pillars, picked or created as in FR-029 and FR-030.
 - **FR-038**: Video clips MUST show as child rows of their video and stay their own tasks.
 
 **Columns (§6)**
@@ -244,7 +244,7 @@ The Content sheet becomes the Content Space's Board tab and the Video sheet the 
 - **Workbook**: the Sheet view of one page (Space, Space › Brand folder, Brand page, My tasks); holds its sheet tabs in order.
 - **Sheet tab**: one tab of a workbook; Board (always linked, first) or added; linked or unlinked; has a creator.
 - **Row**: a line in a tab; plain or linked; may sit under a theme and pillar; may be a child of another row; a linked row points to a task, and an unlinked tab remembers the task a row had.
-- **Theme group / Pillar group**: the groups in a tab; in a linked tab mapped to a project and one of its pillars; plain labels in an unlinked tab.
+- **Theme group / Pillar group**: the groups in a tab: a project placed on the tab, and one of its pillars.
 - **Column**: a standard field, a custom field or a sheet-only column; its layout is kept per person and per tab.
 - **Conversion report**: every old tab, its destination, and before/after counts.
 

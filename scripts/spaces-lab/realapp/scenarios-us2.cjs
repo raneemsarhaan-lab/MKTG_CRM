@@ -74,7 +74,8 @@ module.exports = (EMAIL, psql, ok) => {
     {
       id: 'us2-my-tasks', as: 'content',
       async run({ page, go }) {
-        await go('/me')
+        // The page reopens on the view used last (spec 027), so ask for the List.
+        await go('/me?view=list')
         const me = psql(`select id from members where role='Content Creator'`)
         const want = psql(`select count(*) from tasks where dropped_at is null and (assignee_id='${me}' or (task_owner_id='${me}' and assignee_id is distinct from '${me}'))`)
         const rows = await page.$$eval('[data-my-tasks] [data-row]', els => els.length)

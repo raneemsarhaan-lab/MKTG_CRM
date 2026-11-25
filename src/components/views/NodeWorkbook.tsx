@@ -113,6 +113,8 @@ export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
         initialSheetId={tab && /^[0-9a-f-]{36}$/i.test(tab) ? tab : null}
         initialCell={cell && cell.length < 200 ? cell : null}
         inPage
+        // Spec 027 (US2): a Space's (or brand's) first tab is its Board tab; My tasks keeps its Tasks tab.
+        boardTabName={node === 'me' ? undefined : t('boardTab')}
       />
     </div>
   )

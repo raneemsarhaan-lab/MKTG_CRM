@@ -18,8 +18,6 @@ Rules: the Board tab is first (`position 0`), can't be moved, renamed away from 
 | Field | Change | Meaning |
 |---|---|---|
 | sheet_id | **new** UUID, nullable | The added tab this row is in. Null: the Space's Board tab (as today). |
-| group_id | **new** UUID, nullable | The label group (unlinked tab) the row sits under |
-| project_id | **relaxed** to nullable | Theme (project) of a row in the Board tab or a linked tab; null in an unlinked tab |
 | last_task_id | **new** UUID, nullable | The task a row was linked to before "Unlink row" / "Unlink from board"; used to reconnect without duplicates |
 | task_id, pillar_id, parent_id, title, values, position | existing | As today |
 
@@ -38,21 +36,17 @@ remembered (last_task_id = T)
   └─ tab linked / Make task ──► linked (task_id = T, reconnected; no new task)
 ```
 
-## SheetGroup (table `sheet_groups`) — **new**: theme/pillar labels of an unlinked tab
+## ContentSheetTheme (table `content_themes`) — a theme placed on a tab
 
-| Field | Meaning |
-|---|---|
-| id, sheet_id | The tab |
-| parent_id | Null = theme; set = pillar under that theme |
-| name | Label |
-| project_id, pillar_id | Set when the tab is linked (mapped to a project and pillar), else null |
-| position | Order in this sheet only |
+| Field | Change | Meaning |
+|---|---|---|
+| sheet_id | **new** UUID, nullable | The added tab this theme is placed on. Null: the Space's Board tab (as today, with `space_id`). |
 
-Linking a tab maps each theme label to a project by name (existing) or a new project after confirmation, and each pillar label to a pillar of that project; rows get `project_id`/`pillar_id` from their groups.
+Constraints: unique `(space_id, project_id)` stays; tab themes carry `space_id = NULL` and a new unique `(sheet_id, project_id)`. Order (`position`) and pillar order are per tab, so dragging reorders this sheet only.
 
 ## Per-person layout
 
-Existing `members.sheet_layouts` (`{ viewKey: { cols, widths } }`) gains keys per tab (`tab:<sheetId>`), plus `sort`, `group` and `collapsed` per key. Shared Mine/Everyone and Board filters live in the member's tab prefs for the page (`viewPrefs[node].board`), read by both the Board view and the Board tab.
+Existing `members.sheet_layouts` (`{ viewKey: { cols, widths } }`) gains keys per tab (`tab:<sheetId>`), plus `sort`, `group` and `collapsed` per key. Shared Mine/Everyone and Board filters are kept per page on the person's device (browser storage `momentum.scope.<page>` / `momentum.filters.<page>`, where Mine/Everyone already lived), read by both the Board view and the Board tab. Moving them to the server (member prefs) is a follow-up if they must follow a person across devices.
 
 ## Views (Stage A)
 

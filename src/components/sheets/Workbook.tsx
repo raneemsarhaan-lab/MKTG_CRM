@@ -67,6 +67,8 @@ export interface WorkbookProps {
   linked?: ReactNode
   /** Spec 026: shown inside a Space, brand or My tasks page (no Sheets section to go back to). */
   inPage?: boolean
+  /** Spec 027 (US2): the first, linked tab's name on a Space or brand page ("Board"). */
+  boardTabName?: string
   initialSheetId?: string | null
   /** Spec 015: a notification's cell to open, `rowKey:colKey`. */
   initialCell?: string | null
@@ -431,7 +433,9 @@ export function Workbook(p: WorkbookProps) {
 
   // ── names ───────────────────────────────────────────────────────────────
   const folderName = folder.kind === 'content' ? t('folder.content') : folder.kind === 'video' ? t('folder.video') : folder.name ?? ''
-  const nameOf = useCallback((s: SheetSummary) => (s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.kind === 'linked_tasks' ? t('sheet.tasks') : s.name ?? ''), [t])
+  const boardTabName = p.boardTabName
+  const nameOf = useCallback((s: SheetSummary) => (boardTabName && (s.kind === 'linked_content' || s.kind === 'linked_video' || s.kind === 'linked_tasks') ? boardTabName
+    : s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.kind === 'linked_tasks' ? t('sheet.tasks') : s.name ?? ''), [t, boardTabName])
   const pattern = t.raw('sheet.defaultName') as string
 
   // ── tabs ────────────────────────────────────────────────────────────────
@@ -662,13 +666,16 @@ export function Workbook(p: WorkbookProps) {
     const protectItem: PopItem = s.protectedBy
       ? { key: 'unprotect', label: t('tabMenu.unprotect'), ...(single && mayUnprotect(s) ? {} : no(t('tabMenu.why.notProtector'))), onSelect: () => void protect(id, false) }
       : { key: 'protect', label: t('tabMenu.protect'), ...(s.kind !== 'blank' ? no(t('tabMenu.why.linked')) : !single ? { disabled: true } : {}), onSelect: () => setDialog({ kind: 'protect', id }) }
+    // Spec 027 (US2): the Board tab is always linked, first and fixed.
+    const isBoardTab = !!boardTabName && s.kind !== 'blank'
     const items: PopItem[] = [
+      ...(isBoardTab ? [{ key: 'alwaysLinked', label: t('tabMenu.alwaysLinked'), disabled: true, onSelect: () => {} } as PopItem, { kind: 'sep', key: 'sb' } as PopItem] : []),
       // Spec 020 stage C: File › Print (the open sheet).
       ...(id === openId ? [{ key: 'print', label: `${tt('print.title')}…`, kbd: 'Ctrl+P', onSelect: () => sendFormat(open?.kind === 'blank' ? 'blank' : 'linked', { kind: 'print' }) } as PopItem, { kind: 'sep', key: 'sp' } as PopItem] : []),
       { key: 'insert', label: t('tabMenu.insert'), onSelect: () => void createSheet({ before: id }) },
       { key: 'delete', label: t('tabMenu.delete'), danger: true, ...del, onSelect: () => setDialog({ kind: 'delete', ids }) },
       { key: 'rename', label: t('tabMenu.rename'), kbd: 'F2', ...(s.kind !== 'blank' ? no(t('tabMenu.why.linked')) : !single ? { disabled: true } : {}), onSelect: () => setRenaming(id) },
-      { key: 'moveCopy', label: t('tabMenu.moveCopy'), onSelect: () => setDialog({ kind: 'moveCopy', ids }) },
+      { key: 'moveCopy', label: t('tabMenu.moveCopy'), ...(isBoardTab ? no(t('tabMenu.alwaysLinked')) : {}), onSelect: () => setDialog({ kind: 'moveCopy', ids }) },
       protectItem,
       { kind: 'node', key: 'color', node: swatches },
       { kind: 'sep', key: 's1' },

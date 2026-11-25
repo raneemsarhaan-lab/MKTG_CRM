@@ -43,7 +43,7 @@ The approach extends what exists rather than replacing it: the Space's rows shee
 | V. Cultural UX | No change to celebrations; Arabic for all new strings | Pass |
 | VI. State Architecture & Persistence | Per-person layouts and the shared Mine/Everyone choice persist server-side (member prefs), not only in local storage | Pass |
 
-Post-design re-check: Pass (no new violations; one schema relaxation, `content_rows.project_id` DROP NOT NULL, is additive under the guard and justified in Complexity Tracking).
+Post-design re-check: Pass (additive schema only: new columns and uniques; nothing relaxed or dropped).
 
 ## Project Structure
 
@@ -64,7 +64,7 @@ specs/027-sheet-view-rebuild/
 ### Source Code (repository root)
 
 ```text
-prisma/schema.prisma                 # Sheet.linked, Sheet.space_id, ContentRow.sheet_id/group_id/last_task_id, SheetGroup
+prisma/schema.prisma                 # Sheet.linked, Sheet.space_id, ContentRow.sheet_id/last_task_id, ContentSheetTheme.sheet_id
 src/actions/
 ├── views.ts                         # rename / duplicate saved views (A)
 ├── sheet-tabs.ts                    # NEW: add, rename, duplicate, delete, link, unlink, link preview (B)
@@ -99,5 +99,4 @@ Each stage ends with its scenarios, the full suite, a commit and a push to the b
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| `content_rows.project_id` becomes nullable (DROP NOT NULL) | Rows in an unlinked tab sit under label groups, not projects | A separate row table for tabs would duplicate the whole rows feature (Make task, child rows, paste, values) and its tests |
 | Unique `(space_id, task_id)` on rows kept, rows in added tabs carry `space_id = NULL` and a new unique `(sheet_id, task_id)` | A task can be in several linked tabs (FR-015) but once per tab | Dropping the existing unique would need a destructive index change and lose the Board tab's one-row-per-task rule |

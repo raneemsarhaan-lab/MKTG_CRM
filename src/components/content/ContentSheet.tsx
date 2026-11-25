@@ -22,7 +22,7 @@ import { looksLikeRows, cellsFromText, type PastedCell } from '@/components/shee
 import { useSkipText } from '@/components/sheet/skip-text'
 import type { ActiveCell, GridCol } from '@/components/sheet/GridCore'
 import { isWebLink } from '@/lib/content-plan'
-import { buildContentRows, piecesIn, type ContentRow } from './rows'
+import { buildContentRows, isReadOnlyTheme, piecesIn, type ContentRow } from './rows'
 import { ContentGrid, LINK_COLS, pieceLink } from './ContentGrid'
 import { ThemeEditor, NamePrompt } from './ThemeEditor'
 import { PlanPreview } from './PlanPreview'
@@ -117,7 +117,8 @@ export function ContentSheet(p: ContentSheetProps) {
 
   const rows = useMemo(() => buildContentRows(p.tasks, p.themes, {
     mine, showArchived, me: me.id, collapsed: groupMode === 'theme' ? collapsed : noneCollapsed, expanded, drafts, query: p.query, recs: p.rows,
-  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows])
+    boardTasks: p.boardTasks, boardFiltered: p.boardFiltered, noThemeLabel: t('noTheme'),
+  }), [p.tasks, p.themes, mine, showArchived, me.id, collapsed, groupMode, noneCollapsed, expanded, drafts, p.query, p.rows, p.boardTasks, p.boardFiltered, t])
   /** Sheet 2b: rows live on the server when the host has them; otherwise every piece is a row. */
   const rowsOn = !!p.rows && !!p.api.addRow
   const recs = p.rows ?? []
@@ -263,10 +264,12 @@ export function ContentSheet(p: ContentSheetProps) {
         items.push({ key: 'task', text: t('rows.makeTask'), label: t('rows.makeTask'), onSelect: pick(() => void p.api.rowToTask?.(rec.id).then(r => ok(r, t('rows.taskMade')))) })
         items.push({ key: 'link', text: t('rows.linkTask'), label: t('rows.linkTask'), onSelect: () => setPopup({ kind: 'linkTask', anchor, rec }) })
       }
-    } else if (editable && p.api.unlinkRow) {
+    } else if (editable && p.api.unlinkRow && !p.boardTasks) {
       items.push({ key: 'unlink', text: t('rows.unlink'), label: t('rows.unlink'), onSelect: pick(() => void p.api.unlinkRow!(rec.id).then(r => ok(r, t('rows.unlinked')))) })
     }
-    if (editable) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
+    // Spec 027 (US2): the Board tab lists every task on the board, so a task's row there is only archived
+    // (Archive the task); a plain row (an idea) can still be deleted.
+    if (editable && !(p.boardTasks && rec.task_id)) items.push({ key: 'delete', text: t('rows.delete'), label: t('rows.delete'), tone: 'danger', onSelect: () => askDelete(rec, row.kind === 'piece' ? row.task.name : rec.title, anchor) })
     return items
   }
   /** Tab makes a row a child of the row above; Shift+Tab moves it back out (on the row's number). */
@@ -281,12 +284,14 @@ export function ContentSheet(p: ContentSheetProps) {
   type Where = 'before' | 'after' | 'on'
   const rowDrag = rowsOn ? {
     can: (row: ContentRow) => {
-      if (row.kind === 'theme') return admin
+      if (row.kind === 'theme') return admin && !isReadOnlyTheme(row.theme.id)
       if (row.kind === 'pillar') return mayEditTheme(row.theme)
       const rec = recOf(row)
       return !!rec && canEditRec(rec)
     },
     accepts: (from: ContentRow, to: ContentRow, where: Where) => {
+      const inNone = (r: ContentRow) => 'theme' in r && isReadOnlyTheme(r.theme.id)
+      if (inNone(to) || inNone(from)) return false
       if (from.kind === 'theme') return to.kind === 'theme' && where !== 'on'
       if (from.kind === 'pillar') return to.kind === 'pillar' && to.theme.id === from.theme.id && where !== 'on'
       const rec = recOf(from)
@@ -424,6 +429,8 @@ export function ContentSheet(p: ContentSheetProps) {
     if (col === 'media') { if (row.kind === 'piece') ml.open(row.task, anchor); return }
     const menu = (label: string, items: MenuItem[]) => { if (items.length) setPopup({ kind: 'menu', label, anchor, items }) }
     const pick = (fn: () => void) => () => { closePopup(true); fn() }
+    // Spec 027: the Board tab's "No theme" group is not a project: no menu.
+    if (row.kind === 'theme' && isReadOnlyTheme(row.theme.id)) return
     if (row.kind === 'theme') {
       const th = row.theme
       const items: MenuItem[] = []
@@ -705,7 +712,7 @@ export function ContentSheet(p: ContentSheetProps) {
 
       {/* User, 25 Nov 2026: no summary line ("Content plan · 23 pieces · …") above the grid. */}
 
-      {p.themes.length === 0
+      {p.themes.length === 0 && !p.boardTasks?.length
         ? <div className="fx-sheet-empty"><p>{admin ? t('noThemesAdmin') : t('noThemes')}</p></div>
         : (
           <div className="fx-sheet-scroll">

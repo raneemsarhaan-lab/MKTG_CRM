@@ -10,7 +10,7 @@ All decisions below resolve the Technical Context; no NEEDS CLARIFICATION remain
 
 ## R2. Added tabs
 
-- **Decision**: "+" adds a `sheets` record of `kind 'rows'` with `linked = false`. Its rows are `content_rows` with `sheet_id` set and `space_id` NULL (so the Board tab's unique `(space_id, task_id)` doesn't apply), unique `(sheet_id, task_id)`. Groups in an unlinked tab are `sheet_groups` labels; in a linked tab they map to projects and pillars.
+- **Decision**: "+" adds a `sheets` record of `kind 'rows'` with `linked = false`. Its rows are `content_rows` with `sheet_id` set and `space_id` NULL (so the Board tab's unique `(space_id, task_id)` doesn't apply), unique `(sheet_id, task_id)`. Themes are projects in every tab (the owner's prompt, §5), placed on a tab by `content_themes.sheet_id`, so the Board tab's themes, pillars and rows code serves every tab.
 - **Rationale**: One row model for every tab, so linking, Make task, child rows and paste behave the same everywhere.
 - **Alternatives**: A separate `tab_rows` table (rejected: duplication); blank spreadsheet tabs as the only added tab (rejected: no groups, no child rows).
 
@@ -27,7 +27,7 @@ All decisions below resolve the Technical Context; no NEEDS CLARIFICATION remain
 
 ## R5. Shared Mine/Everyone and filters
 
-- **Decision**: The Board view's filter state (Mine/Everyone, filters, sort) is stored per person per page in their tab prefs (server) and in a page-level store; the Board tab reads the same state and applies the same predicate (`scope` in SpacePage + KanbanBoard filters).
+- **Decision**: The Board view's Mine/Everyone and filters are kept per page in the person's browser storage (where Mine/Everyone already lived); the Board tab reads the same keys and applies the same predicate (`scope` + `applyBoardFilters`). Server-side prefs are a follow-up if needed across devices.
 - **Rationale**: FR-010/SC-002 need one source of truth, not two filters that happen to match.
 
 ## R6. Live updates

@@ -144,17 +144,19 @@ export function TabBar(p: TabBarProps) {
                 tabIndex={s.id === focusId ? 0 : -1}
                 data-sheet-tab={s.id}
                 className={`fx-sh-tab${p.grouped.has(s.id) && p.grouped.size > 1 ? ' is-grouped' : ''}${drag?.id === s.id ? ' is-dragging' : ''}`}
-                draggable
+                // Spec 027 (US2): the linked first tab (Board) stays first: it isn't dragged, and nothing drops before it.
+                draggable={!linked}
                 onClick={e => p.onOpen(s.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
                 onDoubleClick={() => { if (!linked) p.onRenameStart(s.id) }}
                 onKeyDown={e => onTabKey(e, s, i)}
                 onFocus={() => setFocusId(s.id)}
                 onContextMenu={e => { e.preventDefault(); p.onMenu(s.id, { x: e.clientX, y: e.clientY }, e.currentTarget) }}
                 onDragStart={e => { setDrag({ id: s.id, before: null, copy: false }); e.dataTransfer.effectAllowed = 'copyMove'; e.dataTransfer.setData('text/plain', s.id) }}
-                onDragOver={e => dragOver(e, s)}
+                onDragOver={linked ? undefined : e => dragOver(e, s)}
                 onDrop={drop}
                 onDragEnd={() => setDrag(null)}
               >
+                {linked && <svg className="fx-sh-tablink" data-tab-linked="" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={t('sheet.linkedTab')}><title>{t('sheet.linkedTab')}</title><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>}
                 <span className="fx-sh-tabname">{p.nameOf(s)}</span>
                 {s.protectedBy && <><span className="fx-sh-tabicon" title={t('sheet.protected')} aria-hidden="true">🔒</span><span className="sr-only">{t('sheet.protected')}</span></>}
                 <span className="fx-sh-caret" aria-hidden="true"

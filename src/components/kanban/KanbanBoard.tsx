@@ -247,6 +247,8 @@ function KanbanBoardInner({
    * here; written below with the history API like ?view and ?task. Inside a
    * Sheets folder the address is the folder's, so they stay local there.
    */
+  /** Spec 027 (US2): the page this board is on (a Space or brand), for the choices its views share. */
+  const pageKey = boardKey ?? spaceId ?? null
   const [filters, setFilters] = useState<BoardFilterState>(() =>
     filtersFromParams(surface === 'sheets' ? new URLSearchParams() : searchParams))
 
@@ -297,6 +299,22 @@ function KanbanBoardInner({
     }
     if (changed) window.history.replaceState(null, '', url)
   }, [view, sheetVideo, sheetRow])
+  // Spec 027 (US2): the page's Board filters are kept per page on this device, so the Board view and the
+  // sheet's Board tab filter the same way.
+  const filtersKey = pageKey ? `momentum.filters.${pageKey}` : null
+  const filtersLoaded = useRef(false)
+  useEffect(() => {
+    if (!filtersKey) return
+    if (!filtersLoaded.current) {
+      filtersLoaded.current = true
+      try {
+        const stored = window.localStorage.getItem(filtersKey)
+        const fromUrl = !embedded && activeFilterCount(filtersFromParams(searchParams)) > 0
+        if (stored && !fromUrl) { setFilters(filtersFromParams(new URLSearchParams(stored))); return }
+      } catch { /* private mode */ }
+    }
+    try { const u = new URL('http://x/'); writeFiltersToUrl(u, filters); window.localStorage.setItem(filtersKey, u.search.slice(1)) } catch { /* private mode */ }
+  }, [filters, filtersKey]) // eslint-disable-line react-hooks/exhaustive-deps
   // replaceState, not pushState: a filter is a refinement of this page, not
   // a place to go Back to. Typing in search is debounced, and the write is
   // guarded, because Safari throws once a page replaces its history too often.
@@ -387,8 +405,9 @@ function KanbanBoardInner({
    */
   // Spec 021: a hosted Board (a Space, a brand) starts on Everyone — the page
   // is already the narrowing — and remembers its own choice apart from /board.
-  const scopeKey = hosted ? 'momentum.view.scope' : 'momentum.board.scope'
-  const [scope, setScope] = useState<'me' | 'team'>(hosted ? 'team' : 'me')
+  // Spec 027 (US2): a Space or brand page's Board view and its sheet's Board tab share one choice.
+  const scopeKey = pageKey ? `momentum.scope.${pageKey}` : hosted ? 'momentum.view.scope' : 'momentum.board.scope'
+  const [scope, setScope] = useState<'me' | 'team'>(hosted || pageKey ? 'team' : 'me')
   useEffect(() => {
     try {
       const v = window.localStorage.getItem(scopeKey)
@@ -1310,10 +1329,30 @@ function KanbanBoardInner({
   const sheetSpaceId = sheetSpace?.id ?? null
   sheetSpaceRef.current = sheetSpaceId
   if (view === 'content' || view === 'sheet') {
+    // Spec 027 (US2): in a Space, the sheet's Board tab lists the board's tasks under the Board's own filter
+    // (Mine / Everyone and Filters, shared with the Board view), and shows that filter bar above it.
+    const boardTab = !!spaceId
+    const isMine = (t: FullTask) => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id)
+    const boardTasks = boardTab
+      ? applyBoardFilters(tasks.filter(t => (scopeTasks ? scopeTasks(t) : true) && (scope !== 'me' || isMine(t))), filters, { currentUserId: currentUser.id, slaConfig, today })
+      : undefined
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
         {!embedded && !hosted && header}
+        {boardTab && (
+          <div className="fx-board-tab-bar" data-board-tab-filters="">
+            <BoardToolbar
+              scope={scope} onScope={chooseScope} brands={brands}
+              hideBrands={!!spaceId || !!boardKey?.startsWith('brand:')}
+              brandIds={filters.brandIds} onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
+              noProject={null}
+              filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
+              sort={null} view="board" onView={() => {}} display={null} noViewPair />
+          </div>
+        )}
         <ContentSheet
+          boardTasks={boardTasks}
+          boardFiltered={boardTab && (scope === 'me' || activeFilterCount(filters) > 0)}
           stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
           tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
           themes={(themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}

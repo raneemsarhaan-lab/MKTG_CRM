@@ -3537,3 +3537,7 @@ a.fx-sheet-open:hover { color: var(--sheet-ink); }
 .fx-sheet-th .fx-fd-ic svg { width: 13px; height: 13px; }
 /* A sheet inside the workbook's pane fills the pane, never the whole screen. */
 .fx-sh-linkedpane > .fx-sheet { flex: 1; height: auto; min-height: 0; }
+/* Spec 027 (US2): the Board's filter bar above the sheet's Board tab. */
+.fx-board-tab-bar { flex: none; padding: 8px 16px 6px; }
+.fx-board-tab-bar .fx-hd-tools { padding: 0; }
+.fx-sh-tablink { flex: none; margin-inline-end: 5px; vertical-align: -2px; color: #6B7080; }

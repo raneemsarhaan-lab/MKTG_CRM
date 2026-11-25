@@ -991,7 +991,8 @@
       "moved": "Theme moved (this sheet only).",
       "removed": "Theme removed from the sheet."
     },
-    "spaceTitle": "{space} plan"
+    "spaceTitle": "{space} plan",
+    "noTheme": "No theme"
   },
   "inbox": {
     "button": {
@@ -1415,7 +1416,8 @@
       "copyName": "{name} ({n})",
       "linkedTitle": "Linked to the board",
       "protected": "Protected",
-      "tasks": "Tasks"
+      "tasks": "Tasks",
+      "linkedTab": "Linked to the board"
     },
     "crumb": "Sheets",
     "status": {
@@ -1525,7 +1527,8 @@
         "lastVisible": "A folder keeps one visible sheet.",
         "noHidden": "No hidden sheets.",
         "notProtector": "Only the person who protected it, or an admin, can unprotect it."
-      }
+      },
+      "alwaysLinked": "The Board tab is always linked."
     },
     "moveCopy": {
       "title": "Move or Copy",
@@ -3361,7 +3364,8 @@
     "assetsSub": "The brand's files: logos, templates, photos and finished designs.",
     "settingsSub": "How this brand's work is set up. Admins only.",
     "workbookSlow": "This sheet is taking too long to open.",
-    "workbookRetry": "Try again"
+    "workbookRetry": "Try again",
+    "boardTab": "Board"
   },
   "views": {
     "list": "List",

@@ -11,8 +11,9 @@ module.exports = (EMAIL, psql, ok) => {
     return id
   }
   const typeInto = async (page, taskId, col, text) => {
-    const row = page.locator(`[data-task-sheet] [data-cell$="${taskId}|${col}"]`).first()
-    await row.click()
+    const sel = `[data-task-sheet] [data-cell$="${taskId}|${col}"]`
+    await page.waitForSelector(sel, { timeout: 60000 })
+    await page.locator(sel).first().click()
     await page.keyboard.type(text)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(1500)

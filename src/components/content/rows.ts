@@ -60,7 +60,26 @@ export interface ContentRowOptions {
   query?: string
   /** Sheet 2b: the sheet's rows. Without them every piece is a row, in date order (the sheet before 2b). */
   recs?: readonly ContentRowRec[]
+  /**
+   * Spec 027 (US2): the Board tab — every task on the board (after the Board's own filter). A theme then
+   * lists its board tasks whether or not they have a row, a row whose task is filtered out hides, and the
+   * tasks with no theme on this sheet close the sheet in a "No theme" group.
+   */
+  boardTasks?: readonly Task[]
+  /**
+   * The Board's Mine or a filter is on. Only then do rows and pieces whose task the Board hides hide too;
+   * otherwise the sheet keeps every row it has (a row whose task moved on to another board stays).
+   */
+  boardFiltered?: boolean
+  noThemeLabel?: string
 }
+
+/**
+ * The Board tab's read-only groups: "No theme", and `__none:<project id>` for a theme of another Space's
+ * sheet. Not themes of this sheet, so no menu, no dragging and no "+ Row".
+ */
+export const NO_THEME_ID = '__none'
+export const isReadOnlyTheme = (id: string) => id === NO_THEME_ID || id.startsWith(`${NO_THEME_ID}:`)
 
 /**
  * Theme, then each pillar with its rows and "+ Row", then rows with no pillar
@@ -74,9 +93,19 @@ export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: Conte
   const byId = new Map(tasks.map(t => [t.id, t]))
   const recs = o.recs ?? []
   const shownTask = (t: Task) => (o.showArchived || !t.dropped_at) && (!o.mine || t.task_owner_id === o.me || t.assignee_id === o.me || !!t.assignee_ids?.includes(o.me))
+  const onBoard = o.boardTasks ? new Set(o.boardTasks.map(t => t.id)) : null
+  /** The Board's filter hides this task (only while Mine or a filter is on). */
+  const hidden = (id: string) => !!(o.boardFiltered && onBoard && !onBoard.has(id))
+  const boardVideos = o.boardTasks ? new Set(o.boardTasks.filter(isVideoTask).map(t => t.id)) : null
+  /** A board task that is a row of its own (clips follow their video). */
+  const ownRow = (t: Task) => !(t.parent_task_id && boardVideos?.has(t.parent_task_id))
+  const placed = new Set<string>()
   for (const theme of themes) {
-    const pieces = piecesIn(tasks, theme.id, o.recs)
-    const mineRecs = recs.filter(r => r.project_id === theme.id)
+    const pieces = o.boardTasks
+      ? [...new Map([...piecesIn(tasks, theme.id, o.recs).filter(t => !hidden(t.id)), ...o.boardTasks.filter(t => t.project_id === theme.id && ownRow(t))].map(t => [t.id, t])).values()]
+      : piecesIn(tasks, theme.id, o.recs)
+    for (const t of pieces) placed.add(t.id)
+    const mineRecs = recs.filter(r => r.project_id === theme.id && (!r.task_id || !hidden(r.task_id)))
     const linkedIds = new Set(mineRecs.map(r => r.task_id).filter(Boolean) as string[])
     // Without rows (the sheet before 2b): every piece of the theme is a row. With rows, the sheet
     // shows only what was put on it — never the project's tasks from other Spaces.
@@ -142,6 +171,34 @@ export function buildContentRows(tasks: Task[], themes: ContentTheme[], o: Conte
     }
     emit(tops(null), draftsFor(null, null), 0, children)
     rows.push({ kind: 'add', key: `a:${theme.id}`, theme, pillarId: null, parentId: null })
+  }
+  // Spec 027 (US2): the board's tasks with no theme on this sheet, last.
+  if (o.boardTasks) {
+    for (const r of recs) if (r.task_id) placed.add(r.task_id)
+    const loose = o.boardTasks.filter(t => ownRow(t) && !placed.has(t.id) && shownTask(t) && (!q || matchesQuery(t.name, q))).sort(comparePieces)
+    // Grouped by their theme's project when it has one (a theme of another Space's sheet: read only here),
+    // then the tasks with no theme at all.
+    const groups = new Map<string, { name: string; list: Task[] }>()
+    for (const t of loose) {
+      const name = (t as Task & { project?: { name?: string } | null }).project?.name
+      const key = t.project_id && name ? `${NO_THEME_ID}:${t.project_id}` : NO_THEME_ID
+      const g = groups.get(key) ?? { name: key === NO_THEME_ID ? o.noThemeLabel ?? 'No theme' : name!, list: [] }
+      g.list.push(t)
+      groups.set(key, g)
+    }
+    const ordered = [...groups].sort((a, b) => (a[0] === NO_THEME_ID ? 1 : b[0] === NO_THEME_ID ? -1 : a[1].name.localeCompare(b[1].name)))
+    for (const [id, g] of ordered) {
+      const theme: ContentTheme = { id, name: g.name, brand_id: null, owner_id: null, frequency_count: null, frequency_period: null, audience: [], pillars: [] }
+      const collapsed = o.collapsed.has(id)
+      rows.push({ kind: 'theme', key: `t:${id}`, theme, pieces: g.list, collapsed, n: n++, lines: 0 })
+      if (collapsed) continue
+      for (const t of g.list) {
+        const clips = isVideoTask(t) ? clipsOf(tasks, t.id) : []
+        const expanded = clips.length > 0 && o.expanded.has(t.id)
+        rows.push({ kind: 'piece', key: `k:${t.id}`, task: t, theme, clips, expanded, n: n++, rec: null, depth: 0 })
+        if (expanded) for (const c of clips) if (o.showArchived || !c.dropped_at) rows.push({ kind: 'clip', key: `q:${c.id}`, task: c, video: t, theme, n: n++ })
+      }
+    }
   }
   return rows
 }

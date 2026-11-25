@@ -42,6 +42,10 @@ export interface ContentApi extends SheetApi {
 }
 
 export interface ContentSheetProps {
+  /** Spec 027 (US2): the Board tab — the board's tasks after its own filter; every one is listed. */
+  boardTasks?: import('@/types/index').Task[]
+  /** The Board's Mine or a filter is on: rows whose task it hides hide too. */
+  boardFiltered?: boolean
   /** Fields (25 Nov 2026): the field system here — promoted fields, each person's columns, the Space and the library. */
   fieldSystem?: {
     promoted: string[]
