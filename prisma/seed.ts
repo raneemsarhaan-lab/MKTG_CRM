@@ -554,6 +554,14 @@ async function main() {
     return `${r.merged} copies folded back${what ? ` (moved: ${what})` : ''}`
   })
 
+  // Fields clean-up (owner's approval, 25 Nov 2026, after the read-only report): Platform is copied into
+  // an empty Channels (LinkedIn → LinkedIn). Channels already set is left alone; Platform stays.
+  await once('platform-to-channels-v1', 'copied Platform into empty Channels', async () => {
+    const { platformToChannels } = await import('../src/lib/fields-cleanup')
+    const r = await platformToChannels(prisma)
+    return `${r.copied} tasks given their Platform as Channels${r.noMatch ? `, ${r.noMatch} with no matching choice left as they were` : ''}`
+  })
+
   // Workspace settings
   await prisma.workspaceSettings.upsert({
     where:  { id: 1 },
