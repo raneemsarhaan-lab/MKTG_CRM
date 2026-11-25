@@ -12,6 +12,9 @@
  *   first, then any blank tabs the team adds.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+
+/** A view never waits on "Opening the sheet…" longer than this: then it says so, with Try again (user, 25 Nov 2026). */
+const OPEN_LIMIT_MS = 10_000
 import { useTranslations } from 'next-intl'
 import { useSearchParams } from 'next/navigation'
 import { Workbook } from '@/components/sheets/Workbook'
@@ -43,28 +46,59 @@ export function NodeWorkbook({ data, node, folder, linked, brandId = null }: {
   // The workbook re-reads its tabs after some changes: the same tabs are left out then.
   const api = useMemo(() => (brandId ? { ...sheetsApi, listSheets: async (id: string) => { const r = await sheetsApi.listSheets(id); return r.success ? { ...r, sheets: mine(r.sheets) } : r } } : sheetsApi), [brandId, mine])
 
+  // Which try this is: Try again starts the load over.
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let live = true
+    let step = 'folders'
+    const where = node ?? folder
+    const give = (why: string, detail?: unknown) => {
+      if (!live) return
+      live = false
+      console.error(`[momentum:sheet] the ${where} sheet didn't open (${why}) at step "${step}"`, detail ?? '')
+      setFailed(why)
+    }
+    // Never stay on the loading line: past the limit, say so and offer Try again.
+    const timer = window.setTimeout(() => give('timeout', `no answer within ${OPEN_LIMIT_MS / 1000} s`), OPEN_LIMIT_MS)
     void (async () => {
-      const all = await listFolders().catch(() => null)
-      const folders = all?.success ? all.folders : []
-      if (node) {
-        const r = await ensureNodeWorkbook(node).catch(() => null)
-        if (!live) return
-        if (!r?.success) { setFailed(r?.error ?? 'generic'); return }
-        setLoaded({ folder: r.folder, folders: [r.folder, ...folders], sheets: mine(r.sheets) })
-      } else if (folder) {
-        const f = folders.find(x => x.kind === folder)
-        const s = f ? await listSheets(f.id).catch(() => null) : null
-        if (!live) return
-        if (!f || !s?.success) { setFailed('gone'); return }
-        setLoaded({ folder: f, folders, sheets: s.sheets })
+      try {
+        const all = await listFolders()
+        const folders = all?.success ? all.folders : []
+        if (node) {
+          step = 'workbook'
+          const r = await ensureNodeWorkbook(node)
+          if (!live) return
+          if (!r?.success) { give(r?.error ?? 'generic'); return }
+          live = false
+          setLoaded({ folder: r.folder, folders: [r.folder, ...folders], sheets: mine(r.sheets) })
+        } else if (folder) {
+          const f = folders.find(x => x.kind === folder)
+          if (!f) { give('gone', all?.success ? 'no such folder' : all); return }
+          step = 'tabs'
+          const s = await listSheets(f.id)
+          if (!live) return
+          if (!s?.success) { give(s?.error ?? 'generic'); return }
+          live = false
+          setLoaded({ folder: f, folders, sheets: s.sheets })
+        }
+      } catch (e) {
+        give('error', e)
+      } finally {
+        window.clearTimeout(timer)
       }
     })()
-    return () => { live = false }
-  }, [node, folder, mine])
+    return () => { live = false; window.clearTimeout(timer) }
+  }, [node, folder, mine, attempt])
 
-  if (failed) return <p data-node-workbook-error style={{ padding: '18px 38px', color: PIPE.textMuted, fontSize: 13 }}>{t('workbookFailed')}</p>
+  if (failed) return (
+    <div data-node-workbook-error={failed} role="alert" style={{ padding: '18px 38px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', color: PIPE.textSecondary, fontSize: 13 }}>
+      <span>{failed === 'timeout' ? t('workbookSlow') : t('workbookFailed')}</span>
+      <button type="button" data-node-workbook-retry="" onClick={() => { setFailed(null); setLoaded(null); setAttempt(a => a + 1) }}
+        style={{ border: `1px solid ${PIPE.border}`, background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', font: 'inherit', fontWeight: 700, color: PIPE.ink, cursor: 'pointer' }}>
+        {t('workbookRetry')}
+      </button>
+    </div>
+  )
   if (!loaded) return <p data-node-workbook-loading style={{ padding: '18px 38px', color: PIPE.textMuted, fontSize: 13 }}>{t('workbookLoading')}</p>
   return (
     <div data-node-workbook={node ?? folder} style={{ minWidth: 0 }}>
