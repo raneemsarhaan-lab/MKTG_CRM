@@ -11,14 +11,13 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { LinkedTask, Priority, SheetTaskMap, StageId, TaskField } from '@/types/index'
+import type { LinkedTask, SheetTaskMap, StageId, TaskField } from '@/types/index'
 import { STAGE_META } from '@/lib/stage-meta'
 import { STAGE_COLORS, contentTypeColor } from '@/lib/tokens'
 import { shownWord } from '@/lib/sheet-links'
 import { StagePill } from '@/components/sheet/StatusCell'
 import { PersonChip } from '@/components/sheet/PersonChip'
 import { SheetMenu, type MenuItem } from '@/components/sheet/SheetMenu'
-import { PRIORITY_COLOR } from '@/lib/priorities'
 import { intlLocale } from '@/lib/sheet-format'
 
 export interface FieldChoices {
@@ -30,7 +29,8 @@ export interface FieldChoices {
 
 /** Fields that open a control (the rest are typed, like a team column's text). */
 export const CONTROL_FIELDS = new Set<TaskField>(['stage', 'assignee', 'owner', 'type', 'pillar', 'theme', 'priority', 'due', 'link:doc', 'link:design', 'link:post', 'link:published'])
-const PRIORITIES = ['Urgent', 'High', 'Normal', 'Low', 'None'] as const
+const PRIORITIES = ['High', 'Medium', 'Low'] as const
+const PRIORITY_COLOR: Record<string, string> = { High: '#B42318', Medium: '#334155', Low: '#64748B' }
 
 const boardStage = (id: string, locale: string) => {
   const m = STAGE_META[id as StageId]
@@ -67,7 +67,7 @@ export function FieldValue({ field, raw, map, people, plain }: { field: TaskFiel
     case 'pillar': case 'theme':
       return raw ? <span className="fx-fd-chip">{raw}</span> : null
     case 'priority':
-      return raw ? <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[raw as Priority] }}><span aria-hidden="true">⚑ </span>{shownWord(raw, map.words?.priority, map.show, raw)}</span> : null
+      return raw ? <span className="fx-fd-prio" style={{ color: PRIORITY_COLOR[raw] }}><span aria-hidden="true">⚑ </span>{shownWord(raw, map.words?.priority, map.show, raw)}</span> : null
     case 'due': {
       if (!raw) return null
       const d = new Date(`${raw}T00:00`)

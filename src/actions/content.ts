@@ -1,10 +1,5 @@
 'use server'
 
-import { spaceSheetId } from '@/lib/sheet-columns'
-import { datesFor } from '@/lib/due-dates-server'
-import { needsHandoff } from '@/lib/spaces'
-import { addAssigneeSpaces, addSpaces, loadSpaceContext } from '@/lib/spaces-server'
-
 /**
  * The Content sheet's server actions (spec 009, contracts/server.md).
  *
@@ -78,14 +73,10 @@ export interface PlanRowInput {
 export interface AddPlanResult {
   success: boolean; error?: string
   created?: string[]; updated?: string[]; skipped?: string[]
-  /** Sheet 2b: plain rows added (a paste on a theme, pillar or "+ Row" line). */
-  rowsCreated?: string[]
   themesCreated?: string[]; pillarsCreated?: string[]
   problems?: { row: number; code: string }[]
   /** Custom values written (spec 010). */
   values?: number
-  /** Spec 021 (FR-030a): rows skipped because they would need the hand-off box. */
-  handoff?: number
 }
 
 /**
@@ -93,13 +84,7 @@ export interface AddPlanResult {
  * under an advisory lock, so two pastes never create the same theme or piece
  * twice, and a second paste of the same rows adds nothing.
  */
-export async function addPlan(rows: PlanRowInput[], opts: {
-  useSheetTitleStatus: boolean
-  /** Sheet 2b: pasted on a theme, pillar or "+ Row" line — rows that name no theme go there. */
-  target?: { projectId: string; pillarId?: string | null } | null
-  /** Spec 026: the Space whose sheet is pasted into; the Content Space when left out. */
-  spaceId?: string | null
-}): Promise<AddPlanResult> {
+export async function addPlan(rows: PlanRowInput[], opts: { useSheetTitleStatus: boolean }): Promise<AddPlanResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
   if (!Array.isArray(rows) || rows.length === 0) return { success: false, error: 'Nothing to add' }
@@ -115,20 +100,13 @@ export async function addPlan(rows: PlanRowInput[], opts: {
     return first.length === 1 ? first[0].id : null
   }
   const types = (await prisma.contentType.findMany({ select: { label: true } })).map(t => t.label)
-  // Spec 021: pasted pieces show in the Content Space; a paste never opens the hand-off box.
-  const spaceCtx = await loadSpaceContext()
-  const contentSpace = spaceCtx.spaces.find(x => x.key === 'content')?.id
-  // Spec 026 (§7): Paste plan only creates plain rows — no tasks, and no linking in bulk.
-  const sheetSpace = spaceCtx.spaces.find(x => x.id === opts.spaceId) ?? spaceCtx.spaces.find(x => x.key === 'content')
-  const sheetSpaceId = sheetSpace?.id ?? null
-  void contentSpace
 
   try {
     const out = await prisma.$transaction(async tx => {
       // $executeRaw: the lock returns void, which $queryRaw cannot read back.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('content-plan'))`
-      const res = { rowsCreated: [] as string[], created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0, handoff: 0 }
-      const columns = await pasteColumns(tx, sheetSpace ? spaceSheetId(sheetSpace) : 'content', members)
+      const res = { created: [] as string[], updated: [] as string[], skipped: [] as string[], themesCreated: [] as string[], pillarsCreated: [] as string[], problems: [] as { row: number; code: string }[], values: 0 }
+      const columns = await pasteColumns(tx, 'content', members)
       const themeCache = new Map<string, { id: string; brand_id: string | null }>()
       const now = new Date()
       // A piece that arrives already Published was published on a day the sheet
@@ -140,9 +118,7 @@ export async function addPlan(rows: PlanRowInput[], opts: {
       for (const [i, r] of rows.entries()) {
         const row = i + 1
         const title = (r.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)
-        let themeName = (r.theme ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
-        // Sheet 2b: a paste on a theme, pillar or "+ Row" line fills that theme when the rows name none.
-        if (!themeName && opts.target) themeName = (await tx.project.findUnique({ where: { id: opts.target.projectId }, select: { name: true } }))?.name ?? ''
+        const themeName = (r.theme ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
         if (!title) { res.problems.push({ row, code: 'noTitle' }); continue }
         if (!themeName) { res.problems.push({ row, code: 'noTheme' }); continue }
         const status = readStatus(r.status)
@@ -180,21 +156,12 @@ export async function addPlan(rows: PlanRowInput[], opts: {
             res.themesCreated.push(themeName)
           }
           themeCache.set(tkey, theme)
-          // The theme is on this Space's sheet (the Content Space's sync would add it; other Spaces need it here).
-          if (!(await tx.contentSheetTheme.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId }, select: { id: true } }))) {
-            const last = await tx.contentSheetTheme.findFirst({ where: { space_id: sheetSpaceId }, orderBy: { position: 'desc' }, select: { position: true } })
-            await tx.contentSheetTheme.create({ data: { project_id: theme.id, space_id: sheetSpaceId, position: (last?.position ?? 0) + 1, created_by: member.id } })
-          }
         }
-        // Anyone with access to the Space may add plain rows.
+        if (!(await mayAddPiece(tx, theme.id, member))) { res.problems.push({ row, code: 'mayNotAdd' }); continue }
 
         // The pillar: matched by name within the theme, or created.
         let pillarId: string | null = null
         const pillarName = (r.pillar ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
-        if (!pillarName && opts.target?.pillarId && opts.target.projectId === theme.id) {
-          const tp = await tx.contentPillar.findUnique({ where: { id: opts.target.pillarId } })
-          if (tp?.project_id === theme.id) pillarId = tp.id
-        }
         if (pillarName) {
           const pillars = await tx.contentPillar.findMany({ where: { project_id: theme.id } })
           const p = pillars.find(x => norm(x.name) === norm(pillarName))
@@ -208,9 +175,7 @@ export async function addPlan(rows: PlanRowInput[], opts: {
 
         const type = readType(r.type, types.length ? types : KNOWN_TYPES)
         const links = { doc: link(r.working_doc), design: link(r.design), post: link(r.post), published: link(r.published) }
-        // Spec 026: a pasted task link no longer links or updates a task; rows are linked one at a time with Make task.
-        const taskId = null as string | null
-        void taskIdFromLink
+        const taskId = taskIdFromLink(r.task_link)
 
         if (taskId) {
           const task = await tx.task.findUnique({ where: { id: taskId } })
@@ -228,10 +193,6 @@ export async function addPlan(rows: PlanRowInput[], opts: {
             ...(!task.post_url && links.post ? { post_url: links.post } : {}),
             ...(!task.published_url && links.published ? { published_url: links.published } : {}),
           }
-          if (opts.useSheetTitleStatus && !status.archived && status.stage !== task.status) {
-            const shown = (await tx.taskSpace.findMany({ where: { task_id: taskId }, select: { space_id: true } })).map(x => x.space_id)
-            if (needsHandoff(task, status.stage, shown, spaceCtx.spaces)) { res.handoff++; continue }
-          }
           if (opts.useSheetTitleStatus) {
             data.name = title
             if (status.archived) data.dropped_at = task.dropped_at ?? now
@@ -248,30 +209,35 @@ export async function addPlan(rows: PlanRowInput[], opts: {
           continue
         }
 
-        // A plain row of the same title in this theme is already in the sheet.
-        if (await tx.contentRow.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId, task_id: null, title: { equals: title, mode: 'insensitive' } }, select: { id: true } })) {
-          res.skipped.push(title); continue
-        }
         // Already in this theme by title: nothing to add (FR-035).
         const same = await tx.task.findFirst({
           where: { project_id: theme.id, name: { equals: title, mode: 'insensitive' } },
           select: { id: true, task_owner_id: true, assignee_id: true, dropped_at: true },
         })
-        if (same && await tx.contentRow.findFirst({ where: { space_id: sheetSpaceId, task_id: same.id }, select: { id: true } })) {
-          // Already a linked row of this sheet: nothing is added, and the task isn't touched.
-          res.skipped.push(title)
+        if (same) {
+          // Its empty custom cells are filled from the paste, under the row rule.
+          const n = !same.dropped_at && canAct(same, member)
+            ? await writePastedValues(tx, columns, same.id, r.custom, member.id, { onlyEmpty: true })
+            : 0
+          if (n) res.values += n
+          else res.skipped.push(title)
           continue
         }
 
-        // A new line is a plain row (its custom values kept on the row).
-        {
-          const last = await tx.contentRow.findFirst({ where: { project_id: theme.id, space_id: sheetSpaceId }, orderBy: { position: 'desc' }, select: { position: true } })
-          const values: Record<string, string> = {}
-          for (const [colId, v] of Object.entries(r.custom ?? {})) { const c = columns.get(colId); if (c && typeof v === 'string' && v.trim()) values[(await tx.sheetColumn.findUnique({ where: { id: c.id }, select: { key: true } }))?.key ?? colId] = v.trim().slice(0, 5000) }
-          const made = await tx.contentRow.create({ data: { project_id: theme.id, space_id: sheetSpaceId, pillar_id: pillarId, title, position: (last?.position ?? 0) + 1, values, created_by: member.id } })
-          res.rowsCreated.push(made.id)
-          continue
-        }
+        const owner = memberByName(r.owner) ?? member.id
+        const task = await tx.task.create({
+          data: {
+            name: title, project_id: theme.id, pillar_id: pillarId, brand_id: theme.brand_id,
+            content_type_label: type ?? 'Post', task_owner_id: owner, assignee_id: null,
+            initiator_role: member.role, status: status.stage as StageId, stage_date: stageDateFor(status.stage),
+            dropped_at: status.archived ? now : null, hours_estimate: 0, priority: 'Medium', created_by: member.id,
+            post_url: links.post, published_url: links.published,
+          },
+        })
+        if (links.doc) await setRoleLink(tx, task.id, 'working_doc', links.doc, member.id)
+        if (links.design) await setRoleLink(tx, task.id, 'design', links.design, member.id)
+        res.values += await writePastedValues(tx, columns, task.id, r.custom, member.id, { onlyEmpty: false })
+        res.created.push(task.id)
       }
       return res
     }, { timeout: 60_000 })
@@ -322,16 +288,9 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
     data: {
       name: title, project_id: themeId, pillar_id: pillarId, brand_id: theme.brand_id, content_type_label: 'Post',
       task_owner_id: owner, assignee_id: assignee, initiator_role: member.role, status: 'todo', stage_date: new Date(),
-      hours_estimate: 0, priority: 'Normal', created_by: member.id,
+      hours_estimate: 0, priority: 'Medium', created_by: member.id,
     },
   })
-  // Spec 021: a piece is content work — it shows in the Content Space, and in its assignee's.
-  {
-    const ctx = await loadSpaceContext()
-    const content = ctx.spaces.find(x => x.key === 'content')?.id
-    if (content) await addSpaces(prisma, task.id, [content], 'created', member.id)
-    await addAssigneeSpaces(prisma, task, task.assignee_id, member.id, ctx)
-  }
   // Spec 012: the theme's people follow it; the stage holders and a new assignee hear about it.
   await notifyAfter(async tx => {
     for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
@@ -346,8 +305,6 @@ export async function addPiece(themeId: string, input: { title: string; pillarId
 export interface PiecePatch {
   pillar_id?: string | null
   due_date?: string | null
-  /** The Content sheet's Date: the day the piece goes live. Moves an automatic due date. */
-  publish_date?: string | null
   post_url?: string | null
   published_url?: string | null
 }
@@ -367,10 +324,11 @@ export async function updatePiece(taskId: string, patch: PiecePatch): Promise<{ 
     }
     data.pillar_id = patch.pillar_id || null
   }
-  if (patch.due_date !== undefined || patch.publish_date !== undefined) {
-    const dates = await datesFor(task, { due_date: patch.due_date, publish_date: patch.publish_date })
-    if (typeof dates === 'string') return { success: false, error: 'bad_date' }
-    Object.assign(data, dates)
+  if (patch.due_date !== undefined) {
+    if (patch.due_date && !/^\d{4}-\d{2}-\d{2}$/.test(patch.due_date)) return { success: false, error: 'bad_date' }
+    const d = patch.due_date ? new Date(`${patch.due_date}T00:00:00Z`) : null
+    if (d && Number.isNaN(d.getTime())) return { success: false, error: 'bad_date' }
+    data.due_date = d
   }
   for (const k of ['post_url', 'published_url'] as const) {
     const v = patch[k]

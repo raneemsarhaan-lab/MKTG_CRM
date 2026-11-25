@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import type { Member, NavTree as NavTreeData, PinnedFolder } from '@/types/index'
-import { NavTree } from './NavTree/NavTree'
+import type { Member } from '@/types/index'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { NAV_ICON, PHONE_TABS, navFor } from '@/lib/nav'
 import { logout } from '@/lib/logout'
@@ -40,7 +39,7 @@ import { logout } from '@/lib/logout'
  * scrolling normally — which the alternative, an app shell that scrolls
  * internally, would have taken away.
  */
-export function TabBar({ member, pins = [], tree = null }: { member: Member; pins?: PinnedFolder[]; tree?: NavTreeData | null }) {
+export function TabBar({ member }: { member: Member }) {
   const pathname = usePathname()
   const t        = useTranslations('nav')
   const [moreOpen, setMoreOpen] = useState(false)
@@ -98,13 +97,6 @@ export function TabBar({ member, pins = [], tree = null }: { member: Member; pin
             width: 38, height: 4, borderRadius: 999, background: '#E4E1F2',
             margin: '2px auto 12px',
           }} />
-
-          {/* Spec 021: on a phone the More sheet is the tree's drawer. */}
-          {tree && (
-            <div style={{ maxHeight: '52dvh', overflowY: 'auto', marginBottom: 8, borderBottom: '1px solid #F1EFFA', paddingBottom: 8 }}>
-              <NavTree tree={tree} pins={pins} pathname={pathname} phone />
-            </div>
-          )}
 
           {overflow.map(({ href, key }) => (
             <Link

@@ -1,13 +1,9 @@
 'use client'
 
-import { PANEL_SECTIONS } from '@/lib/space-settings'
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Task, Member, Stage, TaskComment, TaskAttachment, SLAConfig, StageId } from '@/types/index'
-import type { Brand, TeamSpace, TaskSpace, BrandFeatureKey } from '@/types/index'
-import { featureOn } from '@/lib/brand-features'
-import { ShowsIn } from './ShowsIn'
-import { handoffRequest } from '@/components/handoff/request'
+import type { Brand } from '@/types/index'
 import { STAGE_META, nextStageId, EIGHT_STAGE, NINE_STAGE } from '@/lib/stage-meta'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import {
@@ -23,9 +19,7 @@ import { Brief } from '@/components/shared/Brief'
 import { useIsPhone } from '@/hooks/useMediaQuery'
 import { shortName } from '@/lib/attachments'
 import { makeUploader, uploadToStorage, shrinkImage } from '@/lib/attachment-upload'
-import { useLocale, useTranslations } from 'next-intl'
-import { cairoToday, daysBetween, formatDay, isOverdue } from '@/lib/due-dates'
-import { ManualMark } from '@/components/shared/DueDates'
+import { useTranslations } from 'next-intl'
 import { intlLocale } from '@/lib/sheet-format'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { AttachmentsSection, type AttachmentsHandle, type UploadFn } from './attachments/AttachmentsSection'
@@ -41,18 +35,6 @@ import { ProjectPicker } from '@/components/shared/ProjectPicker'
 import { useNotify } from '@/components/notifications/NotifyProvider'
 import { ReplyComposer } from './ReplyComposer'
 import { mentionedIn } from '@/lib/notify/mentions'
-import { useMoveError } from '@/components/fields/moveErrors'
-import { RepeatEditor } from '@/components/templates/RepeatEditor'
-import { templateFromTask } from '@/actions/templates'
-import { TypePicker } from '@/components/types/TypePicker'
-import { DescriptionLabel, PanelFieldSections, PanelTopFields, REQUIRED_EVENT, hasSections } from '@/components/fields/PanelFields'
-import { useCardFields } from '@/components/fields/CardFields'
-import { TypeIcon } from '@/components/types/TypeIcon'
-import { typeName } from '@/lib/task-types'
-import { PRIORITIES, asPriority, priorityColor } from '@/lib/priorities'
-import type { Priority } from '@/types/index'
-import { AssigneesPicker } from '@/components/people/AssigneesPicker'
-import { TagPicker } from '@/components/tags/TagPicker'
 import { useDialogFocus } from './useDialogFocus'
 
 /**
@@ -80,6 +62,7 @@ type FullTask = Task & {
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email']
+const PRIORITIES = ['High', 'Medium', 'Low']
 
 /** The brand palette — blue primary, lime-green secondary accent. */
 const CU = {
@@ -101,14 +84,6 @@ const CU = {
 
 interface TaskModalProps {
   task: FullTask
-  /** Spec 024 (§4): inside a Space, the order of the sections under the top rows. */
-  sectionOrder?: string[]
-  /** Spec 024 (§8): inside a Space, its own name for a stage (Editing, Edit Review…); elsewhere the original names. */
-  stageNameOf?: (stage: StageId) => string | undefined
-  /** Spec 021: the task's Task link fields ("Part of ↗ …" with ⇄ and ×), shown under Fields. */
-  linksSection?: React.ReactNode
-  /** The workspace's days-before for the due-date rule (the hover on an automatic due date). */
-  dueDaysBefore?: number
   currentUser: Member
   stages: Stage[]
   slaConfig: SLAConfig
@@ -116,7 +91,7 @@ interface TaskModalProps {
   onClose: () => void
   brands?: Brand[]
   members?: Member[]
-  contentTypes?: import('@/types/index').ContentType[]
+  contentTypes?: { id: string; label: string }[]
   /** Everything the composer can link to with #, and a chip can jump to. */
   allTasks?: TaskRef[]
   /**
@@ -136,9 +111,6 @@ interface TaskModalProps {
    * switch; elsewhere the button navigates to the board's sheet.
    */
   onOpenSheet?: (videoId: string, rowId: string | null) => void
-  /** Spec 021: the live team Spaces, and every Shows in row (the panel picks this task's). */
-  spaces?: TeamSpace[]
-  taskSpaces?: TaskSpace[]
 }
 
 /* ── icons — 16px line set, ClickUp's weight ─────────────────────────── */
@@ -536,10 +508,7 @@ export function TaskModal({
   task, currentUser, stages: _stages, slaConfig: _slaConfig, today, onClose,
   brands = [], members = [], contentTypes = [], allTasks = [], hasStorage = false,
   initialPreviewId, initialCommentId, initialSection, onOpenSheet,
-  spaces = [], taskSpaces = [], linksSection, dueDaysBefore = 7, stageNameOf, sectionOrder,
 }: TaskModalProps) {
-  const orderOf = (k: string) => { const i = sectionOrder?.indexOf(k) ?? -1; return i < 0 ? PANEL_SECTIONS.indexOf(k as never) : i }
-  const nameOf = (s: StageId) => stageNameOf?.(s) ?? STAGE_META[s]?.label_en ?? s
   const [cmtText, setCmtText]             = useState('')
   const [editingBrief, setEditingBrief]   = useState(false)
   // Where the read brief was clicked, so editing starts on that word (spec 005 FR-015).
@@ -651,7 +620,6 @@ export function TaskModal({
   const stageBtnRef  = useRef<HTMLButtonElement>(null)
   const stageMenuRef = useRef<HTMLDivElement>(null)
   const setCelebration = useUIStore(s => s.setCelebration)
-  const openHandoff = useUIStore(s => s.openHandoff)
   const selectTask     = useUIStore(s => s.selectTask)
 
   // The phone tab into the address (see paneInUrl). replaceState, as the
@@ -750,14 +718,6 @@ export function TaskModal({
       ? { video: task.parent_task_id, row: task.id }
       : null
   const tsheet = useTranslations('sheet')
-  const tDates = useTranslations('dates')
-  const tRepeat = useTranslations('repeat')
-  const tTpl = useTranslations('templates')
-  const tMedia = useTranslations('media')
-  const moveErr = useMoveError()
-  const locale = useLocale()
-  const tSpaces = useTranslations('spaces')
-  const tSheet = useTranslations('taskSheet')
   function openSheet() {
     if (!sheetTarget) return
     if (onOpenSheet) { onOpenSheet(sheetTarget.video, sheetTarget.row); return }
@@ -773,9 +733,8 @@ export function TaskModal({
   // The board's query includes the relation; a panel opened from elsewhere may
   // only have the id, so fall back to the member list.
   const assignee  = task.assignee ?? members.find(m => m.id === task.assignee_id) ?? null
-  // Days are Cairo days (src/lib/due-dates.ts); published or done work is never overdue.
-  const daysLeft  = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
-  const overdue   = isOverdue(task as Parameters<typeof isOverdue>[0])
+  const daysLeft  = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue   = daysLeft !== null && daysLeft < 0
 
   /**
    * The task's files as the Attachments section has them (spec 007). The
@@ -796,22 +755,16 @@ export function TaskModal({
   // Mirrors canAct() in the server action — owner or assignee, or a manager.
   const canEdit =
     task.task_owner_id === currentUser.id ||
-    task.assignee_id === currentUser.id || !!task.assignee_ids?.includes(currentUser.id) ||
+    task.assignee_id === currentUser.id ||
     currentUser.access === 'admin' ||
     currentUser.access === 'superuser'
 
   const isAdmin     = currentUser.access === 'admin'
-  const tPri        = useTranslations('priority')
-  const tAs         = useTranslations('assignees')
-  const tTags       = useTranslations('tags')
-  const typeOf      = contentTypes.find(c => c.label === task.content_type_label)
-  const cardFields  = useCardFields()
-  const withSections = hasSections(task, cardFields?.fields, cardFields?.links)
   const isSuperuser = currentUser.access === 'superuser'
   const isPublished = task.status === 'publish'
 
   const isOwnStage = stageMeta.owner_role === null
-    ? task.assignee_id === currentUser.id || task.task_owner_id === currentUser.id || !!task.assignee_ids?.includes(currentUser.id)
+    ? task.assignee_id === currentUser.id || task.task_owner_id === currentUser.id
     : stageMeta.owner_role === currentUser.role
 
   const canAdvance = !isPublished && nextStage !== null && (isOwnStage || isAdmin || isSuperuser)
@@ -902,7 +855,7 @@ export function TaskModal({
         try {
           const res = await updateTask(task.id, patch)
           if (res.success) { router.refresh(); after?.(); resolve(true); return }
-          setError(res.error === 'start_after_due' ? tDates('startAfterDue') : errorText(res.error, 'Could not save the change — check your connection and try again.'))
+          setError(errorText(res.error, 'Could not save the change — check your connection and try again.'))
           resolve(false)
         } catch {
           setError('Could not save the change — check your connection and try again.')
@@ -951,18 +904,12 @@ export function TaskModal({
     startAdvance(async () => {
       const fallback = 'Could not move the task — check your connection and try again.'
       const result = await moveTask(task.id).catch(() => null)
-      // Spec 021 (FR-030): into the design half with no production Space → the hand-off box.
-      const handoff = result ? handoffRequest(result, task, spaces, taskSpaces, members, tSpaces) : null
-      if (handoff) { openHandoff(handoff); return }
       if (!result?.success) {
-        if (result?.error === 'needs_handoff') return
-        if (result) flagRequired(result)
         setError(
-          (result ? moveErr(result) : null)
-          ?? (result?.error === 'not_authorized' ? 'That stage belongs to someone else — ask an admin to move it.'
-            : result?.error === 'terminal'     ? 'This task is already at its last stage.'
-            : result?.error === 'dropped'      ? 'This clip was dropped, so it can’t move on — restore it on its sheet first.'
-            : errorText(result?.error, fallback)))
+          result?.error === 'not_authorized' ? 'That stage belongs to someone else — ask an admin to move it.'
+          : result?.error === 'terminal'     ? 'This task is already at its last stage.'
+          : result?.error === 'dropped'      ? 'This clip was dropped, so it can’t move on — restore it on the video sheet first.'
+          : errorText(result?.error, fallback))
         return
       }
       router.refresh()
@@ -971,11 +918,6 @@ export function TaskModal({
       }
       onClose()
     })
-  }
-
-  /** Spec 023: a refusal for required fields outlines their sections in the panel. */
-  function flagRequired(r: { error?: string; missing?: string[] }) {
-    if (r.error === 'required_fields' && r.missing?.length) window.dispatchEvent(new CustomEvent(REQUIRED_EVENT, { detail: { taskId: task.id, missing: r.missing } }))
   }
 
   /* ── naming people and linking tasks in a comment ────────────────────── */
@@ -1127,14 +1069,11 @@ export function TaskModal({
     if (next === task.status) return
     setError('')
     startTransition(async () => {
-      const r = await setTaskStage(task.id, next).catch(() => ({ success: false as const, error: undefined, shouldCelebrate: false }))
-      const handoff = handoffRequest(r, task, spaces, taskSpaces, members, tSpaces)
-      if (handoff) { openHandoff(handoff); return }
+      const r = await setTaskStage(task.id, next).catch(() => ({ success: false, error: undefined, shouldCelebrate: false }))
       if (!r.success) {
-        flagRequired(r)
         setError(r.error === 'not_authorized'
           ? 'That stage belongs to someone else — ask an admin to move it.'
-          : moveErr(r) ?? errorText(r.error, 'Could not move the task — check your connection and try again.'))
+          : errorText(r.error, 'Could not move the task — check your connection and try again.'))
         return
       }
       router.refresh()
@@ -1298,11 +1237,7 @@ export function TaskModal({
    * behind "Show N empty fields" — an imported task with six blank attributes
    * reads as a form to complete rather than a brief to work from.
    */
-  // Spec 021 (US4): a field switched off for the task's brand is hidden, never cleared.
-  const taskBrand = brands.find(b => b.id === task.brand_id) ?? task.brand ?? null
-  const on = (k: BrandFeatureKey) => featureOn(taskBrand, k)
-  const FIELD_FEATURE: Record<string, BrandFeatureKey> = { type: 'type', platform: 'platform', cover: 'covers' }
-  const allFields: { key: string; filled: boolean; node: React.ReactNode }[] = [
+  const fields: { key: string; filled: boolean; node: React.ReactNode }[] = [
     {
       key: 'brand', filled: Boolean(task.brand?.name),
       node: (
@@ -1327,9 +1262,22 @@ export function TaskModal({
       key: 'type', filled: Boolean(task.content_type_label),
       node: (
         <Field key="type" icon="type" label="Type">
-          {/* Spec 023: the type's icon and colour; admins add a type from the menu ("+ Type"). */}
-          <TypePicker value={task.content_type_label} types={contentTypes} canEdit={canEdit} canAdd={isAdmin}
-            onPick={v => saveField('Type', { content_type_label: v })} />
+          <InlineValue
+            canEdit={canEdit} type="select" value={task.content_type_label}
+            display={task.content_type_label ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px',
+                borderRadius: 8, background: CU.blueLight, color: CU.blue, fontWeight: 700, fontSize: 13,
+              }}>
+                <Icon name="folder" size={13} color={CU.blue} width={2.2} />
+                {task.content_type_label}
+              </span>
+            ) : ''}
+            options={contentTypes.map(c => ({ value: c.label, label: c.label }))}
+            emptyLabel="–"
+            ariaLabel="Type"
+            onCommit={v => saveField('Type', { content_type_label: v })}
+          />
         </Field>
       ),
     },
@@ -1363,15 +1311,6 @@ export function TaskModal({
             ariaLabel="Owner"
             onCommit={v => saveField('Owner', { task_owner_id: v })}
           />
-        </Field>
-      ),
-    },
-    {
-      // Spec 021: the team Spaces this task shows in.
-      key: 'spaces', filled: true,
-      node: (
-        <Field key="spaces" icon="folder" label={tSpaces('showsIn')}>
-          <ShowsIn taskId={task.id} spaces={spaces} rows={taskSpaces} canEdit={canEdit} />
         </Field>
       ),
     },
@@ -1505,7 +1444,6 @@ export function TaskModal({
       ),
     },
   ]
-  const fields = allFields.filter(f => !FIELD_FEATURE[f.key] || on(FIELD_FEATURE[f.key]))
   const emptyCount = fields.filter(f => !f.filled).length
 
   /**
@@ -1708,7 +1646,7 @@ export function TaskModal({
               </>
             )}
 
-            {task.content_type_label && on('type') && (
+            {task.content_type_label && (
               <>
                 <span style={{ color: CU.faint }}>/</span>
                 <span style={{
@@ -1717,8 +1655,8 @@ export function TaskModal({
                   color: CU.text, textTransform: 'uppercase',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220,
                 }}>
-                  <TypeIcon icon={typeOf?.icon} color={typeOf?.color ?? CU.label} size={15} />
-                  {typeOf ? typeName(typeOf, locale) : task.content_type_label}
+                  <Icon name="type" size={15} color={CU.label} />
+                  {task.content_type_label}
                 </span>
               </>
             )}
@@ -1759,20 +1697,6 @@ export function TaskModal({
                           onClick={() => { setMenuOpen(false); setAddingSubtask(true) }} />
                 <MenuItem icon="openIn" label="Open the board behind this"
                           onClick={() => { setMenuOpen(false); requestClose() }} />
-                {/* Spec 023 (US7): admins and superusers save a task as a template of its type. */}
-                {currentUser.access !== 'user' && task.content_type_label && !task.parent_task_id && (
-                  <MenuItem icon="subtask" label={tTpl('saveAs')}
-                            onClick={() => {
-                              setMenuOpen(false)
-                              const name = window.prompt(tTpl('namePrompt'), task.name)
-                              if (!name?.trim()) return
-                              startTransition(async () => {
-                                const r = await templateFromTask(task.id, name.trim())
-                                if (r.success) { setCopied('template'); setTimeout(() => setCopied(''), 2500) }
-                                else setError(tTpl('failed'))
-                              })
-                            }} />
-                )}
               </div>
             )}
           </div>
@@ -1913,9 +1837,6 @@ export function TaskModal({
               {copied === 'link' && (
                 <span style={{ fontSize: 13, color: CU.label }}>Link copied</span>
               )}
-              {copied === 'template' && (
-                <span data-template-saved="" style={{ fontSize: 13, color: CU.label }}>{tTpl('savedFromTask')}</span>
-              )}
             </div>
 
             {/* scrolls */}
@@ -1992,7 +1913,7 @@ export function TaskModal({
                       disabled={isPending || advancing}
                       aria-haspopup="listbox"
                       aria-expanded={stageOpen}
-                      aria-label={`Stage: ${nameOf(task.status as StageId)}. Change it`}
+                      aria-label={`Stage: ${stageMeta.label_en}. Change it`}
                       title="Change the stage"
                       className="fx-hov"
                       style={{
@@ -2003,7 +1924,7 @@ export function TaskModal({
                         cursor: 'pointer', fontFamily: 'inherit', opacity: isPending || advancing ? 0.6 : 1,
                       }}
                     >
-                      {nameOf(task.status as StageId)}
+                      {stageMeta.label_en}
                       <Icon name="chevron" size={13} color="#fff" width={2.6} />
                     </button>
 
@@ -2036,7 +1957,7 @@ export function TaskModal({
                               onMouseLeave={e => { if (!here) e.currentTarget.style.background = 'transparent' }}
                             >
                               <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                              <span style={{ flex: 1, minWidth: 0 }}>{nameOf(id)}</span>
+                              <span style={{ flex: 1, minWidth: 0 }}>{meta.label_en}</span>
                               {here && <span style={{ fontSize: 12, color: CU.faint }}>now</span>}
                               {!here && back && <span style={{ fontSize: 12, color: CU.faint }}>back</span>}
                             </button>
@@ -2050,9 +1971,9 @@ export function TaskModal({
                         type="button"
                         onClick={handleAdvance}
                         disabled={isPending || advancing}
-                        title={`Move to ${nameOf(nextMeta.id)}`}
-                        aria-label={advancing ? `Moving to ${nameOf(nextMeta.id)}…`
-                          : `Move to ${nameOf(nextMeta.id)}${isOverride ? ' (admin override)' : ''}`}
+                        title={`Move to ${nextMeta.label_en}`}
+                        aria-label={advancing ? `Moving to ${nextMeta.label_en}…`
+                          : `Move to ${nextMeta.label_en}${isOverride ? ' (admin override)' : ''}`}
                         className="fx-hov"
                         style={{
                           border: 'none', background: isOverride ? CU.ink : CU.blueLight,
@@ -2067,7 +1988,7 @@ export function TaskModal({
                           <>
                             {isOverride && <span aria-hidden="true">⚡ </span>}
                             <span aria-hidden="true">→ </span>
-                            {nameOf(nextMeta.id)}
+                            {nextMeta.label_en}
                           </>
                         )}
                       </button>
@@ -2078,95 +1999,67 @@ export function TaskModal({
                 {/* Assignee is who is doing it; Owner sits in Fields below and
                     is who is answerable for it. Everything personal — My Day,
                     the attention card, the bell — follows this one. */}
-                <Prop icon="user" label={tAs('label')}>
-                  {/* Spec 023 (US5): several assignees, the first is the lead. */}
-                  <AssigneesPicker taskId={task.id} ids={task.assignee_ids?.length ? task.assignee_ids : task.assignee_id ? [task.assignee_id] : []}
-                    hours={task.assignee_hours ?? {}} estimate={Number(task.hours_estimate ?? 0)} members={members} canEdit={canEdit} />
+                <Prop icon="user" label="Assignee">
+                  <InlineValue
+                    canEdit={canEdit} type="select"
+                    value={task.assignee_id ?? ''}
+                    display={assignee ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+                        <Avatar name={assignee.name} size={26} />
+                        {assignee.name}
+                      </span>
+                    ) : ''}
+                    emptyLabel="Nobody yet"
+                    options={[{ value: '', label: '— nobody —' },
+                              ...members.map(m => ({ value: m.id, label: m.name }))]}
+                    ariaLabel="Assignee"
+                    onCommit={v => saveField('Assignee', { assignee_id: v || null })}
+                  />
                 </Prop>
 
-                {/* Spec 023: fields placed in the top rows (Channels), after Assignee. */}
-                <PanelTopFields task={task} canEdit={canEdit} Row={({ label, children }) => <Prop icon="platform" label={label}>{children}</Prop>} />
-
-                {/* Spec 023 (US4): tags, unless the brand has them switched off. */}
-                {on('tags') && <Prop icon="tag" label={tTags('title')}>
-                  <TagPicker taskId={task.id} value={task.tag_ids ?? []} tags={cardFields?.tags ?? []} canEdit={canEdit} />
-                </Prop>}
-
-                {/* Publishing date: set by people. It moves an automatic due date. */}
-                <Prop icon="calendar" label={tDates('publish')}>
-                  <span data-publish-date={task.publish_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
-                    <InlineValue
-                      canEdit={canEdit} type="date" value={task.publish_date ?? ''}
-                      display={task.publish_date ? formatDay(task.publish_date, locale) : ''}
-                      onCommit={v => applyPatch({ publish_date: v || null })}
-                    />
-                  </span>
-                </Prop>
-
-                {/* Spec 023 (US6): optional start date; never after the due date. */}
-                <Prop icon="calendar" label={tDates('start')}>
-                  <span data-start-date={task.start_date ?? ''} style={{ flex: '0 1 auto', minWidth: 0 }}>
-                    <InlineValue
-                      canEdit={canEdit} type="date" value={task.start_date ?? ''}
-                      display={task.start_date ? formatDay(task.start_date, locale) : ''}
-                      onCommit={v => applyPatch({ start_date: v || null })}
-                    />
-                  </span>
-                </Prop>
-
-                <Prop icon="calendar" label={tDates('due')}>
+                <Prop icon="calendar" label="Due date">
                   {/* The InlineValue button fills its parent, so it gets a
                       shrink-to-fit box of its own — otherwise it claims the
                       whole row and knocks the overdue count onto a line by
                       itself, which then drags the label out of alignment. */}
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap' }}>
-                    <span data-due-date={task.due_date ?? ''} data-due-manual={task.due_manual ? 'true' : 'false'} style={{ flex: '0 1 auto', minWidth: 0 }}
-                          title={task.due_date ? (task.due_manual ? tDates('manualHint') : task.publish_date ? tDates('autoHint', { days: dueDaysBefore }) : undefined) : undefined}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ flex: '0 1 auto', minWidth: 0 }}>
                       <InlineValue
                         canEdit={canEdit} type="date" value={task.due_date ?? ''}
-                        display={task.due_date ? <>{formatDay(task.due_date, locale)}{task.due_manual && <ManualMark label={tDates('manual')} />}</> : ''}
+                        display={task.due_date ? fmtDate(task.due_date, loc) : ''}
                         ariaLabel="Due date"
-                        onCommit={v => saveField('Due date', { due_date: v || null })}
+                        onCommit={v => saveField('Due date', { due_date: v })}
                       />
                     </span>
-                    {daysLeft !== null && (task.status !== 'publish') && (
-                      <span data-due-count="" style={{
+                    {daysLeft !== null && (
+                      <span style={{
                         flexShrink: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
                         color: overdue ? '#D22040' : CU.faint,
                       }}>
-                        {overdue ? tDates('overdue', { n: Math.abs(daysLeft) }) : daysLeft === 0 ? tDates('today') : tDates('left', { n: daysLeft })}
+                        {fmtUnit(Math.abs(daysLeft), 'day', loc)} {overdue ? 'overdue' : 'left'}
                       </span>
-                    )}
-                    {canEdit && task.due_manual && (
-                      <button type="button" data-due-reset="" onClick={() => void applyPatch({ due_reset: true })}
-                              style={{ border: 'none', background: 'none', padding: '0 2px', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: CU.label, textDecoration: 'underline', cursor: 'pointer' }}>
-                        {tDates('reset')}
-                      </button>
                     )}
                   </span>
                 </Prop>
 
-                {/* Spec 023 (US8): repeat this task on publishing dates. */}
-                {!task.parent_task_id && <Prop icon="calendar" label={tRepeat('title')}>
-                  <RepeatEditor taskId={task.id} repeating={!!task.repeat_rule_id} canEdit={canEdit} />
-                </Prop>}
-
-                {on('priorities') && <Prop icon="flag" label="Priority">
+                <Prop icon="flag" label="Priority">
                   <InlineValue
                     canEdit={canEdit} type="select" value={task.priority}
                     display={
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        <Icon name="flag" size={15} color={priorityColor(task.priority)} />
-                        <span data-priority={asPriority(task.priority) ?? 'None'}>{tPri(asPriority(task.priority) ?? 'None')}</span>
+                        <Icon name="flag" size={15}
+                              color={task.priority === 'High' ? '#E5484D'
+                                   : task.priority === 'Medium' ? '#E8A33D' : '#8F95A1'} />
+                        {task.priority}
                       </span>
                     }
-                    options={PRIORITIES.map(p => ({ value: p, label: tPri(p) }))}
+                    options={PRIORITIES.map(p => ({ value: p, label: p }))}
                     ariaLabel="Priority"
-                    onCommit={v => saveField('Priority', { priority: v as Priority })}
+                    onCommit={v => saveField('Priority', { priority: v as 'Low' | 'Medium' | 'High' })}
                   />
-                </Prop>}
+                </Prop>
 
-                {on('hours') && <Prop icon="clock" label="Time estimate">
+                <Prop icon="clock" label="Time estimate">
                   <InlineValue
                     canEdit={canEdit} type="number" min={0} step={0.5}
                     value={task.hours_estimate}
@@ -2174,7 +2067,7 @@ export function TaskModal({
                     ariaLabel="Time estimate"
                     onCommit={v => saveField('Time estimate', { hours_estimate: parseFloat(v) })}
                   />
-                </Prop>}
+                </Prop>
 
                 <Prop icon="folder" label="Pipeline">
                   <span style={{ color: CU.label }}>{task.nine_stage ? '9-stage' : '8-stage'}</span>
@@ -2187,16 +2080,7 @@ export function TaskModal({
 
               <div style={{ height: 1, background: CU.line, margin: '22px 0 18px' }} />
 
-              {/* Spec 024 (§4): inside a Space, these sections follow its order. */}
-              <div data-panel-sections="" style={{ display: 'flex', flexDirection: 'column' }}>
-              {/* ── Spec 023: field sections around the Description (Caption above, TOV below) ── */}
-              <div data-panel-section="above" style={{ order: orderOf('above') }}>
-              <PanelFieldSections task={task} canEdit={canEdit} place="above" />
-              </div>
-
               {/* ── Description ──────────────────────────────────────────── */}
-              <div data-panel-section="description" style={{ order: orderOf('description') }}>
-              {withSections && <DescriptionLabel />}
               {editingBrief ? (
                 <BriefEditor
                   value={briefText}
@@ -2295,14 +2179,9 @@ export function TaskModal({
                   )}
                 </>
               )}
-              </div>
-
-              <div data-panel-section="below" style={{ order: orderOf('below') }}>
-              <PanelFieldSections task={task} canEdit={canEdit} place="below" />
-              </div>
 
               {/* ── Fields ───────────────────────────────────────────────── */}
-              <div data-panel-section="fields" style={{ order: orderOf('fields'), marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
+              <div style={{ marginTop: 26, background: '#F7F9FE', borderRadius: 22, padding: '14px 14px 10px' }}>
                 <h2 style={{ margin: '0 0 10px', font: 'inherit' }}>
                   <button type="button" onClick={() => setFieldsOpen(v => !v)}
                           aria-expanded={fieldsOpen}
@@ -2322,7 +2201,6 @@ export function TaskModal({
                 {fieldsOpen && (
                   <div>
                     {fields.filter(f => f.filled).map(f => f.node)}
-                    {linksSection}
                     {showEmpty && fields.filter(f => !f.filled).map(f => f.node)}
                     {emptyCount > 0 && (
                       <button type="button" onClick={() => setShowEmpty(v => !v)}
@@ -2344,9 +2222,8 @@ export function TaskModal({
               </div>
 
               {/* ── Subtasks + actions ───────────────────────────────────── */}
-              {/* Spec 021 (US4): a video's clips are hidden when its brand has Video clips off. */}
-              {(task.subtasks?.length ?? 0) > 0 && !(task.content_type_label === 'Video' && !on('clips')) && (
-                <div data-panel-section="subtasks" style={{ order: orderOf('subtasks'), marginTop: 20 }}>
+              {(task.subtasks?.length ?? 0) > 0 && (
+                <div style={{ marginTop: 20 }}>
                   <h2 style={{ fontSize: 16.5, fontWeight: 600, color: CU.text, margin: '0 0 8px' }}>
                     Subtasks <span style={{ color: CU.faint, fontWeight: 500 }}>{task.subtasks!.length}</span>
                   </h2>
@@ -2426,7 +2303,6 @@ export function TaskModal({
               )}
 
               {/* ── Attachments (spec 007) ─────────────────────────────── */}
-              <div data-panel-section="attachments" style={{ order: orderOf('attachments') }}>
               <AttachmentsSection
                 handle={sectionRef}
                 taskId={task.id}
@@ -2442,8 +2318,6 @@ export function TaskModal({
                 onStoredForComment={a => setDraftFiles(d => (d.includes(a.id) ? d : [...d, a.id]))}
                 onFilesChange={setFiles}
               />
-              </div>
-              </div>
 
               {isPublished && (
                 <div style={{
@@ -2805,4 +2679,3 @@ function MenuItem({ icon, label, onClick }: { icon: IconName; label: string; onC
     </button>
   )
 }
-

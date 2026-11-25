@@ -156,6 +156,7 @@ export function TabBar(p: TabBarProps) {
                 onDragEnd={() => setDrag(null)}
               >
                 <span className="fx-sh-tabname">{p.nameOf(s)}</span>
+                {linked && <><span className="fx-sh-tabicon" title={t('sheet.linkedTitle')} aria-hidden="true">🔗</span><span className="sr-only">{t('sheet.linkedTitle')}</span></>}
                 {s.protectedBy && <><span className="fx-sh-tabicon" title={t('sheet.protected')} aria-hidden="true">🔒</span><span className="sr-only">{t('sheet.protected')}</span></>}
                 <span className="fx-sh-caret" aria-hidden="true"
                       onClick={e => { e.stopPropagation(); const b = e.currentTarget.getBoundingClientRect(); p.onMenu(s.id, { x: b.left, y: b.top - 4 }, e.currentTarget.parentElement as HTMLElement) }}>▾</span>

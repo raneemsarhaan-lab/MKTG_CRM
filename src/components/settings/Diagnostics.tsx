@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { COLORS } from '@/lib/tokens'
-import { listDataExports, listNeedsLinkedTask, pingServerAction } from '@/actions/diagnostics'
+import { pingServerAction } from '@/actions/diagnostics'
 
 /**
  * Diagnostics — what the deployed server reports about itself.
@@ -260,55 +260,6 @@ export function Diagnostics() {
           )}
         </div>
       )}
-      <NeedsLinkedTask />
-      <KeptExports />
-    </div>
-  )
-}
-
-/**
- * A content task in the design stages that is on no Design or Video board (owner, 25 Nov 2026): add it
- * to its board from the task's "Shows in".
- */
-function NeedsLinkedTask() {
-  const [list, setList] = useState<Awaited<ReturnType<typeof listNeedsLinkedTask>> | null>(null)
-  useEffect(() => { void listNeedsLinkedTask().then(setList).catch(() => setList([])) }, [])
-  if (!list?.length) return null
-  const stage: Record<string, string> = { 'r-design': 'Ready For Design', 'd-prog': 'D-In Progress', 'd-check': 'D-Check' }
-  return (
-    <div data-needs-linked-task={list.length} role="alert" style={{ marginTop: 18, border: '1px solid #F1B8C2', background: '#FDE7EA', borderRadius: 12, padding: '12px 14px' }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 800, color: '#8F1230' }}>Not on the Design or Video board: {list.length}</h3>
-      <p style={{ margin: '0 0 8px', fontSize: 12.5, color: '#3A1F24' }}>
-        These content tasks are in the design stages but don’t show on the Design or Video board.
-        Open each one and add the board’s Space under “Shows in”. The list empties as they are fixed.
-      </p>
-      <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, display: 'grid', gap: 2 }}>
-        {list.map(x => (
-          <li key={x.id} data-needs-link={x.id}>
-            <a href={`/board?task=${x.id}`}>{x.name}</a> — {stage[x.status] ?? x.status}{x.brand ? ` · ${x.brand}` : ''} · belongs on the {x.board === 'video' ? 'Video' : 'Design'} board
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-/** Spec 026: files kept for the record when something was removed (the clip details). */
-function KeptExports() {
-  const [list, setList] = useState<{ name: string; title: string; rows: number; created_at: string }[] | null>(null)
-  useEffect(() => { void listDataExports().then(setList).catch(() => setList([])) }, [])
-  if (!list?.length) return null
-  return (
-    <div data-kept-exports style={{ marginTop: 18, borderTop: '1px solid #E1E1E0', paddingTop: 14 }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 800 }}>Kept exports</h3>
-      <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--muted)' }}>Saved before a column or field was removed. Nothing here is used by the app.</p>
-      <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13 }}>
-        {list.map(x => (
-          <li key={x.name}>
-            <a href={`/api/exports/${x.name}`} data-kept-export={x.name}>{x.name}</a> — {x.title} · {x.rows} rows · {x.created_at.slice(0, 10)}
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

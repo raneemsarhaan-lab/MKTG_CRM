@@ -110,7 +110,7 @@ export function FormatCellsDialog({ state, target, onClose }: { state: FormatSta
                       </select>)}
                   </div>
                 )}
-                {(d.num?.kind === 'number' || d.num?.kind === 'currency') && (
+                {d.num?.kind === 'number' && (
                   <label className="fx-fc-chk"><input type="checkbox" checked={d.num.sep !== false} onChange={e => setNum({ ...d.num!, sep: e.target.checked })} />{t('fc.thousands')}</label>
                 )}
                 {d.num && (d.num.kind === 'number' || d.num.kind === 'currency') && lb(t('fc.negative'), NEG, d.num.neg ?? 'minus', n => display('-1234.1', { ...d.num!, neg: n }, locale), n => setNum({ ...d.num!, neg: n }), n => (n.includes('red') ? { color: '#C00000' } : undefined))}

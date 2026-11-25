@@ -13,11 +13,9 @@ import { COLUMN_KINDS, convertValues, formatValue, nextChoiceColor } from '@/lib
 import { CHOICE_COLORS } from '@/lib/tokens'
 import type { ColumnPatch } from './types'
 
-const ICON: Record<ColumnKind, string> = { text: 'Aa', number: '#', date: '▦', link: '↗', person: '☺', choice: '◉', checkbox: '☑', task: '⇢' }
+const ICON: Record<ColumnKind, string> = { text: 'Aa', number: '#', date: '▦', link: '↗', person: '☺', choice: '◉', checkbox: '☑' }
 
-export function ColumnEditor({ initial, preset, values, members, heading, nameError, onSave, onCancel }: {
-  /** Adding: the kind chosen in the ＋ Field menu. */
-  preset?: ColumnKind
+export function ColumnEditor({ initial, values, members, heading, nameError, onSave, onCancel }: {
   /** Editing this column; absent when adding. */
   initial?: { name: string; kind: ColumnKind; options: ChoiceOption[] }
   /** The column's values, task id → value (for the kind-change review and options in use). */
@@ -31,7 +29,7 @@ export function ColumnEditor({ initial, preset, values, members, heading, nameEr
   const t = useTranslations('sheet.columns')
   const lang = useLocale()
   const [name, setName] = useState(initial?.name ?? '')
-  const [kind, setKind] = useState<ColumnKind>(initial?.kind ?? preset ?? 'text')
+  const [kind, setKind] = useState<ColumnKind>(initial?.kind ?? 'text')
   const [options, setOptions] = useState<ChoiceOption[]>(() =>
     initial?.options.length ? initial.options.map(o => ({ ...o })) : [{ id: `new-${Date.now()}`, name: t('optionN', { n: 1 }), color: CHOICE_COLORS[0] }])
   const [replace, setReplace] = useState<Record<string, string | null>>({})

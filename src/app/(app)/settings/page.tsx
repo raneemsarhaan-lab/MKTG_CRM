@@ -3,8 +3,6 @@ import { getSessionMember } from '@/lib/authz'
 import { prisma } from '@/lib/prisma'
 import { mapMember, mapSlaConfig } from '@/lib/mappers'
 import { SettingsView } from '@/components/settings/SettingsView'
-import { cleanFeatures } from '@/lib/brand-features'
-import { ruleFromSettings } from '@/lib/due-dates'
 import type { WorkspaceSettings } from '@/types/index'
 
 export default async function SettingsPage() {
@@ -49,16 +47,11 @@ export default async function SettingsPage() {
           id: b.id, name: b.name, color: b.color,
           logo_url: b.logo_url ?? undefined,
           description: b.description ?? undefined,
-          // Spec 021 (US4): the brand's own switch overrides and its C-Check default.
-          features: cleanFeatures(b.features),
-          nine_stage_default: b.nine_stage_default ?? null,
           assets: b.assets.map(a => ({ id: a.id, filename: a.filename, url: a.url })),
         }))}
-        contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label, media_boards: ct.media_boards }))}
+        contentTypes={contentTypes.map(ct => ({ id: ct.id, label: ct.label }))}
         slaConfig={mapSlaConfig(slaRows)}
         workspaceSettings={workspaceSettings}
-        brandFeatureDefaults={cleanFeatures(wsRow?.brand_feature_defaults)}
-        dueRule={ruleFromSettings(wsRow)}
       />
     </div>
   )

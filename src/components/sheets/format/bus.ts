@@ -86,7 +86,7 @@ export interface FormatState {
   advancedOn?: boolean
 }
 
-export type PasteMode = 'all' | 'values' | 'formats' | 'comments' | 'noBorders' | 'validation' | 'widths'
+export type PasteMode = 'all' | 'values' | 'formats' | 'noBorders' | 'validation' | 'widths'
 export type CleanOp = 'trim' | 'upper' | 'lower' | 'proper' | 'toNumber' | 'blanks'
 export type SplitFormat = 'general' | 'text' | 'date' | 'skip'
 /** The dialogs the toolbar asks the workbook to open. */
@@ -106,7 +106,7 @@ export type FormatCmd =
   | { kind: 'paint'; style: CellStyle | null }
   | { kind: 'clear'; what: ClearWhat }
   | { kind: 'fill'; dir: 'down' | 'right' }
-  | { kind: 'pasteSpecial'; mode: PasteMode; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null; op?: PasteOp | null; skipBlanks?: boolean; keys?: (string | null)[][] | null }
+  | { kind: 'pasteSpecial'; mode: PasteMode; transpose: boolean; grid: string[][]; styles: (CellStyle | null)[][] | null; op?: PasteOp | null; skipBlanks?: boolean }
   | { kind: 'find'; q: FindQuery; dir: 1 | -1 }
   | { kind: 'replace'; q: FindQuery; by: string; all: boolean }
   // Stage 3: Styles, Sort & Filter (FR-030–FR-032, FR-045, FR-046).
@@ -228,22 +228,6 @@ export const announceFind = (r: FindResult) => document.dispatchEvent(new Custom
 export const COMMENTS_CLEAR = 'momentum:comments-clear'
 export const clearComments = (source: FormatSource, keys: string[]) =>
   document.dispatchEvent(new CustomEvent(COMMENTS_CLEAR, { detail: { source, keys } }))
-
-/**
- * Undo for comments (spec 015 FR-048): the comments panel says what an action
- * changed, and the open sheet puts it on its own undo stack. After an undo or
- * redo, the sheet asks the panel to load the threads again.
- */
-export const COMMENT_RECORD = 'momentum:comment-record'
-export const recordCommentStep = (source: FormatSource, sheet: string, label: string, ops: import('@/lib/sheet-undo').CommentOp[]) =>
-  document.dispatchEvent(new CustomEvent(COMMENT_RECORD, { detail: { source, sheet, label, ops } }))
-export const COMMENTS_RELOAD = 'momentum:comments-reload'
-export const reloadComments = (source: FormatSource) => document.dispatchEvent(new CustomEvent(COMMENTS_RELOAD, { detail: { source } }))
-
-/** Paste carries comments (spec 015 FR-041): copy the threads at `from` ("sheet|rowKey|colKey") to these cells. */
-export const COMMENTS_PASTE = 'momentum:comments-paste'
-export const pasteComments = (source: FormatSource, pairs: { from: string; rowKey: string; colKey: string }[]) =>
-  document.dispatchEvent(new CustomEvent(COMMENTS_PASTE, { detail: { source, pairs } }))
 
 /** Spec 020: the right-drag menu's Series… asks the workbook for the Series dialog. */
 export const SERIES_OPEN = 'momentum:series-open'

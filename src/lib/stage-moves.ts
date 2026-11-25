@@ -20,27 +20,20 @@ interface MoveTask {
   nine_stage: boolean
   task_owner_id: string
   assignee_id?: string | null
-  /** Spec 023 (R9): every assignee (lead and others); any of them holds a working stage. */
-  assignee_ids?: string[] | null
   dropped_at?: string | Date | null
-  /** Spec 024 (§7): the roles its Space names for stages (owner or approver); a named role holds that stage. */
-  stage_roles?: Partial<Record<string, string>> | null
 }
 interface MoveMember { id: string; role: string; access: AccessLevel | string }
 
 /** Whether the member holds the task's current stage (the right to hand it on). */
 export function holdsStage(
-  task: Pick<MoveTask, 'status' | 'task_owner_id' | 'assignee_id' | 'assignee_ids' | 'stage_roles'>,
+  task: Pick<MoveTask, 'status' | 'task_owner_id' | 'assignee_id'>,
   member: Pick<MoveMember, 'id' | 'role'>,
 ): boolean {
   const meta = STAGE_META[task.status as StageId]
   if (!meta) return false
-  const mine = task.assignee_id === member.id || task.task_owner_id === member.id || !!task.assignee_ids?.includes(member.id)
-  // Spec 024: the Space's role for this stage. An approver replaces the built-in reviewer;
-  // an owner of a working stage holds it alongside the task's own people.
-  const named = task.stage_roles?.[task.status]
-  if (named) return named === member.role || (!meta.owner_role && mine)
-  return meta.owner_role ? meta.owner_role === member.role : mine
+  return meta.owner_role
+    ? meta.owner_role === member.role
+    : task.assignee_id === member.id || task.task_owner_id === member.id
 }
 
 /** Every stage the member may move this task to, in path order; [] when none. */
@@ -52,13 +45,6 @@ export function allowedStages(task: MoveTask, member: MoveMember): StageId[] {
   if (!path.includes(task.status as StageId)) return []
   return path.filter(s => s !== task.status)
 }
-
-/**
- * Spec 021: the first stage of the design half. A pipeline task crossing from
- * before it to it or later must show in a production team Space (the hand-off,
- * src/lib/spaces.ts `needsHandoff`).
- */
-export const DESIGN_HALF_START: StageId = 'r-design'
 
 /** The stage after the current one on the task's path, if any. */
 export function nextOnPath(task: Pick<MoveTask, 'status' | 'nine_stage'>): StageId | null {

@@ -22,7 +22,7 @@ import { applyLocale } from '@/lib/locale-switch'
 import { useUIStore } from '@/store/useUIStore'
 
 export const SETTINGS_ORDER: NotificationKind[] = [
-  'mention', 'assigned', 'urgent', 'comment', 'reply', 'sheet_mention', 'sheet_reply', 'attachment',
+  'mention', 'assigned', 'comment', 'reply', 'attachment',
   'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
 ]
 const CHANNELS = ['in_app', 'push', 'email'] as const
@@ -84,7 +84,7 @@ export function NotificationSettings() {
 
   const head = (
     <>
-      <Link href="/me" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
+      <Link href="/board" className="fx-nt-link fx-nt-back">← {t('back')}</Link>
       <h1>{tp('title')}</h1>
     </>
   )

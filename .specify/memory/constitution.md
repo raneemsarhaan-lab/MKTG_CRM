@@ -1,52 +1,17 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 4.1.0 → 4.2.0 (2026-11-23)
-Type of bump: MINOR — spec 023 Stage B (T040): a task has several assignees,
-  the first is the lead (tasks.assignee_id); any assignee holds a working
-  stage and may edit the task; Priority is Urgent | High | Normal | Low | None
-  (Medium renamed Normal); Urgent sorts first and notifies, it does not change
-  the SLA.
-
-Previous: 4.0.0 → 4.1.0 (2026-11-23)
-Type of bump: MINOR — spec 023 Stage A (T002): required fields join the one
-  move rule; milestones are calendar markers, not tasks; task types are data.
+Version change: 2.0.0 → 2.1.0 (2026-11-04)
+Type of bump: MINOR — §VI gains an explicit allowance for per-device view
+  preferences in localStorage, outside the Zustand store.
 
 Modified principles:
-  - §II: the move rule also refuses a stage while a field required from it
-    (spec 023, "Required from stage") is empty, on every path, with the field
-    named. Milestones (name, date, brand) are not tasks and never enter the
-    pipeline.
-  - §VI: task types are the content types as data (Arabic name, icon, colour,
-    defaults, attached fields); fields, their values and milestones live in
-    Postgres.
-
-Templates: no changes needed.
-
-Previous report (4.0.0)
------------------------
-Version change: 3.0.0 → 4.0.0 (2026-11-23)
-Type of bump: MAJOR — §II redefined again: one workflow (simple tasks removed),
-  media tasks on the Design and Video boards, and SLA working days from
-  Settings on Cairo days. Done as the first task of spec 022 (T001).
-
-Modified principles:
-  - §II: every task is a pipeline task (11 stages, or 10 when its brand had
-    C-Check off). Simple tasks are removed and migrated. Media tasks (Design,
-    Video) are added: linked to a content task (automatically once at Ready For
-    Design, or by hand) or unlinked. allowedStages holds a content task before
-    F-Check until every linked media task has passed D-Check, and keeps a linked
-    media task following its content task after D-Check. SLA counts the working
-    days of the Settings › Due Dates weekend, on Africa/Cairo days. The hand-off
-    creates linked media tasks. Space stages rename or split original stages in
-    a Space's own views only.
-  - §V: the simple-task celebration is removed; tasks migrated from simple
-    tasks never celebrate.
-  - §VI: `MediaBoard` joins the exhaustive unions; `TaskKind` and
-    `SimpleStatus` are retired. Space stages and sub-stage positions are shared
-    data in Postgres.
-  - Tech stack: drag-and-drop moves cards across columns only; cards are not
-    reordered within a column (boards sort by due date).
+  - §VI: "No localStorage persistence" now applies to application data and to
+    the Zustand store. Small per-device view preferences (a toggle, a chosen
+    column set, a collapsed panel) MAY use localStorage under `momentum.*` keys.
+    This matches existing practice (board scope and upstream toggle, sidebar,
+    My Day) and spec 008's column set and Show dropped. Resolves spec 008
+    /speckit-analyze finding C1.
 
 Templates:
   ✅ .specify/templates/plan-template.md — no changes needed
@@ -54,27 +19,52 @@ Templates:
   ✅ .specify/templates/tasks-template.md — no changes needed
 
 Follow-up TODOs:
-  - d-check ownership → Islam (HANDOVER §14) still needs its own amendment.
+  - None.
 
-Previous report (3.0.0)
+Previous report (2.0.0)
 -----------------------
-§II redefined (the 11 stages as built, plus simple tasks), stack corrected to
-what runs in production (spec 021, research R9).
+Version change: 1.0.0 → 2.0.0
+Type of bump: MAJOR — framework migration from Vite/React to Next.js 15 App Router;
+  multiple principle updates to align with accepted plan.md decisions
+
+Modified principles:
+  - §II: English stage labels corrected to canonical full names (To Do, Writing,
+    Content Review, Islam Check, Ready to Design, Designing, Design Review,
+    Final Check, Published) — previously used abbreviated internal codes
+  - §III: Admin-only mutation gate changed from Zustand store to Postgres RLS;
+    UI gating now correctly described as presentation-only
+  - §V: Celebration trigger scope corrected — fires on any personally-owned
+    stage advance (not only on publish transition); shouldCelebrate from moveTask
+    Server Action is authoritative
+  - §VI: Zustand persisted keys removed — all app data lives in Postgres;
+    slaConfig persistence moved from Zustand to sla_config table;
+    currentUser re-resolution updated from getSession()+MEMBERS seed to
+    server-side Supabase cookie session;
+    onAuthStateChange Zustand coupling removed
+  - Tech Stack: Framework updated React 19+Vite → Next.js 15 App Router;
+    Deployment updated GitHub Pages → Vercel; Auth/DB expanded to include
+    Postgres+Realtime+Storage; next-intl and @dnd-kit added;
+    Zustand persist middleware removed
+  - Source layout updated to reflect App Router structure
+
+Templates:
+  ✅ .specify/templates/plan-template.md — no changes needed
+  ✅ .specify/templates/spec-template.md — no changes needed
+  ✅ .specify/templates/tasks-template.md — no changes needed
+
+Follow-up TODOs:
+  - None; all amendments resolve /speckit-analyze findings C2, H4, H2, H1, H3.
 -->
 
 
-# Momentum Creative Ops Constitution
-
-Momentum was called Fluxo until August 2026. Cookie and storage keys keep their
-`fluxo` prefixes on purpose (HANDOVER, top note).
+# Fluxo Creative Ops Constitution
 
 ## Core Principles
 
 ### I. Design System Fidelity
 
-All UI code MUST use the established token map (`src/lib/tokens.ts`, mirrored
-as CSS variables in `src/app/globals.css`). Ad-hoc color literals are forbidden
-outside the token files.
+All UI code MUST use the established Fluxo design token map. Ad-hoc color
+literals are forbidden outside the token map.
 
 **Color tokens (canonical):**
 
@@ -92,145 +82,116 @@ outside the token files.
 | `panel`  | `#FFFFFF` | Card / modal surface          |
 | `line`   | `#E1E1E0` | Borders / dividers            |
 
-Brand colours and stage colours are data (`brands.color`, `STAGE_COLORS`), not
-new tokens.
-
 **Typography rules (non-negotiable):**
 - Headings, stat numbers, wordmark: Montserrat, weight 700–900,
   letter-spacing −0.01em to −0.03em.
 - Body, labels, inputs: Inter, weight 300–700.
 - Cursive accent text only: Caveat, weight 600–700.
 - Font sizes: 10px (micro chips) → 38px (BigStat headline).
-- No system fonts for branded text.
+- No system fonts for branded text. Google Fonts import MUST include all
+  three families at the declared weights.
 
-**Rationale**: a consistent visual language is what makes Momentum feel like a
-product. Diverging from tokens breaks the unified feel across views and makes
-redesigns expensive.
+**Rationale**: A consistent visual language is what makes Fluxo feel like a
+product, not a prototype. Diverging from tokens breaks the unified feel
+across views and makes redesigns expensive.
 
-### II. Workflow Integrity
+### II. Workflow Pipeline Integrity
 
-Momentum has **one workflow**: every task is a pipeline task.
-
-#### The content pipeline
-
-The pipeline is the core model of the system and MUST NOT be altered without a
-constitution amendment. Its definition lives in `src/lib/stage-meta.ts`.
+The 9-stage content pipeline is the core model of the system and MUST NOT be
+altered without a constitution amendment.
 
 **Canonical stages (in order):**
 
-| # | ID              | English label     | Arabic label                | Phase   | Owner role          |
-|---|-----------------|-------------------|-----------------------------|---------|---------------------|
-| 1 | `todo`          | To Do             | افكار للتنفيذ               | Intake  | Assignee            |
-| 2 | `c-prog`        | C-In Progress     | كتابة المحتوى               | Content | Assignee            |
-| 3 | `c-final`       | C-Review          | مراجعة المحتوى              | Content | Marketing Manager   |
-| 4 | `c-check`       | C-Check           | موافقة نهائية على المحتوى  | Content | Managing Director   |
-| 5 | `r-design`      | Ready For Design  | جاهز للتصميم               | Design  | Assignee            |
-| 6 | `d-prog`        | D-In Progress     | تصميم                       | Design  | Assignee            |
-| 7 | `d-check`       | D-Check           | مراجعة التصميم             | Design  | Brand Director      |
-| 8 | `final-check`   | F-Check           | المراجعة النهائية          | Ship    | Marketing Manager   |
-| 9 | `ready-publish` | Ready to Publish  | جاهز للنشر                  | Ship    | Assignee            |
-| 10| `scheduled`     | Scheduled         | مجدول                       | Ship    | Assignee            |
-| 11| `publish`       | Published         | تم النشر                    | Ship    | — (terminal)        |
-
-**Rules:**
-- **Assignee** in the table means any of the task's assignees (spec 023): the
-  first is the lead and is `tasks.assignee_id`; the others are in
-  `task_assignees`. Any of them, and the task's owner, holds a working stage.
-- **C-Check is optional per task.** A task created "with C-Check" has 11 stages;
-  without it, 10 (`EIGHT_STAGE` in code, named for history). The choice is made
-  at creation from the task's brand default (`brands.nine_stage_default`), else
-  the workspace default (`workspace_settings.nine_stage_default`), and is
-  immutable afterwards.
-- **Ownership is by role, never by name.** Review stages belong to members whose
-  `role` equals the stage's owner role. Working stages belong to the task's
-  assignee or owner.
-- **One move rule.** `allowedStages` (`src/lib/stage-moves.ts`) decides every
-  stage change — Advance, the stage menu, Board drag across columns, Inbox,
-  sheet cells and bulk moves. Admins and superusers override ownership. No
-  screen may add a second path around it.
-- **Published is terminal.** Nothing moves a task out of `publish`.
-- **Media tasks (spec 022).** The Design and Video boards hold media tasks
-  (`tasks.media_board`). A media task is *linked* to a content task
-  (`tasks.content_task_id`) or *unlinked*.
-  - A content task reaching Ready For Design for the first time is linked
-    automatically, once, to every board its content type needs; the hand-off
-    box asks for a person per board.
-  - A media board can Link task (by hand) or Create task (an unlinked media task
-    that starts at Ready For Design and counts SLA from there).
-  - Any member may unlink (user, 2026-11-23); both tasks keep their history
-    and move separately afterwards.
-  - `allowedStages` MUST hold a content task before F-Check until every linked
-    media task has passed D-Check, and MUST keep a linked media task following
-    its content task after D-Check.
-- **Required fields (spec 023).** A task type's field may be required from a
-  stage. `allowedStages`' move gate MUST refuse moving a task to or past that
-  stage while the field is empty, on every path (Advance, stage menu, Board
-  drag, Inbox, sheets, bulk, and a linked row's move), naming the field. When
-  linked media tasks pass D-Check, the content task waits instead of moving.
-- **Milestones (spec 023)** are calendar markers (a name, a date, a brand). They
-  are not tasks and never enter the pipeline.
-- **Space stages (spec 022).** A team Space may rename or split each original
-  stage in its own views. Each Space stage maps to exactly one original stage;
-  every original stage has at least one. A move between Space stages of one
-  original stage changes nothing outside that Space. The original stages stay
-  the source of truth for SLA, approvals, overdue, reports and the main board.
+| ID            | English Label    | Arabic Label                 | Phase   | Color     |
+|---------------|-----------------|------------------------------|---------|-----------|
+| `todo`        | To Do           | افكار للتنفيذ                | Intake  | `#64748B` |
+| `c-prog`      | Writing         | كتابة المحتوى                | Content | `#3B82F6` |
+| `c-final`     | Content Review  | مراجعة المحتوى               | Content | `#2E6FB0` |
+| `c-check`     | Islam Check     | موافقة نهائية على المحتوى   | Content | `#1F5A94` |
+| `r-design`    | Ready to Design | جاهز للتصميم                | Design  | `#8B5CF6` |
+| `d-prog`      | Designing       | تصميم                        | Design  | `#7C3AED` |
+| `d-check`     | Design Review   | مراجعة التصميم              | Design  | `#5B3FB5` |
+| `final-check` | Final Check     | المراجعة النهائية           | Ship    | `#F59E0B` |
+| `publish`     | Published       | تم النشر                     | Ship    | `#22C55E` |
 
 **SLA enforcement:**
-- Every pipeline stage carries an SLA threshold per content type, stored in
-  `sla_config`; admins edit it in Settings.
-- Breach is computed on render, never stored:
-  `businessDaysBetween(stage_date, today) > sla[stage][type]`, counting the
-  working days of the Settings › Due Dates weekend (Friday and Saturday by
-  default) on Africa/Cairo days.
-- A brand may switch SLA tracking off; its tasks then show no breach.
+- Every stage MUST carry an SLA threshold per content type
+  (Post, Video, Reel, Design, Email, Story, Deck, Other).
+- SLA breach detection MUST be computed on render (not stored).
+  A task is breached when `businessDaysBetween(stageDate, today) > sla[stage][ctype]`.
+- The SLA matrix defaults live in `src/data/stages.ts` as `SLA_DEFAULTS`.
+- Admins may override per-stage SLA via the Settings view; overrides persist
+  in the `sla_config` Postgres table (not Zustand). SLA reads are always
+  server-side at render time via the `updateSLA` Server Action.
 
-**Rationale**: the pipeline encodes the agency's real approval chain; changing
-it risks corrupting task data and SLA. One workflow, with media work split into
-linked media tasks, keeps every deliverable on that chain.
+**Review stage ownership (immutable unless amended):**
+
+| Stage         | Owner role            |
+|---------------|-----------------------|
+| `c-final`     | Marketing Manager     |
+| `c-check`     | Managing Director     |
+| `d-check`     | Brand Director        |
+| `final-check` | Marketing Manager     |
+
+Working stages (`todo`, `c-prog`, `r-design`, `d-prog`) are owned by the
+task's assignee.
+
+**Rationale**: The 9-stage model encodes the agency's real approval chain.
+Changing it without an amendment risks corrupting existing task data and
+breaking downstream SLA calculations.
 
 ### III. Role-Based Feature Access
 
-Three access tiers. Every feature gate MUST be enforced in the server action or
-page guard that performs it; hiding a control in the UI is presentation only.
+Three access tiers MUST be enforced at the component level. No feature gate
+may be left to a runtime API check alone; the UI MUST also conditionally
+render.
 
-| Tier        | Badge color               | Capabilities |
-|-------------|---------------------------|--------------|
-| `admin`     | lime `#C3F53D` / `#111`   | Everything: Settings, members, team Spaces and their members, brand feature switches, SLA. |
-| `superuser` | violet `#B79CF5` / `#111` | Full pipeline; creates tasks for anyone; edits team Space stages. No Settings. |
-| `user`      | neutral `#EDEDEA` / `#6B` | Creates tasks they own; acts on tasks they own or are assigned; moves the stages they hold. |
+| Tier       | Badge color               | Capabilities                                        |
+|------------|---------------------------|-----------------------------------------------------|
+| `admin`    | lime `#C3F53D` / `#111`   | Full access; Capacity view; Settings; member mgmt   |
+| `superuser`| violet `#B79CF5` / `#111` | Full pipeline; cannot access Settings or Capacity   |
+| `user`     | neutral `#EDEDEA` / `#6B` | Own tasks only; no admin views                      |
 
 Rules:
-- **There is no row-level security.** Prisma connects as one database user.
-  Every server action carries its own permission check (HANDOVER §6); a missing
-  check is a privilege escalation, not a style issue.
-- Settings is admin-only and rejects non-admins on the server.
-- `currentUser.access` is resolved on the server from the session on every
-  request.
+- Capacity view and Settings nav items MUST be hidden from non-admins.
+- Admin-only mutations (addMember, removeMember, updateSLA) MUST be
+  enforced at the database level via Postgres RLS. UI gating (hiding controls
+  from non-admins) is presentation only; DB-level enforcement via RLS is the
+  authoritative security gate.
+- `currentUser.access` is the single source of truth; derive it from the
+  `MEMBERS` seed + Supabase auth email match.
 
-**Rationale**: senior stakeholders and junior executors share the tool.
-Over-privileged access risks accidental data corruption.
+**Rationale**: The tool is used by both senior stakeholders and junior
+executors. Over-privileged access creates risk of accidental data corruption.
 
 ### IV. Design-Driven Development
 
-Every new view or major component MUST be preceded by a standalone HTML design
-file in `design/`. The design file is the source of truth for:
+Every new view or major component MUST be preceded by a standalone HTML
+design file (the bundled prototype format used in this project). The design
+file is the source of truth for:
 - Layout structure and responsive breakpoints
 - Component hierarchy and naming
-- Color usage (mapping to the tokens above)
+- Color usage (mapping to tokens above)
 - Interaction patterns (hover states, transitions, animations)
 - Copy / microcopy (including Arabic labels)
 
-Implementation MUST match the design file before shipping. Deviations require
-explicit sign-off and a note in the PR. A design is re-implemented in the
-codebase's React/TypeScript architecture, never pasted in.
+Implementation MUST match the design file to pixel-level fidelity before
+shipping. Deviations require explicit sign-off and a note in the PR.
 
-**Rationale**: standalone HTML prototypes are the team's design handoff format.
-Treating them as the spec removes interpretation gaps.
+When a design file is provided, an agent MUST:
+1. Decompress and read the bundled JS component (gzip+base64 manifest entry
+   with `createContext` + `useStore` in the source).
+2. Extract design tokens, layout, and component names.
+3. Re-implement in the codebase's React/TypeScript architecture—never
+   copy-paste the standalone JS directly.
+
+**Rationale**: Standalone HTML prototypes are the team's design handoff
+format. Treating them as the spec eliminates interpretation gaps.
 
 ### V. Cultural UX & Celebration System
 
-The Arabic celebration system is a first-class product feature. It MUST be
-preserved in every refactor.
+The Arabic celebration system is a first-class product feature, not an
+easter egg. It MUST be preserved in every refactor.
 
 **Four reactions (non-negotiable):**
 
@@ -242,83 +203,88 @@ preserved in every refactor.
 | `tabla`    | طبلة              | 🥁    | `#534AB7`    |
 
 **Rules:**
-- A celebration fires for **one person**, the one who acted, never broadcast.
-- Pipeline tasks: it fires when a member advances a stage they personally own
-  (working stages for any assignee or the owner, review stages for the matching role).
-  The server's move result (`shouldCelebrate`) is authoritative.
-- Tasks migrated from simple tasks (spec 022) never celebrate.
-- Celebrations are opt-in per member (`celebrationsOn`).
-- Sound plays the recorded assets in `public/sounds/`; the four Web Audio
-  patterns in `src/lib/celebration-audio.ts` are the fallback and MUST NOT be
-  replaced with generic sounds. Audio only plays off a user gesture.
-- Arabic copy (stage labels, reaction copy, celebration messages) is content
-  data, not hardcoded strings.
+- Celebrations MUST trigger when a user advances a stage they personally own:
+  working stages (`todo`, `c-prog`, `r-design`, `d-prog`) fire for the task
+  owner; review stages (`c-final`, `c-check`, `d-check`, `final-check`) fire
+  for the member whose role matches the stage's `owner_role`. Admin or superuser
+  advances that do not match stage ownership MUST NOT trigger a celebration.
+  The `moveTask` Server Action returns `shouldCelebrate: boolean` to signal this.
+- Audio synthesis MUST use the Web Audio API (no external audio CDN
+  dependency). The four synthesis patterns (LFO sine / bandpass noise /
+  sawtooth arpeggio / dum-tak tabla) are canonical and MUST not be replaced
+  with generic sounds.
+- Particle colors per reaction are defined in `src/lib/sounds.ts` / the
+  REACTIONS constant and MUST match the design.
+- Arabic text (stage labels, reaction copy, celebration messages) MUST be
+  treated as content data, not hardcoded strings, to allow future i18n.
 
-**Rationale**: the celebration system is a cultural expression of the team's
-identity and makes completing work feel rewarding.
+**Rationale**: The celebration system is a cultural expression of the team's
+identity and a key differentiator that makes task completion feel rewarding.
 
 ### VI. State Architecture & Persistence
 
-- **Application data lives in PostgreSQL** and is read in server components
-  (loaders such as `loadBoardData`) and written through server actions. Prisma
-  results that feed components go through `src/lib/mappers.ts`.
-- **Zustand (`src/store/useUIStore.ts`) holds UI ephemera only** — the open
-  task, the celebration payload, dialogs (such as the hand-off box), pending
-  deletes. No `persist` middleware.
-- **Per-device view preferences** (a toggle, a column set, a collapsed panel,
-  a calendar layout) MAY be kept in `localStorage` under `momentum.*` keys.
-  They MUST be read after mount, wrapped in try/catch, and the view MUST render
-  correctly without them. They MUST NOT hold application data or anything
-  another member needs to see; shared things (saved views, team Space words)
-  belong in Postgres, as do team Space stages and each task's sub-stage.
-- **Task types are data (spec 023).** The content types are the task types:
-  each has an Arabic name, an icon, a colour, defaults for new tasks and the
-  fields attached to it. Field definitions, their attachments, every task's
-  values and milestones live in Postgres.
-- **Priority** is `Urgent | High | Normal | Low | None` (spec 023 D7–D8); stored
-  `Medium` reads as Normal. Urgent sorts first in every list and notifies the
-  assignees; it never shortens an SLA.
-- **Types**: `StageId`, `ContentType`, `Priority`, `Platform`, `AccessLevel`,
-  `MediaBoard` are exhaustive unions in `src/types/index.ts`; adding a value
-  updates that file first. (`TaskKind` and `SimpleStatus` are retired.)
-- **Session**: one signed cookie, `fluxo_session`, verified by the same HMAC
-  function in middleware and on the server (`src/lib/session.ts`). Email and
-  password login only; accounts are created by admins.
-- **Data changes to existing rows** go through `once()` markers in
-  `prisma/seed.ts`; importers never overwrite what exists, and deletions are
-  recorded as tombstones.
+App state MUST follow the Zustand + Supabase dual-layer pattern.
 
-**Rationale**: separating server data from UI ephemera prevents stale-state
-bugs and keeps authorization in one place per action.
+**Zustand store (`src/store/useUIStore.ts`):**
+- Persisted keys: NONE. All application data (tasks, members, brands,
+  slaConfig) lives in Postgres and is fetched server-side via Server Components
+  and Server Actions. No localStorage persistence of application data or of
+  the store.
+- Per-device view preferences (a toggle, a chosen column set, a collapsed
+  panel) MAY be kept in `localStorage` outside the store, under a `momentum.*`
+  key. They MUST be read after mount (never during render), wrapped in
+  try/catch, and the view MUST render correctly without them. They MUST NOT
+  hold application data or anything another member needs to see.
+- Ephemeral UI state only: `celebration`, `selectedTaskId`, `showTaskForm`,
+  `profileOpen`.
+- `currentUser` is resolved server-side on every request from the Supabase
+  session cookie; it is NOT stored in Zustand.
+
+**Type system (`src/types.ts`):**
+- `StageId`, `ContentType`, `Brand`, `Priority`, `Platform`, `AccessLevel`
+  MUST be exhaustive TypeScript union types.
+- Adding a new value to any union MUST update `src/types.ts` first;
+  no string literals elsewhere.
+
+**Supabase auth:**
+- Only `@forefront.consulting` email domain is accepted; enforced in
+  `/auth/callback/route.ts` — sign out and redirect to `/login?error=domain`
+  if the email domain does not match.
+- Session is managed via server-side cookies using `@supabase/ssr`.
+- `logout()` MUST call `supabase.auth.signOut()`. No Zustand state to clear
+  (currentUser lives only in the server session).
+
+**Rationale**: Separating ephemeral UI state from persisted data prevents
+stale state bugs across sessions and keeps the auth layer clean.
 
 ## Tech Stack
 
-Adding or swapping a major dependency requires a constitution amendment.
+These are the canonical dependencies for Fluxo. Adding or swapping a major
+dependency requires a constitution amendment.
 
-| Layer         | Choice                                                         |
-|---------------|----------------------------------------------------------------|
-| Framework     | Next.js 16 (App Router) + TypeScript (strict)                  |
-| Database      | PostgreSQL (Cranl-hosted)                                      |
-| ORM           | Prisma 5 — pinned; v7 breaks the schema (HANDOVER §4)          |
-| Auth          | Custom HMAC session (`src/lib/session.ts`), bcryptjs passwords |
-| Styling       | Tailwind CSS v4 + CSS variables from the token map             |
-| State         | Zustand v5, no `persist` — UI ephemera only                    |
-| i18n          | next-intl, Arabic + English, full RTL (cookie locale)          |
-| Drag-and-drop | @dnd-kit — move across columns (no reorder within a column)    |
-| Icons         | Lucide React                                                   |
-| Fonts         | Google Fonts (Montserrat, Inter, Caveat)                       |
-| Deployment    | Cranl, from `main`                                             |
-| Testing       | `npm run typecheck`, plus per-feature labs (`scripts/*-lab`): pure checks in Node and Playwright scenarios |
+| Layer        | Choice                                                    |
+|--------------|-----------------------------------------------------------|
+| Framework    | Next.js 15 (App Router) + TypeScript (strict)             |
+| Build tool   | Next.js built-in (no separate Vite)                       |
+| Styling      | Tailwind CSS v4 (inline + `@theme`)                       |
+| State        | Zustand v5, no `persist` — UI ephemera only               |
+| Auth/DB      | Supabase (Auth + Postgres + Realtime + Storage)           |
+| i18n         | next-intl (cookie-based locale, no URL segment)           |
+| Drag-and-drop| @dnd-kit/core (within-column reorder only)                |
+| Icons        | Lucide React                                              |
+| Fonts        | Google Fonts (Montserrat, Inter, Caveat)                  |
+| Deployment   | Vercel                                                    |
+| Testing      | (none mandated yet — see Governance)                      |
 
 **Source layout:**
 
 ```
 src/
-├── middleware.ts         Session guard (cookie check, redirect to /login)
-├── app/                  App Router pages, layouts, route handlers
-├── actions/              Server Actions — each carries its own permission check
+├── middleware.ts         Auth guard (cookie check, redirect to /login)
+├── app/                  Next.js App Router pages, layouts, route handlers
+├── actions/              Server Actions (tasks.ts, members.ts, settings.ts)
 ├── components/           React components organized by view
-├── lib/                  Pure logic (stage-moves, spaces, workload…), loaders, Prisma helpers
+├── lib/                  Supabase helpers, stage-meta.ts, alert-status.ts
 ├── store/                useUIStore.ts (Zustand, UI ephemera only)
 ├── types/                index.ts — shared TypeScript union types
 └── app/globals.css       CSS token variables, base reset, RTL logical props
@@ -328,15 +294,16 @@ src/
 
 - This constitution supersedes all other practices. When implementation
   conflicts with a principle, the implementation MUST change.
-- Amendments require documented rationale, a version bump, and updates to any
+- Amendments require: documented rationale, version bump, and update to any
   affected templates or skill files.
 - Version bump rules:
   - **MAJOR**: principle removed or fundamentally redefined.
   - **MINOR**: new principle or section added.
   - **PATCH**: wording, clarity, or typo fixes.
-- PRs introducing new views, components, or state shape changes MUST include a
-  "Constitution Check" referencing the relevant principles.
-- Spec Kit skills (`/speckit-plan`, `/speckit-specify`, …) read this file to
-  enforce compliance gates.
+- All PRs introducing new views, components, or state shape changes MUST
+  include a "Constitution Check" comment referencing the relevant principle.
+- Use `.specify/memory/constitution.md` as the runtime governance reference.
+  Spec Kit skills (`/speckit-plan`, `/speckit-specify`, etc.) read this file
+  to enforce compliance gates.
 
-**Version**: 4.2.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-23
+**Version**: 2.1.0 | **Ratified**: 2026-07-15 | **Last Amended**: 2026-11-04

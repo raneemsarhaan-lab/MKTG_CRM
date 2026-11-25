@@ -10,8 +10,6 @@
  * apply on screen, push on the stack, queue for the server (R5, R6). The
  * linked tab is the board's own sheet, passed in by the page.
  */
-import { applyCommentOps } from '@/actions/sheet-comments'
-import { COMMENT_RECORD, reloadComments } from './format/bus'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
@@ -63,8 +61,6 @@ export interface WorkbookProps {
   names: Record<string, string>
   /** The board's sheet, for a linked folder's linked tab. */
   linked?: ReactNode
-  /** Spec 026: shown inside a Space, brand or My tasks page (no Sheets section to go back to). */
-  inPage?: boolean
   initialSheetId?: string | null
   /** Spec 015: a notification's cell to open, `rowKey:colKey`. */
   initialCell?: string | null
@@ -90,7 +86,6 @@ const SB_KEY = 'momentum.sheet.stats'
 export function Workbook(p: WorkbookProps) {
   const t = useTranslations('sheets')
   const { api, folder } = p
-  const inPage = !!p.inPage
   const [sheets, setSheets] = useState<SheetSummary[]>(() => [...p.initialSheets].sort(byPos))
   const visible = useMemo(() => sheets.filter(s => !s.hidden), [sheets])
   const hidden = useMemo(() => sheets.filter(s => s.hidden), [sheets])
@@ -222,7 +217,6 @@ export function Workbook(p: WorkbookProps) {
     setStacks(s => ({ ...s, [id]: u.stack }))
     outbox.enqueue(id, toServer(back))
     replayFields(id, back)
-    replayComments(back)
   }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
   const doRedo = useCallback(() => {
     const id = openRef.current
@@ -233,25 +227,7 @@ export function Workbook(p: WorkbookProps) {
     setStacks(s => ({ ...s, [id]: r.stack }))
     outbox.enqueue(id, toServer(fwd))
     replayFields(id, fwd)
-    replayComments(fwd)
   }, [outbox]) // eslint-disable-line react-hooks/exhaustive-deps
-  /** Spec 015 FR-048: comment actions undo and redo through the comments panel's actions. */
-  function replayComments(changes: BlankChange[]) {
-    const ops = changes.flatMap(ch => (ch.kind === 'comments' ? ch.ops : []))
-    if (!ops.length) return
-    void applyCommentOps(ops).then(r => { if (!r.success) say(t('grid.reason.commentUndo')); reloadComments('blank') }).catch(() => reloadComments('blank'))
-  }
-  // A comment action on the open blank sheet is a step of its undo stack (not re-applied: it's done).
-  useEffect(() => {
-    const on = (e: Event) => {
-      const d = (e as CustomEvent<{ source: string; sheet: string; label: string; ops: import('@/lib/sheet-undo').CommentOp[] }>).detail
-      if (d.source !== 'blank' || d.sheet !== openRef.current || !d.ops.length) return
-      const id = d.sheet
-      setStacks(s => ({ ...s, [id]: push(s[id] ?? emptyStack(), makeStep(d.label, [{ kind: 'comments', ops: d.ops }])) }))
-    }
-    document.addEventListener(COMMENT_RECORD, on)
-    return () => document.removeEventListener(COMMENT_RECORD, on)
-  }, [])
 
   // The linked tab's history, from its grid (it lives in the board's sheet, not here).
   const [linkedHist, setLinkedHist] = useState({ canUndo: false, canRedo: false })
@@ -422,7 +398,7 @@ export function Workbook(p: WorkbookProps) {
 
   // ── names ───────────────────────────────────────────────────────────────
   const folderName = folder.kind === 'content' ? t('folder.content') : folder.kind === 'video' ? t('folder.video') : folder.name ?? ''
-  const nameOf = useCallback((s: SheetSummary) => (s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.kind === 'linked_tasks' ? t('sheet.tasks') : s.name ?? ''), [t])
+  const nameOf = useCallback((s: SheetSummary) => (s.kind === 'linked_content' ? t('sheet.content') : s.kind === 'linked_video' ? t('sheet.video') : s.name ?? ''), [t])
   const pattern = t.raw('sheet.defaultName') as string
 
   // ── tabs ────────────────────────────────────────────────────────────────
@@ -771,13 +747,12 @@ export function Workbook(p: WorkbookProps) {
     ? t('protect.blocked', { name: p.names[open.protectedBy] ?? '…' })
     : null
   const status = outbox.status
-  // Spec 021: a brand's or a Space's workbook isn't "linked" as a folder; only its Tasks tab is.
-  const linkedFolder = folder.kind === 'content' || folder.kind === 'video'
+  const linkedFolder = folder.kind !== 'team'
   const statusText = status === 'retrying' ? t('status.retrying', { n: outbox.pending }) : status === 'saving' ? t('status.saving') : t('status.saved')
   const dialogSheet = (id: string) => sheets.find(s => s.id === id)
 
   // Spec 019: ⚙ Fields on team sheets and (stage 2) the Content sheet.
-  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video' || open?.kind === 'linked_tasks'
+  const fieldsHere = (openBlank && !!doc) || open?.kind === 'linked_content' || open?.kind === 'linked_video'
   // Spec 018: on a computer these sit in the title row; on a phone, in the tools row as before.
   const headTools = (
     <>
@@ -808,10 +783,10 @@ export function Workbook(p: WorkbookProps) {
     <div className="fx-sh-workbook" data-workbook={folder.id} onKeyDownCapture={onKeyDownCapture}>
       <div className="fx-sh-top" ref={topRef}>
         <nav className="fx-sh-crumbs" aria-label={t('crumb')} data-crumb="">
-          {/* Spec 026: inside a Space, brand or My tasks page there is no Sheets section to go back to. */}
-          {!inPage && <><Link href="/sheets">{t('crumb')}</Link><span aria-hidden="true">›</span></>}
+          <Link href="/sheets">{t('crumb')}</Link>
+          <span aria-hidden="true">›</span>
           <h1>{folderName}</h1>
-          {/* User, 24 Nov 2026: no "Linked" tag — every sheet is the same kind of sheet. */}
+          {linkedFolder && <span className="fx-sh-linked"><span aria-hidden="true">🔗 </span>{t('home.linkedBadge')}</span>}
         </nav>
         <span className={`fx-sh-status is-${status}`} data-save-status={status} role="status" aria-live="polite"
               title={status === 'retrying' ? t('status.offline') : undefined}>{statusText}</span>
@@ -850,7 +825,7 @@ export function Workbook(p: WorkbookProps) {
           onPaste={async mode => {
             const clip = await readClipboard()
             if (!clip || !clip.grid.length) { say(t('format.edit.noClip')); return }
-            sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles, keys: clip.keys })
+            sendFormat(fmtTarget, { kind: 'pasteSpecial', mode, transpose: false, grid: clip.grid, styles: clip.styles })
           }}
           onPasteSpecial={() => setPasteSpecial(true)}
           onFind={replace => setFind({ replace })}
@@ -950,7 +925,7 @@ export function Workbook(p: WorkbookProps) {
 
       {open && (
         <SheetComments
-          sheetRef={openBlank ? open.id : open.kind === 'linked_tasks' ? open.linkedKey ?? open.id : open.kind === 'linked_video' ? 'linked_video' : 'linked_content'}
+          sheetRef={openBlank ? open.id : open.kind === 'linked_video' ? 'linked_video' : 'linked_content'}
           source={fmtTarget}
           state={fmtState}
           names={p.names}

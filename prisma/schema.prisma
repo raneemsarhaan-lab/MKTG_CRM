@@ -357,7 +357,7 @@ model Task {
   /// dozen kilobytes or so. It is set on upload and is not a user field —
   /// cover_image_url above is the one somebody chooses.
   cover_thumb          String?   @db.Text
-  priority             String    @default("Normal")
+  priority             String    @default("Medium")
   /// Spec 012 (R11): members @mentioned in the description, by id.
   description_mentions String[]  @default([]) @db.Uuid
   created_by           String?   @db.Uuid

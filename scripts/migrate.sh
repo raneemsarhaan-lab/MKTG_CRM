@@ -24,8 +24,8 @@ set -e
 # The schema and the reference rows the app cannot render without. Fatal:
 # serving pages against a schema that was never pushed fails on every request,
 # which is worse than not starting.
-# First, a guard: `db push --accept-data-loss` would drop a column without asking. If the change
-# can lose or alter existing data, stop here, before anything is touched (scripts/schema-guard.sh).
+# Roll back of 25 Nov 2026: the database keeps the newer version's tables and columns. This check
+# stops the start if the schema change would drop, rename or retype anything, so no data is lost.
 step 120 fatal   "Checking the schema change keeps all data" \
   bash "$(dirname "$0")/schema-guard.sh"
 step 180 fatal   "Pushing Prisma schema to database" \

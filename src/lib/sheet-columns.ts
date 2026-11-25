@@ -10,7 +10,7 @@ import { isWebLink } from '@/lib/content-plan'
 import { CHOICE_COLORS } from '@/lib/tokens'
 import { intlLocale } from '@/lib/sheet-format'
 
-export const COLUMN_KINDS: ColumnKind[] = ['text', 'number', 'date', 'link', 'person', 'choice', 'checkbox', 'task']
+export const COLUMN_KINDS: ColumnKind[] = ['text', 'number', 'date', 'link', 'person', 'choice', 'checkbox']
 export const MAX_CUSTOM_COLUMNS = 30
 export const MAX_NAME = 40
 export const MAX_OPTIONS = 50
@@ -29,13 +29,11 @@ export interface BuiltInColumn {
 }
 
 /** The built-in columns of each sheet, in default order. Title is always first. */
-export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
+export const BUILT_INS: Record<SheetId, BuiltInColumn[]> = {
   content: [
     { key: 'title', width: 300, en: 'Title' },
     { key: 'type', width: 130, en: 'Type' },
     { key: 'status', width: 156, en: 'Status' },
-    // Spec 022 (R19): Link task — the piece's Design and Video tasks.
-    { key: 'media', width: 340, en: 'Link task' },
     { key: 'assignee', width: 130, en: 'Assignee' },
     { key: 'doc', width: 124, en: 'Working Doc' },
     { key: 'design', width: 116, en: 'Design Link' },
@@ -54,8 +52,6 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
     { key: 'title', width: 280, en: 'Clip', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'type', width: 96, en: 'Type', sets: ['copy', 'full', 'sheet'] },
     { key: 'status', width: 160, en: 'Stage', sets: ['editing', 'copy', 'full', 'sheet'] },
-    // Spec 022 (R19): Link task on a video's own row — its Design and Video tasks.
-    { key: 'media', width: 340, en: 'Link task', sets: ['full', 'sheet'] },
     { key: 'editor', width: 150, en: 'Owner', sets: ['editing', 'copy', 'full', 'sheet'] },
     { key: 'reviewer', width: 150, en: 'Reviewer', sets: ['sheet'] },
     { key: 'due', width: 90, en: 'Due', sets: ['sheet'] },
@@ -76,47 +72,10 @@ export const BUILT_INS: Record<'content' | 'video', BuiltInColumn[]> = {
   ],
 }
 /** The sets a sheet has: the Video sheet's three, or one for the Content sheet. */
-export const SHEET_SETS: Record<'content' | 'video', string[]> = { content: ['all'], video: ['editing', 'copy', 'full', 'sheet'] }
-
-/** Spec 021 (T081): a Space's, brand's or My tasks' Tasks sheet. */
-export const TASK_BUILT_INS: BuiltInColumn[] = [
-  { key: 'title', width: 300, en: 'Task' },
-  { key: 'brand', width: 170, en: 'Brand' },
-  // Spec 025: the Spaces a task shows in — on a brand's sheet only.
-  { key: 'space', width: 150, en: 'Space' },
-  { key: 'status', width: 150, en: 'Status' },
-  // Spec 022 (R19): Link task — this task's Design and Video tasks.
-  { key: 'media', width: 340, en: 'Link task' },
-  { key: 'assignee', width: 140, en: 'Assignee' },
-  { key: 'publish', width: 130, en: 'Publishing date' },
-  { key: 'start', width: 120, en: 'Start date' },
-  { key: 'due', width: 130, en: 'Due date' },
-  { key: 'type', width: 110, en: 'Type' },
-  { key: 'priority', width: 90, en: 'Priority' },
-  { key: 'platform', width: 110, en: 'Platform' },
-]
-export const TASK_SHEET = /^tasks:(space|brand|me):[0-9a-f-]{36}$/
-export const isTaskSheet = (sheet: string) => TASK_SHEET.test(sheet)
-/** Spec 026: a Space's sheet of rows (`rows:<spaceId>`); the Content Space's keeps the id `content`. */
-export const ROWS_SHEET = /^rows:[0-9a-f-]{36}$/
-export const isRowsSheet = (sheet: string) => sheet === 'content' || ROWS_SHEET.test(sheet)
-export const builtInsFor = (sheet: SheetId): BuiltInColumn[] => (isRowsSheet(sheet) ? BUILT_INS.content : sheet === 'video' ? BUILT_INS.video : TASK_BUILT_INS)
-export const setsFor = (sheet: SheetId): string[] => (sheet === 'video' ? SHEET_SETS.video : ['all'])
-
-/**
- * Spec 026: where a Space's sheet keeps its columns. The Content Space keeps the
- * id its sheet always had; every other Space has `rows:<its id>`, and the
- * one-time conversion moves the custom columns of its old sheet there.
- */
-export const spaceSheetId = (space: { id: string; key: string }): SheetId =>
-  (space.key === 'content' || !space.id ? 'content' : `rows:${space.id}`) as SheetId
+export const SHEET_SETS: Record<SheetId, string[]> = { content: ['all'], video: ['editing', 'copy', 'full', 'sheet'] }
 
 export const isCustomKey = (key: string) => key.startsWith('c:')
-/** Spec 026 (§6): a task-field column, `f:<field id>` — a field of the library shown on a sheet of rows. */
-export const isFieldKey = (key: string) => /^f:[0-9a-f-]{36}$/.test(key)
-/** A library field as a column: its key, and whether it shows before anyone decides (a type in use carries it). */
-export interface FieldColumn { key: string; shown: boolean; width?: number }
-export const builtInOf = (sheet: SheetId, key: string) => builtInsFor(sheet).find(b => b.key === key)
+export const builtInOf = (sheet: SheetId, key: string) => BUILT_INS[sheet].find(b => b.key === key)
 
 export interface LaidColumn {
   key: string
@@ -128,8 +87,6 @@ export interface LaidColumn {
   kind: ColumnKind | null
   options: ChoiceOption[]
   record: SheetColumnRecord | null
-  /** Spec 026: a task field of the library. It is renamed, moved and hidden like a built-in column. */
-  field?: boolean
 }
 
 /**
@@ -137,13 +94,10 @@ export interface LaidColumn {
  * defaults. With records: their order, a built-in added to the code later
  * slotted after its default predecessor, Title always first and shown.
  */
-export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string, fields: FieldColumn[] = [], defaults: string[] = []): LaidColumn[] {
-  const builtIns = builtInsFor(sheet)
-  // Spec 024 (§5): the Space's default columns — the built-ins that show until someone shows or hides one.
-  const picked = defaults.filter(k => builtIns.some(b => b.key === k))
+export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: string): LaidColumn[] {
+  const builtIns = BUILT_INS[sheet]
   const recs = records.filter(r => r.sheet === sheet && (!isCustomKey(r.key) || r.kind))
   const byKey = new Map(recs.map(r => [r.key, r]))
-  const fieldOf = new Map(fields.map(f => [f.key, f]))
   let keys: string[]
   if (!recs.length) keys = builtIns.map(b => b.key)
   else {
@@ -153,28 +107,22 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
       const before = builtIns.slice(0, i).reverse().find(x => keys.includes(x.key))
       keys.splice(before ? keys.indexOf(before.key) + 1 : 0, 0, b.key)
     })
-    // A task-field column keeps its place once it has a record (even while the caller's field list is
-    // not at hand: the optimistic layer), so a change to another column never moves it.
-    keys = keys.filter(k => isCustomKey(k) || isFieldKey(k) || builtIns.some(b => b.key === k))
+    keys = keys.filter(k => isCustomKey(k) || builtIns.some(b => b.key === k))
   }
-  // Task fields nobody has placed yet follow, in the library's order.
-  for (const f of fields) if (!keys.includes(f.key)) keys.push(f.key)
   keys = ['title', ...keys.filter(k => k !== 'title')]
   return keys.map(key => {
     const r = byKey.get(key) ?? null
     const b = builtInOf(sheet, key)
-    const f = isFieldKey(key) ? fieldOf.get(key) ?? { key, shown: false } : null
-    const defaultShown = f ? f.shown : b ? (picked.length ? picked.includes(key) : b.sets ? b.sets.includes(set) : true) : true
+    const defaultShown = b ? (b.sets ? b.sets.includes(set) : true) : true
     return {
       key,
-      builtIn: !!b || !!f,
+      builtIn: !!b,
       name: r?.name ?? null,
-      width: clampWidth(r?.width ?? b?.width ?? f?.width ?? CUSTOM_WIDTH),
+      width: clampWidth(r?.width ?? b?.width ?? CUSTOM_WIDTH),
       shown: key === 'title' ? true : r && !r.shownDefault ? r.shownIn.includes(set) : defaultShown,
-      kind: b || f ? null : (r?.kind ?? null),
-      options: b || f ? [] : (r?.options ?? []),
+      kind: b ? null : (r?.kind ?? null),
+      options: b ? [] : (r?.options ?? []),
       record: r,
-      ...(f ? { field: true } : {}),
     }
   })
 }
@@ -182,7 +130,7 @@ export function applyLayout(sheet: SheetId, records: SheetColumnRecord[], set: s
 /** Default visibility of a column in every set, the starting point for a first hide or show. */
 export function defaultShownIn(sheet: SheetId, key: string): string[] {
   const b = builtInOf(sheet, key)
-  return setsFor(sheet).filter(s => (b?.sets ? b.sets.includes(s) : true))
+  return SHEET_SETS[sheet].filter(s => (b?.sets ? b.sets.includes(s) : true))
 }
 
 export const clampWidth = (w: number) => Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(w)))
@@ -245,8 +193,6 @@ export function readPastedValues(
 export interface ValueCtx {
   members?: { id: string; name: string }[]
   options?: ChoiceOption[]
-  /** Spec 021 (Task link): the tasks a value may name, by id or exact name. */
-  tasks?: { id: string; name: string }[]
   /**
    * The reader's language, for a Number or Date shown in a cell. Absent: English,
    * which is what a kind change and the server read back (convertValues).
@@ -261,7 +207,7 @@ export interface ValueCtx {
  * sheet never mixes digit styles.
  */
 export const sheetLocale = (lang: string) => intlLocale(lang)
-export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long' | 'task'
+export type ParseCode = 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'long'
 export type Parsed = { ok: true; value: string } | { ok: false; code: ParseCode }
 
 /** "2026-11-20" or "20/11/2026" (also 20.11.2026, 20-11-26) → YYYY-MM-DD, or null. */
@@ -307,14 +253,6 @@ export function parseValue(kind: ColumnKind, raw: string, ctx: ValueCtx = {}): P
       const o = os.find(x => x.id === v) ?? os.find(x => same(x.name, v))
       return o ? { ok: true, value: o.id } : { ok: false, code: 'choice' }
     }
-    case 'task': {
-      // One task (approved design): its id, or a name only one task has.
-      const ts = ctx.tasks ?? []
-      const byId = ts.find(x => x.id === v)
-      if (byId) return { ok: true, value: byId.id }
-      const named = ts.filter(x => same(x.name, v))
-      return named.length === 1 ? { ok: true, value: named[0].id } : { ok: false, code: 'task' }
-    }
     case 'checkbox': {
       const l = v.toLowerCase()
       if (YES.includes(l)) return { ok: true, value: '1' }
@@ -331,7 +269,6 @@ export function formatValue(kind: ColumnKind, value: string, ctx: ValueCtx = {})
     case 'person': return ctx.members?.find(m => m.id === value)?.name ?? ''
     case 'choice': return ctx.options?.find(o => o.id === value)?.name ?? ''
     case 'checkbox': return value === '1' ? 'yes' : ''
-    case 'task': return ctx.tasks?.find(x => x.id === value)?.name ?? ''
     case 'date': {
       const d = new Date(`${value}T00:00:00`)
       return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(sheetLocale(ctx.lang ?? 'en'), { day: 'numeric', month: 'short', year: 'numeric' })
@@ -388,7 +325,7 @@ export type LayoutOp =
 export function materialise(sheet: SheetId, records: SheetColumnRecord[], who: { id: string; name: string }): SheetColumnRecord[] {
   const mine = records.filter(r => r.sheet === sheet)
   const others = records.filter(r => r.sheet !== sheet)
-  const laid = applyLayout(sheet, mine, setsFor(sheet)[0])
+  const laid = applyLayout(sheet, mine, SHEET_SETS[sheet][0])
   const now = new Date().toISOString()
   const full = laid.map((c, i): SheetColumnRecord => c.record
     ? { ...c.record, position: i }

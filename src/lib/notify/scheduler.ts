@@ -18,10 +18,8 @@
  *   every tick   instant emails (unread for 10 minutes)
  *   hourly       due tomorrow / overdue reminders
  *   08:30 team   daily summary emails
- *   03:00 team   clean-up: read notifications over 90 days, old reminder keys,
- *                orphaned sheet formats and comments (spec 015)
+ *   03:00 team   clean-up: read notifications over 90 days, old reminder keys
  */
-import { runRecurring } from '@/lib/recurrence-server'
 import { prisma } from '@/lib/prisma'
 import type { NotificationKind, NotificationMeta } from '@/types/index'
 import { notify, deliver } from './notify'
@@ -145,14 +143,10 @@ export async function runCleanup(now = new Date()): Promise<number> {
   const r = await prisma.notification.deleteMany({ where: { read_at: { not: null, lt: cutoff } } })
   await prisma.dueReminder.deleteMany({ where: { due_date: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
   await prisma.emailDigest.deleteMany({ where: { day: { lt: new Date(now.getTime() - 30 * 24 * 3600_000) } } })
-  // Spec 015 (T057) clears formats and comment threads whose row, column or task is gone. It is NOT
-  // run in this release (user, 25 Nov 2026: nothing deletes live rows until its removal is approved):
-  // it is new, it deletes rows on a schedule, and it doesn't know the rows of the new sheets.
-  // `clearSheetOrphans` in src/lib/sheet-cleanup.ts is kept for when it is approved.
   return r.count
 }
 
-let lastDue = 0, lastRecurring = 0, lastCleanupDay = ''
+let lastDue = 0, lastCleanupDay = ''
 /**
  * One tick: every job that is due now. Returns the jobs it ran. A job that
  * fails is logged and the others still run; the hourly and nightly ones are
@@ -169,11 +163,6 @@ export async function tick(now = new Date()): Promise<string[]> {
   if (now.getTime() - lastDue >= 55 * 60_000) {
     lastDue = now.getTime()
     await job('due', () => runDueReminders(now))
-  }
-  // Spec 023 (US8): recurring tasks whose creation day has come, hourly.
-  if (now.getTime() - lastRecurring >= 55 * 60_000) {
-    lastRecurring = now.getTime()
-    await job('recurring', () => runRecurring(now))
   }
   if (clock.h > 8 || (clock.h === 8 && clock.m >= 30)) await job('daily', () => runDailySummary(now))
   const day = teamDay(now, TZ())

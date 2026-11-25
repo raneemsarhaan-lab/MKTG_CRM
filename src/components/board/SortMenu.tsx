@@ -14,25 +14,24 @@
 import { useTranslations } from 'next-intl'
 import type { Task } from '@/types/index'
 import { HeaderMenu, ChevronIcon } from './HeaderMenu'
-import { compareByDue, compareByPublish } from '@/lib/due-dates'
-import { priorityRank, urgentFirst } from '@/lib/priorities'
 
-export type SortKey = 'due' | 'publish' | 'priority' | 'name' | 'created' | 'updated'
-/** Boards sort by due date, earliest first, unless a person picks otherwise for that board. */
+export type SortKey = 'due' | 'priority' | 'name' | 'created' | 'updated'
 export const DEFAULT_SORT: SortKey = 'due'
-export const SORT_KEYS: readonly SortKey[] = ['due', 'publish', 'priority', 'name', 'created', 'updated']
+export const SORT_KEYS: readonly SortKey[] = ['due', 'priority', 'name', 'created', 'updated']
 
+const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 
-/** Due date, earliest first; no due date last; then publishing date, then created. */
 function byDue<T extends Task>(a: T, b: T): number {
-  return compareByDue(a, b)
-}
-function byPublish<T extends Task>(a: T, b: T): number {
-  return compareByPublish(a, b)
+  if (a.due_date !== b.due_date) {
+    if (!a.due_date) return 1
+    if (!b.due_date) return -1
+    return a.due_date < b.due_date ? -1 : 1
+  }
+  return byCreated(a, b)
 }
 
 function byPriority<T extends Task>(a: T, b: T): number {
-  const d = priorityRank(a.priority) - priorityRank(b.priority)
+  const d = (PRIORITY_RANK[a.priority] ?? 1) - (PRIORITY_RANK[b.priority] ?? 1)
   return d !== 0 ? d : byDue(a, b)
 }
 
@@ -51,14 +50,12 @@ function byUpdated<T extends Task>(a: T, b: T): number {
 /** Sorts a copy; the input array is left untouched. */
 export function sortTasks<T extends Task>(tasks: T[], sort: SortKey): T[] {
   const copy = [...tasks]
-  // Spec 023 (D8): Urgent first in every sort; the chosen order follows.
   switch (sort) {
-    case 'due':      return copy.sort(urgentFirst(byDue))
-    case 'publish':  return copy.sort(urgentFirst(byPublish))
+    case 'due':      return copy.sort(byDue)
     case 'priority': return copy.sort(byPriority)
-    case 'name':     return copy.sort(urgentFirst(byName))
-    case 'created':  return copy.sort(urgentFirst(byCreated))
-    case 'updated':  return copy.sort(urgentFirst(byUpdated))
+    case 'name':     return copy.sort(byName)
+    case 'created':  return copy.sort(byCreated)
+    case 'updated':  return copy.sort(byUpdated)
   }
 }
 
@@ -71,16 +68,11 @@ function SortIcon() {
   )
 }
 
-export function SortMenu({ value, onChange, noPriority = false, onReset }: {
+export function SortMenu({ value, onChange }: {
   value: SortKey
   onChange(next: SortKey): void
-  /** Spec 021 (US4): no brand on the board uses Priorities. */
-  noPriority?: boolean
-  /** "Reset to default sort": back to due date, and the board forgets the choice. */
-  onReset?(): void
 }) {
   const t = useTranslations('header')
-  const tDates = useTranslations('dates')
 
   return (
     <HeaderMenu
@@ -89,19 +81,13 @@ export function SortMenu({ value, onChange, noPriority = false, onReset }: {
       width={200}
       trigger={<><SortIcon /><span className="fx-hd-lbl-keep">{t(`sort.${value}`)}</span><ChevronIcon /></>}
     >
-      {SORT_KEYS.filter(key => !(noPriority && key === 'priority')).map(key => (
+      {SORT_KEYS.map(key => (
         <button key={key} type="button" className="fx-hd-opt" data-sort-option={key}
                 aria-pressed={value === key} onClick={() => onChange(key)}>
           <span className="fx-hd-opt-txt">{t(`sort.${key}`)}</span>
           {value === key && <span className="fx-hd-check" aria-hidden="true">✓</span>}
         </button>
       ))}
-      {onReset && (
-        <button type="button" className="fx-hd-opt" data-sort-reset="" disabled={value === DEFAULT_SORT} onClick={onReset}
-                style={{ borderTop: '1px solid var(--line, #E5E7EB)', marginTop: 4 }}>
-          <span className="fx-hd-opt-txt">{tDates('sortReset')}</span>
-        </button>
-      )}
     </HeaderMenu>
   )
 }

@@ -5,8 +5,6 @@
  * video, with or without clip details (subtasks made before the sheet, or by
  * "New subtask", have none, and show blank cells).
  */
-import { featureOn } from '@/lib/brand-features'
-import type { BrandFeatures } from '@/types/index'
 import type { Task } from '@/types/index'
 
 export type SheetTask = Task
@@ -40,8 +38,8 @@ export function clipsOf(tasks: SheetTask[], videoId: string): SheetTask[] {
 }
 
 /** Whether a task belongs to the member for the Mine toggle (FR-054). */
-export function isMine(t: Pick<Task, 'assignee_id' | 'task_owner_id' | 'assignee_ids'>, me: string): boolean {
-  return t.assignee_id === me || t.task_owner_id === me || !!t.assignee_ids?.includes(me)
+export function isMine(t: Pick<Task, 'assignee_id' | 'task_owner_id'>, me: string): boolean {
+  return t.assignee_id === me || t.task_owner_id === me
 }
 
 /** The most recent change across a video and its clips. */
@@ -69,11 +67,7 @@ export function videosWithClips(tasks: SheetTask[]): { video: SheetTask; clips: 
  * isn't published, so a new video's band is there to add clips to. Most
  * recently worked on first.
  */
-export function sheetVideos(all: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
-  // Spec 021 (US5): simple tasks are never videos or clips on the Video sheet.
-  // Spec 022: media tasks live on their boards, never as videos here.
-  // Spec 024 (§8): a clip is made on the Video board and still sits under its video.
-  const tasks = all.filter(t => !(t as { media_board?: string | null }).media_board || !!t.parent_task_id)
+export function sheetVideos(tasks: SheetTask[]): { video: SheetTask; clips: SheetTask[] }[] {
   const withClips = videosWithClips(tasks)
   const has = new Set(withClips.map(g => g.video.id))
   const empty = tasks
@@ -125,11 +119,6 @@ export function buildRows(tasks: SheetTask[], o: RowOptions): SheetRow[] {
     const videoHit = !q || matchesQuery(video.name, q)
     const clipHit = (c: SheetTask) => videoHit || matchesQuery(c.name, q) || matchesQuery(c.clip?.file_name, q)
     if (!videoHit && !clips.some(clipHit)) continue
-    // Spec 021 (US4): a brand with Video clips off shows its videos alone; the clips are kept.
-    if (!featureOn((video as { brand?: { features?: BrandFeatures } }).brand, 'clips')) {
-      if (videoHit) rows.push({ kind: 'video', key: `v:${video.id}`, task: video, clips: [], collapsed: true, n: n++ })
-      continue
-    }
     const collapsed = o.collapsed.has(video.id) && videoHit
     rows.push({ kind: 'video', key: `v:${video.id}`, task: video, clips, collapsed, n: n++ })
     if (collapsed) continue

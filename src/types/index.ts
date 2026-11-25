@@ -25,9 +25,8 @@ export type BoardTab = 'pipeline' | 'content'
 
 // ─── Sheet columns (spec 010) ─────────────────────────────────────────────────
 
-/** Spec 021 (T081): 'tasks:<node>' is a Space's, brand's or My tasks' Tasks sheet. */
-export type SheetId = 'content' | 'video' | `tasks:${string}` | `rows:${string}`
-export type ColumnKind = 'text' | 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox' | 'task'
+export type SheetId = 'content' | 'video'
+export type ColumnKind = 'text' | 'number' | 'date' | 'link' | 'person' | 'choice' | 'checkbox'
 export interface ChoiceOption { id: string; name: string; color: string }
 /** One column of a sheet the team has shaped (data-model §1). */
 export interface SheetColumnRecord {
@@ -83,8 +82,7 @@ export type SheetColumn =
   | 'in' | 'out' | 'length' | 'files' | 'published' | 'drop'
   | 'reviewer' | 'due' | 'inStage' | 'doc' | 'design' | 'task' | 'post'
 export type AlertStatus = 'On Track' | 'At Risk' | 'Will Miss' | 'Stuck' | 'Idle' | 'Overdue'
-/** Spec 023 (D7): Medium became Normal. */
-export type Priority = 'Urgent' | 'High' | 'Normal' | 'Low' | 'None'
+export type Priority = 'Low' | 'Medium' | 'High'
 
 // ─── Core entities ─────────────────────────────────────────────────────────
 
@@ -119,170 +117,11 @@ export interface Brand {
   color: string
   logo_url?: string
   description?: string
-  /** Spec 021 (R11): feature switch overrides; a missing key means the workspace default. */
-  features?: BrandFeatures
-  /** Spec 021 (R11): the brand's own overrides, when `features` holds the resolved switches. */
-  own_features?: BrandFeatures
-  /** Spec 021 (R11): the brand's "with C-Check" default for new tasks; null = the workspace default. */
-  nine_stage_default?: boolean | null
-  /** Spec 025: the short name the sidebar shows; null = the full name. */
-  short_name?: string | null
-  /** Spec 025: the priority new tasks for this brand start with; null = the Space's, then the type's. */
-  default_priority?: string | null
-}
-
-// ─── Spec 021: brands, team Spaces and views ─────────────────────────────────
-
-/** A task's workflow (R1). Fixed at creation. */
-export type TaskKind = 'pipeline' | 'simple'
-
-/** A simple task's status: To Do › In progress › Done. */
-export type SimpleStatus = 's-todo' | 's-doing' | 's-done'
-
-/** The per-brand feature switches (US4). */
-export type BrandFeatureKey = 'priorities' | 'platform' | 'type' | 'pillars' | 'hours' | 'covers' | 'clips' | 'sla' | 'tags'
-/** Spec 023: a switchable task field's switch is `f:<field id>`. */
-export type BrandFeatures = Partial<Record<BrandFeatureKey, boolean>> & { [field: `f:${string}`]: boolean | undefined }
-
-/** A brand's four fixed Folders. */
-export type BrandFolderKey = 'cal' | 'assets' | 'sheet' | 'lib'
-
-/** Why a task shows in a Space. */
-export type TaskSpaceVia = 'created' | 'assignee' | 'handoff' | 'manual' | 'migration'
-
-/** A team Space: a lens on one team's work across every brand. */
-export interface TeamSpace {
-  id: string
-  key: string
-  name: string
-  color: string
-  is_production: boolean
-  default_kind: TaskKind
-  /** { [stageId | simpleStatus]: words } — unused for 'content' and 'video' (R5). */
-  words: Record<string, string[]>
-  sort_order: number
-  archived_at: string | null
-  /** Spec 022 (R9): the role new tasks made in this Space are assigned to. */
-  default_assignee_role?: string | null
-  /** Spec 022: this Space is the Design or Video media board. */
-  media_board?: MediaBoard | null
-  /** Spec 024: how the Space works (defaults filled in). */
-  settings: import('@/lib/space-settings').SpaceSettings
-}
-
-/** Spec 022: a media board. */
-export type MediaBoard = 'design' | 'video'
-
-/** Spec 022 (R7): a Space's name for one original stage (one of possibly several). */
-export interface SpaceStage {
-  id: string
-  space_id: string
-  stage_id: StageId
-  /** Null shows the original stage's name. */
-  name: string | null
-  position: number
-  aliases: string[]
-}
-
-/** Spec 022 (R7): a task's sub-stage in one Space, valid while its stage is still stage_id. */
-export interface TaskSpaceStage {
-  task_id: string
-  space_id: string
-  space_stage_id: string
-  stage_id: StageId
-}
-
-export interface SpaceMember {
-  space_id: string
-  member_id: string
-}
-
-/** One Shows in row. */
-export interface TaskSpace {
-  task_id: string
-  space_id: string
-  added_via: TaskSpaceVia
-}
-
-export type ViewType = 'list' | 'board' | 'sheet' | 'calendar' | 'workload' | 'files' | 'gallery'
-
-/** 'everything' | 'me' | 'space:<id>' | 'brand:<id>' | 'brand:<id>:<folder>' */
-export type ViewNode = string
-
-export interface SavedView {
-  id: string
-  node: ViewNode
-  type: ViewType
-  name: string
-  config: Record<string, unknown>
-  /** Null for a shared view. */
-  owner_id: string | null
-  position: number
-  /** The reader created it (may edit a shared view). */
-  mine?: boolean
-}
-
-/** What the hand-off box needs to open (contracts/handoff.md). */
-export interface HandoffDefaults {
-  /** Production Spaces pre-ticked for this task. */
-  spaceIds: string[]
-  /** Members of each production Space, by Space id. */
-  candidates: Record<string, string[]>
-  /** Spec 022: each media board with its Space and suggested person (the Space's default assignee). */
-  boards?: { board: MediaBoard; spaceId: string; suggested: string | null }[]
 }
 
 export interface ContentType {
   id: string
   label: string
-  /** Spec 022 (R6): the media boards a task of this type is linked to at Ready For Design. */
-  media_boards?: string[]
-  /** Spec 023 (R1): a task type's Arabic name, icon, colour and defaults. */
-  name_ar?: string | null
-  icon?: string
-  color?: string
-  default_priority?: string | null
-  default_tag_ids?: string[]
-  default_template_id?: string | null
-  position?: number
-}
-/** Spec 023: task types are the content types, extended. */
-export type TaskType = ContentType
-
-/** Spec 023 (R2): a field's kind. */
-export type FieldKind = 'text' | 'number' | 'money' | 'date' | 'link' | 'person' | 'choice' | 'multi' | 'checkbox' | 'rating' | 'task'
-export interface FieldOption { id: string; en: string; ar?: string | null; color?: string | null }
-export interface TaskFieldDef {
-  id: string
-  name_en: string
-  name_ar: string | null
-  kind: FieldKind
-  /** place: where the task panel shows it — the top rows, or above / below the Description (default above). */
-  options: { choices?: FieldOption[]; currency?: string; max?: number; place?: 'top' | 'above' | 'below'; hint?: { en: string; ar?: string | null } }
-  on_card: boolean
-  switchable: boolean
-  position: number
-  retired: boolean
-}
-export interface TaskTypeFieldLink { type_label: string; field_id: string; required_from: StageId | null; default_value: unknown; position: number }
-export interface TaskFieldValueRow { task_id: string; field_id: string; value: unknown }
-/** Spec 023 (R8): a workspace tag. */
-export interface Tag { id: string; name: string; color: string }
-/** My tasks: a personal to-do, private to its owner. */
-export interface Todo { id: string; name: string; note: string | null; day: string | null; flagged: boolean; done_at: string | null; created_at: string }
-/** Spec 023 (R6): a brand's calendar marker — not a task. */
-export interface Milestone { id: string; brand_id: string; name: string; day: string }
-/** Spec 023 (US7): a task template. Subtask offsets are days from the publishing date. */
-export interface TaskTemplateSubtask { name: string; startOffset?: number | null; dueOffset?: number | null; assigneeRole?: string | null }
-export interface TaskTemplate {
-  id: string
-  type_label: string
-  name: string
-  name_pattern: string
-  brief: string | null
-  values: { fields?: Record<string, unknown>; priority?: string | null; tagIds?: string[]; assigneeRole?: string | null; projectId?: string | null; hours?: number | null }
-  subtasks: TaskTemplateSubtask[]
-  updated_at: string
 }
 
 export interface Stage {
@@ -315,12 +154,6 @@ export interface Task {
   task_owner_id: string
   /** Who is doing the work. Null when nobody has picked it up. */
   assignee_id?: string | null
-  /** Spec 023 (R9): every assignee, the lead first (the lead is also assignee_id). */
-  assignee_ids?: string[]
-  /** Spec 023: hours set per person; others share the rest evenly. */
-  assignee_hours?: Record<string, number>
-  /** Spec 023 (R8): the task's tags. */
-  tag_ids?: string[]
   assignee?: Member
   task_owner?: Member
   initiator_role: string
@@ -328,30 +161,6 @@ export interface Task {
   status: StageId
   stage_date: string
   due_date: string | null
-  /** Spec 023 (US6): optional start; never after the due date. */
-  start_date?: string | null
-  /** Spec 023 (US8): the repeat rule this task belongs to; shows ↻. */
-  repeat_rule_id?: string | null
-  /** The day the content goes live (Africa/Cairo). */
-  publish_date?: string | null
-  /** The due date was set by hand: a new publishing date doesn't move it. */
-  due_manual?: boolean
-  /** Spec 022 (R1): 'design' | 'video' for a media task; null for a content task. */
-  media_board?: MediaBoard | null
-  /** Spec 022: the content task a media task is linked to; null when unlinked. */
-  content_task_id?: string | null
-  /** Spec 022: the stage the task began at ('r-design' when made on a media board). */
-  entry_stage?: StageId
-  /** Spec 022 (R5): when the automatic link at Ready For Design ran (content tasks). */
-  auto_linked_at?: string | null
-  /** Spec 024: the Space whose rules apply to this task (board data only). */
-  home_space_id?: string | null
-  /** Spec 024: that Space's role per stage (owner or approver). */
-  stage_roles?: Partial<Record<string, string>> | null
-  /** Spec 024: that Space's SLA for the task's current stage, when it sets one. */
-  space_sla_days?: number | null
-  /** Spec 022: migrated from a simple task (never celebrates). */
-  migrated_simple?: boolean
   hours_estimate: number
   cover_image_url?: string
   /** Auto-preview of the newest uploaded image. Not a user field. */
@@ -377,10 +186,6 @@ export interface Task {
   pillar_id?: string | null
   /** The social post's link (spec 009). */
   post_url?: string | null
-  /** Spec 021: 'pipeline' unless created as a simple task. */
-  kind?: TaskKind
-  /** Spec 021: a simple task's status; null for pipeline tasks. */
-  simple_status?: SimpleStatus | null
 }
 
 /** A theme of the Content sheet: a project flagged as a content stream (spec 009). */
@@ -393,11 +198,6 @@ export interface ContentTheme {
   frequency_period: FrequencyPeriod | null
   audience: AudienceKey[]
   pillars: { id: string; name: string; sort_order: number }[]
-  /** Sheet 2b: the theme's entry on the Content sheet (not the project) and its place there. */
-  sheet_theme_id?: string | null
-  position?: number
-  /** Spec 026: the Space whose sheet this theme entry is on. */
-  space_id?: string | null
 }
 
 /** A clip's own details (spec 008 data-model §2). Length is out − in, never stored. */
@@ -502,8 +302,6 @@ export interface UIStore {
   pendingDeletes: Record<string, PendingDelete>
   /** The member turned celebrations on (off by default); while off, setCelebration ignores new ones. */
   celebrationsOn: boolean
-  /** Spec 021: the hand-off box, when open. */
-  handoff: HandoffRequest | null
 
   setCelebration: (payload: CelebrationPayload | null) => void
   setCelebrationsOn: (on: boolean) => void
@@ -512,40 +310,12 @@ export interface UIStore {
   setProfileOpen: (open: boolean) => void
   putPendingDelete: (entry: PendingDelete) => void
   dropPendingDelete: (attachmentId: string) => void
-  /** Opens the hand-off box; false (and nothing changes) when one is already open. */
-  openHandoff: (req: HandoffRequest) => boolean
-  closeHandoff: () => void
-}
-
-/** Spec 021: everything the hand-off box needs, gathered by whoever got `needs_handoff`. */
-export interface HandoffRequest {
-  taskId: string
-  taskName: string
-  target: StageId
-  /** Names of the Spaces the task already shows in. */
-  shownIn: string[]
-  /** Production Spaces to offer. */
-  spaces: { id: string; key: string; name: string; color: string }[]
-  /** Pre-ticked Space ids. */
-  ticked: string[]
-  /** Members of each production Space, by Space id. */
-  candidates: Record<string, { id: string; name: string; role: string }[]>
-  /** Spec 022: each media board's Space and suggested person (its default assignee). */
-  suggested?: Record<string, string | null>
 }
 
 export interface MoveTaskResult {
   success: boolean
   shouldCelebrate: boolean
   error?: string
-  /** Spec 021: set with error 'needs_handoff' — the stage asked for and what the box pre-ticks. */
-  target?: StageId
-  handoff?: HandoffDefaults
-  /** Spec 023: set with error 'required_fields' — the empty fields (English names) and the stage they're needed by. */
-  missing?: string[]
-  /** The same fields' Arabic names (the English name where none is set). */
-  missing_ar?: string[]
-  requiredStage?: StageId
 }
 
 export interface WorkspaceSettings {
@@ -563,10 +333,8 @@ export type NotificationKind =
   | 'assigned' | 'mention' | 'due_soon' | 'overdue'
   /** Spec 015: a sheet comment mentions you, or someone replies in a thread you're in. */
   | 'sheet_mention' | 'sheet_reply'
-  /** Spec 023 (D8): a task you're on became Urgent. */
-  | 'urgent'
 export const NOTIFICATION_KINDS: NotificationKind[] = [
-  'mention', 'assigned', 'urgent', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
+  'mention', 'assigned', 'comment', 'reply', 'attachment', 'task_created_in_stage', 'task_moved_to_stage', 'due_soon', 'overdue',
   'sheet_mention', 'sheet_reply',
 ]
 /** Where a member hears about it. */
@@ -611,11 +379,9 @@ export interface AppNotification {
 // ─── Spec 013: Sheets (specs/013-spreadsheet-editing/data-model.md) ─────────
 
 /** A folder in the Sheets section. */
-/** Spec 021: 'node' is a Space's or My tasks' own workbook (linked_key 'node:<node>'). */
-export type SheetFolderKind = 'content' | 'video' | 'team' | 'brand' | 'node'
+export type SheetFolderKind = 'content' | 'video' | 'team'
 /** A tab in a folder: one of the two linked sheets, or a blank sheet. */
-/** Spec 021: 'linked_tasks' is a Space's, brand's or My tasks' live Tasks tab (linked_key 'tasks:<node>'). */
-export type SheetKind = 'linked_content' | 'linked_video' | 'linked_tasks' | 'blank'
+export type SheetKind = 'linked_content' | 'linked_video' | 'blank'
 /** Excel-style tab colours (FR-059a), stored as keys, drawn from SHEETS_UI.tabs. */
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray', 'black'] as const
 export type TabColor = typeof TAB_COLORS[number]
@@ -650,10 +416,6 @@ export interface SheetSummary {
   protectedBy: string | null
   rowCount: number
   colCount: number
-  /** Spec 021: a linked_tasks sheet's key ('tasks:<node>'), for comments and formats. */
-  linkedKey?: string | null
-  /** A tab tagged with a brand: shown on its Space and in that brand's folder only. */
-  brandId?: string | null
 }
 
 /** A blank sheet as the client holds it (data-model §4). */
@@ -819,8 +581,7 @@ export interface SheetView {
   advanced?: AdvancedFilter | null
   outline?: OutlineGroupRecord[]
 }
-/** Spec 021 (T081): 'brand' groups a Tasks sheet by brand. */
-export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'brand' | 'none' } | { by: 'col'; col: string }
+export type GroupBy = { by: 'theme' | 'stage' | 'assignee' | 'type' | 'none' } | { by: 'col'; col: string }
 
 // ─── Spec 015 stage 3: sort, filter, tables, conditional formatting ─────────
 
@@ -1028,21 +789,4 @@ export interface HoursWeekReport {
   rows: HoursWeekRow[]
   dayTotals: Record<string, number>
   completeCount: number
-}
-
-/** Spec 021: what the sidebar's Me / Teams / Brands sections need (contracts/routes.md). */
-export interface NavTree {
-  /** Open tasks assigned to me or handed off by me. */
-  myOpen: number
-  /** My tasks page (user, 2026-11-23): open tasks and to-dos that are mine, and how many are overdue. */
-  myTasks?: { open: number; overdue: number }
-  /** Spec 025: unread notifications, for the Inbox row. */
-  inboxUnread?: number
-  /** Spec 025: each Space with one folder per brand; counts are open tasks and how many are overdue. */
-  spaces: { id: string; key: string; name: string; name_ar?: string | null; color: string; open: number; overdue?: number; folders?: { id: string; name: string; color: string; open: number; overdue: number }[] }[]
-  /** `name` is the short name the sidebar shows; `full_name` the brand's own. */
-  brands: { id: string; name: string; full_name?: string; color: string; open: number; overdue?: number }[]
-  /** Open tasks with no brand; the "No brand" entry shows only when > 0. */
-  noBrandOpen: number
-  noBrandOverdue?: number
 }

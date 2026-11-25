@@ -7,9 +7,7 @@ import { HeaderMenu } from '@/components/board/HeaderMenu'
 import { COLORS } from '@/lib/tokens'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { getAlertStatus } from '@/lib/alert-status'
-import { featureOn, featureOnAny } from '@/lib/brand-features'
 import { calDaysBetween } from '@/lib/utils'
-import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
 import { intlLocale } from '@/lib/sheet-format'
 import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
 
@@ -27,7 +25,6 @@ import type { AlertStatus, Member, SLAConfig, Task } from '@/types/index'
  */
 
 export type DuePreset = 'any' | 'overdue' | 'today' | 'week' | 'none'
-export type PublishPreset = 'any' | 'today' | 'week' | 'none'
 
 export interface BoardFilterState {
   search:         string
@@ -40,24 +37,20 @@ export interface BoardFilterState {
   duePreset:      DuePreset
   dueFrom:        string
   dueTo:          string
-  /** The publishing date, filtered the same way (overdue doesn't apply). */
-  publishPreset?: PublishPreset
-  publishFrom?:   string
-  publishTo?:     string
   onlyMine:       boolean
   withAttachments: boolean
 }
 
 export const EMPTY_FILTERS: BoardFilterState = {
   search: '', brandIds: [], ownerIds: [], contentTypes: [], platforms: [],
-  priorities: [], alerts: [], duePreset: 'any', dueFrom: '', dueTo: '', publishPreset: 'any', publishFrom: '', publishTo: '',
+  priorities: [], alerts: [], duePreset: 'any', dueFrom: '', dueTo: '',
   onlyMine: false, withAttachments: false,
 }
 
 export const ALERT_OPTIONS: AlertStatus[] =
   ['Overdue', 'Stuck', 'Will Miss', 'At Risk', 'Idle', 'On Track']
 
-const PRIORITY_OPTIONS = ['Urgent', 'High', 'Normal', 'Low', 'None']
+const PRIORITY_OPTIONS = ['High', 'Medium', 'Low']
 
 /** How many dimensions are narrowing the board right now. */
 export function activeFilterCount(f: BoardFilterState): number {
@@ -70,7 +63,6 @@ export function activeFilterCount(f: BoardFilterState): number {
     (f.priorities.length   ? 1 : 0) +
     (f.alerts.length       ? 1 : 0) +
     (f.duePreset !== 'any' || f.dueFrom || f.dueTo ? 1 : 0) +
-    ((f.publishPreset ?? 'any') !== 'any' || f.publishFrom || f.publishTo ? 1 : 0) +
     (f.onlyMine        ? 1 : 0) +
     (f.withAttachments ? 1 : 0)
   )
@@ -153,10 +145,9 @@ export function applyBoardFilters<T extends Task>(
     // The Assignee filter means who is doing it, which is what people mean
     // when they ask whose task it is.
     if (f.ownerIds.length     && !f.ownerIds.includes(t.assignee_id ?? t.task_owner_id)) return false
-    // Spec 021 (US4): a value switched off for the task's brand is hidden, so it matches nothing.
-    if (f.contentTypes.length && !(featureOn(t.brand, 'type') && f.contentTypes.includes(t.content_type_label))) return false
-    if (f.platforms.length    && !(featureOn(t.brand, 'platform') && f.platforms.includes(t.platform ?? ''))) return false
-    if (f.priorities.length   && !(featureOn(t.brand, 'priorities') && f.priorities.includes(t.priority))) return false
+    if (f.contentTypes.length && !f.contentTypes.includes(t.content_type_label)) return false
+    if (f.platforms.length    && !f.platforms.includes(t.platform ?? '')) return false
+    if (f.priorities.length   && !f.priorities.includes(t.priority)) return false
     if (f.withAttachments && (t.attachments?.length ?? 0) === 0) return false
 
     if (f.alerts.length) {
@@ -170,9 +161,7 @@ export function applyBoardFilters<T extends Task>(
         if (t.due_date) return false
       } else {
         if (!t.due_date) return false
-        // Cairo days (src/lib/due-dates.ts); published or done work is never overdue.
-        const days = daysBetween(cairoToday(), t.due_date.slice(0, 10))
-        if (f.duePreset === 'overdue' && !isOverdue(t)) return false
+        const days = calDaysBetween(ctx.today, new Date(t.due_date))
         if (f.duePreset === 'overdue' && days >= 0)          return false
         if (f.duePreset === 'today'   && days !== 0)         return false
         if (f.duePreset === 'week'    && (days < 0 || days > 7)) return false
@@ -181,17 +170,6 @@ export function applyBoardFilters<T extends Task>(
 
     if (f.dueFrom && (!t.due_date || t.due_date < f.dueFrom)) return false
     if (f.dueTo   && (!t.due_date || t.due_date > f.dueTo))   return false
-
-    const pp = f.publishPreset ?? 'any', pub = t.publish_date?.slice(0, 10) ?? null
-    if (pp === 'none' && pub) return false
-    if (pp !== 'any' && pp !== 'none') {
-      if (!pub) return false
-      const days = daysBetween(cairoToday(), pub)
-      if (pp === 'today' && days !== 0) return false
-      if (pp === 'week' && (days < 0 || days > 7)) return false
-    }
-    if (f.publishFrom && (!pub || pub < f.publishFrom)) return false
-    if (f.publishTo   && (!pub || pub > f.publishTo))   return false
 
     return true
   })
@@ -254,14 +232,11 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
 
   // Only offer values that exist on the board.
   const usedTypes = useMemo(
-    () => [...new Set(tasks.filter(t => featureOn(t.brand, 'type')).map(t => t.content_type_label).filter(Boolean))].sort(),
+    () => [...new Set(tasks.map(t => t.content_type_label).filter(Boolean))].sort(),
     [tasks])
   const usedPlatforms = useMemo(
-    () => [...new Set(tasks.filter(t => featureOn(t.brand, 'platform')).map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
+    () => [...new Set(tasks.map(t => t.platform).filter((p): p is string => Boolean(p)))].sort(),
     [tasks])
-  // Spec 021 (US4): Priority and SLA status are offered while any brand on the board uses them.
-  const anyPriority = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'priorities'), [tasks])
-  const anySla = useMemo(() => featureOnAny(tasks.map(t => t.brand), 'sla'), [tasks])
   const usedOwnerIds = useMemo(() => new Set(tasks.map(t => t.assignee_id ?? t.task_owner_id)), [tasks])
 
   const memberName = (id: string) => members.find(m => m.id === id)?.name ?? 'Unknown'
@@ -269,10 +244,6 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
   const count = activeFilterCount(filters)
   const behindButton = count - (filters.brandIds.length ? 1 : 0) - (filters.search.trim() ? 1 : 0)
 
-  const pp = filters.publishPreset ?? 'any'
-  const publishText = pp !== 'any'
-    ? ({ today: 'Publishing today', week: 'Next 7 days', none: 'No publishing date' } as const)[pp]
-    : filters.publishFrom || filters.publishTo ? `${filters.publishFrom || '…'} → ${filters.publishTo || '…'}` : ''
   // The range reads as dates, in the reader's language, not as ISO strings.
   // The values are calendar days, so they are formatted at UTC midnight to
   // keep a time zone from moving them a day.
@@ -313,14 +284,14 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           ))}
         </PillSection>
 
-        {usedTypes.length > 0 && <PillSection label="Content type">
+        <PillSection label="Content type">
           {usedTypes.map(v => (
             <PillOption key={v} selected={filters.contentTypes.includes(v)} pressed={filters.contentTypes.includes(v)}
                         onClick={() => toggle('contentTypes', v)}>
               <Check on={filters.contentTypes.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>}
+        </PillSection>
 
         {usedPlatforms.length > 0 && (
           <PillSection label="Platform">
@@ -333,23 +304,23 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
           </PillSection>
         )}
 
-        {anyPriority && <PillSection label="Priority">
+        <PillSection label="Priority">
           {PRIORITY_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.priorities.includes(v)} pressed={filters.priorities.includes(v)}
                         onClick={() => toggle('priorities', v)}>
               <Check on={filters.priorities.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>}
+        </PillSection>
 
-        {anySla && <PillSection label="SLA status">
+        <PillSection label="SLA status">
           {ALERT_OPTIONS.map(v => (
             <PillOption key={v} selected={filters.alerts.includes(v)} pressed={filters.alerts.includes(v)}
                         onClick={() => toggleAlert(v)}>
               <Check on={filters.alerts.includes(v)} /> {v}
             </PillOption>
           ))}
-        </PillSection>}
+        </PillSection>
 
         <PillSection label={`Due date${dueText ? ` · ${dueText}` : ''}`}>
           {([
@@ -366,23 +337,6 @@ export function FiltersButton({ filters, onChange, tasks, members }: FiltersButt
                        onChange={e => set('dueFrom', e.target.value)} />
             <PillInput type="date" name="to" aria-label="Due to" value={filters.dueTo}
                        onChange={e => set('dueTo', e.target.value)} />
-          </div>
-        </PillSection>
-
-        <PillSection label={`Publishing date${publishText ? ` · ${publishText}` : ''}`}>
-          {([
-            ['any', 'Any date'], ['today', 'Publishing today'], ['week', 'Next 7 days'], ['none', 'No publishing date'],
-          ] as [PublishPreset, string][]).map(([v, label]) => (
-            <PillOption key={v} selected={(filters.publishPreset ?? 'any') === v}
-                        onClick={() => onChange({ ...filters, publishPreset: v })}>
-              <Check on={(filters.publishPreset ?? 'any') === v} /> {label}
-            </PillOption>
-          ))}
-          <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-            <PillInput type="date" value={filters.publishFrom ?? ''} data-filter-publish-from=""
-                       onChange={e => onChange({ ...filters, publishFrom: e.target.value })} />
-            <PillInput type="date" value={filters.publishTo ?? ''} data-filter-publish-to=""
-                       onChange={e => onChange({ ...filters, publishTo: e.target.value })} />
           </div>
         </PillSection>
 

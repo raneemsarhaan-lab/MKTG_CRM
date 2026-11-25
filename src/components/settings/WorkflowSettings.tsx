@@ -1,12 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-import { boardsFor } from '@/lib/media'
 import type { ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { COLORS, STAGE_COLORS } from '@/lib/tokens'
-import { updateSLA, createContentType, removeContentType, updateWeeklyCapacity, updateNineStageDefault, setContentTypeBoards } from '@/actions/settings'
+import { updateSLA, createContentType, removeContentType, updateWeeklyCapacity, updateNineStageDefault } from '@/actions/settings'
 
 const SLA_STAGES: { id: string; label: string }[] = [
   { id: 'c-prog',      label: 'C-In Progress' },
@@ -24,8 +21,6 @@ interface WorkflowSettingsProps {
 }
 
 export function WorkflowSettings({ contentTypes, slaConfig, workspaceSettings }: WorkflowSettingsProps) {
-  const tMedia = useTranslations('media')
-  const router = useRouter()
   const [newType, setNewType] = useState('')
   const [typeError, setTypeError] = useState<string | null>(null)
   const [capacityHrs, setCapacityHrs] = useState(workspaceSettings.capacity_hrs_per_wk)
@@ -80,36 +75,6 @@ export function WorkflowSettings({ contentTypes, slaConfig, workspaceSettings }:
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Spec 022 (R6): which media boards each type goes to at Ready For Design. */}
-      <div style={cardStyle} data-type-boards>
-        <div style={labelStyle}>{tMedia('typeBoards')}</div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '-6px 0 12px' }}>{tMedia('typeBoardsHint')}</p>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {contentTypes.map(ct => {
-            const cur = boardsFor(ct.label, contentTypes)
-            const pick = cur.length === 2 ? 'both' : cur[0]
-            return (
-              <div key={ct.id} data-type-boards-row={ct.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{ct.label}</span>
-                <span role="radiogroup" aria-label={`${tMedia('typeBoards')}: ${ct.label}`} style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 9, overflow: 'hidden' }}>
-                  {(['design', 'video', 'both'] as const).map(k => (
-                    <button key={k} type="button" role="radio" aria-checked={pick === k} data-type-board={k} disabled={isPending}
-                      onClick={() => startTransition(async () => {
-                        const r = await setContentTypeBoards(ct.label, k === 'both' ? ['design', 'video'] : [k])
-                        if (r.success) router.refresh()
-                      })}
-                      style={{ border: 'none', padding: '5px 12px', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
-                        background: pick === k ? 'var(--ink)' : '#fff', color: pick === k ? '#fff' : 'var(--ink)' }}>
-                      {tMedia(k)}
-                    </button>
-                  ))}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
       {/* Content types */}
       <div style={cardStyle}>
         <div style={labelStyle}>Content types</div>

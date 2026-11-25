@@ -77,7 +77,7 @@ The app was deployed to Cranl and hung on an infinite loading spinner — the pa
 | ORM | **Prisma v5** | ⚠️ Must be v5 — see warning below |
 | Auth | **Custom HMAC session** | `src/lib/session.ts` — NextAuth was removed, see §6 |
 | Password hashing | bcryptjs | 10 rounds |
-| Drag & drop | @dnd-kit | Reorder within a column; moves across columns go through `allowedStages` |
+| Drag & drop | @dnd-kit | Within-column reorder only |
 | State | Zustand | `useUIStore` |
 | i18n | next-intl | Arabic + English, full RTL |
 | Styling | Tailwind v4 + CSS variables | Tokens in `src/lib/tokens.ts` |
@@ -283,11 +283,9 @@ When someone advances a task out of a stage they own, a confetti overlay plus so
 
 This was previously broadcast over Supabase Realtime so it appeared in other tabs. That code is removed. The current behaviour matches the original intent more closely than the Realtime version did.
 
-### Drag and drop: reorder within a column, move across columns
+### Drag and drop is reorder-only
 
-@dnd-kit reorders cards **within** a column (local only, not saved). Dragging a card to **another** column moves the task through `moveTo` → `setTaskStage`, so it passes the same `allowedStages` check as Advance and the stage menu (`KanbanBoard.tsx` `handleDragEnd`). A column that isn't on the task's path refuses the drop. Since spec 021, a move into the design half without a production team Space opens the hand-off box instead of moving.
-
-*(Corrected 2026-11-22: this section used to say cross-column drags were rejected. They have been allowed for some time.)*
+@dnd-kit allows reordering **within** a column. Cross-column drags are rejected — `handleDragEnd` returns early when the source and target stages differ. Stage changes happen only through the task modal's explicit Advance action, so they always pass through the permission check.
 
 ### SLA and alert status
 
@@ -889,159 +887,6 @@ Design: `design/content-sheet-bulk-bar.html`, approved.
 
 The stage-move celebration is off unless a member turns it on (`members.celebrations`, Notification settings → Celebrations). The gate is in `useUIStore.setCelebration`.
 
-### 7.w Brands, team Spaces and views (spec 021)
-
-| Piece | Where it lives |
-|---|---|
-| Tables: `team_spaces`, `team_space_members`, `task_spaces` (Shows in, with `added_via`), `saved_views`, brand feature switches | `prisma/schema.prisma` |
-| Shows in: the Space a task is created in, else the creator's working Spaces, plus the assignee's (never Planning-type or media boards for content tasks); a reassign drops what only the old assignee brought | `src/lib/spaces.ts`, `src/lib/spaces-server.ts` |
-| Hand-off: the first move into Ready For Design opens the box (now: links media tasks, spec 022) | `src/lib/spaces.ts` `needsHandoff`, `src/actions/task-spaces.ts`, `src/components/handoff/` |
-| Views anywhere (List, Board, Sheet, Calendar, Workload) and saved views | `src/components/views/`, `src/actions/views.ts` |
-| Brand pages: Folders, the brand Sheet (Content and Video sheets filtered to the brand), Assets, Library | `src/components/views/BrandPage.tsx` |
-| Brand feature switches | `src/lib/brand-features.ts`, Settings and the brand header |
-| My notes (private column on My tasks) | `src/components/views/TaskSheet.tsx` (`notes`) |
-| Related task field (was "Task link") | `src/components/sheet/LinkTaskPicker.tsx`, `src/components/kanban/TaskLinks.tsx` |
-| One-time data changes | `prisma/seed.ts` `once()` markers for Spaces, members and Shows in |
-
-Status words (US3) and simple tasks (US5) were replaced by spec 022; see 7.x.
-
-### 7.x Task methodology (spec 022)
-
-One workflow for every task, with media boards and Space stages. Decisions and
-rationale: `specs/022-task-methodology/` (research R1–R19) and the approved
-design `design/task-methodology.html`.
-
-| Rule | Where it lives |
-|---|---|
-| Every task is a pipeline task (11 stages, 10 without C-Check). New tasks get the Space's default assignee role | `src/actions/tasks.ts` `createTask`; `src/lib/spaces.ts` `defaultAssigneeFor`; Settings › Spaces |
-| Design and Video are media boards (`team_spaces.media_board`); their tasks are media tasks (`tasks.media_board`, linked by `content_task_id`) | `src/lib/media.ts` (pure), `src/lib/media-server.ts` |
-| Ready For Design links a content task to media once (`auto_linked_at`): the box gives one person per board | `src/actions/task-spaces.ts` `handOff`, `src/components/handoff/HandoffDialog.tsx` |
-| A linked content task's stage follows its linked tasks: the earliest open one, then F-Check once all pass D-Check; after that the media tasks follow it. Moving a linked row moves its linked tasks (their permissions apply) | `syncContent`, `moveThroughMedia` in `src/lib/media-server.ts` |
-| Link task (sheets and calendars of content Spaces), Create task on boards, Unlink (anyone) | `src/actions/media.ts`, `src/components/media/MediaLinks.tsx` |
-| Space stages: rename or split per Space; a sub-stage move changes only that Space; leaving a stage forgets the sub-stage | `src/lib/space-stages.ts`, `src/actions/space-stages.ts`, `src/components/spaces/SpaceStages.tsx`, `useSpaceStages.ts` |
-| Shows in: created-in, creator's and assignee's Spaces; a reassign drops what only the old assignee brought; content tasks never go to a board | `src/lib/spaces.ts`, `changeAssigneeSpaces` in `src/lib/spaces-server.ts` |
-| SLA: working days on Cairo days, the Settings › Due Dates weekend; no SLA before `entry_stage` | `src/lib/utils.ts` `businessDaysBetween`, `src/lib/alert-status.ts` |
-| Task link field is now called "Related task" | `messages/*.json` `sheet.columns.kinds.task` |
-
-One-time data changes, all in `prisma/seed.ts` `once()`: `simple-to-pipeline-v1`,
-`space-default-roles-v1`, `content-type-boards-v1`, `media-tasks-v1`,
-`due-dates-v1` (was `scripts/due-dates-migrate.ts`), `space-stages-v1`,
-`content-follows-media-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-022-*.cjs`
-and the pure checks in `scripts/spaces-lab/pure.mjs`.
-
-### 7.y Task types and fields (spec 023)
-
-ClickUp's task model, in four stages. Decisions: `specs/023-task-types-fields/`
-(research, data model, contracts) and `design/023-description-fields.html`.
-
-| Rule | Where it lives |
-|---|---|
-| Task types are the content types, with EN/AR names, icon, colour, default priority, tags and template. Admins edit | `content_types`; `src/actions/task-types.ts`; Task types page `src/app/(app)/task-types/page.tsx`, `src/components/types/` |
-| Field library (text, number, date, link, person, choice, multi-choice, checkbox, related task, money, rating), attached to types; values belong to the task | `task_fields`, `task_type_fields`, `task_field_values`; `src/lib/task-fields.ts`, `src/actions/task-fields.ts`, `src/components/fields/` |
-| Required from a stage: only a move that crosses that stage is refused, naming the field; a brand's switched-off field never blocks | `missingRequired` in `src/lib/task-fields.ts`; `requiredGate` in `src/lib/media-server.ts`; `fieldOn` in `src/lib/brand-features.ts` |
-| Caption / TOV / Channels: description sections with placement (`options.place`) and a red "not added" mark | `PanelFields.tsx`, `CardFields.tsx` |
-| Status groups (Not started / Active / Done / Closed) for filters and list grouping; milestones are calendar markers, not tasks | `src/lib/view-config.ts`; `milestones`, `src/actions/milestones.ts`, `CalendarView.tsx` |
-| Priorities Urgent / High / Normal / Low / None (Medium reads Normal); Urgent sorts first and notifies (kind `urgent`) | `src/lib/priorities.ts`; `src/lib/notify/recipients.ts` |
-| Tags: workspace-wide with colours; anyone creates while tagging; admins rename, merge, delete; a brand switch | `tags`, `task_tags`; `src/lib/tags.ts`, `src/actions/tags.ts`, `TagPicker.tsx` |
-| Several assignees: the lead stays `tasks.assignee_id` (SLA, alerts, Shows in follow the lead); hours per person or an even share | `task_assignees`; `src/lib/assignees.ts`, `src/actions/assignees.ts`, `AssigneesPicker.tsx` |
-| Start date: optional, never after the due date; calendar Spans (per device); workload spreads hours over the span's working days | `tasks.start_date`; `src/lib/start-dates.ts`, `dayLoad` in `src/lib/task-load.ts`, `WorkloadView.tsx` |
-| Templates per type: name pattern, brief, priority, hours, assignee by role, subtasks dated from the publishing date, field values and tags. Admins and superusers manage them; everyone uses them. Editing changes new tasks only | `task_templates`; `src/lib/templates.ts`, `src/lib/templates-server.ts`, `src/actions/templates.ts`, `TemplatesSettings.tsx` (a tab on Task types), Template pill in `TaskForm.tsx`, ❖＋ on calendar days |
-| Recurring tasks: a repeat rule on publishing dates; each occurrence is made on its creation day (due date minus the lead time, at least the type's total SLA working days) by the hourly job, once (`tasks.recurrence_key`); Skip next, Stop repeating, ↻ | `repeat_rules`; `src/lib/recurrence.ts`, `src/lib/recurrence-server.ts` (`runRecurring`), `src/actions/recurrence.ts`, `RepeatEditor.tsx`; `/api/notifications/tick?job=recurring` runs it on demand with the tick secret |
-| Workspace search (ranking, close matches, Did you mean, Arabic normalisation) and My tasks (private to-dos) | `src/lib/search.ts`, `src/components/search/`; `todos`, `src/lib/my-tasks.ts`, `src/components/mytasks/` |
-
-One-time data changes, all in `prisma/seed.ts` `once()`: `task-types-v1`,
-`content-fields-v1`, `priority-normal-v1`. Tests: `scripts/spaces-lab/realapp/scenarios-023-*.cjs`,
-`scenarios-search.cjs`, `scenarios-mytasks.cjs` and the pure checks in `scripts/spaces-lab/pure.mjs`.
-
-### 7.z Content sheet rows (sheet 2b)
-
-Rows are their own records; a row may stand for one task. Rules: `design/sheets-methodology.html` §2b.
-
-| Rule | Where it lives |
-|---|---|
-| A theme is the sheet's entry for a project (`content_themes`: order, pillar order); removing it leaves the project (its `is_theme` flag is kept in step) | `src/actions/content-rows.ts` `addSheetTheme`, `reorderThemes`, `removeSheetTheme` |
-| Rows (`content_rows`): plain (title, date, custom values) or linked (`task_id`); one level of children; ordered by `position` | `src/lib/content-rows.ts` (pure), `src/components/content/rows.ts` |
-| Every task in a theme's project gets a linked row; a linked row follows its task to another theme or pillar. Runs before the board data loads | `syncContentSheet` in `src/lib/content-rows-server.ts` |
-| Moving a linked row moves its task's theme and pillar; deleting it unlinks (the task leaves the theme) or deletes both | `moveRow`, `deleteRow` |
-| Tab / Shift+Tab on a row's number; drag rows, themes and pillars by their number | `onRowKey` and `rowDrag` in `GridCore.tsx`, used by `ContentSheet.tsx` |
-| Paste plan on a theme, pillar or + Row line makes plain rows (`addPlan` with `target`) | `src/actions/content.ts`, `PlanPreview.tsx` |
-
-Tests: `scripts/spaces-lab/realapp/scenarios-2b.cjs`, `pure-content-rows`. Without rows (the sheet lab), the sheet shows every piece as a row in date order, as before.
-
-### 7.za Space settings (spec 024)
-
-Each team Space says how it works. Settings are one JSON column (`team_spaces.settings`); missing keys take the Space's defaults, so a Space with nothing stored behaves as its default. Spec: `specs/024-space-settings/spec.md`.
-
-| Rule | Where it lives |
-|---|---|
-| The settings, their defaults per Space key, and every rule that reads them (range, stage ownership, field rules, creators, link roles, SLA, labels) | `src/lib/space-settings.ts` (pure) |
-| Reading them on the server: a new task's start, who may create, the Space whose rules apply to a task (`homeSpaceOf`), the one-time clip move | `src/lib/space-settings-server.ts` |
-| Saving (admins and superusers): a patch is merged into the stored settings, checked, and stored whole; a flow that doesn't hold together is refused | `updateSpaceSettings` in `src/actions/spaces.ts`, `requireLead` in `src/lib/authz.ts` |
-| A new task starts at its Space's "Starts at" (on the board when the Space is one), with the Space's default type, assignee and priority | `createTask`, `createTasks`, `addClips` in `src/actions/tasks.ts` |
-| Clips are media tasks on the Video board at the Video Space's start, and still sit under their video in the Video sheet | `addClips`; `sheetVideos` in `src/components/sheet/rows.ts` |
-| Required fields are checked by the Space whose rules apply; a field hidden there, or required before a stage earlier than its start, is never asked | `requiredGate` in `src/lib/media-server.ts` |
-| The panel and cards show or hide a type's fields by the Space being looked at | `ruleFor` in `src/components/fields/CardFields.tsx`, `usePanelFields` |
-| A Space's board shows its range only; its views list only tasks inside it | `KanbanBoard.tsx` (`stagesInScope`), `SpacePage.tsx` (`scope`) |
-| Stage owner or approver per Space stage; a Space SLA for the stages it owns | `stageRoles` → `holdsStage` (`src/lib/stage-moves.ts`); `space_sla_days` → `getAlertStatus` |
-| Who else is told when a task enters, goes overdue or is handed back | `notifyRoles`, used in `src/lib/notify/notify.ts` |
-| Who may link and unlink; hand-off without the box | `canLink` in `src/actions/media.ts`; `autoHandoff` in `src/actions/tasks.ts` |
-| The settings screen (seven sections, saves as you change) | `src/components/spaces/SpaceSettings.tsx` |
-
-Board data gives every task `home_space_id`, `stage_roles` and `space_sla_days`. Server moves get the same roles through `withAssignees`.
-
-Tests: `scripts/spaces-lab/realapp/scenarios-024.cjs`, `pure-space-settings`. The dev server's `.next` cache can grow very large (35 GB seen); delete `.next` if pages stop compiling.
-
-### 7.zb Sidebar and brand pages (spec 025)
-
-Spec and decisions: `specs/025-sidebar-brand-pages/spec.md`.
-
-| Rule | Where it lives |
-|---|---|
-| The sidebar: My work (My tasks, Inbox), Spaces (a folder per brand under each; the arrow only opens the list), Brands (no rows under a brand). A count is open tasks with the overdue count in red | `src/lib/nav-tree.ts` (one pass over the open tasks), `src/components/shared/NavTree/NavTree.tsx` |
-| The other pages are a row of icons at the bottom of the sidebar | `src/components/shared/Sidebar.tsx` |
-| Short brand names (`brands.short_name`) and a brand's default priority (`brands.default_priority`) | `setBrandBasics` in `src/actions/brands.ts`; `brandPriority` in `src/actions/tasks.ts` |
-| A Space › Brand folder is the Space page narrowed to one brand (`/spaces/<key>/<brandId>`), with its own remembered view (`space:<id>:brand:<id>`) | `src/app/(app)/spaces/[key]/[brandId]/page.tsx`, `SpacePage.tsx`, `validNode` in `src/lib/views-data.ts` |
-| Space pages: Board, Sheet, Calendar; brand chips filter all three; Group by brand groups cards inside each column | `SpacePage.tsx`, `src/components/spaces/brandGroup.tsx`, `KanbanColumn.tsx` |
-| A page opens on `?view=`, else the member's home view, else the view used last, else its default | `ViewHost.tsx` (`remembered`, `prefs.last`), `viewPrefs` in `src/lib/board-data.ts` |
-| The brand page's three sections; Calendar and Sheet addresses lead to those views; Settings is admins only (404 otherwise) | `src/app/(app)/brands/[brandId]/[[...folder]]/page.tsx`, `BrandPage.tsx` |
-| The Space column on a brand's sheet (the Spaces the task shows in; read-only) | `TaskSheet.tsx` (`showSpace`), `TASK_BUILT_INS` |
-| Assets: the brand's own files plus files on its finished tasks; sort, type filter and search are pure | `src/lib/brand-assets.ts`, `src/actions/brand-assets.ts`, `src/components/brands/BrandAssetsTable.tsx`, `src/app/api/brand-assets/[id]/route.ts` |
-
-Tests: `scripts/spaces-lab/realapp/scenarios-025.cjs`.
-
-### 7.zc One sheet system (spec 026)
-
-Every Space's Sheet view is one kind of sheet: themes (projects) › pillars › rows › child rows. A row is plain (a planning line) or linked (it stands for a task). Spec and decisions: `specs/026-one-sheet-system/spec.md`.
-
-| Rule | Where it lives |
-|---|---|
-| Rows and theme entries belong to a Space's sheet (`content_rows.space_id`, `content_themes.space_id`); a task has at most one row per sheet | `prisma/schema.prisma`; every row action takes the Space (`sheetSpace` in `src/actions/content-rows.ts`) |
-| Each Space's sheet keeps its own columns: `content` for the Content Space, `rows:<spaceId>` for the others | `spaceSheetId`, `isRowsSheet`, `builtInsFor` in `src/lib/sheet-columns.ts` |
-| Make task: a new task in a chosen Space (that Space's start stage, board, default type, assignee and priority), or an existing task there (the task's values win); a child row makes a subtask, a video's child row a clip | `makeTask`, `rowValuesToTask` in `src/actions/content-rows.ts`; `MakeTaskDialog` in `src/components/content/RowDialogs.tsx` |
-| Unlink keeps the row's last values as plain text; the task keeps its theme and isn't given a row again (`tasks.sheet_row_off`) | `unlinkRow`; `syncContentSheet` skips it |
-| A plain row holds its own value in task-field and sheet-only columns, and a stage as a label (`values.status`) | `ContentGrid.tsx` (line rows), `updateRow` |
-| The Task cell: Make task on a plain row; the task's name, Space and stage on a linked row | `ContentGrid.tsx` (`case 'task'`) |
-| The Content Space's sheet still gives a new task in one of its themes a linked row; a theme on another Space's sheet stays there | `src/lib/content-rows-server.ts` |
-| Paste plan only creates plain rows, on the sheet it is pasted into | `addPlan` in `src/actions/content.ts` |
-| The Space page's Sheet view is this sheet for every Space; a saved Sheet view of a Space is its tasks as a task sheet (filters and fields kept) | `SpacePage.tsx` |
-| Outside a Space, the board's "Content" is the Content Space's sheet and "Sheet" the Video Space's. The old Video sheet component is no longer shown | `KanbanBoard.tsx` (`sheetSpace`) |
-| The Brand page's Sheet view is the brand's tasks from every Space (the task sheet, with a Space column). The strip of Spaces was removed on 25 Nov | `BrandPage.tsx` |
-| Columns: every field of the library is a column of a sheet of rows (`f:<field id>`), shown by itself while a type in use carries it; place, width, name and on/off are per sheet (`sheet_columns`). "+ Column" asks for a Task field or a Sheet only column; the Fields drawer renames | `applyLayout` (its `fields` and `defaults`), `isFieldKey` in `src/lib/sheet-columns.ts`; `records` in `src/actions/sheet-columns.ts`; `useFieldColumnDefs` in `src/components/fields/taskFieldColumns.tsx`; the add menu in `ContentGrid.tsx` |
-| A Space's "Default sheet columns" (spec 024 §5) decide which of its sheet's own columns show until someone changes one | `defaultShown` in `useSheetColumns`; the list in `SpaceSettings.tsx` (`ROW_COLUMNS`) |
-| The sheet's toolbar is "+ Column" and "+ Theme" only (user, 24 Nov). Paste plan, Only my rows and Show archived are commands of the workbook's Data menu | `ROWS_COMMAND` in `src/components/sheets/links/FieldsPanel.tsx`; `FormatToolbar.tsx` (Data menu); `ContentSheet.tsx` |
-| An old Sheets address leads to the page that owns the sheet, with its tab and cell (`?tab=&cell=`). The folders of blank sheets made in the old Sheets section are removed by the seed, their contents kept as CSV exports | `src/lib/sheet-home.ts`, `src/app/(app)/sheets/`, `NodeWorkbook.tsx`; `removeTeamSheets` in `src/lib/sheet-convert.ts` (seed step `team-sheets-removed-v1`) |
-| One-time conversion: rows get their Space; videos become linked rows with their clips as child rows; custom columns move to each Space's sheet; clip details exported to a kept CSV | `src/lib/sheet-convert.ts`, run by the seed (`sheet-spaces-v1`); `data_exports`, `/api/exports/[name]`, Settings › Diagnostics |
-
-The task sheet (`TaskSheet.tsx`: one line per task, with a Space column) is the Sheet view of a brand's page and of My tasks.
-
-Tests: `scripts/spaces-lab/realapp/scenarios-026.cjs`. The old Video sheet is out of the app; `scripts/sheet-lab/harness/` keeps its two files as the lab's harness for the shared grid (`npm run lab:sheet`).
-
-Also changed on 24–25 Nov at the user's request: the sidebar's Brands show each brand's icon (`brandMark` in `NavTree.tsx`); "+ Theme" asks for a name only; a name that is already a project of that brand uses that project, so the same theme on several Spaces' sheets is one project (`addSheetTheme`, `themeNames` in `src/actions/content-rows.ts`, `ThemeAdd` in `RowDialogs.tsx`); a sheet never shows that project's tasks from other Spaces (`piecesIn` in `src/components/content/rows.ts`; `syncContentSheet` gives rows only to the Content Space's own tasks); a brand's List groups tasks by project with each task's Spaces (`projectGroups` in `ListView.tsx`, `BrandPage.tsx`); the workbook shows no "Linked" tag; the home view and pinned views show an icon before their name (`ViewHost.tsx`); a Space page has no brand filter chips and no "Group by brand" (its brand folders are the filter; the board's grouping code in `KanbanColumn.tsx` is kept but nothing switches it on); the sidebar shows numbers only on My tasks and Inbox (`NavTree.tsx`); the notifications page filters by All or one of four groups of kinds, with one list for the dates (`KIND_GROUPS` in `NotificationsPage.tsx`).
-
-If a style change doesn't show in the dev server, its build cache is stale: stop it, delete `.next`, start it again.
-
----
-
 ## 8. The Islam Check toggle (9-stage vs 8-stage)
 
 Stage 3, `c-check` — Managing Director sign-off on content — is optional.
@@ -1317,7 +1162,7 @@ Run through this after the first successful deploy.
 **Tasks**
 - [ ] "+ New task" creates a task in the correct column
 - [ ] Advancing a stage fires the celebration, for that person only, when they have turned Celebrations on (off by default)
-- [ ] Reordering within a column works; dragging across columns moves the task only to stages the member may move it to
+- [ ] Reordering within a column works; dragging across columns does nothing
 - [ ] A task in Published cannot be moved out
 - [ ] Comments save and appear
 
@@ -1353,9 +1198,6 @@ Run through this after the first successful deploy.
 | Sheet columns: Arabic strings | Medium | `sheet.columns.*` in `messages/ar.json`; native review (spec 010) |
 | Board header: Arabic strings | Medium | `header.*` in `messages/ar.json`; native review (spec 011) |
 | Inbox: Arabic strings | Medium | `inbox.*` in `messages/ar.json`; native review |
-| Spaces, views and methodology: Arabic strings | Medium | `spaces.*` (incl. `spaces.stages`), `views.*`, `calendar.*`, `handoff.*`, `me.*`, `media.*`, `dates.*` in `messages/ar.json`; native review (specs 021–022) |
-| Task types, fields, tags, templates, repeat, search, My tasks: Arabic strings | Medium | `types.*`, `fields.*`, `tags.*`, `priority.*`, `statusGroups.*`, `milestones.*`, `assignees.*`, `templates.*`, `repeat.*`, `search.*`, `myTasks.*`, `dates.start*` in `messages/ar.json`; native review (spec 023) |
-| Accessibility: contrast and board cards | Medium | axe (`scripts/spaces-lab/realapp/axe-022.cjs`) still flags grey secondary text on tinted backgrounds app-wide (darker `PIPE.textMuted`/`placeholder` would fix it; a design call) and board cards with buttons inside a button-like card |
 | Inbox: who moved a task | Low | Team can't name who moved a task, because there is no event log. An events table would fix this and let Done list reviews you approved |
 | Cross-tab celebration sync | Low | Removed with Realtime; current behaviour is arguably correct |
 
@@ -1369,7 +1211,7 @@ Run through this after the first successful deploy.
 4. **Ownership is by role, never by name** — §7.
 5. **Published is terminal.** Do not add an escape hatch.
 6. **The nine-stage choice lives in exactly one place** — `workspace_settings.nine_stage_default`, immutable per-task after creation — §8.
-7. **Every stage change goes through `allowedStages`** (`src/lib/stage-moves.ts`), whichever screen it comes from: Advance, the stage menu, Board drag, Inbox, sheets and bulk moves. Never add a path that writes `status` without it.
+7. **Stage changes go through the modal's Advance action,** never through drag — that is where the permission check lives.
 8. **The reference UI files are the source of truth** for layout and design. Do not invent layout decisions that contradict them.
 9. **Every server action carries its own permission check.** There is no RLS
    behind it — that call is the entire gate, and a missing one is a privilege

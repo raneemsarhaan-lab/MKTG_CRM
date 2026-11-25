@@ -324,8 +324,7 @@ export async function linkChoices(): Promise<LinkChoices | Fail> {
     people: people.map(p => ({ id: p.id, name: p.name, color: p.color, avatar: p.avatar_url })),
     types: types.map(t => t.label),
     pillars: pillars.map(p => ({ id: p.id, name: p.name, projectId: p.project_id })),
-    // Spec 021 (FR-027a): everyone may create tasks they own; createTask checks the owner.
-    teamCols, canCreate: true, me: m.id, canAddTheme: m.access === 'admin' || m.access === 'superuser',
+    teamCols, canCreate: m.access !== 'user', me: m.id, canAddTheme: m.access === 'admin' || m.access === 'superuser',
   }
 }
 
@@ -337,8 +336,7 @@ export async function linkChoices(): Promise<LinkChoices | Fail> {
 export async function createTasksForRows(sheetId: string, rows: { rowId: string; values: TaskFieldValues }[], shared: { due?: string }): Promise<{ success: true; created: { rowId: string; taskId: string; link: string }[]; problems: { rowId: string; reason: string }[]; tasks: Record<string, LinkedTask> } | Fail> {
   const s = await sheetFor(sheetId)
   if (!s.ok) return fail(s.error)
-  // Spec 021 (R10): users may create rows' tasks for themselves; createTask
-  // refuses any other owner or assignee, row by row.
+  if (s.m.access === 'user') return fail('not_authorized')
   if (!s.map) return fail('not_linked')
   const list = (Array.isArray(rows) ? rows : []).filter(r => r && isId(r.rowId))
   if (list.length > MAX_CREATE) return fail('too_many')

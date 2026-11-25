@@ -13,12 +13,12 @@ import { useTranslations } from 'next-intl'
 import { tabKeys, useFocusReturn } from '../a11y'
 import type { PasteOp } from '@/lib/sheet-clean'
 import type { CellStyle } from '@/types/index'
-import { parseClipboard, toGrid, toKeys, toStyles } from '@/lib/sheet-clipboard'
+import { parseClipboard, toGrid, toStyles } from '@/lib/sheet-clipboard'
 import { Modal } from '../Dialogs'
 import { FIND_RESULT, sendFormat, type FindResult, type FormatSource, type PasteMode } from './bus'
 
 /** What's on the clipboard, read on a click (the browser asks the first time). Null when it won't say. */
-export async function readClipboard(): Promise<{ grid: string[][]; styles: (CellStyle | null)[][] | null; keys: (string | null)[][] | null } | null> {
+export async function readClipboard(): Promise<{ grid: string[][]; styles: (CellStyle | null)[][] | null } | null> {
   let html = '', text = ''
   try {
     const items = await navigator.clipboard.read()
@@ -30,7 +30,7 @@ export async function readClipboard(): Promise<{ grid: string[][]; styles: (Cell
     try { text = await navigator.clipboard.readText() } catch { return null }
   }
   const cells = parseClipboard({ html, text }, new DOMParser())
-  return { grid: toGrid(cells), styles: toStyles(cells), keys: toKeys(cells) }
+  return { grid: toGrid(cells), styles: toStyles(cells) }
 }
 
 export function FindPanel({ target, replace: startReplace, onClose }: { target: FormatSource; replace: boolean; onClose(): void }) {
@@ -114,7 +114,7 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
     const clip = await readClipboard()
     onClose()
     if (!clip || !clip.grid.length) { say(t('noClip')); return }
-    sendFormat(target, { kind: 'pasteSpecial', mode, transpose: flip, grid: clip.grid, styles: clip.styles, op, skipBlanks: skip, keys: clip.keys })
+    sendFormat(target, { kind: 'pasteSpecial', mode, transpose: flip, grid: clip.grid, styles: clip.styles, op, skipBlanks: skip })
   }
   // Spec 020 stage C: Excel's letters (Ctrl+Alt+V, then V for values, T for formats, …, and Enter).
   const AK: Record<string, string> = { all: 'A', formulas: 'F', values: 'V', formats: 'T', comments: 'C', validation: 'N', noBorders: 'X', widths: 'W', none: 'O', add: 'D', sub: 'S', mul: 'M', div: 'I', skip: 'B', transpose: 'E' }
@@ -130,7 +130,7 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
     if (!k) return
     e.preventDefault()
     const off = linked && ['validation', 'noBorders', 'widths', 'add', 'sub', 'mul', 'div', 'skip'].includes(k)
-    if (off || k === 'formulas') return
+    if (off || k === 'formulas' || k === 'comments') return
     if (k === 'skip') setSkip(v => !v)
     else if (k === 'transpose') setFlip(v => !v)
     else if (k === 'none') setOp(null)
@@ -159,7 +159,7 @@ export function PasteSpecialDialog({ target, onClose, say }: { target: FormatSou
           {radio('formats', t('psFormats'))}
         </div>
         <div className="fx-tip-col">
-          {radio('comments', t('psComments'))}
+          {radio('comments', t('psComments'), true, t('psCommentsWhy'))}
           {radio('validation', tt('ps.validation'), linked, tt('blankOnly'))}
           {radio('noBorders', tt('ps.noBorders'), linked, tt('blankOnly'))}
           {radio('widths', tt('ps.widths'), linked, tt('blankOnly'))}

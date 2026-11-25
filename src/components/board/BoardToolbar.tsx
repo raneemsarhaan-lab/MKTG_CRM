@@ -15,9 +15,7 @@ import type { Brand } from '@/types/index'
 import { BrandMenu } from './BrandMenu'
 import { ViewPair } from './ViewPair'
 
-export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display, hideBrands = false }: {
-  /** Spec 025: the page has its own brand filter (a Space) or is one brand (a folder, a brand page). */
-  hideBrands?: boolean
+export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noProject, filters, sort, view, onView, display }: {
   scope: 'me' | 'team'
   onScope(s: 'me' | 'team'): void
   brands: Brand[]
@@ -45,7 +43,7 @@ export function BoardToolbar({ scope, onScope, brands, brandIds, onBrandIds, noP
         ))}
       </div>
       <span className="fx-hd-vr" aria-hidden="true" />
-      {!hideBrands && <BrandMenu brands={brands} selected={brandIds} onChange={onBrandIds} />}
+      <BrandMenu brands={brands} selected={brandIds} onChange={onBrandIds} />
       {filters}
       {sort}
       {noProject !== null && (

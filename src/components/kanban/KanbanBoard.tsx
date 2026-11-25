@@ -1,9 +1,5 @@
 'use client'
 
-import { spaceSheetId } from '@/lib/sheet-columns'
-import { AddLabelProvider } from '@/components/spaces/addLabel'
-import { newTaskLabel, rangeOf, typesForSpace } from '@/lib/space-settings'
-import { createTask } from '@/actions/tasks'
 import { useState, useMemo, useEffect, useRef, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -11,22 +7,19 @@ import {
   MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, closestCorners,
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId, TeamSpace, SpaceMember, TaskSpace as TaskSpaceRow, SpaceStage, TaskSpaceStage } from '@/types/index'
-import { useSpaceStages } from '@/components/spaces/useSpaceStages'
-import { setWorkWeekend } from '@/lib/utils'
+import type { Task, Member, SLAConfig, Brand, ContentType, TaskComment, TaskAttachment, StageId, BoardView, MoveTaskResult, ContentTheme, InboxState, InboxTab, SheetColumnRecord, SheetValues, SheetId } from '@/types/index'
 import { STAGE_META, ALL_STAGES, NINE_STAGE, EIGHT_STAGE, UPSTREAM_STAGES, startsDownstream } from '@/lib/stage-meta'
 import { inboxModel, openingTab } from '@/lib/inbox'
 import {
   setTaskStage, addComment, bulkUpdateTasks, bulkDeleteTasks, updateTask, updateClip, addClips, addLinkAttachment, dropClip, restoreClip, addVideo, removeAttachment,
 } from '@/actions/tasks'
 import { writeClipField } from '@/actions/sheet-links'
-import { PIPE } from '@/lib/pipeline-tokens'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
+import { VideoSheet } from '@/components/sheet/VideoSheet'
 import { ContentSheet } from '@/components/content/ContentSheet'
 import type { ContentApi } from '@/components/content/types'
 import { setLinkedRowHeights } from '@/actions/sheets'
 import { addPlan, addPiece, updatePiece, setPieceLink, addTheme, saveTheme, savePillar, removePillar } from '@/actions/content'
-import * as contentRows from '@/actions/content-rows'
 import { makeUploader } from '@/lib/attachment-upload'
 import { useUIStore } from '@/store/useUIStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -37,10 +30,6 @@ import {
 } from './BoardFilters'
 import { BoardHeader } from '@/components/board/BoardHeader'
 import { BoardToolbar } from '@/components/board/BoardToolbar'
-import { setBoardSort } from '@/actions/views'
-import { defaultAssigneeFor } from '@/lib/spaces'
-import { isLinkedMedia } from '@/lib/media'
-import { MediaIndexContext, MediaPanelSection, buildMediaIndex } from '@/components/media/MediaLinks'
 import { SortMenu, sortTasks, DEFAULT_SORT, SORT_KEYS, type SortKey } from '@/components/board/SortMenu'
 import { UserMenu } from '@/components/shared/UserMenu'
 import { TaskModal } from './TaskModal'
@@ -56,13 +45,8 @@ import { addColumn, renameColumn, moveColumn, setColumnShown, resizeColumn, upda
 import { applyOp, type LayoutOp } from '@/lib/sheet-columns'
 import { snoozeTask, unsnoozeTasks, setInboxPrefs } from '@/actions/inbox'
 import { useIsPhone } from '@/hooks/useMediaQuery'
-import { featureOnAny } from '@/lib/brand-features'
 import { BulkBar, type BulkPatch } from './BulkBar'
-import { TaskLinkNames, TaskLinksSection, linkNamesByTask, taskLinkFields } from './TaskLinks'
 import { TaskForm } from '@/components/shared/TaskForm'
-import { handoffRequest } from '@/components/handoff/request'
-import { useMoveError } from '@/components/fields/moveErrors'
-import { CardFieldsProvider } from '@/components/fields/CardFields'
 
 type FullTask = Task & {
   brand: Brand
@@ -72,11 +56,6 @@ type FullTask = Task & {
 }
 
 interface KanbanBoardProps {
-  /** Spec 023: custom fields for cards (the field library, attachments, values). */
-  taskFields?: import('@/types/index').TaskFieldDef[]
-  typeFields?: import('@/types/index').TaskTypeFieldLink[]
-  fieldValues?: import('@/types/index').TaskFieldValueRow[]
-  tags?: import('@/types/index').Tag[]
   initialTasks: FullTask[]
   currentUser: Member
   members: Member[]
@@ -97,65 +76,16 @@ interface KanbanBoardProps {
    * Spec 013 R2: 'sheets' shows only one sheet, inside a Sheets folder's
    * workbook — no board header, no Inbox, and the address is the folder's.
    */
-  surface?: 'board' | 'sheets' | 'view'
-  /** With surface 'sheets': the Content sheet or the video sheet. With 'view': the view to start on. */
-  sheetsView?: 'content' | 'sheet' | 'board'
-  /**
-   * Spec 021: with surface 'view' (a team Space, a brand, My tasks), only the
-   * tasks this returns true for are on the Board. The page around it draws its
-   * own header; the toolbar, columns, drag, bulk and the task panel are the
-   * Board's own, so every move keeps the same rules (FR-011, FR-013a).
-   */
-  scopeTasks?: (t: Task) => boolean
-  /** Spec 021: "+ Task" from a Space adds it to that Space (FR-028). */
-  spaceId?: string
-  /**
-   * Spec 021 (research R6): a brand's Sheet is today's Content and Video
-   * sheets with only that brand's rows — same columns, words and formats.
-   */
-  sheetScope?: (t: Task) => boolean
-  themeScope?: (theme: ContentTheme) => boolean
-  /** The one brand this sheet is narrowed to (a Space › Brand folder, a brand's page): new themes take it. */
-  sheetBrandId?: string | null
-  /** Spec 021: live team Spaces, their members, and Shows in rows. */
-  spaces?: TeamSpace[]
-  spaceMembers?: SpaceMember[]
-  taskSpaces?: TaskSpaceRow[]
+  surface?: 'board' | 'sheets'
+  /** With surface 'sheets': the Content sheet or the video sheet. */
+  sheetsView?: 'content' | 'sheet'
   /** Spec 013: the linked sheets' saved row heights, by task id. */
   linkedRowHeights?: { content: Record<string, number>; video: Record<string, number> }
-  /** Sheet 2b: the Content sheet's rows. */
-  contentRows?: import('@/lib/content-rows').ContentRowRec[]
-  /** Spec 021: the workspace's C-Check default, for a new task's stage line. */
-  workspaceNineStage?: boolean
-  /** The due-date rule (Settings › Due Dates). */
-  dueRule?: import('@/lib/due-dates').DueRule
-  /** Which board this is, for the member's saved sort ('board', 'space:<id>', 'brand:<id>', 'me'). */
-  boardKey?: string
-  /** The member's saved sort per board. */
-  boardSorts?: Record<string, string>
-  /** Spec 022 (US4): Space stages and tasks' sub-stages. */
-  spaceStages?: SpaceStage[]
-  taskSpaceStages?: TaskSpaceStage[]
 }
 
 const NO_INBOX: InboxState = { readIds: [], snoozes: {}, since: new Date(0).toISOString(), pinned: false, showWeek: false }
 
-export function KanbanBoard(props: KanbanBoardProps) {
-  const names = useMemo(() => new Map(props.initialTasks.map(x => [x.id, x.name])), [props.initialTasks])
-  // Spec 024 (§3): inside a Space, its sheets' add rows use the Space's "New task label".
-  const wrapLocale = useLocale()
-  const wrapSpace = props.spaceId ? props.spaces?.find(x => x.id === props.spaceId) : undefined
-  const sheetAddLabel = wrapSpace ? newTaskLabel(wrapSpace.settings, wrapLocale, '') || null : null
-  return (
-    <AddLabelProvider value={sheetAddLabel}>
-    <CardFieldsProvider fields={props.taskFields} links={props.typeFields} values={props.fieldValues} types={props.contentTypes} members={props.members} taskName={id => names.get(id)} tags={props.tags} spaces={props.spaces} viewSpaceId={props.spaceId ?? null}>
-      <KanbanBoardInner {...props} />
-    </CardFieldsProvider>
-    </AddLabelProvider>
-  )
-}
-
-function KanbanBoardInner({
+export function KanbanBoard({
   initialTasks,
   currentUser,
   members,
@@ -171,37 +101,9 @@ function KanbanBoardInner({
   surface = 'board',
   sheetsView = 'content',
   linkedRowHeights,
-  contentRows: contentRows_,
-  scopeTasks,
-  spaceId,
-  sheetScope,
-  themeScope,
-  sheetBrandId = null,
-  spaces = [],
-  spaceMembers = [],
-  taskSpaces = [],
-  workspaceNineStage = false,
-  dueRule,
-  boardKey,
-  boardSorts,
-  spaceStages = [],
-  taskSpaceStages = [],
 }: KanbanBoardProps) {
-  // Spec 022 (US6): SLA days count the Settings weekend.
-  setWorkWeekend(dueRule?.weekend)
   const embedded = surface === 'sheets'
-  /** Spec 021: hosted by a Space, brand or My tasks page, which owns the header and the address. */
-  const hosted = surface === 'view'
   const [tasks, setTasks]         = useState<FullTask[]>(initialTasks)
-  // Spec 022 (US4): a Space's Board shows its own stages; the Content and Video sheets read their Spaces'.
-  const ss = useSpaceStages(hosted && spaceId ? spaceId : null, spaceStages, taskSpaceStages)
-  const spaceStageCols = !!ss?.own
-  // Spec 026: the Space whose sheet is shown — the page's Space, else the Content Space.
-  // (Outside a Space, the board's "Sheet" is the Video Space's sheet and "Content" the Content Space's.)
-  const pageSheetSpace = (spaceId ? spaces.find(x => x.id === spaceId) : undefined) ?? spaces.find(x => x.key === 'content')
-  const contentStages = useSpaceStages(pageSheetSpace?.id ?? null, spaceStages, taskSpaceStages)
-  const sheetSpaceRef = useRef<string | null>(pageSheetSpace?.id ?? null)
-  const videoStages = useSpaceStages(spaces.find(x => x.key === 'video')?.id ?? null, spaceStages, taskSpaceStages)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<StageId | null>(null)
   const [dragError, setDragError] = useState('')
@@ -225,13 +127,6 @@ function KanbanBoardInner({
   const showTaskForm   = useUIStore(s => s.showTaskForm)
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const setCelebration = useUIStore(s => s.setCelebration)
-  const openHandoff    = useUIStore(s => s.openHandoff)
-  const tSpaces        = useTranslations('spaces')
-  const tMedia         = useTranslations('media')
-  const moveErr        = useMoveError()
-  const tSheet         = useTranslations('taskSheet')
-  const tViews         = useTranslations('views')
-  const tHandoff       = useTranslations('handoff')
   const searchParams   = useSearchParams()
 
   /**
@@ -257,7 +152,7 @@ function KanbanBoardInner({
    * switching never refetches the board.
    */
   const [view, setViewState] = useState<BoardView>(() => {
-    if (embedded || hosted) return sheetsView
+    if (embedded) return sheetsView
     const v = searchParams.get('view')
     return v === 'sheet' || v === 'content' ? v : 'board'
   })
@@ -270,7 +165,7 @@ function KanbanBoardInner({
   const [sheetVideo, setSheetVideo] = useState<string | null>(() => searchParams.get('video'))
   const [sheetRow, setSheetRow] = useState<string | null>(() => searchParams.get('row'))
   useEffect(() => {
-    if (embedded || hosted) return
+    if (embedded) return
     const url = new URL(window.location.href)
     const want: Record<string, string | null> = {
       view: view === 'board' ? null : view,
@@ -373,19 +268,13 @@ function KanbanBoardInner({
    * Read after mount like every other stored preference: reading
    * localStorage during render makes the server and client disagree.
    */
-  // Spec 021: a hosted Board (a Space, a brand) starts on Everyone — the page
-  // is already the narrowing — and remembers its own choice apart from /board.
-  const scopeKey = hosted ? 'momentum.view.scope' : 'momentum.board.scope'
-  const [scope, setScope] = useState<'me' | 'team'>(hosted ? 'team' : 'me')
+  const [scope, setScope] = useState<'me' | 'team'>('me')
   useEffect(() => {
-    try {
-      const v = window.localStorage.getItem(scopeKey)
-      if (v === 'team' || v === 'me') setScope(v)
-    } catch { /* private mode */ }
-  }, [scopeKey])
+    if (window.localStorage.getItem('momentum.board.scope') === 'team') setScope('team')
+  }, [])
   function chooseScope(next: 'me' | 'team') {
     setScope(next)
-    try { window.localStorage.setItem(scopeKey, next) } catch { /* private mode */ }
+    try { window.localStorage.setItem('momentum.board.scope', next) } catch { /* private mode */ }
   }
 
   /**
@@ -394,19 +283,14 @@ function KanbanBoardInner({
    * way as `scope` above — the server's own default order already matches
    * 'due', so there is no first-paint flash while this settles.
    */
-  // Saved per person per board, on the server, so it follows them across sessions and devices.
-  const board = boardKey ?? (spaceId ? `space:${spaceId}` : 'board')
-  const savedSort = boardSorts?.[board]
-  // Spec 024 (§5): a Space's default sort, until the member picks their own.
-  const spaceSort = spaceId ? spaces.find(x => x.id === spaceId)?.settings.views.sort : undefined
-  const [sortBy, setSortBy] = useState<SortKey>(savedSort && (SORT_KEYS as string[]).includes(savedSort) ? savedSort as SortKey : spaceSort ?? DEFAULT_SORT)
+  const [sortBy, setSortBy] = useState<SortKey>(DEFAULT_SORT)
+  useEffect(() => {
+    const stored = window.localStorage.getItem('momentum.board.sort')
+    if (stored && (SORT_KEYS as string[]).includes(stored)) setSortBy(stored as SortKey)
+  }, [])
   function chooseSort(next: SortKey) {
     setSortBy(next)
-    void setBoardSort(board, next === DEFAULT_SORT ? null : next)
-  }
-  function resetSort() {
-    setSortBy(DEFAULT_SORT)
-    void setBoardSort(board, null)
+    try { window.localStorage.setItem('momentum.board.sort', next) } catch { /* private mode */ }
   }
 
   /**
@@ -414,15 +298,11 @@ function KanbanBoardInner({
    * the bell and bulk actions. Split once, here; only the video sheet reads
    * `tasks` with them in.
    */
-  const liveTasks = useMemo(
-    // Spec 022: on Everything (no scope), linked media tasks show through their content task.
-    () => tasks.filter(t => !t.dropped_at && (scopeTasks ? scopeTasks(t) : !isLinkedMedia(t))),
-    [tasks, scopeTasks],
-  )
+  const liveTasks = useMemo(() => tasks.filter(t => !t.dropped_at), [tasks])
 
   const scopedTasks = useMemo(
     () => (scope === 'me'
-      ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id || !!t.assignee_ids?.includes(currentUser.id))
+      ? liveTasks.filter(t => (t.assignee_id ?? t.task_owner_id) === currentUser.id)
       : liveTasks),
     [liveTasks, scope, currentUser.id],
   )
@@ -441,21 +321,12 @@ function KanbanBoardInner({
     return map
   }, [filteredTasks, sortBy])
 
-  const tasksByEntry = useMemo(() => {
-    const map: Record<string, FullTask[]> = {}
-    if (!ss) return map
-    ss.entries.forEach(e => { map[e.id] = [] })
-    sortTasks(filteredTasks, sortBy).forEach(t => { const e = ss.of(t); if (e && map[e.id]) map[e.id].push(t) })
-    return map
-  }, [filteredTasks, sortBy, ss]) // eslint-disable-line react-hooks/exhaustive-deps
-
   function handleDragStart({ active }: DragStartEvent) {
     setActiveDragId(active.id as string)
   }
 
   /** A drop lands either on a column (its stage id) or on a card in one. */
   function stageOfDropTarget(overId: string): StageId | null {
-    if (overId.startsWith('ss:')) return (ss?.entries.find(e => `ss:${e.id}` === overId)?.stage_id as StageId) ?? null
     if ((ALL_STAGES as string[]).includes(overId)) return overId as StageId
     return (tasks.find(t => t.id === overId)?.status as StageId) ?? null
   }
@@ -478,28 +349,6 @@ function KanbanBoardInner({
     const fromStage = dragged.status as StageId
     const toStage   = stageOfDropTarget(over.id as string)
     if (!toStage) return
-
-    // Spec 022 (US4): a Space stage column. Within one original stage it's a sub-stage move
-    // (only this Space changes); to another stage it's a real move, then its sub-stage.
-    if (spaceStageCols && ss) {
-      const overId = over.id as string
-      const entry = overId.startsWith('ss:') ? ss.entries.find(e => `ss:${e.id}` === overId) : ss.of(tasks.find(t => t.id === overId) ?? dragged)
-      if (entry && toStage === fromStage) {
-        if (ss.of(dragged)?.id !== entry.id) void ss.sub(dragged, entry).then(err => { if (err) setDragError(tSpaces('stages.otherStage')) })
-        return
-      }
-      if (entry && entry.position > 0) {
-        const path = dragged.nine_stage ? NINE_STAGE : EIGHT_STAGE
-        if (!path.includes(toStage)) { setDragError(`${STAGE_META[toStage].label_en} isn't part of this task's pipeline`); return }
-        setDragError('')
-        startTransition(async () => {
-          const res = await moveTo(dragged, toStage)
-          if (res.success) await ss.sub({ ...dragged, status: toStage }, entry)
-          else if (res.error !== 'needs_handoff') setDragError(moveErr(res) ?? 'Could not move that task')
-        })
-        return
-      }
-    }
 
     // Same column — a reorder. Position isn't persisted (there is no order
     // column), so this stays local and is discarded on the next server render.
@@ -524,12 +373,11 @@ function KanbanBoardInner({
     setDragError('')
     startTransition(async () => {
       const res = await moveTo(dragged, toStage)
-      // Spec 021: a hand-off opens its box instead of an error.
-      if (!res.success && res.error !== 'needs_handoff') {
+      if (!res.success) {
         setDragError(
           res.error === 'not_authorized'
             ? `Only ${STAGE_META[fromStage].owner_role ?? 'the task owner'} can move this out of ${STAGE_META[fromStage].label_en}`
-            : moveErr(res) ?? 'Could not move that task. Try again, or reload the board if it keeps happening.',
+            : 'Could not move that task. Try again, or reload the board if it keeps happening.',
         )
       }
     })
@@ -550,10 +398,6 @@ function KanbanBoardInner({
     try { res = await setTaskStage(task.id, toStage) } catch { res = { success: false, shouldCelebrate: false, error: 'generic' } }
     if (!res.success) {
       setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, ...from } : t)))
-      // Spec 021 (FR-030): drag, Inbox and sheet cells all land here — the box
-      // opens for the task, and the card/cell stays where it was until confirmed.
-      const req = handoffRequest(res, task, spaces, taskSpaces, members, tSpaces)
-      if (req) openHandoff(req)
       return res
     }
     router.refresh()
@@ -633,14 +477,7 @@ function KanbanBoardInner({
       return r
     },
   }
-  const columnsBundle: ColumnsBundle = {
-    records: colRecords, values: colValues, api: columnsApi,
-    // Spec 021: Task link fields on the Content and Video sheets.
-    taskLinks: {
-      tasks, spaces, brands, me: currentUser, workspaceNineStage, spaceStages,
-      openTask: id => selectTask(id), onCreated: () => router.refresh(), create: createTask,
-    },
-  }
+  const columnsBundle: ColumnsBundle = { records: colRecords, values: colValues, api: columnsApi }
 
   const sheetApi: ContentApi = {
     move: (taskId, to) => {
@@ -687,7 +524,7 @@ function KanbanBoardInner({
           id: c.id, name: c.name, parent_task_id: videoId, parent: { id: videoId, name: video?.name ?? '' },
           content_type_label: 'Reel', status: 'todo' as StageId, stage_date: now.slice(0, 10),
           task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: null, assignee: undefined,
-          due_date: null, priority: 'Normal' as const, created_at: now, updated_at: now,
+          due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now,
           comments: [], subtasks: [], published_url: null, dropped_at: null, clip: c.clip,
           cover_image_url: undefined, cover_thumb: undefined,
           attachments: c.link_attachment ? [{ ...c.link_attachment, task_id: c.id, uploaded_by: currentUser.id }] : [],
@@ -755,7 +592,7 @@ function KanbanBoardInner({
         const base = tasks[0]
         if (base) setTasks(prev => [{
           ...base, id: res.id!, name: name.trim(), parent_task_id: null, parent: undefined, project_id: null, pillar_id: null,
-          content_type_label: 'Video', status: 'todo' as StageId, stage_date: now.slice(0, 10), due_date: null, priority: 'Normal' as const,
+          content_type_label: 'Video', status: 'todo' as StageId, stage_date: now.slice(0, 10), due_date: null, priority: 'Medium' as const,
           task_owner_id: currentUser.id, task_owner: currentUser, assignee_id: currentUser.id, assignee: currentUser,
           created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [], published_url: null, post_url: null, dropped_at: null, clip: null,
           cover_image_url: undefined, cover_thumb: undefined,
@@ -788,7 +625,7 @@ function KanbanBoardInner({
     },
     // ── the Content sheet (spec 009) ──
     async addPlan(rows, opts) {
-      const res = await addPlan(rows, { ...opts, spaceId: sheetSpaceRef.current }).catch(() => ({ success: false as const, error: 'generic' }))
+      const res = await addPlan(rows, opts).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) router.refresh()
       return res
     },
@@ -813,7 +650,7 @@ function KanbanBoardInner({
               }
             })(),
             parent_task_id: null, parent: null,
-            due_date: null, priority: 'Normal' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
+            due_date: null, priority: 'Medium' as const, created_at: now, updated_at: now, comments: [], subtasks: [], attachments: [],
             published_url: null, post_url: null, dropped_at: null, clip: null, cover_image_url: undefined, cover_thumb: undefined,
           }, ...prev])
         }
@@ -826,7 +663,7 @@ function KanbanBoardInner({
       if (!before) return { success: false, error: 'not_found' }
       patchTask(taskId, patch as Partial<FullTask>)
       const res = await updatePiece(taskId, patch).catch(() => ({ success: false as const, error: 'generic' }))
-      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, publish_date: before.publish_date, post_url: before.post_url, published_url: before.published_url })
+      if (!res.success) patchTask(taskId, { pillar_id: before.pillar_id, due_date: before.due_date, post_url: before.post_url, published_url: before.published_url })
       else router.refresh()
       return res
     },
@@ -872,31 +709,6 @@ function KanbanBoardInner({
       }
       return res
     },
-    // ── sheet 2b: rows, themes and pillars (each refreshes the page's data) ──
-    ...(() => {
-      const fail = { success: false as const, error: 'generic' }
-      const run = <A extends unknown[], R extends { success: boolean }>(fn: (...a: A) => Promise<R>) => async (...a: A): Promise<R> => {
-        const res = await fn(...a).catch(() => fail as unknown as R)
-        if (res.success) router.refresh()
-        return res
-      }
-      return {
-        // Spec 026: every call carries the Space whose sheet this is.
-        addRow: run((input: Parameters<typeof contentRows.addRow>[0]) => contentRows.addRow({ ...input, spaceId: sheetSpaceRef.current })),
-        updateRow: run(contentRows.updateRow), moveRow: run(contentRows.moveRow),
-        indentRow: run(contentRows.indentRow), deleteRow: run(contentRows.deleteRow), rowToTask: run(contentRows.rowToTask),
-        linkRowTask: run(contentRows.linkRowTask),
-        makeTask: run(contentRows.makeTask), unlinkRow: run(contentRows.unlinkRow),
-        reorderThemes: run((a: string, b: string, w: 'before' | 'after') => contentRows.reorderThemes(a, b, w, sheetSpaceRef.current)),
-        removeSheetTheme: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removeSheetTheme(a, d, sheetSpaceRef.current)),
-        addPillarAt: run((a: string, n: string, anchor?: { pillarId: string; where: 'above' | 'below' } | null) => contentRows.addPillarAt(a, n, anchor, sheetSpaceRef.current)),
-        reorderPillars: run((a: string, b: string, c: string, w: 'before' | 'after') => contentRows.reorderPillars(a, b, c, w, sheetSpaceRef.current)),
-        removePillarTo: run((a: string, d: { projectId: string; pillarId?: string | null } | null) => contentRows.removePillarTo(a, d, sheetSpaceRef.current)),
-        // A theme added in a Space › Brand folder, or on a brand's page, belongs to that brand.
-        addSheetTheme: run((input: { name: string; anchor?: { projectId: string; where: 'above' | 'below' } | null }) => contentRows.addSheetTheme({ ...input, spaceId: sheetSpaceRef.current, brandId: sheetBrandId })),
-        themeNames: () => contentRows.themeNames(sheetSpaceRef.current, sheetBrandId).catch(() => []),
-      }
-    })(),
     async removePillar(id) {
       const res = await removePillar(id).catch(() => ({ success: false as const, error: 'generic' }))
       if (res.success) {
@@ -921,17 +733,6 @@ function KanbanBoardInner({
 
   // "Now" is the server's day until mount, so the first render matches; then
   // the device's own clock, ticking each minute for "today" and "late".
-  // User, 2026-11-23: a linked row's Status follows its task, so moves made elsewhere
-  // show here without a reload — on focus, and every 30 seconds while visible and idle.
-  useEffect(() => {
-    const busy = () => { const a = document.activeElement as HTMLElement | null; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable) || !!document.querySelector('[role="dialog"], [role="listbox"], [role="menu"]') }
-    const tick = () => { if (document.visibilityState === 'visible' && !busy()) router.refresh() }
-    const onVisible = () => { if (document.visibilityState === 'visible') tick() }
-    window.addEventListener('focus', tick)
-    document.addEventListener('visibilitychange', onVisible)
-    const id = window.setInterval(tick, 30_000)
-    return () => { window.removeEventListener('focus', tick); document.removeEventListener('visibilitychange', onVisible); window.clearInterval(id) }
-  }, [router])
   const [now, setNow] = useState<Date>(today)
   useEffect(() => {
     setNow(new Date())
@@ -1082,7 +883,6 @@ function KanbanBoardInner({
    * localStorage while rendering makes the server and client disagree.
    */
   const [showUpstream, setShowUpstream] = useState(true)
-  const boardLocale = useLocale()
   const isPhone = useIsPhone()
   useEffect(() => {
     const stored = window.localStorage.getItem('momentum.board.upstream')
@@ -1092,15 +892,9 @@ function KanbanBoardInner({
     setShowUpstream(v)
     try { window.localStorage.setItem('momentum.board.upstream', v ? '1' : '0') } catch { /* private mode */ }
   }
-  // Spec 022: a media board's tasks start at Ready For Design, so it has no writing columns.
-  // Spec 024 (§2): a Space's board shows the stages from its "Starts at" to its "Ends at".
-  const viewSpace = hosted && spaceId ? spaces.find(x => x.id === spaceId) : undefined
-  const stagesInScope = viewSpace
-    ? rangeOf(viewSpace.settings.flow)
-    : showUpstream
-      ? ALL_STAGES
-      : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
-  const addLabel = viewSpace ? newTaskLabel(viewSpace.settings, boardLocale, '') || undefined : undefined
+  const stagesInScope = showUpstream
+    ? ALL_STAGES
+    : ALL_STAGES.filter(id => !(UPSTREAM_STAGES as string[]).includes(id))
 
   /* Stacked, an empty stage is a heading with nothing beneath it.
    *
@@ -1161,7 +955,7 @@ function KanbanBoardInner({
    * note has a bar left to sit in, since the bar disappears at zero.
    */
   function runBulk(
-    fn: () => Promise<{ changed: number; refused: number; handoff?: number; error?: string }>,
+    fn: () => Promise<{ changed: number; refused: number; error?: string }>,
     clearAfter = false,
   ) {
     setBulkBusy(true)
@@ -1170,11 +964,11 @@ function KanbanBoardInner({
       const res = await fn()
       setBulkBusy(false)
       if (res.error) { setBulkNote(res.error); return }
-      setBulkNote([
-        res.refused > 0 ? `${res.changed} changed · ${res.refused} not yours` : `${res.changed} changed`,
-        // Spec 021 (FR-030a): bulk moves skip tasks that need a hand-off, and say so.
-        res.handoff ? tHandoff('refused', { n: res.handoff }) : '',
-      ].filter(Boolean).join(' · '))
+      setBulkNote(
+        res.refused > 0
+          ? `${res.changed} changed · ${res.refused} not yours`
+          : `${res.changed} changed`,
+      )
       if (clearAfter) setSelected(new Set())
       router.refresh()
       setTimeout(() => setBulkNote(''), 5000)
@@ -1197,13 +991,10 @@ function KanbanBoardInner({
   const taskPanel = selectedTask && (
     <TaskModal
       task={selectedTask}
-      stageNameOf={hosted && spaceId && ss ? s => ss.stageName(s) : undefined}
-      sectionOrder={viewSpace?.settings.section_order}
       currentUser={currentUser}
       stages={[]}
       slaConfig={slaConfig}
       today={today}
-      dueDaysBefore={dueRule?.daysBefore}
       brands={brands}
       members={members}
       contentTypes={contentTypes}
@@ -1215,22 +1006,9 @@ function KanbanBoardInner({
       initialCommentId={commentFor?.taskId === selectedTask.id ? commentFor.commentId : undefined}
       initialSection={sectionFor?.taskId === selectedTask.id ? sectionFor.section : undefined}
       onOpenSheet={openSheet}
-      spaces={spaces}
-      taskSpaces={taskSpaces}
-      linksSection={<>
-        <MediaPanelSection key={`m-${selectedTask.id}`} task={selectedTask as never} tasks={tasks as never} onOpenTask={id => selectTask(id)} />
-        <TaskLinksSection key={selectedTask.id} taskId={selectedTask.id} brandId={selectedTask.brand_id}
-          fields={taskLinkFields(colRecords, colValues, selectedTask.id)} ctx={columnsBundle.taskLinks!}
-          set={async (columnId, value) => (await columnsApi.setValue(columnId, selectedTask.id, value)).success} />
-      </>}
       onClose={() => { setPreviewFor(null); setCommentFor(null); setSectionFor(null); selectTask(null) }}
     />
   )
-
-  // Spec 022: media links for the cards.
-  const mediaIndex = useMemo(() => buildMediaIndex(tasks as never), [tasks])
-  // Spec 021: each card's Task links, by name.
-  const linkNames = useMemo(() => linkNamesByTask(colRecords, colValues, new Map(tasks.map(x => [x.id, x.name]))), [colRecords, colValues, tasks])
 
   /* ── The header (spec 011): top bar and title row, on every view ── */
   const header = (
@@ -1253,7 +1031,7 @@ function KanbanBoardInner({
         </>
       }
       account={<UserMenu member={currentUser} variant="header" />}
-      canCreate
+      canCreate={currentUser.access !== 'user'}
       onNewTask={() => setShowTaskForm(true)}
     />
   )
@@ -1275,48 +1053,58 @@ function KanbanBoardInner({
       buttonRef={inboxBtn}
     />
   )
-  // Spec 021: the creator's own pipeline Spaces, for "Show in" when not created from a Space.
-  const mySpaces = spaces.filter(x => spaceMembers.some(r => r.space_id === x.id && r.member_id === currentUser.id))
-  // Spec 024 (§3): in a Space, the form offers its allowed task types, the default first.
-  const formSpace = spaceId ? spaces.find(x => x.id === spaceId) : undefined
   const taskForm = showTaskForm && (
     <TaskForm
       currentUser={currentUser}
       brands={brands}
-      contentTypes={typesForSpace(formSpace?.settings, contentTypes)}
+      contentTypes={contentTypes}
       members={members}
-      spaceId={spaceId ?? null}
-      spaceChoices={mySpaces.map(x => ({ id: x.id, name: x.name }))}
-      spaceAssignees={Object.fromEntries(spaces.map(x => [x.id, defaultAssigneeFor(x, members, spaceMembers.filter(r => r.space_id === x.id).map(r => r.member_id))]))}
-      dueRule={dueRule}
     />
   )
 
-  // Spec 026: one sheet system. In a Space it is that Space's sheet; outside one, "Sheet" is the Video
-  // Space's and "Content" the Content Space's. The old Video sheet (videos with clip details) is gone.
-  const sheetSpace = spaceId ? pageSheetSpace : view === 'sheet' ? spaces.find(x => x.key === 'video') ?? pageSheetSpace : pageSheetSpace
-  const sheetSpaceId = sheetSpace?.id ?? null
-  sheetSpaceRef.current = sheetSpaceId
-  if (view === 'content' || view === 'sheet') {
+  if (view === 'content') {
     return (
       <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
-        {!embedded && !hosted && header}
+        {!embedded && header}
         <ContentSheet
-          stages={sheetSpace?.key === 'video' && !spaceId ? videoStages : contentStages}
-          tasks={sheetScope ? tasks.filter(sheetScope) : tasks}
-          themes={(themeScope ? themes.filter(themeScope) : themes).filter(th => !sheetSpaceId || !th.space_id || th.space_id === sheetSpaceId)}
+          tasks={tasks}
+          themes={themes}
           me={currentUser}
           members={members}
           contentTypes={types}
           columns={columnsBundle}
-          rowHeights={sheetSpace?.key === 'content' || !sheetSpace ? linkedRowHeights?.content : undefined}
-          rows={contentRows_?.filter(r => !sheetSpaceId || !r.space_id || r.space_id === sheetSpaceId)}
-          sheet={sheetSpace ? spaceSheetId(sheetSpace) : 'content'}
-          space={sheetSpace ?? null}
-          spaces={spaces}
-          taskSpaces={taskSpaces}
+          rowHeights={linkedRowHeights?.content}
           onOpenTask={id => selectTask(id)}
           onOpenVideoSheet={id => { setSheetVideo(id); setSheetRow(null); setView('sheet') }}
+          onView={v => setView(v)}
+          query={filters.search}
+          api={sheetApi}
+        />
+        {taskPanel}
+        {!embedded && inboxOpen && inboxPanel(false)}
+        {taskForm}
+      </div>
+    )
+  }
+
+  if (view === 'sheet') {
+    return (
+      <div className={`fx-board-page is-sheet${embedded ? ' is-embedded' : ''}`}>
+        {!embedded && header}
+        <VideoSheet
+          tasks={tasks}
+          me={currentUser}
+          members={members}
+          contentTypes={types}
+          columns={columnsBundle}
+          rowHeights={linkedRowHeights?.video}
+          slaConfig={slaConfig}
+          themes={themes}
+          hasStorage={hasStorage}
+          videoId={sheetVideo}
+          highlightId={sheetRow}
+          onOpenVideo={id => { setSheetVideo(id); setSheetRow(null) }}
+          onOpenTask={(id, opts) => { setPreviewFor(opts?.previewId ? { taskId: id, previewId: opts.previewId } : null); selectTask(id) }}
           onView={v => setView(v)}
           query={filters.search}
           api={sheetApi}
@@ -1334,8 +1122,6 @@ function KanbanBoardInner({
     : null
 
   return (
-    <TaskLinkNames.Provider value={linkNames}>
-    <MediaIndexContext.Provider value={mediaIndex}>
     <div
       className={selected.size > 0 ? 'fx-board-selecting' : undefined}
       style={{
@@ -1344,17 +1130,16 @@ function KanbanBoardInner({
       }}
     >
       <div className="fx-hd-wrap">
-        {!hosted && header}
+        {header}
         <BoardToolbar
           scope={scope}
           onScope={chooseScope}
           brands={brands}
-          hideBrands={hosted && (!!spaceId || !!boardKey?.startsWith('brand:'))}
           brandIds={filters.brandIds}
           onBrandIds={ids => setFilters(f => ({ ...f, brandIds: ids }))}
           noProject={noProject}
           filters={<FiltersButton filters={filters} onChange={setFilters} tasks={liveTasks} members={members} />}
-          sort={<SortMenu value={sortBy} onChange={chooseSort} onReset={resetSort} noPriority={!featureOnAny(liveTasks.map(x => x.brand), 'priorities')} />}
+          sort={<SortMenu value={sortBy} onChange={chooseSort} />}
           view="board"
           onView={v => setView(v)}
           display={
@@ -1430,27 +1215,7 @@ function KanbanBoardInner({
           gap: 14, marginTop: 14, alignItems: 'start', overflowX: 'auto',
           minWidth: 0, padding: '0 26px 16px 38px',
         }}>
-          {spaceStageCols && ss && ss.entries.filter(e => shownStages.includes(e.stage_id) || (!isPhone && stagesInScope.includes(e.stage_id))).map(e => (
-            <KanbanColumn
-              key={e.id}
-              stage={STAGE_META[e.stage_id]}
-              spaceStage={{ id: e.id, name: e.name, named: e.named }}
-              tasks={tasksByEntry[e.id] ?? []}
-              currentUser={currentUser}
-              members={members}
-              slaConfig={slaConfig}
-              today={today}
-              highlight={overStage === e.stage_id && activeDragId !== null}
-              onSelectTask={id => selectTask(id)}
-              onAddTask={() => setShowTaskForm(true)}
-              addLabel={addLabel}
-              selectedIds={selected}
-              selecting={selected.size > 0}
-              onToggleSelect={toggleSelect}
-              onSelectAll={selectStage}
-            />
-          ))}
-          {!spaceStageCols && shownStages.map(stageId => {
+          {shownStages.map(stageId => {
             const stage      = STAGE_META[stageId]
             const stageTasks = tasksByStage[stageId] ?? []
 
@@ -1465,9 +1230,7 @@ function KanbanBoardInner({
                 today={today}
                 highlight={overStage === stageId && activeDragId !== null}
                 onSelectTask={id => selectTask(id)}
-                // Spec 021 (FR-027a): everyone may create tasks they own.
-                onAddTask={() => setShowTaskForm(true)}
-                addLabel={addLabel}
+                onAddTask={currentUser.access !== 'user' ? () => setShowTaskForm(true) : undefined}
                 selectedIds={selected}
                 selecting={selected.size > 0}
                 onToggleSelect={toggleSelect}
@@ -1501,7 +1264,6 @@ function KanbanBoardInner({
 
       <BulkBar
         count={selected.size}
-        selectedBrands={liveTasks.filter(x => selected.has(x.id)).map(x => x.brand)}
         members={members}
         brands={brands}
         types={contentTypes}
@@ -1518,7 +1280,5 @@ function KanbanBoardInner({
       {/* Task creation form */}
       {taskForm}
     </div>
-    </MediaIndexContext.Provider>
-    </TaskLinkNames.Provider>
   )
 }

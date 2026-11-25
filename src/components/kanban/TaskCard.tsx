@@ -6,20 +6,10 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS, isKeyboardEvent } from '@dnd-kit/utilities'
 import type { Task, Member, SLAConfig, AlertStatus } from '@/types/index'
 import { getAlertStatus } from '@/lib/alert-status'
-import { featureOn } from '@/lib/brand-features'
-import { useTaskLinkNames } from './TaskLinks'
-import { CardMedia } from '@/components/media/MediaLinks'
-import { TaskDates } from '@/components/shared/DueDates'
-import { cairoToday, daysBetween, isOverdue } from '@/lib/due-dates'
-import { useLocale, useTranslations } from 'next-intl'
 import { initials, avatarColor, calDaysBetween } from '@/lib/utils'
 import { coverImageFor } from '@/lib/attachments'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { PIPE } from '@/lib/pipeline-tokens'
-import { CardFieldValues, useCardFields, useCardShows } from '@/components/fields/CardFields'
-import { TypeIcon } from '@/components/types/TypeIcon'
-import { typeName } from '@/lib/task-types'
-import { TagChip } from '@/components/tags/TagPicker'
 
 /**
  * Board task card — Pipeline handoff §7 "Task card".
@@ -95,12 +85,9 @@ function AssigneeDot({ name, stacked }: { name: string; stacked?: boolean }) {
 /** Status and due date, worked out once for the card and for its description. */
 function cardFacts(task: TaskCardProps['task'], slaConfig: SLAConfig, today: Date) {
   const alert    = getAlertStatus(task, slaConfig, today)
-  // Whole days in Cairo, as everywhere else dates are compared (spec 022).
-  const daysLeft = task.due_date ? daysBetween(cairoToday(), task.due_date.slice(0, 10)) : null
-  // Published or done work is never overdue (and shows no count).
-  const overdue  = isOverdue(task as Parameters<typeof isOverdue>[0])
-  const open     = task.status !== 'publish'
-  const dueLabel = daysLeft === null || !open
+  const daysLeft = task.due_date ? calDaysBetween(today, new Date(task.due_date)) : null
+  const overdue  = daysLeft !== null && daysLeft < 0
+  const dueLabel = daysLeft === null
     ? ''
     : overdue ? `${Math.abs(daysLeft)}d over`
     : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`
@@ -121,7 +108,6 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   slaConfig: SLAConfig
   today: Date
 }) {
-  const tViews   = useTranslations('views')
   const { alert, overdue, dueLabel } = cardFacts(task, slaConfig, today)
   const chip = CHIP[alert]
 
@@ -131,26 +117,14 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
   const brandColor = task.brand?.color ?? PIPE.textFaint
   const brandMark  = (task.brand?.name ?? '—').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
   const cover      = coverImageFor(task)
-  // Spec 021: the tasks this one links to (Task link fields), e.g. "↗ Ramadan launch plan".
-  const linkNames  = useTaskLinkNames(task.id)
 
-  // Spec 023: the page's Fields button decides which standard fields the card shows.
-  const shows = useCardShows()
-  const locale = useLocale()
-  const types = useCardFields()?.types
-  const type = types?.find(x => x.label === task.content_type_label)
-  const ctx = useCardFields()
-  const tPri = useTranslations('priority')
-  const tRepeat = useTranslations('repeat')
-  const tagList = (task.tag_ids ?? []).map(id => ctx?.tags.find(x => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
-  const people = (task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])).map(id => ctx?.members.find(m => m.id === id)).filter((x): x is NonNullable<typeof x> => !!x)
   // Stable per task, so a card does not reshuffle its bars on every render.
   const bars = BAR_SETS[task.id.charCodeAt(0) % BAR_SETS.length]
 
   return (
     <>
-      {/* Cover — spec 021 (US4): none when the brand has Cover images off. */}
-      {featureOn(task.brand, 'covers') && <div data-card-cover style={{ position: 'relative', marginBottom: 9 }}>
+      {/* Cover */}
+      <div style={{ position: 'relative', marginBottom: 9 }}>
         <ImageWithFallback
           src={cover}
           alt=""
@@ -177,13 +151,13 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
           }
         />
 
-      </div>}
+      </div>
 
       {/* Brand, then the project it serves.
           Two short lines above the title so a column can be read for
           direction without opening anything. The brand mark moved here from
           the cover's corner rather than being drawn twice. */}
-      {shows('brand') && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
         <span aria-hidden="true" style={{
           width: 16, height: 16, borderRadius: 4, flexShrink: 0, overflow: 'hidden',
           background: task.brand ? brandColor : PIPE.surface,
@@ -205,7 +179,7 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         }}>
           {task.brand?.name ?? 'No brand'}
         </span>
-      </div>}
+      </div>
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -231,38 +205,13 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         {task.name}
       </div>
 
-      {/* Spec 023: custom field values the page shows. */}
-      <CardFieldValues taskId={task.id} typeLabel={task.content_type_label} status={task.status} brand={task.brand} homeSpaceId={task.home_space_id} />
-
-      {/* Publishing and due dates, each labelled (✎ on a due date set by hand). */}
-      {(shows('publish') || shows('due')) && <div style={{ marginTop: 5 }}><TaskDates task={shows('publish') && shows('due') ? task : { ...task, publish_date: shows('publish') ? task.publish_date : null, due_date: shows('due') ? task.due_date : null } as typeof task} size={10.5} /></div>}
-
       {/* Chips */}
       <div style={{ display: 'flex', gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
-        {featureOn(task.brand, 'sla') && <span data-sla-chip style={{ display: 'contents' }}><Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip></span>}
-        {/* Spec 022: media links (content: per-board stage; media: its content task, or Unlinked). */}
-        <CardMedia task={task as never} />
-        {linkNames.map(n => (
-          <span key={n} data-card-task-link="" title={n} style={{ display: 'inline-flex', alignItems: 'center', maxWidth: 170, height: 22, padding: '0 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, background: 'color-mix(in srgb, #5B5FC7 10%, transparent)', color: '#3B3F9E' }}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {n}</span>
-          </span>
-        ))}
-        {/* Spec 023 (US4): up to three tags, then +N. */}
-        {featureOn(task.brand, 'tags') && tagList.slice(0, 3).map(tg => <TagChip key={tg.id} tag={tg} small />)}
-        {featureOn(task.brand, 'tags') && tagList.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, alignSelf: 'center' }}>+{tagList.length - 3}</span>}
-        {/* Spec 023 (US8): a repeating task. */}
-        {task.repeat_rule_id && (
-          <span data-repeat-mark="" title={tRepeat('mark')} aria-label={tRepeat('mark')} style={{ display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: PIPE.surface, color: PIPE.textSecondary }}>↻</span>
-        )}
-        {task.priority === 'Urgent' && featureOn(task.brand, 'priorities') && (
-          <span data-card-urgent="" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 800, padding: '4px 8px', borderRadius: 6, background: '#FDE7EA', color: '#D22040', whiteSpace: 'nowrap' }}>⚑ {tPri('Urgent')}</span>
-        )}
-        {task.content_type_label && featureOn(task.brand, 'type') && shows('type') && (
-          <span data-card-type={task.content_type_label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, padding: '4px 8px', borderRadius: 6, whiteSpace: 'nowrap',
-            background: type?.color ? `${type.color}1A` : PIPE.surface, color: type?.color ?? PIPE.textMuted }}>
-            <TypeIcon icon={type?.icon} color={type?.color ?? PIPE.textMuted} size={11} />
-            {type ? typeName(type, locale) : task.content_type_label}
-          </span>
+        <Chip {...chip}>{chip.upper ? alert.toUpperCase() : alert}</Chip>
+        {task.content_type_label && (
+          <Chip bg={PIPE.surface} color={PIPE.textMuted} weight={600}>
+            {task.content_type_label}
+          </Chip>
         )}
       </div>
 
@@ -271,15 +220,10 @@ function CardBody({ task, currentStageOwner, slaConfig, today }: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginTop: 10, gap: 8,
       }}>
-        <div style={{ display: 'flex', flexShrink: 0, visibility: shows('assignee') ? undefined : 'hidden' }}>
-          {/* Spec 023 (US5): up to three assignees, the lead first; otherwise the owner. */}
-          {people.length
-            ? people.slice(0, 3).map((m, i) => <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />)
-            : <AssigneeDot name={task.task_owner.name} />}
-          {people.length > 3 && <span style={{ fontSize: 10.5, fontWeight: 700, color: PIPE.textFaint, marginInlineStart: 3 }}>+{people.length - 3}</span>}
-          {!people.length && currentStageOwner && currentStageOwner.id !== task.task_owner.id && (
-            <AssigneeDot name={currentStageOwner.name} stacked />
-          )}
+        <div style={{ display: 'flex', flexShrink: 0 }}>
+          {assigneesOf(task, currentStageOwner).map((m, i) => (
+            <AssigneeDot key={m.id} name={m.name} stacked={i > 0} />
+          ))}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>

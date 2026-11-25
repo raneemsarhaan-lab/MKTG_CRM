@@ -197,8 +197,8 @@
 
 ## Phase 11: Polish & Cross-Cutting Concerns
 
-- [ ] T069 *(Partly done 2026-11-23: 92 of 120 tips classified in validation.md; 28 need the reference document.)* [P] Write the SC-001 coverage table (each of the 120 tips: available, new, formula-free equivalent, later formulas spec, or out of scope, with a reason) in specs/020-excel-power-tips/validation.md
-- [X] T070 *(Present: HANDOVER "Excel power tips in the sheets (spec 020)".)* [P] Add a sheet power tips section (keys, fill handle, validation, cleanup, tables, outline, locks, print) to HANDOVER.md
+- [ ] T069 [P] Write the SC-001 coverage table (each of the 120 tips: available, new, formula-free equivalent, later formulas spec, or out of scope, with a reason) in specs/020-excel-power-tips/validation.md
+- [ ] T070 [P] Add a sheet power tips section (keys, fill handle, validation, cleanup, tables, outline, locks, print) to HANDOVER.md
 - [ ] T071 Run the full regression set from quickstart.md (all realapp labs, lab:sheet, lab:spreadsheet), plus Arabic and phone axe runs, before each stage's PR
 
 ---

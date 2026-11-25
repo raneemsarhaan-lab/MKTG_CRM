@@ -32,7 +32,7 @@ export function makeLab(now: Date) {
   const task = (id: string, name: string, status: StageId, o: Partial<Task> = {}): Task => ({
     id, name, status, brand_id: 'b1', content_type_label: 'Post', task_owner_id: 'sara', assignee_id: null,
     initiator_role: 'Content Creator', nine_stage: false, stage_date: day(0), due_date: null,
-    hours_estimate: 1, priority: 'Normal', created_at: ago(400), updated_at: ago(1),
+    hours_estimate: 1, priority: 'Medium', created_at: ago(400), updated_at: ago(1),
     comments: [], attachments: [], ...o,
   })
   const comment = (id: string, task_id: string, author: string, body: string, hours: number, mentions: string[] = []) =>

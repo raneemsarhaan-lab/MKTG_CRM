@@ -41,7 +41,7 @@ interface Props {
 
 /** Who may set a due date: the board's edit rule (owner, assignee, admin, superuser). */
 const canEdit = (t: InboxTask, me: Member) =>
-  t.task_owner_id === me.id || t.assignee_id === me.id || !!t.assignee_ids?.includes(me.id) || me.access === 'admin' || me.access === 'superuser'
+  t.task_owner_id === me.id || t.assignee_id === me.id || me.access === 'admin' || me.access === 'superuser'
 
 function Icon({ d, size = 15 }: { d: ReactNode; size?: number }) {
   return (

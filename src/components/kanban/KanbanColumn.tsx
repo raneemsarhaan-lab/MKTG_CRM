@@ -1,17 +1,8 @@
 'use client'
 
-import { Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { useBrandGroup } from '@/components/spaces/brandGroup'
 import { useLocale } from 'next-intl'
-import { SortableContext, type SortingStrategy } from '@dnd-kit/sortable'
-
-/**
- * Cards keep the board's sort (due date by default): dragging one only moves
- * it to another stage, never reorders it within a column, so cards don't
- * shuffle out of the way while it is carried.
- */
-const keepOrder: SortingStrategy = () => null
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { Task, Member, SLAConfig, StageMeta, StageId } from '@/types/index'
 import { PIPE, PIPE_ACCENT, PIPE_ACCENT_INK } from '@/lib/pipeline-tokens'
 import { TaskCard } from './TaskCard'
@@ -41,23 +32,17 @@ interface KanbanColumnProps {
   highlight?: boolean
   onSelectTask: (id: string) => void
   onAddTask?: () => void
-  /** Spec 024 (§3): the Space's own text for the add button. */
-  addLabel?: string
   selectedIds?: Set<string>
   selecting?: boolean
   onToggleSelect?: (id: string, shiftKey: boolean) => void
   onSelectAll?: (stageId: StageId, on: boolean) => void
-  /** Spec 021 (US5): a simple-status column, drawn dashed after the pipeline. */
-  dashed?: boolean
-  /** Spec 022 (US4): a Space stage column — its own drop id and name, the original stage underneath. */
-  spaceStage?: { id: string; name: string; named?: boolean }
 }
 
 export function KanbanColumn({
-  stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask, addLabel,
-  selectedIds, selecting, onToggleSelect, onSelectAll, dashed = false, spaceStage,
+  stage, tasks, currentUser, members, slaConfig, today, highlight, onSelectTask, onAddTask,
+  selectedIds, selecting, onToggleSelect, onSelectAll,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: spaceStage ? `ss:${spaceStage.id}` : stage.id })
+  const { setNodeRef, isOver } = useDroppable({ id: stage.id })
   const active = isOver || Boolean(highlight)
   const accent = PIPE_ACCENT[stage.id] ?? PIPE.purpleStroke
   const ink = PIPE_ACCENT_INK[stage.id] ?? PIPE.ink
@@ -66,10 +51,6 @@ export function KanbanColumn({
   const arabic = useLocale() === 'ar'
 
   const allSelected = tasks.length > 0 && tasks.every(t => selectedIds?.has(t.id))
-  // Spec 025: "Group by brand" — the column's cards under their brand's name, the sort kept inside each.
-  const byBrand = useBrandGroup()
-  const brandKey = (t: { brand?: { name?: string } | null }) => t.brand?.name ?? '\uffff'
-  const shownTasks = byBrand ? [...tasks].sort((a, b) => brandKey(a).localeCompare(brandKey(b))) : tasks
 
   const stageOwner = stage.owner_role
     ? members.find(m => m.role === stage.owner_role) ?? null
@@ -80,17 +61,15 @@ export function KanbanColumn({
     // holding one card would otherwise offer a 100px-tall place to aim at.
     <div
       role="region"
-      aria-label={`${spaceStage?.name ?? stage.label_en} column`}
+      aria-label={`${stage.label_en} column`}
       ref={setNodeRef}
-      data-space-stage={spaceStage?.id}
-      data-simple-column={dashed ? stage.id : undefined}
       style={{
         // One neutral grey for every column: the header alone carries the
         // stage colour, and the white cards still stand off the panel.
-        background: dashed ? 'transparent' : '#FAFAFC',
+        background: '#FAFAFC',
         // No outline at rest; the stage colour draws it while a card is dragged
         // over. Transparent, not none, so the column doesn't shift by a pixel.
-        border: dashed ? `1.5px dashed ${active ? accent : PIPE.border}` : `1px solid ${active ? accent : 'transparent'}`,
+        border: `1px solid ${active ? accent : 'transparent'}`,
         borderRadius: 14,
         overflow: 'hidden',
         boxShadow: active ? `0 0 0 3px ${accent}22` : 'none',
@@ -116,8 +95,7 @@ export function KanbanColumn({
               fontSize: 15, lineHeight: 1.25, fontWeight: 800, letterSpacing: arabic ? 0 : '0.01em',
               color: PIPE.ink, textTransform: 'uppercase', overflowWrap: 'break-word', minWidth: 0,
             }}>
-              {/* A Space's own name for the stage (spec 022), else the stage's name in the reader's language. */}
-              {spaceStage?.name ?? (arabic ? stage.label_ar : stage.label_en)}
+              {arabic ? stage.label_ar : stage.label_en}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -152,29 +130,16 @@ export function KanbanColumn({
             </div>
           </div>
         </div>
-        {/* A stage a Space renamed still says which board stage it is. (The Arabic line under every
-            title went with main's header: the title is in the reader's language now.) */}
-        {spaceStage?.named && (
-          <div style={{ marginTop: 4, marginInlineStart: 17, fontSize: 11, fontWeight: 500, color: PIPE.placeholder }}>
-            {arabic ? stage.label_ar : stage.label_en}
-          </div>
-        )}
       </div>
 
       <div style={{
         padding: '0 6px 10px', display: 'flex', flexDirection: 'column', gap: 10,
         flex: 1, minHeight: 96, overflowY: 'auto',
       }}>
-        <SortableContext items={shownTasks.map(t => t.id)} strategy={keepOrder}>
-          {shownTasks.map((task, i) => (
-            <Fragment key={task.id}>
-            {byBrand && (i === 0 || brandKey(shownTasks[i - 1]) !== brandKey(task)) && (
-              <div data-brand-group={task.brand?.name ?? ''} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 4px 0', fontSize: 11.5, fontWeight: 700, color: PIPE.textMuted }}>
-                <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: task.brand?.color ?? PIPE.textFaint }} />
-                {task.brand?.name ?? '—'}
-              </div>
-            )}
+        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map(task => (
             <TaskCard
+              key={task.id}
               task={task}
               currentStageOwner={stageOwner}
               currentUser={currentUser}
@@ -185,7 +150,6 @@ export function KanbanColumn({
               selecting={selecting}
               onToggleSelect={onToggleSelect}
             />
-            </Fragment>
           ))}
         </SortableContext>
 
@@ -207,7 +171,7 @@ export function KanbanColumn({
                  strokeWidth="2.6" aria-hidden="true">
               <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
-            {addLabel ?? 'Add task'}
+            Add task
           </button>
         )}
       </div>

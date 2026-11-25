@@ -13,8 +13,7 @@ const themeTip = t => t.page.getAttribute('[data-cell="t:th-strategy|title"] .fx
 const stageText = async (t, key) => (await t.page.locator(`[data-cell="${key}|status"] .fx-sheet-ellipsis`).first().innerText()).trim()
 
 async function pastePlan(t, kind = 'html') {
-  // The toolbar keeps + Column and + Theme only; Paste plan is a command of the workbook's Data menu.
-  await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'pastePlan' })))
+  await t.page.locator('[data-paste-plan]').click()
   await t.page.waitForSelector('[data-plan-preview] textarea')
   await t.page.locator('[data-plan-preview] textarea').focus()
   if (kind === 'html') {
@@ -100,7 +99,7 @@ export const content = [
     id: 'cus1-2', hash: C,
     async run(t) {
       const heads = await t.page.$$eval('[role="columnheader"]:not([data-tail-head])', hs => hs.slice(1).map(h => h.textContent || h.getAttribute('aria-label')))
-      t.eq(heads, ['Title', 'Type', 'Status', 'Link task', 'Assignee', 'Working Doc', 'Design Link', 'Task', 'LinkedIn Link', 'Published Link', 'Pillar', 'Publishing date', 'Archive or restore'], 'piece columns')
+      t.eq(heads, ['Title', 'Type', 'Status', 'Assignee', 'Working Doc', 'Design Link', 'Task Link', 'LinkedIn Link', 'Published Link', 'Pillar', 'Date', 'Archive or restore'], 'piece columns')
       t.eq(await t.page.getAttribute('[data-cell="t:th-strategy|title"]', 'class').then(c => c.includes('is-span')), true, 'the theme row spans the columns')
     },
   },
@@ -398,8 +397,7 @@ export const content = [
     id: 'cus-columns', hash: C,
     async run(t) {
       // Task Link: every piece links to its task; activating it opens the task.
-      // Spec 026: a linked row's Task cell is the task's name as a link, with its Space and stage.
-      t.eq((await t.text(`k:${POST1}`, 'task')).includes('↗ '), true, 'the Task cell names the task')
+      t.eq((await t.text(`k:${POST1}`, 'task')).trim(), 'Open task', 'Task Link shown')
       t.eq(await t.page.getAttribute(`[data-cell="k:${POST1}|task"] a`, 'href'), `/board?task=${POST1}`, 'a link to the task')
       await t.cell(`k:${POST1}`, 'task').click()
       await t.idle(100)
@@ -428,9 +426,9 @@ export const content = [
       await t.idle(200)
       t.assert(await t.page.locator(`[data-row="k:${POST1}"].is-dropped`).count() === 1, 'greyed')
       t.assert((await summary(t)).includes('1 archived'), 'counted as archived')
-      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'archived' })))
+      await t.page.locator('[data-show-archived]').click()
       t.assert(!(await t.rows()).includes(`k:${POST1}`), 'Show archived off hides it')
-      await t.page.evaluate(() => document.dispatchEvent(new CustomEvent('momentum:rows-command', { detail: 'archived' })))
+      await t.page.locator('[data-show-archived]').click()
       await t.cell(`k:${POST1}`, 'archive').click()
       await t.idle(200)
       t.eq((await t.task(POST1)).dropped_at, null, 'restored')
@@ -445,9 +443,8 @@ export const content = [
       await t.page.locator('[data-cell="k:v1|date"] input').fill('20/11/2026')
       await t.page.keyboard.press('Enter')
       await t.idle(150)
-      // The Date column is the publishing date (its due date is worked out on the server).
-      t.eq((await t.task('v1')).publish_date, '2026-11-20', 'publishing date')
-      t.assert((await t.text('k:v1', 'date')).includes('20 Nov'), 'shown')
+      t.eq((await t.task('v1')).due_date, '2026-11-20', 'due date')
+      t.assert((await t.text('k:v1', 'date')).includes('Due 20 Nov'), 'shown')
       await t.cell('k:v1', 'pillar').click()
       await t.page.locator('[data-menu-item="pl-ai"]').click()
       await t.idle(150)

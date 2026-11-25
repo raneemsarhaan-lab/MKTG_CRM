@@ -4,16 +4,12 @@ import { useState } from 'react'
 import type { Member, ContentType, SLAConfig, WorkspaceSettings } from '@/types/index'
 import { TeamSettings } from './TeamSettings'
 import { WorkflowSettings } from './WorkflowSettings'
-import { useTranslations } from 'next-intl'
-import { DueDateSettings } from './DueDateSettings'
-import { DEFAULT_RULE, type DueRule } from '@/lib/due-dates'
 import { BrandSettings, type BrandWithAssets } from './BrandSettings'
 import { Diagnostics } from './Diagnostics'
 import { WorkloadSettings } from './WorkloadSettings'
 import { FillLists } from './FillLists'
-import { SpacesSettings } from './SpacesSettings'
 
-type Tab = 'team' | 'spaces' | 'brands' | 'workflow' | 'due' | 'diagnostics' | 'workload' | 'sheets'
+type Tab = 'team' | 'brands' | 'workflow' | 'diagnostics' | 'workload' | 'sheets'
 
 interface SettingsViewProps {
   seniorityLevels?: { key: string; label: string }[]
@@ -29,15 +25,10 @@ interface SettingsViewProps {
   contentTypes: ContentType[]
   slaConfig: SLAConfig
   workspaceSettings: WorkspaceSettings
-  /** Spec 021 (US4): the switches a brand follows until it has its own. */
-  brandFeatureDefaults?: import('@/types/index').BrandFeatures
-  /** The due-date rule (Settings › Due Dates). */
-  dueRule?: DueRule
 }
 
-export function SettingsView({ seniorityLevels, workload, members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings, brandFeatureDefaults = {}, dueRule }: SettingsViewProps) {
+export function SettingsView({ seniorityLevels, workload, members, currentUserId, brands, contentTypes, slaConfig, workspaceSettings }: SettingsViewProps) {
   const [tab, setTab] = useState<Tab>('team')
-  const tDue = useTranslations('dates.settings')
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
     fontSize: '0.82rem', fontWeight: 700, padding: '8px 18px',
@@ -81,17 +72,11 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
           <button style={tabBtn(tab === 'team')} onClick={() => setTab('team')}>
             Team &amp; Access
           </button>
-          <button style={tabBtn(tab === 'spaces')} onClick={() => setTab('spaces')} data-settings-tab="spaces">
-            Spaces
-          </button>
           <button style={tabBtn(tab === 'brands')} onClick={() => setTab('brands')}>
             Brands
           </button>
           <button style={tabBtn(tab === 'workflow')} onClick={() => setTab('workflow')}>
             SLA &amp; Workflow
-          </button>
-          <button style={tabBtn(tab === 'due')} onClick={() => setTab('due')} data-settings-tab="due">
-            {tDue('tab')}
           </button>
           <button style={tabBtn(tab === 'workload')} onClick={() => setTab('workload')}>
             Workload
@@ -108,9 +93,7 @@ export function SettingsView({ seniorityLevels, workload, members, currentUserId
         {tab === 'team' && (
           <TeamSettings members={members} currentUserId={currentUserId} seniorityLevels={seniorityLevels} />
         )}
-        {tab === 'spaces' && <SpacesSettings members={members} />}
-        {tab === 'brands' && <BrandSettings brands={brands} defaults={brandFeatureDefaults} workspaceNineStage={workspaceSettings.nine_stage_default} />}
-        {tab === 'due' && <DueDateSettings rule={dueRule ?? DEFAULT_RULE} />}
+        {tab === 'brands' && <BrandSettings brands={brands} />}
         {tab === 'workload' && workload && (
           <WorkloadSettings settings={workload.settings} levels={workload.levels} roles={workload.roles} />
         )}

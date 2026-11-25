@@ -1,7 +1,6 @@
 'use server'
 
-import { getSessionMember, requireAdmin } from '@/lib/authz'
-import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/authz'
 
 /**
  * A server action that does nothing but come back.
@@ -17,20 +16,4 @@ export async function pingServerAction(): Promise<{ ok: boolean; error?: string;
   const guard = await requireAdmin()
   if (guard.error) return { ok: false, error: guard.error, at: new Date().toISOString() }
   return { ok: true, at: new Date().toISOString() }
-}
-
-/** User, 25 Nov 2026: content tasks in the design stages with no linked Design or Video task — errors to fix by hand. */
-export async function listNeedsLinkedTask(): Promise<import('@/lib/needs-linked-task').NeedsLink[]> {
-  const member = await getSessionMember()
-  if (!member || (member.access !== 'admin' && member.access !== 'superuser')) return []
-  const { needsLinkedTask } = await import('@/lib/needs-linked-task')
-  return needsLinkedTask(prisma)
-}
-
-/** Spec 026: the exports kept for the record (the clip details CSV), for Settings › Diagnostics. */
-export async function listDataExports(): Promise<{ name: string; title: string; rows: number; created_at: string }[]> {
-  const member = await getSessionMember()
-  if (!member || (member.access !== 'admin' && member.access !== 'superuser')) return []
-  const rows = await prisma.dataExport.findMany({ orderBy: { created_at: 'desc' }, select: { name: true, title: true, rows: true, created_at: true } })
-  return rows.map(r => ({ ...r, created_at: r.created_at.toISOString() }))
 }

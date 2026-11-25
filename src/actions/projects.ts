@@ -730,11 +730,7 @@ export async function createTaskInProject(
   })
   if (!project) return { success: false, error: 'That project no longer exists' }
 
-  // Spec 021 (US4, R11): the brand's C-Check default first, else the workspace's.
-  const [ws, brandRow] = await Promise.all([
-    prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
-    project.brand_id ? prisma.brand.findUnique({ where: { id: project.brand_id }, select: { nine_stage_default: true } }) : null,
-  ])
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
 
   const task = await prisma.task.create({
     data: {
@@ -747,7 +743,7 @@ export async function createTaskInProject(
       initiator_role: member.role,
       created_by:     member.id,
       status:         'todo',
-      nine_stage:     brandRow?.nine_stage_default ?? ws?.nine_stage_default ?? false,
+      nine_stage:     ws?.nine_stage_default ?? false,
     },
     select: { id: true },
   })

@@ -3,9 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PIPE } from '@/lib/pipeline-tokens'
 import { ALL_STAGES, STAGE_META } from '@/lib/stage-meta'
-import type { Brand, BrandFeatureKey, BrandFeatures, ContentType, Member, StageId } from '@/types/index'
-import { featureOnAny } from '@/lib/brand-features'
-import { PRIORITIES, PRIORITY_COLOR } from '@/lib/priorities'
+import type { Brand, ContentType, Member, StageId } from '@/types/index'
 
 /**
  * Bulk action bar — ClickUp's pattern.
@@ -22,10 +20,8 @@ export interface BulkPatch {
   assignee_id?:        string | null
   brand_id?:           string
   content_type_label?: string
-  priority?:           import('@/types/index').Priority
+  priority?:           'Low' | 'Medium' | 'High'
   due_date?:           string
-  /** The Content sheet's Date: the publishing date (its due date follows unless set by hand). */
-  publish_date?:       string
 }
 
 /** The choices the bar can offer. The board shows its six; the Video sheet picks its own (design/video-sheet-bulk-bar.html). */
@@ -49,13 +45,10 @@ interface BulkBarProps {
   stageName?: (id: StageId) => string
   /** The Content sheet's Pillar choice: the pillars of the pieces' theme, or null when the pieces span themes (the button is greyed out, with labels.pillarOff as its tip). */
   pillars?: { id: string; name: string }[] | null
-  /** Spec 021 (US4): the selected tasks' brands, so switched-off fields are left out. */
-  selectedBrands?: ({ features?: BrandFeatures | null } | null | undefined)[]
   onPillar?: (id: string | null) => void
 }
 
 type MenuKind = BulkField | null
-const FIELD_FEATURE: Partial<Record<BulkField, BrandFeatureKey>> = { type: 'type', priority: 'priorities', pillar: 'pillars' }
 const BOARD_FIELDS: BulkField[] = ['stage', 'assignee', 'brand', 'type', 'priority', 'due']
 
 const BTN: React.CSSProperties = {
@@ -150,10 +143,8 @@ function Item({ onClick, children, stage }: { onClick: () => void; children: Rea
 }
 
 export function BulkBar({
-  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields: allFields = BOARD_FIELDS, labels = {}, stageName, pillars, onPillar, selectedBrands,
+  count, members, brands, types, busy, note, onApply, onDelete, onClear, fields = BOARD_FIELDS, labels = {}, stageName, pillars, onPillar,
 }: BulkBarProps) {
-  // Spec 021 (US4): a field every selected task's brand has switched off isn't offered.
-  const fields = selectedBrands ? allFields.filter(f => !FIELD_FEATURE[f] || featureOnAny(selectedBrands, FIELD_FEATURE[f]!)) : allFields
   const L = {
     count: `${count} selected`, stage: 'Stage', assignee: 'Assignee', owner: 'Owner', brand: 'Brand', type: 'Type', priority: 'Priority',
     due: 'Due date', remove: 'Delete', confirm: `Delete ${count}? Yes`, cancel: 'Cancel', clear: 'Clear selection', noBrand: 'No brand', setDue: 'Set due date', pillar: 'Pillar', noPillar: 'No pillar', pillarOff: 'Pick pieces from one theme', saving: 'Saving…', ...labels,
@@ -203,7 +194,7 @@ export function BulkBar({
           ...(pillars ?? []).map(pl => <Item key={pl.id} onClick={() => { close(); onPillar?.(pl.id) }}>{pl.name}</Item>),
           <Item key="" onClick={() => { close(); onPillar?.(null) }}>{L.noPillar}</Item>,
         ]
-        case 'priority': return PRIORITIES.map(p => <Item key={p} onClick={() => apply({ priority: p })}><span style={{ color: PRIORITY_COLOR[p] }}>⚑</span> {p === 'None' ? '–' : p}</Item>)
+        case 'priority': return (['High', 'Medium', 'Low'] as const).map(p => <Item key={p} onClick={() => apply({ priority: p })}>{p}</Item>)
         case 'due': return (
           <div style={{ padding: 6, display: 'grid', gap: 6 }}>
             <input

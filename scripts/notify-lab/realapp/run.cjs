@@ -192,7 +192,7 @@ async function openPanel(page) {
 
   // History page: Mentions only.
   await b.page.goto(`${BASE}/notifications`); await b.page.waitForSelector('[data-nt-history] [data-notification]')
-  await b.page.locator('[data-nt-filter-group="mentions"]').click(); await sleep(800)
+  await b.page.locator('[data-nt-filter-kind="mention"]').click(); await sleep(800)
   const kinds = await b.page.$$eval('[data-nt-history] [data-notification]', rs => [...new Set(rs.map(r => r.getAttribute('data-kind')))])
   ok('history: filter by kind', kinds.join() === 'mention', kinds.join())
   await b.page.screenshot({ path: `${SHOTS}/rt-history.png` })

@@ -47,7 +47,7 @@ function task(p: Partial<Task> & Pick<Task, 'id' | 'name'>): Task {
   return {
     brand_id: 'brand-1', content_type_label: 'Reel', task_owner_id: owner, task_owner: byId[owner],
     assignee_id: null, initiator_role: 'Marketing Manager', nine_stage: false, status: 'todo',
-    stage_date: new Date().toISOString().slice(0, 10), due_date: null, hours_estimate: 0, priority: 'Normal',
+    stage_date: new Date().toISOString().slice(0, 10), due_date: null, hours_estimate: 0, priority: 'Medium',
     created_at: iso(600), updated_at: iso(600), parent_task_id: null, attachments: [], comments: [],
     published_url: null, dropped_at: null, clip: null, subtasks: [],
     ...p,

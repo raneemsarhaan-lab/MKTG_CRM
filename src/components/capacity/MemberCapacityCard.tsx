@@ -16,7 +16,7 @@ export function MemberCapacityCard({ member, activeTasks }: MemberCapacityCardPr
   const over        = pct > 100
   const fillWidth   = Math.min(pct, 100)
   const fillColor   = over ? COLORS.coral : COLORS.lime
-  const highCount   = activeTasks.filter(t => t.priority === 'High' || t.priority === 'Urgent').length
+  const highCount   = activeTasks.filter(t => t.priority === 'High').length
 
   // Brand breakdown: { brandId → hours }
   const byBrandId: Record<string, { hours: number; count: number; name?: string; color?: string }> = {}

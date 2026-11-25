@@ -187,9 +187,9 @@ description: "Task list for Sheet Formatting, Editing Tools and Comments (spec 0
 
 ## Phase 9: Polish and cross-cutting
 
-- [X] T057 [P] Add a daily cleanup of orphaned `sheet_formats` and `sheet_comments` (rows, columns and tasks gone for more than 30 days) to `src/lib/notify/scheduler.ts` or a new `src/lib/sheet-cleanup.ts` called from it (research R1).
-- [X] T058 [P] Performance pass on a 5,000-row formatted sheet: `toCss` cache hit rate, keystroke under 100 ms, Ctrl+A format under 1 s; record numbers in `validation.md`.
-- [X] T059 *(Done 2026-11-23: audit of every FR and SC against the code; 33 of 37 FRs and all 6 SCs built. Gaps became T060–T067 below.)* Run `/speckit-analyze`-style consistency check of spec, plan and tasks against what was built; close any gaps as new tasks.
+- [ ] T057 [P] Add a daily cleanup of orphaned `sheet_formats` and `sheet_comments` (rows, columns and tasks gone for more than 30 days) to `src/lib/notify/scheduler.ts` or a new `src/lib/sheet-cleanup.ts` called from it (research R1).
+- [ ] T058 [P] Performance pass on a 5,000-row formatted sheet: `toCss` cache hit rate, keystroke under 100 ms, Ctrl+A format under 1 s; record numbers in `validation.md`.
+- [ ] T059 Run `/speckit-analyze`-style consistency check of spec, plan and tasks against what was built; close any gaps as new tasks.
 
 ---
 
@@ -243,17 +243,3 @@ T049 sheet-rules.ts · T050 cell styles
 - **Stage 2 release**: US4, its own PR.
 - **Stage 3 release**: US5, its own PR.
 - Each stage keeps `lab:sheet` green so the Content and Video sheets never regress.
-
-## Follow-ups from the T059 audit (2026-11-23)
-
-- [X] T060 Sheet access (security): comment actions and sheet actions checked only that someone was signed in, so a private My tasks or Space sheet could be read or written by anyone with its key. `src/lib/sheet-access.ts` (`mayUseSheet`, `mayUseFolder`) now guards every action in `src/actions/sheet-comments.ts` and the sheet-id actions in `src/actions/sheets.ts`, with the same rule as `ensureNodeWorkbook`.
-- [X] T061 FR-021: Currency and Accounting get the thousands-separator option in Format Cells, and `display()` in `src/lib/sheet-format.ts` honours `sep` for them.
-- [X] T062 *(Built, user 2026-11-23: a copy names each cell's comment address in the clipboard's HTML; Paste, Paste Special › All and › Comments copy the threads (with replies) onto the pasted cells, blank and linked sheets; `copyCellComments`.)* FR-041: Paste Special › Comments only is offered but greyed: copy the source cells' threads to the targets, or drop the option from the spec.
-- [X] T063 *(Built, user 2026-11-23: add, reply, edit, delete, resolve, reopen, Clear › Comments and comment paste are steps of the sheet's own undo stack (`CommentsChange`), replayed by `applyCommentOps`; research R6 superseded.)* FR-048: comment actions (add, reply, edit, delete, resolve, reopen, Clear › Comments) aren't on the undo stack (research R6 chose that; the spec says otherwise). Decide, then either add a comment kind to `src/lib/sheet-undo.ts` or amend FR-048.
-- [X] T064 *(Built, user 2026-11-23: number formats show on the Content, Video and task sheets (`withNumberFormats`), copy carries looks and shown text, and a paste there carries looks in the same undo step.)* FR-070: on the Content and Video sheets, number formats are saved but not shown (`ContentGrid.tsx`, `SheetGrid.tsx`, `TaskSheet.tsx` never call `display()`), and copy/paste drop cell styles (only `BlankSheet.tsx` sets `copyStyle`; `useLinkedEditing.ts` ignores `w.style`). Either show them or grey the number formats there.
-- [X] T065 *(Done 2026-11-23: `mergesAfter` in BlankSheet shrinks a merge to the rows or columns left, in the same undo step; one cell left ends the merge. Hidden edges still hide the merge.)* T017 follow-up: deleting or hiding a merge's edge row or column should shrink the merge; today it disappears (`BlankSheet.tsx`, merges have no equivalent of `tablesAfter`).
-- [X] T066 *(Done: both kinds in Settings; sheet mentions push by default like mentions. Email and recipients already went through `notifySheet` and the generic renderer.)* T028 follow-up: add `sheet_mention` and `sheet_reply` to `SETTINGS_ORDER` (`NotificationSettings.tsx`), `sheet_mention` to `URGENT` (`src/lib/notify/settings.ts`), and handle both in `email.ts` / `recipients.ts`.
-- [X] T067 Font size: the toolbar offers up to 96 pt (spec 018) but `validateStyle` caps at 72 (`src/lib/sheet-format.ts`); align them.
-
-Doc drift (no code change): T016, T023, T030–T032 and T050 name files that were folded into `FormatToolbar.tsx`, `comments/SheetComments.tsx` and `src/lib/sheet-rules.ts`; plan.md's "hidden linked rows/columns" in `sheets.view` isn't used (Hide and Freeze are off on linked sheets, with the reason shown).
-

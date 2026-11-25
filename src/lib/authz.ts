@@ -48,31 +48,11 @@ export async function requireAdmin(): Promise<Guard> {
   return { member }
 }
 
-/** Spec 024: admins and superusers — Space settings. */
-export async function requireLead(): Promise<Guard> {
-  const member = await getSessionMember()
-  if (!member) return { error: 'not_authenticated' }
-  if (member.access !== 'admin' && member.access !== 'superuser') return { error: 'not_authorized' }
-  return { member }
-}
-
 /** Admin or superuser — task creation. Mirrors the guard in TaskForm. */
 export async function requireTaskCreator(): Promise<Guard> {
   const member = await getSessionMember()
   if (!member) return { error: 'not_authenticated' }
   if (member.access === 'user') return { error: 'not_authorized' }
-  return { member }
-}
-
-/**
- * Spec 021 (research R10): who may create a task owned by `ownerId`.
- * Admins and superusers may create for anyone. A user may create tasks they
- * own themselves — never for someone else.
- */
-export async function requireTaskCreatorFor(ownerId: string | null | undefined): Promise<Guard> {
-  const member = await getSessionMember()
-  if (!member) return { error: 'not_authenticated' }
-  if (member.access === 'user' && ownerId && ownerId !== member.id) return { error: 'not_authorized' }
   return { member }
 }
 

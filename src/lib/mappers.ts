@@ -1,5 +1,3 @@
-import { resolveSettings } from '@/lib/space-settings'
-import { orderPillars } from '@/lib/content-rows'
 import type { Member, Brand, ContentType, Task, TaskComment, TaskAttachment, SLAConfig } from '@/types/index'
 
 function toDateStr(d: Date | string | null | undefined): string {
@@ -45,74 +43,12 @@ export function mapBrand(b: any): Brand {
     color:       b.color,
     logo_url:    b.logo_url    ?? undefined,
     description: b.description ?? undefined,
-    features:    (b.features && typeof b.features === 'object' ? b.features : {}) as import('@/types/index').BrandFeatures,
-    nine_stage_default: b.nine_stage_default ?? null,
-    short_name: b.short_name ?? null,
-    default_priority: b.default_priority ?? null,
   }
-}
-
-/** Spec 021: a team Space row. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapSpace(s: any): import('@/types/index').TeamSpace {
-  return {
-    id:            s.id,
-    key:           s.key,
-    name:          s.name,
-    color:         s.color,
-    is_production: !!s.is_production,
-    default_kind:  s.default_kind === 'simple' ? 'simple' : 'pipeline',
-    words:         (s.words && typeof s.words === 'object' ? s.words : {}) as Record<string, string[]>,
-    sort_order:    s.sort_order ?? 0,
-    archived_at:   s.archived_at ? toIsoStr(s.archived_at) : null,
-    default_assignee_role: s.default_assignee_role ?? null,
-    media_board:   s.media_board === 'design' || s.media_board === 'video' ? s.media_board : null,
-    // Spec 024: the stored settings over the Space's defaults.
-    settings:      resolveSettings(s.key, s.settings),
-  }
-}
-
-/** Spec 022: a Space stage row. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapSpaceStage(r: any): import('@/types/index').SpaceStage {
-  return { id: r.id, space_id: r.space_id, stage_id: r.stage_id, name: r.name ?? null, position: r.position ?? 0, aliases: Array.isArray(r.aliases) ? r.aliases : [] }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapContentType(ct: any): ContentType {
-  return {
-    id: ct.id, label: ct.label, media_boards: ct.media_boards,
-    name_ar: ct.name_ar ?? null, icon: ct.icon ?? 'doc', color: ct.color ?? '#6B7280',
-    default_priority: ct.default_priority ?? null, default_tag_ids: ct.default_tag_ids ?? [],
-    default_template_id: ct.default_template_id ?? null, position: ct.position ?? 0,
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapTaskField(f: any): import('@/types/index').TaskFieldDef {
-  const o = (f.options && typeof f.options === 'object' ? f.options : {}) as import('@/types/index').TaskFieldDef['options']
-  return { id: f.id, name_en: f.name_en, name_ar: f.name_ar ?? null, kind: f.kind, options: o, on_card: !!f.on_card, switchable: !!f.switchable, position: f.position ?? 0, retired: !!f.retired_at }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapTypeField(x: any): import('@/types/index').TaskTypeFieldLink {
-  return { type_label: x.type_label, field_id: x.field_id, required_from: x.required_from ?? null, default_value: x.default_value ?? null, position: x.position ?? 0 }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapTemplate(t: any): import('@/types/index').TaskTemplate {
-  const values = t.values && typeof t.values === 'object' && !Array.isArray(t.values) ? t.values : {}
-  return {
-    id: t.id, type_label: t.type_label, name: t.name, name_pattern: t.name_pattern, brief: t.brief ?? null,
-    values, subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-    updated_at: t.updated_at instanceof Date ? t.updated_at.toISOString() : String(t.updated_at ?? ''),
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapMilestone(m: any): import('@/types/index').Milestone {
-  const d = m.day instanceof Date ? m.day.toISOString().slice(0, 10) : String(m.day).slice(0, 10)
-  return { id: m.id, brand_id: m.brand_id, name: m.name, day: d }
+  return { id: ct.id, label: ct.label }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,24 +99,11 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     task_owner:         t.task_owner ? mapMember(t.task_owner) : undefined,
     assignee_id:        t.assignee_id ?? null,
     assignee:           t.assignee ? mapMember(t.assignee) : undefined,
-    // Spec 023 (R9): every assignee, the lead first; and hours set per person.
-    assignee_ids:       assigneeIds(t.assignee_id ?? null, t.assignees),
-    tag_ids:            (t.tags ?? []).map((x: { tag_id: string }) => x.tag_id) as string[],
-    assignee_hours:     Object.fromEntries((t.assignees ?? []).filter((r: { hours: number | null }) => r.hours != null).map((r: { member_id: string; hours: number }) => [r.member_id, r.hours])) as Record<string, number>,
     initiator_role:     t.initiator_role,
     nine_stage:         t.nine_stage,
     status:             t.status,
     stage_date:         toDateStr(t.stage_date),
     due_date:           t.due_date ? toDateStr(t.due_date) : null,
-    start_date:         t.start_date ? toDateStr(t.start_date) : null,
-    repeat_rule_id:     t.repeat_rule_id ?? null,
-    publish_date:       t.publish_date ? toDateStr(t.publish_date) : null,
-    due_manual:         t.due_manual === true,
-    media_board:        t.media_board === 'design' || t.media_board === 'video' ? t.media_board : null,
-    content_task_id:    t.content_task_id ?? null,
-    entry_stage:        t.entry_stage ?? 'todo',
-    auto_linked_at:     t.auto_linked_at ? toIsoStr(t.auto_linked_at) : null,
-    migrated_simple:    t.migrated_simple === true,
     hours_estimate:     Number(t.hours_estimate),
     cover_image_url:    t.cover_image_url ?? undefined,
     cover_thumb:        t.cover_thumb ?? undefined,
@@ -204,8 +127,6 @@ export function mapTask(t: any): Task & { brand?: Brand; task_owner?: Member; co
     published_url:      t.published_url ?? null,
     post_url:           t.post_url ?? null,
     pillar_id:          t.pillar_id ?? null,
-    kind:               t.kind === 'simple' ? 'simple' : 'pipeline',
-    simple_status:      t.simple_status ?? null,
     dropped_at:         t.dropped_at ? toIsoStr(t.dropped_at) : null,
     clip:               t.clip
       ? {
@@ -244,23 +165,9 @@ export function mapTheme(p: any): import('@/types/index').ContentTheme {
     frequency_count: p.frequency_count ?? null,
     frequency_period: p.frequency_period === 'week' || p.frequency_period === 'month' ? p.frequency_period : null,
     audience: (p.audience ?? []) as import('@/types/index').AudienceKey[],
-    // Sheet 2b: the sheet's own pillar order first, then the project's.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pillars: orderPillars((p.pillars ?? []).map((x: any) => ({ id: x.id, name: x.name, sort_order: x.sort_order })), p.pillar_order ?? []),
-    sheet_theme_id: p.sheet_theme_id ?? null,
-    position: typeof p.position === 'number' ? p.position : 0,
-    space_id: p.space_id ?? null,
-  }
-}
-
-/** Sheet 2b: a Content sheet row. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function mapContentRow(r: any): import('@/lib/content-rows').ContentRowRec {
-  const values = r.values && typeof r.values === 'object' && !Array.isArray(r.values) ? r.values as Record<string, string> : {}
-  return {
-    id: r.id, project_id: r.project_id, pillar_id: r.pillar_id ?? null, parent_id: r.parent_id ?? null, position: Number(r.position) || 0,
-    title: r.title ?? '', date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date ? String(r.date).slice(0, 10) : null,
-    values, task_id: r.task_id ?? null, created_by: r.created_by ?? null, space_id: r.space_id ?? null,
+    pillars: (p.pillars ?? []).map((x: any) => ({ id: x.id, name: x.name, sort_order: x.sort_order }))
+      .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order),
   }
 }
 
@@ -282,10 +189,4 @@ export function mapSheetColumn(c: any): import('@/types/index').SheetColumnRecor
     updatedByName: c.updater?.name ?? null,
     updatedAt:     (c.updated_at instanceof Date ? c.updated_at : new Date(c.updated_at)).toISOString(),
   }
-}
-
-/** Every assignee of a task: the lead (tasks.assignee_id) first, then the others by position. */
-export function assigneeIds(lead: string | null, rows: { member_id: string; position: number }[] | undefined): string[] {
-  const others = (rows ?? []).filter(r => r.member_id !== lead).sort((a, b) => a.position - b.position).map(r => r.member_id)
-  return lead ? [lead, ...others] : others
 }

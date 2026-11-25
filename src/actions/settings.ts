@@ -5,8 +5,6 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { requireAdmin, requireMember } from '@/lib/authz'
 import { cleanFillLists, type FillList } from '@/lib/sheet-fill'
-import { cleanRule, dayDate } from '@/lib/due-dates'
-import { tasksToRecalc } from '@/lib/due-dates-server'
 
 function revalidateAll() {
   revalidatePath('/settings')
@@ -197,7 +195,7 @@ export async function removeContentType(
 
   try {
     await prisma.contentType.delete({ where: { label } })
-    revalidatePath('/', 'layout'); revalidatePath('/settings')
+    revalidatePath('/settings')
     return { success: true }
   } catch (e: unknown) {
     return { success: false, error: String(e) }
@@ -379,52 +377,4 @@ export async function saveFillLists(lists: FillList[]): Promise<{ success: true;
   } catch (e: unknown) {
     return { success: false, error: String(e) }
   }
-}
-
-// ─── Due dates (Settings › Due Dates) ─────────────────────────────────────────
-
-type DueRuleInput = { daysBefore: number; weekend: number[]; shift: 'earlier' | 'later' }
-
-/** How many open, automatic due dates a rule would change (for the confirmation). */
-export async function previewDueRule(input: DueRuleInput): Promise<{ success: true; count: number } | { success: false; error: string }> {
-  const auth = await requireAdmin()
-  if (auth.error) return { success: false, error: auth.error }
-  const c = cleanRule(input)
-  if (!c.rule) return { success: false, error: c.error }
-  return { success: true, count: (await tasksToRecalc(c.rule)).length }
-}
-
-/**
- * Saves the rule, then moves every open, automatic due date to match it.
- * Hand-set due dates and published or done tasks are left alone.
- */
-export async function saveDueRule(input: DueRuleInput): Promise<{ success: true; updated: number } | { success: false; error: string }> {
-  const auth = await requireAdmin()
-  if (auth.error) return { success: false, error: auth.error }
-  const c = cleanRule(input)
-  if (!c.rule) return { success: false, error: c.error }
-  const rule = c.rule
-  await prisma.workspaceSettings.upsert({
-    where:  { id: 1 },
-    update: { due_days_before: rule.daysBefore, due_weekend_days: rule.weekend, due_weekend_shift: rule.shift, updated_at: new Date() },
-    create: { id: 1, capacity_hrs_per_wk: 40, nine_stage_default: false, due_days_before: rule.daysBefore, due_weekend_days: rule.weekend, due_weekend_shift: rule.shift },
-  })
-  const moves = await tasksToRecalc(rule)
-  for (const m of moves) await prisma.task.update({ where: { id: m.id }, data: { due_date: dayDate(m.due) } })
-  revalidatePath('/', 'layout')
-  return { success: true, updated: moves.length }
-}
-
-// ─── Media boards per content type (spec 022 R6) ──────────────────────────────
-
-/** Which media boards a task of this type is linked to at Ready For Design. Admins only. */
-export async function setContentTypeBoards(label: string, boards: string[]): Promise<{ success: boolean; error?: string }> {
-  const auth = await requireAdmin()
-  if (auth.error) return { success: false, error: auth.error }
-  const clean = [...new Set((boards ?? []).filter(b => b === 'design' || b === 'video'))]
-  if (!clean.length) return { success: false, error: 'invalid' }
-  const r = await prisma.contentType.updateMany({ where: { label }, data: { media_boards: clean } })
-  if (!r.count) return { success: false, error: 'not_found' }
-  revalidatePath('/settings')
-  return { success: true }
 }

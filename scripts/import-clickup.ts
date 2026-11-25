@@ -99,8 +99,7 @@ export const BRAND_PATTERNS: [RegExp, string][] = [
 ]
 
 /** ClickUp priority: 1 urgent, 2 high, 3 normal, 4 low. */
-// 'Normal' is what the app calls ClickUp's normal priority (it was 'Medium' before the priorities release).
-const PRIORITY: Record<string, string> = { '1': 'High', '2': 'High', '3': 'Normal', '4': 'Low' }
+const PRIORITY: Record<string, string> = { '1': 'High', '2': 'High', '3': 'Medium', '4': 'Low' }
 
 /** ClickUp's Attachments column is a JSON array of { title, url }. */
 export function parseAttachments(raw: string): { title: string; url: string }[] {
@@ -487,7 +486,7 @@ async function main() {
       stage_date:     stageDate,
       due_date:       dueDate,
       hours_estimate: 0,
-      priority:       PRIORITY[r['Priority']?.trim()] ?? 'Normal',
+      priority:       PRIORITY[r['Priority']?.trim()] ?? 'Medium',
       created_by:     admin.id,
     }
 

@@ -10,10 +10,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { focusBack, opener } from './a11y'
 
-export function Modal({ title, children, onCancel, attr, body, width, className, attrs }: {
+export function Modal({ title, children, onCancel, attr, body, className, attrs }: {
   title: string
-  /** A wider dialog than the default, in px (still full width on phones). */
-  width?: number
   children: ReactNode
   onCancel(): void
   attr?: string
@@ -49,7 +47,7 @@ export function Modal({ title, children, onCancel, attr, body, width, className,
   return (
     <div className="fx-sh-scrim" onPointerDown={e => { if (e.target === e.currentTarget) onCancel() }}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={body ? `${id}-b` : undefined}
-           className={`fx-sh-dialog${className ? ` ${className}` : ''}`} onKeyDown={onKeyDown} style={width ? { width: `min(${width}px, 100%)` } : undefined} {...(attr ? { [attr]: '' } : {})} {...(attrs ?? {})}>
+           className={`fx-sh-dialog${className ? ` ${className}` : ''}`} onKeyDown={onKeyDown} {...(attr ? { [attr]: '' } : {})} {...(attrs ?? {})}>
         <h2 id={`${id}-t`}>{title}</h2>
         {body && <p id={`${id}-b`}>{body}</p>}
         {children}

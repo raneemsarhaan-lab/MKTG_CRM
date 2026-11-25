@@ -25,16 +25,6 @@ export type TablesChange = { kind: 'tables'; before: SheetTableRecord[]; after: 
 export type ValidationsChange = { kind: 'validations'; before: ValidationRecord[]; after: ValidationRecord[] }
 /** Spec 020: comment threads that moved with their cells (a border drag), by row and column ids. */
 export type CommentMovesChange = { kind: 'commentMoves'; moves: { from: [string, string]; to: [string, string] }[] }
-/**
- * Spec 015 FR-048 (user, 2026-11-23: undo for comments): what a comment action
- * changed, so undo and redo can put it back — comments shown or removed (add,
- * reply, delete, clear, paste), a text edit, a thread resolved or reopened.
- */
-export type CommentOp =
-  | { op: 'live'; ids: string[]; before: boolean; after: boolean }
-  | { op: 'edit'; id: string; before: string; after: string }
-  | { op: 'resolve'; id: string; before: boolean; after: boolean }
-export type CommentsChange = { kind: 'comments'; ops: CommentOp[] }
 /** Spec 016: the sheet's column mapping before and after. */
 export type TaskMapChange = { kind: 'taskMap'; before: SheetTaskMap | null; after: SheetTaskMap | null }
 /** Spec 016: rows' tasks before and after (null = not linked). */
@@ -62,7 +52,6 @@ export type BlankChange =
   | TablesChange
   | ValidationsChange
   | CommentMovesChange
-  | CommentsChange
   | RowOrderChange
   | ColOrderChange
   | TaskMapChange
@@ -77,7 +66,6 @@ export type LinkedChange =
   | FormatsChange
   | ViewChange
   | RulesChange
-  | CommentsChange
 
 export type Change = BlankChange | LinkedChange
 
@@ -101,7 +89,6 @@ export function invert(ch: Change): Change {
     case 'tables': return { kind: 'tables', before: ch.after, after: ch.before }
     case 'validations': return { kind: 'validations', before: ch.after, after: ch.before }
     case 'commentMoves': return { kind: 'commentMoves', moves: [...ch.moves].reverse().map(m => ({ from: m.to, to: m.from })) }
-    case 'comments': return { kind: 'comments', ops: [...ch.ops].reverse().map(o => ({ ...o, before: o.after, after: o.before }) as CommentOp) }
     case 'rowOrder': return { kind: 'rowOrder', rows: ch.rows.map(x => ({ id: x.id, before: x.after, after: x.before })) }
     case 'colOrder': return { kind: 'colOrder', cols: ch.cols.map(x => ({ id: x.id, before: x.after, after: x.before })) }
     case 'taskMap': return { kind: 'taskMap', before: ch.after, after: ch.before }

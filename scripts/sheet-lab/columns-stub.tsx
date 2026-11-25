@@ -9,7 +9,7 @@
 import { useState } from 'react'
 import type { ChoiceOption, ColumnKind, Member, SheetColumnRecord, SheetId, SheetValues, Task } from '@/types/index'
 import {
-  builtInsFor, MAX_CUSTOM_COLUMNS, applyOp, builtInOf, checkName, cleanOptions, convertValues, isCustomKey, materialise,
+  BUILT_INS, MAX_CUSTOM_COLUMNS, applyOp, builtInOf, checkName, cleanOptions, convertValues, isCustomKey, materialise,
   normName, parseValue, type LayoutOp,
 } from '@/lib/sheet-columns'
 import type { ColumnsApi, ColumnsBundle } from '@/components/sheet/types'
@@ -48,7 +48,7 @@ export function useLabColumns(opts: {
   pasteWriter = { setValues, members: opts.members }
 
   const others = (sheet: SheetId, except?: string) => {
-    const keys = new Set([...builtInsFor(sheet).map(b => b.key), ...cur().filter(r => r.sheet === sheet).map(r => r.key)])
+    const keys = new Set([...BUILT_INS[sheet].map(b => b.key), ...cur().filter(r => r.sheet === sheet).map(r => r.key)])
     return [...keys].filter(k => k !== except).map(k => [cur().find(r => r.sheet === sheet && r.key === k)?.name ?? '', builtInOf(sheet, k)?.en ?? ''].filter(Boolean))
   }
   async function layout(sheet: SheetId, fn: string, op: LayoutOp, check?: () => string | null) {

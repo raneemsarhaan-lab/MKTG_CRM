@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useTranslations } from 'next-intl'
-import type { Brand, BrandFeatures } from '@/types/index'
-import { BrandFeaturesList } from '@/components/brands/BrandFeatures'
+import type { Brand } from '@/types/index'
 import { COLORS } from '@/lib/tokens'
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback'
 import { ImageUpload } from '@/components/shared/ImageUpload'
@@ -31,9 +29,6 @@ export type BrandWithAssets = Brand & { assets?: BrandAsset[] }
 
 interface Props {
   brands: BrandWithAssets[]
-  /** Spec 021 (US4): the workspace's default feature switches. */
-  defaults?: BrandFeatures
-  workspaceNineStage?: boolean
 }
 
 const input: React.CSSProperties = {
@@ -43,11 +38,10 @@ const input: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
-export function BrandSettings({ brands, defaults = {}, workspaceNineStage = false }: Props) {
+export function BrandSettings({ brands }: Props) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [error, setError]   = useState('')
-  const tf = useTranslations('spaces.features')
 
   return (
     <div>
@@ -74,8 +68,6 @@ export function BrandSettings({ brands, defaults = {}, workspaceNineStage = fals
             open={openId === b.id}
             onToggle={() => setOpenId(openId === b.id ? null : b.id)}
             onError={setError}
-            defaults={defaults}
-            workspaceNineStage={workspaceNineStage}
           />
         ))}
         {brands.length === 0 && (
@@ -95,20 +87,11 @@ export function BrandSettings({ brands, defaults = {}, workspaceNineStage = fals
       </button>
 
       {adding && <AddBrandModal onClose={() => setAdding(false)} />}
-
-      {/* Spec 021 (US4, FR-021): what every brand follows until it has its own switch. */}
-      <section data-brand-defaults style={{ marginTop: 26, maxWidth: 620, borderRadius: 16, border: '1px solid var(--line)', background: '#fff', padding: '14px 18px' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9rem' }}>{tf('defaultsTitle')}</h3>
-        <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 8px' }}>{tf('defaultsHelp')}</p>
-        <BrandFeaturesList defaults={defaults} />
-      </section>
     </div>
   )
 }
 
-function BrandRow({ brand: b, first, open, onToggle, onError, defaults, workspaceNineStage }: {
-  defaults: BrandFeatures
-  workspaceNineStage: boolean
+function BrandRow({ brand: b, first, open, onToggle, onError }: {
   brand:    BrandWithAssets
   first:    boolean
   open:     boolean
@@ -121,7 +104,6 @@ function BrandRow({ brand: b, first, open, onToggle, onError, defaults, workspac
   const [confirmDelete, setConfirm] = useState(false)
 
   const assets = b.assets ?? []
-  const tf = useTranslations('spaces.features')
 
   function patch(next: Parameters<typeof updateBrand>[1]) {
     onError('')
@@ -359,17 +341,6 @@ function BrandRow({ brand: b, first, open, onToggle, onError, defaults, workspac
                 Attach
               </button>
             </div>
-          </div>
-
-          {/* Spec 021 (US4): this brand's feature switches. */}
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={LABEL}>{tf('open')}</label>
-            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', margin: 0 }}>{tf('help')}</p>
-            <BrandFeaturesList
-              brand={{ id: b.id, name: b.name, own: b.features ?? {}, nine_stage_default: b.nine_stage_default ?? null }}
-              defaults={defaults}
-              workspaceNineStage={workspaceNineStage}
-            />
           </div>
         </div>
       )}

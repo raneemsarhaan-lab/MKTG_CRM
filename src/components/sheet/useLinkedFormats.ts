@@ -26,14 +26,14 @@ import { LinkedFormatsContext } from '@/components/sheets/format/context'
 import { formatKey, indexFormats, planBorders, planRect, resolveStyle, toCss, validateStyle, type FormatItem } from '@/lib/sheet-format'
 import { clearPatch, matches, nextMatch, paintPatch, replaceIn, transpose } from '@/lib/sheet-tools'
 import { pastePlan } from '@/lib/sheet-clipboard'
-import { announceFind, clearComments, pasteComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState } from '@/components/sheets/format/bus'
+import { announceFind, clearComments, useCommentBridge, useFormatBridge, type FormatCmd, type FormatState } from '@/components/sheets/format/bus'
 import type { ActiveCell, AreasNotice, CellWrite, GridCol, GridRect, WriteResult, WriteWhy } from './GridCore'
 import { unionCells } from '@/lib/sheet-selection'
 
 export interface LinkedFormatsInput<R extends { key: string }> {
   /** Off outside the Sheets workbook's linked tab and the Content page (no `linked` prop). */
   enabled: boolean
-  sheetKey: 'linked_content' | 'linked_video' | `tasks:${string}`
+  sheetKey: 'linked_content' | 'linked_video'
   rows: R[]
   cols: GridCol[]
   active: ActiveCell | null
@@ -188,20 +188,6 @@ export function useLinkedFormats<R extends { key: string }>(p: LinkedFormatsInpu
         const styles = cmd.styles ? (cmd.transpose ? transpose(cmd.styles, null) : cmd.styles) : null
         if (!grid.length) return
         const plan = pastePlan(grid, q), one = grid.length === 1 && grid[0].length === 1
-        // Spec 015 FR-041: the copied cells' comment threads (Comments, and All).
-        const keys = cmd.keys ? (cmd.transpose ? transpose(cmd.keys, null) : cmd.keys) : null
-        const carry = () => {
-          if (!keys) return 0
-          const out: { from: string; rowKey: string; colKey: string }[] = []
-          for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
-            const k = one ? keys[0]?.[0] : keys[r]?.[c], task = rk(q.r0 + r), col = p.cols[q.c0 + c]
-            if (k && task && col && col !== 'rowNo') out.push({ from: k, rowKey: task, colKey: String(col) })
-          }
-          if (out.length) pasteComments('linked', out)
-          return out.length
-        }
-        if (cmd.mode === 'comments') { if (!carry()) p.say(t2('noComments')); return }
-        if (cmd.mode === 'all') carry()
         if (cmd.mode !== 'formats') {
           const writes: CellWrite[] = []
           for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) writes.push({ r: q.r0 + r, c: q.c0 + c, value: plan.value(r, c) })

@@ -53,31 +53,19 @@ export function statusMenuItems(
   task: Task, me: Member,
   t: ReturnType<typeof useTranslations>, names: ReturnType<typeof useStageNames>,
   choose: (to: StageId) => void,
-  /** Spec 022 (US4): the linked Space's stages — its names, and the other steps of the current stage. */
-  space?: { api: import('@/components/spaces/useSpaceStages').SpaceStagesApi; stepLabel: string; pick(entry: import('@/lib/space-stages').SpaceStageEntry): void } | null,
-  /** Spec 022: a linked row moves only within its linked tasks' stages (Ready For Design to F-Check). */
-  only?: ((s: StageId) => boolean) | null,
 ): MenuItem[] {
-  const moves = allowedStages(task, me).filter(s => !only || only(s))
-  const steps = space ? space.api.entries.filter(e => e.stage_id === task.status && e.id !== space.api.of(task)?.id) : []
-  const stepItems: MenuItem[] = steps.map(e => ({
-    key: `step:${e.id}`, group: space!.stepLabel,
-    label: <StagePill stage={task.status as StageId} name={e.name} />, hint: names.real(task.status as StageId),
-    text: `${e.name} (${names.real(task.status as StageId)})`,
-    onSelect: () => space!.pick(e),
-  }))
-  if (!moves.length) return stepItems
+  const moves = allowedStages(task, me)
+  if (!moves.length) return []
   const next = nextOnPath(task)
   const i = (s: StageId) => ALL_STAGES.indexOf(s)
   const cur = i(task.status as StageId)
-  const nameOf = (s: StageId) => (space ? space.api.stageName(s) : names.video(s))
   const item = (s: StageId, group: string, tone?: 'next'): MenuItem => ({
     key: s, group, tone,
-    label: <StagePill stage={s} name={nameOf(s)} />, hint: names.real(s),
-    text: `${nameOf(s)} (${names.real(s)})`,
+    label: <StagePill stage={s} name={names.video(s)} />, hint: names.real(s),
+    text: `${names.video(s)} (${names.real(s)})`,
     onSelect: () => choose(s),
   })
-  const items: MenuItem[] = [...stepItems]
+  const items: MenuItem[] = []
   if (next && moves.includes(next)) items.push(item(next, t('menu.next'), 'next'))
   moves.filter(s => i(s) < cur).reverse().forEach(s => items.push(item(s, t('menu.backTo'))))
   moves.filter(s => i(s) > cur && s !== next).forEach(s => items.push(item(s, t('menu.skipTo'))))

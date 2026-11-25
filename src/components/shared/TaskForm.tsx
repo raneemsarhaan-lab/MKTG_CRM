@@ -1,11 +1,8 @@
 'use client'
-import { useLocale, useTranslations } from 'next-intl'
-import { cairoToday, calcDueDate, DEFAULT_RULE, formatDay, type DueRule } from '@/lib/due-dates'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Member, Brand, ContentType, BrandFeatureKey } from '@/types/index'
-import { featureOn } from '@/lib/brand-features'
+import type { Member, Brand, ContentType } from '@/types/index'
 import { createTask, createTasks } from '@/actions/tasks'
 import { useUIStore } from '@/store/useUIStore'
 import { ProjectPicker } from '@/components/shared/ProjectPicker'
@@ -13,11 +10,6 @@ import { BriefEditor } from '@/components/kanban/BriefEditor'
 import { FieldPill, PillOption, PillInput } from './FieldPill'
 import { shortDate } from '@/lib/myboard'
 import { looksLikeList, parsePastedList, MAX_PASTED } from '@/lib/paste-list'
-import { PRIORITIES, PRIORITY_COLOR, asPriority } from '@/lib/priorities'
-import type { Priority } from '@/types/index'
-import type { TaskTemplate } from '@/types/index'
-import { listTemplates } from '@/actions/templates'
-import { fillPattern } from '@/lib/templates'
 
 /** The blue + lime brand palette, local to this form — see TaskModal's `CU`. */
 const CU = {
@@ -56,20 +48,16 @@ interface TaskFormProps {
   brands:       Brand[]
   contentTypes: ContentType[]
   members:      Member[]
-  /** Spec 021 (FR-028): created from this Space. */
-  spaceId?:     string | null
-  /** Spec 021: the Spaces the creator could choose from when not created from one. */
-  spaceChoices?: { id: string; name: string }[]
-  /** Spec 021: each Space's default kind — a new task takes the stages of the Space it's created in. */
-  /** Spec 022 (R9): each Space's default assignee (member id), preselected for admins and superusers. */
-  spaceAssignees?: Record<string, string | null>
-  /** The due-date rule, for the due date shown while it's still automatic. */
-  dueRule?: DueRule
 }
 
 const PLATFORMS  = ['LinkedIn', 'Instagram', 'TikTok', 'Facebook', 'Twitter', 'YouTube', 'Email'] as const
+const PRIORITIES = ['High', 'Medium', 'Low'] as const
 
-
+const PRIORITY_COLOR: Record<string, string> = {
+  High:   '#D57D6F',
+  Medium: '#E0A23F',
+  Low:    '#7C8288',
+}
 
 /**
  * A brand's own mark.
@@ -104,11 +92,7 @@ function Icon({ d, strokeWidth = 2 }: { d: string; strokeWidth?: number }) {
   )
 }
 
-export function TaskForm({ currentUser, brands, contentTypes, members, spaceId = null, spaceChoices = [], spaceAssignees = {}, dueRule = DEFAULT_RULE }: TaskFormProps) {
-  const tDates = useTranslations('dates')
-  const tPri = useTranslations('priority')
-  const locale = useLocale()
-  const tViews = useTranslations('views')
+export function TaskForm({ currentUser, brands, contentTypes, members }: TaskFormProps) {
   const setShowTaskForm = useUIStore(s => s.setShowTaskForm)
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -125,7 +109,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   // (fresh initial content) after "Create and add another" clears the brief.
   const [descKey, setDescKey] = useState(0)
 
-  const today = cairoToday()
+  const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -135,44 +119,18 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
     // The owner is whoever raises the task — they are accountable for it.
     // The assignee starts as them too and is the thing intake actually picks.
     task_owner_id: currentUser.id,
-    // Spec 022 (R9): the Space's default assignee for admins and superusers; users take their own tasks.
-    assignee_id:   (currentUser.access !== 'user' && spaceId ? spaceAssignees[spaceId] : null) ?? currentUser.id,
-    // Publishing date first; the due date follows it until someone sets it by hand.
-    publish_date: '',
-    due_date: '',
-    due_touched: false,
+    assignee_id:   currentUser.id,
+    due_date: today,
     hours_estimate: 2,
-    // Spec 023 (T019): the type's default priority until someone picks one.
-    priority: (asPriority(contentTypes[0]?.default_priority) ?? 'Normal') as Priority,
-    priority_touched: false,
+    priority: 'Medium' as typeof PRIORITIES[number],
     project_id: '',
     project_name: '',
     cover_image_url: '',
   })
 
-  // Spec 021 (research R10): a user creates tasks for themselves — they own
-  // them and are the only assignee they can pick. The server checks the same.
-  const isUser = currentUser.access === 'user'
-  const assignable = isUser ? members.filter(m => m.id === currentUser.id) : members
-  const [showIn, setShowIn] = useState<string | null>(spaceId ?? spaceChoices?.[0]?.id ?? null)
-  // Spec 023 (US7): templates of the chosen type. undefined = the type's default; null = none.
-  const tTpl = useTranslations('templates')
-  const [templates, setTemplates] = useState<TaskTemplate[]>([])
-  const [tplChoice, setTplChoice] = useState<string | null | undefined>(undefined)
-  useEffect(() => { listTemplates().then(setTemplates).catch(() => null) }, [])
-  const typeTemplates = templates.filter(x => x.type_label === form.content_type_label)
-  const typeDefault = contentTypes.find(c => c.label === form.content_type_label)?.default_template_id ?? null
-  const activeTpl = tplChoice === null ? null : typeTemplates.find(x => x.id === (tplChoice ?? typeDefault)) ?? null
-  function pickTemplate(id: string | null) {
-    setTplChoice(id)
-    const tpl = templates.find(x => x.id === id)
-    if (!tpl) return
-    const brandName = brands.find(b => b.id === form.brand_id)?.name ?? ''
-    if (!form.name.trim()) patch('name', fillPattern(tpl.name_pattern, { brand: brandName, type: tpl.type_label, date: form.publish_date || null }))
-    if (typeof tpl.values.hours === 'number') patch('hours_estimate', tpl.values.hours)
-    const p = asPriority(tpl.values.priority)
-    if (p && !form.priority_touched) patch('priority', p)
-  }
+  // Mirrors requireTaskCreator() in the server action — the check that counts
+  // is the server one; this only avoids rendering a form that cannot submit.
+  if (currentUser.access === 'user') return null
 
   function patch<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(p => ({ ...p, [k]: v }))
@@ -207,16 +165,14 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
+        platform:           form.platform,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
-        publish_date:       form.publish_date || null,
-        due_date:           form.due_touched ? form.due_date || null : null,
+        due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
         priority:           form.priority,
         project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
-        space_id:           showIn,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create those tasks'); return }
       router.refresh()
@@ -236,18 +192,14 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
         description:        form.description || undefined,
         brand_id:           form.brand_id,
         content_type_label: form.content_type_label,
-        platform:           featureOn(brands.find(b => b.id === form.brand_id), 'platform') ? form.platform : undefined,
+        platform:           form.platform,
         task_owner_id:      form.task_owner_id,
         assignee_id:        form.assignee_id,
-        publish_date:       form.publish_date || null,
-        due_date:           form.due_touched ? form.due_date || null : null,
+        due_date:           form.due_date,
         hours_estimate:     form.hours_estimate,
-        // A template's priority wins until someone picks one by hand.
-        priority:           form.priority_touched || !activeTpl ? form.priority : undefined,
+        priority:           form.priority,
         project_id:         form.project_id || null,
         cover_image_url:    form.cover_image_url || undefined,
-        space_id:           showIn,
-        template_id:        tplChoice === null ? null : activeTpl?.id,
       })
       if (!result.success) { setError(result.error ?? 'Failed to create task'); return }
 
@@ -265,10 +217,6 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
   }
 
   const brand  = brands.find(b => b.id === form.brand_id)
-  // The due date as it will be saved: set by hand, or from the publishing date.
-  const shownDue = form.due_touched ? form.due_date : form.publish_date ? calcDueDate(form.publish_date, dueRule) : ''
-  // Spec 021 (US4): the chosen brand's switched-off fields aren't offered.
-  const on = (k: BrandFeatureKey) => featureOn(brand, k)
   const assignee = members.find(m => m.id === form.assignee_id)
   const close  = () => setShowTaskForm(false)
 
@@ -339,53 +287,27 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               ))}
             </FieldPill>
 
-            {on('type') && (
-              <FieldPill
-                label="Type"
-                value={form.content_type_label}
-                active
-                icon={
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                       strokeWidth="2" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
-                  </svg>
-                }
-              >
-                {closePill => contentTypes.map(c => (
-                  <PillOption
-                    key={c.id}
-                    selected={c.label === form.content_type_label}
-                    onClick={() => {
-                      patch('content_type_label', c.label)
-                      setTplChoice(undefined)
-                      const dflt = asPriority(c.default_priority)
-                      if (dflt && !form.priority_touched) patch('priority', dflt)
-                      closePill()
-                    }}
-                  >
-                    {c.label}
-                  </PillOption>
-                ))}
-              </FieldPill>
-            )}
-
-            {typeTemplates.length > 0 && (
-              <FieldPill
-                label={tTpl('template')}
-                value={activeTpl ? activeTpl.name : tTpl('noTemplate')}
-                active={!!activeTpl}
-                icon={<span aria-hidden="true" style={{ fontSize: 12 }}>❖</span>}
-              >
-                {closePill => [
-                  <PillOption key="none" selected={!activeTpl} onClick={() => { setTplChoice(null); closePill() }}>{tTpl('noTemplate')}</PillOption>,
-                  ...typeTemplates.map(x => (
-                    <PillOption key={x.id} selected={activeTpl?.id === x.id} onClick={() => { pickTemplate(x.id); closePill() }}>
-                      <span data-form-template={x.name}>{x.name}{x.id === typeDefault ? ` · ${tTpl('isDefault')}` : ''}</span>
-                    </PillOption>
-                  )),
-                ]}
-              </FieldPill>
-            )}
+            <FieldPill
+              label="Type"
+              value={form.content_type_label}
+              active
+              icon={
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+                </svg>
+              }
+            >
+              {closePill => contentTypes.map(c => (
+                <PillOption
+                  key={c.id}
+                  selected={c.label === form.content_type_label}
+                  onClick={() => { patch('content_type_label', c.label); closePill() }}
+                >
+                  {c.label}
+                </PillOption>
+              ))}
+            </FieldPill>
           </div>
 
           {/* ── Title ────────────────────────────────────────────────────── */}
@@ -445,7 +367,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
 
             <FieldPill label="Assignee" value={assignee?.name} active
                        icon={<Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8" />}>
-              {closePill => assignable.map(m => (
+              {closePill => members.map(m => (
                 <PillOption
                   key={m.id}
                   selected={m.id === form.assignee_id}
@@ -457,76 +379,42 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               ))}
             </FieldPill>
 
-            {/* Spec 021 (FR-028): which of the creator's Spaces it shows in, when not created from one. */}
-            {!spaceId && spaceChoices.length > 1 && (
-              <FieldPill label="Show in" value={spaceChoices.find(x => x.id === showIn)?.name} active
-                         icon={<Icon d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />}>
-                {closePill => spaceChoices.map(x => (
-                  <PillOption key={x.id} selected={x.id === showIn} onClick={() => { setShowIn(x.id); closePill() }}>{x.name}</PillOption>
-                ))}
-              </FieldPill>
-            )}
-
-            <FieldPill label={tDates('publish')} value={form.publish_date ? formatDay(form.publish_date, locale) : tDates('none')} active width={220}
+            <FieldPill label="Due date" value={shortDate(form.due_date)} active width={220}
                        icon={<Icon d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}>
               {closePill => (
                 <PillInput
                   type="date"
-                  value={form.publish_date}
-                  data-form-publish=""
-                  onChange={e => patch('publish_date', e.target.value)}
+                  value={form.due_date}
+                  min={today}
+                  onChange={e => patch('due_date', e.target.value)}
                   onBlur={closePill}
                 />
               )}
             </FieldPill>
 
-            {/* Worked out from the publishing date until set by hand (then ✎). */}
-            <FieldPill label={tDates('due')} value={shownDue ? `${formatDay(shownDue, locale)}${form.due_touched ? ' ✎' : ''}` : tDates('none')} active width={220}
-                       icon={<Icon d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />}>
-              {closePill => (
-                <>
-                  <PillInput
-                    type="date"
-                    value={shownDue}
-                    data-form-due=""
-                    onChange={e => setForm(f => ({ ...f, due_date: e.target.value, due_touched: true }))}
-                    onBlur={closePill}
-                  />
-                  {form.due_touched && (
-                    <button type="button" data-form-due-reset="" onClick={() => setForm(f => ({ ...f, due_date: '', due_touched: false }))}
-                            style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', color: CU.muted }}>
-                      {tDates('reset')}
-                    </button>
-                  )}
-                </>
-              )}
+            <FieldPill
+              label="Priority"
+              value={form.priority}
+              active
+              icon={<span aria-hidden="true" style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: PRIORITY_COLOR[form.priority], display: 'inline-block',
+              }} />}
+              width={180}
+            >
+              {closePill => PRIORITIES.map(p => (
+                <PillOption
+                  key={p}
+                  selected={p === form.priority}
+                  onClick={() => { patch('priority', p); closePill() }}
+                >
+                  <span aria-hidden="true" style={{
+                    width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[p],
+                  }} />
+                  {p}
+                </PillOption>
+              ))}
             </FieldPill>
-
-            {on('priorities') && (
-              <FieldPill
-                label="Priority"
-                value={tPri(form.priority)}
-                active
-                icon={<span aria-hidden="true" style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: PRIORITY_COLOR[form.priority], display: 'inline-block',
-                }} />}
-                width={180}
-              >
-                {closePill => PRIORITIES.map(p => (
-                  <PillOption
-                    key={p}
-                    selected={p === form.priority}
-                    onClick={() => { patch('priority', p); patch('priority_touched', true); closePill() }}
-                  >
-                    <span aria-hidden="true" style={{
-                      width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[p],
-                    }} />
-                    {tPri(p)}
-                  </PillOption>
-                ))}
-              </FieldPill>
-            )}
 
             {/* Overflow — secondary fields, ClickUp's "…" */}
             <button
@@ -566,19 +454,17 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
             ) : (
               <>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {on('platform') && (
-              <FieldPill label="Platform" value={form.platform} active width={190}>
-                {closePill => PLATFORMS.map(p => (
-                  <PillOption
-                    key={p}
-                    selected={p === form.platform}
-                    onClick={() => { patch('platform', p); closePill() }}
-                  >
-                    {tPri(p)}
-                  </PillOption>
-                ))}
-              </FieldPill>
-            )}
+            <FieldPill label="Platform" value={form.platform} active width={190}>
+              {closePill => PLATFORMS.map(p => (
+                <PillOption
+                  key={p}
+                  selected={p === form.platform}
+                  onClick={() => { patch('platform', p); closePill() }}
+                >
+                  {p}
+                </PillOption>
+              ))}
+            </FieldPill>
 
             {/* Project, where Campaign used to be. Campaign was free text that
                 grouped nothing — not one of the 316 tasks ever had a value in
@@ -616,23 +502,21 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
               )}
             </span>
 
-            {on('hours') && (
-              <FieldPill label="Estimate" value={`${form.hours_estimate}h`} active width={180}>
-                {closePill => (
-                  <PillInput
-                    type="number"
-                    min={0.5}
-                    max={200}
-                    step={0.5}
-                    value={form.hours_estimate}
-                    onChange={e => patch('hours_estimate', parseFloat(e.target.value) || 1)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); closePill() } }}
-                  />
-                )}
-              </FieldPill>
-            )}
+            <FieldPill label="Estimate" value={`${form.hours_estimate}h`} active width={180}>
+              {closePill => (
+                <PillInput
+                  type="number"
+                  min={0.5}
+                  max={200}
+                  step={0.5}
+                  value={form.hours_estimate}
+                  onChange={e => patch('hours_estimate', parseFloat(e.target.value) || 1)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); closePill() } }}
+                />
+              )}
+            </FieldPill>
                 </div>
-                {on('covers') && <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 12 }}>
                   <label style={{
                     display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
                     textTransform: 'uppercase', color: CU.muted, marginBottom: 6,
@@ -645,7 +529,7 @@ export function TaskForm({ currentUser, brands, contentTypes, members, spaceId =
                     placeholder="https://…"
                     onChange={e => patch('cover_image_url', e.target.value)}
                   />
-                </div>}
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowMore(false)}

@@ -13,8 +13,6 @@
  * browser.
  */
 import type { Prisma } from '@prisma/client'
-import { notifyRoles, stageRoles } from '@/lib/space-settings'
-import { homeSpaceOf } from '@/lib/space-settings-server'
 import { resolveRecipients, type NotifyEvent, type RFollower } from './recipients'
 import { groupKey, joins, merged } from './group'
 import { effective, mergeSettings, type KindSettings } from './settings'
@@ -42,24 +40,16 @@ async function settingsLoader(db: Tx, memberIds: string[]): Promise<(id: string)
 export async function notify(db: Tx, event: NotifyEvent, extra: NotifyExtra = {}): Promise<string[]> {
   const task = await db.task.findUnique({
     where: { id: event.taskId },
-    select: { id: true, name: true, status: true, nine_stage: true, kind: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true,
-      assignees: { select: { member_id: true, position: true } } },
+    select: { id: true, name: true, status: true, nine_stage: true, task_owner_id: true, assignee_id: true, created_by: true, dropped_at: true },
   })
   if (!task) return []
-  // Spec 023 (R9): every assignee hears what the lead hears.
-  const assignee_ids = [task.assignee_id, ...task.assignees.sort((a, b) => a.position - b.position).map(r => r.member_id)].filter((x): x is string => !!x)
   // Archived tasks are quiet (spec edge case), except the paste summary which is about new tasks.
   if (task.dropped_at && event.kind !== 'task_created_in_stage') return []
 
   const members = await db.member.findMany({ select: { id: true, role: true, access: true } })
   const followers: RFollower[] = await db.taskFollower.findMany({ where: { task_id: task.id }, select: { member_id: true, muted: true } })
   const settingsOf = await settingsLoader(db, members.map(m => m.id))
-  // Spec 024 (§7): the task's Space names who holds its stages and who else hears about it.
-  const home = await homeSpaceOf(task.id, db)
-  const roles = notifyRoles(home?.settings, event.kind, task.status)
-  const inSpace = home && roles.length ? new Set((await db.teamSpaceMember.findMany({ where: { space_id: home.id }, select: { member_id: true } })).map(r => r.member_id)) : null
-  const also = inSpace ? members.filter(m => roles.includes(m.role) && inSpace.has(m.id)).map(m => m.id) : []
-  const recipients = resolveRecipients(event, { task: { ...task, assignee_ids, stage_roles: stageRoles(home?.settings) }, members, followers, settingsOf, also })
+  const recipients = resolveRecipients(event, { task, members, followers, settingsOf })
   if (!recipients.length) return []
 
   const now = new Date()

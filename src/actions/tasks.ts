@@ -1,20 +1,8 @@
 'use server'
 
-import { datesFor, newTaskDates } from '@/lib/due-dates-server'
-import { applyTemplateExtras, loadTemplate } from '@/lib/templates-server'
-import { fillPattern } from '@/lib/templates'
-import { afterMove, mediaGate, moveThroughMedia, requiredGate, requiredRefusal } from '@/lib/media-server'
-import { withAssignees } from '@/lib/assignees-server'
-import { everyAssignee } from '@/lib/assignees'
-import { asPriority } from '@/lib/priorities'
-import { creationPlan, creationRefusal, homeSpaceOf, loadSpacesWithSettings, videoSpace } from '@/lib/space-settings-server'
-import { assigneeIds } from '@/lib/mappers'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { getSessionMember, requireTaskCreator, requireTaskCreatorFor } from '@/lib/authz'
-import { addAssigneeSpaces, addSpaces, changeAssigneeSpaces, handoffFor, loadSpaceContext, spacesOnCreate } from '@/lib/spaces-server'
-import { defaultAssigneeFor } from '@/lib/spaces'
-import { needsHandoff } from '@/lib/spaces'
+import { getSessionMember, requireTaskCreator } from '@/lib/authz'
 import { nextStageId, NINE_STAGE, EIGHT_STAGE } from '@/lib/stage-meta'
 import { STAGE_META } from '@/lib/stage-meta'
 import { MAX_PASTED } from '@/lib/paste-list'
@@ -28,7 +16,6 @@ import { pasteColumns, writePastedValues } from '@/lib/sheet-values'
 import { createComment } from '@/lib/comments'
 import { notify, follow, notifyAfter } from '@/lib/notify/notify'
 import type { StageId, MoveTaskResult } from '@/types/index'
-import type { Priority } from '@/types/index'
 
 /**
  * Who may act on a task.
@@ -38,12 +25,11 @@ import type { Priority } from '@/types/index'
  * admin or superuser overrides both.
  */
 function canAct(
-  task: { task_owner_id: string; assignee_id: string | null; assignee_ids?: string[] | null },
+  task: { task_owner_id: string; assignee_id: string | null },
   member: { id: string; access: string },
 ): boolean {
   return task.task_owner_id === member.id
     || task.assignee_id === member.id
-    || !!task.assignee_ids?.includes(member.id)
     || member.access === 'admin'
     || member.access === 'superuser'
 }
@@ -54,13 +40,9 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   const member = await getSessionMember()
   if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
 
-  const found = await prisma.task.findUnique({ where: { id: taskId } })
-  // Spec 023 (R9): any assignee holds a working stage.
-  const task = found ? await withAssignees(found) : null
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
-  // Spec 021 (US5): simple tasks never move through the pipeline (setSimpleStatus moves them).
-  if (task.kind === 'simple') return { success: false, shouldCelebrate: false, error: 'simple_task' }
   const nextStage = nextStageId(task.status as StageId, task.nine_stage)
   if (!nextStage) return { success: false, shouldCelebrate: false, error: 'terminal' }
   if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
@@ -68,26 +50,10 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
   // Own-stage check, shared with the board, the sheet and bulk moves
   // (src/lib/stage-moves.ts): a working stage belongs to the assignee or the
   // owner, a review stage to its role; admin and superuser may override.
-  const reqNext = await requiredGate(task, nextStage)
-  if (reqNext) return { success: false, shouldCelebrate: false, ...requiredRefusal(reqNext) }
-  const throughNext = await moveThroughMedia(task, nextStage, member)
-  if (throughNext) {
-    if (!throughNext.success) return { success: false, shouldCelebrate: false, error: throughNext.error }
-    revalidatePath('/board'); revalidatePath('/overview')
-    return { success: true, shouldCelebrate: false }
-  }
   const isOwnStage = holdsStage(task, member)
   if (!allowedStages(task, member).includes(nextStage)) {
     return { success: false, shouldCelebrate: false, error: 'not_authorized' }
   }
-
-  // Spec 022 (R2, R3): a content task waits for its media tasks; a linked media task past D-Check follows content.
-  const blockNext = await mediaGate(task, nextStage)
-  if (blockNext) return { success: false, shouldCelebrate: false, error: blockNext }
-
-  // Spec 022 (R5): a content task's first move into Ready For Design links it to media → the hand-off box.
-  const handoff = await handoffFor(task, nextStage)
-  if (handoff) return await autoHandoff(taskId, nextStage, handoff) ?? { success: false, shouldCelebrate: false, error: 'needs_handoff', target: nextStage, handoff }
 
   // An override advance is not the overrider's win — no celebration.
   const shouldCelebrate = isOwnStage
@@ -97,7 +63,6 @@ export async function moveTask(taskId: string): Promise<MoveTaskResult> {
     data:  { status: nextStage, stage_date: new Date(), updated_at: new Date() },
   })
   await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
-  await afterMove(task, member.id)
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -125,32 +90,15 @@ export async function setTaskStage(
   const member = await getSessionMember()
   if (!member) return { success: false, shouldCelebrate: false, error: 'not_authenticated' }
 
-  const found = await prisma.task.findUnique({ where: { id: taskId } })
-  // Spec 023 (R9): any assignee holds a working stage.
-  const task = found ? await withAssignees(found) : null
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
   if (!task) return { success: false, shouldCelebrate: false, error: 'not_found' }
 
-  if (task.kind === 'simple') return { success: false, shouldCelebrate: false, error: 'simple_task' }
   const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
   const fromIdx = path.indexOf(task.status as StageId)
   const toIdx   = path.indexOf(stageId)
   if (toIdx === -1) return { success: false, shouldCelebrate: false, error: 'stage_not_in_pipeline' }
   if (toIdx === fromIdx) return { success: true, shouldCelebrate: false }
   if (task.dropped_at) return { success: false, shouldCelebrate: false, error: 'dropped' }
-
-  // Spec 022 (user, 2026-11-23): a linked row's Status follows its linked tasks, so moving
-  // it moves them — with their own stage permissions, approvals and SLA.
-  // Spec 023 (FR-008): a field required by the target stage must be filled first.
-  if (toIdx > fromIdx) {
-    const req = await requiredGate(task, stageId)
-    if (req) return { success: false, shouldCelebrate: false, ...requiredRefusal(req) }
-  }
-  const through = await moveThroughMedia(task, stageId, member)
-  if (through) {
-    if (!through.success) return { success: false, shouldCelebrate: false, error: through.error, missing: 'missing' in through ? through.missing as string[] : undefined, missing_ar: 'missing_ar' in through ? through.missing_ar as string[] : undefined, requiredStage: 'requiredStage' in through ? through.requiredStage as StageId : undefined }
-    revalidatePath('/board'); revalidatePath('/overview'); revalidatePath('/', 'layout')
-    return { success: true, shouldCelebrate: false }
-  }
 
   // The shared rule (src/lib/stage-moves.ts): the sheet's status menu offers
   // exactly this list, so the two can never disagree (spec 008 SC-003).
@@ -159,18 +107,11 @@ export async function setTaskStage(
     return { success: false, shouldCelebrate: false, error: 'not_authorized' }
   }
 
-  const blockTo = await mediaGate(task, stageId)
-  if (blockTo) return { success: false, shouldCelebrate: false, error: blockTo }
-
-  const handoff = await handoffFor(task, stageId)
-  if (handoff) return await autoHandoff(taskId, stageId, handoff) ?? { success: false, shouldCelebrate: false, error: 'needs_handoff', target: stageId, handoff }
-
   await prisma.task.update({
     where: { id: taskId },
     data:  { status: stageId, stage_date: new Date(), updated_at: new Date() },
   })
   await notifyAfter(tx => notify(tx, { kind: 'task_moved_to_stage', actorId: member.id, taskId }))
-  await afterMove(task, member.id)
 
   revalidatePath('/board')
   revalidatePath('/overview')
@@ -262,15 +203,9 @@ export interface TaskPatch {
   task_owner_id?:      string
   /** Null hands the task back to nobody. */
   assignee_id?:        string | null
-  due_date?:           string | null   // ISO yyyy-mm-dd; null or '' clears it. Marks it set by hand.
-  /** The day the content goes live (yyyy-mm-dd, Cairo); null clears it. Moves an automatic due date. */
-  publish_date?:       string | null
-  /** "Reset to auto": forget the hand-set due date and work it out from the publishing date. */
-  due_reset?:          boolean
-  /** Spec 023 (US6): optional start date (yyyy-mm-dd); null clears it; refused after the due date. */
-  start_date?:         string | null
+  due_date?:           string | null   // ISO yyyy-mm-dd; null or '' clears it
   hours_estimate?:     number
-  priority?:           Priority
+  priority?:           'Low' | 'Medium' | 'High'
   cover_image_url?:    string
   /** Spec 012 (R11): members @mentioned in the description, by id. */
   description_mentions?: string[]
@@ -283,9 +218,8 @@ export async function updateTask(
   const member = await getSessionMember()
   if (!member) return { success: false, error: 'not_authenticated' }
 
-  const found = await prisma.task.findUnique({ where: { id: taskId } })
-  if (!found) return { success: false, error: 'not_found' }
-  const task = await withAssignees(found)
+  const task = await prisma.task.findUnique({ where: { id: taskId } })
+  if (!task) return { success: false, error: 'not_found' }
 
   if (!canAct(task, member)) return { success: false, error: 'not_authorized' }
 
@@ -306,16 +240,14 @@ export async function updateTask(
   if (patch.task_owner_id !== undefined)      data.task_owner_id      = patch.task_owner_id
   if (patch.assignee_id !== undefined)        data.assignee_id        = patch.assignee_id || null
   if (patch.cover_image_url !== undefined)    data.cover_image_url    = patch.cover_image_url.trim() || null
-  if (patch.priority !== undefined) {
-    const p = asPriority(patch.priority)
-    if (!p) return { success: false, error: 'invalid_priority' }
-    data.priority = p
-  }
+  if (patch.priority !== undefined)           data.priority           = patch.priority
 
-  // Publishing and due dates: a due date set here is set by hand; a new publishing date moves an automatic one.
-  const dates = await datesFor(task, patch)
-  if (typeof dates === 'string') return { success: false, error: dates }
-  Object.assign(data, dates)
+  if (patch.due_date === null || patch.due_date === '') data.due_date = null
+  else if (patch.due_date !== undefined) {
+    const d = new Date(patch.due_date)
+    if (Number.isNaN(d.getTime())) return { success: false, error: 'Invalid due date' }
+    data.due_date = d
+  }
   if (patch.hours_estimate !== undefined) {
     const h = Number(patch.hours_estimate)
     if (!Number.isFinite(h) || h < 0 || h > 999) return { success: false, error: 'Invalid estimate' }
@@ -335,14 +267,9 @@ export async function updateTask(
 
   // Spec 012: a new assignee hears about it and follows; new mentions too.
   const newAssignee = patch.assignee_id !== undefined && patch.assignee_id && patch.assignee_id !== task.assignee_id ? patch.assignee_id : null
-  // Spec 022 (US5): the task joins the new assignee's Spaces, and leaves the ones only the old assignee brought.
-  if (patch.assignee_id !== undefined && (patch.assignee_id || null) !== task.assignee_id) await changeAssigneeSpaces(prisma, task, task.assignee_id, patch.assignee_id || null, member.id)
-  // Spec 023 (D8): a task that becomes Urgent tells every assignee.
-  const becameUrgent = data.priority === 'Urgent' && task.priority !== 'Urgent'
-  if (newAssignee || newlyMentioned.length || becameUrgent) {
+  if (newAssignee || newlyMentioned.length) {
     await notifyAfter(async tx => {
       const ids: string[] = []
-      if (becameUrgent) ids.push(...await notify(tx, { kind: 'urgent', actorId: member.id, taskId, assigneeIds: everyAssignee({ assignee_id: (data.assignee_id as string | null | undefined) ?? task.assignee_id, assignee_ids: task.assignee_ids }) }))
       if (newAssignee) {
         await follow(tx, taskId, newAssignee, { clearMute: true })
         ids.push(...await notify(tx, { kind: 'assigned', actorId: member.id, taskId, assigneeId: newAssignee }))
@@ -410,8 +337,6 @@ export async function createSubtask(
       status:             'todo',
       stage_date:         new Date(),
       due_date:           parent.due_date,
-      publish_date:       parent.publish_date,
-      due_manual:         parent.due_manual,
       hours_estimate:     0,
       priority:           parent.priority,
       created_by:         member.id,
@@ -586,11 +511,6 @@ export async function addClips(
   if (video.content_type_label !== 'Video' || video.parent_task_id || video.dropped_at) {
     return { success: false, error: 'not_a_video' }
   }
-  // Spec 024 (§8): clips are made in the Video Space, at its "Starts at" stage, on the Video board.
-  const vSpace = await videoSpace()
-  if (vSpace && !vSpace.settings.child_rows) return { success: false, error: 'child_rows_off' }
-  const plan = creationPlan(vSpace ? { ...vSpace, media_board: 'video' } : { media_board: 'video', settings: (await import('@/lib/space-settings')).defaultSettings('video') })
-  const clipAssignee = vSpace ? await spaceDefaultAssignee(vSpace.id, await loadSpaceContext()) : null
 
   // Clean every row before touching the database.
   const clean = rows.map(r => {
@@ -643,19 +563,16 @@ export async function addClips(
             platform:           video.platform,
             project_id:         video.project_id,
             task_owner_id:      member.id,
-            assignee_id:        clipAssignee,
+            assignee_id:        null,
             initiator_role:     member.role,
             nine_stage:         video.nine_stage,
-            status:             plan.status,
-            entry_stage:        plan.entry_stage,
-            media_board:        plan.media_board,
+            status:             'todo',
             stage_date:         now,
             hours_estimate:     0,
-            priority:           asPriority(plan.default_priority) ?? 'Normal',
+            priority:           'Medium',
             created_by:         member.id,
           },
         })
-        if (vSpace) await tx.taskSpace.create({ data: { task_id: task.id, space_id: vSpace.id, added_via: 'created', added_by: member.id } })
         const clip = await tx.taskClip.create({
           data: {
             task_id:   task.id,
@@ -767,11 +684,7 @@ export async function dropTask(taskId: string): Promise<{ success: boolean; erro
   if (task.dropped_at) return { success: true, dropped_at: task.dropped_at.toISOString() }
 
   const at = new Date()
-  await prisma.$transaction([
-    prisma.task.update({ where: { id: taskId }, data: { dropped_at: at, updated_at: at } }),
-    // Spec 022 (T037): dropping a content task unlinks its media tasks; they stay on their boards.
-    prisma.task.updateMany({ where: { content_task_id: taskId }, data: { content_task_id: null, updated_at: at } }),
-  ])
+  await prisma.task.update({ where: { id: taskId }, data: { dropped_at: at, updated_at: at } })
   revalidatePath('/board')
   revalidatePath('/overview')
   revalidatePath('/capacity')
@@ -814,8 +727,6 @@ export interface BulkResult {
   success: boolean
   changed:  number
   refused:  number
-  /** Spec 021 (FR-030a): tasks skipped because they need the hand-off box. */
-  handoff?: number
   error?:   string
 }
 
@@ -839,31 +750,21 @@ export async function bulkUpdateTasks(
   if (!member) return { success: false, changed: 0, refused: 0, error: 'not_authenticated' }
   if (taskIds.length === 0) return { success: true, changed: 0, refused: 0 }
 
-  // Spec 023 (R9): with every assignee, so any of them holds a working stage.
-  const tasks = (await prisma.task.findMany({ where: { id: { in: taskIds } }, include: { assignees: { select: { member_id: true, position: true } } } }))
-    .map(t => ({ ...t, assignee_ids: assigneeIds(t.assignee_id, t.assignees) }))
+  const tasks = await prisma.task.findMany({ where: { id: { in: taskIds } } })
   const isAdmin = member.access === 'admin' || member.access === 'superuser'
 
-  let changed = 0, refused = 0, handoff = 0
-  const spaceCtx = await loadSpaceContext()
-  const shownRows = await prisma.taskSpace.findMany({ where: { task_id: { in: tasks.map(t => t.id) } }, select: { task_id: true, space_id: true } })
-  const shownOf = (id: string) => shownRows.filter(r => r.task_id === id).map(r => r.space_id)
+  let changed = 0, refused = 0
 
   for (const task of tasks) {
     const data: Record<string, unknown> = { updated_at: new Date() }
 
     if (patch.status !== undefined) {
       const path = task.nine_stage ? NINE_STAGE : EIGHT_STAGE
-      // Spec 021 (US5): a stage means nothing to a simple task; it is skipped, not changed.
-      if (task.kind === 'simple' || !path.includes(patch.status) || task.dropped_at) { refused++; continue }
+      if (!path.includes(patch.status) || task.dropped_at) { refused++; continue }
 
       // The same rule as a drag or the sheet's menu (src/lib/stage-moves.ts).
       if (patch.status !== task.status) {
         if (!allowedStages(task, member).includes(patch.status)) { refused++; continue }
-        // Spec 021 (FR-030a): a bulk move never opens a box — it skips the task and counts it.
-        if (needsHandoff(task, patch.status, shownOf(task.id), spaceCtx.spaces)) { handoff++; continue }
-        if (await mediaGate(task, patch.status)) { refused++; continue }
-        if (path.indexOf(patch.status) > path.indexOf(task.status as StageId) && await requiredGate(task, patch.status)) { refused++; continue }
         data.status = patch.status
         data.stage_date = new Date()
       }
@@ -879,19 +780,20 @@ export async function bulkUpdateTasks(
     if (patch.content_type_label !== undefined) data.content_type_label = patch.content_type_label || null
     if (patch.platform !== undefined)           data.platform           = patch.platform || null
     if (patch.project_id !== undefined)         data.project_id         = patch.project_id || null
-    if (patch.priority !== undefined) { const p = asPriority(patch.priority); if (!p) { refused++; continue } data.priority = p }
-    const dates = await datesFor(task, { due_date: patch.due_date, publish_date: patch.publish_date })
-    if (typeof dates === 'string') { refused++; continue }
-    Object.assign(data, dates)
+    if (patch.priority !== undefined)           data.priority           = patch.priority
+    if (patch.due_date === null || patch.due_date === '') data.due_date = null
+    else if (patch.due_date !== undefined) {
+      const d = new Date(patch.due_date)
+      if (Number.isNaN(d.getTime())) { refused++; continue }
+      data.due_date = d
+    }
 
     if (Object.keys(data).length === 1) continue   // nothing but updated_at
     await prisma.task.update({ where: { id: task.id }, data })
-    if (data.status !== undefined) await afterMove(task, member.id)
     changed++
     // Spec 012: each task's move and new assignee, as if done one by one.
     const moved = data.status !== undefined
     const assignee = data.assignee_id && data.assignee_id !== task.assignee_id ? data.assignee_id as string : null
-    if (assignee) await changeAssigneeSpaces(prisma, task, task.assignee_id, assignee, member.id, spaceCtx)
     if (moved || assignee) {
       await notifyAfter(async tx => {
         const ids: string[] = []
@@ -908,8 +810,7 @@ export async function bulkUpdateTasks(
   revalidatePath('/board')
   revalidatePath('/overview')
   revalidatePath('/capacity')
-  revalidatePath('/', 'layout')
-  return { success: true, changed, refused, handoff }
+  return { success: true, changed, refused }
 }
 
 /**
@@ -969,129 +870,46 @@ interface CreateTaskInput {
   task_owner_id:      string
   /** Who will do it. Defaults to the owner when not given. */
   assignee_id?:       string | null
-  /** Spec 021 (Link task): a task made from a Task link may have no due date yet. Given here, it's set by hand. */
-  due_date?:          string | null
-  /** Spec 023 (US6): an optional start date (from a template); dropped when after the due date. */
-  start_date?:        string | null
-  /** The day it goes live; with no due date given, the due date is worked out from it. */
-  publish_date?:      string | null
+  due_date:           string
   platform?:          string
   project_id?:        string | null
   hours_estimate?:    number
-  priority?:          Priority
+  priority?:          'Low' | 'Medium' | 'High'
   cover_image_url?:   string
-  /** Spec 021 (FR-028): the Space it was created from. */
-  space_id?:          string | null
-  /** Spec 023 (US7): a template to fill it from; null = none (not even the type's default). */
-  template_id?:       string | null
-}
-
-/**
- * Spec 021 (research R10): a user may create a task only for themselves —
- * they own it, and it is assigned to them or to nobody.
- */
-function userMayCreate(member: { id: string; access: string }, owner: string, assignee: string | null | undefined): boolean {
-  if (member.access !== 'user') return true
-  return owner === member.id && (!assignee || assignee === member.id)
-}
-
-/**
- * Spec 024 (§6): a Space set to hand off without asking — the task goes to the
- * boards its type needs, each with the receiving Space's default assignee.
- * Null when the Space asks for a person (the hand-off box opens).
- */
-async function autoHandoff(taskId: string, target: StageId, handoff: { spaceIds: string[] }): Promise<MoveTaskResult | null> {
-  const home = await homeSpaceOf(taskId)
-  if (home?.settings.linking.handoff !== 'default' || !handoff.spaceIds.length) return null
-  const { handOff } = await import('@/actions/task-spaces')
-  return handOff(taskId, { target, links: handoff.spaceIds.map(spaceId => ({ spaceId, assigneeId: null })) })
-}
-
-/** Spec 022 (R9): the member who gets a new task made in this Space, or null. */
-async function spaceDefaultAssignee(spaceId: string | null | undefined, ctx: Awaited<ReturnType<typeof loadSpaceContext>>): Promise<string | null> {
-  if (!spaceId) return null
-  const space = await prisma.teamSpace.findUnique({ where: { id: spaceId }, select: { id: true, default_assignee_role: true } })
-  if (!space?.default_assignee_role) return null
-  const members = await prisma.member.findMany({ where: { role: space.default_assignee_role }, select: { id: true, name: true, role: true } })
-  return defaultAssigneeFor(space, members, ctx.members[spaceId] ?? [])
-}
-
-/** Spec 025: the brand's default priority for new tasks, when it sets one. */
-async function brandPriority(brandId: string | null | undefined): Promise<Priority | null> {
-  if (!brandId) return null
-  return asPriority((await prisma.brand.findUnique({ where: { id: brandId }, select: { default_priority: true } }))?.default_priority)
-}
-
-/** "With C-Check" for a new task: the brand's default first (R11), else the workspace's. */
-async function nineStageFor(brandId: string | null | undefined): Promise<boolean> {
-  const [brand, ws] = await Promise.all([
-    brandId ? prisma.brand.findUnique({ where: { id: brandId }, select: { nine_stage_default: true } }) : null,
-    prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
-  ])
-  return brand?.nine_stage_default ?? ws?.nine_stage_default ?? false
 }
 
 export async function createTask(
   input: CreateTaskInput,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  const auth = await requireTaskCreatorFor(input.task_owner_id)
+  const auth = await requireTaskCreator()
   if (auth.error) return { success: false, error: auth.error }
   const member = auth.member
-  if (!userMayCreate(member, input.task_owner_id, input.assignee_id)) return { success: false, error: 'not_authorized' }
 
-  const nineStage = await nineStageFor(input.brand_id)
-  // Spec 021 (approved design): the task takes the stages of the Space it is created in.
-  const spaceCtx = await loadSpaceContext()
-  // Spec 022: every task is a pipeline task.
-  const kind = 'pipeline' as const
-  // Spec 022 (R9): no assignee given → the Space's default assignee role (users keep their own tasks).
-  const assignee = input.assignee_id !== undefined ? input.assignee_id
-    : member.access === 'user' ? null
-    : await spaceDefaultAssignee(input.space_id, spaceCtx)
+  // Fetch workspace default for nine_stage
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+  const nineStage = ws?.nine_stage_default ?? false
 
-  // Spec 024 (§2–§3): a task made in a Space starts at its "Starts at" stage (a Design or Video
-  // board: an unlinked media task there), takes its default type and priority, and only the
-  // Space's creators may make it, with a type the Space allows.
-  const inSpace = input.space_id ? (await loadSpacesWithSettings()).find(s => s.id === input.space_id) : undefined
-  if (input.space_id && !inSpace) return { success: false, error: 'not_found' }
-  const plan = creationPlan(inSpace)
-  if (inSpace) {
-    if (!input.content_type_label && plan.default_type) input = { ...input, content_type_label: plan.default_type }
-    const refusal = await creationRefusal(inSpace, member, input.content_type_label)
-    if (refusal) return { success: false, error: refusal }
-  }
-  const media = { status: plan.status, entry_stage: plan.entry_stage, ...(plan.media_board ? { media_board: plan.media_board } : {}) }
-
-  const typeRow = input.content_type_label ? await prisma.contentType.findUnique({ where: { label: input.content_type_label }, select: { default_priority: true, default_tag_ids: true, default_template_id: true } }) : null
-  // Spec 023 (US7, T019): the template asked for, else the type's default one.
-  const tpl = input.template_id === null ? null : await loadTemplate(input.template_id ?? typeRow?.default_template_id)
-  const useTpl = tpl && tpl.type_label === input.content_type_label ? tpl : null
   const task = await prisma.task.create({
     data: {
-      kind,
       name:               input.name,
-      description:        input.description?.trim() || useTpl?.brief?.trim() || null,
+      description:        input.description?.trim() || null,
       brand_id:           input.brand_id || null,
       content_type_label: input.content_type_label || null,
       platform:           input.platform   ?? null,
       project_id:         input.project_id ?? null,
       task_owner_id:      input.task_owner_id,
-      assignee_id:        assignee ?? input.task_owner_id,
+      assignee_id:        input.assignee_id ?? input.task_owner_id,
       initiator_role:     member.role,
       nine_stage:         nineStage,
+      status:             'todo',
       stage_date:         new Date(),
-      ...(await newTaskDates(input.publish_date, input.due_date, input.start_date)),
-      hours_estimate:     input.hours_estimate ?? (Number(useTpl?.values.hours) || 0),
-      // Spec 023 (T019): the template's or the type's default priority when none was chosen.
-      priority:           input.priority ?? asPriority(useTpl?.values.priority) ?? asPriority(plan.default_priority) ?? await brandPriority(input.brand_id) ?? asPriority(typeRow?.default_priority) ?? 'Normal',
+      due_date:           new Date(input.due_date),
+      hours_estimate:     input.hours_estimate ?? 0,
+      priority:           input.priority ?? 'Medium',
       cover_image_url:    input.cover_image_url ?? null,
       created_by:         member.id,
-      ...media,
     },
   })
-  // Spec 021 (FR-028, FR-029): the Space it was created from (or the creator's), then the assignee's.
-  await addSpaces(prisma, task.id, spacesOnCreate(member.id, kind, input.space_id, spaceCtx), 'created', member.id)
-  await addAssigneeSpaces(prisma, task, task.assignee_id, member.id, spaceCtx)
   // Spec 012: the people on it follow; the stage's holders and a new assignee hear about it.
   await notifyAfter(async tx => {
     for (const id of new Set([member.id, task.task_owner_id, task.assignee_id].filter((x): x is string => !!x))) await follow(tx, task.id, id)
@@ -1102,17 +920,7 @@ export async function createTask(
     return ids
   })
 
-  // Spec 023 (T054): the type's default tags.
-  if (typeRow?.default_tag_ids?.length) await prisma.taskTag.createMany({ data: typeRow.default_tag_ids.map(tag_id => ({ task_id: task.id, tag_id })), skipDuplicates: true }).catch(() => null)
-  // Spec 023 (US7): the template's field values, tags and subtasks.
-  if (useTpl) {
-    const brandName = input.brand_id ? (await prisma.brand.findUnique({ where: { id: input.brand_id }, select: { name: true } }))?.name ?? '' : ''
-    const publish = input.publish_date?.slice(0, 10) ?? null
-    await applyTemplateExtras(task.id, useTpl, member.id, x => fillPattern(x, { brand: brandName, type: input.content_type_label, date: publish }))
-  }
-
   revalidatePath('/board')
-  revalidatePath('/', 'layout')
   return { success: true, id: task.id }
 }
 
@@ -1122,21 +930,18 @@ export async function createTask(
  * ready for clips.
  */
 export async function addVideo(name: string): Promise<{ success: boolean; id?: string; error?: string }> {
-  // Spec 021 (R10): a user may add a video they own.
-  const auth = await requireTaskCreatorFor(null)
+  const auth = await requireTaskCreator()
   if (auth.error) return { success: false, error: auth.error }
   const member = auth.member
   const n = (typeof name === 'string' ? name : '').replace(/\s+/g, ' ').trim().slice(0, 200)
   if (!n) return { success: false, error: 'no_name' }
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
   const task = await prisma.task.create({
     data: {
       name: n, content_type_label: 'Video', task_owner_id: member.id, assignee_id: member.id, initiator_role: member.role,
-      nine_stage: await nineStageFor(null), status: 'todo', stage_date: new Date(), priority: 'Normal', created_by: member.id,
+      nine_stage: ws?.nine_stage_default ?? false, status: 'todo', stage_date: new Date(), priority: 'Medium', created_by: member.id,
     },
   })
-  const spaceCtx = await loadSpaceContext()
-  await addSpaces(prisma, task.id, spacesOnCreate(member.id, 'pipeline', null, spaceCtx), 'created', member.id)
-  await addAssigneeSpaces(prisma, task, member.id, member.id, spaceCtx)
   await notifyAfter(async tx => {
     await follow(tx, task.id, member.id)
     return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: task.id })
@@ -1160,21 +965,10 @@ export async function createTasks(
   names: string[],
   shared: Omit<CreateTaskInput, 'name'>,
 ): Promise<{ success: boolean; created?: number; error?: string }> {
-  const auth = await requireTaskCreatorFor(shared.task_owner_id)
+  const auth = await requireTaskCreator()
   if (auth.error) return { success: false, error: auth.error }
   const member = auth.member
-  if (!userMayCreate(member, shared.task_owner_id, shared.assignee_id)) return { success: false, error: 'not_authorized' }
 
-  // Spec 024 (§2–§3): the same Space rules as one task.
-  const inSpace = shared.space_id ? (await loadSpacesWithSettings()).find(s => s.id === shared.space_id) : undefined
-  if (shared.space_id && !inSpace) return { success: false, error: 'not_found' }
-  const plan = creationPlan(inSpace)
-  if (inSpace) {
-    if (!shared.content_type_label && plan.default_type) shared = { ...shared, content_type_label: plan.default_type }
-    const refusal = await creationRefusal(inSpace, member, shared.content_type_label)
-    if (refusal) return { success: false, error: refusal }
-  }
-  const typeRow = shared.content_type_label ? await prisma.contentType.findUnique({ where: { label: shared.content_type_label }, select: { default_priority: true } }) : null
   const clean = names.map(n => n.trim()).filter(Boolean)
   if (!clean.length) return { success: false, error: 'Nothing to create' }
   if (clean.length > MAX_PASTED) {
@@ -1182,21 +976,16 @@ export async function createTasks(
   }
   if (!shared.brand_id) return { success: false, error: 'Select a brand' }
 
-  const nineStage = await nineStageFor(shared.brand_id)
+  const ws = await prisma.workspaceSettings.findUnique({ where: { id: 1 } })
+  const nineStage = ws?.nine_stage_default ?? false
   const now = new Date()
-  const shareDates = await newTaskDates(shared.publish_date, shared.due_date)
-  const brandDefault = await brandPriority(shared.brand_id)
-  const spaceCtx = await loadSpaceContext()
-  const kind = 'pipeline' as const
-  // Spec 024: no assignee chosen → the Space's default assignee role, as for one task.
-  const assignee = shared.assignee_id ?? (member.access === 'user' ? null : await spaceDefaultAssignee(shared.space_id, spaceCtx)) ?? shared.task_owner_id
+  const due = new Date(shared.due_date)
 
   try {
     const ids = clean.map(() => crypto.randomUUID())
     const result = await prisma.task.createMany({
       data: clean.map((name, i) => ({
         id: ids[i],
-        kind,
         name,
         description:        shared.description?.trim() || null,
         brand_id:           shared.brand_id,
@@ -1204,31 +993,22 @@ export async function createTasks(
         platform:           shared.platform ?? null,
         project_id:         shared.project_id ?? null,
         task_owner_id:      shared.task_owner_id,
-        assignee_id:        assignee,
+        assignee_id:        shared.assignee_id ?? shared.task_owner_id,
         initiator_role:     member.role,
         nine_stage:         nineStage,
-        status:             plan.status,
-        entry_stage:        plan.entry_stage,
-        media_board:        plan.media_board,
+        status:             'todo',
         stage_date:         now,
-        ...shareDates,
+        due_date:           due,
         hours_estimate:     shared.hours_estimate ?? 0,
-        priority:           shared.priority ?? asPriority(plan.default_priority) ?? brandDefault ?? asPriority(typeRow?.default_priority) ?? 'Normal',
+        priority:           shared.priority ?? 'Medium',
         cover_image_url:    shared.cover_image_url ?? null,
         created_by:         member.id,
       })),
     })
 
-    // Spec 021 (FR-028, FR-029): each new task's starting Spaces.
-    const startIds = spacesOnCreate(member.id, kind, shared.space_id, spaceCtx)
-    for (const id of ids) {
-      await addSpaces(prisma, id, startIds, 'created', member.id)
-      await addAssigneeSpaces(prisma, { id, kind, media_board: plan.media_board }, assignee, member.id, spaceCtx)
-    }
-
     // Spec 012: a pasted list is one notification per stage holder, not one per task.
     await notifyAfter(async tx => {
-      const people = [...new Set([member.id, shared.task_owner_id, assignee].filter((x): x is string => !!x))]
+      const people = [...new Set([member.id, shared.task_owner_id, shared.assignee_id ?? shared.task_owner_id].filter((x): x is string => !!x))]
       await tx.taskFollower.createMany({ data: ids.flatMap(t => people.map(m => ({ task_id: t, member_id: m }))), skipDuplicates: true })
       return notify(tx, { kind: 'task_created_in_stage', actorId: member.id, taskId: ids[0], pasteId: `list:${ids[0]}`, pasteCount: ids.length })
     })
@@ -1455,4 +1235,3 @@ export async function loadAttachments(taskId: string): Promise<{
     uploaded_by: r.uploaded_by, uploaded_at: r.uploaded_at.toISOString(),
   }))
 }
-
